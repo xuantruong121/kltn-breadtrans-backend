@@ -91,7 +91,9 @@ __decorate([
     (0, common_1.Post)(':courseId/classes'),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, swagger_1.ApiOperation)({ summary: 'Tạo lớp học mới cho khóa học (TEACHER tự gán mình vào lớp)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Tạo lớp học mới cho khóa học (TEACHER tự gán mình vào lớp)',
+    }),
     __param(0, (0, common_1.Param)('courseId', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.Request)()),

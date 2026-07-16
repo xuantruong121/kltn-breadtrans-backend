@@ -4,8 +4,8 @@ export declare class UserService {
     constructor(prisma: PrismaService);
     getUserProfile(userId: number): Promise<{
         profile: {
-            fullName: string;
             id: number;
+            fullName: string;
             avatar: string | null;
             phone: string | null;
             address: string | null;
@@ -13,9 +13,9 @@ export declare class UserService {
             userId: number;
         } | null;
         email: string;
-        id: number;
-        role: import("@prisma/client").$Enums.Role;
+        role: import(".prisma/client").$Enums.Role;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
     }>;
 }

@@ -18,7 +18,7 @@ exports.QuizModule = QuizModule = __decorate([
     (0, common_1.Module)({
         imports: [ai_module_1.AiModule],
         providers: [quiz_service_1.QuizService],
-        controllers: [quiz_controller_1.QuizController]
+        controllers: [quiz_controller_1.QuizController],
     })
 ], QuizModule);
 //# sourceMappingURL=quiz.module.js.map

@@ -27,9 +27,9 @@ let GamificationService = class GamificationService {
                         id: true,
                         email: true,
                         profile: true,
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
     }
     async getMyBadges(userId) {
@@ -37,7 +37,7 @@ let GamificationService = class GamificationService {
             where: { userId },
             include: {
                 badge: true,
-            }
+            },
         });
     }
 };

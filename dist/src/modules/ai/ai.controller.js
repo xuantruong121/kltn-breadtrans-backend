@@ -23,7 +23,9 @@ class ChatDto {
 }
 exports.ChatDto = ChatDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'Can you explain the difference between present perfect and past simple?' }),
+    (0, swagger_1.ApiProperty)({
+        example: 'Can you explain the difference between present perfect and past simple?',
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)

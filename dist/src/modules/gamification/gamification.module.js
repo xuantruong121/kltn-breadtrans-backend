@@ -17,7 +17,7 @@ exports.GamificationModule = GamificationModule;
 exports.GamificationModule = GamificationModule = __decorate([
     (0, common_1.Module)({
         providers: [gamification_service_1.GamificationService, gamification_listener_1.GamificationListener],
-        controllers: [gamification_controller_1.GamificationController]
+        controllers: [gamification_controller_1.GamificationController],
     })
 ], GamificationModule);
 //# sourceMappingURL=gamification.module.js.map

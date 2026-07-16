@@ -4,16 +4,16 @@ export declare class GamificationController {
     constructor(gamificationService: GamificationService);
     getLeaderboard(): Promise<({
         user: {
+            email: string;
             profile: {
-                fullName: string;
                 id: number;
+                fullName: string;
                 avatar: string | null;
                 phone: string | null;
                 address: string | null;
                 targetScore: string | null;
                 userId: number;
             } | null;
-            email: string;
             id: number;
         };
     } & {
@@ -24,11 +24,11 @@ export declare class GamificationController {
     })[]>;
     getMyBadges(req: any): Promise<({
         badge: {
-            description: string;
             id: number;
             name: string;
+            description: string;
             iconUrl: string | null;
-            criteria: import("@prisma/client/runtime/client").JsonValue;
+            criteria: import("@prisma/client/runtime/library").JsonValue;
         };
     } & {
         id: number;

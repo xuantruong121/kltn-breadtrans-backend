@@ -1,6 +1,19 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { QuizService } from './quiz.service';
-import { CreateQuizDto, CreateQuestionDto, SubmitQuizDto } from './dto/quiz.dto';
+import {
+  CreateQuizDto,
+  CreateQuestionDto,
+  SubmitQuizDto,
+} from './dto/quiz.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';

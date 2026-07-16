@@ -16,7 +16,6 @@ jest.mock('bcrypt', () => ({
 describe('AuthService', () => {
   let service: AuthService;
   let mockCtx: MockContext;
-  let jwtService: JwtService;
 
   beforeEach(async () => {
     mockCtx = createMockContext();
@@ -37,21 +36,27 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    jwtService = module.get<JwtService>(JwtService);
   });
 
   describe('register', () => {
     it('should throw ConflictException if user already exists', async () => {
-      mockCtx.prisma.user.findUnique.mockResolvedValue({ id: 1, email: 'test@example.com' } as any);
+      mockCtx.prisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        email: 'test@example.com',
+      } as any);
 
       await expect(
-        service.register({ email: 'test@example.com', password: '123', fullName: 'Test' }),
+        service.register({
+          email: 'test@example.com',
+          password: '123',
+          fullName: 'Test',
+        }),
       ).rejects.toThrow(ConflictException);
     });
 
     it('should create a new user successfully', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(null);
-      
+
       const hashedPassword = 'hashedPassword';
       // bcrypt functions are already mocked at module level
 
@@ -65,8 +70,12 @@ describe('AuthService', () => {
 
       mockCtx.prisma.user.create.mockResolvedValue(mockCreatedUser as any);
 
-      const result = await service.register({ email: 'test@example.com', password: '123', fullName: 'Test User' });
-      
+      const result = await service.register({
+        email: 'test@example.com',
+        password: '123',
+        fullName: 'Test User',
+      });
+
       expect(result).not.toHaveProperty('password');
       expect(result.email).toEqual('test@example.com');
       expect(mockCtx.prisma.user.create).toHaveBeenCalled();
@@ -78,7 +87,7 @@ describe('AuthService', () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.login({ email: 'invalid@example.com', password: '123' })
+        service.login({ email: 'invalid@example.com', password: '123' }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -92,7 +101,7 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
 
       await expect(
-        service.login({ email: 'test@example.com', password: 'wrong' })
+        service.login({ email: 'test@example.com', password: 'wrong' }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -106,7 +115,10 @@ describe('AuthService', () => {
 
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
 
-      const result = await service.login({ email: 'test@example.com', password: '123' });
+      const result = await service.login({
+        email: 'test@example.com',
+        password: '123',
+      });
 
       expect(result).toHaveProperty('access_token', 'mock-jwt-token');
       expect(result.user).toHaveProperty('email', 'test@example.com');

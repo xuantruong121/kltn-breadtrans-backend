@@ -10,7 +10,9 @@ export class GamificationListener {
 
   @OnEvent('quiz.submitted')
   async handleQuizSubmittedEvent(payload: { userId: number; score: number }) {
-    this.logger.log(`Handling quiz.submitted event for user ${payload.userId} with score ${payload.score}`);
+    this.logger.log(
+      `Handling quiz.submitted event for user ${payload.userId} with score ${payload.score}`,
+    );
 
     try {
       // Tính điểm thưởng (ví dụ: mỗi điểm số bài thi tương đương 10 points)
@@ -23,7 +25,7 @@ export class GamificationListener {
             userId: payload.userId,
             points: pointsEarned,
             reason: 'Hoàn thành bài thi (Quiz)',
-          }
+          },
         });
 
         // 2. Cập nhật bảng xếp hạng
@@ -37,27 +39,37 @@ export class GamificationListener {
         // Trong thực tế, criteria nên được truy vấn từ DB để so sánh logic động.
         // Dưới đây là mã cứng demo:
         const firstBadge = await this.prisma.badge.findFirst({
-          where: { name: 'Thợ săn điểm số' }
+          where: { name: 'Thợ săn điểm số' },
         });
 
         // Giả sử có huy hiệu này và user có điểm >= 100
         if (firstBadge && leaderboard.totalPoints >= 100) {
-            const userBadgeExists = await this.prisma.userBadge.findUnique({
-                where: { userId_badgeId: { userId: payload.userId, badgeId: firstBadge.id } }
+          const userBadgeExists = await this.prisma.userBadge.findUnique({
+            where: {
+              userId_badgeId: {
+                userId: payload.userId,
+                badgeId: firstBadge.id,
+              },
+            },
+          });
+          if (!userBadgeExists) {
+            await this.prisma.userBadge.create({
+              data: {
+                userId: payload.userId,
+                badgeId: firstBadge.id,
+              },
             });
-            if (!userBadgeExists) {
-                await this.prisma.userBadge.create({
-                    data: {
-                        userId: payload.userId,
-                        badgeId: firstBadge.id,
-                    }
-                });
-                this.logger.log(`Awarded badge ${firstBadge.name} to user ${payload.userId}`);
-            }
+            this.logger.log(
+              `Awarded badge ${firstBadge.name} to user ${payload.userId}`,
+            );
+          }
         }
       }
     } catch (error) {
-      this.logger.error(`Failed to handle gamification for user ${payload.userId}`, error);
+      this.logger.error(
+        `Failed to handle gamification for user ${payload.userId}`,
+        error,
+      );
     }
   }
 }

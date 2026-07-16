@@ -11,15 +11,20 @@ export class AiService {
     this.genAI = new GoogleGenerativeAI(apiKey);
   }
 
-  async generateFeedback(question: string, studentAnswer: string): Promise<string> {
+  async generateFeedback(
+    question: string,
+    studentAnswer: string,
+  ): Promise<string> {
     try {
       if (process.env.GEMINI_API_KEY === undefined) {
         this.logger.warn('GEMINI_API_KEY is not set. Returning mock feedback.');
         return `[Mock AI Feedback] This is a mock feedback for answer: "${studentAnswer}". Please set GEMINI_API_KEY to use real AI.`;
       }
 
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash',
+      });
+
       const prompt = `You are a professional English teacher grading a student's writing assignment.
 Question: "${question}"
 Student's Answer: "${studentAnswer}"
@@ -46,9 +51,11 @@ Please keep the response concise but informative.`;
         return `[Mock AI Chat] I received your message: "${prompt}". Please set GEMINI_API_KEY.`;
       }
 
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash',
+      });
       const fullPrompt = `You are an AI teaching assistant for an online English learning platform. Answer the student's question helpfully: "${prompt}"`;
-      
+
       const result = await model.generateContent(fullPrompt);
       return result.response.text();
     } catch (error) {

@@ -1,11 +1,19 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { AiService } from './ai.service';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiProperty } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiProperty,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IsString, IsNotEmpty } from 'class-validator';
 
 export class ChatDto {
-  @ApiProperty({ example: 'Can you explain the difference between present perfect and past simple?' })
+  @ApiProperty({
+    example:
+      'Can you explain the difference between present perfect and past simple?',
+  })
   @IsString()
   @IsNotEmpty()
   prompt: string;

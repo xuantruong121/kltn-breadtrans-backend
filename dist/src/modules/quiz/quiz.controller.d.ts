@@ -4,43 +4,43 @@ export declare class QuizController {
     private readonly quizService;
     constructor(quizService: QuizService);
     createQuiz(dto: CreateQuizDto): Promise<{
-        type: import("@prisma/client").$Enums.QuizType;
-        description: string | null;
-        title: string;
-        id: number;
         createdAt: Date;
+        id: number;
+        description: string | null;
+        type: import(".prisma/client").$Enums.QuizType;
+        title: string;
         courseId: number | null;
         timeLimit: number | null;
     }>;
     getQuizById(id: number): Promise<{
         questions: {
-            type: string;
             id: number;
-            content: import("@prisma/client/runtime/client").JsonValue;
+            type: string;
             order: number;
+            content: import("@prisma/client/runtime/library").JsonValue;
             quizId: number;
         }[];
     } & {
-        type: import("@prisma/client").$Enums.QuizType;
-        description: string | null;
-        title: string;
-        id: number;
         createdAt: Date;
+        id: number;
+        description: string | null;
+        type: import(".prisma/client").$Enums.QuizType;
+        title: string;
         courseId: number | null;
         timeLimit: number | null;
     }>;
     createQuestion(quizId: number, dto: CreateQuestionDto): Promise<{
-        type: string;
         id: number;
-        content: import("@prisma/client/runtime/client").JsonValue;
+        type: string;
         order: number;
+        content: import("@prisma/client/runtime/library").JsonValue;
         quizId: number;
     }>;
     submitQuiz(quizId: number, dto: SubmitQuizDto, req: any): Promise<{
         results: {
             id: number;
             questionId: number;
-            answer: import("@prisma/client/runtime/client").JsonValue;
+            answer: import("@prisma/client/runtime/library").JsonValue;
             isCorrect: boolean | null;
             score: number | null;
             submissionId: number;

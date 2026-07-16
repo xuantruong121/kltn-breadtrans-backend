@@ -47,10 +47,9 @@ let QuizService = class QuizService {
         const quiz = await this.getQuizById(quizId);
         let totalScore = 0;
         const resultsData = await Promise.all(dto.answers.map(async (ans) => {
-            const question = quiz.questions.find(q => q.id === ans.questionId);
+            const question = quiz.questions.find((q) => q.id === ans.questionId);
             let isCorrect = false;
             let score = 0;
-            let aiFeedbackForQuestion = null;
             if (question) {
                 if (question.type === 'MULTIPLE_CHOICE') {
                     const content = question.content;
@@ -62,7 +61,7 @@ let QuizService = class QuizService {
                 }
                 else if (question.type === 'WRITING') {
                     const content = question.content;
-                    aiFeedbackForQuestion = await this.aiService.generateFeedback(content.text || 'Write an essay.', ans.answer);
+                    await this.aiService.generateFeedback(content.text || 'Write an essay.', ans.answer);
                 }
             }
             return {
@@ -74,7 +73,7 @@ let QuizService = class QuizService {
         }));
         let overallAiFeedback = '';
         for (const ans of dto.answers) {
-            const question = quiz.questions.find(q => q.id === ans.questionId);
+            const question = quiz.questions.find((q) => q.id === ans.questionId);
             if (question && question.type === 'WRITING') {
                 const content = question.content;
                 const feedback = await this.aiService.generateFeedback(content.text, ans.answer);
@@ -98,7 +97,7 @@ let QuizService = class QuizService {
         this.eventEmitter.emit('quiz.submitted', {
             userId,
             score: totalScore,
-            submissionId: submission.id
+            submissionId: submission.id,
         });
         return submission;
     }

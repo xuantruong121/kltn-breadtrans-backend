@@ -25,7 +25,13 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             event_emitter_1.EventEmitterModule.forRoot(),
-            auth_module_1.AuthModule, user_module_1.UserModule, course_module_1.CourseModule, quiz_module_1.QuizModule, ai_module_1.AiModule, gamification_module_1.GamificationModule, prisma_module_1.PrismaModule
+            auth_module_1.AuthModule,
+            user_module_1.UserModule,
+            course_module_1.CourseModule,
+            quiz_module_1.QuizModule,
+            ai_module_1.AiModule,
+            gamification_module_1.GamificationModule,
+            prisma_module_1.PrismaModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

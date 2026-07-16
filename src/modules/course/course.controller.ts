@@ -1,6 +1,21 @@
-import { Controller, Get, Post, Body, Param, Delete, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { CourseService } from './course.service';
-import { CreateCourseDto, CreateClassDto, CreateLessonDto, CreateMaterialDto } from './dto/course.dto';
+import {
+  CreateCourseDto,
+  CreateClassDto,
+  CreateLessonDto,
+  CreateMaterialDto,
+} from './dto/course.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -42,11 +57,13 @@ export class CourseController {
   }
 
   // --- Classes ---
-  
+
   @Post(':courseId/classes')
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Tạo lớp học mới cho khóa học (TEACHER tự gán mình vào lớp)' })
+  @ApiOperation({
+    summary: 'Tạo lớp học mới cho khóa học (TEACHER tự gán mình vào lớp)',
+  })
   createClass(
     @Param('courseId', ParseIntPipe) courseId: number,
     @Body() dto: CreateClassDto,

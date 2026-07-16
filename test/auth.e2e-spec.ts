@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 
@@ -24,7 +23,7 @@ describe('AuthModule (e2e)', () => {
   afterAll(async () => {
     // Dọn dẹp dữ liệu test để không ảnh hưởng lần chạy sau
     await prisma.user.deleteMany({
-      where: { email: 'test_e2e@breadtrans.com' }
+      where: { email: 'test_e2e@breadtrans.com' },
     });
     await app.close();
   });

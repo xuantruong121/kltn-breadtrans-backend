@@ -59,7 +59,9 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Get)('profile'),
-    (0, swagger_1.ApiOperation)({ summary: 'Lấy thông tin tài khoản đang đăng nhập (Test JWT)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Lấy thông tin tài khoản đang đăng nhập (Test JWT)',
+    }),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

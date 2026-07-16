@@ -15,9 +15,9 @@ export class GamificationService {
             id: true,
             email: true,
             profile: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
   }
 
@@ -26,7 +26,7 @@ export class GamificationService {
       where: { userId },
       include: {
         badge: true,
-      }
+      },
     });
   }
 }

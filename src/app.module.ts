@@ -13,7 +13,14 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
-    AuthModule, UserModule, CourseModule, QuizModule, AiModule, GamificationModule, PrismaModule],
+    AuthModule,
+    UserModule,
+    CourseModule,
+    QuizModule,
+    AiModule,
+    GamificationModule,
+    PrismaModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

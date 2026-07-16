@@ -30,7 +30,7 @@ let GamificationListener = GamificationListener_1 = class GamificationListener {
                         userId: payload.userId,
                         points: pointsEarned,
                         reason: 'Hoàn thành bài thi (Quiz)',
-                    }
+                    },
                 });
                 const leaderboard = await this.prisma.leaderboard.upsert({
                     where: { userId: payload.userId },
@@ -38,18 +38,23 @@ let GamificationListener = GamificationListener_1 = class GamificationListener {
                     create: { userId: payload.userId, totalPoints: pointsEarned },
                 });
                 const firstBadge = await this.prisma.badge.findFirst({
-                    where: { name: 'Thợ săn điểm số' }
+                    where: { name: 'Thợ săn điểm số' },
                 });
                 if (firstBadge && leaderboard.totalPoints >= 100) {
                     const userBadgeExists = await this.prisma.userBadge.findUnique({
-                        where: { userId_badgeId: { userId: payload.userId, badgeId: firstBadge.id } }
+                        where: {
+                            userId_badgeId: {
+                                userId: payload.userId,
+                                badgeId: firstBadge.id,
+                            },
+                        },
                     });
                     if (!userBadgeExists) {
                         await this.prisma.userBadge.create({
                             data: {
                                 userId: payload.userId,
                                 badgeId: firstBadge.id,
-                            }
+                            },
                         });
                         this.logger.log(`Awarded badge ${firstBadge.name} to user ${payload.userId}`);
                     }

@@ -4,11 +4,11 @@ export declare class CourseService {
     private prisma;
     constructor(prisma: PrismaService);
     createCourse(dto: CreateCourseDto): Promise<{
-        description: string | null;
-        title: string;
-        id: number;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        description: string | null;
+        title: string;
         thumbnail: string | null;
         price: number | null;
     }>;
@@ -23,27 +23,27 @@ export declare class CourseService {
             teacherId: number;
         }[];
     } & {
-        description: string | null;
-        title: string;
-        id: number;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        description: string | null;
+        title: string;
         thumbnail: string | null;
         price: number | null;
     })[]>;
     getCourseById(id: number): Promise<{
         classes: ({
             teacher: {
+                email: string;
                 profile: {
-                    fullName: string;
                     id: number;
+                    fullName: string;
                     avatar: string | null;
                     phone: string | null;
                     address: string | null;
                     targetScore: string | null;
                     userId: number;
                 } | null;
-                email: string;
                 id: number;
             };
         } & {
@@ -56,29 +56,29 @@ export declare class CourseService {
             teacherId: number;
         })[];
         quizzes: {
-            type: import("@prisma/client").$Enums.QuizType;
-            description: string | null;
-            title: string;
-            id: number;
             createdAt: Date;
+            id: number;
+            description: string | null;
+            type: import(".prisma/client").$Enums.QuizType;
+            title: string;
             courseId: number | null;
             timeLimit: number | null;
         }[];
     } & {
-        description: string | null;
-        title: string;
-        id: number;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        description: string | null;
+        title: string;
         thumbnail: string | null;
         price: number | null;
     }>;
     deleteCourse(id: number): Promise<{
-        description: string | null;
-        title: string;
-        id: number;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        description: string | null;
+        title: string;
         thumbnail: string | null;
         price: number | null;
     }>;
@@ -93,31 +93,31 @@ export declare class CourseService {
     }>;
     getClassById(classId: number): Promise<{
         teacher: {
+            email: string;
             profile: {
-                fullName: string;
                 id: number;
+                fullName: string;
                 avatar: string | null;
                 phone: string | null;
                 address: string | null;
                 targetScore: string | null;
                 userId: number;
             } | null;
-            email: string;
             id: number;
         };
         lessons: ({
             materials: {
-                title: string;
                 id: number;
+                title: string;
                 fileUrl: string;
                 fileType: string | null;
                 lessonId: number;
             }[];
         } & {
+            createdAt: Date;
+            id: number;
             description: string | null;
             title: string;
-            id: number;
-            createdAt: Date;
             order: number;
             videoUrl: string | null;
             classId: number;
@@ -141,17 +141,17 @@ export declare class CourseService {
         teacherId: number;
     }>;
     createLesson(classId: number, dto: CreateLessonDto): Promise<{
+        createdAt: Date;
+        id: number;
         description: string | null;
         title: string;
-        id: number;
-        createdAt: Date;
         order: number;
         videoUrl: string | null;
         classId: number;
     }>;
     createMaterial(lessonId: number, dto: CreateMaterialDto): Promise<{
-        title: string;
         id: number;
+        title: string;
         fileUrl: string;
         fileType: string | null;
         lessonId: number;

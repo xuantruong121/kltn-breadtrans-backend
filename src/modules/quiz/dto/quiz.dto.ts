@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsNumber, IsNotEmpty, IsEnum, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsNotEmpty,
+  IsEnum,
+  IsArray,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { QuizType } from '@prisma/client';
 
@@ -35,7 +42,9 @@ export class CreateQuestionDto {
   @IsNotEmpty()
   type: string;
 
-  @ApiProperty({ example: { text: 'What is 1+1?', options: ['1', '2', '3'], correct: '2' } })
+  @ApiProperty({
+    example: { text: 'What is 1+1?', options: ['1', '2', '3'], correct: '2' },
+  })
   @IsNotEmpty()
   content: any; // JSONB
 

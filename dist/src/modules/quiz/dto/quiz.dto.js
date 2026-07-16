@@ -64,7 +64,9 @@ __decorate([
     __metadata("design:type", String)
 ], CreateQuestionDto.prototype, "type", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: { text: 'What is 1+1?', options: ['1', '2', '3'], correct: '2' } }),
+    (0, swagger_1.ApiProperty)({
+        example: { text: 'What is 1+1?', options: ['1', '2', '3'], correct: '2' },
+    }),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", Object)
 ], CreateQuestionDto.prototype, "content", void 0);
