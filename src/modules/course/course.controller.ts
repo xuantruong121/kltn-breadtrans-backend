@@ -25,6 +25,7 @@ import { Role } from '@prisma/client';
 @ApiTags('courses')
 @Controller('courses')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class CourseController {
   constructor(private readonly courseService: CourseService) {}
 

@@ -135,6 +135,7 @@ exports.CourseController = CourseController = __decorate([
     (0, swagger_1.ApiTags)('courses'),
     (0, common_1.Controller)('courses'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, swagger_1.ApiBearerAuth)(),
     __metadata("design:paramtypes", [course_service_1.CourseService])
 ], CourseController);
 //# sourceMappingURL=course.controller.js.map

@@ -45,7 +45,9 @@ export class QuizService {
 
     const resultsData = await Promise.all(
       dto.answers.map(async (ans) => {
-        const question = quiz.questions.find((q: any) => q.id === ans.questionId);
+        const question = quiz.questions.find(
+          (q: any) => q.id === ans.questionId,
+        );
         let isCorrect = false;
         let score = 0;
 

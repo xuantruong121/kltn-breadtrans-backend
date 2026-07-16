@@ -23,6 +23,7 @@ import { Role } from '@prisma/client';
 @ApiTags('quizzes')
 @Controller('quizzes')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class QuizController {
   constructor(private readonly quizService: QuizService) {}
 
