@@ -85,6 +85,7 @@ exports.QuizController = QuizController = __decorate([
     (0, swagger_1.ApiTags)('quizzes'),
     (0, common_1.Controller)('quizzes'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, swagger_1.ApiBearerAuth)(),
     __metadata("design:paramtypes", [quiz_service_1.QuizService])
 ], QuizController);
 //# sourceMappingURL=quiz.controller.js.map
