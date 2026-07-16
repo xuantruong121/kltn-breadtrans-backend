@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile         Profile?
+  enrollments     Enrollment[]
+  teachingClasses Class[]        @relation("TeacherClasses")
+  submissions     Submission[]
+  pointHistory    PointHistory[]
+  userBadges      UserBadge[]
+  leaderboard     Leaderboard?
+}
+
+model Profile {
+  id          Int     @id @default(autoincrement())
+  userId      Int     @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName    String
+  avatar      String?
+  phone       String?
+  address     String?
+  targetScore String? // e.g., "IELTS 7.0", "TOEIC 800"
+}
+
+model Course {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  thumbnail   String?
+  price       Float?   @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  classes Class[]
+  quizzes Quiz[]
+}
+
+model Class {
+  id          Int       @id @default(autoincrement())
+  courseId    Int
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacherId   Int
+  teacher     User      @relation("TeacherClasses", fields: [teacherId], references: [id])
+  name        String
+  startDate   DateTime?
+  endDate     DateTime?
+  meetingLink String? // Google Meet/Zoom link
+
+  enrollments Enrollment[]
+  lessons     Lesson[]
+}
+
+model Enrollment {
+  id       Int      @id @default(autoincrement())
+  userId   Int
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classId  Int
+  class    Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+  progress Float    @default(0) // Percentage 0-100
+
+  @@unique([userId, classId])
+}
+
+model Lesson {
+  id          Int      @id @default(autoincrement())
+  classId     Int
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  order       Int      @default(0)
+  videoUrl    String?
+  createdAt   DateTime @default(now())
+
+  materials Material[]
+}
+
+model Material {
+  id       Int     @id @default(autoincrement())
+  lessonId Int
+  lesson   Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title    String
+  fileUrl  String
+  fileType String? // PDF, DOCX, MP3, vv.
+}
+
+enum QuizType {
+  IELTS
+  TOEIC
+  VSTEP
+  GENERAL
+}
+
+model Quiz {
+  id          Int      @id @default(autoincrement())
+  courseId    Int?
+  course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  type        QuizType @default(GENERAL)
+  timeLimit   Int? // In minutes
+  createdAt   DateTime @default(now())
+
+  questions   Question[]
+  submissions Submission[]
+}
+
+model Question {
+  id      Int    @id @default(autoincrement())
+  quizId  Int
+  quiz    Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  type    String // MULTIPLE_CHOICE, FILL_IN_BLANK, WRITING, SPEAKING
+  content Json // Flexible structure for different question types (JSONB)
+  order   Int    @default(0)
+}
+
+model Submission {
+  id          Int      @id @default(autoincrement())
+  quizId      Int
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score       Float?
+  submittedAt DateTime @default(now())
+  aiFeedback  String?  @db.Text
+
+  results Result[]
+}
+
+model Result {
+  id           Int        @id @default(autoincrement())
+  submissionId Int
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  questionId   Int
+  answer       Json // User's answer
+  isCorrect    Boolean?
+  score        Float?
+}
+
+// Gamification Models
+model Leaderboard {
+  id          Int  @id @default(autoincrement())
+  userId      Int  @unique
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalPoints Int  @default(0)
+  rank        Int?
+}
+
+model Badge {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String
+  iconUrl     String?
+  criteria    Json // vd: { type: "POINTS", threshold: 1000 }
+
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId   Int
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  awardedAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+}
+
+model PointHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    Int
+  reason    String // vd: "Completed Quiz", "Daily Login"
+  createdAt DateTime @default(now())
+}
