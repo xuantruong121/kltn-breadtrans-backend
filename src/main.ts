@@ -40,6 +40,10 @@ async function bootstrap() {
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, documentFactory);
 
-  await app.listen(process.env.PORT ?? 3000);
+  // Bật CORS để cho phép Frontend gọi API từ bất kỳ nguồn nào
+  app.enableCors();
+
+  // Bỏ chặn IP nội bộ (Lắng nghe trên 0.0.0.0 để chung mạng LAN kết nối được)
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 bootstrap();
