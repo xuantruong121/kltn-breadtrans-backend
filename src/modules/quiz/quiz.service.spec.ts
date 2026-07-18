@@ -27,7 +27,6 @@ const mockEventEmitter = {
 describe('QuizService', () => {
   let service: QuizService;
   let prisma: PrismaService;
-  let ai: AiService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -41,7 +40,6 @@ describe('QuizService', () => {
 
     service = module.get<QuizService>(QuizService);
     prisma = module.get<PrismaService>(PrismaService);
-    ai = module.get<AiService>(AiService);
   });
 
   afterEach(() => {
@@ -58,7 +56,7 @@ describe('QuizService', () => {
       mockPrismaService.quiz.findUnique.mockResolvedValue(mockQuiz);
 
       const result = await service.getQuizById(1);
-      
+
       expect(prisma.quiz.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
         include: { questions: { orderBy: { order: 'asc' } } },

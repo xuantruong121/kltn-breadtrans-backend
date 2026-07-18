@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { UploadService } from '../upload/upload.service';
 import { CreateExerciseDto } from './dto/create-exercise.dto';
-import * as streamifier from 'streamifier';
 
 @Injectable()
 export class SpeakingService {
@@ -13,7 +17,7 @@ export class SpeakingService {
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
     private readonly uploadService: UploadService,
-  ) { }
+  ) {}
 
   async findAllExercises(category?: string) {
     return this.prisma.speakingExercise.findMany({
@@ -72,7 +76,9 @@ export class SpeakingService {
     const exercise = await this.findExerciseById(exerciseId);
 
     // 3. Upload file audio lên Cloudinary để lưu trữ
-    this.logger.log(`Uploading audio for exercise #${exerciseId} by user #${userId}`);
+    this.logger.log(
+      `Uploading audio for exercise #${exerciseId} by user #${userId}`,
+    );
     const uploadResult = await this.uploadService.uploadStream(
       audioFile.buffer,
       {

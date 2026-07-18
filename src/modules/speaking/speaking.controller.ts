@@ -50,7 +50,11 @@ export class SpeakingController {
 
   @Get('exercises')
   @ApiOperation({ summary: 'Lấy danh sách bài tập phát âm' })
-  @ApiQuery({ name: 'category', required: false, enum: ['IELTS', 'TOEIC', 'GENERAL'] })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    enum: ['IELTS', 'TOEIC', 'GENERAL'],
+  })
   findAllExercises(@Query('category') category?: string) {
     return this.speakingService.findAllExercises(category);
   }
@@ -88,9 +92,7 @@ export class SpeakingController {
     @Request() req: any,
     @UploadedFile(
       new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
-        ],
+        validators: [new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 })],
       }),
     )
     audio: Express.Multer.File,

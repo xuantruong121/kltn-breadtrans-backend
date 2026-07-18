@@ -1,6 +1,9 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
-import type { IAIEvaluator, PronunciationFeedback } from './strategies/ai-evaluator.interface';
+import type {
+  IAIEvaluator,
+  PronunciationFeedback,
+} from './strategies/ai-evaluator.interface';
 
 /**
  * AiService giờ đây hoạt động như một "Context" trong Strategy Pattern.
@@ -41,7 +44,11 @@ export class AiService {
     userAnswer: string,
     correctAnswer: string,
   ): Promise<string> {
-    return this.aiEvaluator.explainToeicError(questionContent, userAnswer, correctAnswer);
+    return this.aiEvaluator.explainToeicError(
+      questionContent,
+      userAnswer,
+      correctAnswer,
+    );
   }
 
   async generateToeicQuestions(

@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, Logger } from '@nestjs/common';
 import { IAIEvaluator, PronunciationFeedback } from './ai-evaluator.interface';
 
 /**
- * Lớp giả lập OpenAI Strategy. 
+ * Lớp giả lập OpenAI Strategy.
  * Trong thực tế, bạn sẽ khởi tạo OpenAI SDK (VD: new OpenAI(...)) ở đây.
  * Việc tạo class này chứng minh cho hội đồng KLTN rằng hệ thống rất linh hoạt (Open/Closed Principle).
  */
@@ -38,11 +40,19 @@ export class OpenAIEvaluatorStrategy implements IAIEvaluator {
     };
   }
 
-  async explainToeicError(questionContent: any, userAnswer: string, correctAnswer: string): Promise<string> {
+  async explainToeicError(
+    questionContent: any,
+    userAnswer: string,
+    correctAnswer: string,
+  ): Promise<string> {
     return 'Mock OpenAI explanation for TOEIC error.';
   }
 
-  async generateToeicQuestions(topic: string, part: number, count: number): Promise<any[]> {
+  async generateToeicQuestions(
+    topic: string,
+    part: number,
+    count: number,
+  ): Promise<any[]> {
     return [];
   }
 }

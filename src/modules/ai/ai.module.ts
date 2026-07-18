@@ -9,7 +9,7 @@ import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
   controllers: [AiController],
   providers: [
     AiService,
-    // Đăng ký Strategy mặc định ở đây. 
+    // Đăng ký Strategy mặc định ở đây.
     // Muốn đổi sang ChatGPT? Chỉ cần đổi useClass thành OpenAIEvaluatorStrategy!
     {
       provide: AI_EVALUATOR_TOKEN,

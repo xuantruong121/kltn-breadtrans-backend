@@ -52,7 +52,11 @@ export class AiController {
   @ApiOperation({ summary: 'Sinh bộ câu hỏi TOEIC tự động theo chủ đề' })
   async generateToeicQuiz(@Body() dto: GenerateToeicDto) {
     // Gọi AI sinh câu hỏi (JSON)
-    const questions = await this.aiService.generateToeicQuestions(dto.topic, dto.part, dto.count);
+    const questions = await this.aiService.generateToeicQuestions(
+      dto.topic,
+      dto.part,
+      dto.count,
+    );
     // (Trong thực tế, QuizController sẽ lấy questions này lưu vào DB. Ở đây trả về trực tiếp để review)
     return { success: true, questions };
   }
@@ -60,9 +64,16 @@ export class AiController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('explain-toeic-error/:questionId')
-  @ApiOperation({ summary: 'AI Gia sư giải thích tại sao câu TOEIC này bị sai' })
+  @ApiOperation({
+    summary: 'AI Gia sư giải thích tại sao câu TOEIC này bị sai',
+  })
   async explainToeicError(
-    @Body() body: { questionContent: any; userAnswer: string; correctAnswer: string },
+    @Body()
+    body: {
+      questionContent: any;
+      userAnswer: string;
+      correctAnswer: string;
+    },
   ) {
     const explanation = await this.aiService.explainToeicError(
       body.questionContent,

@@ -62,7 +62,7 @@ describe('UserService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
 
       const result = await service.getUserProfile(1);
-      
+
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
         include: { profile: true },
@@ -74,7 +74,9 @@ describe('UserService', () => {
     it('should throw NotFoundException if user not found', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.getUserProfile(999)).rejects.toThrow(NotFoundException);
+      await expect(service.getUserProfile(999)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

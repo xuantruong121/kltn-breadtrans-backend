@@ -16,7 +16,10 @@ export class UploadService {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
-    return this.uploadStream(file.buffer, { folder: 'breadtrans', resource_type: 'auto' });
+    return this.uploadStream(file.buffer, {
+      folder: 'breadtrans',
+      resource_type: 'auto',
+    });
   }
 
   async uploadStream(
@@ -32,7 +35,9 @@ export class UploadService {
         (error, result) => {
           if (error) {
             this.logger.error('Error uploading to Cloudinary', error);
-            return reject(new BadRequestException('Lỗi tải file lên Cloudinary'));
+            return reject(
+              new BadRequestException('Lỗi tải file lên Cloudinary'),
+            );
           }
           resolve(result as CloudinaryResponse);
         },

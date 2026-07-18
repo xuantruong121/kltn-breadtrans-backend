@@ -46,4 +46,6 @@ async function bootstrap() {
   // Bỏ chặn IP nội bộ (Lắng nghe trên 0.0.0.0 để chung mạng LAN kết nối được)
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('Error starting server', err);
+});
