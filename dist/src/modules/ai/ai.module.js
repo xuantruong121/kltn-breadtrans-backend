@@ -8,15 +8,23 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AiModule = void 0;
 const common_1 = require("@nestjs/common");
-const ai_service_1 = require("./ai.service");
 const ai_controller_1 = require("./ai.controller");
+const ai_service_1 = require("./ai.service");
+const gemini_evaluator_strategy_1 = require("./strategies/gemini-evaluator.strategy");
+const ai_evaluator_interface_1 = require("./strategies/ai-evaluator.interface");
 let AiModule = class AiModule {
 };
 exports.AiModule = AiModule;
 exports.AiModule = AiModule = __decorate([
     (0, common_1.Module)({
-        providers: [ai_service_1.AiService],
         controllers: [ai_controller_1.AiController],
+        providers: [
+            ai_service_1.AiService,
+            {
+                provide: ai_evaluator_interface_1.AI_EVALUATOR_TOKEN,
+                useClass: gemini_evaluator_strategy_1.GeminiEvaluatorStrategy,
+            },
+        ],
         exports: [ai_service_1.AiService],
     })
 ], AiModule);

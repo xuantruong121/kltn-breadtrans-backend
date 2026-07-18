@@ -17,6 +17,7 @@ const quiz_module_1 = require("./modules/quiz/quiz.module");
 const ai_module_1 = require("./modules/ai/ai.module");
 const gamification_module_1 = require("./modules/gamification/gamification.module");
 const upload_module_1 = require("./modules/upload/upload.module");
+const speaking_module_1 = require("./modules/speaking/speaking.module");
 const prisma_module_1 = require("./prisma/prisma.module");
 const event_emitter_1 = require("@nestjs/event-emitter");
 let AppModule = class AppModule {
@@ -33,6 +34,7 @@ exports.AppModule = AppModule = __decorate([
             ai_module_1.AiModule,
             gamification_module_1.GamificationModule,
             upload_module_1.UploadModule,
+            speaking_module_1.SpeakingModule,
             prisma_module_1.PrismaModule,
         ],
         controllers: [app_controller_1.AppController],

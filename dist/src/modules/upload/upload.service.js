@@ -50,18 +50,21 @@ let UploadService = UploadService_1 = class UploadService {
         if (!file) {
             throw new common_1.BadRequestException('No file provided');
         }
+        return this.uploadStream(file.buffer, { folder: 'breadtrans', resource_type: 'auto' });
+    }
+    async uploadStream(buffer, options) {
         return new Promise((resolve, reject) => {
             const uploadStream = cloudinary_1.v2.uploader.upload_stream({
-                folder: 'breadtrans',
-                resource_type: 'auto',
+                folder: options.folder || 'breadtrans',
+                resource_type: (options.resource_type || 'auto'),
             }, (error, result) => {
                 if (error) {
-                    this.logger.error('Error uploading file to Cloudinary', error);
+                    this.logger.error('Error uploading to Cloudinary', error);
                     return reject(new common_1.BadRequestException('Lỗi tải file lên Cloudinary'));
                 }
                 resolve(result);
             });
-            streamifier.createReadStream(file.buffer).pipe(uploadStream);
+            streamifier.createReadStream(buffer).pipe(uploadStream);
         });
     }
 };

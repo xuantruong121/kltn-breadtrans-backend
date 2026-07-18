@@ -1,8 +1,8 @@
-import type { IAIEvaluator, PronunciationFeedback } from './strategies/ai-evaluator.interface';
-export declare class AiService {
-    private readonly aiEvaluator;
+import { IAIEvaluator, PronunciationFeedback } from './ai-evaluator.interface';
+export declare class GeminiEvaluatorStrategy implements IAIEvaluator {
     private readonly logger;
-    constructor(aiEvaluator: IAIEvaluator);
+    private genAI;
+    constructor();
     generateFeedback(question: string, studentAnswer: string): Promise<string>;
     chat(prompt: string): Promise<string>;
     assessPronunciation(targetText: string, audioBuffer: Buffer): Promise<PronunciationFeedback>;

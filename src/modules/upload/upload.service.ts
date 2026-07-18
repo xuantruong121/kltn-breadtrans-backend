@@ -16,26 +16,28 @@ export class UploadService {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
+    return this.uploadStream(file.buffer, { folder: 'breadtrans', resource_type: 'auto' });
+  }
 
+  async uploadStream(
+    buffer: Buffer,
+    options: { folder?: string; resource_type?: string },
+  ): Promise<CloudinaryResponse> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: 'breadtrans',
-          resource_type: 'auto', // Hỗ trợ cả image, video, pdf
+          folder: options.folder || 'breadtrans',
+          resource_type: (options.resource_type || 'auto') as any,
         },
         (error, result) => {
           if (error) {
-            this.logger.error('Error uploading file to Cloudinary', error);
-            return reject(
-              new BadRequestException('Lỗi tải file lên Cloudinary'),
-            );
+            this.logger.error('Error uploading to Cloudinary', error);
+            return reject(new BadRequestException('Lỗi tải file lên Cloudinary'));
           }
           resolve(result as CloudinaryResponse);
         },
       );
-
-      // Chuyển Buffer thành Stream và bắn lên Cloudinary
-      streamifier.createReadStream(file.buffer).pipe(uploadStream);
+      streamifier.createReadStream(buffer).pipe(uploadStream);
     });
   }
 }

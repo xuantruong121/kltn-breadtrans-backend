@@ -22,13 +22,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  profile         Profile?
-  enrollments     Enrollment[]
-  teachingClasses Class[]        @relation("TeacherClasses")
-  submissions     Submission[]
-  pointHistory    PointHistory[]
-  userBadges      UserBadge[]
-  leaderboard     Leaderboard?
+  profile            Profile?
+  enrollments        Enrollment[]
+  teachingClasses    Class[]             @relation("TeacherClasses")
+  submissions        Submission[]
+  pointHistory       PointHistory[]
+  userBadges         UserBadge[]
+  leaderboard        Leaderboard?
+  speakingSubmissions SpeakingSubmission[]
 }
 
 model Profile {
@@ -117,7 +118,7 @@ model Quiz {
   course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
   title       String
   description String?
-  type        QuizType @default(GENERAL)
+  type        QuizType @default(TOEIC)
   timeLimit   Int? // In minutes
   createdAt   DateTime @default(now())
 
@@ -194,4 +195,30 @@ model PointHistory {
   points    Int
   reason    String // vd: "Completed Quiz", "Daily Login"
   createdAt DateTime @default(now())
+}
+
+// Speaking Practice Models
+model SpeakingExercise {
+  id          Int      @id @default(autoincrement())
+  title       String
+  targetText  String   @db.Text // Câu/đoạn văn cần đọc (hoặc script mẫu)
+  imageUrl    String?  // Dùng cho TOEIC Part 1 (Mô tả tranh)
+  audioUrl    String?  // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
+  difficulty  String   @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
+  category    String   @default("TOEIC") // IELTS, TOEIC, GENERAL
+  createdAt   DateTime @default(now())
+
+  submissions SpeakingSubmission[]
+}
+
+model SpeakingSubmission {
+  id           Int              @id @default(autoincrement())
+  exerciseId   Int
+  exercise     SpeakingExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  userId       Int
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  audioUrl     String           // URL file audio lưu trên Cloudinary
+  overallScore Float?           // Điểm tổng (0-10)
+  aiFeedback   Json?            // JSON structured feedback từ Gemini
+  submittedAt  DateTime         @default(now())
 }
