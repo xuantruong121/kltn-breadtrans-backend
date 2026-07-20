@@ -244,10 +244,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             const result = await model.generateContent(prompt);
             const response = result.response;
             let text = response.text().trim();
-            if (text.startsWith('\`\`\`json')) {
+            if (text.startsWith('```json')) {
                 text = text.substring(7, text.length - 3).trim();
             }
-            else if (text.startsWith('\`\`\`')) {
+            else if (text.startsWith('```')) {
                 text = text.substring(3, text.length - 3).trim();
             }
             return JSON.parse(text);
@@ -278,10 +278,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             const result = await model.generateContent(prompt);
             const response = result.response;
             let text = response.text().trim();
-            if (text.startsWith('\`\`\`json')) {
+            if (text.startsWith('```json')) {
                 text = text.substring(7, text.length - 3).trim();
             }
-            else if (text.startsWith('\`\`\`')) {
+            else if (text.startsWith('```')) {
                 text = text.substring(3, text.length - 3).trim();
             }
             return JSON.parse(text);
@@ -363,6 +363,56 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         catch (error) {
             this.logger.error(`Error parsing ETS PDF: ${error.message}`, error.stack);
             throw new Error('Lỗi khi phân tích đề thi ETS');
+        }
+    }
+    async evaluateWritingPart1(imageUrl, keywords, userSentence) {
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error('Thiếu GEMINI_API_KEY');
+        }
+        try {
+            const model = this.genAI.getGenerativeModel({
+                model: 'gemini-3.5-flash',
+            });
+            const prompt = `
+        You are a TOEIC Writing evaluator. Evaluate the following user sentence for TOEIC Writing Part 1 (Write a sentence based on a picture).
+        The user was given this picture and these two keywords: ${keywords.join(', ')}.
+        User's sentence: "${userSentence}"
+        
+        Criteria:
+        - Score 3: One sentence, uses both keywords appropriately, no grammar errors, relevant to the picture.
+        - Score 2: One sentence, uses both keywords, but has minor grammar errors or is slightly irrelevant.
+        - Score 1: Missing a keyword, or major grammar errors making it hard to understand.
+        - Score 0: Blank, totally irrelevant, or not a sentence.
+
+        Respond STRICTLY with a valid JSON object:
+        {
+          "score": 3,
+          "feedback": "Your explanation here in Vietnamese"
+        }
+      `;
+            const responseImg = await fetch(imageUrl);
+            const arrayBuffer = await responseImg.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const imagePart = {
+                inlineData: {
+                    data: buffer.toString('base64'),
+                    mimeType: 'image/jpeg',
+                },
+            };
+            const result = await model.generateContent([prompt, imagePart]);
+            const response = result.response;
+            let text = response.text().trim();
+            if (text.startsWith('```json')) {
+                text = text.substring(7, text.length - 3).trim();
+            }
+            else if (text.startsWith('```')) {
+                text = text.substring(3, text.length - 3).trim();
+            }
+            return JSON.parse(text);
+        }
+        catch (error) {
+            this.logger.error(`Error evaluating writing part 1: ${error.message}`, error.stack);
+            throw new Error('Lỗi khi chấm điểm Writing Part 1');
         }
     }
 };

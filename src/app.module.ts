@@ -12,6 +12,7 @@ import { SpeakingModule } from './modules/speaking/speaking.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ReadingModule } from './modules/reading/reading.module';
+import { WritingModule } from './modules/writing/writing.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ReadingModule } from './modules/reading/reading.module';
     SpeakingModule,
     PrismaModule,
     ReadingModule,
+    WritingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

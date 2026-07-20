@@ -29,16 +29,16 @@ let QuizService = class QuizService {
     async getListeningPractices() {
         return this.prisma.quiz.findMany({
             where: {
-                type: 'LISTENING_PRACTICE'
+                type: 'LISTENING_PRACTICE',
             },
             include: {
                 _count: {
-                    select: { questions: true }
-                }
+                    select: { questions: true },
+                },
             },
             orderBy: {
-                id: 'desc'
-            }
+                id: 'desc',
+            },
         });
     }
     async getQuizById(id) {

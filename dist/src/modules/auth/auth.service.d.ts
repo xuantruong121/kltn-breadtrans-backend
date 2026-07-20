@@ -8,12 +8,12 @@ export declare class AuthService {
     register(registerDto: RegisterDto): Promise<{
         profile: {
             id: number;
+            userId: number;
             fullName: string;
             avatar: string | null;
             phone: string | null;
             address: string | null;
             targetScore: string | null;
-            userId: number;
         } | null;
         createdAt: Date;
         id: number;

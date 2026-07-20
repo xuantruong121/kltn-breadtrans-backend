@@ -90,7 +90,7 @@ let AiController = class AiController {
                 title: `Bài luyện nghe: ${dto.topic}`,
                 description: 'Được tạo tự động bởi AI',
                 type: 'LISTENING_PRACTICE',
-            }
+            },
         });
         const questionData = [];
         for (let i = 0; i < questions.length; i++) {
@@ -112,7 +112,10 @@ let AiController = class AiController {
                     audioUrl: audioUrl,
                     transcript: q.transcript,
                     translation: q.translation,
-                    words: q.transcript.replace(/[^\w\s']/g, "").split(" ").filter((w) => w.length > 0)
+                    words: String(q.transcript)
+                        .replace(/[^\w\s']/g, '')
+                        .split(' ')
+                        .filter((w) => w.length > 0),
                 },
                 order: i + 1,
             });
@@ -123,7 +126,7 @@ let AiController = class AiController {
         return {
             success: true,
             message: `Đã tạo ${questions.length} câu luyện nghe.`,
-            quizId: newQuiz.id
+            quizId: newQuiz.id,
         };
     }
     async generateToeicQuiz(dto) {

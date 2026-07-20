@@ -50,12 +50,12 @@ export declare class CourseService {
                 email: string;
                 profile: {
                     id: number;
+                    userId: number;
                     fullName: string;
                     avatar: string | null;
                     phone: string | null;
                     address: string | null;
                     targetScore: string | null;
-                    userId: number;
                 } | null;
             };
         } & {
@@ -100,12 +100,12 @@ export declare class CourseService {
             email: string;
             profile: {
                 id: number;
+                userId: number;
                 fullName: string;
                 avatar: string | null;
                 phone: string | null;
                 address: string | null;
                 targetScore: string | null;
-                userId: number;
             } | null;
         };
         lessons: ({

@@ -41,6 +41,9 @@ let OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy_1 = class OpenAIEvaluatorS
     async importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl) {
         return [];
     }
+    async evaluateWritingPart1(imageUrl, keywords, userSentence) {
+        throw new Error('Chức năng này hiện chỉ hỗ trợ Gemini Vision.');
+    }
 };
 exports.OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy;
 exports.OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy_1 = __decorate([

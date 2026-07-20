@@ -77,6 +77,9 @@ let AiService = AiService_1 = class AiService {
             return null;
         }
     }
+    async evaluateWritingPart1(imageUrl, keywords, userSentence) {
+        return this.aiEvaluator.evaluateWritingPart1(imageUrl, keywords, userSentence);
+    }
     async importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl) {
         return this.aiEvaluator.importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl);
     }

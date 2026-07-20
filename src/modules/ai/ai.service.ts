@@ -103,6 +103,18 @@ export class AiService {
     }
   }
 
+  async evaluateWritingPart1(
+    imageUrl: string,
+    keywords: string[],
+    userSentence: string,
+  ): Promise<{ score: number; feedback: string }> {
+    return this.aiEvaluator.evaluateWritingPart1(
+      imageUrl,
+      keywords,
+      userSentence,
+    );
+  }
+
   async importEtsPdf(
     pdfBuffer: Buffer,
     pdfMimeType: string,

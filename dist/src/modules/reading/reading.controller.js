@@ -49,7 +49,9 @@ __decorate([
 ], ReadingController.prototype, "getTopicsByCategory", null);
 __decorate([
     (0, common_1.Get)('topics/:id'),
-    (0, swagger_1.ApiOperation)({ summary: 'Lấy chi tiết một chủ đề (gồm các bài Quizzes con)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Lấy chi tiết một chủ đề (gồm các bài Quizzes con)',
+    }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),

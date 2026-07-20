@@ -6,19 +6,20 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ReadingModule = void 0;
+exports.WritingModule = void 0;
 const common_1 = require("@nestjs/common");
-const reading_controller_1 = require("./reading.controller");
-const reading_service_1 = require("./reading.service");
+const writing_controller_1 = require("./writing.controller");
+const writing_service_1 = require("./writing.service");
+const ai_module_1 = require("../ai/ai.module");
 const prisma_module_1 = require("../../prisma/prisma.module");
-let ReadingModule = class ReadingModule {
+let WritingModule = class WritingModule {
 };
-exports.ReadingModule = ReadingModule;
-exports.ReadingModule = ReadingModule = __decorate([
+exports.WritingModule = WritingModule;
+exports.WritingModule = WritingModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule],
-        controllers: [reading_controller_1.ReadingController],
-        providers: [reading_service_1.ReadingService],
+        imports: [ai_module_1.AiModule, prisma_module_1.PrismaModule],
+        controllers: [writing_controller_1.WritingController],
+        providers: [writing_service_1.WritingService],
     })
-], ReadingModule);
-//# sourceMappingURL=reading.module.js.map
+], WritingModule);
+//# sourceMappingURL=writing.module.js.map

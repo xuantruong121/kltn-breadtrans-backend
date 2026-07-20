@@ -67,6 +67,18 @@ export interface IAIEvaluator {
   generateDictation(topic: string, count: number): Promise<any[]>;
 
   /**
+   * Đánh giá TOEIC Writing Part 1
+   * @param imageUrl URL hình ảnh
+   * @param keywords Danh sách từ khóa
+   * @param userSentence Câu trả lời của học viên
+   */
+  evaluateWritingPart1(
+    imageUrl: string,
+    keywords: string[],
+    userSentence: string,
+  ): Promise<{ score: number; feedback: string }>;
+
+  /**
    * Đọc file PDF/Image đề thi ETS và bóc tách thành JSON (Kèm Audio để trích xuất Timestamp)
    * @param pdfBuffer Buffer của file PDF/Ảnh
    * @param pdfMimeType MimeType của file PDF

@@ -51,10 +51,10 @@ export declare class SpeakingController {
         };
     } & {
         id: number;
-        userId: number;
-        audioUrl: string;
         submittedAt: Date;
         aiFeedback: import("@prisma/client/runtime/library").JsonValue | null;
+        userId: number;
+        audioUrl: string;
         overallScore: number | null;
         exerciseId: number;
     })[]>;

@@ -69,4 +69,12 @@ export class OpenAIEvaluatorStrategy implements IAIEvaluator {
   ): Promise<any[]> {
     return [];
   }
+
+  async evaluateWritingPart1(
+    imageUrl: string,
+    keywords: string[],
+    userSentence: string,
+  ): Promise<{ score: number; feedback: string }> {
+    throw new Error('Chức năng này hiện chỉ hỗ trợ Gemini Vision.');
+  }
 }

@@ -65,18 +65,18 @@ export declare class QuizService {
     submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto): Promise<{
         results: {
             id: number;
+            score: number | null;
             questionId: number;
             answer: import("@prisma/client/runtime/library").JsonValue;
             isCorrect: boolean | null;
-            score: number | null;
             submissionId: number;
         }[];
     } & {
         id: number;
-        userId: number;
         quizId: number;
         score: number | null;
         submittedAt: Date;
         aiFeedback: string | null;
+        userId: number;
     }>;
 }

@@ -8,4 +8,8 @@ export declare class OpenAIEvaluatorStrategy implements IAIEvaluator {
     generateToeicQuestions(topic: string, part: number, count: number): Promise<any[]>;
     generateDictation(topic: string, count: number): Promise<any[]>;
     importEtsPdf(pdfBuffer: Buffer, pdfMimeType: string, audioBuffer?: Buffer, audioMimeType?: string, audioUrl?: string): Promise<any[]>;
+    evaluateWritingPart1(imageUrl: string, keywords: string[], userSentence: string): Promise<{
+        score: number;
+        feedback: string;
+    }>;
 }

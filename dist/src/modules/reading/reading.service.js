@@ -26,9 +26,9 @@ let ReadingService = class ReadingService {
                 quizzes: {
                     include: {
                         questions: true,
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
         const userResults = await this.prisma.result.findMany({
             where: {
@@ -36,26 +36,26 @@ let ReadingService = class ReadingService {
                     userId: userId,
                     quiz: {
                         practiceTopic: {
-                            category: category
-                        }
-                    }
-                }
-            }
+                            category: category,
+                        },
+                    },
+                },
+            },
         });
-        const correctQuestionIds = new Set(userResults.filter(r => r.isCorrect).map(r => r.questionId));
-        const completedQuestionIds = new Set(userResults.map(r => r.questionId));
-        return topics.map(topic => {
+        const correctQuestionIds = new Set(userResults.filter((r) => r.isCorrect).map((r) => r.questionId));
+        const completedQuestionIds = new Set(userResults.map((r) => r.questionId));
+        return topics.map((topic) => {
             let totalQuestions = 0;
             let completedCount = 0;
             let correctCount = 0;
             let completedArticles = 0;
-            topic.quizzes.forEach(quiz => {
+            topic.quizzes.forEach((quiz) => {
                 const allQuestions = quiz.questions;
                 totalQuestions += allQuestions.length;
                 let isQuizCompleted = true;
                 if (allQuestions.length === 0)
                     isQuizCompleted = false;
-                allQuestions.forEach(q => {
+                allQuestions.forEach((q) => {
                     if (completedQuestionIds.has(q.id)) {
                         completedCount++;
                     }
@@ -78,7 +78,7 @@ let ReadingService = class ReadingService {
                 correctAnswers: correctCount,
                 incorrectAnswers: completedCount - correctCount,
                 completedArticles,
-                totalArticles: topic.quizzes.length
+                totalArticles: topic.quizzes.length,
             };
         });
     }
@@ -95,12 +95,12 @@ let ReadingService = class ReadingService {
                         bilingualContent: true,
                         timeLimit: true,
                         _count: {
-                            select: { questions: true }
-                        }
+                            select: { questions: true },
+                        },
                     },
-                    orderBy: { createdAt: 'asc' }
-                }
-            }
+                    orderBy: { createdAt: 'asc' },
+                },
+            },
         });
         if (!topic)
             throw new common_1.NotFoundException('Topic not found');
@@ -112,8 +112,8 @@ let ReadingService = class ReadingService {
             select: {
                 id: true,
                 title: true,
-                theoryContent: true
-            }
+                theoryContent: true,
+            },
         });
         if (!quiz)
             throw new common_1.NotFoundException('Quiz not found');
@@ -123,12 +123,12 @@ let ReadingService = class ReadingService {
         const bilingualQuizzes = await this.prisma.quiz.findMany({
             where: {
                 practiceTopic: {
-                    category: client_1.TopicCategory.BILINGUAL_LEVEL
-                }
+                    category: client_1.TopicCategory.BILINGUAL_LEVEL,
+                },
             },
             include: {
-                questions: true
-            }
+                questions: true,
+            },
         });
         const userResults = await this.prisma.result.findMany({
             where: {
@@ -136,26 +136,26 @@ let ReadingService = class ReadingService {
                     userId: userId,
                     quiz: {
                         practiceTopic: {
-                            category: client_1.TopicCategory.BILINGUAL_LEVEL
-                        }
-                    }
-                }
-            }
+                            category: client_1.TopicCategory.BILINGUAL_LEVEL,
+                        },
+                    },
+                },
+            },
         });
-        const correctQuestionIds = new Set(userResults.filter(r => r.isCorrect).map(r => r.questionId));
-        const completedQuestionIds = new Set(userResults.map(r => r.questionId));
+        const correctQuestionIds = new Set(userResults.filter((r) => r.isCorrect).map((r) => r.questionId));
+        const completedQuestionIds = new Set(userResults.map((r) => r.questionId));
         let completedArticles = 0;
         let sentencesRead = 0;
         let questionsAnswered = 0;
         let correctAnswers = 0;
         const completedArticlesList = [];
-        bilingualQuizzes.forEach(quiz => {
+        bilingualQuizzes.forEach((quiz) => {
             let isCompleted = true;
             let qAnswered = 0;
             let qCorrect = 0;
             if (quiz.questions.length === 0)
                 isCompleted = false;
-            quiz.questions.forEach(q => {
+            quiz.questions.forEach((q) => {
                 if (completedQuestionIds.has(q.id)) {
                     qAnswered++;
                 }
@@ -175,7 +175,7 @@ let ReadingService = class ReadingService {
                 completedArticlesList.push({
                     title: quiz.title,
                     sentencesCount: sCount,
-                    questionsCount: quiz.questions.length
+                    questionsCount: quiz.questions.length,
                 });
             }
         });
@@ -183,8 +183,10 @@ let ReadingService = class ReadingService {
             completedArticles,
             sentencesRead,
             questionsAnswered,
-            accuracy: questionsAnswered === 0 ? 0 : Math.round((correctAnswers / questionsAnswered) * 100),
-            completedArticlesList
+            accuracy: questionsAnswered === 0
+                ? 0
+                : Math.round((correctAnswers / questionsAnswered) * 100),
+            completedArticlesList,
         };
     }
 };
