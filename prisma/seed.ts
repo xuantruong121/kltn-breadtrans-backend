@@ -5,6 +5,8 @@ const prisma = new PrismaClient({ log: ['info', 'warn', 'error'] });
 
 async function clearDB() {
   console.log('Clearing old data...');
+  await prisma.speakingSubmission.deleteMany();
+  await prisma.speakingExercise.deleteMany();
   await prisma.userBadge.deleteMany();
   await prisma.pointHistory.deleteMany();
   await prisma.leaderboard.deleteMany();
@@ -158,6 +160,28 @@ async function main() {
       }
     });
   }
+
+  // 8. Speaking Exercises (10 bài tập phát âm các level khác nhau)
+  const speakingData = [
+    // BEGINNER
+    { title: 'Basic Greetings', targetText: 'Hello! My name is Nam. I am a student. Nice to meet you!', difficulty: 'BEGINNER', category: 'GENERAL' },
+    { title: 'Numbers and Days', targetText: 'Today is Monday. There are seven days in a week. The first month of the year is January.', difficulty: 'BEGINNER', category: 'GENERAL' },
+    { title: 'Daily Routine', targetText: 'I wake up at six o\'clock every morning. Then I brush my teeth, have breakfast, and go to school.', difficulty: 'BEGINNER', category: 'GENERAL' },
+    // INTERMEDIATE
+    { title: 'TOEIC: Office Communication', targetText: 'The meeting has been rescheduled to Thursday afternoon. Please bring your project reports and performance summaries.', difficulty: 'INTERMEDIATE', category: 'TOEIC' },
+    { title: 'TOEIC: Business Travel', targetText: 'I would like to book a single room for three nights, from the fifteenth to the eighteenth of November.', difficulty: 'INTERMEDIATE', category: 'TOEIC' },
+    { title: 'Environmental Issues', targetText: 'Climate change is one of the most pressing challenges of our time. We must reduce carbon emissions to protect the planet for future generations.', difficulty: 'INTERMEDIATE', category: 'GENERAL' },
+    { title: 'Technology in Education', targetText: 'Digital learning platforms have transformed the way students access information. Online education offers flexibility and a wide range of resources.', difficulty: 'INTERMEDIATE', category: 'GENERAL' },
+    // ADVANCED
+    { title: 'IELTS: Problem & Solution', targetText: 'Although urbanization brings economic growth, it also leads to overcrowding and environmental degradation. Governments should invest in sustainable infrastructure and promote green spaces within cities.', difficulty: 'ADVANCED', category: 'IELTS' },
+    { title: 'IELTS: Technology & Society', targetText: 'The rapid advancement of artificial intelligence raises significant ethical concerns regarding privacy, employment, and decision-making. Society must establish regulatory frameworks to ensure responsible development.', difficulty: 'ADVANCED', category: 'IELTS' },
+    { title: 'IELTS: Global Economy', targetText: 'International trade agreements foster economic interdependence, yet they can expose developing nations to exploitation. Policymakers must strike a balance between liberalization and the protection of domestic industries.', difficulty: 'ADVANCED', category: 'IELTS' },
+  ];
+
+  for (const ex of speakingData) {
+    await prisma.speakingExercise.create({ data: ex });
+  }
+  console.log(`✓ Seeded ${speakingData.length} Speaking Exercises`);
 
   console.log('Seeding finished successfully.');
 }

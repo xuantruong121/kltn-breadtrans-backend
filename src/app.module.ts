@@ -8,8 +8,11 @@ import { QuizModule } from './modules/quiz/quiz.module';
 import { AiModule } from './modules/ai/ai.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { SpeakingModule } from './modules/speaking/speaking.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ReadingModule } from './modules/reading/reading.module';
+import { WritingModule } from './modules/writing/writing.module';
 
 @Module({
   imports: [
@@ -21,7 +24,10 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     AiModule,
     GamificationModule,
     UploadModule,
+    SpeakingModule,
     PrismaModule,
+    ReadingModule,
+    WritingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

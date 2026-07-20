@@ -20,6 +20,22 @@ export class QuizService {
     return this.prisma.quiz.create({ data: dto });
   }
 
+  async getListeningPractices() {
+    return this.prisma.quiz.findMany({
+      where: {
+        type: 'LISTENING_PRACTICE',
+      },
+      include: {
+        _count: {
+          select: { questions: true },
+        },
+      },
+      orderBy: {
+        id: 'desc',
+      },
+    });
+  }
+
   async getQuizById(id: number) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },

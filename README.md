@@ -1,98 +1,112 @@
 <p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+  <img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" />
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+<h1 align="center">Breadtrans E-Learning Backend (KLTN) 🚀</h1>
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+<p align="center">
+  Hệ thống Backend phục vụ Khóa luận tốt nghiệp: Nền tảng luyện thi TOEIC 4 Kỹ năng tích hợp Trí tuệ nhân tạo (AI). Được xây dựng dựa trên <strong>NestJS</strong>, <strong>PostgreSQL (Prisma)</strong>, <strong>Redis</strong> và sức mạnh từ <strong>Google Gemini / Azure Speech API</strong>.
 </p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 🌟 Tính năng nổi bật (Core Features)
 
-## Project setup
+1. **TOEIC 4 Kỹ năng (Nghe, Nói, Đọc, Viết):**
+   - Hỗ trợ đầy đủ các dạng bài trắc nghiệm thông thường (Listening, Reading).
+   - Luyện nói (Speaking) tự động chấm điểm phát âm qua AI (Azure Speech / Gemini).
+   - Luyện viết (Writing) tích hợp AI chấm lỗi ngữ pháp, chính tả tự động.
 
-```bash
-$ npm install
+2. **🤖 AI ETS Importer (Siêu việt):**
+   - Hỗ trợ **Multi-modal AI**: Khả năng tải lên cùng lúc 1 file PDF/Ảnh đề thi và 1 file Audio (.mp3).
+   - Trí tuệ nhân tạo Gemini 1.5 tự động đọc tài liệu, nghe âm thanh, bóc tách toàn bộ câu hỏi (A, B, C, D) kèm **Timestamps** và lưu thẳng vào Database chỉ trong vài chục giây.
+
+3. **☁️ Cloud Uploads:**
+   - Quản lý toàn bộ tài nguyên hình ảnh, âm thanh trực tiếp trên **Cloudinary** (Tối đa 10MB/file).
+
+4. **⚙️ Kiến trúc linh hoạt:**
+   - Áp dụng **Strategy Pattern** cho phép dễ dàng chuyển đổi giữa các mô hình AI khác nhau (Gemini, ChatGPT).
+   - Database Prisma Schema được thiết kế linh hoạt (lưu trữ JSON cho `content`), hỗ trợ chèn đa phương tiện vào bài thi mà không cần sửa cấu trúc cơ sở dữ liệu.
+
+---
+
+## 🛠️ Công nghệ sử dụng (Tech Stack)
+
+- **Framework:** [NestJS](https://nestjs.com/) (TypeScript)
+- **Cơ sở dữ liệu:** PostgreSQL
+- **ORM:** [Prisma](https://www.prisma.io/)
+- **Caching & Queue:** Redis
+- **Containerization:** Docker & Docker Compose
+- **Tích hợp AI:** Google Gemini 1.5 Flash, Azure AI Speech
+- **File Storage:** Cloudinary
+
+---
+
+## 🚀 Hướng dẫn Cài đặt & Chạy dự án
+
+### 1. Yêu cầu hệ thống (Prerequisites)
+- [Node.js](https://nodejs.org/en/) (phiên bản >= 18.x)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) (Để chạy Postgres & Redis)
+- Git
+
+### 2. Cấu hình biến môi trường (`.env`)
+Tạo file `.env` ở thư mục gốc và cung cấp các khóa API cần thiết:
+
+```env
+# Database (Postgres)
+DATABASE_URL="postgresql://postgres:password@localhost:5432/breadtrans?schema=public"
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Cổng chạy Backend
+PORT=3000
+
+# API Keys AI
+GEMINI_API_KEY="your_gemini_api_key_here"
+AZURE_SPEECH_KEY="your_azure_speech_key_here"
+AZURE_SPEECH_REGION="eastus"
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME="your_cloud_name"
+CLOUDINARY_API_KEY="your_api_key"
+CLOUDINARY_API_SECRET="your_api_secret"
 ```
 
-## Compile and run the project
+### 3. Cài đặt Dependencies & Khởi chạy
 
+Chạy các lệnh sau trong Terminal (khuyến nghị mở 3 terminal riêng biệt):
+
+**Terminal 1 (Khởi động Database):**
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker-compose up -d
 ```
 
-## Run tests
-
+**Terminal 2 (Đồng bộ CSDL & Mở giao diện DB):**
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
+npx prisma generate
+npx prisma db push
+npx prisma studio
 ```
+*(Prisma Studio sẽ chạy ở `http://localhost:5555` giúp bạn xem và chỉnh sửa data trực tiếp).*
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
+**Terminal 3 (Chạy Server Backend):**
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run start:dev
 ```
+*(Backend sẽ chạy ở `http://localhost:3000`).*
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## 📖 API Documentation (Swagger)
 
-Check out a few resources that may come in handy when working with NestJS:
+Hệ thống tích hợp sẵn Swagger để test API. Sau khi khởi động thành công, vui lòng truy cập:
+👉 **[http://localhost:3000/api/docs](http://localhost:3000/api/docs)**
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
 
-## Support
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## 👨‍💻 Tác giả
+- Phát triển bởi: **Khóa luận tốt nghiệp (KLTN)**
+- Bản quyền thuộc về tác giả dự án.

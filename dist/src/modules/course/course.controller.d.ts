@@ -5,105 +5,108 @@ export declare class CourseController {
     constructor(courseService: CourseService);
     createCourse(createCourseDto: CreateCourseDto): Promise<{
         createdAt: Date;
-        updatedAt: Date;
         id: number;
-        description: string | null;
         title: string;
+        description: string | null;
+        updatedAt: Date;
         thumbnail: string | null;
         price: number | null;
     }>;
     getAllCourses(): Promise<({
         classes: {
-            id: number;
             name: string;
+            id: number;
+            courseId: number;
             startDate: Date | null;
             endDate: Date | null;
             meetingLink: string | null;
-            courseId: number;
             teacherId: number;
         }[];
     } & {
         createdAt: Date;
-        updatedAt: Date;
         id: number;
-        description: string | null;
         title: string;
+        description: string | null;
+        updatedAt: Date;
         thumbnail: string | null;
         price: number | null;
     })[]>;
     getCourseById(id: number): Promise<{
+        quizzes: {
+            createdAt: Date;
+            id: number;
+            title: string;
+            description: string | null;
+            theoryContent: string | null;
+            bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+            type: import(".prisma/client").$Enums.QuizType;
+            timeLimit: number | null;
+            courseId: number | null;
+            practiceTopicId: number | null;
+        }[];
         classes: ({
             teacher: {
+                id: number;
                 email: string;
                 profile: {
                     id: number;
+                    userId: number;
                     fullName: string;
                     avatar: string | null;
                     phone: string | null;
                     address: string | null;
                     targetScore: string | null;
-                    userId: number;
                 } | null;
-                id: number;
             };
         } & {
-            id: number;
             name: string;
+            id: number;
+            courseId: number;
             startDate: Date | null;
             endDate: Date | null;
             meetingLink: string | null;
-            courseId: number;
             teacherId: number;
         })[];
-        quizzes: {
-            createdAt: Date;
-            id: number;
-            description: string | null;
-            type: import(".prisma/client").$Enums.QuizType;
-            title: string;
-            courseId: number | null;
-            timeLimit: number | null;
-        }[];
     } & {
         createdAt: Date;
-        updatedAt: Date;
         id: number;
-        description: string | null;
         title: string;
+        description: string | null;
+        updatedAt: Date;
         thumbnail: string | null;
         price: number | null;
     }>;
     deleteCourse(id: number): Promise<{
         createdAt: Date;
-        updatedAt: Date;
         id: number;
-        description: string | null;
         title: string;
+        description: string | null;
+        updatedAt: Date;
         thumbnail: string | null;
         price: number | null;
     }>;
     createClass(courseId: number, dto: CreateClassDto, req: any): Promise<{
-        id: number;
         name: string;
+        id: number;
+        courseId: number;
         startDate: Date | null;
         endDate: Date | null;
         meetingLink: string | null;
-        courseId: number;
         teacherId: number;
     }>;
     getClassById(classId: number): Promise<{
         teacher: {
+            id: number;
             email: string;
             profile: {
                 id: number;
+                userId: number;
                 fullName: string;
                 avatar: string | null;
                 phone: string | null;
                 address: string | null;
                 targetScore: string | null;
-                userId: number;
             } | null;
-            id: number;
         };
         lessons: ({
             materials: {
@@ -114,29 +117,29 @@ export declare class CourseController {
                 lessonId: number;
             }[];
         } & {
+            order: number;
             createdAt: Date;
             id: number;
-            description: string | null;
             title: string;
-            order: number;
+            description: string | null;
             videoUrl: string | null;
             classId: number;
         })[];
     } & {
-        id: number;
         name: string;
+        id: number;
+        courseId: number;
         startDate: Date | null;
         endDate: Date | null;
         meetingLink: string | null;
-        courseId: number;
         teacherId: number;
     }>;
     createLesson(classId: number, dto: CreateLessonDto): Promise<{
+        order: number;
         createdAt: Date;
         id: number;
-        description: string | null;
         title: string;
-        order: number;
+        description: string | null;
         videoUrl: string | null;
         classId: number;
     }>;
