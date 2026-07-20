@@ -86,7 +86,7 @@ Please keep the response concise but informative.`;
                 headers: {
                     'Ocp-Apim-Subscription-Key': azureKey,
                     'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'Pronunciation-Assessment': pronAssessmentHeader,
                 },
                 body: new Uint8Array(audioBuffer),
@@ -117,7 +117,8 @@ Please keep the response concise but informative.`;
                 for (const wordObj of bestResult.Words) {
                     transcript += wordObj.Word + ' ';
                     const wScore = wordObj.PronunciationAssessment || wordObj;
-                    if (wScore.ErrorType !== 'None' || (wScore.AccuracyScore !== undefined && wScore.AccuracyScore < 80)) {
+                    if (wScore.ErrorType !== 'None' ||
+                        (wScore.AccuracyScore !== undefined && wScore.AccuracyScore < 80)) {
                         problematicWords.push(wordObj.Word);
                     }
                 }
@@ -125,13 +126,19 @@ Please keep the response concise but informative.`;
             if (!process.env.GEMINI_API_KEY) {
                 return {
                     overallScore,
-                    clarity: overallScore >= 8 ? 'Excellent' : overallScore >= 6 ? 'Good' : 'Fair',
+                    clarity: overallScore >= 8
+                        ? 'Excellent'
+                        : overallScore >= 6
+                            ? 'Good'
+                            : 'Fair',
                     feedback: `[No Gemini Key] Azure Score: ${overallScore}/10. Accuracy: ${pronScores.AccuracyScore}, Fluency: ${pronScores.FluencyScore}.`,
                     problematicWords,
                     suggestions: [],
                 };
             }
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+            const model = this.genAI.getGenerativeModel({
+                model: 'gemini-3.5-flash',
+            });
             const prompt = `Học viên vừa đọc câu: "${targetText}"
 Hệ thống AI (Azure) đã chấm điểm phát âm với kết quả sau:
 - Điểm tổng (0-100): ${pronScores.PronScore}
@@ -162,7 +169,8 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
                     feedback = parsed.feedback || '';
                     suggestions = parsed.suggestions || [];
                 }
-                catch (e) { }
+                catch {
+                }
             }
             return {
                 overallScore: Number(overallScore.toFixed(1)),
@@ -188,7 +196,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             return 'Chức năng giải thích đang bảo trì. Vui lòng thử lại sau.';
         }
         try {
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const model = this.genAI.getGenerativeModel({
+                model: 'gemini-1.5-flash',
+            });
             const prompt = `
         Bạn là một gia sư TOEIC chuyên nghiệp và tận tâm.
         Hãy giải thích câu hỏi TOEIC sau đây bằng tiếng Việt một cách dễ hiểu, ngắn gọn nhưng đầy đủ ngữ pháp/từ vựng cần thiết.
@@ -202,7 +212,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         3. Dịch nghĩa câu hỏi sang tiếng Việt.
       `;
             const result = await model.generateContent(prompt);
-            const response = await result.response;
+            const response = result.response;
             return response.text();
         }
         catch (error) {
@@ -215,7 +225,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             throw new Error('Thiếu GEMINI_API_KEY');
         }
         try {
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const model = this.genAI.getGenerativeModel({
+                model: 'gemini-1.5-flash',
+            });
             const prompt = `
         Bạn là một chuyên gia ra đề thi TOEIC. Hãy tạo ra ${count} câu hỏi trắc nghiệm thuộc TOEIC Part ${part}.
         Chủ đề từ vựng/ngữ cảnh: ${topic}.
@@ -230,12 +242,12 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
       `;
             const result = await model.generateContent(prompt);
-            const response = await result.response;
+            const response = result.response;
             let text = response.text().trim();
-            if (text.startsWith('\`\`\`json')) {
+            if (text.startsWith('```json')) {
                 text = text.substring(7, text.length - 3).trim();
             }
-            else if (text.startsWith('\`\`\`')) {
+            else if (text.startsWith('```')) {
                 text = text.substring(3, text.length - 3).trim();
             }
             return JSON.parse(text);

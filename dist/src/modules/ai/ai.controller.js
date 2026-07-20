@@ -93,7 +93,9 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Post)('explain-toeic-error/:questionId'),
-    (0, swagger_1.ApiOperation)({ summary: 'AI Gia sư giải thích tại sao câu TOEIC này bị sai' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'AI Gia sư giải thích tại sao câu TOEIC này bị sai',
+    }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

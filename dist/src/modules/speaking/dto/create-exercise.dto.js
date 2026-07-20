@@ -35,13 +35,19 @@ __decorate([
     __metadata("design:type", String)
 ], CreateExerciseDto.prototype, "targetText", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'INTERMEDIATE', enum: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] }),
+    (0, swagger_1.ApiPropertyOptional)({
+        example: 'INTERMEDIATE',
+        enum: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'],
+    }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsIn)(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']),
     __metadata("design:type", String)
 ], CreateExerciseDto.prototype, "difficulty", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'IELTS', enum: ['IELTS', 'TOEIC', 'GENERAL'] }),
+    (0, swagger_1.ApiPropertyOptional)({
+        example: 'IELTS',
+        enum: ['IELTS', 'TOEIC', 'GENERAL'],
+    }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsIn)(['IELTS', 'TOEIC', 'GENERAL']),
     __metadata("design:type", String)

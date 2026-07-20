@@ -50,7 +50,10 @@ let UploadService = UploadService_1 = class UploadService {
         if (!file) {
             throw new common_1.BadRequestException('No file provided');
         }
-        return this.uploadStream(file.buffer, { folder: 'breadtrans', resource_type: 'auto' });
+        return this.uploadStream(file.buffer, {
+            folder: 'breadtrans',
+            resource_type: 'auto',
+        });
     }
     async uploadStream(buffer, options) {
         return new Promise((resolve, reject) => {

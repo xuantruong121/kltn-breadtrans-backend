@@ -57,7 +57,11 @@ __decorate([
 __decorate([
     (0, common_1.Get)('exercises'),
     (0, swagger_1.ApiOperation)({ summary: 'Lấy danh sách bài tập phát âm' }),
-    (0, swagger_1.ApiQuery)({ name: 'category', required: false, enum: ['IELTS', 'TOEIC', 'GENERAL'] }),
+    (0, swagger_1.ApiQuery)({
+        name: 'category',
+        required: false,
+        enum: ['IELTS', 'TOEIC', 'GENERAL'],
+    }),
     __param(0, (0, common_1.Query)('category')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -96,9 +100,7 @@ __decorate([
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Request)()),
     __param(2, (0, common_1.UploadedFile)(new common_1.ParseFilePipe({
-        validators: [
-            new common_1.MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
-        ],
+        validators: [new common_1.MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 })],
     }))),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Object, Object]),
