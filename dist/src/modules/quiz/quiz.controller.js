@@ -29,6 +29,9 @@ let QuizController = class QuizController {
     createQuiz(dto) {
         return this.quizService.createQuiz(dto);
     }
+    getListeningPractices() {
+        return this.quizService.getListeningPractices();
+    }
     getQuizById(id) {
         return this.quizService.getQuizById(id);
     }
@@ -50,6 +53,14 @@ __decorate([
     __metadata("design:paramtypes", [quiz_dto_1.CreateQuizDto]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "createQuiz", null);
+__decorate([
+    (0, common_1.Get)('listening-practice'),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy danh sách các bài Luyện Nghe (Nghe Chép)' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "getListeningPractices", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, swagger_1.ApiBearerAuth)(),

@@ -55,4 +55,18 @@ export class OpenAIEvaluatorStrategy implements IAIEvaluator {
   ): Promise<any[]> {
     return [];
   }
+
+  async generateDictation(topic: string, count: number): Promise<any[]> {
+    return [];
+  }
+
+  async importEtsPdf(
+    pdfBuffer: Buffer,
+    pdfMimeType: string,
+    audioBuffer?: Buffer,
+    audioMimeType?: string,
+    audioUrl?: string,
+  ): Promise<any[]> {
+    return [];
+  }
 }

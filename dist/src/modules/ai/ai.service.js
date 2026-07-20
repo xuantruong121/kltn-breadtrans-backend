@@ -38,6 +38,48 @@ let AiService = AiService_1 = class AiService {
     async generateToeicQuestions(topic, part, count) {
         return this.aiEvaluator.generateToeicQuestions(topic, part, count);
     }
+    async generateDictation(topic, count) {
+        return this.aiEvaluator.generateDictation(topic, count);
+    }
+    async generateTtsAudio(text) {
+        const azureKey = process.env.AZURE_SPEECH_KEY;
+        const azureRegion = process.env.AZURE_SPEECH_REGION;
+        if (!azureKey || !azureRegion) {
+            this.logger.warn('Thiếu AZURE_SPEECH_KEY. Bỏ qua tạo Audio.');
+            return null;
+        }
+        try {
+            const endpoint = `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`;
+            const ssml = `<speak version='1.0' xml:lang='en-US'>
+  <voice xml:lang='en-US' xml:gender='Female' name='en-US-JennyNeural'>
+    ${text}
+  </voice>
+</speak>`;
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Ocp-Apim-Subscription-Key': azureKey,
+                    'Content-Type': 'application/ssml+xml',
+                    'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+                    'User-Agent': 'BreadtransKLTN',
+                },
+                body: ssml,
+            });
+            if (!response.ok) {
+                this.logger.error(`Azure TTS failed: ${response.statusText}`);
+                return null;
+            }
+            const arrayBuffer = await response.arrayBuffer();
+            return Buffer.from(arrayBuffer);
+        }
+        catch (e) {
+            this.logger.error('Error in Azure TTS:', e);
+            return null;
+        }
+    }
+    async importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl) {
+        return this.aiEvaluator.importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl);
+    }
 };
 exports.AiService = AiService;
 exports.AiService = AiService = AiService_1 = __decorate([

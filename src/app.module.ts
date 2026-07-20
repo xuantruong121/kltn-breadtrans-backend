@@ -11,6 +11,7 @@ import { UploadModule } from './modules/upload/upload.module';
 import { SpeakingModule } from './modules/speaking/speaking.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ReadingModule } from './modules/reading/reading.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     UploadModule,
     SpeakingModule,
     PrismaModule,
+    ReadingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

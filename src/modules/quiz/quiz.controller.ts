@@ -35,6 +35,13 @@ export class QuizController {
     return this.quizService.createQuiz(dto);
   }
 
+  @Get('listening-practice')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy danh sách các bài Luyện Nghe (Nghe Chép)' })
+  getListeningPractices() {
+    return this.quizService.getListeningPractices();
+  }
+
   @Get(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy chi tiết Quiz và danh sách Questions' })

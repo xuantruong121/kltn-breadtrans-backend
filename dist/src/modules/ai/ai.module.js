@@ -12,11 +12,13 @@ const ai_controller_1 = require("./ai.controller");
 const ai_service_1 = require("./ai.service");
 const gemini_evaluator_strategy_1 = require("./strategies/gemini-evaluator.strategy");
 const ai_evaluator_interface_1 = require("./strategies/ai-evaluator.interface");
+const upload_module_1 = require("../upload/upload.module");
 let AiModule = class AiModule {
 };
 exports.AiModule = AiModule;
 exports.AiModule = AiModule = __decorate([
     (0, common_1.Module)({
+        imports: [upload_module_1.UploadModule],
         controllers: [ai_controller_1.AiController],
         providers: [
             ai_service_1.AiService,

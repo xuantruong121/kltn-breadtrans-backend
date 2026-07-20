@@ -1,13 +1,25 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  UseInterceptors,
+  UploadedFiles,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from './ai.service';
+import { UploadService } from '../upload/upload.service';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
   ApiProperty,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber } from 'class-validator';
 
 export class ChatDto {
   @ApiProperty({
@@ -32,10 +44,26 @@ export class GenerateToeicDto {
   count: number;
 }
 
+export class GenerateDictationDto {
+  @ApiProperty({ example: 'Daily conversation at the restaurant' })
+  @IsString()
+  @IsNotEmpty()
+  topic: string;
+
+  @ApiProperty({ example: 5, description: 'Number of sentences to generate' })
+  @IsNumber()
+  @IsNotEmpty()
+  count: number;
+}
+
 @ApiTags('ai')
 @Controller('ai')
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    private readonly prisma: PrismaService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -48,16 +76,81 @@ export class AiController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Post('generate-dictation')
+  @ApiOperation({ summary: 'AI tự động sinh bài Luyện Nghe (Chép chính tả)' })
+  async generateDictation(@Body() dto: GenerateDictationDto) {
+    // 1. Gọi Gemini sinh ra JSON các câu Dictation
+    const questions = await this.aiService.generateDictation(
+      dto.topic,
+      dto.count,
+    );
+
+    // 2. Lưu thành 1 Quiz loại LISTENING_PRACTICE
+    const newQuiz = await this.prisma.quiz.create({
+      data: {
+        title: `Bài luyện nghe: ${dto.topic}`,
+        description: 'Được tạo tự động bởi AI',
+        type: 'LISTENING_PRACTICE',
+      },
+    });
+
+    const questionData = [];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      let audioUrl = '';
+
+      // Tạo Audio từ văn bản
+      const audioBuffer = await this.aiService.generateTtsAudio(q.transcript);
+      if (audioBuffer) {
+        // Upload lên Cloudinary
+        const uploadResult = await this.uploadService.uploadStream(
+          audioBuffer,
+          {
+            folder: 'dictation_audio',
+            resource_type: 'video', // Audio lưu dưới dạng video trên Cloudinary
+          },
+        );
+        audioUrl = uploadResult.secure_url;
+      }
+
+      questionData.push({
+        quizId: newQuiz.id,
+        type: 'DICTATION',
+        content: {
+          part: 1,
+          audioUrl: audioUrl, // Đã có audio xịn
+          transcript: q.transcript,
+          translation: q.translation,
+          words: String(q.transcript)
+            .replace(/[^\w\s']/g, '')
+            .split(' ')
+            .filter((w: string) => w.length > 0),
+        },
+        order: i + 1,
+      });
+    }
+
+    await this.prisma.question.createMany({
+      data: questionData,
+    });
+
+    return {
+      success: true,
+      message: `Đã tạo ${questions.length} câu luyện nghe.`,
+      quizId: newQuiz.id,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post('generate-toeic-quiz')
   @ApiOperation({ summary: 'Sinh bộ câu hỏi TOEIC tự động theo chủ đề' })
   async generateToeicQuiz(@Body() dto: GenerateToeicDto) {
-    // Gọi AI sinh câu hỏi (JSON)
     const questions = await this.aiService.generateToeicQuestions(
       dto.topic,
       dto.part,
       dto.count,
     );
-    // (Trong thực tế, QuizController sẽ lấy questions này lưu vào DB. Ở đây trả về trực tiếp để review)
     return { success: true, questions };
   }
 
@@ -81,5 +174,80 @@ export class AiController {
       body.correctAnswer,
     );
     return { success: true, explanation };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('import-ets-pdf')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'pdfFile', maxCount: 1 },
+      { name: 'audioFile', maxCount: 1 },
+    ]),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB',
+  })
+  async importEtsPdf(
+    @UploadedFiles()
+    files: {
+      pdfFile?: Express.Multer.File[];
+      audioFile?: Express.Multer.File[];
+    },
+  ) {
+    const pdfFile = files?.pdfFile?.[0];
+    const audioFile = files?.audioFile?.[0];
+
+    if (!pdfFile) {
+      throw new BadRequestException(
+        'Vui lòng upload file PDF hoặc hình ảnh đề thi (pdfFile).',
+      );
+    }
+
+    let audioUrl = '';
+    if (audioFile) {
+      const uploadResult = await this.uploadService.uploadFile(audioFile);
+      audioUrl = uploadResult.secure_url;
+    }
+
+    const questions = await this.aiService.importEtsPdf(
+      pdfFile.buffer,
+      pdfFile.mimetype,
+      audioFile?.buffer,
+      audioFile?.mimetype,
+      audioUrl,
+    );
+
+    if (!questions || questions.length === 0) {
+      throw new BadRequestException(
+        'AI không tìm thấy câu hỏi nào trong file này.',
+      );
+    }
+
+    const newQuiz = await this.prisma.quiz.create({
+      data: {
+        title: `Đề thi TOEIC ETS tự động - ${new Date().toLocaleDateString('vi-VN')}`,
+        description: 'Tạo tự động bởi AI Importer (PDF + Audio)',
+        type: 'TOEIC',
+      },
+    });
+
+    const questionData = questions.map((q, index) => ({
+      quizId: newQuiz.id,
+      type: q.type || 'MULTIPLE_CHOICE',
+      content: q.content,
+      order: index + 1,
+    }));
+
+    await this.prisma.question.createMany({
+      data: questionData,
+    });
+
+    return {
+      success: true,
+      message: `Đã trích xuất và lưu thành công ${questions.length} câu hỏi.`,
+      quizId: newQuiz.id,
+    };
   }
 }

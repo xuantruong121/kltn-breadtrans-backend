@@ -105,22 +105,47 @@ model Material {
   fileType String? // PDF, DOCX, MP3, vv.
 }
 
+enum TopicCategory {
+  GRAMMAR_TOPIC
+  GRAMMAR_LEVEL
+  GRAMMAR_MOCK_TEST
+  BILINGUAL_LEVEL
+}
+
+model PracticeTopic {
+  id             Int             @id @default(autoincrement())
+  name           String
+  vietnameseName String?
+  category       TopicCategory
+  iconUrl        String?
+  order          Int             @default(0)
+  createdAt      DateTime        @default(now())
+
+  quizzes        Quiz[]
+}
+
 enum QuizType {
   IELTS
   TOEIC
   VSTEP
   GENERAL
+  LISTENING_PRACTICE
+  BILINGUAL_READING
 }
 
 model Quiz {
-  id          Int      @id @default(autoincrement())
-  courseId    Int?
-  course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  title       String
-  description String?
-  type        QuizType @default(TOEIC)
-  timeLimit   Int? // In minutes
-  createdAt   DateTime @default(now())
+  id              Int            @id @default(autoincrement())
+  courseId        Int?
+  course          Course?        @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  practiceTopicId Int?
+  practiceTopic   PracticeTopic? @relation(fields: [practiceTopicId], references: [id], onDelete: SetNull)
+  title           String
+  description     String?
+  theoryContent   String?        @db.Text
+  bilingualContent Json?         // Array of { en: string, vi: string }
+  type            QuizType       @default(TOEIC)
+  timeLimit       Int?           // In minutes
+  createdAt       DateTime       @default(now())
 
   questions   Question[]
   submissions Submission[]

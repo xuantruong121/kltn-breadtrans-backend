@@ -20,6 +20,7 @@ const upload_module_1 = require("./modules/upload/upload.module");
 const speaking_module_1 = require("./modules/speaking/speaking.module");
 const prisma_module_1 = require("./prisma/prisma.module");
 const event_emitter_1 = require("@nestjs/event-emitter");
+const reading_module_1 = require("./modules/reading/reading.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -36,6 +37,7 @@ exports.AppModule = AppModule = __decorate([
             upload_module_1.UploadModule,
             speaking_module_1.SpeakingModule,
             prisma_module_1.PrismaModule,
+            reading_module_1.ReadingModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

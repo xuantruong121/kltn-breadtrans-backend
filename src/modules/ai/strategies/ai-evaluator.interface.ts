@@ -58,4 +58,27 @@ export interface IAIEvaluator {
     part: number,
     count: number,
   ): Promise<any[]>;
+
+  /**
+   * Tự động sinh danh sách câu hỏi Luyện nghe (Chép chính tả)
+   * @param topic Chủ đề
+   * @param count Số lượng câu
+   */
+  generateDictation(topic: string, count: number): Promise<any[]>;
+
+  /**
+   * Đọc file PDF/Image đề thi ETS và bóc tách thành JSON (Kèm Audio để trích xuất Timestamp)
+   * @param pdfBuffer Buffer của file PDF/Ảnh
+   * @param pdfMimeType MimeType của file PDF
+   * @param audioBuffer Buffer của file Audio (Tùy chọn)
+   * @param audioMimeType MimeType của file Audio (Tùy chọn)
+   * @param audioUrl URL của Audio đã upload để gắn vào JSON
+   */
+  importEtsPdf(
+    pdfBuffer: Buffer,
+    pdfMimeType: string,
+    audioBuffer?: Buffer,
+    audioMimeType?: string,
+    audioUrl?: string,
+  ): Promise<any[]>;
 }

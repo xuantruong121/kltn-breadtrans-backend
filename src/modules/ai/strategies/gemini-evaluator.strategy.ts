@@ -53,7 +53,7 @@ Please keep the response concise but informative.`;
       }
 
       const model = this.genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash',
       });
       const fullPrompt = `You are an AI teaching assistant for an online English learning platform. Answer the student's question helpfully: "${prompt}"`;
 
@@ -255,7 +255,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
     }
     try {
       const model = this.genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3.5-flash',
       });
       const prompt = `
         Bạn là một gia sư TOEIC chuyên nghiệp và tận tâm.
@@ -291,7 +291,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
     }
     try {
       const model = this.genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3.5-flash',
       });
       const prompt = `
         Bạn là một chuyên gia ra đề thi TOEIC. Hãy tạo ra ${count} câu hỏi trắc nghiệm thuộc TOEIC Part ${part}.
@@ -309,7 +309,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       const result = await model.generateContent(prompt);
       const response = result.response;
       let text = response.text().trim();
-      // Loại bỏ markdown code block nếu có
       if (text.startsWith('```json')) {
         text = text.substring(7, text.length - 3).trim();
       } else if (text.startsWith('```')) {
@@ -322,6 +321,132 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         error.stack,
       );
       throw new Error('Lỗi khi sinh câu hỏi TOEIC');
+    }
+  }
+
+  async generateDictation(topic: string, count: number): Promise<any[]> {
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error('Thiếu GEMINI_API_KEY');
+    }
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash',
+      });
+      const prompt = `
+        Bạn là một giáo viên tiếng Anh chuyên dạy luyện nghe chép chính tả (Dictation) TOEIC.
+        Hãy tạo ${count} câu tiếng Anh thông dụng thuộc chủ đề "${topic}".
+        Trả về kết quả dưới dạng một mảng JSON (không bọc trong markdown block). Mỗi phần tử là một object có cấu trúc:
+        {
+          "transcript": "<Câu tiếng Anh chuẩn xác, độ dài từ 7-15 từ>",
+          "translation": "<Dịch nghĩa sang tiếng Việt>"
+        }
+        Chỉ trả về JSON hợp lệ, không thêm bất kỳ văn bản giải thích nào khác.
+      `;
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      let text = response.text().trim();
+      if (text.startsWith('```json')) {
+        text = text.substring(7, text.length - 3).trim();
+      } else if (text.startsWith('```')) {
+        text = text.substring(3, text.length - 3).trim();
+      }
+      return JSON.parse(text);
+    } catch (error: any) {
+      this.logger.error(
+        `Error generating dictation: ${error.message}`,
+        error.stack,
+      );
+      throw new Error('Lỗi khi sinh bài nghe chép chính tả');
+    }
+  }
+
+  async importEtsPdf(
+    pdfBuffer: Buffer,
+    pdfMimeType: string,
+    audioBuffer?: Buffer,
+    audioMimeType?: string,
+    audioUrl?: string,
+  ): Promise<any[]> {
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error('Thiếu GEMINI_API_KEY');
+    }
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash',
+      });
+
+      let prompt = `
+        Bạn là một chuyên gia nhận dạng tài liệu đề thi TOEIC.
+        Tôi cung cấp cho bạn một file đề thi TOEIC (PDF/Image)
+      `;
+
+      if (audioBuffer) {
+        prompt += ` và một file âm thanh đính kèm.`;
+      }
+
+      prompt += `
+        Nhiệm vụ của bạn là bóc tách tất cả các câu hỏi trắc nghiệm thành một mảng JSON nguyên bản.
+        Mỗi phần tử trong JSON phải có cấu trúc:
+        {
+          "type": "MULTIPLE_CHOICE",
+          "content": {
+             "text": "Nội dung câu hỏi (nếu có)",
+             "options": ["A. Lựa chọn 1", "B. Lựa chọn 2", "C. Lựa chọn 3", "D. Lựa chọn 4"],
+             "correctAnswer": "A",
+             "explanation": ""`;
+
+      if (audioBuffer) {
+        prompt += `,
+             "audioUrl": "${audioUrl || ''}",
+             "audioTimestamp": "00:00 - 00:00"`;
+      }
+
+      prompt += `
+          }
+        }
+        
+        Lưu ý: 
+        - Chỉ trả về duy nhất chuỗi JSON chứa mảng các câu hỏi, không thêm Markdown format hay text giải thích.
+        - Nếu có bài đọc (Passage), hãy đưa đoạn văn bản bài đọc đó vào trường "passage" bên trong "content" của câu hỏi đầu tiên.`;
+
+      if (audioBuffer) {
+        prompt += `
+        - VỚI PHẦN LISTENING (Part 1, 2, 3, 4): Hãy lắng nghe file âm thanh đính kèm để phân tách từng câu hỏi (hoặc cụm câu hỏi). Điền khoảng thời gian (Timestamp) bắt đầu và kết thúc của đoạn âm thanh liên quan vào trường "audioTimestamp" (VD: "01:20 - 01:50"). Hãy cố gắng dự đoán chính xác nhất có thể.`;
+      }
+
+      const contents: any[] = [
+        {
+          inlineData: {
+            data: pdfBuffer.toString('base64'),
+            mimeType: pdfMimeType,
+          },
+        },
+      ];
+
+      if (audioBuffer && audioMimeType) {
+        contents.push({
+          inlineData: {
+            data: audioBuffer.toString('base64'),
+            mimeType: audioMimeType,
+          },
+        });
+      }
+
+      contents.push(prompt);
+
+      const result = await model.generateContent(contents);
+
+      const response = result.response;
+      let text = response.text().trim();
+      if (text.startsWith('```json')) {
+        text = text.substring(7, text.length - 3).trim();
+      } else if (text.startsWith('```')) {
+        text = text.substring(3, text.length - 3).trim();
+      }
+      return JSON.parse(text);
+    } catch (error: any) {
+      this.logger.error(`Error parsing ETS PDF: ${error.message}`, error.stack);
+      throw new Error('Lỗi khi phân tích đề thi ETS');
     }
   }
 }

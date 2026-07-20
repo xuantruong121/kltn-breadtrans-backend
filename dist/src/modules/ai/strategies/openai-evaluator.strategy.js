@@ -35,6 +35,12 @@ let OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy_1 = class OpenAIEvaluatorS
     async generateToeicQuestions(topic, part, count) {
         return [];
     }
+    async generateDictation(topic, count) {
+        return [];
+    }
+    async importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl) {
+        return [];
+    }
 };
 exports.OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy;
 exports.OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy_1 = __decorate([

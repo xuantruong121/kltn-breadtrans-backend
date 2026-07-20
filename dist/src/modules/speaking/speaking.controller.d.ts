@@ -4,6 +4,7 @@ export declare class SpeakingController {
     private readonly speakingService;
     constructor(speakingService: SpeakingService);
     createExercise(dto: CreateExerciseDto): Promise<{
+        category: string;
         createdAt: Date;
         id: number;
         title: string;
@@ -11,9 +12,9 @@ export declare class SpeakingController {
         imageUrl: string | null;
         audioUrl: string | null;
         difficulty: string;
-        category: string;
     }>;
     findAllExercises(category?: string): Promise<{
+        category: string;
         createdAt: Date;
         id: number;
         title: string;
@@ -21,9 +22,9 @@ export declare class SpeakingController {
         imageUrl: string | null;
         audioUrl: string | null;
         difficulty: string;
-        category: string;
     }[]>;
     findOne(id: number): Promise<{
+        category: string;
         createdAt: Date;
         id: number;
         title: string;
@@ -31,7 +32,6 @@ export declare class SpeakingController {
         imageUrl: string | null;
         audioUrl: string | null;
         difficulty: string;
-        category: string;
     }>;
     submitAudio(exerciseId: number, req: any, audio: Express.Multer.File): Promise<{
         submissionId: number;
@@ -40,6 +40,7 @@ export declare class SpeakingController {
     }>;
     getMySubmissions(req: any): Promise<({
         exercise: {
+            category: string;
             createdAt: Date;
             id: number;
             title: string;
@@ -47,7 +48,6 @@ export declare class SpeakingController {
             imageUrl: string | null;
             audioUrl: string | null;
             difficulty: string;
-            category: string;
         };
     } & {
         id: number;

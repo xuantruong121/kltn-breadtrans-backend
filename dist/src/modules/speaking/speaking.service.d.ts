@@ -9,6 +9,7 @@ export declare class SpeakingService {
     private readonly logger;
     constructor(prisma: PrismaService, aiService: AiService, uploadService: UploadService);
     findAllExercises(category?: string): Promise<{
+        category: string;
         createdAt: Date;
         id: number;
         title: string;
@@ -16,9 +17,9 @@ export declare class SpeakingService {
         imageUrl: string | null;
         audioUrl: string | null;
         difficulty: string;
-        category: string;
     }[]>;
     findExerciseById(id: number): Promise<{
+        category: string;
         createdAt: Date;
         id: number;
         title: string;
@@ -26,9 +27,9 @@ export declare class SpeakingService {
         imageUrl: string | null;
         audioUrl: string | null;
         difficulty: string;
-        category: string;
     }>;
     createExercise(dto: CreateExerciseDto): Promise<{
+        category: string;
         createdAt: Date;
         id: number;
         title: string;
@@ -36,7 +37,6 @@ export declare class SpeakingService {
         imageUrl: string | null;
         audioUrl: string | null;
         difficulty: string;
-        category: string;
     }>;
     submitAudio(exerciseId: number, userId: number, audioFile: Express.Multer.File): Promise<{
         submissionId: number;
@@ -45,6 +45,7 @@ export declare class SpeakingService {
     }>;
     getMySubmissions(userId: number): Promise<({
         exercise: {
+            category: string;
             createdAt: Date;
             id: number;
             title: string;
@@ -52,7 +53,6 @@ export declare class SpeakingService {
             imageUrl: string | null;
             audioUrl: string | null;
             difficulty: string;
-            category: string;
         };
     } & {
         id: number;
