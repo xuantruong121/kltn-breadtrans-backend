@@ -49,4 +49,25 @@ export class AuthController {
   getProfile(@Request() req: any) {
     return req.user;
   }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cấp lại Access Token mới bằng Refresh Token' })
+  @ApiResponse({ status: 200, description: 'Trả về token mới.' })
+  @ApiResponse({ status: 401, description: 'Refresh Token không hợp lệ.' })
+  async refreshTokens(
+    @Body('userId') userId: number,
+    @Body('refreshToken') refreshToken: string,
+  ) {
+    return this.authService.refreshTokens(userId, refreshToken);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng xuất, xóa refresh token' })
+  async logout(@Request() req: any) {
+    return this.authService.logout(req.user.userId);
+  }
 }

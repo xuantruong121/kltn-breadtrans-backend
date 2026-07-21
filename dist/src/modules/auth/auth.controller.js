@@ -32,6 +32,12 @@ let AuthController = class AuthController {
     getProfile(req) {
         return req.user;
     }
+    async refreshTokens(userId, refreshToken) {
+        return this.authService.refreshTokens(userId, refreshToken);
+    }
+    async logout(req) {
+        return this.authService.logout(req.user.userId);
+    }
 };
 exports.AuthController = AuthController;
 __decorate([
@@ -67,6 +73,29 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "getProfile", null);
+__decorate([
+    (0, common_1.Post)('refresh'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Cấp lại Access Token mới bằng Refresh Token' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Trả về token mới.' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'Refresh Token không hợp lệ.' }),
+    __param(0, (0, common_1.Body)('userId')),
+    __param(1, (0, common_1.Body)('refreshToken')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, String]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "refreshTokens", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Post)('logout'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Đăng xuất, xóa refresh token' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "logout", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('auth'),
     (0, common_1.Controller)('auth'),

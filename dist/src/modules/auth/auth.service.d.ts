@@ -8,25 +8,34 @@ export declare class AuthService {
     register(registerDto: RegisterDto): Promise<{
         profile: {
             id: number;
-            userId: number;
             fullName: string;
             avatar: string | null;
             phone: string | null;
             address: string | null;
             targetScore: string | null;
+            userId: number;
         } | null;
-        createdAt: Date;
-        id: number;
         email: string;
         role: import(".prisma/client").$Enums.Role;
+        refreshToken: string | null;
+        createdAt: Date;
         updatedAt: Date;
+        id: number;
     }>;
     login(loginDto: LoginDto): Promise<{
         access_token: string;
+        refresh_token: string;
         user: {
             id: number;
             email: string;
             role: import(".prisma/client").$Enums.Role;
         };
+    }>;
+    refreshTokens(userId: number, refreshToken: string): Promise<{
+        access_token: string;
+        refresh_token: string;
+    }>;
+    logout(userId: number): Promise<{
+        message: string;
     }>;
 }

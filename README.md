@@ -19,7 +19,7 @@
 
 2. **🤖 AI ETS Importer (Siêu việt):**
    - Hỗ trợ **Multi-modal AI**: Khả năng tải lên cùng lúc 1 file PDF/Ảnh đề thi và 1 file Audio (.mp3).
-   - Trí tuệ nhân tạo Gemini 1.5 tự động đọc tài liệu, nghe âm thanh, bóc tách toàn bộ câu hỏi (A, B, C, D) kèm **Timestamps** và lưu thẳng vào Database chỉ trong vài chục giây.
+   - Trí tuệ nhân tạo Gemini 3.5 tự động đọc tài liệu, nghe âm thanh, bóc tách toàn bộ câu hỏi (A, B, C, D) kèm **Timestamps** và lưu thẳng vào Database chỉ trong vài chục giây.
 
 3. **☁️ Cloud Uploads:**
    - Quản lý toàn bộ tài nguyên hình ảnh, âm thanh trực tiếp trên **Cloudinary** (Tối đa 10MB/file).
@@ -37,7 +37,7 @@
 - **ORM:** [Prisma](https://www.prisma.io/)
 - **Caching & Queue:** Redis
 - **Containerization:** Docker & Docker Compose
-- **Tích hợp AI:** Google Gemini 1.5 Flash, Azure AI Speech
+- **Tích hợp AI:** Google Gemini 3.5 Flash, Azure AI Speech
 - **File Storage:** Cloudinary
 
 ---

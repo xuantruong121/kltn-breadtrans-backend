@@ -16,6 +16,7 @@ export declare class UserController {
         id: number;
         email: string;
         role: import(".prisma/client").$Enums.Role;
+        refreshToken: string | null;
         updatedAt: Date;
     }>;
 }
