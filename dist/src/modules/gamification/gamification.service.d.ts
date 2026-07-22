@@ -19,8 +19,8 @@ export declare class GamificationService {
     } & {
         id: number;
         userId: number;
-        totalPoints: number;
         rank: number | null;
+        totalPoints: number;
     })[]>;
     getMyBadges(userId: number): Promise<({
         badge: {

@@ -1,0 +1,40 @@
+# BreadTrans — Caddyfile
+# Domain: breadtrans.edu.vn (A record → 216.198.79.1)
+# Caddy tự động xin SSL từ Let's Encrypt — không cần cấu hình gì thêm!
+
+breadtrans.edu.vn {
+    # Reverse proxy tới NestJS API container
+    reverse_proxy api:3000
+
+    # Gzip compression
+    encode gzip
+
+    # Security headers
+    header {
+        # Chặn clickjacking
+        X-Frame-Options DENY
+        # Ngăn MIME sniffing
+        X-Content-Type-Options nosniff
+        # XSS protection
+        X-XSS-Protection "1; mode=block"
+        # HSTS — giữ HTTPS vĩnh viễn sau khi đã test OK
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # Ẩn thông tin server
+        -Server
+    }
+
+    # Log requests (xem bằng: docker compose logs caddy)
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+        format json
+    }
+}
+
+# Redirect www.breadtrans.edu.vn → breadtrans.edu.vn
+# (Thêm CNAME record: www → breadtrans.edu.vn trên DNS trước)
+# www.breadtrans.edu.vn {
+#     redir https://breadtrans.edu.vn{uri} permanent
+# }

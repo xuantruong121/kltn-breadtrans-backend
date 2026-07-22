@@ -75,18 +75,16 @@ export class SpeakingService {
     // 2. Kiểm tra exercise có tồn tại không
     const exercise = await this.findExerciseById(exerciseId);
 
-    // 3. Upload file audio lên Cloudinary để lưu trữ
+    // 3. Upload file audio lên Cloudflare R2 để lưu trữ
     this.logger.log(
       `Uploading audio for exercise #${exerciseId} by user #${userId}`,
     );
-    const uploadResult = await this.uploadService.uploadStream(
+    const uploadResult = await this.uploadService.uploadRawBuffer(
       audioFile.buffer,
-      {
-        folder: 'speaking_audio',
-        resource_type: 'video',
-      },
+      audioFile.mimetype || 'audio/mpeg',
+      'speaking_audio',
     );
-    const audioUrl = uploadResult.secure_url;
+    const audioUrl = uploadResult.url;
 
     // 3. Đánh giá phát âm qua Azure + Gemini
     this.logger.log('Sending audio to AI Evaluator (Azure+Gemini)...');

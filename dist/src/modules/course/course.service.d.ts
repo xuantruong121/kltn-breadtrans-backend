@@ -20,6 +20,13 @@ export declare class CourseService {
             startDate: Date | null;
             endDate: Date | null;
             meetingLink: string | null;
+            status: string;
+            links: import("@prisma/client/runtime/library").JsonValue | null;
+            summary: import("@prisma/client/runtime/library").JsonValue | null;
+            noteProcess: string | null;
+            rank: import("@prisma/client/runtime/library").JsonValue | null;
+            stories: import("@prisma/client/runtime/library").JsonValue | null;
+            pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
             teacherId: number;
         }[];
     } & {
@@ -65,6 +72,13 @@ export declare class CourseService {
             startDate: Date | null;
             endDate: Date | null;
             meetingLink: string | null;
+            status: string;
+            links: import("@prisma/client/runtime/library").JsonValue | null;
+            summary: import("@prisma/client/runtime/library").JsonValue | null;
+            noteProcess: string | null;
+            rank: import("@prisma/client/runtime/library").JsonValue | null;
+            stories: import("@prisma/client/runtime/library").JsonValue | null;
+            pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
             teacherId: number;
         })[];
     } & {
@@ -92,6 +106,13 @@ export declare class CourseService {
         startDate: Date | null;
         endDate: Date | null;
         meetingLink: string | null;
+        status: string;
+        links: import("@prisma/client/runtime/library").JsonValue | null;
+        summary: import("@prisma/client/runtime/library").JsonValue | null;
+        noteProcess: string | null;
+        rank: import("@prisma/client/runtime/library").JsonValue | null;
+        stories: import("@prisma/client/runtime/library").JsonValue | null;
+        pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
         teacherId: number;
     }>;
     getClassById(classId: number): Promise<{
@@ -132,6 +153,13 @@ export declare class CourseService {
         startDate: Date | null;
         endDate: Date | null;
         meetingLink: string | null;
+        status: string;
+        links: import("@prisma/client/runtime/library").JsonValue | null;
+        summary: import("@prisma/client/runtime/library").JsonValue | null;
+        noteProcess: string | null;
+        rank: import("@prisma/client/runtime/library").JsonValue | null;
+        stories: import("@prisma/client/runtime/library").JsonValue | null;
+        pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
         teacherId: number;
     }>;
     deleteClass(id: number): Promise<{
@@ -141,6 +169,13 @@ export declare class CourseService {
         startDate: Date | null;
         endDate: Date | null;
         meetingLink: string | null;
+        status: string;
+        links: import("@prisma/client/runtime/library").JsonValue | null;
+        summary: import("@prisma/client/runtime/library").JsonValue | null;
+        noteProcess: string | null;
+        rank: import("@prisma/client/runtime/library").JsonValue | null;
+        stories: import("@prisma/client/runtime/library").JsonValue | null;
+        pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
         teacherId: number;
     }>;
     createLesson(classId: number, dto: CreateLessonDto): Promise<{

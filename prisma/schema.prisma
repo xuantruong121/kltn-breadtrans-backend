@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "library"
 }
 
@@ -15,22 +15,61 @@ enum Role {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  password     String
   role         Role     @default(STUDENT)
   refreshToken String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  profile            Profile?
-  enrollments        Enrollment[]
-  teachingClasses    Class[]             @relation("TeacherClasses")
-  submissions        Submission[]
-  pointHistory       PointHistory[]
-  userBadges         UserBadge[]
-  leaderboard        Leaderboard?
+  // Bổ sung các trường từ Firestore Users Schema
+  totalBanhRan              Int       @default(0)
+  streakCount               Int       @default(0)
+  lastStreakUpdate          DateTime?
+  parentName                String?
+  parentPhone               String?
+  birthYear                 Int?
+  nextExamDate              String? // YYYY-MM-DD
+  isSelfClaimed             Boolean   @default(false)
+  tuitionFee                Json? // Record<"YYYY-MM", { amount?, paidAt? }>
+  bankQrUrl                 String?
+  bankName                  String?
+  bankBin                   String?
+  bankAccountNumber         String?
+  bankAccountName           String?
+  bankAccount               String?
+  sessionToken              String?
+  loginCount                Int       @default(0)
+  lastLoginAt               DateTime?
+  lastDeviceType            String? // "pc" | "non-pc"
+  admirationsMessage        Json?
+  admirationsSentToday      Json?
+  admirationsSentStoryToday Json?
+  timesVocabXS              Int       @default(0)
+  timesVocab                Int       @default(0)
+  quizAccuracy              Float     @default(0)
+  speakingAccuracy          Float     @default(0)
+  countHeart                Int       @default(0)
+  movies                    Json?
+  gameTickets               Json?
+  speaking                  Json? // Array of SpeakingItem
+  writing                   Json? // Array of WritingItem
+
+  profile             Profile?
+  enrollments         Enrollment[]
+  teachingClasses     Class[]               @relation("TeacherClasses")
+  submissions         Submission[]
+  pointHistory        PointHistory[]
+  userBadges          UserBadge[]
+  leaderboard         Leaderboard?
   speakingSubmissions SpeakingSubmission[]
+  bookProgresses      UserBookProgress[]
+  marketOrders        MarketOrder[]
+  gamePlays           GamePlay[]
+  watchTracking       WatchTracking?
+  aiUsages            AiUsage[]
+  vocabProgresses     UserVocabWordProgress[]
 }
 
 model Profile {
@@ -67,6 +106,15 @@ model Class {
   startDate   DateTime?
   endDate     DateTime?
   meetingLink String? // Google Meet/Zoom link
+
+  // Bổ sung các trường từ Firestore Classes Schema
+  status             String  @default("active") // "active" | "inactive"
+  links              Json? // { zalo?, meet? }
+  summary            Json?
+  noteProcess        String?
+  rank               Json? // ClassRankSnapshot
+  stories            Json? // Record<userId, Record<storyId, IClassStory>>
+  pendingEvaluations Json? // Record<"studentId_bookId_lessonId", ...>
 
   enrollments Enrollment[]
   lessons     Lesson[]
@@ -116,15 +164,15 @@ enum TopicCategory {
 }
 
 model PracticeTopic {
-  id             Int             @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   name           String
   vietnameseName String?
   category       TopicCategory
   iconUrl        String?
-  order          Int             @default(0)
-  createdAt      DateTime        @default(now())
+  order          Int           @default(0)
+  createdAt      DateTime      @default(now())
 
-  quizzes        Quiz[]
+  quizzes Quiz[]
 }
 
 enum QuizType {
@@ -147,9 +195,9 @@ model Quiz {
   title           String
   description     String?
   theoryContent   String?        @db.Text
-  bilingualContent Json?         // Array of { en: string, vi: string }
+  bilingualContent Json? // Array of { en: string, vi: string }
   type            QuizType       @default(TOEIC)
-  timeLimit       Int?           // In minutes
+  timeLimit       Int? // In minutes
   createdAt       DateTime       @default(now())
 
   questions   Question[]
@@ -229,14 +277,14 @@ model PointHistory {
 
 // Speaking Practice Models
 model SpeakingExercise {
-  id          Int      @id @default(autoincrement())
-  title       String
-  targetText  String   @db.Text // Câu/đoạn văn cần đọc (hoặc script mẫu)
-  imageUrl    String?  // Dùng cho TOEIC Part 1 (Mô tả tranh)
-  audioUrl    String?  // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
-  difficulty  String   @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
-  category    String   @default("TOEIC") // IELTS, TOEIC, GENERAL
-  createdAt   DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  title      String
+  targetText String   @db.Text // Câu/đoạn văn cần đọc (hoặc script mẫu)
+  imageUrl   String? // Dùng cho TOEIC Part 1 (Mô tả tranh)
+  audioUrl   String? // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
+  difficulty String   @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
+  category   String   @default("TOEIC") // IELTS, TOEIC, GENERAL
+  createdAt  DateTime @default(now())
 
   submissions SpeakingSubmission[]
 }
@@ -247,8 +295,238 @@ model SpeakingSubmission {
   exercise     SpeakingExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   userId       Int
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  audioUrl     String           // URL file audio lưu trên Cloudinary
-  overallScore Float?           // Điểm tổng (0-10)
-  aiFeedback   Json?            // JSON structured feedback từ Gemini
+  audioUrl     String // URL file audio lưu trên Cloudinary
+  overallScore Float? // Điểm tổng (0-10)
+  aiFeedback   Json? // JSON structured feedback từ Gemini
   submittedAt  DateTime         @default(now())
 }
+
+// ==========================================
+// MODELS BỔ SUNG TỪ FIRESTORE SCHEMA DỰ ÁN BREADTRANS
+// ==========================================
+
+model UserBookProgress {
+  id                       Int      @id @default(autoincrement())
+  userId                   Int
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId                   String
+  lessons                  Json? // Record<lessonId, LessonProgress>
+  completedLessons         Json? // Array of Int
+  completedLessonsSpeaking Json? // Array of Int
+  needQuizs                Json?
+  needSpeakings            Json?
+  lastUpdated              DateTime @default(now()) @updatedAt
+
+  @@unique([userId, bookId])
+}
+
+model CurrencyTransaction {
+  id          Int      @id @default(autoincrement())
+  studentId   Int
+  studentName String
+  userId      Int
+  userName    String
+  userRole    String
+  amount      Float
+  reason      String
+  type        String // "add" | "subtract" | "shopee"
+  classId     Int?
+  gameMeta    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CurrencyRequest {
+  id          Int       @id @default(autoincrement())
+  studentId   Int
+  studentName String
+  teacherId   Int
+  teacherName String
+  classId     Int
+  className   String
+  amount      Float
+  reason      String
+  status      String    @default("pending") // "pending" | "approved" | "rejected"
+  createdAt   DateTime  @default(now())
+  reviewedBy  String?
+  reviewedAt  DateTime?
+}
+
+model ClassAttendance {
+  id        Int      @id @default(autoincrement())
+  classId   Int
+  month     Int
+  year      Int
+  days      Json // Record<"YYYY-MM-DD", Record<userId, status>>
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([classId, month, year])
+}
+
+model ContentTopic {
+  id            Int      @id @default(autoincrement())
+  topicId       String   @unique
+  category      String // "grammar" | "movie" | "music"
+  title         String
+  order         Int?     @default(0)
+  materialLinks Json?
+  exercises     Json? // Array of ContentExercise
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model MarketProduct {
+  id            Int      @id @default(autoincrement())
+  name          String
+  price         Float
+  imageUrl      String?
+  order         Int      @default(0)
+  purchaseCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model MarketOrder {
+  id                Int       @id @default(autoincrement())
+  userId            Int
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentName       String
+  items             Json // Array of item objects
+  totalK            Float
+  totalBanh         Float
+  status            String    @default("pending") // "pending" | "approved" | "rejected"
+  bankSnapshot      Json?
+  createdAt         DateTime  @default(now())
+  paidAtCheckout    Boolean?
+  balanceAtCheckout Float?
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  currencyTxId      Int?
+}
+
+model GameSettings {
+  id        Int      @id @default(autoincrement())
+  gameId    String   @unique // "flappy-bird", "shell-game", "caro", "sky-high"
+  config    Json
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model GamePlay {
+  id         Int       @id @default(autoincrement())
+  playToken  String    @unique
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId     String
+  difficulty String?
+  status     String    @default("active") // "active" | "finished" | "expired"
+  reward     Float?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  result     Json?
+}
+
+model GameBattle {
+  id                Int       @id @default(autoincrement())
+  roomId            String    @unique
+  gameId            String
+  p1Id              Int
+  p2Id              Int
+  stake             Float     @default(0)
+  status            String    @default("pending") // "pending" | "escrowed" | "settled" | "cancelled"
+  winnerRole        String? // "p1" | "p2" | "draw"
+  winnerUserId      Int?
+  settledWinnerRole String?
+  settledAt         DateTime?
+  createdAt         DateTime  @default(now())
+  escrowedAt        DateTime?
+}
+
+model WatchTracking {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     Json // Map keyed by video URL
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model AiUsage {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekKey   String // e.g. "2026-W24"
+  count     Int      @default(0)
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([userId, weekKey])
+}
+
+model SpeakingEvalRetry {
+  id                       Int       @id @default(autoincrement())
+  jobId                    String    @unique
+  studentId                Int
+  bookId                   String
+  lessonId                 String
+  audioUrl                 String
+  audioMimeType            String?
+  recordedDurationSeconds  Float?
+  referenceDurationSeconds Float?
+  script                   String?   @db.Text
+  retryCount               Int       @default(0)
+  maxAttempts              Int       @default(3)
+  status                   String    @default("pending") // "pending" | "failed" | "resolved"
+  nextRetryAt              DateTime?
+  lastError                String?   @db.Text
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @default(now()) @updatedAt
+  failedAt                 DateTime?
+  resolvedAt               DateTime?
+}
+
+// Vocab Module Models
+model VocabTopic {
+  id           Int          @id @default(autoincrement())
+  title        String
+  categoryName String       @default("600 TỪ VỰNG TOEIC")
+  totalWords   Int          @default(12)
+  isPro        Boolean      @default(false)
+  iconUrl      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  words        VocabWord[]
+}
+
+model VocabWord {
+  id          Int      @id @default(autoincrement())
+  topicId     Int
+  topic       VocabTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  word        String
+  pos         String   @default("noun") // "verb", "noun", "adjective", "adverb"
+  ipaUs       String?
+  ipaUk       String?
+  meaning     String
+  audioUs     String?
+  audioUk     String?
+  exampleEn   String?  @db.Text
+  exampleVi   String?  @db.Text
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  userProgress UserVocabWordProgress[]
+}
+
+model UserVocabWordProgress {
+  id             Int        @id @default(autoincrement())
+  userId         Int
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId         Int
+  word           VocabWord  @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  isStarred      Boolean    @default(false)
+  isMastered     Boolean    @default(false)
+  reviewCount    Int        @default(0)
+  nextReviewAt   DateTime?
+  lastReviewedAt DateTime?
+
+  @@unique([userId, wordId])
+}
+
