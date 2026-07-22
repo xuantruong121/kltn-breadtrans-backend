@@ -2,111 +2,192 @@
   <img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" />
 </p>
 
-<h1 align="center">Breadtrans E-Learning Backend (KLTN) 🚀</h1>
+<h1 align="center">BreadTrans E-Learning Backend 🚀</h1>
 
 <p align="center">
-  Hệ thống Backend phục vụ Khóa luận tốt nghiệp: Nền tảng luyện thi TOEIC 4 Kỹ năng tích hợp Trí tuệ nhân tạo (AI). Được xây dựng dựa trên <strong>NestJS</strong>, <strong>PostgreSQL (Prisma)</strong>, <strong>Redis</strong> và sức mạnh từ <strong>Google Gemini / Azure Speech API</strong>.
+  Backend cho nền tảng luyện thi TOEIC 4 kỹ năng tích hợp AI — Khóa luận tốt nghiệp.<br/>
+  Xây dựng với <strong>NestJS</strong>, <strong>PostgreSQL (Prisma)</strong>, <strong>Redis</strong>, <strong>Cloudflare R2</strong> và <strong>Google Gemini</strong>.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/NestJS-11-red?logo=nestjs" alt="NestJS" />
+  <img src="https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma" alt="Prisma" />
+  <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker" alt="Docker" />
 </p>
 
 ---
 
-## 🌟 Tính năng nổi bật (Core Features)
+## 🌟 Tính năng chính
 
-1. **TOEIC 4 Kỹ năng (Nghe, Nói, Đọc, Viết):**
-   - Hỗ trợ đầy đủ các dạng bài trắc nghiệm thông thường (Listening, Reading).
-   - Luyện nói (Speaking) tự động chấm điểm phát âm qua AI (Azure Speech / Gemini).
-   - Luyện viết (Writing) tích hợp AI chấm lỗi ngữ pháp, chính tả tự động.
-
-2. **🤖 AI ETS Importer (Siêu việt):**
-   - Hỗ trợ **Multi-modal AI**: Khả năng tải lên cùng lúc 1 file PDF/Ảnh đề thi và 1 file Audio (.mp3).
-   - Trí tuệ nhân tạo Gemini 1.5 tự động đọc tài liệu, nghe âm thanh, bóc tách toàn bộ câu hỏi (A, B, C, D) kèm **Timestamps** và lưu thẳng vào Database chỉ trong vài chục giây.
-
-3. **☁️ Cloud Uploads:**
-   - Quản lý toàn bộ tài nguyên hình ảnh, âm thanh trực tiếp trên **Cloudinary** (Tối đa 10MB/file).
-
-4. **⚙️ Kiến trúc linh hoạt:**
-   - Áp dụng **Strategy Pattern** cho phép dễ dàng chuyển đổi giữa các mô hình AI khác nhau (Gemini, ChatGPT).
-   - Database Prisma Schema được thiết kế linh hoạt (lưu trữ JSON cho `content`), hỗ trợ chèn đa phương tiện vào bài thi mà không cần sửa cấu trúc cơ sở dữ liệu.
+| Tính năng | Mô tả |
+|-----------|-------|
+| **TOEIC 4 Kỹ năng** | Nghe, Nói, Đọc, Viết — đầy đủ dạng bài theo chuẩn ETS |
+| **AI Speaking Grader** | Chấm điểm phát âm tự động qua Google Gemini |
+| **AI Writing Checker** | Chấm lỗi ngữ pháp, chính tả, gợi ý cải thiện bằng AI |
+| **AI ETS PDF Importer** | Upload PDF đề thi + Audio → AI tự bóc tách câu hỏi vào DB |
+| **Vocabulary Learning** | 4 bước học (Flashcard → Quiz → Typing → Speaking) + TTS |
+| **Gamification** | Bánh rắn currency, streak, bảng xếp hạng lớp |
+| **Cloudflare R2 Storage** | Lưu trữ audio, hình ảnh — không tốn phí egress |
+| **Cloudflare Tunnel** | Expose local backend ra internet cho FE dev (không cần VPS) |
 
 ---
 
-## 🛠️ Công nghệ sử dụng (Tech Stack)
+## 🛠️ Tech Stack
 
-- **Framework:** [NestJS](https://nestjs.com/) (TypeScript)
-- **Cơ sở dữ liệu:** PostgreSQL
-- **ORM:** [Prisma](https://www.prisma.io/)
-- **Caching & Queue:** Redis
-- **Containerization:** Docker & Docker Compose
-- **Tích hợp AI:** Google Gemini 1.5 Flash, Azure AI Speech
-- **File Storage:** Cloudinary
+| Layer | Công nghệ |
+|-------|-----------|
+| Framework | NestJS 11 (TypeScript) |
+| Database | PostgreSQL 15 via Prisma ORM |
+| Cache | Redis 7 |
+| File Storage | Cloudflare R2 (S3-compatible) |
+| AI | Google Gemini Flash |
+| Auth | JWT + Passport |
+| Docs | Swagger / OpenAPI |
+| Containerization | Docker + Docker Compose |
+| Reverse Proxy | Caddy (production, auto HTTPS) |
+| Tunnel (dev) | Cloudflare Tunnel (`cloudflared`) |
 
 ---
 
-## 🚀 Hướng dẫn Cài đặt & Chạy dự án
+## 🚀 Cài đặt & Chạy Local
 
-### 1. Yêu cầu hệ thống (Prerequisites)
-- [Node.js](https://nodejs.org/en/) (phiên bản >= 18.x)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) (Để chạy Postgres & Redis)
+### Yêu cầu
+- [Node.js](https://nodejs.org/) >= 20
+- [Docker Desktop](https://www.docker.com/products/docker-desktop)
 - Git
 
-### 2. Cấu hình biến môi trường (`.env`)
-Tạo file `.env` ở thư mục gốc và cung cấp các khóa API cần thiết:
+### 1. Clone & cài dependencies
+
+```bash
+git clone <repo-url>
+cd kltn-breadtrans-backend
+npm install
+```
+
+### 2. Cấu hình biến môi trường
+
+```bash
+cp .env.example .env
+```
+
+Mở file `.env` và điền các giá trị:
 
 ```env
-# Database (Postgres)
-DATABASE_URL="postgresql://postgres:password@localhost:5432/breadtrans?schema=public"
+# Database
+DATABASE_URL="postgresql://postgres:password@localhost:5432/kltn_db?schema=public"
 
 # Redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-# Cổng chạy Backend
-PORT=3000
+# JWT
+JWT_SECRET=your_secret_key_here
 
-# API Keys AI
-GEMINI_API_KEY="your_gemini_api_key_here"
-AZURE_SPEECH_KEY="your_azure_speech_key_here"
-AZURE_SPEECH_REGION="eastus"
+# Google Gemini AI
+GEMINI_API_KEY=your_gemini_api_key_here
 
-# Cloudinary
-CLOUDINARY_CLOUD_NAME="your_cloud_name"
-CLOUDINARY_API_KEY="your_api_key"
-CLOUDINARY_API_SECRET="your_api_secret"
+# Cloudflare R2 Storage
+R2_ACCOUNT_ID=your_account_id
+R2_BUCKET_NAME=breadtrans-files
+R2_ACCESS_KEY_ID=your_access_key_id
+R2_SECRET_ACCESS_KEY=your_secret_access_key
+R2_PUBLIC_URL=https://your-r2-public-url
 ```
 
-### 3. Cài đặt Dependencies & Khởi chạy
+### 3. Khởi chạy (1 lệnh)
 
-Chạy các lệnh sau trong Terminal (khuyến nghị mở 3 terminal riêng biệt):
-
-**Terminal 1 (Khởi động Database):**
 ```bash
+# Windows — khởi động Docker + Backend + Cloudflare Tunnel cùng lúc
+..\start-dev.ps1
+```
+
+Hoặc khởi động thủ công:
+
+```bash
+# Terminal 1: Database
 docker-compose up -d
-```
 
-**Terminal 2 (Đồng bộ CSDL & Mở giao diện DB):**
-```bash
-npm install
+# Terminal 2: Backend
 npx prisma generate
-npx prisma db push
-npx prisma studio
-```
-*(Prisma Studio sẽ chạy ở `http://localhost:5555` giúp bạn xem và chỉnh sửa data trực tiếp).*
-
-**Terminal 3 (Chạy Server Backend):**
-```bash
+npx prisma migrate dev
 npm run start:dev
+
+# Terminal 3: Expose ra internet (cho FE dev)
+cloudflared tunnel --url http://localhost:3000
 ```
-*(Backend sẽ chạy ở `http://localhost:3000`).*
+
+### 4. Đồng bộ & xem Database
+
+```bash
+# Tạo/cập nhật bảng theo schema
+npx prisma migrate dev --name init
+
+# Mở Prisma Studio (giao diện quản lý DB)
+npx prisma studio
+# → Truy cập: http://localhost:5555
+```
 
 ---
 
-## 📖 API Documentation (Swagger)
+## 📖 API Documentation
 
-Hệ thống tích hợp sẵn Swagger để test API. Sau khi khởi động thành công, vui lòng truy cập:
-👉 **[http://localhost:3000/api/docs](http://localhost:3000/api/docs)**
+Sau khi backend chạy, truy cập Swagger UI:
 
+👉 **Local:** [http://localhost:3000/api/docs](http://localhost:3000/api/docs)  
+👉 **Production:** [https://breadtrans.edu.vn/api/docs](https://breadtrans.edu.vn/api/docs)
 
+---
+
+## 🌐 Expose Local Backend (Development)
+
+Dùng **Cloudflare Tunnel** để FE developer (khác mạng) có thể gọi vào backend đang chạy trên máy bạn:
+
+```powershell
+# Cài cloudflared (1 lần)
+winget install --id Cloudflare.cloudflared
+
+# Chạy tunnel (mở terminal mới sau khi cài)
+cloudflared tunnel --url http://localhost:3000
+
+# URL dạng https://xxxx.trycloudflare.com sẽ hiện sau ~5 giây
+# Gửi URL đó cho FE dev để dùng làm VITE_API_URL / NEXT_PUBLIC_API_URL
+```
+
+> CORS đã được cấu hình tự động: `NODE_ENV=development` → mở toàn bộ origin, không cần config thêm.
+
+---
+
+## 🧪 Testing
+
+```bash
+# Unit tests
+npm run test
+
+# Unit tests (watch mode)
+npm run test:watch
+
+# Coverage report
+npm run test:cov
+
+# E2E tests
+npm run test:e2e
+```
+
+---
+
+## 🐳 Production Deployment
+
+Xem file [`docker-compose.production.yml`](./docker-compose.production.yml) và [`COMMANDS.md`](../COMMANDS.md) (mục 7) để biết chi tiết deploy lên Oracle Cloud Free Tier với Caddy HTTPS tự động.
+
+```bash
+# Deploy stack production (chạy trên VPS)
+docker compose -f docker-compose.production.yml up -d --build
+```
+
+---
 
 ## 👨‍💻 Tác giả
-- Phát triển bởi: **Khóa luận tốt nghiệp (KLTN)**
-- Bản quyền thuộc về tác giả dự án.
+
+Phát triển bởi nhóm sinh viên KLTN — Khoa Công nghệ Thông tin.

@@ -67,11 +67,8 @@ let SpeakingService = SpeakingService_1 = class SpeakingService {
         }
         const exercise = await this.findExerciseById(exerciseId);
         this.logger.log(`Uploading audio for exercise #${exerciseId} by user #${userId}`);
-        const uploadResult = await this.uploadService.uploadStream(audioFile.buffer, {
-            folder: 'speaking_audio',
-            resource_type: 'video',
-        });
-        const audioUrl = uploadResult.secure_url;
+        const uploadResult = await this.uploadService.uploadRawBuffer(audioFile.buffer, audioFile.mimetype || 'audio/mpeg', 'speaking_audio');
+        const audioUrl = uploadResult.url;
         this.logger.log('Sending audio to AI Evaluator (Azure+Gemini)...');
         const aiFeedback = await this.aiService.assessPronunciation(exercise.targetText, audioFile.buffer);
         const submission = await this.prisma.speakingSubmission.create({

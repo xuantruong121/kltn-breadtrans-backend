@@ -19,8 +19,8 @@ export declare class GamificationController {
     } & {
         id: number;
         userId: number;
-        totalPoints: number;
         rank: number | null;
+        totalPoints: number;
     })[]>;
     getMyBadges(req: any): Promise<({
         badge: {

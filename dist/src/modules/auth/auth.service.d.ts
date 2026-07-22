@@ -17,16 +17,56 @@ export declare class AuthService {
         } | null;
         createdAt: Date;
         id: number;
+        updatedAt: Date;
         email: string;
         role: import(".prisma/client").$Enums.Role;
-        updatedAt: Date;
+        refreshToken: string | null;
+        totalBanhRan: number;
+        streakCount: number;
+        lastStreakUpdate: Date | null;
+        parentName: string | null;
+        parentPhone: string | null;
+        birthYear: number | null;
+        nextExamDate: string | null;
+        isSelfClaimed: boolean;
+        tuitionFee: import("@prisma/client/runtime/library").JsonValue | null;
+        bankQrUrl: string | null;
+        bankName: string | null;
+        bankBin: string | null;
+        bankAccountNumber: string | null;
+        bankAccountName: string | null;
+        bankAccount: string | null;
+        sessionToken: string | null;
+        loginCount: number;
+        lastLoginAt: Date | null;
+        lastDeviceType: string | null;
+        admirationsMessage: import("@prisma/client/runtime/library").JsonValue | null;
+        admirationsSentToday: import("@prisma/client/runtime/library").JsonValue | null;
+        admirationsSentStoryToday: import("@prisma/client/runtime/library").JsonValue | null;
+        timesVocabXS: number;
+        timesVocab: number;
+        quizAccuracy: number;
+        speakingAccuracy: number;
+        countHeart: number;
+        movies: import("@prisma/client/runtime/library").JsonValue | null;
+        gameTickets: import("@prisma/client/runtime/library").JsonValue | null;
+        speaking: import("@prisma/client/runtime/library").JsonValue | null;
+        writing: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
     login(loginDto: LoginDto): Promise<{
         access_token: string;
+        refresh_token: string;
         user: {
             id: number;
             email: string;
             role: import(".prisma/client").$Enums.Role;
         };
+    }>;
+    refreshTokens(userId: number, refreshToken: string): Promise<{
+        access_token: string;
+        refresh_token: string;
+    }>;
+    logout(userId: number): Promise<{
+        message: string;
     }>;
 }

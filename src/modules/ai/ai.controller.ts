@@ -102,15 +102,13 @@ export class AiController {
       // Tạo Audio từ văn bản
       const audioBuffer = await this.aiService.generateTtsAudio(q.transcript);
       if (audioBuffer) {
-        // Upload lên Cloudinary
-        const uploadResult = await this.uploadService.uploadStream(
+        // Upload lên Cloudflare R2
+        const uploadResult = await this.uploadService.uploadRawBuffer(
           audioBuffer,
-          {
-            folder: 'dictation_audio',
-            resource_type: 'video', // Audio lưu dưới dạng video trên Cloudinary
-          },
+          'audio/mpeg',
+          'dictation_audio',
         );
-        audioUrl = uploadResult.secure_url;
+        audioUrl = uploadResult.url;
       }
 
       questionData.push({
@@ -208,7 +206,7 @@ export class AiController {
     let audioUrl = '';
     if (audioFile) {
       const uploadResult = await this.uploadService.uploadFile(audioFile);
-      audioUrl = uploadResult.secure_url;
+      audioUrl = uploadResult.url;
     }
 
     const questions = await this.aiService.importEtsPdf(

@@ -98,11 +98,8 @@ let AiController = class AiController {
             let audioUrl = '';
             const audioBuffer = await this.aiService.generateTtsAudio(q.transcript);
             if (audioBuffer) {
-                const uploadResult = await this.uploadService.uploadStream(audioBuffer, {
-                    folder: 'dictation_audio',
-                    resource_type: 'video',
-                });
-                audioUrl = uploadResult.secure_url;
+                const uploadResult = await this.uploadService.uploadRawBuffer(audioBuffer, 'audio/mpeg', 'dictation_audio');
+                audioUrl = uploadResult.url;
             }
             questionData.push({
                 quizId: newQuiz.id,
@@ -146,7 +143,7 @@ let AiController = class AiController {
         let audioUrl = '';
         if (audioFile) {
             const uploadResult = await this.uploadService.uploadFile(audioFile);
-            audioUrl = uploadResult.secure_url;
+            audioUrl = uploadResult.url;
         }
         const questions = await this.aiService.importEtsPdf(pdfFile.buffer, pdfFile.mimetype, audioFile?.buffer, audioFile?.mimetype, audioUrl);
         if (!questions || questions.length === 0) {

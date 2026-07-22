@@ -13,6 +13,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ReadingModule } from './modules/reading/reading.module';
 import { WritingModule } from './modules/writing/writing.module';
+import { VocabModule } from './modules/vocab/vocab.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { WritingModule } from './modules/writing/writing.module';
     PrismaModule,
     ReadingModule,
     WritingModule,
+    VocabModule,
   ],
   controllers: [AppController],
   providers: [AppService],

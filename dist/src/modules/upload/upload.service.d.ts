@@ -1,13 +1,16 @@
-export interface CloudinaryResponse {
-    secure_url: string;
-    public_id: string;
-    format: string;
+import { R2Service } from './r2.service';
+export interface UploadResult {
+    url: string;
+    key: string;
+    contentType: string;
 }
 export declare class UploadService {
+    private readonly r2;
     private readonly logger;
-    uploadFile(file: Express.Multer.File): Promise<CloudinaryResponse>;
-    uploadStream(buffer: Buffer, options: {
-        folder?: string;
-        resource_type?: string;
-    }): Promise<CloudinaryResponse>;
+    constructor(r2: R2Service);
+    uploadFile(file: Express.Multer.File): Promise<UploadResult>;
+    uploadRawBuffer(buffer: Buffer, mimeType: string, folder?: string, filename?: string): Promise<UploadResult>;
+    deleteFile(key: string): Promise<void>;
+    getPresignedUploadUrl(key: string, mimeType: string, expiresIn?: number): Promise<string>;
+    private resolveFolder;
 }

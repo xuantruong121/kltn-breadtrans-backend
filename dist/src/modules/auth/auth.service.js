@@ -94,14 +94,64 @@ let AuthService = class AuthService {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         const payload = { sub: user.id, email: user.email, role: user.role };
+        const access_token = this.jwtService.sign(payload);
+        const refresh_token = this.jwtService.sign(payload, { expiresIn: '7d' });
+        const salt = await bcrypt.genSalt();
+        const hashedRefreshToken = await bcrypt.hash(refresh_token, salt);
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: { refreshToken: hashedRefreshToken },
+        });
         return {
-            access_token: this.jwtService.sign(payload),
+            access_token,
+            refresh_token,
             user: {
                 id: user.id,
                 email: user.email,
                 role: user.role,
             },
         };
+    }
+    async refreshTokens(userId, refreshToken) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user || !user.refreshToken) {
+            throw new common_1.UnauthorizedException('Access denied');
+        }
+        const refreshTokenMatches = await bcrypt.compare(refreshToken, user.refreshToken);
+        if (!refreshTokenMatches) {
+            throw new common_1.UnauthorizedException('Access denied');
+        }
+        const payload = { sub: user.id, email: user.email, role: user.role };
+        const access_token = this.jwtService.sign(payload);
+        const new_refresh_token = this.jwtService.sign(payload, {
+            expiresIn: '7d',
+        });
+        const salt = await bcrypt.genSalt();
+        const hashedRefreshToken = await bcrypt.hash(new_refresh_token, salt);
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: { refreshToken: hashedRefreshToken },
+        });
+        return {
+            access_token,
+            refresh_token: new_refresh_token,
+        };
+    }
+    async logout(userId) {
+        await this.prisma.user.updateMany({
+            where: {
+                id: userId,
+                refreshToken: {
+                    not: null,
+                },
+            },
+            data: {
+                refreshToken: null,
+            },
+        });
+        return { message: 'Logged out successfully' };
     }
 };
 exports.AuthService = AuthService;

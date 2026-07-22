@@ -1,0 +1,38 @@
+# Thay YOUR_DOMAIN bằng domain thực của bạn (ví dụ: api.breadtrans.xyz)
+# Caddy sẽ tự động xin SSL từ Let's Encrypt
+
+breadtrans.edu.vn {
+    # Reverse proxy tới NestJS API
+    reverse_proxy api:3000
+
+    # Gzip compression
+    encode gzip
+
+    # Security headers
+    header {
+        # Chặn clickjacking
+        X-Frame-Options DENY
+        # Ngăn MIME sniffing
+        X-Content-Type-Options nosniff
+        # XSS protection
+        X-XSS-Protection "1; mode=block"
+        # HSTS (enable sau khi đã test SSL)
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # Xóa server header
+        -Server
+    }
+
+    # Log requests
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+        format json
+    }
+}
+
+# Redirect www → non-www (nếu cần)
+# www.YOUR_DOMAIN.com {
+#     redir https://YOUR_DOMAIN.com{uri} permanent
+# }

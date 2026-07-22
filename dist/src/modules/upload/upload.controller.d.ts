@@ -5,7 +5,14 @@ export declare class UploadController {
     uploadFile(file: Express.Multer.File): Promise<{
         message: string;
         url: string;
-        publicId: string;
-        format: string;
+        key: string;
+        contentType: string;
+    }>;
+    deleteFile(key: string): Promise<{
+        message: string;
+    }>;
+    getPresignedUrl(key: string, mimeType: string, expiresIn?: number): Promise<{
+        presignedUrl: string;
+        key: string;
     }>;
 }
