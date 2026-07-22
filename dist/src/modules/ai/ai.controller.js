@@ -20,6 +20,9 @@ const ai_service_1 = require("./ai.service");
 const upload_service_1 = require("../upload/upload.service");
 const swagger_1 = require("@nestjs/swagger");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const roles_guard_1 = require("../../common/guards/roles.guard");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 class ChatDto {
     prompt;
@@ -219,13 +222,16 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Post)('import-ets-pdf'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
+    (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileFieldsInterceptor)([
         { name: 'pdfFile', maxCount: 1 },
         { name: 'audioFile', maxCount: 1 },
     ])),
     (0, swagger_1.ApiConsumes)('multipart/form-data'),
     (0, swagger_1.ApiOperation)({
-        summary: 'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB',
+        summary: 'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB (Chỉ ADMIN/TEACHER)',
     }),
     __param(0, (0, common_1.UploadedFiles)()),
     __metadata("design:type", Function),

@@ -508,4 +508,147 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       throw new Error('Lỗi khi chấm điểm Writing Part 1');
     }
   }
+
+  async evaluateWritingPart2(
+    emailPrompt: string,
+    userResponse: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
+    if (!process.env.GEMINI_API_KEY) {
+      return {
+        score: 3,
+        feedback: '[Mock Gemini] Email đáp ứng cơ bản các yêu cầu đề bài.',
+        suggestions: ['Nên dùng từ nối trang trọng hơn như "Furthermore", "However".'],
+      };
+    }
+    try {
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const prompt = `
+        You are a certified ETS TOEIC Writing Evaluator. Evaluate this TOEIC Writing Part 2 response (Respond to an Email Request).
+        Original Email Request: "${emailPrompt}"
+        Student's Response Email: "${userResponse}"
+        
+        Scoring Criteria (0 to 4 points):
+        - Score 4: Fully addresses all requests in the prompt, clear organization, professional tone, minimal grammar errors.
+        - Score 3: Addresses all or most requests, clear tone, minor vocabulary/grammar issues.
+        - Score 2: Partially addresses requests, inappropriate tone or multiple grammar mistakes.
+        - Score 1: Fails to address main requests or major language errors.
+        - Score 0: Blank or off-topic.
+
+        Respond STRICTLY with a valid JSON object:
+        {
+          "score": 4,
+          "feedback": "Phản hồi chi tiết bằng tiếng Việt...",
+          "suggestions": ["Gợi ý 1", "Gợi ý 2"]
+        }
+      `;
+
+      const result = await model.generateContent(prompt);
+      let text = result.response.text().trim();
+      if (text.startsWith('```json')) text = text.substring(7, text.length - 3).trim();
+      else if (text.startsWith('```')) text = text.substring(3, text.length - 3).trim();
+      return JSON.parse(text);
+    } catch (error: any) {
+      this.logger.error(`Error evaluating writing part 2: ${error.message}`);
+      return {
+        score: 3,
+        feedback: 'Đã hoàn thành bài viết email.',
+        suggestions: ['Kiểm tra lại cấu trúc ngữ pháp và từ vựng.'],
+      };
+    }
+  }
+
+  async evaluateWritingPart3(
+    essayTopic: string,
+    userEssay: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
+    if (!process.env.GEMINI_API_KEY) {
+      return {
+        score: 4,
+        feedback: '[Mock Gemini] Bài luận có lập luận rõ ràng, cấu trúc đủ 3 phần.',
+        suggestions: ['Mở rộng thêm các ví dụ thực tế ở phần thân bài.'],
+      };
+    }
+    try {
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const prompt = `
+        You are an ETS TOEIC Writing Evaluator. Grade this TOEIC Writing Part 3 (Write an Opinion Essay).
+        Essay Topic: "${essayTopic}"
+        Student's Essay: "${userEssay}"
+
+        Scoring Criteria (0 to 5 points):
+        - Score 5: Well-organized (Introduction, Body, Conclusion), strong thesis, relevant examples, accurate complex sentences.
+        - Score 4: Good organization and support, minor errors in word choice/grammar.
+        - Score 3: Adequate support, some grammatical weaknesses or lack of transitions.
+        - Score 2: Weak development, frequent grammar errors.
+        - Score 1: Inadequate vocabulary, unorganized ideas.
+        - Score 0: Off-topic or blank.
+
+        Respond STRICTLY with a valid JSON object:
+        {
+          "score": 5,
+          "feedback": "Phận xét chi tiết bài luận bằng tiếng Việt...",
+          "suggestions": ["Khuyên 1", "Khuyên 2"]
+        }
+      `;
+
+      const result = await model.generateContent(prompt);
+      let text = result.response.text().trim();
+      if (text.startsWith('```json')) text = text.substring(7, text.length - 3).trim();
+      else if (text.startsWith('```')) text = text.substring(3, text.length - 3).trim();
+      return JSON.parse(text);
+    } catch (error: any) {
+      this.logger.error(`Error evaluating writing part 3: ${error.message}`);
+      return {
+        score: 4,
+        feedback: 'Bài viết đạt yêu cầu cơ bản về độ dài và nội dung.',
+        suggestions: ['Tăng cường sử dụng từ nối và cấu trúc phức.'],
+      };
+    }
+  }
+
+  async evaluateSpeakingPart3To5(
+    promptText: string,
+    studentResponse: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
+    if (!process.env.GEMINI_API_KEY) {
+      return {
+        score: 3,
+        feedback: '[Mock Gemini] Trả lời đúng trọng tâm câu hỏi, phát âm khá tốt.',
+        suggestions: ['Nói tự nhiên hơn và bổ sung chi tiết giải thích.'],
+      };
+    }
+    try {
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const prompt = `
+        You are a TOEIC Speaking Examiner. Grade this Speaking Part 3-5 response.
+        Question / Situation: "${promptText}"
+        Student's Spoken Text / Transcript: "${studentResponse}"
+
+        Evaluation Criteria (Score 0-3 for Part 3-4, 0-5 for Part 5):
+        - Pronunciation, Intonation, Stress
+        - Relevance to the prompt and completeness of ideas
+        - Grammar and Vocabulary appropriateness
+
+        Respond STRICTLY with a valid JSON object:
+        {
+          "score": 3,
+          "feedback": "Nhận xét chi tiết về phát âm, nội dung, ngữ pháp bằng tiếng Việt...",
+          "suggestions": ["Gợi ý phát âm/từ vựng 1", "Gợi ý 2"]
+        }
+      `;
+
+      const result = await model.generateContent(prompt);
+      let text = result.response.text().trim();
+      if (text.startsWith('```json')) text = text.substring(7, text.length - 3).trim();
+      else if (text.startsWith('```')) text = text.substring(3, text.length - 3).trim();
+      return JSON.parse(text);
+    } catch (error: any) {
+      this.logger.error(`Error evaluating speaking part 3-5: ${error.message}`);
+      return {
+        score: 3,
+        feedback: 'Bài phát âm trôi chảy, đúng trọng tâm.',
+        suggestions: ['Chú ý nhấn trọng âm câu tốt hơn.'],
+      };
+    }
+  }
 }

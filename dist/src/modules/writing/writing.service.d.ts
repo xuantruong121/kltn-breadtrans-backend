@@ -45,4 +45,16 @@ export declare class WritingService {
         score: number;
         feedback: string;
     }>;
+    submitWritingPart2(emailPrompt: string, userId: number, userResponse: string): Promise<{
+        score: number;
+        maxScore: number;
+        feedback: string;
+        suggestions: string[];
+    }>;
+    submitWritingPart3(essayTopic: string, userId: number, userEssay: string): Promise<{
+        score: number;
+        maxScore: number;
+        feedback: string;
+        suggestions: string[];
+    }>;
 }

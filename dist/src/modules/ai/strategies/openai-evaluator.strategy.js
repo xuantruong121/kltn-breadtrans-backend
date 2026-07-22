@@ -44,6 +44,27 @@ let OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy_1 = class OpenAIEvaluatorS
     async evaluateWritingPart1(imageUrl, keywords, userSentence) {
         throw new Error('Chức năng này hiện chỉ hỗ trợ Gemini Vision.');
     }
+    async evaluateWritingPart2(emailPrompt, userResponse) {
+        return {
+            score: 3,
+            feedback: '[OpenAI Mock] Phản hồi email giả lập.',
+            suggestions: ['Sử dụng thêm từ nối.'],
+        };
+    }
+    async evaluateWritingPart3(essayTopic, userEssay) {
+        return {
+            score: 4,
+            feedback: '[OpenAI Mock] Bài luận giả lập.',
+            suggestions: ['Mở rộng lập luận.'],
+        };
+    }
+    async evaluateSpeakingPart3To5(promptText, studentResponse) {
+        return {
+            score: 3,
+            feedback: '[OpenAI Mock] Đánh giá bài nói giả lập.',
+            suggestions: ['Cải thiện phát âm.'],
+        };
+    }
 };
 exports.OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy;
 exports.OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy = OpenAIEvaluatorStrategy_1 = __decorate([

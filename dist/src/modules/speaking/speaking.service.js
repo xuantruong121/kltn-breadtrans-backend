@@ -86,6 +86,9 @@ let SpeakingService = SpeakingService_1 = class SpeakingService {
             assessment: aiFeedback,
         };
     }
+    async evaluateSpeakingPart3To5(promptText, studentResponse) {
+        return this.aiService.evaluateSpeakingPart3To5(promptText, studentResponse);
+    }
     async getMySubmissions(userId) {
         return this.prisma.speakingSubmission.findMany({
             where: { userId },

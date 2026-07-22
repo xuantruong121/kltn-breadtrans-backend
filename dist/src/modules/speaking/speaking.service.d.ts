@@ -43,6 +43,11 @@ export declare class SpeakingService {
         audioUrl: string;
         assessment: import("../ai/strategies/ai-evaluator.interface").PronunciationFeedback;
     }>;
+    evaluateSpeakingPart3To5(promptText: string, studentResponse: string): Promise<{
+        score: number;
+        feedback: string;
+        suggestions: string[];
+    }>;
     getMySubmissions(userId: number): Promise<({
         exercise: {
             category: string;

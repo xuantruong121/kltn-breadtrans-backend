@@ -79,4 +79,34 @@ export declare class QuizService {
         aiFeedback: string | null;
         userId: number;
     }>;
+    calculateToeicScore(listeningCorrect: number, readingCorrect: number): {
+        listening: {
+            correct: number;
+            total: number;
+            score: number;
+        };
+        reading: {
+            correct: number;
+            total: number;
+            score: number;
+        };
+        totalScore: number;
+    };
+    getSubmissionAnalytics(submissionId: number): Promise<{
+        submissionId: number;
+        quizTitle: string;
+        overallScore: number | null;
+        totalQuestions: number;
+        totalCorrect: number;
+        overallAccuracyPercent: number;
+        categoriesBreakdown: {
+            category: string;
+            correct: number;
+            total: number;
+            accuracyPercent: number;
+        }[];
+        strengths: string[];
+        weaknesses: string[];
+        recommendation: string;
+    }>;
 }

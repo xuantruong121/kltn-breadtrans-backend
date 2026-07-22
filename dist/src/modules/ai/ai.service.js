@@ -80,6 +80,15 @@ let AiService = AiService_1 = class AiService {
     async evaluateWritingPart1(imageUrl, keywords, userSentence) {
         return this.aiEvaluator.evaluateWritingPart1(imageUrl, keywords, userSentence);
     }
+    async evaluateWritingPart2(emailPrompt, userResponse) {
+        return this.aiEvaluator.evaluateWritingPart2(emailPrompt, userResponse);
+    }
+    async evaluateWritingPart3(essayTopic, userEssay) {
+        return this.aiEvaluator.evaluateWritingPart3(essayTopic, userEssay);
+    }
+    async evaluateSpeakingPart3To5(promptText, studentResponse) {
+        return this.aiEvaluator.evaluateSpeakingPart3To5(promptText, studentResponse);
+    }
     async importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl) {
         return this.aiEvaluator.importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl);
     }

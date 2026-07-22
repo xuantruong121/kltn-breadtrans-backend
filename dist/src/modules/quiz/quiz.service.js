@@ -116,6 +116,90 @@ let QuizService = class QuizService {
         });
         return submission;
     }
+    calculateToeicScore(listeningCorrect, readingCorrect) {
+        const lCorrect = Math.min(100, Math.max(0, listeningCorrect));
+        const rCorrect = Math.min(100, Math.max(0, readingCorrect));
+        const convertListening = (c) => {
+            if (c <= 5)
+                return 5;
+            if (c >= 96)
+                return 495;
+            return Math.round(5 + (c - 5) * (490 / 91));
+        };
+        const convertReading = (c) => {
+            if (c <= 5)
+                return 5;
+            if (c >= 96)
+                return 495;
+            return Math.round(5 + (c - 5) * (490 / 91));
+        };
+        const listeningScore = convertListening(lCorrect);
+        const readingScore = convertReading(rCorrect);
+        const totalScore = listeningScore + readingScore;
+        return {
+            listening: { correct: lCorrect, total: 100, score: listeningScore },
+            reading: { correct: rCorrect, total: 100, score: readingScore },
+            totalScore,
+        };
+    }
+    async getSubmissionAnalytics(submissionId) {
+        const submission = await this.prisma.submission.findUnique({
+            where: { id: submissionId },
+            include: {
+                quiz: {
+                    include: {
+                        questions: true,
+                    },
+                },
+                results: true,
+            },
+        });
+        if (!submission)
+            throw new common_1.NotFoundException('Submission not found');
+        const tagStats = {};
+        let totalCorrect = 0;
+        const totalQuestions = submission.results.length;
+        submission.results.forEach((res) => {
+            if (res.isCorrect)
+                totalCorrect++;
+            const question = submission.quiz.questions.find((q) => q.id === res.questionId);
+            const content = question?.content;
+            const category = content?.category || question?.type || 'General';
+            if (!tagStats[category]) {
+                tagStats[category] = { correct: 0, total: 0 };
+            }
+            tagStats[category].total += 1;
+            if (res.isCorrect) {
+                tagStats[category].correct += 1;
+            }
+        });
+        const categoriesBreakdown = Object.entries(tagStats).map(([category, stat]) => {
+            const accuracy = stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0;
+            return {
+                category,
+                correct: stat.correct,
+                total: stat.total,
+                accuracyPercent: accuracy,
+            };
+        });
+        const strengths = categoriesBreakdown.filter((c) => c.accuracyPercent >= 75).map((c) => c.category);
+        const weaknesses = categoriesBreakdown.filter((c) => c.accuracyPercent < 50).map((c) => c.category);
+        const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+        return {
+            submissionId,
+            quizTitle: submission.quiz.title,
+            overallScore: submission.score,
+            totalQuestions,
+            totalCorrect,
+            overallAccuracyPercent: overallAccuracy,
+            categoriesBreakdown,
+            strengths: strengths.length > 0 ? strengths : ['Cần luyện tập thêm để xác định điểm mạnh'],
+            weaknesses: weaknesses.length > 0 ? weaknesses : ['Không có điểm yếu nghiêm trọng'],
+            recommendation: weaknesses.length > 0
+                ? `Bạn nên tập trung ôn luyện lại các mảng kiến thức: ${weaknesses.join(', ')}.`
+                : 'Thành tích rất tốt! Hãy tiếp tục duy trì và thử sức ở đề thi khó hơn.',
+        };
+    }
 };
 exports.QuizService = QuizService;
 exports.QuizService = QuizService = __decorate([

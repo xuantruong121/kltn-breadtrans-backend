@@ -41,6 +41,12 @@ let QuizController = class QuizController {
     submitQuiz(quizId, dto, req) {
         return this.quizService.submitQuiz(quizId, req.user.id, dto);
     }
+    getSubmissionAnalytics(id) {
+        return this.quizService.getSubmissionAnalytics(id);
+    }
+    calculateToeicScore(listeningCorrect, readingCorrect) {
+        return this.quizService.calculateToeicScore(listeningCorrect, readingCorrect);
+    }
 };
 exports.QuizController = QuizController;
 __decorate([
@@ -92,6 +98,25 @@ __decorate([
     __metadata("design:paramtypes", [Number, quiz_dto_1.SubmitQuizDto, Object]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "submitQuiz", null);
+__decorate([
+    (0, common_1.Get)('submissions/:id/analytics'),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Báo cáo phân tích điểm mạnh, điểm yếu và lỗ hổng kiến thức sau khi nộp bài' }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "getSubmissionAnalytics", null);
+__decorate([
+    (0, common_1.Post)('score-conversion'),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Quy đổi số câu đúng Listening/Reading ra thang điểm TOEIC (10 - 990)' }),
+    __param(0, (0, common_1.Body)('listeningCorrect')),
+    __param(1, (0, common_1.Body)('readingCorrect')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "calculateToeicScore", null);
 exports.QuizController = QuizController = __decorate([
     (0, swagger_1.ApiTags)('quizzes'),
     (0, common_1.Controller)('quizzes'),

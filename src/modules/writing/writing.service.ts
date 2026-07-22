@@ -135,4 +135,32 @@ export class WritingService {
       feedback: evaluation.feedback,
     };
   }
+
+  async submitWritingPart2(emailPrompt: string, userId: number, userResponse: string) {
+    const evaluation = await this.aiService.evaluateWritingPart2(
+      emailPrompt,
+      userResponse,
+    );
+
+    return {
+      score: evaluation.score,
+      maxScore: 4,
+      feedback: evaluation.feedback,
+      suggestions: evaluation.suggestions,
+    };
+  }
+
+  async submitWritingPart3(essayTopic: string, userId: number, userEssay: string) {
+    const evaluation = await this.aiService.evaluateWritingPart3(
+      essayTopic,
+      userEssay,
+    );
+
+    return {
+      score: evaluation.score,
+      maxScore: 5,
+      feedback: evaluation.feedback,
+      suggestions: evaluation.suggestions,
+    };
+  }
 }

@@ -34,6 +34,12 @@ let WritingController = class WritingController {
     submitWriting(id, req, answer) {
         return this.writingService.submitWriting(id, req.user.id, answer);
     }
+    submitWritingPart2(req, emailPrompt, userResponse) {
+        return this.writingService.submitWritingPart2(emailPrompt, req.user.id, userResponse);
+    }
+    submitWritingPart3(req, essayTopic, userEssay) {
+        return this.writingService.submitWritingPart3(essayTopic, req.user.id, userEssay);
+    }
 };
 exports.WritingController = WritingController;
 __decorate([
@@ -65,7 +71,7 @@ __decorate([
     (0, common_1.Post)('quizzes/:id/submit'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, swagger_1.ApiOperation)({ summary: 'Nộp bài và chấm điểm bằng AI' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Nộp bài và chấm điểm bằng AI (Part 1)' }),
     (0, swagger_1.ApiBody)({
         schema: { type: 'object', properties: { answer: { type: 'string' } } },
     }),
@@ -76,6 +82,48 @@ __decorate([
     __metadata("design:paramtypes", [Number, Object, String]),
     __metadata("design:returntype", void 0)
 ], WritingController.prototype, "submitWriting", null);
+__decorate([
+    (0, common_1.Post)('part2/submit'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Chấm điểm bài TOEIC Writing Part 2 (Respond to an Email)' }),
+    (0, swagger_1.ApiBody)({
+        schema: {
+            type: 'object',
+            properties: {
+                emailPrompt: { type: 'string', description: 'Nội dung email đề bài' },
+                userResponse: { type: 'string', description: 'Email trả lời của học viên' },
+            },
+        },
+    }),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)('emailPrompt')),
+    __param(2, (0, common_1.Body)('userResponse')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:returntype", void 0)
+], WritingController.prototype, "submitWritingPart2", null);
+__decorate([
+    (0, common_1.Post)('part3/submit'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Chấm điểm bài TOEIC Writing Part 3 (Write an Opinion Essay)' }),
+    (0, swagger_1.ApiBody)({
+        schema: {
+            type: 'object',
+            properties: {
+                essayTopic: { type: 'string', description: 'Chủ đề bài luận đề bài' },
+                userEssay: { type: 'string', description: 'Bài luận của học viên' },
+            },
+        },
+    }),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)('essayTopic')),
+    __param(2, (0, common_1.Body)('userEssay')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:returntype", void 0)
+], WritingController.prototype, "submitWritingPart3", null);
 exports.WritingController = WritingController = __decorate([
     (0, swagger_1.ApiTags)('Writing'),
     (0, common_1.Controller)('writing'),

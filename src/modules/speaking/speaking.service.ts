@@ -111,6 +111,10 @@ export class SpeakingService {
     };
   }
 
+  async evaluateSpeakingPart3To5(promptText: string, studentResponse: string) {
+    return this.aiService.evaluateSpeakingPart3To5(promptText, studentResponse);
+  }
+
   async getMySubmissions(userId: number) {
     return this.prisma.speakingSubmission.findMany({
       where: { userId },

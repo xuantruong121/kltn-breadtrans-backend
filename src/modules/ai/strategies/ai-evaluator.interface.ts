@@ -79,6 +79,36 @@ export interface IAIEvaluator {
   ): Promise<{ score: number; feedback: string }>;
 
   /**
+   * Đánh giá TOEIC Writing Part 2 (Respond to an Email Request - Thang điểm 0-4)
+   * @param emailPrompt Nội dung email yêu cầu
+   * @param userResponse Email phản hồi của học viên
+   */
+  evaluateWritingPart2(
+    emailPrompt: string,
+    userResponse: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }>;
+
+  /**
+   * Đánh giá TOEIC Writing Part 3 (Write an Opinion Essay - Thang điểm 0-5)
+   * @param essayTopic Chủ đề bài luận
+   * @param userEssay Bài luận của học viên
+   */
+  evaluateWritingPart3(
+    essayTopic: string,
+    userEssay: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }>;
+
+  /**
+   * Đánh giá TOEIC Speaking Part 3-5 (Respond to Questions / Solution / Opinion)
+   * @param promptText Câu hỏi / tình huống đề bài
+   * @param studentResponse Bản ghi âm hoặc transcript câu trả lời
+   */
+  evaluateSpeakingPart3To5(
+    promptText: string,
+    studentResponse: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }>;
+
+  /**
    * Đọc file PDF/Image đề thi ETS và bóc tách thành JSON (Kèm Audio để trích xuất Timestamp)
    * @param pdfBuffer Buffer của file PDF/Ảnh
    * @param pdfMimeType MimeType của file PDF
