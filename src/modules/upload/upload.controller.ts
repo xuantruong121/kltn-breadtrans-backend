@@ -71,7 +71,7 @@ export class UploadController {
     };
   }
 
-  @Delete(':key(*)')
+  @Delete('*key')
   @ApiOperation({ summary: 'Xóa file khỏi R2 theo key' })
   @ApiParam({ name: 'key', description: 'Key của file trong bucket R2 (vd: images/uuid.png)' })
   async deleteFile(@Param('key') key: string) {

@@ -72,7 +72,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], UploadController.prototype, "uploadFile", null);
 __decorate([
-    (0, common_1.Delete)(':key(*)'),
+    (0, common_1.Delete)('*key'),
     (0, swagger_1.ApiOperation)({ summary: 'Xóa file khỏi R2 theo key' }),
     (0, swagger_1.ApiParam)({ name: 'key', description: 'Key của file trong bucket R2 (vd: images/uuid.png)' }),
     __param(0, (0, common_1.Param)('key')),

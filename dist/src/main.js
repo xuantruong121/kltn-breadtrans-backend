@@ -58,14 +58,38 @@ async function bootstrap() {
     app.useGlobalFilters(new http_exception_filter_1.HttpExceptionFilter());
     app.useGlobalInterceptors(new transform_interceptor_1.TransformInterceptor());
     const config = new swagger_1.DocumentBuilder()
-        .setTitle('E-Learning API')
-        .setDescription('API documentation for the KLTN E-Learning platform')
+        .setTitle('BreadTrans API')
+        .setDescription('API documentation for the BreadTrans E-Learning platform')
         .setVersion('1.0')
         .addBearerAuth()
         .build();
     const documentFactory = () => swagger_1.SwaggerModule.createDocument(app, config);
     swagger_1.SwaggerModule.setup('api/docs', app, documentFactory);
-    app.enableCors();
+    const isDev = process.env.NODE_ENV !== 'production';
+    if (isDev) {
+        app.enableCors({ origin: true, credentials: true });
+    }
+    else {
+        const allowedOrigins = (process.env.CORS_ORIGIN ?? '')
+            .split(',')
+            .map((o) => o.trim())
+            .filter(Boolean);
+        app.enableCors({
+            origin: (origin, callback) => {
+                if (!origin)
+                    return callback(null, true);
+                if (allowedOrigins.includes(origin)) {
+                    callback(null, true);
+                }
+                else {
+                    callback(new Error(`Origin "${origin}" not allowed by CORS policy`));
+                }
+            },
+            credentials: true,
+            methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization'],
+        });
+    }
     await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 bootstrap().catch((err) => {
