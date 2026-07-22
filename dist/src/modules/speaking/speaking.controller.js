@@ -39,6 +39,9 @@ let SpeakingController = class SpeakingController {
     submitAudio(exerciseId, req, audio) {
         return this.speakingService.submitAudio(exerciseId, req.user.id, audio);
     }
+    submitPart3To5(promptText, studentResponse) {
+        return this.speakingService.evaluateSpeakingPart3To5(promptText, studentResponse);
+    }
     getMySubmissions(req) {
         return this.speakingService.getMySubmissions(req.user.id);
     }
@@ -106,6 +109,24 @@ __decorate([
     __metadata("design:paramtypes", [Number, Object, Object]),
     __metadata("design:returntype", void 0)
 ], SpeakingController.prototype, "submitAudio", null);
+__decorate([
+    (0, common_1.Post)('part3-5/submit'),
+    (0, swagger_1.ApiOperation)({ summary: 'Chấm điểm TOEIC Speaking Part 3-5 (Trả lời câu hỏi / Nêu giải pháp / Ý kiến)' }),
+    (0, swagger_1.ApiBody)({
+        schema: {
+            type: 'object',
+            properties: {
+                promptText: { type: 'string', description: 'Nội dung câu hỏi đề bài' },
+                studentResponse: { type: 'string', description: 'Bài nói hoặc transcript của học viên' },
+            },
+        },
+    }),
+    __param(0, (0, common_1.Body)('promptText')),
+    __param(1, (0, common_1.Body)('studentResponse')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", void 0)
+], SpeakingController.prototype, "submitPart3To5", null);
 __decorate([
     (0, common_1.Get)('my-submissions'),
     (0, swagger_1.ApiOperation)({ summary: 'Xem lịch sử bài luyện phát âm của tôi' }),

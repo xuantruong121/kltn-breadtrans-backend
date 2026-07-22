@@ -115,6 +115,30 @@ export class AiService {
     );
   }
 
+  async evaluateWritingPart2(
+    emailPrompt: string,
+    userResponse: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
+    return this.aiEvaluator.evaluateWritingPart2(emailPrompt, userResponse);
+  }
+
+  async evaluateWritingPart3(
+    essayTopic: string,
+    userEssay: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
+    return this.aiEvaluator.evaluateWritingPart3(essayTopic, userEssay);
+  }
+
+  async evaluateSpeakingPart3To5(
+    promptText: string,
+    studentResponse: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
+    return this.aiEvaluator.evaluateSpeakingPart3To5(
+      promptText,
+      studentResponse,
+    );
+  }
+
   async importEtsPdf(
     pdfBuffer: Buffer,
     pdfMimeType: string,

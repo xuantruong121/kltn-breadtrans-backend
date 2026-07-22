@@ -43,4 +43,16 @@ export declare class WritingController {
         score: number;
         feedback: string;
     }>;
+    submitWritingPart2(req: any, emailPrompt: string, userResponse: string): Promise<{
+        score: number;
+        maxScore: number;
+        feedback: string;
+        suggestions: string[];
+    }>;
+    submitWritingPart3(req: any, essayTopic: string, userEssay: string): Promise<{
+        score: number;
+        maxScore: number;
+        feedback: string;
+        suggestions: string[];
+    }>;
 }

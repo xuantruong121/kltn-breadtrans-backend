@@ -100,6 +100,24 @@ export class SpeakingController {
     return this.speakingService.submitAudio(exerciseId, req.user.id, audio);
   }
 
+  @Post('part3-5/submit')
+  @ApiOperation({ summary: 'Chấm điểm TOEIC Speaking Part 3-5 (Trả lời câu hỏi / Nêu giải pháp / Ý kiến)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        promptText: { type: 'string', description: 'Nội dung câu hỏi đề bài' },
+        studentResponse: { type: 'string', description: 'Bài nói hoặc transcript của học viên' },
+      },
+    },
+  })
+  submitPart3To5(
+    @Body('promptText') promptText: string,
+    @Body('studentResponse') studentResponse: string,
+  ) {
+    return this.speakingService.evaluateSpeakingPart3To5(promptText, studentResponse);
+  }
+
   @Get('my-submissions')
   @ApiOperation({ summary: 'Xem lịch sử bài luyện phát âm của tôi' })
   getMySubmissions(@Request() req: any) {

@@ -127,6 +127,24 @@ let WritingService = class WritingService {
             feedback: evaluation.feedback,
         };
     }
+    async submitWritingPart2(emailPrompt, userId, userResponse) {
+        const evaluation = await this.aiService.evaluateWritingPart2(emailPrompt, userResponse);
+        return {
+            score: evaluation.score,
+            maxScore: 4,
+            feedback: evaluation.feedback,
+            suggestions: evaluation.suggestions,
+        };
+    }
+    async submitWritingPart3(essayTopic, userId, userEssay) {
+        const evaluation = await this.aiService.evaluateWritingPart3(essayTopic, userEssay);
+        return {
+            score: evaluation.score,
+            maxScore: 5,
+            feedback: evaluation.feedback,
+            suggestions: evaluation.suggestions,
+        };
+    }
 };
 exports.WritingService = WritingService;
 exports.WritingService = WritingService = __decorate([

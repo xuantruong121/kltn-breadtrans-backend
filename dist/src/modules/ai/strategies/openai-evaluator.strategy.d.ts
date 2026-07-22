@@ -12,4 +12,19 @@ export declare class OpenAIEvaluatorStrategy implements IAIEvaluator {
         score: number;
         feedback: string;
     }>;
+    evaluateWritingPart2(emailPrompt: string, userResponse: string): Promise<{
+        score: number;
+        feedback: string;
+        suggestions: string[];
+    }>;
+    evaluateWritingPart3(essayTopic: string, userEssay: string): Promise<{
+        score: number;
+        feedback: string;
+        suggestions: string[];
+    }>;
+    evaluateSpeakingPart3To5(promptText: string, studentResponse: string): Promise<{
+        score: number;
+        feedback: string;
+        suggestions: string[];
+    }>;
 }

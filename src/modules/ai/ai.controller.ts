@@ -19,6 +19,9 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 import { IsString, IsNotEmpty, IsNumber } from 'class-validator';
 
 export class ChatDto {
@@ -177,6 +180,9 @@ export class AiController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('import-ets-pdf')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'pdfFile', maxCount: 1 },
@@ -185,7 +191,7 @@ export class AiController {
   )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB',
+    summary: 'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB (Chỉ ADMIN/TEACHER)',
   })
   async importEtsPdf(
     @UploadedFiles()

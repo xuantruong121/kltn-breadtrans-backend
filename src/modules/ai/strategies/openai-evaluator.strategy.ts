@@ -77,4 +77,37 @@ export class OpenAIEvaluatorStrategy implements IAIEvaluator {
   ): Promise<{ score: number; feedback: string }> {
     throw new Error('Chức năng này hiện chỉ hỗ trợ Gemini Vision.');
   }
+
+  async evaluateWritingPart2(
+    emailPrompt: string,
+    userResponse: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
+    return {
+      score: 3,
+      feedback: '[OpenAI Mock] Phản hồi email giả lập.',
+      suggestions: ['Sử dụng thêm từ nối.'],
+    };
+  }
+
+  async evaluateWritingPart3(
+    essayTopic: string,
+    userEssay: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
+    return {
+      score: 4,
+      feedback: '[OpenAI Mock] Bài luận giả lập.',
+      suggestions: ['Mở rộng lập luận.'],
+    };
+  }
+
+  async evaluateSpeakingPart3To5(
+    promptText: string,
+    studentResponse: string,
+  ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
+    return {
+      score: 3,
+      feedback: '[OpenAI Mock] Đánh giá bài nói giả lập.',
+      suggestions: ['Cải thiện phát âm.'],
+    };
+  }
 }
