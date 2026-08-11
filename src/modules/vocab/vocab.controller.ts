@@ -20,7 +20,7 @@ export class VocabController {
   @Get('topics')
   @ApiOperation({ summary: 'Lấy danh sách các chủ đề từ vựng TOEIC' })
   getTopics(@Request() req: any) {
-    const userId = req?.user?.userId;
+    const userId = req?.user?.id;
     return this.vocabService.getTopics(userId);
   }
 
@@ -30,7 +30,7 @@ export class VocabController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req: any,
   ) {
-    const userId = req?.user?.userId;
+    const userId = req?.user?.id;
     return this.vocabService.getTopicDetails(id, userId);
   }
 
@@ -42,7 +42,7 @@ export class VocabController {
     @Param('id', ParseIntPipe) wordId: number,
     @Request() req: any,
   ) {
-    return this.vocabService.toggleStar(req.user.userId, wordId);
+    return this.vocabService.toggleStar(req.user.id, wordId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -53,7 +53,7 @@ export class VocabController {
     @Param('id', ParseIntPipe) wordId: number,
     @Request() req: any,
   ) {
-    return this.vocabService.toggleMastered(req.user.userId, wordId);
+    return this.vocabService.toggleMastered(req.user.id, wordId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -65,6 +65,6 @@ export class VocabController {
     @Body('isCorrect') isCorrect: boolean,
     @Request() req: any,
   ) {
-    return this.vocabService.submitReview(req.user.userId, wordId, isCorrect);
+    return this.vocabService.submitReview(req.user.id, wordId, isCorrect);
   }
 }

@@ -68,6 +68,6 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng xuất, xóa refresh token' })
   async logout(@Request() req: any) {
-    return this.authService.logout(req.user.userId);
+    return this.authService.logout(req.user.id);
   }
 }

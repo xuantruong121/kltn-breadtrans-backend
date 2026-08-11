@@ -6,19 +6,18 @@ export declare class AuthController {
     register(registerDto: RegisterDto): Promise<{
         profile: {
             id: number;
-            userId: number;
             fullName: string;
             avatar: string | null;
             phone: string | null;
             address: string | null;
             targetScore: string | null;
+            userId: number;
         } | null;
-        createdAt: Date;
-        id: number;
-        updatedAt: Date;
         email: string;
         role: import(".prisma/client").$Enums.Role;
         refreshToken: string | null;
+        createdAt: Date;
+        updatedAt: Date;
         totalBanhRan: number;
         streakCount: number;
         lastStreakUpdate: Date | null;
@@ -50,6 +49,7 @@ export declare class AuthController {
         gameTickets: import("@prisma/client/runtime/library").JsonValue | null;
         speaking: import("@prisma/client/runtime/library").JsonValue | null;
         writing: import("@prisma/client/runtime/library").JsonValue | null;
+        id: number;
     }>;
     login(loginDto: LoginDto): Promise<{
         access_token: string;

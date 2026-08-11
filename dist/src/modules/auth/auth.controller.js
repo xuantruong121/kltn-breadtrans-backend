@@ -36,7 +36,7 @@ let AuthController = class AuthController {
         return this.authService.refreshTokens(userId, refreshToken);
     }
     async logout(req) {
-        return this.authService.logout(req.user.userId);
+        return this.authService.logout(req.user.id);
     }
 };
 exports.AuthController = AuthController;
