@@ -17,6 +17,7 @@ import { VocabModule } from './modules/vocab/vocab.module';
 import { ToeicModule } from './modules/toeic/toeic.module';
 import { ClassModule } from './modules/class/class.module';
 import { EventsModule } from './modules/events/events.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 import { RedisModule } from '@nestjs-modules/ioredis';
 
@@ -42,6 +43,7 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     ToeicModule,
     ClassModule,
     EventsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

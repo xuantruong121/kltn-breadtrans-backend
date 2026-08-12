@@ -26,6 +26,7 @@ const vocab_module_1 = require("./modules/vocab/vocab.module");
 const toeic_module_1 = require("./modules/toeic/toeic.module");
 const class_module_1 = require("./modules/class/class.module");
 const events_module_1 = require("./modules/events/events.module");
+const admin_module_1 = require("./modules/admin/admin.module");
 const ioredis_1 = require("@nestjs-modules/ioredis");
 let AppModule = class AppModule {
 };
@@ -53,6 +54,7 @@ exports.AppModule = AppModule = __decorate([
             toeic_module_1.ToeicModule,
             class_module_1.ClassModule,
             events_module_1.EventsModule,
+            admin_module_1.AdminModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

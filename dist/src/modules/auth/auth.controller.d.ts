@@ -5,8 +5,9 @@ export declare class AuthController {
     constructor(authService: AuthService);
     register(registerDto: RegisterDto): Promise<{
         profile: {
-            fullName: string;
             id: number;
+            userId: number;
+            fullName: string;
             avatar: string | null;
             phone: string | null;
             address: string | null;
@@ -16,18 +17,17 @@ export declare class AuthController {
             birthYear: number | null;
             nextExamDate: string | null;
             isSelfClaimed: boolean;
-            userId: number;
         } | null;
+        createdAt: Date;
+        id: number;
+        updatedAt: Date;
         email: string;
-        refreshToken: string | null;
         role: import(".prisma/client").$Enums.Role;
+        refreshToken: string | null;
         sessionToken: string | null;
         loginCount: number;
         lastLoginAt: Date | null;
         lastDeviceType: string | null;
-        createdAt: Date;
-        updatedAt: Date;
-        id: number;
     }>;
     login(loginDto: LoginDto): Promise<{
         access_token: string;
@@ -38,8 +38,9 @@ export declare class AuthController {
             email: string;
             role: import(".prisma/client").$Enums.Role;
             profile: {
-                fullName: string;
                 id: number;
+                userId: number;
+                fullName: string;
                 avatar: string | null;
                 phone: string | null;
                 address: string | null;
@@ -49,7 +50,6 @@ export declare class AuthController {
                 birthYear: number | null;
                 nextExamDate: string | null;
                 isSelfClaimed: boolean;
-                userId: number;
             } | null;
         };
     }>;
