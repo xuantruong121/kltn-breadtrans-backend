@@ -6,6 +6,7 @@ import { createMockContext, MockContext } from '../../prisma/prisma.mock';
 import * as bcrypt from 'bcrypt';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
 
 jest.mock('bcrypt', () => ({
   genSalt: jest.fn().mockResolvedValue('salt'),
@@ -30,6 +31,14 @@ describe('AuthService', () => {
           provide: JwtService,
           useValue: {
             sign: jest.fn().mockReturnValue('mock-jwt-token'),
+          },
+        },
+        {
+          provide: getRedisConnectionToken('default'),
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
           },
         },
       ],
