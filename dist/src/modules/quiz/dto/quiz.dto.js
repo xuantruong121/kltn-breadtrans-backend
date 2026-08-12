@@ -40,7 +40,7 @@ __decorate([
     __metadata("design:type", String)
 ], CreateQuizDto.prototype, "description", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ enum: client_1.QuizType, default: client_1.QuizType.GENERAL }),
+    (0, swagger_1.ApiPropertyOptional)({ enum: client_1.QuizType, default: client_1.QuizType.TOEIC }),
     (0, class_validator_1.IsEnum)(client_1.QuizType),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)

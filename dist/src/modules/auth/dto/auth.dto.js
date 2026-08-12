@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LoginDto = exports.RegisterDto = void 0;
+exports.VerifyOtpDto = exports.GenerateOtpDto = exports.RefreshTokenDto = exports.LoginDto = exports.RegisterDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 class RegisterDto {
@@ -39,6 +39,7 @@ __decorate([
 class LoginDto {
     email;
     password;
+    deviceId;
 }
 exports.LoginDto = LoginDto;
 __decorate([
@@ -52,4 +53,50 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], LoginDto.prototype, "password", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'device-uuid-1234', required: false }),
+    __metadata("design:type", String)
+], LoginDto.prototype, "deviceId", void 0);
+class RefreshTokenDto {
+    deviceId;
+    refreshToken;
+}
+exports.RefreshTokenDto = RefreshTokenDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'device-uuid-1234' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], RefreshTokenDto.prototype, "deviceId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'long-refresh-token' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], RefreshTokenDto.prototype, "refreshToken", void 0);
+class GenerateOtpDto {
+    email;
+}
+exports.GenerateOtpDto = GenerateOtpDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'student@test.com' }),
+    (0, class_validator_1.IsEmail)({}, { message: 'Invalid email format' }),
+    __metadata("design:type", String)
+], GenerateOtpDto.prototype, "email", void 0);
+class VerifyOtpDto {
+    email;
+    otp;
+}
+exports.VerifyOtpDto = VerifyOtpDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'student@test.com' }),
+    (0, class_validator_1.IsEmail)({}, { message: 'Invalid email format' }),
+    __metadata("design:type", String)
+], VerifyOtpDto.prototype, "email", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: '123456' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], VerifyOtpDto.prototype, "otp", void 0);
 //# sourceMappingURL=auth.dto.js.map

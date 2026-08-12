@@ -135,7 +135,7 @@ npx prisma studio
 
 Sau khi backend chạy, truy cập Swagger UI:
 
-👉 **Local:** [http://localhost:3000/api/docs](http://localhost:3000/api/docs)  
+👉 **Local:** [http://localhost:3001/api/docs](http://localhost:3001/api/docs)  
 👉 **Production:** [https://breadtrans.edu.vn/api/docs](https://breadtrans.edu.vn/api/docs)
 
 ---
@@ -149,7 +149,7 @@ Dùng **Cloudflare Tunnel** để FE developer (khác mạng) có thể gọi v�
 winget install --id Cloudflare.cloudflared
 
 # Chạy tunnel (mở terminal mới sau khi cài)
-cloudflared tunnel --url http://localhost:3000
+cloudflared tunnel --url http://localhost:3001
 
 # URL dạng https://xxxx.trycloudflare.com sẽ hiện sau ~5 giây
 # Gửi URL đó cho FE dev để dùng làm VITE_API_URL / NEXT_PUBLIC_API_URL

@@ -9,7 +9,13 @@ import {
   Request,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  RefreshTokenDto,
+  GenerateOtpDto,
+  VerifyOtpDto,
+} from './dto/auth.dto';
 import {
   ApiTags,
   ApiOperation,
@@ -17,6 +23,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import * as crypto from 'crypto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -34,40 +41,53 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })
-  @ApiResponse({ status: 200, description: 'Trả về access token.' })
+  @ApiResponse({ status: 200, description: 'Trả về access token và refresh token.' })
   @ApiResponse({ status: 401, description: 'Sai tài khoản hoặc mật khẩu.' })
   async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+    // If client doesn't provide a deviceId, generate a temporary one
+    const deviceId = loginDto.deviceId || crypto.randomUUID();
+    return this.authService.login(loginDto, deviceId);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy token mới bằng Refresh Token' })
+  async refreshTokens(@Request() req: any, @Body() body: RefreshTokenDto) {
+    return this.authService.refreshTokens(req.user.id, body.deviceId, body.refreshToken);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Đăng xuất khỏi thiết bị hiện tại' })
+  async logout(@Request() req: any, @Body('deviceId') deviceId: string) {
+    return this.authService.logout(req.user.id, deviceId);
+  }
+
+  @Post('otp/generate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Tạo mã OTP' })
+  async generateOtp(@Body() body: GenerateOtpDto) {
+    return this.authService.generateOtp(body.email);
+  }
+
+  @Post('otp/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Xác thực mã OTP' })
+  async verifyOtp(@Body() body: VerifyOtpDto) {
+    return this.authService.verifyOtp(body.email, body.otp);
   }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('profile')
   @ApiOperation({
-    summary: 'Lấy thông tin tài khoản đang đăng nhập (Test JWT)',
+    summary: 'Lấy thông tin tài khoản đang đăng nhập',
   })
   getProfile(@Request() req: any) {
     return req.user;
-  }
-
-  @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cấp lại Access Token mới bằng Refresh Token' })
-  @ApiResponse({ status: 200, description: 'Trả về token mới.' })
-  @ApiResponse({ status: 401, description: 'Refresh Token không hợp lệ.' })
-  async refreshTokens(
-    @Body('userId') userId: number,
-    @Body('refreshToken') refreshToken: string,
-  ) {
-    return this.authService.refreshTokens(userId, refreshToken);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Post('logout')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Đăng xuất, xóa refresh token' })
-  async logout(@Request() req: any) {
-    return this.authService.logout(req.user.id);
   }
 }

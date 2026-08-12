@@ -14,6 +14,11 @@ export declare class GamificationController {
                 phone: string | null;
                 address: string | null;
                 targetScore: string | null;
+                parentName: string | null;
+                parentPhone: string | null;
+                birthYear: number | null;
+                nextExamDate: string | null;
+                isSelfClaimed: boolean;
             } | null;
         };
     } & {

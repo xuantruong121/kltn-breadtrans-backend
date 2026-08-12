@@ -23,6 +23,10 @@ const event_emitter_1 = require("@nestjs/event-emitter");
 const reading_module_1 = require("./modules/reading/reading.module");
 const writing_module_1 = require("./modules/writing/writing.module");
 const vocab_module_1 = require("./modules/vocab/vocab.module");
+const toeic_module_1 = require("./modules/toeic/toeic.module");
+const class_module_1 = require("./modules/class/class.module");
+const events_module_1 = require("./modules/events/events.module");
+const ioredis_1 = require("@nestjs-modules/ioredis");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -30,6 +34,10 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             event_emitter_1.EventEmitterModule.forRoot(),
+            ioredis_1.RedisModule.forRoot({
+                type: 'single',
+                url: 'redis://localhost:6379',
+            }),
             auth_module_1.AuthModule,
             user_module_1.UserModule,
             course_module_1.CourseModule,
@@ -42,6 +50,9 @@ exports.AppModule = AppModule = __decorate([
             reading_module_1.ReadingModule,
             writing_module_1.WritingModule,
             vocab_module_1.VocabModule,
+            toeic_module_1.ToeicModule,
+            class_module_1.ClassModule,
+            events_module_1.EventsModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

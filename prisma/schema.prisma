@@ -14,52 +14,52 @@ enum Role {
   STUDENT
 }
 
+enum CourseStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+}
+
+enum ClassStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum EnrollmentStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  COMPLETED
+  DROPPED
+}
+
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  password     String
-  role         Role     @default(STUDENT)
-  refreshToken String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  email          String   @unique
+  password       String
+  role           Role     @default(STUDENT)
+  refreshToken   String?
+  sessionToken   String?
+  loginCount     Int      @default(0)
+  lastLoginAt    DateTime?
+  lastDeviceType String? // "pc" | "non-pc"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  // Bổ sung các trường từ Firestore Users Schema
-  totalBanhRan              Int       @default(0)
-  streakCount               Int       @default(0)
-  lastStreakUpdate          DateTime?
-  parentName                String?
-  parentPhone               String?
-  birthYear                 Int?
-  nextExamDate              String? // YYYY-MM-DD
-  isSelfClaimed             Boolean   @default(false)
-  tuitionFee                Json? // Record<"YYYY-MM", { amount?, paidAt? }>
-  bankQrUrl                 String?
-  bankName                  String?
-  bankBin                   String?
-  bankAccountNumber         String?
-  bankAccountName           String?
-  bankAccount               String?
-  sessionToken              String?
-  loginCount                Int       @default(0)
-  lastLoginAt               DateTime?
-  lastDeviceType            String? // "pc" | "non-pc"
-  admirationsMessage        Json?
-  admirationsSentToday      Json?
-  admirationsSentStoryToday Json?
-  timesVocabXS              Int       @default(0)
-  timesVocab                Int       @default(0)
-  quizAccuracy              Float     @default(0)
-  speakingAccuracy          Float     @default(0)
-  countHeart                Int       @default(0)
-  movies                    Json?
-  gameTickets               Json?
-  speaking                  Json? // Array of SpeakingItem
-  writing                   Json? // Array of WritingItem
-
+  // Core Relations
   profile             Profile?
+  stats               UserStats?
+  billing             UserBilling?
+
+  // Other Relations
   enrollments         Enrollment[]
   teachingClasses     Class[]               @relation("TeacherClasses")
+  teachingCourses     Course[]              @relation("TeacherCourses")
   submissions         Submission[]
+  assignmentSubmissions AssignmentSubmission[]
+  attendances         Attendance[]
   pointHistory        PointHistory[]
   userBadges          UserBadge[]
   leaderboard         Leaderboard?
@@ -70,6 +70,8 @@ model User {
   watchTracking       WatchTracking?
   aiUsages            AiUsage[]
   vocabProgresses     UserVocabWordProgress[]
+  toeicAttempts       ToeicAttempt[]
+  toeicSpeakingWritingSubmissions ToeicSpeakingWritingSubmission[]
 }
 
 model Profile {
@@ -81,6 +83,51 @@ model Profile {
   phone       String?
   address     String?
   targetScore String? // e.g., "IELTS 7.0", "TOEIC 800"
+  
+  // Thông tin cá nhân & Phụ huynh
+  parentName      String?
+  parentPhone     String?
+  birthYear       Int?
+  nextExamDate    String? // YYYY-MM-DD
+  isSelfClaimed   Boolean @default(false)
+}
+
+model UserStats {
+  id                        Int       @id @default(autoincrement())
+  userId                    Int       @unique
+  user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  totalBanhRan              Int       @default(0)
+  streakCount               Int       @default(0)
+  lastStreakUpdate          DateTime?
+  countHeart                Int       @default(0)
+  timesVocabXS              Int       @default(0)
+  timesVocab                Int       @default(0)
+  quizAccuracy              Float     @default(0)
+  speakingAccuracy          Float     @default(0)
+  
+  // Các trường JSON nặng
+  movies                    Json?
+  gameTickets               Json?
+  admirationsMessage        Json?
+  admirationsSentToday      Json?
+  admirationsSentStoryToday Json?
+  speaking                  Json? // Array of SpeakingItem
+  writing                   Json? // Array of WritingItem
+}
+
+model UserBilling {
+  id                Int       @id @default(autoincrement())
+  userId            Int       @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  tuitionFee        Json?     // Record<"YYYY-MM", { amount?, paidAt? }>
+  bankQrUrl         String?
+  bankName          String?
+  bankBin           String?
+  bankAccountNumber String?
+  bankAccountName   String?
+  bankAccount       String?
 }
 
 model Course {
@@ -89,10 +136,14 @@ model Course {
   description String?
   thumbnail   String?
   price       Float?   @default(0)
+  teacherId   Int?
+  teacher     User?    @relation("TeacherCourses", fields: [teacherId], references: [id])
+  status      CourseStatus @default(DRAFT)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   classes Class[]
+  lessons Lesson[]
   quizzes Quiz[]
 }
 
@@ -108,7 +159,7 @@ model Class {
   meetingLink String? // Google Meet/Zoom link
 
   // Bổ sung các trường từ Firestore Classes Schema
-  status             String  @default("active") // "active" | "inactive"
+  status             ClassStatus @default(UPCOMING)
   links              Json? // { zalo?, meet? }
   summary            Json?
   noteProcess        String?
@@ -116,8 +167,10 @@ model Class {
   stories            Json? // Record<userId, Record<storyId, IClassStory>>
   pendingEvaluations Json? // Record<"studentId_bookId_lessonId", ...>
 
-  enrollments Enrollment[]
-  lessons     Lesson[]
+  enrollments   Enrollment[]
+  sessions      Session[]
+  assignments   Assignment[]
+  announcements Announcement[]
 }
 
 model Enrollment {
@@ -128,14 +181,15 @@ model Enrollment {
   class    Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   joinedAt DateTime @default(now())
   progress Float    @default(0) // Percentage 0-100
+  status   EnrollmentStatus @default(ACTIVE)
 
   @@unique([userId, classId])
 }
 
 model Lesson {
   id          Int      @id @default(autoincrement())
-  classId     Int
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  courseId    Int
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   title       String
   description String?
   order       Int      @default(0)
@@ -153,6 +207,70 @@ model Material {
   fileUrl  String
   fileType String? // PDF, DOCX, MP3, vv.
 }
+
+model Session {
+  id          Int      @id @default(autoincrement())
+  classId     Int
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  title       String
+  startTime   DateTime
+  endTime     DateTime
+  meetingLink String?
+  status      String   @default("scheduled")
+  recordingUrl String?
+  createdAt   DateTime @default(now())
+
+  attendances Attendance[]
+}
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isPresent Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, userId])
+}
+
+model Assignment {
+  id          Int      @id @default(autoincrement())
+  classId     Int
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  title       String
+  description String?  @db.Text
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+
+  submissions AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           Int      @id @default(autoincrement())
+  assignmentId Int
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  userId       Int
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content      String?    @db.Text
+  fileUrl      String?
+  grade        Float?
+  feedback     String?    @db.Text
+  submittedAt  DateTime   @default(now())
+
+  @@unique([assignmentId, userId])
+}
+
+model Announcement {
+  id        Int      @id @default(autoincrement())
+  classId   Int
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  title     String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+}
+
 
 enum TopicCategory {
   GRAMMAR_TOPIC
@@ -176,10 +294,7 @@ model PracticeTopic {
 }
 
 enum QuizType {
-  IELTS
   TOEIC
-  VSTEP
-  GENERAL
   LISTENING_PRACTICE
   BILINGUAL_READING
   WRITING_PICTURE
@@ -530,3 +645,98 @@ model UserVocabWordProgress {
   @@unique([userId, wordId])
 }
 
+// ==========================================
+// TOEIC PRACTICE MODULE
+// ==========================================
+
+enum ExamType {
+  FULL_TEST
+  PRACTICE_BY_PART
+}
+
+enum AttemptMode {
+  PRACTICE
+  FULL_TEST
+}
+
+model ToeicExamSet {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?  @db.Text
+  type        ExamType @default(FULL_TEST)
+  difficulty  String   @default("medium") // "easy" | "medium" | "hard"
+  createdBy   Int?
+  createdAt   DateTime @default(now())
+
+  groups      ToeicQuestionGroup[]
+  attempts    ToeicAttempt[]
+}
+
+model ToeicQuestionGroup {
+  id           Int      @id @default(autoincrement())
+  examId       Int
+  exam         ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
+  part         Int      // 1 to 7
+  audioUrl     String?
+  imageUrl     String?
+  passageText  String?  @db.Text
+  groupOrder   Int      @default(0)
+
+  questions    ToeicQuestion[]
+}
+
+model ToeicQuestion {
+  id             Int      @id @default(autoincrement())
+  groupId        Int
+  group          ToeicQuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  questionNumber Int
+  text           String?  @db.Text
+  options        Json     // Array of 4 strings
+  correctIndex   Int      // 0, 1, 2, 3
+  explanation    String?  @db.Text
+
+  attemptAnswers ToeicAttemptAnswer[]
+  speakingWritingSubmissions ToeicSpeakingWritingSubmission[]
+}
+
+model ToeicAttempt {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId          Int
+  exam            ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
+  mode            AttemptMode  @default(PRACTICE)
+  startedAt       DateTime @default(now())
+  submittedAt     DateTime?
+  timeRemaining   Int?     // In seconds
+  listeningScore  Int?
+  readingScore    Int?
+  totalScore      Int?
+
+  answers         ToeicAttemptAnswer[]
+}
+
+model ToeicAttemptAnswer {
+  id            Int      @id @default(autoincrement())
+  attemptId     Int
+  attempt       ToeicAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId    Int
+  question      ToeicQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedIndex Int?
+
+  @@unique([attemptId, questionId])
+}
+
+model ToeicSpeakingWritingSubmission {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId    Int
+  question      ToeicQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  audioUrl      String?
+  textContent   String?  @db.Text
+  aiGradedScore Float?
+  aiTranscript  String?  @db.Text
+  aiFeedback    Json?    // Detailed feedback object
+  gradedAt      DateTime?
+}

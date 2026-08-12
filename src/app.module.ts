@@ -14,10 +14,19 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ReadingModule } from './modules/reading/reading.module';
 import { WritingModule } from './modules/writing/writing.module';
 import { VocabModule } from './modules/vocab/vocab.module';
+import { ToeicModule } from './modules/toeic/toeic.module';
+import { ClassModule } from './modules/class/class.module';
+import { EventsModule } from './modules/events/events.module';
+
+import { RedisModule } from '@nestjs-modules/ioredis';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
+    RedisModule.forRoot({
+      type: 'single',
+      url: 'redis://localhost:6379',
+    }),
     AuthModule,
     UserModule,
     CourseModule,
@@ -30,6 +39,9 @@ import { VocabModule } from './modules/vocab/vocab.module';
     ReadingModule,
     WritingModule,
     VocabModule,
+    ToeicModule,
+    ClassModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

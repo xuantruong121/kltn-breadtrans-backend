@@ -27,4 +27,36 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty()
   password: string;
+  
+  @ApiProperty({ example: 'device-uuid-1234', required: false })
+  deviceId?: string;
+}
+
+export class RefreshTokenDto {
+  @ApiProperty({ example: 'device-uuid-1234' })
+  @IsString()
+  @IsNotEmpty()
+  deviceId: string;
+
+  @ApiProperty({ example: 'long-refresh-token' })
+  @IsString()
+  @IsNotEmpty()
+  refreshToken: string;
+}
+
+export class GenerateOtpDto {
+  @ApiProperty({ example: 'student@test.com' })
+  @IsEmail({}, { message: 'Invalid email format' })
+  email: string;
+}
+
+export class VerifyOtpDto {
+  @ApiProperty({ example: 'student@test.com' })
+  @IsEmail({}, { message: 'Invalid email format' })
+  email: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
 }

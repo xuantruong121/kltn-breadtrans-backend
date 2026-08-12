@@ -12,17 +12,32 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CourseService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const events_gateway_1 = require("../events/events.gateway");
 let CourseService = class CourseService {
     prisma;
-    constructor(prisma) {
+    eventsGateway;
+    constructor(prisma, eventsGateway) {
         this.prisma = prisma;
+        this.eventsGateway = eventsGateway;
     }
     async createCourse(dto) {
         return this.prisma.course.create({ data: dto });
     }
-    async getAllCourses() {
+    async getAllCourses(userId, role) {
+        if (role === 'TEACHER' && userId) {
+            return this.prisma.course.findMany({
+                where: { teacherId: userId },
+                include: {
+                    classes: true,
+                    teacher: { select: { id: true, email: true, profile: true } }
+                },
+            });
+        }
         return this.prisma.course.findMany({
-            include: { classes: true },
+            include: {
+                classes: true,
+                teacher: { select: { id: true, email: true, profile: true } }
+            },
         });
     }
     async getCourseById(id) {
@@ -44,12 +59,57 @@ let CourseService = class CourseService {
     async deleteCourse(id) {
         return this.prisma.course.delete({ where: { id } });
     }
+    async updateCourseStatus(id, status) {
+        const updated = await this.prisma.course.update({
+            where: { id },
+            data: { status },
+        });
+        this.eventsGateway.broadcastCourseUpdate();
+        return updated;
+    }
+    async getUserClasses(userId, role) {
+        if (role === 'TEACHER' || role === 'ADMIN') {
+            const classes = await this.prisma.class.findMany({
+                where: { teacherId: userId },
+                include: {
+                    course: { select: { title: true } },
+                    sessions: true,
+                    _count: { select: { enrollments: true } }
+                },
+            });
+            return classes.map(c => ({
+                ...c,
+                studentCount: c._count.enrollments
+            }));
+        }
+        else if (role === 'STUDENT') {
+            const enrollments = await this.prisma.enrollment.findMany({
+                where: { userId },
+                include: {
+                    class: {
+                        include: {
+                            course: { select: { title: true } },
+                            teacher: { select: { email: true, profile: { select: { fullName: true } } } },
+                            _count: { select: { enrollments: true } }
+                        }
+                    }
+                }
+            });
+            return enrollments.map(e => ({
+                ...e.class,
+                studentCount: e.class._count.enrollments
+            }));
+        }
+        return [];
+    }
     async createClass(courseId, teacherId, dto) {
+        const meetingLink = dto.meetingLink || `https://meet.jit.si/kltn-breadtrans-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         return this.prisma.class.create({
             data: {
                 ...dto,
                 courseId,
                 teacherId,
+                meetingLink,
             },
         });
     }
@@ -57,8 +117,10 @@ let CourseService = class CourseService {
         const classData = await this.prisma.class.findUnique({
             where: { id: classId },
             include: {
-                lessons: {
-                    include: { materials: true },
+                course: {
+                    include: {
+                        lessons: { include: { materials: true } }
+                    }
                 },
                 teacher: { select: { id: true, email: true, profile: true } },
             },
@@ -70,11 +132,11 @@ let CourseService = class CourseService {
     async deleteClass(id) {
         return this.prisma.class.delete({ where: { id } });
     }
-    async createLesson(classId, dto) {
+    async createLesson(courseId, dto) {
         return this.prisma.lesson.create({
             data: {
                 ...dto,
-                classId,
+                courseId,
             },
         });
     }
@@ -90,6 +152,7 @@ let CourseService = class CourseService {
 exports.CourseService = CourseService;
 exports.CourseService = CourseService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        events_gateway_1.EventsGateway])
 ], CourseService);
 //# sourceMappingURL=course.service.js.map

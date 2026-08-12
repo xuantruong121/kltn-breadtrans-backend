@@ -1,4 +1,5 @@
 import { UserService } from './user.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 export declare class UserController {
     private readonly userService;
     constructor(userService: UserService);
@@ -11,6 +12,11 @@ export declare class UserController {
             phone: string | null;
             address: string | null;
             targetScore: string | null;
+            parentName: string | null;
+            parentPhone: string | null;
+            birthYear: number | null;
+            nextExamDate: string | null;
+            isSelfClaimed: boolean;
         } | null;
         createdAt: Date;
         id: number;
@@ -18,36 +24,23 @@ export declare class UserController {
         email: string;
         role: import(".prisma/client").$Enums.Role;
         refreshToken: string | null;
-        totalBanhRan: number;
-        streakCount: number;
-        lastStreakUpdate: Date | null;
+        sessionToken: string | null;
+        loginCount: number;
+        lastLoginAt: Date | null;
+        lastDeviceType: string | null;
+    }>;
+    updateProfile(req: any, updateData: UpdateProfileDto): Promise<{
+        id: number;
+        userId: number;
+        fullName: string;
+        avatar: string | null;
+        phone: string | null;
+        address: string | null;
+        targetScore: string | null;
         parentName: string | null;
         parentPhone: string | null;
         birthYear: number | null;
         nextExamDate: string | null;
         isSelfClaimed: boolean;
-        tuitionFee: import("@prisma/client/runtime/library").JsonValue | null;
-        bankQrUrl: string | null;
-        bankName: string | null;
-        bankBin: string | null;
-        bankAccountNumber: string | null;
-        bankAccountName: string | null;
-        bankAccount: string | null;
-        sessionToken: string | null;
-        loginCount: number;
-        lastLoginAt: Date | null;
-        lastDeviceType: string | null;
-        admirationsMessage: import("@prisma/client/runtime/library").JsonValue | null;
-        admirationsSentToday: import("@prisma/client/runtime/library").JsonValue | null;
-        admirationsSentStoryToday: import("@prisma/client/runtime/library").JsonValue | null;
-        timesVocabXS: number;
-        timesVocab: number;
-        quizAccuracy: number;
-        speakingAccuracy: number;
-        countHeart: number;
-        movies: import("@prisma/client/runtime/library").JsonValue | null;
-        gameTickets: import("@prisma/client/runtime/library").JsonValue | null;
-        speaking: import("@prisma/client/runtime/library").JsonValue | null;
-        writing: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
 }

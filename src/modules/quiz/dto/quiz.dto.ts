@@ -25,7 +25,7 @@ export class CreateQuizDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ enum: QuizType, default: QuizType.GENERAL })
+  @ApiPropertyOptional({ enum: QuizType, default: QuizType.TOEIC })
   @IsEnum(QuizType)
   @IsOptional()
   type?: QuizType;
