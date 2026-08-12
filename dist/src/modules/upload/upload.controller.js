@@ -45,7 +45,9 @@ exports.UploadController = UploadController;
 __decorate([
     (0, common_1.Post)(),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
-    (0, swagger_1.ApiOperation)({ summary: 'Upload file lên Cloudflare R2 (Ảnh, Audio, Video, PDF)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Upload file lên Cloudflare R2 (Ảnh, Audio, Video, PDF)',
+    }),
     (0, swagger_1.ApiConsumes)('multipart/form-data'),
     (0, swagger_1.ApiBody)({
         schema: {
@@ -74,7 +76,10 @@ __decorate([
 __decorate([
     (0, common_1.Delete)('*key'),
     (0, swagger_1.ApiOperation)({ summary: 'Xóa file khỏi R2 theo key' }),
-    (0, swagger_1.ApiParam)({ name: 'key', description: 'Key của file trong bucket R2 (vd: images/uuid.png)' }),
+    (0, swagger_1.ApiParam)({
+        name: 'key',
+        description: 'Key của file trong bucket R2 (vd: images/uuid.png)',
+    }),
     __param(0, (0, common_1.Param)('key')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -82,10 +87,22 @@ __decorate([
 ], UploadController.prototype, "deleteFile", null);
 __decorate([
     (0, common_1.Get)('presign'),
-    (0, swagger_1.ApiOperation)({ summary: 'Lấy presigned URL để FE upload file lớn trực tiếp lên R2' }),
-    (0, swagger_1.ApiQuery)({ name: 'key', description: 'Key muốn lưu trong bucket (vd: audio/my-recording.mp3)' }),
-    (0, swagger_1.ApiQuery)({ name: 'mimeType', description: 'MIME type của file (vd: audio/mpeg)' }),
-    (0, swagger_1.ApiQuery)({ name: 'expiresIn', required: false, description: 'Thời gian hết hạn (giây), mặc định 900s' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Lấy presigned URL để FE upload file lớn trực tiếp lên R2',
+    }),
+    (0, swagger_1.ApiQuery)({
+        name: 'key',
+        description: 'Key muốn lưu trong bucket (vd: audio/my-recording.mp3)',
+    }),
+    (0, swagger_1.ApiQuery)({
+        name: 'mimeType',
+        description: 'MIME type của file (vd: audio/mpeg)',
+    }),
+    (0, swagger_1.ApiQuery)({
+        name: 'expiresIn',
+        required: false,
+        description: 'Thời gian hết hạn (giây), mặc định 900s',
+    }),
     __param(0, (0, common_1.Query)('key')),
     __param(1, (0, common_1.Query)('mimeType')),
     __param(2, (0, common_1.Query)('expiresIn')),

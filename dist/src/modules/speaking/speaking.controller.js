@@ -111,13 +111,18 @@ __decorate([
 ], SpeakingController.prototype, "submitAudio", null);
 __decorate([
     (0, common_1.Post)('part3-5/submit'),
-    (0, swagger_1.ApiOperation)({ summary: 'Chấm điểm TOEIC Speaking Part 3-5 (Trả lời câu hỏi / Nêu giải pháp / Ý kiến)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Chấm điểm TOEIC Speaking Part 3-5 (Trả lời câu hỏi / Nêu giải pháp / Ý kiến)',
+    }),
     (0, swagger_1.ApiBody)({
         schema: {
             type: 'object',
             properties: {
                 promptText: { type: 'string', description: 'Nội dung câu hỏi đề bài' },
-                studentResponse: { type: 'string', description: 'Bài nói hoặc transcript của học viên' },
+                studentResponse: {
+                    type: 'string',
+                    description: 'Bài nói hoặc transcript của học viên',
+                },
             },
         },
     }),

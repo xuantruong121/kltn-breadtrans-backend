@@ -517,11 +517,15 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       return {
         score: 3,
         feedback: '[Mock Gemini] Email đáp ứng cơ bản các yêu cầu đề bài.',
-        suggestions: ['Nên dùng từ nối trang trọng hơn như "Furthermore", "However".'],
+        suggestions: [
+          'Nên dùng từ nối trang trọng hơn như "Furthermore", "However".',
+        ],
       };
     }
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash',
+      });
       const prompt = `
         You are a certified ETS TOEIC Writing Evaluator. Evaluate this TOEIC Writing Part 2 response (Respond to an Email Request).
         Original Email Request: "${emailPrompt}"
@@ -544,8 +548,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
 
       const result = await model.generateContent(prompt);
       let text = result.response.text().trim();
-      if (text.startsWith('```json')) text = text.substring(7, text.length - 3).trim();
-      else if (text.startsWith('```')) text = text.substring(3, text.length - 3).trim();
+      if (text.startsWith('```json'))
+        text = text.substring(7, text.length - 3).trim();
+      else if (text.startsWith('```'))
+        text = text.substring(3, text.length - 3).trim();
       return JSON.parse(text);
     } catch (error: any) {
       this.logger.error(`Error evaluating writing part 2: ${error.message}`);
@@ -564,12 +570,15 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
     if (!process.env.GEMINI_API_KEY) {
       return {
         score: 4,
-        feedback: '[Mock Gemini] Bài luận có lập luận rõ ràng, cấu trúc đủ 3 phần.',
+        feedback:
+          '[Mock Gemini] Bài luận có lập luận rõ ràng, cấu trúc đủ 3 phần.',
         suggestions: ['Mở rộng thêm các ví dụ thực tế ở phần thân bài.'],
       };
     }
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash',
+      });
       const prompt = `
         You are an ETS TOEIC Writing Evaluator. Grade this TOEIC Writing Part 3 (Write an Opinion Essay).
         Essay Topic: "${essayTopic}"
@@ -593,8 +602,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
 
       const result = await model.generateContent(prompt);
       let text = result.response.text().trim();
-      if (text.startsWith('```json')) text = text.substring(7, text.length - 3).trim();
-      else if (text.startsWith('```')) text = text.substring(3, text.length - 3).trim();
+      if (text.startsWith('```json'))
+        text = text.substring(7, text.length - 3).trim();
+      else if (text.startsWith('```'))
+        text = text.substring(3, text.length - 3).trim();
       return JSON.parse(text);
     } catch (error: any) {
       this.logger.error(`Error evaluating writing part 3: ${error.message}`);
@@ -613,12 +624,15 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
     if (!process.env.GEMINI_API_KEY) {
       return {
         score: 3,
-        feedback: '[Mock Gemini] Trả lời đúng trọng tâm câu hỏi, phát âm khá tốt.',
+        feedback:
+          '[Mock Gemini] Trả lời đúng trọng tâm câu hỏi, phát âm khá tốt.',
         suggestions: ['Nói tự nhiên hơn và bổ sung chi tiết giải thích.'],
       };
     }
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash',
+      });
       const prompt = `
         You are a TOEIC Speaking Examiner. Grade this Speaking Part 3-5 response.
         Question / Situation: "${promptText}"
@@ -639,8 +653,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
 
       const result = await model.generateContent(prompt);
       let text = result.response.text().trim();
-      if (text.startsWith('```json')) text = text.substring(7, text.length - 3).trim();
-      else if (text.startsWith('```')) text = text.substring(3, text.length - 3).trim();
+      if (text.startsWith('```json'))
+        text = text.substring(7, text.length - 3).trim();
+      else if (text.startsWith('```'))
+        text = text.substring(3, text.length - 3).trim();
       return JSON.parse(text);
     } catch (error: any) {
       this.logger.error(`Error evaluating speaking part 3-5: ${error.message}`);

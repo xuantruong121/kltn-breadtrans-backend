@@ -41,7 +41,10 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })
-  @ApiResponse({ status: 200, description: 'Trả về access token và refresh token.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về access token và refresh token.',
+  })
   @ApiResponse({ status: 401, description: 'Sai tài khoản hoặc mật khẩu.' })
   async login(@Body() loginDto: LoginDto) {
     // If client doesn't provide a deviceId, generate a temporary one
@@ -55,7 +58,11 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy token mới bằng Refresh Token' })
   async refreshTokens(@Request() req: any, @Body() body: RefreshTokenDto) {
-    return this.authService.refreshTokens(req.user.id, body.deviceId, body.refreshToken);
+    return this.authService.refreshTokens(
+      req.user.id,
+      body.deviceId,
+      body.refreshToken,
+    );
   }
 
   @Post('logout')

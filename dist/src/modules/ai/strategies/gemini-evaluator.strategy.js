@@ -420,11 +420,15 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             return {
                 score: 3,
                 feedback: '[Mock Gemini] Email đáp ứng cơ bản các yêu cầu đề bài.',
-                suggestions: ['Nên dùng từ nối trang trọng hơn như "Furthermore", "However".'],
+                suggestions: [
+                    'Nên dùng từ nối trang trọng hơn như "Furthermore", "However".',
+                ],
             };
         }
         try {
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+            const model = this.genAI.getGenerativeModel({
+                model: 'gemini-3.5-flash',
+            });
             const prompt = `
         You are a certified ETS TOEIC Writing Evaluator. Evaluate this TOEIC Writing Part 2 response (Respond to an Email Request).
         Original Email Request: "${emailPrompt}"
@@ -470,7 +474,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             };
         }
         try {
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+            const model = this.genAI.getGenerativeModel({
+                model: 'gemini-3.5-flash',
+            });
             const prompt = `
         You are an ETS TOEIC Writing Evaluator. Grade this TOEIC Writing Part 3 (Write an Opinion Essay).
         Essay Topic: "${essayTopic}"
@@ -517,7 +523,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             };
         }
         try {
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+            const model = this.genAI.getGenerativeModel({
+                model: 'gemini-3.5-flash',
+            });
             const prompt = `
         You are a TOEIC Speaking Examiner. Grade this Speaking Part 3-5 response.
         Question / Situation: "${promptText}"

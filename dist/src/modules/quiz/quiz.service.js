@@ -182,9 +182,15 @@ let QuizService = class QuizService {
                 accuracyPercent: accuracy,
             };
         });
-        const strengths = categoriesBreakdown.filter((c) => c.accuracyPercent >= 75).map((c) => c.category);
-        const weaknesses = categoriesBreakdown.filter((c) => c.accuracyPercent < 50).map((c) => c.category);
-        const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+        const strengths = categoriesBreakdown
+            .filter((c) => c.accuracyPercent >= 75)
+            .map((c) => c.category);
+        const weaknesses = categoriesBreakdown
+            .filter((c) => c.accuracyPercent < 50)
+            .map((c) => c.category);
+        const overallAccuracy = totalQuestions > 0
+            ? Math.round((totalCorrect / totalQuestions) * 100)
+            : 0;
         return {
             submissionId,
             quizTitle: submission.quiz.title,
@@ -193,7 +199,9 @@ let QuizService = class QuizService {
             totalCorrect,
             overallAccuracyPercent: overallAccuracy,
             categoriesBreakdown,
-            strengths: strengths.length > 0 ? strengths : ['Cần luyện tập thêm để xác định điểm mạnh'],
+            strengths: strengths.length > 0
+                ? strengths
+                : ['Cần luyện tập thêm để xác định điểm mạnh'],
             weaknesses: weaknesses.length > 0 ? weaknesses : ['Không có điểm yếu nghiêm trọng'],
             recommendation: weaknesses.length > 0
                 ? `Bạn nên tập trung ôn luyện lại các mảng kiến thức: ${weaknesses.join(', ')}.`

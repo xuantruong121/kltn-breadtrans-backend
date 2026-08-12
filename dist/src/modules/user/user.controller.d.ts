@@ -5,9 +5,8 @@ export declare class UserController {
     constructor(userService: UserService);
     getProfile(req: any): Promise<{
         profile: {
-            id: number;
-            userId: number;
             fullName: string;
+            id: number;
             avatar: string | null;
             phone: string | null;
             address: string | null;
@@ -17,22 +16,22 @@ export declare class UserController {
             birthYear: number | null;
             nextExamDate: string | null;
             isSelfClaimed: boolean;
+            userId: number;
         } | null;
-        createdAt: Date;
-        id: number;
-        updatedAt: Date;
         email: string;
-        role: import(".prisma/client").$Enums.Role;
         refreshToken: string | null;
+        role: import(".prisma/client").$Enums.Role;
         sessionToken: string | null;
         loginCount: number;
         lastLoginAt: Date | null;
         lastDeviceType: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        id: number;
     }>;
     updateProfile(req: any, updateData: UpdateProfileDto): Promise<{
-        id: number;
-        userId: number;
         fullName: string;
+        id: number;
         avatar: string | null;
         phone: string | null;
         address: string | null;
@@ -42,5 +41,6 @@ export declare class UserController {
         birthYear: number | null;
         nextExamDate: string | null;
         isSelfClaimed: boolean;
+        userId: number;
     }>;
 }

@@ -54,7 +54,10 @@ export class CourseController {
   @Get('classes')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy danh sách các lớp học của người dùng (Giáo viên hoặc Học sinh)' })
+  @ApiOperation({
+    summary:
+      'Lấy danh sách các lớp học của người dùng (Giáo viên hoặc Học sinh)',
+  })
   getUserClasses(@Request() req: any) {
     return this.courseService.getUserClasses(req.user.id, req.user.role);
   }

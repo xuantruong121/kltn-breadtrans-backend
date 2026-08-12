@@ -26,10 +26,7 @@ export class VocabController {
 
   @Get('topics/:id')
   @ApiOperation({ summary: 'Lấy chi tiết 1 chủ đề từ vựng và danh sách từ' })
-  getTopicDetails(
-    @Param('id', ParseIntPipe) id: number,
-    @Request() req: any,
-  ) {
+  getTopicDetails(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const userId = req?.user?.id;
     return this.vocabService.getTopicDetails(id, userId);
   }
@@ -38,10 +35,7 @@ export class VocabController {
   @ApiBearerAuth()
   @Post('words/:id/star')
   @ApiOperation({ summary: 'Đánh dấu Yêu thích / Bỏ yêu thích từ vựng' })
-  toggleStar(
-    @Param('id', ParseIntPipe) wordId: number,
-    @Request() req: any,
-  ) {
+  toggleStar(@Param('id', ParseIntPipe) wordId: number, @Request() req: any) {
     return this.vocabService.toggleStar(req.user.id, wordId);
   }
 
@@ -59,7 +53,9 @@ export class VocabController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('words/:id/review')
-  @ApiOperation({ summary: 'Cập nhật tiến độ ôn tập SRS sau khi học/làm trắc nghiệm' })
+  @ApiOperation({
+    summary: 'Cập nhật tiến độ ôn tập SRS sau khi học/làm trắc nghiệm',
+  })
   submitReview(
     @Param('id', ParseIntPipe) wordId: number,
     @Body('isCorrect') isCorrect: boolean,

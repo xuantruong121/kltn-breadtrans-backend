@@ -1,4 +1,11 @@
-import { Controller, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -21,7 +28,10 @@ export class UserController {
   @ApiBearerAuth()
   @Patch('profile')
   @ApiOperation({ summary: 'Cập nhật thông tin profile của user hiện tại' })
-  async updateProfile(@Request() req: any, @Body() updateData: UpdateProfileDto) {
+  async updateProfile(
+    @Request() req: any,
+    @Body() updateData: UpdateProfileDto,
+  ) {
     return this.userService.updateUserProfile(req.user.id, updateData);
   }
 }

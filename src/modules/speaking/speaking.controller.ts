@@ -101,13 +101,19 @@ export class SpeakingController {
   }
 
   @Post('part3-5/submit')
-  @ApiOperation({ summary: 'Chấm điểm TOEIC Speaking Part 3-5 (Trả lời câu hỏi / Nêu giải pháp / Ý kiến)' })
+  @ApiOperation({
+    summary:
+      'Chấm điểm TOEIC Speaking Part 3-5 (Trả lời câu hỏi / Nêu giải pháp / Ý kiến)',
+  })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
         promptText: { type: 'string', description: 'Nội dung câu hỏi đề bài' },
-        studentResponse: { type: 'string', description: 'Bài nói hoặc transcript của học viên' },
+        studentResponse: {
+          type: 'string',
+          description: 'Bài nói hoặc transcript của học viên',
+        },
       },
     },
   })
@@ -115,7 +121,10 @@ export class SpeakingController {
     @Body('promptText') promptText: string,
     @Body('studentResponse') studentResponse: string,
   ) {
-    return this.speakingService.evaluateSpeakingPart3To5(promptText, studentResponse);
+    return this.speakingService.evaluateSpeakingPart3To5(
+      promptText,
+      studentResponse,
+    );
   }
 
   @Get('my-submissions')

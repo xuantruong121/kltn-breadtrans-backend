@@ -86,13 +86,18 @@ __decorate([
     (0, common_1.Post)('part2/submit'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, swagger_1.ApiOperation)({ summary: 'Chấm điểm bài TOEIC Writing Part 2 (Respond to an Email)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Chấm điểm bài TOEIC Writing Part 2 (Respond to an Email)',
+    }),
     (0, swagger_1.ApiBody)({
         schema: {
             type: 'object',
             properties: {
                 emailPrompt: { type: 'string', description: 'Nội dung email đề bài' },
-                userResponse: { type: 'string', description: 'Email trả lời của học viên' },
+                userResponse: {
+                    type: 'string',
+                    description: 'Email trả lời của học viên',
+                },
             },
         },
     }),
@@ -107,7 +112,9 @@ __decorate([
     (0, common_1.Post)('part3/submit'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, swagger_1.ApiOperation)({ summary: 'Chấm điểm bài TOEIC Writing Part 3 (Write an Opinion Essay)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Chấm điểm bài TOEIC Writing Part 3 (Write an Opinion Essay)',
+    }),
     (0, swagger_1.ApiBody)({
         schema: {
             type: 'object',

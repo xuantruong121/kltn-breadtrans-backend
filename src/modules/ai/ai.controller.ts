@@ -191,7 +191,8 @@ export class AiController {
   )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB (Chỉ ADMIN/TEACHER)',
+    summary:
+      'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB (Chỉ ADMIN/TEACHER)',
   })
   async importEtsPdf(
     @UploadedFiles()

@@ -67,7 +67,9 @@ let AuthService = class AuthService {
     }
     async register(registerDto) {
         const { email, password, fullName } = registerDto;
-        const existingUser = await this.prisma.user.findUnique({ where: { email } });
+        const existingUser = await this.prisma.user.findUnique({
+            where: { email },
+        });
         if (existingUser)
             throw new common_1.ConflictException('Email already exists');
         const salt = await bcrypt.genSalt();
@@ -87,7 +89,7 @@ let AuthService = class AuthService {
         const { email, password } = loginDto;
         const user = await this.prisma.user.findUnique({
             where: { email },
-            include: { profile: true }
+            include: { profile: true },
         });
         if (!user)
             throw new common_1.UnauthorizedException('Invalid credentials');
@@ -153,7 +155,10 @@ let AuthService = class AuthService {
         if (!storedHash)
             throw new common_1.UnauthorizedException('OTP expired or invalid');
         const secret = process.env.OTP_SECRET || 'secret-key-otp';
-        const computedHash = crypto.createHmac('sha256', secret).update(providedOtp).digest('hex');
+        const computedHash = crypto
+            .createHmac('sha256', secret)
+            .update(providedOtp)
+            .digest('hex');
         if (storedHash !== computedHash) {
             throw new common_1.UnauthorizedException('Invalid OTP');
         }

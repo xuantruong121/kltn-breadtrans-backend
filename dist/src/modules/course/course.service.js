@@ -29,14 +29,14 @@ let CourseService = class CourseService {
                 where: { teacherId: userId },
                 include: {
                     classes: true,
-                    teacher: { select: { id: true, email: true, profile: true } }
+                    teacher: { select: { id: true, email: true, profile: true } },
                 },
             });
         }
         return this.prisma.course.findMany({
             include: {
                 classes: true,
-                teacher: { select: { id: true, email: true, profile: true } }
+                teacher: { select: { id: true, email: true, profile: true } },
             },
         });
     }
@@ -74,12 +74,12 @@ let CourseService = class CourseService {
                 include: {
                     course: { select: { title: true } },
                     sessions: true,
-                    _count: { select: { enrollments: true } }
+                    _count: { select: { enrollments: true } },
                 },
             });
-            return classes.map(c => ({
+            return classes.map((c) => ({
                 ...c,
-                studentCount: c._count.enrollments
+                studentCount: c._count.enrollments,
             }));
         }
         else if (role === 'STUDENT') {
@@ -89,21 +89,27 @@ let CourseService = class CourseService {
                     class: {
                         include: {
                             course: { select: { title: true } },
-                            teacher: { select: { email: true, profile: { select: { fullName: true } } } },
-                            _count: { select: { enrollments: true } }
-                        }
-                    }
-                }
+                            teacher: {
+                                select: {
+                                    email: true,
+                                    profile: { select: { fullName: true } },
+                                },
+                            },
+                            _count: { select: { enrollments: true } },
+                        },
+                    },
+                },
             });
-            return enrollments.map(e => ({
+            return enrollments.map((e) => ({
                 ...e.class,
-                studentCount: e.class._count.enrollments
+                studentCount: e.class._count.enrollments,
             }));
         }
         return [];
     }
     async createClass(courseId, teacherId, dto) {
-        const meetingLink = dto.meetingLink || `https://meet.jit.si/kltn-breadtrans-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const meetingLink = dto.meetingLink ||
+            `https://meet.jit.si/kltn-breadtrans-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         return this.prisma.class.create({
             data: {
                 ...dto,
@@ -119,8 +125,8 @@ let CourseService = class CourseService {
             include: {
                 course: {
                     include: {
-                        lessons: { include: { materials: true } }
-                    }
+                        lessons: { include: { materials: true } },
+                    },
                 },
                 teacher: { select: { id: true, email: true, profile: true } },
             },

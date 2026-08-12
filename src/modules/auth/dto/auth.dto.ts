@@ -27,7 +27,7 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty()
   password: string;
-  
+
   @ApiProperty({ example: 'device-uuid-1234', required: false })
   deviceId?: string;
 }

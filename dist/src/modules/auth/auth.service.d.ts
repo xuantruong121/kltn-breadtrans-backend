@@ -9,9 +9,8 @@ export declare class AuthService {
     constructor(prisma: PrismaService, jwtService: JwtService, redis: Redis);
     register(registerDto: RegisterDto): Promise<{
         profile: {
-            id: number;
-            userId: number;
             fullName: string;
+            id: number;
             avatar: string | null;
             phone: string | null;
             address: string | null;
@@ -21,17 +20,18 @@ export declare class AuthService {
             birthYear: number | null;
             nextExamDate: string | null;
             isSelfClaimed: boolean;
+            userId: number;
         } | null;
-        createdAt: Date;
-        id: number;
-        updatedAt: Date;
         email: string;
-        role: import(".prisma/client").$Enums.Role;
         refreshToken: string | null;
+        role: import(".prisma/client").$Enums.Role;
         sessionToken: string | null;
         loginCount: number;
         lastLoginAt: Date | null;
         lastDeviceType: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        id: number;
     }>;
     login(loginDto: LoginDto, deviceId: string): Promise<{
         access_token: string;
@@ -42,9 +42,8 @@ export declare class AuthService {
             email: string;
             role: import(".prisma/client").$Enums.Role;
             profile: {
-                id: number;
-                userId: number;
                 fullName: string;
+                id: number;
                 avatar: string | null;
                 phone: string | null;
                 address: string | null;
@@ -54,6 +53,7 @@ export declare class AuthService {
                 birthYear: number | null;
                 nextExamDate: string | null;
                 isSelfClaimed: boolean;
+                userId: number;
             } | null;
         };
     }>;

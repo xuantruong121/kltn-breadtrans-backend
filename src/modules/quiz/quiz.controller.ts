@@ -73,18 +73,27 @@ export class QuizController {
 
   @Get('submissions/:id/analytics')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Báo cáo phân tích điểm mạnh, điểm yếu và lỗ hổng kiến thức sau khi nộp bài' })
+  @ApiOperation({
+    summary:
+      'Báo cáo phân tích điểm mạnh, điểm yếu và lỗ hổng kiến thức sau khi nộp bài',
+  })
   getSubmissionAnalytics(@Param('id', ParseIntPipe) id: number) {
     return this.quizService.getSubmissionAnalytics(id);
   }
 
   @Post('score-conversion')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Quy đổi số câu đúng Listening/Reading ra thang điểm TOEIC (10 - 990)' })
+  @ApiOperation({
+    summary:
+      'Quy đổi số câu đúng Listening/Reading ra thang điểm TOEIC (10 - 990)',
+  })
   calculateToeicScore(
     @Body('listeningCorrect') listeningCorrect: number,
     @Body('readingCorrect') readingCorrect: number,
   ) {
-    return this.quizService.calculateToeicScore(listeningCorrect, readingCorrect);
+    return this.quizService.calculateToeicScore(
+      listeningCorrect,
+      readingCorrect,
+    );
   }
 }

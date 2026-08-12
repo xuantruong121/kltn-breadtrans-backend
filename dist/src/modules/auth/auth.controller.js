@@ -95,7 +95,10 @@ __decorate([
     (0, common_1.Post)('login'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: 'Đăng nhập vào hệ thống' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Trả về access token và refresh token.' }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Trả về access token và refresh token.',
+    }),
     (0, swagger_1.ApiResponse)({ status: 401, description: 'Sai tài khoản hoặc mật khẩu.' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
