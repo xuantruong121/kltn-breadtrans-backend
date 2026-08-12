@@ -6,10 +6,14 @@ import {
   CreateLessonDto,
   CreateMaterialDto,
 } from './dto/course.dto';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class CourseService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private eventsGateway: EventsGateway,
+  ) {}
 
   // ================= COURSES =================
 
@@ -17,9 +21,22 @@ export class CourseService {
     return this.prisma.course.create({ data: dto });
   }
 
-  async getAllCourses() {
+  async getAllCourses(userId?: number, role?: string) {
+    if (role === 'TEACHER' && userId) {
+      return this.prisma.course.findMany({
+        where: { teacherId: userId },
+        include: {
+          classes: true,
+          teacher: { select: { id: true, email: true, profile: true } },
+        },
+      });
+    }
+    // Admin gets all courses (or public ones)
     return this.prisma.course.findMany({
-      include: { classes: true },
+      include: {
+        classes: true,
+        teacher: { select: { id: true, email: true, profile: true } },
+      },
     });
   }
 
@@ -43,14 +60,70 @@ export class CourseService {
     return this.prisma.course.delete({ where: { id } });
   }
 
+  async updateCourseStatus(id: number, status: any) {
+    const updated = await this.prisma.course.update({
+      where: { id },
+      data: { status },
+    });
+
+    // Broadcast the update so frontends can refetch immediately
+    this.eventsGateway.broadcastCourseUpdate();
+
+    return updated;
+  }
+
   // ================= CLASSES =================
 
+  async getUserClasses(userId: number, role: string) {
+    if (role === 'TEACHER' || role === 'ADMIN') {
+      const classes = await this.prisma.class.findMany({
+        where: { teacherId: userId },
+        include: {
+          course: { select: { title: true } },
+          sessions: true,
+          _count: { select: { enrollments: true } },
+        },
+      });
+      return classes.map((c) => ({
+        ...c,
+        studentCount: c._count.enrollments,
+      }));
+    } else if (role === 'STUDENT') {
+      const enrollments = await this.prisma.enrollment.findMany({
+        where: { userId },
+        include: {
+          class: {
+            include: {
+              course: { select: { title: true } },
+              teacher: {
+                select: {
+                  email: true,
+                  profile: { select: { fullName: true } },
+                },
+              },
+              _count: { select: { enrollments: true } },
+            },
+          },
+        },
+      });
+      return enrollments.map((e) => ({
+        ...e.class,
+        studentCount: e.class._count.enrollments,
+      }));
+    }
+    return [];
+  }
+
   async createClass(courseId: number, teacherId: number, dto: CreateClassDto) {
+    const meetingLink =
+      dto.meetingLink ||
+      `https://meet.jit.si/kltn-breadtrans-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     return this.prisma.class.create({
       data: {
         ...dto,
         courseId,
         teacherId,
+        meetingLink,
       },
     });
   }
@@ -59,8 +132,10 @@ export class CourseService {
     const classData = await this.prisma.class.findUnique({
       where: { id: classId },
       include: {
-        lessons: {
-          include: { materials: true },
+        course: {
+          include: {
+            lessons: { include: { materials: true } },
+          },
         },
         teacher: { select: { id: true, email: true, profile: true } },
       },
@@ -75,11 +150,11 @@ export class CourseService {
 
   // ================= LESSONS & MATERIALS =================
 
-  async createLesson(classId: number, dto: CreateLessonDto) {
+  async createLesson(courseId: number, dto: CreateLessonDto) {
     return this.prisma.lesson.create({
       data: {
         ...dto,
-        classId,
+        courseId,
       },
     });
   }

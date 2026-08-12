@@ -55,13 +55,18 @@ export class WritingController {
   @Post('part2/submit')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Chấm điểm bài TOEIC Writing Part 2 (Respond to an Email)' })
+  @ApiOperation({
+    summary: 'Chấm điểm bài TOEIC Writing Part 2 (Respond to an Email)',
+  })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
         emailPrompt: { type: 'string', description: 'Nội dung email đề bài' },
-        userResponse: { type: 'string', description: 'Email trả lời của học viên' },
+        userResponse: {
+          type: 'string',
+          description: 'Email trả lời của học viên',
+        },
       },
     },
   })
@@ -70,13 +75,19 @@ export class WritingController {
     @Body('emailPrompt') emailPrompt: string,
     @Body('userResponse') userResponse: string,
   ) {
-    return this.writingService.submitWritingPart2(emailPrompt, req.user.id, userResponse);
+    return this.writingService.submitWritingPart2(
+      emailPrompt,
+      req.user.id,
+      userResponse,
+    );
   }
 
   @Post('part3/submit')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Chấm điểm bài TOEIC Writing Part 3 (Write an Opinion Essay)' })
+  @ApiOperation({
+    summary: 'Chấm điểm bài TOEIC Writing Part 3 (Write an Opinion Essay)',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -91,6 +102,10 @@ export class WritingController {
     @Body('essayTopic') essayTopic: string,
     @Body('userEssay') userEssay: string,
   ) {
-    return this.writingService.submitWritingPart3(essayTopic, req.user.id, userEssay);
+    return this.writingService.submitWritingPart3(
+      essayTopic,
+      req.user.id,
+      userEssay,
+    );
   }
 }

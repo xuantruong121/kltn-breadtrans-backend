@@ -35,7 +35,9 @@ export class UploadController {
 
   @Post()
   @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({ summary: 'Upload file lên Cloudflare R2 (Ảnh, Audio, Video, PDF)' })
+  @ApiOperation({
+    summary: 'Upload file lên Cloudflare R2 (Ảnh, Audio, Video, PDF)',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -55,7 +57,8 @@ export class UploadController {
         validators: [
           new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 }), // 50MB
           new FileTypeValidator({
-            fileType: /^(image\/(jpeg|png|webp|gif)|audio\/(mpeg|mp4|ogg|wav)|video\/mp4|application\/pdf)$/,
+            fileType:
+              /^(image\/(jpeg|png|webp|gif)|audio\/(mpeg|mp4|ogg|wav)|video\/mp4|application\/pdf)$/,
           }),
         ],
       }),
@@ -73,23 +76,42 @@ export class UploadController {
 
   @Delete('*key')
   @ApiOperation({ summary: 'Xóa file khỏi R2 theo key' })
-  @ApiParam({ name: 'key', description: 'Key của file trong bucket R2 (vd: images/uuid.png)' })
+  @ApiParam({
+    name: 'key',
+    description: 'Key của file trong bucket R2 (vd: images/uuid.png)',
+  })
   async deleteFile(@Param('key') key: string) {
     await this.uploadService.deleteFile(key);
     return { message: 'Đã xóa file thành công' };
   }
 
   @Get('presign')
-  @ApiOperation({ summary: 'Lấy presigned URL để FE upload file lớn trực tiếp lên R2' })
-  @ApiQuery({ name: 'key', description: 'Key muốn lưu trong bucket (vd: audio/my-recording.mp3)' })
-  @ApiQuery({ name: 'mimeType', description: 'MIME type của file (vd: audio/mpeg)' })
-  @ApiQuery({ name: 'expiresIn', required: false, description: 'Thời gian hết hạn (giây), mặc định 900s' })
+  @ApiOperation({
+    summary: 'Lấy presigned URL để FE upload file lớn trực tiếp lên R2',
+  })
+  @ApiQuery({
+    name: 'key',
+    description: 'Key muốn lưu trong bucket (vd: audio/my-recording.mp3)',
+  })
+  @ApiQuery({
+    name: 'mimeType',
+    description: 'MIME type của file (vd: audio/mpeg)',
+  })
+  @ApiQuery({
+    name: 'expiresIn',
+    required: false,
+    description: 'Thời gian hết hạn (giây), mặc định 900s',
+  })
   async getPresignedUrl(
     @Query('key') key: string,
     @Query('mimeType') mimeType: string,
     @Query('expiresIn') expiresIn?: number,
   ) {
-    const url = await this.uploadService.getPresignedUploadUrl(key, mimeType, expiresIn);
+    const url = await this.uploadService.getPresignedUploadUrl(
+      key,
+      mimeType,
+      expiresIn,
+    );
     return { presignedUrl: url, key };
   }
 }

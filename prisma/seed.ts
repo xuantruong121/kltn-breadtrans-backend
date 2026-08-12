@@ -1,76 +1,149 @@
-import { PrismaClient, Role, QuizType } from '@prisma/client';
+import { PrismaClient, Role, QuizType, TopicCategory } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient({ log: ['info', 'warn', 'error'] });
 
 async function clearDB() {
   console.log('Clearing old data...');
-  await prisma.speakingSubmission.deleteMany();
-  await prisma.speakingExercise.deleteMany();
-  await prisma.userBadge.deleteMany();
-  await prisma.pointHistory.deleteMany();
-  await prisma.leaderboard.deleteMany();
-  await prisma.result.deleteMany();
-  await prisma.submission.deleteMany();
-  await prisma.question.deleteMany();
-  await prisma.quiz.deleteMany();
-  await prisma.material.deleteMany();
-  await prisma.lesson.deleteMany();
-  await prisma.enrollment.deleteMany();
-  await prisma.class.deleteMany();
-  await prisma.course.deleteMany();
-  await prisma.badge.deleteMany();
-  await prisma.profile.deleteMany();
-  await prisma.user.deleteMany();
+  // Delete all data in reverse dependency order
+  const tables = [
+    'ToeicSpeakingWritingSubmission', 'ToeicAttemptAnswer', 'ToeicAttempt', 'ToeicQuestion', 'ToeicQuestionGroup', 'ToeicExamSet',
+    'UserVocabWordProgress', 'VocabWord', 'VocabTopic',
+    'AiUsage', 'WatchTracking', 'GameBattle', 'GamePlay', 'GameSettings',
+    'MarketOrder', 'MarketProduct',
+    'CurrencyRequest', 'CurrencyTransaction',
+    'SpeakingEvalRetry', 'SpeakingSubmission', 'SpeakingExercise',
+    'UserBookProgress', 'Leaderboard', 'UserBadge', 'Badge', 'PointHistory',
+    'Attendance', 'Session', 'AssignmentSubmission', 'Assignment', 'Announcement',
+    'Result', 'Submission', 'Question', 'Quiz', 'PracticeTopic',
+    'Material', 'Lesson', 'Enrollment', 'Class', 'Course',
+    'UserBilling', 'UserStats', 'Profile', 'User'
+  ];
+
+  for (const table of tables) {
+    try {
+      // @ts-ignore
+      if (prisma[table.charAt(0).toLowerCase() + table.slice(1)]) {
+        // @ts-ignore
+        await prisma[table.charAt(0).toLowerCase() + table.slice(1)].deleteMany();
+      }
+    } catch (e) {
+      console.warn(`Could not clear table ${table}`, e.message);
+    }
+  }
 }
 
 async function main() {
   await clearDB();
-  console.log('Seeding fake data (10+ records per table)...');
+  console.log('Seeding comprehensive fake data...');
 
   const passwordHash = await bcrypt.hash('123456', 10);
 
-  // 1. Fake Users (1 Admin, 3 Teachers, 6 Students = 10 Users)
+  // 1. Fake Users
   const users = [];
   
   // Admin
   users.push(await prisma.user.create({
-    data: { email: 'admin@breadtrans.com', password: passwordHash, role: Role.ADMIN, profile: { create: { fullName: 'Admin System' } } }
+    data: { 
+      email: 'admin@breadtrans.com', password: passwordHash, role: Role.ADMIN, 
+      profile: { create: { fullName: 'Admin System' } },
+      stats: { create: { totalBanhRan: 1000000, countHeart: 999 } },
+      billing: { create: { bankName: 'MBBank', bankAccountNumber: '123456789' } }
+    }
   }));
 
   // 3 Teachers
   for (let i = 1; i <= 3; i++) {
     users.push(await prisma.user.create({
-      data: { email: `teacher${i}@breadtrans.com`, password: passwordHash, role: Role.TEACHER, profile: { create: { fullName: `Teacher ${i}` } } }
+      data: { 
+        email: `teacher${i}@breadtrans.com`, password: passwordHash, role: Role.TEACHER, 
+        profile: { create: { fullName: `Teacher ${i}` } },
+        stats: { create: { totalBanhRan: 5000 } },
+        billing: { create: { bankName: 'Vietcombank', bankAccountNumber: `98765432${i}` } }
+      }
     }));
   }
 
   // 6 Students
   for (let i = 1; i <= 6; i++) {
     users.push(await prisma.user.create({
-      data: { email: `student${i}@breadtrans.com`, password: passwordHash, role: Role.STUDENT, profile: { create: { fullName: `Student ${i}`, targetScore: `IELTS ${6.0 + i * 0.5}` } } }
+      data: { 
+        email: `student${i}@breadtrans.com`, password: passwordHash, role: Role.STUDENT, 
+        profile: { create: { fullName: `Student ${i}`, targetScore: `IELTS ${6.0 + i * 0.5}`, phone: `090123456${i}` } },
+        stats: { create: { totalBanhRan: 1000 + i * 150, countHeart: 5, streakCount: i } },
+        billing: { create: { tuitionFee: { "2026-08": { amount: 500000, paidAt: new Date().toISOString() } } } }
+      }
     }));
   }
 
   const teachers = users.filter(u => u.role === Role.TEACHER);
   const students = users.filter(u => u.role === Role.STUDENT);
 
-  // 2. Fake Badges (10 Badges)
-  const badges = [];
-  for (let i = 1; i <= 10; i++) {
-    badges.push(await prisma.badge.create({
+  // 2. Market Products
+  const products = [];
+  for (let i = 1; i <= 5; i++) {
+    products.push(await prisma.marketProduct.create({
       data: {
-        name: `Huy hiệu Cấp ${i}`,
-        description: `Dành cho học viên đạt ${i * 100} điểm`,
-        criteria: { type: 'POINTS', threshold: i * 100 },
-        iconUrl: `https://example.com/badge${i}.png`
+        name: `Sản phẩm Cửa hàng ${i}`,
+        price: 200 + i * 100,
+        imageUrl: `https://example.com/product${i}.png`,
+        order: i,
+        purchaseCount: 0
       }
     }));
   }
 
-  // 3. Fake Courses (10 Courses)
+  // 3. Vocab Topic & Words
+  const vocabTopic = await prisma.vocabTopic.create({
+    data: {
+      title: 'Office Communication',
+      categoryName: 'Business English',
+      totalWords: 5,
+      isPro: false,
+      words: {
+        create: [
+          { word: 'Meeting', pos: 'noun', meaning: 'Cuộc họp', exampleEn: 'We have a meeting at 3 PM.' },
+          { word: 'Agenda', pos: 'noun', meaning: 'Chương trình nghị sự', exampleEn: 'Let\'s review the agenda.' },
+          { word: 'Colleague', pos: 'noun', meaning: 'Đồng nghiệp', exampleEn: 'He is my colleague.' },
+          { word: 'Deadline', pos: 'noun', meaning: 'Hạn chót', exampleEn: 'The deadline is tomorrow.' },
+          { word: 'Report', pos: 'noun', meaning: 'Báo cáo', exampleEn: 'Please submit the report.' }
+        ]
+      }
+    }
+  });
+
+  // 4. TOEIC Exam
+  const toeicExam = await prisma.toeicExamSet.create({
+    data: {
+      title: 'Đề thi TOEIC Rút gọn 2026',
+      description: 'Mô phỏng đề thi thực tế (Rút gọn)',
+      difficulty: 'Trung bình',
+      createdBy: teachers[0].id,
+      groups: {
+        create: [
+          {
+            part: 1,
+            groupOrder: 1,
+            questions: {
+              create: [
+                {
+                  questionNumber: 1,
+                  text: 'What is the man doing?',
+                  options: ['A', 'B', 'C', 'D'],
+                  correctIndex: 0,
+                  explanation: 'The man is standing by the desk.'
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  });
+
+  // 5. Courses & Classes
   const courses = [];
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 1; i <= 3; i++) {
     courses.push(await prisma.course.create({
       data: {
         title: `Khóa học Tiếng Anh Chuyên Sâu ${i}`,
@@ -81,9 +154,8 @@ async function main() {
     }));
   }
 
-  // 4. Fake Classes (10 Classes)
   const classes = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 3; i++) {
     const course = courses[i];
     const teacher = teachers[i % teachers.length];
     classes.push(await prisma.class.create({
@@ -96,33 +168,10 @@ async function main() {
     }));
   }
 
-  // 5. Fake Lessons & Materials (10 Lessons, each with 1 Material)
-  for (let i = 0; i < 10; i++) {
-    const cls = classes[i];
-    const lesson = await prisma.lesson.create({
-      data: {
-        classId: cls.id,
-        title: `Bài giảng ${i + 1}`,
-        description: `Nội dung bài giảng ${i + 1}`,
-        order: 1,
-        videoUrl: `https://youtube.com/watch?v=vid${i}`
-      }
-    });
-
-    await prisma.material.create({
-      data: {
-        lessonId: lesson.id,
-        title: `Tài liệu PDF cho bài ${i + 1}`,
-        fileUrl: `https://example.com/doc${i + 1}.pdf`,
-        fileType: 'PDF'
-      }
-    });
-  }
-
-  // 6. Fake Enrollments (10 Enrollments)
-  for (let i = 0; i < 10; i++) {
-    const student = students[i % students.length];
-    const cls = classes[i];
+  // 6. Enrollments
+  for (let i = 0; i < students.length; i++) {
+    const student = students[i];
+    const cls = classes[i % classes.length];
     await prisma.enrollment.create({
       data: {
         userId: student.id,
@@ -132,56 +181,23 @@ async function main() {
     });
   }
 
-  // 7. Fake Quizzes & Questions (10 Quizzes, 2 questions each)
-  const quizTypes = [QuizType.GENERAL, QuizType.IELTS, QuizType.TOEIC, QuizType.VSTEP];
-  for (let i = 0; i < 10; i++) {
-    const course = courses[i];
-    await prisma.quiz.create({
-      data: {
-        courseId: course.id,
-        title: `Đề thi trắc nghiệm ${i + 1}`,
-        description: `Bài kiểm tra đánh giá năng lực ${i + 1}`,
-        timeLimit: 45,
-        type: quizTypes[i % quizTypes.length],
-        questions: {
-          create: [
-            {
-              type: 'MULTIPLE_CHOICE',
-              order: 1,
-              content: { text: `Câu hỏi trắc nghiệm số 1 của đề ${i+1}?`, options: ['A', 'B', 'C', 'D'], correct: 'A' }
-            },
-            {
-              type: 'WRITING',
-              order: 2,
-              content: { text: `Viết một đoạn văn ngắn về chủ đề ${i+1}.` }
-            }
-          ]
-        }
+  // 7. Practice Quizzes
+  const quiz = await prisma.quiz.create({
+    data: {
+      title: 'Đề thi trắc nghiệm mẫu',
+      type: QuizType.TOEIC,
+      questions: {
+        create: [
+          { type: 'MULTIPLE_CHOICE', order: 1, content: { text: `Câu hỏi mẫu?`, options: ['A', 'B', 'C', 'D'], correct: 'A' } }
+        ]
       }
-    });
-  }
+    }
+  });
 
-  // 8. Speaking Exercises (10 bài tập phát âm các level khác nhau)
-  const speakingData = [
-    // BEGINNER
-    { title: 'Basic Greetings', targetText: 'Hello! My name is Nam. I am a student. Nice to meet you!', difficulty: 'BEGINNER', category: 'GENERAL' },
-    { title: 'Numbers and Days', targetText: 'Today is Monday. There are seven days in a week. The first month of the year is January.', difficulty: 'BEGINNER', category: 'GENERAL' },
-    { title: 'Daily Routine', targetText: 'I wake up at six o\'clock every morning. Then I brush my teeth, have breakfast, and go to school.', difficulty: 'BEGINNER', category: 'GENERAL' },
-    // INTERMEDIATE
-    { title: 'TOEIC: Office Communication', targetText: 'The meeting has been rescheduled to Thursday afternoon. Please bring your project reports and performance summaries.', difficulty: 'INTERMEDIATE', category: 'TOEIC' },
-    { title: 'TOEIC: Business Travel', targetText: 'I would like to book a single room for three nights, from the fifteenth to the eighteenth of November.', difficulty: 'INTERMEDIATE', category: 'TOEIC' },
-    { title: 'Environmental Issues', targetText: 'Climate change is one of the most pressing challenges of our time. We must reduce carbon emissions to protect the planet for future generations.', difficulty: 'INTERMEDIATE', category: 'GENERAL' },
-    { title: 'Technology in Education', targetText: 'Digital learning platforms have transformed the way students access information. Online education offers flexibility and a wide range of resources.', difficulty: 'INTERMEDIATE', category: 'GENERAL' },
-    // ADVANCED
-    { title: 'IELTS: Problem & Solution', targetText: 'Although urbanization brings economic growth, it also leads to overcrowding and environmental degradation. Governments should invest in sustainable infrastructure and promote green spaces within cities.', difficulty: 'ADVANCED', category: 'IELTS' },
-    { title: 'IELTS: Technology & Society', targetText: 'The rapid advancement of artificial intelligence raises significant ethical concerns regarding privacy, employment, and decision-making. Society must establish regulatory frameworks to ensure responsible development.', difficulty: 'ADVANCED', category: 'IELTS' },
-    { title: 'IELTS: Global Economy', targetText: 'International trade agreements foster economic interdependence, yet they can expose developing nations to exploitation. Policymakers must strike a balance between liberalization and the protection of domestic industries.', difficulty: 'ADVANCED', category: 'IELTS' },
-  ];
-
-  for (const ex of speakingData) {
-    await prisma.speakingExercise.create({ data: ex });
-  }
-  console.log(`✓ Seeded ${speakingData.length} Speaking Exercises`);
+  // 8. Speaking Exercises
+  await prisma.speakingExercise.create({ 
+    data: { title: 'Basic Greetings', targetText: 'Hello! Nice to meet you!', difficulty: 'BEGINNER', category: 'GENERAL' } 
+  });
 
   console.log('Seeding finished successfully.');
 }

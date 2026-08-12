@@ -30,6 +30,17 @@ let UserService = class UserService {
         const { password, ...userWithoutPassword } = user;
         return userWithoutPassword;
     }
+    async updateUserProfile(userId, updateData) {
+        return this.prisma.profile.upsert({
+            where: { userId },
+            update: updateData,
+            create: {
+                userId,
+                fullName: updateData.fullName || 'User',
+                ...updateData,
+            },
+        });
+    }
 };
 exports.UserService = UserService;
 exports.UserService = UserService = __decorate([

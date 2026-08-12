@@ -77,7 +77,7 @@ async function bootstrap() {
   }
 
   // Lắng nghe trên 0.0.0.0 — cần thiết để Cloudflare Tunnel / Docker kết nối được
-  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
+  await app.listen(process.env.PORT ?? 3001, '0.0.0.0');
 }
 
 bootstrap().catch((err) => {

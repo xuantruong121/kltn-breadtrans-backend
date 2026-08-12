@@ -4,33 +4,33 @@ export declare class SpeakingController {
     private readonly speakingService;
     constructor(speakingService: SpeakingService);
     createExercise(dto: CreateExerciseDto): Promise<{
-        category: string;
+        title: string;
         createdAt: Date;
         id: number;
-        title: string;
+        category: string;
+        audioUrl: string | null;
         targetText: string;
         imageUrl: string | null;
-        audioUrl: string | null;
         difficulty: string;
     }>;
     findAllExercises(category?: string): Promise<{
-        category: string;
+        title: string;
         createdAt: Date;
         id: number;
-        title: string;
+        category: string;
+        audioUrl: string | null;
         targetText: string;
         imageUrl: string | null;
-        audioUrl: string | null;
         difficulty: string;
     }[]>;
     findOne(id: number): Promise<{
-        category: string;
+        title: string;
         createdAt: Date;
         id: number;
-        title: string;
+        category: string;
+        audioUrl: string | null;
         targetText: string;
         imageUrl: string | null;
-        audioUrl: string | null;
         difficulty: string;
     }>;
     submitAudio(exerciseId: number, req: any, audio: Express.Multer.File): Promise<{
@@ -45,20 +45,20 @@ export declare class SpeakingController {
     }>;
     getMySubmissions(req: any): Promise<({
         exercise: {
-            category: string;
+            title: string;
             createdAt: Date;
             id: number;
-            title: string;
+            category: string;
+            audioUrl: string | null;
             targetText: string;
             imageUrl: string | null;
-            audioUrl: string | null;
             difficulty: string;
         };
     } & {
         id: number;
+        userId: number;
         submittedAt: Date;
         aiFeedback: import("@prisma/client/runtime/library").JsonValue | null;
-        userId: number;
         audioUrl: string;
         overallScore: number | null;
         exerciseId: number;

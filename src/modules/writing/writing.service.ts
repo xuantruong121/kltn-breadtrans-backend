@@ -136,7 +136,11 @@ export class WritingService {
     };
   }
 
-  async submitWritingPart2(emailPrompt: string, userId: number, userResponse: string) {
+  async submitWritingPart2(
+    emailPrompt: string,
+    userId: number,
+    userResponse: string,
+  ) {
     const evaluation = await this.aiService.evaluateWritingPart2(
       emailPrompt,
       userResponse,
@@ -150,7 +154,11 @@ export class WritingService {
     };
   }
 
-  async submitWritingPart3(essayTopic: string, userId: number, userEssay: string) {
+  async submitWritingPart3(
+    essayTopic: string,
+    userId: number,
+    userEssay: string,
+  ) {
     const evaluation = await this.aiService.evaluateWritingPart3(
       essayTopic,
       userEssay,

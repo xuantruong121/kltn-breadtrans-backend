@@ -1,71 +1,70 @@
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto, RefreshTokenDto, GenerateOtpDto, VerifyOtpDto } from './dto/auth.dto';
 export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
     register(registerDto: RegisterDto): Promise<{
         profile: {
-            id: number;
-            userId: number;
             fullName: string;
+            id: number;
             avatar: string | null;
             phone: string | null;
             address: string | null;
             targetScore: string | null;
+            parentName: string | null;
+            parentPhone: string | null;
+            birthYear: number | null;
+            nextExamDate: string | null;
+            isSelfClaimed: boolean;
+            userId: number;
         } | null;
-        createdAt: Date;
-        id: number;
-        updatedAt: Date;
         email: string;
-        role: import(".prisma/client").$Enums.Role;
         refreshToken: string | null;
-        totalBanhRan: number;
-        streakCount: number;
-        lastStreakUpdate: Date | null;
-        parentName: string | null;
-        parentPhone: string | null;
-        birthYear: number | null;
-        nextExamDate: string | null;
-        isSelfClaimed: boolean;
-        tuitionFee: import("@prisma/client/runtime/library").JsonValue | null;
-        bankQrUrl: string | null;
-        bankName: string | null;
-        bankBin: string | null;
-        bankAccountNumber: string | null;
-        bankAccountName: string | null;
-        bankAccount: string | null;
+        role: import(".prisma/client").$Enums.Role;
         sessionToken: string | null;
         loginCount: number;
         lastLoginAt: Date | null;
         lastDeviceType: string | null;
-        admirationsMessage: import("@prisma/client/runtime/library").JsonValue | null;
-        admirationsSentToday: import("@prisma/client/runtime/library").JsonValue | null;
-        admirationsSentStoryToday: import("@prisma/client/runtime/library").JsonValue | null;
-        timesVocabXS: number;
-        timesVocab: number;
-        quizAccuracy: number;
-        speakingAccuracy: number;
-        countHeart: number;
-        movies: import("@prisma/client/runtime/library").JsonValue | null;
-        gameTickets: import("@prisma/client/runtime/library").JsonValue | null;
-        speaking: import("@prisma/client/runtime/library").JsonValue | null;
-        writing: import("@prisma/client/runtime/library").JsonValue | null;
+        createdAt: Date;
+        updatedAt: Date;
+        id: number;
     }>;
     login(loginDto: LoginDto): Promise<{
         access_token: string;
         refresh_token: string;
+        deviceId: string;
         user: {
             id: number;
             email: string;
             role: import(".prisma/client").$Enums.Role;
+            profile: {
+                fullName: string;
+                id: number;
+                avatar: string | null;
+                phone: string | null;
+                address: string | null;
+                targetScore: string | null;
+                parentName: string | null;
+                parentPhone: string | null;
+                birthYear: number | null;
+                nextExamDate: string | null;
+                isSelfClaimed: boolean;
+                userId: number;
+            } | null;
         };
     }>;
-    getProfile(req: any): any;
-    refreshTokens(userId: number, refreshToken: string): Promise<{
+    refreshTokens(req: any, body: RefreshTokenDto): Promise<{
         access_token: string;
         refresh_token: string;
     }>;
-    logout(req: any): Promise<{
+    logout(req: any, deviceId: string): Promise<{
         message: string;
     }>;
+    generateOtp(body: GenerateOtpDto): Promise<{
+        message: string;
+    }>;
+    verifyOtp(body: VerifyOtpDto): Promise<{
+        message: string;
+    }>;
+    getProfile(req: any): any;
 }

@@ -21,4 +21,17 @@ export class UserService {
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
+
+  async updateUserProfile(userId: number, updateData: any) {
+    // Upsert profile in case it doesn't exist
+    return this.prisma.profile.upsert({
+      where: { userId },
+      update: updateData,
+      create: {
+        userId,
+        fullName: updateData.fullName || 'User',
+        ...updateData,
+      },
+    });
+  }
 }

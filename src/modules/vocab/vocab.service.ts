@@ -14,7 +14,10 @@ export class VocabService {
     });
 
     // Fetch user progress if userId is provided
-    let userProgressMap: Record<number, { mastered: number; starred: number }> = {};
+    const userProgressMap: Record<
+      number,
+      { mastered: number; starred: number }
+    > = {};
     if (userId) {
       const userProgresses = await this.prisma.userVocabWordProgress.findMany({
         where: { userId },
@@ -85,7 +88,10 @@ export class VocabService {
       throw new NotFoundException('Topic not found');
     }
 
-    let userProgressMap: Record<number, { isStarred: boolean; isMastered: boolean }> = {};
+    const userProgressMap: Record<
+      number,
+      { isStarred: boolean; isMastered: boolean }
+    > = {};
     if (userId) {
       const progresses = await this.prisma.userVocabWordProgress.findMany({
         where: { userId, word: { topicId } },
@@ -99,7 +105,10 @@ export class VocabService {
     }
 
     const words = topic.words.map((w) => {
-      const prog = userProgressMap[w.id] || { isStarred: false, isMastered: false };
+      const prog = userProgressMap[w.id] || {
+        isStarred: false,
+        isMastered: false,
+      };
       return {
         id: w.id,
         word: w.word,
@@ -169,7 +178,9 @@ export class VocabService {
     });
 
     const newReviewCount = (existing?.reviewCount || 0) + 1;
-    const isMastered = isCorrect ? (existing?.isMastered || newReviewCount >= 2) : false;
+    const isMastered = isCorrect
+      ? existing?.isMastered || newReviewCount >= 2
+      : false;
 
     if (existing) {
       return this.prisma.userVocabWordProgress.update({

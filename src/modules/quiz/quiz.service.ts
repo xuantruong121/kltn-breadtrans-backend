@@ -191,7 +191,9 @@ export class QuizService {
 
     submission.results.forEach((res) => {
       if (res.isCorrect) totalCorrect++;
-      const question = submission.quiz.questions.find((q) => q.id === res.questionId);
+      const question = submission.quiz.questions.find(
+        (q) => q.id === res.questionId,
+      );
       const content = question?.content as any;
       const category = content?.category || question?.type || 'General';
 
@@ -204,20 +206,30 @@ export class QuizService {
       }
     });
 
-    const categoriesBreakdown = Object.entries(tagStats).map(([category, stat]) => {
-      const accuracy = stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0;
-      return {
-        category,
-        correct: stat.correct,
-        total: stat.total,
-        accuracyPercent: accuracy,
-      };
-    });
+    const categoriesBreakdown = Object.entries(tagStats).map(
+      ([category, stat]) => {
+        const accuracy =
+          stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0;
+        return {
+          category,
+          correct: stat.correct,
+          total: stat.total,
+          accuracyPercent: accuracy,
+        };
+      },
+    );
 
-    const strengths = categoriesBreakdown.filter((c) => c.accuracyPercent >= 75).map((c) => c.category);
-    const weaknesses = categoriesBreakdown.filter((c) => c.accuracyPercent < 50).map((c) => c.category);
+    const strengths = categoriesBreakdown
+      .filter((c) => c.accuracyPercent >= 75)
+      .map((c) => c.category);
+    const weaknesses = categoriesBreakdown
+      .filter((c) => c.accuracyPercent < 50)
+      .map((c) => c.category);
 
-    const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+    const overallAccuracy =
+      totalQuestions > 0
+        ? Math.round((totalCorrect / totalQuestions) * 100)
+        : 0;
 
     return {
       submissionId,
@@ -227,8 +239,12 @@ export class QuizService {
       totalCorrect,
       overallAccuracyPercent: overallAccuracy,
       categoriesBreakdown,
-      strengths: strengths.length > 0 ? strengths : ['Cần luyện tập thêm để xác định điểm mạnh'],
-      weaknesses: weaknesses.length > 0 ? weaknesses : ['Không có điểm yếu nghiêm trọng'],
+      strengths:
+        strengths.length > 0
+          ? strengths
+          : ['Cần luyện tập thêm để xác định điểm mạnh'],
+      weaknesses:
+        weaknesses.length > 0 ? weaknesses : ['Không có điểm yếu nghiêm trọng'],
       recommendation:
         weaknesses.length > 0
           ? `Bạn nên tập trung ôn luyện lại các mảng kiến thức: ${weaknesses.join(', ')}.`

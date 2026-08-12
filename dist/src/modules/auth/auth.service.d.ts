@@ -1,72 +1,73 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
+import Redis from 'ioredis';
 export declare class AuthService {
     private readonly prisma;
     private readonly jwtService;
-    constructor(prisma: PrismaService, jwtService: JwtService);
+    private readonly redis;
+    constructor(prisma: PrismaService, jwtService: JwtService, redis: Redis);
     register(registerDto: RegisterDto): Promise<{
         profile: {
-            id: number;
-            userId: number;
             fullName: string;
+            id: number;
             avatar: string | null;
             phone: string | null;
             address: string | null;
             targetScore: string | null;
+            parentName: string | null;
+            parentPhone: string | null;
+            birthYear: number | null;
+            nextExamDate: string | null;
+            isSelfClaimed: boolean;
+            userId: number;
         } | null;
-        createdAt: Date;
-        id: number;
-        updatedAt: Date;
         email: string;
-        role: import(".prisma/client").$Enums.Role;
         refreshToken: string | null;
-        totalBanhRan: number;
-        streakCount: number;
-        lastStreakUpdate: Date | null;
-        parentName: string | null;
-        parentPhone: string | null;
-        birthYear: number | null;
-        nextExamDate: string | null;
-        isSelfClaimed: boolean;
-        tuitionFee: import("@prisma/client/runtime/library").JsonValue | null;
-        bankQrUrl: string | null;
-        bankName: string | null;
-        bankBin: string | null;
-        bankAccountNumber: string | null;
-        bankAccountName: string | null;
-        bankAccount: string | null;
+        role: import(".prisma/client").$Enums.Role;
         sessionToken: string | null;
         loginCount: number;
         lastLoginAt: Date | null;
         lastDeviceType: string | null;
-        admirationsMessage: import("@prisma/client/runtime/library").JsonValue | null;
-        admirationsSentToday: import("@prisma/client/runtime/library").JsonValue | null;
-        admirationsSentStoryToday: import("@prisma/client/runtime/library").JsonValue | null;
-        timesVocabXS: number;
-        timesVocab: number;
-        quizAccuracy: number;
-        speakingAccuracy: number;
-        countHeart: number;
-        movies: import("@prisma/client/runtime/library").JsonValue | null;
-        gameTickets: import("@prisma/client/runtime/library").JsonValue | null;
-        speaking: import("@prisma/client/runtime/library").JsonValue | null;
-        writing: import("@prisma/client/runtime/library").JsonValue | null;
+        createdAt: Date;
+        updatedAt: Date;
+        id: number;
     }>;
-    login(loginDto: LoginDto): Promise<{
+    login(loginDto: LoginDto, deviceId: string): Promise<{
         access_token: string;
         refresh_token: string;
+        deviceId: string;
         user: {
             id: number;
             email: string;
             role: import(".prisma/client").$Enums.Role;
+            profile: {
+                fullName: string;
+                id: number;
+                avatar: string | null;
+                phone: string | null;
+                address: string | null;
+                targetScore: string | null;
+                parentName: string | null;
+                parentPhone: string | null;
+                birthYear: number | null;
+                nextExamDate: string | null;
+                isSelfClaimed: boolean;
+                userId: number;
+            } | null;
         };
     }>;
-    refreshTokens(userId: number, refreshToken: string): Promise<{
+    refreshTokens(userId: number, deviceId: string, providedRefreshToken: string): Promise<{
         access_token: string;
         refresh_token: string;
     }>;
-    logout(userId: number): Promise<{
+    logout(userId: number, deviceId: string): Promise<{
+        message: string;
+    }>;
+    generateOtp(email: string): Promise<{
+        message: string;
+    }>;
+    verifyOtp(email: string, providedOtp: string): Promise<{
         message: string;
     }>;
 }

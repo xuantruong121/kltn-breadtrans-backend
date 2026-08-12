@@ -43,6 +43,25 @@ export class CourseController {
     return this.courseService.getAllCourses();
   }
 
+  @Get('my-courses')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy danh sách khóa học do mình tạo (Teacher)' })
+  getMyCourses(@Request() req: any) {
+    return this.courseService.getAllCourses(req.user.id, req.user.role);
+  }
+
+  @Get('classes')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Lấy danh sách các lớp học của người dùng (Giáo viên hoặc Học sinh)',
+  })
+  getUserClasses(@Request() req: any) {
+    return this.courseService.getUserClasses(req.user.id, req.user.role);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết một khóa học' })
   getCourseById(@Param('id', ParseIntPipe) id: number) {
@@ -57,7 +76,16 @@ export class CourseController {
     return this.courseService.deleteCourse(id);
   }
 
-  // --- Classes ---
+  @Post(':id/status')
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cập nhật trạng thái khóa học (Duyệt/Từ chối)' })
+  updateCourseStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('status') status: any,
+  ) {
+    return this.courseService.updateCourseStatus(id, status);
+  }
 
   @Post(':courseId/classes')
   @Roles(Role.ADMIN, Role.TEACHER)
@@ -82,15 +110,15 @@ export class CourseController {
 
   // --- Lessons & Materials ---
 
-  @Post('classes/:classId/lessons')
+  @Post(':courseId/lessons')
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Tạo bài học mới cho lớp học' })
+  @ApiOperation({ summary: 'Tạo bài học mới cho khóa học' })
   createLesson(
-    @Param('classId', ParseIntPipe) classId: number,
+    @Param('courseId', ParseIntPipe) courseId: number,
     @Body() dto: CreateLessonDto,
   ) {
-    return this.courseService.createLesson(classId, dto);
+    return this.courseService.createLesson(courseId, dto);
   }
 
   @Post('lessons/:lessonId/materials')

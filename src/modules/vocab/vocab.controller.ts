@@ -20,17 +20,14 @@ export class VocabController {
   @Get('topics')
   @ApiOperation({ summary: 'Lấy danh sách các chủ đề từ vựng TOEIC' })
   getTopics(@Request() req: any) {
-    const userId = req?.user?.userId;
+    const userId = req?.user?.id;
     return this.vocabService.getTopics(userId);
   }
 
   @Get('topics/:id')
   @ApiOperation({ summary: 'Lấy chi tiết 1 chủ đề từ vựng và danh sách từ' })
-  getTopicDetails(
-    @Param('id', ParseIntPipe) id: number,
-    @Request() req: any,
-  ) {
-    const userId = req?.user?.userId;
+  getTopicDetails(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const userId = req?.user?.id;
     return this.vocabService.getTopicDetails(id, userId);
   }
 
@@ -38,11 +35,8 @@ export class VocabController {
   @ApiBearerAuth()
   @Post('words/:id/star')
   @ApiOperation({ summary: 'Đánh dấu Yêu thích / Bỏ yêu thích từ vựng' })
-  toggleStar(
-    @Param('id', ParseIntPipe) wordId: number,
-    @Request() req: any,
-  ) {
-    return this.vocabService.toggleStar(req.user.userId, wordId);
+  toggleStar(@Param('id', ParseIntPipe) wordId: number, @Request() req: any) {
+    return this.vocabService.toggleStar(req.user.id, wordId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -53,18 +47,20 @@ export class VocabController {
     @Param('id', ParseIntPipe) wordId: number,
     @Request() req: any,
   ) {
-    return this.vocabService.toggleMastered(req.user.userId, wordId);
+    return this.vocabService.toggleMastered(req.user.id, wordId);
   }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('words/:id/review')
-  @ApiOperation({ summary: 'Cập nhật tiến độ ôn tập SRS sau khi học/làm trắc nghiệm' })
+  @ApiOperation({
+    summary: 'Cập nhật tiến độ ôn tập SRS sau khi học/làm trắc nghiệm',
+  })
   submitReview(
     @Param('id', ParseIntPipe) wordId: number,
     @Body('isCorrect') isCorrect: boolean,
     @Request() req: any,
   ) {
-    return this.vocabService.submitReview(req.user.userId, wordId, isCorrect);
+    return this.vocabService.submitReview(req.user.id, wordId, isCorrect);
   }
 }

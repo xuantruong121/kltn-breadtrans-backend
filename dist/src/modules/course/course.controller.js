@@ -32,11 +32,20 @@ let CourseController = class CourseController {
     getAllCourses() {
         return this.courseService.getAllCourses();
     }
+    getMyCourses(req) {
+        return this.courseService.getAllCourses(req.user.id, req.user.role);
+    }
+    getUserClasses(req) {
+        return this.courseService.getUserClasses(req.user.id, req.user.role);
+    }
     getCourseById(id) {
         return this.courseService.getCourseById(id);
     }
     deleteCourse(id) {
         return this.courseService.deleteCourse(id);
+    }
+    updateCourseStatus(id, status) {
+        return this.courseService.updateCourseStatus(id, status);
     }
     createClass(courseId, dto, req) {
         return this.courseService.createClass(courseId, req.user.id, dto);
@@ -44,8 +53,8 @@ let CourseController = class CourseController {
     getClassById(classId) {
         return this.courseService.getClassById(classId);
     }
-    createLesson(classId, dto) {
-        return this.courseService.createLesson(classId, dto);
+    createLesson(courseId, dto) {
+        return this.courseService.createLesson(courseId, dto);
     }
     createMaterial(lessonId, dto) {
         return this.courseService.createMaterial(lessonId, dto);
@@ -70,6 +79,28 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], CourseController.prototype, "getAllCourses", null);
 __decorate([
+    (0, common_1.Get)('my-courses'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy danh sách khóa học do mình tạo (Teacher)' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], CourseController.prototype, "getMyCourses", null);
+__decorate([
+    (0, common_1.Get)('classes'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Lấy danh sách các lớp học của người dùng (Giáo viên hoặc Học sinh)',
+    }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], CourseController.prototype, "getUserClasses", null);
+__decorate([
     (0, common_1.Get)(':id'),
     (0, swagger_1.ApiOperation)({ summary: 'Lấy chi tiết một khóa học' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
@@ -87,6 +118,17 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], CourseController.prototype, "deleteCourse", null);
+__decorate([
+    (0, common_1.Post)(':id/status'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Cập nhật trạng thái khóa học (Duyệt/Từ chối)' }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)('status')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], CourseController.prototype, "updateCourseStatus", null);
 __decorate([
     (0, common_1.Post)(':courseId/classes'),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
@@ -110,11 +152,11 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], CourseController.prototype, "getClassById", null);
 __decorate([
-    (0, common_1.Post)('classes/:classId/lessons'),
+    (0, common_1.Post)(':courseId/lessons'),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, swagger_1.ApiOperation)({ summary: 'Tạo bài học mới cho lớp học' }),
-    __param(0, (0, common_1.Param)('classId', common_1.ParseIntPipe)),
+    (0, swagger_1.ApiOperation)({ summary: 'Tạo bài học mới cho khóa học' }),
+    __param(0, (0, common_1.Param)('courseId', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, course_dto_1.CreateLessonDto]),
