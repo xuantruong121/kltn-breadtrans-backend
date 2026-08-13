@@ -88,8 +88,14 @@ let QuizService = class QuizService {
                 }
                 else if (question.type === 'DICTATION') {
                     const content = question.content;
-                    const cleanCorrect = (content.correctAnswer || '').toLowerCase().replace(/[.,!?]/g, '').trim();
-                    const cleanAns = (ans.answer || '').toLowerCase().replace(/[.,!?]/g, '').trim();
+                    const cleanCorrect = String(content.correctAnswer || '')
+                        .toLowerCase()
+                        .replace(/[.,!?]/g, '')
+                        .trim();
+                    const cleanAns = String(ans.answer || '')
+                        .toLowerCase()
+                        .replace(/[.,!?]/g, '')
+                        .trim();
                     if (cleanCorrect === cleanAns) {
                         isCorrect = true;
                         score = 1;

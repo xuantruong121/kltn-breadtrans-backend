@@ -65,7 +65,7 @@ export class GamificationListener {
           }
         }
       }
-      
+
       // 4. Update Daily Quests
       const today = new Date().toISOString().split('T')[0];
       const activeQuests = await this.prisma.dailyQuest.findMany({
@@ -92,7 +92,10 @@ export class GamificationListener {
           },
         });
 
-        if (progress.currentValue >= quest.targetValue && !progress.isCompleted) {
+        if (
+          progress.currentValue >= quest.targetValue &&
+          !progress.isCompleted
+        ) {
           // Mark as completed
           await this.prisma.userQuestProgress.update({
             where: { id: progress.id },
@@ -136,8 +139,10 @@ export class GamificationListener {
               });
             }
           }
-          
-          this.logger.log(`User ${payload.userId} completed quest ${quest.id} and received rewards.`);
+
+          this.logger.log(
+            `User ${payload.userId} completed quest ${quest.id} and received rewards.`,
+          );
         }
       }
     } catch (error) {
@@ -177,7 +182,10 @@ export class GamificationListener {
           },
         });
 
-        if (progress.currentValue >= quest.targetValue && !progress.isCompleted) {
+        if (
+          progress.currentValue >= quest.targetValue &&
+          !progress.isCompleted
+        ) {
           await this.prisma.userQuestProgress.update({
             where: { id: progress.id },
             data: { isCompleted: true },
@@ -209,15 +217,23 @@ export class GamificationListener {
               });
             } else {
               await this.prisma.userStats.create({
-                data: { userId: payload.userId, totalBanhRan: quest.rewardBanh },
+                data: {
+                  userId: payload.userId,
+                  totalBanhRan: quest.rewardBanh,
+                },
               });
             }
           }
-          this.logger.log(`User ${payload.userId} completed quest ${quest.id} and received rewards.`);
+          this.logger.log(
+            `User ${payload.userId} completed quest ${quest.id} and received rewards.`,
+          );
         }
       }
     } catch (error) {
-      this.logger.error(`Failed to handle vocab.learned for user ${payload.userId}`, error);
+      this.logger.error(
+        `Failed to handle vocab.learned for user ${payload.userId}`,
+        error,
+      );
     }
   }
 }

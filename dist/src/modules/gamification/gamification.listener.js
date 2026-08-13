@@ -83,7 +83,8 @@ let GamificationListener = GamificationListener_1 = class GamificationListener {
                         currentValue: 1,
                     },
                 });
-                if (progress.currentValue >= quest.targetValue && !progress.isCompleted) {
+                if (progress.currentValue >= quest.targetValue &&
+                    !progress.isCompleted) {
                     await this.prisma.userQuestProgress.update({
                         where: { id: progress.id },
                         data: { isCompleted: true },
@@ -157,7 +158,8 @@ let GamificationListener = GamificationListener_1 = class GamificationListener {
                         currentValue: payload.count,
                     },
                 });
-                if (progress.currentValue >= quest.targetValue && !progress.isCompleted) {
+                if (progress.currentValue >= quest.targetValue &&
+                    !progress.isCompleted) {
                     await this.prisma.userQuestProgress.update({
                         where: { id: progress.id },
                         data: { isCompleted: true },
@@ -188,7 +190,10 @@ let GamificationListener = GamificationListener_1 = class GamificationListener {
                         }
                         else {
                             await this.prisma.userStats.create({
-                                data: { userId: payload.userId, totalBanhRan: quest.rewardBanh },
+                                data: {
+                                    userId: payload.userId,
+                                    totalBanhRan: quest.rewardBanh,
+                                },
                             });
                         }
                     }
