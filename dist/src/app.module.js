@@ -42,10 +42,12 @@ exports.AppModule = AppModule = __decorate([
                 type: 'single',
                 url: 'redis://localhost:6379',
             }),
-            throttler_1.ThrottlerModule.forRoot([{
+            throttler_1.ThrottlerModule.forRoot([
+                {
                     ttl: 60000,
                     limit: 100,
-                }]),
+                },
+            ]),
             auth_module_1.AuthModule,
             user_module_1.UserModule,
             course_module_1.CourseModule,

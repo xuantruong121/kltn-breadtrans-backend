@@ -30,33 +30,44 @@ export class ClassService {
           include: {
             lessons: {
               include: {
-                materials: true
-              }
-            }
-          }
+                materials: true,
+              },
+            },
+          },
         },
         sessions: {
-          orderBy: { startTime: 'asc' }
+          orderBy: { startTime: 'asc' },
         },
         assignments: {
           include: {
-            submissions: role === 'STUDENT' ? {
-              where: { userId }
-            } : true
+            submissions:
+              role === 'STUDENT'
+                ? {
+                    where: { userId },
+                  }
+                : true,
           },
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
         },
         teacher: {
-          select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } }
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true, avatar: true } },
+          },
         },
         enrollments: {
           include: {
             user: {
-              select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } }
-            }
-          }
-        }
-      }
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true, avatar: true } },
+              },
+            },
+          },
+        },
+      },
     });
     return cls;
   }

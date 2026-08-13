@@ -47,29 +47,64 @@ let CourseService = class CourseService {
                             course: {
                                 include: {
                                     teacher: { select: { id: true, email: true, profile: true } },
+                                    lessons: { select: { videoUrl: true } },
                                 },
                             },
-                            teacher: { select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } } },
+                            teacher: {
+                                select: {
+                                    id: true,
+                                    email: true,
+                                    profile: { select: { fullName: true, avatar: true } },
+                                },
+                            },
                             _count: { select: { enrollments: true } },
                         },
                     },
                 },
                 orderBy: { joinedAt: 'desc' },
             });
-            return enrollments.map((e) => ({
-                classId: e.classId,
-                className: e.class.name,
-                classStatus: e.class.status,
-                meetingLink: e.class.meetingLink,
-                startDate: e.class.startDate,
-                endDate: e.class.endDate,
-                progress: e.progress,
-                enrollmentStatus: e.status,
-                joinedAt: e.joinedAt,
-                studentCount: e.class._count.enrollments,
-                teacher: e.class.teacher,
-                course: e.class.course,
-            }));
+            const watchTracking = await this.prisma.watchTracking.findUnique({
+                where: { userId },
+            });
+            const watchedItems = watchTracking?.items || {};
+            return enrollments.map((e) => {
+                let calculatedProgress = e.progress;
+                if (e.class.course.lessons && e.class.course.lessons.length > 0) {
+                    const totalLessons = e.class.course.lessons.length;
+                    let completedLessons = 0;
+                    e.class.course.lessons.forEach((lesson) => {
+                        if (lesson.videoUrl && watchedItems[lesson.videoUrl]) {
+                            const watchedData = watchedItems[lesson.videoUrl];
+                            if (watchedData.played >= 0.9) {
+                                completedLessons++;
+                            }
+                        }
+                    });
+                    calculatedProgress = Math.round((completedLessons / totalLessons) * 100);
+                    if (calculatedProgress !== e.progress) {
+                        this.prisma.enrollment
+                            .update({
+                            where: { id: e.id },
+                            data: { progress: calculatedProgress },
+                        })
+                            .catch(() => { });
+                    }
+                }
+                return {
+                    classId: e.classId,
+                    className: e.class.name,
+                    classStatus: e.class.status,
+                    meetingLink: e.class.meetingLink,
+                    startDate: e.class.startDate,
+                    endDate: e.class.endDate,
+                    progress: calculatedProgress,
+                    enrollmentStatus: e.status,
+                    joinedAt: e.joinedAt,
+                    studentCount: e.class._count.enrollments,
+                    teacher: e.class.teacher,
+                    course: e.class.course,
+                };
+            });
         }
         return this.prisma.course.findMany({
             include: {
@@ -117,10 +152,14 @@ let CourseService = class CourseService {
                     enrollments: {
                         include: {
                             user: {
-                                select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } }
-                            }
-                        }
-                    }
+                                select: {
+                                    id: true,
+                                    email: true,
+                                    profile: { select: { fullName: true, avatar: true } },
+                                },
+                            },
+                        },
+                    },
                 },
             });
             return classes.map((c) => ({

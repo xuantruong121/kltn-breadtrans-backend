@@ -22,6 +22,7 @@ let UserService = class UserService {
             where: { id: userId },
             include: {
                 profile: true,
+                stats: true,
             },
         });
         if (!user) {

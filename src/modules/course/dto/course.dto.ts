@@ -23,12 +23,18 @@ export class CreateCourseDto {
   @IsOptional()
   thumbnail?: string;
 
-  @ApiPropertyOptional({ example: 'BEGINNER', description: 'BEGINNER | INTERMEDIATE | ADVANCED' })
+  @ApiPropertyOptional({
+    example: 'BEGINNER',
+    description: 'BEGINNER | INTERMEDIATE | ADVANCED',
+  })
   @IsString()
   @IsOptional()
   level?: string;
 
-  @ApiPropertyOptional({ example: 1, description: 'ID của giáo viên phụ trách (Admin gán)' })
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'ID của giáo viên phụ trách (Admin gán)',
+  })
   @IsNumber()
   @IsOptional()
   teacherId?: number;

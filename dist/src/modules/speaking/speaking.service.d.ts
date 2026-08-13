@@ -13,30 +13,30 @@ export declare class SpeakingService {
         createdAt: Date;
         id: number;
         title: string;
-        imageUrl: string | null;
         targetText: string;
-        audioUrl: string | null;
         difficulty: string;
+        imageUrl: string | null;
+        audioUrl: string | null;
     }[]>;
     findExerciseById(id: number): Promise<{
         category: string;
         createdAt: Date;
         id: number;
         title: string;
-        imageUrl: string | null;
         targetText: string;
-        audioUrl: string | null;
         difficulty: string;
+        imageUrl: string | null;
+        audioUrl: string | null;
     }>;
     createExercise(dto: CreateExerciseDto): Promise<{
         category: string;
         createdAt: Date;
         id: number;
         title: string;
-        imageUrl: string | null;
         targetText: string;
-        audioUrl: string | null;
         difficulty: string;
+        imageUrl: string | null;
+        audioUrl: string | null;
     }>;
     submitAudio(exerciseId: number, userId: number, audioFile: Express.Multer.File): Promise<{
         submissionId: number;
@@ -54,10 +54,10 @@ export declare class SpeakingService {
             createdAt: Date;
             id: number;
             title: string;
-            imageUrl: string | null;
             targetText: string;
-            audioUrl: string | null;
             difficulty: string;
+            imageUrl: string | null;
+            audioUrl: string | null;
         };
     } & {
         id: number;

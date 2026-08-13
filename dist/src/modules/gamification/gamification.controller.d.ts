@@ -24,15 +24,15 @@ export declare class GamificationController {
     } & {
         id: number;
         userId: number;
-        totalPoints: number;
         rank: number | null;
+        totalPoints: number;
     })[]>;
     getMyBadges(req: any): Promise<({
         badge: {
-            id: number;
             name: string;
-            description: string;
             iconUrl: string | null;
+            id: number;
+            description: string;
             criteria: import("@prisma/client/runtime/library").JsonValue;
         };
     } & {
@@ -42,36 +42,36 @@ export declare class GamificationController {
         awardedAt: Date;
     })[]>;
     getMyPet(req: any): Promise<{
-        id: number;
-        userId: number;
-        createdAt: Date;
-        updatedAt: Date;
         name: string;
+        createdAt: Date;
+        id: number;
+        updatedAt: Date;
+        userId: number;
+        level: number;
         health: number;
         happiness: number;
-        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     feedPet(req: any): Promise<{
-        id: number;
-        userId: number;
-        createdAt: Date;
-        updatedAt: Date;
         name: string;
+        createdAt: Date;
+        id: number;
+        updatedAt: Date;
+        userId: number;
+        level: number;
         health: number;
         happiness: number;
-        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     getMyDailyQuests(req: any): Promise<({
         quest: {
             id: number;
-            description: string | null;
             title: string;
-            targetValue: number;
+            description: string | null;
             type: string;
+            targetValue: number;
             rewardXP: number;
             rewardBanh: number;
             isActive: boolean;

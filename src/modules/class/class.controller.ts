@@ -33,11 +33,17 @@ export class ClassController {
   }
 
   @Get(':classId')
-  @ApiOperation({ summary: 'Lấy chi tiết lớp học (Course, Lessons, Sessions, Assignments)' })
+  @ApiOperation({
+    summary: 'Lấy chi tiết lớp học (Course, Lessons, Sessions, Assignments)',
+  })
   getClassDetail(
     @Param('classId', ParseIntPipe) classId: number,
-    @Request() req: any
+    @Request() req: any,
   ) {
-    return this.classService.getClassDetail(classId, req.user.id, req.user.role);
+    return this.classService.getClassDetail(
+      classId,
+      req.user.id,
+      req.user.role,
+    );
   }
 }

@@ -86,6 +86,22 @@ let QuizService = class QuizService {
                         totalScore += score;
                     }
                 }
+                else if (question.type === 'DICTATION') {
+                    const content = question.content;
+                    const cleanCorrect = String(content.correctAnswer || '')
+                        .toLowerCase()
+                        .replace(/[.,!?]/g, '')
+                        .trim();
+                    const cleanAns = String(ans.answer || '')
+                        .toLowerCase()
+                        .replace(/[.,!?]/g, '')
+                        .trim();
+                    if (cleanCorrect === cleanAns) {
+                        isCorrect = true;
+                        score = 1;
+                        totalScore += score;
+                    }
+                }
                 else if (question.type === 'WRITING') {
                     const content = question.content;
                     await this.aiService.generateFeedback(content.text || 'Write an essay.', ans.answer);
@@ -211,6 +227,8 @@ let QuizService = class QuizService {
             totalCorrect,
             overallAccuracyPercent: overallAccuracy,
             categoriesBreakdown,
+            results: submission.results,
+            questions: submission.quiz.questions,
             strengths: strengths.length > 0
                 ? strengths
                 : ['Cần luyện tập thêm để xác định điểm mạnh'],

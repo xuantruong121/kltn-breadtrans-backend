@@ -52,6 +52,9 @@ export declare class CourseController {
                     isSelfClaimed: boolean;
                 } | null;
             } | null;
+            lessons: {
+                videoUrl: string | null;
+            }[];
         } & {
             createdAt: Date;
             id: number;
@@ -147,6 +150,9 @@ export declare class CourseController {
                     isSelfClaimed: boolean;
                 } | null;
             } | null;
+            lessons: {
+                videoUrl: string | null;
+            }[];
         } & {
             createdAt: Date;
             id: number;

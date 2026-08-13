@@ -8,6 +8,6 @@ import { GamificationModule } from '../gamification/gamification.module';
   imports: [PrismaModule, GamificationModule],
   controllers: [AssignmentController],
   providers: [AssignmentService],
-  exports: [AssignmentService]
+  exports: [AssignmentService],
 })
 export class AssignmentModule {}

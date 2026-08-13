@@ -18,6 +18,25 @@ export declare class UserController {
             nextExamDate: string | null;
             isSelfClaimed: boolean;
         } | null;
+        stats: {
+            id: number;
+            userId: number;
+            totalBanhRan: number;
+            streakCount: number;
+            lastStreakUpdate: Date | null;
+            countHeart: number;
+            timesVocabXS: number;
+            timesVocab: number;
+            quizAccuracy: number;
+            speakingAccuracy: number;
+            movies: import("@prisma/client/runtime/library").JsonValue | null;
+            gameTickets: import("@prisma/client/runtime/library").JsonValue | null;
+            admirationsMessage: import("@prisma/client/runtime/library").JsonValue | null;
+            admirationsSentToday: import("@prisma/client/runtime/library").JsonValue | null;
+            admirationsSentStoryToday: import("@prisma/client/runtime/library").JsonValue | null;
+            speaking: import("@prisma/client/runtime/library").JsonValue | null;
+            writing: import("@prisma/client/runtime/library").JsonValue | null;
+        } | null;
         createdAt: Date;
         id: number;
         updatedAt: Date;

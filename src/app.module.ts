@@ -31,10 +31,12 @@ import { RedisModule } from '@nestjs-modules/ioredis';
       type: 'single',
       url: 'redis://localhost:6379',
     }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100,
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     AuthModule,
     UserModule,
     CourseModule,

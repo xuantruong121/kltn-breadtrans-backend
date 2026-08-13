@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsEnum, IsNumber, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsDateString,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum AssignmentType {
@@ -25,7 +31,10 @@ export class CreateAssignmentDto {
   @IsEnum(AssignmentType)
   type: AssignmentType;
 
-  @ApiProperty({ required: false, description: 'Quiz questions if type is QUIZ' })
+  @ApiProperty({
+    required: false,
+    description: 'Quiz questions if type is QUIZ',
+  })
   @IsOptional()
   quizData?: any;
 }

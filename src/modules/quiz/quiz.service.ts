@@ -88,6 +88,21 @@ export class QuizService {
               score = 1;
               totalScore += score;
             }
+          } else if (question.type === 'DICTATION') {
+            const content = question.content as any;
+            const cleanCorrect = String(content.correctAnswer || '')
+              .toLowerCase()
+              .replace(/[.,!?]/g, '')
+              .trim();
+            const cleanAns = String(ans.answer || '')
+              .toLowerCase()
+              .replace(/[.,!?]/g, '')
+              .trim();
+            if (cleanCorrect === cleanAns) {
+              isCorrect = true;
+              score = 1;
+              totalScore += score;
+            }
           } else if (question.type === 'WRITING') {
             // Gọi AI chấm bài cho câu tự luận
             const content = question.content as any;
@@ -252,6 +267,8 @@ export class QuizService {
       totalCorrect,
       overallAccuracyPercent: overallAccuracy,
       categoriesBreakdown,
+      results: submission.results,
+      questions: submission.quiz.questions,
       strengths:
         strengths.length > 0
           ? strengths
