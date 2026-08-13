@@ -1,4 +1,4 @@
-import { PrismaClient, Role, QuizType, TopicCategory } from '@prisma/client';
+import { PrismaClient, Role, QuizType, TopicCategory, CourseStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient({ log: ['info', 'warn', 'error'] });
@@ -148,8 +148,9 @@ async function main() {
       data: {
         title: `Khóa học Tiếng Anh Chuyên Sâu ${i}`,
         description: `Mô tả chi tiết cho khóa học ${i}`,
-        price: 500000 + i * 50000,
-        thumbnail: `https://example.com/course${i}.jpg`
+        level: i === 1 ? 'BEGINNER' : i === 2 ? 'INTERMEDIATE' : 'ADVANCED',
+        thumbnail: `https://example.com/course${i}.jpg`,
+        status: CourseStatus.PUBLISHED
       }
     }));
   }

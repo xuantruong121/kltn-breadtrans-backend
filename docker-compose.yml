@@ -4,7 +4,6 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: kltn-postgres
-    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -17,7 +16,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kltn-redis
-    restart: always
     ports:
       - '6379:6379'
     volumes:

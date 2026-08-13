@@ -22,21 +22,64 @@ export class CourseService {
   }
 
   async getAllCourses(userId?: number, role?: string) {
+    // TEACHER: only their own courses
     if (role === 'TEACHER' && userId) {
       return this.prisma.course.findMany({
         where: { teacherId: userId },
         include: {
-          classes: true,
+          classes: {
+            include: {
+              _count: { select: { enrollments: true } },
+            },
+          },
           teacher: { select: { id: true, email: true, profile: true } },
         },
+        orderBy: { createdAt: 'desc' },
       });
     }
-    // Admin gets all courses (or public ones)
+
+    // STUDENT: only courses from classes they are enrolled in
+    if (role === 'STUDENT' && userId) {
+      const enrollments = await this.prisma.enrollment.findMany({
+        where: { userId },
+        include: {
+          class: {
+            include: {
+              course: {
+                include: {
+                  teacher: { select: { id: true, email: true, profile: true } },
+                },
+              },
+              teacher: { select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } } },
+              _count: { select: { enrollments: true } },
+            },
+          },
+        },
+        orderBy: { joinedAt: 'desc' },
+      });
+      return enrollments.map((e) => ({
+        classId: e.classId,
+        className: e.class.name,
+        classStatus: e.class.status,
+        meetingLink: e.class.meetingLink,
+        startDate: e.class.startDate,
+        endDate: e.class.endDate,
+        progress: e.progress,
+        enrollmentStatus: e.status,
+        joinedAt: e.joinedAt,
+        studentCount: e.class._count.enrollments,
+        teacher: e.class.teacher,
+        course: e.class.course,
+      }));
+    }
+
+    // Default (Admin handled in AdminModule, this is fallback)
     return this.prisma.course.findMany({
       include: {
         classes: true,
         teacher: { select: { id: true, email: true, profile: true } },
       },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -82,6 +125,13 @@ export class CourseService {
           course: { select: { title: true } },
           sessions: true,
           _count: { select: { enrollments: true } },
+          enrollments: {
+            include: {
+              user: {
+                select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } }
+              }
+            }
+          }
         },
       });
       return classes.map((c) => ({

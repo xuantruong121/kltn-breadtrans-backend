@@ -35,6 +35,14 @@ export class QuizController {
     return this.quizService.createQuiz(dto);
   }
 
+  @Get()
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy tất cả quizzes (chỉ ADMIN/TEACHER)' })
+  getAllQuizzes() {
+    return this.quizService.getAllQuizzes();
+  }
+
   @Get('listening-practice')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách các bài Luyện Nghe (Nghe Chép)' })

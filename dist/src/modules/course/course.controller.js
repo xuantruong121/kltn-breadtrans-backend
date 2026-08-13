@@ -29,8 +29,10 @@ let CourseController = class CourseController {
     createCourse(createCourseDto) {
         return this.courseService.createCourse(createCourseDto);
     }
-    getAllCourses() {
-        return this.courseService.getAllCourses();
+    getAllCourses(req, role) {
+        const userId = req.user?.id;
+        const userRole = role || req.user?.role;
+        return this.courseService.getAllCourses(userId, userRole);
     }
     getMyCourses(req) {
         return this.courseService.getAllCourses(req.user.id, req.user.role);
@@ -74,8 +76,10 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({ summary: 'Lấy danh sách tất cả khóa học' }),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Query)('role')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], CourseController.prototype, "getAllCourses", null);
 __decorate([

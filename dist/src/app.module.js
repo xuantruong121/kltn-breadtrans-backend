@@ -8,6 +8,8 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
+const core_1 = require("@nestjs/core");
+const throttler_1 = require("@nestjs/throttler");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const auth_module_1 = require("./modules/auth/auth.module");
@@ -26,6 +28,8 @@ const vocab_module_1 = require("./modules/vocab/vocab.module");
 const toeic_module_1 = require("./modules/toeic/toeic.module");
 const class_module_1 = require("./modules/class/class.module");
 const events_module_1 = require("./modules/events/events.module");
+const admin_module_1 = require("./modules/admin/admin.module");
+const assignment_module_1 = require("./modules/assignment/assignment.module");
 const ioredis_1 = require("@nestjs-modules/ioredis");
 let AppModule = class AppModule {
 };
@@ -38,6 +42,10 @@ exports.AppModule = AppModule = __decorate([
                 type: 'single',
                 url: 'redis://localhost:6379',
             }),
+            throttler_1.ThrottlerModule.forRoot([{
+                    ttl: 60000,
+                    limit: 100,
+                }]),
             auth_module_1.AuthModule,
             user_module_1.UserModule,
             course_module_1.CourseModule,
@@ -53,9 +61,17 @@ exports.AppModule = AppModule = __decorate([
             toeic_module_1.ToeicModule,
             class_module_1.ClassModule,
             events_module_1.EventsModule,
+            admin_module_1.AdminModule,
+            assignment_module_1.AssignmentModule,
         ],
         controllers: [app_controller_1.AppController],
-        providers: [app_service_1.AppService],
+        providers: [
+            app_service_1.AppService,
+            {
+                provide: core_1.APP_GUARD,
+                useClass: throttler_1.ThrottlerGuard,
+            },
+        ],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map
