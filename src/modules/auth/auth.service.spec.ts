@@ -96,7 +96,10 @@ describe('AuthService', () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.login({ email: 'invalid@example.com', password: '123' }, 'test-device'),
+        service.login(
+          { email: 'invalid@example.com', password: '123' },
+          'test-device',
+        ),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -110,7 +113,10 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
 
       await expect(
-        service.login({ email: 'test@example.com', password: 'wrong' }, 'test-device'),
+        service.login(
+          { email: 'test@example.com', password: 'wrong' },
+          'test-device',
+        ),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -124,10 +130,13 @@ describe('AuthService', () => {
 
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
 
-      const result = await service.login({
-        email: 'test@example.com',
-        password: 'password',
-      }, 'test-device');
+      const result = await service.login(
+        {
+          email: 'test@example.com',
+          password: 'password',
+        },
+        'test-device',
+      );
 
       expect(result).toHaveProperty('access_token', 'mock-jwt-token');
       expect(result.user).toHaveProperty('email', 'test@example.com');

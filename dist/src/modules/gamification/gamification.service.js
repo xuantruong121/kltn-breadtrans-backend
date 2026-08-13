@@ -22,18 +22,18 @@ let GamificationService = class GamificationService {
             data: {
                 userId,
                 points,
-                reason
-            }
+                reason,
+            },
         });
         await this.prisma.leaderboard.upsert({
             where: { userId },
             update: { totalPoints: { increment: points } },
-            create: { userId, totalPoints: points }
+            create: { userId, totalPoints: points },
         });
         await this.prisma.userStats.upsert({
             where: { userId },
             update: { totalBanhRan: { increment: points } },
-            create: { userId, totalBanhRan: points }
+            create: { userId, totalBanhRan: points },
         });
     }
     async getLeaderboard() {
@@ -61,7 +61,7 @@ let GamificationService = class GamificationService {
     }
     async getMyPet(userId) {
         let pet = await this.prisma.userPet.findUnique({
-            where: { userId }
+            where: { userId },
         });
         if (!pet) {
             pet = await this.prisma.userPet.create({
@@ -71,17 +71,28 @@ let GamificationService = class GamificationService {
                     health: 100,
                     happiness: 100,
                     level: 1,
-                    exp: 0
-                }
+                    exp: 0,
+                },
             });
         }
         return pet;
     }
     async feedPet(userId) {
         const pet = await this.getMyPet(userId);
+        let userStats = await this.prisma.userStats.findUnique({
+            where: { userId },
+        });
+        if (!userStats) {
+            userStats = await this.prisma.userStats.create({
+                data: { userId, totalBanhRan: 0 },
+            });
+        }
+        if (userStats.totalBanhRan < 10) {
+            throw new common_1.BadRequestException('Bạn không đủ 10 Bánh Rán để cho thú cưng ăn!');
+        }
         await this.prisma.userStats.update({
             where: { userId },
-            data: { totalBanhRan: { decrement: 10 } }
+            data: { totalBanhRan: { decrement: 10 } },
         });
         return this.prisma.userPet.update({
             where: { userId },
@@ -89,27 +100,45 @@ let GamificationService = class GamificationService {
                 happiness: Math.min(pet.happiness + 20, 100),
                 health: Math.min(pet.health + 10, 100),
                 exp: pet.exp + 50,
-                lastFedAt: new Date()
-            }
+                lastFedAt: new Date(),
+            },
         });
     }
     async getMyDailyQuests(userId) {
         const today = new Date().toISOString().split('T')[0];
         let activeQuests = await this.prisma.dailyQuest.findMany({
             where: { isActive: true },
-            take: 3
+            take: 3,
         });
         if (activeQuests.length === 0) {
             await this.prisma.dailyQuest.createMany({
                 data: [
-                    { title: "Hoàn thành 1 bài luyện nói", targetValue: 1, type: "DO_SPEAKING", rewardXP: 50, rewardBanh: 10 },
-                    { title: "Đạt 100 điểm kinh nghiệm", targetValue: 100, type: "EARN_XP", rewardXP: 20, rewardBanh: 5 },
-                    { title: "Học 10 từ vựng", targetValue: 10, type: "LEARN_VOCAB", rewardXP: 30, rewardBanh: 5 }
-                ]
+                    {
+                        title: 'Hoàn thành 1 bài luyện nói',
+                        targetValue: 1,
+                        type: 'DO_SPEAKING',
+                        rewardXP: 50,
+                        rewardBanh: 10,
+                    },
+                    {
+                        title: 'Đạt 100 điểm kinh nghiệm',
+                        targetValue: 100,
+                        type: 'EARN_XP',
+                        rewardXP: 20,
+                        rewardBanh: 5,
+                    },
+                    {
+                        title: 'Học 10 từ vựng',
+                        targetValue: 10,
+                        type: 'LEARN_VOCAB',
+                        rewardXP: 30,
+                        rewardBanh: 5,
+                    },
+                ],
             });
             activeQuests = await this.prisma.dailyQuest.findMany({
                 where: { isActive: true },
-                take: 3
+                take: 3,
             });
         }
         const progresses = [];
@@ -119,19 +148,19 @@ let GamificationService = class GamificationService {
                     userId_questId_dateKey: {
                         userId,
                         questId: quest.id,
-                        dateKey: today
-                    }
+                        dateKey: today,
+                    },
                 },
                 update: {},
                 create: {
                     userId,
                     questId: quest.id,
                     dateKey: today,
-                    currentValue: 0
+                    currentValue: 0,
                 },
                 include: {
-                    quest: true
-                }
+                    quest: true,
+                },
             });
             progresses.push(progress);
         }
@@ -139,23 +168,25 @@ let GamificationService = class GamificationService {
     }
     async getArenaSnippet(userId) {
         const leaderboard = await this.getLeaderboard();
-        const myRankIndex = leaderboard.findIndex(entry => entry.userId === userId);
+        const myRankIndex = leaderboard.findIndex((entry) => entry.userId === userId);
         if (myRankIndex === -1) {
             return {
                 rank: null,
                 tier: 'Đồng',
-                message: 'Bạn chưa có mặt trên bảng xếp hạng.'
+                message: 'Bạn chưa có mặt trên bảng xếp hạng.',
             };
         }
         const tier = myRankIndex < 3 ? 'Vàng' : myRankIndex < 7 ? 'Bạc' : 'Đồng';
         const nextRank = myRankIndex > 0 ? leaderboard[myRankIndex - 1] : null;
-        const diff = nextRank ? nextRank.totalPoints - leaderboard[myRankIndex].totalPoints : 0;
+        const diff = nextRank
+            ? nextRank.totalPoints - leaderboard[myRankIndex].totalPoints
+            : 0;
         return {
             rank: myRankIndex + 1,
             tier,
             message: diff > 0
                 ? `Bạn đang cách Top ${myRankIndex} chỉ ${diff} điểm!`
-                : `Tuyệt vời! Bạn đang dẫn đầu bảng xếp hạng.`
+                : `Tuyệt vời! Bạn đang dẫn đầu bảng xếp hạng.`,
         };
     }
 };

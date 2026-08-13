@@ -19,7 +19,9 @@ export class AdminService {
       this.prisma.user.count({ where: { role: Role.STUDENT } }),
       this.prisma.user.count({ where: { role: Role.TEACHER } }),
       this.prisma.course.count({ where: { status: CourseStatus.PUBLISHED } }),
-      this.prisma.course.count({ where: { status: CourseStatus.PENDING_REVIEW } }),
+      this.prisma.course.count({
+        where: { status: CourseStatus.PENDING_REVIEW },
+      }),
       this.prisma.enrollment.count(),
       this.prisma.enrollment.findMany({
         take: 10,
@@ -52,7 +54,13 @@ export class AdminService {
     }));
 
     return {
-      stats: { totalStudents, totalTeachers, totalCourses, pendingCourses, totalEnrollments },
+      stats: {
+        totalStudents,
+        totalTeachers,
+        totalCourses,
+        pendingCourses,
+        totalEnrollments,
+      },
       recentActivity,
     };
   }
@@ -62,13 +70,24 @@ export class AdminService {
       where: role ? { role: role as Role } : undefined,
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true, email: true, role: true, createdAt: true, lastLoginAt: true, loginCount: true,
+        id: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        lastLoginAt: true,
+        loginCount: true,
         profile: { select: { fullName: true, avatar: true, phone: true } },
       },
     });
   }
 
-  async createUser(dto: { email: string; password: string; role: Role; fullName: string; phone?: string }) {
+  async createUser(dto: {
+    email: string;
+    password: string;
+    role: Role;
+    fullName: string;
+    phone?: string;
+  }) {
     const hashed = await bcrypt.hash(dto.password, 10);
     return this.prisma.user.create({
       data: {
@@ -78,7 +97,10 @@ export class AdminService {
         profile: { create: { fullName: dto.fullName, phone: dto.phone } },
       },
       select: {
-        id: true, email: true, role: true, createdAt: true,
+        id: true,
+        email: true,
+        role: true,
+        createdAt: true,
         profile: { select: { fullName: true, phone: true } },
       },
     });
@@ -89,9 +111,13 @@ export class AdminService {
   }
 
   async enrollUserInClass(userId: number, classId: number) {
-    const existing = await this.prisma.enrollment.findFirst({ where: { userId, classId } });
+    const existing = await this.prisma.enrollment.findFirst({
+      where: { userId, classId },
+    });
     if (existing) return existing;
-    return this.prisma.enrollment.create({ data: { userId, classId, status: 'ACTIVE', progress: 0 } });
+    return this.prisma.enrollment.create({
+      data: { userId, classId, status: 'ACTIVE', progress: 0 },
+    });
   }
 
   async removeEnrollment(userId: number, classId: number) {
@@ -105,7 +131,8 @@ export class AdminService {
       include: {
         user: {
           select: {
-            id: true, email: true,
+            id: true,
+            email: true,
             profile: { select: { fullName: true, avatar: true, phone: true } },
           },
         },
@@ -118,7 +145,13 @@ export class AdminService {
   async getAdminCourses() {
     return this.prisma.course.findMany({
       include: {
-        teacher: { select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } } },
+        teacher: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true, avatar: true } },
+          },
+        },
         classes: {
           include: {
             _count: { select: { enrollments: true } },
@@ -130,7 +163,13 @@ export class AdminService {
     });
   }
 
-  async adminCreateCourse(dto: { title: string; description?: string; thumbnail?: string; level?: string; teacherId?: number }) {
+  async adminCreateCourse(dto: {
+    title: string;
+    description?: string;
+    thumbnail?: string;
+    level?: string;
+    teacherId?: number;
+  }) {
     return this.prisma.course.create({
       data: {
         title: dto.title,
@@ -141,17 +180,39 @@ export class AdminService {
         status: CourseStatus.PUBLISHED,
       },
       include: {
-        teacher: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        teacher: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true } },
+          },
+        },
       },
     });
   }
 
-  async adminUpdateCourse(courseId: number, dto: { title?: string; description?: string; thumbnail?: string; level?: string; teacherId?: number; status?: string }) {
+  async adminUpdateCourse(
+    courseId: number,
+    dto: {
+      title?: string;
+      description?: string;
+      thumbnail?: string;
+      level?: string;
+      teacherId?: number;
+      status?: string;
+    },
+  ) {
     return this.prisma.course.update({
       where: { id: courseId },
       data: dto as any,
       include: {
-        teacher: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        teacher: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true } },
+          },
+        },
       },
     });
   }
@@ -166,15 +227,32 @@ export class AdminService {
     return this.prisma.class.findMany({
       include: {
         course: { select: { id: true, title: true, thumbnail: true } },
-        teacher: { select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } } },
+        teacher: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true, avatar: true } },
+          },
+        },
         _count: { select: { enrollments: true } },
       },
       orderBy: { id: 'desc' },
     });
   }
 
-  async adminCreateClass(courseId: number, dto: { name: string; teacherId: number; startDate?: string; endDate?: string; meetingLink?: string }) {
-    const meetingLink = dto.meetingLink || `https://meet.jit.si/breadtrans-${courseId}-${Date.now()}`;
+  async adminCreateClass(
+    courseId: number,
+    dto: {
+      name: string;
+      teacherId: number;
+      startDate?: string;
+      endDate?: string;
+      meetingLink?: string;
+    },
+  ) {
+    const meetingLink =
+      dto.meetingLink ||
+      `https://meet.jit.si/breadtrans-${courseId}-${Date.now()}`;
     return this.prisma.class.create({
       data: {
         name: dto.name,
@@ -187,7 +265,13 @@ export class AdminService {
       },
       include: {
         course: { select: { id: true, title: true } },
-        teacher: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        teacher: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true } },
+          },
+        },
       },
     });
   }
@@ -197,7 +281,13 @@ export class AdminService {
       where: { id: classId },
       data: { teacherId },
       include: {
-        teacher: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        teacher: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true } },
+          },
+        },
       },
     });
   }
@@ -207,13 +297,22 @@ export class AdminService {
       where: { id: classId },
       include: {
         course: { select: { id: true, title: true, thumbnail: true } },
-        teacher: { select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } } },
+        teacher: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true, avatar: true } },
+          },
+        },
         enrollments: {
           include: {
             user: {
               select: {
-                id: true, email: true,
-                profile: { select: { fullName: true, avatar: true, phone: true } },
+                id: true,
+                email: true,
+                profile: {
+                  select: { fullName: true, avatar: true, phone: true },
+                },
               },
             },
           },

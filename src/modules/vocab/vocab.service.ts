@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class VocabService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async getTopics(userId?: number) {
     const topics = await this.prisma.vocabTopic.findMany({
@@ -163,11 +167,15 @@ export class VocabService {
         where: { id: existing.id },
         data: { isMastered: !existing.isMastered },
       });
+      if (updated.isMastered && !existing.isMastered) {
+        this.eventEmitter.emit('vocab.learned', { userId, count: 1 });
+      }
       return { isMastered: updated.isMastered };
     } else {
       const created = await this.prisma.userVocabWordProgress.create({
         data: { userId, wordId, isMastered: true },
       });
+      this.eventEmitter.emit('vocab.learned', { userId, count: 1 });
       return { isMastered: created.isMastered };
     }
   }

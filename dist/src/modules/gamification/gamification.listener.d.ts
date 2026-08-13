@@ -7,4 +7,8 @@ export declare class GamificationListener {
         userId: number;
         score: number;
     }): Promise<void>;
+    handleVocabLearnedEvent(payload: {
+        userId: number;
+        count: number;
+    }): Promise<void>;
 }

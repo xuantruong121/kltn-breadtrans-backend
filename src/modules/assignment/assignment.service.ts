@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateAssignmentDto, SubmitAssignmentDto, GradeAssignmentDto, AssignmentType } from './dto/assignment.dto';
+import {
+  CreateAssignmentDto,
+  SubmitAssignmentDto,
+  GradeAssignmentDto,
+  AssignmentType,
+} from './dto/assignment.dto';
 
 import { GamificationService } from '../gamification/gamification.service';
 
@@ -8,7 +13,7 @@ import { GamificationService } from '../gamification/gamification.service';
 export class AssignmentService {
   constructor(
     private prisma: PrismaService,
-    private gamification: GamificationService
+    private gamification: GamificationService,
   ) {}
 
   async createAssignment(classId: number, dto: CreateAssignmentDto) {
@@ -32,11 +37,14 @@ export class AssignmentService {
     return this.prisma.assignment.findMany({
       where: { classId },
       include: {
-        submissions: role === 'STUDENT' && userId ? {
-          where: { userId }
-        } : true, // Giáo viên xem được tất cả submissions
+        submissions:
+          role === 'STUDENT' && userId
+            ? {
+                where: { userId },
+              }
+            : true, // Giáo viên xem được tất cả submissions
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -46,18 +54,30 @@ export class AssignmentService {
       include: {
         submissions: {
           include: {
-            user: { select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } } }
-          }
+            user: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true, avatar: true } },
+              },
+            },
+          },
         },
-        class: { select: { id: true, name: true, teacherId: true } }
-      }
+        class: { select: { id: true, name: true, teacherId: true } },
+      },
     });
     if (!assignment) throw new NotFoundException('Không tìm thấy bài tập');
     return assignment;
   }
 
-  async submitAssignment(assignmentId: number, userId: number, dto: SubmitAssignmentDto) {
-    const assignment = await this.prisma.assignment.findUnique({ where: { id: assignmentId } });
+  async submitAssignment(
+    assignmentId: number,
+    userId: number,
+    dto: SubmitAssignmentDto,
+  ) {
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+    });
     if (!assignment) throw new NotFoundException('Không tìm thấy bài tập');
 
     // Chấm điểm tự động nếu là dạng QUIZ
@@ -90,18 +110,26 @@ export class AssignmentService {
         fileUrl: dto.fileUrl,
         quizAnswers: dto.quizAnswers,
         grade,
-      }
+      },
     });
 
     // Cộng điểm Gamification cho QUIZ (nếu có điểm)
     if (grade !== undefined && grade !== null) {
       const points = Math.round(grade * 10); // 10 điểm = 100 xp
       if (points > 0) {
-        await this.gamification.addPoints(userId, points, `Hoàn thành bài tập trắc nghiệm: ${assignment.title}`);
+        await this.gamification.addPoints(
+          userId,
+          points,
+          `Hoàn thành bài tập trắc nghiệm: ${assignment.title}`,
+        );
       }
     } else {
       // Tự luận: nộp bài thành công +50đ (tạm tính)
-      await this.gamification.addPoints(userId, 50, `Nộp bài tập tự luận: ${assignment.title}`);
+      await this.gamification.addPoints(
+        userId,
+        50,
+        `Nộp bài tập tự luận: ${assignment.title}`,
+      );
     }
 
     return submission;
@@ -112,15 +140,19 @@ export class AssignmentService {
       where: { id: submissionId },
       data: {
         grade: dto.grade,
-        feedback: dto.feedback
+        feedback: dto.feedback,
       },
-      include: { assignment: true }
+      include: { assignment: true },
     });
 
     // Nếu giáo viên chấm điểm tự luận, thưởng thêm điểm dựa trên grade (0-10) -> 0-100đ
     if (dto.grade !== undefined && dto.grade !== null) {
       const points = Math.round(dto.grade * 10);
-      await this.gamification.addPoints(updated.userId, points, `Giáo viên chấm điểm bài tập: ${updated.assignment.title}`);
+      await this.gamification.addPoints(
+        updated.userId,
+        points,
+        `Giáo viên chấm điểm bài tập: ${updated.assignment.title}`,
+      );
     }
 
     return updated;

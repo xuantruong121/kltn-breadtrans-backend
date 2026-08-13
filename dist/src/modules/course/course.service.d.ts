@@ -54,6 +54,9 @@ export declare class CourseService {
                     isSelfClaimed: boolean;
                 } | null;
             } | null;
+            lessons: {
+                videoUrl: string | null;
+            }[];
         } & {
             createdAt: Date;
             id: number;

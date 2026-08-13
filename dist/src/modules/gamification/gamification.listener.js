@@ -60,9 +60,144 @@ let GamificationListener = GamificationListener_1 = class GamificationListener {
                     }
                 }
             }
+            const today = new Date().toISOString().split('T')[0];
+            const activeQuests = await this.prisma.dailyQuest.findMany({
+                where: { isActive: true, type: 'COMPLETE_QUIZ' },
+            });
+            for (const quest of activeQuests) {
+                const progress = await this.prisma.userQuestProgress.upsert({
+                    where: {
+                        userId_questId_dateKey: {
+                            userId: payload.userId,
+                            questId: quest.id,
+                            dateKey: today,
+                        },
+                    },
+                    update: {
+                        currentValue: { increment: 1 },
+                    },
+                    create: {
+                        userId: payload.userId,
+                        questId: quest.id,
+                        dateKey: today,
+                        currentValue: 1,
+                    },
+                });
+                if (progress.currentValue >= quest.targetValue && !progress.isCompleted) {
+                    await this.prisma.userQuestProgress.update({
+                        where: { id: progress.id },
+                        data: { isCompleted: true },
+                    });
+                    if (quest.rewardXP > 0) {
+                        await this.prisma.leaderboard.upsert({
+                            where: { userId: payload.userId },
+                            update: { totalPoints: { increment: quest.rewardXP } },
+                            create: { userId: payload.userId, totalPoints: quest.rewardXP },
+                        });
+                        await this.prisma.pointHistory.create({
+                            data: {
+                                userId: payload.userId,
+                                points: quest.rewardXP,
+                                reason: `Hoàn thành nhiệm vụ: ${quest.title}`,
+                            },
+                        });
+                    }
+                    if (quest.rewardBanh > 0) {
+                        const userStats = await this.prisma.userStats.findUnique({
+                            where: { userId: payload.userId },
+                        });
+                        if (userStats) {
+                            await this.prisma.userStats.update({
+                                where: { userId: payload.userId },
+                                data: {
+                                    totalBanhRan: { increment: quest.rewardBanh },
+                                },
+                            });
+                        }
+                        else {
+                            await this.prisma.userStats.create({
+                                data: {
+                                    userId: payload.userId,
+                                    totalBanhRan: quest.rewardBanh,
+                                },
+                            });
+                        }
+                    }
+                    this.logger.log(`User ${payload.userId} completed quest ${quest.id} and received rewards.`);
+                }
+            }
         }
         catch (error) {
             this.logger.error(`Failed to handle gamification for user ${payload.userId}`, error);
+        }
+    }
+    async handleVocabLearnedEvent(payload) {
+        this.logger.log(`Handling vocab.learned event for user ${payload.userId}`);
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const activeQuests = await this.prisma.dailyQuest.findMany({
+                where: { isActive: true, type: 'LEARN_VOCAB' },
+            });
+            for (const quest of activeQuests) {
+                const progress = await this.prisma.userQuestProgress.upsert({
+                    where: {
+                        userId_questId_dateKey: {
+                            userId: payload.userId,
+                            questId: quest.id,
+                            dateKey: today,
+                        },
+                    },
+                    update: {
+                        currentValue: { increment: payload.count },
+                    },
+                    create: {
+                        userId: payload.userId,
+                        questId: quest.id,
+                        dateKey: today,
+                        currentValue: payload.count,
+                    },
+                });
+                if (progress.currentValue >= quest.targetValue && !progress.isCompleted) {
+                    await this.prisma.userQuestProgress.update({
+                        where: { id: progress.id },
+                        data: { isCompleted: true },
+                    });
+                    if (quest.rewardXP > 0) {
+                        await this.prisma.leaderboard.upsert({
+                            where: { userId: payload.userId },
+                            update: { totalPoints: { increment: quest.rewardXP } },
+                            create: { userId: payload.userId, totalPoints: quest.rewardXP },
+                        });
+                        await this.prisma.pointHistory.create({
+                            data: {
+                                userId: payload.userId,
+                                points: quest.rewardXP,
+                                reason: `Hoàn thành nhiệm vụ: ${quest.title}`,
+                            },
+                        });
+                    }
+                    if (quest.rewardBanh > 0) {
+                        const userStats = await this.prisma.userStats.findUnique({
+                            where: { userId: payload.userId },
+                        });
+                        if (userStats) {
+                            await this.prisma.userStats.update({
+                                where: { userId: payload.userId },
+                                data: { totalBanhRan: { increment: quest.rewardBanh } },
+                            });
+                        }
+                        else {
+                            await this.prisma.userStats.create({
+                                data: { userId: payload.userId, totalBanhRan: quest.rewardBanh },
+                            });
+                        }
+                    }
+                    this.logger.log(`User ${payload.userId} completed quest ${quest.id} and received rewards.`);
+                }
+            }
+        }
+        catch (error) {
+            this.logger.error(`Failed to handle vocab.learned for user ${payload.userId}`, error);
         }
     }
 };
@@ -73,6 +208,12 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], GamificationListener.prototype, "handleQuizSubmittedEvent", null);
+__decorate([
+    (0, event_emitter_1.OnEvent)('vocab.learned'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GamificationListener.prototype, "handleVocabLearnedEvent", null);
 exports.GamificationListener = GamificationListener = GamificationListener_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])

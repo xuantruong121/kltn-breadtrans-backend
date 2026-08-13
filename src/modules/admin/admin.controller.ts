@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -28,7 +38,16 @@ export class AdminController {
 
   @Post('users')
   @ApiOperation({ summary: 'Admin tao tai khoan moi (Student hoac Teacher)' })
-  createUser(@Body() dto: { email: string; password: string; role: Role; fullName: string; phone?: string }) {
+  createUser(
+    @Body()
+    dto: {
+      email: string;
+      password: string;
+      role: Role;
+      fullName: string;
+      phone?: string;
+    },
+  ) {
     return this.adminService.createUser(dto);
   }
 
@@ -66,7 +85,16 @@ export class AdminController {
 
   @Post('courses')
   @ApiOperation({ summary: 'Admin: Tao khoa hoc moi' })
-  adminCreateCourse(@Body() dto: { title: string; description?: string; thumbnail?: string; level?: string; teacherId?: number }) {
+  adminCreateCourse(
+    @Body()
+    dto: {
+      title: string;
+      description?: string;
+      thumbnail?: string;
+      level?: string;
+      teacherId?: number;
+    },
+  ) {
     return this.adminService.adminCreateCourse(dto);
   }
 
@@ -74,7 +102,15 @@ export class AdminController {
   @ApiOperation({ summary: 'Admin: Cap nhat khoa hoc' })
   adminUpdateCourse(
     @Param('courseId', ParseIntPipe) courseId: number,
-    @Body() dto: { title?: string; description?: string; thumbnail?: string; level?: string; teacherId?: number; status?: string },
+    @Body()
+    dto: {
+      title?: string;
+      description?: string;
+      thumbnail?: string;
+      level?: string;
+      teacherId?: number;
+      status?: string;
+    },
   ) {
     return this.adminService.adminUpdateCourse(courseId, dto);
   }
@@ -97,7 +133,14 @@ export class AdminController {
   @ApiOperation({ summary: 'Admin: Tao lop hoc trong khoa hoc' })
   adminCreateClass(
     @Param('courseId', ParseIntPipe) courseId: number,
-    @Body() dto: { name: string; teacherId: number; startDate?: string; endDate?: string; meetingLink?: string },
+    @Body()
+    dto: {
+      name: string;
+      teacherId: number;
+      startDate?: string;
+      endDate?: string;
+      meetingLink?: string;
+    },
   ) {
     return this.adminService.adminCreateClass(courseId, dto);
   }

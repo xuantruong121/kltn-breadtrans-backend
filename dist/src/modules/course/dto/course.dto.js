@@ -39,13 +39,19 @@ __decorate([
     __metadata("design:type", String)
 ], CreateCourseDto.prototype, "thumbnail", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'BEGINNER', description: 'BEGINNER | INTERMEDIATE | ADVANCED' }),
+    (0, swagger_1.ApiPropertyOptional)({
+        example: 'BEGINNER',
+        description: 'BEGINNER | INTERMEDIATE | ADVANCED',
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateCourseDto.prototype, "level", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 1, description: 'ID của giáo viên phụ trách (Admin gán)' }),
+    (0, swagger_1.ApiPropertyOptional)({
+        example: 1,
+        description: 'ID của giáo viên phụ trách (Admin gán)',
+    }),
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Number)

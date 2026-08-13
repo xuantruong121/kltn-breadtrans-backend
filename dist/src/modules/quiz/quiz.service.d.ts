@@ -121,6 +121,21 @@ export declare class QuizService {
             total: number;
             accuracyPercent: number;
         }[];
+        results: {
+            id: number;
+            score: number | null;
+            questionId: number;
+            answer: import("@prisma/client/runtime/library").JsonValue;
+            isCorrect: boolean | null;
+            submissionId: number;
+        }[];
+        questions: {
+            order: number;
+            id: number;
+            type: string;
+            content: import("@prisma/client/runtime/library").JsonValue;
+            quizId: number;
+        }[];
         strengths: string[];
         weaknesses: string[];
         recommendation: string;
