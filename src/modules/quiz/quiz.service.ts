@@ -20,6 +20,19 @@ export class QuizService {
     return this.prisma.quiz.create({ data: dto });
   }
 
+  async getAllQuizzes() {
+    return this.prisma.quiz.findMany({
+      include: {
+        _count: {
+          select: { questions: true },
+        },
+      },
+      orderBy: {
+        id: 'desc',
+      },
+    });
+  }
+
   async getListeningPractices() {
     return this.prisma.quiz.findMany({
       where: {

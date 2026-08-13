@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Role, CourseStatus } from '@prisma/client';
+import { Role, CourseStatus, ClassStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -109,6 +109,117 @@ export class AdminService {
             profile: { select: { fullName: true, avatar: true, phone: true } },
           },
         },
+      },
+    });
+  }
+
+  // ============== COURSE MANAGEMENT ==============
+
+  async getAdminCourses() {
+    return this.prisma.course.findMany({
+      include: {
+        teacher: { select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } } },
+        classes: {
+          include: {
+            _count: { select: { enrollments: true } },
+          },
+        },
+        _count: { select: { classes: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async adminCreateCourse(dto: { title: string; description?: string; thumbnail?: string; level?: string; teacherId?: number }) {
+    return this.prisma.course.create({
+      data: {
+        title: dto.title,
+        description: dto.description,
+        thumbnail: dto.thumbnail,
+        level: dto.level,
+        teacherId: dto.teacherId,
+        status: CourseStatus.PUBLISHED,
+      },
+      include: {
+        teacher: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      },
+    });
+  }
+
+  async adminUpdateCourse(courseId: number, dto: { title?: string; description?: string; thumbnail?: string; level?: string; teacherId?: number; status?: string }) {
+    return this.prisma.course.update({
+      where: { id: courseId },
+      data: dto as any,
+      include: {
+        teacher: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      },
+    });
+  }
+
+  async adminDeleteCourse(courseId: number) {
+    return this.prisma.course.delete({ where: { id: courseId } });
+  }
+
+  // ============== CLASS MANAGEMENT ==============
+
+  async getAllClasses() {
+    return this.prisma.class.findMany({
+      include: {
+        course: { select: { id: true, title: true, thumbnail: true } },
+        teacher: { select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } } },
+        _count: { select: { enrollments: true } },
+      },
+      orderBy: { id: 'desc' },
+    });
+  }
+
+  async adminCreateClass(courseId: number, dto: { name: string; teacherId: number; startDate?: string; endDate?: string; meetingLink?: string }) {
+    const meetingLink = dto.meetingLink || `https://meet.jit.si/breadtrans-${courseId}-${Date.now()}`;
+    return this.prisma.class.create({
+      data: {
+        name: dto.name,
+        courseId,
+        teacherId: dto.teacherId,
+        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+        meetingLink,
+        status: ClassStatus.ONGOING,
+      },
+      include: {
+        course: { select: { id: true, title: true } },
+        teacher: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      },
+    });
+  }
+
+  async adminAssignTeacher(classId: number, teacherId: number) {
+    return this.prisma.class.update({
+      where: { id: classId },
+      data: { teacherId },
+      include: {
+        teacher: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      },
+    });
+  }
+
+  async getClassWithEnrollments(classId: number) {
+    return this.prisma.class.findUnique({
+      where: { id: classId },
+      include: {
+        course: { select: { id: true, title: true, thumbnail: true } },
+        teacher: { select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } } },
+        enrollments: {
+          include: {
+            user: {
+              select: {
+                id: true, email: true,
+                profile: { select: { fullName: true, avatar: true, phone: true } },
+              },
+            },
+          },
+          orderBy: { joinedAt: 'desc' },
+        },
+        _count: { select: { enrollments: true } },
       },
     });
   }

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards, Request } from '@nestjs/common';
 import { GamificationService } from './gamification.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -20,5 +20,41 @@ export class GamificationController {
   @ApiOperation({ summary: 'Lấy danh sách huy hiệu của học viên hiện tại' })
   getMyBadges(@Request() req: any) {
     return this.gamificationService.getMyBadges(req.user.id);
+  }
+
+  // ==========================================
+  // PET & DAILY QUESTS
+  // ==========================================
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('pet')
+  @ApiOperation({ summary: 'Lấy thông tin thú cưng của học sinh' })
+  getMyPet(@Request() req: any) {
+    return this.gamificationService.getMyPet(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('pet/feed')
+  @ApiOperation({ summary: 'Cho thú cưng ăn (Tiêu hao bánh rán)' })
+  feedPet(@Request() req: any) {
+    return this.gamificationService.feedPet(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('quests')
+  @ApiOperation({ summary: 'Lấy danh sách nhiệm vụ hôm nay và tiến độ' })
+  getMyDailyQuests(@Request() req: any) {
+    return this.gamificationService.getMyDailyQuests(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('arena/snippet')
+  @ApiOperation({ summary: 'Lấy tóm tắt rank đấu trường cho trang chủ' })
+  getArenaSnippet(@Request() req: any) {
+    return this.gamificationService.getArenaSnippet(req.user.id);
   }
 }

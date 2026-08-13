@@ -22,14 +22,42 @@ export class ClassService {
     });
   }
 
-  async createAssignment(classId: number, dto: any) {
-    return this.prisma.assignment.create({
-      data: {
-        classId,
-        title: dto.title,
-        description: dto.description,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
-      },
+  async getClassDetail(classId: number, userId: number, role: string) {
+    const cls = await this.prisma.class.findUnique({
+      where: { id: classId },
+      include: {
+        course: {
+          include: {
+            lessons: {
+              include: {
+                materials: true
+              }
+            }
+          }
+        },
+        sessions: {
+          orderBy: { startTime: 'asc' }
+        },
+        assignments: {
+          include: {
+            submissions: role === 'STUDENT' ? {
+              where: { userId }
+            } : true
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        teacher: {
+          select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } }
+        },
+        enrollments: {
+          include: {
+            user: {
+              select: { id: true, email: true, profile: { select: { fullName: true, avatar: true } } }
+            }
+          }
+        }
+      }
     });
+    return cls;
   }
 }

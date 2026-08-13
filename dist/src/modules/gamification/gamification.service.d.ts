@@ -2,6 +2,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export declare class GamificationService {
     private readonly prisma;
     constructor(prisma: PrismaService);
+    addPoints(userId: number, points: number, reason: string): Promise<void>;
     getLeaderboard(): Promise<({
         user: {
             id: number;
@@ -24,15 +25,15 @@ export declare class GamificationService {
     } & {
         id: number;
         userId: number;
-        rank: number | null;
         totalPoints: number;
+        rank: number | null;
     })[]>;
     getMyBadges(userId: number): Promise<({
         badge: {
-            name: string;
-            iconUrl: string | null;
             id: number;
+            name: string;
             description: string;
+            iconUrl: string | null;
             criteria: import("@prisma/client/runtime/library").JsonValue;
         };
     } & {
@@ -41,4 +42,57 @@ export declare class GamificationService {
         badgeId: number;
         awardedAt: Date;
     })[]>;
+    getMyPet(userId: number): Promise<{
+        id: number;
+        userId: number;
+        createdAt: Date;
+        updatedAt: Date;
+        name: string;
+        health: number;
+        happiness: number;
+        level: number;
+        exp: number;
+        lastFedAt: Date | null;
+    }>;
+    feedPet(userId: number): Promise<{
+        id: number;
+        userId: number;
+        createdAt: Date;
+        updatedAt: Date;
+        name: string;
+        health: number;
+        happiness: number;
+        level: number;
+        exp: number;
+        lastFedAt: Date | null;
+    }>;
+    getMyDailyQuests(userId: number): Promise<({
+        quest: {
+            id: number;
+            description: string | null;
+            title: string;
+            targetValue: number;
+            type: string;
+            rewardXP: number;
+            rewardBanh: number;
+            isActive: boolean;
+        };
+    } & {
+        id: number;
+        userId: number;
+        questId: number;
+        currentValue: number;
+        isCompleted: boolean;
+        completedAt: Date | null;
+        dateKey: string;
+    })[]>;
+    getArenaSnippet(userId: number): Promise<{
+        rank: null;
+        tier: string;
+        message: string;
+    } | {
+        rank: number;
+        tier: string;
+        message: string;
+    }>;
 }

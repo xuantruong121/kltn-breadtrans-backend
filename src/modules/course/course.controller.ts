@@ -8,6 +8,7 @@ import {
   UseGuards,
   Request,
   ParseIntPipe,
+  Query,
 } from '@nestjs/common';
 import { CourseService } from './course.service';
 import {
@@ -39,8 +40,10 @@ export class CourseController {
 
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả khóa học' })
-  getAllCourses() {
-    return this.courseService.getAllCourses();
+  getAllCourses(@Request() req: any, @Query('role') role?: string) {
+    const userId = req.user?.id;
+    const userRole = role || req.user?.role;
+    return this.courseService.getAllCourses(userId, userRole);
   }
 
   @Get('my-courses')

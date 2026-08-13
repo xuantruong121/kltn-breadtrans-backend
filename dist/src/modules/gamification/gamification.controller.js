@@ -28,6 +28,18 @@ let GamificationController = class GamificationController {
     getMyBadges(req) {
         return this.gamificationService.getMyBadges(req.user.id);
     }
+    getMyPet(req) {
+        return this.gamificationService.getMyPet(req.user.id);
+    }
+    feedPet(req) {
+        return this.gamificationService.feedPet(req.user.id);
+    }
+    getMyDailyQuests(req) {
+        return this.gamificationService.getMyDailyQuests(req.user.id);
+    }
+    getArenaSnippet(req) {
+        return this.gamificationService.getArenaSnippet(req.user.id);
+    }
 };
 exports.GamificationController = GamificationController;
 __decorate([
@@ -47,6 +59,46 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], GamificationController.prototype, "getMyBadges", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Get)('pet'),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy thông tin thú cưng của học sinh' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "getMyPet", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Post)('pet/feed'),
+    (0, swagger_1.ApiOperation)({ summary: 'Cho thú cưng ăn (Tiêu hao bánh rán)' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "feedPet", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Get)('quests'),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy danh sách nhiệm vụ hôm nay và tiến độ' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "getMyDailyQuests", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Get)('arena/snippet'),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy tóm tắt rank đấu trường cho trang chủ' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "getArenaSnippet", null);
 exports.GamificationController = GamificationController = __decorate([
     (0, swagger_1.ApiTags)('gamification'),
     (0, common_1.Controller)('gamification'),

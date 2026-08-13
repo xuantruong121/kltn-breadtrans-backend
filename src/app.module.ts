@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
@@ -18,6 +20,7 @@ import { ToeicModule } from './modules/toeic/toeic.module';
 import { ClassModule } from './modules/class/class.module';
 import { EventsModule } from './modules/events/events.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AssignmentModule } from './modules/assignment/assignment.module';
 
 import { RedisModule } from '@nestjs-modules/ioredis';
 
@@ -28,6 +31,10 @@ import { RedisModule } from '@nestjs-modules/ioredis';
       type: 'single',
       url: 'redis://localhost:6379',
     }),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100,
+    }]),
     AuthModule,
     UserModule,
     CourseModule,
@@ -44,8 +51,15 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     ClassModule,
     EventsModule,
     AdminModule,
+    AssignmentModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

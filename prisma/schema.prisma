@@ -72,6 +72,8 @@ model User {
   vocabProgresses     UserVocabWordProgress[]
   toeicAttempts       ToeicAttempt[]
   toeicSpeakingWritingSubmissions ToeicSpeakingWritingSubmission[]
+  pet                 UserPet?
+  questProgresses     UserQuestProgress[]
 }
 
 model Profile {
@@ -135,10 +137,10 @@ model Course {
   title       String
   description String?
   thumbnail   String?
-  price       Float?   @default(0)
+  level       String?  // e.g. "BEGINNER", "INTERMEDIATE", "ADVANCED"
   teacherId   Int?
   teacher     User?    @relation("TeacherCourses", fields: [teacherId], references: [id])
-  status      CourseStatus @default(DRAFT)
+  status      CourseStatus @default(PUBLISHED)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -235,6 +237,11 @@ model Attendance {
   @@unique([sessionId, userId])
 }
 
+enum AssignmentType {
+  ESSAY
+  QUIZ
+}
+
 model Assignment {
   id          Int      @id @default(autoincrement())
   classId     Int
@@ -242,6 +249,8 @@ model Assignment {
   title       String
   description String?  @db.Text
   dueDate     DateTime?
+  type        AssignmentType @default(ESSAY)
+  quizData    Json?    // Array of { question, options: string[], correctOptionIndex: number }
   createdAt   DateTime @default(now())
 
   submissions AssignmentSubmission[]
@@ -255,6 +264,7 @@ model AssignmentSubmission {
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   content      String?    @db.Text
   fileUrl      String?
+  quizAnswers  Json?      // Array of selected option indices corresponding to quizData questions
   grade        Float?
   feedback     String?    @db.Text
   submittedAt  DateTime   @default(now())
@@ -739,4 +749,49 @@ model ToeicSpeakingWritingSubmission {
   aiTranscript  String?  @db.Text
   aiFeedback    Json?    // Detailed feedback object
   gradedAt      DateTime?
+}
+
+// ==========================================
+// PET & DAILY QUESTS (GAMIFICATION)
+// ==========================================
+
+model UserPet {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String   @default("Bread")
+  health    Int      @default(100) // 0-100
+  happiness Int      @default(100) // 0-100
+  level     Int      @default(1)
+  exp       Int      @default(0)
+  lastFedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model DailyQuest {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  targetValue Int      @default(1) // e.g. 50 XP
+  type        String   // "EARN_XP", "DO_SPEAKING", "COMPLETE_LESSON"
+  rewardXP    Int      @default(10)
+  rewardBanh  Int      @default(5)
+  isActive    Boolean  @default(true)
+
+  userProgress UserQuestProgress[]
+}
+
+model UserQuestProgress {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId      Int
+  quest        DailyQuest @relation(fields: [questId], references: [id], onDelete: Cascade)
+  currentValue Int      @default(0)
+  isCompleted  Boolean  @default(false)
+  completedAt  DateTime?
+  dateKey      String   // e.g. "2026-08-13" to refresh daily
+
+  @@unique([userId, questId, dateKey])
 }

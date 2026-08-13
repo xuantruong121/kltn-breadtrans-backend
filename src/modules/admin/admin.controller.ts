@@ -55,4 +55,65 @@ export class AdminController {
   getEnrollmentsByClass(@Param('classId', ParseIntPipe) classId: number) {
     return this.adminService.getEnrollmentsByClass(classId);
   }
+
+  // ============== COURSE MANAGEMENT ==============
+
+  @Get('courses')
+  @ApiOperation({ summary: 'Admin: Lay toan bo danh sach khoa hoc' })
+  getAdminCourses() {
+    return this.adminService.getAdminCourses();
+  }
+
+  @Post('courses')
+  @ApiOperation({ summary: 'Admin: Tao khoa hoc moi' })
+  adminCreateCourse(@Body() dto: { title: string; description?: string; thumbnail?: string; level?: string; teacherId?: number }) {
+    return this.adminService.adminCreateCourse(dto);
+  }
+
+  @Post('courses/:courseId/update')
+  @ApiOperation({ summary: 'Admin: Cap nhat khoa hoc' })
+  adminUpdateCourse(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Body() dto: { title?: string; description?: string; thumbnail?: string; level?: string; teacherId?: number; status?: string },
+  ) {
+    return this.adminService.adminUpdateCourse(courseId, dto);
+  }
+
+  @Delete('courses/:courseId')
+  @ApiOperation({ summary: 'Admin: Xoa khoa hoc' })
+  adminDeleteCourse(@Param('courseId', ParseIntPipe) courseId: number) {
+    return this.adminService.adminDeleteCourse(courseId);
+  }
+
+  // ============== CLASS MANAGEMENT ==============
+
+  @Get('classes')
+  @ApiOperation({ summary: 'Admin: Lay toan bo danh sach lop hoc' })
+  getAllClasses() {
+    return this.adminService.getAllClasses();
+  }
+
+  @Post('courses/:courseId/classes')
+  @ApiOperation({ summary: 'Admin: Tao lop hoc trong khoa hoc' })
+  adminCreateClass(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Body() dto: { name: string; teacherId: number; startDate?: string; endDate?: string; meetingLink?: string },
+  ) {
+    return this.adminService.adminCreateClass(courseId, dto);
+  }
+
+  @Post('classes/:classId/assign-teacher')
+  @ApiOperation({ summary: 'Admin: Phan cong giao vien cho lop hoc' })
+  assignTeacher(
+    @Param('classId', ParseIntPipe) classId: number,
+    @Body() dto: { teacherId: number },
+  ) {
+    return this.adminService.adminAssignTeacher(classId, dto.teacherId);
+  }
+
+  @Get('classes/:classId')
+  @ApiOperation({ summary: 'Admin: Chi tiet lop hoc kem danh sach hoc vien' })
+  getClassDetail(@Param('classId', ParseIntPipe) classId: number) {
+    return this.adminService.getClassWithEnrollments(classId);
+  }
 }

@@ -19,6 +19,22 @@ export declare class QuizService {
         courseId: number | null;
         practiceTopicId: number | null;
     }>;
+    getAllQuizzes(): Promise<({
+        _count: {
+            questions: number;
+        };
+    } & {
+        createdAt: Date;
+        id: number;
+        title: string;
+        description: string | null;
+        theoryContent: string | null;
+        bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+        type: import(".prisma/client").$Enums.QuizType;
+        timeLimit: number | null;
+        courseId: number | null;
+        practiceTopicId: number | null;
+    })[]>;
     getListeningPractices(): Promise<({
         _count: {
             questions: number;

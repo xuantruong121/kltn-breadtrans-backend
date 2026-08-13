@@ -29,6 +29,9 @@ let QuizController = class QuizController {
     createQuiz(dto) {
         return this.quizService.createQuiz(dto);
     }
+    getAllQuizzes() {
+        return this.quizService.getAllQuizzes();
+    }
     getListeningPractices() {
         return this.quizService.getListeningPractices();
     }
@@ -59,6 +62,15 @@ __decorate([
     __metadata("design:paramtypes", [quiz_dto_1.CreateQuizDto]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "createQuiz", null);
+__decorate([
+    (0, common_1.Get)(),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy tất cả quizzes (chỉ ADMIN/TEACHER)' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "getAllQuizzes", null);
 __decorate([
     (0, common_1.Get)('listening-practice'),
     (0, swagger_1.ApiBearerAuth)(),

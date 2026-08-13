@@ -6,5 +6,6 @@ import { GamificationListener } from './gamification.listener';
 @Module({
   providers: [GamificationService, GamificationListener],
   controllers: [GamificationController],
+  exports: [GamificationService]
 })
 export class GamificationModule {}

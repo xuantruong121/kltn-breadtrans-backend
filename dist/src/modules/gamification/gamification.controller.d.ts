@@ -24,15 +24,15 @@ export declare class GamificationController {
     } & {
         id: number;
         userId: number;
-        rank: number | null;
         totalPoints: number;
+        rank: number | null;
     })[]>;
     getMyBadges(req: any): Promise<({
         badge: {
-            name: string;
-            iconUrl: string | null;
             id: number;
+            name: string;
             description: string;
+            iconUrl: string | null;
             criteria: import("@prisma/client/runtime/library").JsonValue;
         };
     } & {
@@ -41,4 +41,57 @@ export declare class GamificationController {
         badgeId: number;
         awardedAt: Date;
     })[]>;
+    getMyPet(req: any): Promise<{
+        id: number;
+        userId: number;
+        createdAt: Date;
+        updatedAt: Date;
+        name: string;
+        health: number;
+        happiness: number;
+        level: number;
+        exp: number;
+        lastFedAt: Date | null;
+    }>;
+    feedPet(req: any): Promise<{
+        id: number;
+        userId: number;
+        createdAt: Date;
+        updatedAt: Date;
+        name: string;
+        health: number;
+        happiness: number;
+        level: number;
+        exp: number;
+        lastFedAt: Date | null;
+    }>;
+    getMyDailyQuests(req: any): Promise<({
+        quest: {
+            id: number;
+            description: string | null;
+            title: string;
+            targetValue: number;
+            type: string;
+            rewardXP: number;
+            rewardBanh: number;
+            isActive: boolean;
+        };
+    } & {
+        id: number;
+        userId: number;
+        questId: number;
+        currentValue: number;
+        isCompleted: boolean;
+        completedAt: Date | null;
+        dateKey: string;
+    })[]>;
+    getArenaSnippet(req: any): Promise<{
+        rank: null;
+        tier: string;
+        message: string;
+    } | {
+        rank: number;
+        tier: string;
+        message: string;
+    }>;
 }

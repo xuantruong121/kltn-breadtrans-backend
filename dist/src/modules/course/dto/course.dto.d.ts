@@ -2,7 +2,8 @@ export declare class CreateCourseDto {
     title: string;
     description?: string;
     thumbnail?: string;
-    price?: number;
+    level?: string;
+    teacherId?: number;
 }
 export declare class CreateClassDto {
     name: string;

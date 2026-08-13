@@ -1,10 +1,12 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   Param,
   ParseIntPipe,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,14 +32,12 @@ export class ClassController {
     return this.classService.createSession(classId, dto);
   }
 
-  @Post(':classId/assignments')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Tạo bài tập cho lớp' })
-  createAssignment(
+  @Get(':classId')
+  @ApiOperation({ summary: 'Lấy chi tiết lớp học (Course, Lessons, Sessions, Assignments)' })
+  getClassDetail(
     @Param('classId', ParseIntPipe) classId: number,
-    @Body() dto: any,
+    @Request() req: any
   ) {
-    return this.classService.createAssignment(classId, dto);
+    return this.classService.getClassDetail(classId, req.user.id, req.user.role);
   }
 }

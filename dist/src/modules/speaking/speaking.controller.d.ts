@@ -9,9 +9,9 @@ export declare class SpeakingController {
         id: number;
         title: string;
         imageUrl: string | null;
-        difficulty: string;
-        audioUrl: string | null;
         targetText: string;
+        audioUrl: string | null;
+        difficulty: string;
     }>;
     findAllExercises(category?: string): Promise<{
         category: string;
@@ -19,9 +19,9 @@ export declare class SpeakingController {
         id: number;
         title: string;
         imageUrl: string | null;
-        difficulty: string;
-        audioUrl: string | null;
         targetText: string;
+        audioUrl: string | null;
+        difficulty: string;
     }[]>;
     findOne(id: number): Promise<{
         category: string;
@@ -29,9 +29,9 @@ export declare class SpeakingController {
         id: number;
         title: string;
         imageUrl: string | null;
-        difficulty: string;
-        audioUrl: string | null;
         targetText: string;
+        audioUrl: string | null;
+        difficulty: string;
     }>;
     submitAudio(exerciseId: number, req: any, audio: Express.Multer.File): Promise<{
         submissionId: number;
@@ -50,9 +50,9 @@ export declare class SpeakingController {
             id: number;
             title: string;
             imageUrl: string | null;
-            difficulty: string;
-            audioUrl: string | null;
             targetText: string;
+            audioUrl: string | null;
+            difficulty: string;
         };
     } & {
         id: number;
