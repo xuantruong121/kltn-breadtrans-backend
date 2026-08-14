@@ -20,7 +20,7 @@ export class VocabService {
     // Fetch user progress if userId is provided
     const userProgressMap: Record<
       number,
-      { mastered: number; starred: number }
+      { mastered: number; starred: number; needReview: number }
     > = {};
     if (userId) {
       const userProgresses = await this.prisma.userVocabWordProgress.findMany({
@@ -31,9 +31,13 @@ export class VocabService {
       userProgresses.forEach((p) => {
         const topicId = p.word.topicId;
         if (!userProgressMap[topicId]) {
-          userProgressMap[topicId] = { mastered: 0, starred: 0 };
+          userProgressMap[topicId] = { mastered: 0, starred: 0, needReview: 0 };
         }
-        if (p.isMastered) userProgressMap[topicId].mastered += 1;
+        if (p.isMastered) {
+          userProgressMap[topicId].mastered += 1;
+        } else {
+          userProgressMap[topicId].needReview += 1;
+        }
         if (p.isStarred) userProgressMap[topicId].starred += 1;
       });
     }
@@ -43,14 +47,18 @@ export class VocabService {
     topics.forEach((t) => {
       const cat = t.categoryName || '600 TỪ VỰNG TOEIC';
       if (!categoriesMap[cat]) categoriesMap[cat] = [];
-      const prog = userProgressMap[t.id] || { mastered: 0, starred: 0 };
+      const prog = userProgressMap[t.id] || {
+        mastered: 0,
+        starred: 0,
+        needReview: 0,
+      };
       categoriesMap[cat].push({
         id: t.id,
         title: t.title,
         categoryName: t.categoryName,
         totalWords: t.totalWords,
         learnedCount: prog.mastered,
-        needReviewCount: Math.max(0, t.totalWords - prog.mastered),
+        needReviewCount: prog.needReview,
         isPro: t.isPro,
       });
     });
@@ -62,14 +70,18 @@ export class VocabService {
     }));
 
     const allQuizzes = topics.map((t) => {
-      const prog = userProgressMap[t.id] || { mastered: 0, starred: 0 };
+      const prog = userProgressMap[t.id] || {
+        mastered: 0,
+        starred: 0,
+        needReview: 0,
+      };
       return {
         id: t.id,
         title: t.title,
         categoryName: t.categoryName,
         totalWords: t.totalWords,
         learnedCount: prog.mastered,
-        needReviewCount: Math.max(0, t.totalWords - prog.mastered),
+        needReviewCount: prog.needReview,
         isPro: t.isPro,
       };
     });
@@ -157,7 +169,7 @@ export class VocabService {
     }
   }
 
-  async toggleMastered(userId: number, wordId: number) {
+  async setMastered(userId: number, wordId: number, isMastered: boolean) {
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
     });
@@ -165,7 +177,7 @@ export class VocabService {
     if (existing) {
       const updated = await this.prisma.userVocabWordProgress.update({
         where: { id: existing.id },
-        data: { isMastered: !existing.isMastered },
+        data: { isMastered },
       });
       if (updated.isMastered && !existing.isMastered) {
         this.eventEmitter.emit('vocab.learned', { userId, count: 1 });
@@ -173,9 +185,11 @@ export class VocabService {
       return { isMastered: updated.isMastered };
     } else {
       const created = await this.prisma.userVocabWordProgress.create({
-        data: { userId, wordId, isMastered: true },
+        data: { userId, wordId, isMastered },
       });
-      this.eventEmitter.emit('vocab.learned', { userId, count: 1 });
+      if (created.isMastered) {
+        this.eventEmitter.emit('vocab.learned', { userId, count: 1 });
+      }
       return { isMastered: created.isMastered };
     }
   }

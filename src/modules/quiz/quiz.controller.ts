@@ -46,8 +46,8 @@ export class QuizController {
   @Get('listening-practice')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách các bài Luyện Nghe (Nghe Chép)' })
-  getListeningPractices() {
-    return this.quizService.getListeningPractices();
+  getListeningPractices(@Request() req: any) {
+    return this.quizService.getListeningPractices(req.user.id);
   }
 
   @Get(':id')

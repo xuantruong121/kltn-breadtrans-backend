@@ -30,8 +30,8 @@ let SpeakingController = class SpeakingController {
     createExercise(dto) {
         return this.speakingService.createExercise(dto);
     }
-    findAllExercises(category) {
-        return this.speakingService.findAllExercises(category);
+    findAllExercises(category, req) {
+        return this.speakingService.findAllExercises(category, req.user.id);
     }
     findOne(id) {
         return this.speakingService.findExerciseById(id);
@@ -66,8 +66,9 @@ __decorate([
         enum: ['IELTS', 'TOEIC', 'GENERAL'],
     }),
     __param(0, (0, common_1.Query)('category')),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], SpeakingController.prototype, "findAllExercises", null);
 __decorate([

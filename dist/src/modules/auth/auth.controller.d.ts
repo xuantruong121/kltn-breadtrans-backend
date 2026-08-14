@@ -6,7 +6,6 @@ export declare class AuthController {
     register(registerDto: RegisterDto): Promise<{
         profile: {
             id: number;
-            userId: number;
             fullName: string;
             avatar: string | null;
             phone: string | null;
@@ -17,10 +16,8 @@ export declare class AuthController {
             birthYear: number | null;
             nextExamDate: string | null;
             isSelfClaimed: boolean;
+            userId: number;
         } | null;
-        createdAt: Date;
-        id: number;
-        updatedAt: Date;
         email: string;
         role: import(".prisma/client").$Enums.Role;
         refreshToken: string | null;
@@ -28,6 +25,9 @@ export declare class AuthController {
         loginCount: number;
         lastLoginAt: Date | null;
         lastDeviceType: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        id: number;
     }>;
     login(loginDto: LoginDto): Promise<{
         access_token: string;
@@ -39,7 +39,6 @@ export declare class AuthController {
             role: import(".prisma/client").$Enums.Role;
             profile: {
                 id: number;
-                userId: number;
                 fullName: string;
                 avatar: string | null;
                 phone: string | null;
@@ -50,6 +49,7 @@ export declare class AuthController {
                 birthYear: number | null;
                 nextExamDate: string | null;
                 isSelfClaimed: boolean;
+                userId: number;
             } | null;
         };
     }>;

@@ -40,6 +40,15 @@ let GamificationController = class GamificationController {
     getArenaSnippet(req) {
         return this.gamificationService.getArenaSnippet(req.user.id);
     }
+    spinWheel(req) {
+        return this.gamificationService.spinWheel(req.user.id);
+    }
+    triggerDailyCron() {
+        return this.gamificationService.triggerDailyCron();
+    }
+    triggerWeeklyCron() {
+        return this.gamificationService.triggerWeeklyCron();
+    }
 };
 exports.GamificationController = GamificationController;
 __decorate([
@@ -99,6 +108,30 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], GamificationController.prototype, "getArenaSnippet", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Post)('spin-wheel'),
+    (0, swagger_1.ApiOperation)({ summary: 'Quay vòng quay may mắn (tốn 50 Bánh Rán)' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "spinWheel", null);
+__decorate([
+    (0, common_1.Post)('trigger-daily-cron'),
+    (0, swagger_1.ApiOperation)({ summary: '[Test] Chạy cronjob bảo vệ chuỗi mỗi ngày' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "triggerDailyCron", null);
+__decorate([
+    (0, common_1.Post)('trigger-weekly-cron'),
+    (0, swagger_1.ApiOperation)({ summary: '[Test] Chạy cronjob cập nhật Giải đấu hàng tuần' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "triggerWeeklyCron", null);
 exports.GamificationController = GamificationController = __decorate([
     (0, swagger_1.ApiTags)('gamification'),
     (0, common_1.Controller)('gamification'),

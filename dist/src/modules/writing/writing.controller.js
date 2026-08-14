@@ -22,8 +22,8 @@ let WritingController = class WritingController {
     constructor(writingService) {
         this.writingService = writingService;
     }
-    getTopics() {
-        return this.writingService.getTopics();
+    getTopics(req) {
+        return this.writingService.getTopics(req.user.id);
     }
     getQuizDetails(id) {
         return this.writingService.getQuizDetails(id);
@@ -47,8 +47,9 @@ __decorate([
     (0, swagger_1.ApiOperation)({
         summary: 'Lấy danh sách các chủ điểm và bài viết Writing Part 1',
     }),
+    __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], WritingController.prototype, "getTopics", null);
 __decorate([

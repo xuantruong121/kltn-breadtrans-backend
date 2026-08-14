@@ -10,9 +10,9 @@ describe('VocabService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        VocabService, 
+        VocabService,
         { provide: PrismaService, useValue: {} },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } }
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

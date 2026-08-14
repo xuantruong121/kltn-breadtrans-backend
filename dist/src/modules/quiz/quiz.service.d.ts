@@ -8,14 +8,14 @@ export declare class QuizService {
     private aiService;
     constructor(prisma: PrismaService, eventEmitter: EventEmitter2, aiService: AiService);
     createQuiz(dto: CreateQuizDto): Promise<{
-        title: string;
+        createdAt: Date;
+        id: number;
         description: string | null;
+        title: string;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
         type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
-        createdAt: Date;
-        id: number;
         courseId: number | null;
         practiceTopicId: number | null;
     }>;
@@ -24,59 +24,59 @@ export declare class QuizService {
             questions: number;
         };
     } & {
-        title: string;
+        createdAt: Date;
+        id: number;
         description: string | null;
+        title: string;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
         type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
-        createdAt: Date;
-        id: number;
         courseId: number | null;
         practiceTopicId: number | null;
     })[]>;
-    getListeningPractices(): Promise<({
+    getListeningPractices(userId: number): Promise<{
+        isCompleted: boolean;
         _count: {
             questions: number;
         };
-    } & {
-        title: string;
+        createdAt: Date;
+        id: number;
         description: string | null;
+        title: string;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
         type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
-        createdAt: Date;
-        id: number;
         courseId: number | null;
         practiceTopicId: number | null;
-    })[]>;
+    }[]>;
     getQuizById(id: number): Promise<{
         questions: {
-            type: string;
             id: number;
-            order: number;
-            quizId: number;
             content: import("@prisma/client/runtime/library").JsonValue;
+            type: string;
+            quizId: number;
+            order: number;
         }[];
     } & {
-        title: string;
+        createdAt: Date;
+        id: number;
         description: string | null;
+        title: string;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
         type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
-        createdAt: Date;
-        id: number;
         courseId: number | null;
         practiceTopicId: number | null;
     }>;
     createQuestion(quizId: number, dto: CreateQuestionDto): Promise<{
-        type: string;
         id: number;
-        order: number;
-        quizId: number;
         content: import("@prisma/client/runtime/library").JsonValue;
+        type: string;
+        quizId: number;
+        order: number;
     }>;
     submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto): Promise<{
         results: {
@@ -89,11 +89,11 @@ export declare class QuizService {
         }[];
     } & {
         id: number;
+        userId: number;
         quizId: number;
         score: number | null;
         submittedAt: Date;
         aiFeedback: string | null;
-        userId: number;
     }>;
     calculateToeicScore(listeningCorrect: number, readingCorrect: number): {
         listening: {
@@ -130,11 +130,11 @@ export declare class QuizService {
             submissionId: number;
         }[];
         questions: {
-            type: string;
             id: number;
-            order: number;
-            quizId: number;
             content: import("@prisma/client/runtime/library").JsonValue;
+            type: string;
+            quizId: number;
+            order: number;
         }[];
         strengths: string[];
         weaknesses: string[];

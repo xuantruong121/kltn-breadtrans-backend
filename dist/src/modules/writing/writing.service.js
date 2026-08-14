@@ -21,7 +21,7 @@ let WritingService = class WritingService {
         this.prisma = prisma;
         this.aiService = aiService;
     }
-    async getTopics() {
+    async getTopics(userId) {
         const categories = await this.prisma.practiceTopic.findMany({
             where: { category: client_1.TopicCategory.WRITING_PART1 },
             include: {
@@ -38,6 +38,14 @@ let WritingService = class WritingService {
             },
             orderBy: { id: 'desc' },
         });
+        const userSubmissions = await this.prisma.submission.findMany({
+            where: {
+                userId,
+                quizId: { in: quizzes.map((q) => q.id) },
+            },
+            select: { quizId: true },
+        });
+        const completedQuizIds = new Set(userSubmissions.map((s) => s.quizId));
         return {
             categories,
             quizzes: quizzes.map((q) => {
@@ -49,6 +57,7 @@ let WritingService = class WritingService {
                     topicName: q.practiceTopic?.name,
                     imageUrl: content.imageUrl,
                     keywords: content.keywords,
+                    isCompleted: completedQuizIds.has(q.id),
                 };
             }),
         };

@@ -4,11 +4,9 @@ export declare class GamificationController {
     constructor(gamificationService: GamificationService);
     getLeaderboard(): Promise<({
         user: {
-            id: number;
             email: string;
             profile: {
                 id: number;
-                userId: number;
                 fullName: string;
                 avatar: string | null;
                 phone: string | null;
@@ -19,20 +17,24 @@ export declare class GamificationController {
                 birthYear: number | null;
                 nextExamDate: string | null;
                 isSelfClaimed: boolean;
+                userId: number;
             } | null;
+            id: number;
         };
     } & {
         id: number;
         userId: number;
-        rank: number | null;
         totalPoints: number;
+        rank: number | null;
+        tier: string;
+        weeklyExp: number;
     })[]>;
     getMyBadges(req: any): Promise<({
         badge: {
-            name: string;
-            iconUrl: string | null;
             id: number;
+            name: string;
             description: string;
+            iconUrl: string | null;
             criteria: import("@prisma/client/runtime/library").JsonValue;
         };
     } & {
@@ -42,34 +44,34 @@ export declare class GamificationController {
         awardedAt: Date;
     })[]>;
     getMyPet(req: any): Promise<{
-        name: string;
         createdAt: Date;
-        id: number;
         updatedAt: Date;
+        id: number;
+        name: string;
         userId: number;
-        level: number;
         health: number;
         happiness: number;
+        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     feedPet(req: any): Promise<{
-        name: string;
         createdAt: Date;
-        id: number;
         updatedAt: Date;
+        id: number;
+        name: string;
         userId: number;
-        level: number;
         health: number;
         happiness: number;
+        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     getMyDailyQuests(req: any): Promise<({
         quest: {
             id: number;
-            title: string;
             description: string | null;
+            title: string;
             type: string;
             targetValue: number;
             rewardXP: number;
@@ -92,6 +94,19 @@ export declare class GamificationController {
     } | {
         rank: number;
         tier: string;
+        message: string;
+    }>;
+    spinWheel(req: any): Promise<{
+        success: boolean;
+        reward: string;
+        rewardType: string;
+    }>;
+    triggerDailyCron(): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    triggerWeeklyCron(): Promise<{
+        success: boolean;
         message: string;
     }>;
 }

@@ -65,7 +65,14 @@ let AuthController = class AuthController {
         return this.authService.login(loginDto, deviceId);
     }
     async refreshTokens(req, body) {
-        return this.authService.refreshTokens(req.user.id, body.deviceId, body.refreshToken);
+        const authHeader = req.headers.authorization;
+        if (!authHeader)
+            throw new common_1.UnauthorizedException('Missing token');
+        const token = authHeader.split(' ')[1];
+        const decoded = this.authService['jwtService'].decode(token);
+        if (!decoded || !decoded.sub)
+            throw new common_1.UnauthorizedException('Invalid token');
+        return this.authService.refreshTokens(decoded.sub, body.deviceId, body.refreshToken);
     }
     async logout(req, deviceId) {
         return this.authService.logout(req.user.id, deviceId);
@@ -108,8 +115,6 @@ __decorate([
 __decorate([
     (0, common_1.Post)('refresh'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Lấy token mới bằng Refresh Token' }),
     __param(0, (0, common_1.Request)()),
     __param(1, (0, common_1.Body)()),

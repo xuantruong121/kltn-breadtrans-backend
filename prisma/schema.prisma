@@ -102,6 +102,7 @@ model UserStats {
   totalBanhRan              Int       @default(0)
   streakCount               Int       @default(0)
   lastStreakUpdate          DateTime?
+  streakFreezes             Int       @default(0)
   countHeart                Int       @default(0)
   timesVocabXS              Int       @default(0)
   timesVocab                Int       @default(0)
@@ -368,6 +369,8 @@ model Leaderboard {
   user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
   totalPoints Int  @default(0)
   rank        Int?
+  tier        String @default("Đồng") // Đồng, Bạc, Vàng, Bạch Kim, Kim Cương
+  weeklyExp   Int    @default(0)
 }
 
 model Badge {

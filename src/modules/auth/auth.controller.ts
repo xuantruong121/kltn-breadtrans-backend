@@ -7,6 +7,7 @@ import {
   Get,
   UseGuards,
   Request,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
@@ -54,12 +55,19 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy token mới bằng Refresh Token' })
   async refreshTokens(@Request() req: any, @Body() body: RefreshTokenDto) {
+    const authHeader = req.headers.authorization as string;
+    if (!authHeader) throw new UnauthorizedException('Missing token');
+    const token = authHeader.split(' ')[1];
+
+    // Use decode (not verify) to get payload even if expired
+    const decoded = this.authService['jwtService'].decode(token);
+    if (!decoded || !decoded.sub)
+      throw new UnauthorizedException('Invalid token');
+
     return this.authService.refreshTokens(
-      req.user.id,
+      decoded.sub,
       body.deviceId,
       body.refreshToken,
     );

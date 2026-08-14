@@ -10,7 +10,7 @@ export class WritingService {
     private aiService: AiService,
   ) {}
 
-  async getTopics() {
+  async getTopics(userId: number) {
     const categories = await this.prisma.practiceTopic.findMany({
       where: { category: TopicCategory.WRITING_PART1 },
       include: {
@@ -29,6 +29,16 @@ export class WritingService {
       orderBy: { id: 'desc' },
     });
 
+    const userSubmissions = await this.prisma.submission.findMany({
+      where: {
+        userId,
+        quizId: { in: quizzes.map((q) => q.id) },
+      },
+      select: { quizId: true },
+    });
+
+    const completedQuizIds = new Set(userSubmissions.map((s) => s.quizId));
+
     return {
       categories,
       quizzes: quizzes.map((q) => {
@@ -40,6 +50,7 @@ export class WritingService {
           topicName: q.practiceTopic?.name,
           imageUrl: content.imageUrl,
           keywords: content.keywords,
+          isCompleted: completedQuizIds.has(q.id),
         };
       }),
     };
