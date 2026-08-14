@@ -33,14 +33,14 @@ let SpeakingService = SpeakingService_1 = class SpeakingService {
         const userSubmissions = await this.prisma.speakingSubmission.findMany({
             where: {
                 userId,
-                exerciseId: { in: exercises.map(e => e.id) }
+                exerciseId: { in: exercises.map((e) => e.id) },
             },
-            select: { exerciseId: true }
+            select: { exerciseId: true },
         });
-        const completedExerciseIds = new Set(userSubmissions.map(s => s.exerciseId));
-        return exercises.map(exercise => ({
+        const completedExerciseIds = new Set(userSubmissions.map((s) => s.exerciseId));
+        return exercises.map((exercise) => ({
             ...exercise,
-            isCompleted: completedExerciseIds.has(exercise.id)
+            isCompleted: completedExerciseIds.has(exercise.id),
         }));
     }
     async findExerciseById(id) {

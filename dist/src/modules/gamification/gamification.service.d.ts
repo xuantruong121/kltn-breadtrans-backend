@@ -14,11 +14,9 @@ export declare class GamificationService {
     }>;
     getLeaderboard(tier?: string): Promise<({
         user: {
-            id: number;
             email: string;
             profile: {
                 id: number;
-                userId: number;
                 fullName: string;
                 avatar: string | null;
                 phone: string | null;
@@ -29,7 +27,9 @@ export declare class GamificationService {
                 birthYear: number | null;
                 nextExamDate: string | null;
                 isSelfClaimed: boolean;
+                userId: number;
             } | null;
+            id: number;
         };
     } & {
         id: number;
@@ -54,11 +54,11 @@ export declare class GamificationService {
         awardedAt: Date;
     })[]>;
     getMyPet(userId: number): Promise<{
-        id: number;
-        userId: number;
-        name: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        name: string;
+        userId: number;
         health: number;
         happiness: number;
         level: number;
@@ -66,11 +66,11 @@ export declare class GamificationService {
         lastFedAt: Date | null;
     }>;
     feedPet(userId: number): Promise<{
-        id: number;
-        userId: number;
-        name: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        name: string;
+        userId: number;
         health: number;
         happiness: number;
         level: number;
@@ -82,8 +82,8 @@ export declare class GamificationService {
             id: number;
             description: string | null;
             title: string;
-            targetValue: number;
             type: string;
+            targetValue: number;
             rewardXP: number;
             rewardBanh: number;
             isActive: boolean;

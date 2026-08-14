@@ -13,7 +13,11 @@ export class GamificationListener {
   ) {}
 
   @OnEvent('quiz.submitted')
-  async handleQuizSubmittedEvent(payload: { userId: number; quizId?: number; score: number }) {
+  async handleQuizSubmittedEvent(payload: {
+    userId: number;
+    quizId?: number;
+    score: number;
+  }) {
     this.logger.log(
       `Handling quiz.submitted event for user ${payload.userId} with score ${payload.score}`,
     );
@@ -230,7 +234,9 @@ export class GamificationListener {
   @OnEvent('gamification.xp_earned')
   async handleXpEarnedEvent(payload: { userId: number; points: number }) {
     if (payload.points <= 0) return;
-    this.logger.log(`Handling gamification.xp_earned event for user ${payload.userId}`);
+    this.logger.log(
+      `Handling gamification.xp_earned event for user ${payload.userId}`,
+    );
     try {
       const today = new Date().toISOString().split('T')[0];
       const activeQuests = await this.prisma.dailyQuest.findMany({

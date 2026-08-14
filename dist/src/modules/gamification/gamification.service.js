@@ -26,7 +26,7 @@ let GamificationService = class GamificationService {
         });
         if (!myLeaderboard) {
             myLeaderboard = await this.prisma.leaderboard.create({
-                data: { userId, tier: 'Đồng' }
+                data: { userId, tier: 'Đồng' },
             });
         }
         await this.prisma.pointHistory.create({
@@ -196,7 +196,7 @@ let GamificationService = class GamificationService {
         return progresses;
     }
     async getArenaSnippet(userId) {
-        let myLeaderboard = await this.prisma.leaderboard.findUnique({
+        const myLeaderboard = await this.prisma.leaderboard.findUnique({
             where: { userId },
         });
         const tier = myLeaderboard?.tier || 'Đồng';
@@ -223,7 +223,9 @@ let GamificationService = class GamificationService {
     }
     async spinWheel(userId) {
         const COST = 50;
-        const userStats = await this.prisma.userStats.findUnique({ where: { userId } });
+        const userStats = await this.prisma.userStats.findUnique({
+            where: { userId },
+        });
         if (!userStats || userStats.totalBanhRan < COST) {
             throw new common_1.BadRequestException('Không đủ 50 Bánh Rán để quay!');
         }
@@ -271,8 +273,8 @@ let GamificationService = class GamificationService {
         const stats = await this.prisma.userStats.findMany({
             where: {
                 lastStreakUpdate: { lt: yesterday },
-                streakCount: { gt: 0 }
-            }
+                streakCount: { gt: 0 },
+            },
         });
         for (const stat of stats) {
             if (stat.streakFreezes > 0) {
@@ -280,18 +282,21 @@ let GamificationService = class GamificationService {
                     where: { id: stat.id },
                     data: {
                         streakFreezes: { decrement: 1 },
-                        lastStreakUpdate: new Date()
-                    }
+                        lastStreakUpdate: new Date(),
+                    },
                 });
             }
             else {
                 await this.prisma.userStats.update({
                     where: { id: stat.id },
-                    data: { streakCount: 0 }
+                    data: { streakCount: 0 },
                 });
             }
         }
-        return { success: true, message: `Processed ${stats.length} inactive users.` };
+        return {
+            success: true,
+            message: `Processed ${stats.length} inactive users.`,
+        };
     }
     async triggerWeeklyCron() {
         const tiers = ['Đồng', 'Bạc', 'Vàng', 'Bạch Kim', 'Kim Cương'];
@@ -299,7 +304,7 @@ let GamificationService = class GamificationService {
             const currentTier = tiers[i];
             const usersInTier = await this.prisma.leaderboard.findMany({
                 where: { tier: currentTier },
-                orderBy: { weeklyExp: 'desc' }
+                orderBy: { weeklyExp: 'desc' },
             });
             if (usersInTier.length === 0)
                 continue;
@@ -316,7 +321,7 @@ let GamificationService = class GamificationService {
                 }
                 await this.prisma.leaderboard.update({
                     where: { id: u.id },
-                    data: { tier: newTier, weeklyExp: 0 }
+                    data: { tier: newTier, weeklyExp: 0 },
                 });
             }
         }

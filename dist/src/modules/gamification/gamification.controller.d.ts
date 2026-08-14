@@ -4,11 +4,9 @@ export declare class GamificationController {
     constructor(gamificationService: GamificationService);
     getLeaderboard(): Promise<({
         user: {
-            id: number;
             email: string;
             profile: {
                 id: number;
-                userId: number;
                 fullName: string;
                 avatar: string | null;
                 phone: string | null;
@@ -19,7 +17,9 @@ export declare class GamificationController {
                 birthYear: number | null;
                 nextExamDate: string | null;
                 isSelfClaimed: boolean;
+                userId: number;
             } | null;
+            id: number;
         };
     } & {
         id: number;
@@ -44,11 +44,11 @@ export declare class GamificationController {
         awardedAt: Date;
     })[]>;
     getMyPet(req: any): Promise<{
-        id: number;
-        userId: number;
-        name: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        name: string;
+        userId: number;
         health: number;
         happiness: number;
         level: number;
@@ -56,11 +56,11 @@ export declare class GamificationController {
         lastFedAt: Date | null;
     }>;
     feedPet(req: any): Promise<{
-        id: number;
-        userId: number;
-        name: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        name: string;
+        userId: number;
         health: number;
         happiness: number;
         level: number;
@@ -72,8 +72,8 @@ export declare class GamificationController {
             id: number;
             description: string | null;
             title: string;
-            targetValue: number;
             type: string;
+            targetValue: number;
             rewardXP: number;
             rewardBanh: number;
             isActive: boolean;

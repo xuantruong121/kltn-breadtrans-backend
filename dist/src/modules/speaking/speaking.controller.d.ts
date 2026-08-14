@@ -4,35 +4,35 @@ export declare class SpeakingController {
     private readonly speakingService;
     constructor(speakingService: SpeakingService);
     createExercise(dto: CreateExerciseDto): Promise<{
+        createdAt: Date;
         id: number;
         title: string;
+        category: string;
         targetText: string;
         imageUrl: string | null;
         audioUrl: string | null;
         difficulty: string;
-        category: string;
-        createdAt: Date;
     }>;
     findAllExercises(category: string, req: any): Promise<{
         isCompleted: boolean;
+        createdAt: Date;
         id: number;
         title: string;
+        category: string;
         targetText: string;
         imageUrl: string | null;
         audioUrl: string | null;
         difficulty: string;
-        category: string;
-        createdAt: Date;
     }[]>;
     findOne(id: number): Promise<{
+        createdAt: Date;
         id: number;
         title: string;
+        category: string;
         targetText: string;
         imageUrl: string | null;
         audioUrl: string | null;
         difficulty: string;
-        category: string;
-        createdAt: Date;
     }>;
     submitAudio(exerciseId: number, req: any, audio: Express.Multer.File): Promise<{
         submissionId: number;
@@ -46,22 +46,22 @@ export declare class SpeakingController {
     }>;
     getMySubmissions(req: any): Promise<({
         exercise: {
+            createdAt: Date;
             id: number;
             title: string;
+            category: string;
             targetText: string;
             imageUrl: string | null;
             audioUrl: string | null;
             difficulty: string;
-            category: string;
-            createdAt: Date;
         };
     } & {
         id: number;
+        userId: number;
+        submittedAt: Date;
+        aiFeedback: import("@prisma/client/runtime/library").JsonValue | null;
         audioUrl: string;
         exerciseId: number;
-        userId: number;
         overallScore: number | null;
-        aiFeedback: import("@prisma/client/runtime/library").JsonValue | null;
-        submittedAt: Date;
     })[]>;
 }

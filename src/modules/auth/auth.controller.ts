@@ -60,10 +60,11 @@ export class AuthController {
     const authHeader = req.headers.authorization as string;
     if (!authHeader) throw new UnauthorizedException('Missing token');
     const token = authHeader.split(' ')[1];
-    
+
     // Use decode (not verify) to get payload even if expired
-    const decoded = this.authService['jwtService'].decode(token) as any;
-    if (!decoded || !decoded.sub) throw new UnauthorizedException('Invalid token');
+    const decoded = this.authService['jwtService'].decode(token);
+    if (!decoded || !decoded.sub)
+      throw new UnauthorizedException('Invalid token');
 
     return this.authService.refreshTokens(
       decoded.sub,

@@ -47,7 +47,11 @@ export class VocabService {
     topics.forEach((t) => {
       const cat = t.categoryName || '600 TỪ VỰNG TOEIC';
       if (!categoriesMap[cat]) categoriesMap[cat] = [];
-      const prog = userProgressMap[t.id] || { mastered: 0, starred: 0, needReview: 0 };
+      const prog = userProgressMap[t.id] || {
+        mastered: 0,
+        starred: 0,
+        needReview: 0,
+      };
       categoriesMap[cat].push({
         id: t.id,
         title: t.title,
@@ -66,7 +70,11 @@ export class VocabService {
     }));
 
     const allQuizzes = topics.map((t) => {
-      const prog = userProgressMap[t.id] || { mastered: 0, starred: 0, needReview: 0 };
+      const prog = userProgressMap[t.id] || {
+        mastered: 0,
+        starred: 0,
+        needReview: 0,
+      };
       return {
         id: t.id,
         title: t.title,

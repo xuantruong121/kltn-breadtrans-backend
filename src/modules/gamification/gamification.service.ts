@@ -13,13 +13,13 @@ export class GamificationService {
     let myLeaderboard = await this.prisma.leaderboard.findUnique({
       where: { userId },
     });
-    
+
     if (!myLeaderboard) {
       myLeaderboard = await this.prisma.leaderboard.create({
-        data: { userId, tier: 'Đồng' }
+        data: { userId, tier: 'Đồng' },
       });
     }
-    
+
     // 1. Lưu PointHistory
     await this.prisma.pointHistory.create({
       data: {
@@ -222,7 +222,7 @@ export class GamificationService {
   }
 
   async getArenaSnippet(userId: number) {
-    let myLeaderboard = await this.prisma.leaderboard.findUnique({
+    const myLeaderboard = await this.prisma.leaderboard.findUnique({
       where: { userId },
     });
     const tier = myLeaderboard?.tier || 'Đồng';
@@ -261,7 +261,9 @@ export class GamificationService {
 
   async spinWheel(userId: number) {
     const COST = 50;
-    const userStats = await this.prisma.userStats.findUnique({ where: { userId } });
+    const userStats = await this.prisma.userStats.findUnique({
+      where: { userId },
+    });
     if (!userStats || userStats.totalBanhRan < COST) {
       throw new BadRequestException('Không đủ 50 Bánh Rán để quay!');
     }
@@ -278,25 +280,29 @@ export class GamificationService {
     const rand = Math.random() * 100;
     let reward = '';
     let rewardType = '';
-    
-    if (rand < 5) { // 5% trúng Jackpot (Vé giảm học phí)
+
+    if (rand < 5) {
+      // 5% trúng Jackpot (Vé giảm học phí)
       reward = '1 Voucher Giảm 5% Học phí';
       rewardType = 'voucher';
       await this.prisma.pointHistory.create({
         data: { userId, points: 0, reason: 'Jackpot: Voucher Giảm 5% Học phí' },
       });
-    } else if (rand < 20) { // 15% trúng 100 Bánh Rán (lời)
+    } else if (rand < 20) {
+      // 15% trúng 100 Bánh Rán (lời)
       reward = '100 Bánh Rán';
       rewardType = 'points';
       await this.addPoints(userId, 100, 'Trúng thưởng vòng quay');
-    } else if (rand < 40) { // 20% trúng vé streak
+    } else if (rand < 40) {
+      // 20% trúng vé streak
       reward = '1 Vé Bảo vệ Chuỗi';
       rewardType = 'streak_freeze';
       await this.prisma.userStats.update({
         where: { userId },
         data: { streakFreezes: { increment: 1 } },
       });
-    } else { // 60% trúng 20 Bánh Rán (lỗ)
+    } else {
+      // 60% trúng 20 Bánh Rán (lỗ)
       reward = '20 Bánh Rán';
       rewardType = 'points';
       await this.addPoints(userId, 20, 'Trúng thưởng vòng quay');
@@ -313,43 +319,49 @@ export class GamificationService {
     const stats = await this.prisma.userStats.findMany({
       where: {
         lastStreakUpdate: { lt: yesterday },
-        streakCount: { gt: 0 }
-      }
+        streakCount: { gt: 0 },
+      },
     });
 
     for (const stat of stats) {
       if (stat.streakFreezes > 0) {
         await this.prisma.userStats.update({
           where: { id: stat.id },
-          data: { 
+          data: {
             streakFreezes: { decrement: 1 },
-            lastStreakUpdate: new Date() // giả vờ như đã học để không bị trừ tiếp vào ngày mai
-          }
+            lastStreakUpdate: new Date(), // giả vờ như đã học để không bị trừ tiếp vào ngày mai
+          },
         });
       } else {
         await this.prisma.userStats.update({
           where: { id: stat.id },
-          data: { streakCount: 0 }
+          data: { streakCount: 0 },
         });
       }
     }
-    return { success: true, message: `Processed ${stats.length} inactive users.` };
+    return {
+      success: true,
+      message: `Processed ${stats.length} inactive users.`,
+    };
   }
 
   async triggerWeeklyCron() {
     const tiers = ['Đồng', 'Bạc', 'Vàng', 'Bạch Kim', 'Kim Cương'];
-    
+
     for (let i = 0; i < tiers.length; i++) {
       const currentTier = tiers[i];
       const usersInTier = await this.prisma.leaderboard.findMany({
         where: { tier: currentTier },
-        orderBy: { weeklyExp: 'desc' }
+        orderBy: { weeklyExp: 'desc' },
       });
 
       if (usersInTier.length === 0) continue;
 
       const top20Index = Math.max(1, Math.floor(usersInTier.length * 0.2));
-      const bottom20Index = Math.max(usersInTier.length - Math.floor(usersInTier.length * 0.2), top20Index);
+      const bottom20Index = Math.max(
+        usersInTier.length - Math.floor(usersInTier.length * 0.2),
+        top20Index,
+      );
 
       for (let j = 0; j < usersInTier.length; j++) {
         const u = usersInTier[j];
@@ -366,7 +378,7 @@ export class GamificationService {
 
         await this.prisma.leaderboard.update({
           where: { id: u.id },
-          data: { tier: newTier, weeklyExp: 0 }
+          data: { tier: newTier, weeklyExp: 0 },
         });
       }
     }

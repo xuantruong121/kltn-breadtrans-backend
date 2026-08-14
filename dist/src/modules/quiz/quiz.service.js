@@ -55,14 +55,14 @@ let QuizService = class QuizService {
         const userSubmissions = await this.prisma.submission.findMany({
             where: {
                 userId,
-                quizId: { in: quizzes.map(q => q.id) }
+                quizId: { in: quizzes.map((q) => q.id) },
             },
-            select: { quizId: true }
+            select: { quizId: true },
         });
-        const completedQuizIds = new Set(userSubmissions.map(s => s.quizId));
-        return quizzes.map(quiz => ({
+        const completedQuizIds = new Set(userSubmissions.map((s) => s.quizId));
+        return quizzes.map((quiz) => ({
             ...quiz,
-            isCompleted: completedQuizIds.has(quiz.id)
+            isCompleted: completedQuizIds.has(quiz.id),
         }));
     }
     async getQuizById(id) {
@@ -98,7 +98,8 @@ let QuizService = class QuizService {
                         totalScore += score;
                     }
                 }
-                else if (question.type === 'DICTATION' || question.type === 'FILL_IN_BLANK') {
+                else if (question.type === 'DICTATION' ||
+                    question.type === 'FILL_IN_BLANK') {
                     const content = question.content;
                     const cleanCorrect = String(content.correctAnswer || content.correct || '')
                         .toLowerCase()
