@@ -25,11 +25,23 @@ let SpeakingService = SpeakingService_1 = class SpeakingService {
         this.aiService = aiService;
         this.uploadService = uploadService;
     }
-    async findAllExercises(category) {
-        return this.prisma.speakingExercise.findMany({
+    async findAllExercises(category, userId) {
+        const exercises = await this.prisma.speakingExercise.findMany({
             where: category ? { category } : {},
             orderBy: { createdAt: 'desc' },
         });
+        const userSubmissions = await this.prisma.speakingSubmission.findMany({
+            where: {
+                userId,
+                exerciseId: { in: exercises.map(e => e.id) }
+            },
+            select: { exerciseId: true }
+        });
+        const completedExerciseIds = new Set(userSubmissions.map(s => s.exerciseId));
+        return exercises.map(exercise => ({
+            ...exercise,
+            isCompleted: completedExerciseIds.has(exercise.id)
+        }));
     }
     async findExerciseById(id) {
         const exercise = await this.prisma.speakingExercise.findUnique({

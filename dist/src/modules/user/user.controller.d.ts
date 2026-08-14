@@ -24,6 +24,7 @@ export declare class UserController {
             totalBanhRan: number;
             streakCount: number;
             lastStreakUpdate: Date | null;
+            streakFreezes: number;
             countHeart: number;
             timesVocabXS: number;
             timesVocab: number;

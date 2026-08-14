@@ -24,15 +24,17 @@ export declare class GamificationController {
     } & {
         id: number;
         userId: number;
-        rank: number | null;
         totalPoints: number;
+        rank: number | null;
+        tier: string;
+        weeklyExp: number;
     })[]>;
     getMyBadges(req: any): Promise<({
         badge: {
-            name: string;
-            iconUrl: string | null;
             id: number;
+            name: string;
             description: string;
+            iconUrl: string | null;
             criteria: import("@prisma/client/runtime/library").JsonValue;
         };
     } & {
@@ -42,36 +44,36 @@ export declare class GamificationController {
         awardedAt: Date;
     })[]>;
     getMyPet(req: any): Promise<{
+        id: number;
+        userId: number;
         name: string;
         createdAt: Date;
-        id: number;
         updatedAt: Date;
-        userId: number;
-        level: number;
         health: number;
         happiness: number;
+        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     feedPet(req: any): Promise<{
+        id: number;
+        userId: number;
         name: string;
         createdAt: Date;
-        id: number;
         updatedAt: Date;
-        userId: number;
-        level: number;
         health: number;
         happiness: number;
+        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     getMyDailyQuests(req: any): Promise<({
         quest: {
             id: number;
-            title: string;
             description: string | null;
-            type: string;
+            title: string;
             targetValue: number;
+            type: string;
             rewardXP: number;
             rewardBanh: number;
             isActive: boolean;
@@ -92,6 +94,19 @@ export declare class GamificationController {
     } | {
         rank: number;
         tier: string;
+        message: string;
+    }>;
+    spinWheel(req: any): Promise<{
+        success: boolean;
+        reward: string;
+        rewardType: string;
+    }>;
+    triggerDailyCron(): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    triggerWeeklyCron(): Promise<{
+        success: boolean;
         message: string;
     }>;
 }

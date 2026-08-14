@@ -57,4 +57,25 @@ export class GamificationController {
   getArenaSnippet(@Request() req: any) {
     return this.gamificationService.getArenaSnippet(req.user.id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('spin-wheel')
+  @ApiOperation({ summary: 'Quay vòng quay may mắn (tốn 50 Bánh Rán)' })
+  spinWheel(@Request() req: any) {
+    return this.gamificationService.spinWheel(req.user.id);
+  }
+
+  // NOTE: Thường cronjob chạy tự động, nhưng để test thì mở API POST
+  @Post('trigger-daily-cron')
+  @ApiOperation({ summary: '[Test] Chạy cronjob bảo vệ chuỗi mỗi ngày' })
+  triggerDailyCron() {
+    return this.gamificationService.triggerDailyCron();
+  }
+
+  @Post('trigger-weekly-cron')
+  @ApiOperation({ summary: '[Test] Chạy cronjob cập nhật Giải đấu hàng tuần' })
+  triggerWeeklyCron() {
+    return this.gamificationService.triggerWeeklyCron();
+  }
 }

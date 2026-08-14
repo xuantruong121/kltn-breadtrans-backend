@@ -1,9 +1,18 @@
 import { PrismaService } from '../../prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 export declare class GamificationService {
     private readonly prisma;
-    constructor(prisma: PrismaService);
-    addPoints(userId: number, points: number, reason: string): Promise<void>;
-    getLeaderboard(): Promise<({
+    private readonly eventEmitter;
+    constructor(prisma: PrismaService, eventEmitter: EventEmitter2);
+    addPoints(userId: number, points: number, reason: string): Promise<{
+        id: number;
+        userId: number;
+        totalPoints: number;
+        rank: number | null;
+        tier: string;
+        weeklyExp: number;
+    }>;
+    getLeaderboard(tier?: string): Promise<({
         user: {
             id: number;
             email: string;
@@ -25,15 +34,17 @@ export declare class GamificationService {
     } & {
         id: number;
         userId: number;
-        rank: number | null;
         totalPoints: number;
+        rank: number | null;
+        tier: string;
+        weeklyExp: number;
     })[]>;
     getMyBadges(userId: number): Promise<({
         badge: {
-            name: string;
-            iconUrl: string | null;
             id: number;
+            name: string;
             description: string;
+            iconUrl: string | null;
             criteria: import("@prisma/client/runtime/library").JsonValue;
         };
     } & {
@@ -43,36 +54,36 @@ export declare class GamificationService {
         awardedAt: Date;
     })[]>;
     getMyPet(userId: number): Promise<{
+        id: number;
+        userId: number;
         name: string;
         createdAt: Date;
-        id: number;
         updatedAt: Date;
-        userId: number;
-        level: number;
         health: number;
         happiness: number;
+        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     feedPet(userId: number): Promise<{
+        id: number;
+        userId: number;
         name: string;
         createdAt: Date;
-        id: number;
         updatedAt: Date;
-        userId: number;
-        level: number;
         health: number;
         happiness: number;
+        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     getMyDailyQuests(userId: number): Promise<({
         quest: {
             id: number;
-            title: string;
             description: string | null;
-            type: string;
+            title: string;
             targetValue: number;
+            type: string;
             rewardXP: number;
             rewardBanh: number;
             isActive: boolean;
@@ -93,6 +104,19 @@ export declare class GamificationService {
     } | {
         rank: number;
         tier: string;
+        message: string;
+    }>;
+    spinWheel(userId: number): Promise<{
+        success: boolean;
+        reward: string;
+        rewardType: string;
+    }>;
+    triggerDailyCron(): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    triggerWeeklyCron(): Promise<{
+        success: boolean;
         message: string;
     }>;
 }

@@ -35,11 +35,11 @@ export declare class QuizService {
         courseId: number | null;
         practiceTopicId: number | null;
     })[]>;
-    getListeningPractices(): Promise<({
+    getListeningPractices(userId: number): Promise<{
+        isCompleted: boolean;
         _count: {
             questions: number;
         };
-    } & {
         title: string;
         description: string | null;
         theoryContent: string | null;
@@ -50,13 +50,13 @@ export declare class QuizService {
         id: number;
         courseId: number | null;
         practiceTopicId: number | null;
-    })[]>;
+    }[]>;
     getQuizById(id: number): Promise<{
         questions: {
             type: string;
             id: number;
-            order: number;
             quizId: number;
+            order: number;
             content: import("@prisma/client/runtime/library").JsonValue;
         }[];
     } & {
@@ -74,8 +74,8 @@ export declare class QuizService {
     createQuestion(quizId: number, dto: CreateQuestionDto): Promise<{
         type: string;
         id: number;
-        order: number;
         quizId: number;
+        order: number;
         content: import("@prisma/client/runtime/library").JsonValue;
     }>;
     submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto): Promise<{
@@ -90,10 +90,10 @@ export declare class QuizService {
     } & {
         id: number;
         quizId: number;
+        userId: number;
         score: number | null;
         submittedAt: Date;
         aiFeedback: string | null;
-        userId: number;
     }>;
     calculateToeicScore(listeningCorrect: number, readingCorrect: number): {
         listening: {
@@ -132,8 +132,8 @@ export declare class QuizService {
         questions: {
             type: string;
             id: number;
-            order: number;
             quizId: number;
+            order: number;
             content: import("@prisma/client/runtime/library").JsonValue;
         }[];
         strengths: string[];

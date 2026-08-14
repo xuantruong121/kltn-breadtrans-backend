@@ -4,19 +4,19 @@ export declare class WritingService {
     private prisma;
     private aiService;
     constructor(prisma: PrismaService, aiService: AiService);
-    getTopics(): Promise<{
+    getTopics(userId: number): Promise<{
         categories: ({
             _count: {
                 quizzes: number;
             };
         } & {
+            id: number;
             name: string;
             vietnameseName: string | null;
             category: import(".prisma/client").$Enums.TopicCategory;
             iconUrl: string | null;
             order: number;
             createdAt: Date;
-            id: number;
         })[];
         quizzes: {
             id: number;
@@ -24,6 +24,7 @@ export declare class WritingService {
             topicName: string | undefined;
             imageUrl: any;
             keywords: any;
+            isCompleted: boolean;
         }[];
     }>;
     getQuizDetails(quizId: number): Promise<{

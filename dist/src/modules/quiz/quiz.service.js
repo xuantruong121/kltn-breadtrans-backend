@@ -38,8 +38,8 @@ let QuizService = class QuizService {
             },
         });
     }
-    async getListeningPractices() {
-        return this.prisma.quiz.findMany({
+    async getListeningPractices(userId) {
+        const quizzes = await this.prisma.quiz.findMany({
             where: {
                 type: 'LISTENING_PRACTICE',
             },
@@ -52,6 +52,18 @@ let QuizService = class QuizService {
                 id: 'desc',
             },
         });
+        const userSubmissions = await this.prisma.submission.findMany({
+            where: {
+                userId,
+                quizId: { in: quizzes.map(q => q.id) }
+            },
+            select: { quizId: true }
+        });
+        const completedQuizIds = new Set(userSubmissions.map(s => s.quizId));
+        return quizzes.map(quiz => ({
+            ...quiz,
+            isCompleted: completedQuizIds.has(quiz.id)
+        }));
     }
     async getQuizById(id) {
         const quiz = await this.prisma.quiz.findUnique({
@@ -86,9 +98,9 @@ let QuizService = class QuizService {
                         totalScore += score;
                     }
                 }
-                else if (question.type === 'DICTATION') {
+                else if (question.type === 'DICTATION' || question.type === 'FILL_IN_BLANK') {
                     const content = question.content;
-                    const cleanCorrect = String(content.correctAnswer || '')
+                    const cleanCorrect = String(content.correctAnswer || content.correct || '')
                         .toLowerCase()
                         .replace(/[.,!?]/g, '')
                         .trim();

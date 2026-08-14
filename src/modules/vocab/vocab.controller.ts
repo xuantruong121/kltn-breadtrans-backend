@@ -17,6 +17,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 export class VocabController {
   constructor(private readonly vocabService: VocabService) {}
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('topics')
   @ApiOperation({ summary: 'Lấy danh sách các chủ đề từ vựng TOEIC' })
   getTopics(@Request() req: any) {
@@ -24,6 +26,8 @@ export class VocabController {
     return this.vocabService.getTopics(userId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('topics/:id')
   @ApiOperation({ summary: 'Lấy chi tiết 1 chủ đề từ vựng và danh sách từ' })
   getTopicDetails(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
@@ -43,11 +47,12 @@ export class VocabController {
   @ApiBearerAuth()
   @Post('words/:id/master')
   @ApiOperation({ summary: 'Đánh dấu Đã thuộc / Bỏ thuộc từ vựng' })
-  toggleMastered(
+  setMastered(
     @Param('id', ParseIntPipe) wordId: number,
+    @Body('isMastered') isMastered: boolean,
     @Request() req: any,
   ) {
-    return this.vocabService.toggleMastered(req.user.id, wordId);
+    return this.vocabService.setMastered(req.user.id, wordId, isMastered);
   }
 
   @UseGuards(JwtAuthGuard)

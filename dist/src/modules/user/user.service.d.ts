@@ -23,6 +23,7 @@ export declare class UserService {
             totalBanhRan: number;
             streakCount: number;
             lastStreakUpdate: Date | null;
+            streakFreezes: number;
             countHeart: number;
             timesVocabXS: number;
             timesVocab: number;

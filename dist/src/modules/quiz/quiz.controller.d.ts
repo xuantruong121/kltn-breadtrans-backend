@@ -31,11 +31,11 @@ export declare class QuizController {
         courseId: number | null;
         practiceTopicId: number | null;
     })[]>;
-    getListeningPractices(): Promise<({
+    getListeningPractices(req: any): Promise<{
+        isCompleted: boolean;
         _count: {
             questions: number;
         };
-    } & {
         title: string;
         description: string | null;
         theoryContent: string | null;
@@ -46,13 +46,13 @@ export declare class QuizController {
         id: number;
         courseId: number | null;
         practiceTopicId: number | null;
-    })[]>;
+    }[]>;
     getQuizById(id: number): Promise<{
         questions: {
             type: string;
             id: number;
-            order: number;
             quizId: number;
+            order: number;
             content: import("@prisma/client/runtime/library").JsonValue;
         }[];
     } & {
@@ -70,8 +70,8 @@ export declare class QuizController {
     createQuestion(quizId: number, dto: CreateQuestionDto): Promise<{
         type: string;
         id: number;
-        order: number;
         quizId: number;
+        order: number;
         content: import("@prisma/client/runtime/library").JsonValue;
     }>;
     submitQuiz(quizId: number, dto: SubmitQuizDto, req: any): Promise<{
@@ -86,10 +86,10 @@ export declare class QuizController {
     } & {
         id: number;
         quizId: number;
+        userId: number;
         score: number | null;
         submittedAt: Date;
         aiFeedback: string | null;
-        userId: number;
     }>;
     getSubmissionAnalytics(id: number): Promise<{
         submissionId: number;
@@ -115,8 +115,8 @@ export declare class QuizController {
         questions: {
             type: string;
             id: number;
-            order: number;
             quizId: number;
+            order: number;
             content: import("@prisma/client/runtime/library").JsonValue;
         }[];
         strengths: string[];
