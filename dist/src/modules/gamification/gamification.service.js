@@ -29,7 +29,6 @@ let GamificationService = class GamificationService {
                 data: { userId, tier: 'Đồng' }
             });
         }
-        const tier = myLeaderboard.tier || 'Đồng';
         await this.prisma.pointHistory.create({
             data: {
                 userId,

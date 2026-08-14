@@ -20,7 +20,7 @@ export class GamificationService {
       });
     }
     
-    const tier = myLeaderboard.tier || 'Đồng';
+    // 1. Lưu PointHistory
     await this.prisma.pointHistory.create({
       data: {
         userId,
