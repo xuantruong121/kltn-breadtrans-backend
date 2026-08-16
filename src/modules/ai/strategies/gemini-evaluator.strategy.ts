@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { IAIEvaluator, PronunciationFeedback } from './ai-evaluator.interface';
 
 @Injectable()
@@ -10,9 +10,14 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
   private currentKeyIndex = 0;
 
   constructor() {
-    const keysStr = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
-    this.apiKeys = keysStr.split(',').map(k => k.trim()).filter(k => k.length > 0);
-    const initialKey = this.apiKeys.length > 0 ? this.apiKeys[0] : 'fake-api-key';
+    const keysStr =
+      process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
+    this.apiKeys = keysStr
+      .split(',')
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
+    const initialKey =
+      this.apiKeys.length > 0 ? this.apiKeys[0] : 'fake-api-key';
     this.genAI = new GoogleGenerativeAI(initialKey);
   }
 
@@ -20,7 +25,9 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
     return this.apiKeys.length > 0;
   }
 
-  private async executeWithRotation(operation: (model: any) => Promise<any>): Promise<any> {
+  private async executeWithRotation<T>(
+    operation: (model: GenerativeModel) => Promise<T>,
+  ): Promise<T> {
     if (!this.hasKeys()) {
       throw new Error('Thiếu GEMINI_API_KEYS');
     }
@@ -35,20 +42,30 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
 
       try {
         return await operation(model);
-      } catch (error: any) {
-        if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('Quota')) {
-          this.logger.warn(`Gemini API Key at index ${this.currentKeyIndex} hit rate limit (429). Rotating to next key...`);
-          this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+      } catch (e: any) {
+        const errMsg = String(e?.message || '');
+        if (
+          e?.status === 429 ||
+          errMsg.includes('429') ||
+          errMsg.includes('Too Many Requests') ||
+          errMsg.includes('Quota')
+        ) {
+          this.logger.warn(
+            `Gemini API Key at index ${this.currentKeyIndex} hit rate limit (429). Rotating to next key...`,
+          );
+          this.currentKeyIndex =
+            (this.currentKeyIndex + 1) % this.apiKeys.length;
           attempts++;
         } else {
-          throw error;
+          throw e;
         }
       }
     }
 
-    throw new Error('Tất cả API keys đều đã hết hạn mức (429 Too Many Requests). Vui lòng thử lại sau.');
+    throw new Error(
+      'Tất cả API keys đều đã hết hạn mức (429 Too Many Requests). Vui lòng thử lại sau.',
+    );
   }
-
 
   async generateFeedback(
     question: string,
@@ -59,8 +76,6 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
         this.logger.warn('GEMINI_API_KEY is not set. Returning mock feedback.');
         return `[Mock Gemini Feedback] This is a mock feedback for answer: "${studentAnswer}". Please set GEMINI_API_KEY to use real AI.`;
       }
-
-      
 
       const prompt = `You are a professional English teacher grading a student's writing assignment.
 Question: "${question}"
@@ -73,7 +88,9 @@ Provide detailed feedback, including:
 4. Estimated band score (if applicable, e.g., IELTS)
 Please keep the response concise but informative.`;
 
-      const result = await this.executeWithRotation(m => m.generateContent(prompt));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent(prompt),
+      );
       const response = result.response;
       return response.text();
     } catch (error) {
@@ -88,10 +105,11 @@ Please keep the response concise but informative.`;
         return `[Mock Gemini Chat] I received your message: "${prompt}". Please set GEMINI_API_KEY.`;
       }
 
-      
       const fullPrompt = `You are an AI teaching assistant for an online English learning platform. Answer the student's question helpfully: "${prompt}"`;
 
-      const result = await this.executeWithRotation(m => m.generateContent(fullPrompt));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent(fullPrompt),
+      );
       return result.response.text();
     } catch (error) {
       this.logger.error('Chat Gemini AI failed', error);
@@ -214,7 +232,6 @@ Please keep the response concise but informative.`;
         };
       }
 
-      
       const prompt = `Học viên vừa đọc câu: "${targetText}"
 Hệ thống AI (Azure) đã chấm điểm phát âm với kết quả sau:
 - Điểm tổng (0-100): ${pronScores.PronScore}
@@ -235,7 +252,9 @@ Hãy đóng vai một giáo viên tiếng Anh tận tâm. Đưa ra một JSON c�
 }
 Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
 
-      const geminiResult = await this.executeWithRotation(m => m.generateContent(prompt));
+      const geminiResult = await this.executeWithRotation((m) =>
+        m.generateContent(prompt),
+      );
       const rawText = geminiResult.response.text().trim();
 
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -289,7 +308,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       return 'Chức năng giải thích đang bảo trì. Vui lòng thử lại sau.';
     }
     try {
-      
       const prompt = `
         Bạn là một gia sư TOEIC chuyên nghiệp và tận tâm.
         Hãy giải thích câu hỏi TOEIC sau đây bằng tiếng Việt một cách dễ hiểu, ngắn gọn nhưng đầy đủ ngữ pháp/từ vựng cần thiết.
@@ -302,7 +320,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         2. Tại sao đáp án đúng lại hợp lý (giải thích ngữ pháp/ngữ nghĩa)?
         3. Dịch nghĩa câu hỏi sang tiếng Việt.
       `;
-      const result = await this.executeWithRotation(m => m.generateContent(prompt));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent(prompt),
+      );
       const response = result.response;
       return response.text();
     } catch (error: any) {
@@ -323,7 +343,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       throw new Error('Thiếu GEMINI_API_KEY');
     }
     try {
-      
       const prompt = `
         Bạn là một chuyên gia ra đề thi TOEIC. Hãy tạo ra ${count} câu hỏi trắc nghiệm thuộc TOEIC Part ${part}.
         Chủ đề từ vựng/ngữ cảnh: ${topic}.
@@ -337,7 +356,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
           "explanation": "Giải thích ngắn gọn tại sao A đúng"
         }
       `;
-      const result = await this.executeWithRotation(m => m.generateContent(prompt));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent(prompt),
+      );
       const response = result.response;
       let text = response.text().trim();
       if (text.startsWith('```json')) {
@@ -360,7 +381,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       throw new Error('Thiếu GEMINI_API_KEY');
     }
     try {
-      
       const prompt = `
         Bạn là một giáo viên tiếng Anh chuyên dạy luyện nghe chép chính tả (Dictation) TOEIC.
         Hãy tạo ${count} câu tiếng Anh thông dụng thuộc chủ đề "${topic}".
@@ -371,7 +391,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
         Chỉ trả về JSON hợp lệ, không thêm bất kỳ văn bản giải thích nào khác.
       `;
-      const result = await this.executeWithRotation(m => m.generateContent(prompt));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent(prompt),
+      );
       const response = result.response;
       let text = response.text().trim();
       if (text.startsWith('```json')) {
@@ -400,8 +422,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       throw new Error('Thiếu GEMINI_API_KEY');
     }
     try {
-      
-
       let prompt = `
         Bạn là một chuyên gia nhận dạng tài liệu đề thi TOEIC.
         Tôi cung cấp cho bạn một file đề thi TOEIC (PDF/Image)
@@ -461,7 +481,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
 
       contents.push(prompt);
 
-      const result = await this.executeWithRotation(m => m.generateContent(contents));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent(contents),
+      );
 
       const response = result.response;
       let text = response.text().trim();
@@ -486,7 +508,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       throw new Error('Thiếu GEMINI_API_KEY');
     }
     try {
-      
       const prompt = `
         You are a TOEIC Writing evaluator. Evaluate the following user sentence for TOEIC Writing Part 1 (Write a sentence based on a picture).
         The user was given this picture and these two keywords: ${keywords.join(', ')}.
@@ -516,7 +537,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         },
       };
 
-      const result = await this.executeWithRotation(m => m.generateContent([prompt, imagePart]));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent([prompt, imagePart]),
+      );
       const response = result.response;
       let text = response.text().trim();
       if (text.startsWith('```json')) {
@@ -548,7 +571,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       };
     }
     try {
-      
       const prompt = `
         You are a certified ETS TOEIC Writing Evaluator. Evaluate this TOEIC Writing Part 2 response (Respond to an Email Request).
         Original Email Request: "${emailPrompt}"
@@ -569,7 +591,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
       `;
 
-      const result = await this.executeWithRotation(m => m.generateContent(prompt));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent(prompt),
+      );
       let text = result.response.text().trim();
       if (text.startsWith('```json'))
         text = text.substring(7, text.length - 3).trim();
@@ -599,7 +623,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       };
     }
     try {
-      
       const prompt = `
         You are an ETS TOEIC Writing Evaluator. Grade this TOEIC Writing Part 3 (Write an Opinion Essay).
         Essay Topic: "${essayTopic}"
@@ -621,7 +644,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
       `;
 
-      const result = await this.executeWithRotation(m => m.generateContent(prompt));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent(prompt),
+      );
       let text = result.response.text().trim();
       if (text.startsWith('```json'))
         text = text.substring(7, text.length - 3).trim();
@@ -651,7 +676,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       };
     }
     try {
-      
       const prompt = `
         You are a TOEIC Speaking Examiner. Grade this Speaking Part 3-5 response.
         Question / Situation: "${promptText}"
@@ -670,7 +694,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
       `;
 
-      const result = await this.executeWithRotation(m => m.generateContent(prompt));
+      const result = await this.executeWithRotation((m) =>
+        m.generateContent(prompt),
+      );
       let text = result.response.text().trim();
       if (text.startsWith('```json'))
         text = text.substring(7, text.length - 3).trim();
