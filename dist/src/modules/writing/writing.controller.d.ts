@@ -8,13 +8,13 @@ export declare class WritingController {
                 quizzes: number;
             };
         } & {
+            createdAt: Date;
             id: number;
             name: string;
-            vietnameseName: string | null;
-            category: import(".prisma/client").$Enums.TopicCategory;
-            iconUrl: string | null;
             order: number;
-            createdAt: Date;
+            category: import(".prisma/client").$Enums.TopicCategory;
+            vietnameseName: string | null;
+            iconUrl: string | null;
         })[];
         quizzes: {
             id: number;

@@ -147,6 +147,135 @@ The new manager is responsible for the overall ______ of the team.
             }
         }
     });
+    const bilingualLevel2 = await prisma.practiceTopic.create({
+        data: {
+            name: 'Level 2 - Trung bình',
+            category: client_1.TopicCategory.BILINGUAL_LEVEL,
+            order: 2,
+            quizzes: {
+                create: [
+                    {
+                        title: 'Flight Cancellation Notice (Notice)',
+                        type: client_1.QuizType.BILINGUAL_READING,
+                        bilingualContent: [
+                            { en: "Attention all passengers.", vi: "Xin lưu ý tất cả hành khách." },
+                            { en: "Flight 405 to Tokyo has been canceled due to heavy snow.", vi: "Chuyến bay 405 đến Tokyo đã bị hủy do tuyết rơi dày." },
+                            { en: "Please proceed to the customer service desk for rebooking.", vi: "Vui lòng tiến đến quầy dịch vụ khách hàng để đặt lại vé." },
+                            { en: "We sincerely apologize for the inconvenience.", vi: "Chúng tôi chân thành xin lỗi vì sự bất tiện này." }
+                        ],
+                        questions: {
+                            create: [
+                                {
+                                    type: 'MULTIPLE_CHOICE',
+                                    content: {
+                                        text: 'Why was the flight canceled?',
+                                        options: ['Because of bad weather', 'Because of a mechanical issue', 'Because of pilot illness', 'Because of security reasons'],
+                                        correctAnswer: 'Because of bad weather'
+                                    },
+                                    order: 1
+                                },
+                                {
+                                    type: 'MULTIPLE_CHOICE',
+                                    content: {
+                                        text: 'What should passengers do next?',
+                                        options: ['Go home', 'Wait at the gate', 'Go to the customer service desk', 'Board the plane'],
+                                        correctAnswer: 'Go to the customer service desk'
+                                    },
+                                    order: 2
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        title: 'Office Relocation (Memo)',
+                        type: client_1.QuizType.BILINGUAL_READING,
+                        bilingualContent: [
+                            { en: "To: All Employees", vi: "Tới: Toàn thể nhân viên" },
+                            { en: "From: Management", vi: "Từ: Ban giám đốc" },
+                            { en: "We are moving our headquarters to a new building next month.", vi: "Chúng tôi sẽ chuyển trụ sở chính đến một tòa nhà mới vào tháng tới." },
+                            { en: "The new office will provide more space and better facilities.", vi: "Văn phòng mới sẽ cung cấp không gian rộng hơn và cơ sở vật chất tốt hơn." },
+                            { en: "Please pack your personal belongings by Friday, October 20.", vi: "Vui lòng đóng gói đồ đạc cá nhân của bạn trước thứ Sáu, ngày 20 tháng 10." }
+                        ],
+                        questions: {
+                            create: [
+                                {
+                                    type: 'MULTIPLE_CHOICE',
+                                    content: {
+                                        text: 'What is the memo mainly about?',
+                                        options: ['A new company policy', 'A change in management', 'Moving to a new office', 'A company holiday'],
+                                        correctAnswer: 'Moving to a new office'
+                                    },
+                                    order: 1
+                                },
+                                {
+                                    type: 'MULTIPLE_CHOICE',
+                                    content: {
+                                        text: 'By when should employees pack their belongings?',
+                                        options: ['Next month', 'October 20', 'This Friday', 'October 25'],
+                                        correctAnswer: 'October 20'
+                                    },
+                                    order: 2
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    });
+    const bilingualLevel3 = await prisma.practiceTopic.create({
+        data: {
+            name: 'Level 3 - Khó',
+            category: client_1.TopicCategory.BILINGUAL_LEVEL,
+            order: 3,
+            quizzes: {
+                create: [
+                    {
+                        title: 'Software Upgrade Schedule (Email)',
+                        type: client_1.QuizType.BILINGUAL_READING,
+                        bilingualContent: [
+                            { en: "Dear Team,", vi: "Thân gửi nhóm," },
+                            { en: "The IT department will upgrade the accounting software this weekend.", vi: "Phòng CNTT sẽ nâng cấp phần mềm kế toán vào cuối tuần này." },
+                            { en: "The system will be unavailable from Saturday 8:00 PM to Sunday 6:00 AM.", vi: "Hệ thống sẽ không khả dụng từ 8:00 tối thứ Bảy đến 6:00 sáng Chủ nhật." },
+                            { en: "Please make sure to save your work and log out before leaving on Friday.", vi: "Vui lòng đảm bảo lưu công việc của bạn và đăng xuất trước khi rời đi vào thứ Sáu." },
+                            { en: "If you encounter any issues on Monday, contact the help desk immediately.", vi: "Nếu bạn gặp bất kỳ vấn đề gì vào thứ Hai, hãy liên hệ ngay với bộ phận hỗ trợ." }
+                        ],
+                        questions: {
+                            create: [
+                                {
+                                    type: 'MULTIPLE_CHOICE',
+                                    content: {
+                                        text: 'What is the purpose of the email?',
+                                        options: ['To announce a new employee', 'To inform about a software upgrade', 'To schedule a meeting', 'To request new computers'],
+                                        correctAnswer: 'To inform about a software upgrade'
+                                    },
+                                    order: 1
+                                },
+                                {
+                                    type: 'MULTIPLE_CHOICE',
+                                    content: {
+                                        text: 'When will the system be unavailable?',
+                                        options: ['All day Saturday', 'From Friday evening to Sunday morning', 'From Saturday 8:00 PM to Sunday 6:00 AM', 'On Monday morning'],
+                                        correctAnswer: 'From Saturday 8:00 PM to Sunday 6:00 AM'
+                                    },
+                                    order: 2
+                                },
+                                {
+                                    type: 'MULTIPLE_CHOICE',
+                                    content: {
+                                        text: 'What should employees do if they have problems on Monday?',
+                                        options: ['Restart their computers', 'Email the manager', 'Contact the help desk', 'Install the software again'],
+                                        correctAnswer: 'Contact the help desk'
+                                    },
+                                    order: 3
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    });
     console.log('Seeding completed successfully!');
 }
 main()

@@ -6,6 +6,9 @@ export interface PronunciationFeedback {
   feedback: string; // Nhận xét tổng quan
   problematicWords: string[]; // Danh sách từ phát âm sai
   suggestions: string[]; // Gợi ý cải thiện
+  fluencyScore?: number;
+  accuracyScore?: number;
+  completenessScore?: number;
 }
 
 export interface IAIEvaluator {

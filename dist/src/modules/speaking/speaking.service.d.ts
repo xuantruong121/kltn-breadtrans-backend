@@ -10,33 +10,33 @@ export declare class SpeakingService {
     constructor(prisma: PrismaService, aiService: AiService, uploadService: UploadService);
     findAllExercises(category: string | undefined, userId: number): Promise<{
         isCompleted: boolean;
+        title: string;
         createdAt: Date;
         id: number;
-        title: string;
         category: string;
+        audioUrl: string | null;
         targetText: string;
         imageUrl: string | null;
-        audioUrl: string | null;
         difficulty: string;
     }[]>;
     findExerciseById(id: number): Promise<{
+        title: string;
         createdAt: Date;
         id: number;
-        title: string;
         category: string;
+        audioUrl: string | null;
         targetText: string;
         imageUrl: string | null;
-        audioUrl: string | null;
         difficulty: string;
     }>;
     createExercise(dto: CreateExerciseDto): Promise<{
+        title: string;
         createdAt: Date;
         id: number;
-        title: string;
         category: string;
+        audioUrl: string | null;
         targetText: string;
         imageUrl: string | null;
-        audioUrl: string | null;
         difficulty: string;
     }>;
     submitAudio(exerciseId: number, userId: number, audioFile: Express.Multer.File): Promise<{
@@ -51,13 +51,13 @@ export declare class SpeakingService {
     }>;
     getMySubmissions(userId: number): Promise<({
         exercise: {
+            title: string;
             createdAt: Date;
             id: number;
-            title: string;
             category: string;
+            audioUrl: string | null;
             targetText: string;
             imageUrl: string | null;
-            audioUrl: string | null;
             difficulty: string;
         };
     } & {
@@ -66,7 +66,7 @@ export declare class SpeakingService {
         submittedAt: Date;
         aiFeedback: import("@prisma/client/runtime/library").JsonValue | null;
         audioUrl: string;
-        exerciseId: number;
         overallScore: number | null;
+        exerciseId: number;
     })[]>;
 }

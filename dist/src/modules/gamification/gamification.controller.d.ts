@@ -4,9 +4,11 @@ export declare class GamificationController {
     constructor(gamificationService: GamificationService);
     getLeaderboard(): Promise<({
         user: {
+            id: number;
             email: string;
             profile: {
                 id: number;
+                userId: number;
                 fullName: string;
                 avatar: string | null;
                 phone: string | null;
@@ -17,24 +19,22 @@ export declare class GamificationController {
                 birthYear: number | null;
                 nextExamDate: string | null;
                 isSelfClaimed: boolean;
-                userId: number;
             } | null;
-            id: number;
         };
     } & {
         id: number;
         userId: number;
-        totalPoints: number;
         rank: number | null;
+        totalPoints: number;
         tier: string;
         weeklyExp: number;
     })[]>;
     getMyBadges(req: any): Promise<({
         badge: {
-            id: number;
             name: string;
-            description: string;
             iconUrl: string | null;
+            id: number;
+            description: string;
             criteria: import("@prisma/client/runtime/library").JsonValue;
         };
     } & {
@@ -44,34 +44,34 @@ export declare class GamificationController {
         awardedAt: Date;
     })[]>;
     getMyPet(req: any): Promise<{
-        createdAt: Date;
-        updatedAt: Date;
-        id: number;
         name: string;
+        createdAt: Date;
+        id: number;
+        updatedAt: Date;
         userId: number;
+        level: number;
         health: number;
         happiness: number;
-        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     feedPet(req: any): Promise<{
-        createdAt: Date;
-        updatedAt: Date;
-        id: number;
         name: string;
+        createdAt: Date;
+        id: number;
+        updatedAt: Date;
         userId: number;
+        level: number;
         health: number;
         happiness: number;
-        level: number;
         exp: number;
         lastFedAt: Date | null;
     }>;
     getMyDailyQuests(req: any): Promise<({
         quest: {
             id: number;
-            description: string | null;
             title: string;
+            description: string | null;
             type: string;
             targetValue: number;
             rewardXP: number;
