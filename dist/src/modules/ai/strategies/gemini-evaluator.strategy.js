@@ -16,19 +16,49 @@ const generative_ai_1 = require("@google/generative-ai");
 let GeminiEvaluatorStrategy = GeminiEvaluatorStrategy_1 = class GeminiEvaluatorStrategy {
     logger = new common_1.Logger(GeminiEvaluatorStrategy_1.name);
     genAI;
+    apiKeys = [];
+    currentKeyIndex = 0;
     constructor() {
-        const apiKey = process.env.GEMINI_API_KEY || 'fake-api-key';
-        this.genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
+        const keysStr = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
+        this.apiKeys = keysStr.split(',').map(k => k.trim()).filter(k => k.length > 0);
+        const initialKey = this.apiKeys.length > 0 ? this.apiKeys[0] : 'fake-api-key';
+        this.genAI = new generative_ai_1.GoogleGenerativeAI(initialKey);
+    }
+    hasKeys() {
+        return this.apiKeys.length > 0;
+    }
+    async executeWithRotation(operation) {
+        if (!this.hasKeys()) {
+            throw new Error('Thiếu GEMINI_API_KEYS');
+        }
+        let attempts = 0;
+        const maxAttempts = this.apiKeys.length;
+        while (attempts < maxAttempts) {
+            const currentKey = this.apiKeys[this.currentKeyIndex];
+            const genAI = new generative_ai_1.GoogleGenerativeAI(currentKey);
+            const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+            try {
+                return await operation(model);
+            }
+            catch (error) {
+                if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('Quota')) {
+                    this.logger.warn(`Gemini API Key at index ${this.currentKeyIndex} hit rate limit (429). Rotating to next key...`);
+                    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+                    attempts++;
+                }
+                else {
+                    throw error;
+                }
+            }
+        }
+        throw new Error('Tất cả API keys đều đã hết hạn mức (429 Too Many Requests). Vui lòng thử lại sau.');
     }
     async generateFeedback(question, studentAnswer) {
         try {
-            if (process.env.GEMINI_API_KEY === undefined) {
+            if (!this.hasKeys()) {
                 this.logger.warn('GEMINI_API_KEY is not set. Returning mock feedback.');
                 return `[Mock Gemini Feedback] This is a mock feedback for answer: "${studentAnswer}". Please set GEMINI_API_KEY to use real AI.`;
             }
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const prompt = `You are a professional English teacher grading a student's writing assignment.
 Question: "${question}"
 Student's Answer: "${studentAnswer}"
@@ -39,7 +69,7 @@ Provide detailed feedback, including:
 3. Suggestions for improvement
 4. Estimated band score (if applicable, e.g., IELTS)
 Please keep the response concise but informative.`;
-            const result = await model.generateContent(prompt);
+            const result = await this.executeWithRotation(m => m.generateContent(prompt));
             const response = result.response;
             return response.text();
         }
@@ -50,14 +80,11 @@ Please keep the response concise but informative.`;
     }
     async chat(prompt) {
         try {
-            if (process.env.GEMINI_API_KEY === undefined) {
+            if (!this.hasKeys()) {
                 return `[Mock Gemini Chat] I received your message: "${prompt}". Please set GEMINI_API_KEY.`;
             }
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const fullPrompt = `You are an AI teaching assistant for an online English learning platform. Answer the student's question helpfully: "${prompt}"`;
-            const result = await model.generateContent(fullPrompt);
+            const result = await this.executeWithRotation(m => m.generateContent(fullPrompt));
             return result.response.text();
         }
         catch (error) {
@@ -123,7 +150,7 @@ Please keep the response concise but informative.`;
                     }
                 }
             }
-            if (!process.env.GEMINI_API_KEY) {
+            if (!this.hasKeys()) {
                 return {
                     overallScore,
                     clarity: overallScore >= 8
@@ -136,9 +163,6 @@ Please keep the response concise but informative.`;
                     suggestions: [],
                 };
             }
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const prompt = `Học viên vừa đọc câu: "${targetText}"
 Hệ thống AI (Azure) đã chấm điểm phát âm với kết quả sau:
 - Điểm tổng (0-100): ${pronScores.PronScore}
@@ -158,7 +182,7 @@ Hãy đóng vai một giáo viên tiếng Anh tận tâm. Đưa ra một JSON c�
   ]
 }
 Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
-            const geminiResult = await model.generateContent(prompt);
+            const geminiResult = await this.executeWithRotation(m => m.generateContent(prompt));
             const rawText = geminiResult.response.text().trim();
             const jsonMatch = rawText.match(/\{[\s\S]*\}/);
             let clarity = 'Fair', feedback = '', suggestions = [];
@@ -178,6 +202,9 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
                 feedback: feedback || `Phát âm của bạn đạt ${overallScore}/10 điểm.`,
                 problematicWords,
                 suggestions,
+                fluencyScore: pronScores.FluencyScore,
+                accuracyScore: pronScores.AccuracyScore,
+                completenessScore: pronScores.CompletenessScore,
             };
         }
         catch (error) {
@@ -192,13 +219,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
     }
     async explainToeicError(questionContent, userAnswer, correctAnswer) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!this.hasKeys()) {
             return 'Chức năng giải thích đang bảo trì. Vui lòng thử lại sau.';
         }
         try {
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const prompt = `
         Bạn là một gia sư TOEIC chuyên nghiệp và tận tâm.
         Hãy giải thích câu hỏi TOEIC sau đây bằng tiếng Việt một cách dễ hiểu, ngắn gọn nhưng đầy đủ ngữ pháp/từ vựng cần thiết.
@@ -211,7 +235,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         2. Tại sao đáp án đúng lại hợp lý (giải thích ngữ pháp/ngữ nghĩa)?
         3. Dịch nghĩa câu hỏi sang tiếng Việt.
       `;
-            const result = await model.generateContent(prompt);
+            const result = await this.executeWithRotation(m => m.generateContent(prompt));
             const response = result.response;
             return response.text();
         }
@@ -221,13 +245,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
     }
     async generateToeicQuestions(topic, part, count) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!this.hasKeys()) {
             throw new Error('Thiếu GEMINI_API_KEY');
         }
         try {
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const prompt = `
         Bạn là một chuyên gia ra đề thi TOEIC. Hãy tạo ra ${count} câu hỏi trắc nghiệm thuộc TOEIC Part ${part}.
         Chủ đề từ vựng/ngữ cảnh: ${topic}.
@@ -241,7 +262,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
           "explanation": "Giải thích ngắn gọn tại sao A đúng"
         }
       `;
-            const result = await model.generateContent(prompt);
+            const result = await this.executeWithRotation(m => m.generateContent(prompt));
             const response = result.response;
             let text = response.text().trim();
             if (text.startsWith('```json')) {
@@ -258,13 +279,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
     }
     async generateDictation(topic, count) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!this.hasKeys()) {
             throw new Error('Thiếu GEMINI_API_KEY');
         }
         try {
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const prompt = `
         Bạn là một giáo viên tiếng Anh chuyên dạy luyện nghe chép chính tả (Dictation) TOEIC.
         Hãy tạo ${count} câu tiếng Anh thông dụng thuộc chủ đề "${topic}".
@@ -275,7 +293,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
         Chỉ trả về JSON hợp lệ, không thêm bất kỳ văn bản giải thích nào khác.
       `;
-            const result = await model.generateContent(prompt);
+            const result = await this.executeWithRotation(m => m.generateContent(prompt));
             const response = result.response;
             let text = response.text().trim();
             if (text.startsWith('```json')) {
@@ -292,13 +310,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
     }
     async importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!this.hasKeys()) {
             throw new Error('Thiếu GEMINI_API_KEY');
         }
         try {
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             let prompt = `
         Bạn là một chuyên gia nhận dạng tài liệu đề thi TOEIC.
         Tôi cung cấp cho bạn một file đề thi TOEIC (PDF/Image)
@@ -349,7 +364,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
                 });
             }
             contents.push(prompt);
-            const result = await model.generateContent(contents);
+            const result = await this.executeWithRotation(m => m.generateContent(contents));
             const response = result.response;
             let text = response.text().trim();
             if (text.startsWith('```json')) {
@@ -366,13 +381,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
     }
     async evaluateWritingPart1(imageUrl, keywords, userSentence) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!this.hasKeys()) {
             throw new Error('Thiếu GEMINI_API_KEY');
         }
         try {
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const prompt = `
         You are a TOEIC Writing evaluator. Evaluate the following user sentence for TOEIC Writing Part 1 (Write a sentence based on a picture).
         The user was given this picture and these two keywords: ${keywords.join(', ')}.
@@ -399,7 +411,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
                     mimeType: 'image/jpeg',
                 },
             };
-            const result = await model.generateContent([prompt, imagePart]);
+            const result = await this.executeWithRotation(m => m.generateContent([prompt, imagePart]));
             const response = result.response;
             let text = response.text().trim();
             if (text.startsWith('```json')) {
@@ -416,7 +428,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
     }
     async evaluateWritingPart2(emailPrompt, userResponse) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!this.hasKeys()) {
             return {
                 score: 3,
                 feedback: '[Mock Gemini] Email đáp ứng cơ bản các yêu cầu đề bài.',
@@ -426,9 +438,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             };
         }
         try {
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const prompt = `
         You are a certified ETS TOEIC Writing Evaluator. Evaluate this TOEIC Writing Part 2 response (Respond to an Email Request).
         Original Email Request: "${emailPrompt}"
@@ -448,7 +457,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
           "suggestions": ["Gợi ý 1", "Gợi ý 2"]
         }
       `;
-            const result = await model.generateContent(prompt);
+            const result = await this.executeWithRotation(m => m.generateContent(prompt));
             let text = result.response.text().trim();
             if (text.startsWith('```json'))
                 text = text.substring(7, text.length - 3).trim();
@@ -466,7 +475,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
     }
     async evaluateWritingPart3(essayTopic, userEssay) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!this.hasKeys()) {
             return {
                 score: 4,
                 feedback: '[Mock Gemini] Bài luận có lập luận rõ ràng, cấu trúc đủ 3 phần.',
@@ -474,9 +483,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             };
         }
         try {
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const prompt = `
         You are an ETS TOEIC Writing Evaluator. Grade this TOEIC Writing Part 3 (Write an Opinion Essay).
         Essay Topic: "${essayTopic}"
@@ -497,7 +503,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
           "suggestions": ["Khuyên 1", "Khuyên 2"]
         }
       `;
-            const result = await model.generateContent(prompt);
+            const result = await this.executeWithRotation(m => m.generateContent(prompt));
             let text = result.response.text().trim();
             if (text.startsWith('```json'))
                 text = text.substring(7, text.length - 3).trim();
@@ -515,7 +521,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
     }
     async evaluateSpeakingPart3To5(promptText, studentResponse) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!this.hasKeys()) {
             return {
                 score: 3,
                 feedback: '[Mock Gemini] Trả lời đúng trọng tâm câu hỏi, phát âm khá tốt.',
@@ -523,9 +529,6 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             };
         }
         try {
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3.5-flash',
-            });
             const prompt = `
         You are a TOEIC Speaking Examiner. Grade this Speaking Part 3-5 response.
         Question / Situation: "${promptText}"
@@ -543,7 +546,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
           "suggestions": ["Gợi ý phát âm/từ vựng 1", "Gợi ý 2"]
         }
       `;
-            const result = await model.generateContent(prompt);
+            const result = await this.executeWithRotation(m => m.generateContent(prompt));
             let text = result.response.text().trim();
             if (text.startsWith('```json'))
                 text = text.substring(7, text.length - 3).trim();

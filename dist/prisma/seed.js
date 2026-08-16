@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const client_1 = require("@prisma/client");
 const bcrypt = __importStar(require("bcrypt"));
+const child_process_1 = require("child_process");
 const prisma = new client_1.PrismaClient({ log: ['info', 'warn', 'error'] });
 async function clearDB() {
     console.log('Clearing old data...');
@@ -204,6 +205,28 @@ async function main() {
         data: { title: 'Basic Greetings', targetText: 'Hello! Nice to meet you!', difficulty: 'BEGINNER', category: 'GENERAL' }
     });
     console.log('Seeding finished successfully.');
+    console.log('\n--- Running additional seed scripts ---');
+    const additionalSeeds = [
+        'seed-vocab.ts',
+        'seed-bilingual.ts',
+        'seed-writing.ts',
+        'prisma/seed-ai.ts',
+        'prisma/seed-ipa.ts',
+        'prisma/seed-more.ts',
+        'prisma/seed-practice.ts',
+        'prisma/seed-translation.ts'
+    ];
+    for (const script of additionalSeeds) {
+        try {
+            console.log(`\n▶ Executing ${script}...`);
+            (0, child_process_1.execSync)(`npx ts-node ${script}`, { stdio: 'inherit' });
+            console.log(`✅ Finished ${script}`);
+        }
+        catch (error) {
+            console.error(`❌ Failed to execute ${script}`, error.message);
+        }
+    }
+    console.log('\n--- All seed scripts completed ---');
 }
 main()
     .catch((e) => {

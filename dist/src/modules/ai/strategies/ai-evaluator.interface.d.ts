@@ -5,6 +5,9 @@ export interface PronunciationFeedback {
     feedback: string;
     problematicWords: string[];
     suggestions: string[];
+    fluencyScore?: number;
+    accuracyScore?: number;
+    completenessScore?: number;
 }
 export interface IAIEvaluator {
     generateFeedback(question: string, studentAnswer: string): Promise<string>;

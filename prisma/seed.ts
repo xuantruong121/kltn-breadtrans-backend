@@ -1,5 +1,6 @@
 import { PrismaClient, Role, QuizType, TopicCategory, CourseStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { execSync } from 'child_process';
 
 const prisma = new PrismaClient({ log: ['info', 'warn', 'error'] });
 
@@ -201,6 +202,32 @@ async function main() {
   });
 
   console.log('Seeding finished successfully.');
+
+  // ==========================================
+  // RUN OTHER SCATTERED SEED SCRIPTS
+  // ==========================================
+  console.log('\n--- Running additional seed scripts ---');
+  const additionalSeeds = [
+    'seed-vocab.ts',
+    'seed-bilingual.ts',
+    'seed-writing.ts',
+    'prisma/seed-ai.ts',
+    'prisma/seed-ipa.ts',
+    'prisma/seed-more.ts',
+    'prisma/seed-practice.ts',
+    'prisma/seed-translation.ts'
+  ];
+
+  for (const script of additionalSeeds) {
+    try {
+      console.log(`\n▶ Executing ${script}...`);
+      execSync(`npx ts-node ${script}`, { stdio: 'inherit' });
+      console.log(`✅ Finished ${script}`);
+    } catch (error) {
+      console.error(`❌ Failed to execute ${script}`, error.message);
+    }
+  }
+  console.log('\n--- All seed scripts completed ---');
 }
 
 main()
