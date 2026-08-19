@@ -169,7 +169,9 @@ export class AdminController {
 
   @Post('vocab/topics')
   @ApiOperation({ summary: 'Admin: Tao chu de tu vung moi' })
-  createVocabTopic(@Body() dto: { title: string; categoryName?: string; isPro?: boolean }) {
+  createVocabTopic(
+    @Body() dto: { title: string; categoryName?: string; isPro?: boolean },
+  ) {
     return this.adminService.createVocabTopic(dto);
   }
 
@@ -246,4 +248,3 @@ export class AdminController {
     return this.adminService.deletePracticeTopic(id);
   }
 }
-

@@ -24,14 +24,18 @@ export class ClassController {
 
   @Get()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy danh sách các lớp học của người dùng hiện tại' })
+  @ApiOperation({
+    summary: 'Lấy danh sách các lớp học của người dùng hiện tại',
+  })
   getMyClasses(@Request() req: any) {
     return this.classService.getMyClasses(req.user.id, req.user.role);
   }
 
   @Get('my-classes')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy danh sách các lớp học của người dùng hiện tại (Alias)' })
+  @ApiOperation({
+    summary: 'Lấy danh sách các lớp học của người dùng hiện tại (Alias)',
+  })
   getMyClassesAlias(@Request() req: any) {
     return this.classService.getMyClasses(req.user.id, req.user.role);
   }
@@ -83,4 +87,3 @@ export class ClassController {
     );
   }
 }
-

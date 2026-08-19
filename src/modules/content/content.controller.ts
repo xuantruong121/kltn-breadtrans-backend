@@ -10,7 +10,12 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { ContentService } from './content.service';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -22,8 +27,14 @@ export class ContentController {
   constructor(private readonly contentService: ContentService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách chủ đề học qua phim/nhạc (Learn Media)' })
-  @ApiQuery({ name: 'category', required: false, enum: ['movie', 'music', 'grammar'] })
+  @ApiOperation({
+    summary: 'Lấy danh sách chủ đề học qua phim/nhạc (Learn Media)',
+  })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    enum: ['movie', 'music', 'grammar'],
+  })
   getContentTopics(@Query('category') category?: string) {
     return this.contentService.getContentTopics(category);
   }

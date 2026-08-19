@@ -21,8 +21,20 @@ interface QueuePlayer {
 
 interface ActiveRoom {
   roomId: string;
-  p1: { userId: number; socketId: string; userName: string; score: number; answeredCount: number };
-  p2: { userId: number; socketId: string; userName: string; score: number; answeredCount: number };
+  p1: {
+    userId: number;
+    socketId: string;
+    userName: string;
+    score: number;
+    answeredCount: number;
+  };
+  p2: {
+    userId: number;
+    socketId: string;
+    userName: string;
+    score: number;
+    answeredCount: number;
+  };
   stake: number;
   questions: any[];
   isSettled: boolean;
@@ -56,7 +68,13 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('join_queue')
   async handleJoinQueue(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { userId: number; userName?: string; stake?: number; gameId?: string },
+    @MessageBody()
+    payload: {
+      userId: number;
+      userName?: string;
+      stake?: number;
+      gameId?: string;
+    },
   ) {
     const stake = payload.stake || 20;
     const userId = payload.userId;
@@ -108,7 +126,13 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const activeRoom: ActiveRoom = {
         roomId,
-        p1: { userId, socketId: client.id, userName, score: 0, answeredCount: 0 },
+        p1: {
+          userId,
+          socketId: client.id,
+          userName,
+          score: 0,
+          answeredCount: 0,
+        },
         p2: {
           userId: opponent.userId,
           socketId: opponent.socketId,
@@ -124,10 +148,10 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.rooms.set(roomId, activeRoom);
 
       // Join socket room
-      client.join(roomId);
+      await client.join(roomId);
       const opponentSocket = this.server.sockets.sockets.get(opponent.socketId);
       if (opponentSocket) {
-        opponentSocket.join(roomId);
+        await opponentSocket.join(roomId);
       }
 
       // Escrow stakes
@@ -185,7 +209,13 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('submit_answer')
   async handleSubmitAnswer(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { roomId: string; userId: number; questionIndex: number; isCorrect: boolean },
+    @MessageBody()
+    payload: {
+      roomId: string;
+      userId: number;
+      questionIndex: number;
+      isCorrect: boolean;
+    },
   ) {
     const room = this.rooms.get(payload.roomId);
     if (!room || room.isSettled) return;
@@ -200,8 +230,16 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Broadcast current progress to both
     this.server.to(payload.roomId).emit('arena:progress_update', {
-      p1: { userId: room.p1.userId, score: room.p1.score, answered: room.p1.answeredCount },
-      p2: { userId: room.p2.userId, score: room.p2.score, answered: room.p2.answeredCount },
+      p1: {
+        userId: room.p1.userId,
+        score: room.p1.score,
+        answered: room.p1.answeredCount,
+      },
+      p2: {
+        userId: room.p2.userId,
+        score: room.p2.score,
+        answered: room.p2.answeredCount,
+      },
     });
 
     // Check if both completed all 5 questions

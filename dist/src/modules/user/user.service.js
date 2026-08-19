@@ -46,7 +46,7 @@ let UserService = class UserService {
         });
     }
     async getUserStats(userId) {
-        const [stats, leaderboard, pet, vocabProgress, submissionsCount, toeicCount] = await Promise.all([
+        const [stats, leaderboard, pet, vocabProgress, submissionsCount, toeicCount,] = await Promise.all([
             this.prisma.userStats.findUnique({ where: { userId } }),
             this.prisma.leaderboard.findUnique({ where: { userId } }),
             this.prisma.userPet.findUnique({ where: { userId } }),

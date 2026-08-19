@@ -40,17 +40,23 @@ export class UserService {
   }
 
   async getUserStats(userId: number) {
-    const [stats, leaderboard, pet, vocabProgress, submissionsCount, toeicCount] =
-      await Promise.all([
-        this.prisma.userStats.findUnique({ where: { userId } }),
-        this.prisma.leaderboard.findUnique({ where: { userId } }),
-        this.prisma.userPet.findUnique({ where: { userId } }),
-        this.prisma.userVocabWordProgress.count({
-          where: { userId, isMastered: true },
-        }),
-        this.prisma.submission.count({ where: { userId } }),
-        this.prisma.toeicAttempt.count({ where: { userId } }),
-      ]);
+    const [
+      stats,
+      leaderboard,
+      pet,
+      vocabProgress,
+      submissionsCount,
+      toeicCount,
+    ] = await Promise.all([
+      this.prisma.userStats.findUnique({ where: { userId } }),
+      this.prisma.leaderboard.findUnique({ where: { userId } }),
+      this.prisma.userPet.findUnique({ where: { userId } }),
+      this.prisma.userVocabWordProgress.count({
+        where: { userId, isMastered: true },
+      }),
+      this.prisma.submission.count({ where: { userId } }),
+      this.prisma.toeicAttempt.count({ where: { userId } }),
+    ]);
 
     return {
       streakCount: stats?.streakCount || 0,
@@ -67,4 +73,3 @@ export class UserService {
     };
   }
 }
-

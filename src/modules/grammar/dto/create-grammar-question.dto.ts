@@ -14,7 +14,9 @@ export class CreateGrammarQuestionDto {
   @IsInt()
   correctIndex: number;
 
-  @ApiPropertyOptional({ example: 'Chủ ngữ "She" ngôi thứ 3 số ít nên động từ thêm "es" (goes).' })
+  @ApiPropertyOptional({
+    example: 'Chủ ngữ "She" ngôi thứ 3 số ít nên động từ thêm "es" (goes).',
+  })
   @IsString()
   @IsOptional()
   explanation?: string;

@@ -36,7 +36,9 @@ export class GrammarController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('topics/:id')
-  @ApiOperation({ summary: 'Lấy chi tiết một chủ đề ngữ pháp và danh sách câu hỏi' })
+  @ApiOperation({
+    summary: 'Lấy chi tiết một chủ đề ngữ pháp và danh sách câu hỏi',
+  })
   getTopicDetail(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const userId = req?.user?.id;
     return this.grammarService.getTopicDetail(id, userId);
@@ -45,7 +47,9 @@ export class GrammarController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('topics/:id/attempt')
-  @ApiOperation({ summary: 'Nộp bài làm trắc nghiệm ngữ pháp và nhận thưởng Bánh Mì' })
+  @ApiOperation({
+    summary: 'Nộp bài làm trắc nghiệm ngữ pháp và nhận thưởng Bánh Mì',
+  })
   submitAttempt(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: SubmitGrammarAttemptDto,

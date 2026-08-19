@@ -19,7 +19,10 @@ export class GrammarService {
       orderBy: { order: 'asc' },
     });
 
-    let userAttemptsMap: Record<number, { lastScore: number; count: number }> = {};
+    const userAttemptsMap: Record<
+      number,
+      { lastScore: number; count: number }
+    > = {};
     if (userId) {
       const attempts = await this.prisma.grammarAttempt.findMany({
         where: { userId },
@@ -139,7 +142,10 @@ export class GrammarService {
     });
 
     // Emit event for Gamification
-    this.eventEmitter.emit('gamification.xp_earned', { userId, points: rewardXP });
+    this.eventEmitter.emit('gamification.xp_earned', {
+      userId,
+      points: rewardXP,
+    });
 
     return {
       attemptId: attempt.id,

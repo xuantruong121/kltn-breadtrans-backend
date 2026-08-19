@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
 import { AdjustCurrencyDto } from './dto/adjust-currency.dto';
@@ -88,7 +92,7 @@ export class MarketService {
       throw new BadRequestException('Số lượng Bánh Mì thanh toán không hợp lệ');
     }
 
-    let stats = await this.prisma.userStats.findUnique({
+    const stats = await this.prisma.userStats.findUnique({
       where: { userId },
     });
 
@@ -104,18 +108,26 @@ export class MarketService {
       data: { totalBanhRan: { decrement: totalBanh } },
     });
 
+    const items = dto.items || [];
+    const itemNames = items.map((i) => i.name || 'Vật phẩm').join(', ');
+
     // Create PointHistory
     await this.prisma.pointHistory.create({
       data: {
         userId,
         points: -totalBanh,
-        reason: `Đổi vật phẩm cửa hàng: ${dto.items.map((i) => i.name).join(', ')}`,
+        reason: `Đổi vật phẩm cửa hàng: ${itemNames}`,
       },
     });
 
     // Check item effects (e.g. Streak Freeze item)
-    for (const item of dto.items) {
-      if (item.type === 'streak_freeze' || item.id === 'streak-freeze' || item.name?.includes('Khiên')) {
+    for (const item of items) {
+      const name = item.name || '';
+      if (
+        item.type === 'streak_freeze' ||
+        item.id === 'streak-freeze' ||
+        name.includes('Khiên')
+      ) {
         const qty = item.quantity || 1;
         await this.prisma.userStats.update({
           where: { userId },
@@ -138,7 +150,7 @@ export class MarketService {
         totalBanh,
         status: 'approved',
         paidAtCheckout: true,
-        balanceAtCheckout: (stats.totalBanhRan - totalBanh),
+        balanceAtCheckout: stats.totalBanhRan - totalBanh,
       },
     });
 

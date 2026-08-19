@@ -32,7 +32,9 @@ export class MarketController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('currency/balance')
-  @ApiOperation({ summary: 'Lấy số dư Bánh Mì và thông tin Gamification của tôi' })
+  @ApiOperation({
+    summary: 'Lấy số dư Bánh Mì và thông tin Gamification của tôi',
+  })
   getCurrencyBalance(@Request() req: any) {
     return this.marketService.getCurrencyBalance(req.user.id);
   }
@@ -94,9 +96,6 @@ export class MarketController {
   @Post('currency/adjust')
   @ApiOperation({ summary: '[Admin] Cộng/trừ Bánh Mì thủ công cho học viên' })
   adjustCurrency(@Body() dto: AdjustCurrencyDto, @Request() req: any) {
-    return this.marketService.adjustCurrency(
-      dto,
-      req.user.email || 'Admin',
-    );
+    return this.marketService.adjustCurrency(dto, req.user.email || 'Admin');
   }
 }

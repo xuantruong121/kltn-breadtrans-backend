@@ -43,4 +43,3 @@ export class UserController {
     return this.userService.updateUserProfile(req.user.id, updateData);
   }
 }
-

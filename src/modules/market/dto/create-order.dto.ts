@@ -1,14 +1,28 @@
 import { IsArray, IsNumber, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export interface MarketOrderItem {
+  id: string;
+  name: string;
+  price?: number;
+  quantity?: number;
+  type?: string;
+}
+
 export class CreateMarketOrderDto {
   @ApiProperty({
     example: [
-      { id: 'streak-freeze', name: 'Khiên Bảo Vệ Streak', price: 100, quantity: 1, type: 'streak_freeze' }
+      {
+        id: 'streak-freeze',
+        name: 'Khiên Bảo Vệ Streak',
+        price: 100,
+        quantity: 1,
+        type: 'streak_freeze',
+      },
     ],
   })
   @IsArray()
-  items: any[];
+  items: MarketOrderItem[];
 
   @ApiProperty({ example: 100 })
   @IsNumber()

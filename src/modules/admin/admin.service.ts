@@ -57,8 +57,12 @@ export class AdminService {
       this.prisma.speakingExercise.count().catch(() => 15),
       this.prisma.contentTopic.count().catch(() => 4),
       this.prisma.marketOrder.count().catch(() => 0),
-      this.prisma.marketOrder.count({ where: { status: 'approved' } }).catch(() => 0),
-      this.prisma.userStats.aggregate({ _sum: { totalBanhRan: true } }).catch(() => ({ _sum: { totalBanhRan: 1250 } })),
+      this.prisma.marketOrder
+        .count({ where: { status: 'approved' } })
+        .catch(() => 0),
+      this.prisma.userStats
+        .aggregate({ _sum: { totalBanhRan: true } })
+        .catch(() => ({ _sum: { totalBanhRan: 1250 } })),
     ]);
 
     const recentActivity = recentEnrollments.map((e) => ({
@@ -75,7 +79,7 @@ export class AdminService {
     const monthlyTrends = monthNames.map((m, idx) => ({
       month: m,
       enrollments: Math.max(1, Math.round((baseEnrollment * (idx + 1)) / 6)),
-      activityCount: Math.round((baseEnrollment * (idx + 1.5) * 4) + (idx * 12)),
+      activityCount: Math.round(baseEnrollment * (idx + 1.5) * 4 + idx * 12),
     }));
 
     const contentBreakdown = {
@@ -375,7 +379,11 @@ export class AdminService {
     });
   }
 
-  async createVocabTopic(dto: { title: string; categoryName?: string; isPro?: boolean }) {
+  async createVocabTopic(dto: {
+    title: string;
+    categoryName?: string;
+    isPro?: boolean;
+  }) {
     return this.prisma.vocabTopic.create({
       data: {
         title: dto.title,
@@ -470,4 +478,3 @@ export class AdminService {
     return this.prisma.practiceTopic.delete({ where: { id } });
   }
 }
-

@@ -424,7 +424,7 @@ model SpeakingSubmission {
   exercise     SpeakingExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   userId       Int
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  audioUrl     String // URL file audio lưu trên Cloudinary
+  audioUrl     String // URL file audio lưu trên Cloudflare R2
   overallScore Float? // Điểm tổng (0-10)
   aiFeedback   Json? // JSON structured feedback từ Gemini
   submittedAt  DateTime         @default(now())

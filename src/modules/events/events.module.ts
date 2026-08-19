@@ -9,4 +9,3 @@ import { PrismaModule } from '../../prisma/prisma.module';
   exports: [EventsGateway, ArenaGateway],
 })
 export class EventsModule {}
-

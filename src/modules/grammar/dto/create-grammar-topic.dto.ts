@@ -11,7 +11,9 @@ export class CreateGrammarTopicDto {
   @IsOptional()
   level?: string;
 
-  @ApiPropertyOptional({ example: 'Chủ đề các thì căn bản trong bài thi TOEIC' })
+  @ApiPropertyOptional({
+    example: 'Chủ đề các thì căn bản trong bài thi TOEIC',
+  })
   @IsString()
   @IsOptional()
   description?: string;

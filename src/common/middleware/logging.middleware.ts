@@ -7,7 +7,6 @@ export class LoggingMiddleware implements NestMiddleware {
 
   use(req: Request, res: Response, next: NextFunction) {
     const { method, originalUrl, ip } = req;
-    const userAgent = req.get('user-agent') || '';
     const startTime = Date.now();
 
     res.on('finish', () => {
