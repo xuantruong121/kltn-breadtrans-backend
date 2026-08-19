@@ -74,6 +74,7 @@ model User {
   toeicSpeakingWritingSubmissions ToeicSpeakingWritingSubmission[]
   pet                 UserPet?
   questProgresses     UserQuestProgress[]
+  grammarAttempts     GrammarAttempt[]
 }
 
 model Profile {
@@ -423,7 +424,7 @@ model SpeakingSubmission {
   exercise     SpeakingExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   userId       Int
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  audioUrl     String // URL file audio lưu trên Cloudinary
+  audioUrl     String // URL file audio lưu trên Cloudflare R2
   overallScore Float? // Điểm tổng (0-10)
   aiFeedback   Json? // JSON structured feedback từ Gemini
   submittedAt  DateTime         @default(now())
@@ -798,3 +799,46 @@ model UserQuestProgress {
 
   @@unique([userId, questId, dateKey])
 }
+
+// ==========================================
+// GRAMMAR MODULE
+// ==========================================
+
+model GrammarTopic {
+  id             Int               @id @default(autoincrement())
+  title          String
+  level          String            @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
+  description    String?           @db.Text
+  videoYoutubeId String?
+  keyFormula     String?           @db.Text
+  order          Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @default(now()) @updatedAt
+
+  questions      GrammarQuestion[]
+  attempts       GrammarAttempt[]
+}
+
+model GrammarQuestion {
+  id           Int          @id @default(autoincrement())
+  topicId      Int
+  topic        GrammarTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  question     String       @db.Text
+  options      Json         // Array of 4 strings
+  correctIndex Int
+  explanation  String?      @db.Text
+  order        Int          @default(0)
+  createdAt    DateTime     @default(now())
+}
+
+model GrammarAttempt {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId   Int
+  topic     GrammarTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  score     Float
+  answers   Json         // User answers mapping / array
+  createdAt DateTime     @default(now())
+}
+

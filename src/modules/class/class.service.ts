@@ -71,4 +71,75 @@ export class ClassService {
     });
     return cls;
   }
+
+  async getMyClasses(userId: number, role: string) {
+    if (role === 'TEACHER') {
+      return this.prisma.class.findMany({
+        where: { teacherId: userId },
+        include: {
+          course: true,
+          sessions: { orderBy: { startTime: 'asc' } },
+          _count: { select: { enrollments: true } },
+        },
+        orderBy: { startDate: 'desc' },
+      });
+    }
+
+    // Default STUDENT
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { userId },
+      include: {
+        class: {
+          include: {
+            course: true,
+            teacher: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true, avatar: true } },
+              },
+            },
+            sessions: {
+              where: { endTime: { gte: new Date() } },
+              orderBy: { startTime: 'asc' },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: { joinedAt: 'desc' },
+    });
+
+    return enrollments.map((e) => ({
+      ...e.class,
+      enrollmentProgress: e.progress,
+      enrollmentStatus: e.status,
+      nextSession: e.class.sessions[0] || null,
+    }));
+  }
+
+  async getWatchTracking(userId: number) {
+    const tracking = await this.prisma.watchTracking.findUnique({
+      where: { userId },
+    });
+    return tracking?.items || {};
+  }
+
+  async updateWatchTracking(userId: number, videoKey: string, payload: any) {
+    const existing = await this.prisma.watchTracking.findUnique({
+      where: { userId },
+    });
+
+    const currentItems = (existing?.items as Record<string, any>) || {};
+    currentItems[videoKey] = {
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return this.prisma.watchTracking.upsert({
+      where: { userId },
+      update: { items: currentItems },
+      create: { userId, items: currentItems },
+    });
+  }
 }

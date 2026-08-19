@@ -37,16 +37,46 @@ export declare class UserService {
             speaking: import("@prisma/client/runtime/library").JsonValue | null;
             writing: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
-        createdAt: Date;
+        billing: {
+            id: number;
+            userId: number;
+            tuitionFee: import("@prisma/client/runtime/library").JsonValue | null;
+            bankQrUrl: string | null;
+            bankName: string | null;
+            bankBin: string | null;
+            bankAccountNumber: string | null;
+            bankAccountName: string | null;
+            bankAccount: string | null;
+        } | null;
+        leaderboard: {
+            id: number;
+            userId: number;
+            totalPoints: number;
+            rank: number | null;
+            tier: string;
+            weeklyExp: number;
+        } | null;
+        pet: {
+            id: number;
+            createdAt: Date;
+            updatedAt: Date;
+            name: string;
+            userId: number;
+            health: number;
+            happiness: number;
+            level: number;
+            exp: number;
+            lastFedAt: Date | null;
+        } | null;
         id: number;
-        updatedAt: Date;
         email: string;
         role: import(".prisma/client").$Enums.Role;
-        refreshToken: string | null;
         sessionToken: string | null;
         loginCount: number;
         lastLoginAt: Date | null;
         lastDeviceType: string | null;
+        createdAt: Date;
+        updatedAt: Date;
     }>;
     updateUserProfile(userId: number, updateData: any): Promise<{
         id: number;
@@ -61,5 +91,29 @@ export declare class UserService {
         birthYear: number | null;
         nextExamDate: string | null;
         isSelfClaimed: boolean;
+    }>;
+    getUserStats(userId: number): Promise<{
+        streakCount: number;
+        streakFreezes: number;
+        totalBanhRan: number;
+        quizAccuracy: number;
+        speakingAccuracy: number;
+        totalPoints: number;
+        weeklyExp: number;
+        tier: string;
+        masteredVocabCount: number;
+        totalQuizzesDone: number;
+        pet: {
+            id: number;
+            createdAt: Date;
+            updatedAt: Date;
+            name: string;
+            userId: number;
+            health: number;
+            happiness: number;
+            level: number;
+            exp: number;
+            lastFedAt: Date | null;
+        } | null;
     }>;
 }

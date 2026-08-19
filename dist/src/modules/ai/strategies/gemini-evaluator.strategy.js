@@ -20,7 +20,10 @@ let GeminiEvaluatorStrategy = GeminiEvaluatorStrategy_1 = class GeminiEvaluatorS
     currentKeyIndex = 0;
     constructor() {
         const keysStr = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
-        this.apiKeys = keysStr.split(',').map(k => k.trim()).filter(k => k.length > 0);
+        this.apiKeys = keysStr
+            .split(',')
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0);
         const initialKey = this.apiKeys.length > 0 ? this.apiKeys[0] : 'fake-api-key';
         this.genAI = new generative_ai_1.GoogleGenerativeAI(initialKey);
     }
@@ -40,14 +43,19 @@ let GeminiEvaluatorStrategy = GeminiEvaluatorStrategy_1 = class GeminiEvaluatorS
             try {
                 return await operation(model);
             }
-            catch (error) {
-                if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('Quota')) {
+            catch (e) {
+                const errMsg = String(e?.message || '');
+                if (e?.status === 429 ||
+                    errMsg.includes('429') ||
+                    errMsg.includes('Too Many Requests') ||
+                    errMsg.includes('Quota')) {
                     this.logger.warn(`Gemini API Key at index ${this.currentKeyIndex} hit rate limit (429). Rotating to next key...`);
-                    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+                    this.currentKeyIndex =
+                        (this.currentKeyIndex + 1) % this.apiKeys.length;
                     attempts++;
                 }
                 else {
-                    throw error;
+                    throw e;
                 }
             }
         }
@@ -69,7 +77,7 @@ Provide detailed feedback, including:
 3. Suggestions for improvement
 4. Estimated band score (if applicable, e.g., IELTS)
 Please keep the response concise but informative.`;
-            const result = await this.executeWithRotation(m => m.generateContent(prompt));
+            const result = await this.executeWithRotation((m) => m.generateContent(prompt));
             const response = result.response;
             return response.text();
         }
@@ -84,7 +92,7 @@ Please keep the response concise but informative.`;
                 return `[Mock Gemini Chat] I received your message: "${prompt}". Please set GEMINI_API_KEY.`;
             }
             const fullPrompt = `You are an AI teaching assistant for an online English learning platform. Answer the student's question helpfully: "${prompt}"`;
-            const result = await this.executeWithRotation(m => m.generateContent(fullPrompt));
+            const result = await this.executeWithRotation((m) => m.generateContent(fullPrompt));
             return result.response.text();
         }
         catch (error) {
@@ -182,7 +190,7 @@ Hãy đóng vai một giáo viên tiếng Anh tận tâm. Đưa ra một JSON c�
   ]
 }
 Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
-            const geminiResult = await this.executeWithRotation(m => m.generateContent(prompt));
+            const geminiResult = await this.executeWithRotation((m) => m.generateContent(prompt));
             const rawText = geminiResult.response.text().trim();
             const jsonMatch = rawText.match(/\{[\s\S]*\}/);
             let clarity = 'Fair', feedback = '', suggestions = [];
@@ -235,7 +243,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         2. Tại sao đáp án đúng lại hợp lý (giải thích ngữ pháp/ngữ nghĩa)?
         3. Dịch nghĩa câu hỏi sang tiếng Việt.
       `;
-            const result = await this.executeWithRotation(m => m.generateContent(prompt));
+            const result = await this.executeWithRotation((m) => m.generateContent(prompt));
             const response = result.response;
             return response.text();
         }
@@ -262,7 +270,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
           "explanation": "Giải thích ngắn gọn tại sao A đúng"
         }
       `;
-            const result = await this.executeWithRotation(m => m.generateContent(prompt));
+            const result = await this.executeWithRotation((m) => m.generateContent(prompt));
             const response = result.response;
             let text = response.text().trim();
             if (text.startsWith('```json')) {
@@ -293,7 +301,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         }
         Chỉ trả về JSON hợp lệ, không thêm bất kỳ văn bản giải thích nào khác.
       `;
-            const result = await this.executeWithRotation(m => m.generateContent(prompt));
+            const result = await this.executeWithRotation((m) => m.generateContent(prompt));
             const response = result.response;
             let text = response.text().trim();
             if (text.startsWith('```json')) {
@@ -364,7 +372,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
                 });
             }
             contents.push(prompt);
-            const result = await this.executeWithRotation(m => m.generateContent(contents));
+            const result = await this.executeWithRotation((m) => m.generateContent(contents));
             const response = result.response;
             let text = response.text().trim();
             if (text.startsWith('```json')) {
@@ -411,7 +419,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
                     mimeType: 'image/jpeg',
                 },
             };
-            const result = await this.executeWithRotation(m => m.generateContent([prompt, imagePart]));
+            const result = await this.executeWithRotation((m) => m.generateContent([prompt, imagePart]));
             const response = result.response;
             let text = response.text().trim();
             if (text.startsWith('```json')) {
@@ -457,7 +465,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
           "suggestions": ["Gợi ý 1", "Gợi ý 2"]
         }
       `;
-            const result = await this.executeWithRotation(m => m.generateContent(prompt));
+            const result = await this.executeWithRotation((m) => m.generateContent(prompt));
             let text = result.response.text().trim();
             if (text.startsWith('```json'))
                 text = text.substring(7, text.length - 3).trim();
@@ -503,7 +511,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
           "suggestions": ["Khuyên 1", "Khuyên 2"]
         }
       `;
-            const result = await this.executeWithRotation(m => m.generateContent(prompt));
+            const result = await this.executeWithRotation((m) => m.generateContent(prompt));
             let text = result.response.text().trim();
             if (text.startsWith('```json'))
                 text = text.substring(7, text.length - 3).trim();
@@ -546,7 +554,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
           "suggestions": ["Gợi ý phát âm/từ vựng 1", "Gợi ý 2"]
         }
       `;
-            const result = await this.executeWithRotation(m => m.generateContent(prompt));
+            const result = await this.executeWithRotation((m) => m.generateContent(prompt));
             let text = result.response.text().trim();
             if (text.startsWith('```json'))
                 text = text.substring(7, text.length - 3).trim();

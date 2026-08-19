@@ -11,8 +11,8 @@ export declare class CourseService {
         title: string;
         description: string | null;
         updatedAt: Date;
-        thumbnail: string | null;
         level: string | null;
+        thumbnail: string | null;
         status: import(".prisma/client").$Enums.CourseStatus;
         teacherId: number | null;
     }>;
@@ -63,8 +63,8 @@ export declare class CourseService {
             title: string;
             description: string | null;
             updatedAt: Date;
-            thumbnail: string | null;
             level: string | null;
+            thumbnail: string | null;
             status: import(".prisma/client").$Enums.CourseStatus;
             teacherId: number | null;
         };
@@ -109,8 +109,8 @@ export declare class CourseService {
         title: string;
         description: string | null;
         updatedAt: Date;
-        thumbnail: string | null;
         level: string | null;
+        thumbnail: string | null;
         status: import(".prisma/client").$Enums.CourseStatus;
         teacherId: number | null;
     })[]>;
@@ -168,8 +168,8 @@ export declare class CourseService {
         title: string;
         description: string | null;
         updatedAt: Date;
-        thumbnail: string | null;
         level: string | null;
+        thumbnail: string | null;
         status: import(".prisma/client").$Enums.CourseStatus;
         teacherId: number | null;
     }>;
@@ -179,8 +179,8 @@ export declare class CourseService {
         title: string;
         description: string | null;
         updatedAt: Date;
-        thumbnail: string | null;
         level: string | null;
+        thumbnail: string | null;
         status: import(".prisma/client").$Enums.CourseStatus;
         teacherId: number | null;
     }>;
@@ -190,8 +190,8 @@ export declare class CourseService {
         title: string;
         description: string | null;
         updatedAt: Date;
-        thumbnail: string | null;
         level: string | null;
+        thumbnail: string | null;
         status: import(".prisma/client").$Enums.CourseStatus;
         teacherId: number | null;
     }>;
@@ -315,8 +315,8 @@ export declare class CourseService {
             title: string;
             description: string | null;
             updatedAt: Date;
-            thumbnail: string | null;
             level: string | null;
+            thumbnail: string | null;
             status: import(".prisma/client").$Enums.CourseStatus;
             teacherId: number | null;
         };

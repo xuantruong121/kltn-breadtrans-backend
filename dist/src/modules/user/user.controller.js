@@ -26,6 +26,9 @@ let UserController = class UserController {
     async getProfile(req) {
         return this.userService.getUserProfile(req.user.id);
     }
+    async getStats(req) {
+        return this.userService.getUserStats(req.user.id);
+    }
     async updateProfile(req, updateData) {
         return this.userService.updateUserProfile(req.user.id, updateData);
     }
@@ -41,6 +44,16 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], UserController.prototype, "getProfile", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Get)('stats'),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy thống kê học tập tổng hợp của user hiện tại' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], UserController.prototype, "getStats", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
