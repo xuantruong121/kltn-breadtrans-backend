@@ -23,13 +23,16 @@ let UserService = class UserService {
             include: {
                 profile: true,
                 stats: true,
+                leaderboard: true,
+                pet: true,
+                billing: true,
             },
         });
         if (!user) {
             throw new common_1.NotFoundException('User not found');
         }
-        const { password, ...userWithoutPassword } = user;
-        return userWithoutPassword;
+        const { password, refreshToken, ...userWithoutSensitiveData } = user;
+        return userWithoutSensitiveData;
     }
     async updateUserProfile(userId, updateData) {
         return this.prisma.profile.upsert({
@@ -41,6 +44,31 @@ let UserService = class UserService {
                 ...updateData,
             },
         });
+    }
+    async getUserStats(userId) {
+        const [stats, leaderboard, pet, vocabProgress, submissionsCount, toeicCount] = await Promise.all([
+            this.prisma.userStats.findUnique({ where: { userId } }),
+            this.prisma.leaderboard.findUnique({ where: { userId } }),
+            this.prisma.userPet.findUnique({ where: { userId } }),
+            this.prisma.userVocabWordProgress.count({
+                where: { userId, isMastered: true },
+            }),
+            this.prisma.submission.count({ where: { userId } }),
+            this.prisma.toeicAttempt.count({ where: { userId } }),
+        ]);
+        return {
+            streakCount: stats?.streakCount || 0,
+            streakFreezes: stats?.streakFreezes || 0,
+            totalBanhRan: stats?.totalBanhRan || 0,
+            quizAccuracy: stats?.quizAccuracy || 0,
+            speakingAccuracy: stats?.speakingAccuracy || 0,
+            totalPoints: leaderboard?.totalPoints || 0,
+            weeklyExp: leaderboard?.weeklyExp || 0,
+            tier: leaderboard?.tier || 'Đồng',
+            masteredVocabCount: vocabProgress,
+            totalQuizzesDone: submissionsCount + toeicCount,
+            pet: pet || null,
+        };
     }
 };
 exports.UserService = UserService;

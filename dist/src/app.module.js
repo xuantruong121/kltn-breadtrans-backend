@@ -30,8 +30,15 @@ const class_module_1 = require("./modules/class/class.module");
 const events_module_1 = require("./modules/events/events.module");
 const admin_module_1 = require("./modules/admin/admin.module");
 const assignment_module_1 = require("./modules/assignment/assignment.module");
+const grammar_module_1 = require("./modules/grammar/grammar.module");
+const market_module_1 = require("./modules/market/market.module");
+const content_module_1 = require("./modules/content/content.module");
+const logging_middleware_1 = require("./common/middleware/logging.middleware");
 const ioredis_1 = require("@nestjs-modules/ioredis");
 let AppModule = class AppModule {
+    configure(consumer) {
+        consumer.apply(logging_middleware_1.LoggingMiddleware).forRoutes('*');
+    }
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
@@ -65,6 +72,9 @@ exports.AppModule = AppModule = __decorate([
             events_module_1.EventsModule,
             admin_module_1.AdminModule,
             assignment_module_1.AssignmentModule,
+            grammar_module_1.GrammarModule,
+            market_module_1.MarketModule,
+            content_module_1.ContentModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [

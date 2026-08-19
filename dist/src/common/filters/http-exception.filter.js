@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.HttpExceptionFilter = void 0;
 const common_1 = require("@nestjs/common");
 let HttpExceptionFilter = class HttpExceptionFilter {
+    logger = new common_1.Logger('ExceptionFilter');
     catch(exception, host) {
         const ctx = host.switchToHttp();
         const response = ctx.getResponse();
@@ -17,21 +18,33 @@ let HttpExceptionFilter = class HttpExceptionFilter {
             ? exception.getStatus()
             : common_1.HttpStatus.INTERNAL_SERVER_ERROR;
         let message = 'Internal server error';
+        let errorDetails = null;
         if (exception instanceof common_1.HttpException) {
             const responseObj = exception.getResponse();
-            message =
-                typeof responseObj === 'object' && responseObj['message']
-                    ? responseObj['message']
-                    : responseObj.toString();
+            if (typeof responseObj === 'object' && responseObj !== null) {
+                message = responseObj['message'] || responseObj.toString();
+                errorDetails = responseObj['error'] || null;
+            }
+            else {
+                message = responseObj.toString();
+            }
         }
         else if (exception instanceof Error) {
             message = exception.message;
+        }
+        const logDetails = `[${request.method}] ${request.url} - Status: ${status} - Error: ${Array.isArray(message) ? message.join(', ') : message}`;
+        if (status >= 500) {
+            this.logger.error(logDetails, exception?.stack || '');
+        }
+        else {
+            this.logger.warn(logDetails);
         }
         response.status(status).json({
             statusCode: status,
             timestamp: new Date().toISOString(),
             path: request.url,
             message,
+            error: errorDetails,
         });
     }
 };

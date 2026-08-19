@@ -159,4 +159,91 @@ export class AdminController {
   getClassDetail(@Param('classId', ParseIntPipe) classId: number) {
     return this.adminService.getClassWithEnrollments(classId);
   }
+
+  // ============== VOCAB MANAGEMENT ==============
+  @Get('vocab/topics')
+  @ApiOperation({ summary: 'Admin: Lay danh sach chu de tu vung' })
+  getVocabTopics() {
+    return this.adminService.getVocabTopics();
+  }
+
+  @Post('vocab/topics')
+  @ApiOperation({ summary: 'Admin: Tao chu de tu vung moi' })
+  createVocabTopic(@Body() dto: { title: string; categoryName?: string; isPro?: boolean }) {
+    return this.adminService.createVocabTopic(dto);
+  }
+
+  @Delete('vocab/topics/:id')
+  @ApiOperation({ summary: 'Admin: Xoa chu de tu vung' })
+  deleteVocabTopic(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.deleteVocabTopic(id);
+  }
+
+  @Post('vocab/topics/:id/words')
+  @ApiOperation({ summary: 'Admin: Them tu vung vao chu de' })
+  addVocabWord(@Param('id', ParseIntPipe) topicId: number, @Body() dto: any) {
+    return this.adminService.addVocabWord(topicId, dto);
+  }
+
+  @Delete('vocab/words/:id')
+  @ApiOperation({ summary: 'Admin: Xoa tu vung' })
+  deleteVocabWord(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.deleteVocabWord(id);
+  }
+
+  // ============== SPEAKING MANAGEMENT ==============
+  @Get('speaking/exercises')
+  @ApiOperation({ summary: 'Admin: Lay danh sach bai tap phat am' })
+  getSpeakingExercises() {
+    return this.adminService.getSpeakingExercises();
+  }
+
+  @Post('speaking/exercises')
+  @ApiOperation({ summary: 'Admin: Tao bai tap phat am moi' })
+  createSpeakingExercise(
+    @Body()
+    dto: {
+      title: string;
+      targetText: string;
+      category?: string;
+      difficulty?: string;
+    },
+  ) {
+    return this.adminService.createSpeakingExercise(dto);
+  }
+
+  @Delete('speaking/exercises/:id')
+  @ApiOperation({ summary: 'Admin: Xoa bai tap phat am' })
+  deleteSpeakingExercise(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.deleteSpeakingExercise(id);
+  }
+
+  // ============== PRACTICE TOPICS MANAGEMENT ==============
+  @Get('practice-topics')
+  @ApiOperation({ summary: 'Admin: Lay danh sach chu de luyen tap' })
+  getPracticeTopics() {
+    return this.adminService.getPracticeTopics();
+  }
+
+  @Post('practice-topics')
+  @ApiOperation({ summary: 'Admin: Tao chu de luyen tap moi' })
+  createPracticeTopic(
+    @Body()
+    dto: {
+      name: string;
+      vietnameseName?: string;
+      category?: string;
+      iconUrl?: string;
+      order?: number;
+    },
+  ) {
+    return this.adminService.createPracticeTopic(dto);
+  }
+
+  @Delete('practice-topics/:id')
+  @ApiOperation({ summary: 'Admin: Xoa chu de luyen tap' })
+  deletePracticeTopic(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.deletePracticeTopic(id);
+  }
 }
+

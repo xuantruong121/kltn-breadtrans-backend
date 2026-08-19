@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Param,
   ParseIntPipe,
@@ -20,6 +21,41 @@ import { ClassService } from './class.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ClassController {
   constructor(private readonly classService: ClassService) {}
+
+  @Get()
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy danh sách các lớp học của người dùng hiện tại' })
+  getMyClasses(@Request() req: any) {
+    return this.classService.getMyClasses(req.user.id, req.user.role);
+  }
+
+  @Get('my-classes')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy danh sách các lớp học của người dùng hiện tại (Alias)' })
+  getMyClassesAlias(@Request() req: any) {
+    return this.classService.getMyClasses(req.user.id, req.user.role);
+  }
+
+  @Get('watch-tracking')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy dữ liệu theo dõi video đã xem' })
+  getWatchTracking(@Request() req: any) {
+    return this.classService.getWatchTracking(req.user.id);
+  }
+
+  @Patch('watch-tracking')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cập nhật tiến độ xem video bài học' })
+  updateWatchTracking(
+    @Request() req: any,
+    @Body() body: { videoKey: string; data: any },
+  ) {
+    return this.classService.updateWatchTracking(
+      req.user.id,
+      body.videoKey,
+      body.data,
+    );
+  }
 
   @Post(':classId/sessions')
   @Roles(Role.ADMIN, Role.TEACHER)
@@ -47,3 +83,4 @@ export class ClassController {
     );
   }
 }
+

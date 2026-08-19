@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
@@ -21,6 +21,10 @@ import { ClassModule } from './modules/class/class.module';
 import { EventsModule } from './modules/events/events.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AssignmentModule } from './modules/assignment/assignment.module';
+import { GrammarModule } from './modules/grammar/grammar.module';
+import { MarketModule } from './modules/market/market.module';
+import { ContentModule } from './modules/content/content.module';
+import { LoggingMiddleware } from './common/middleware/logging.middleware';
 
 import { RedisModule } from '@nestjs-modules/ioredis';
 
@@ -54,7 +58,11 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     EventsModule,
     AdminModule,
     AssignmentModule,
+    GrammarModule,
+    MarketModule,
+    ContentModule,
   ],
+
   controllers: [AppController],
   providers: [
     AppService,
@@ -64,4 +72,8 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggingMiddleware).forRoutes('*');
+  }
+}

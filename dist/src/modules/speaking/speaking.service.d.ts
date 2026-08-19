@@ -10,34 +10,34 @@ export declare class SpeakingService {
     constructor(prisma: PrismaService, aiService: AiService, uploadService: UploadService);
     findAllExercises(category: string | undefined, userId: number): Promise<{
         isCompleted: boolean;
-        title: string;
+        category: string;
         createdAt: Date;
         id: number;
-        category: string;
-        audioUrl: string | null;
+        title: string;
         targetText: string;
-        imageUrl: string | null;
         difficulty: string;
+        imageUrl: string | null;
+        audioUrl: string | null;
     }[]>;
     findExerciseById(id: number): Promise<{
-        title: string;
+        category: string;
         createdAt: Date;
         id: number;
-        category: string;
-        audioUrl: string | null;
+        title: string;
         targetText: string;
-        imageUrl: string | null;
         difficulty: string;
+        imageUrl: string | null;
+        audioUrl: string | null;
     }>;
     createExercise(dto: CreateExerciseDto): Promise<{
-        title: string;
+        category: string;
         createdAt: Date;
         id: number;
-        category: string;
-        audioUrl: string | null;
+        title: string;
         targetText: string;
-        imageUrl: string | null;
         difficulty: string;
+        imageUrl: string | null;
+        audioUrl: string | null;
     }>;
     submitAudio(exerciseId: number, userId: number, audioFile: Express.Multer.File): Promise<{
         submissionId: number;
@@ -51,20 +51,20 @@ export declare class SpeakingService {
     }>;
     getMySubmissions(userId: number): Promise<({
         exercise: {
-            title: string;
+            category: string;
             createdAt: Date;
             id: number;
-            category: string;
-            audioUrl: string | null;
+            title: string;
             targetText: string;
-            imageUrl: string | null;
             difficulty: string;
+            imageUrl: string | null;
+            audioUrl: string | null;
         };
     } & {
         id: number;
-        userId: number;
         submittedAt: Date;
         aiFeedback: import("@prisma/client/runtime/library").JsonValue | null;
+        userId: number;
         audioUrl: string;
         overallScore: number | null;
         exerciseId: number;

@@ -26,6 +26,14 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Get('stats')
+  @ApiOperation({ summary: 'Lấy thống kê học tập tổng hợp của user hiện tại' })
+  async getStats(@Request() req: any) {
+    return this.userService.getUserStats(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Patch('profile')
   @ApiOperation({ summary: 'Cập nhật thông tin profile của user hiện tại' })
   async updateProfile(
@@ -35,3 +43,4 @@ export class UserController {
     return this.userService.updateUserProfile(req.user.id, updateData);
   }
 }
+
