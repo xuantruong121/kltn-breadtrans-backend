@@ -65,7 +65,13 @@ describe('UserService', () => {
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
-        include: { profile: true, stats: true },
+        include: {
+          profile: true,
+          stats: true,
+          leaderboard: true,
+          pet: true,
+          billing: true,
+        },
       });
       expect(result).toHaveProperty('id', 1);
       expect(result).not.toHaveProperty('password');
