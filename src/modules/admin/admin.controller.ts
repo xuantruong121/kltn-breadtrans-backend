@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -49,6 +50,24 @@ export class AdminController {
     },
   ) {
     return this.adminService.createUser(dto);
+  }
+
+  @Patch('users/:id')
+  @ApiOperation({
+    summary:
+      'Admin cập nhật thông tin người dùng (Họ tên, SĐT, Role, Password)',
+  })
+  updateUser(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    dto: {
+      fullName?: string;
+      phone?: string;
+      role?: Role;
+      password?: string;
+    },
+  ) {
+    return this.adminService.updateUser(id, dto);
   }
 
   @Delete('users/:id')

@@ -213,9 +213,11 @@ export class CourseService {
   }
 
   async createClass(courseId: number, teacherId: number, dto: CreateClassDto) {
+    const dailyDomain = process.env.DAILY_DOMAIN || 'breadtrans-kltn.daily.co';
+    const randomCode = Math.random().toString(36).substring(2, 10);
     const meetingLink =
       dto.meetingLink ||
-      `https://meet.jit.si/kltn-breadtrans-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      `https://${dailyDomain}/class-course-${courseId}-${randomCode}`;
     return this.prisma.class.create({
       data: {
         ...dto,

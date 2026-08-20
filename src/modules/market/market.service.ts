@@ -4,12 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EventsGateway } from '../events/events.gateway';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
 import { AdjustCurrencyDto } from './dto/adjust-currency.dto';
 
 @Injectable()
 export class MarketService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventsGateway: EventsGateway,
+  ) {}
 
   async getProducts() {
     let products = await this.prisma.marketProduct.findMany({
@@ -27,27 +31,33 @@ export class MarketService {
             imageUrl: '🛡️',
           },
           {
-            name: 'Thẻ Nhân Đôi Bánh Mì (2X Boost)',
-            price: 150,
+            name: 'Thẻ Nhân Đôi Bánh Mì (24h Boost)',
+            price: 200,
             order: 2,
             imageUrl: '⚡',
           },
           {
-            name: 'Vương Miện Hoàng Gia (Avatar Frame)',
-            price: 300,
+            name: 'Huy Hiệu Bậc Thầy Từ Vựng',
+            price: 150,
             order: 3,
+            imageUrl: '🏅',
+          },
+          {
+            name: 'Vương Miện Quán Quân (Avatar Frame)',
+            price: 500,
+            order: 4,
             imageUrl: '👑',
           },
           {
-            name: 'Huy Hiệu Học Bá TOEIC',
-            price: 500,
-            order: 4,
-            imageUrl: '🎖️',
+            name: 'Sổ Tay Học Từ Vựng Mini',
+            price: 1200,
+            order: 5,
+            imageUrl: '📔',
           },
           {
-            name: 'Voucher Trà Sữa 30k',
-            price: 1000,
-            order: 5,
+            name: 'Voucher Trà Sữa 20k',
+            price: 2000,
+            order: 6,
             imageUrl: '🧋',
           },
         ],
@@ -140,6 +150,20 @@ export class MarketService {
       where: { userId },
     });
 
+    // Kiểm tra xem đơn hàng có chứa Quà tặng thực tế / Voucher cần Admin duyệt hay không
+    const hasRealGift = (items as Array<Record<string, any>>).some((item) => {
+      const cat = String(item?.category || '');
+      const name = String(item?.name || '');
+      return (
+        cat === 'gift' ||
+        name.includes('Voucher') ||
+        name.includes('Sổ Tay') ||
+        name.includes('Quà')
+      );
+    });
+
+    const initialStatus = hasRealGift ? 'pending' : 'approved';
+
     // Create Order Record
     const order = await this.prisma.marketOrder.create({
       data: {
@@ -148,7 +172,7 @@ export class MarketService {
         items: dto.items as any,
         totalK: dto.totalK || 0,
         totalBanh,
-        status: 'approved',
+        status: initialStatus,
         paidAtCheckout: true,
         balanceAtCheckout: stats.totalBanhRan - totalBanh,
       },
@@ -156,7 +180,10 @@ export class MarketService {
 
     return {
       success: true,
-      message: 'Đổi vật phẩm thành công!',
+      status: initialStatus,
+      message: hasRealGift
+        ? 'Yêu cầu đổi quà đã được gửi tới Ban Quản Trị! Vui lòng chờ phê duyệt nhé 🎁'
+        : 'Đổi vật phẩm thành công!',
       orderId: order.id,
       remainingBanh: stats.totalBanhRan - totalBanh,
     };
@@ -193,7 +220,32 @@ export class MarketService {
       throw new NotFoundException(`Order ${orderId} not found`);
     }
 
-    return this.prisma.marketOrder.update({
+    // Nếu Admin Từ Chối -> Hoàn lại Bánh Mì cho Học Sinh
+    if (status === 'rejected' && order.status === 'pending') {
+      const updatedStats = await this.prisma.userStats.upsert({
+        where: { userId: order.userId },
+        update: { totalBanhRan: { increment: order.totalBanh } },
+        create: { userId: order.userId, totalBanhRan: order.totalBanh },
+      });
+
+      await this.prisma.pointHistory.create({
+        data: {
+          userId: order.userId,
+          points: order.totalBanh,
+          reason: `Hoàn lại ${order.totalBanh} Bánh Mì do đơn hàng #${orderId} bị từ chối bởi ${reviewerName}`,
+        },
+      });
+
+      // Bắn sự kiện cập nhật số dư Bánh Mì hoàn tiền cho học sinh
+      this.eventsGateway.sendCurrencyUpdate(order.userId, {
+        amount: order.totalBanh,
+        newBalance: updatedStats.totalBanhRan,
+        reason: `Hoàn tiền đơn đổi quà #${orderId}`,
+        studentName: order.studentName,
+      });
+    }
+
+    const updatedOrder = await this.prisma.marketOrder.update({
       where: { id: orderId },
       data: {
         status,
@@ -201,15 +253,31 @@ export class MarketService {
         reviewedAt: new Date(),
       },
     });
+
+    // Bắn sự kiện Real-time thông báo kết quả duyệt đơn cho học sinh
+    this.eventsGateway.sendOrderReviewUpdate(order.userId, {
+      orderId: order.id,
+      status,
+      totalBanh: order.totalBanh,
+      reviewerName,
+    });
+
+    return updatedOrder;
   }
 
   async adjustCurrency(dto: AdjustCurrencyDto, adminName: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: dto.userId },
+      include: { profile: true },
     });
     if (!user) {
       throw new NotFoundException(`User with ID ${dto.userId} not found`);
     }
+
+    const studentName =
+      user.profile?.fullName ||
+      user.email?.split('@')[0] ||
+      `Học viên #${dto.userId}`;
 
     const updatedStats = await this.prisma.userStats.upsert({
       where: { userId: dto.userId },
@@ -228,7 +296,7 @@ export class MarketService {
     await this.prisma.currencyTransaction.create({
       data: {
         studentId: dto.userId,
-        studentName: user.email,
+        studentName,
         userId: dto.userId,
         userName: adminName,
         userRole: 'ADMIN',
@@ -238,10 +306,19 @@ export class MarketService {
       },
     });
 
+    // Bắn sự kiện Real-time cập nhật số dư Bánh Mì ngay lập tức cho học sinh
+    this.eventsGateway.sendCurrencyUpdate(dto.userId, {
+      amount: dto.amount,
+      newBalance: updatedStats.totalBanhRan,
+      reason: dto.reason,
+      studentName,
+    });
+
     return {
       success: true,
-      message: `Đã điều chỉnh ${dto.amount} Bánh Mì cho học viên ID ${dto.userId}`,
+      message: `Đã ${dto.amount >= 0 ? 'cộng' : 'trừ'} ${Math.abs(dto.amount)} Bánh Mì cho học viên ${studentName} thành công!`,
       currentBanh: updatedStats.totalBanhRan,
+      studentName,
     };
   }
 }

@@ -57,7 +57,7 @@ export class MarketController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Get('orders/mine')
+  @Get(['orders/my', 'orders/mine'])
   @ApiOperation({ summary: 'Lấy danh sách đơn hàng đã đổi của học viên' })
   getMyOrders(@Request() req: any) {
     return this.marketService.getMyOrders(req.user.id);

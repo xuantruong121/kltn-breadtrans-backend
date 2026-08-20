@@ -38,7 +38,7 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
     while (attempts < maxAttempts) {
       const currentKey = this.apiKeys[this.currentKeyIndex];
       const genAI = new GoogleGenerativeAI(currentKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
       try {
         return await operation(model);
@@ -74,19 +74,18 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
     try {
       if (!this.hasKeys()) {
         this.logger.warn('GEMINI_API_KEY is not set. Returning mock feedback.');
-        return `[Mock Gemini Feedback] This is a mock feedback for answer: "${studentAnswer}". Please set GEMINI_API_KEY to use real AI.`;
+        return `[Mock Gemini Feedback] Nhận xét cho câu trả lời của em: "${studentAnswer}".`;
       }
 
-      const prompt = `You are a professional English teacher grading a student's writing assignment.
-Question: "${question}"
-Student's Answer: "${studentAnswer}"
+      const prompt = `Bạn là một giáo viên tiếng Anh tận tâm, vui vẻ và ân cần đang chấm bài viết cho học sinh/trẻ em trên nền tảng BreadTrans Junior.
+Đề bài: "${question}"
+Bài làm của học sinh: "${studentAnswer}"
 
-Provide detailed feedback, including:
-1. Overall assessment
-2. Grammar and vocabulary corrections
-3. Suggestions for improvement
-4. Estimated band score (if applicable, e.g., IELTS)
-Please keep the response concise but informative.`;
+Hãy đưa ra nhận xét chi tiết HOÀN TOÀN BẰNG TIẾNG VIỆT với giọng điệu động viên, khen ngợi và hướng dẫn tận tình theo cấu trúc sau:
+1. 🌟 Khen ngợi và nhận xét tổng quan bài làm
+2. ✏️ Sửa lỗi ngữ pháp & từ vựng (chỉ rõ từ/câu cần sửa, viết lại câu hoàn chỉnh và giải thích ngắn gọn, dễ hiểu)
+3. 💡 Gợi ý mẹo nhỏ để em viết hay và tự nhiên hơn
+4. 🏆 Đánh giá mức độ hoàn thành`;
 
       const result = await this.executeWithRotation((m) =>
         m.generateContent(prompt),
@@ -95,17 +94,29 @@ Please keep the response concise but informative.`;
       return response.text();
     } catch (error) {
       this.logger.error('Failed to generate Gemini AI feedback', error);
-      return 'Could not generate AI feedback at this time due to an error.';
+      return 'Thầy/Cô chưa thể tạo nhận xét lúc này. Em hãy thử lại sau ít phút nhé!';
     }
   }
 
   async chat(prompt: string): Promise<string> {
     try {
       if (!this.hasKeys()) {
-        return `[Mock Gemini Chat] I received your message: "${prompt}". Please set GEMINI_API_KEY.`;
+        return `[Mock Gemini Chat] Bánh Mì Gia Sư đã nhận tin nhắn của em: "${prompt}".`;
       }
 
-      const fullPrompt = `You are an AI teaching assistant for an online English learning platform. Answer the student's question helpfully: "${prompt}"`;
+      const fullPrompt = `Bạn là "Bánh Mì Gia Sư" (AI Tutor) - Trợ lý gia sư tiếng Anh thông minh, vui vẻ, tận tâm và thân thiện dành riêng cho trẻ em và học sinh trên nền tảng học tiếng Anh BreadTrans Junior.
+
+NHIỆM VỤ & PHONG CÁCH GIAO TIẾP:
+- Giọng văn: Luôn ấm áp, vui tươi, khích lệ, dùng nhiều icon/emoji sinh động (🍞, ✨, 🌟, 🎒, 👏, 🎉) phù hợp với lứa tuổi thiếu nhi và học sinh.
+- Ngôn ngữ trả lời: BẮT BUỘC trả lời chủ yếu bằng TIẾNG VIỆT tự nhiên, dễ hiểu, trong sáng.
+- Khi học sinh hỏi về từ vựng, câu hoặc ngữ pháp tiếng Anh:
+  + Cung cấp từ/câu tiếng Anh chính xác kèm phiên âm dễ đọc và dịch nghĩa tiếng Việt chi tiết.
+  + Đưa ra ví dụ vui nhộn, gần gũi với đời sống học đường và tuổi thơ.
+- Khi học sinh chào hỏi (như "ha lô", "chào bạn", "hello", "hi"): Chào đón các em thật nhiệt tình bằng tiếng Việt, khen ngợi tinh thần học tập và hỏi xem em cần giúp đỡ bài học nào hôm nay.
+- Trình bày câu trả lời rõ ràng, có định dạng markdown đẹp mắt (in đậm, danh sách gạch đầu dòng), không quá dài dòng gây khó hiểu cho trẻ em.
+
+Nội dung câu hỏi của học sinh:
+"${prompt}"`;
 
       const result = await this.executeWithRotation((m) =>
         m.generateContent(fullPrompt),
@@ -113,7 +124,7 @@ Please keep the response concise but informative.`;
       return result.response.text();
     } catch (error) {
       this.logger.error('Chat Gemini AI failed', error);
-      return 'I am currently unable to process your request.';
+      return 'Bánh Mì Gia Sư đang gặp chút trục trặc nhỏ. Em chờ một lát rồi hỏi lại nhé! 🍞';
     }
   }
 

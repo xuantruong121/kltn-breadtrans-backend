@@ -123,6 +123,7 @@ export class AdminService {
         lastLoginAt: true,
         loginCount: true,
         profile: { select: { fullName: true, avatar: true, phone: true } },
+        stats: { select: { totalBanhRan: true, streakCount: true } },
       },
     });
   }
@@ -148,6 +149,58 @@ export class AdminService {
         role: true,
         createdAt: true,
         profile: { select: { fullName: true, phone: true } },
+      },
+    });
+  }
+
+  async updateUser(
+    userId: number,
+    dto: {
+      fullName?: string;
+      phone?: string;
+      role?: Role;
+      password?: string;
+    },
+  ) {
+    const updateUserData: any = {};
+    if (dto.role) updateUserData.role = dto.role;
+    if (dto.password) {
+      updateUserData.password = await bcrypt.hash(dto.password, 10);
+    }
+
+    if (Object.keys(updateUserData).length > 0) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: updateUserData,
+      });
+    }
+
+    if (dto.fullName !== undefined || dto.phone !== undefined) {
+      await this.prisma.profile.upsert({
+        where: { userId },
+        update: {
+          fullName: dto.fullName,
+          phone: dto.phone,
+        },
+        create: {
+          userId,
+          fullName: dto.fullName || 'Học viên',
+          phone: dto.phone,
+        },
+      });
+    }
+
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        lastLoginAt: true,
+        loginCount: true,
+        profile: { select: { fullName: true, avatar: true, phone: true } },
+        stats: { select: { totalBanhRan: true, streakCount: true } },
       },
     });
   }
@@ -296,9 +349,11 @@ export class AdminService {
       meetingLink?: string;
     },
   ) {
+    const dailyDomain = process.env.DAILY_DOMAIN || 'breadtrans-kltn.daily.co';
+    const randomCode = Math.random().toString(36).substring(2, 10);
     const meetingLink =
       dto.meetingLink ||
-      `https://meet.jit.si/breadtrans-${courseId}-${Date.now()}`;
+      `https://${dailyDomain}/breadtrans-${courseId}-${randomCode}`;
     return this.prisma.class.create({
       data: {
         name: dto.name,

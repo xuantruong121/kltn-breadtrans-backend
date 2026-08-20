@@ -91,7 +91,7 @@ async function main() {
             data: {
                 email: `student${i}@breadtrans.com`, password: passwordHash, role: client_1.Role.STUDENT,
                 profile: { create: { fullName: `Student ${i}`, targetScore: `IELTS ${6.0 + i * 0.5}`, phone: `090123456${i}` } },
-                stats: { create: { totalBanhRan: 1000 + i * 150, countHeart: 5, streakCount: i } },
+                stats: { create: { totalBanhRan: 0, countHeart: 5, streakCount: 0 } },
                 billing: { create: { tuitionFee: { "2026-08": { amount: 500000, paidAt: new Date().toISOString() } } } }
             }
         }));
@@ -175,7 +175,7 @@ async function main() {
                 courseId: course.id,
                 teacherId: teacher.id,
                 name: `Lớp ${course.title} - Ca tối`,
-                meetingLink: `https://meet.google.com/xyz-123-${i}`
+                meetingLink: `https://breadtrans-kltn.daily.co/class-room-${i + 1}`
             }
         }));
     }

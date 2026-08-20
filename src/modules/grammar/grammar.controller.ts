@@ -96,4 +96,13 @@ export class GrammarController {
   deleteTopic(@Param('id', ParseIntPipe) id: number) {
     return this.grammarService.deleteTopic(id);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @Delete('questions/:id')
+  @ApiOperation({ summary: '[Admin/Teacher] Xóa câu hỏi ngữ pháp' })
+  deleteQuestion(@Param('id', ParseIntPipe) id: number) {
+    return this.grammarService.deleteQuestion(id);
+  }
 }

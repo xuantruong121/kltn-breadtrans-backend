@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Param,
   ParseIntPipe,
@@ -61,6 +62,18 @@ export class ClassController {
     );
   }
 
+  @Post('daily-room')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Tạo hoặc lấy URL phòng học Daily.co qua API' })
+  async getOrCreateDailyRoom(
+    @Body() body: { roomName?: string; title?: string },
+  ) {
+    const url = await this.classService.createDailyRoom(
+      body.roomName || body.title,
+    );
+    return { url };
+  }
+
   @Post(':classId/sessions')
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiBearerAuth()
@@ -70,6 +83,95 @@ export class ClassController {
     @Body() dto: any,
   ) {
     return this.classService.createSession(classId, dto);
+  }
+
+  @Delete('sessions/:sessionId')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xóa buổi học (Session)' })
+  deleteSession(@Param('sessionId', ParseIntPipe) sessionId: number) {
+    return this.classService.deleteSession(sessionId);
+  }
+
+  @Patch('sessions/:sessionId/finish')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kết thúc buổi học ngay lập tức' })
+  finishSession(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @Request() req: any,
+  ) {
+    return this.classService.finishSession(
+      sessionId,
+      req.user.id,
+      req.user.role,
+    );
+  }
+
+  @Post(':classId/reward-student')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Giáo viên thưởng Bánh Mì cho học sinh trong lớp' })
+  rewardStudent(
+    @Param('classId', ParseIntPipe) classId: number,
+    @Body() body: { studentId: number; amount: number; reason?: string },
+    @Request() req: any,
+  ) {
+    return this.classService.rewardStudentInClass(
+      req.user.id,
+      req.user.role,
+      classId,
+      body.studentId,
+      body.amount,
+      body.reason,
+    );
+  }
+
+  @Get('sessions/:sessionId/attendance')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy danh sách điểm danh của một buổi học' })
+  getSessionAttendance(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @Request() req: any,
+  ) {
+    return this.classService.getSessionAttendance(
+      sessionId,
+      req.user.id,
+      req.user.role,
+    );
+  }
+
+  @Post('sessions/:sessionId/attendance')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lưu điểm danh buổi học' })
+  saveSessionAttendance(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @Body() body: { records: Array<{ userId: number; isPresent: boolean }> },
+    @Request() req: any,
+  ) {
+    return this.classService.saveSessionAttendance(
+      sessionId,
+      req.user.id,
+      req.user.role,
+      body.records || [],
+    );
+  }
+
+  @Get(':classId/students-analytics')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy thống kê tiến độ học viên trong lớp' })
+  getClassStudentsAnalytics(
+    @Param('classId', ParseIntPipe) classId: number,
+    @Request() req: any,
+  ) {
+    return this.classService.getClassStudentsAnalytics(
+      classId,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Get(':classId')

@@ -52,32 +52,32 @@ export declare class UserController {
         leaderboard: {
             id: number;
             userId: number;
-            totalPoints: number;
             rank: number | null;
+            totalPoints: number;
             tier: string;
             weeklyExp: number;
         } | null;
         pet: {
-            id: number;
-            createdAt: Date;
-            updatedAt: Date;
             name: string;
+            createdAt: Date;
+            id: number;
+            updatedAt: Date;
             userId: number;
+            level: number;
             health: number;
             happiness: number;
-            level: number;
             exp: number;
             lastFedAt: Date | null;
         } | null;
+        createdAt: Date;
         id: number;
+        updatedAt: Date;
         email: string;
         role: import(".prisma/client").$Enums.Role;
         sessionToken: string | null;
         loginCount: number;
         lastLoginAt: Date | null;
         lastDeviceType: string | null;
-        createdAt: Date;
-        updatedAt: Date;
     }>;
     getStats(req: any): Promise<{
         streakCount: number;
@@ -91,14 +91,14 @@ export declare class UserController {
         masteredVocabCount: number;
         totalQuizzesDone: number;
         pet: {
-            id: number;
-            createdAt: Date;
-            updatedAt: Date;
             name: string;
+            createdAt: Date;
+            id: number;
+            updatedAt: Date;
             userId: number;
+            level: number;
             health: number;
             happiness: number;
-            level: number;
             exp: number;
             lastFedAt: Date | null;
         } | null;

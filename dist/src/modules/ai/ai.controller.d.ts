@@ -2,7 +2,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from './ai.service';
 import { UploadService } from '../upload/upload.service';
 export declare class ChatDto {
-    prompt: string;
+    prompt?: string;
+    messages?: Array<{
+        role: string;
+        content: string;
+    }>;
 }
 export declare class GenerateToeicDto {
     topic: string;
@@ -20,6 +24,7 @@ export declare class AiController {
     constructor(aiService: AiService, prisma: PrismaService, uploadService: UploadService);
     chat(chatDto: ChatDto): Promise<{
         reply: string;
+        answer: string;
     }>;
     generateDictation(dto: GenerateDictationDto): Promise<{
         success: boolean;

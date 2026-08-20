@@ -29,6 +29,12 @@ let QuizController = class QuizController {
     createQuiz(dto) {
         return this.quizService.createQuiz(dto);
     }
+    updateQuiz(id, dto) {
+        return this.quizService.updateQuiz(id, dto);
+    }
+    deleteQuiz(id) {
+        return this.quizService.deleteQuiz(id);
+    }
     getAllQuizzes() {
         return this.quizService.getAllQuizzes();
     }
@@ -40,6 +46,12 @@ let QuizController = class QuizController {
     }
     createQuestion(quizId, dto) {
         return this.quizService.createQuestion(quizId, dto);
+    }
+    updateQuestion(questionId, dto) {
+        return this.quizService.updateQuestion(questionId, dto);
+    }
+    deleteQuestion(questionId) {
+        return this.quizService.deleteQuestion(questionId);
     }
     submitQuiz(quizId, dto, req) {
         return this.quizService.submitQuiz(quizId, req.user.id, dto);
@@ -62,6 +74,27 @@ __decorate([
     __metadata("design:paramtypes", [quiz_dto_1.CreateQuizDto]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "createQuiz", null);
+__decorate([
+    (0, common_1.Patch)(':id'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Cập nhật đề thi (chỉ ADMIN/TEACHER)' }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "updateQuiz", null);
+__decorate([
+    (0, common_1.Delete)(':id'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Xóa đề thi (chỉ ADMIN/TEACHER)' }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "deleteQuiz", null);
 __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
@@ -100,6 +133,27 @@ __decorate([
     __metadata("design:paramtypes", [Number, quiz_dto_1.CreateQuestionDto]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "createQuestion", null);
+__decorate([
+    (0, common_1.Patch)('questions/:questionId'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Cập nhật câu hỏi trong Quiz' }),
+    __param(0, (0, common_1.Param)('questionId', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "updateQuestion", null);
+__decorate([
+    (0, common_1.Delete)('questions/:questionId'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.TEACHER),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Xóa câu hỏi khỏi Quiz' }),
+    __param(0, (0, common_1.Param)('questionId', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "deleteQuestion", null);
 __decorate([
     (0, common_1.Post)(':id/submit'),
     (0, swagger_1.ApiBearerAuth)(),

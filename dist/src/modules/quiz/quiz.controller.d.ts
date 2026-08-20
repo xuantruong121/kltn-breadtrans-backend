@@ -15,6 +15,30 @@ export declare class QuizController {
         courseId: number | null;
         practiceTopicId: number | null;
     }>;
+    updateQuiz(id: number, dto: Partial<CreateQuizDto>): Promise<{
+        createdAt: Date;
+        id: number;
+        title: string;
+        description: string | null;
+        theoryContent: string | null;
+        bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+        type: import(".prisma/client").$Enums.QuizType;
+        timeLimit: number | null;
+        courseId: number | null;
+        practiceTopicId: number | null;
+    }>;
+    deleteQuiz(id: number): Promise<{
+        createdAt: Date;
+        id: number;
+        title: string;
+        description: string | null;
+        theoryContent: string | null;
+        bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+        type: import(".prisma/client").$Enums.QuizType;
+        timeLimit: number | null;
+        courseId: number | null;
+        practiceTopicId: number | null;
+    }>;
     getAllQuizzes(): Promise<({
         _count: {
             questions: number;
@@ -68,6 +92,20 @@ export declare class QuizController {
         practiceTopicId: number | null;
     }>;
     createQuestion(quizId: number, dto: CreateQuestionDto): Promise<{
+        order: number;
+        id: number;
+        type: string;
+        content: import("@prisma/client/runtime/library").JsonValue;
+        quizId: number;
+    }>;
+    updateQuestion(questionId: number, dto: Partial<CreateQuestionDto>): Promise<{
+        order: number;
+        id: number;
+        type: string;
+        content: import("@prisma/client/runtime/library").JsonValue;
+        quizId: number;
+    }>;
+    deleteQuestion(questionId: number): Promise<{
         order: number;
         id: number;
         type: string;
