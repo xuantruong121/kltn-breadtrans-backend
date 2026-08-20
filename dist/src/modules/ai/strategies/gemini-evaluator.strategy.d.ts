@@ -1,11 +1,12 @@
-import { IAIEvaluator, PronunciationFeedback } from './ai-evaluator.interface';
+import { IAIEvaluator, PronunciationFeedback, SmartGeneratedContent } from './ai-evaluator.interface';
 export declare class GeminiEvaluatorStrategy implements IAIEvaluator {
     private readonly logger;
-    private genAI;
     private apiKeys;
     private currentKeyIndex;
     constructor();
     private hasKeys;
+    private getModelName;
+    private sleep;
     private executeWithRotation;
     generateFeedback(question: string, studentAnswer: string): Promise<string>;
     chat(prompt: string): Promise<string>;
@@ -33,4 +34,8 @@ export declare class GeminiEvaluatorStrategy implements IAIEvaluator {
         feedback: string;
         suggestions: string[];
     }>;
+    generateSmartContentFromDocument(documentText: string, options?: {
+        quizCount?: number;
+        flashcardCount?: number;
+    }): Promise<SmartGeneratedContent>;
 }

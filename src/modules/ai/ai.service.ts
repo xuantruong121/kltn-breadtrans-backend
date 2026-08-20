@@ -154,4 +154,14 @@ export class AiService {
       audioUrl,
     );
   }
+
+  async generateSmartContentFromDocument(
+    documentText: string,
+    options?: { quizCount?: number; flashcardCount?: number },
+  ) {
+    return this.aiEvaluator.generateSmartContentFromDocument(
+      documentText,
+      options,
+    );
+  }
 }

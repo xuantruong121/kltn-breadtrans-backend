@@ -30,4 +30,8 @@ export declare class AiService {
         suggestions: string[];
     }>;
     importEtsPdf(pdfBuffer: Buffer, pdfMimeType: string, audioBuffer?: Buffer, audioMimeType?: string, audioUrl?: string): Promise<any[]>;
+    generateSmartContentFromDocument(documentText: string, options?: {
+        quizCount?: number;
+        flashcardCount?: number;
+    }): Promise<import("./strategies/ai-evaluator.interface").SmartGeneratedContent>;
 }

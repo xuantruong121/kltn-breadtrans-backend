@@ -11,6 +11,30 @@ export interface PronunciationFeedback {
   completenessScore?: number;
 }
 
+export interface SmartGeneratedContent {
+  documentSummary?: string;
+  quizQuestions: Array<{
+    question: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+    difficulty?: string;
+  }>;
+  flashcards: Array<{
+    term: string;
+    pos?: string;
+    ipa?: string;
+    meaning: string;
+    example: string;
+  }>;
+  assignment: {
+    title: string;
+    description: string;
+    instructions: string;
+    estimatedTimeMinutes?: number;
+  };
+}
+
 export interface IAIEvaluator {
   /**
    * Đánh giá và trả về phản hồi cho bài tập của học viên
@@ -126,4 +150,14 @@ export interface IAIEvaluator {
     audioMimeType?: string,
     audioUrl?: string,
   ): Promise<any[]>;
+
+  /**
+   * Sinh câu hỏi trắc nghiệm, Flashcard và bài tập từ văn bản tài liệu đã trích xuất
+   * @param documentText Nội dung tài liệu
+   * @param options Tùy chọn số lượng câu hỏi và flashcard
+   */
+  generateSmartContentFromDocument(
+    documentText: string,
+    options?: { quizCount?: number; flashcardCount?: number },
+  ): Promise<SmartGeneratedContent>;
 }

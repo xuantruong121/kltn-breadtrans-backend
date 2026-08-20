@@ -92,6 +92,9 @@ let AiService = AiService_1 = class AiService {
     async importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl) {
         return this.aiEvaluator.importEtsPdf(pdfBuffer, pdfMimeType, audioBuffer, audioMimeType, audioUrl);
     }
+    async generateSmartContentFromDocument(documentText, options) {
+        return this.aiEvaluator.generateSmartContentFromDocument(documentText, options);
+    }
 };
 exports.AiService = AiService;
 exports.AiService = AiService = AiService_1 = __decorate([

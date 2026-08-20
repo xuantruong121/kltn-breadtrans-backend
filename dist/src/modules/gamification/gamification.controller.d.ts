@@ -81,10 +81,10 @@ export declare class GamificationController {
     } & {
         id: number;
         userId: number;
+        completedAt: Date | null;
         questId: number;
         currentValue: number;
         isCompleted: boolean;
-        completedAt: Date | null;
         dateKey: string;
     })[]>;
     getArenaSnippet(req: any): Promise<{

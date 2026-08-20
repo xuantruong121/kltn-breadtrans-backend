@@ -1,4 +1,4 @@
-import { IAIEvaluator, PronunciationFeedback } from './ai-evaluator.interface';
+import { IAIEvaluator, PronunciationFeedback, SmartGeneratedContent } from './ai-evaluator.interface';
 export declare class OpenAIEvaluatorStrategy implements IAIEvaluator {
     private readonly logger;
     generateFeedback(question: string, studentAnswer: string): Promise<string>;
@@ -27,4 +27,8 @@ export declare class OpenAIEvaluatorStrategy implements IAIEvaluator {
         feedback: string;
         suggestions: string[];
     }>;
+    generateSmartContentFromDocument(documentText: string, options?: {
+        quizCount?: number;
+        flashcardCount?: number;
+    }): Promise<SmartGeneratedContent>;
 }

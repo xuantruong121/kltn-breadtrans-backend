@@ -18,12 +18,15 @@ async function urlToGenerativePart(url, mimeType) {
 }
 async function main() {
     console.log('Seeding Writing Data...');
-    if (!process.env.GEMINI_API_KEY) {
-        console.error('Missing GEMINI_API_KEY');
+    const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "";
+    const apiKeys = rawKeys.split(",").map(k => k.trim()).filter(Boolean);
+    const apiKey = apiKeys[0];
+    if (!apiKey) {
+        console.error('Missing GEMINI_API_KEYS in .env');
         process.exit(1);
     }
-    const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const imageUrls = [
         {
             url: 'https://images.unsplash.com/photo-1556740738-b6a63e27c4df?q=80&w=800&auto=format&fit=crop',

@@ -167,7 +167,9 @@ export class CourseService {
         where: { teacherId: userId },
         include: {
           course: { select: { title: true } },
-          sessions: true,
+          sessions: {
+            orderBy: { startTime: 'asc' },
+          },
           _count: { select: { enrollments: true } },
           enrollments: {
             include: {
@@ -181,6 +183,7 @@ export class CourseService {
             },
           },
         },
+        orderBy: { startDate: 'desc' },
       });
       return classes.map((c) => ({
         ...c,
@@ -193,6 +196,9 @@ export class CourseService {
           class: {
             include: {
               course: { select: { title: true } },
+              sessions: {
+                orderBy: { startTime: 'asc' },
+              },
               teacher: {
                 select: {
                   email: true,
@@ -203,6 +209,7 @@ export class CourseService {
             },
           },
         },
+        orderBy: { class: { startDate: 'desc' } },
       });
       return enrollments.map((e) => ({
         ...e.class,

@@ -91,10 +91,10 @@ export declare class GamificationService {
     } & {
         id: number;
         userId: number;
+        completedAt: Date | null;
         questId: number;
         currentValue: number;
         isCompleted: boolean;
-        completedAt: Date | null;
         dateKey: string;
     })[]>;
     getArenaSnippet(userId: number): Promise<{

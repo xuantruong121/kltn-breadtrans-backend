@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, Logger } from '@nestjs/common';
-import { IAIEvaluator, PronunciationFeedback } from './ai-evaluator.interface';
+import {
+  IAIEvaluator,
+  PronunciationFeedback,
+  SmartGeneratedContent,
+} from './ai-evaluator.interface';
 
 /**
  * Lớp giả lập OpenAI Strategy.
@@ -108,6 +112,40 @@ export class OpenAIEvaluatorStrategy implements IAIEvaluator {
       score: 3,
       feedback: '[OpenAI Mock] Đánh giá bài nói giả lập.',
       suggestions: ['Cải thiện phát âm.'],
+    };
+  }
+
+  async generateSmartContentFromDocument(
+    documentText: string,
+    options?: { quizCount?: number; flashcardCount?: number },
+  ): Promise<SmartGeneratedContent> {
+    this.logger.log('Using OpenAI Strategy for smart content generation...');
+    return {
+      documentSummary: 'Tóm tắt giả lập từ OpenAI Strategy.',
+      quizQuestions: [
+        {
+          question: 'What is the main topic of the text?',
+          options: ['AI in Education', 'Sports', 'Cooking', 'Travel'],
+          correctIndex: 0,
+          explanation: 'Văn bản nói về AI trong giáo dục.',
+          difficulty: 'EASY',
+        },
+      ],
+      flashcards: [
+        {
+          term: 'Artificial Intelligence',
+          pos: 'noun',
+          ipa: '/ˌɑːr.t̬ə.fɪʃ.əl ɪnˈtel.ə.dʒəns/',
+          meaning: 'Trí tuệ nhân tạo',
+          example: 'AI is transforming education.',
+        },
+      ],
+      assignment: {
+        title: 'Thảo luận về AI trong học tập',
+        description: 'Viết một đoạn văn ngắn về lợi ích của AI.',
+        instructions: 'Nêu ít nhất 2 lợi ích và 1 thách thức.',
+        estimatedTimeMinutes: 30,
+      },
     };
   }
 }
