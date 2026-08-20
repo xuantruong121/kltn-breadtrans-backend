@@ -53,7 +53,10 @@ export class AdminController {
   }
 
   @Patch('users/:id')
-  @ApiOperation({ summary: 'Admin cập nhật thông tin người dùng (Họ tên, SĐT, Role, Password)' })
+  @ApiOperation({
+    summary:
+      'Admin cập nhật thông tin người dùng (Họ tên, SĐT, Role, Password)',
+  })
   updateUser(
     @Param('id', ParseIntPipe) id: number,
     @Body()

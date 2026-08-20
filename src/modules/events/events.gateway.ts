@@ -38,18 +38,20 @@ export class EventsGateway
 
   // 1. Người dùng tham gia Room cá nhân & Room quản trị
   @SubscribeMessage('joinUserRoom')
-  handleJoinUserRoom(
+  async handleJoinUserRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { userId: number; role?: string; name?: string },
   ) {
     if (!data?.userId) return;
     const userRoom = `user_${data.userId}`;
-    client.join(userRoom);
+    await client.join(userRoom);
     this.logger.log(`Client ${client.id} joined personal room: ${userRoom}`);
 
     if (data.role === 'ADMIN' || data.role === 'TEACHER') {
-      client.join('admins');
-      this.logger.log(`Client ${client.id} (${data.role}) joined 'admins' room`);
+      await client.join('admins');
+      this.logger.log(
+        `Client ${client.id} (${data.role}) joined 'admins' room`,
+      );
     }
   }
 
@@ -99,7 +101,9 @@ export class EventsGateway
         null;
       if (targetUserId) {
         // Gửi thẳng cho học sinh đó
-        this.server.to(`user_${targetUserId}`).emit('chat:new_message', payload);
+        this.server
+          .to(`user_${targetUserId}`)
+          .emit('chat:new_message', payload);
       }
 
       // Gửi cho các Admin khác theo dõi (trừ Admin vừa gửi)

@@ -1,11 +1,28 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+
+import { EventsGateway } from '../events/events.gateway';
+
+export interface CreateSessionDto {
+  title?: string;
+  startTime?: string | Date;
+  endTime?: string | Date;
+  meetingLink?: string;
+}
 
 @Injectable()
 export class ClassService {
   private readonly logger = new Logger(ClassService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventsGateway: EventsGateway,
+  ) {}
 
   async createDailyRoom(requestedName?: string): Promise<string> {
     const apiKey = process.env.DAILY_API_KEY;
@@ -47,17 +64,19 @@ export class ClassService {
         }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as Record<string, any>;
       if (response.ok && data.url) {
         this.logger.log(`Created Daily.co room: ${data.url}`);
-        return data.url;
+        return String(data.url);
       }
 
       if (
-        String(data.info || '').includes('already exists') ||
-        String(data.error || '').includes('already exists')
+        response.status === 400 &&
+        String(data.info || '').includes('already exists')
       ) {
-        this.logger.log(`Daily.co room ${cleanName} already exists, using URL: ${fallbackUrl}`);
+        this.logger.log(
+          `Daily.co room ${cleanName} already exists, using URL: ${fallbackUrl}`,
+        );
         return fallbackUrl;
       }
 
@@ -69,8 +88,8 @@ export class ClassService {
     }
   }
 
-  async createSession(classId: number, dto: any) {
-    let meetingLink = dto.meetingLink;
+  async createSession(classId: number, dto: CreateSessionDto) {
+    let meetingLink = dto.meetingLink ? String(dto.meetingLink) : '';
     if (!meetingLink || !meetingLink.includes('daily.co')) {
       const sessionSlug = dto.title
         ? `class-${classId}-${dto.title}`
@@ -81,7 +100,7 @@ export class ClassService {
     return this.prisma.session.create({
       data: {
         classId,
-        title: dto.title,
+        title: dto.title || 'Buổi học trực tuyến',
         startTime: dto.startTime ? new Date(dto.startTime) : new Date(),
         endTime: dto.endTime
           ? new Date(dto.endTime)
@@ -143,7 +162,9 @@ export class ClassService {
       },
     });
 
-    this.logger.log(`Session ${sessionId} was finished early by user ${userId}`);
+    this.logger.log(
+      `Session ${sessionId} was finished early by user ${userId}`,
+    );
 
     return {
       success: true,
@@ -271,5 +292,314 @@ export class ClassService {
       update: { items: currentItems },
       create: { userId, items: currentItems },
     });
+  }
+
+  // ==========================================
+  // TEACHER PORTAL: REWARD STUDENT IN CLASS
+  // ==========================================
+  async rewardStudentInClass(
+    teacherId: number,
+    role: string,
+    classId: number,
+    studentId: number,
+    amount: number,
+    reason?: string,
+  ) {
+    const cls = await this.prisma.class.findUnique({
+      where: { id: classId },
+      include: {
+        enrollments: { where: { userId: studentId } },
+      },
+    });
+
+    if (!cls) throw new NotFoundException('Không tìm thấy lớp học');
+    if (role !== 'ADMIN' && cls.teacherId !== teacherId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền thưởng cho học sinh của lớp này',
+      );
+    }
+    if (cls.enrollments.length === 0) {
+      throw new NotFoundException('Học sinh không thuộc lớp học này');
+    }
+
+    const rewardAmount = Math.max(1, Math.min(amount || 20, 500));
+    const rewardReason = reason?.trim() || 'Giáo viên thưởng Bánh Mì';
+
+    const updatedStats = await this.prisma.userStats.upsert({
+      where: { userId: studentId },
+      update: { totalBanhRan: { increment: rewardAmount } },
+      create: { userId: studentId, totalBanhRan: rewardAmount },
+    });
+
+    await this.prisma.pointHistory.create({
+      data: {
+        userId: studentId,
+        points: rewardAmount,
+        reason: `${cls.name}: ${rewardReason}`,
+      },
+    });
+
+    const studentUser = await this.prisma.user.findUnique({
+      where: { id: studentId },
+      include: { profile: true },
+    });
+
+    const studentName =
+      studentUser?.profile?.fullName || studentUser?.email || 'Học viên';
+
+    this.eventsGateway.sendCurrencyUpdate(studentId, {
+      amount: rewardAmount,
+      newBalance: updatedStats.totalBanhRan,
+      reason: `${cls.name}: ${rewardReason}`,
+      studentName,
+    });
+
+    return {
+      success: true,
+      amount: rewardAmount,
+      newBalance: updatedStats.totalBanhRan,
+      message: `Đã thưởng +${rewardAmount} 🍞 cho ${studentName}!`,
+    };
+  }
+
+  // ==========================================
+  // TEACHER PORTAL: ATTENDANCE TRACKING
+  // ==========================================
+  async getSessionAttendance(
+    sessionId: number,
+    teacherId: number,
+    role: string,
+  ) {
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        class: {
+          include: {
+            enrollments: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: {
+                      select: { fullName: true, avatar: true, phone: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        attendances: true,
+      },
+    });
+
+    if (!session) throw new NotFoundException('Không tìm thấy buổi học');
+    if (role !== 'ADMIN' && session.class.teacherId !== teacherId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xem điểm danh buổi học này',
+      );
+    }
+
+    const attendanceMap = new Map<number, boolean>();
+    session.attendances.forEach((att) => {
+      attendanceMap.set(att.userId, att.isPresent);
+    });
+
+    const students = session.class.enrollments.map((enr) => ({
+      userId: enr.user.id,
+      email: enr.user.email,
+      fullName: enr.user.profile?.fullName || enr.user.email,
+      avatar: enr.user.profile?.avatar || null,
+      phone: enr.user.profile?.phone || null,
+      isPresent: attendanceMap.has(enr.user.id)
+        ? attendanceMap.get(enr.user.id)
+        : true,
+    }));
+
+    return {
+      sessionId: session.id,
+      sessionTitle: session.title,
+      startTime: session.startTime,
+      endTime: session.endTime,
+      students,
+    };
+  }
+
+  async saveSessionAttendance(
+    sessionId: number,
+    teacherId: number,
+    role: string,
+    records: Array<{ userId: number; isPresent: boolean }>,
+  ) {
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { class: true, attendances: true },
+    });
+
+    if (!session) throw new NotFoundException('Không tìm thấy buổi học');
+    if (role !== 'ADMIN' && session.class.teacherId !== teacherId) {
+      throw new ForbiddenException('Bạn không có quyền điểm danh buổi học này');
+    }
+
+    const existingMap = new Map<number, boolean>();
+    session.attendances.forEach((att) => {
+      existingMap.set(att.userId, att.isPresent);
+    });
+
+    for (const rec of records) {
+      const wasPresent = existingMap.get(rec.userId);
+
+      await this.prisma.attendance.upsert({
+        where: {
+          sessionId_userId: {
+            sessionId,
+            userId: rec.userId,
+          },
+        },
+        update: { isPresent: rec.isPresent },
+        create: {
+          sessionId,
+          userId: rec.userId,
+          isPresent: rec.isPresent,
+        },
+      });
+
+      // Tặng +5 Bánh Mì chuyên cần nếu được điểm danh Có mặt lần đầu trong buổi này
+      if (rec.isPresent && wasPresent !== true) {
+        const stats = await this.prisma.userStats.upsert({
+          where: { userId: rec.userId },
+          update: { totalBanhRan: { increment: 5 } },
+          create: { userId: rec.userId, totalBanhRan: 5 },
+        });
+
+        await this.prisma.pointHistory.create({
+          data: {
+            userId: rec.userId,
+            points: 5,
+            reason: `Chuyên cần: ${session.title}`,
+          },
+        });
+
+        const student = await this.prisma.user.findUnique({
+          where: { id: rec.userId },
+          include: { profile: true },
+        });
+
+        this.eventsGateway.sendCurrencyUpdate(rec.userId, {
+          amount: 5,
+          newBalance: stats.totalBanhRan,
+          reason: `Chuyên cần buổi học: ${session.title}`,
+          studentName:
+            student?.profile?.fullName || student?.email || 'Học viên',
+        });
+      }
+    }
+
+    return {
+      success: true,
+      message: `Đã lưu điểm danh cho ${records.length} học viên thành công!`,
+    };
+  }
+
+  // ==========================================
+  // TEACHER PORTAL: STUDENT LEARNING ANALYTICS
+  // ==========================================
+  async getClassStudentsAnalytics(
+    classId: number,
+    teacherId: number,
+    role: string,
+  ) {
+    const cls = await this.prisma.class.findUnique({
+      where: { id: classId },
+      include: {
+        enrollments: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                lastLoginAt: true,
+                profile: {
+                  select: { fullName: true, avatar: true, phone: true },
+                },
+                stats: { select: { totalBanhRan: true, streakCount: true } },
+              },
+            },
+          },
+        },
+        assignments: {
+          include: {
+            submissions: true,
+          },
+        },
+        sessions: {
+          include: {
+            attendances: true,
+          },
+        },
+      },
+    });
+
+    if (!cls) throw new NotFoundException('Không tìm thấy lớp học');
+    if (role !== 'ADMIN' && cls.teacherId !== teacherId) {
+      throw new ForbiddenException('Bạn không có quyền xem lớp học này');
+    }
+
+    const totalAssignments = cls.assignments.length;
+    const totalSessions = cls.sessions.length;
+
+    const students = cls.enrollments.map((enr) => {
+      const studentId = enr.user.id;
+
+      // Bài tập đã nộp
+      const studentSubmissions = cls.assignments
+        .flatMap((a) => a.submissions)
+        .filter((sub) => sub.userId === studentId);
+
+      const submittedCount = studentSubmissions.length;
+      const gradedSubmissions = studentSubmissions.filter(
+        (sub) => sub.grade !== null,
+      );
+      const avgGrade =
+        gradedSubmissions.length > 0
+          ? Number(
+              (
+                gradedSubmissions.reduce(
+                  (acc, sub) => acc + (sub.grade || 0),
+                  0,
+                ) / gradedSubmissions.length
+              ).toFixed(1),
+            )
+          : null;
+
+      // Buổi học đã tham gia
+      const attendedCount = cls.sessions
+        .flatMap((s) => s.attendances)
+        .filter((att) => att.userId === studentId && att.isPresent).length;
+
+      return {
+        userId: studentId,
+        email: enr.user.email,
+        fullName: enr.user.profile?.fullName || enr.user.email,
+        avatar: enr.user.profile?.avatar || null,
+        phone: enr.user.profile?.phone || null,
+        totalBanhRan: enr.user.stats?.totalBanhRan || 0,
+        streakCount: enr.user.stats?.streakCount || 0,
+        lastLoginAt: enr.user.lastLoginAt,
+        totalAssignments,
+        submittedAssignmentsCount: submittedCount,
+        averageGrade: avgGrade,
+        totalSessions,
+        attendedSessionsCount: attendedCount,
+      };
+    });
+
+    return {
+      classId: cls.id,
+      className: cls.name,
+      totalStudents: students.length,
+      students,
+    };
   }
 }

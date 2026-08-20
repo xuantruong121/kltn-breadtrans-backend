@@ -151,11 +151,16 @@ export class MarketService {
     });
 
     // Kiểm tra xem đơn hàng có chứa Quà tặng thực tế / Voucher cần Admin duyệt hay không
-    const hasRealGift = items.some(
-      (item: any) =>
-        item.category === 'gift' ||
-        (item.name && (item.name.includes('Voucher') || item.name.includes('Sổ Tay') || item.name.includes('Quà')))
-    );
+    const hasRealGift = (items as Array<Record<string, any>>).some((item) => {
+      const cat = String(item?.category || '');
+      const name = String(item?.name || '');
+      return (
+        cat === 'gift' ||
+        name.includes('Voucher') ||
+        name.includes('Sổ Tay') ||
+        name.includes('Quà')
+      );
+    });
 
     const initialStatus = hasRealGift ? 'pending' : 'approved';
 

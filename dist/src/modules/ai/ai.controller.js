@@ -100,7 +100,9 @@ let AiController = class AiController {
             const lastUserMsg = [...chatDto.messages]
                 .reverse()
                 .find((m) => m.role === 'user');
-            textPrompt = lastUserMsg ? lastUserMsg.content : chatDto.messages[chatDto.messages.length - 1].content;
+            textPrompt = lastUserMsg
+                ? lastUserMsg.content
+                : chatDto.messages[chatDto.messages.length - 1].content;
         }
         if (!textPrompt) {
             throw new common_1.BadRequestException('Vui lòng cung cấp nội dung câu hỏi (prompt hoặc messages)');

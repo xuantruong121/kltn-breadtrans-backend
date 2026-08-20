@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { ClassController } from './class.controller';
 import { ClassService } from './class.service';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { EventsModule } from '../events/events.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, EventsModule],
   controllers: [ClassController],
   providers: [ClassService],
   exports: [ClassService],

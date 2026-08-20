@@ -22,7 +22,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsArray,
+} from 'class-validator';
 
 export class ChatDto {
   @ApiProperty({
@@ -88,11 +94,15 @@ export class AiController {
       const lastUserMsg = [...chatDto.messages]
         .reverse()
         .find((m) => m.role === 'user');
-      textPrompt = lastUserMsg ? lastUserMsg.content : chatDto.messages[chatDto.messages.length - 1].content;
+      textPrompt = lastUserMsg
+        ? lastUserMsg.content
+        : chatDto.messages[chatDto.messages.length - 1].content;
     }
 
     if (!textPrompt) {
-      throw new BadRequestException('Vui lòng cung cấp nội dung câu hỏi (prompt hoặc messages)');
+      throw new BadRequestException(
+        'Vui lòng cung cấp nội dung câu hỏi (prompt hoặc messages)',
+      );
     }
 
     const reply = await this.aiService.chat(textPrompt);
