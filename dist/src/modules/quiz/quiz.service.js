@@ -26,6 +26,23 @@ let QuizService = class QuizService {
     async createQuiz(dto) {
         return this.prisma.quiz.create({ data: dto });
     }
+    async updateQuiz(id, dto) {
+        const existing = await this.prisma.quiz.findUnique({ where: { id } });
+        if (!existing)
+            throw new common_1.NotFoundException('Quiz not found');
+        return this.prisma.quiz.update({
+            where: { id },
+            data: dto,
+        });
+    }
+    async deleteQuiz(id) {
+        const existing = await this.prisma.quiz.findUnique({ where: { id } });
+        if (!existing)
+            throw new common_1.NotFoundException('Quiz not found');
+        return this.prisma.quiz.delete({
+            where: { id },
+        });
+    }
     async getAllQuizzes() {
         return this.prisma.quiz.findMany({
             include: {
@@ -80,6 +97,27 @@ let QuizService = class QuizService {
                 ...dto,
                 quizId,
             },
+        });
+    }
+    async updateQuestion(questionId, dto) {
+        const existing = await this.prisma.question.findUnique({
+            where: { id: questionId },
+        });
+        if (!existing)
+            throw new common_1.NotFoundException('Question not found');
+        return this.prisma.question.update({
+            where: { id: questionId },
+            data: dto,
+        });
+    }
+    async deleteQuestion(questionId) {
+        const existing = await this.prisma.question.findUnique({
+            where: { id: questionId },
+        });
+        if (!existing)
+            throw new common_1.NotFoundException('Question not found');
+        return this.prisma.question.delete({
+            where: { id: questionId },
         });
     }
     async submitQuiz(quizId, userId, dto) {

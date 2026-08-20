@@ -153,6 +153,58 @@ export class AdminService {
     });
   }
 
+  async updateUser(
+    userId: number,
+    dto: {
+      fullName?: string;
+      phone?: string;
+      role?: Role;
+      password?: string;
+    },
+  ) {
+    const updateUserData: any = {};
+    if (dto.role) updateUserData.role = dto.role;
+    if (dto.password) {
+      updateUserData.password = await bcrypt.hash(dto.password, 10);
+    }
+
+    if (Object.keys(updateUserData).length > 0) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: updateUserData,
+      });
+    }
+
+    if (dto.fullName !== undefined || dto.phone !== undefined) {
+      await this.prisma.profile.upsert({
+        where: { userId },
+        update: {
+          fullName: dto.fullName,
+          phone: dto.phone,
+        },
+        create: {
+          userId,
+          fullName: dto.fullName || 'Học viên',
+          phone: dto.phone,
+        },
+      });
+    }
+
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        lastLoginAt: true,
+        loginCount: true,
+        profile: { select: { fullName: true, avatar: true, phone: true } },
+        stats: { select: { totalBanhRan: true, streakCount: true } },
+      },
+    });
+  }
+
   async deleteUser(userId: number) {
     return this.prisma.user.delete({ where: { id: userId } });
   }

@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -35,6 +37,25 @@ export class QuizController {
     return this.quizService.createQuiz(dto);
   }
 
+  @Patch(':id')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cập nhật đề thi (chỉ ADMIN/TEACHER)' })
+  updateQuiz(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: Partial<CreateQuizDto>,
+  ) {
+    return this.quizService.updateQuiz(id, dto);
+  }
+
+  @Delete(':id')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xóa đề thi (chỉ ADMIN/TEACHER)' })
+  deleteQuiz(@Param('id', ParseIntPipe) id: number) {
+    return this.quizService.deleteQuiz(id);
+  }
+
   @Get()
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiBearerAuth()
@@ -66,6 +87,25 @@ export class QuizController {
     @Body() dto: CreateQuestionDto,
   ) {
     return this.quizService.createQuestion(quizId, dto);
+  }
+
+  @Patch('questions/:questionId')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cập nhật câu hỏi trong Quiz' })
+  updateQuestion(
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Body() dto: Partial<CreateQuestionDto>,
+  ) {
+    return this.quizService.updateQuestion(questionId, dto);
+  }
+
+  @Delete('questions/:questionId')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xóa câu hỏi khỏi Quiz' })
+  deleteQuestion(@Param('questionId', ParseIntPipe) questionId: number) {
+    return this.quizService.deleteQuestion(questionId);
   }
 
   @Post(':id/submit')
