@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Param,
   ParseIntPipe,
@@ -61,6 +62,14 @@ export class ClassController {
     );
   }
 
+  @Post('daily-room')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Tạo hoặc lấy URL phòng học Daily.co qua API' })
+  async getOrCreateDailyRoom(@Body() body: { roomName?: string; title?: string }) {
+    const url = await this.classService.createDailyRoom(body.roomName || body.title);
+    return { url };
+  }
+
   @Post(':classId/sessions')
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiBearerAuth()
@@ -70,6 +79,29 @@ export class ClassController {
     @Body() dto: any,
   ) {
     return this.classService.createSession(classId, dto);
+  }
+
+  @Delete('sessions/:sessionId')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xóa buổi học (Session)' })
+  deleteSession(@Param('sessionId', ParseIntPipe) sessionId: number) {
+    return this.classService.deleteSession(sessionId);
+  }
+
+  @Patch('sessions/:sessionId/finish')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kết thúc buổi học ngay lập tức' })
+  finishSession(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @Request() req: any,
+  ) {
+    return this.classService.finishSession(
+      sessionId,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Get(':classId')

@@ -123,6 +123,7 @@ export class AdminService {
         lastLoginAt: true,
         loginCount: true,
         profile: { select: { fullName: true, avatar: true, phone: true } },
+        stats: { select: { totalBanhRan: true, streakCount: true } },
       },
     });
   }
@@ -296,9 +297,11 @@ export class AdminService {
       meetingLink?: string;
     },
   ) {
+    const dailyDomain = process.env.DAILY_DOMAIN || 'breadtrans-kltn.daily.co';
+    const randomCode = Math.random().toString(36).substring(2, 10);
     const meetingLink =
       dto.meetingLink ||
-      `https://meet.jit.si/breadtrans-${courseId}-${Date.now()}`;
+      `https://${dailyDomain}/breadtrans-${courseId}-${randomCode}`;
     return this.prisma.class.create({
       data: {
         name: dto.name,

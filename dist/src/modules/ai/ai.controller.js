@@ -26,16 +26,28 @@ const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 class ChatDto {
     prompt;
+    messages;
 }
 exports.ChatDto = ChatDto;
 __decorate([
     (0, swagger_1.ApiProperty)({
         example: 'Can you explain the difference between present perfect and past simple?',
+        required: false,
     }),
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], ChatDto.prototype, "prompt", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        required: false,
+        type: 'array',
+        items: { type: 'object' },
+    }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], ChatDto.prototype, "messages", void 0);
 class GenerateToeicDto {
     topic;
     part;
@@ -83,8 +95,18 @@ let AiController = class AiController {
         this.uploadService = uploadService;
     }
     async chat(chatDto) {
-        const reply = await this.aiService.chat(chatDto.prompt);
-        return { reply };
+        let textPrompt = chatDto.prompt;
+        if (!textPrompt && chatDto.messages && chatDto.messages.length > 0) {
+            const lastUserMsg = [...chatDto.messages]
+                .reverse()
+                .find((m) => m.role === 'user');
+            textPrompt = lastUserMsg ? lastUserMsg.content : chatDto.messages[chatDto.messages.length - 1].content;
+        }
+        if (!textPrompt) {
+            throw new common_1.BadRequestException('Vui lòng cung cấp nội dung câu hỏi (prompt hoặc messages)');
+        }
+        const reply = await this.aiService.chat(textPrompt);
+        return { reply, answer: reply };
     }
     async generateDictation(dto) {
         const questions = await this.aiService.generateDictation(dto.topic, dto.count);

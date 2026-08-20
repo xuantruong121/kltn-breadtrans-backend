@@ -207,4 +207,10 @@ export class GrammarService {
       where: { id },
     });
   }
+
+  async deleteQuestion(id: number) {
+    return this.prisma.grammarQuestion.delete({
+      where: { id },
+    });
+  }
 }

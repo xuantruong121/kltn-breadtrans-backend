@@ -22,16 +22,26 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
-import { IsString, IsNotEmpty, IsNumber } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, IsArray } from 'class-validator';
 
 export class ChatDto {
   @ApiProperty({
     example:
       'Can you explain the difference between present perfect and past simple?',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  prompt: string;
+  prompt?: string;
+
+  @ApiProperty({
+    required: false,
+    type: 'array',
+    items: { type: 'object' },
+  })
+  @IsOptional()
+  @IsArray()
+  messages?: Array<{ role: string; content: string }>;
 }
 
 export class GenerateToeicDto {
@@ -73,8 +83,20 @@ export class AiController {
   @Post('chat')
   @ApiOperation({ summary: 'Chat với trợ lý AI ảo (Hỗ trợ học tập)' })
   async chat(@Body() chatDto: ChatDto) {
-    const reply = await this.aiService.chat(chatDto.prompt);
-    return { reply };
+    let textPrompt = chatDto.prompt;
+    if (!textPrompt && chatDto.messages && chatDto.messages.length > 0) {
+      const lastUserMsg = [...chatDto.messages]
+        .reverse()
+        .find((m) => m.role === 'user');
+      textPrompt = lastUserMsg ? lastUserMsg.content : chatDto.messages[chatDto.messages.length - 1].content;
+    }
+
+    if (!textPrompt) {
+      throw new BadRequestException('Vui lòng cung cấp nội dung câu hỏi (prompt hoặc messages)');
+    }
+
+    const reply = await this.aiService.chat(textPrompt);
+    return { reply, answer: reply };
   }
 
   @UseGuards(JwtAuthGuard)
