@@ -7,7 +7,7 @@ import {
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { AiService } from './ai.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { SmartGeneratedContent } from './strategies/ai-evaluator.interface';
 import * as crypto from 'crypto';
 import * as mammoth from 'mammoth';
