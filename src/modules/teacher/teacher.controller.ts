@@ -37,10 +37,7 @@ export class TeacherController {
   @ApiOperation({
     summary: 'Lấy danh sách các buổi học sắp tới của giảng viên',
   })
-  getUpcomingSessions(
-    @Request() req: any,
-    @Query('limit') limit?: string,
-  ) {
+  getUpcomingSessions(@Request() req: any, @Query('limit') limit?: string) {
     const take = limit ? parseInt(limit, 10) : 8;
     return this.teacherService.getUpcomingSessions(req.user.id, take);
   }

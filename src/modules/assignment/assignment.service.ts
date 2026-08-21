@@ -84,9 +84,10 @@ export class AssignmentService {
     });
     if (!assignment) throw new NotFoundException('Không tìm thấy bài tập');
 
-    const existingSubmission = await this.prisma.assignmentSubmission.findUnique({
-      where: { assignmentId_userId: { assignmentId, userId } },
-    });
+    const existingSubmission =
+      await this.prisma.assignmentSubmission.findUnique({
+        where: { assignmentId_userId: { assignmentId, userId } },
+      });
 
     if (existingSubmission) {
       // Rule 1: QUIZ chỉ được làm và nộp 1 lần duy nhất để bảo đảm tính trung thực
@@ -180,7 +181,10 @@ export class AssignmentService {
     };
   }
 
-  private async updateStudentEnrollmentProgress(classId: number, userId: number) {
+  private async updateStudentEnrollmentProgress(
+    classId: number,
+    userId: number,
+  ) {
     try {
       const [totalSessions, totalAssignments] = await Promise.all([
         this.prisma.session.count({ where: { classId } }),

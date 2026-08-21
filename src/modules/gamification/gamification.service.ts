@@ -307,7 +307,10 @@ export class GamificationService {
 
   async recordVocabLearned(userId: number, count: number = 1) {
     const validCount = Math.max(1, count || 1);
-    this.eventEmitter.emit('vocab.learned', { userId, count: validCount });
+    await this.eventEmitter.emitAsync('vocab.learned', {
+      userId,
+      count: validCount,
+    });
     return { success: true, count: validCount };
   }
 
