@@ -35,6 +35,7 @@ const market_module_1 = require("./modules/market/market.module");
 const content_module_1 = require("./modules/content/content.module");
 const schedule_1 = require("@nestjs/schedule");
 const notifications_module_1 = require("./modules/notifications/notifications.module");
+const teacher_module_1 = require("./modules/teacher/teacher.module");
 const logging_middleware_1 = require("./common/middleware/logging.middleware");
 const ioredis_1 = require("@nestjs-modules/ioredis");
 let AppModule = class AppModule {
@@ -79,6 +80,7 @@ exports.AppModule = AppModule = __decorate([
             market_module_1.MarketModule,
             content_module_1.ContentModule,
             notifications_module_1.NotificationsModule,
+            teacher_module_1.TeacherModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [

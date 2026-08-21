@@ -244,6 +244,7 @@ export declare class CourseController {
             classId: number;
             startTime: Date;
             endTime: Date;
+            lessonNote: string | null;
             recordingUrl: string | null;
         }[];
         name: string;
@@ -283,6 +284,7 @@ export declare class CourseController {
             classId: number;
             startTime: Date;
             endTime: Date;
+            lessonNote: string | null;
             recordingUrl: string | null;
         }[];
         name: string;

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateAssignmentDto,
@@ -80,6 +84,34 @@ export class AssignmentService {
     });
     if (!assignment) throw new NotFoundException('Không tìm thấy bài tập');
 
+    const existingSubmission = await this.prisma.assignmentSubmission.findUnique({
+      where: { assignmentId_userId: { assignmentId, userId } },
+    });
+
+    if (existingSubmission) {
+      // Rule 1: QUIZ chỉ được làm và nộp 1 lần duy nhất để bảo đảm tính trung thực
+      if (assignment.type === 'QUIZ') {
+        throw new ForbiddenException(
+          'Bài tập trắc nghiệm chỉ được nộp 1 lần duy nhất và bài làm đã được ghi nhận.',
+        );
+      }
+      // Rule 2: ESSAY nếu đã được giáo viên chấm điểm thì bị khóa bài nộp
+      if (
+        assignment.type === 'ESSAY' &&
+        existingSubmission.grade !== null &&
+        existingSubmission.grade !== undefined
+      ) {
+        throw new ForbiddenException(
+          'Bài tập tự luận đã được giáo viên chấm điểm và nhận xét, không thể nộp đè bài mới.',
+        );
+      }
+    }
+
+    const now = new Date();
+    const isLate = assignment.dueDate
+      ? now.getTime() > new Date(assignment.dueDate).getTime()
+      : false;
+
     // Chấm điểm tự động nếu là dạng QUIZ
     let grade = undefined;
     if (assignment.type === 'QUIZ' && dto.quizAnswers && assignment.quizData) {
@@ -91,7 +123,7 @@ export class AssignmentService {
           correctCount++;
         }
       }
-      grade = (correctCount / questions.length) * 10;
+      grade = Number(((correctCount / questions.length) * 10).toFixed(1));
     }
 
     const submission = await this.prisma.assignmentSubmission.upsert({
@@ -101,7 +133,7 @@ export class AssignmentService {
         fileUrl: dto.fileUrl,
         quizAnswers: dto.quizAnswers,
         grade,
-        submittedAt: new Date(),
+        submittedAt: now,
       },
       create: {
         assignmentId,
@@ -110,32 +142,102 @@ export class AssignmentService {
         fileUrl: dto.fileUrl,
         quizAnswers: dto.quizAnswers,
         grade,
+        submittedAt: now,
       },
     });
 
-    // Cộng điểm Gamification cho QUIZ (nếu có điểm)
-    if (grade !== undefined && grade !== null) {
-      const points = Math.round(grade * 10); // 10 điểm = 100 xp
-      if (points > 0) {
-        await this.gamification.addPoints(
+    // Cập nhật tiến độ học tập (Enrollment.progress) của học sinh cho lớp học
+    await this.updateStudentEnrollmentProgress(assignment.classId, userId);
+
+    // Đối với QUIZ: Hệ thống tự chấm điểm và thưởng Bánh Mì/EXP ngay (Đảm bảo Idempotency khi nộp lại)
+    if (assignment.type === 'QUIZ' && grade !== undefined && grade !== null) {
+      const historyKey = `Hoàn thành bài tập trắc nghiệm: ${assignment.title}`;
+      const alreadyRewarded = await this.prisma.pointHistory.findFirst({
+        where: {
           userId,
-          points,
-          `Hoàn thành bài tập trắc nghiệm: ${assignment.title}`,
-        );
+          reason: { contains: historyKey },
+        },
+      });
+
+      if (!alreadyRewarded) {
+        const rawPoints = Math.round(grade * 10); // 10 điểm = 100 xp
+        const points = isLate ? Math.round(rawPoints * 0.5) : rawPoints;
+        if (points > 0) {
+          await this.gamification.addPoints(
+            userId,
+            points,
+            `${historyKey}${isLate ? ' (Nộp trễ - Giảm 50% thưởng)' : ''}`,
+          );
+        }
       }
-    } else {
-      // Tự luận: nộp bài thành công +50đ (tạm tính)
-      await this.gamification.addPoints(
-        userId,
-        50,
-        `Nộp bài tập tự luận: ${assignment.title}`,
+    }
+    // Đối với ESSAY: Điểm thưởng sẽ được hệ thống tính và phát sau khi giáo viên chấm bài xong (Hướng A)
+
+    return {
+      ...submission,
+      isLate,
+      isAutoGraded: assignment.type === 'QUIZ',
+    };
+  }
+
+  private async updateStudentEnrollmentProgress(classId: number, userId: number) {
+    try {
+      const [totalSessions, totalAssignments] = await Promise.all([
+        this.prisma.session.count({ where: { classId } }),
+        this.prisma.assignment.count({ where: { classId } }),
+      ]);
+
+      if (totalSessions === 0 && totalAssignments === 0) return;
+
+      const [attendedSessions, submittedAssignments] = await Promise.all([
+        this.prisma.attendance.count({
+          where: {
+            session: { classId },
+            userId,
+            isPresent: true,
+          },
+        }),
+        this.prisma.assignmentSubmission.count({
+          where: {
+            assignment: { classId },
+            userId,
+          },
+        }),
+      ]);
+
+      let progress = 0;
+      if (totalSessions > 0 && totalAssignments > 0) {
+        const sessionRatio = attendedSessions / totalSessions;
+        const assignmentRatio = submittedAssignments / totalAssignments;
+        progress = (0.5 * sessionRatio + 0.5 * assignmentRatio) * 100;
+      } else if (totalSessions > 0) {
+        progress = (attendedSessions / totalSessions) * 100;
+      } else if (totalAssignments > 0) {
+        progress = (submittedAssignments / totalAssignments) * 100;
+      }
+
+      await this.prisma.enrollment.updateMany({
+        where: { classId, userId },
+        data: { progress: Math.min(100, Math.round(progress)) },
+      });
+    } catch (error) {
+      console.error(
+        `Error recalculating progress for user ${userId} in class ${classId}:`,
+        error,
       );
     }
-
-    return submission;
   }
 
   async gradeSubmission(submissionId: number, dto: GradeAssignmentDto) {
+    const existing = await this.prisma.assignmentSubmission.findUnique({
+      where: { id: submissionId },
+      include: { assignment: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Không tìm thấy bài nộp');
+    }
+
     const updated = await this.prisma.assignmentSubmission.update({
       where: { id: submissionId },
       data: {
@@ -145,14 +247,22 @@ export class AssignmentService {
       include: { assignment: true },
     });
 
-    // Nếu giáo viên chấm điểm tự luận, thưởng thêm điểm dựa trên grade (0-10) -> 0-100đ
+    // Khi giáo viên chấm bài tự luận (ESSAY), tính thưởng Bánh Mì/EXP theo chất lượng bài làm
     if (dto.grade !== undefined && dto.grade !== null) {
-      const points = Math.round(dto.grade * 10);
-      await this.gamification.addPoints(
-        updated.userId,
-        points,
-        `Giáo viên chấm điểm bài tập: ${updated.assignment.title}`,
-      );
+      const isLate = updated.assignment.dueDate
+        ? new Date(updated.submittedAt) > new Date(updated.assignment.dueDate)
+        : false;
+
+      const rawPoints = Math.round(dto.grade * 10); // Điểm 10 -> tối đa 100 XP / Bánh Mì
+      const points = isLate ? Math.round(rawPoints * 0.5) : rawPoints;
+
+      if (points > 0) {
+        await this.gamification.addPoints(
+          updated.userId,
+          points,
+          `Giáo viên chấm điểm bài tập: ${updated.assignment.title}${isLate ? ' (Nộp trễ - Giảm 50% thưởng)' : ''}`,
+        );
+      }
     }
 
     return updated;

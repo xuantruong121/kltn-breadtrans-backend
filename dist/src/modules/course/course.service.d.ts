@@ -229,6 +229,7 @@ export declare class CourseService {
             classId: number;
             startTime: Date;
             endTime: Date;
+            lessonNote: string | null;
             recordingUrl: string | null;
         }[];
         name: string;
@@ -268,6 +269,7 @@ export declare class CourseService {
             classId: number;
             startTime: Date;
             endTime: Date;
+            lessonNote: string | null;
             recordingUrl: string | null;
         }[];
         name: string;

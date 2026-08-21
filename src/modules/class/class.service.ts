@@ -220,6 +220,29 @@ export class ClassService {
         },
       },
     });
+
+    if (!cls) throw new NotFoundException('Không tìm thấy lớp học');
+
+    // Kiểm tra phân quyền phạm vi truy cập (RBAC & Scope)
+    if (role === 'STUDENT') {
+      const isEnrolled = cls.enrollments.some(
+        (e) =>
+          (e.user.id === userId || (e as any).userId === userId) &&
+          (e.status === 'ACTIVE' || e.status === 'COMPLETED'),
+      );
+      if (!isEnrolled) {
+        throw new ForbiddenException(
+          'Bạn chưa ghi danh hoặc không có quyền truy cập bài giảng và tài liệu của lớp học này',
+        );
+      }
+    } else if (role === 'TEACHER') {
+      if (cls.teacherId !== userId) {
+        throw new ForbiddenException(
+          'Bạn không phải là giảng viên phụ trách lớp học này',
+        );
+      }
+    }
+
     return cls;
   }
 
@@ -236,7 +259,6 @@ export class ClassService {
       });
     }
 
-    // Default STUDENT
     const enrollments = await this.prisma.enrollment.findMany({
       where: { userId },
       include: {
@@ -250,22 +272,17 @@ export class ClassService {
                 profile: { select: { fullName: true, avatar: true } },
               },
             },
-            sessions: {
-              where: { endTime: { gte: new Date() } },
-              orderBy: { startTime: 'asc' },
-              take: 1,
-            },
+            sessions: { orderBy: { startTime: 'asc' } },
           },
         },
       },
       orderBy: { joinedAt: 'desc' },
     });
 
-    return enrollments.map((e) => ({
-      ...e.class,
-      enrollmentProgress: e.progress,
-      enrollmentStatus: e.status,
-      nextSession: e.class.sessions[0] || null,
+    return enrollments.map((enr) => ({
+      ...enr.class,
+      enrollmentProgress: enr.progress,
+      enrollmentStatus: enr.status,
     }));
   }
 
@@ -295,20 +312,22 @@ export class ClassService {
   }
 
   // ==========================================
-  // TEACHER PORTAL: REWARD STUDENT IN CLASS
+  // TEACHER PORTAL: REWARD BANH RAN FOR STUDENT
   // ==========================================
   async rewardStudentInClass(
-    teacherId: number,
-    role: string,
     classId: number,
     studentId: number,
     amount: number,
-    reason?: string,
+    reason: string,
+    teacherId: number,
+    role: string,
   ) {
     const cls = await this.prisma.class.findUnique({
       where: { id: classId },
       include: {
-        enrollments: { where: { userId: studentId } },
+        enrollments: {
+          where: { userId: studentId, status: 'ACTIVE' },
+        },
       },
     });
 
@@ -322,8 +341,32 @@ export class ClassService {
       throw new NotFoundException('Học sinh không thuộc lớp học này');
     }
 
-    const rewardAmount = Math.max(1, Math.min(amount || 20, 500));
+    // Giới hạn trần thưởng mỗi lần: Teacher tối đa 50 🍞/lần, Admin tối đa 500
+    const maxPerTx = role === 'ADMIN' ? 500 : 50;
+    const rewardAmount = Math.max(1, Math.min(amount || 20, maxPerTx));
     const rewardReason = reason?.trim() || 'Giáo viên thưởng Bánh Mì';
+
+    if (role !== 'ADMIN') {
+      // Kiểm tra trần thưởng trong ngày cho học sinh này (Tối đa 100 🍞/ngày cho nguồn Giáo viên thưởng)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const todayRewards = await this.prisma.pointHistory.aggregate({
+        where: {
+          userId: studentId,
+          createdAt: { gte: startOfDay },
+          reason: { startsWith: '[TEACHER_REWARD]' },
+        },
+        _sum: { points: true },
+      });
+
+      const todayTotal = todayRewards._sum.points || 0;
+      if (todayTotal + rewardAmount > 100) {
+        throw new ForbiddenException(
+          `Đã vượt quá giới hạn thưởng Bánh Mì cho học sinh này trong ngày (Đã thưởng ${todayTotal}/100 🍞 hôm nay)`,
+        );
+      }
+    }
 
     const updatedStats = await this.prisma.userStats.upsert({
       where: { userId: studentId },
@@ -335,7 +378,7 @@ export class ClassService {
       data: {
         userId: studentId,
         points: rewardAmount,
-        reason: `${cls.name}: ${rewardReason}`,
+        reason: `[TEACHER_REWARD] ${cls.name}: ${rewardReason}`,
       },
     });
 
@@ -356,9 +399,8 @@ export class ClassService {
 
     return {
       success: true,
-      amount: rewardAmount,
+      message: `Đã thưởng thành công ${rewardAmount} Bánh Mì cho ${studentName}!`,
       newBalance: updatedStats.totalBanhRan,
-      message: `Đã thưởng +${rewardAmount} 🍞 cho ${studentName}!`,
     };
   }
 
@@ -376,14 +418,13 @@ export class ClassService {
         class: {
           include: {
             enrollments: {
+              where: { status: 'ACTIVE' },
               include: {
                 user: {
                   select: {
                     id: true,
                     email: true,
-                    profile: {
-                      select: { fullName: true, avatar: true, phone: true },
-                    },
+                    profile: { select: { fullName: true, avatar: true } },
                   },
                 },
               },
@@ -397,7 +438,7 @@ export class ClassService {
     if (!session) throw new NotFoundException('Không tìm thấy buổi học');
     if (role !== 'ADMIN' && session.class.teacherId !== teacherId) {
       throw new ForbiddenException(
-        'Bạn không có quyền xem điểm danh buổi học này',
+        'Bạn không có quyền xem điểm danh của lớp này',
       );
     }
 
@@ -406,23 +447,24 @@ export class ClassService {
       attendanceMap.set(att.userId, att.isPresent);
     });
 
-    const students = session.class.enrollments.map((enr) => ({
+    const result = session.class.enrollments.map((enr) => ({
       userId: enr.user.id,
       email: enr.user.email,
       fullName: enr.user.profile?.fullName || enr.user.email,
-      avatar: enr.user.profile?.avatar || null,
-      phone: enr.user.profile?.phone || null,
+      avatar: enr.user.profile?.avatar,
       isPresent: attendanceMap.has(enr.user.id)
         ? attendanceMap.get(enr.user.id)
-        : true,
+        : false,
     }));
 
     return {
-      sessionId: session.id,
-      sessionTitle: session.title,
-      startTime: session.startTime,
-      endTime: session.endTime,
-      students,
+      session: {
+        id: session.id,
+        title: session.title,
+        startTime: session.startTime,
+        endTime: session.endTime,
+      },
+      students: result,
     };
   }
 
@@ -442,14 +484,7 @@ export class ClassService {
       throw new ForbiddenException('Bạn không có quyền điểm danh buổi học này');
     }
 
-    const existingMap = new Map<number, boolean>();
-    session.attendances.forEach((att) => {
-      existingMap.set(att.userId, att.isPresent);
-    });
-
     for (const rec of records) {
-      const wasPresent = existingMap.get(rec.userId);
-
       await this.prisma.attendance.upsert({
         where: {
           sessionId_userId: {
@@ -465,41 +500,104 @@ export class ClassService {
         },
       });
 
-      // Tặng +5 Bánh Mì chuyên cần nếu được điểm danh Có mặt lần đầu trong buổi này
-      if (rec.isPresent && wasPresent !== true) {
-        const stats = await this.prisma.userStats.upsert({
-          where: { userId: rec.userId },
-          update: { totalBanhRan: { increment: 5 } },
-          create: { userId: rec.userId, totalBanhRan: 5 },
-        });
-
-        await this.prisma.pointHistory.create({
-          data: {
+      // Tặng +5 Bánh Mì chuyên cần nếu được điểm danh Có mặt (Đảm bảo Idempotency)
+      if (rec.isPresent) {
+        const alreadyRewarded = await this.prisma.pointHistory.findFirst({
+          where: {
             userId: rec.userId,
-            points: 5,
             reason: `Chuyên cần: ${session.title}`,
           },
         });
 
-        const student = await this.prisma.user.findUnique({
-          where: { id: rec.userId },
-          include: { profile: true },
-        });
+        if (!alreadyRewarded) {
+          const stats = await this.prisma.userStats.upsert({
+            where: { userId: rec.userId },
+            update: { totalBanhRan: { increment: 5 } },
+            create: { userId: rec.userId, totalBanhRan: 5 },
+          });
 
-        this.eventsGateway.sendCurrencyUpdate(rec.userId, {
-          amount: 5,
-          newBalance: stats.totalBanhRan,
-          reason: `Chuyên cần buổi học: ${session.title}`,
-          studentName:
-            student?.profile?.fullName || student?.email || 'Học viên',
-        });
+          await this.prisma.pointHistory.create({
+            data: {
+              userId: rec.userId,
+              points: 5,
+              reason: `Chuyên cần: ${session.title}`,
+            },
+          });
+
+          const student = await this.prisma.user.findUnique({
+            where: { id: rec.userId },
+            include: { profile: true },
+          });
+
+          this.eventsGateway.sendCurrencyUpdate(rec.userId, {
+            amount: 5,
+            newBalance: stats.totalBanhRan,
+            reason: `Chuyên cần buổi học: ${session.title}`,
+            studentName:
+              student?.profile?.fullName || student?.email || 'Học viên',
+          });
+        }
       }
+      // Tự động tính toán lại tiến độ học tập (Enrollment.progress) của học viên
+      await this.recalculateEnrollmentProgress(session.classId, rec.userId);
     }
 
     return {
       success: true,
       message: `Đã lưu điểm danh cho ${records.length} học viên thành công!`,
     };
+  }
+
+  // ==========================================
+  // HELPER: RECALCULATE ENROLLMENT PROGRESS (0 - 100%)
+  // Công thức: 50% Điểm danh chuyên cần + 50% Bài tập đã nộp
+  // ==========================================
+  async recalculateEnrollmentProgress(classId: number, userId: number) {
+    try {
+      const [totalSessions, totalAssignments] = await Promise.all([
+        this.prisma.session.count({ where: { classId } }),
+        this.prisma.assignment.count({ where: { classId } }),
+      ]);
+
+      if (totalSessions === 0 && totalAssignments === 0) return;
+
+      const [attendedSessions, submittedAssignments] = await Promise.all([
+        this.prisma.attendance.count({
+          where: {
+            session: { classId },
+            userId,
+            isPresent: true,
+          },
+        }),
+        this.prisma.assignmentSubmission.count({
+          where: {
+            assignment: { classId },
+            userId,
+          },
+        }),
+      ]);
+
+      let progress = 0;
+      if (totalSessions > 0 && totalAssignments > 0) {
+        const sessionRatio = attendedSessions / totalSessions;
+        const assignmentRatio = submittedAssignments / totalAssignments;
+        progress = (0.5 * sessionRatio + 0.5 * assignmentRatio) * 100;
+      } else if (totalSessions > 0) {
+        progress = (attendedSessions / totalSessions) * 100;
+      } else if (totalAssignments > 0) {
+        progress = (submittedAssignments / totalAssignments) * 100;
+      }
+
+      await this.prisma.enrollment.updateMany({
+        where: { classId, userId },
+        data: { progress: Math.min(100, Math.round(progress)) },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error recalculating progress for user ${userId} in class ${classId}:`,
+        error,
+      );
+    }
   }
 
   // ==========================================

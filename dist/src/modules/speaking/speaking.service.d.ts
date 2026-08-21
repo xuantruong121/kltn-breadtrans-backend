@@ -66,7 +66,7 @@ export declare class SpeakingService {
         aiFeedback: import("@prisma/client/runtime/library").JsonValue | null;
         userId: number;
         audioUrl: string;
-        overallScore: number | null;
         exerciseId: number;
+        overallScore: number | null;
     })[]>;
 }

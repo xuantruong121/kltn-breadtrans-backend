@@ -271,6 +271,11 @@ let GamificationService = class GamificationService {
         }
         return progresses;
     }
+    async recordVocabLearned(userId, count = 1) {
+        const validCount = Math.max(1, count || 1);
+        this.eventEmitter.emit('vocab.learned', { userId, count: validCount });
+        return { success: true, count: validCount };
+    }
     async getArenaSnippet(userId) {
         const myLeaderboard = await this.prisma.leaderboard.findUnique({
             where: { userId },
