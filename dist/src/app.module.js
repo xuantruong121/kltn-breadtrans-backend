@@ -33,6 +33,8 @@ const assignment_module_1 = require("./modules/assignment/assignment.module");
 const grammar_module_1 = require("./modules/grammar/grammar.module");
 const market_module_1 = require("./modules/market/market.module");
 const content_module_1 = require("./modules/content/content.module");
+const schedule_1 = require("@nestjs/schedule");
+const notifications_module_1 = require("./modules/notifications/notifications.module");
 const logging_middleware_1 = require("./common/middleware/logging.middleware");
 const ioredis_1 = require("@nestjs-modules/ioredis");
 let AppModule = class AppModule {
@@ -45,6 +47,7 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             event_emitter_1.EventEmitterModule.forRoot(),
+            schedule_1.ScheduleModule.forRoot(),
             ioredis_1.RedisModule.forRoot({
                 type: 'single',
                 url: 'redis://localhost:6379',
@@ -75,6 +78,7 @@ exports.AppModule = AppModule = __decorate([
             grammar_module_1.GrammarModule,
             market_module_1.MarketModule,
             content_module_1.ContentModule,
+            notifications_module_1.NotificationsModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [

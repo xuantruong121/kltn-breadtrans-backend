@@ -65,19 +65,34 @@ export class AuthService {
     });
 
     const payload = { sub: user.id, email: user.email, role: user.role };
-    const access_token = this.jwtService.sign(payload, { expiresIn: '1h' });
+    const access_token = this.jwtService.sign(payload, { expiresIn: '1d' });
 
-    // Generate a secure random refresh token family ID
-    const refreshToken = crypto.randomBytes(40).toString('hex');
+    // Generate signed JWT refresh token (30 days) containing userId and deviceId
+    const refreshToken = this.jwtService.sign(
+      { sub: user.id, deviceId, type: 'refresh' },
+      { expiresIn: '30d' },
+    );
 
-    // Store in Redis: user:{userId}:device:{deviceId} -> refreshToken (7 days TTL)
+    // Store in Redis (30 days TTL) and save to PostgreSQL as durable fallback
     const redisKey = `user:${user.id}:device:${deviceId}`;
-    await this.redis.set(redisKey, refreshToken, 'EX', 7 * 24 * 60 * 60);
+    try {
+      await this.redis.set(redisKey, refreshToken, 'EX', 30 * 24 * 60 * 60);
+    } catch (redisErr) {
+      console.warn(
+        '[AuthService] Failed to set refresh token in Redis:',
+        redisErr,
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken },
+    });
 
     return {
       access_token,
       refresh_token: refreshToken,
-      deviceId, // Tell client what device ID we registered (if they didn't provide one, maybe we generate one? Actually we require it in DTO)
+      deviceId,
       user: {
         id: user.id,
         email: user.email,
@@ -92,39 +107,95 @@ export class AuthService {
     deviceId: string,
     providedRefreshToken: string,
   ) {
-    const redisKey = `user:${userId}:device:${deviceId}`;
-    const storedToken = await this.redis.get(redisKey);
+    // 1. Verify token signature and type
+    let tokenPayload: any = null;
+    try {
+      tokenPayload = this.jwtService.verify(providedRefreshToken);
+    } catch {
+      // If verify fails, decode to check if expired
+      tokenPayload = this.jwtService.decode(providedRefreshToken);
+    }
 
-    // REUSE DETECTION (Replay Attack)
-    // If the provided refresh token does not match the one in Redis, someone is trying to reuse an old or invalid token!
-    if (storedToken !== providedRefreshToken) {
-      // Security measure: Revoke ALL tokens for this device (or user) to force re-authentication
-      await this.redis.del(redisKey);
+    const effectiveUserId = tokenPayload?.sub || userId;
+    const effectiveDeviceId = tokenPayload?.deviceId || deviceId;
+
+    if (!effectiveUserId) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const redisKey = `user:${effectiveUserId}:device:${effectiveDeviceId}`;
+    let storedToken: string | null = null;
+    try {
+      storedToken = await this.redis.get(redisKey);
+    } catch (err) {
+      console.warn('[AuthService] Redis get failed during refresh:', err);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: effectiveUserId },
+      include: { profile: true },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    // 2. Check token validity: Redis first, DB fallback if Redis was restarted/flushed
+    const isValidToken =
+      storedToken === providedRefreshToken ||
+      user.refreshToken === providedRefreshToken;
+
+    if (!isValidToken) {
+      if (storedToken) {
+        await this.redis.del(redisKey);
+      }
       throw new UnauthorizedException(
         'Replay attack detected or token expired. Session revoked.',
       );
     }
 
-    // Token is valid. Rotate it!
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('User not found');
-
+    // 3. Token is valid. Rotate tokens!
     const payload = { sub: user.id, email: user.email, role: user.role };
-    const access_token = this.jwtService.sign(payload, { expiresIn: '1h' });
-    const new_refresh_token = crypto.randomBytes(40).toString('hex');
+    const new_access_token = this.jwtService.sign(payload, { expiresIn: '1d' });
+    const new_refresh_token = this.jwtService.sign(
+      { sub: user.id, deviceId: effectiveDeviceId, type: 'refresh' },
+      { expiresIn: '30d' },
+    );
 
-    // Replace old token with new one in Redis
-    await this.redis.set(redisKey, new_refresh_token, 'EX', 7 * 24 * 60 * 60);
+    // Replace old token with new one in Redis and PostgreSQL
+    try {
+      await this.redis.set(
+        redisKey,
+        new_refresh_token,
+        'EX',
+        30 * 24 * 60 * 60,
+      );
+    } catch (redisErr) {
+      console.warn(
+        '[AuthService] Failed to set rotated token in Redis:',
+        redisErr,
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: new_refresh_token },
+    });
 
     return {
-      access_token,
+      access_token: new_access_token,
       refresh_token: new_refresh_token,
     };
   }
 
   async logout(userId: number, deviceId: string) {
     const redisKey = `user:${userId}:device:${deviceId}`;
-    await this.redis.del(redisKey);
+    try {
+      await this.redis.del(redisKey);
+    } catch (err) {
+      console.warn('[AuthService] Redis del failed during logout:', err);
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: null },
+    });
     return { message: 'Logged out successfully' };
   }
 

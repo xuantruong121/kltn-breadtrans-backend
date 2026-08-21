@@ -8,17 +8,23 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GamificationService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const event_emitter_1 = require("@nestjs/event-emitter");
+const notifications_service_1 = require("../notifications/notifications.service");
 let GamificationService = class GamificationService {
     prisma;
     eventEmitter;
-    constructor(prisma, eventEmitter) {
+    notificationsService;
+    constructor(prisma, eventEmitter, notificationsService) {
         this.prisma = prisma;
         this.eventEmitter = eventEmitter;
+        this.notificationsService = notificationsService;
     }
     async addPoints(userId, points, reason) {
         let myLeaderboard = await this.prisma.leaderboard.findUnique({
@@ -48,8 +54,78 @@ let GamificationService = class GamificationService {
             update: { totalBanhRan: { increment: points } },
             create: { userId, totalBanhRan: points },
         });
+        await this.recordStreakActivity(userId);
         this.eventEmitter.emit('gamification.xp_earned', { userId, points });
         return updatedLeaderboard;
+    }
+    async recordStreakActivity(userId) {
+        try {
+            const now = new Date();
+            const stats = await this.prisma.userStats.findUnique({
+                where: { userId },
+            });
+            if (!stats) {
+                await this.prisma.userStats.create({
+                    data: {
+                        userId,
+                        streakCount: 1,
+                        lastStreakUpdate: now,
+                    },
+                });
+                return;
+            }
+            const lastUpdate = stats.lastStreakUpdate
+                ? new Date(stats.lastStreakUpdate)
+                : null;
+            if (!lastUpdate) {
+                await this.prisma.userStats.update({
+                    where: { userId },
+                    data: { streakCount: 1, lastStreakUpdate: now },
+                });
+                return;
+            }
+            const nowDateStr = now.toISOString().split('T')[0];
+            const lastDateStr = lastUpdate.toISOString().split('T')[0];
+            if (nowDateStr === lastDateStr) {
+                return;
+            }
+            const nowMidnight = new Date(nowDateStr).getTime();
+            const lastMidnight = new Date(lastDateStr).getTime();
+            const diffDays = Math.round((nowMidnight - lastMidnight) / (1000 * 60 * 60 * 24));
+            if (diffDays === 1) {
+                await this.prisma.userStats.update({
+                    where: { userId },
+                    data: {
+                        streakCount: { increment: 1 },
+                        lastStreakUpdate: now,
+                    },
+                });
+            }
+            else if (diffDays > 1) {
+                if (stats.streakFreezes > 0) {
+                    await this.prisma.userStats.update({
+                        where: { userId },
+                        data: {
+                            streakFreezes: { decrement: 1 },
+                            streakCount: { increment: 1 },
+                            lastStreakUpdate: now,
+                        },
+                    });
+                }
+                else {
+                    await this.prisma.userStats.update({
+                        where: { userId },
+                        data: {
+                            streakCount: 1,
+                            lastStreakUpdate: now,
+                        },
+                    });
+                }
+            }
+        }
+        catch (err) {
+            console.error('[Streak] Failed to update streak for user:', userId, err);
+        }
     }
     async getLeaderboard(tier = 'Đồng') {
         return this.prisma.leaderboard.findMany({
@@ -327,11 +403,43 @@ let GamificationService = class GamificationService {
         }
         return { success: true, message: 'Leagues updated successfully.' };
     }
+    async sendAdmiration(senderId, targetUserId, message) {
+        if (senderId === targetUserId) {
+            throw new common_1.BadRequestException('Bạn không thể tự gửi ngưỡng mộ cho chính mình!');
+        }
+        const sender = await this.prisma.user.findUnique({
+            where: { id: senderId },
+            include: { profile: true },
+        });
+        const targetUser = await this.prisma.user.findUnique({
+            where: { id: targetUserId },
+            include: { stats: true },
+        });
+        if (!targetUser) {
+            throw new common_1.BadRequestException('Không tìm thấy học viên nhận ngưỡng mộ!');
+        }
+        const senderName = sender?.profile?.fullName || sender?.email || 'Một bạn học';
+        const admirationMsg = message || 'Rất ngưỡng mộ thành tích học tập của bạn! Cùng cố gắng nhé!';
+        if (this.notificationsService) {
+            void this.notificationsService.sendPushToUser(targetUserId, {
+                title: '⭐ Bạn nhận được lời ngưỡng mộ mới!',
+                body: `${senderName}: "${admirationMsg}"`,
+                icon: sender?.profile?.avatar || '/icons/icon-192.png',
+                url: '/student/profile',
+            });
+        }
+        return {
+            success: true,
+            message: `Đã gửi lời ngưỡng mộ tới bạn học thành công!`,
+        };
+    }
 };
 exports.GamificationService = GamificationService;
 exports.GamificationService = GamificationService = __decorate([
     (0, common_1.Injectable)(),
+    __param(2, (0, common_1.Optional)()),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        event_emitter_1.EventEmitter2])
+        event_emitter_1.EventEmitter2,
+        notifications_service_1.NotificationsService])
 ], GamificationService);
 //# sourceMappingURL=gamification.service.js.map

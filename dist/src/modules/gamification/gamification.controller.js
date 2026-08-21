@@ -43,6 +43,9 @@ let GamificationController = class GamificationController {
     spinWheel(req) {
         return this.gamificationService.spinWheel(req.user.id);
     }
+    sendAdmiration(req, body) {
+        return this.gamificationService.sendAdmiration(req.user.id, body.targetUserId, body.message);
+    }
     triggerDailyCron() {
         return this.gamificationService.triggerDailyCron();
     }
@@ -118,6 +121,19 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], GamificationController.prototype, "spinWheel", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Post)('admiration/send'),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Gửi lời ngưỡng mộ tới bạn học & bắn Web Push Notification',
+    }),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "sendAdmiration", null);
 __decorate([
     (0, common_1.Post)('trigger-daily-cron'),
     (0, swagger_1.ApiOperation)({ summary: '[Test] Chạy cronjob bảo vệ chuỗi mỗi ngày' }),

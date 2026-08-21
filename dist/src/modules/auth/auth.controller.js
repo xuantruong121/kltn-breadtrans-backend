@@ -65,14 +65,16 @@ let AuthController = class AuthController {
         return this.authService.login(loginDto, deviceId);
     }
     async refreshTokens(req, body) {
+        let userId = null;
         const authHeader = req.headers.authorization;
-        if (!authHeader)
-            throw new common_1.UnauthorizedException('Missing token');
-        const token = authHeader.split(' ')[1];
-        const decoded = this.authService['jwtService'].decode(token);
-        if (!decoded || !decoded.sub)
-            throw new common_1.UnauthorizedException('Invalid token');
-        return this.authService.refreshTokens(decoded.sub, body.deviceId, body.refreshToken);
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.split(' ')[1];
+            const decoded = this.authService['jwtService'].decode(token);
+            if (decoded && decoded.sub) {
+                userId = decoded.sub;
+            }
+        }
+        return this.authService.refreshTokens(userId, body.deviceId, body.refreshToken);
     }
     async logout(req, deviceId) {
         return this.authService.logout(req.user.id, deviceId);

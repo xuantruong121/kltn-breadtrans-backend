@@ -1,12 +1,14 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class GamificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
   async addPoints(userId: number, points: number, reason: string) {
@@ -45,10 +47,92 @@ export class GamificationService {
       create: { userId, totalBanhRan: points },
     });
 
+    // 4. Ghi nhận và cộng chuỗi Streak tự động
+    await this.recordStreakActivity(userId);
+
     // Phát sự kiện xp_earned để listener cập nhật nhiệm vụ
     this.eventEmitter.emit('gamification.xp_earned', { userId, points });
 
     return updatedLeaderboard;
+  }
+
+  async recordStreakActivity(userId: number) {
+    try {
+      const now = new Date();
+      const stats = await this.prisma.userStats.findUnique({
+        where: { userId },
+      });
+
+      if (!stats) {
+        await this.prisma.userStats.create({
+          data: {
+            userId,
+            streakCount: 1,
+            lastStreakUpdate: now,
+          },
+        });
+        return;
+      }
+
+      const lastUpdate = stats.lastStreakUpdate
+        ? new Date(stats.lastStreakUpdate)
+        : null;
+      if (!lastUpdate) {
+        await this.prisma.userStats.update({
+          where: { userId },
+          data: { streakCount: 1, lastStreakUpdate: now },
+        });
+        return;
+      }
+
+      const nowDateStr = now.toISOString().split('T')[0];
+      const lastDateStr = lastUpdate.toISOString().split('T')[0];
+
+      // Nếu đã học trong cùng một ngày, không tăng thêm
+      if (nowDateStr === lastDateStr) {
+        return;
+      }
+
+      const nowMidnight = new Date(nowDateStr).getTime();
+      const lastMidnight = new Date(lastDateStr).getTime();
+      const diffDays = Math.round(
+        (nowMidnight - lastMidnight) / (1000 * 60 * 60 * 24),
+      );
+
+      if (diffDays === 1) {
+        // Học liên tiếp ngày hôm sau -> Tăng 1 ngày streak!
+        await this.prisma.userStats.update({
+          where: { userId },
+          data: {
+            streakCount: { increment: 1 },
+            lastStreakUpdate: now,
+          },
+        });
+      } else if (diffDays > 1) {
+        // Cách hơn 1 ngày: Kiểm tra khiên bảo vệ
+        if (stats.streakFreezes > 0) {
+          await this.prisma.userStats.update({
+            where: { userId },
+            data: {
+              streakFreezes: { decrement: 1 },
+              streakCount: { increment: 1 },
+              lastStreakUpdate: now,
+            },
+          });
+        } else {
+          // Bị ngắt chuỗi -> Bắt đầu lại từ 1
+          await this.prisma.userStats.update({
+            where: { userId },
+            data: {
+              streakCount: 1,
+              lastStreakUpdate: now,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[Streak] Failed to update streak for user:', userId, err);
+    }
   }
 
   async getLeaderboard(tier: string = 'Đồng') {
@@ -383,5 +467,51 @@ export class GamificationService {
       }
     }
     return { success: true, message: 'Leagues updated successfully.' };
+  }
+
+  async sendAdmiration(
+    senderId: number,
+    targetUserId: number,
+    message?: string,
+  ) {
+    if (senderId === targetUserId) {
+      throw new BadRequestException(
+        'Bạn không thể tự gửi ngưỡng mộ cho chính mình!',
+      );
+    }
+
+    const sender = await this.prisma.user.findUnique({
+      where: { id: senderId },
+      include: { profile: true },
+    });
+
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      include: { stats: true },
+    });
+
+    if (!targetUser) {
+      throw new BadRequestException('Không tìm thấy học viên nhận ngưỡng mộ!');
+    }
+
+    const senderName =
+      sender?.profile?.fullName || sender?.email || 'Một bạn học';
+    const admirationMsg =
+      message || 'Rất ngưỡng mộ thành tích học tập của bạn! Cùng cố gắng nhé!';
+
+    // Send Web Push Notification to target user
+    if (this.notificationsService) {
+      void this.notificationsService.sendPushToUser(targetUserId, {
+        title: '⭐ Bạn nhận được lời ngưỡng mộ mới!',
+        body: `${senderName}: "${admirationMsg}"`,
+        icon: sender?.profile?.avatar || '/icons/icon-192.png',
+        url: '/student/profile',
+      });
+    }
+
+    return {
+      success: true,
+      message: `Đã gửi lời ngưỡng mộ tới bạn học thành công!`,
+    };
   }
 }
