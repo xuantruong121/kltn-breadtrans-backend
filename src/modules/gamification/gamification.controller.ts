@@ -59,6 +59,16 @@ export class GamificationController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Post('vocab-learned')
+  @ApiOperation({
+    summary: 'Ghi nhận học từ vựng mới để tính tiến độ nhiệm vụ ngày',
+  })
+  recordVocabLearned(@Body('count') count: number, @Request() req: any) {
+    return this.gamificationService.recordVocabLearned(req.user.id, count || 1);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('arena/snippet')
   @ApiOperation({ summary: 'Lấy tóm tắt rank đấu trường cho trang chủ' })
   getArenaSnippet(@Request() req: any) {

@@ -37,6 +37,9 @@ let GamificationController = class GamificationController {
     getMyDailyQuests(req) {
         return this.gamificationService.getMyDailyQuests(req.user.id);
     }
+    recordVocabLearned(count, req) {
+        return this.gamificationService.recordVocabLearned(req.user.id, count || 1);
+    }
     getArenaSnippet(req) {
         return this.gamificationService.getArenaSnippet(req.user.id);
     }
@@ -101,6 +104,17 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], GamificationController.prototype, "getMyDailyQuests", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Post)('vocab-learned'),
+    (0, swagger_1.ApiOperation)({ summary: 'Ghi nhận học từ vựng mới để tính tiến độ nhiệm vụ ngày' }),
+    __param(0, (0, common_1.Body)('count')),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "recordVocabLearned", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),

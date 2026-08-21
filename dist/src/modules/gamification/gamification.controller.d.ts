@@ -46,9 +46,9 @@ export declare class GamificationController {
     getMyPet(req: any): Promise<{
         id: number;
         userId: number;
-        name: string;
         createdAt: Date;
         updatedAt: Date;
+        name: string;
         health: number;
         happiness: number;
         level: number;
@@ -58,9 +58,9 @@ export declare class GamificationController {
     feedPet(req: any): Promise<{
         id: number;
         userId: number;
-        name: string;
         createdAt: Date;
         updatedAt: Date;
+        name: string;
         health: number;
         happiness: number;
         level: number;
@@ -87,6 +87,10 @@ export declare class GamificationController {
         completedAt: Date | null;
         dateKey: string;
     })[]>;
+    recordVocabLearned(count: number, req: any): Promise<{
+        success: boolean;
+        count: number;
+    }>;
     getArenaSnippet(req: any): Promise<{
         rank: null;
         tier: string;

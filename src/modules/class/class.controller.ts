@@ -118,12 +118,12 @@ export class ClassController {
     @Request() req: any,
   ) {
     return this.classService.rewardStudentInClass(
-      req.user.id,
-      req.user.role,
       classId,
       body.studentId,
       body.amount,
-      body.reason,
+      body.reason || 'Giáo viên thưởng Bánh Mì',
+      req.user.id,
+      req.user.role,
     );
   }
 

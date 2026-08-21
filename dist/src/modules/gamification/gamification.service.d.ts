@@ -100,6 +100,10 @@ export declare class GamificationService {
         completedAt: Date | null;
         dateKey: string;
     })[]>;
+    recordVocabLearned(userId: number, count?: number): Promise<{
+        success: boolean;
+        count: number;
+    }>;
     getArenaSnippet(userId: number): Promise<{
         rank: null;
         tier: string;

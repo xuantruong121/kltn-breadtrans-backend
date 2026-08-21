@@ -222,6 +222,7 @@ model Session {
   endTime     DateTime
   meetingLink String?
   status      String   @default("scheduled")
+  lessonNote  String?  @db.Text
   recordingUrl String?
   createdAt   DateTime @default(now())
 
