@@ -555,7 +555,6 @@ export class AdminService {
       archivedSpeakingAudio,
       totalWritingSubmissions,
       totalDbSessions,
-      recentSessions,
       totalMaterials,
       totalUsers,
     ] = await Promise.all([
@@ -568,17 +567,6 @@ export class AdminService {
         .catch(() => 0),
       this.prisma.submission.count().catch(() => 0),
       this.prisma.session.count().catch(() => 0),
-      this.prisma.session
-        .findMany({
-          take: 50,
-          select: {
-            id: true,
-            startTime: true,
-            endTime: true,
-            class: { select: { _count: { select: { enrollments: true } } } },
-          },
-        })
-        .catch(() => []),
       this.prisma.material.count().catch(() => 0),
       this.prisma.user.count().catch(() => 0),
     ]);
