@@ -4,10 +4,19 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const prisma = new PrismaClient();
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+
+const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "";
+const apiKeys = rawKeys.split(",").map(k => k.trim()).filter(Boolean);
+const apiKey = apiKeys[0];
+
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+const model = genAI ? genAI.getGenerativeModel({ model: "gemini-2.5-flash" }) : null;
 
 async function generateListeningPractice() {
+  if (!model) {
+    console.warn("⚠️ AI Model is not initialized. Skipping generateListeningPractice.");
+    return;
+  }
   console.log("Generating Listening Practice (Dictation)...");
 
   const schema: any = {
@@ -66,6 +75,10 @@ async function generateListeningPractice() {
 }
 
 async function generateWritingTopics() {
+  if (!model) {
+    console.warn("⚠️ AI Model is not initialized. Skipping generateWritingTopics.");
+    return;
+  }
   console.log("Generating Writing Practice Topics...");
 
   const schema: any = {

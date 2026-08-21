@@ -75,6 +75,7 @@ model User {
   pet                 UserPet?
   questProgresses     UserQuestProgress[]
   grammarAttempts     GrammarAttempt[]
+  pushSubscriptions   PushSubscription[]
 }
 
 model Profile {
@@ -841,4 +842,19 @@ model GrammarAttempt {
   answers   Json         // User answers mapping / array
   createdAt DateTime     @default(now())
 }
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
 

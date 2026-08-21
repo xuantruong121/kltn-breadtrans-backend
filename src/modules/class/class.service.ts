@@ -534,6 +534,7 @@ export class ClassService {
           },
         },
         sessions: {
+          orderBy: { startTime: 'asc' },
           include: {
             attendances: true,
           },

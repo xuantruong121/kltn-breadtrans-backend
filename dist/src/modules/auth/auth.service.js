@@ -104,10 +104,19 @@ let AuthService = class AuthService {
             },
         });
         const payload = { sub: user.id, email: user.email, role: user.role };
-        const access_token = this.jwtService.sign(payload, { expiresIn: '1h' });
-        const refreshToken = crypto.randomBytes(40).toString('hex');
+        const access_token = this.jwtService.sign(payload, { expiresIn: '1d' });
+        const refreshToken = this.jwtService.sign({ sub: user.id, deviceId, type: 'refresh' }, { expiresIn: '30d' });
         const redisKey = `user:${user.id}:device:${deviceId}`;
-        await this.redis.set(redisKey, refreshToken, 'EX', 7 * 24 * 60 * 60);
+        try {
+            await this.redis.set(redisKey, refreshToken, 'EX', 30 * 24 * 60 * 60);
+        }
+        catch (redisErr) {
+            console.warn('[AuthService] Failed to set refresh token in Redis:', redisErr);
+        }
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: { refreshToken },
+        });
         return {
             access_token,
             refresh_token: refreshToken,
@@ -121,27 +130,70 @@ let AuthService = class AuthService {
         };
     }
     async refreshTokens(userId, deviceId, providedRefreshToken) {
-        const redisKey = `user:${userId}:device:${deviceId}`;
-        const storedToken = await this.redis.get(redisKey);
-        if (storedToken !== providedRefreshToken) {
-            await this.redis.del(redisKey);
-            throw new common_1.UnauthorizedException('Replay attack detected or token expired. Session revoked.');
+        let tokenPayload = null;
+        try {
+            tokenPayload = this.jwtService.verify(providedRefreshToken);
         }
-        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        catch {
+            tokenPayload = this.jwtService.decode(providedRefreshToken);
+        }
+        const effectiveUserId = tokenPayload?.sub || userId;
+        const effectiveDeviceId = tokenPayload?.deviceId || deviceId;
+        if (!effectiveUserId) {
+            throw new common_1.UnauthorizedException('Invalid refresh token');
+        }
+        const redisKey = `user:${effectiveUserId}:device:${effectiveDeviceId}`;
+        let storedToken = null;
+        try {
+            storedToken = await this.redis.get(redisKey);
+        }
+        catch (err) {
+            console.warn('[AuthService] Redis get failed during refresh:', err);
+        }
+        const user = await this.prisma.user.findUnique({
+            where: { id: effectiveUserId },
+            include: { profile: true },
+        });
         if (!user)
             throw new common_1.UnauthorizedException('User not found');
+        const isValidToken = storedToken === providedRefreshToken ||
+            user.refreshToken === providedRefreshToken;
+        if (!isValidToken) {
+            if (storedToken) {
+                await this.redis.del(redisKey);
+            }
+            throw new common_1.UnauthorizedException('Replay attack detected or token expired. Session revoked.');
+        }
         const payload = { sub: user.id, email: user.email, role: user.role };
-        const access_token = this.jwtService.sign(payload, { expiresIn: '1h' });
-        const new_refresh_token = crypto.randomBytes(40).toString('hex');
-        await this.redis.set(redisKey, new_refresh_token, 'EX', 7 * 24 * 60 * 60);
+        const new_access_token = this.jwtService.sign(payload, { expiresIn: '1d' });
+        const new_refresh_token = this.jwtService.sign({ sub: user.id, deviceId: effectiveDeviceId, type: 'refresh' }, { expiresIn: '30d' });
+        try {
+            await this.redis.set(redisKey, new_refresh_token, 'EX', 30 * 24 * 60 * 60);
+        }
+        catch (redisErr) {
+            console.warn('[AuthService] Failed to set rotated token in Redis:', redisErr);
+        }
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: { refreshToken: new_refresh_token },
+        });
         return {
-            access_token,
+            access_token: new_access_token,
             refresh_token: new_refresh_token,
         };
     }
     async logout(userId, deviceId) {
         const redisKey = `user:${userId}:device:${deviceId}`;
-        await this.redis.del(redisKey);
+        try {
+            await this.redis.del(redisKey);
+        }
+        catch (err) {
+            console.warn('[AuthService] Redis del failed during logout:', err);
+        }
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { refreshToken: null },
+        });
         return { message: 'Logged out successfully' };
     }
     async generateOtp(email) {

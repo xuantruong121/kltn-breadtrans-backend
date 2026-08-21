@@ -147,7 +147,9 @@ let CourseService = class CourseService {
                 where: { teacherId: userId },
                 include: {
                     course: { select: { title: true } },
-                    sessions: true,
+                    sessions: {
+                        orderBy: { startTime: 'asc' },
+                    },
                     _count: { select: { enrollments: true } },
                     enrollments: {
                         include: {
@@ -161,6 +163,7 @@ let CourseService = class CourseService {
                         },
                     },
                 },
+                orderBy: { startDate: 'desc' },
             });
             return classes.map((c) => ({
                 ...c,
@@ -174,6 +177,9 @@ let CourseService = class CourseService {
                     class: {
                         include: {
                             course: { select: { title: true } },
+                            sessions: {
+                                orderBy: { startTime: 'asc' },
+                            },
                             teacher: {
                                 select: {
                                     email: true,
@@ -184,6 +190,7 @@ let CourseService = class CourseService {
                         },
                     },
                 },
+                orderBy: { class: { startDate: 'desc' } },
             });
             return enrollments.map((e) => ({
                 ...e.class,

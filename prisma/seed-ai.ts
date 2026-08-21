@@ -5,16 +5,22 @@ dotenv.config();
 
 const prisma = new PrismaClient({ log: ['info', 'warn', 'error'] });
 
-const apiKey = process.env.GEMINI_API_KEY;
+const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "";
+const apiKeys = rawKeys.split(",").map(k => k.trim()).filter(Boolean);
+const apiKey = apiKeys[0];
+
 if (!apiKey) {
-  console.error("GEMINI_API_KEY is not defined in .env");
-  process.exit(1);
+  console.warn("⚠️ No GEMINI_API_KEYS defined in .env, skipping AI seed generation.");
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+const model = genAI ? genAI.getGenerativeModel({ model: "gemini-2.5-flash" }) : null;
 
 async function generateVocabTopic(topicTitle: string, categoryName: string, iconUrl: string) {
+  if (!model) {
+    console.warn("⚠️ AI Model is not initialized. Skipping generateVocabTopic.");
+    return;
+  }
   console.log(`Generating Vocab Topic: ${topicTitle}...`);
   
   const schema: any = {
@@ -66,6 +72,10 @@ async function generateVocabTopic(topicTitle: string, categoryName: string, icon
 }
 
 async function generateSpeakingExercises() {
+  if (!model) {
+    console.warn("⚠️ AI Model is not initialized. Skipping generateSpeakingExercises.");
+    return;
+  }
   console.log("Generating Speaking Exercises...");
   
   const schema: any = {
@@ -99,6 +109,10 @@ async function generateSpeakingExercises() {
 }
 
 async function generateBilingualReading() {
+  if (!model) {
+    console.warn("⚠️ AI Model is not initialized. Skipping generateBilingualReading.");
+    return;
+  }
   console.log("Generating Bilingual Reading...");
   
   const schema: any = {

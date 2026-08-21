@@ -91,6 +91,65 @@ export class ContentService {
             ],
           },
           {
+            topicId: 'movie-inside-out-emotions',
+            category: 'movie',
+            title: 'Inside Out: Khám Phá Cảm Xúc Hỉ Nộ Ái Ố',
+            order: 3,
+            materialLinks: {
+              youtubeId: 'yRUAzGQ3nSY',
+              thumbnail:
+                'https://img.youtube.com/vi/yRUAzGQ3nSY/maxresdefault.jpg',
+              duration: '3:50',
+              level: 'BEGINNER',
+              description:
+                'Học các tính từ và danh từ miêu tả cảm xúc con người qua các nhân vật Joy, Sadness, Anger, Fear, Disgust.',
+            },
+            exercises: [
+              {
+                id: 1,
+                question: 'Nhân vật "Joy" trong phim đại diện cho cảm xúc nào?',
+                options: [
+                  'Niềm vui, hạnh phúc',
+                  'Sự tức giận',
+                  'Sự sợ hãi',
+                  'Nỗi buồn',
+                ],
+                correctIndex: 0,
+                explanation: '"Joy" có nghĩa là niềm vui sướng hân hoan.',
+              },
+            ],
+          },
+          {
+            topicId: 'movie-lion-king-hakuna-matata',
+            category: 'movie',
+            title: 'The Lion King: Hakuna Matata - Lối Sống Tích Cực',
+            order: 4,
+            materialLinks: {
+              youtubeId: 'nbY_aP-alkw',
+              thumbnail:
+                'https://img.youtube.com/vi/nbY_aP-alkw/maxresdefault.jpg',
+              duration: '4:05',
+              level: 'INTERMEDIATE',
+              description:
+                'Cụm từ Hakuna Matata kinh điển mang thông điệp không âu lo và cách kết hợp thì hiện tại trong lời thoại.',
+            },
+            exercises: [
+              {
+                id: 1,
+                question:
+                  '"Hakuna Matata" theo lời giải thích của Timon & Pumbaa có nghĩa là gì?',
+                options: [
+                  'No worries (Không có gì phải lo lắng)',
+                  'Eat well (Ăn ngon miệng)',
+                  'Run fast (Chạy nhanh lên)',
+                  'Good morning (Chào buổi sáng)',
+                ],
+                correctIndex: 0,
+                explanation: '"It means no worries for the rest of your days".',
+              },
+            ],
+          },
+          {
             topicId: 'music-count-on-me-bruno',
             category: 'music',
             title: 'Count On Me - Bruno Mars (Bài Ca Tình Bạn)',
@@ -158,6 +217,69 @@ export class ContentService {
                 correctIndex: 0,
                 explanation:
                   '"Give up" = bỏ cuộc, "Give in" = nhượng bộ/đầu hàng.',
+              },
+            ],
+          },
+          {
+            topicId: 'music-whole-new-world-aladdin',
+            category: 'music',
+            title: 'A Whole New World - Aladdin (Thế Giới Diệu Kỳ)',
+            order: 3,
+            materialLinks: {
+              youtubeId: 'eitDnP0_83k',
+              thumbnail:
+                'https://img.youtube.com/vi/eitDnP0_83k/maxresdefault.jpg',
+              duration: '4:12',
+              level: 'INTERMEDIATE',
+              description:
+                'Học các tính từ miêu tả cảnh quan tráng lệ như "shining, shimmering, splendid" cùng ca khúc huyền thoại Aladdin.',
+            },
+            exercises: [
+              {
+                id: 1,
+                question:
+                  'Các từ "shining, shimmering, splendid" dùng để miêu tả điều gì?',
+                options: [
+                  'Vẻ đẹp lấp lánh, tráng lệ',
+                  'Sự tối tăm, u ám',
+                  'Sự ồn ào náo nhiệt',
+                  'Sự lạnh lẽo',
+                ],
+                correctIndex: 0,
+                explanation:
+                  '"Shimmering" = lấp lánh lung linh, "splendid" = tuyệt vời, tráng lệ.',
+              },
+            ],
+          },
+          {
+            topicId: 'music-heal-the-world-mj',
+            category: 'music',
+            title:
+              'Heal The World - Michael Jackson (Vì Một Thế Giới Tốt Đẹp Hơn)',
+            order: 4,
+            materialLinks: {
+              youtubeId: 'BWf-eARnf6U',
+              thumbnail:
+                'https://img.youtube.com/vi/BWf-eARnf6U/maxresdefault.jpg',
+              duration: '5:20',
+              level: 'ADVANCED',
+              description:
+                'Mở rộng vốn từ vựng về nhân loại, hòa bình và cấu trúc câu mệnh lệnh truyền cảm hứng.',
+            },
+            exercises: [
+              {
+                id: 1,
+                question:
+                  '"Heal the world, make it a better place" mang thông điệp gì?',
+                options: [
+                  'Hàn gắn thế giới, biến nó thành nơi tốt đẹp hơn',
+                  'Bảo vệ tài chính cá nhân',
+                  'Xây dựng nhà máy mới',
+                  'Học cách làm giàu',
+                ],
+                correctIndex: 0,
+                explanation:
+                  '"Heal" = chữa lành/hàn gắn, "better place" = nơi tốt đẹp hơn.',
               },
             ],
           },

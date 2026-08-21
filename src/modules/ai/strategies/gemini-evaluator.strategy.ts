@@ -1,11 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
-import { IAIEvaluator, PronunciationFeedback } from './ai-evaluator.interface';
+import {
+  GoogleGenerativeAI,
+  GenerativeModel,
+  SchemaType,
+} from '@google/generative-ai';
+import {
+  IAIEvaluator,
+  PronunciationFeedback,
+  SmartGeneratedContent,
+} from './ai-evaluator.interface';
 
 @Injectable()
 export class GeminiEvaluatorStrategy implements IAIEvaluator {
   private readonly logger = new Logger(GeminiEvaluatorStrategy.name);
-  private genAI: GoogleGenerativeAI;
   private apiKeys: string[] = [];
   private currentKeyIndex = 0;
 
@@ -16,13 +23,18 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
       .split(',')
       .map((k) => k.trim())
       .filter((k) => k.length > 0);
-    const initialKey =
-      this.apiKeys.length > 0 ? this.apiKeys[0] : 'fake-api-key';
-    this.genAI = new GoogleGenerativeAI(initialKey);
   }
 
   private hasKeys(): boolean {
     return this.apiKeys.length > 0;
+  }
+
+  private getModelName(): string {
+    return process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite';
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private async executeWithRotation<T>(
@@ -32,30 +44,36 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
       throw new Error('Thiếu GEMINI_API_KEYS');
     }
 
+    const modelName = this.getModelName();
     let attempts = 0;
-    const maxAttempts = this.apiKeys.length;
+    const maxAttempts = Math.max(this.apiKeys.length * 3, 3);
+    const retryDelays = [2000, 4000, 8000];
 
     while (attempts < maxAttempts) {
       const currentKey = this.apiKeys[this.currentKeyIndex];
       const genAI = new GoogleGenerativeAI(currentKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ model: modelName });
 
       try {
         return await operation(model);
       } catch (e: any) {
         const errMsg = String(e?.message || '');
-        if (
+        const isRateLimit =
           e?.status === 429 ||
           errMsg.includes('429') ||
           errMsg.includes('Too Many Requests') ||
-          errMsg.includes('Quota')
-        ) {
+          errMsg.includes('Quota') ||
+          errMsg.includes('RESOURCE_EXHAUSTED');
+
+        if (isRateLimit) {
+          const delay = retryDelays[Math.min(attempts, retryDelays.length - 1)];
           this.logger.warn(
-            `Gemini API Key at index ${this.currentKeyIndex} hit rate limit (429). Rotating to next key...`,
+            `Gemini API Key index ${this.currentKeyIndex} hit rate limit (429). Rotating key and waiting ${delay}ms before retry ${attempts + 1}/${maxAttempts}...`,
           );
           this.currentKeyIndex =
             (this.currentKeyIndex + 1) % this.apiKeys.length;
           attempts++;
+          await this.sleep(delay);
         } else {
           throw e;
         }
@@ -63,7 +81,7 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
     }
 
     throw new Error(
-      'Tất cả API keys đều đã hết hạn mức (429 Too Many Requests). Vui lòng thử lại sau.',
+      'Tất cả Gemini API keys đều đã hết hạn mức (429 Too Many Requests). Vui lòng thử lại sau.',
     );
   }
 
@@ -722,5 +740,93 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         suggestions: ['Chú ý nhấn trọng âm câu tốt hơn.'],
       };
     }
+  }
+
+  async generateSmartContentFromDocument(
+    documentText: string,
+    options?: { quizCount?: number; flashcardCount?: number },
+  ): Promise<SmartGeneratedContent> {
+    const quizCount = Math.min(Math.max(options?.quizCount || 5, 1), 20);
+    const flashcardCount = Math.min(
+      Math.max(options?.flashcardCount || 8, 1),
+      25,
+    );
+
+    const schema: any = {
+      type: SchemaType.OBJECT,
+      properties: {
+        documentSummary: { type: SchemaType.STRING },
+        quizQuestions: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              question: { type: SchemaType.STRING },
+              options: {
+                type: SchemaType.ARRAY,
+                items: { type: SchemaType.STRING },
+              },
+              correctIndex: { type: SchemaType.INTEGER },
+              explanation: { type: SchemaType.STRING },
+              difficulty: { type: SchemaType.STRING },
+            },
+            required: ['question', 'options', 'correctIndex', 'explanation'],
+          },
+        },
+        flashcards: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              term: { type: SchemaType.STRING },
+              pos: { type: SchemaType.STRING },
+              ipa: { type: SchemaType.STRING },
+              meaning: { type: SchemaType.STRING },
+              example: { type: SchemaType.STRING },
+            },
+            required: ['term', 'meaning', 'example'],
+          },
+        },
+        assignment: {
+          type: SchemaType.OBJECT,
+          properties: {
+            title: { type: SchemaType.STRING },
+            description: { type: SchemaType.STRING },
+            instructions: { type: SchemaType.STRING },
+            estimatedTimeMinutes: { type: SchemaType.INTEGER },
+          },
+          required: ['title', 'description', 'instructions'],
+        },
+      },
+      required: ['quizQuestions', 'flashcards', 'assignment'],
+    };
+
+    const prompt = `
+You are an expert English language educator and curriculum developer for BreadTrans.
+Analyze the following educational document / lesson text and generate a comprehensive learning kit:
+
+1. Exactly ${quizCount} multiple-choice quiz questions (TOEIC / English comprehension format). Each question MUST have exactly 4 distinct options, the zero-based index of the correct answer (correctIndex: 0, 1, 2, or 3), and a clear, helpful Vietnamese explanation of why that answer is correct.
+2. Exactly ${flashcardCount} key vocabulary flashcards extracted from the text. Include the term, part of speech (pos: noun, verb, adjective, adverb), American IPA pronunciation (ipa), clear Vietnamese meaning, and an example sentence from or related to the text.
+3. One practical homework assignment (essay or written task) for students based on the document's core theme, with step-by-step instructions.
+
+DOCUMENT CONTENT:
+---
+${documentText.slice(0, 15000)}
+---
+`;
+
+    const result = await this.executeWithRotation((m) =>
+      m.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: schema,
+          temperature: 0.3,
+        },
+      }),
+    );
+
+    const rawText = result.response.text();
+    return JSON.parse(rawText) as SmartGeneratedContent;
   }
 }

@@ -9,6 +9,29 @@ export interface PronunciationFeedback {
     accuracyScore?: number;
     completenessScore?: number;
 }
+export interface SmartGeneratedContent {
+    documentSummary?: string;
+    quizQuestions: Array<{
+        question: string;
+        options: string[];
+        correctIndex: number;
+        explanation: string;
+        difficulty?: string;
+    }>;
+    flashcards: Array<{
+        term: string;
+        pos?: string;
+        ipa?: string;
+        meaning: string;
+        example: string;
+    }>;
+    assignment: {
+        title: string;
+        description: string;
+        instructions: string;
+        estimatedTimeMinutes?: number;
+    };
+}
 export interface IAIEvaluator {
     generateFeedback(question: string, studentAnswer: string): Promise<string>;
     chat(prompt: string): Promise<string>;
@@ -36,4 +59,8 @@ export interface IAIEvaluator {
         suggestions: string[];
     }>;
     importEtsPdf(pdfBuffer: Buffer, pdfMimeType: string, audioBuffer?: Buffer, audioMimeType?: string, audioUrl?: string): Promise<any[]>;
+    generateSmartContentFromDocument(documentText: string, options?: {
+        quizCount?: number;
+        flashcardCount?: number;
+    }): Promise<SmartGeneratedContent>;
 }

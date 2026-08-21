@@ -15,7 +15,6 @@ const common_1 = require("@nestjs/common");
 const generative_ai_1 = require("@google/generative-ai");
 let GeminiEvaluatorStrategy = GeminiEvaluatorStrategy_1 = class GeminiEvaluatorStrategy {
     logger = new common_1.Logger(GeminiEvaluatorStrategy_1.name);
-    genAI;
     apiKeys = [];
     currentKeyIndex = 0;
     constructor() {
@@ -24,42 +23,52 @@ let GeminiEvaluatorStrategy = GeminiEvaluatorStrategy_1 = class GeminiEvaluatorS
             .split(',')
             .map((k) => k.trim())
             .filter((k) => k.length > 0);
-        const initialKey = this.apiKeys.length > 0 ? this.apiKeys[0] : 'fake-api-key';
-        this.genAI = new generative_ai_1.GoogleGenerativeAI(initialKey);
     }
     hasKeys() {
         return this.apiKeys.length > 0;
+    }
+    getModelName() {
+        return process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite';
+    }
+    async sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
     async executeWithRotation(operation) {
         if (!this.hasKeys()) {
             throw new Error('Thiếu GEMINI_API_KEYS');
         }
+        const modelName = this.getModelName();
         let attempts = 0;
-        const maxAttempts = this.apiKeys.length;
+        const maxAttempts = Math.max(this.apiKeys.length * 3, 3);
+        const retryDelays = [2000, 4000, 8000];
         while (attempts < maxAttempts) {
             const currentKey = this.apiKeys[this.currentKeyIndex];
             const genAI = new generative_ai_1.GoogleGenerativeAI(currentKey);
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+            const model = genAI.getGenerativeModel({ model: modelName });
             try {
                 return await operation(model);
             }
             catch (e) {
                 const errMsg = String(e?.message || '');
-                if (e?.status === 429 ||
+                const isRateLimit = e?.status === 429 ||
                     errMsg.includes('429') ||
                     errMsg.includes('Too Many Requests') ||
-                    errMsg.includes('Quota')) {
-                    this.logger.warn(`Gemini API Key at index ${this.currentKeyIndex} hit rate limit (429). Rotating to next key...`);
+                    errMsg.includes('Quota') ||
+                    errMsg.includes('RESOURCE_EXHAUSTED');
+                if (isRateLimit) {
+                    const delay = retryDelays[Math.min(attempts, retryDelays.length - 1)];
+                    this.logger.warn(`Gemini API Key index ${this.currentKeyIndex} hit rate limit (429). Rotating key and waiting ${delay}ms before retry ${attempts + 1}/${maxAttempts}...`);
                     this.currentKeyIndex =
                         (this.currentKeyIndex + 1) % this.apiKeys.length;
                     attempts++;
+                    await this.sleep(delay);
                 }
                 else {
                     throw e;
                 }
             }
         }
-        throw new Error('Tất cả API keys đều đã hết hạn mức (429 Too Many Requests). Vui lòng thử lại sau.');
+        throw new Error('Tất cả Gemini API keys đều đã hết hạn mức (429 Too Many Requests). Vui lòng thử lại sau.');
     }
     async generateFeedback(question, studentAnswer) {
         try {
@@ -581,6 +590,81 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
                 suggestions: ['Chú ý nhấn trọng âm câu tốt hơn.'],
             };
         }
+    }
+    async generateSmartContentFromDocument(documentText, options) {
+        const quizCount = Math.min(Math.max(options?.quizCount || 5, 1), 20);
+        const flashcardCount = Math.min(Math.max(options?.flashcardCount || 8, 1), 25);
+        const schema = {
+            type: generative_ai_1.SchemaType.OBJECT,
+            properties: {
+                documentSummary: { type: generative_ai_1.SchemaType.STRING },
+                quizQuestions: {
+                    type: generative_ai_1.SchemaType.ARRAY,
+                    items: {
+                        type: generative_ai_1.SchemaType.OBJECT,
+                        properties: {
+                            question: { type: generative_ai_1.SchemaType.STRING },
+                            options: {
+                                type: generative_ai_1.SchemaType.ARRAY,
+                                items: { type: generative_ai_1.SchemaType.STRING },
+                            },
+                            correctIndex: { type: generative_ai_1.SchemaType.INTEGER },
+                            explanation: { type: generative_ai_1.SchemaType.STRING },
+                            difficulty: { type: generative_ai_1.SchemaType.STRING },
+                        },
+                        required: ['question', 'options', 'correctIndex', 'explanation'],
+                    },
+                },
+                flashcards: {
+                    type: generative_ai_1.SchemaType.ARRAY,
+                    items: {
+                        type: generative_ai_1.SchemaType.OBJECT,
+                        properties: {
+                            term: { type: generative_ai_1.SchemaType.STRING },
+                            pos: { type: generative_ai_1.SchemaType.STRING },
+                            ipa: { type: generative_ai_1.SchemaType.STRING },
+                            meaning: { type: generative_ai_1.SchemaType.STRING },
+                            example: { type: generative_ai_1.SchemaType.STRING },
+                        },
+                        required: ['term', 'meaning', 'example'],
+                    },
+                },
+                assignment: {
+                    type: generative_ai_1.SchemaType.OBJECT,
+                    properties: {
+                        title: { type: generative_ai_1.SchemaType.STRING },
+                        description: { type: generative_ai_1.SchemaType.STRING },
+                        instructions: { type: generative_ai_1.SchemaType.STRING },
+                        estimatedTimeMinutes: { type: generative_ai_1.SchemaType.INTEGER },
+                    },
+                    required: ['title', 'description', 'instructions'],
+                },
+            },
+            required: ['quizQuestions', 'flashcards', 'assignment'],
+        };
+        const prompt = `
+You are an expert English language educator and curriculum developer for BreadTrans.
+Analyze the following educational document / lesson text and generate a comprehensive learning kit:
+
+1. Exactly ${quizCount} multiple-choice quiz questions (TOEIC / English comprehension format). Each question MUST have exactly 4 distinct options, the zero-based index of the correct answer (correctIndex: 0, 1, 2, or 3), and a clear, helpful Vietnamese explanation of why that answer is correct.
+2. Exactly ${flashcardCount} key vocabulary flashcards extracted from the text. Include the term, part of speech (pos: noun, verb, adjective, adverb), American IPA pronunciation (ipa), clear Vietnamese meaning, and an example sentence from or related to the text.
+3. One practical homework assignment (essay or written task) for students based on the document's core theme, with step-by-step instructions.
+
+DOCUMENT CONTENT:
+---
+${documentText.slice(0, 15000)}
+---
+`;
+        const result = await this.executeWithRotation((m) => m.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: schema,
+                temperature: 0.3,
+            },
+        }));
+        const rawText = result.response.text();
+        return JSON.parse(rawText);
     }
 };
 exports.GeminiEvaluatorStrategy = GeminiEvaluatorStrategy;

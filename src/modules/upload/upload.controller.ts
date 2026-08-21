@@ -58,7 +58,7 @@ export class UploadController {
           new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 }), // 50MB
           new FileTypeValidator({
             fileType:
-              /^(image\/(jpeg|png|webp|gif)|audio\/(mpeg|mp4|ogg|wav)|video\/mp4|application\/pdf)$/,
+              /^(image\/(jpeg|png|webp|gif|svg\+xml)|audio\/(mpeg|mp3|mp4|ogg|wav|webm|aac|x-m4a)|video\/(mp4|webm|ogg|quicktime)|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-powerpoint|vnd\.openxmlformats-officedocument\.presentationml\.presentation|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|zip|x-zip-compressed)|text\/plain)$/,
           }),
         ],
       }),

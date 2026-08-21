@@ -1,4 +1,11 @@
-import { Controller, Get, Post, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { GamificationService } from './gamification.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -64,6 +71,23 @@ export class GamificationController {
   @ApiOperation({ summary: 'Quay vòng quay may mắn (tốn 50 Bánh Rán)' })
   spinWheel(@Request() req: any) {
     return this.gamificationService.spinWheel(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admiration/send')
+  @ApiOperation({
+    summary: 'Gửi lời ngưỡng mộ tới bạn học & bắn Web Push Notification',
+  })
+  sendAdmiration(
+    @Request() req: any,
+    @Body() body: { targetUserId: number; message?: string },
+  ) {
+    return this.gamificationService.sendAdmiration(
+      req.user.id,
+      body.targetUserId,
+      body.message,
+    );
   }
 
   // NOTE: Thường cronjob chạy tự động, nhưng để test thì mở API POST

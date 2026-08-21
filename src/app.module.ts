@@ -24,13 +24,15 @@ import { AssignmentModule } from './modules/assignment/assignment.module';
 import { GrammarModule } from './modules/grammar/grammar.module';
 import { MarketModule } from './modules/market/market.module';
 import { ContentModule } from './modules/content/content.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { LoggingMiddleware } from './common/middleware/logging.middleware';
-
 import { RedisModule } from '@nestjs-modules/ioredis';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     RedisModule.forRoot({
       type: 'single',
       url: 'redis://localhost:6379',
@@ -61,6 +63,7 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     GrammarModule,
     MarketModule,
     ContentModule,
+    NotificationsModule,
   ],
 
   controllers: [AppController],
