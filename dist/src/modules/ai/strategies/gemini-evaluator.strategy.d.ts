@@ -1,11 +1,15 @@
+import Redis from 'ioredis';
 import { IAIEvaluator, PronunciationFeedback, SmartGeneratedContent } from './ai-evaluator.interface';
 export declare class GeminiEvaluatorStrategy implements IAIEvaluator {
+    private readonly redis?;
     private readonly logger;
     private apiKeys;
     private currentKeyIndex;
-    constructor();
+    constructor(redis?: Redis | undefined);
     private hasKeys;
     private getModelName;
+    private getCacheKey;
+    private getCachedOrGenerate;
     private sleep;
     private executeWithRotation;
     generateFeedback(question: string, studentAnswer: string): Promise<string>;

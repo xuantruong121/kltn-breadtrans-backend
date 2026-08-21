@@ -1,4 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
+import { createHash } from 'crypto';
 import {
   GoogleGenerativeAI,
   GenerativeModel,
@@ -16,7 +19,7 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
   private apiKeys: string[] = [];
   private currentKeyIndex = 0;
 
-  constructor() {
+  constructor(@Optional() @InjectRedis() private readonly redis?: Redis) {
     const keysStr =
       process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
     this.apiKeys = keysStr
@@ -31,6 +34,50 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
 
   private getModelName(): string {
     return process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite';
+  }
+
+  private getCacheKey(prefix: string, ...args: any[]): string {
+    const raw = args
+      .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a ?? '')))
+      .join('::');
+    const hash = createHash('md5').update(raw).digest('hex');
+    return `gemini:${prefix}:${hash}`;
+  }
+
+  private async getCachedOrGenerate<T>(
+    cacheKey: string,
+    ttlSeconds: number,
+    generator: () => Promise<T>,
+  ): Promise<T> {
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) {
+          this.logger.log(`[Cache HIT] key: ${cacheKey}`);
+          return JSON.parse(cached) as T;
+        }
+      } catch (err) {
+        this.logger.warn(`Redis get failed for key ${cacheKey}: ${err}`);
+      }
+    }
+
+    const result = await generator();
+
+    if (this.redis && result !== undefined && result !== null) {
+      try {
+        await this.redis.set(
+          cacheKey,
+          JSON.stringify(result),
+          'EX',
+          ttlSeconds,
+        );
+        this.logger.log(`[Cache SET] key: ${cacheKey} (TTL: ${ttlSeconds}s)`);
+      } catch (err) {
+        this.logger.warn(`Redis set failed for key ${cacheKey}: ${err}`);
+      }
+    }
+
+    return result;
   }
 
   private async sleep(ms: number): Promise<void> {
@@ -89,13 +136,17 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
     question: string,
     studentAnswer: string,
   ): Promise<string> {
-    try {
-      if (!this.hasKeys()) {
-        this.logger.warn('GEMINI_API_KEY is not set. Returning mock feedback.');
-        return `[Mock Gemini Feedback] Nhận xét cho câu trả lời của em: "${studentAnswer}".`;
-      }
+    const cacheKey = this.getCacheKey('feedback', question, studentAnswer);
+    return this.getCachedOrGenerate(cacheKey, 86400, async () => {
+      try {
+        if (!this.hasKeys()) {
+          this.logger.warn(
+            'GEMINI_API_KEY is not set. Returning mock feedback.',
+          );
+          return `[Mock Gemini Feedback] Nhận xét cho câu trả lời của em: "${studentAnswer}".`;
+        }
 
-      const prompt = `Bạn là một giáo viên tiếng Anh tận tâm, vui vẻ và ân cần đang chấm bài viết cho học sinh/trẻ em trên nền tảng BreadTrans Junior.
+        const prompt = `Bạn là một giáo viên tiếng Anh tận tâm, vui vẻ và ân cần đang chấm bài viết cho học sinh/trẻ em trên nền tảng BreadTrans Junior.
 Đề bài: "${question}"
 Bài làm của học sinh: "${studentAnswer}"
 
@@ -105,15 +156,16 @@ Hãy đưa ra nhận xét chi tiết HOÀN TOÀN BẰNG TIẾNG VIỆT với gi�
 3. 💡 Gợi ý mẹo nhỏ để em viết hay và tự nhiên hơn
 4. 🏆 Đánh giá mức độ hoàn thành`;
 
-      const result = await this.executeWithRotation((m) =>
-        m.generateContent(prompt),
-      );
-      const response = result.response;
-      return response.text();
-    } catch (error) {
-      this.logger.error('Failed to generate Gemini AI feedback', error);
-      return 'Thầy/Cô chưa thể tạo nhận xét lúc này. Em hãy thử lại sau ít phút nhé!';
-    }
+        const result = await this.executeWithRotation((m) =>
+          m.generateContent(prompt),
+        );
+        const response = result.response;
+        return response.text();
+      } catch (error) {
+        this.logger.error('Failed to generate Gemini AI feedback', error);
+        return 'Thầy/Cô chưa thể tạo nhận xét lúc này. Em hãy thử lại sau ít phút nhé!';
+      }
+    });
   }
 
   async chat(prompt: string): Promise<string> {
@@ -336,8 +388,15 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
     if (!this.hasKeys()) {
       return 'Chức năng giải thích đang bảo trì. Vui lòng thử lại sau.';
     }
-    try {
-      const prompt = `
+    const cacheKey = this.getCacheKey(
+      'toeic_explain',
+      questionContent,
+      userAnswer,
+      correctAnswer,
+    );
+    return this.getCachedOrGenerate(cacheKey, 86400, async () => {
+      try {
+        const prompt = `
         Bạn là một gia sư TOEIC chuyên nghiệp và tận tâm.
         Hãy giải thích câu hỏi TOEIC sau đây bằng tiếng Việt một cách dễ hiểu, ngắn gọn nhưng đầy đủ ngữ pháp/từ vựng cần thiết.
         Nội dung câu hỏi: ${JSON.stringify(questionContent)}
@@ -349,18 +408,19 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         2. Tại sao đáp án đúng lại hợp lý (giải thích ngữ pháp/ngữ nghĩa)?
         3. Dịch nghĩa câu hỏi sang tiếng Việt.
       `;
-      const result = await this.executeWithRotation((m) =>
-        m.generateContent(prompt),
-      );
-      const response = result.response;
-      return response.text();
-    } catch (error: any) {
-      this.logger.error(
-        `Error explaining TOEIC error: ${error.message}`,
-        error.stack,
-      );
-      return 'Xin lỗi, tôi không thể giải thích câu hỏi này lúc này.';
-    }
+        const result = await this.executeWithRotation((m) =>
+          m.generateContent(prompt),
+        );
+        const response = result.response;
+        return response.text();
+      } catch (error: any) {
+        this.logger.error(
+          `Error explaining TOEIC error: ${error.message}`,
+          error.stack,
+        );
+        return 'Xin lỗi, tôi không thể giải thích câu hỏi này lúc này.';
+      }
+    });
   }
 
   async generateToeicQuestions(

@@ -24,7 +24,10 @@ export class ClassService {
     private readonly eventsGateway: EventsGateway,
   ) {}
 
-  async createDailyRoom(requestedName?: string): Promise<string> {
+  async createDailyRoom(
+    requestedName?: string,
+    endTime?: string | Date,
+  ): Promise<string> {
     const apiKey = process.env.DAILY_API_KEY;
     const domain = process.env.DAILY_DOMAIN || 'breadtrans-kltn.daily.co';
 
@@ -45,6 +48,20 @@ export class ClassService {
       return fallbackUrl;
     }
 
+    // Tối ưu chi phí: Tính thời gian hết hạn phòng (exp) theo endTime + 15 phút gia hạn
+    let expTimestamp: number;
+    if (endTime) {
+      const end = new Date(endTime).getTime();
+      expTimestamp = Math.floor(end / 1000) + 900;
+      const minExp = Math.floor(Date.now() / 1000) + 600;
+      if (expTimestamp < minExp) {
+        expTimestamp = minExp;
+      }
+    } else {
+      // Mặc định phòng chỉ tồn tại 8 tiếng thay vì 30 ngày để tránh tiêu hao minutes ngầm
+      expTimestamp = Math.floor(Date.now() / 1000) + 28800;
+    }
+
     try {
       const response = await fetch('https://api.daily.co/v1/rooms', {
         method: 'POST',
@@ -59,14 +76,16 @@ export class ClassService {
             enable_chat: true,
             enable_screenshare: true,
             enable_prejoin_ui: true,
-            exp: Math.floor(Date.now() / 1000) + 86400 * 30, // 30 days
+            exp: expTimestamp,
           },
         }),
       });
 
       const data = (await response.json()) as Record<string, any>;
       if (response.ok && data.url) {
-        this.logger.log(`Created Daily.co room: ${data.url}`);
+        this.logger.log(
+          `Created Daily.co room: ${data.url} (expires in ${Math.round((expTimestamp - Math.floor(Date.now() / 1000)) / 60)} mins)`,
+        );
         return String(data.url);
       }
 
@@ -94,7 +113,7 @@ export class ClassService {
       const sessionSlug = dto.title
         ? `class-${classId}-${dto.title}`
         : `class-${classId}-${Date.now()}`;
-      meetingLink = await this.createDailyRoom(sessionSlug);
+      meetingLink = await this.createDailyRoom(sessionSlug, dto.endTime);
     }
 
     return this.prisma.session.create({

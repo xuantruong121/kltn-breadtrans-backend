@@ -31,7 +31,7 @@ let SpeakingController = class SpeakingController {
         return this.speakingService.createExercise(dto);
     }
     findAllExercises(category, req) {
-        return this.speakingService.findAllExercises(category, req.user.id);
+        return this.speakingService.findAllExercises(category, req?.user?.id);
     }
     findOne(id) {
         return this.speakingService.findExerciseById(id);

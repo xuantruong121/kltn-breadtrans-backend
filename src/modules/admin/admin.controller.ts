@@ -266,4 +266,26 @@ export class AdminController {
   deletePracticeTopic(@Param('id', ParseIntPipe) id: number) {
     return this.adminService.deletePracticeTopic(id);
   }
+
+  // ============== CLOUD RESOURCES & COST MANAGEMENT (FINOPS) ==============
+
+  @Get('system-costs')
+  @ApiOperation({ summary: 'Lay bao cao tong quan chi phi & tai nguyen Cloud' })
+  getSystemCosts() {
+    return this.adminService.getSystemCostsOverview();
+  }
+
+  @Post('system-costs/purge-ai-cache')
+  @ApiOperation({ summary: 'Xoa toan bo cache cua Gemini AI tren Redis' })
+  purgeAiCache() {
+    return this.adminService.purgeAiCache();
+  }
+
+  @Post('system-costs/trigger-r2-cleanup')
+  @ApiOperation({
+    summary: 'Kich hoat quet & don dep file audio cu hon 90 ngay tren R2',
+  })
+  triggerR2Cleanup() {
+    return this.adminService.triggerR2Cleanup();
+  }
 }

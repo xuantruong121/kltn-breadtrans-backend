@@ -30,13 +30,15 @@ let SpeakingService = SpeakingService_1 = class SpeakingService {
             where: category ? { category } : {},
             orderBy: { createdAt: 'desc' },
         });
-        const userSubmissions = await this.prisma.speakingSubmission.findMany({
-            where: {
-                userId,
-                exerciseId: { in: exercises.map((e) => e.id) },
-            },
-            select: { exerciseId: true },
-        });
+        const userSubmissions = userId
+            ? await this.prisma.speakingSubmission.findMany({
+                where: {
+                    userId,
+                    exerciseId: { in: exercises.map((e) => e.id) },
+                },
+                select: { exerciseId: true },
+            })
+            : [];
         const completedExerciseIds = new Set(userSubmissions.map((s) => s.exerciseId));
         return exercises.map((exercise) => ({
             ...exercise,

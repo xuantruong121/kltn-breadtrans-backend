@@ -23,7 +23,7 @@ let WritingController = class WritingController {
         this.writingService = writingService;
     }
     getTopics(req) {
-        return this.writingService.getTopics(req.user.id);
+        return this.writingService.getTopics(req?.user?.id);
     }
     getQuizDetails(id) {
         return this.writingService.getQuizDetails(id);

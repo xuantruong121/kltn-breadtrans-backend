@@ -66,10 +66,16 @@ export class ClassController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Tạo hoặc lấy URL phòng học Daily.co qua API' })
   async getOrCreateDailyRoom(
-    @Body() body: { roomName?: string; title?: string },
+    @Body()
+    body: {
+      roomName?: string;
+      title?: string;
+      endTime?: string | Date;
+    },
   ) {
     const url = await this.classService.createDailyRoom(
       body.roomName || body.title,
+      body.endTime,
     );
     return { url };
   }
