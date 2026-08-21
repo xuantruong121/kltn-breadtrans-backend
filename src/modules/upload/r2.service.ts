@@ -4,6 +4,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
@@ -41,6 +42,32 @@ export class R2Service {
   }
 
   /**
+   * Truy vấn dung lượng thực tế đang lưu trên Cloudflare R2 bucket.
+   */
+  async getBucketStorageUsage(): Promise<{
+    totalBytes: number;
+    fileCount: number;
+    totalMb: number;
+  }> {
+    try {
+      if (!process.env.R2_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID) {
+        return { totalBytes: 0, fileCount: 0, totalMb: 0 };
+      }
+      const command = new ListObjectsV2Command({
+        Bucket: this.bucket,
+      });
+      const response = await this.client.send(command);
+      const objects = response.Contents || [];
+      const totalBytes = objects.reduce((sum, obj) => sum + (obj.Size || 0), 0);
+      const totalMb = Number((totalBytes / (1024 * 1024)).toFixed(2));
+      return { totalBytes, fileCount: objects.length, totalMb };
+    } catch (err) {
+      this.logger.warn(`Could not query R2 bucket size: ${err}`);
+      return { totalBytes: 0, fileCount: 0, totalMb: 0 };
+    }
+  }
+
+  /**
    * Upload file buffer lên Cloudflare R2.
    * @param buffer   File buffer từ Multer
    * @param mimeType MIME type (vd: 'image/png', 'audio/mpeg')
@@ -63,32 +90,32 @@ export class R2Service {
           Key: key,
           Body: buffer,
           ContentType: mimeType,
-          // Cache 1 năm cho static assets
-          CacheControl: 'public, max-age=31536000, immutable',
         }),
       );
-    } catch (err) {
-      this.logger.error('R2 upload failed', err);
-      throw new BadRequestException('Lỗi tải file lên Cloudflare R2');
-    }
 
-    return {
-      url: `${this.publicUrl}/${key}`,
-      key,
-      contentType: mimeType,
-    };
+      const url = `${this.publicUrl}/${key}`;
+      return { url, key, contentType: mimeType };
+    } catch (err) {
+      this.logger.error(`Failed to upload file to R2: ${err}`);
+      throw new BadRequestException('Failed to upload file to storage');
+    }
   }
 
   /**
-   * Xóa file khỏi bucket theo key.
+   * Xóa file khỏi R2 bucket bằng key.
    */
   async deleteFile(key: string): Promise<void> {
     try {
       await this.client.send(
-        new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        }),
       );
+      this.logger.log(`Deleted "${key}" from R2`);
     } catch (err) {
-      this.logger.warn(`R2 delete failed for key "${key}"`, err);
+      this.logger.error(`Failed to delete file from R2: ${err}`);
+      throw new BadRequestException('Failed to delete file from storage');
     }
   }
 
@@ -113,16 +140,23 @@ export class R2Service {
   }
 
   /**
-   * Tạo presigned URL để download file private (nếu bucket không public).
+   * Tạo Presigned URL cho phép client download trực tiếp file riêng tư.
+   * Hết hạn sau `expiresIn` giây (mặc định 3600s = 1 giờ).
    */
   async getPresignedDownloadUrl(
     key: string,
-    expiresIn: number = 3600,
+    expiresIn = 3600,
   ): Promise<string> {
-    const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
     return getSignedUrl(this.client, command, { expiresIn });
   }
 
+  /**
+   * Tự đoán file extension từ MIME type nếu không có originalName.
+   */
   private guessExt(mimeType: string): string {
     const map: Record<string, string> = {
       'image/jpeg': '.jpg',
@@ -130,10 +164,10 @@ export class R2Service {
       'image/webp': '.webp',
       'image/gif': '.gif',
       'audio/mpeg': '.mp3',
-      'audio/mp4': '.m4a',
-      'audio/ogg': '.ogg',
       'audio/wav': '.wav',
+      'audio/webm': '.webm',
       'video/mp4': '.mp4',
+      'video/webm': '.webm',
       'application/pdf': '.pdf',
     };
     return map[mimeType] ?? '';

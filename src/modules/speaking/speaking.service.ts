@@ -19,19 +19,21 @@ export class SpeakingService {
     private readonly uploadService: UploadService,
   ) {}
 
-  async findAllExercises(category: string | undefined, userId: number) {
+  async findAllExercises(category: string | undefined, userId?: number) {
     const exercises = await this.prisma.speakingExercise.findMany({
       where: category ? { category } : {},
       orderBy: { createdAt: 'desc' },
     });
 
-    const userSubmissions = await this.prisma.speakingSubmission.findMany({
-      where: {
-        userId,
-        exerciseId: { in: exercises.map((e) => e.id) },
-      },
-      select: { exerciseId: true },
-    });
+    const userSubmissions = userId
+      ? await this.prisma.speakingSubmission.findMany({
+          where: {
+            userId,
+            exerciseId: { in: exercises.map((e) => e.id) },
+          },
+          select: { exerciseId: true },
+        })
+      : [];
 
     const completedExerciseIds = new Set(
       userSubmissions.map((s) => s.exerciseId),

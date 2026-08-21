@@ -22,7 +22,7 @@ export class WritingController {
     summary: 'Lấy danh sách các chủ điểm và bài viết Writing Part 1',
   })
   getTopics(@Request() req: any) {
-    return this.writingService.getTopics(req.user.id);
+    return this.writingService.getTopics(req?.user?.id);
   }
 
   @Get('quizzes/:id')

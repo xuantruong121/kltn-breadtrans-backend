@@ -36,7 +36,7 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     ScheduleModule.forRoot(),
     RedisModule.forRoot({
       type: 'single',
-      url: 'redis://localhost:6379',
+      url: process.env.REDIS_URL || 'redis://localhost:6379',
     }),
     ThrottlerModule.forRoot([
       {

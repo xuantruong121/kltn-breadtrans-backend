@@ -11,14 +11,17 @@ const common_1 = require("@nestjs/common");
 const upload_controller_1 = require("./upload.controller");
 const upload_service_1 = require("./upload.service");
 const r2_service_1 = require("./r2.service");
+const r2_cleanup_service_1 = require("./r2-cleanup.service");
+const prisma_module_1 = require("../../prisma/prisma.module");
 let UploadModule = class UploadModule {
 };
 exports.UploadModule = UploadModule;
 exports.UploadModule = UploadModule = __decorate([
     (0, common_1.Module)({
+        imports: [prisma_module_1.PrismaModule],
         controllers: [upload_controller_1.UploadController],
-        providers: [upload_service_1.UploadService, r2_service_1.R2Service],
-        exports: [upload_service_1.UploadService, r2_service_1.R2Service],
+        providers: [upload_service_1.UploadService, r2_service_1.R2Service, r2_cleanup_service_1.R2CleanupService],
+        exports: [upload_service_1.UploadService, r2_service_1.R2Service, r2_cleanup_service_1.R2CleanupService],
     })
 ], UploadModule);
 //# sourceMappingURL=upload.module.js.map

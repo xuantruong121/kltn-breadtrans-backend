@@ -51,7 +51,7 @@ exports.AppModule = AppModule = __decorate([
             schedule_1.ScheduleModule.forRoot(),
             ioredis_1.RedisModule.forRoot({
                 type: 'single',
-                url: 'redis://localhost:6379',
+                url: process.env.REDIS_URL || 'redis://localhost:6379',
             }),
             throttler_1.ThrottlerModule.forRoot([
                 {

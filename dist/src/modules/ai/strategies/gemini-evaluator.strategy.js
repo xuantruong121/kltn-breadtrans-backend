@@ -8,16 +8,27 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 var GeminiEvaluatorStrategy_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GeminiEvaluatorStrategy = void 0;
 const common_1 = require("@nestjs/common");
+const ioredis_1 = require("@nestjs-modules/ioredis");
+const ioredis_2 = __importDefault(require("ioredis"));
+const crypto_1 = require("crypto");
 const generative_ai_1 = require("@google/generative-ai");
 let GeminiEvaluatorStrategy = GeminiEvaluatorStrategy_1 = class GeminiEvaluatorStrategy {
+    redis;
     logger = new common_1.Logger(GeminiEvaluatorStrategy_1.name);
     apiKeys = [];
     currentKeyIndex = 0;
-    constructor() {
+    constructor(redis) {
+        this.redis = redis;
         const keysStr = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
         this.apiKeys = keysStr
             .split(',')
@@ -29,6 +40,38 @@ let GeminiEvaluatorStrategy = GeminiEvaluatorStrategy_1 = class GeminiEvaluatorS
     }
     getModelName() {
         return process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite';
+    }
+    getCacheKey(prefix, ...args) {
+        const raw = args
+            .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a ?? '')))
+            .join('::');
+        const hash = (0, crypto_1.createHash)('md5').update(raw).digest('hex');
+        return `gemini:${prefix}:${hash}`;
+    }
+    async getCachedOrGenerate(cacheKey, ttlSeconds, generator) {
+        if (this.redis) {
+            try {
+                const cached = await this.redis.get(cacheKey);
+                if (cached) {
+                    this.logger.log(`[Cache HIT] key: ${cacheKey}`);
+                    return JSON.parse(cached);
+                }
+            }
+            catch (err) {
+                this.logger.warn(`Redis get failed for key ${cacheKey}: ${err}`);
+            }
+        }
+        const result = await generator();
+        if (this.redis && result !== undefined && result !== null) {
+            try {
+                await this.redis.set(cacheKey, JSON.stringify(result), 'EX', ttlSeconds);
+                this.logger.log(`[Cache SET] key: ${cacheKey} (TTL: ${ttlSeconds}s)`);
+            }
+            catch (err) {
+                this.logger.warn(`Redis set failed for key ${cacheKey}: ${err}`);
+            }
+        }
+        return result;
     }
     async sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
@@ -71,12 +114,14 @@ let GeminiEvaluatorStrategy = GeminiEvaluatorStrategy_1 = class GeminiEvaluatorS
         throw new Error('Tất cả Gemini API keys đều đã hết hạn mức (429 Too Many Requests). Vui lòng thử lại sau.');
     }
     async generateFeedback(question, studentAnswer) {
-        try {
-            if (!this.hasKeys()) {
-                this.logger.warn('GEMINI_API_KEY is not set. Returning mock feedback.');
-                return `[Mock Gemini Feedback] Nhận xét cho câu trả lời của em: "${studentAnswer}".`;
-            }
-            const prompt = `Bạn là một giáo viên tiếng Anh tận tâm, vui vẻ và ân cần đang chấm bài viết cho học sinh/trẻ em trên nền tảng BreadTrans Junior.
+        const cacheKey = this.getCacheKey('feedback', question, studentAnswer);
+        return this.getCachedOrGenerate(cacheKey, 86400, async () => {
+            try {
+                if (!this.hasKeys()) {
+                    this.logger.warn('GEMINI_API_KEY is not set. Returning mock feedback.');
+                    return `[Mock Gemini Feedback] Nhận xét cho câu trả lời của em: "${studentAnswer}".`;
+                }
+                const prompt = `Bạn là một giáo viên tiếng Anh tận tâm, vui vẻ và ân cần đang chấm bài viết cho học sinh/trẻ em trên nền tảng BreadTrans Junior.
 Đề bài: "${question}"
 Bài làm của học sinh: "${studentAnswer}"
 
@@ -85,14 +130,15 @@ Hãy đưa ra nhận xét chi tiết HOÀN TOÀN BẰNG TIẾNG VIỆT với gi�
 2. ✏️ Sửa lỗi ngữ pháp & từ vựng (chỉ rõ từ/câu cần sửa, viết lại câu hoàn chỉnh và giải thích ngắn gọn, dễ hiểu)
 3. 💡 Gợi ý mẹo nhỏ để em viết hay và tự nhiên hơn
 4. 🏆 Đánh giá mức độ hoàn thành`;
-            const result = await this.executeWithRotation((m) => m.generateContent(prompt));
-            const response = result.response;
-            return response.text();
-        }
-        catch (error) {
-            this.logger.error('Failed to generate Gemini AI feedback', error);
-            return 'Thầy/Cô chưa thể tạo nhận xét lúc này. Em hãy thử lại sau ít phút nhé!';
-        }
+                const result = await this.executeWithRotation((m) => m.generateContent(prompt));
+                const response = result.response;
+                return response.text();
+            }
+            catch (error) {
+                this.logger.error('Failed to generate Gemini AI feedback', error);
+                return 'Thầy/Cô chưa thể tạo nhận xét lúc này. Em hãy thử lại sau ít phút nhé!';
+            }
+        });
     }
     async chat(prompt) {
         try {
@@ -250,8 +296,10 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         if (!this.hasKeys()) {
             return 'Chức năng giải thích đang bảo trì. Vui lòng thử lại sau.';
         }
-        try {
-            const prompt = `
+        const cacheKey = this.getCacheKey('toeic_explain', questionContent, userAnswer, correctAnswer);
+        return this.getCachedOrGenerate(cacheKey, 86400, async () => {
+            try {
+                const prompt = `
         Bạn là một gia sư TOEIC chuyên nghiệp và tận tâm.
         Hãy giải thích câu hỏi TOEIC sau đây bằng tiếng Việt một cách dễ hiểu, ngắn gọn nhưng đầy đủ ngữ pháp/từ vựng cần thiết.
         Nội dung câu hỏi: ${JSON.stringify(questionContent)}
@@ -263,14 +311,15 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         2. Tại sao đáp án đúng lại hợp lý (giải thích ngữ pháp/ngữ nghĩa)?
         3. Dịch nghĩa câu hỏi sang tiếng Việt.
       `;
-            const result = await this.executeWithRotation((m) => m.generateContent(prompt));
-            const response = result.response;
-            return response.text();
-        }
-        catch (error) {
-            this.logger.error(`Error explaining TOEIC error: ${error.message}`, error.stack);
-            return 'Xin lỗi, tôi không thể giải thích câu hỏi này lúc này.';
-        }
+                const result = await this.executeWithRotation((m) => m.generateContent(prompt));
+                const response = result.response;
+                return response.text();
+            }
+            catch (error) {
+                this.logger.error(`Error explaining TOEIC error: ${error.message}`, error.stack);
+                return 'Xin lỗi, tôi không thể giải thích câu hỏi này lúc này.';
+            }
+        });
     }
     async generateToeicQuestions(topic, part, count) {
         if (!this.hasKeys()) {
@@ -670,6 +719,8 @@ ${documentText.slice(0, 15000)}
 exports.GeminiEvaluatorStrategy = GeminiEvaluatorStrategy;
 exports.GeminiEvaluatorStrategy = GeminiEvaluatorStrategy = GeminiEvaluatorStrategy_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [])
+    __param(0, (0, common_1.Optional)()),
+    __param(0, (0, ioredis_1.InjectRedis)()),
+    __metadata("design:paramtypes", [ioredis_2.default])
 ], GeminiEvaluatorStrategy);
 //# sourceMappingURL=gemini-evaluator.strategy.js.map

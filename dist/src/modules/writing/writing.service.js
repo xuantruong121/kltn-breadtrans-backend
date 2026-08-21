@@ -38,13 +38,15 @@ let WritingService = class WritingService {
             },
             orderBy: { id: 'desc' },
         });
-        const userSubmissions = await this.prisma.submission.findMany({
-            where: {
-                userId,
-                quizId: { in: quizzes.map((q) => q.id) },
-            },
-            select: { quizId: true },
-        });
+        const userSubmissions = userId
+            ? await this.prisma.submission.findMany({
+                where: {
+                    userId,
+                    quizId: { in: quizzes.map((q) => q.id) },
+                },
+                select: { quizId: true },
+            })
+            : [];
         const completedQuizIds = new Set(userSubmissions.map((s) => s.quizId));
         return {
             categories,

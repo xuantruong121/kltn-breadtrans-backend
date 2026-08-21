@@ -56,7 +56,7 @@ export class SpeakingController {
     enum: ['IELTS', 'TOEIC', 'GENERAL'],
   })
   findAllExercises(@Query('category') category: string, @Request() req: any) {
-    return this.speakingService.findAllExercises(category, req.user.id);
+    return this.speakingService.findAllExercises(category, req?.user?.id);
   }
 
   @Get('exercises/:id')
