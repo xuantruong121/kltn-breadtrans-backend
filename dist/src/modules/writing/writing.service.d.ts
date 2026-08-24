@@ -10,13 +10,13 @@ export declare class WritingService {
                 quizzes: number;
             };
         } & {
-            id: number;
             name: string;
             vietnameseName: string | null;
             category: import(".prisma/client").$Enums.TopicCategory;
             iconUrl: string | null;
             order: number;
             createdAt: Date;
+            id: number;
         })[];
         quizzes: {
             id: number;
