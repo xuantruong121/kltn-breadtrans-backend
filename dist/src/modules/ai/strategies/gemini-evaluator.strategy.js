@@ -250,16 +250,21 @@ Nội dung câu hỏi của học sinh:
                     isSilentOrNoSpeech: true,
                 };
             }
-            const bestResult = azureData.NBest[0];
+            const nBestList = (azureData?.NBest ||
+                []);
+            const bestResult = nBestList[0] || {};
             const pronScores = bestResult.PronunciationAssessment || bestResult;
             const accuracyScore = pronScores.AccuracyScore ?? bestResult.AccuracyScore ?? 0;
             const fluencyScore = pronScores.FluencyScore ?? bestResult.FluencyScore ?? 0;
             const completenessScore = pronScores.CompletenessScore ?? bestResult.CompletenessScore ?? 0;
             const rawPronScore = pronScores.PronScore ?? bestResult.PronScore ?? 0;
-            const spokenWords = (bestResult.Words || []).filter((w) => (w.Duration ?? 0) > 0 ||
-                (w.ErrorType ?? w.PronunciationAssessment?.ErrorType) !== 'Omission' ||
-                (w.AccuracyScore ?? w.PronunciationAssessment?.AccuracyScore ?? 0) > 0);
-            if (!bestResult.Words || bestResult.Words.length === 0 || spokenWords.length === 0) {
+            const bestWords = bestResult.Words || [];
+            const spokenWords = bestWords.filter((w) => (w.Duration ?? 0) > 0 ||
+                (w.ErrorType ?? w.PronunciationAssessment?.ErrorType) !==
+                    'Omission' ||
+                (w.AccuracyScore ?? w.PronunciationAssessment?.AccuracyScore ?? 0) >
+                    0);
+            if (bestWords.length === 0 || spokenWords.length === 0) {
                 this.logger.warn('No spoken words recognized in recording.');
                 const allUnspokenWords = targetWordsList.map((w) => ({
                     word: w,
@@ -289,13 +294,11 @@ Nội dung câu hỏi của học sinh:
             const usedAzureIndices = new Set();
             for (let wIdx = 0; wIdx < targetWordsList.length; wIdx++) {
                 const targetWord = targetWordsList[wIdx];
-                const cleanTarget = targetWord
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, '');
+                const cleanTarget = targetWord.toLowerCase().replace(/[^a-z0-9]/g, '');
                 let matchedIndex = -1;
-                if (wIdx < bestResult.Words.length && !usedAzureIndices.has(wIdx)) {
-                    const directAz = bestResult.Words[wIdx];
-                    const cleanDirect = (directAz.Word || '')
+                if (wIdx < bestWords.length && !usedAzureIndices.has(wIdx)) {
+                    const directAz = bestWords[wIdx];
+                    const cleanDirect = String(directAz.Word || '')
                         .toLowerCase()
                         .replace(/[^a-z0-9]/g, '');
                     if (cleanDirect === cleanTarget) {
@@ -303,11 +306,11 @@ Nội dung câu hỏi của học sinh:
                     }
                 }
                 if (matchedIndex === -1) {
-                    for (let i = 0; i < bestResult.Words.length; i++) {
+                    for (let i = 0; i < bestWords.length; i++) {
                         if (usedAzureIndices.has(i))
                             continue;
-                        const azWord = bestResult.Words[i];
-                        const cleanAz = (azWord.Word || '')
+                        const azWord = bestWords[i];
+                        const cleanAz = String(azWord.Word || '')
                             .toLowerCase()
                             .replace(/[^a-z0-9]/g, '');
                         if (cleanAz === cleanTarget) {
@@ -318,21 +321,14 @@ Nội dung câu hỏi của học sinh:
                 }
                 if (matchedIndex !== -1) {
                     usedAzureIndices.add(matchedIndex);
-                    const azObj = bestResult.Words[matchedIndex];
+                    const azObj = bestWords[matchedIndex];
                     const wScore = azObj.PronunciationAssessment || azObj;
                     const azAccuracy = wScore.AccuracyScore ?? azObj.AccuracyScore ?? 0;
                     const azError = wScore.ErrorType ?? azObj.ErrorType ?? 'None';
                     const azDuration = azObj.Duration ?? 0;
-                    const isOmitted = azError === 'Omission' ||
-                        (azDuration === 0 && azAccuracy === 0);
-                    const isCorrect = !isOmitted &&
-                        azError === 'None' &&
-                        azAccuracy >= 60;
-                    const finalErrorType = isCorrect
-                        ? 'None'
-                        : isOmitted
-                            ? 'Omission'
-                            : 'Mispronunciation';
+                    const isOmitted = azError === 'Omission' || (azDuration === 0 && azAccuracy === 0);
+                    const isCorrect = !isOmitted && azError === 'None' && azAccuracy >= 60;
+                    const finalErrorType = isCorrect ? 'None' : isOmitted ? 'Omission' : 'Mispronunciation';
                     words.push({
                         word: targetWord,
                         accuracyScore: isOmitted ? 0 : azAccuracy,
@@ -353,10 +349,10 @@ Nội dung câu hỏi của học sinh:
                     problematicWords.push(targetWord);
                 }
             }
-            if (bestResult.Words) {
-                transcript = bestResult.Words
+            if (bestWords.length > 0) {
+                transcript = bestWords
                     .filter((w) => (w.Duration ?? 0) > 0)
-                    .map((w) => w.Word)
+                    .map((w) => String(w.Word || ''))
                     .join(' ');
             }
             let overallScore = (rawPronScore / 100) * 10;
@@ -406,7 +402,13 @@ Hãy đóng vai một giáo viên tiếng Anh tận tâm cho thiếu nhi. Đưa 
   ]
 }
 Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
-            let clarity = overallScore >= 8 ? 'Excellent' : overallScore >= 6 ? 'Good' : overallScore >= 4 ? 'Fair' : 'Poor';
+            let clarity = overallScore >= 8
+                ? 'Excellent'
+                : overallScore >= 6
+                    ? 'Good'
+                    : overallScore >= 4
+                        ? 'Fair'
+                        : 'Poor';
             let feedback = '';
             let suggestions = [];
             try {
@@ -431,10 +433,12 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
                         ? `Tuyệt vời! Bạn phát âm rất chuẩn đạt ${overallScore.toFixed(1)}/10 điểm.`
                         : `Phát âm của bạn đạt ${overallScore.toFixed(1)}/10 điểm. Hãy tiếp tục luyện tập nhé!`),
                 problematicWords,
-                suggestions: suggestions.length > 0 ? suggestions : [
-                    'Nghe lại audio mẫu để bắt chước ngữ điệu chuẩn.',
-                    'Luyện tập đọc chậm rãi từng từ trước khi đọc cả câu.'
-                ],
+                suggestions: suggestions.length > 0
+                    ? suggestions
+                    : [
+                        'Nghe lại audio mẫu để bắt chước ngữ điệu chuẩn.',
+                        'Luyện tập đọc chậm rãi từng từ trước khi đọc cả câu.',
+                    ],
                 fluencyScore,
                 accuracyScore,
                 completenessScore,
