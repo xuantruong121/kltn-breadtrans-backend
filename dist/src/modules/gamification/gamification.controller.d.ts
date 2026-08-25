@@ -24,17 +24,17 @@ export declare class GamificationController {
     } & {
         id: number;
         userId: number;
-        rank: number | null;
         totalPoints: number;
+        rank: number | null;
         tier: string;
         weeklyExp: number;
     })[]>;
     getMyBadges(req: any): Promise<({
         badge: {
-            name: string;
-            iconUrl: string | null;
             id: number;
+            name: string;
             description: string;
+            iconUrl: string | null;
             criteria: import("@prisma/client/runtime/library").JsonValue;
         };
     } & {
@@ -44,36 +44,51 @@ export declare class GamificationController {
         awardedAt: Date;
     })[]>;
     getMyPet(req: any): Promise<{
+        id: number;
+        userId: number;
         name: string;
         createdAt: Date;
-        id: number;
         updatedAt: Date;
-        userId: number;
-        level: number;
         health: number;
         happiness: number;
+        level: number;
         exp: number;
+        roster: import("@prisma/client/runtime/library").JsonValue | null;
         lastFedAt: Date | null;
     }>;
     feedPet(req: any): Promise<{
+        id: number;
+        userId: number;
         name: string;
         createdAt: Date;
-        id: number;
         updatedAt: Date;
-        userId: number;
-        level: number;
         health: number;
         happiness: number;
+        level: number;
         exp: number;
+        roster: import("@prisma/client/runtime/library").JsonValue | null;
+        lastFedAt: Date | null;
+    }>;
+    changePetType(req: any, petName: string): Promise<{
+        id: number;
+        userId: number;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        health: number;
+        happiness: number;
+        level: number;
+        exp: number;
+        roster: import("@prisma/client/runtime/library").JsonValue | null;
         lastFedAt: Date | null;
     }>;
     getMyDailyQuests(req: any): Promise<({
         quest: {
             id: number;
-            title: string;
             description: string | null;
-            type: string;
+            title: string;
             targetValue: number;
+            type: string;
             rewardXP: number;
             rewardBanh: number;
             isActive: boolean;
@@ -81,10 +96,10 @@ export declare class GamificationController {
     } & {
         id: number;
         userId: number;
-        completedAt: Date | null;
         questId: number;
         currentValue: number;
         isCompleted: boolean;
+        completedAt: Date | null;
         dateKey: string;
     })[]>;
     recordVocabLearned(count: number, req: any): Promise<{

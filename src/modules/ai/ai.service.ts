@@ -103,6 +103,51 @@ export class AiService {
     }
   }
 
+  async generateVietnameseTtsAudio(
+    text: string,
+    voiceName: string = 'vi-VN-HoaiMyNeural',
+  ): Promise<Buffer | null> {
+    const azureKey = process.env.AZURE_SPEECH_KEY;
+    const azureRegion = process.env.AZURE_SPEECH_REGION;
+    if (!azureKey || !azureRegion) {
+      this.logger.warn('Thiếu AZURE_SPEECH_KEY. Bỏ qua tạo Audio tiếng Việt.');
+      return null;
+    }
+
+    try {
+      const endpoint = `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`;
+      const ssml = `<speak version='1.0' xml:lang='vi-VN'>
+  <voice xml:lang='vi-VN' xml:gender='Female' name='${voiceName}'>
+    ${text}
+  </voice>
+</speak>`;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': azureKey,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+          'User-Agent': 'BreadtransKLTN',
+        },
+        body: ssml,
+      });
+
+      if (!response.ok) {
+        this.logger.error(
+          `Azure Vietnamese TTS failed: ${response.statusText}`,
+        );
+        return null;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    } catch (e) {
+      this.logger.error('Error in Azure Vietnamese TTS:', e);
+      return null;
+    }
+  }
+
   async evaluateWritingPart1(
     imageUrl: string,
     keywords: string[],

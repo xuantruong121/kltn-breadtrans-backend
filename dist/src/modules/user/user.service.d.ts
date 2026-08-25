@@ -66,6 +66,7 @@ export declare class UserService {
             health: number;
             happiness: number;
             exp: number;
+            roster: import("@prisma/client/runtime/library").JsonValue | null;
             lastFedAt: Date | null;
         } | null;
         createdAt: Date;
@@ -113,6 +114,7 @@ export declare class UserService {
             health: number;
             happiness: number;
             exp: number;
+            roster: import("@prisma/client/runtime/library").JsonValue | null;
             lastFedAt: Date | null;
         } | null;
     }>;

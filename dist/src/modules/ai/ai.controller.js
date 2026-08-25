@@ -198,6 +198,27 @@ let AiController = class AiController {
             quizId: newQuiz.id,
         };
     }
+    async getVietnameseTts(text, res) {
+        if (!text) {
+            return res
+                .status(common_1.HttpStatus.BAD_REQUEST)
+                .json({ message: 'Text is required' });
+        }
+        const cleanText = text
+            .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{1F200}-\u{1F2FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FAFF}]|[\u{1F000}-\u{1F02F}]/gu, '')
+            .replace(/[✨❤️🍞💖🥰🥺😢🐾🥖👑🎂🍩🥐🦉🐱🦊🕶️🧙‍♂️🌌🎀🧚‍♀️🎤🌟]/g, '')
+            .trim();
+        const audioBuffer = await this.aiService.generateVietnameseTtsAudio(cleanText);
+        if (!audioBuffer) {
+            return res
+                .status(common_1.HttpStatus.INTERNAL_SERVER_ERROR)
+                .json({ message: 'Failed to generate Vietnamese TTS' });
+        }
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', audioBuffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.end(audioBuffer);
+    }
 };
 exports.AiController = AiController;
 __decorate([
@@ -262,6 +283,15 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AiController.prototype, "importEtsPdf", null);
+__decorate([
+    (0, common_1.Get)('tts/vietnamese'),
+    (0, swagger_1.ApiOperation)({ summary: 'Tạo giọng đọc tiếng Việt chuẩn bằng Azure Neural TTS' }),
+    __param(0, (0, common_1.Query)('text')),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], AiController.prototype, "getVietnameseTts", null);
 exports.AiController = AiController = __decorate([
     (0, swagger_1.ApiTags)('ai'),
     (0, common_1.Controller)('ai'),

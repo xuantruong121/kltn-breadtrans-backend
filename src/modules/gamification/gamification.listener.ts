@@ -65,13 +65,20 @@ export class GamificationListener {
         }
       }
 
-      // 4. Update Daily Quests
+      // 4. Update Daily Quests (COMPLETE_QUIZ & PERFECT_QUIZ)
       const today = new Date().toISOString().split('T')[0];
       const activeQuests = await this.prisma.dailyQuest.findMany({
-        where: { isActive: true, type: 'COMPLETE_QUIZ' },
+        where: {
+          isActive: true,
+          type: { in: ['COMPLETE_QUIZ', 'PERFECT_QUIZ'] },
+        },
       });
 
       for (const quest of activeQuests) {
+        if (quest.type === 'PERFECT_QUIZ' && payload.score < 100) {
+          continue;
+        }
+
         const progress = await this.prisma.userQuestProgress.upsert({
           where: {
             userId_questId_dateKey: {
@@ -112,24 +119,14 @@ export class GamificationListener {
 
           // Reward Banh Ran (UserStats)
           if (quest.rewardBanh > 0) {
-            const userStats = await this.prisma.userStats.findUnique({
+            await this.prisma.userStats.upsert({
               where: { userId: payload.userId },
+              update: { totalBanhRan: { increment: quest.rewardBanh } },
+              create: {
+                userId: payload.userId,
+                totalBanhRan: quest.rewardBanh,
+              },
             });
-            if (userStats) {
-              await this.prisma.userStats.update({
-                where: { userId: payload.userId },
-                data: {
-                  totalBanhRan: { increment: quest.rewardBanh },
-                },
-              });
-            } else {
-              await this.prisma.userStats.create({
-                data: {
-                  userId: payload.userId,
-                  totalBanhRan: quest.rewardBanh,
-                },
-              });
-            }
           }
 
           this.logger.log(
@@ -140,6 +137,100 @@ export class GamificationListener {
     } catch (error) {
       this.logger.error(
         `Failed to handle gamification for user ${payload.userId}`,
+        error,
+      );
+    }
+  }
+
+  @OnEvent('speaking.submitted')
+  async handleSpeakingSubmittedEvent(payload: {
+    userId: number;
+    exerciseId?: number;
+    overallScore: number;
+    isSilentOrNoSpeech?: boolean;
+  }) {
+    this.logger.log(
+      `Handling speaking.submitted event for user ${payload.userId} with score ${payload.overallScore}`,
+    );
+
+    try {
+      if (payload.isSilentOrNoSpeech) return;
+
+      // 1. Tặng điểm EXP cho bài luyện phát âm (tối thiểu 10 XP, tối đa 50 XP)
+      const pointsEarned = Math.max(10, Math.round(payload.overallScore * 5));
+      if (pointsEarned > 0) {
+        await this.gamificationService.addPoints(
+          payload.userId,
+          pointsEarned,
+          'Luyện phát âm AI (Speaking)',
+        );
+      }
+
+      // 2. Cập nhật tiến độ nhiệm vụ ngày DO_SPEAKING
+      const today = new Date().toISOString().split('T')[0];
+      const activeQuests = await this.prisma.dailyQuest.findMany({
+        where: {
+          isActive: true,
+          type: { in: ['DO_SPEAKING', 'PRACTICE_SPEAKING'] },
+        },
+      });
+
+      for (const quest of activeQuests) {
+        const progress = await this.prisma.userQuestProgress.upsert({
+          where: {
+            userId_questId_dateKey: {
+              userId: payload.userId,
+              questId: quest.id,
+              dateKey: today,
+            },
+          },
+          update: {
+            currentValue: { increment: 1 },
+          },
+          create: {
+            userId: payload.userId,
+            questId: quest.id,
+            dateKey: today,
+            currentValue: 1,
+          },
+        });
+
+        if (
+          progress.currentValue >= quest.targetValue &&
+          !progress.isCompleted
+        ) {
+          await this.prisma.userQuestProgress.update({
+            where: { id: progress.id },
+            data: { isCompleted: true },
+          });
+
+          if (quest.rewardXP > 0) {
+            await this.gamificationService.addPoints(
+              payload.userId,
+              quest.rewardXP,
+              `Hoàn thành nhiệm vụ: ${quest.title}`,
+            );
+          }
+
+          if (quest.rewardBanh > 0) {
+            await this.prisma.userStats.upsert({
+              where: { userId: payload.userId },
+              update: { totalBanhRan: { increment: quest.rewardBanh } },
+              create: {
+                userId: payload.userId,
+                totalBanhRan: quest.rewardBanh,
+              },
+            });
+          }
+
+          this.logger.log(
+            `User ${payload.userId} completed speaking quest ${quest.id} and received rewards.`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to handle speaking gamification for user ${payload.userId}`,
         error,
       );
     }

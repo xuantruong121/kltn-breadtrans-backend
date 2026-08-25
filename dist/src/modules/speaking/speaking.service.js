@@ -12,6 +12,7 @@ var SpeakingService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SpeakingService = void 0;
 const common_1 = require("@nestjs/common");
+const event_emitter_1 = require("@nestjs/event-emitter");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const ai_service_1 = require("../ai/ai.service");
 const upload_service_1 = require("../upload/upload.service");
@@ -19,11 +20,13 @@ let SpeakingService = SpeakingService_1 = class SpeakingService {
     prisma;
     aiService;
     uploadService;
+    eventEmitter;
     logger = new common_1.Logger(SpeakingService_1.name);
-    constructor(prisma, aiService, uploadService) {
+    constructor(prisma, aiService, uploadService, eventEmitter) {
         this.prisma = prisma;
         this.aiService = aiService;
         this.uploadService = uploadService;
+        this.eventEmitter = eventEmitter;
     }
     async findAllExercises(category, userId) {
         const exercises = await this.prisma.speakingExercise.findMany({
@@ -94,6 +97,17 @@ let SpeakingService = SpeakingService_1 = class SpeakingService {
                 aiFeedback: aiFeedback,
             },
         });
+        try {
+            await this.eventEmitter.emitAsync('speaking.submitted', {
+                userId,
+                exerciseId,
+                overallScore: aiFeedback.overallScore,
+                isSilentOrNoSpeech: aiFeedback.isSilentOrNoSpeech,
+            });
+        }
+        catch (e) {
+            this.logger.error('Failed to emit speaking.submitted event', e);
+        }
         return {
             submissionId: submission.id,
             audioUrl,
@@ -116,6 +130,7 @@ exports.SpeakingService = SpeakingService = SpeakingService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         ai_service_1.AiService,
-        upload_service_1.UploadService])
+        upload_service_1.UploadService,
+        event_emitter_1.EventEmitter2])
 ], SpeakingService);
 //# sourceMappingURL=speaking.service.js.map

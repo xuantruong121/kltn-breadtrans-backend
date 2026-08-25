@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { UploadService } from '../upload/upload.service';
@@ -17,6 +18,7 @@ export class SpeakingService {
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
     private readonly uploadService: UploadService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async findAllExercises(category: string | undefined, userId?: number) {
@@ -122,6 +124,18 @@ export class SpeakingService {
         aiFeedback: aiFeedback as any,
       },
     });
+
+    // 5. Bắn event gamification để cập nhật nhiệm vụ ngày DO_SPEAKING & cộng điểm thưởng
+    try {
+      await this.eventEmitter.emitAsync('speaking.submitted', {
+        userId,
+        exerciseId,
+        overallScore: aiFeedback.overallScore,
+        isSilentOrNoSpeech: aiFeedback.isSilentOrNoSpeech,
+      });
+    } catch (e) {
+      this.logger.error('Failed to emit speaking.submitted event', e);
+    }
 
     return {
       submissionId: submission.id,

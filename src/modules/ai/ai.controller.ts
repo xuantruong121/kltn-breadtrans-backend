@@ -1,12 +1,17 @@
 import {
   Controller,
   Post,
+  Get,
+  Query,
+  Res,
   Body,
   UseGuards,
   UseInterceptors,
   UploadedFiles,
   BadRequestException,
+  HttpStatus,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from './ai.service';
@@ -286,5 +291,37 @@ export class AiController {
       message: `Đã trích xuất và lưu thành công ${questions.length} câu hỏi.`,
       quizId: newQuiz.id,
     };
+  }
+
+  @Get('tts/vietnamese')
+  @ApiOperation({ summary: 'Tạo giọng đọc tiếng Việt chuẩn bằng Azure Neural TTS' })
+  async getVietnameseTts(@Query('text') text: string, @Res() res: Response) {
+    if (!text) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Text is required' });
+    }
+
+    const cleanText = text
+      .replace(
+        /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{1F200}-\u{1F2FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FAFF}]|[\u{1F000}-\u{1F02F}]/gu,
+        '',
+      )
+      .replace(/[✨❤️🍞💖🥰🥺😢🐾🥖👑🎂🍩🥐🦉🐱🦊🕶️🧙‍♂️🌌🎀🧚‍♀️🎤🌟]/g, '')
+      .trim();
+
+    const audioBuffer =
+      await this.aiService.generateVietnameseTtsAudio(cleanText);
+
+    if (!audioBuffer) {
+      return res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .json({ message: 'Failed to generate Vietnamese TTS' });
+    }
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', audioBuffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.end(audioBuffer);
   }
 }

@@ -54,7 +54,75 @@ let GamificationListener = GamificationListener_1 = class GamificationListener {
             }
             const today = new Date().toISOString().split('T')[0];
             const activeQuests = await this.prisma.dailyQuest.findMany({
-                where: { isActive: true, type: 'COMPLETE_QUIZ' },
+                where: {
+                    isActive: true,
+                    type: { in: ['COMPLETE_QUIZ', 'PERFECT_QUIZ'] },
+                },
+            });
+            for (const quest of activeQuests) {
+                if (quest.type === 'PERFECT_QUIZ' && payload.score < 100) {
+                    continue;
+                }
+                const progress = await this.prisma.userQuestProgress.upsert({
+                    where: {
+                        userId_questId_dateKey: {
+                            userId: payload.userId,
+                            questId: quest.id,
+                            dateKey: today,
+                        },
+                    },
+                    update: {
+                        currentValue: { increment: 1 },
+                    },
+                    create: {
+                        userId: payload.userId,
+                        questId: quest.id,
+                        dateKey: today,
+                        currentValue: 1,
+                    },
+                });
+                if (progress.currentValue >= quest.targetValue &&
+                    !progress.isCompleted) {
+                    await this.prisma.userQuestProgress.update({
+                        where: { id: progress.id },
+                        data: { isCompleted: true },
+                    });
+                    if (quest.rewardXP > 0) {
+                        await this.gamificationService.addPoints(payload.userId, quest.rewardXP, `Hoàn thành nhiệm vụ: ${quest.title}`);
+                    }
+                    if (quest.rewardBanh > 0) {
+                        await this.prisma.userStats.upsert({
+                            where: { userId: payload.userId },
+                            update: { totalBanhRan: { increment: quest.rewardBanh } },
+                            create: {
+                                userId: payload.userId,
+                                totalBanhRan: quest.rewardBanh,
+                            },
+                        });
+                    }
+                    this.logger.log(`User ${payload.userId} completed quest ${quest.id} and received rewards.`);
+                }
+            }
+        }
+        catch (error) {
+            this.logger.error(`Failed to handle gamification for user ${payload.userId}`, error);
+        }
+    }
+    async handleSpeakingSubmittedEvent(payload) {
+        this.logger.log(`Handling speaking.submitted event for user ${payload.userId} with score ${payload.overallScore}`);
+        try {
+            if (payload.isSilentOrNoSpeech)
+                return;
+            const pointsEarned = Math.max(10, Math.round(payload.overallScore * 5));
+            if (pointsEarned > 0) {
+                await this.gamificationService.addPoints(payload.userId, pointsEarned, 'Luyện phát âm AI (Speaking)');
+            }
+            const today = new Date().toISOString().split('T')[0];
+            const activeQuests = await this.prisma.dailyQuest.findMany({
+                where: {
+                    isActive: true,
+                    type: { in: ['DO_SPEAKING', 'PRACTICE_SPEAKING'] },
+                },
             });
             for (const quest of activeQuests) {
                 const progress = await this.prisma.userQuestProgress.upsert({
@@ -85,32 +153,21 @@ let GamificationListener = GamificationListener_1 = class GamificationListener {
                         await this.gamificationService.addPoints(payload.userId, quest.rewardXP, `Hoàn thành nhiệm vụ: ${quest.title}`);
                     }
                     if (quest.rewardBanh > 0) {
-                        const userStats = await this.prisma.userStats.findUnique({
+                        await this.prisma.userStats.upsert({
                             where: { userId: payload.userId },
+                            update: { totalBanhRan: { increment: quest.rewardBanh } },
+                            create: {
+                                userId: payload.userId,
+                                totalBanhRan: quest.rewardBanh,
+                            },
                         });
-                        if (userStats) {
-                            await this.prisma.userStats.update({
-                                where: { userId: payload.userId },
-                                data: {
-                                    totalBanhRan: { increment: quest.rewardBanh },
-                                },
-                            });
-                        }
-                        else {
-                            await this.prisma.userStats.create({
-                                data: {
-                                    userId: payload.userId,
-                                    totalBanhRan: quest.rewardBanh,
-                                },
-                            });
-                        }
                     }
-                    this.logger.log(`User ${payload.userId} completed quest ${quest.id} and received rewards.`);
+                    this.logger.log(`User ${payload.userId} completed speaking quest ${quest.id} and received rewards.`);
                 }
             }
         }
         catch (error) {
-            this.logger.error(`Failed to handle gamification for user ${payload.userId}`, error);
+            this.logger.error(`Failed to handle speaking gamification for user ${payload.userId}`, error);
         }
     }
     async handleVocabLearnedEvent(payload) {
@@ -241,6 +298,12 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], GamificationListener.prototype, "handleQuizSubmittedEvent", null);
+__decorate([
+    (0, event_emitter_1.OnEvent)('speaking.submitted'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GamificationListener.prototype, "handleSpeakingSubmittedEvent", null);
 __decorate([
     (0, event_emitter_1.OnEvent)('vocab.learned'),
     __metadata("design:type", Function),

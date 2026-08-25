@@ -1,3 +1,4 @@
+import type { Response } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from './ai.service';
 import { UploadService } from '../upload/upload.service';
@@ -51,4 +52,5 @@ export declare class AiController {
         message: string;
         quizId: number;
     }>;
+    getVietnameseTts(text: string, res: Response): Promise<Response<any, Record<string, any>>>;
 }

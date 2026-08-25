@@ -34,6 +34,9 @@ let GamificationController = class GamificationController {
     feedPet(req) {
         return this.gamificationService.feedPet(req.user.id);
     }
+    changePetType(req, petName) {
+        return this.gamificationService.changePetType(req.user.id, petName || 'Bánh Mì Dũng Cảm');
+    }
     getMyDailyQuests(req) {
         return this.gamificationService.getMyDailyQuests(req.user.id);
     }
@@ -94,6 +97,17 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], GamificationController.prototype, "feedPet", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.Post)('pet/change-type'),
+    (0, swagger_1.ApiOperation)({ summary: 'Đổi loài thú cưng' }),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)('petName')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], GamificationController.prototype, "changePetType", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),

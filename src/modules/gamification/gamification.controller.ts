@@ -51,6 +51,14 @@ export class GamificationController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Post('pet/change-type')
+  @ApiOperation({ summary: 'Đổi loài thú cưng' })
+  changePetType(@Request() req: any, @Body('petName') petName: string) {
+    return this.gamificationService.changePetType(req.user.id, petName || 'Bánh Mì Dũng Cảm');
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('quests')
   @ApiOperation({ summary: 'Lấy danh sách nhiệm vụ hôm nay và tiến độ' })
   getMyDailyQuests(@Request() req: any) {
