@@ -145,14 +145,46 @@ let GamificationService = class GamificationService {
     }
     async getMyBadges(userId) {
         const DEFAULT_BADGES = [
-            { name: 'Tân Binh', description: 'Đạt 100 điểm kinh nghiệm đầu tiên', criteria: { type: 'EXP', threshold: 100 } },
-            { name: 'Chăm Chỉ', description: 'Duy trì chuỗi ngày học liên tục', criteria: { type: 'STREAK', threshold: 1 } },
-            { name: 'Siêu Sao', description: 'Đạt Top 1 Bảng xếp hạng tuần', criteria: { type: 'LEADERBOARD_TOP1' } },
-            { name: 'Thợ Săn', description: 'Thu thập đủ 1000 điểm kinh nghiệm', criteria: { type: 'EXP', threshold: 1000 } },
-            { name: 'Học Bá', description: 'Đạt điểm tối đa trong các bài Quiz', criteria: { type: 'QUIZ', threshold: 1 } },
-            { name: 'Đấu Sĩ Bất Bại', description: 'Thắng các trận so tài trong Đấu Trường', criteria: { type: 'ARENA', threshold: 1 } },
-            { name: 'Giọng Đọc Vàng', description: 'Đạt điểm phát âm AI xuất sắc', criteria: { type: 'SPEAKING', threshold: 1 } },
-            { name: 'Chuyên Gia Nuôi Thú', description: 'Nuôi thú cưng đạt Cấp độ 2 trở lên', criteria: { type: 'PET_LEVEL', threshold: 2 } },
+            {
+                name: 'Tân Binh',
+                description: 'Đạt 100 điểm kinh nghiệm đầu tiên',
+                criteria: { type: 'EXP', threshold: 100 },
+            },
+            {
+                name: 'Chăm Chỉ',
+                description: 'Duy trì chuỗi ngày học liên tục',
+                criteria: { type: 'STREAK', threshold: 1 },
+            },
+            {
+                name: 'Siêu Sao',
+                description: 'Đạt Top 1 Bảng xếp hạng tuần',
+                criteria: { type: 'LEADERBOARD_TOP1' },
+            },
+            {
+                name: 'Thợ Săn',
+                description: 'Thu thập đủ 1000 điểm kinh nghiệm',
+                criteria: { type: 'EXP', threshold: 1000 },
+            },
+            {
+                name: 'Học Bá',
+                description: 'Đạt điểm tối đa trong các bài Quiz',
+                criteria: { type: 'QUIZ', threshold: 1 },
+            },
+            {
+                name: 'Đấu Sĩ Bất Bại',
+                description: 'Thắng các trận so tài trong Đấu Trường',
+                criteria: { type: 'ARENA', threshold: 1 },
+            },
+            {
+                name: 'Giọng Đọc Vàng',
+                description: 'Đạt điểm phát âm AI xuất sắc',
+                criteria: { type: 'SPEAKING', threshold: 1 },
+            },
+            {
+                name: 'Chuyên Gia Nuôi Thú',
+                description: 'Nuôi thú cưng đạt Cấp độ 2 trở lên',
+                criteria: { type: 'PET_LEVEL', threshold: 2 },
+            },
         ];
         for (const b of DEFAULT_BADGES) {
             const existing = await this.prisma.badge.findFirst({
@@ -264,10 +296,34 @@ let GamificationService = class GamificationService {
         });
         if (!pet) {
             const initialRoster = {
-                bready: { level: 1, exp: 0, health: 100, happiness: 100, lastFedAt: null },
-                owly: { level: 1, exp: 0, health: 100, happiness: 100, lastFedAt: null },
-                mimi: { level: 1, exp: 0, health: 100, happiness: 100, lastFedAt: null },
-                foxy: { level: 1, exp: 0, health: 100, happiness: 100, lastFedAt: null },
+                bready: {
+                    level: 1,
+                    exp: 0,
+                    health: 100,
+                    happiness: 100,
+                    lastFedAt: null,
+                },
+                owly: {
+                    level: 1,
+                    exp: 0,
+                    health: 100,
+                    happiness: 100,
+                    lastFedAt: null,
+                },
+                mimi: {
+                    level: 1,
+                    exp: 0,
+                    health: 100,
+                    happiness: 100,
+                    lastFedAt: null,
+                },
+                foxy: {
+                    level: 1,
+                    exp: 0,
+                    health: 100,
+                    happiness: 100,
+                    lastFedAt: null,
+                },
             };
             pet = await this.prisma.userPet.create({
                 data: {
@@ -283,7 +339,7 @@ let GamificationService = class GamificationService {
             return pet;
         }
         const currentSpecies = this.normalizeSpeciesKey(pet.name);
-        let roster = pet.roster || {};
+        const roster = pet.roster || {};
         if (!roster[currentSpecies]) {
             roster[currentSpecies] = {
                 level: pet.level || 1,
@@ -305,7 +361,8 @@ let GamificationService = class GamificationService {
             const happinessDecay = daysPassed * 15;
             const newHealth = Math.max(20, 100 - healthDecay);
             const newHappiness = Math.max(20, 100 - happinessDecay);
-            if (newHealth !== activePetData.health || newHappiness !== activePetData.happiness) {
+            if (newHealth !== activePetData.health ||
+                newHappiness !== activePetData.happiness) {
                 activePetData.health = newHealth;
                 activePetData.happiness = newHappiness;
                 roster[currentSpecies] = activePetData;
@@ -339,7 +396,7 @@ let GamificationService = class GamificationService {
             data: { totalBanhRan: { decrement: 10 } },
         });
         const currentSpecies = this.normalizeSpeciesKey(pet.name);
-        let roster = pet.roster || {};
+        const roster = pet.roster || {};
         const activePetData = roster[currentSpecies] || {
             level: pet.level || 1,
             exp: pet.exp || 0,
@@ -374,7 +431,7 @@ let GamificationService = class GamificationService {
         const pet = await this.getMyPet(userId);
         const currentSpecies = this.normalizeSpeciesKey(pet.name);
         const targetSpecies = this.normalizeSpeciesKey(targetPetName);
-        let roster = pet.roster || {};
+        const roster = pet.roster || {};
         roster[currentSpecies] = {
             level: pet.level || 1,
             exp: pet.exp || 0,

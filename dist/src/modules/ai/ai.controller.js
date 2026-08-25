@@ -206,7 +206,7 @@ let AiController = class AiController {
         }
         const cleanText = text
             .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{1F200}-\u{1F2FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FAFF}]|[\u{1F000}-\u{1F02F}]/gu, '')
-            .replace(/[✨❤️🍞💖🥰🥺😢🐾🥖👑🎂🍩🥐🦉🐱🦊🕶️🧙‍♂️🌌🎀🧚‍♀️🎤🌟]/g, '')
+            .replace(/\u200D|\uFE0E|\uFE0F/g, '')
             .trim();
         const audioBuffer = await this.aiService.generateVietnameseTtsAudio(cleanText);
         if (!audioBuffer) {
@@ -285,7 +285,9 @@ __decorate([
 ], AiController.prototype, "importEtsPdf", null);
 __decorate([
     (0, common_1.Get)('tts/vietnamese'),
-    (0, swagger_1.ApiOperation)({ summary: 'Tạo giọng đọc tiếng Việt chuẩn bằng Azure Neural TTS' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Tạo giọng đọc tiếng Việt chuẩn bằng Azure Neural TTS',
+    }),
     __param(0, (0, common_1.Query)('text')),
     __param(1, (0, common_1.Res)()),
     __metadata("design:type", Function),
