@@ -770,6 +770,7 @@ model UserPet {
   happiness Int      @default(100) // 0-100
   level     Int      @default(1)
   exp       Int      @default(0)
+  roster    Json?    // Per-species stats roster: { [speciesId]: { level, exp, health, happiness, lastFedAt } }
   lastFedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt

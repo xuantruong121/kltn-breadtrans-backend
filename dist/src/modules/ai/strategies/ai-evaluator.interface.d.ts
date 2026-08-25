@@ -1,4 +1,10 @@
 export declare const AI_EVALUATOR_TOKEN = "AI_EVALUATOR_STRATEGY";
+export interface WordAssessment {
+    word: string;
+    accuracyScore: number;
+    errorType: 'None' | 'Mispronunciation' | 'Omission' | 'Insertion' | 'Unspoken';
+    isCorrect: boolean;
+}
 export interface PronunciationFeedback {
     overallScore: number;
     clarity: string;
@@ -8,6 +14,8 @@ export interface PronunciationFeedback {
     fluencyScore?: number;
     accuracyScore?: number;
     completenessScore?: number;
+    words?: WordAssessment[];
+    isSilentOrNoSpeech?: boolean;
 }
 export interface SmartGeneratedContent {
     documentSummary?: string;

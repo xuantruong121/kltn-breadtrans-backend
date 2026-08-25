@@ -153,6 +153,138 @@ export class GamificationService {
   }
 
   async getMyBadges(userId: number) {
+    // 1. Ensure standard 8 badges exist in database
+    const DEFAULT_BADGES = [
+      {
+        name: 'Tân Binh',
+        description: 'Đạt 100 điểm kinh nghiệm đầu tiên',
+        criteria: { type: 'EXP', threshold: 100 },
+      },
+      {
+        name: 'Chăm Chỉ',
+        description: 'Duy trì chuỗi ngày học liên tục',
+        criteria: { type: 'STREAK', threshold: 1 },
+      },
+      {
+        name: 'Siêu Sao',
+        description: 'Đạt Top 1 Bảng xếp hạng tuần',
+        criteria: { type: 'LEADERBOARD_TOP1' },
+      },
+      {
+        name: 'Thợ Săn',
+        description: 'Thu thập đủ 1000 điểm kinh nghiệm',
+        criteria: { type: 'EXP', threshold: 1000 },
+      },
+      {
+        name: 'Học Bá',
+        description: 'Đạt điểm tối đa trong các bài Quiz',
+        criteria: { type: 'QUIZ', threshold: 1 },
+      },
+      {
+        name: 'Đấu Sĩ Bất Bại',
+        description: 'Thắng các trận so tài trong Đấu Trường',
+        criteria: { type: 'ARENA', threshold: 1 },
+      },
+      {
+        name: 'Giọng Đọc Vàng',
+        description: 'Đạt điểm phát âm AI xuất sắc',
+        criteria: { type: 'SPEAKING', threshold: 1 },
+      },
+      {
+        name: 'Chuyên Gia Nuôi Thú',
+        description: 'Nuôi thú cưng đạt Cấp độ 2 trở lên',
+        criteria: { type: 'PET_LEVEL', threshold: 2 },
+      },
+    ];
+
+    for (const b of DEFAULT_BADGES) {
+      const existing = await this.prisma.badge.findFirst({
+        where: { name: b.name },
+      });
+      if (!existing) {
+        await this.prisma.badge.create({
+          data: {
+            name: b.name,
+            description: b.description,
+            iconUrl: '',
+            criteria: b.criteria,
+          },
+        });
+      }
+    }
+
+    // 2. Fetch user stats and leaderboard to automatically unlock earned badges
+    const leaderboard = await this.prisma.leaderboard.findUnique({
+      where: { userId },
+    });
+    const userStats = await this.prisma.userStats.findUnique({
+      where: { userId },
+    });
+    const userPet = await this.prisma.userPet.findUnique({
+      where: { userId },
+    });
+
+    const totalExp = leaderboard?.totalPoints || 0;
+    const weeklyExp = leaderboard?.weeklyExp || 0;
+    const streak = userStats?.streakCount || 0;
+    const petLevel = userPet?.level || 1;
+
+    const badgesToAward: string[] = [];
+
+    // Milestone 1: Tân Binh (>= 100 EXP)
+    if (totalExp >= 100 || weeklyExp >= 100) {
+      badgesToAward.push('Tân Binh');
+    }
+
+    // Milestone 2: Thợ Săn (>= 1000 EXP)
+    if (totalExp >= 1000 || weeklyExp >= 1000) {
+      badgesToAward.push('Thợ Săn');
+    }
+
+    // Milestone 3: Chăm Chỉ (Streak >= 1)
+    if (streak >= 1) {
+      badgesToAward.push('Chăm Chỉ');
+    }
+
+    // Milestone 4: Siêu Sao (Top 1 Weekly Leaderboard)
+    const topRank = await this.prisma.leaderboard.findFirst({
+      orderBy: { weeklyExp: 'desc' },
+    });
+    if (topRank && topRank.userId === userId && weeklyExp > 0) {
+      badgesToAward.push('Siêu Sao');
+    }
+
+    // Milestone 5: Chuyên Gia Nuôi Thú (Pet Level >= 2)
+    if (petLevel >= 2) {
+      badgesToAward.push('Chuyên Gia Nuôi Thú');
+    }
+
+    // Award all earned badges to user
+    for (const badgeName of badgesToAward) {
+      const badgeRecord = await this.prisma.badge.findFirst({
+        where: { name: badgeName },
+      });
+      if (badgeRecord) {
+        const userBadgeExists = await this.prisma.userBadge.findUnique({
+          where: {
+            userId_badgeId: {
+              userId,
+              badgeId: badgeRecord.id,
+            },
+          },
+        });
+
+        if (!userBadgeExists) {
+          await this.prisma.userBadge.create({
+            data: {
+              userId,
+              badgeId: badgeRecord.id,
+            },
+          });
+        }
+      }
+    }
+
     return this.prisma.userBadge.findMany({
       where: { userId },
       include: {
@@ -162,8 +294,41 @@ export class GamificationService {
   }
 
   // ==========================================
-  // PET & DAILY QUESTS
+  // PET & DAILY QUESTS (INDEPENDENT PER-SPECIES SYSTEM)
   // ==========================================
+
+  private normalizeSpeciesKey(name?: string): string {
+    if (!name) return 'bready';
+    const n = name.trim().toLowerCase();
+    if (
+      n.includes('cú') ||
+      n === 'owly' ||
+      n.includes('owl') ||
+      n.includes('thông thái') ||
+      n.includes('cử nhân')
+    ) {
+      return 'owly';
+    }
+    if (
+      n.includes('mèo bánh cá') ||
+      n.includes('taiyaki') ||
+      n === 'mimi' ||
+      n.includes('mimi') ||
+      n.includes('nơ hồng') ||
+      n.includes('thiên thần')
+    ) {
+      return 'mimi';
+    }
+    if (
+      n.includes('cáo') ||
+      n === 'foxy' ||
+      n.includes('fox') ||
+      n.includes('phim')
+    ) {
+      return 'foxy';
+    }
+    return 'bready';
+  }
 
   async getMyPet(userId: number) {
     let pet = await this.prisma.userPet.findUnique({
@@ -171,16 +336,99 @@ export class GamificationService {
     });
 
     if (!pet) {
+      const initialRoster = {
+        bready: {
+          level: 1,
+          exp: 0,
+          health: 100,
+          happiness: 100,
+          lastFedAt: null,
+        },
+        owly: {
+          level: 1,
+          exp: 0,
+          health: 100,
+          happiness: 100,
+          lastFedAt: null,
+        },
+        mimi: {
+          level: 1,
+          exp: 0,
+          health: 100,
+          happiness: 100,
+          lastFedAt: null,
+        },
+        foxy: {
+          level: 1,
+          exp: 0,
+          health: 100,
+          happiness: 100,
+          lastFedAt: null,
+        },
+      };
       pet = await this.prisma.userPet.create({
         data: {
           userId,
-          name: 'Bánh Mì',
+          name: 'Bánh Mì Dũng Cảm',
           health: 100,
           happiness: 100,
           level: 1,
           exp: 0,
-        },
+          roster: initialRoster,
+        } as any,
       });
+      return pet;
+    }
+
+    const currentSpecies = this.normalizeSpeciesKey(pet.name);
+    const roster = ((pet as any).roster as Record<string, any>) || {};
+
+    // Ensure roster has current species initialized
+    if (!roster[currentSpecies]) {
+      roster[currentSpecies] = {
+        level: pet.level || 1,
+        exp: pet.exp || 0,
+        health: pet.health ?? 100,
+        happiness: pet.happiness ?? 100,
+        lastFedAt: pet.lastFedAt,
+      };
+    }
+
+    // Dynamic Time-Based Decay for active pet
+    const activePetData = roster[currentSpecies];
+    const now = new Date().getTime();
+    const lastFedTime = activePetData.lastFedAt
+      ? new Date(activePetData.lastFedAt).getTime()
+      : new Date(pet.createdAt).getTime();
+    const hoursSinceLastFed = Math.floor(
+      (now - lastFedTime) / (1000 * 60 * 60),
+    );
+
+    if (hoursSinceLastFed >= 24) {
+      const daysPassed = Math.floor(hoursSinceLastFed / 24);
+      const healthDecay = daysPassed * 10;
+      const happinessDecay = daysPassed * 15;
+
+      const newHealth = Math.max(20, 100 - healthDecay);
+      const newHappiness = Math.max(20, 100 - happinessDecay);
+
+      if (
+        newHealth !== activePetData.health ||
+        newHappiness !== activePetData.happiness
+      ) {
+        activePetData.health = newHealth;
+        activePetData.happiness = newHappiness;
+        roster[currentSpecies] = activePetData;
+
+        pet = await this.prisma.userPet.update({
+          where: { userId },
+          data: {
+            health: newHealth,
+            happiness: newHappiness,
+            roster: roster as any,
+          } as any,
+        });
+      }
     }
 
     return pet;
@@ -212,26 +460,83 @@ export class GamificationService {
       data: { totalBanhRan: { decrement: 10 } },
     });
 
-    const newExp = pet.exp + 50;
-    const newLevel = Math.floor(newExp / 1000) + 1;
-    let newName = pet.name;
+    const currentSpecies = this.normalizeSpeciesKey(pet.name);
+    const roster = ((pet as any).roster as Record<string, any>) || {};
+    const activePetData = roster[currentSpecies] || {
+      level: pet.level || 1,
+      exp: pet.exp || 0,
+      health: pet.health ?? 100,
+      happiness: pet.happiness ?? 100,
+      lastFedAt: null,
+    };
 
-    // Tiến hóa thú cưng dựa trên level
-    if (newLevel >= 10) newName = 'Vua Bánh Mì';
-    else if (newLevel >= 7) newName = 'Bánh Kem Hoàng Gia';
-    else if (newLevel >= 4) newName = 'Bánh Macaron';
-    else if (newLevel >= 2) newName = 'Bánh Sừng Bò';
+    const newExp = (activePetData.exp || 0) + 50;
+    const newLevel = Math.floor(newExp / 1000) + 1;
+    const newHappiness = Math.min((activePetData.happiness ?? 100) + 20, 100);
+    const newHealth = Math.min((activePetData.health ?? 100) + 10, 100);
+    const now = new Date();
+
+    activePetData.exp = newExp;
+    activePetData.level = newLevel;
+    activePetData.happiness = newHappiness;
+    activePetData.health = newHealth;
+    activePetData.lastFedAt = now;
+    roster[currentSpecies] = activePetData;
 
     return this.prisma.userPet.update({
       where: { userId },
       data: {
-        name: newName,
         level: newLevel,
-        happiness: Math.min(pet.happiness + 20, 100),
-        health: Math.min(pet.health + 10, 100),
         exp: newExp,
-        lastFedAt: new Date(),
-      },
+        happiness: newHappiness,
+        health: newHealth,
+        lastFedAt: now,
+        roster: roster as any,
+      } as any,
+    });
+  }
+
+  async changePetType(userId: number, targetPetName: string) {
+    const pet = await this.getMyPet(userId);
+    const currentSpecies = this.normalizeSpeciesKey(pet.name);
+    const targetSpecies = this.normalizeSpeciesKey(targetPetName);
+
+    const roster = ((pet as any).roster as Record<string, any>) || {};
+
+    // 1. Save current active pet stats into roster
+    roster[currentSpecies] = {
+      level: pet.level || 1,
+      exp: pet.exp || 0,
+      health: pet.health ?? 100,
+      happiness: pet.happiness ?? 100,
+      lastFedAt: pet.lastFedAt,
+    };
+
+    // 2. Retrieve or initialize target pet stats
+    if (!roster[targetSpecies]) {
+      roster[targetSpecies] = {
+        level: 1,
+        exp: 0,
+        health: 100,
+        happiness: 100,
+        lastFedAt: null,
+      };
+    }
+
+    const targetData = roster[targetSpecies];
+
+    // 3. Switch active pet to target pet stats
+    return this.prisma.userPet.update({
+      where: { userId },
+      data: {
+        name: targetPetName,
+        level: targetData.level || 1,
+        exp: targetData.exp || 0,
+        health: targetData.health ?? 100,
+        happiness: Math.min((targetData.happiness ?? 100) + 15, 100),
+        lastFedAt: targetData.lastFedAt,
+        roster: roster as any,
+      } as any,
     });
   }
 

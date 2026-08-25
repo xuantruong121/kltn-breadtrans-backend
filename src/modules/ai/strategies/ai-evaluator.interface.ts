@@ -1,14 +1,24 @@
 export const AI_EVALUATOR_TOKEN = 'AI_EVALUATOR_STRATEGY';
 
+export interface WordAssessment {
+  word: string;
+  accuracyScore: number;
+  errorType:
+    'None' | 'Mispronunciation' | 'Omission' | 'Insertion' | 'Unspoken';
+  isCorrect: boolean;
+}
+
 export interface PronunciationFeedback {
   overallScore: number; // 0-10
   clarity: string; // "Excellent" | "Good" | "Fair" | "Poor"
   feedback: string; // Nhận xét tổng quan
-  problematicWords: string[]; // Danh sách từ phát âm sai
+  problematicWords: string[]; // Danh sách từ phát âm sai hoặc chưa đọc
   suggestions: string[]; // Gợi ý cải thiện
   fluencyScore?: number;
   accuracyScore?: number;
   completenessScore?: number;
+  words?: WordAssessment[]; // Chi tiết trạng thái từng từ trong câu
+  isSilentOrNoSpeech?: boolean; // Cờ báo hiệu không phát hiện giọng nói
 }
 
 export interface SmartGeneratedContent {

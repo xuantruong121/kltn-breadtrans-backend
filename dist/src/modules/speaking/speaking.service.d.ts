@@ -1,3 +1,4 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { UploadService } from '../upload/upload.service';
@@ -6,8 +7,9 @@ export declare class SpeakingService {
     private readonly prisma;
     private readonly aiService;
     private readonly uploadService;
+    private readonly eventEmitter;
     private readonly logger;
-    constructor(prisma: PrismaService, aiService: AiService, uploadService: UploadService);
+    constructor(prisma: PrismaService, aiService: AiService, uploadService: UploadService, eventEmitter: EventEmitter2);
     findAllExercises(category: string | undefined, userId?: number): Promise<{
         isCompleted: boolean;
         category: string;
@@ -66,7 +68,7 @@ export declare class SpeakingService {
         aiFeedback: import("@prisma/client/runtime/library").JsonValue | null;
         userId: number;
         audioUrl: string;
-        overallScore: number | null;
         exerciseId: number;
+        overallScore: number | null;
     })[]>;
 }

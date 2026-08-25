@@ -180,13 +180,30 @@ Nội dung câu hỏi của học sinh:
                 GradingSystem: 'HundredMark',
                 Granularity: 'Phoneme',
                 Dimension: 'Comprehensive',
+                EnableMiscue: true,
             };
             const pronAssessmentHeader = Buffer.from(JSON.stringify(pronAssessmentParams)).toString('base64');
+            let contentType = 'audio/wav; codecs=audio/pcm; samplerate=16000';
+            if (audioBuffer.length >= 4 &&
+                audioBuffer[0] === 0x1a &&
+                audioBuffer[1] === 0x45 &&
+                audioBuffer[2] === 0xdf &&
+                audioBuffer[3] === 0xa3) {
+                contentType = 'audio/webm; codecs=opus';
+            }
+            else if (audioBuffer.length >= 4 &&
+                audioBuffer.toString('ascii', 0, 4) === 'OggS') {
+                contentType = 'audio/ogg; codecs=opus';
+            }
+            else if (audioBuffer.length >= 4 &&
+                audioBuffer.toString('ascii', 0, 4) === 'RIFF') {
+                contentType = 'audio/wav; codecs=audio/pcm; samplerate=16000';
+            }
             const azureResponse = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Ocp-Apim-Subscription-Key': azureKey,
-                    'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
+                    'Content-Type': contentType,
                     Accept: 'application/json',
                     'Pronunciation-Assessment': pronAssessmentHeader,
                 },
@@ -199,96 +216,253 @@ Nội dung câu hỏi của học sinh:
             }
             const azureData = await azureResponse.json();
             this.logger.log(`Azure response: ${JSON.stringify(azureData).substring(0, 200)}...`);
-            if (azureData.RecognitionStatus !== 'Success') {
-                throw new Error(`Azure recognition failed: ${azureData.RecognitionStatus} - Có thể bạn chưa nói gì, hoặc âm thanh quá ồn.`);
-            }
-            if (!azureData.NBest || azureData.NBest.length === 0) {
-                throw new Error('Azure returned Success but NBest array is empty (no transcription).');
+            const targetWordsList = targetText
+                .split(/\s+/)
+                .filter((w) => w.trim().length > 0);
+            const nonSuccessStatuses = [
+                'InitialSilenceTimeout',
+                'BabbleTimeout',
+                'Error',
+            ];
+            if (nonSuccessStatuses.includes(azureData.RecognitionStatus) ||
+                !azureData.NBest ||
+                azureData.NBest.length === 0) {
+                this.logger.warn(`No speech or silence detected by Azure STT: ${azureData.RecognitionStatus}`);
+                const allUnspokenWords = targetWordsList.map((w) => ({
+                    word: w,
+                    accuracyScore: 0,
+                    errorType: 'Omission',
+                    isCorrect: false,
+                }));
+                return {
+                    overallScore: 0,
+                    clarity: 'Poor',
+                    feedback: 'Không phát hiện thấy giọng nói trong bản ghi âm. Vui lòng kiểm tra micro và đọc to, rõ ràng theo đoạn văn mẫu nhé!',
+                    problematicWords: targetWordsList,
+                    suggestions: [
+                        'Hãy đảm bảo micro của bạn hoạt động tốt và không bị tắt tiếng (mute).',
+                        'Đọc to, rõ ràng từng từ theo câu mẫu trên màn hình.',
+                    ],
+                    fluencyScore: 0,
+                    accuracyScore: 0,
+                    completenessScore: 0,
+                    words: allUnspokenWords,
+                    isSilentOrNoSpeech: true,
+                };
             }
             const bestResult = azureData.NBest[0];
             const pronScores = bestResult.PronunciationAssessment || bestResult;
-            if (pronScores.PronScore === undefined) {
-                this.logger.error(`Missing PronunciationScore. bestResult object: ${JSON.stringify(bestResult)}`);
-                throw new Error('PronunciationScore data is missing in Azure response.');
+            const accuracyScore = pronScores.AccuracyScore ?? bestResult.AccuracyScore ?? 0;
+            const fluencyScore = pronScores.FluencyScore ?? bestResult.FluencyScore ?? 0;
+            const completenessScore = pronScores.CompletenessScore ?? bestResult.CompletenessScore ?? 0;
+            const rawPronScore = pronScores.PronScore ?? bestResult.PronScore ?? 0;
+            const spokenWords = (bestResult.Words || []).filter((w) => (w.Duration ?? 0) > 0 ||
+                (w.ErrorType ?? w.PronunciationAssessment?.ErrorType) !== 'Omission' ||
+                (w.AccuracyScore ?? w.PronunciationAssessment?.AccuracyScore ?? 0) > 0);
+            if (!bestResult.Words || bestResult.Words.length === 0 || spokenWords.length === 0) {
+                this.logger.warn('No spoken words recognized in recording.');
+                const allUnspokenWords = targetWordsList.map((w) => ({
+                    word: w,
+                    accuracyScore: 0,
+                    errorType: 'Omission',
+                    isCorrect: false,
+                }));
+                return {
+                    overallScore: 0,
+                    clarity: 'Poor',
+                    feedback: 'Không nghe rõ giọng đọc của bạn. Hãy thử đọc lại với âm lượng to và rõ ràng hơn nhé!',
+                    problematicWords: targetWordsList,
+                    suggestions: [
+                        'Nói gần micro hơn để thu âm rõ nét nhất.',
+                        'Luyện tập phát âm từng từ trước khi ghi âm hoàn chỉnh.',
+                    ],
+                    fluencyScore: 0,
+                    accuracyScore: 0,
+                    completenessScore: 0,
+                    words: allUnspokenWords,
+                    isSilentOrNoSpeech: true,
+                };
             }
-            const overallScore = pronScores.PronScore / 10;
+            const words = [];
             const problematicWords = [];
             let transcript = '';
-            if (bestResult.Words) {
-                for (const wordObj of bestResult.Words) {
-                    transcript += wordObj.Word + ' ';
-                    const wScore = wordObj.PronunciationAssessment || wordObj;
-                    if (wScore.ErrorType !== 'None' ||
-                        (wScore.AccuracyScore !== undefined && wScore.AccuracyScore < 80)) {
-                        problematicWords.push(wordObj.Word);
+            const usedAzureIndices = new Set();
+            for (let wIdx = 0; wIdx < targetWordsList.length; wIdx++) {
+                const targetWord = targetWordsList[wIdx];
+                const cleanTarget = targetWord
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, '');
+                let matchedIndex = -1;
+                if (wIdx < bestResult.Words.length && !usedAzureIndices.has(wIdx)) {
+                    const directAz = bestResult.Words[wIdx];
+                    const cleanDirect = (directAz.Word || '')
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]/g, '');
+                    if (cleanDirect === cleanTarget) {
+                        matchedIndex = wIdx;
                     }
                 }
+                if (matchedIndex === -1) {
+                    for (let i = 0; i < bestResult.Words.length; i++) {
+                        if (usedAzureIndices.has(i))
+                            continue;
+                        const azWord = bestResult.Words[i];
+                        const cleanAz = (azWord.Word || '')
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]/g, '');
+                        if (cleanAz === cleanTarget) {
+                            matchedIndex = i;
+                            break;
+                        }
+                    }
+                }
+                if (matchedIndex !== -1) {
+                    usedAzureIndices.add(matchedIndex);
+                    const azObj = bestResult.Words[matchedIndex];
+                    const wScore = azObj.PronunciationAssessment || azObj;
+                    const azAccuracy = wScore.AccuracyScore ?? azObj.AccuracyScore ?? 0;
+                    const azError = wScore.ErrorType ?? azObj.ErrorType ?? 'None';
+                    const azDuration = azObj.Duration ?? 0;
+                    const isOmitted = azError === 'Omission' ||
+                        (azDuration === 0 && azAccuracy === 0);
+                    const isCorrect = !isOmitted &&
+                        azError === 'None' &&
+                        azAccuracy >= 60;
+                    const finalErrorType = isCorrect
+                        ? 'None'
+                        : isOmitted
+                            ? 'Omission'
+                            : 'Mispronunciation';
+                    words.push({
+                        word: targetWord,
+                        accuracyScore: isOmitted ? 0 : azAccuracy,
+                        errorType: finalErrorType,
+                        isCorrect,
+                    });
+                    if (!isCorrect) {
+                        problematicWords.push(targetWord);
+                    }
+                }
+                else {
+                    words.push({
+                        word: targetWord,
+                        accuracyScore: 0,
+                        errorType: 'Omission',
+                        isCorrect: false,
+                    });
+                    problematicWords.push(targetWord);
+                }
             }
+            if (bestResult.Words) {
+                transcript = bestResult.Words
+                    .filter((w) => (w.Duration ?? 0) > 0)
+                    .map((w) => w.Word)
+                    .join(' ');
+            }
+            let overallScore = (rawPronScore / 100) * 10;
+            if (completenessScore < 60) {
+                overallScore = Math.min(overallScore, (completenessScore / 100) * 10);
+            }
+            if (problematicWords.length === targetWordsList.length) {
+                overallScore = Math.min(overallScore, 1.0);
+            }
+            overallScore = Math.max(0, Math.min(10, overallScore));
             if (!this.hasKeys()) {
                 return {
-                    overallScore,
+                    overallScore: Number(overallScore.toFixed(1)),
                     clarity: overallScore >= 8
                         ? 'Excellent'
                         : overallScore >= 6
                             ? 'Good'
-                            : 'Fair',
-                    feedback: `[No Gemini Key] Azure Score: ${overallScore}/10. Accuracy: ${pronScores.AccuracyScore}, Fluency: ${pronScores.FluencyScore}.`,
+                            : overallScore >= 4
+                                ? 'Fair'
+                                : 'Poor',
+                    feedback: `[No Gemini Key] Azure Score: ${overallScore.toFixed(1)}/10. Accuracy: ${accuracyScore}, Fluency: ${fluencyScore}, Completeness: ${completenessScore}.`,
                     problematicWords,
                     suggestions: [],
+                    fluencyScore,
+                    accuracyScore,
+                    completenessScore,
+                    words,
+                    isSilentOrNoSpeech: false,
                 };
             }
             const prompt = `Học viên vừa đọc câu: "${targetText}"
 Hệ thống AI (Azure) đã chấm điểm phát âm với kết quả sau:
-- Điểm tổng (0-100): ${pronScores.PronScore}
-- Điểm chính xác (Accuracy): ${pronScores.AccuracyScore}
-- Điểm trôi chảy (Fluency): ${pronScores.FluencyScore}
-- Điểm hoàn thiện (Completeness): ${pronScores.CompletenessScore}
-- Các từ phát âm sai hoặc kém: ${problematicWords.join(', ') || 'Không có'}
-- Những gì học viên thực sự đã nói: "${transcript.trim()}"
+- Điểm tổng (0-100): ${rawPronScore}
+- Điểm chính xác (Accuracy): ${accuracyScore}
+- Điểm trôi chảy (Fluency): ${fluencyScore}
+- Điểm hoàn thiện (Completeness): ${completenessScore}%
+- Các từ phát âm sai hoặc chưa đọc: ${problematicWords.join(', ') || 'Không có (đọc đúng tất cả)'}
+- Những gì học viên thực sự đã nói: "${transcript.trim() || 'Không có âm thanh rõ ràng'}"
 
-Hãy đóng vai một giáo viên tiếng Anh tận tâm. Đưa ra một JSON có cấu trúc như sau (KHÔNG dùng markdown):
+Hãy đóng vai một giáo viên tiếng Anh tận tâm cho thiếu nhi. Đưa ra một JSON có cấu trúc như sau (KHÔNG dùng markdown):
 {
   "clarity": "<Excellent | Good | Fair | Poor>",
-  "feedback": "<2-3 câu nhận xét tổng quan bằng tiếng Việt, dựa vào điểm số và các lỗi trên, giọng điệu khích lệ>",
+  "feedback": "<2-3 câu nhận xét tổng quan bằng tiếng Việt, dựa vào điểm số và các lỗi trên, giọng điệu khích lệ, ấm áp>",
   "suggestions": [
-    "<Lời khuyên 1 bằng tiếng Việt>",
-    "<Lời khuyên 2 bằng tiếng Việt>"
+    "<Lời khuyên 1 bằng tiếng Việt ngắn gọn, dễ hiểu>",
+    "<Lời khuyên 2 bằng tiếng Việt ngắn gọn, dễ hiểu>"
   ]
 }
 Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
-            const geminiResult = await this.executeWithRotation((m) => m.generateContent(prompt));
-            const rawText = geminiResult.response.text().trim();
-            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-            let clarity = 'Fair', feedback = '', suggestions = [];
-            if (jsonMatch) {
-                try {
+            let clarity = overallScore >= 8 ? 'Excellent' : overallScore >= 6 ? 'Good' : overallScore >= 4 ? 'Fair' : 'Poor';
+            let feedback = '';
+            let suggestions = [];
+            try {
+                const geminiResult = await this.executeWithRotation((m) => m.generateContent(prompt));
+                const rawText = geminiResult.response.text().trim();
+                const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
                     const parsed = JSON.parse(jsonMatch[0]);
                     clarity = parsed.clarity || clarity;
                     feedback = parsed.feedback || '';
                     suggestions = parsed.suggestions || [];
                 }
-                catch {
-                }
+            }
+            catch (err) {
+                this.logger.warn(`Gemini feedback generation failed: ${err.message}`);
             }
             return {
                 overallScore: Number(overallScore.toFixed(1)),
                 clarity,
-                feedback: feedback || `Phát âm của bạn đạt ${overallScore}/10 điểm.`,
+                feedback: feedback ||
+                    (overallScore >= 8
+                        ? `Tuyệt vời! Bạn phát âm rất chuẩn đạt ${overallScore.toFixed(1)}/10 điểm.`
+                        : `Phát âm của bạn đạt ${overallScore.toFixed(1)}/10 điểm. Hãy tiếp tục luyện tập nhé!`),
                 problematicWords,
-                suggestions,
-                fluencyScore: pronScores.FluencyScore,
-                accuracyScore: pronScores.AccuracyScore,
-                completenessScore: pronScores.CompletenessScore,
+                suggestions: suggestions.length > 0 ? suggestions : [
+                    'Nghe lại audio mẫu để bắt chước ngữ điệu chuẩn.',
+                    'Luyện tập đọc chậm rãi từng từ trước khi đọc cả câu.'
+                ],
+                fluencyScore,
+                accuracyScore,
+                completenessScore,
+                words,
+                isSilentOrNoSpeech: false,
             };
         }
         catch (error) {
             this.logger.error(`Azure/Gemini pronunciation assessment failed: ${error.message}`, error.stack);
+            const targetWordsList = targetText
+                .split(/\s+/)
+                .filter((w) => w.trim().length > 0);
             return {
                 overallScore: 0,
                 clarity: 'Poor',
-                feedback: 'Hệ thống đánh giá phát âm đang gặp sự cố. Vui lòng thử lại sau.',
-                problematicWords: [],
-                suggestions: ['Vui lòng kiểm tra lại micro và kết nối mạng.'],
+                feedback: 'Không thể phân tích được phát âm (có thể do micro chưa thu được tiếng hoặc kết nối mạng). Vui lòng thử lại!',
+                problematicWords: targetWordsList,
+                suggestions: [
+                    'Vui lòng kiểm tra lại micro và cấp quyền truy cập âm thanh trên trình duyệt.',
+                    'Nói to và rõ ràng hơn khi ghi âm.',
+                ],
+                words: targetWordsList.map((w) => ({
+                    word: w,
+                    accuracyScore: 0,
+                    errorType: 'Unspoken',
+                    isCorrect: false,
+                })),
+                isSilentOrNoSpeech: true,
             };
         }
     }
