@@ -54,7 +54,10 @@ export class GamificationController {
   @Post('pet/change-type')
   @ApiOperation({ summary: 'Đổi loài thú cưng' })
   changePetType(@Request() req: any, @Body('petName') petName: string) {
-    return this.gamificationService.changePetType(req.user.id, petName || 'Bánh Mì Dũng Cảm');
+    return this.gamificationService.changePetType(
+      req.user.id,
+      petName || 'Bánh Mì Dũng Cảm',
+    );
   }
 
   @UseGuards(JwtAuthGuard)

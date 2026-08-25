@@ -318,24 +318,69 @@ Nội dung câu hỏi của học sinh:
       }
 
       // 2. Lấy kết quả tốt nhất từ NBest[0]
-      const bestResult = azureData.NBest[0];
-      const pronScores = bestResult.PronunciationAssessment || bestResult;
+      interface AzureWordAssessment {
+        AccuracyScore?: number;
+        ErrorType?: string;
+      }
 
-      const accuracyScore = pronScores.AccuracyScore ?? bestResult.AccuracyScore ?? 0;
-      const fluencyScore = pronScores.FluencyScore ?? bestResult.FluencyScore ?? 0;
-      const completenessScore = pronScores.CompletenessScore ?? bestResult.CompletenessScore ?? 0;
+      interface AzureWordItem {
+        Word?: string;
+        Offset?: number;
+        Duration?: number;
+        AccuracyScore?: number;
+        ErrorType?: string;
+        PronunciationAssessment?: AzureWordAssessment;
+      }
+
+      interface AzurePronScores {
+        AccuracyScore?: number;
+        FluencyScore?: number;
+        CompletenessScore?: number;
+        PronScore?: number;
+      }
+
+      interface AzureNBestItem {
+        Confidence?: number;
+        Lexical?: string;
+        ITN?: string;
+        MaskedITN?: string;
+        Display?: string;
+        AccuracyScore?: number;
+        FluencyScore?: number;
+        CompletenessScore?: number;
+        PronScore?: number;
+        Words?: AzureWordItem[];
+        PronunciationAssessment?: AzurePronScores;
+      }
+
+      const nBestList: AzureNBestItem[] = (azureData?.NBest ||
+        []) as AzureNBestItem[];
+      const bestResult: AzureNBestItem = nBestList[0] || {};
+      const pronScores: AzurePronScores =
+        bestResult.PronunciationAssessment || bestResult;
+
+      const accuracyScore =
+        pronScores.AccuracyScore ?? bestResult.AccuracyScore ?? 0;
+      const fluencyScore =
+        pronScores.FluencyScore ?? bestResult.FluencyScore ?? 0;
+      const completenessScore =
+        pronScores.CompletenessScore ?? bestResult.CompletenessScore ?? 0;
       const rawPronScore = pronScores.PronScore ?? bestResult.PronScore ?? 0;
 
+      const bestWords: AzureWordItem[] = bestResult.Words || [];
+
       // Kiểm tra xem có từ nào thực sự được phát âm không
-      const spokenWords = (bestResult.Words || []).filter(
-        (w: any) =>
+      const spokenWords = bestWords.filter(
+        (w: AzureWordItem) =>
           (w.Duration ?? 0) > 0 ||
-          (w.ErrorType ?? w.PronunciationAssessment?.ErrorType) !== 'Omission' ||
-          (w.AccuracyScore ?? w.PronunciationAssessment?.AccuracyScore ?? 0) > 0,
+          (w.ErrorType ?? w.PronunciationAssessment?.ErrorType) !==
+            'Omission' ||
+          (w.AccuracyScore ?? w.PronunciationAssessment?.AccuracyScore ?? 0) >
+            0,
       );
 
       // Nếu hoàn toàn không có từ nào được phát âm
-      if (!bestResult.Words || bestResult.Words.length === 0 || spokenWords.length === 0) {
+      if (bestWords.length === 0 || spokenWords.length === 0) {
         this.logger.warn('No spoken words recognized in recording.');
         const allUnspokenWords = targetWordsList.map((w) => ({
           word: w,
@@ -366,7 +411,8 @@ Nội dung câu hỏi của học sinh:
       const words: Array<{
         word: string;
         accuracyScore: number;
-        errorType: 'None' | 'Mispronunciation' | 'Omission' | 'Insertion' | 'Unspoken';
+        errorType:
+          'None' | 'Mispronunciation' | 'Omission' | 'Insertion' | 'Unspoken';
         isCorrect: boolean;
       }> = [];
       const problematicWords: string[] = [];
@@ -376,16 +422,14 @@ Nội dung câu hỏi của học sinh:
 
       for (let wIdx = 0; wIdx < targetWordsList.length; wIdx++) {
         const targetWord = targetWordsList[wIdx];
-        const cleanTarget = targetWord
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '');
+        const cleanTarget = targetWord.toLowerCase().replace(/[^a-z0-9]/g, '');
 
         let matchedIndex = -1;
 
         // Ưu tiên so khớp theo đúng thứ tự vị trí nếu từ khớp
-        if (wIdx < bestResult.Words.length && !usedAzureIndices.has(wIdx)) {
-          const directAz = bestResult.Words[wIdx];
-          const cleanDirect = (directAz.Word || '')
+        if (wIdx < bestWords.length && !usedAzureIndices.has(wIdx)) {
+          const directAz: AzureWordItem = bestWords[wIdx];
+          const cleanDirect = String(directAz.Word || '')
             .toLowerCase()
             .replace(/[^a-z0-9]/g, '');
           if (cleanDirect === cleanTarget) {
@@ -395,10 +439,10 @@ Nội dung câu hỏi của học sinh:
 
         // Tìm kiếm tuyến tính nếu thứ tự bị lệch
         if (matchedIndex === -1) {
-          for (let i = 0; i < bestResult.Words.length; i++) {
+          for (let i = 0; i < bestWords.length; i++) {
             if (usedAzureIndices.has(i)) continue;
-            const azWord = bestResult.Words[i];
-            const cleanAz = (azWord.Word || '')
+            const azWord: AzureWordItem = bestWords[i];
+            const cleanAz = String(azWord.Word || '')
               .toLowerCase()
               .replace(/[^a-z0-9]/g, '');
 
@@ -411,28 +455,22 @@ Nội dung câu hỏi của học sinh:
 
         if (matchedIndex !== -1) {
           usedAzureIndices.add(matchedIndex);
-          const azObj = bestResult.Words[matchedIndex];
-          const wScore = azObj.PronunciationAssessment || azObj;
+          const azObj: AzureWordItem = bestWords[matchedIndex];
+          const wScore: AzureWordAssessment =
+            azObj.PronunciationAssessment || azObj;
           const azAccuracy = wScore.AccuracyScore ?? azObj.AccuracyScore ?? 0;
           const azError = wScore.ErrorType ?? azObj.ErrorType ?? 'None';
           const azDuration = azObj.Duration ?? 0;
 
           // Kiểm tra xem từ có thực sự được phát âm hay bị bỏ sót
           const isOmitted =
-            azError === 'Omission' ||
-            (azDuration === 0 && azAccuracy === 0);
+            azError === 'Omission' || (azDuration === 0 && azAccuracy === 0);
 
           const isCorrect =
-            !isOmitted &&
-            azError === 'None' &&
-            azAccuracy >= 60;
+            !isOmitted && azError === 'None' && azAccuracy >= 60;
 
           const finalErrorType: 'None' | 'Mispronunciation' | 'Omission' =
-            isCorrect
-              ? 'None'
-              : isOmitted
-              ? 'Omission'
-              : 'Mispronunciation';
+            isCorrect ? 'None' : isOmitted ? 'Omission' : 'Mispronunciation';
 
           words.push({
             word: targetWord,
@@ -456,10 +494,10 @@ Nội dung câu hỏi của học sinh:
         }
       }
 
-      if (bestResult.Words) {
-        transcript = bestResult.Words
-          .filter((w: any) => (w.Duration ?? 0) > 0)
-          .map((w: any) => w.Word)
+      if (bestWords.length > 0) {
+        transcript = bestWords
+          .filter((w: AzureWordItem) => (w.Duration ?? 0) > 0)
+          .map((w: AzureWordItem) => String(w.Word || ''))
           .join(' ');
       }
 
@@ -482,10 +520,10 @@ Nội dung câu hỏi của học sinh:
             overallScore >= 8
               ? 'Excellent'
               : overallScore >= 6
-              ? 'Good'
-              : overallScore >= 4
-              ? 'Fair'
-              : 'Poor',
+                ? 'Good'
+                : overallScore >= 4
+                  ? 'Fair'
+                  : 'Poor',
           feedback: `[No Gemini Key] Azure Score: ${overallScore.toFixed(1)}/10. Accuracy: ${accuracyScore}, Fluency: ${fluencyScore}, Completeness: ${completenessScore}.`,
           problematicWords,
           suggestions: [],
@@ -517,7 +555,14 @@ Hãy đóng vai một giáo viên tiếng Anh tận tâm cho thiếu nhi. Đưa 
 }
 Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
 
-      let clarity = overallScore >= 8 ? 'Excellent' : overallScore >= 6 ? 'Good' : overallScore >= 4 ? 'Fair' : 'Poor';
+      let clarity =
+        overallScore >= 8
+          ? 'Excellent'
+          : overallScore >= 6
+            ? 'Good'
+            : overallScore >= 4
+              ? 'Fair'
+              : 'Poor';
       let feedback = '';
       let suggestions: string[] = [];
 
@@ -547,10 +592,13 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
             ? `Tuyệt vời! Bạn phát âm rất chuẩn đạt ${overallScore.toFixed(1)}/10 điểm.`
             : `Phát âm của bạn đạt ${overallScore.toFixed(1)}/10 điểm. Hãy tiếp tục luyện tập nhé!`),
         problematicWords,
-        suggestions: suggestions.length > 0 ? suggestions : [
-          'Nghe lại audio mẫu để bắt chước ngữ điệu chuẩn.',
-          'Luyện tập đọc chậm rãi từng từ trước khi đọc cả câu.'
-        ],
+        suggestions:
+          suggestions.length > 0
+            ? suggestions
+            : [
+                'Nghe lại audio mẫu để bắt chước ngữ điệu chuẩn.',
+                'Luyện tập đọc chậm rãi từng từ trước khi đọc cả câu.',
+              ],
         fluencyScore,
         accuracyScore,
         completenessScore,

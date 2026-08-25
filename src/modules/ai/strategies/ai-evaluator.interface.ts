@@ -3,7 +3,8 @@ export const AI_EVALUATOR_TOKEN = 'AI_EVALUATOR_STRATEGY';
 export interface WordAssessment {
   word: string;
   accuracyScore: number;
-  errorType: 'None' | 'Mispronunciation' | 'Omission' | 'Insertion' | 'Unspoken';
+  errorType:
+    'None' | 'Mispronunciation' | 'Omission' | 'Insertion' | 'Unspoken';
   isCorrect: boolean;
 }
 
