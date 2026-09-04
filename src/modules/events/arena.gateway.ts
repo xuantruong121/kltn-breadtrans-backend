@@ -429,18 +429,25 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
             message: `Bạn không còn đủ ${stake} Bánh Mì để tham gia trận đấu!`,
           });
           await this.redis.srem('arena:queued_users', String(p1.userId));
-          // Đưa P2 lại vào hàng đợi để chờ đối thủ khác
+          // Đưa P2 lại vào hàng đợi để chờ đối thủ khác và đảm bảo P2 nằm trong Set chống trùng
           await this.redis.lpush(queueKey, p2Raw);
+          await this.redis.sadd('arena:queued_users', String(p2.userId));
         } else if (escrowError === 'P2_INSUFFICIENT') {
           s2?.emit('arena:error', {
             message: `Bạn không còn đủ ${stake} Bánh Mì để tham gia trận đấu!`,
           });
           await this.redis.srem('arena:queued_users', String(p2.userId));
-          // Đưa P1 lại vào hàng đợi để chờ đối thủ khác
+          // Đưa P1 lại vào hàng đợi để chờ đối thủ khác và đảm bảo P1 nằm trong Set chống trùng
           await this.redis.lpush(queueKey, p1Raw);
+          await this.redis.sadd('arena:queued_users', String(p1.userId));
         } else {
-          // Lỗi hệ thống khác, đưa cả 2 trở lại hàng đợi
+          // Lỗi hệ thống khác, đưa cả 2 trở lại hàng đợi và bảo đảm cả 2 nằm trong Set chống trùng
           await this.redis.lpush(queueKey, p2Raw, p1Raw);
+          await this.redis.sadd(
+            'arena:queued_users',
+            String(p1.userId),
+            String(p2.userId),
+          );
         }
         return;
       }
