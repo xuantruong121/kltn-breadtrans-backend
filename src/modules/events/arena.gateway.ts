@@ -96,6 +96,11 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
             const player = JSON.parse(item);
             if (player.socketId === socketId) {
               await this.redis.lrem(key, 0, item);
+              await this.redis.srem(
+                'arena:queued_users',
+                String(player.userId),
+              );
+              await this.redis.del(`arena:lock:user:${player.userId}`);
               await this.redis.del(`arena:user_queued:${player.userId}`);
               this.logger.log(
                 `[Arena] Removed queued player #${player.userId} from ${key}`,
@@ -187,6 +192,26 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userName = payload.userName || `Player ${userId}`;
     const gameId = payload.gameId || 'vocab-duel';
     const queueKey = `arena:queue:${stake}:${gameId}`;
+    const queuedSetKey = 'arena:queued_users';
+
+    // 0. Atomic Deduplication: Kiểm tra user có đang trong hàng đợi hay không qua Redis Set O(1)
+    const addedToQueueSet = await this.redis.sadd(queuedSetKey, String(userId));
+    if (addedToQueueSet === 0) {
+      client.emit('arena:error', {
+        message: 'Bạn đang trong hàng đợi tìm trận hoặc đã vào trận đấu!',
+      });
+      return;
+    }
+
+    // 0b. Chống double-click tức thời bằng atomic lock NX PX 5000
+    const userLockKey = `arena:lock:user:${userId}`;
+    const locked = await this.redis.set(userLockKey, '1', 'PX', 5000, 'NX');
+    if (!locked) {
+      client.emit('arena:error', {
+        message: 'Thao tác quá nhanh, vui lòng đợi một chút!',
+      });
+      return;
+    }
 
     // 1. Verify user exists and has enough Bánh Mì
     const userStats = await this.prisma.userStats.findUnique({
@@ -195,6 +220,8 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     if (!userStats || userStats.totalBanhRan < stake) {
+      await this.redis.srem(queuedSetKey, String(userId));
+      await this.redis.del(userLockKey);
       client.emit('arena:error', {
         message: `Bạn không đủ ${stake} Bánh Mì để tham gia mức cược này!`,
       });
@@ -211,6 +238,8 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const match: MatchState = JSON.parse(rawMatch);
         if (!match.isSettled) {
           // Allow client to resume match
+          await this.redis.srem(queuedSetKey, String(userId));
+          await this.redis.del(userLockKey);
           await this.reconnectPlayerToMatch(client, match, userId);
           return;
         }
@@ -219,6 +248,8 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // 3. Remove user from any existing queue to prevent duplicate entries
     await this.removeUserFromQueues(userId);
+    // Tái kích hoạt lại vào queuedSetKey vì removeUserFromQueues đã srem
+    await this.redis.sadd(queuedSetKey, String(userId));
 
     // 4. Push to Redis queue
     const playerData = {
@@ -264,6 +295,8 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private async removeUserFromQueues(userId: number) {
     try {
+      await this.redis.srem('arena:queued_users', String(userId));
+      await this.redis.del(`arena:lock:user:${userId}`);
       await this.redis.del(`arena:user_queued:${userId}`);
       const keys = await this.redis.keys('arena:queue:*');
       for (const key of keys) {
@@ -289,6 +322,13 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     stake: number,
     gameId: string,
   ) {
+    // 0. Matchmaking Mutex Lock: Chỉ 1 tiến trình xử lý ghép cặp trên queue này tại một thời điểm
+    const matchMutexKey = `arena:lock:matcher:${queueKey}`;
+    const acquired = await this.redis.set(matchMutexKey, '1', 'PX', 3000, 'NX');
+    if (!acquired) {
+      return; // Một tiến trình khác đang xử lý ghép cặp cho queue này
+    }
+
     try {
       const p1Raw = await this.redis.lpop(queueKey);
       const p2Raw = await this.redis.lpop(queueKey);
@@ -301,9 +341,10 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const p1 = JSON.parse(p1Raw);
       const p2 = JSON.parse(p2Raw);
 
-      // Sanity check: same user shouldn't match against themselves
+      // Sanity check: cùng 1 user không tự đấu với chính mình
       if (p1.userId === p2.userId) {
         await this.redis.lpush(queueKey, p1Raw);
+        await this.redis.srem('arena:queued_users', String(p1.userId));
         return;
       }
 
@@ -312,8 +353,16 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const s2 = this.server.sockets.sockets.get(p2.socketId);
 
       if (!s1 || !s2) {
-        if (s1) await this.redis.lpush(queueKey, p1Raw);
-        if (s2) await this.redis.lpush(queueKey, p2Raw);
+        if (s1) {
+          await this.redis.lpush(queueKey, p1Raw);
+        } else {
+          await this.redis.srem('arena:queued_users', String(p1.userId));
+        }
+        if (s2) {
+          await this.redis.lpush(queueKey, p2Raw);
+        } else {
+          await this.redis.srem('arena:queued_users', String(p2.userId));
+        }
         return;
       }
 
@@ -321,41 +370,89 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const matchId = `match_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const questions = await this.fetchArenaQuestions(5);
 
-      // Escrow stakes
-      await this.prisma.userStats.update({
-        where: { userId: p1.userId },
-        data: { totalBanhRan: { decrement: stake } },
-      });
-      await this.prisma.userStats.update({
-        where: { userId: p2.userId },
-        data: { totalBanhRan: { decrement: stake } },
-      });
+      // Escrow stakes nguyên tử qua Prisma Transaction
+      let escrowError: string | null = null;
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const p1Deduct = await tx.userStats.updateMany({
+            where: { userId: p1.userId, totalBanhRan: { gte: stake } },
+            data: { totalBanhRan: { decrement: stake } },
+          });
+          const p2Deduct = await tx.userStats.updateMany({
+            where: { userId: p2.userId, totalBanhRan: { gte: stake } },
+            data: { totalBanhRan: { decrement: stake } },
+          });
 
-      // Log escrow currency transactions
-      await this.prisma.currencyTransaction.createMany({
-        data: [
-          {
-            studentId: p1.userId,
-            studentName: p1.userName,
-            userId: p1.userId,
-            userName: p1.userName,
-            userRole: 'STUDENT',
-            amount: -stake,
-            reason: `Cược Đấu Trường 1v1 (${matchId})`,
-            type: 'subtract',
-          },
-          {
-            studentId: p2.userId,
-            studentName: p2.userName,
-            userId: p2.userId,
-            userName: p2.userName,
-            userRole: 'STUDENT',
-            amount: -stake,
-            reason: `Cược Đấu Trường 1v1 (${matchId})`,
-            type: 'subtract',
-          },
-        ],
-      });
+          if (p1Deduct.count === 0) {
+            throw new Error('P1_INSUFFICIENT');
+          }
+          if (p2Deduct.count === 0) {
+            throw new Error('P2_INSUFFICIENT');
+          }
+
+          // Log escrow currency transactions
+          await tx.currencyTransaction.createMany({
+            data: [
+              {
+                studentId: p1.userId,
+                studentName: p1.userName,
+                userId: p1.userId,
+                userName: p1.userName,
+                userRole: 'STUDENT',
+                amount: -stake,
+                reason: `Cược Đấu Trường 1v1 (${matchId})`,
+                type: 'subtract',
+              },
+              {
+                studentId: p2.userId,
+                studentName: p2.userName,
+                userId: p2.userId,
+                userName: p2.userName,
+                userRole: 'STUDENT',
+                amount: -stake,
+                reason: `Cược Đấu Trường 1v1 (${matchId})`,
+                type: 'subtract',
+              },
+            ],
+          });
+        });
+      } catch (err: any) {
+        escrowError = err?.message || 'ESCROW_ERROR';
+        this.logger.warn(
+          `[Arena] Escrow failed for match ${matchId}: ${escrowError}`,
+        );
+      }
+
+      if (escrowError) {
+        if (escrowError === 'P1_INSUFFICIENT') {
+          s1?.emit('arena:error', {
+            message: `Bạn không còn đủ ${stake} Bánh Mì để tham gia trận đấu!`,
+          });
+          await this.redis.srem('arena:queued_users', String(p1.userId));
+          // Đưa P2 lại vào hàng đợi để chờ đối thủ khác
+          await this.redis.lpush(queueKey, p2Raw);
+        } else if (escrowError === 'P2_INSUFFICIENT') {
+          s2?.emit('arena:error', {
+            message: `Bạn không còn đủ ${stake} Bánh Mì để tham gia trận đấu!`,
+          });
+          await this.redis.srem('arena:queued_users', String(p2.userId));
+          // Đưa P1 lại vào hàng đợi để chờ đối thủ khác
+          await this.redis.lpush(queueKey, p1Raw);
+        } else {
+          // Lỗi hệ thống khác, đưa cả 2 trở lại hàng đợi
+          await this.redis.lpush(queueKey, p2Raw, p1Raw);
+        }
+        return;
+      }
+
+      // Khi đã ghép và trừ cược thành công -> xóa khỏi Set queued_users
+      await this.redis.srem(
+        'arena:queued_users',
+        String(p1.userId),
+        String(p2.userId),
+      );
+      await this.redis.del(`arena:lock:user:${p1.userId}`);
+      await this.redis.del(`arena:lock:user:${p2.userId}`);
 
       const matchState: MatchState = {
         matchId,
@@ -440,6 +537,8 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }, 2500);
     } catch (err) {
       this.logger.error('[Arena] Error in tryMatchPlayers:', err);
+    } finally {
+      await this.redis.del(matchMutexKey);
     }
   }
 

@@ -27,6 +27,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 import {
   IsString,
   IsNotEmpty,
@@ -89,7 +90,7 @@ export class AiController {
     private readonly uploadService: UploadService,
   ) {}
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
   @Post('chat')
   @ApiOperation({ summary: 'Chat với trợ lý AI ảo (Hỗ trợ học tập)' })
@@ -114,7 +115,7 @@ export class AiController {
     return { reply, answer: reply };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
   @Post('generate-dictation')
   @ApiOperation({ summary: 'AI tự động sinh bài Luyện Nghe (Chép chính tả)' })
@@ -179,7 +180,7 @@ export class AiController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
   @Post('generate-toeic-quiz')
   @ApiOperation({ summary: 'Sinh bộ câu hỏi TOEIC tự động theo chủ đề' })
@@ -192,7 +193,7 @@ export class AiController {
     return { success: true, questions };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
   @Post('explain-toeic-error/:questionId')
   @ApiOperation({

@@ -22,6 +22,7 @@ const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const client_1 = require("@prisma/client");
+const ai_rate_limit_guard_1 = require("../../common/guards/ai-rate-limit.guard");
 let SpeakingController = class SpeakingController {
     speakingService;
     constructor(speakingService) {
@@ -80,6 +81,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], SpeakingController.prototype, "findOne", null);
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, ai_rate_limit_guard_1.AiRateLimitGuard),
     (0, common_1.Post)('exercises/:id/submit'),
     (0, swagger_1.ApiOperation)({
         summary: 'Nộp audio để AI chấm phát âm (Azure Speech)',

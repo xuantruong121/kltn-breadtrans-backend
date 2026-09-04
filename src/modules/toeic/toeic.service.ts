@@ -173,7 +173,9 @@ export class ToeicService {
     });
     if (!attempt) throw new NotFoundException('Result not found');
     if (role !== 'ADMIN' && role !== 'TEACHER' && attempt.userId !== userId) {
-      throw new ForbiddenException('Bạn không có quyền xem kết quả bài thi này');
+      throw new ForbiddenException(
+        'Bạn không có quyền xem kết quả bài thi này',
+      );
     }
 
     // Auto-Finalize: Nếu quá hạn 120 phút mà chưa submit, tự động finalize ngay

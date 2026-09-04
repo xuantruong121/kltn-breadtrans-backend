@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { WritingService } from './writing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 
 @ApiTags('Writing')
@@ -38,7 +39,7 @@ export class WritingController {
   }
 
   @Post('quizzes/:id/submit')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Nộp bài và chấm điểm bằng AI (Part 1)' })
   @ApiBody({
@@ -53,7 +54,7 @@ export class WritingController {
   }
 
   @Post('part2/submit')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Chấm điểm bài TOEIC Writing Part 2 (Respond to an Email)',
@@ -83,7 +84,7 @@ export class WritingController {
   }
 
   @Post('part3/submit')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Chấm điểm bài TOEIC Writing Part 3 (Write an Opinion Essay)',

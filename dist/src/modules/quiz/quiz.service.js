@@ -135,7 +135,7 @@ let QuizService = class QuizService {
     async submitQuiz(quizId, userId, dto) {
         const quiz = await this.getQuizById(quizId, true);
         let totalScore = 0;
-        const resultsData = await Promise.all(dto.answers.map(async (ans) => {
+        const resultsData = dto.answers.map((ans) => {
             const question = quiz.questions.find((q) => q.id === ans.questionId);
             let isCorrect = false;
             let score = 0;
@@ -174,7 +174,7 @@ let QuizService = class QuizService {
                 isCorrect,
                 score,
             };
-        }));
+        });
         let overallAiFeedback = '';
         for (const ans of dto.answers) {
             const question = quiz.questions.find((q) => q.id === ans.questionId);

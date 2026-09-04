@@ -516,6 +516,7 @@ model MarketProduct {
   price         Float
   imageUrl      String?
   order         Int      @default(0)
+  stock         Int      @default(100)
   purchaseCount Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

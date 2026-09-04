@@ -54,11 +54,7 @@ export class GrammarService {
     }));
   }
 
-  async getTopicDetail(
-    id: number,
-    userId?: number,
-    includeAnswers = false,
-  ) {
+  async getTopicDetail(id: number, userId?: number, includeAnswers = false) {
     const topic = await this.prisma.grammarTopic.findUnique({
       where: { id },
       include: {
@@ -140,7 +136,7 @@ export class GrammarService {
     // Chống farm thưởng Bánh Mì & XP bằng UserGrammarReward (Atomic ở tầng DB với @@unique([userId, topicId]))
     let isFirstCompletion = false;
     try {
-      await (this.prisma as any).userGrammarReward.create({
+      await this.prisma.userGrammarReward.create({
         data: {
           userId,
           topicId,

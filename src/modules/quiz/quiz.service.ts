@@ -139,57 +139,53 @@ export class QuizService {
 
     let totalScore = 0;
 
-    const resultsData = await Promise.all(
-      dto.answers.map(async (ans) => {
-        const question = quiz.questions.find(
-          (q: any) => q.id === ans.questionId,
-        );
-        let isCorrect = false;
-        let score = 0;
+    const resultsData = dto.answers.map((ans) => {
+      const question = quiz.questions.find((q: any) => q.id === ans.questionId);
+      let isCorrect = false;
+      let score = 0;
 
-        if (question) {
-          if (question.type === 'MULTIPLE_CHOICE') {
-            const content = question.content as any;
-            if (content.correct === ans.answer) {
-              isCorrect = true;
-              score = 1;
-              totalScore += score;
-            }
-          } else if (
-            question.type === 'DICTATION' ||
-            question.type === 'FILL_IN_BLANK'
-          ) {
-            const content = question.content as any;
-            const cleanCorrect = String(
-              content.correctAnswer || content.correct || '',
-            )
-              .toLowerCase()
-              .replace(/[.,!?]/g, '')
-              .trim();
-            const cleanAns = String(ans.answer || '')
-              .toLowerCase()
-              .replace(/[.,!?]/g, '')
-              .trim();
-            if (cleanCorrect === cleanAns) {
-              isCorrect = true;
-              score = 1;
-              totalScore += score;
-            }
-          } else if (question.type === 'WRITING') {
-            // Sẽ gọi AI chấm bài và gom overallAiFeedback ở vòng lặp bên dưới
+      if (question) {
+        if (question.type === 'MULTIPLE_CHOICE') {
+          const content = question.content;
+          if (content.correct === ans.answer) {
+            isCorrect = true;
+            score = 1;
+            totalScore += score;
           }
+        } else if (
+          question.type === 'DICTATION' ||
+          question.type === 'FILL_IN_BLANK'
+        ) {
+          const content = question.content;
+          const cleanCorrect = String(
+            content.correctAnswer || content.correct || '',
+          )
+            .toLowerCase()
+            .replace(/[.,!?]/g, '')
+            .trim();
+          const cleanAns = String(ans.answer || '')
+            .toLowerCase()
+            .replace(/[.,!?]/g, '')
+            .trim();
+          if (cleanCorrect === cleanAns) {
+            isCorrect = true;
+            score = 1;
+            totalScore += score;
+          }
+        } else if (question.type === 'WRITING') {
+          // Sẽ gọi AI chấm bài và gom overallAiFeedback ở vòng lặp bên dưới
         }
+      }
 
-        return {
-          questionId: ans.questionId,
-          answer: ans.answer,
-          isCorrect,
-          score,
-          // (Optional: You could save this feedback into the Result JSON if you want.
-          // We will just accumulate it into the Submission aiFeedback for now)
-        };
-      }),
-    );
+      return {
+        questionId: ans.questionId,
+        answer: ans.answer,
+        isCorrect,
+        score,
+        // (Optional: You could save this feedback into the Result JSON if you want.
+        // We will just accumulate it into the Submission aiFeedback for now)
+      };
+    });
 
     // Accumulate all AI feedback to store in the Submission
     let overallAiFeedback = '';
@@ -197,7 +193,7 @@ export class QuizService {
     for (const ans of dto.answers) {
       const question = quiz.questions.find((q: any) => q.id === ans.questionId);
       if (question && question.type === 'WRITING') {
-        const content = question.content as any;
+        const content = question.content;
         const feedback = await this.aiService.generateFeedback(
           content.text,
           ans.answer,
@@ -224,7 +220,7 @@ export class QuizService {
     // Chống farm điểm thưởng Quiz bằng UserQuizReward (Atomic @@unique([userId, quizId]))
     let isFirstSubmission = false;
     try {
-      await (this.prisma as any).userQuizReward.create({
+      await this.prisma.userQuizReward.create({
         data: {
           userId,
           quizId,
