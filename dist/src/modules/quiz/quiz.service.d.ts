@@ -1,3 +1,4 @@
+import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateQuizDto, CreateQuestionDto, SubmitQuizDto } from './dto/quiz.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -7,7 +8,10 @@ export declare class QuizService {
     private eventEmitter;
     private aiService;
     constructor(prisma: PrismaService, eventEmitter: EventEmitter2, aiService: AiService);
-    createQuiz(dto: CreateQuizDto): Promise<{
+    createQuiz(dto: CreateQuizDto, user?: {
+        id: number;
+        role: Role;
+    }): Promise<{
         createdAt: Date;
         id: number;
         title: string;
@@ -19,7 +23,10 @@ export declare class QuizService {
         courseId: number | null;
         practiceTopicId: number | null;
     }>;
-    updateQuiz(id: number, dto: Partial<CreateQuizDto>): Promise<{
+    updateQuiz(id: number, dto: Partial<CreateQuizDto>, user?: {
+        id: number;
+        role: Role;
+    }): Promise<{
         createdAt: Date;
         id: number;
         title: string;
@@ -31,7 +38,10 @@ export declare class QuizService {
         courseId: number | null;
         practiceTopicId: number | null;
     }>;
-    deleteQuiz(id: number): Promise<{
+    deleteQuiz(id: number, user?: {
+        id: number;
+        role: Role;
+    }): Promise<{
         createdAt: Date;
         id: number;
         title: string;

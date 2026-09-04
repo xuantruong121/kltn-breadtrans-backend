@@ -3,7 +3,7 @@ import { CreateQuizDto, CreateQuestionDto, SubmitQuizDto } from './dto/quiz.dto'
 export declare class QuizController {
     private readonly quizService;
     constructor(quizService: QuizService);
-    createQuiz(dto: CreateQuizDto): Promise<{
+    createQuiz(dto: CreateQuizDto, req: any): Promise<{
         createdAt: Date;
         id: number;
         title: string;
@@ -15,7 +15,7 @@ export declare class QuizController {
         courseId: number | null;
         practiceTopicId: number | null;
     }>;
-    updateQuiz(id: number, dto: Partial<CreateQuizDto>): Promise<{
+    updateQuiz(id: number, dto: Partial<CreateQuizDto>, req: any): Promise<{
         createdAt: Date;
         id: number;
         title: string;
@@ -27,7 +27,7 @@ export declare class QuizController {
         courseId: number | null;
         practiceTopicId: number | null;
     }>;
-    deleteQuiz(id: number): Promise<{
+    deleteQuiz(id: number, req: any): Promise<{
         createdAt: Date;
         id: number;
         title: string;

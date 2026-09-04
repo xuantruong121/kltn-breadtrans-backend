@@ -1,11 +1,12 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Role, CourseStatus, ClassStatus } from '@prisma/client';
+import { Role, CourseStatus } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { R2Service } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
+import { CourseService } from '../course/course.service';
 
 @Injectable()
 export class AdminService {
@@ -13,6 +14,7 @@ export class AdminService {
     private prisma: PrismaService,
     private r2Service: R2Service,
     private r2CleanupService: R2CleanupService,
+    private courseService: CourseService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
   ) {}
 
@@ -219,13 +221,7 @@ export class AdminService {
   }
 
   async enrollUserInClass(userId: number, classId: number) {
-    const existing = await this.prisma.enrollment.findFirst({
-      where: { userId, classId },
-    });
-    if (existing) return existing;
-    return this.prisma.enrollment.create({
-      data: { userId, classId, status: 'ACTIVE', progress: 0 },
-    });
+    return this.courseService.enrollInClass(classId, userId);
   }
 
   async removeEnrollment(userId: number, classId: number) {
@@ -278,25 +274,7 @@ export class AdminService {
     level?: string;
     teacherId?: number;
   }) {
-    return this.prisma.course.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        thumbnail: dto.thumbnail,
-        level: dto.level,
-        teacherId: dto.teacherId,
-        status: CourseStatus.PUBLISHED,
-      },
-      include: {
-        teacher: {
-          select: {
-            id: true,
-            email: true,
-            profile: { select: { fullName: true } },
-          },
-        },
-      },
-    });
+    return this.courseService.createCourse(dto, { id: 0, role: Role.ADMIN });
   }
 
   async adminUpdateCourse(
@@ -307,26 +285,27 @@ export class AdminService {
       thumbnail?: string;
       level?: string;
       teacherId?: number;
-      status?: string;
+      status?: any;
     },
   ) {
-    return this.prisma.course.update({
-      where: { id: courseId },
-      data: dto as any,
-      include: {
-        teacher: {
-          select: {
-            id: true,
-            email: true,
-            profile: { select: { fullName: true } },
-          },
-        },
-      },
+    return this.courseService.updateCourse(courseId, dto, {
+      id: 0,
+      role: Role.ADMIN,
     });
   }
 
   async adminDeleteCourse(courseId: number) {
-    return this.prisma.course.delete({ where: { id: courseId } });
+    return this.courseService.deleteCourse(courseId, {
+      id: 0,
+      role: Role.ADMIN,
+    });
+  }
+
+  async adminReviewCourse(courseId: number, action: 'APPROVE' | 'REJECT') {
+    return this.courseService.reviewCourse(courseId, action, {
+      id: 0,
+      role: Role.ADMIN,
+    });
   }
 
   // ============== CLASS MANAGEMENT ==============
@@ -356,50 +335,22 @@ export class AdminService {
       startDate?: string;
       endDate?: string;
       meetingLink?: string;
+      capacity?: number;
     },
   ) {
-    const dailyDomain = process.env.DAILY_DOMAIN || 'breadtrans-kltn.daily.co';
-    const randomCode = Math.random().toString(36).substring(2, 10);
-    const meetingLink =
-      dto.meetingLink ||
-      `https://${dailyDomain}/breadtrans-${courseId}-${randomCode}`;
-    return this.prisma.class.create({
-      data: {
-        name: dto.name,
-        courseId,
-        teacherId: dto.teacherId,
-        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-        meetingLink,
-        status: ClassStatus.ONGOING,
-      },
-      include: {
-        course: { select: { id: true, title: true } },
-        teacher: {
-          select: {
-            id: true,
-            email: true,
-            profile: { select: { fullName: true } },
-          },
-        },
-      },
-    });
+    return this.courseService.createClass(
+      courseId,
+      { id: 0, role: Role.ADMIN },
+      dto,
+    );
   }
 
   async adminAssignTeacher(classId: number, teacherId: number) {
-    return this.prisma.class.update({
-      where: { id: classId },
-      data: { teacherId },
-      include: {
-        teacher: {
-          select: {
-            id: true,
-            email: true,
-            profile: { select: { fullName: true } },
-          },
-        },
-      },
-    });
+    return this.courseService.updateClass(
+      classId,
+      { id: 0, role: Role.ADMIN },
+      { teacherId },
+    );
   }
 
   async getClassWithEnrollments(classId: number) {

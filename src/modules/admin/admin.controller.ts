@@ -159,9 +159,21 @@ export class AdminController {
       startDate?: string;
       endDate?: string;
       meetingLink?: string;
+      capacity?: number;
     },
   ) {
     return this.adminService.adminCreateClass(courseId, dto);
+  }
+
+  @Post('courses/:courseId/review')
+  @ApiOperation({
+    summary: 'Admin: Duyet hoac tu choi khoa hoc (APPROVE / REJECT)',
+  })
+  adminReviewCourse(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Body() dto: { action: 'APPROVE' | 'REJECT' },
+  ) {
+    return this.adminService.adminReviewCourse(courseId, dto.action);
   }
 
   @Post('classes/:classId/assign-teacher')

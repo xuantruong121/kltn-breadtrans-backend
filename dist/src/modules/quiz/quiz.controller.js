@@ -26,14 +26,14 @@ let QuizController = class QuizController {
     constructor(quizService) {
         this.quizService = quizService;
     }
-    createQuiz(dto) {
-        return this.quizService.createQuiz(dto);
+    createQuiz(dto, req) {
+        return this.quizService.createQuiz(dto, req.user);
     }
-    updateQuiz(id, dto) {
-        return this.quizService.updateQuiz(id, dto);
+    updateQuiz(id, dto, req) {
+        return this.quizService.updateQuiz(id, dto, req.user);
     }
-    deleteQuiz(id) {
-        return this.quizService.deleteQuiz(id);
+    deleteQuiz(id, req) {
+        return this.quizService.deleteQuiz(id, req.user);
     }
     getAllQuizzes() {
         return this.quizService.getAllQuizzes();
@@ -71,8 +71,9 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Tạo bài trắc nghiệm (chỉ ADMIN/TEACHER)' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [quiz_dto_1.CreateQuizDto]),
+    __metadata("design:paramtypes", [quiz_dto_1.CreateQuizDto, Object]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "createQuiz", null);
 __decorate([
@@ -82,8 +83,9 @@ __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Cập nhật đề thi (chỉ ADMIN/TEACHER)' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:paramtypes", [Number, Object, Object]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "updateQuiz", null);
 __decorate([
@@ -92,8 +94,9 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Xóa đề thi (chỉ ADMIN/TEACHER)' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "deleteQuiz", null);
 __decorate([

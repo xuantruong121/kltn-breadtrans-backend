@@ -19,6 +19,7 @@ exports.CourseModule = CourseModule = __decorate([
         imports: [events_module_1.EventsModule],
         providers: [course_service_1.CourseService],
         controllers: [course_controller_1.CourseController],
+        exports: [course_service_1.CourseService],
     })
 ], CourseModule);
 //# sourceMappingURL=course.module.js.map
