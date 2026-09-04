@@ -17,14 +17,16 @@ export class GamificationListener {
     userId: number;
     quizId?: number;
     score: number;
+    isFirstSubmission?: boolean;
   }) {
     this.logger.log(
-      `Handling quiz.submitted event for user ${payload.userId} with score ${payload.score}`,
+      `Handling quiz.submitted event for user ${payload.userId} with score ${payload.score} (firstSubmission: ${payload.isFirstSubmission})`,
     );
 
     try {
-      // Tính điểm thưởng (ví dụ: mỗi điểm số bài thi tương đương 10 points)
-      const pointsEarned = payload.score * 10;
+      // Chỉ cộng điểm kinh nghiệm (XP / Leaderboard / Badges) cho lần nộp đầu tiên
+      const pointsEarned =
+        payload.isFirstSubmission === false ? 0 : payload.score * 10;
 
       if (pointsEarned > 0) {
         // 1 & 2. Thêm lịch sử điểm và Cập nhật bảng xếp hạng (bao gồm weeklyExp)

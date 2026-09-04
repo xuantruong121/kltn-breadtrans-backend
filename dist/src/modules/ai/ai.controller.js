@@ -23,6 +23,7 @@ const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const client_1 = require("@prisma/client");
+const ai_rate_limit_guard_1 = require("../../common/guards/ai-rate-limit.guard");
 const class_validator_1 = require("class-validator");
 class ChatDto {
     prompt;
@@ -222,7 +223,7 @@ let AiController = class AiController {
 };
 exports.AiController = AiController;
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, ai_rate_limit_guard_1.AiRateLimitGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Post)('chat'),
     (0, swagger_1.ApiOperation)({ summary: 'Chat với trợ lý AI ảo (Hỗ trợ học tập)' }),
@@ -232,7 +233,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AiController.prototype, "chat", null);
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, ai_rate_limit_guard_1.AiRateLimitGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Post)('generate-dictation'),
     (0, swagger_1.ApiOperation)({ summary: 'AI tự động sinh bài Luyện Nghe (Chép chính tả)' }),
@@ -242,7 +243,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AiController.prototype, "generateDictation", null);
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, ai_rate_limit_guard_1.AiRateLimitGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Post)('generate-toeic-quiz'),
     (0, swagger_1.ApiOperation)({ summary: 'Sinh bộ câu hỏi TOEIC tự động theo chủ đề' }),
@@ -252,7 +253,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AiController.prototype, "generateToeicQuiz", null);
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, ai_rate_limit_guard_1.AiRateLimitGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Post)('explain-toeic-error/:questionId'),
     (0, swagger_1.ApiOperation)({

@@ -34,8 +34,14 @@ export class AssignmentController {
   createAssignment(
     @Param('classId', ParseIntPipe) classId: number,
     @Body() dto: CreateAssignmentDto,
+    @Request() req: any,
   ) {
-    return this.assignmentService.createAssignment(classId, dto);
+    return this.assignmentService.createAssignment(
+      classId,
+      dto,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Get('classes/:classId/assignments')
@@ -74,7 +80,13 @@ export class AssignmentController {
   gradeSubmission(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: GradeAssignmentDto,
+    @Request() req: any,
   ) {
-    return this.assignmentService.gradeSubmission(id, dto);
+    return this.assignmentService.gradeSubmission(
+      id,
+      dto,
+      req.user.id,
+      req.user.role,
+    );
   }
 }

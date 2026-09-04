@@ -303,7 +303,7 @@ export declare class CourseService {
         stories: import("@prisma/client/runtime/library").JsonValue | null;
         pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
-    getClassById(classId: number): Promise<{
+    getClassById(classId: number, userId?: number, role?: string): Promise<{
         course: {
             lessons: ({
                 materials: {

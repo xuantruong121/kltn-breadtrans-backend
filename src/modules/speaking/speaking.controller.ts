@@ -28,6 +28,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 
 @ApiTags('Speaking Practice')
 @ApiBearerAuth()
@@ -65,6 +66,7 @@ export class SpeakingController {
     return this.speakingService.findExerciseById(id);
   }
 
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @Post('exercises/:id/submit')
   @ApiOperation({
     summary: 'Nộp audio để AI chấm phát âm (Azure Speech)',

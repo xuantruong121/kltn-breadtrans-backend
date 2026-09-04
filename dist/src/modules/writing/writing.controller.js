@@ -16,6 +16,7 @@ exports.WritingController = void 0;
 const common_1 = require("@nestjs/common");
 const writing_service_1 = require("./writing.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const ai_rate_limit_guard_1 = require("../../common/guards/ai-rate-limit.guard");
 const swagger_1 = require("@nestjs/swagger");
 let WritingController = class WritingController {
     writingService;
@@ -70,7 +71,7 @@ __decorate([
 ], WritingController.prototype, "getCommunitySubmissions", null);
 __decorate([
     (0, common_1.Post)('quizzes/:id/submit'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, ai_rate_limit_guard_1.AiRateLimitGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Nộp bài và chấm điểm bằng AI (Part 1)' }),
     (0, swagger_1.ApiBody)({
@@ -85,7 +86,7 @@ __decorate([
 ], WritingController.prototype, "submitWriting", null);
 __decorate([
     (0, common_1.Post)('part2/submit'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, ai_rate_limit_guard_1.AiRateLimitGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({
         summary: 'Chấm điểm bài TOEIC Writing Part 2 (Respond to an Email)',
@@ -111,7 +112,7 @@ __decorate([
 ], WritingController.prototype, "submitWritingPart2", null);
 __decorate([
     (0, common_1.Post)('part3/submit'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, ai_rate_limit_guard_1.AiRateLimitGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({
         summary: 'Chấm điểm bài TOEIC Writing Part 3 (Write an Opinion Essay)',

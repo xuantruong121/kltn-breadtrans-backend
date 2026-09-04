@@ -17,6 +17,9 @@ const common_1 = require("@nestjs/common");
 const platform_express_1 = require("@nestjs/platform-express");
 const upload_service_1 = require("./upload.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const roles_guard_1 = require("../../common/guards/roles.guard");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const client_1 = require("@prisma/client");
 const swagger_1 = require("@nestjs/swagger");
 let UploadController = class UploadController {
     uploadService;
@@ -75,6 +78,8 @@ __decorate([
 ], UploadController.prototype, "uploadFile", null);
 __decorate([
     (0, common_1.Delete)('*key'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     (0, swagger_1.ApiOperation)({ summary: 'Xóa file khỏi R2 theo key' }),
     (0, swagger_1.ApiParam)({
         name: 'key',

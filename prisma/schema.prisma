@@ -76,6 +76,8 @@ model User {
   questProgresses     UserQuestProgress[]
   grammarAttempts     GrammarAttempt[]
   pushSubscriptions   PushSubscription[]
+  userGrammarRewards  UserGrammarReward[]
+  userQuizRewards     UserQuizReward[]
 }
 
 model Profile {
@@ -271,6 +273,7 @@ model AssignmentSubmission {
   quizAnswers  Json?      // Array of selected option indices corresponding to quizData questions
   grade        Float?
   feedback     String?    @db.Text
+  isPointsAwarded Boolean @default(false)
   submittedAt  DateTime   @default(now())
 
   @@unique([assignmentId, userId])
@@ -331,6 +334,7 @@ model Quiz {
 
   questions   Question[]
   submissions Submission[]
+  rewards     UserQuizReward[]
 }
 
 model Question {
@@ -512,6 +516,7 @@ model MarketProduct {
   price         Float
   imageUrl      String?
   order         Int      @default(0)
+  stock         Int      @default(100)
   purchaseCount Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -820,6 +825,7 @@ model GrammarTopic {
 
   questions      GrammarQuestion[]
   attempts       GrammarAttempt[]
+  rewards        UserGrammarReward[]
 }
 
 model GrammarQuestion {
@@ -857,6 +863,28 @@ model PushSubscription {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+model UserGrammarReward {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId   Int
+  topic     GrammarTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@unique([userId, topicId])
+}
+
+model UserQuizReward {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId    Int
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, quizId])
 }
 
 

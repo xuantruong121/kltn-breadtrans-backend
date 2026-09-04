@@ -74,8 +74,10 @@ export class QuizController {
   @Get(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy chi tiết Quiz và danh sách Questions' })
-  getQuizById(@Param('id', ParseIntPipe) id: number) {
-    return this.quizService.getQuizById(id);
+  getQuizById(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const isStaff =
+      req.user?.role === Role.ADMIN || req.user?.role === Role.TEACHER;
+    return this.quizService.getQuizById(id, isStaff);
   }
 
   @Post(':id/questions')

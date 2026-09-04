@@ -41,7 +41,9 @@ export class GrammarController {
   })
   getTopicDetail(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const userId = req?.user?.id;
-    return this.grammarService.getTopicDetail(id, userId);
+    const isStaff =
+      req?.user?.role === Role.ADMIN || req?.user?.role === Role.TEACHER;
+    return this.grammarService.getTopicDetail(id, userId, isStaff);
   }
 
   @UseGuards(JwtAuthGuard)

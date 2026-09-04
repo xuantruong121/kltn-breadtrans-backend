@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ToeicService } from './toeic.service';
-import { AttemptMode } from '@prisma/client';
+import { AttemptMode, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Assume this exists based on standard NestJS auth
 
 @Controller('toeic')
@@ -23,8 +23,10 @@ export class ToeicController {
   }
 
   @Get('exams/:examId')
-  getExamDetails(@Param('examId') examId: string) {
-    return this.toeicService.getExamDetails(+examId);
+  getExamDetails(@Param('examId') examId: string, @Req() req: any) {
+    const isStaff =
+      req.user?.role === Role.ADMIN || req.user?.role === Role.TEACHER;
+    return this.toeicService.getExamDetails(+examId, isStaff);
   }
 
   @Post('exams/:examId/attempts')
@@ -42,25 +44,26 @@ export class ToeicController {
   }
 
   @Get('attempts/:id/remaining-time')
-  getRemainingTime(@Param('id') id: string) {
-    return this.toeicService.getRemainingTime(+id);
+  getRemainingTime(@Param('id') id: string, @Req() req: any) {
+    return this.toeicService.getRemainingTime(+id, req.user.id, req.user.role);
   }
 
   @Patch('attempts/:id/answers')
   saveAnswers(
     @Param('id') id: string,
+    @Req() req: any,
     @Body('answers') answers: Record<string, number>,
   ) {
-    return this.toeicService.saveAnswers(+id, answers);
+    return this.toeicService.saveAnswers(+id, req.user.id, answers);
   }
 
   @Post('attempts/:id/submit')
-  submitAttempt(@Param('id') id: string) {
-    return this.toeicService.submitAttempt(+id);
+  submitAttempt(@Param('id') id: string, @Req() req: any) {
+    return this.toeicService.submitAttempt(+id, req.user.id);
   }
 
   @Get('attempts/:id/result')
-  getResult(@Param('id') id: string) {
-    return this.toeicService.getResult(+id);
+  getResult(@Param('id') id: string, @Req() req: any) {
+    return this.toeicService.getResult(+id, req.user.id, req.user.role);
   }
 }
