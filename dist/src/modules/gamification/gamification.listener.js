@@ -24,9 +24,9 @@ let GamificationListener = GamificationListener_1 = class GamificationListener {
         this.gamificationService = gamificationService;
     }
     async handleQuizSubmittedEvent(payload) {
-        this.logger.log(`Handling quiz.submitted event for user ${payload.userId} with score ${payload.score}`);
+        this.logger.log(`Handling quiz.submitted event for user ${payload.userId} with score ${payload.score} (firstSubmission: ${payload.isFirstSubmission})`);
         try {
-            const pointsEarned = payload.score * 10;
+            const pointsEarned = payload.isFirstSubmission === false ? 0 : payload.score * 10;
             if (pointsEarned > 0) {
                 const leaderboard = await this.gamificationService.addPoints(payload.userId, pointsEarned, 'Hoàn thành bài thi (Quiz)');
                 const firstBadge = await this.prisma.badge.findFirst({

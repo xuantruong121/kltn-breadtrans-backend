@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateCourseDto,
@@ -235,7 +239,7 @@ export class CourseService {
     });
   }
 
-  async getClassById(classId: number) {
+  async getClassById(classId: number, userId?: number, role?: string) {
     const classData = await this.prisma.class.findUnique({
       where: { id: classId },
       include: {
@@ -248,6 +252,28 @@ export class CourseService {
       },
     });
     if (!classData) throw new NotFoundException('Class not found');
+
+    if (role === 'STUDENT' && userId) {
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: {
+          classId,
+          userId,
+          status: { in: ['ACTIVE', 'COMPLETED'] },
+        },
+      });
+      if (!enrollment) {
+        throw new ForbiddenException(
+          'Bạn chưa ghi danh hoặc không có quyền truy cập bài giảng của lớp học này',
+        );
+      }
+    } else if (role === 'TEACHER' && userId) {
+      if (classData.teacherId !== userId) {
+        throw new ForbiddenException(
+          'Bạn không phải là giảng viên phụ trách lớp học này',
+        );
+      }
+    }
+
     return classData;
   }
 

@@ -112,8 +112,9 @@ export class AuthService {
     try {
       tokenPayload = this.jwtService.verify(providedRefreshToken);
     } catch {
-      // If verify fails, decode to check if expired
-      tokenPayload = this.jwtService.decode(providedRefreshToken);
+      throw new UnauthorizedException(
+        'Refresh token không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     const effectiveUserId = tokenPayload?.sub || userId;

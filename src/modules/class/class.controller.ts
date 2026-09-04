@@ -87,16 +87,29 @@ export class ClassController {
   createSession(
     @Param('classId', ParseIntPipe) classId: number,
     @Body() dto: any,
+    @Request() req: any,
   ) {
-    return this.classService.createSession(classId, dto);
+    return this.classService.createSession(
+      classId,
+      dto,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Delete('sessions/:sessionId')
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Xóa buổi học (Session)' })
-  deleteSession(@Param('sessionId', ParseIntPipe) sessionId: number) {
-    return this.classService.deleteSession(sessionId);
+  deleteSession(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @Request() req: any,
+  ) {
+    return this.classService.deleteSession(
+      sessionId,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Patch('sessions/:sessionId/finish')

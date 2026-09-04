@@ -41,8 +41,9 @@ let QuizController = class QuizController {
     getListeningPractices(req) {
         return this.quizService.getListeningPractices(req.user.id);
     }
-    getQuizById(id) {
-        return this.quizService.getQuizById(id);
+    getQuizById(id, req) {
+        const isStaff = req.user?.role === client_1.Role.ADMIN || req.user?.role === client_1.Role.TEACHER;
+        return this.quizService.getQuizById(id, isStaff);
     }
     createQuestion(quizId, dto) {
         return this.quizService.createQuestion(quizId, dto);
@@ -118,8 +119,9 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Lấy chi tiết Quiz và danh sách Questions' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "getQuizById", null);
 __decorate([

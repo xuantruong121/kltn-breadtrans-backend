@@ -213,7 +213,7 @@ let CourseService = class CourseService {
             },
         });
     }
-    async getClassById(classId) {
+    async getClassById(classId, userId, role) {
         const classData = await this.prisma.class.findUnique({
             where: { id: classId },
             include: {
@@ -227,6 +227,23 @@ let CourseService = class CourseService {
         });
         if (!classData)
             throw new common_1.NotFoundException('Class not found');
+        if (role === 'STUDENT' && userId) {
+            const enrollment = await this.prisma.enrollment.findFirst({
+                where: {
+                    classId,
+                    userId,
+                    status: { in: ['ACTIVE', 'COMPLETED'] },
+                },
+            });
+            if (!enrollment) {
+                throw new common_1.ForbiddenException('Bạn chưa ghi danh hoặc không có quyền truy cập bài giảng của lớp học này');
+            }
+        }
+        else if (role === 'TEACHER' && userId) {
+            if (classData.teacherId !== userId) {
+                throw new common_1.ForbiddenException('Bạn không phải là giảng viên phụ trách lớp học này');
+            }
+        }
         return classData;
     }
     async deleteClass(id) {

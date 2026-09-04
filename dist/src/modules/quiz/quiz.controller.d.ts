@@ -71,15 +71,14 @@ export declare class QuizController {
         courseId: number | null;
         practiceTopicId: number | null;
     }[]>;
-    getQuizById(id: number): Promise<{
+    getQuizById(id: number, req: any): Promise<{
         questions: {
+            content: any;
             order: number;
             id: number;
             type: string;
-            content: import("@prisma/client/runtime/library").JsonValue;
             quizId: number;
         }[];
-    } & {
         createdAt: Date;
         id: number;
         title: string;
@@ -113,6 +112,7 @@ export declare class QuizController {
         quizId: number;
     }>;
     submitQuiz(quizId: number, dto: SubmitQuizDto, req: any): Promise<{
+        isFirstSubmission: boolean;
         results: {
             id: number;
             score: number | null;
@@ -121,7 +121,6 @@ export declare class QuizController {
             isCorrect: boolean | null;
             submissionId: number;
         }[];
-    } & {
         id: number;
         quizId: number;
         score: number | null;

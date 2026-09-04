@@ -107,7 +107,24 @@ export class ClassService {
     }
   }
 
-  async createSession(classId: number, dto: CreateSessionDto) {
+  async createSession(
+    classId: number,
+    dto: CreateSessionDto,
+    userId?: number,
+    role?: string,
+  ) {
+    if (userId && role !== 'ADMIN') {
+      const cls = await this.prisma.class.findUnique({
+        where: { id: classId },
+      });
+      if (!cls) throw new NotFoundException('Không tìm thấy lớp học');
+      if (cls.teacherId !== userId) {
+        throw new ForbiddenException(
+          'Bạn không phải là giảng viên phụ trách lớp học này',
+        );
+      }
+    }
+
     let meetingLink = dto.meetingLink ? String(dto.meetingLink) : '';
     if (!meetingLink || !meetingLink.includes('daily.co')) {
       const sessionSlug = dto.title
@@ -129,12 +146,19 @@ export class ClassService {
     });
   }
 
-  async deleteSession(sessionId: number) {
+  async deleteSession(sessionId: number, userId?: number, role?: string) {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
+      include: { class: true },
     });
     if (!session) {
-      return { success: false, message: 'Session not found' };
+      throw new NotFoundException('Không tìm thấy buổi học');
+    }
+
+    if (userId && role !== 'ADMIN' && session.class.teacherId !== userId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xóa buổi học của lớp này',
+      );
     }
 
     await this.prisma.session.delete({

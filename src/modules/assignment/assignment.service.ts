@@ -20,9 +20,20 @@ export class AssignmentService {
     private gamification: GamificationService,
   ) {}
 
-  async createAssignment(classId: number, dto: CreateAssignmentDto) {
+  async createAssignment(
+    classId: number,
+    dto: CreateAssignmentDto,
+    userId?: number,
+    role?: string,
+  ) {
     const cls = await this.prisma.class.findUnique({ where: { id: classId } });
     if (!cls) throw new NotFoundException('Không tìm thấy lớp học');
+
+    if (role !== 'ADMIN' && cls.teacherId !== userId) {
+      throw new ForbiddenException(
+        'Bạn không phải là giảng viên phụ trách lớp học này',
+      );
+    }
 
     return this.prisma.assignment.create({
       data: {
@@ -37,6 +48,30 @@ export class AssignmentService {
   }
 
   async getAssignmentsByClass(classId: number, userId?: number, role?: string) {
+    const cls = await this.prisma.class.findUnique({ where: { id: classId } });
+    if (!cls) throw new NotFoundException('Không tìm thấy lớp học');
+
+    if (role === 'STUDENT' && userId) {
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: {
+          classId,
+          userId,
+          status: { in: ['ACTIVE', 'COMPLETED'] },
+        },
+      });
+      if (!enrollment) {
+        throw new ForbiddenException(
+          'Bạn chưa ghi danh hoặc không có quyền truy cập bài tập của lớp học này',
+        );
+      }
+    } else if (role === 'TEACHER' && userId) {
+      if (cls.teacherId !== userId) {
+        throw new ForbiddenException(
+          'Bạn không phải là giảng viên phụ trách lớp học này',
+        );
+      }
+    }
+
     // Nếu là STUDENT, kèm theo submission của riêng học sinh đó để biết đã nộp chưa
     return this.prisma.assignment.findMany({
       where: { classId },
@@ -81,8 +116,23 @@ export class AssignmentService {
   ) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
+      include: { class: true },
     });
     if (!assignment) throw new NotFoundException('Không tìm thấy bài tập');
+
+    // Chỉ học sinh có enrollment ACTIVE trong lớp mới có thể nộp bài tập
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: {
+        classId: assignment.classId,
+        userId,
+        status: 'ACTIVE',
+      },
+    });
+    if (!enrollment) {
+      throw new ForbiddenException(
+        'Chỉ học sinh đang hoạt động (ACTIVE) trong lớp mới có thể nộp bài tập',
+      );
+    }
 
     const existingSubmission =
       await this.prisma.assignmentSubmission.findUnique({
@@ -150,17 +200,17 @@ export class AssignmentService {
     // Cập nhật tiến độ học tập (Enrollment.progress) của học sinh cho lớp học
     await this.updateStudentEnrollmentProgress(assignment.classId, userId);
 
-    // Đối với QUIZ: Hệ thống tự chấm điểm và thưởng Bánh Mì/EXP ngay (Đảm bảo Idempotency khi nộp lại)
+    // Đối với QUIZ: Hệ thống tự chấm điểm và thưởng Bánh Mì/EXP ngay (Đảm bảo Idempotency qua CAS isPointsAwarded)
     if (assignment.type === 'QUIZ' && grade !== undefined && grade !== null) {
       const historyKey = `Hoàn thành bài tập trắc nghiệm: ${assignment.title}`;
-      const alreadyRewarded = await this.prisma.pointHistory.findFirst({
-        where: {
-          userId,
-          reason: { contains: historyKey },
-        },
+
+      // CAS atomic compare-and-swap trên isPointsAwarded để phòng chống TOCTOU race condition
+      const awardUpdate = await this.prisma.assignmentSubmission.updateMany({
+        where: { id: submission.id, isPointsAwarded: false },
+        data: { isPointsAwarded: true },
       });
 
-      if (!alreadyRewarded) {
+      if (awardUpdate.count === 1) {
         const rawPoints = Math.round(grade * 10); // 10 điểm = 100 xp
         const points = isLate ? Math.round(rawPoints * 0.5) : rawPoints;
         if (points > 0) {
@@ -232,14 +282,41 @@ export class AssignmentService {
     }
   }
 
-  async gradeSubmission(submissionId: number, dto: GradeAssignmentDto) {
+  async gradeSubmission(
+    submissionId: number,
+    dto: GradeAssignmentDto,
+    userId?: number,
+    role?: string,
+  ) {
     const existing = await this.prisma.assignmentSubmission.findUnique({
       where: { id: submissionId },
-      include: { assignment: true },
+      include: { assignment: { include: { class: true } } },
     });
 
     if (!existing) {
       throw new NotFoundException('Không tìm thấy bài nộp');
+    }
+
+    if (role !== 'ADMIN' && existing.assignment.class.teacherId !== userId) {
+      throw new ForbiddenException(
+        'Bạn không phải là giảng viên phụ trách lớp học này',
+      );
+    }
+
+    // Atomic compare-and-swap trên isPointsAwarded để phòng chống cộng thưởng 2 lần
+    let shouldAwardPoints = false;
+    if (
+      dto.grade !== undefined &&
+      dto.grade !== null &&
+      !existing.isPointsAwarded
+    ) {
+      const awardCheck = await this.prisma.assignmentSubmission.updateMany({
+        where: { id: submissionId, isPointsAwarded: false },
+        data: { isPointsAwarded: true },
+      });
+      if (awardCheck.count === 1) {
+        shouldAwardPoints = true;
+      }
     }
 
     const updated = await this.prisma.assignmentSubmission.update({
@@ -252,7 +329,7 @@ export class AssignmentService {
     });
 
     // Khi giáo viên chấm bài tự luận (ESSAY), tính thưởng Bánh Mì/EXP theo chất lượng bài làm
-    if (dto.grade !== undefined && dto.grade !== null) {
+    if (shouldAwardPoints && dto.grade !== undefined && dto.grade !== null) {
       const isLate = updated.assignment.dueDate
         ? new Date(updated.submittedAt) > new Date(updated.assignment.dueDate)
         : false;

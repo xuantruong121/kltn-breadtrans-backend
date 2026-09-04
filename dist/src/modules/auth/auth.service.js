@@ -135,7 +135,7 @@ let AuthService = class AuthService {
             tokenPayload = this.jwtService.verify(providedRefreshToken);
         }
         catch {
-            tokenPayload = this.jwtService.decode(providedRefreshToken);
+            throw new common_1.UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
         }
         const effectiveUserId = tokenPayload?.sub || userId;
         const effectiveDeviceId = tokenPayload?.deviceId || deviceId;

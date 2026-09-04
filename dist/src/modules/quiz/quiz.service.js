@@ -82,13 +82,25 @@ let QuizService = class QuizService {
             isCompleted: completedQuizIds.has(quiz.id),
         }));
     }
-    async getQuizById(id) {
+    async getQuizById(id, includeAnswers = false) {
         const quiz = await this.prisma.quiz.findUnique({
             where: { id },
             include: { questions: { orderBy: { order: 'asc' } } },
         });
         if (!quiz)
             throw new common_1.NotFoundException('Quiz not found');
+        if (!includeAnswers && quiz.questions) {
+            const sanitizedQuestions = quiz.questions.map((q) => {
+                if (!q.content || typeof q.content !== 'object')
+                    return q;
+                const content = { ...q.content };
+                delete content.correct;
+                delete content.correctAnswer;
+                delete content.explanation;
+                return { ...q, content };
+            });
+            return { ...quiz, questions: sanitizedQuestions };
+        }
         return quiz;
     }
     async createQuestion(quizId, dto) {
@@ -121,7 +133,7 @@ let QuizService = class QuizService {
         });
     }
     async submitQuiz(quizId, userId, dto) {
-        const quiz = await this.getQuizById(quizId);
+        const quiz = await this.getQuizById(quizId, true);
         let totalScore = 0;
         const resultsData = await Promise.all(dto.answers.map(async (ans) => {
             const question = quiz.questions.find((q) => q.id === ans.questionId);
@@ -154,8 +166,6 @@ let QuizService = class QuizService {
                     }
                 }
                 else if (question.type === 'WRITING') {
-                    const content = question.content;
-                    await this.aiService.generateFeedback(content.text || 'Write an essay.', ans.answer);
                 }
             }
             return {
@@ -188,12 +198,35 @@ let QuizService = class QuizService {
                 results: true,
             },
         });
+        let isFirstSubmission = false;
+        try {
+            await this.prisma.userQuizReward.create({
+                data: {
+                    userId,
+                    quizId,
+                },
+            });
+            isFirstSubmission = true;
+        }
+        catch (e) {
+            if (e.code === 'P2002') {
+                isFirstSubmission = false;
+            }
+            else {
+                throw e;
+            }
+        }
         this.eventEmitter.emit('quiz.submitted', {
             userId,
+            quizId,
             score: totalScore,
             submissionId: submission.id,
+            isFirstSubmission,
         });
-        return submission;
+        return {
+            ...submission,
+            isFirstSubmission,
+        };
     }
     calculateToeicScore(listeningCorrect, readingCorrect) {
         const lCorrect = Math.min(100, Math.max(0, listeningCorrect));

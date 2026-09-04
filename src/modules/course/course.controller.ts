@@ -107,8 +107,15 @@ export class CourseController {
 
   @Get('classes/:classId')
   @ApiOperation({ summary: 'Lấy chi tiết lớp học (chứa Lessons và Materials)' })
-  getClassById(@Param('classId', ParseIntPipe) classId: number) {
-    return this.courseService.getClassById(classId);
+  getClassById(
+    @Param('classId', ParseIntPipe) classId: number,
+    @Request() req: any,
+  ) {
+    return this.courseService.getClassById(
+      classId,
+      req.user?.id,
+      req.user?.role,
+    );
   }
 
   // --- Lessons & Materials ---

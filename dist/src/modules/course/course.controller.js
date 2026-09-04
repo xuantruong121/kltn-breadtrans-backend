@@ -52,8 +52,8 @@ let CourseController = class CourseController {
     createClass(courseId, dto, req) {
         return this.courseService.createClass(courseId, req.user.id, dto);
     }
-    getClassById(classId) {
-        return this.courseService.getClassById(classId);
+    getClassById(classId, req) {
+        return this.courseService.getClassById(classId, req.user?.id, req.user?.role);
     }
     createLesson(courseId, dto) {
         return this.courseService.createLesson(courseId, dto);
@@ -151,8 +151,9 @@ __decorate([
     (0, common_1.Get)('classes/:classId'),
     (0, swagger_1.ApiOperation)({ summary: 'Lấy chi tiết lớp học (chứa Lessons và Materials)' }),
     __param(0, (0, common_1.Param)('classId', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], CourseController.prototype, "getClassById", null);
 __decorate([

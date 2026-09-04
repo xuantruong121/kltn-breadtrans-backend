@@ -54,13 +54,27 @@ export class GrammarService {
     }));
   }
 
-  async getTopicDetail(id: number, userId?: number) {
+  async getTopicDetail(
+    id: number,
+    userId?: number,
+    includeAnswers = false,
+  ) {
     const topic = await this.prisma.grammarTopic.findUnique({
       where: { id },
       include: {
-        questions: {
-          orderBy: { order: 'asc' },
-        },
+        questions: includeAnswers
+          ? { orderBy: { order: 'asc' } }
+          : {
+              select: {
+                id: true,
+                topicId: true,
+                question: true,
+                options: true,
+                order: true,
+                createdAt: true,
+              },
+              orderBy: { order: 'asc' },
+            },
       },
     });
 
@@ -113,7 +127,7 @@ export class GrammarService {
     const totalQuestions = topic.questions.length || 1;
     const score = Math.round((correctCount / totalQuestions) * 100);
 
-    // Save attempt
+    // Save attempt (lịch sử làm bài luôn được lưu đầy đủ)
     const attempt = await this.prisma.grammarAttempt.create({
       data: {
         userId,
@@ -123,29 +137,51 @@ export class GrammarService {
       },
     });
 
-    // Reward Bánh Mì & XP
-    const rewardBanh = Math.max(5, Math.floor(score / 10));
-    const rewardXP = score;
+    // Chống farm thưởng Bánh Mì & XP bằng UserGrammarReward (Atomic ở tầng DB với @@unique([userId, topicId]))
+    let isFirstCompletion = false;
+    try {
+      await (this.prisma as any).userGrammarReward.create({
+        data: {
+          userId,
+          topicId,
+        },
+      });
+      isFirstCompletion = true;
+    } catch (e: any) {
+      if (e.code === 'P2002') {
+        isFirstCompletion = false;
+      } else {
+        throw e;
+      }
+    }
 
-    await this.prisma.userStats.upsert({
-      where: { userId },
-      update: { totalBanhRan: { increment: rewardBanh } },
-      create: { userId, totalBanhRan: rewardBanh },
-    });
+    let rewardBanh = 0;
+    let rewardXP = 0;
 
-    await this.prisma.pointHistory.create({
-      data: {
+    if (isFirstCompletion) {
+      rewardBanh = Math.max(5, Math.floor(score / 10));
+      rewardXP = score;
+
+      await this.prisma.userStats.upsert({
+        where: { userId },
+        update: { totalBanhRan: { increment: rewardBanh } },
+        create: { userId, totalBanhRan: rewardBanh },
+      });
+
+      await this.prisma.pointHistory.create({
+        data: {
+          userId,
+          points: rewardBanh,
+          reason: `Hoàn thành bài Ngữ pháp lần đầu: ${topic.title} (${score}%)`,
+        },
+      });
+
+      // Emit event for Gamification
+      this.eventEmitter.emit('gamification.xp_earned', {
         userId,
-        points: rewardBanh,
-        reason: `Hoàn thành bài Ngữ pháp: ${topic.title} (${score}%)`,
-      },
-    });
-
-    // Emit event for Gamification
-    this.eventEmitter.emit('gamification.xp_earned', {
-      userId,
-      points: rewardXP,
-    });
+        points: rewardXP,
+      });
+    }
 
     return {
       attemptId: attempt.id,
@@ -154,6 +190,7 @@ export class GrammarService {
       totalQuestions,
       rewardBanh,
       rewardXP,
+      isFirstCompletion,
       questionsResult,
     };
   }

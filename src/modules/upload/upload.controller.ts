@@ -16,6 +16,9 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 import {
   ApiTags,
   ApiOperation,
@@ -75,6 +78,8 @@ export class UploadController {
   }
 
   @Delete('*key')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Xóa file khỏi R2 theo key' })
   @ApiParam({
     name: 'key',

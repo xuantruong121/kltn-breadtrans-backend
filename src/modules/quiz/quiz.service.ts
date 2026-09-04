@@ -82,12 +82,25 @@ export class QuizService {
     }));
   }
 
-  async getQuizById(id: number) {
+  async getQuizById(id: number, includeAnswers = false) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },
       include: { questions: { orderBy: { order: 'asc' } } },
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
+
+    if (!includeAnswers && quiz.questions) {
+      const sanitizedQuestions = quiz.questions.map((q) => {
+        if (!q.content || typeof q.content !== 'object') return q;
+        const content = { ...(q.content as any) };
+        delete content.correct;
+        delete content.correctAnswer;
+        delete content.explanation;
+        return { ...q, content };
+      });
+      return { ...quiz, questions: sanitizedQuestions };
+    }
+
     return quiz;
   }
 
@@ -122,7 +135,7 @@ export class QuizService {
   }
 
   async submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto) {
-    const quiz = await this.getQuizById(quizId);
+    const quiz = await this.getQuizById(quizId, true);
 
     let totalScore = 0;
 
@@ -163,12 +176,7 @@ export class QuizService {
               totalScore += score;
             }
           } else if (question.type === 'WRITING') {
-            // Gọi AI chấm bài cho câu tự luận
-            const content = question.content as any;
-            await this.aiService.generateFeedback(
-              content.text || 'Write an essay.',
-              ans.answer,
-            );
+            // Sẽ gọi AI chấm bài và gom overallAiFeedback ở vòng lặp bên dưới
           }
         }
 
@@ -213,14 +221,37 @@ export class QuizService {
       },
     });
 
-    // Phát ra sự kiện cho Gamification
+    // Chống farm điểm thưởng Quiz bằng UserQuizReward (Atomic @@unique([userId, quizId]))
+    let isFirstSubmission = false;
+    try {
+      await (this.prisma as any).userQuizReward.create({
+        data: {
+          userId,
+          quizId,
+        },
+      });
+      isFirstSubmission = true;
+    } catch (e: any) {
+      if (e.code === 'P2002') {
+        isFirstSubmission = false;
+      } else {
+        throw e;
+      }
+    }
+
+    // Phát ra sự kiện cho Gamification kèm cờ isFirstSubmission
     this.eventEmitter.emit('quiz.submitted', {
       userId,
+      quizId,
       score: totalScore,
       submissionId: submission.id,
+      isFirstSubmission,
     });
 
-    return submission;
+    return {
+      ...submission,
+      isFirstSubmission,
+    };
   }
 
   /**

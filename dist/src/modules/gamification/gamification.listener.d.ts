@@ -9,6 +9,7 @@ export declare class GamificationListener {
         userId: number;
         quizId?: number;
         score: number;
+        isFirstSubmission?: boolean;
     }): Promise<void>;
     handleSpeakingSubmittedEvent(payload: {
         userId: number;
