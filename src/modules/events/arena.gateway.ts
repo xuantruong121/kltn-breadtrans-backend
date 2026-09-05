@@ -13,6 +13,23 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from './events.gateway';
+import { JwtService } from '@nestjs/jwt';
+import { getJwtSecret } from '../auth/auth.constants';
+import * as crypto from 'crypto';
+
+const getSocketCorsConfig = () => {
+  if (process.env.NODE_ENV !== 'production') {
+    return { origin: true, credentials: true };
+  }
+  const origins = (process.env.CORS_ORIGIN ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  return {
+    origin: origins.length > 0 ? origins : false,
+    credentials: true,
+  };
+};
 
 interface ServerQuestion {
   id: number;
@@ -59,9 +76,7 @@ interface MatchState {
 }
 
 @WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
+  cors: getSocketCorsConfig(),
   namespace: '/arena',
 })
 export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -76,10 +91,66 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly prisma: PrismaService,
     @InjectRedis() private readonly redis: Redis,
     private readonly eventsGateway: EventsGateway,
+    private readonly jwtService: JwtService,
   ) {}
 
-  handleConnection(client: Socket) {
-    this.logger.log(`[Arena] Client connected: ${client.id}`);
+  async handleConnection(client: Socket) {
+    const token =
+      client.handshake.auth?.token ||
+      client.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
+
+    if (!token) {
+      this.logger.warn(
+        `[Arena] Connection rejected: Missing auth token (${client.id})`,
+      );
+      client.emit('arena:error', {
+        message: 'Authentication token required for Arena',
+      });
+      client.disconnect(true);
+      return;
+    }
+
+    try {
+      const secret = getJwtSecret();
+      const payload = this.jwtService.verify(token, { secret });
+      if (payload.type !== 'access' || !payload.deviceId) {
+        throw new Error('Access token required');
+      }
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      if (await this.redis.get(`jwt:denylist:${tokenHash}`)) {
+        throw new Error('Token revoked');
+      }
+      const loggedOutAt = await this.redis.get(
+        `user:${payload.sub}:device:${payload.deviceId}:logged_out_at`,
+      );
+      if (loggedOutAt && payload.iat && payload.iat * 1000 < Number(loggedOutAt)) {
+        throw new Error('Device session revoked');
+      }
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        include: { profile: true },
+      });
+      if (!user) throw new Error('User not found');
+      client.data.user = {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        deviceId: payload.deviceId,
+        profile: user.profile,
+      };
+      this.logger.log(
+        `[Arena] Client authenticated: ${client.id} (User #${user.id})`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `[Arena] Connection rejected: Invalid auth token (${client.id})`,
+      );
+      client.emit('arena:error', {
+        message: 'Invalid or expired authentication token',
+      });
+      client.disconnect(true);
+      return;
+    }
   }
 
   async handleDisconnect(client: Socket) {
@@ -181,16 +252,31 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody()
     payload: {
-      userId: number;
+      userId?: number;
       userName?: string;
       stake?: number;
       gameId?: string;
     },
   ) {
-    const stake = payload.stake || 20;
-    const userId = payload.userId;
-    const userName = payload.userName || `Player ${userId}`;
+    const authUser = client.data?.user;
+    if (!authUser) {
+      client.emit('arena:error', { message: 'Chưa xác thực danh tính!' });
+      client.disconnect(true);
+      return;
+    }
+
+    const allowedStakes = [10, 20, 50, 100];
+    const stake = payload.stake;
+    if (typeof stake !== 'number' || !Number.isInteger(stake) || !allowedStakes.includes(stake)) {
+      client.emit('arena:error', { message: 'Mức cược không hợp lệ.' });
+      return;
+    }
+    const userId = authUser.userId;
     const gameId = payload.gameId || 'vocab-duel';
+    if (gameId !== 'vocab-duel') {
+      client.emit('arena:error', { message: 'Loại trò chơi không hợp lệ.' });
+      return;
+    }
     const queueKey = `arena:queue:${stake}:${gameId}`;
     const queuedSetKey = 'arena:queued_users';
 
@@ -229,6 +315,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const avatar = userStats.user?.profile?.avatar || '';
+    const userName = userStats.user?.profile?.fullName || userStats.user?.email || `Player ${userId}`;
 
     // 2. Check if user is already in an active unsettled match
     const existingMatchId = await this.redis.get(`arena:user_match:${userId}`);
@@ -285,10 +372,11 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('cancel_queue')
   async handleCancelQueue(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload?: { userId?: number },
+    @MessageBody() _payload?: { userId?: number },
   ) {
-    if (payload?.userId) {
-      await this.removeUserFromQueues(payload.userId);
+    const authUser = client.data?.user;
+    if (authUser?.userId) {
+      await this.removeUserFromQueues(authUser.userId);
     }
     client.emit('arena:cancelled', { message: 'Đã hủy tìm trận đấu.' });
   }
@@ -414,6 +502,18 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 type: 'subtract',
               },
             ],
+          });
+
+          await tx.gameBattle.create({
+            data: {
+              roomId: matchId,
+              gameId,
+              p1Id: p1.userId,
+              p2Id: p2.userId,
+              stake,
+              status: 'escrowed',
+              escrowedAt: new Date(),
+            },
           });
         });
       } catch (err: any) {
@@ -644,7 +744,20 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return; // Stale round answer, ignore
       }
 
-      const isP1 = match.p1.userId === payload.userId;
+      const authUser = client.data?.user;
+      if (!authUser) return;
+
+      const userId = authUser.userId;
+      const isP1 = match.p1.userId === userId;
+      const isP2 = match.p2.userId === userId;
+
+      if (!isP1 && !isP2) {
+        this.logger.warn(
+          `[Arena] User #${userId} attempted to submit answer to match ${matchId} but is not a participant`,
+        );
+        return;
+      }
+
       const player = isP1 ? match.p1 : match.p2;
 
       // Prevent answering twice in same round
@@ -768,8 +881,11 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('reconnect_match')
   async handleReconnectMatch(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { matchId: string; userId: number },
+    @MessageBody() payload: { matchId: string; userId?: number },
   ) {
+    const authUser = client.data?.user;
+    if (!authUser) return;
+
     try {
       const rawMatch = await this.redis.get(`arena:match:${payload.matchId}`);
       if (!rawMatch) {
@@ -785,7 +901,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      await this.reconnectPlayerToMatch(client, match, payload.userId);
+      await this.reconnectPlayerToMatch(client, match, authUser.userId);
     } catch (err) {
       this.logger.error('[Arena] Error in handleReconnectMatch:', err);
     }
@@ -922,6 +1038,12 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     winnerRole: 'p1' | 'p2' | 'draw',
     isForfeit: boolean,
   ) {
+    const lockKey = `arena:lock:settle:${match.matchId}`;
+    const lockOwner = `${process.pid}:${crypto.randomUUID()}`;
+    const acquired = await this.redis.set(lockKey, lockOwner, 'PX', 10000, 'NX');
+    if (!acquired) return;
+
+    try {
     match.isSettled = true;
     match.status = isForfeit ? 'forfeited' : 'settled';
 
@@ -932,40 +1054,56 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const winner = match[winnerRole];
       winnerUserId = winner.userId;
 
-      // 1. Award Bánh Mì to Winner
-      const updatedStats = await this.prisma.userStats.update({
-        where: { userId: winner.userId },
-        data: { totalBanhRan: { increment: totalReward } },
+      // Wrap balance update, PointHistory, and CurrencyTransaction in an atomic transaction
+      const { updatedStats } = await this.prisma.$transaction(async (tx) => {
+        const claim = await tx.gameBattle.updateMany({
+          where: { roomId: match.matchId, status: 'escrowed' },
+          data: {
+            status: 'settled',
+            winnerRole,
+            winnerUserId,
+            settledWinnerRole: winnerRole,
+            settledAt: new Date(),
+          },
+        });
+        if (claim.count !== 1) {
+          throw new Error('MATCH_ALREADY_SETTLED');
+        }
+
+        const stats = await tx.userStats.update({
+          where: { userId: winner.userId },
+          data: { totalBanhRan: { increment: totalReward } },
+        });
+
+        await tx.pointHistory.create({
+          data: {
+            userId: winner.userId,
+            points: totalReward,
+            reason: isForfeit
+              ? `Thắng do đối thủ bỏ cuộc trong Đấu Trường 1v1 (${match.matchId})`
+              : `Thắng trận Đấu Trường 1v1 (${match.matchId})`,
+          },
+        });
+
+        await tx.currencyTransaction.create({
+          data: {
+            studentId: winner.userId,
+            studentName: winner.userName,
+            userId: winner.userId,
+            userName: winner.userName,
+            userRole: 'STUDENT',
+            amount: totalReward,
+            reason: isForfeit
+              ? `Thắng do đối thủ bỏ cuộc Đấu Trường 1v1`
+              : `Chiến thắng Đấu Trường 1v1`,
+            type: 'add',
+          },
+        });
+
+        return { updatedStats: stats };
       });
 
-      // 2. Insert PointHistory
-      await this.prisma.pointHistory.create({
-        data: {
-          userId: winner.userId,
-          points: totalReward,
-          reason: isForfeit
-            ? `Thắng do đối thủ bỏ cuộc trong Đấu Trường 1v1 (${match.matchId})`
-            : `Thắng trận Đấu Trường 1v1 (${match.matchId})`,
-        },
-      });
-
-      // 3. Insert CurrencyTransaction
-      await this.prisma.currencyTransaction.create({
-        data: {
-          studentId: winner.userId,
-          studentName: winner.userName,
-          userId: winner.userId,
-          userName: winner.userName,
-          userRole: 'STUDENT',
-          amount: totalReward,
-          reason: isForfeit
-            ? `Thắng do đối thủ bỏ cuộc Đấu Trường 1v1`
-            : `Chiến thắng Đấu Trường 1v1`,
-          type: 'add',
-        },
-      });
-
-      // 4. Real-time balance notification to Winner
+      // Real-time balance notification to Winner
       this.eventsGateway.sendCurrencyUpdate(winner.userId, {
         amount: totalReward,
         newBalance: updatedStats.totalBanhRan,
@@ -973,39 +1111,57 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
         studentName: winner.userName,
       });
     } else {
-      // Draw: Refund escrow stakes to both players
-      const p1Stats = await this.prisma.userStats.update({
-        where: { userId: match.p1.userId },
-        data: { totalBanhRan: { increment: match.stake } },
-      });
-      const p2Stats = await this.prisma.userStats.update({
-        where: { userId: match.p2.userId },
-        data: { totalBanhRan: { increment: match.stake } },
-      });
+      // Draw: Refund escrow stakes to both players atomically
+      const { p1Stats, p2Stats } = await this.prisma.$transaction(async (tx) => {
+        const claim = await tx.gameBattle.updateMany({
+          where: { roomId: match.matchId, status: 'escrowed' },
+          data: {
+            status: 'settled',
+            winnerRole: 'draw',
+            winnerUserId: null,
+            settledWinnerRole: 'draw',
+            settledAt: new Date(),
+          },
+        });
+        if (claim.count !== 1) {
+          throw new Error('MATCH_ALREADY_SETTLED');
+        }
 
-      await this.prisma.currencyTransaction.createMany({
-        data: [
-          {
-            studentId: match.p1.userId,
-            studentName: match.p1.userName,
-            userId: match.p1.userId,
-            userName: match.p1.userName,
-            userRole: 'STUDENT',
-            amount: match.stake,
-            reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
-            type: 'add',
-          },
-          {
-            studentId: match.p2.userId,
-            studentName: match.p2.userName,
-            userId: match.p2.userId,
-            userName: match.p2.userName,
-            userRole: 'STUDENT',
-            amount: match.stake,
-            reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
-            type: 'add',
-          },
-        ],
+        const s1 = await tx.userStats.update({
+          where: { userId: match.p1.userId },
+          data: { totalBanhRan: { increment: match.stake } },
+        });
+        const s2 = await tx.userStats.update({
+          where: { userId: match.p2.userId },
+          data: { totalBanhRan: { increment: match.stake } },
+        });
+
+        await tx.currencyTransaction.createMany({
+          data: [
+            {
+              studentId: match.p1.userId,
+              studentName: match.p1.userName,
+              userId: match.p1.userId,
+              userName: match.p1.userName,
+              userRole: 'STUDENT',
+              amount: match.stake,
+              reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
+              type: 'add',
+            },
+            {
+              studentId: match.p2.userId,
+              studentName: match.p2.userName,
+              userId: match.p2.userId,
+              userName: match.p2.userName,
+              userRole: 'STUDENT',
+              amount: match.stake,
+              reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
+              type: 'add',
+            },
+          ],
+        });
+
+        return { p1Stats: s1, p2Stats: s2 };
       });
 
       this.eventsGateway.sendCurrencyUpdate(match.p1.userId, {
@@ -1024,6 +1180,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     // Save final match state with short TTL (10 mins)
+    await this.redis.set(`arena:settled:${match.matchId}`, '1', 'EX', 86400);
     await this.redis.set(
       `arena:match:${match.matchId}`,
       JSON.stringify(match),
@@ -1056,6 +1213,11 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(
       `[Arena] [${match.matchId}] Match finalized. Winner: ${winnerRole} (${winnerUserId || 'Draw'})`,
     );
+    } finally {
+      const unlockScript =
+        'if redis.call(get, KEYS[1]) == ARGV[1] then return redis.call(del, KEYS[1]) else return 0 end';
+      await this.redis.eval(unlockScript, 1, lockKey, lockOwner);
+    }
   }
 
   // ==========================================

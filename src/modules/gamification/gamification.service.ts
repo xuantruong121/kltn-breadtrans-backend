@@ -1,13 +1,19 @@
-import { Injectable, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, BadRequestException, Optional, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationsService } from '../notifications/notifications.service';
+import { Cron } from '@nestjs/schedule';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
 
 @Injectable()
 export class GamificationService {
+  private readonly logger = new Logger(GamificationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    @InjectRedis() private readonly redis: Redis,
     @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
@@ -743,44 +749,118 @@ export class GamificationService {
     };
   }
 
-  async triggerWeeklyCron() {
+  async triggerWeeklyCron(isManualTrigger = false) {
     const tiers = ['Đồng', 'Bạc', 'Vàng', 'Bạch Kim', 'Kim Cương'];
+    const now = new Date();
+    const year = now.getFullYear();
+    const firstDay = new Date(year, 0, 1);
+    const week = Math.ceil(
+      ((now.getTime() - firstDay.getTime()) / 86400000 + firstDay.getDay() + 1) / 7,
+    );
+    const weekKey = `${year}-W${String(week).padStart(2, '0')}`;
+    const maxAttempts = isManualTrigger ? 3 : 1;
 
-    for (let i = 0; i < tiers.length; i++) {
-      const currentTier = tiers[i];
-      const usersInTier = await this.prisma.leaderboard.findMany({
-        where: { tier: currentTier },
-        orderBy: { weeklyExp: 'desc' },
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const lockResult: any = await tx.$queryRaw`
+          SELECT pg_try_advisory_xact_lock(hashtext('cron-weekly-league')) AS locked
+        `;
+        if (!lockResult?.[0]?.locked) {
+          return { acquired: false, noop: true };
+        }
+
+        await tx.$queryRaw`
+          SELECT * FROM GameSettings
+          WHERE gameId = 'cron-weekly-league'
+          FOR UPDATE
+        `;
+        const setting = await tx.gameSettings.findUnique({
+          where: { gameId: 'cron-weekly-league' },
+        });
+        const config = (setting?.config as Record<string, unknown> | null) || {};
+        if (config.lastProcessedWeek === weekKey) {
+          return { acquired: true, noop: true };
+        }
+
+        const snapshot = await tx.leaderboard.findMany({
+          orderBy: [{ weeklyExp: 'desc' }, { id: 'asc' }],
+        });
+        const updates: Array<{ id: number; tier: string; weeklyExp: number }> = [];
+        for (let i = 0; i < tiers.length; i++) {
+          const currentTier = tiers[i];
+          const users = snapshot.filter((u) => u.tier === currentTier);
+          const topCount = Math.max(1, Math.floor(users.length * 0.2));
+          const bottomStart = Math.max(users.length - Math.floor(users.length * 0.2), topCount);
+          users.forEach((user, index) => {
+            let newTier = currentTier;
+            if (index < topCount && i < tiers.length - 1) newTier = tiers[i + 1];
+            else if (index >= bottomStart && i > 0) newTier = tiers[i - 1];
+            updates.push({ id: user.id, tier: newTier, weeklyExp: 0 });
+          });
+        }
+
+        for (const update of updates) {
+          await tx.leaderboard.update({
+            where: { id: update.id },
+            data: { tier: update.tier, weeklyExp: update.weeklyExp },
+          });
+        }
+
+        await tx.gameSettings.upsert({
+          where: { gameId: 'cron-weekly-league' },
+          update: {
+            config: { lastProcessedWeek: weekKey, processedAt: now.toISOString() },
+          },
+          create: {
+            gameId: 'cron-weekly-league',
+            config: { lastProcessedWeek: weekKey, processedAt: now.toISOString() },
+          },
+        });
+        return { acquired: true, noop: false };
       });
 
-      if (usersInTier.length === 0) continue;
+      if (result.acquired) {
+        await this.redis.set(`gamification:cron:weekly:${weekKey}:completed`, '1', 'EX', 7 * 86400);
+        return {
+          success: true,
+          noop: result.noop,
+          message: result.noop
+            ? `Tuần ${weekKey} đã được xử lý trước đó.`
+            : `Weekly league ${weekKey} processed successfully.`,
+        };
+      }
+      if (attempt < maxAttempts) await new Promise((resolve) => setTimeout(resolve, 250));
+    }
 
-      const top20Index = Math.max(1, Math.floor(usersInTier.length * 0.2));
-      const bottom20Index = Math.max(
-        usersInTier.length - Math.floor(usersInTier.length * 0.2),
-        top20Index,
-      );
+    return { success: true, noop: true, message: 'Weekly cron đang được xử lý bởi tiến trình khác.' };
+  }
 
-      for (let j = 0; j < usersInTier.length; j++) {
-        const u = usersInTier[j];
-        let newTier = currentTier;
+  // ================= CRON SCHEDULES (Asia/Ho_Chi_Minh) =================
 
-        // Thăng hạng (nếu chưa phải cao nhất)
-        if (j < top20Index && i < tiers.length - 1) {
-          newTier = tiers[i + 1];
-        }
-        // Giáng hạng (nếu chưa phải thấp nhất)
-        else if (j >= bottom20Index && i > 0) {
-          newTier = tiers[i - 1];
-        }
-
-        await this.prisma.leaderboard.update({
-          where: { id: u.id },
-          data: { tier: newTier, weeklyExp: 0 },
-        });
+  @Cron('0 0 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  async handleDailyCronSchedule() {
+    if (process.env.CRON_INTERNAL_ENABLED === 'true') {
+      this.logger.log('[GamificationService] Executing automated daily streak cronjob...');
+      try {
+        const res = await this.triggerDailyCron();
+        this.logger.log(`[GamificationService] Daily streak cron completed: ${res.message}`);
+      } catch (err) {
+        this.logger.error('[GamificationService] Daily streak cron failed:', err);
       }
     }
-    return { success: true, message: 'Leagues updated successfully.' };
+  }
+
+  @Cron('0 0 * * 0', { timeZone: 'Asia/Ho_Chi_Minh' })
+  async handleWeeklyCronSchedule() {
+    if (process.env.CRON_INTERNAL_ENABLED === 'true') {
+      this.logger.log('[GamificationService] Executing automated weekly leagues cronjob...');
+      try {
+        const res = await this.triggerWeeklyCron();
+        this.logger.log(`[GamificationService] Weekly leagues cron completed: ${res.message}`);
+      } catch (err) {
+        this.logger.error('[GamificationService] Weekly leagues cron failed:', err);
+      }
+    }
   }
 
   async sendAdmiration(

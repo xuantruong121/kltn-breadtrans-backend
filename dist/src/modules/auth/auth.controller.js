@@ -76,8 +76,17 @@ let AuthController = class AuthController {
         }
         return this.authService.refreshTokens(userId, body.deviceId, body.refreshToken);
     }
-    async logout(req, deviceId) {
-        return this.authService.logout(req.user.id, deviceId);
+    async logout(req) {
+        const deviceId = req.user?.deviceId;
+        if (!deviceId) {
+            throw new common_1.UnauthorizedException('Token thiếu thông tin thiết bị, vui lòng đăng nhập lại.');
+        }
+        const authorization = req.headers.authorization;
+        const accessToken = authorization?.replace(/^Bearer\s+/i, '');
+        if (!accessToken) {
+            throw new common_1.UnauthorizedException('Access token is required.');
+        }
+        return this.authService.logout(req.user.id, deviceId, accessToken);
     }
     async generateOtp(body) {
         return this.authService.generateOtp(body.email);
@@ -131,9 +140,8 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Đăng xuất khỏi thiết bị hiện tại' }),
     __param(0, (0, common_1.Request)()),
-    __param(1, (0, common_1.Body)('deviceId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "logout", null);
 __decorate([

@@ -61,7 +61,7 @@ export declare class AuthService {
         access_token: string;
         refresh_token: string;
     }>;
-    logout(userId: number, deviceId: string): Promise<{
+    logout(userId: number, deviceId: string, accessToken: string): Promise<{
         message: string;
     }>;
     generateOtp(email: string): Promise<{

@@ -11,18 +11,32 @@ export class NotificationsService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   onModuleInit() {
-    const publicKey =
-      process.env.VAPID_PUBLIC_KEY ||
-      'BBHW4US29BdbTAUO0IWZIvZPRd9eFQZ7pibsO7mEvTziEI-R_bfnWqEelWkCQrn_CrldpBlpsmCbtOFSMSmxPhY';
-    const privateKey =
-      process.env.VAPID_PRIVATE_KEY ||
-      'Th85ZGzfRXuvqw_1EHsarZ4n-uwYCZLluLpusjdcxfY';
+    const isProd = process.env.NODE_ENV === 'production';
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
     const subject = process.env.VAPID_SUBJECT || 'mailto:admin@breadtrans.com';
+
+    if (!publicKey || !privateKey) {
+      if (isProd) {
+        throw new Error(
+          '[Security] VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are mandatory in production environment.',
+        );
+      }
+      this.logger.warn(
+        '[NotificationsService] VAPID keys not configured in non-production. Web push notifications disabled.',
+      );
+      return;
+    }
 
     try {
       webpush.setVapidDetails(subject, publicKey, privateKey);
       this.logger.log('VAPID details successfully configured for Web Push.');
     } catch (err) {
+      if (isProd) {
+        throw new Error(
+          `[Security] Invalid VAPID configuration in production: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       this.logger.error('Failed to configure VAPID details:', err);
     }
   }
@@ -56,13 +70,13 @@ export class NotificationsService implements OnModuleInit {
     }
   }
 
-  async unsubscribe(endpoint: string) {
+  async unsubscribe(endpoint: string, userId: number) {
     try {
-      await (this.prisma as any).pushSubscription.deleteMany({
-        where: { endpoint },
+      const deleteResult = await (this.prisma as any).pushSubscription.deleteMany({
+        where: { endpoint, userId },
       });
       this.logger.log(
-        `Unsubscribed push endpoint: ${endpoint.substring(0, 30)}...`,
+        `Unsubscribed push endpoint (${deleteResult.count} removed): ${endpoint.substring(0, 30)}...`,
       );
       return { success: true, message: 'Đã hủy đăng ký nhận thông báo.' };
     } catch (err) {

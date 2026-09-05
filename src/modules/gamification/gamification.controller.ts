@@ -5,10 +5,14 @@ import {
   Body,
   UseGuards,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { GamificationService } from './gamification.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 
 @ApiTags('gamification')
 @Controller('gamification')
@@ -111,16 +115,32 @@ export class GamificationController {
     );
   }
 
-  // NOTE: Thường cronjob chạy tự động, nhưng để test thì mở API POST
+  // NOTE: Cronjob tự động chạy nội bộ theo lịch. Endpoint này chỉ dành cho Admin hoặc môi trường Dev/Test.
   @Post('trigger-daily-cron')
-  @ApiOperation({ summary: '[Test] Chạy cronjob bảo vệ chuỗi mỗi ngày' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[Admin/Test] Chạy cronjob bảo vệ chuỗi mỗi ngày' })
   triggerDailyCron() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException(
+        'Thao tác thủ công bị vô hiệu hóa hoàn toàn trên môi trường production.',
+      );
+    }
     return this.gamificationService.triggerDailyCron();
   }
 
   @Post('trigger-weekly-cron')
-  @ApiOperation({ summary: '[Test] Chạy cronjob cập nhật Giải đấu hàng tuần' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[Admin/Test] Chạy cronjob cập nhật Giải đấu hàng tuần' })
   triggerWeeklyCron() {
-    return this.gamificationService.triggerWeeklyCron();
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException(
+        'Thao tác thủ công bị vô hiệu hóa hoàn toàn trên môi trường production.',
+      );
+    }
+    return this.gamificationService.triggerWeeklyCron(true);
   }
 }

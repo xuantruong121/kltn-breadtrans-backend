@@ -12,118 +12,118 @@ export declare class QuizService {
         id: number;
         role: Role;
     }): Promise<{
-        type: import(".prisma/client").$Enums.QuizType;
-        description: string | null;
-        title: string;
         createdAt: Date;
         id: number;
-        courseId: number | null;
-        practiceTopicId: number | null;
+        title: string;
+        description: string | null;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+        type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
+        courseId: number | null;
+        practiceTopicId: number | null;
     }>;
     updateQuiz(id: number, dto: Partial<CreateQuizDto>, user?: {
         id: number;
         role: Role;
     }): Promise<{
-        type: import(".prisma/client").$Enums.QuizType;
-        description: string | null;
-        title: string;
         createdAt: Date;
         id: number;
-        courseId: number | null;
-        practiceTopicId: number | null;
+        title: string;
+        description: string | null;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+        type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
+        courseId: number | null;
+        practiceTopicId: number | null;
     }>;
     deleteQuiz(id: number, user?: {
         id: number;
         role: Role;
     }): Promise<{
-        type: import(".prisma/client").$Enums.QuizType;
-        description: string | null;
-        title: string;
         createdAt: Date;
         id: number;
-        courseId: number | null;
-        practiceTopicId: number | null;
+        title: string;
+        description: string | null;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+        type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
+        courseId: number | null;
+        practiceTopicId: number | null;
     }>;
     getAllQuizzes(): Promise<({
         _count: {
             questions: number;
         };
     } & {
-        type: import(".prisma/client").$Enums.QuizType;
-        description: string | null;
-        title: string;
         createdAt: Date;
         id: number;
-        courseId: number | null;
-        practiceTopicId: number | null;
+        title: string;
+        description: string | null;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+        type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
+        courseId: number | null;
+        practiceTopicId: number | null;
     })[]>;
     getListeningPractices(userId: number): Promise<{
         isCompleted: boolean;
         _count: {
             questions: number;
         };
-        type: import(".prisma/client").$Enums.QuizType;
-        description: string | null;
-        title: string;
         createdAt: Date;
         id: number;
-        courseId: number | null;
-        practiceTopicId: number | null;
+        title: string;
+        description: string | null;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+        type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
+        courseId: number | null;
+        practiceTopicId: number | null;
     }[]>;
     getQuizById(id: number, includeAnswers?: boolean): Promise<{
         questions: {
             content: any;
-            type: string;
             order: number;
             id: number;
+            type: string;
             quizId: number;
         }[];
-        type: import(".prisma/client").$Enums.QuizType;
-        description: string | null;
-        title: string;
         createdAt: Date;
         id: number;
-        courseId: number | null;
-        practiceTopicId: number | null;
+        title: string;
+        description: string | null;
         theoryContent: string | null;
         bilingualContent: import("@prisma/client/runtime/library").JsonValue | null;
+        type: import(".prisma/client").$Enums.QuizType;
         timeLimit: number | null;
+        courseId: number | null;
+        practiceTopicId: number | null;
     }>;
     createQuestion(quizId: number, dto: CreateQuestionDto): Promise<{
-        type: string;
         order: number;
         id: number;
-        quizId: number;
+        type: string;
         content: import("@prisma/client/runtime/library").JsonValue;
+        quizId: number;
     }>;
     updateQuestion(questionId: number, dto: Partial<CreateQuestionDto>): Promise<{
-        type: string;
         order: number;
         id: number;
-        quizId: number;
+        type: string;
         content: import("@prisma/client/runtime/library").JsonValue;
+        quizId: number;
     }>;
     deleteQuestion(questionId: number): Promise<{
-        type: string;
         order: number;
         id: number;
-        quizId: number;
+        type: string;
         content: import("@prisma/client/runtime/library").JsonValue;
+        quizId: number;
     }>;
     submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto): Promise<{
         isFirstSubmission: boolean;
@@ -136,11 +136,11 @@ export declare class QuizService {
             submissionId: number;
         }[];
         id: number;
-        userId: number;
         quizId: number;
         score: number | null;
         submittedAt: Date;
         aiFeedback: string | null;
+        userId: number;
     }>;
     calculateToeicScore(listeningCorrect: number, readingCorrect: number): {
         listening: {
@@ -177,11 +177,11 @@ export declare class QuizService {
             submissionId: number;
         }[];
         questions: {
-            type: string;
             order: number;
             id: number;
-            quizId: number;
+            type: string;
             content: import("@prisma/client/runtime/library").JsonValue;
+            quizId: number;
         }[];
         strengths: string[];
         weaknesses: string[];

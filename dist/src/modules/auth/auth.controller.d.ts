@@ -57,7 +57,7 @@ export declare class AuthController {
         access_token: string;
         refresh_token: string;
     }>;
-    logout(req: any, deviceId: string): Promise<{
+    logout(req: any): Promise<{
         message: string;
     }>;
     generateOtp(body: GenerateOtpDto): Promise<{

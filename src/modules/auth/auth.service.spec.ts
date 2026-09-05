@@ -17,10 +17,17 @@ jest.mock('bcrypt', () => ({
 describe('AuthService', () => {
   let service: AuthService;
   let mockCtx: MockContext;
+  let module: TestingModule;
+  let redisMock: any;
 
   beforeEach(async () => {
     mockCtx = createMockContext();
-    const module: TestingModule = await Test.createTestingModule({
+    redisMock = {
+      get: jest.fn(),
+      set: jest.fn(),
+      del: jest.fn(),
+    };
+    module = await Test.createTestingModule({
       providers: [
         AuthService,
         {
@@ -35,11 +42,7 @@ describe('AuthService', () => {
         },
         {
           provide: getRedisConnectionToken('default'),
-          useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            del: jest.fn(),
-          },
+          useValue: redisMock,
         },
       ],
     }).compile();
@@ -140,6 +143,59 @@ describe('AuthService', () => {
 
       expect(result).toHaveProperty('access_token', 'mock-jwt-token');
       expect(result.user).toHaveProperty('email', 'test@example.com');
+    });
+  });
+
+  describe('generateOtp & verifyOtp', () => {
+    it('should generate a 6-digit OTP and store HMAC hash in Redis', async () => {
+      mockCtx.prisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        email: 'test@example.com',
+      } as any);
+
+      const redis = module.get(getRedisConnectionToken('default'));
+      const result = await service.generateOtp('test@example.com');
+
+      expect(result).toHaveProperty('message');
+      expect(redis.set).toHaveBeenCalledTimes(1);
+      const [key, hash, mode, ttl] = (redis.set as jest.Mock).mock.calls[0];
+      expect(key).toBe('otp:test@example.com');
+      expect(hash).toHaveLength(64); // SHA-256 hex length
+      expect(mode).toBe('EX');
+      expect(ttl).toBe(300);
+    });
+
+    it('should reject non-existent user when generating OTP', async () => {
+      mockCtx.prisma.user.findUnique.mockResolvedValue(null);
+      await expect(service.generateOtp('unknown@example.com')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should verify matching OTP and delete key from Redis', async () => {
+      const redis = module.get(getRedisConnectionToken('default'));
+      const crypto = require('crypto');
+      const { getOtpSecret } = require('./auth.constants');
+      const testOtp = '123456';
+      const expectedHash = crypto
+        .createHmac('sha256', getOtpSecret())
+        .update(testOtp)
+        .digest('hex');
+
+      (redis.get as jest.Mock).mockResolvedValueOnce(expectedHash);
+
+      const result = await service.verifyOtp('test@example.com', testOtp);
+      expect(result).toEqual({ message: 'OTP verified successfully' });
+      expect(redis.del).toHaveBeenCalledWith('otp:test@example.com');
+    });
+
+    it('should reject invalid OTP', async () => {
+      const redis = module.get(getRedisConnectionToken('default'));
+      (redis.get as jest.Mock).mockResolvedValueOnce('stored-hash');
+
+      await expect(
+        service.verifyOtp('test@example.com', 'wrong-otp'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });

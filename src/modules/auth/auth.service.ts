@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
+import { getOtpSecret } from './auth.constants';
 
 @Injectable()
 export class AuthService {
@@ -64,8 +65,17 @@ export class AuthService {
       },
     });
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
-    const access_token = this.jwtService.sign(payload, { expiresIn: '1d' });
+    const access_token = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        deviceId,
+        type: 'access',
+        jti: crypto.randomUUID(),
+      },
+      { expiresIn: '1d' },
+    );
 
     // Generate signed JWT refresh token (30 days) containing userId and deviceId
     const refreshToken = this.jwtService.sign(
@@ -73,21 +83,9 @@ export class AuthService {
       { expiresIn: '30d' },
     );
 
-    // Store in Redis (30 days TTL) and save to PostgreSQL as durable fallback
+    // Redis is the per-device source of truth for refresh sessions.
     const redisKey = `user:${user.id}:device:${deviceId}`;
-    try {
-      await this.redis.set(redisKey, refreshToken, 'EX', 30 * 24 * 60 * 60);
-    } catch (redisErr) {
-      console.warn(
-        '[AuthService] Failed to set refresh token in Redis:',
-        redisErr,
-      );
-    }
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken },
-    });
+    await this.redis.set(redisKey, refreshToken, 'EX', 30 * 24 * 60 * 60);
 
     return {
       access_token,
@@ -117,20 +115,23 @@ export class AuthService {
       );
     }
 
-    const effectiveUserId = tokenPayload?.sub || userId;
-    const effectiveDeviceId = tokenPayload?.deviceId || deviceId;
+    if (tokenPayload?.type !== 'refresh') {
+      throw new UnauthorizedException('Token type must be refresh');
+    }
 
-    if (!effectiveUserId) {
+    const effectiveUserId = tokenPayload?.sub || userId;
+    const effectiveDeviceId = tokenPayload?.deviceId;
+
+    if (!effectiveUserId || !effectiveDeviceId) {
       throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (deviceId && deviceId !== effectiveDeviceId) {
+      throw new UnauthorizedException('Refresh token device mismatch');
     }
 
     const redisKey = `user:${effectiveUserId}:device:${effectiveDeviceId}`;
     let storedToken: string | null = null;
-    try {
-      storedToken = await this.redis.get(redisKey);
-    } catch (err) {
-      console.warn('[AuthService] Redis get failed during refresh:', err);
-    }
+    storedToken = await this.redis.get(redisKey);
 
     const user = await this.prisma.user.findUnique({
       where: { id: effectiveUserId },
@@ -138,10 +139,8 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('User not found');
 
-    // 2. Check token validity: Redis first, DB fallback if Redis was restarted/flushed
-    const isValidToken =
-      storedToken === providedRefreshToken ||
-      user.refreshToken === providedRefreshToken;
+    // 2. Check token validity only against the per-device Redis session.
+    const isValidToken = storedToken === providedRefreshToken;
 
     if (!isValidToken) {
       if (storedToken) {
@@ -153,32 +152,24 @@ export class AuthService {
     }
 
     // 3. Token is valid. Rotate tokens!
-    const payload = { sub: user.id, email: user.email, role: user.role };
-    const new_access_token = this.jwtService.sign(payload, { expiresIn: '1d' });
+    const new_access_token = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        deviceId: effectiveDeviceId,
+        type: 'access',
+        jti: crypto.randomUUID(),
+      },
+      { expiresIn: '1d' },
+    );
     const new_refresh_token = this.jwtService.sign(
       { sub: user.id, deviceId: effectiveDeviceId, type: 'refresh' },
       { expiresIn: '30d' },
     );
 
-    // Replace old token with new one in Redis and PostgreSQL
-    try {
-      await this.redis.set(
-        redisKey,
-        new_refresh_token,
-        'EX',
-        30 * 24 * 60 * 60,
-      );
-    } catch (redisErr) {
-      console.warn(
-        '[AuthService] Failed to set rotated token in Redis:',
-        redisErr,
-      );
-    }
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken: new_refresh_token },
-    });
+    // Replace the per-device refresh session in Redis only.
+    await this.redis.set(redisKey, new_refresh_token, 'EX', 30 * 24 * 60 * 60);
 
     return {
       access_token: new_access_token,
@@ -186,17 +177,18 @@ export class AuthService {
     };
   }
 
-  async logout(userId: number, deviceId: string) {
+  async logout(userId: number, deviceId: string, accessToken: string) {
     const redisKey = `user:${userId}:device:${deviceId}`;
-    try {
-      await this.redis.del(redisKey);
-    } catch (err) {
-      console.warn('[AuthService] Redis del failed during logout:', err);
-    }
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken: null },
-    });
+    await this.redis.del(redisKey);
+    await this.redis.set(`${redisKey}:logged_out_at`, Date.now().toString(), 'EX', 86400);
+    const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+    const decoded = this.jwtService.decode(accessToken) as { exp?: number } | null;
+    const remainingTtl = Math.max(
+      1,
+      (decoded?.exp ?? Math.floor(Date.now() / 1000) + 86400) -
+        Math.floor(Date.now() / 1000),
+    );
+    await this.redis.set(`jwt:denylist:${tokenHash}`, 'revoked', 'EX', remainingTtl);
     return { message: 'Logged out successfully' };
   }
 
@@ -206,19 +198,26 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw new UnauthorizedException('User not found');
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
+    // Cryptographically secure 6-digit OTP (100000 to 999999 inclusive)
+    const otp = crypto.randomInt(100000, 1000000).toString();
 
     // Hash it before storing in Redis so even if Redis is breached, OTP is safe
-    const secret = process.env.OTP_SECRET || 'secret-key-otp';
+    const secret = getOtpSecret();
     const hash = crypto.createHmac('sha256', secret).update(otp).digest('hex');
 
     const redisKey = `otp:${email}`;
     await this.redis.set(redisKey, hash, 'EX', 300); // 5 mins TTL
 
-    // In a real app, send email here!
-    console.log(`[DEV MODE] OTP for ${email}: ${otp}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DEV MODE ONLY] OTP for ${email}: ${otp}`);
+    }
 
-    return { message: 'OTP sent successfully (check console)' };
+    return {
+      message:
+        process.env.NODE_ENV === 'production'
+          ? 'OTP sent successfully'
+          : 'OTP sent successfully (check console in DEV)',
+    };
   }
 
   async verifyOtp(email: string, providedOtp: string) {
@@ -226,7 +225,7 @@ export class AuthService {
     const storedHash = await this.redis.get(redisKey);
     if (!storedHash) throw new UnauthorizedException('OTP expired or invalid');
 
-    const secret = process.env.OTP_SECRET || 'secret-key-otp';
+    const secret = getOtpSecret();
     const computedHash = crypto
       .createHmac('sha256', secret)
       .update(providedOtp)

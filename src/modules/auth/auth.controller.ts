@@ -7,6 +7,7 @@ import {
   Get,
   UseGuards,
   Request,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
@@ -80,8 +81,19 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Đăng xuất khỏi thiết bị hiện tại' })
-  async logout(@Request() req: any, @Body('deviceId') deviceId: string) {
-    return this.authService.logout(req.user.id, deviceId);
+  async logout(@Request() req: any) {
+    const deviceId = req.user?.deviceId;
+    if (!deviceId) {
+      throw new UnauthorizedException(
+        'Token thiếu thông tin thiết bị, vui lòng đăng nhập lại.',
+      );
+    }
+    const authorization = req.headers.authorization as string | undefined;
+    const accessToken = authorization?.replace(/^Bearer\s+/i, '');
+    if (!accessToken) {
+      throw new UnauthorizedException('Access token is required.');
+    }
+    return this.authService.logout(req.user.id, deviceId, accessToken);
   }
 
   @Post('otp/generate')
