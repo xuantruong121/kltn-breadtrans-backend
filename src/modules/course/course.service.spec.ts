@@ -761,5 +761,69 @@ describe('CourseService - Business Logic & Rules', () => {
         service.deleteClass(1, { id: 10, role: Role.TEACHER }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    // 35. X01: Teacher A sửa Course của Teacher B -> 403 Forbidden
+    it('35. X01: Teacher A sửa Course của Teacher B -> 403 Forbidden', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({
+        id: 15,
+        teacherId: 42, // Teacher B
+        status: CourseStatus.DRAFT,
+      });
+
+      await expect(
+        service.updateCourse(
+          15,
+          { description: 'Hacked' },
+          { id: 41, role: Role.TEACHER },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    // 36. X02: Teacher A sửa Class của Teacher B -> 403 Forbidden
+    it('36. X02: Teacher A sửa Class của Teacher B -> 403 Forbidden', async () => {
+      mockPrisma.class.findUnique.mockResolvedValue({
+        id: 18,
+        teacherId: 42, // Teacher B
+        status: ClassStatus.UPCOMING,
+      });
+
+      await expect(
+        service.updateClass(
+          18,
+          { id: 41, role: Role.TEACHER },
+          { name: 'Hacked' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    // 37. X05: Direct revertCourseToDraft khi có lớp ONGOING -> 400 BadRequest
+    it('37. X05: Direct revertCourseToDraft khi có lớp ONGOING -> 400 BadRequest', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({
+        id: 13,
+        teacherId: 41,
+        status: CourseStatus.PUBLISHED,
+      });
+      mockPrisma.class.count.mockResolvedValue(2); // 2 lớp ONGOING
+
+      await expect(
+        service.revertCourseToDraft(13, { id: 41, role: Role.TEACHER }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    // 38. X06: Student chưa ghi danh gọi getClassById -> 403 Forbidden
+    it('38. X06: Student chưa ghi danh gọi getClassById -> 403 Forbidden', async () => {
+      mockPrisma.class.findUnique.mockResolvedValue({
+        id: 18,
+        teacherId: 42,
+        course: { lessons: [{ materials: [] }] },
+      });
+      mockPrisma.enrollment.findFirst.mockResolvedValue(null); // Chưa ghi danh
+
+      await expect(
+        service.getClassById(18, 47, 'STUDENT'),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 });
+
+
