@@ -75,6 +75,8 @@ export declare class UserController {
         updatedAt: Date;
         email: string;
         role: import(".prisma/client").$Enums.Role;
+        emailVerifiedAt: Date | null;
+        mustChangePassword: boolean;
         sessionToken: string | null;
         loginCount: number;
         lastLoginAt: Date | null;

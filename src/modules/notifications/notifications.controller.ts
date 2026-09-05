@@ -19,9 +19,7 @@ export class NotificationsController {
   @Get('public-key')
   getPublicKey() {
     return {
-      publicKey:
-        process.env.VAPID_PUBLIC_KEY ||
-        'BBHW4US29BdbTAUO0IWZIvZPRd9eFQZ7pibsO7mEvTziEI-R_bfnWqEelWkCQrn_CrldpBlpsmCbtOFSMSmxPhY',
+      publicKey: process.env.VAPID_PUBLIC_KEY || '',
     };
   }
 
@@ -34,9 +32,11 @@ export class NotificationsController {
   }
 
   @Post('unsubscribe')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async unsubscribe(@Body() dto: UnsubscribeDto) {
-    return await this.notificationsService.unsubscribe(dto.endpoint);
+  async unsubscribe(@Req() req: any, @Body() dto: UnsubscribeDto) {
+    const userId = req.user.id;
+    return await this.notificationsService.unsubscribe(dto.endpoint, userId);
   }
 
   @Post('test')

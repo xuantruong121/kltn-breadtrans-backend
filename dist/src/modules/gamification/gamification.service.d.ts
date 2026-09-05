@@ -1,11 +1,14 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationsService } from '../notifications/notifications.service';
+import Redis from 'ioredis';
 export declare class GamificationService {
     private readonly prisma;
     private readonly eventEmitter;
+    private readonly redis;
     private readonly notificationsService?;
-    constructor(prisma: PrismaService, eventEmitter: EventEmitter2, notificationsService?: NotificationsService | undefined);
+    private readonly logger;
+    constructor(prisma: PrismaService, eventEmitter: EventEmitter2, redis: Redis, notificationsService?: NotificationsService | undefined);
     addPoints(userId: number, points: number, reason: string): Promise<{
         id: number;
         userId: number;
@@ -138,10 +141,13 @@ export declare class GamificationService {
         success: boolean;
         message: string;
     }>;
-    triggerWeeklyCron(): Promise<{
+    triggerWeeklyCron(isManualTrigger?: boolean): Promise<{
         success: boolean;
+        noop: boolean;
         message: string;
     }>;
+    handleDailyCronSchedule(): Promise<void>;
+    handleWeeklyCronSchedule(): Promise<void>;
     sendAdmiration(senderId: number, targetUserId: number, message?: string): Promise<{
         success: boolean;
         message: string;

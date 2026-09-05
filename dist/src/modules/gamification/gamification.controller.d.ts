@@ -133,6 +133,7 @@ export declare class GamificationController {
     }>;
     triggerWeeklyCron(): Promise<{
         success: boolean;
+        noop: boolean;
         message: string;
     }>;
 }

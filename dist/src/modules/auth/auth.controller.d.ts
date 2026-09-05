@@ -1,9 +1,12 @@
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, RefreshTokenDto, GenerateOtpDto, VerifyOtpDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto, RefreshTokenDto, GenerateOtpDto, VerifyOtpDto, VerifyRegistrationDto, ChangePasswordDto, ActivateTeacherDto } from './dto/auth.dto';
 export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
     register(registerDto: RegisterDto): Promise<{
+        message: string;
+    }>;
+    verifyRegistration(body: VerifyRegistrationDto): Promise<{
         profile: {
             id: number;
             userId: number;
@@ -23,6 +26,8 @@ export declare class AuthController {
         updatedAt: Date;
         email: string;
         role: import(".prisma/client").$Enums.Role;
+        emailVerifiedAt: Date | null;
+        mustChangePassword: boolean;
         refreshToken: string | null;
         sessionToken: string | null;
         loginCount: number;
@@ -57,8 +62,17 @@ export declare class AuthController {
         access_token: string;
         refresh_token: string;
     }>;
-    logout(req: any, deviceId: string): Promise<{
+    logout(req: any): Promise<{
         message: string;
+    }>;
+    changePassword(req: any, body: ChangePasswordDto): Promise<{
+        message: string;
+    }>;
+    activateTeacher(body: ActivateTeacherDto): Promise<{
+        id: number;
+        email: string;
+        role: import(".prisma/client").$Enums.Role;
+        emailVerifiedAt: Date | null;
     }>;
     generateOtp(body: GenerateOtpDto): Promise<{
         message: string;

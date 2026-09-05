@@ -7,6 +7,7 @@ import {
   Get,
   UseGuards,
   Request,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
@@ -15,6 +16,9 @@ import {
   RefreshTokenDto,
   GenerateOtpDto,
   VerifyOtpDto,
+  VerifyRegistrationDto,
+  ChangePasswordDto,
+  ActivateTeacherDto,
 } from './dto/auth.dto';
 import {
   ApiTags,
@@ -38,6 +42,11 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  @Post('register/verify')
+  @HttpCode(HttpStatus.OK)
+  async verifyRegistration(@Body() body: VerifyRegistrationDto) {
+    return this.authService.verifyRegistration(body.email, body.otp);
+  }
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })
@@ -80,10 +89,38 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Đăng xuất khỏi thiết bị hiện tại' })
-  async logout(@Request() req: any, @Body('deviceId') deviceId: string) {
-    return this.authService.logout(req.user.id, deviceId);
+  async logout(@Request() req: any) {
+    const deviceId = req.user?.deviceId;
+    if (!deviceId) {
+      throw new UnauthorizedException(
+        'Token thiếu thông tin thiết bị, vui lòng đăng nhập lại.',
+      );
+    }
+    const authorization = req.headers.authorization as string | undefined;
+    const accessToken = authorization?.replace(/^Bearer\s+/i, '');
+    if (!accessToken) {
+      throw new UnauthorizedException('Access token is required.');
+    }
+    return this.authService.logout(req.user.id, deviceId, accessToken);
   }
 
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@Request() req: any, @Body() body: ChangePasswordDto) {
+    return this.authService.changePassword(
+      req.user.id,
+      body.currentPassword,
+      body.newPassword,
+    );
+  }
+
+  @Post('activate-teacher')
+  @HttpCode(HttpStatus.OK)
+  async activateTeacher(@Body() body: ActivateTeacherDto) {
+    return this.authService.activateTeacher(body.token, body.newPassword);
+  }
   @Post('otp/generate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tạo mã OTP' })

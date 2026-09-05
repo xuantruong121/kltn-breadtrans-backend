@@ -37,6 +37,13 @@ export class AdminController {
     return this.adminService.getAllUsers(role);
   }
 
+  @Post('teachers')
+  @ApiOperation({ summary: 'Admin tạo tài khoản Teacher qua activation email' })
+  createTeacher(
+    @Body() dto: { email: string; fullName: string; phone?: string },
+  ) {
+    return this.adminService.createTeacher(dto);
+  }
   @Post('users')
   @ApiOperation({ summary: 'Admin tao tai khoan moi (Student hoac Teacher)' })
   createUser(

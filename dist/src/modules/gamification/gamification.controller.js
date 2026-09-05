@@ -17,6 +17,9 @@ const common_1 = require("@nestjs/common");
 const gamification_service_1 = require("./gamification.service");
 const swagger_1 = require("@nestjs/swagger");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const roles_guard_1 = require("../../common/guards/roles.guard");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const client_1 = require("@prisma/client");
 let GamificationController = class GamificationController {
     gamificationService;
     constructor(gamificationService) {
@@ -53,10 +56,16 @@ let GamificationController = class GamificationController {
         return this.gamificationService.sendAdmiration(req.user.id, body.targetUserId, body.message);
     }
     triggerDailyCron() {
+        if (process.env.NODE_ENV === 'production') {
+            throw new common_1.ForbiddenException('Thao tác thủ công bị vô hiệu hóa hoàn toàn trên môi trường production.');
+        }
         return this.gamificationService.triggerDailyCron();
     }
     triggerWeeklyCron() {
-        return this.gamificationService.triggerWeeklyCron();
+        if (process.env.NODE_ENV === 'production') {
+            throw new common_1.ForbiddenException('Thao tác thủ công bị vô hiệu hóa hoàn toàn trên môi trường production.');
+        }
+        return this.gamificationService.triggerWeeklyCron(true);
     }
 };
 exports.GamificationController = GamificationController;
@@ -166,14 +175,22 @@ __decorate([
 ], GamificationController.prototype, "sendAdmiration", null);
 __decorate([
     (0, common_1.Post)('trigger-daily-cron'),
-    (0, swagger_1.ApiOperation)({ summary: '[Test] Chạy cronjob bảo vệ chuỗi mỗi ngày' }),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: '[Admin/Test] Chạy cronjob bảo vệ chuỗi mỗi ngày' }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], GamificationController.prototype, "triggerDailyCron", null);
 __decorate([
     (0, common_1.Post)('trigger-weekly-cron'),
-    (0, swagger_1.ApiOperation)({ summary: '[Test] Chạy cronjob cập nhật Giải đấu hàng tuần' }),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({
+        summary: '[Admin/Test] Chạy cronjob cập nhật Giải đấu hàng tuần',
+    }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)

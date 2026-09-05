@@ -60,3 +60,40 @@ export class VerifyOtpDto {
   @IsNotEmpty()
   otp: string;
 }
+
+export class VerifyRegistrationDto {
+  @ApiProperty({ example: 'student@test.com' })
+  @IsEmail({}, { message: 'Invalid email format' })
+  email: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
+}
+
+export class ChangePasswordDto {
+  @ApiProperty({ example: 'temporary-password' })
+  @IsString()
+  @IsNotEmpty()
+  currentPassword: string;
+
+  @ApiProperty({ example: 'NewStrongPassword123!' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  newPassword: string;
+}
+
+export class ActivateTeacherDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
+  @ApiProperty({ example: 'NewStrongPassword123!' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  newPassword: string;
+}
