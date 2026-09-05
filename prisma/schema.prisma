@@ -145,7 +145,7 @@ model Course {
   level       String?  // e.g. "BEGINNER", "INTERMEDIATE", "ADVANCED"
   teacherId   Int?
   teacher     User?    @relation("TeacherCourses", fields: [teacherId], references: [id])
-  status      CourseStatus @default(PUBLISHED)
+  status      CourseStatus @default(DRAFT)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -164,6 +164,7 @@ model Class {
   startDate   DateTime?
   endDate     DateTime?
   meetingLink String? // Google Meet/Zoom link
+  capacity    Int?    @default(30)
 
   // Bổ sung các trường từ Firestore Classes Schema
   status             ClassStatus @default(UPCOMING)
@@ -178,6 +179,8 @@ model Class {
   sessions      Session[]
   assignments   Assignment[]
   announcements Announcement[]
+
+  @@unique([courseId, name])
 }
 
 model Enrollment {

@@ -33,8 +33,8 @@ export class QuizController {
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Tạo bài trắc nghiệm (chỉ ADMIN/TEACHER)' })
-  createQuiz(@Body() dto: CreateQuizDto) {
-    return this.quizService.createQuiz(dto);
+  createQuiz(@Body() dto: CreateQuizDto, @Request() req: any) {
+    return this.quizService.createQuiz(dto, req.user);
   }
 
   @Patch(':id')
@@ -44,16 +44,17 @@ export class QuizController {
   updateQuiz(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: Partial<CreateQuizDto>,
+    @Request() req: any,
   ) {
-    return this.quizService.updateQuiz(id, dto);
+    return this.quizService.updateQuiz(id, dto, req.user);
   }
 
   @Delete(':id')
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Xóa đề thi (chỉ ADMIN/TEACHER)' })
-  deleteQuiz(@Param('id', ParseIntPipe) id: number) {
-    return this.quizService.deleteQuiz(id);
+  deleteQuiz(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.quizService.deleteQuiz(id, req.user);
   }
 
   @Get()

@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.QuizService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const event_emitter_1 = require("@nestjs/event-emitter");
 const ai_service_1 = require("../ai/ai.service");
@@ -23,22 +24,72 @@ let QuizService = class QuizService {
         this.eventEmitter = eventEmitter;
         this.aiService = aiService;
     }
-    async createQuiz(dto) {
+    async createQuiz(dto, user) {
+        if (dto.courseId && user && user.role === client_1.Role.TEACHER) {
+            const course = await this.prisma.course.findUnique({
+                where: { id: dto.courseId },
+            });
+            if (!course)
+                throw new common_1.NotFoundException('Course not found');
+            if (course.teacherId !== user.id) {
+                throw new common_1.ForbiddenException('Bạn không có quyền tạo bài kiểm tra cho khóa học của giáo viên khác');
+            }
+            if (course.status === client_1.CourseStatus.PENDING_REVIEW) {
+                throw new common_1.BadRequestException('Khóa học đang chờ duyệt, không thể tạo bài kiểm tra');
+            }
+            if (course.status === client_1.CourseStatus.PUBLISHED) {
+                throw new common_1.BadRequestException('Khóa học đã xuất bản không thể thêm bài kiểm tra trực tiếp. Vui lòng chuyển khóa học về Bản nháp.');
+            }
+        }
         return this.prisma.quiz.create({ data: dto });
     }
-    async updateQuiz(id, dto) {
-        const existing = await this.prisma.quiz.findUnique({ where: { id } });
+    async updateQuiz(id, dto, user) {
+        const existing = await this.prisma.quiz.findUnique({
+            where: { id },
+            include: { course: true },
+        });
         if (!existing)
             throw new common_1.NotFoundException('Quiz not found');
+        if (user && user.role === client_1.Role.TEACHER) {
+            if (!existing.course) {
+                throw new common_1.ForbiddenException('Giáo viên không có quyền chỉnh sửa bài kiểm tra độc lập/hệ thống');
+            }
+            if (existing.course.teacherId !== user.id) {
+                throw new common_1.ForbiddenException('Bạn không có quyền chỉnh sửa bài kiểm tra của khóa học khác');
+            }
+            if (existing.course.status === client_1.CourseStatus.PENDING_REVIEW) {
+                throw new common_1.BadRequestException('Khóa học đang chờ duyệt, không thể chỉnh sửa bài kiểm tra');
+            }
+            if (existing.course.status === client_1.CourseStatus.PUBLISHED) {
+                throw new common_1.BadRequestException('Khóa học đã xuất bản không thể chỉnh sửa bài kiểm tra trực tiếp. Vui lòng chuyển khóa học về Bản nháp.');
+            }
+        }
         return this.prisma.quiz.update({
             where: { id },
             data: dto,
         });
     }
-    async deleteQuiz(id) {
-        const existing = await this.prisma.quiz.findUnique({ where: { id } });
+    async deleteQuiz(id, user) {
+        const existing = await this.prisma.quiz.findUnique({
+            where: { id },
+            include: { course: true },
+        });
         if (!existing)
             throw new common_1.NotFoundException('Quiz not found');
+        if (user && user.role === client_1.Role.TEACHER) {
+            if (!existing.course) {
+                throw new common_1.ForbiddenException('Giáo viên không có quyền xóa bài kiểm tra độc lập/hệ thống');
+            }
+            if (existing.course.teacherId !== user.id) {
+                throw new common_1.ForbiddenException('Bạn không có quyền xóa bài kiểm tra của khóa học khác');
+            }
+            if (existing.course.status === client_1.CourseStatus.PENDING_REVIEW) {
+                throw new common_1.BadRequestException('Khóa học đang chờ duyệt, không thể xóa bài kiểm tra');
+            }
+            if (existing.course.status === client_1.CourseStatus.PUBLISHED) {
+                throw new common_1.BadRequestException('Khóa học đã xuất bản không thể xóa bài kiểm tra trực tiếp. Vui lòng chuyển khóa học về Bản nháp.');
+            }
+        }
         return this.prisma.quiz.delete({
             where: { id },
         });
