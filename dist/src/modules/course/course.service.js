@@ -174,7 +174,7 @@ let CourseService = class CourseService {
             orderBy: { createdAt: 'desc' },
         });
     }
-    async getCourseById(id) {
+    async getCourseById(id, userId, role) {
         const course = await this.prisma.course.findUnique({
             where: { id },
             include: {
@@ -206,7 +206,46 @@ let CourseService = class CourseService {
         });
         if (!course)
             throw new common_1.NotFoundException('Course not found');
-        return course;
+        const isStaff = role === client_1.Role.ADMIN ||
+            (role === client_1.Role.TEACHER && course.teacherId === userId);
+        if (isStaff) {
+            return course;
+        }
+        const safeLessons = (course.lessons || []).map((lesson) => ({
+            id: lesson.id,
+            courseId: lesson.courseId,
+            title: lesson.title,
+            description: lesson.description,
+            order: lesson.order,
+            videoUrl: null,
+            createdAt: lesson.createdAt,
+            materials: (lesson.materials || []).map((m) => ({
+                id: m.id,
+                lessonId: m.lessonId,
+                title: m.title,
+                fileType: m.fileType,
+                fileUrl: null,
+            })),
+        }));
+        const safeClasses = (course.classes || []).map((cls) => ({
+            id: cls.id,
+            courseId: cls.courseId,
+            name: cls.name,
+            status: cls.status,
+            startDate: cls.startDate,
+            endDate: cls.endDate,
+            capacity: cls.capacity,
+            meetingLink: null,
+            teacher: cls.teacher,
+            studentCount: cls._count?.enrollments ?? 0,
+            _count: cls._count,
+        }));
+        return {
+            ...course,
+            lessons: safeLessons,
+            classes: safeClasses,
+            quizzes: [],
+        };
     }
     async updateCourse(id, dto, user) {
         const course = await this.prisma.course.findUnique({ where: { id } });
@@ -884,6 +923,153 @@ let CourseService = class CourseService {
             }
         }
         return this.prisma.material.delete({ where: { id: materialId } });
+    }
+    async getPublicCatalog() {
+        const courses = await this.prisma.course.findMany({
+            where: { status: client_1.CourseStatus.PUBLISHED },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                thumbnail: true,
+                level: true,
+                status: true,
+                createdAt: true,
+                teacher: {
+                    select: {
+                        id: true,
+                        profile: {
+                            select: {
+                                fullName: true,
+                                avatar: true,
+                            },
+                        },
+                    },
+                },
+                classes: {
+                    where: { status: client_1.ClassStatus.UPCOMING },
+                    select: { id: true },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        return courses.map((c) => ({
+            id: c.id,
+            title: c.title,
+            description: c.description,
+            thumbnail: c.thumbnail,
+            level: c.level,
+            status: c.status,
+            createdAt: c.createdAt,
+            teacher: {
+                id: c.teacher?.id ?? null,
+                fullName: c.teacher?.profile?.fullName ?? 'Giảng viên trung tâm',
+                avatar: c.teacher?.profile?.avatar ?? null,
+            },
+            upcomingClassCount: c.classes.length,
+        }));
+    }
+    async getPublicCourseDetail(id) {
+        const course = await this.prisma.course.findFirst({
+            where: { id, status: client_1.CourseStatus.PUBLISHED },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                thumbnail: true,
+                level: true,
+                status: true,
+                createdAt: true,
+                teacher: {
+                    select: {
+                        id: true,
+                        profile: {
+                            select: {
+                                fullName: true,
+                                avatar: true,
+                                targetScore: true,
+                            },
+                        },
+                    },
+                },
+                lessons: {
+                    select: {
+                        id: true,
+                        title: true,
+                        description: true,
+                        order: true,
+                    },
+                    orderBy: { order: 'asc' },
+                },
+                classes: {
+                    where: { status: client_1.ClassStatus.UPCOMING },
+                    select: {
+                        id: true,
+                        name: true,
+                        startDate: true,
+                        endDate: true,
+                        capacity: true,
+                        status: true,
+                        teacher: {
+                            select: {
+                                id: true,
+                                profile: {
+                                    select: {
+                                        fullName: true,
+                                        avatar: true,
+                                    },
+                                },
+                            },
+                        },
+                        enrollments: {
+                            where: { status: client_1.EnrollmentStatus.ACTIVE },
+                            select: { id: true },
+                        },
+                    },
+                    orderBy: { startDate: 'asc' },
+                },
+            },
+        });
+        if (!course) {
+            throw new common_1.NotFoundException('Khóa học không tồn tại hoặc chưa được công khai');
+        }
+        return {
+            id: course.id,
+            title: course.title,
+            description: course.description,
+            thumbnail: course.thumbnail,
+            level: course.level,
+            status: course.status,
+            createdAt: course.createdAt,
+            teacher: {
+                id: course.teacher?.id ?? null,
+                fullName: course.teacher?.profile?.fullName ?? 'Giảng viên trung tâm',
+                avatar: course.teacher?.profile?.avatar ?? null,
+                specialization: course.teacher?.profile?.targetScore ?? null,
+            },
+            lessons: course.lessons,
+            classes: course.classes.map((cls) => {
+                const capacity = cls.capacity ?? 30;
+                const currentEnrollmentCount = cls.enrollments.length;
+                const remainingSeats = Math.max(0, capacity - currentEnrollmentCount);
+                return {
+                    id: cls.id,
+                    name: cls.name,
+                    startDate: cls.startDate,
+                    endDate: cls.endDate,
+                    capacity,
+                    currentEnrollmentCount,
+                    remainingSeats,
+                    isSoldOut: remainingSeats <= 0,
+                    status: cls.status,
+                    teacher: {
+                        id: cls.teacher?.id ?? null,
+                        fullName: cls.teacher?.profile?.fullName ?? 'Giảng viên',
+                        avatar: cls.teacher?.profile?.avatar ?? null,
+                    },
+                };
+            }),
+        };
     }
 };
 exports.CourseService = CourseService;

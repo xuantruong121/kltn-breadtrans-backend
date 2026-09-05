@@ -40,8 +40,8 @@ let CourseController = class CourseController {
     getUserClasses(req) {
         return this.courseService.getUserClasses(req.user.id, req.user.role);
     }
-    getCourseById(id) {
-        return this.courseService.getCourseById(id);
+    getCourseById(id, req) {
+        return this.courseService.getCourseById(id, req.user?.id, req.user?.role);
     }
     updateCourse(id, dto, req) {
         return this.courseService.updateCourse(id, dto, req.user);
@@ -143,8 +143,9 @@ __decorate([
     (0, common_1.Get)(':id'),
     (0, swagger_1.ApiOperation)({ summary: 'Lấy chi tiết một khóa học' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], CourseController.prototype, "getCourseById", null);
 __decorate([

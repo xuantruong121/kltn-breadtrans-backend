@@ -73,8 +73,8 @@ export class CourseController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết một khóa học' })
-  getCourseById(@Param('id', ParseIntPipe) id: number) {
-    return this.courseService.getCourseById(id);
+  getCourseById(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.courseService.getCourseById(id, req.user?.id, req.user?.role);
   }
 
   @Patch(':id')

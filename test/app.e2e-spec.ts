@@ -29,7 +29,9 @@ describe('AppController (e2e)', () => {
 
   afterEach(async () => {
     try {
-      const redis = app.get<Redis>(getRedisConnectionToken(), { strict: false });
+      const redis = app.get<Redis>(getRedisConnectionToken(), {
+        strict: false,
+      });
       if (redis) {
         await redis.quit();
       }

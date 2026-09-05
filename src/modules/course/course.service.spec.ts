@@ -23,6 +23,7 @@ describe('CourseService - Business Logic & Rules', () => {
       create: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
@@ -857,6 +858,458 @@ describe('CourseService - Business Logic & Rules', () => {
       await expect(service.getClassById(18, 47, 'STUDENT')).rejects.toThrow(
         ForbiddenException,
       );
+    });
+
+    // 39. P3-PRE-01: Teacher resubmits a REJECTED course -> PENDING_REVIEW
+    it('39. P3-PRE-01: Teacher resubmits a REJECTED course -> PENDING_REVIEW', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({
+        id: 10,
+        teacherId: 20,
+        status: CourseStatus.REJECTED,
+      });
+      mockPrisma.course.update.mockResolvedValue({
+        id: 10,
+        teacherId: 20,
+        status: CourseStatus.PENDING_REVIEW,
+      });
+
+      const result = await service.submitCourseForReview(10, {
+        id: 20,
+        role: Role.TEACHER,
+      });
+
+      expect(mockPrisma.course.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { status: CourseStatus.PENDING_REVIEW },
+      });
+      expect(result.status).toBe(CourseStatus.PENDING_REVIEW);
+    });
+
+    // 40. P3-PRE-01: Teacher reverts a REJECTED course -> DRAFT
+    it('40. P3-PRE-01: Teacher reverts a REJECTED course -> DRAFT', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({
+        id: 10,
+        teacherId: 20,
+        status: CourseStatus.REJECTED,
+      });
+      mockPrisma.class.count.mockResolvedValue(0);
+      mockPrisma.course.update.mockResolvedValue({
+        id: 10,
+        teacherId: 20,
+        status: CourseStatus.DRAFT,
+      });
+
+      const result = await service.revertCourseToDraft(10, {
+        id: 20,
+        role: Role.TEACHER,
+      });
+
+      expect(mockPrisma.course.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { status: CourseStatus.DRAFT },
+      });
+      expect(result.status).toBe(CourseStatus.DRAFT);
+    });
+
+    // 41. P3-PRE-02: Student calls getCourseById -> private assets sanitized
+    it('41. P3-PRE-02: Student calls getCourseById -> private assets sanitized', async () => {
+      const mockRawCourse = {
+        id: 100,
+        title: 'Mastering English',
+        description: 'Comprehensive course',
+        thumbnail: 'https://r2.dev/thumb.jpg',
+        level: 'INTERMEDIATE',
+        status: CourseStatus.PUBLISHED,
+        teacherId: 30,
+        teacher: {
+          id: 30,
+          email: 't@example.com',
+          profile: { fullName: 'Teacher John' },
+        },
+        lessons: [
+          {
+            id: 1,
+            courseId: 100,
+            title: 'Lesson 1: Greetings',
+            description: 'Learn greetings',
+            order: 1,
+            videoUrl: 'https://r2.dev/secret-video.mp4',
+            createdAt: new Date(),
+            materials: [
+              {
+                id: 101,
+                lessonId: 1,
+                title: 'Lesson 1 Slides.pdf',
+                fileType: 'application/pdf',
+                fileUrl: 'https://r2.dev/secret-slides.pdf',
+              },
+            ],
+          },
+        ],
+        classes: [
+          {
+            id: 50,
+            courseId: 100,
+            name: 'Class A1',
+            status: ClassStatus.UPCOMING,
+            startDate: new Date('2026-10-01'),
+            endDate: new Date('2026-12-01'),
+            capacity: 25,
+            meetingLink: 'https://daily.co/secret-room-123',
+            links: { zalo: 'https://zalo.me/secret' },
+            teacher: {
+              id: 30,
+              email: 't@example.com',
+              profile: { fullName: 'Teacher John' },
+            },
+            _count: { enrollments: 10 },
+          },
+        ],
+        quizzes: [
+          { id: 1, title: 'Secret Quiz', questions: [{ text: 'Question 1' }] },
+        ],
+      };
+
+      mockPrisma.course.findUnique.mockResolvedValue(mockRawCourse);
+
+      const result = await service.getCourseById(100, 999, Role.STUDENT);
+
+      // Verify safe course overview fields are present
+      expect(result.id).toBe(100);
+      expect(result.title).toBe('Mastering English');
+      expect(result.teacher?.email).toBe('t@example.com');
+      expect(result.lessons).toHaveLength(1);
+      expect(result.lessons[0].title).toBe('Lesson 1: Greetings');
+
+      // CRITICAL: Verify private assets are sanitized/null
+      expect(result.lessons[0].videoUrl).toBeNull();
+      expect(result.lessons[0].materials[0].title).toBe('Lesson 1 Slides.pdf');
+      expect(result.lessons[0].materials[0].fileUrl).toBeNull();
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe('Class A1');
+      expect(result.classes[0].meetingLink).toBeNull();
+
+      // Quizzes should not leak internal questions
+      expect(result.quizzes).toEqual([]);
+    });
+
+    // 42. P3-PRE-02: Teacher Owner calls getCourseById -> receives full studio data
+    it('42. P3-PRE-02: Teacher Owner calls getCourseById -> receives full studio data', async () => {
+      const mockRawCourse = {
+        id: 100,
+        title: 'Mastering English',
+        teacherId: 30,
+        lessons: [
+          {
+            id: 1,
+            videoUrl: 'https://r2.dev/secret-video.mp4',
+            materials: [
+              { id: 101, fileUrl: 'https://r2.dev/secret-slides.pdf' },
+            ],
+          },
+        ],
+        classes: [{ id: 50, meetingLink: 'https://daily.co/secret-room-123' }],
+      };
+
+      mockPrisma.course.findUnique.mockResolvedValue(mockRawCourse);
+
+      const result = await service.getCourseById(100, 30, Role.TEACHER);
+
+      expect(result.lessons[0].videoUrl).toBe(
+        'https://r2.dev/secret-video.mp4',
+      );
+      expect(result.lessons[0].materials[0].fileUrl).toBe(
+        'https://r2.dev/secret-slides.pdf',
+      );
+      expect(result.classes[0].meetingLink).toBe(
+        'https://daily.co/secret-room-123',
+      );
+    });
+
+    // 43. P3-PRE-02: Admin calls getCourseById -> receives full review data
+    it('43. P3-PRE-02: Admin calls getCourseById -> receives full review data', async () => {
+      const mockRawCourse = {
+        id: 100,
+        title: 'Mastering English',
+        teacherId: 30,
+        lessons: [
+          {
+            id: 1,
+            videoUrl: 'https://r2.dev/secret-video.mp4',
+            materials: [
+              { id: 101, fileUrl: 'https://r2.dev/secret-slides.pdf' },
+            ],
+          },
+        ],
+        classes: [{ id: 50, meetingLink: 'https://daily.co/secret-room-123' }],
+      };
+
+      mockPrisma.course.findUnique.mockResolvedValue(mockRawCourse);
+
+      const result = await service.getCourseById(100, 1, Role.ADMIN);
+
+      expect(result.lessons[0].videoUrl).toBe(
+        'https://r2.dev/secret-video.mp4',
+      );
+      expect(result.lessons[0].materials[0].fileUrl).toBe(
+        'https://r2.dev/secret-slides.pdf',
+      );
+      expect(result.classes[0].meetingLink).toBe(
+        'https://daily.co/secret-room-123',
+      );
+    });
+
+    // 44. P3-PRE-02: Teacher Non-Owner calls getCourseById -> receives sanitized overview
+    it('44. P3-PRE-02: Teacher Non-Owner calls getCourseById -> receives sanitized overview', async () => {
+      const mockRawCourse = {
+        id: 100,
+        title: 'Mastering English',
+        teacherId: 30,
+        lessons: [
+          {
+            id: 1,
+            title: 'Lesson 1',
+            videoUrl: 'https://r2.dev/secret-video.mp4',
+            materials: [
+              {
+                id: 101,
+                title: 'Slide.pdf',
+                fileUrl: 'https://r2.dev/secret-slides.pdf',
+              },
+            ],
+          },
+        ],
+        classes: [{ id: 50, meetingLink: 'https://daily.co/secret-room-123' }],
+      };
+
+      mockPrisma.course.findUnique.mockResolvedValue(mockRawCourse);
+
+      const result = await service.getCourseById(100, 99, Role.TEACHER); // Teacher 99 != Owner 30
+
+      expect(result.lessons[0].videoUrl).toBeNull();
+      expect(result.lessons[0].materials[0].fileUrl).toBeNull();
+      expect(result.classes[0].meetingLink).toBeNull();
+    });
+  });
+
+  describe('Phase 3A - Public Discovery & Catalog (P01 - P07)', () => {
+    it('P01: getPublicCatalog queries only CourseStatus.PUBLISHED and returns safe cards with upcomingClassCount', async () => {
+      const mockPublishedCourses = [
+        {
+          id: 501,
+          title: 'Speaking Mastery',
+          description: 'Master your spoken English',
+          thumbnail: 'https://r2.dev/thumb1.jpg',
+          level: 'INTERMEDIATE',
+          createdAt: new Date('2026-03-01'),
+          teacher: {
+            id: 10,
+            profile: {
+              fullName: 'Sarah Connor',
+              avatar: 'https://r2.dev/sarah.jpg',
+            },
+          },
+          classes: [{ id: 1 }, { id: 2 }], // 2 upcoming classes
+        },
+      ];
+
+      mockPrisma.course.findMany.mockResolvedValue(mockPublishedCourses);
+
+      const result = await service.getPublicCatalog();
+
+      expect(mockPrisma.course.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: CourseStatus.PUBLISHED },
+          orderBy: { createdAt: 'desc' },
+        }),
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(501);
+      expect(result[0].title).toBe('Speaking Mastery');
+      expect(result[0].upcomingClassCount).toBe(2);
+      expect(result[0].teacher.fullName).toBe('Sarah Connor');
+    });
+
+    it('P02: getPublicCourseDetail returns sanitized curriculum outline (id, title, description, order)', async () => {
+      const mockCourse = {
+        id: 501,
+        title: 'Speaking Mastery',
+        description: 'Master your spoken English',
+        thumbnail: 'https://r2.dev/thumb1.jpg',
+        level: 'INTERMEDIATE',
+        createdAt: new Date('2026-03-01'),
+        teacher: {
+          id: 10,
+          profile: {
+            fullName: 'Sarah Connor',
+            avatar: null,
+            targetScore: 'IELTS 8.0',
+          },
+        },
+        lessons: [
+          {
+            id: 11,
+            title: 'Unit 1: Small Talk',
+            description: 'Basic conversational starters',
+            order: 1,
+          },
+          {
+            id: 12,
+            title: 'Unit 2: Negotiation',
+            description: 'Business talk',
+            order: 2,
+          },
+        ],
+        classes: [],
+      };
+
+      mockPrisma.course.findFirst.mockResolvedValue(mockCourse);
+
+      const result = await service.getPublicCourseDetail(501);
+
+      expect(result.id).toBe(501);
+      expect(result.lessons).toHaveLength(2);
+      expect(result.lessons[0]).toEqual({
+        id: 11,
+        title: 'Unit 1: Small Talk',
+        description: 'Basic conversational starters',
+        order: 1,
+      });
+      // Ensure no private videoUrl or materials in lesson outline
+      expect((result.lessons[0] as any).videoUrl).toBeUndefined();
+      expect((result.lessons[0] as any).materials).toBeUndefined();
+    });
+
+    it('P03: getPublicCourseDetail throws NotFoundException for unpublished courses or non-existent ID', async () => {
+      mockPrisma.course.findFirst.mockResolvedValue(null);
+
+      await expect(service.getPublicCourseDetail(999)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockPrisma.course.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 999, status: CourseStatus.PUBLISHED },
+        }),
+      );
+    });
+
+    it('P04: getPublicCourseDetail includes UPCOMING classes with remaining seats calculated', async () => {
+      const mockCourse = {
+        id: 501,
+        title: 'Speaking Mastery',
+        description: 'Desc',
+        thumbnail: null,
+        level: 'BEGINNER',
+        createdAt: new Date(),
+        teacher: { id: 10, profile: { fullName: 'Sarah', avatar: null } },
+        lessons: [],
+        classes: [
+          {
+            id: 701,
+            name: 'Class October',
+            startDate: new Date('2026-10-01'),
+            endDate: new Date('2026-12-01'),
+            capacity: 25,
+            status: ClassStatus.UPCOMING,
+            teacher: { id: 10, profile: { fullName: 'Sarah', avatar: null } },
+            enrollments: [{ id: 1 }, { id: 2 }, { id: 3 }], // 3 active enrollments
+          },
+        ],
+      };
+
+      mockPrisma.course.findFirst.mockResolvedValue(mockCourse);
+
+      const result = await service.getPublicCourseDetail(501);
+
+      expect(result.classes).toHaveLength(1);
+      const cls = result.classes[0];
+      expect(cls.id).toBe(701);
+      expect(cls.capacity).toBe(25);
+      expect(cls.currentEnrollmentCount).toBe(3);
+      expect(cls.remainingSeats).toBe(22);
+      expect(cls.isSoldOut).toBe(false);
+    });
+
+    it('P05: getPublicCourseDetail filters query so only UPCOMING classes are requested', async () => {
+      mockPrisma.course.findFirst.mockResolvedValue({
+        id: 501,
+        title: 'Course',
+        classes: [],
+        lessons: [],
+      });
+
+      await service.getPublicCourseDetail(501);
+
+      expect(mockPrisma.course.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            classes: expect.objectContaining({
+              where: { status: ClassStatus.UPCOMING },
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('P06: getPublicCourseDetail zero private leak (no videoUrl, materials.fileUrl, meetingLink, or quizzes)', async () => {
+      const mockCourse = {
+        id: 501,
+        title: 'Safe Course',
+        description: 'Safe Desc',
+        thumbnail: 'thumb.jpg',
+        level: 'BEGINNER',
+        createdAt: new Date(),
+        teacher: { id: 10, profile: { fullName: 'Teacher' } },
+        lessons: [{ id: 1, title: 'Lesson 1', description: 'Desc', order: 1 }],
+        classes: [
+          {
+            id: 801,
+            name: 'Upcoming Class',
+            startDate: new Date(),
+            endDate: new Date(),
+            capacity: 20,
+            status: ClassStatus.UPCOMING,
+            teacher: { id: 10, profile: { fullName: 'Teacher' } },
+            enrollments: [],
+          },
+        ],
+      };
+
+      mockPrisma.course.findFirst.mockResolvedValue(mockCourse);
+
+      const result = await service.getPublicCourseDetail(501);
+
+      expect((result as any).quizzes).toBeUndefined();
+      expect((result.lessons[0] as any).videoUrl).toBeUndefined();
+      expect((result.lessons[0] as any).materials).toBeUndefined();
+      expect((result.classes[0] as any).meetingLink).toBeUndefined();
+    });
+
+    it('P07: getPublicCourseDetail calculates isSoldOut: true when active enrollments >= capacity', async () => {
+      const mockCourse = {
+        id: 501,
+        title: 'Full Course',
+        teacher: { id: 10, profile: { fullName: 'Teacher' } },
+        lessons: [],
+        classes: [
+          {
+            id: 901,
+            name: 'Full Class',
+            capacity: 2,
+            status: ClassStatus.UPCOMING,
+            teacher: { id: 10, profile: { fullName: 'Teacher' } },
+            enrollments: [{ id: 1 }, { id: 2 }], // 2/2 full
+          },
+        ],
+      };
+
+      mockPrisma.course.findFirst.mockResolvedValue(mockCourse);
+
+      const result = await service.getPublicCourseDetail(501);
+
+      expect(result.classes[0].remainingSeats).toBe(0);
+      expect(result.classes[0].isSoldOut).toBe(true);
     });
   });
 });
