@@ -194,7 +194,9 @@ export class CreateLessonDto {
 }
 
 export class UpdateLessonDto {
-  @ApiPropertyOptional({ example: 'Unit 1: Introduction to IELTS Reading (Updated)' })
+  @ApiPropertyOptional({
+    example: 'Unit 1: Introduction to IELTS Reading (Updated)',
+  })
   @IsString()
   @IsOptional()
   title?: string;
@@ -216,7 +218,10 @@ export class UpdateLessonDto {
 }
 
 export class ReorderLessonsDto {
-  @ApiProperty({ example: [3, 1, 2], description: 'Danh sách ID bài học theo thứ tự mới' })
+  @ApiProperty({
+    example: [3, 1, 2],
+    description: 'Danh sách ID bài học theo thứ tự mới',
+  })
   @IsArray()
   @IsNumber({}, { each: true })
   lessonIds: number[];
@@ -245,7 +250,9 @@ export class UpdateMaterialDto {
   @IsOptional()
   title?: string;
 
-  @ApiPropertyOptional({ example: 'https://example.com/materials/unit1-v2.pdf' })
+  @ApiPropertyOptional({
+    example: 'https://example.com/materials/unit1-v2.pdf',
+  })
   @IsString()
   @IsOptional()
   fileUrl?: string;
@@ -255,4 +262,3 @@ export class UpdateMaterialDto {
   @IsOptional()
   fileType?: string;
 }
-

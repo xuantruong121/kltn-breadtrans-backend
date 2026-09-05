@@ -470,7 +470,8 @@ let CourseService = class CourseService {
         if (classData.status === client_1.ClassStatus.ONGOING) {
             if (dto.startDate &&
                 classData.startDate &&
-                new Date(dto.startDate).getTime() !== new Date(classData.startDate).getTime()) {
+                new Date(dto.startDate).getTime() !==
+                    new Date(classData.startDate).getTime()) {
                 throw new common_1.BadRequestException('Lớp học đang diễn ra (ONGOING), không thể thay đổi ngày bắt đầu đã xảy ra.');
             }
         }

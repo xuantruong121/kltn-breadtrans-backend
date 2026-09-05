@@ -2,7 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CourseService } from './course.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
-import { Role, CourseStatus, ClassStatus, EnrollmentStatus } from '@prisma/client';
+import {
+  Role,
+  CourseStatus,
+  ClassStatus,
+  EnrollmentStatus,
+} from '@prisma/client';
 import {
   BadRequestException,
   ConflictException,
@@ -549,7 +554,9 @@ describe('CourseService - Business Logic & Rules', () => {
 
       await expect(
         service.revertCourseToDraft(1, { id: 10, role: Role.TEACHER }),
-      ).rejects.toThrow('Khóa học đang chờ Admin duyệt và không thể chuyển về Bản nháp.');
+      ).rejects.toThrow(
+        'Khóa học đang chờ Admin duyệt và không thể chuyển về Bản nháp.',
+      );
     });
 
     // 22c. Revert to draft thành công khi status là REJECTED -> DRAFT
@@ -581,7 +588,11 @@ describe('CourseService - Business Logic & Rules', () => {
       });
 
       await expect(
-        service.updateCourse(1, { title: 'New Title' }, { id: 10, role: Role.TEACHER }),
+        service.updateCourse(
+          1,
+          { title: 'New Title' },
+          { id: 10, role: Role.TEACHER },
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -617,7 +628,11 @@ describe('CourseService - Business Logic & Rules', () => {
       });
 
       await expect(
-        service.createLesson(1, { id: 10, role: Role.TEACHER }, { title: 'Lesson 1' }),
+        service.createLesson(
+          1,
+          { id: 10, role: Role.TEACHER },
+          { title: 'Lesson 1' },
+        ),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -630,7 +645,11 @@ describe('CourseService - Business Logic & Rules', () => {
       });
 
       await expect(
-        service.createLesson(1, { id: 10, role: Role.TEACHER }, { title: 'Lesson 1' }),
+        service.createLesson(
+          1,
+          { id: 10, role: Role.TEACHER },
+          { title: 'Lesson 1' },
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -642,7 +661,11 @@ describe('CourseService - Business Logic & Rules', () => {
       });
 
       await expect(
-        service.updateLesson(5, { id: 10, role: Role.TEACHER }, { title: 'Updated' }),
+        service.updateLesson(
+          5,
+          { id: 10, role: Role.TEACHER },
+          { title: 'Updated' },
+        ),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -675,7 +698,11 @@ describe('CourseService - Business Logic & Rules', () => {
       mockPrisma.enrollment.count.mockResolvedValue(25); // 25 students enrolled
 
       await expect(
-        service.updateClass(1, { id: 10, role: Role.TEACHER }, { capacity: 20 }),
+        service.updateClass(
+          1,
+          { id: 10, role: Role.TEACHER },
+          { capacity: 20 },
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -689,7 +716,11 @@ describe('CourseService - Business Logic & Rules', () => {
       });
 
       await expect(
-        service.updateClass(1, { id: 10, role: Role.TEACHER }, { name: 'New Name' }),
+        service.updateClass(
+          1,
+          { id: 10, role: Role.TEACHER },
+          { name: 'New Name' },
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -745,7 +776,11 @@ describe('CourseService - Business Logic & Rules', () => {
       });
 
       await expect(
-        service.updateClass(1, { id: 10, role: Role.TEACHER }, { teacherId: 99 }),
+        service.updateClass(
+          1,
+          { id: 10, role: Role.TEACHER },
+          { teacherId: 99 },
+        ),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -819,11 +854,9 @@ describe('CourseService - Business Logic & Rules', () => {
       });
       mockPrisma.enrollment.findFirst.mockResolvedValue(null); // Chưa ghi danh
 
-      await expect(
-        service.getClassById(18, 47, 'STUDENT'),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.getClassById(18, 47, 'STUDENT')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 });
-
-

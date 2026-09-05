@@ -267,7 +267,9 @@ class UpdateLessonDto {
 }
 exports.UpdateLessonDto = UpdateLessonDto;
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'Unit 1: Introduction to IELTS Reading (Updated)' }),
+    (0, swagger_1.ApiPropertyOptional)({
+        example: 'Unit 1: Introduction to IELTS Reading (Updated)',
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
@@ -295,7 +297,10 @@ class ReorderLessonsDto {
 }
 exports.ReorderLessonsDto = ReorderLessonsDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: [3, 1, 2], description: 'Danh sách ID bài học theo thứ tự mới' }),
+    (0, swagger_1.ApiProperty)({
+        example: [3, 1, 2],
+        description: 'Danh sách ID bài học theo thứ tự mới',
+    }),
     (0, class_validator_1.IsArray)(),
     (0, class_validator_1.IsNumber)({}, { each: true }),
     __metadata("design:type", Array)
@@ -337,7 +342,9 @@ __decorate([
     __metadata("design:type", String)
 ], UpdateMaterialDto.prototype, "title", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'https://example.com/materials/unit1-v2.pdf' }),
+    (0, swagger_1.ApiPropertyOptional)({
+        example: 'https://example.com/materials/unit1-v2.pdf',
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)

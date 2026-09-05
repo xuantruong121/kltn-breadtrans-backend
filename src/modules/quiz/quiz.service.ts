@@ -34,7 +34,9 @@ export class QuizService {
         );
       }
       if (course.status === CourseStatus.PENDING_REVIEW) {
-        throw new BadRequestException('Khóa học đang chờ duyệt, không thể tạo bài kiểm tra');
+        throw new BadRequestException(
+          'Khóa học đang chờ duyệt, không thể tạo bài kiểm tra',
+        );
       }
       if (course.status === CourseStatus.PUBLISHED) {
         throw new BadRequestException(
