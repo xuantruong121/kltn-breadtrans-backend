@@ -277,6 +277,9 @@ let CourseService = class CourseService {
         if (course.status === client_1.CourseStatus.DRAFT) {
             return course;
         }
+        if (course.status === client_1.CourseStatus.PENDING_REVIEW) {
+            throw new common_1.BadRequestException('Khóa học đang chờ Admin duyệt và không thể chuyển về Bản nháp.');
+        }
         const ongoingCount = await this.prisma.class.count({
             where: {
                 courseId: id,

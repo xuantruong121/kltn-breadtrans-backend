@@ -328,6 +328,12 @@ export class CourseService {
       return course;
     }
 
+    if (course.status === CourseStatus.PENDING_REVIEW) {
+      throw new BadRequestException(
+        'Khóa học đang chờ Admin duyệt và không thể chuyển về Bản nháp.',
+      );
+    }
+
     // Safety rule: PUBLISHED + ONGOING Class -> Teacher cannot revert to DRAFT
     const ongoingCount = await this.prisma.class.count({
       where: {

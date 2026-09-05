@@ -539,6 +539,39 @@ describe('CourseService - Business Logic & Rules', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    // 22b. Revert to draft bị từ chối khi status là PENDING_REVIEW -> 400
+    it('22b. Revert to draft bị từ chối khi status là PENDING_REVIEW -> 400', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({
+        id: 1,
+        status: CourseStatus.PENDING_REVIEW,
+        teacherId: 10,
+      });
+
+      await expect(
+        service.revertCourseToDraft(1, { id: 10, role: Role.TEACHER }),
+      ).rejects.toThrow('Khóa học đang chờ Admin duyệt và không thể chuyển về Bản nháp.');
+    });
+
+    // 22c. Revert to draft thành công khi status là REJECTED -> DRAFT
+    it('22c. Revert to draft thành công khi status là REJECTED -> DRAFT', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({
+        id: 1,
+        status: CourseStatus.REJECTED,
+        teacherId: 10,
+      });
+      mockPrisma.class.count.mockResolvedValue(0);
+      mockPrisma.course.update.mockResolvedValue({
+        id: 1,
+        status: CourseStatus.DRAFT,
+      });
+
+      const result = await service.revertCourseToDraft(1, {
+        id: 10,
+        role: Role.TEACHER,
+      });
+      expect(result.status).toBe(CourseStatus.DRAFT);
+    });
+
     // 23. Teacher sửa title/level trên Course PUBLISHED -> bị từ chối 400
     it('23. Teacher sửa title/level trên Course PUBLISHED -> bị từ chối 400', async () => {
       mockPrisma.course.findUnique.mockResolvedValue({
