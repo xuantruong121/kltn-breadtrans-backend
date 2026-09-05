@@ -40,6 +40,8 @@ model User {
   email          String   @unique
   password       String
   role           Role     @default(STUDENT)
+  emailVerifiedAt DateTime?
+  mustChangePassword Boolean @default(false)
   refreshToken   String?
   sessionToken   String?
   loginCount     Int      @default(0)

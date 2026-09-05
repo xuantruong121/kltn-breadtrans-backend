@@ -9,6 +9,7 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
 import { getOtpSecret } from './auth.constants';
+import { EmailService } from '../../common/email/email.service';
 
 jest.mock('bcrypt', () => ({
   genSalt: jest.fn().mockResolvedValue('salt'),
@@ -28,6 +29,8 @@ describe('AuthService', () => {
       get: jest.fn(),
       set: jest.fn(),
       del: jest.fn(),
+      incr: jest.fn().mockResolvedValue(1),
+      expire: jest.fn(),
     };
     module = await Test.createTestingModule({
       providers: [
@@ -45,6 +48,13 @@ describe('AuthService', () => {
         {
           provide: getRedisConnectionToken('default'),
           useValue: redisMock,
+        },
+        {
+          provide: EmailService,
+          useValue: {
+            sendRegistrationOtp: jest.fn(),
+            sendTeacherActivation: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -68,34 +78,43 @@ describe('AuthService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('should create a new user successfully', async () => {
+    it('should stage registration and create the student only after OTP verification', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(null);
-
-      const hashedPassword = 'hashedPassword';
-      // bcrypt functions are already mocked at module level
-
-      const mockCreatedUser = {
-        id: 1,
+      const otp = '123456';
+      const hash = crypto
+        .createHmac('sha256', getOtpSecret())
+        .update(otp)
+        .digest('hex');
+      await service.register({
         email: 'test@example.com',
-        password: hashedPassword,
-        role: Role.STUDENT,
-        profile: { fullName: 'Test User' },
-      };
-
-      mockCtx.prisma.user.create.mockResolvedValue(mockCreatedUser as any);
-
-      const result = await service.register({
-        email: 'test@example.com',
-        password: '123',
+        password: '123456',
         fullName: 'Test User',
       });
-
+      expect(mockCtx.prisma.user.create).not.toHaveBeenCalled();
+      redisMock.get
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            email: 'test@example.com',
+            fullName: 'Test User',
+            password: 'hashedPassword',
+          }),
+        )
+        .mockResolvedValueOnce(hash);
+      mockCtx.prisma.user.create.mockResolvedValue({
+        id: 1,
+        email: 'test@example.com',
+        role: Role.STUDENT,
+        profile: { fullName: 'Test User' },
+      } as any);
+      const result = await service.verifyRegistration('test@example.com', otp);
       expect(result).not.toHaveProperty('password');
-      expect(result.email).toEqual('test@example.com');
-      expect(mockCtx.prisma.user.create).toHaveBeenCalled();
+      expect(mockCtx.prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ role: Role.STUDENT }),
+        }),
+      );
     });
   });
-
   describe('login', () => {
     it('should throw UnauthorizedException for invalid email', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(null);

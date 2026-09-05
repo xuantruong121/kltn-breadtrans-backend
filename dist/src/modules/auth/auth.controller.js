@@ -60,6 +60,9 @@ let AuthController = class AuthController {
     async register(registerDto) {
         return this.authService.register(registerDto);
     }
+    async verifyRegistration(body) {
+        return this.authService.verifyRegistration(body.email, body.otp);
+    }
     async login(loginDto) {
         const deviceId = loginDto.deviceId || crypto.randomUUID();
         return this.authService.login(loginDto, deviceId);
@@ -88,6 +91,12 @@ let AuthController = class AuthController {
         }
         return this.authService.logout(req.user.id, deviceId, accessToken);
     }
+    async changePassword(req, body) {
+        return this.authService.changePassword(req.user.id, body.currentPassword, body.newPassword);
+    }
+    async activateTeacher(body) {
+        return this.authService.activateTeacher(body.token, body.newPassword);
+    }
     async generateOtp(body) {
         return this.authService.generateOtp(body.email);
     }
@@ -109,6 +118,14 @@ __decorate([
     __metadata("design:paramtypes", [auth_dto_1.RegisterDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "register", null);
+__decorate([
+    (0, common_1.Post)('register/verify'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [auth_dto_1.VerifyRegistrationDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "verifyRegistration", null);
 __decorate([
     (0, common_1.Post)('login'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
@@ -144,6 +161,25 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "logout", null);
+__decorate([
+    (0, common_1.Post)('change-password'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, auth_dto_1.ChangePasswordDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "changePassword", null);
+__decorate([
+    (0, common_1.Post)('activate-teacher'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [auth_dto_1.ActivateTeacherDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "activateTeacher", null);
 __decorate([
     (0, common_1.Post)('otp/generate'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

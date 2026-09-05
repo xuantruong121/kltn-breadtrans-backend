@@ -18,6 +18,8 @@ export declare class JwtStrategy extends JwtStrategy_base {
         email: string;
         password: string;
         role: import(".prisma/client").$Enums.Role;
+        emailVerifiedAt: Date | null;
+        mustChangePassword: boolean;
         refreshToken: string | null;
         sessionToken: string | null;
         loginCount: number;

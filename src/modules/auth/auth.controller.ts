@@ -16,6 +16,9 @@ import {
   RefreshTokenDto,
   GenerateOtpDto,
   VerifyOtpDto,
+  VerifyRegistrationDto,
+  ChangePasswordDto,
+  ActivateTeacherDto,
 } from './dto/auth.dto';
 import {
   ApiTags,
@@ -39,6 +42,11 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  @Post('register/verify')
+  @HttpCode(HttpStatus.OK)
+  async verifyRegistration(@Body() body: VerifyRegistrationDto) {
+    return this.authService.verifyRegistration(body.email, body.otp);
+  }
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })
@@ -96,6 +104,23 @@ export class AuthController {
     return this.authService.logout(req.user.id, deviceId, accessToken);
   }
 
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@Request() req: any, @Body() body: ChangePasswordDto) {
+    return this.authService.changePassword(
+      req.user.id,
+      body.currentPassword,
+      body.newPassword,
+    );
+  }
+
+  @Post('activate-teacher')
+  @HttpCode(HttpStatus.OK)
+  async activateTeacher(@Body() body: ActivateTeacherDto) {
+    return this.authService.activateTeacher(body.token, body.newPassword);
+  }
   @Post('otp/generate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tạo mã OTP' })

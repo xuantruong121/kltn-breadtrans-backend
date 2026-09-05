@@ -1,4 +1,9 @@
-import { Injectable, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  Optional,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Role, CourseStatus } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
@@ -7,6 +12,8 @@ import { R2Service } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
 import { CourseService } from '../course/course.service';
+import { EmailService } from '../../common/email/email.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AdminService {
@@ -15,6 +22,7 @@ export class AdminService {
     private r2Service: R2Service,
     private r2CleanupService: R2CleanupService,
     private courseService: CourseService,
+    private readonly emailService: EmailService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
   ) {}
 
@@ -139,6 +147,53 @@ export class AdminService {
     });
   }
 
+  async createTeacher(dto: {
+    email: string;
+    fullName: string;
+    phone?: string;
+  }) {
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    if (existing) throw new ConflictException('Email already exists');
+    if (!this.redis)
+      throw new Error('Redis is required for teacher activation');
+    const activationToken = crypto.randomBytes(32).toString('base64url');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(activationToken)
+      .digest('hex');
+    const temporaryPassword = crypto.randomBytes(24).toString('base64url');
+    const password = await bcrypt.hash(temporaryPassword, 12);
+    const teacher = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        password,
+        role: Role.TEACHER,
+        mustChangePassword: true,
+        profile: { create: { fullName: dto.fullName, phone: dto.phone } },
+      },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        mustChangePassword: true,
+        profile: { select: { fullName: true, phone: true } },
+      },
+    });
+    await this.redis.set(
+      `teacher:activation:${tokenHash}`,
+      String(teacher.id),
+      'EX',
+      86400,
+    );
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    await this.emailService.sendTeacherActivation(
+      dto.email,
+      `${baseUrl}/activate-teacher?token=${encodeURIComponent(activationToken)}`,
+    );
+    return teacher;
+  }
   async createUser(dto: {
     email: string;
     password: string;
@@ -146,6 +201,10 @@ export class AdminService {
     fullName: string;
     phone?: string;
   }) {
+    if (dto.role !== Role.STUDENT)
+      throw new BadRequestException(
+        'Use /admin/teachers to create a Teacher account.',
+      );
     const hashed = await bcrypt.hash(dto.password, 10);
     return this.prisma.user.create({
       data: {

@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -59,6 +63,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException(
         'Token is invalid or user does not exist',
       );
+    }
+
+    const path = req?.route?.path || req?.path || '';
+    if (
+      user.mustChangePassword &&
+      !String(path).endsWith('/change-password') &&
+      !String(path).endsWith('/logout')
+    ) {
+      throw new ForbiddenException('Bạn phải đổi mật khẩu trước khi tiếp tục.');
     }
 
     return {

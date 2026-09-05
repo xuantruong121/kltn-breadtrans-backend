@@ -19,3 +19,15 @@ export declare class VerifyOtpDto {
     email: string;
     otp: string;
 }
+export declare class VerifyRegistrationDto {
+    email: string;
+    otp: string;
+}
+export declare class ChangePasswordDto {
+    currentPassword: string;
+    newPassword: string;
+}
+export declare class ActivateTeacherDto {
+    token: string;
+    newPassword: string;
+}

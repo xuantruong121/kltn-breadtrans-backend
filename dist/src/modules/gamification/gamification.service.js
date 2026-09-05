@@ -650,7 +650,10 @@ let GamificationService = GamificationService_1 = class GamificationService {
         const now = new Date();
         const year = now.getFullYear();
         const firstDay = new Date(year, 0, 1);
-        const week = Math.ceil(((now.getTime() - firstDay.getTime()) / 86400000 + firstDay.getDay() + 1) / 7);
+        const week = Math.ceil(((now.getTime() - firstDay.getTime()) / 86400000 +
+            firstDay.getDay() +
+            1) /
+            7);
         const weekKey = `${year}-W${String(week).padStart(2, '0')}`;
         const maxAttempts = isManualTrigger ? 3 : 1;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -700,11 +703,17 @@ let GamificationService = GamificationService_1 = class GamificationService {
                 await tx.gameSettings.upsert({
                     where: { gameId: 'cron-weekly-league' },
                     update: {
-                        config: { lastProcessedWeek: weekKey, processedAt: now.toISOString() },
+                        config: {
+                            lastProcessedWeek: weekKey,
+                            processedAt: now.toISOString(),
+                        },
                     },
                     create: {
                         gameId: 'cron-weekly-league',
-                        config: { lastProcessedWeek: weekKey, processedAt: now.toISOString() },
+                        config: {
+                            lastProcessedWeek: weekKey,
+                            processedAt: now.toISOString(),
+                        },
                     },
                 });
                 return { acquired: true, noop: false };
@@ -722,7 +731,11 @@ let GamificationService = GamificationService_1 = class GamificationService {
             if (attempt < maxAttempts)
                 await new Promise((resolve) => setTimeout(resolve, 250));
         }
-        return { success: true, noop: true, message: 'Weekly cron đang được xử lý bởi tiến trình khác.' };
+        return {
+            success: true,
+            noop: true,
+            message: 'Weekly cron đang được xử lý bởi tiến trình khác.',
+        };
     }
     async handleDailyCronSchedule() {
         if (process.env.CRON_INTERNAL_ENABLED === 'true') {

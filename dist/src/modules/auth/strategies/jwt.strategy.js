@@ -78,12 +78,17 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
         if (!rawToken) {
             throw new common_1.UnauthorizedException('Access token is required.');
         }
-        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const tokenHash = crypto
+            .createHash('sha256')
+            .update(rawToken)
+            .digest('hex');
         if (await this.redis.get(`jwt:denylist:${tokenHash}`)) {
             throw new common_1.UnauthorizedException('Token đã bị thu hồi.');
         }
         const loggedOutAt = await this.redis.get(`user:${payload.sub}:device:${payload.deviceId}:logged_out_at`);
-        if (loggedOutAt && payload.iat && payload.iat * 1000 < Number(loggedOutAt)) {
+        if (loggedOutAt &&
+            payload.iat &&
+            payload.iat * 1000 < Number(loggedOutAt)) {
             throw new common_1.UnauthorizedException('Phiên thiết bị đã kết thúc.');
         }
         const user = await this.prisma.user.findUnique({
@@ -91,6 +96,12 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
         });
         if (!user) {
             throw new common_1.UnauthorizedException('Token is invalid or user does not exist');
+        }
+        const path = req?.route?.path || req?.path || '';
+        if (user.mustChangePassword &&
+            !String(path).endsWith('/change-password') &&
+            !String(path).endsWith('/logout')) {
+            throw new common_1.ForbiddenException('Bạn phải đổi mật khẩu trước khi tiếp tục.');
         }
         return {
             ...user,

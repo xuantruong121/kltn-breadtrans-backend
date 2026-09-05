@@ -57,14 +57,18 @@ const ioredis_1 = require("@nestjs-modules/ioredis");
 const ioredis_2 = __importDefault(require("ioredis"));
 const crypto = __importStar(require("crypto"));
 const auth_constants_1 = require("./auth.constants");
+const client_1 = require("@prisma/client");
+const email_service_1 = require("../../common/email/email.service");
 let AuthService = class AuthService {
     prisma;
     jwtService;
     redis;
-    constructor(prisma, jwtService, redis) {
+    emailService;
+    constructor(prisma, jwtService, redis, emailService) {
         this.prisma = prisma;
         this.jwtService = jwtService;
         this.redis = redis;
+        this.emailService = emailService;
     }
     async register(registerDto) {
         const { email, password, fullName } = registerDto;
@@ -73,18 +77,19 @@ let AuthService = class AuthService {
         });
         if (existingUser)
             throw new common_1.ConflictException('Email already exists');
-        const salt = await bcrypt.genSalt();
-        const hashedPassword = await bcrypt.hash(password, salt);
-        const newUser = await this.prisma.user.create({
-            data: {
-                email,
-                password: hashedPassword,
-                profile: { create: { fullName } },
-            },
-            include: { profile: true },
-        });
-        const { password: _, ...userWithoutPassword } = newUser;
-        return userWithoutPassword;
+        const hashedPassword = await bcrypt.hash(password, 12);
+        await this.redis.set(`register:pending:${email}`, JSON.stringify({ email, fullName, password: hashedPassword }), 'EX', 600);
+        const otp = crypto.randomInt(100000, 1000000).toString();
+        const otpHash = crypto
+            .createHmac('sha256', (0, auth_constants_1.getOtpSecret)())
+            .update(otp)
+            .digest('hex');
+        await this.redis.set(`register:otp:${email}`, otpHash, 'EX', 300);
+        await this.redis.del(`register:otp:attempts:${email}`);
+        await this.emailService.sendRegistrationOtp(email, otp);
+        return {
+            message: 'Registration started. Verify the OTP sent to your email.',
+        };
     }
     async login(loginDto, deviceId) {
         const { email, password } = loginDto;
@@ -181,7 +186,10 @@ let AuthService = class AuthService {
         const redisKey = `user:${userId}:device:${deviceId}`;
         await this.redis.del(redisKey);
         await this.redis.set(`${redisKey}:logged_out_at`, Date.now().toString(), 'EX', 86400);
-        const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+        const tokenHash = crypto
+            .createHash('sha256')
+            .update(accessToken)
+            .digest('hex');
         const decoded = this.jwtService.decode(accessToken);
         const remainingTtl = Math.max(1, (decoded?.exp ?? Math.floor(Date.now() / 1000) + 86400) -
             Math.floor(Date.now() / 1000));
@@ -222,6 +230,72 @@ let AuthService = class AuthService {
         await this.redis.del(redisKey);
         return { message: 'OTP verified successfully' };
     }
+    async verifyRegistration(email, providedOtp) {
+        const pendingRaw = await this.redis.get(`register:pending:${email}`);
+        if (!pendingRaw)
+            throw new common_1.UnauthorizedException('Registration expired or invalid');
+        const otpKey = `register:otp:${email}`;
+        const storedHash = await this.redis.get(otpKey);
+        if (!storedHash)
+            throw new common_1.UnauthorizedException('OTP expired or invalid');
+        const attempts = await this.redis.incr(`register:otp:attempts:${email}`);
+        await this.redis.expire(`register:otp:attempts:${email}`, 300);
+        if (attempts > 5) {
+            await this.redis.del(`register:pending:${email}`, otpKey);
+            throw new common_1.UnauthorizedException('Too many invalid OTP attempts');
+        }
+        const computedHash = crypto
+            .createHmac('sha256', (0, auth_constants_1.getOtpSecret)())
+            .update(providedOtp)
+            .digest('hex');
+        if (storedHash !== computedHash)
+            throw new common_1.UnauthorizedException('Invalid OTP');
+        const pending = JSON.parse(pendingRaw);
+        const user = await this.prisma.user.create({
+            data: {
+                email: pending.email,
+                password: pending.password,
+                role: client_1.Role.STUDENT,
+                emailVerifiedAt: new Date(),
+                profile: { create: { fullName: pending.fullName } },
+            },
+            include: { profile: true },
+        });
+        await this.redis.del(`register:pending:${email}`, otpKey, `register:otp:attempts:${email}`);
+        const { password, ...safeUser } = user;
+        void password;
+        return safeUser;
+    }
+    async changePassword(userId, currentPassword, newPassword) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user || !(await bcrypt.compare(currentPassword, user.password)))
+            throw new common_1.UnauthorizedException('Current password is invalid');
+        const password = await bcrypt.hash(newPassword, 12);
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { password, mustChangePassword: false },
+        });
+        return { message: 'Password changed successfully' };
+    }
+    async activateTeacher(token, newPassword) {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const key = `teacher:activation:${tokenHash}`;
+        const userIdRaw = await this.redis.get(key);
+        if (!userIdRaw)
+            throw new common_1.UnauthorizedException('Activation token expired or invalid');
+        const password = await bcrypt.hash(newPassword, 12);
+        const user = await this.prisma.user.update({
+            where: { id: Number(userIdRaw) },
+            data: {
+                password,
+                emailVerifiedAt: new Date(),
+                mustChangePassword: false,
+            },
+            select: { id: true, email: true, role: true, emailVerifiedAt: true },
+        });
+        await this.redis.del(key);
+        return user;
+    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
@@ -229,6 +303,7 @@ exports.AuthService = AuthService = __decorate([
     __param(2, (0, ioredis_1.InjectRedis)()),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         jwt_1.JwtService,
-        ioredis_2.default])
+        ioredis_2.default,
+        email_service_1.EmailService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

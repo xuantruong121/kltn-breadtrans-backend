@@ -188,7 +188,9 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, swagger_1.ApiOperation)({ summary: '[Admin/Test] Chạy cronjob cập nhật Giải đấu hàng tuần' }),
+    (0, swagger_1.ApiOperation)({
+        summary: '[Admin/Test] Chạy cronjob cập nhật Giải đấu hàng tuần',
+    }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)

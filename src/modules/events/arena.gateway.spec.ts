@@ -114,7 +114,7 @@ describe('ArenaGateway security validation', () => {
     const finalizeMatch = (
       gateway as unknown as {
         finalizeMatch: (
-          match: typeof match,
+          targetMatch: any,
           winnerRole: 'p1' | 'p2' | 'draw',
           isForfeit: boolean,
         ) => Promise<void>;
