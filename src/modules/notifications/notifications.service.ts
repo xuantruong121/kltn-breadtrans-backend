@@ -72,7 +72,9 @@ export class NotificationsService implements OnModuleInit {
 
   async unsubscribe(endpoint: string, userId: number) {
     try {
-      const deleteResult = await (this.prisma as any).pushSubscription.deleteMany({
+      const deleteResult = await (
+        this.prisma as any
+      ).pushSubscription.deleteMany({
         where: { endpoint, userId },
       });
       this.logger.log(

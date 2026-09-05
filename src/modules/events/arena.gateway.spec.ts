@@ -8,7 +8,7 @@ import { EventsGateway } from './events.gateway';
 
 describe('ArenaGateway security validation', () => {
   let gateway: ArenaGateway;
-  let redis: any;
+  let redis: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     redis = {
@@ -24,7 +24,10 @@ describe('ArenaGateway security validation', () => {
       providers: [
         ArenaGateway,
         { provide: JwtService, useValue: { verify: jest.fn() } },
-        { provide: PrismaService, useValue: { user: { findUnique: jest.fn() } } },
+        {
+          provide: PrismaService,
+          useValue: { user: { findUnique: jest.fn() } },
+        },
         { provide: EventsGateway, useValue: { sendCurrencyUpdate: jest.fn() } },
         { provide: getRedisConnectionToken('default'), useValue: redis },
       ],
@@ -32,23 +35,26 @@ describe('ArenaGateway security validation', () => {
     gateway = module.get(ArenaGateway);
   });
 
-  it.each([-20, 20.5, 9999])('rejects invalid stake %p before queue mutation', async (stake) => {
-    const socket: Partial<Socket> = {
-      data: { user: { userId: 1, role: 'STUDENT' } },
-      emit: jest.fn(),
-      disconnect: jest.fn(),
-    };
+  it.each([-20, 20.5, 9999])(
+    'rejects invalid stake %p before queue mutation',
+    async (stake) => {
+      const socket: Partial<Socket> = {
+        data: { user: { userId: 1, role: 'STUDENT' } },
+        emit: jest.fn(),
+        disconnect: jest.fn(),
+      };
 
-    await gateway.handleJoinQueue(socket as Socket, {
-      stake,
-      gameId: 'vocab-duel',
-    });
+      await gateway.handleJoinQueue(socket as Socket, {
+        stake,
+        gameId: 'vocab-duel',
+      });
 
-    expect(socket.emit).toHaveBeenCalledWith('arena:error', {
-      message: 'Mức cược không hợp lệ.',
-    });
-    expect(redis.sadd).not.toHaveBeenCalled();
-  });
+      expect(socket.emit).toHaveBeenCalledWith('arena:error', {
+        message: 'Mức cược không hợp lệ.',
+      });
+      expect(redis.sadd).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects an unapproved game id', async () => {
     const socket: Partial<Socket> = {
@@ -69,7 +75,7 @@ describe('ArenaGateway security validation', () => {
 
   it('allows only one concurrent settlement claimant', async () => {
     let lockCalls = 0;
-    redis.set.mockImplementation(async (key: string) => {
+    redis.set.mockImplementation((key: string) => {
       if (key.startsWith('arena:lock:settle:')) {
         lockCalls += 1;
         return lockCalls === 1 ? 'OK' : null;
@@ -86,9 +92,15 @@ describe('ArenaGateway security validation', () => {
       pointHistory: { create: jest.fn() },
       currencyTransaction: { create: jest.fn() },
     };
-    const prisma = (gateway as any).prisma;
-    prisma.$transaction = jest.fn((callback: (client: any) => unknown) => callback(tx));
-    (gateway as any).server = {
+    const gatewayInternals = gateway as unknown as {
+      prisma: { $transaction: jest.Mock };
+      server: { to: jest.Mock };
+    };
+    const prisma = gatewayInternals.prisma;
+    prisma.$transaction = jest.fn((callback: (client: any) => unknown) =>
+      callback(tx),
+    );
+    gatewayInternals.server = {
       to: jest.fn().mockReturnValue({ emit: jest.fn() }),
     };
 
@@ -99,9 +111,18 @@ describe('ArenaGateway security validation', () => {
       p2: { userId: 2, userName: 'P2', score: 5 },
       isSettled: false,
     };
+    const finalizeMatch = (
+      gateway as unknown as {
+        finalizeMatch: (
+          match: typeof match,
+          winnerRole: 'p1' | 'p2' | 'draw',
+          isForfeit: boolean,
+        ) => Promise<void>;
+      }
+    ).finalizeMatch.bind(gateway);
     await Promise.all([
-      (gateway as any).finalizeMatch(match, 'p1', false),
-      (gateway as any).finalizeMatch(match, 'p1', false),
+      finalizeMatch(match, 'p1', false),
+      finalizeMatch(match, 'p1', false),
     ]);
 
     expect(updateMany).toHaveBeenCalledTimes(1);

@@ -134,7 +134,9 @@ export class GamificationController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '[Admin/Test] Chạy cronjob cập nhật Giải đấu hàng tuần' })
+  @ApiOperation({
+    summary: '[Admin/Test] Chạy cronjob cập nhật Giải đấu hàng tuần',
+  })
   triggerWeeklyCron() {
     if (process.env.NODE_ENV === 'production') {
       throw new ForbiddenException(

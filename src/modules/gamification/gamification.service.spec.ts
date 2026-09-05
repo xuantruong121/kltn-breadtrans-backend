@@ -4,7 +4,8 @@ describe('GamificationService weekly cron hardening', () => {
   it('uses a fixed snapshot and records the processed week in GameSettings', async () => {
     const updates: any[] = [];
     const tx: any = {
-      $queryRaw: jest.fn()
+      $queryRaw: jest
+        .fn()
         .mockResolvedValueOnce([{ locked: true }])
         .mockResolvedValueOnce([]),
       gameSettings: {
@@ -17,14 +18,16 @@ describe('GamificationService weekly cron hardening', () => {
           { id: 2, tier: 'Đồng', weeklyExp: 50 },
           { id: 3, tier: 'Bạc', weeklyExp: 10 },
         ]),
-        update: jest.fn().mockImplementation(async (args) => {
+        update: jest.fn().mockImplementation((args) => {
           updates.push(args);
           return args;
         }),
       },
     };
     const prisma: any = {
-      $transaction: jest.fn((callback: (client: any) => unknown) => callback(tx)),
+      $transaction: jest.fn((callback: (client: any) => unknown) =>
+        callback(tx),
+      ),
     };
     const redis = { set: jest.fn() };
     const service = new GamificationService(prisma, {} as any, redis as any);
@@ -44,7 +47,9 @@ describe('GamificationService weekly cron hardening', () => {
       $queryRaw: jest.fn().mockResolvedValue([{ locked: false }]),
     };
     const prisma: any = {
-      $transaction: jest.fn((callback: (client: any) => unknown) => callback(tx)),
+      $transaction: jest.fn((callback: (client: any) => unknown) =>
+        callback(tx),
+      ),
     };
     const service = new GamificationService(
       prisma,

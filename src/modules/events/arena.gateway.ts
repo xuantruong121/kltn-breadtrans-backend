@@ -123,7 +123,11 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const loggedOutAt = await this.redis.get(
         `user:${payload.sub}:device:${payload.deviceId}:logged_out_at`,
       );
-      if (loggedOutAt && payload.iat && payload.iat * 1000 < Number(loggedOutAt)) {
+      if (
+        loggedOutAt &&
+        payload.iat &&
+        payload.iat * 1000 < Number(loggedOutAt)
+      ) {
         throw new Error('Device session revoked');
       }
       const user = await this.prisma.user.findUnique({
@@ -141,7 +145,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.log(
         `[Arena] Client authenticated: ${client.id} (User #${user.id})`,
       );
-    } catch (err) {
+    } catch {
       this.logger.warn(
         `[Arena] Connection rejected: Invalid auth token (${client.id})`,
       );
@@ -267,7 +271,11 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const allowedStakes = [10, 20, 50, 100];
     const stake = payload.stake;
-    if (typeof stake !== 'number' || !Number.isInteger(stake) || !allowedStakes.includes(stake)) {
+    if (
+      typeof stake !== 'number' ||
+      !Number.isInteger(stake) ||
+      !allowedStakes.includes(stake)
+    ) {
       client.emit('arena:error', { message: 'Mức cược không hợp lệ.' });
       return;
     }
@@ -315,7 +323,10 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const avatar = userStats.user?.profile?.avatar || '';
-    const userName = userStats.user?.profile?.fullName || userStats.user?.email || `Player ${userId}`;
+    const userName =
+      userStats.user?.profile?.fullName ||
+      userStats.user?.email ||
+      `Player ${userId}`;
 
     // 2. Check if user is already in an active unsettled match
     const existingMatchId = await this.redis.get(`arena:user_match:${userId}`);
@@ -370,10 +381,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('cancel_queue')
-  async handleCancelQueue(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() _payload?: { userId?: number },
-  ) {
+  async handleCancelQueue(@ConnectedSocket() client: Socket) {
     const authUser = client.data?.user;
     if (authUser?.userId) {
       await this.removeUserFromQueues(authUser.userId);
@@ -1040,179 +1048,187 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const lockKey = `arena:lock:settle:${match.matchId}`;
     const lockOwner = `${process.pid}:${crypto.randomUUID()}`;
-    const acquired = await this.redis.set(lockKey, lockOwner, 'PX', 10000, 'NX');
+    const acquired = await this.redis.set(
+      lockKey,
+      lockOwner,
+      'PX',
+      10000,
+      'NX',
+    );
     if (!acquired) return;
 
     try {
-    match.isSettled = true;
-    match.status = isForfeit ? 'forfeited' : 'settled';
+      match.isSettled = true;
+      match.status = isForfeit ? 'forfeited' : 'settled';
 
-    const totalReward = match.stake * 2;
-    let winnerUserId: number | null = null;
+      const totalReward = match.stake * 2;
+      let winnerUserId: number | null = null;
 
-    if (winnerRole === 'p1' || winnerRole === 'p2') {
-      const winner = match[winnerRole];
-      winnerUserId = winner.userId;
+      if (winnerRole === 'p1' || winnerRole === 'p2') {
+        const winner = match[winnerRole];
+        winnerUserId = winner.userId;
 
-      // Wrap balance update, PointHistory, and CurrencyTransaction in an atomic transaction
-      const { updatedStats } = await this.prisma.$transaction(async (tx) => {
-        const claim = await tx.gameBattle.updateMany({
-          where: { roomId: match.matchId, status: 'escrowed' },
-          data: {
-            status: 'settled',
-            winnerRole,
-            winnerUserId,
-            settledWinnerRole: winnerRole,
-            settledAt: new Date(),
-          },
-        });
-        if (claim.count !== 1) {
-          throw new Error('MATCH_ALREADY_SETTLED');
-        }
+        // Wrap balance update, PointHistory, and CurrencyTransaction in an atomic transaction
+        const { updatedStats } = await this.prisma.$transaction(async (tx) => {
+          const claim = await tx.gameBattle.updateMany({
+            where: { roomId: match.matchId, status: 'escrowed' },
+            data: {
+              status: 'settled',
+              winnerRole,
+              winnerUserId,
+              settledWinnerRole: winnerRole,
+              settledAt: new Date(),
+            },
+          });
+          if (claim.count !== 1) {
+            throw new Error('MATCH_ALREADY_SETTLED');
+          }
 
-        const stats = await tx.userStats.update({
-          where: { userId: winner.userId },
-          data: { totalBanhRan: { increment: totalReward } },
-        });
+          const stats = await tx.userStats.update({
+            where: { userId: winner.userId },
+            data: { totalBanhRan: { increment: totalReward } },
+          });
 
-        await tx.pointHistory.create({
-          data: {
-            userId: winner.userId,
-            points: totalReward,
-            reason: isForfeit
-              ? `Thắng do đối thủ bỏ cuộc trong Đấu Trường 1v1 (${match.matchId})`
-              : `Thắng trận Đấu Trường 1v1 (${match.matchId})`,
-          },
-        });
+          await tx.pointHistory.create({
+            data: {
+              userId: winner.userId,
+              points: totalReward,
+              reason: isForfeit
+                ? `Thắng do đối thủ bỏ cuộc trong Đấu Trường 1v1 (${match.matchId})`
+                : `Thắng trận Đấu Trường 1v1 (${match.matchId})`,
+            },
+          });
 
-        await tx.currencyTransaction.create({
-          data: {
-            studentId: winner.userId,
-            studentName: winner.userName,
-            userId: winner.userId,
-            userName: winner.userName,
-            userRole: 'STUDENT',
-            amount: totalReward,
-            reason: isForfeit
-              ? `Thắng do đối thủ bỏ cuộc Đấu Trường 1v1`
-              : `Chiến thắng Đấu Trường 1v1`,
-            type: 'add',
-          },
-        });
-
-        return { updatedStats: stats };
-      });
-
-      // Real-time balance notification to Winner
-      this.eventsGateway.sendCurrencyUpdate(winner.userId, {
-        amount: totalReward,
-        newBalance: updatedStats.totalBanhRan,
-        reason: `Chiến thắng Đấu Trường 1v1 (+${totalReward} 🍞)`,
-        studentName: winner.userName,
-      });
-    } else {
-      // Draw: Refund escrow stakes to both players atomically
-      const { p1Stats, p2Stats } = await this.prisma.$transaction(async (tx) => {
-        const claim = await tx.gameBattle.updateMany({
-          where: { roomId: match.matchId, status: 'escrowed' },
-          data: {
-            status: 'settled',
-            winnerRole: 'draw',
-            winnerUserId: null,
-            settledWinnerRole: 'draw',
-            settledAt: new Date(),
-          },
-        });
-        if (claim.count !== 1) {
-          throw new Error('MATCH_ALREADY_SETTLED');
-        }
-
-        const s1 = await tx.userStats.update({
-          where: { userId: match.p1.userId },
-          data: { totalBanhRan: { increment: match.stake } },
-        });
-        const s2 = await tx.userStats.update({
-          where: { userId: match.p2.userId },
-          data: { totalBanhRan: { increment: match.stake } },
-        });
-
-        await tx.currencyTransaction.createMany({
-          data: [
-            {
-              studentId: match.p1.userId,
-              studentName: match.p1.userName,
-              userId: match.p1.userId,
-              userName: match.p1.userName,
+          await tx.currencyTransaction.create({
+            data: {
+              studentId: winner.userId,
+              studentName: winner.userName,
+              userId: winner.userId,
+              userName: winner.userName,
               userRole: 'STUDENT',
-              amount: match.stake,
-              reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
+              amount: totalReward,
+              reason: isForfeit
+                ? `Thắng do đối thủ bỏ cuộc Đấu Trường 1v1`
+                : `Chiến thắng Đấu Trường 1v1`,
               type: 'add',
             },
-            {
-              studentId: match.p2.userId,
-              studentName: match.p2.userName,
-              userId: match.p2.userId,
-              userName: match.p2.userName,
-              userRole: 'STUDENT',
-              amount: match.stake,
-              reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
-              type: 'add',
-            },
-          ],
+          });
+
+          return { updatedStats: stats };
         });
 
-        return { p1Stats: s1, p2Stats: s2 };
+        // Real-time balance notification to Winner
+        this.eventsGateway.sendCurrencyUpdate(winner.userId, {
+          amount: totalReward,
+          newBalance: updatedStats.totalBanhRan,
+          reason: `Chiến thắng Đấu Trường 1v1 (+${totalReward} 🍞)`,
+          studentName: winner.userName,
+        });
+      } else {
+        // Draw: Refund escrow stakes to both players atomically
+        const { p1Stats, p2Stats } = await this.prisma.$transaction(
+          async (tx) => {
+            const claim = await tx.gameBattle.updateMany({
+              where: { roomId: match.matchId, status: 'escrowed' },
+              data: {
+                status: 'settled',
+                winnerRole: 'draw',
+                winnerUserId: null,
+                settledWinnerRole: 'draw',
+                settledAt: new Date(),
+              },
+            });
+            if (claim.count !== 1) {
+              throw new Error('MATCH_ALREADY_SETTLED');
+            }
+
+            const s1 = await tx.userStats.update({
+              where: { userId: match.p1.userId },
+              data: { totalBanhRan: { increment: match.stake } },
+            });
+            const s2 = await tx.userStats.update({
+              where: { userId: match.p2.userId },
+              data: { totalBanhRan: { increment: match.stake } },
+            });
+
+            await tx.currencyTransaction.createMany({
+              data: [
+                {
+                  studentId: match.p1.userId,
+                  studentName: match.p1.userName,
+                  userId: match.p1.userId,
+                  userName: match.p1.userName,
+                  userRole: 'STUDENT',
+                  amount: match.stake,
+                  reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
+                  type: 'add',
+                },
+                {
+                  studentId: match.p2.userId,
+                  studentName: match.p2.userName,
+                  userId: match.p2.userId,
+                  userName: match.p2.userName,
+                  userRole: 'STUDENT',
+                  amount: match.stake,
+                  reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
+                  type: 'add',
+                },
+              ],
+            });
+
+            return { p1Stats: s1, p2Stats: s2 };
+          },
+        );
+
+        this.eventsGateway.sendCurrencyUpdate(match.p1.userId, {
+          amount: match.stake,
+          newBalance: p1Stats.totalBanhRan,
+          reason: `Hoàn cược Đấu Trường 1v1 (Hòa nhau)`,
+          studentName: match.p1.userName,
+        });
+
+        this.eventsGateway.sendCurrencyUpdate(match.p2.userId, {
+          amount: match.stake,
+          newBalance: p2Stats.totalBanhRan,
+          reason: `Hoàn cược Đấu Trường 1v1 (Hòa nhau)`,
+          studentName: match.p2.userName,
+        });
+      }
+
+      // Save final match state with short TTL (10 mins)
+      await this.redis.set(`arena:settled:${match.matchId}`, '1', 'EX', 86400);
+      await this.redis.set(
+        `arena:match:${match.matchId}`,
+        JSON.stringify(match),
+        'EX',
+        600,
+      );
+      await this.redis.del(`arena:user_match:${match.p1.userId}`);
+      await this.redis.del(`arena:user_match:${match.p2.userId}`);
+
+      // Emit match ended event
+      this.server.to(match.matchId).emit('arena:match_ended', {
+        matchId: match.matchId,
+        winnerRole,
+        winnerUserId,
+        isForfeit,
+        p1: {
+          userId: match.p1.userId,
+          userName: match.p1.userName,
+          score: match.p1.score,
+        },
+        p2: {
+          userId: match.p2.userId,
+          userName: match.p2.userName,
+          score: match.p2.score,
+        },
+        reward: winnerUserId ? totalReward : match.stake,
+        isDraw: winnerRole === 'draw',
       });
 
-      this.eventsGateway.sendCurrencyUpdate(match.p1.userId, {
-        amount: match.stake,
-        newBalance: p1Stats.totalBanhRan,
-        reason: `Hoàn cược Đấu Trường 1v1 (Hòa nhau)`,
-        studentName: match.p1.userName,
-      });
-
-      this.eventsGateway.sendCurrencyUpdate(match.p2.userId, {
-        amount: match.stake,
-        newBalance: p2Stats.totalBanhRan,
-        reason: `Hoàn cược Đấu Trường 1v1 (Hòa nhau)`,
-        studentName: match.p2.userName,
-      });
-    }
-
-    // Save final match state with short TTL (10 mins)
-    await this.redis.set(`arena:settled:${match.matchId}`, '1', 'EX', 86400);
-    await this.redis.set(
-      `arena:match:${match.matchId}`,
-      JSON.stringify(match),
-      'EX',
-      600,
-    );
-    await this.redis.del(`arena:user_match:${match.p1.userId}`);
-    await this.redis.del(`arena:user_match:${match.p2.userId}`);
-
-    // Emit match ended event
-    this.server.to(match.matchId).emit('arena:match_ended', {
-      matchId: match.matchId,
-      winnerRole,
-      winnerUserId,
-      isForfeit,
-      p1: {
-        userId: match.p1.userId,
-        userName: match.p1.userName,
-        score: match.p1.score,
-      },
-      p2: {
-        userId: match.p2.userId,
-        userName: match.p2.userName,
-        score: match.p2.score,
-      },
-      reward: winnerUserId ? totalReward : match.stake,
-      isDraw: winnerRole === 'draw',
-    });
-
-    this.logger.log(
-      `[Arena] [${match.matchId}] Match finalized. Winner: ${winnerRole} (${winnerUserId || 'Draw'})`,
-    );
+      this.logger.log(
+        `[Arena] [${match.matchId}] Match finalized. Winner: ${winnerRole} (${winnerUserId || 'Draw'})`,
+      );
     } finally {
       const unlockScript =
         'if redis.call(get, KEYS[1]) == ARGV[1] then return redis.call(del, KEYS[1]) else return 0 end';

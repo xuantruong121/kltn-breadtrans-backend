@@ -79,7 +79,11 @@ export class EventsGateway
       const loggedOutAt = await this.redis.get(
         `user:${payload.sub}:device:${payload.deviceId}:logged_out_at`,
       );
-      if (loggedOutAt && payload.iat && payload.iat * 1000 < Number(loggedOutAt)) {
+      if (
+        loggedOutAt &&
+        payload.iat &&
+        payload.iat * 1000 < Number(loggedOutAt)
+      ) {
         throw new Error('Device session revoked');
       }
       const user = await this.prisma.user.findUnique({
@@ -108,7 +112,7 @@ export class EventsGateway
       this.logger.log(
         `[EventsGateway] Client authenticated: ${client.id} (User #${user.id}, ${user.role})`,
       );
-    } catch (err) {
+    } catch {
       this.logger.warn(
         `[EventsGateway] Connection rejected: Invalid auth token (${client.id})`,
       );
@@ -126,10 +130,7 @@ export class EventsGateway
 
   // 1. Người dùng tham gia Room cá nhân & Room hỗ trợ (xác thực nghiêm ngặt từ token, không tin payload client)
   @SubscribeMessage('joinUserRoom')
-  async handleJoinUserRoom(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() _data?: { userId?: number; role?: string; name?: string },
-  ) {
+  async handleJoinUserRoom(@ConnectedSocket() client: Socket) {
     const authUser = client.data?.user;
     if (!authUser) {
       client.disconnect(true);
@@ -189,7 +190,11 @@ export class EventsGateway
     );
 
     const content = payload?.message?.content;
-    if (typeof content !== 'string' || content.trim().length === 0 || content.length > 2000) {
+    if (
+      typeof content !== 'string' ||
+      content.trim().length === 0 ||
+      content.length > 2000
+    ) {
       return;
     }
 
@@ -215,10 +220,14 @@ export class EventsGateway
         },
       };
 
-      this.server.to('support_staff').emit('chat:new_message', sanitizedPayload);
+      this.server
+        .to('support_staff')
+        .emit('chat:new_message', sanitizedPayload);
 
       // Nếu học sinh mở nhiều tab, gửi cho các tab khác của chính học sinh này
-      client.to(`user_${authUser.userId}`).emit('chat:new_message', sanitizedPayload);
+      client
+        .to(`user_${authUser.userId}`)
+        .emit('chat:new_message', sanitizedPayload);
     } else {
       // 2. Tin nhắn từ Support Staff (Admin / Teacher) trả lời học sinh:
       const targetUserId =
@@ -273,7 +282,10 @@ export class EventsGateway
     },
   ) {
     const authUser = client.data?.user;
-    if (!authUser || (authUser.role !== 'ADMIN' && authUser.role !== 'TEACHER')) {
+    if (
+      !authUser ||
+      (authUser.role !== 'ADMIN' && authUser.role !== 'TEACHER')
+    ) {
       this.logger.warn(
         `[EventsGateway] Unauthorized chat:toggleMode attempt by User #${authUser?.userId}`,
       );
@@ -286,8 +298,7 @@ export class EventsGateway
       Number.isInteger(requestedTargetUserId) &&
       requestedTargetUserId > 0
         ? requestedTargetUserId
-        : Number(payload.studentId?.replace('student_', '')) ||
-      null;
+        : Number(payload.studentId?.replace('student_', '')) || null;
     if (!targetUserId || !['AI', 'HUMAN'].includes(payload.mode)) return;
     const student = await this.prisma.user.findUnique({
       where: { id: targetUserId },
@@ -302,13 +313,20 @@ export class EventsGateway
     };
 
     this.logger.log(
-      'Chat mode toggled for ' + normalizedPayload.studentId + ' by ' + authUser.role,
+      'Chat mode toggled for ' +
+        normalizedPayload.studentId +
+        ' by ' +
+        authUser.role,
     );
 
-    this.server.to('support_staff').emit('chat:mode_updated', normalizedPayload);
+    this.server
+      .to('support_staff')
+      .emit('chat:mode_updated', normalizedPayload);
 
     if (targetUserId) {
-      this.server.to(`user_${targetUserId}`).emit('chat:mode_updated', normalizedPayload);
+      this.server
+        .to(`user_${targetUserId}`)
+        .emit('chat:mode_updated', normalizedPayload);
     }
   }
 

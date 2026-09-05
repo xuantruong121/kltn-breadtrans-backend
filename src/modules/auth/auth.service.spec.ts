@@ -4,9 +4,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { createMockContext, MockContext } from '../../prisma/prisma.mock';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
+import { getOtpSecret } from './auth.constants';
 
 jest.mock('bcrypt', () => ({
   genSalt: jest.fn().mockResolvedValue('salt'),
@@ -18,7 +20,7 @@ describe('AuthService', () => {
   let service: AuthService;
   let mockCtx: MockContext;
   let module: TestingModule;
-  let redisMock: any;
+  let redisMock: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     mockCtx = createMockContext();
@@ -174,8 +176,6 @@ describe('AuthService', () => {
 
     it('should verify matching OTP and delete key from Redis', async () => {
       const redis = module.get(getRedisConnectionToken('default'));
-      const crypto = require('crypto');
-      const { getOtpSecret } = require('./auth.constants');
       const testOtp = '123456';
       const expectedHash = crypto
         .createHmac('sha256', getOtpSecret())

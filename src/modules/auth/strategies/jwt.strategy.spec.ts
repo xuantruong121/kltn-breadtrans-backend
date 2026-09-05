@@ -43,7 +43,7 @@ describe('JwtStrategy security checks', () => {
   it('rejects a denylisted access token', async () => {
     const token = 'access-token';
     const hash = crypto.createHash('sha256').update(token).digest('hex');
-    redis.get.mockImplementation(async (key: string) =>
+    redis.get.mockImplementation((key: string) =>
       key === `jwt:denylist:${hash}` ? 'revoked' : null,
     );
 

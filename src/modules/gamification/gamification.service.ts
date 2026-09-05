@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, Optional, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Optional,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -755,7 +760,10 @@ export class GamificationService {
     const year = now.getFullYear();
     const firstDay = new Date(year, 0, 1);
     const week = Math.ceil(
-      ((now.getTime() - firstDay.getTime()) / 86400000 + firstDay.getDay() + 1) / 7,
+      ((now.getTime() - firstDay.getTime()) / 86400000 +
+        firstDay.getDay() +
+        1) /
+        7,
     );
     const weekKey = `${year}-W${String(week).padStart(2, '0')}`;
     const maxAttempts = isManualTrigger ? 3 : 1;
@@ -777,7 +785,8 @@ export class GamificationService {
         const setting = await tx.gameSettings.findUnique({
           where: { gameId: 'cron-weekly-league' },
         });
-        const config = (setting?.config as Record<string, unknown> | null) || {};
+        const config =
+          (setting?.config as Record<string, unknown> | null) || {};
         if (config.lastProcessedWeek === weekKey) {
           return { acquired: true, noop: true };
         }
@@ -785,15 +794,20 @@ export class GamificationService {
         const snapshot = await tx.leaderboard.findMany({
           orderBy: [{ weeklyExp: 'desc' }, { id: 'asc' }],
         });
-        const updates: Array<{ id: number; tier: string; weeklyExp: number }> = [];
+        const updates: Array<{ id: number; tier: string; weeklyExp: number }> =
+          [];
         for (let i = 0; i < tiers.length; i++) {
           const currentTier = tiers[i];
           const users = snapshot.filter((u) => u.tier === currentTier);
           const topCount = Math.max(1, Math.floor(users.length * 0.2));
-          const bottomStart = Math.max(users.length - Math.floor(users.length * 0.2), topCount);
+          const bottomStart = Math.max(
+            users.length - Math.floor(users.length * 0.2),
+            topCount,
+          );
           users.forEach((user, index) => {
             let newTier = currentTier;
-            if (index < topCount && i < tiers.length - 1) newTier = tiers[i + 1];
+            if (index < topCount && i < tiers.length - 1)
+              newTier = tiers[i + 1];
             else if (index >= bottomStart && i > 0) newTier = tiers[i - 1];
             updates.push({ id: user.id, tier: newTier, weeklyExp: 0 });
           });
@@ -809,18 +823,29 @@ export class GamificationService {
         await tx.gameSettings.upsert({
           where: { gameId: 'cron-weekly-league' },
           update: {
-            config: { lastProcessedWeek: weekKey, processedAt: now.toISOString() },
+            config: {
+              lastProcessedWeek: weekKey,
+              processedAt: now.toISOString(),
+            },
           },
           create: {
             gameId: 'cron-weekly-league',
-            config: { lastProcessedWeek: weekKey, processedAt: now.toISOString() },
+            config: {
+              lastProcessedWeek: weekKey,
+              processedAt: now.toISOString(),
+            },
           },
         });
         return { acquired: true, noop: false };
       });
 
       if (result.acquired) {
-        await this.redis.set(`gamification:cron:weekly:${weekKey}:completed`, '1', 'EX', 7 * 86400);
+        await this.redis.set(
+          `gamification:cron:weekly:${weekKey}:completed`,
+          '1',
+          'EX',
+          7 * 86400,
+        );
         return {
           success: true,
           noop: result.noop,
@@ -829,10 +854,15 @@ export class GamificationService {
             : `Weekly league ${weekKey} processed successfully.`,
         };
       }
-      if (attempt < maxAttempts) await new Promise((resolve) => setTimeout(resolve, 250));
+      if (attempt < maxAttempts)
+        await new Promise((resolve) => setTimeout(resolve, 250));
     }
 
-    return { success: true, noop: true, message: 'Weekly cron đang được xử lý bởi tiến trình khác.' };
+    return {
+      success: true,
+      noop: true,
+      message: 'Weekly cron đang được xử lý bởi tiến trình khác.',
+    };
   }
 
   // ================= CRON SCHEDULES (Asia/Ho_Chi_Minh) =================
@@ -840,12 +870,19 @@ export class GamificationService {
   @Cron('0 0 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async handleDailyCronSchedule() {
     if (process.env.CRON_INTERNAL_ENABLED === 'true') {
-      this.logger.log('[GamificationService] Executing automated daily streak cronjob...');
+      this.logger.log(
+        '[GamificationService] Executing automated daily streak cronjob...',
+      );
       try {
         const res = await this.triggerDailyCron();
-        this.logger.log(`[GamificationService] Daily streak cron completed: ${res.message}`);
+        this.logger.log(
+          `[GamificationService] Daily streak cron completed: ${res.message}`,
+        );
       } catch (err) {
-        this.logger.error('[GamificationService] Daily streak cron failed:', err);
+        this.logger.error(
+          '[GamificationService] Daily streak cron failed:',
+          err,
+        );
       }
     }
   }
@@ -853,12 +890,19 @@ export class GamificationService {
   @Cron('0 0 * * 0', { timeZone: 'Asia/Ho_Chi_Minh' })
   async handleWeeklyCronSchedule() {
     if (process.env.CRON_INTERNAL_ENABLED === 'true') {
-      this.logger.log('[GamificationService] Executing automated weekly leagues cronjob...');
+      this.logger.log(
+        '[GamificationService] Executing automated weekly leagues cronjob...',
+      );
       try {
         const res = await this.triggerWeeklyCron();
-        this.logger.log(`[GamificationService] Weekly leagues cron completed: ${res.message}`);
+        this.logger.log(
+          `[GamificationService] Weekly leagues cron completed: ${res.message}`,
+        );
       } catch (err) {
-        this.logger.error('[GamificationService] Weekly leagues cron failed:', err);
+        this.logger.error(
+          '[GamificationService] Weekly leagues cron failed:',
+          err,
+        );
       }
     }
   }

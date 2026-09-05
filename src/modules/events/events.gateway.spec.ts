@@ -8,7 +8,7 @@ import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
 describe('EventsGateway Security & Authentication Tests', () => {
   let gateway: EventsGateway;
   let jwtService: JwtService;
-  let prismaMock: any;
+  let prismaMock: { user: { findUnique: jest.Mock } };
 
   beforeEach(async () => {
     prismaMock = {
@@ -210,10 +210,7 @@ describe('EventsGateway Security & Authentication Tests', () => {
     };
 
     // Client maliciously attempts to join user_1 and role: 'ADMIN'
-    await gateway.handleJoinUserRoom(mockSocket as Socket, {
-      userId: 1,
-      role: 'ADMIN',
-    });
+    await gateway.handleJoinUserRoom(mockSocket as Socket);
 
     expect(mockSocket.join).toHaveBeenCalledWith('user_42');
     expect(mockSocket.join).not.toHaveBeenCalledWith('user_1');
@@ -253,15 +250,18 @@ describe('EventsGateway Security & Authentication Tests', () => {
       },
       to: jest.fn().mockReturnValue({ emit }),
     };
-    await gateway.handleChatMessage(mockSocket as Socket, {
-      studentId: 'student_999',
-      studentName: 'Forged Name',
-      message: { role: 'admin', content: 'hello' },
-      fromRole: 'ADMIN',
-    } as any);
+    await gateway.handleChatMessage(
+      mockSocket as Socket,
+      {
+        studentId: 'student_999',
+        studentName: 'Forged Name',
+        message: { role: 'admin', content: 'hello' },
+        fromRole: 'ADMIN',
+      } as any,
+    );
 
-    const supportEmit = ((gateway as any).server.to as jest.Mock).mock.results[0]
-      .value.emit as jest.Mock;
+    const supportEmit = ((gateway as any).server.to as jest.Mock).mock
+      .results[0].value.emit as jest.Mock;
     const payload = supportEmit.mock.calls[0][1];
     expect(payload.studentId).toBe('student_10');
     expect(payload.studentName).toBe('Student');

@@ -32,7 +32,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Access token is required.');
     }
 
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
     if (await this.redis.get(`jwt:denylist:${tokenHash}`)) {
       throw new UnauthorizedException('Token đã bị thu hồi.');
     }
@@ -40,7 +43,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const loggedOutAt = await this.redis.get(
       `user:${payload.sub}:device:${payload.deviceId}:logged_out_at`,
     );
-    if (loggedOutAt && payload.iat && payload.iat * 1000 < Number(loggedOutAt)) {
+    if (
+      loggedOutAt &&
+      payload.iat &&
+      payload.iat * 1000 < Number(loggedOutAt)
+    ) {
       throw new UnauthorizedException('Phiên thiết bị đã kết thúc.');
     }
 

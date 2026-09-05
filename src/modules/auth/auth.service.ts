@@ -180,15 +180,28 @@ export class AuthService {
   async logout(userId: number, deviceId: string, accessToken: string) {
     const redisKey = `user:${userId}:device:${deviceId}`;
     await this.redis.del(redisKey);
-    await this.redis.set(`${redisKey}:logged_out_at`, Date.now().toString(), 'EX', 86400);
-    const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
-    const decoded = this.jwtService.decode(accessToken) as { exp?: number } | null;
+    await this.redis.set(
+      `${redisKey}:logged_out_at`,
+      Date.now().toString(),
+      'EX',
+      86400,
+    );
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(accessToken)
+      .digest('hex');
+    const decoded = this.jwtService.decode(accessToken);
     const remainingTtl = Math.max(
       1,
       (decoded?.exp ?? Math.floor(Date.now() / 1000) + 86400) -
         Math.floor(Date.now() / 1000),
     );
-    await this.redis.set(`jwt:denylist:${tokenHash}`, 'revoked', 'EX', remainingTtl);
+    await this.redis.set(
+      `jwt:denylist:${tokenHash}`,
+      'revoked',
+      'EX',
+      remainingTtl,
+    );
     return { message: 'Logged out successfully' };
   }
 
