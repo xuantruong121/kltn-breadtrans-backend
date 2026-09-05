@@ -59,8 +59,15 @@ export class AssignmentController {
 
   @Get('assignments/:id')
   @ApiOperation({ summary: 'Chi tiết bài tập' })
-  getAssignmentDetail(@Param('id', ParseIntPipe) id: number) {
-    return this.assignmentService.getAssignmentDetail(id);
+  getAssignmentDetail(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.assignmentService.getAssignmentDetail(
+      id,
+      req.user?.id,
+      req.user?.role,
+    );
   }
 
   @Post('assignments/:id/submit')

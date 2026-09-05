@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Role, CourseStatus } from '@prisma/client';
+import { Role, CourseStatus, EnrollmentStatus } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { R2Service } from '../upload/r2.service';
@@ -308,7 +308,7 @@ export class AdminService {
   // ============== COURSE MANAGEMENT ==============
 
   async getAdminCourses() {
-    return this.prisma.course.findMany({
+    const courses = await this.prisma.course.findMany({
       include: {
         teacher: {
           select: {
@@ -320,12 +320,32 @@ export class AdminService {
         classes: {
           include: {
             _count: { select: { enrollments: true } },
+            enrollments: {
+              where: { status: EnrollmentStatus.ACTIVE },
+              select: { id: true },
+            },
           },
         },
         _count: { select: { classes: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return courses.map((course) => ({
+      ...course,
+      classes: (course.classes || []).map((cls) => {
+        const totalEnrollmentCount = cls._count?.enrollments ?? 0;
+        const activeEnrollmentCount = cls.enrollments?.length ?? 0;
+        return {
+          ...cls,
+          tuitionFeeVnd: cls.tuitionFeeVnd ?? 0,
+          activeEnrollmentCount,
+          totalEnrollmentCount,
+          hasEnrollments: totalEnrollmentCount > 0,
+          studentCount: activeEnrollmentCount,
+        };
+      }),
+    }));
   }
 
   async adminCreateCourse(dto: {
@@ -372,7 +392,7 @@ export class AdminService {
   // ============== CLASS MANAGEMENT ==============
 
   async getAllClasses() {
-    return this.prisma.class.findMany({
+    const classes = await this.prisma.class.findMany({
       include: {
         course: { select: { id: true, title: true, thumbnail: true } },
         teacher: {
@@ -383,8 +403,25 @@ export class AdminService {
           },
         },
         _count: { select: { enrollments: true } },
+        enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
+          select: { id: true },
+        },
       },
       orderBy: { id: 'desc' },
+    });
+
+    return classes.map((cls) => {
+      const totalEnrollmentCount = cls._count?.enrollments ?? 0;
+      const activeEnrollmentCount = cls.enrollments?.length ?? 0;
+      return {
+        ...cls,
+        tuitionFeeVnd: cls.tuitionFeeVnd ?? 0,
+        activeEnrollmentCount,
+        totalEnrollmentCount,
+        hasEnrollments: totalEnrollmentCount > 0,
+        studentCount: activeEnrollmentCount,
+      };
     });
   }
 
