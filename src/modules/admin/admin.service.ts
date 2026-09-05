@@ -280,7 +280,9 @@ export class AdminService {
   }
 
   async enrollUserInClass(userId: number, classId: number) {
-    return this.courseService.enrollInClass(classId, userId);
+    return this.courseService.enrollInClass(classId, userId, {
+      isAdminOverride: true,
+    });
   }
 
   async removeEnrollment(userId: number, classId: number) {

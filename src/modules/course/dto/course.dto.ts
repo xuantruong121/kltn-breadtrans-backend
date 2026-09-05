@@ -6,6 +6,7 @@ import {
   IsDateString,
   IsEnum,
   Min,
+  IsInt,
   IsArray,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -131,6 +132,15 @@ export class CreateClassDto {
   @Min(1)
   @IsOptional()
   capacity?: number;
+
+  @ApiPropertyOptional({
+    example: 2500000,
+    description: 'Học phí lớp học tính theo VNĐ (0 = Miễn phí)',
+  })
+  @IsInt({ message: 'Học phí phải là số nguyên' })
+  @Min(0, { message: 'Học phí không được nhỏ hơn 0' })
+  @IsOptional()
+  tuitionFeeVnd?: number;
 }
 
 export class UpdateClassDto {
@@ -165,10 +175,39 @@ export class UpdateClassDto {
   @IsOptional()
   capacity?: number;
 
+  @ApiPropertyOptional({
+    example: 2500000,
+    description: 'Học phí lớp học tính theo VNĐ (0 = Miễn phí)',
+  })
+  @IsInt({ message: 'Học phí phải là số nguyên' })
+  @Min(0, { message: 'Học phí không được nhỏ hơn 0' })
+  @IsOptional()
+  tuitionFeeVnd?: number;
+
   @ApiPropertyOptional({ enum: ClassStatus })
   @IsEnum(ClassStatus)
   @IsOptional()
   status?: ClassStatus;
+}
+
+export class EnrollResponseDto {
+  @ApiProperty({ example: 101 })
+  enrollmentId: number;
+
+  @ApiProperty({ example: 23 })
+  classId: number;
+
+  @ApiProperty({ example: 'ACTIVE', enum: ['ACTIVE', 'PENDING_PAYMENT'] })
+  status: 'ACTIVE' | 'PENDING_PAYMENT';
+
+  @ApiProperty({ example: 0 })
+  tuitionFeeVnd: number;
+
+  @ApiProperty({ example: true })
+  accessGranted: boolean;
+
+  @ApiProperty({ example: 'Đăng ký lớp học thành công.' })
+  message: string;
 }
 
 export class CreateLessonDto {

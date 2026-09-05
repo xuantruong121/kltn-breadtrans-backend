@@ -65,8 +65,14 @@ describe('CourseService - Business Logic & Rules', () => {
       deleteMany: jest.fn(),
       count: jest.fn(),
     },
-    $transaction: jest.fn((promises) =>
-      Array.isArray(promises) ? Promise.all(promises) : promises,
+    $queryRaw: jest.fn(),
+    $transaction: jest.fn(
+      (input: any): any =>
+        typeof input === 'function'
+          ? input(mockPrisma)
+          : Array.isArray(input)
+            ? Promise.all(input)
+            : input,
     ),
   };
 
@@ -434,16 +440,21 @@ describe('CourseService - Business Logic & Rules', () => {
   // ==========================================
   // III. ENROLLMENT TEST CASES (17 -> 20)
   // ==========================================
-  describe('Enrollment Business Rules', () => {
-    // 17. Student enroll thành công
-    it('17. Student enroll thành công', async () => {
-      mockPrisma.class.findUnique.mockResolvedValue({
-        id: 1,
-        status: ClassStatus.UPCOMING,
-        capacity: 30,
-        _count: { enrollments: 5 },
-      });
+  // III. ENROLLMENT TEST CASES (Phase 3B Lifecycle & Concurrency Rules)
+  // ==========================================
+  describe('Enrollment Business Rules (Phase 3B)', () => {
+    // 17. Student enroll FREE class (tuitionFeeVnd = 0) -> ACTIVE
+    it('17. Student enroll FREE class (tuitionFeeVnd = 0) -> ACTIVE', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.UPCOMING,
+          capacity: 30,
+          tuitionFeeVnd: 0,
+        },
+      ]);
       mockPrisma.enrollment.findUnique.mockResolvedValue(null); // Chưa enroll
+      mockPrisma.enrollment.count.mockResolvedValue(5); // 5 active enrollments
       mockPrisma.enrollment.create.mockResolvedValue({
         id: 201,
         userId: 100,
@@ -454,17 +465,62 @@ describe('CourseService - Business Logic & Rules', () => {
       const result = await service.enrollInClass(1, 100);
 
       expect(result.status).toBe(EnrollmentStatus.ACTIVE);
-      expect(mockPrisma.enrollment.create).toHaveBeenCalled();
+      expect(result.accessGranted).toBe(true);
+      expect(result.tuitionFeeVnd).toBe(0);
+      expect(mockPrisma.enrollment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 100,
+            classId: 1,
+            status: EnrollmentStatus.ACTIVE,
+          }),
+        }),
+      );
     });
 
-    // 18. Student enroll trùng -> bị từ chối 409
-    it('18. Student enroll trùng -> bị từ chối 409 Conflict', async () => {
-      mockPrisma.class.findUnique.mockResolvedValue({
-        id: 1,
-        status: ClassStatus.UPCOMING,
-        capacity: 30,
-        _count: { enrollments: 5 },
+    // 17b. Student enroll PAID class (tuitionFeeVnd > 0) -> PENDING_PAYMENT
+    it('17b. Student enroll PAID class (tuitionFeeVnd > 0) -> PENDING_PAYMENT (no access)', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 2,
+          status: ClassStatus.UPCOMING,
+          capacity: 25,
+          tuitionFeeVnd: 1500000,
+        },
+      ]);
+      mockPrisma.enrollment.findUnique.mockResolvedValue(null);
+      mockPrisma.enrollment.count.mockResolvedValue(10);
+      mockPrisma.enrollment.create.mockResolvedValue({
+        id: 202,
+        userId: 100,
+        classId: 2,
+        status: EnrollmentStatus.PENDING_PAYMENT,
       });
+
+      const result = await service.enrollInClass(2, 100);
+
+      expect(result.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      expect(result.accessGranted).toBe(false);
+      expect(result.tuitionFeeVnd).toBe(1500000);
+      expect(mockPrisma.enrollment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: EnrollmentStatus.PENDING_PAYMENT,
+          }),
+        }),
+      );
+    });
+
+    // 18. Student enroll trùng -> bị từ chối 409 Conflict
+    it('18. Student enroll trùng -> bị từ chối 409 Conflict', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.UPCOMING,
+          capacity: 30,
+          tuitionFeeVnd: 0,
+        },
+      ]);
       mockPrisma.enrollment.findUnique.mockResolvedValue({
         id: 201,
         userId: 100,
@@ -476,33 +532,212 @@ describe('CourseService - Business Logic & Rules', () => {
       );
     });
 
-    // 19. Class full -> bị từ chối nếu có capacity
-    it('19. Class full capacity -> bị từ chối 400', async () => {
-      mockPrisma.class.findUnique.mockResolvedValue({
-        id: 1,
-        status: ClassStatus.UPCOMING,
-        capacity: 10,
-        _count: { enrollments: 10 }, // Đã đầy 10/10
-      });
+    // 19. Class full capacity (activeCount >= capacity) -> 409 Conflict
+    it('19. Class full capacity (activeCount >= capacity) -> bị từ chối 409 Conflict', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.UPCOMING,
+          capacity: 10,
+          tuitionFeeVnd: 0,
+        },
+      ]);
       mockPrisma.enrollment.findUnique.mockResolvedValue(null);
+      mockPrisma.enrollment.count.mockResolvedValue(10); // Đã đầy 10/10 ACTIVE
 
       await expect(service.enrollInClass(1, 101)).rejects.toThrow(
-        BadRequestException,
+        ConflictException,
       );
     });
 
-    // 20. Enroll vào Class CANCELLED -> bị từ chối
-    it('20. Enroll vào Class CANCELLED -> bị từ chối 400', async () => {
-      mockPrisma.class.findUnique.mockResolvedValue({
-        id: 1,
-        status: ClassStatus.CANCELLED, // Lớp đã bị hủy
-        capacity: 30,
-        _count: { enrollments: 2 },
-      });
+    // 20. Enroll vào Class CANCELLED -> bị từ chối 400
+    it('20. Enroll vào Class CANCELLED -> bị từ chối 400 BadRequest', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.CANCELLED,
+          capacity: 30,
+          tuitionFeeVnd: 0,
+        },
+      ]);
 
       await expect(service.enrollInClass(1, 102)).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    // 20b. Enroll vào Class COMPLETED -> bị từ chối 400
+    it('20b. Enroll vào Class COMPLETED -> bị từ chối 400 BadRequest', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.COMPLETED,
+          capacity: 30,
+          tuitionFeeVnd: 0,
+        },
+      ]);
+
+      await expect(service.enrollInClass(1, 103)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // 20c. Student enroll vào Class ONGOING -> bị từ chối 400 (Student only UPCOMING)
+    it('20c. Student enroll vào Class ONGOING -> bị từ chối 400 (Student only UPCOMING)', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.ONGOING,
+          capacity: 30,
+          tuitionFeeVnd: 0,
+        },
+      ]);
+
+      await expect(service.enrollInClass(1, 104)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // 20d. Admin override enrolls into ONGOING -> ACTIVE
+    it('20d. Admin override enrolls into ONGOING -> ACTIVE', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.ONGOING,
+          capacity: 30,
+          tuitionFeeVnd: 500000,
+        },
+      ]);
+      mockPrisma.enrollment.findUnique.mockResolvedValue(null);
+      mockPrisma.enrollment.count.mockResolvedValue(5);
+      mockPrisma.enrollment.create.mockResolvedValue({
+        id: 203,
+        userId: 105,
+        classId: 1,
+        status: EnrollmentStatus.ACTIVE,
+      });
+
+      const result = await service.enrollInClass(1, 105, {
+        isAdminOverride: true,
+      });
+
+      expect(result.status).toBe(EnrollmentStatus.ACTIVE);
+      expect(result.accessGranted).toBe(true);
+    });
+
+    // 20e. Admin override CANNOT bypass capacity
+    it('20e. Admin override CANNOT bypass capacity -> 409 Conflict', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.UPCOMING,
+          capacity: 20,
+          tuitionFeeVnd: 0,
+        },
+      ]);
+      mockPrisma.enrollment.findUnique.mockResolvedValue(null);
+      mockPrisma.enrollment.count.mockResolvedValue(20); // Full
+
+      await expect(
+        service.enrollInClass(1, 106, { isAdminOverride: true }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    // 20f. Admin override CANNOT bypass CANCELLED / COMPLETED
+    it('20f. Admin override CANNOT bypass CANCELLED / COMPLETED -> 400 BadRequest', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.CANCELLED,
+          capacity: 30,
+          tuitionFeeVnd: 0,
+        },
+      ]);
+
+      await expect(
+        service.enrollInClass(1, 107, { isAdminOverride: true }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    // 20g. Tuition Lock: Cannot change tuitionFeeVnd when totalEnrollments > 0
+    it('20g. Tuition Lock: Cannot change tuitionFeeVnd when totalEnrollments > 0 -> 400 BadRequest', async () => {
+      mockPrisma.class.findUnique.mockResolvedValue({
+        id: 1,
+        teacherId: 10,
+        status: ClassStatus.UPCOMING,
+        tuitionFeeVnd: 0,
+      });
+      mockPrisma.enrollment.count.mockResolvedValue(1); // 1 enrollment exists
+
+      await expect(
+        service.updateClass(
+          1,
+          { id: 10, role: Role.TEACHER },
+          { tuitionFeeVnd: 200000 },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    // 20h. Tuition Lock: Cannot change tuitionFeeVnd when status != UPCOMING
+    it('20h. Tuition Lock: Cannot change tuitionFeeVnd when status != UPCOMING -> 400 BadRequest', async () => {
+      mockPrisma.class.findUnique.mockResolvedValue({
+        id: 1,
+        teacherId: 10,
+        status: ClassStatus.ONGOING,
+        tuitionFeeVnd: 0,
+      });
+
+      await expect(
+        service.updateClass(
+          1,
+          { id: 10, role: Role.TEACHER },
+          { tuitionFeeVnd: 300000 },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    // 20i. Tuition Change Allowed: UPCOMING with 0 total enrollments
+    it('20i. Tuition Change Allowed: UPCOMING with 0 total enrollments', async () => {
+      mockPrisma.class.findUnique.mockResolvedValue({
+        id: 1,
+        teacherId: 10,
+        status: ClassStatus.UPCOMING,
+        tuitionFeeVnd: 0,
+      });
+      mockPrisma.enrollment.count.mockResolvedValue(0); // 0 enrollments
+      mockPrisma.class.update.mockResolvedValue({
+        id: 1,
+        tuitionFeeVnd: 500000,
+        status: ClassStatus.UPCOMING,
+        _count: { enrollments: 0 },
+      });
+
+      const result = await service.updateClass(
+        1,
+        { id: 10, role: Role.TEACHER },
+        { tuitionFeeVnd: 500000 },
+      );
+
+      expect(result.tuitionFeeVnd).toBe(500000);
+      expect(result.hasEnrollments).toBe(false);
+    });
+
+    // 20j. getMyEnrollmentsInCourse returns user enrollments
+    it('20j. getMyEnrollmentsInCourse returns user enrollments for the course', async () => {
+      mockPrisma.enrollment.findMany.mockResolvedValue([
+        {
+          id: 501,
+          classId: 10,
+          status: EnrollmentStatus.ACTIVE,
+          joinedAt: new Date(),
+        },
+      ]);
+
+      const result = await service.getMyEnrollmentsInCourse(1, 100);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].classId).toBe(10);
+      expect(result[0].status).toBe(EnrollmentStatus.ACTIVE);
     });
   });
 

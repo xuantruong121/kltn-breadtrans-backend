@@ -15,6 +15,7 @@ import {
   UpdateLessonDto,
   CreateMaterialDto,
   UpdateMaterialDto,
+  EnrollResponseDto,
 } from './dto/course.dto';
 import { EventsGateway } from '../events/events.gateway';
 import {
@@ -166,20 +167,25 @@ export class CourseService {
           }
         }
 
+        const isEnrolledActive = e.status === EnrollmentStatus.ACTIVE;
         return {
           classId: e.classId,
           className: e.class.name,
           classStatus: e.class.status,
-          meetingLink: e.class.meetingLink,
+          meetingLink: isEnrolledActive ? e.class.meetingLink : null,
           startDate: e.class.startDate,
           endDate: e.class.endDate,
           capacity: e.class.capacity,
           progress: calculatedProgress,
           enrollmentStatus: e.status,
+          tuitionFeeVnd: e.class.tuitionFeeVnd ?? 0,
           joinedAt: e.joinedAt,
           studentCount: e.class._count.enrollments,
           teacher: e.class.teacher,
-          course: e.class.course,
+          course: {
+            ...e.class.course,
+            lessons: isEnrolledActive ? e.class.course.lessons : [],
+          },
         };
       });
     }
@@ -219,6 +225,10 @@ export class CourseService {
               },
             },
             _count: { select: { enrollments: true } },
+            enrollments: {
+              where: { status: EnrollmentStatus.ACTIVE },
+              select: { id: true },
+            },
           },
         },
         lessons: {
@@ -242,7 +252,21 @@ export class CourseService {
       (role === Role.TEACHER && course.teacherId === userId);
 
     if (isStaff) {
-      return course;
+      return {
+        ...course,
+        classes: (course.classes || []).map((cls) => {
+          const totalEnrollmentCount = cls._count?.enrollments ?? 0;
+          const activeEnrollmentCount = cls.enrollments?.length ?? 0;
+          return {
+            ...cls,
+            tuitionFeeVnd: cls.tuitionFeeVnd ?? 0,
+            activeEnrollmentCount,
+            totalEnrollmentCount,
+            hasEnrollments: totalEnrollmentCount > 0,
+            studentCount: activeEnrollmentCount,
+          };
+        }),
+      };
     }
 
     // Sanitize for Students and non-owner users:
@@ -264,19 +288,27 @@ export class CourseService {
       })),
     }));
 
-    const safeClasses = (course.classes || []).map((cls) => ({
-      id: cls.id,
-      courseId: cls.courseId,
-      name: cls.name,
-      status: cls.status,
-      startDate: cls.startDate,
-      endDate: cls.endDate,
-      capacity: cls.capacity,
-      meetingLink: null,
-      teacher: cls.teacher,
-      studentCount: cls._count?.enrollments ?? 0,
-      _count: cls._count,
-    }));
+    const safeClasses = (course.classes || []).map((cls) => {
+      const totalEnrollmentCount = cls._count?.enrollments ?? 0;
+      const activeEnrollmentCount = cls.enrollments?.length ?? 0;
+      return {
+        id: cls.id,
+        courseId: cls.courseId,
+        name: cls.name,
+        status: cls.status,
+        startDate: cls.startDate,
+        endDate: cls.endDate,
+        capacity: cls.capacity,
+        tuitionFeeVnd: cls.tuitionFeeVnd ?? 0,
+        meetingLink: null,
+        teacher: cls.teacher,
+        activeEnrollmentCount,
+        totalEnrollmentCount,
+        hasEnrollments: totalEnrollmentCount > 0,
+        studentCount: activeEnrollmentCount,
+        _count: cls._count,
+      };
+    });
 
     return {
       ...course,
@@ -568,13 +600,18 @@ export class CourseService {
       );
     }
 
-    // 6. Sức chứa
+    // 6. Sức chứa & Học phí
     if (dto.capacity !== undefined && dto.capacity <= 0) {
       throw new BadRequestException(
         'Sức chứa tối đa (capacity) phải lớn hơn 0',
       );
     }
     const capacity = dto.capacity || 30;
+
+    if (dto.tuitionFeeVnd !== undefined && dto.tuitionFeeVnd < 0) {
+      throw new BadRequestException('Học phí (tuitionFeeVnd) không được âm');
+    }
+    const tuitionFeeVnd = dto.tuitionFeeVnd ?? 0;
 
     // 7. Initial status (không hardcode ONGOING)
     let status: ClassStatus = ClassStatus.UPCOMING;
@@ -598,6 +635,7 @@ export class CourseService {
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
         meetingLink,
         capacity,
+        tuitionFeeVnd,
         status,
       },
       include: {
@@ -683,23 +721,45 @@ export class CourseService {
       );
     }
 
-    // 6. Capacity validation: must be > 0 and >= currentEnrollments
+    // 6. Capacity validation: must be > 0 and >= activeEnrollments (ACTIVE-only seat occupancy)
     if (dto.capacity !== undefined) {
       if (dto.capacity <= 0) {
         throw new BadRequestException(
           'Sức chứa tối đa (capacity) phải lớn hơn 0',
         );
       }
-      const currentEnrollments = await this.prisma.enrollment.count({
+      const activeEnrollments = await this.prisma.enrollment.count({
         where: {
           classId,
-          status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
+          status: EnrollmentStatus.ACTIVE,
         },
       });
-      if (dto.capacity < currentEnrollments) {
+      if (dto.capacity < activeEnrollments) {
         throw new BadRequestException(
-          `Sức chứa mới (${dto.capacity}) không được nhỏ hơn số lượng học viên hiện tại (${currentEnrollments}).`,
+          `Sức chứa mới (${dto.capacity}) không được nhỏ hơn số lượng học viên đang học (${activeEnrollments}).`,
         );
+      }
+    }
+
+    // 6.1 Tuition Fee Lock: only editable in UPCOMING status and with 0 total enrollments
+    if (dto.tuitionFeeVnd !== undefined) {
+      if (dto.tuitionFeeVnd < 0) {
+        throw new BadRequestException('Học phí (tuitionFeeVnd) không được âm');
+      }
+      if (dto.tuitionFeeVnd !== classData.tuitionFeeVnd) {
+        if (classData.status !== ClassStatus.UPCOMING) {
+          throw new BadRequestException(
+            'Chỉ có thể thay đổi học phí khi lớp học ở trạng thái UPCOMING',
+          );
+        }
+        const totalEnrollments = await this.prisma.enrollment.count({
+          where: { classId },
+        });
+        if (totalEnrollments > 0) {
+          throw new BadRequestException(
+            `Không thể thay đổi học phí vì lớp học đã có ${totalEnrollments} lượt ghi danh (bảo vệ tính toàn vẹn học phí).`,
+          );
+        }
       }
     }
 
@@ -734,7 +794,7 @@ export class CourseService {
       targetTeacherId = dto.teacherId;
     }
 
-    return this.prisma.class.update({
+    const updatedClass = await this.prisma.class.update({
       where: { id: classId },
       data: {
         name: dto.name !== undefined ? dto.name.trim() : undefined,
@@ -743,6 +803,7 @@ export class CourseService {
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
         meetingLink: dto.meetingLink,
         capacity: dto.capacity,
+        tuitionFeeVnd: dto.tuitionFeeVnd,
         status: dto.status,
       },
       include: {
@@ -754,8 +815,25 @@ export class CourseService {
             profile: { select: { fullName: true } },
           },
         },
+        _count: { select: { enrollments: true } },
       },
     });
+
+    const activeEnrollmentCount = await this.prisma.enrollment.count({
+      where: {
+        classId,
+        status: EnrollmentStatus.ACTIVE,
+      },
+    });
+    const totalEnrollmentCount = updatedClass._count?.enrollments ?? 0;
+
+    return {
+      ...updatedClass,
+      activeEnrollmentCount,
+      totalEnrollmentCount,
+      hasEnrollments: totalEnrollmentCount > 0,
+      studentCount: activeEnrollmentCount,
+    };
   }
 
   async deleteClass(classId: number, user: { id: number; role: Role }) {
@@ -806,10 +884,19 @@ export class CourseService {
         },
         orderBy: { startDate: 'desc' },
       });
-      return classes.map((c) => ({
-        ...c,
-        studentCount: c._count.enrollments,
-      }));
+      return classes.map((c) => {
+        const totalEnrollmentCount = c._count.enrollments;
+        const activeEnrollmentCount = (c.enrollments || []).filter(
+          (e) => e.status === EnrollmentStatus.ACTIVE,
+        ).length;
+        return {
+          ...c,
+          activeEnrollmentCount,
+          totalEnrollmentCount,
+          hasEnrollments: totalEnrollmentCount > 0,
+          studentCount: activeEnrollmentCount,
+        };
+      });
     } else if (role === 'STUDENT') {
       const enrollments = await this.prisma.enrollment.findMany({
         where: { userId },
@@ -834,6 +921,9 @@ export class CourseService {
       });
       return enrollments.map((e) => ({
         ...e.class,
+        meetingLink:
+          e.status === EnrollmentStatus.ACTIVE ? e.class.meetingLink : null,
+        enrollmentStatus: e.status,
         studentCount: e.class._count.enrollments,
       }));
     }
@@ -880,68 +970,148 @@ export class CourseService {
 
   // ================= ENROLLMENT =================
 
-  async enrollInClass(classId: number, userId: number) {
-    // 1. Kiểm tra Class tồn tại
-    const classData = await this.prisma.class.findUnique({
-      where: { id: classId },
-      include: {
-        _count: { select: { enrollments: true } },
-      },
-    });
-    if (!classData) {
-      throw new NotFoundException('Class not found');
-    }
-
-    // 2. Kiểm tra trạng thái Class
-    if (classData.status === ClassStatus.CANCELLED) {
-      throw new BadRequestException(
-        'Không thể ghi danh vào lớp học đã bị hủy (CANCELLED)',
-      );
-    }
-    if (classData.status === ClassStatus.COMPLETED) {
-      throw new BadRequestException(
-        'Không thể ghi danh vào lớp học đã kết thúc (COMPLETED)',
-      );
-    }
-
-    // 3. Kiểm tra ghi danh trùng lặp
-    const existing = await this.prisma.enrollment.findUnique({
+  async getMyEnrollmentsInCourse(courseId: number, userId: number) {
+    return this.prisma.enrollment.findMany({
       where: {
-        userId_classId: {
-          userId,
-          classId,
+        userId,
+        class: {
+          courseId,
         },
       },
-    });
-    if (existing) {
-      throw new ConflictException('Học viên đã ghi danh vào lớp học này rồi');
-    }
-
-    // 4. Kiểm tra Capacity
-    if (
-      classData.capacity !== null &&
-      classData._count.enrollments >= classData.capacity
-    ) {
-      throw new BadRequestException(
-        'Lớp học đã đủ số lượng học viên tối đa (Full capacity)',
-      );
-    }
-
-    // 5. Tạo enrollment
-    return this.prisma.enrollment.create({
-      data: {
-        userId,
-        classId,
-        status: EnrollmentStatus.ACTIVE,
-        progress: 0,
+      select: {
+        id: true,
+        classId: true,
+        status: true,
+        joinedAt: true,
       },
-      include: {
-        class: {
-          include: {
-            course: { select: { id: true, title: true } },
+    });
+  }
+
+  async enrollInClass(
+    classId: number,
+    userId: number,
+    options?: { isAdminOverride?: boolean },
+  ): Promise<EnrollResponseDto> {
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Lock Class row using parameterized tagged template
+      const lockedClasses = await tx.$queryRaw<
+        Array<{
+          id: number;
+          status: ClassStatus;
+          capacity: number | null;
+          tuitionFeeVnd: number | null;
+        }>
+      >`SELECT id, status, capacity, "tuitionFeeVnd" FROM "Class" WHERE id = ${classId} FOR UPDATE;`;
+
+      if (!lockedClasses || lockedClasses.length === 0) {
+        throw new NotFoundException('Lớp học không tồn tại');
+      }
+      const classData = lockedClasses[0];
+
+      // 2. Validate Class status
+      if (classData.status === ClassStatus.CANCELLED) {
+        throw new BadRequestException(
+          'Không thể ghi danh vào lớp học đã bị hủy (CANCELLED)',
+        );
+      }
+      if (classData.status === ClassStatus.COMPLETED) {
+        throw new BadRequestException(
+          'Không thể ghi danh vào lớp học đã kết thúc (COMPLETED)',
+        );
+      }
+
+      if (!options?.isAdminOverride) {
+        if (classData.status !== ClassStatus.UPCOMING) {
+          throw new BadRequestException(
+            'Chỉ có thể ghi danh vào lớp học sắp khai giảng (UPCOMING)',
+          );
+        }
+      } else {
+        // Admin override: UPCOMING or ONGOING only
+        if (
+          classData.status !== ClassStatus.UPCOMING &&
+          classData.status !== ClassStatus.ONGOING
+        ) {
+          throw new BadRequestException(
+            'Admin chỉ có thể ghi danh học viên vào lớp UPCOMING hoặc ONGOING',
+          );
+        }
+      }
+
+      // 3. Duplicate check (TX level)
+      const existing = await tx.enrollment.findUnique({
+        where: {
+          userId_classId: {
+            userId,
+            classId,
           },
         },
-      },
+      });
+      if (existing) {
+        throw new ConflictException('Học viên đã ghi danh vào lớp học này rồi');
+      }
+
+      // 4. Seat Occupancy Check (ACTIVE enrollments only!)
+      const activeEnrollmentsCount = await tx.enrollment.count({
+        where: {
+          classId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+      });
+
+      if (
+        classData.capacity !== null &&
+        activeEnrollmentsCount >= classData.capacity
+      ) {
+        throw new ConflictException(
+          'Lớp học đã đủ số lượng học viên tối đa (Full capacity)',
+        );
+      }
+
+      // 5. Determine Enrollment Status
+      const tuitionFeeVnd = classData.tuitionFeeVnd ?? 0;
+      let enrollmentStatus: EnrollmentStatus;
+      let message: string;
+
+      if (options?.isAdminOverride) {
+        enrollmentStatus = EnrollmentStatus.ACTIVE;
+        message = 'Admin đã ghi danh học viên vào lớp học thành công';
+      } else if (tuitionFeeVnd === 0) {
+        enrollmentStatus = EnrollmentStatus.ACTIVE;
+        message = 'Ghi danh lớp học miễn phí thành công.';
+      } else {
+        enrollmentStatus = EnrollmentStatus.PENDING_PAYMENT;
+        message =
+          'Ghi danh thành công. Vui lòng thanh toán học phí để hoàn tất kích hoạt lớp học.';
+      }
+
+      // 6. Create enrollment inside tx
+      try {
+        const enrollment = await tx.enrollment.create({
+          data: {
+            userId,
+            classId,
+            status: enrollmentStatus,
+            progress: 0,
+          },
+        });
+
+        return {
+          enrollmentId: enrollment.id,
+          classId: enrollment.classId,
+          status: enrollment.status as 'ACTIVE' | 'PENDING_PAYMENT',
+          tuitionFeeVnd,
+          accessGranted: enrollment.status === EnrollmentStatus.ACTIVE,
+          message,
+        };
+      } catch (error: any) {
+        if (error.code === 'P2002') {
+          throw new ConflictException(
+            'Học viên đã ghi danh vào lớp học này rồi',
+          );
+        }
+        throw error;
+      }
     });
   }
 
@@ -1299,6 +1469,7 @@ export class CourseService {
             endDate: true,
             capacity: true,
             status: true,
+            tuitionFeeVnd: true,
             teacher: {
               select: {
                 id: true,
@@ -1351,6 +1522,7 @@ export class CourseService {
           startDate: cls.startDate,
           endDate: cls.endDate,
           capacity,
+          tuitionFeeVnd: cls.tuitionFeeVnd ?? 0,
           currentEnrollmentCount,
           remainingSeats,
           isSoldOut: remainingSeats <= 0,
