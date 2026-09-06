@@ -9,6 +9,7 @@ import {
   CourseStatus,
   ClassStatus,
   EnrollmentStatus,
+  PaymentStatus,
 } from '@prisma/client';
 import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
@@ -33,25 +34,29 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
   let tokenStudentD: string;
   let tokenTeacher: string;
   let tokenAdmin: string;
+  let makeToken: (user: any) => string;
 
   let testCourse: any;
   let freeClass: any;
   let paidClass: any;
   let singleSeatClass: any;
+  let singleSeatPaidClass: any;
   let completedClass: any;
   let paidClassAssignment: any;
 
   beforeAll(async () => {
     // 0. Safety Fuse: Refuse to run against any non-test database!
     const dbUrl = process.env.DATABASE_URL || '';
-    if (!dbUrl.includes('test') && !dbUrl.includes('kltn_test_db')) {
+    const urlMatches =
+      (dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1')) &&
+      dbUrl.includes('5432') &&
+      (dbUrl.includes('kltn_test_db') || dbUrl.includes('kltn_test'));
+
+    if (!urlMatches) {
       throw new Error(
-        `SAFETY FUSE TRIGGERED: Refusing to run destructive E2E tests outside isolated test DB! DATABASE_URL must contain 'test' or 'kltn_test_db'. Current: ${dbUrl.replace(/:[^:@]+@/, ':***@')}`,
+        `SAFETY FUSE TRIGGERED: Refusing to run destructive E2E tests outside isolated test DB! DATABASE_URL must point to localhost:5432/kltn_test_db or localhost:5432/kltn_test. Current: ${dbUrl.replace(/:[^:@]+@/, ':***@')}`,
       );
     }
-    console.log(
-      `[SAFETY FUSE PASSED] Running E2E suite against verified test DB: ${dbUrl.replace(/:[^:@]+@/, ':***@')}`,
-    );
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -65,6 +70,24 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
 
     prisma = app.get<PrismaService>(PrismaService);
     jwtService = app.get<JwtService>(JwtService);
+
+    // Verify real PostgreSQL connection identity
+    const [dbInfo] = await prisma.$queryRaw<
+      Array<{ db: string; schema: string }>
+    >`SELECT current_database() AS db, current_schema() AS schema;`;
+
+    if (
+      (dbInfo?.db !== 'kltn_test_db' && dbInfo?.db !== 'kltn_test') ||
+      dbInfo?.schema !== 'public'
+    ) {
+      throw new Error(
+        `SAFETY FUSE ABORT: Connected PostgreSQL database is '${dbInfo?.db}' (schema: '${dbInfo?.schema}'). Must be kltn_test_db.public or kltn_test.public!`,
+      );
+    }
+    console.log(
+      `[SAFETY FUSE PASSED] Running E2E suite against verified test DB: ${dbInfo.db}.${dbInfo.schema}`,
+    );
+
     try {
       redis = app.get<Redis>(getRedisConnectionToken());
     } catch {
@@ -133,7 +156,7 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
     });
 
     // 2. Generate JWT tokens
-    const makeToken = (user: any) =>
+    makeToken = (user: any) =>
       jwtService.sign({
         sub: user.id,
         email: user.email,
@@ -210,6 +233,19 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       },
     });
 
+    // Single seat paid class for paid capacity non-reservation test
+    singleSeatPaidClass = await prisma.class.create({
+      data: {
+        name: 'E2E Single Seat Paid Class',
+        courseId: testCourse.id,
+        teacherId: teacherUser.id,
+        capacity: 1,
+        tuitionFeeVnd: 150000,
+        status: ClassStatus.UPCOMING,
+        meetingLink: 'https://daily.co/e2e-single-paid',
+      },
+    });
+
     // Completed class for admin override validation
     completedClass = await prisma.class.create({
       data: {
@@ -240,6 +276,7 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       freeClass?.id,
       paidClass?.id,
       singleSeatClass?.id,
+      singleSeatPaidClass?.id,
       completedClass?.id,
     ].filter(Boolean);
 
@@ -251,6 +288,11 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
         .catch(() => null);
       await prisma.assignment
         ?.deleteMany({ where: { classId: { in: classIds } } })
+        .catch(() => null);
+      await prisma.payment
+        ?.deleteMany({
+          where: { enrollment: { classId: { in: classIds } } },
+        })
         .catch(() => null);
       await prisma.enrollment
         ?.deleteMany({ where: { classId: { in: classIds } } })
@@ -292,7 +334,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
     if (prisma) {
       await prisma.$disconnect().catch(() => null);
     }
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   describe('1. Authentication & Role Guard on POST /courses/classes/:classId/enroll', () => {
@@ -355,6 +399,16 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       expect(dbEnrollment).toBeDefined();
       expect(dbEnrollment?.userId).toBe(studentA.id);
       expect(dbEnrollment?.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+
+      // Verify exactly ONE Payment record created in DB with correct snapshot
+      const dbPayment = await prisma.payment.findUnique({
+        where: { enrollmentId: dbEnrollment!.id },
+      });
+      expect(dbPayment).toBeDefined();
+      expect(dbPayment?.amountVnd).toBe(200000);
+      expect(dbPayment?.transferCode).toBe(`BT-${dbEnrollment!.id}`);
+      expect(dbPayment?.status).toBe(PaymentStatus.PENDING);
+      expect(dbPayment?.activationIssue).toBeNull();
 
       // Verify attacker-specified userId 99999 was NOT created
       const attackerEnrollment = await prisma.enrollment.findFirst({
@@ -455,6 +509,12 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
 
       expect(accessRes.status).toBe(200);
       expect(accessRes.body.id).toBe(freeClass.id);
+
+      // Payment count for free class enrollment must be strictly 0
+      const paymentCount = await prisma.payment.count({
+        where: { enrollment: { classId: freeClass.id, userId: studentA.id } },
+      });
+      expect(paymentCount).toBe(0);
     });
 
     it('Student duplicate enrollment into FREE class -> 409 Conflict', async () => {
@@ -526,7 +586,63 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
   });
 
   describe('6. Real Database Concurrency Acceptance Test (Row-Lock FOR UPDATE) (R5)', () => {
-    it('Capacity Race: 2 concurrent requests for 1 remaining seat -> 1 success (2xx), 1 conflict (409)', async () => {
+    // CASE A — SAME STUDENT / SAME PAID CLASS: 2 concurrent requests from SAME student for SAME paid class
+    it('Case A: Duplicate Race on Paid Class: 2 concurrent requests from SAME student -> 1 success, 1 conflict, 1 Payment in DB', async () => {
+      const freshStudent = await prisma.user.create({
+        data: {
+          email: `concurrent_paid_${Date.now()}@breadtrans.com`,
+          password: 'hashed_password_123',
+          role: Role.STUDENT,
+        },
+      });
+      const tokenFresh = makeToken(freshStudent);
+
+      const [dup1, dup2] = await Promise.all([
+        request(app.getHttpServer())
+          .post(`/courses/classes/${paidClass.id}/enroll`)
+          .set('Authorization', `Bearer ${tokenFresh}`)
+          .send(),
+        request(app.getHttpServer())
+          .post(`/courses/classes/${paidClass.id}/enroll`)
+          .set('Authorization', `Bearer ${tokenFresh}`)
+          .send(),
+      ]);
+
+      const statuses = [dup1.status, dup2.status];
+      const successCount = statuses.filter((s) =>
+        [200, 201].includes(s),
+      ).length;
+      const conflictCount = statuses.filter((s) => s === 409).length;
+
+      expect(successCount).toBe(1);
+      expect(conflictCount).toBe(1);
+
+      // Verify DB record count: strictly 1 Enrollment, strictly 1 Payment
+      const enrollmentRows = await prisma.enrollment.findMany({
+        where: { classId: paidClass.id, userId: freshStudent.id },
+      });
+      expect(enrollmentRows.length).toBe(1);
+
+      const paymentRows = await prisma.payment.findMany({
+        where: { enrollmentId: enrollmentRows[0].id },
+      });
+      expect(paymentRows.length).toBe(1);
+      expect(paymentRows[0].amountVnd).toBe(paidClass.tuitionFeeVnd);
+      expect(paymentRows[0].transferCode).toBe(`BT-${enrollmentRows[0].id}`);
+      expect(paymentRows[0].status).toBe(PaymentStatus.PENDING);
+
+      // Cleanup fresh user
+      await prisma.payment.deleteMany({
+        where: { enrollmentId: enrollmentRows[0].id },
+      });
+      await prisma.enrollment.deleteMany({
+        where: { userId: freshStudent.id },
+      });
+      await prisma.user.delete({ where: { id: freshStudent.id } });
+    });
+
+    // CASE B — FREE CLASS CAPACITY RACE: capacity = 1, 2 DIFFERENT students
+    it('Case B: Free Class Capacity Race: 2 concurrent requests for 1 remaining seat -> 1 success, 1 conflict (409)', async () => {
       // Student C and Student D attempt to enroll concurrently into singleSeatClass (capacity = 1)
       const [resC, resD] = await Promise.all([
         request(app.getHttpServer())
@@ -540,13 +656,15 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       ]);
 
       const statuses = [resC.status, resD.status];
-      const successCount = statuses.filter((s) => s >= 200 && s < 300).length;
+      const successCount = statuses.filter((s) =>
+        [200, 201].includes(s),
+      ).length;
       const conflictCount = statuses.filter((s) => s === 409).length;
 
       expect(successCount).toBe(1);
       expect(conflictCount).toBe(1);
 
-      // Verify DB count: strictly matches capacity invariant (ACTIVE count == capacity)
+      // Verify DB count: strictly matches capacity invariant (ACTIVE count == 1)
       const activeCount = await prisma.enrollment.count({
         where: {
           classId: singleSeatClass.id,
@@ -556,35 +674,77 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       expect(activeCount).toBe(singleSeatClass.capacity);
     });
 
-    it('Duplicate Race: 2 concurrent requests from SAME student for SAME class -> 1 success, 1 conflict, 0 errors', async () => {
-      // Student D tries to enroll in freeClass concurrently twice
-      const [dup1, dup2] = await Promise.all([
+    // CASE C — PAID NON-RESERVATION: capacity = 1, 2 DIFFERENT students, paid UPCOMING class
+    it('Case C: Paid Non-Reservation: 2 different Students enroll in paid class (capacity=1) -> both get PENDING_PAYMENT, ACTIVE count remains 0', async () => {
+      const studentP1 = await prisma.user.create({
+        data: {
+          email: `nonres_p1_${Date.now()}@breadtrans.com`,
+          password: 'hashed_password_123',
+          role: Role.STUDENT,
+        },
+      });
+      const studentP2 = await prisma.user.create({
+        data: {
+          email: `nonres_p2_${Date.now()}@breadtrans.com`,
+          password: 'hashed_password_123',
+          role: Role.STUDENT,
+        },
+      });
+      const tokenP1 = makeToken(studentP1);
+      const tokenP2 = makeToken(studentP2);
+
+      const [resP1, resP2] = await Promise.all([
         request(app.getHttpServer())
-          .post(`/courses/classes/${freeClass.id}/enroll`)
-          .set('Authorization', `Bearer ${tokenStudentD}`)
+          .post(`/courses/classes/${singleSeatPaidClass.id}/enroll`)
+          .set('Authorization', `Bearer ${tokenP1}`)
           .send(),
         request(app.getHttpServer())
-          .post(`/courses/classes/${freeClass.id}/enroll`)
-          .set('Authorization', `Bearer ${tokenStudentD}`)
+          .post(`/courses/classes/${singleSeatPaidClass.id}/enroll`)
+          .set('Authorization', `Bearer ${tokenP2}`)
           .send(),
       ]);
 
-      const statuses = [dup1.status, dup2.status];
-      const successCount = statuses.filter((s) => s >= 200 && s < 300).length;
-      const conflictCount = statuses.filter((s) => s === 409).length;
+      expect([200, 201]).toContain(resP1.status);
+      expect([200, 201]).toContain(resP2.status);
+      expect(resP1.body.status).toBe('PENDING_PAYMENT');
+      expect(resP2.body.status).toBe('PENDING_PAYMENT');
 
-      expect(successCount).toBe(1);
-      expect(conflictCount).toBe(1);
-      expect(statuses).not.toContain(500);
+      // Both receive distinct Payments
+      const p1Payment = await prisma.payment.findUnique({
+        where: { enrollmentId: resP1.body.enrollmentId },
+      });
+      const p2Payment = await prisma.payment.findUnique({
+        where: { enrollmentId: resP2.body.enrollmentId },
+      });
+      expect(p1Payment).toBeDefined();
+      expect(p2Payment).toBeDefined();
+      expect(p1Payment?.id).not.toBe(p2Payment?.id);
+      expect(p1Payment?.transferCode).toBe(`BT-${resP1.body.enrollmentId}`);
+      expect(p2Payment?.transferCode).toBe(`BT-${resP2.body.enrollmentId}`);
 
-      // DB record count must be strictly 1
-      const enrollmentRows = await prisma.enrollment.count({
+      // Crucial invariant: ACTIVE count in DB remains strictly 0!
+      const activeCount = await prisma.enrollment.count({
         where: {
-          classId: freeClass.id,
-          userId: studentD.id,
+          classId: singleSeatPaidClass.id,
+          status: EnrollmentStatus.ACTIVE,
         },
       });
-      expect(enrollmentRows).toBe(1);
+      expect(activeCount).toBe(0);
+
+      // Cleanup
+      await prisma.payment.deleteMany({
+        where: {
+          enrollmentId: {
+            in: [resP1.body.enrollmentId, resP2.body.enrollmentId],
+          },
+        },
+      });
+      await prisma.enrollment.deleteMany({
+        where: { userId: { in: [studentP1.id, studentP2.id] } },
+      });
+      await prisma.user.deleteMany({
+        where: { id: { in: [studentP1.id, studentP2.id] } },
+      });
     });
   });
 });

@@ -1,4 +1,4 @@
-import { PrismaClient, Role, QuizType, TopicCategory, CourseStatus, ClassStatus, EnrollmentStatus } from '@prisma/client';
+import { PrismaClient, Role, QuizType, TopicCategory, CourseStatus, ClassStatus, EnrollmentStatus, PaymentStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient({ log: ['warn', 'error'] });
@@ -17,7 +17,8 @@ async function clearDB() {
     'UserBookProgress', 'Leaderboard', 'UserBadge', 'Badge', 'PointHistory',
     'Attendance', 'Session', 'AssignmentSubmission', 'Assignment', 'Announcement',
     'Result', 'Submission', 'Question', 'Quiz', 'PracticeTopic',
-    'Material', 'Lesson', 'Enrollment', 'Class', 'Course',
+    'Material', 'Lesson',
+    'Payment', 'Enrollment', 'Class', 'Course',
     'UserQuestProgress', 'DailyQuest', 'UserPet',
     'UserBilling', 'UserStats', 'Profile', 'User'
   ];
@@ -368,19 +369,73 @@ async function main() {
     classes.push(cls);
   }
 
-  // Enrollments
+  // Enrollments — mix of ACTIVE (free) and PENDING_PAYMENT (paid)
+  // Classes 0,1,2,3 are free (tuitionFeeVnd=0), classes 4,5,6,7 are paid
+  // Update class tuition fees first
+  const paidClassIndices = [4, 5, 6, 7];
+  const tuitionFees = [800000, 1200000, 900000, 1500000];
+  for (let i = 0; i < paidClassIndices.length; i++) {
+    await prisma.class.update({
+      where: { id: classes[paidClassIndices[i]].id },
+      data: { tuitionFeeVnd: tuitionFees[i] }
+    });
+    // Update local reference too
+    (classes[paidClassIndices[i]] as any).tuitionFeeVnd = tuitionFees[i];
+  }
+
+  const allEnrollments: any[] = [];
   for (let i = 0; i < students.length; i++) {
     const student = students[i];
-    const cls1 = classes[i % classes.length];
-    const cls2 = classes[(i + 3) % classes.length];
+    const cls1 = classes[i % classes.length];       // some free, some paid
+    const cls2 = classes[(i + 3) % classes.length]; // some free, some paid
 
-    await prisma.enrollment.createMany({
-      data: [
-        { userId: student.id, classId: cls1.id, status: EnrollmentStatus.ACTIVE, progress: 35 + (i * 5) % 60 },
-        { userId: student.id, classId: cls2.id, status: EnrollmentStatus.ACTIVE, progress: 20 + (i * 7) % 50 },
-      ]
+    const cls1Fee = (cls1 as any).tuitionFeeVnd ?? 0;
+    const cls2Fee = (cls2 as any).tuitionFeeVnd ?? 0;
+
+    const e1 = await prisma.enrollment.create({
+      data: {
+        userId: student.id,
+        classId: cls1.id,
+        status: cls1Fee === 0 ? EnrollmentStatus.ACTIVE : EnrollmentStatus.PENDING_PAYMENT,
+        progress: cls1Fee === 0 ? 35 + (i * 5) % 60 : 0,
+      }
     });
+    allEnrollments.push({ enrollment: e1, classObj: cls1, fee: cls1Fee });
+
+    // Only add second enrollment if different class
+    if (cls2.id !== cls1.id) {
+      const e2 = await prisma.enrollment.create({
+        data: {
+          userId: student.id,
+          classId: cls2.id,
+          status: cls2Fee === 0 ? EnrollmentStatus.ACTIVE : EnrollmentStatus.PENDING_PAYMENT,
+          progress: cls2Fee === 0 ? 20 + (i * 7) % 50 : 0,
+        }
+      });
+      allEnrollments.push({ enrollment: e2, classObj: cls2, fee: cls2Fee });
+    }
   }
+
+  // ==========================================
+  // PAYMENT SEED — for PENDING_PAYMENT enrollments
+  // ==========================================
+  console.log('💳 Seeding Payments for PENDING_PAYMENT enrollments...');
+  let paymentCount = 0;
+  for (const { enrollment, fee } of allEnrollments) {
+    if (enrollment.status !== EnrollmentStatus.PENDING_PAYMENT) continue;
+    if (fee <= 0) continue; // skip if somehow fee is 0
+
+    await prisma.payment.create({
+      data: {
+        enrollmentId: enrollment.id,
+        amountVnd: fee,
+        transferCode: `BT-${enrollment.id}`,
+        status: PaymentStatus.PENDING,
+      }
+    });
+    paymentCount++;
+  }
+  console.log(`   Created ${paymentCount} Payment records for PENDING_PAYMENT enrollments.`);
 
   // Sessions & Attendance & Materials
   for (let cIdx = 0; cIdx < classes.length; cIdx++) {
@@ -991,7 +1046,9 @@ async function main() {
   console.log('✅ ALL SEED DATA GENERATED SUCCESSFULLY!');
   console.log(`- Users: ${1 + teachers.length + students.length} (1 Admin, ${teachers.length} Teachers, ${students.length} Students)`);
   console.log(`- Courses: ${courses.length}`);
-  console.log(`- Classes: ${classes.length}`);
+  console.log(`- Classes: ${classes.length} (some paid with tuition fees)`);
+  console.log(`- Enrollments: mix of ACTIVE and PENDING_PAYMENT`);
+  console.log(`- Payments: seeded for all PENDING_PAYMENT enrollments`);
   console.log(`- Market Products: ${products.length}`);
   console.log(`- Vocab Topics: ${vocabTopicsData.length} topics`);
   console.log(`- Practice Topics: ${grammarPracticeData.length}`);

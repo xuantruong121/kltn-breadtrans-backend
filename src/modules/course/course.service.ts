@@ -23,6 +23,7 @@ import {
   CourseStatus,
   ClassStatus,
   EnrollmentStatus,
+  PaymentStatus,
 } from '@prisma/client';
 
 @Injectable()
@@ -509,6 +510,15 @@ export class CourseService {
       }
     }
 
+    const paymentCount = await this.prisma.payment.count({
+      where: { enrollment: { class: { courseId: id } } },
+    });
+    if (paymentCount > 0) {
+      throw new ConflictException(
+        'Không thể xóa khóa học vì tồn tại lịch sử thanh toán cần được lưu giữ.',
+      );
+    }
+
     const deleted = await this.prisma.course.delete({ where: { id } });
     this.eventsGateway.broadcastCourseUpdate();
     return deleted;
@@ -853,7 +863,7 @@ export class CourseService {
     });
     if (enrollmentCount > 0) {
       throw new BadRequestException(
-        `Lớp học đã có ${enrollmentCount} học viên đăng ký. Không thể xóa trực tiếp, vui lòng chuyển trạng thái sang CANCELLED để bảo lưu lịch sử học tập.`,
+        `Lớp học đã có ${enrollmentCount} học viên đăng ký hoặc lịch sử thanh toán. Không thể xóa trực tiếp, vui lòng chuyển trạng thái sang CANCELLED để bảo lưu lịch sử.`,
       );
     }
 
@@ -1095,6 +1105,25 @@ export class CourseService {
             progress: 0,
           },
         });
+
+        // 7. For paid Student self-enrollment only, atomically create Payment using transaction client
+        if (!options?.isAdminOverride && tuitionFeeVnd > 0) {
+          await tx.payment.create({
+            data: {
+              enrollmentId: enrollment.id,
+              amountVnd: tuitionFeeVnd,
+              transferCode: `BT-${enrollment.id}`,
+              status: PaymentStatus.PENDING,
+              activationIssue: null,
+              reportedAt: null,
+              reviewedAt: null,
+              confirmedAt: null,
+              reviewedById: null,
+              adminNote: null,
+              activationNotifiedAt: null,
+            },
+          });
+        }
 
         return {
           enrollmentId: enrollment.id,

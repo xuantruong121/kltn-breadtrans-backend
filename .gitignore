@@ -7,3 +7,8 @@ dist
 .env.local
 
 /generated/prisma
+
+# Build artifacts & scratch
+scratch/
+cloudflared.exe
+*.exe
