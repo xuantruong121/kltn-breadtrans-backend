@@ -1,5 +1,5 @@
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateCourseDto, UpdateCourseDto, CreateClassDto, UpdateClassDto, CreateLessonDto, UpdateLessonDto, CreateMaterialDto, UpdateMaterialDto } from './dto/course.dto';
+import { CreateCourseDto, UpdateCourseDto, CreateClassDto, UpdateClassDto, CreateLessonDto, UpdateLessonDto, CreateMaterialDto, UpdateMaterialDto, EnrollResponseDto } from './dto/course.dto';
 import { EventsGateway } from '../events/events.gateway';
 import { Role, CourseStatus } from '@prisma/client';
 export declare class CourseService {
@@ -51,6 +51,7 @@ export declare class CourseService {
             endDate: Date | null;
             meetingLink: string | null;
             capacity: number | null;
+            tuitionFeeVnd: number;
             status: import(".prisma/client").$Enums.ClassStatus;
             links: import("@prisma/client/runtime/library").JsonValue | null;
             summary: import("@prisma/client/runtime/library").JsonValue | null;
@@ -79,6 +80,7 @@ export declare class CourseService {
         capacity: number | null;
         progress: number;
         enrollmentStatus: import(".prisma/client").$Enums.EnrollmentStatus;
+        tuitionFeeVnd: number;
         joinedAt: Date;
         studentCount: number;
         teacher: {
@@ -90,6 +92,9 @@ export declare class CourseService {
             } | null;
         };
         course: {
+            lessons: {
+                videoUrl: string | null;
+            }[];
             teacher: {
                 id: number;
                 email: string;
@@ -108,10 +113,6 @@ export declare class CourseService {
                     isSelfClaimed: boolean;
                 } | null;
             } | null;
-            lessons: {
-                videoUrl: string | null;
-            }[];
-        } & {
             createdAt: Date;
             id: number;
             title: string;
@@ -123,7 +124,43 @@ export declare class CourseService {
             thumbnail: string | null;
         };
     }[]>;
-    getCourseById(id: number): Promise<{
+    getCourseById(id: number, userId?: number, role?: string): Promise<{
+        classes: {
+            tuitionFeeVnd: number;
+            activeEnrollmentCount: number;
+            totalEnrollmentCount: number;
+            hasEnrollments: boolean;
+            studentCount: number;
+            _count: {
+                enrollments: number;
+            };
+            enrollments: {
+                id: number;
+            }[];
+            teacher: {
+                id: number;
+                email: string;
+                profile: {
+                    fullName: string;
+                    avatar: string | null;
+                } | null;
+            };
+            name: string;
+            id: number;
+            courseId: number;
+            teacherId: number;
+            startDate: Date | null;
+            endDate: Date | null;
+            meetingLink: string | null;
+            capacity: number | null;
+            status: import(".prisma/client").$Enums.ClassStatus;
+            links: import("@prisma/client/runtime/library").JsonValue | null;
+            summary: import("@prisma/client/runtime/library").JsonValue | null;
+            noteProcess: string | null;
+            rank: import("@prisma/client/runtime/library").JsonValue | null;
+            stories: import("@prisma/client/runtime/library").JsonValue | null;
+            pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
+        }[];
         quizzes: {
             createdAt: Date;
             id: number;
@@ -144,35 +181,6 @@ export declare class CourseService {
                 avatar: string | null;
             } | null;
         } | null;
-        classes: ({
-            _count: {
-                enrollments: number;
-            };
-            teacher: {
-                id: number;
-                email: string;
-                profile: {
-                    fullName: string;
-                    avatar: string | null;
-                } | null;
-            };
-        } & {
-            name: string;
-            id: number;
-            courseId: number;
-            teacherId: number;
-            startDate: Date | null;
-            endDate: Date | null;
-            meetingLink: string | null;
-            capacity: number | null;
-            status: import(".prisma/client").$Enums.ClassStatus;
-            links: import("@prisma/client/runtime/library").JsonValue | null;
-            summary: import("@prisma/client/runtime/library").JsonValue | null;
-            noteProcess: string | null;
-            rank: import("@prisma/client/runtime/library").JsonValue | null;
-            stories: import("@prisma/client/runtime/library").JsonValue | null;
-            pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
-        })[];
         lessons: ({
             materials: {
                 id: number;
@@ -190,7 +198,67 @@ export declare class CourseService {
             courseId: number;
             videoUrl: string | null;
         })[];
-    } & {
+        createdAt: Date;
+        id: number;
+        title: string;
+        description: string | null;
+        updatedAt: Date;
+        teacherId: number | null;
+        status: import(".prisma/client").$Enums.CourseStatus;
+        level: string | null;
+        thumbnail: string | null;
+    } | {
+        lessons: {
+            id: number;
+            courseId: number;
+            title: string;
+            description: string | null;
+            order: number;
+            videoUrl: null;
+            createdAt: Date;
+            materials: {
+                id: number;
+                lessonId: number;
+                title: string;
+                fileType: string | null;
+                fileUrl: null;
+            }[];
+        }[];
+        classes: {
+            id: number;
+            courseId: number;
+            name: string;
+            status: import(".prisma/client").$Enums.ClassStatus;
+            startDate: Date | null;
+            endDate: Date | null;
+            capacity: number | null;
+            tuitionFeeVnd: number;
+            meetingLink: null;
+            teacher: {
+                id: number;
+                email: string;
+                profile: {
+                    fullName: string;
+                    avatar: string | null;
+                } | null;
+            };
+            activeEnrollmentCount: number;
+            totalEnrollmentCount: number;
+            hasEnrollments: boolean;
+            studentCount: number;
+            _count: {
+                enrollments: number;
+            };
+        }[];
+        quizzes: never[];
+        teacher: {
+            id: number;
+            email: string;
+            profile: {
+                fullName: string;
+                avatar: string | null;
+            } | null;
+        } | null;
         createdAt: Date;
         id: number;
         title: string;
@@ -322,6 +390,7 @@ export declare class CourseService {
         endDate: Date | null;
         meetingLink: string | null;
         capacity: number | null;
+        tuitionFeeVnd: number;
         status: import(".prisma/client").$Enums.ClassStatus;
         links: import("@prisma/client/runtime/library").JsonValue | null;
         summary: import("@prisma/client/runtime/library").JsonValue | null;
@@ -334,9 +403,16 @@ export declare class CourseService {
         id: number;
         role: Role;
     }, dto: UpdateClassDto): Promise<{
+        activeEnrollmentCount: number;
+        totalEnrollmentCount: number;
+        hasEnrollments: boolean;
+        studentCount: number;
         course: {
             id: number;
             title: string;
+        };
+        _count: {
+            enrollments: number;
         };
         teacher: {
             id: number;
@@ -345,7 +421,6 @@ export declare class CourseService {
                 fullName: string;
             } | null;
         };
-    } & {
         name: string;
         id: number;
         courseId: number;
@@ -354,6 +429,7 @@ export declare class CourseService {
         endDate: Date | null;
         meetingLink: string | null;
         capacity: number | null;
+        tuitionFeeVnd: number;
         status: import(".prisma/client").$Enums.ClassStatus;
         links: import("@prisma/client/runtime/library").JsonValue | null;
         summary: import("@prisma/client/runtime/library").JsonValue | null;
@@ -374,6 +450,7 @@ export declare class CourseService {
         endDate: Date | null;
         meetingLink: string | null;
         capacity: number | null;
+        tuitionFeeVnd: number;
         status: import(".prisma/client").$Enums.ClassStatus;
         links: import("@prisma/client/runtime/library").JsonValue | null;
         summary: import("@prisma/client/runtime/library").JsonValue | null;
@@ -383,6 +460,9 @@ export declare class CourseService {
         pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
     getUserClasses(userId: number, role: string): Promise<{
+        activeEnrollmentCount: number;
+        totalEnrollmentCount: number;
+        hasEnrollments: boolean;
         studentCount: number;
         course: {
             title: string;
@@ -427,6 +507,7 @@ export declare class CourseService {
         endDate: Date | null;
         meetingLink: string | null;
         capacity: number | null;
+        tuitionFeeVnd: number;
         status: import(".prisma/client").$Enums.ClassStatus;
         links: import("@prisma/client/runtime/library").JsonValue | null;
         summary: import("@prisma/client/runtime/library").JsonValue | null;
@@ -435,6 +516,8 @@ export declare class CourseService {
         stories: import("@prisma/client/runtime/library").JsonValue | null;
         pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
     }[] | {
+        meetingLink: string | null;
+        enrollmentStatus: import(".prisma/client").$Enums.EnrollmentStatus;
         studentCount: number;
         course: {
             title: string;
@@ -466,8 +549,8 @@ export declare class CourseService {
         teacherId: number;
         startDate: Date | null;
         endDate: Date | null;
-        meetingLink: string | null;
         capacity: number | null;
+        tuitionFeeVnd: number;
         status: import(".prisma/client").$Enums.ClassStatus;
         links: import("@prisma/client/runtime/library").JsonValue | null;
         summary: import("@prisma/client/runtime/library").JsonValue | null;
@@ -533,6 +616,7 @@ export declare class CourseService {
         endDate: Date | null;
         meetingLink: string | null;
         capacity: number | null;
+        tuitionFeeVnd: number;
         status: import(".prisma/client").$Enums.ClassStatus;
         links: import("@prisma/client/runtime/library").JsonValue | null;
         summary: import("@prisma/client/runtime/library").JsonValue | null;
@@ -541,37 +625,15 @@ export declare class CourseService {
         stories: import("@prisma/client/runtime/library").JsonValue | null;
         pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
-    enrollInClass(classId: number, userId: number): Promise<{
-        class: {
-            course: {
-                id: number;
-                title: string;
-            };
-        } & {
-            name: string;
-            id: number;
-            courseId: number;
-            teacherId: number;
-            startDate: Date | null;
-            endDate: Date | null;
-            meetingLink: string | null;
-            capacity: number | null;
-            status: import(".prisma/client").$Enums.ClassStatus;
-            links: import("@prisma/client/runtime/library").JsonValue | null;
-            summary: import("@prisma/client/runtime/library").JsonValue | null;
-            noteProcess: string | null;
-            rank: import("@prisma/client/runtime/library").JsonValue | null;
-            stories: import("@prisma/client/runtime/library").JsonValue | null;
-            pendingEvaluations: import("@prisma/client/runtime/library").JsonValue | null;
-        };
-    } & {
+    getMyEnrollmentsInCourse(courseId: number, userId: number): Promise<{
         id: number;
-        userId: number;
         status: import(".prisma/client").$Enums.EnrollmentStatus;
         classId: number;
         joinedAt: Date;
-        progress: number;
-    }>;
+    }[]>;
+    enrollInClass(classId: number, userId: number, options?: {
+        isAdminOverride?: boolean;
+    }): Promise<EnrollResponseDto>;
     createLesson(courseId: number, user: {
         id: number;
         role: Role;
@@ -660,5 +722,58 @@ export declare class CourseService {
         fileUrl: string;
         fileType: string | null;
         lessonId: number;
+    }>;
+    getPublicCatalog(): Promise<{
+        id: number;
+        title: string;
+        description: string | null;
+        thumbnail: string | null;
+        level: string | null;
+        status: import(".prisma/client").$Enums.CourseStatus;
+        createdAt: Date;
+        teacher: {
+            id: number | null;
+            fullName: string;
+            avatar: string | null;
+        };
+        upcomingClassCount: number;
+    }[]>;
+    getPublicCourseDetail(id: number): Promise<{
+        id: number;
+        title: string;
+        description: string | null;
+        thumbnail: string | null;
+        level: string | null;
+        status: import(".prisma/client").$Enums.CourseStatus;
+        createdAt: Date;
+        teacher: {
+            id: number | null;
+            fullName: string;
+            avatar: string | null;
+            specialization: string | null;
+        };
+        lessons: {
+            order: number;
+            id: number;
+            title: string;
+            description: string | null;
+        }[];
+        classes: {
+            id: number;
+            name: string;
+            startDate: Date | null;
+            endDate: Date | null;
+            capacity: number;
+            tuitionFeeVnd: number;
+            currentEnrollmentCount: number;
+            remainingSeats: number;
+            isSoldOut: boolean;
+            status: import(".prisma/client").$Enums.ClassStatus;
+            teacher: {
+                id: number;
+                fullName: string;
+                avatar: string | null;
+            };
+        }[];
     }>;
 }

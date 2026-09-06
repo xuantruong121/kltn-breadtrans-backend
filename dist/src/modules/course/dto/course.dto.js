@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateMaterialDto = exports.CreateMaterialDto = exports.ReorderLessonsDto = exports.UpdateLessonDto = exports.CreateLessonDto = exports.UpdateClassDto = exports.CreateClassDto = exports.ReviewCourseDto = exports.UpdateCourseDto = exports.CreateCourseDto = void 0;
+exports.UpdateMaterialDto = exports.CreateMaterialDto = exports.ReorderLessonsDto = exports.UpdateLessonDto = exports.CreateLessonDto = exports.EnrollResponseDto = exports.UpdateClassDto = exports.CreateClassDto = exports.ReviewCourseDto = exports.UpdateCourseDto = exports.CreateCourseDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
@@ -130,6 +130,7 @@ class CreateClassDto {
     endDate;
     meetingLink;
     capacity;
+    tuitionFeeVnd;
 }
 exports.CreateClassDto = CreateClassDto;
 __decorate([
@@ -175,6 +176,16 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Number)
 ], CreateClassDto.prototype, "capacity", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({
+        example: 2500000,
+        description: 'Học phí lớp học tính theo VNĐ (0 = Miễn phí)',
+    }),
+    (0, class_validator_1.IsInt)({ message: 'Học phí phải là số nguyên' }),
+    (0, class_validator_1.Min)(0, { message: 'Học phí không được nhỏ hơn 0' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateClassDto.prototype, "tuitionFeeVnd", void 0);
 class UpdateClassDto {
     name;
     teacherId;
@@ -182,6 +193,7 @@ class UpdateClassDto {
     endDate;
     meetingLink;
     capacity;
+    tuitionFeeVnd;
     status;
 }
 exports.UpdateClassDto = UpdateClassDto;
@@ -223,11 +235,54 @@ __decorate([
     __metadata("design:type", Number)
 ], UpdateClassDto.prototype, "capacity", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({
+        example: 2500000,
+        description: 'Học phí lớp học tính theo VNĐ (0 = Miễn phí)',
+    }),
+    (0, class_validator_1.IsInt)({ message: 'Học phí phải là số nguyên' }),
+    (0, class_validator_1.Min)(0, { message: 'Học phí không được nhỏ hơn 0' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdateClassDto.prototype, "tuitionFeeVnd", void 0);
+__decorate([
     (0, swagger_1.ApiPropertyOptional)({ enum: client_1.ClassStatus }),
     (0, class_validator_1.IsEnum)(client_1.ClassStatus),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateClassDto.prototype, "status", void 0);
+class EnrollResponseDto {
+    enrollmentId;
+    classId;
+    status;
+    tuitionFeeVnd;
+    accessGranted;
+    message;
+}
+exports.EnrollResponseDto = EnrollResponseDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 101 }),
+    __metadata("design:type", Number)
+], EnrollResponseDto.prototype, "enrollmentId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 23 }),
+    __metadata("design:type", Number)
+], EnrollResponseDto.prototype, "classId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'ACTIVE', enum: ['ACTIVE', 'PENDING_PAYMENT'] }),
+    __metadata("design:type", String)
+], EnrollResponseDto.prototype, "status", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 0 }),
+    __metadata("design:type", Number)
+], EnrollResponseDto.prototype, "tuitionFeeVnd", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: true }),
+    __metadata("design:type", Boolean)
+], EnrollResponseDto.prototype, "accessGranted", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'Đăng ký lớp học thành công.' }),
+    __metadata("design:type", String)
+], EnrollResponseDto.prototype, "message", void 0);
 class CreateLessonDto {
     title;
     description;

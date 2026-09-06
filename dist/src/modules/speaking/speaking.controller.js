@@ -113,6 +113,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], SpeakingController.prototype, "submitAudio", null);
 __decorate([
+    (0, common_1.UseGuards)(ai_rate_limit_guard_1.AiRateLimitGuard),
     (0, common_1.Post)('part3-5/submit'),
     (0, swagger_1.ApiOperation)({
         summary: 'Chấm điểm TOEIC Speaking Part 3-5 (Trả lời câu hỏi / Nêu giải pháp / Ý kiến)',

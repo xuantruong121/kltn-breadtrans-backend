@@ -87,7 +87,7 @@ export class AssignmentService {
     });
   }
 
-  async getAssignmentDetail(id: number) {
+  async getAssignmentDetail(id: number, userId?: number, role?: string) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id },
       include: {
@@ -106,6 +106,34 @@ export class AssignmentService {
       },
     });
     if (!assignment) throw new NotFoundException('Không tìm thấy bài tập');
+
+    if (role === 'STUDENT' && userId) {
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: {
+          classId: assignment.classId,
+          userId,
+          status: { in: ['ACTIVE', 'COMPLETED'] },
+        },
+      });
+      if (!enrollment) {
+        throw new ForbiddenException(
+          'Bạn chưa ghi danh hoặc không có quyền truy cập bài tập của lớp học này',
+        );
+      }
+      // Học sinh chỉ được xem bài nộp của chính mình
+      assignment.submissions = assignment.submissions.filter(
+        (s) => s.userId === userId,
+      );
+    } else if (role === 'TEACHER' && userId) {
+      if (assignment.class.teacherId !== userId) {
+        throw new ForbiddenException(
+          'Bạn không phải là giảng viên phụ trách lớp học này',
+        );
+      }
+      // Giáo viên phụ trách lớp xem được tất cả submissions của học sinh trong lớp
+    }
+    // ADMIN giữ nguyên quyền xem toàn bộ
+
     return assignment;
   }
 

@@ -102,6 +102,7 @@ export class SpeakingController {
     return this.speakingService.submitAudio(exerciseId, req.user.id, audio);
   }
 
+  @UseGuards(AiRateLimitGuard)
   @Post('part3-5/submit')
   @ApiOperation({
     summary:

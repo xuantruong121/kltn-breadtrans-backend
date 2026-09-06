@@ -10,6 +10,8 @@ import {
   Request,
   ParseIntPipe,
   Query,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { CourseService } from './course.service';
 import {
@@ -71,10 +73,22 @@ export class CourseController {
     return this.courseService.getUserClasses(req.user.id, req.user.role);
   }
 
+  @Get(':courseId/my-enrollments')
+  @Roles(Role.STUDENT)
+  @ApiOperation({
+    summary: 'Lấy trạng thái ghi danh của học viên trong các lớp của khóa học',
+  })
+  getMyEnrollmentsInCourse(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Request() req: any,
+  ) {
+    return this.courseService.getMyEnrollmentsInCourse(courseId, req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết một khóa học' })
-  getCourseById(@Param('id', ParseIntPipe) id: number) {
-    return this.courseService.getCourseById(id);
+  getCourseById(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.courseService.getCourseById(id, req.user?.id, req.user?.role);
   }
 
   @Patch(':id')
@@ -187,7 +201,8 @@ export class CourseController {
   }
 
   @Post('classes/:classId/enroll')
-  @Roles(Role.STUDENT, Role.ADMIN)
+  @Roles(Role.STUDENT)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Học viên ghi danh vào lớp học (Kiểm tra trạng thái & capacity)',
   })

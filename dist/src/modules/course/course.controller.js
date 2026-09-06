@@ -40,8 +40,11 @@ let CourseController = class CourseController {
     getUserClasses(req) {
         return this.courseService.getUserClasses(req.user.id, req.user.role);
     }
-    getCourseById(id) {
-        return this.courseService.getCourseById(id);
+    getMyEnrollmentsInCourse(courseId, req) {
+        return this.courseService.getMyEnrollmentsInCourse(courseId, req.user.id);
+    }
+    getCourseById(id, req) {
+        return this.courseService.getCourseById(id, req.user?.id, req.user?.role);
     }
     updateCourse(id, dto, req) {
         return this.courseService.updateCourse(id, dto, req.user);
@@ -140,11 +143,24 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], CourseController.prototype, "getUserClasses", null);
 __decorate([
+    (0, common_1.Get)(':courseId/my-enrollments'),
+    (0, roles_decorator_1.Roles)(client_1.Role.STUDENT),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Lấy trạng thái ghi danh của học viên trong các lớp của khóa học',
+    }),
+    __param(0, (0, common_1.Param)('courseId', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], CourseController.prototype, "getMyEnrollmentsInCourse", null);
+__decorate([
     (0, common_1.Get)(':id'),
     (0, swagger_1.ApiOperation)({ summary: 'Lấy chi tiết một khóa học' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], CourseController.prototype, "getCourseById", null);
 __decorate([
@@ -255,7 +271,8 @@ __decorate([
 ], CourseController.prototype, "deleteClass", null);
 __decorate([
     (0, common_1.Post)('classes/:classId/enroll'),
-    (0, roles_decorator_1.Roles)(client_1.Role.STUDENT, client_1.Role.ADMIN),
+    (0, roles_decorator_1.Roles)(client_1.Role.STUDENT),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({
         summary: 'Học viên ghi danh vào lớp học (Kiểm tra trạng thái & capacity)',
     }),

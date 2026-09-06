@@ -93,5 +93,74 @@ describe('AssignmentService - Cross-Ownership Security Tests', () => {
         ),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    // PEND-SEC-03a: Student with PENDING_PAYMENT / non-active enrollment -> 403 Forbidden on getAssignmentDetail
+    it('PEND-SEC-03a. Student with PENDING_PAYMENT -> 403 Forbidden on getAssignmentDetail', async () => {
+      mockPrisma.assignment.findUnique.mockResolvedValue({
+        id: 101,
+        classId: 202,
+        class: { id: 202, name: 'Math 101', teacherId: 50 },
+        submissions: [],
+      });
+      // No ACTIVE/COMPLETED enrollment found
+      mockPrisma.enrollment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getAssignmentDetail(101, 999, 'STUDENT'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    // PEND-SEC-03b: Student with ACTIVE enrollment -> returns only own submissions
+    it('PEND-SEC-03b. Student with ACTIVE enrollment -> sees only own submissions', async () => {
+      mockPrisma.assignment.findUnique.mockResolvedValue({
+        id: 101,
+        classId: 202,
+        class: { id: 202, name: 'Math 101', teacherId: 50 },
+        submissions: [
+          { id: 1, userId: 999, content: 'Own submission' },
+          { id: 2, userId: 888, content: 'Peer submission' },
+        ],
+      });
+      mockPrisma.enrollment.findFirst.mockResolvedValue({
+        id: 1,
+        classId: 202,
+        userId: 999,
+        status: 'ACTIVE',
+      });
+
+      const res = await service.getAssignmentDetail(101, 999, 'STUDENT');
+      expect(res.submissions).toHaveLength(1);
+      expect(res.submissions[0].userId).toBe(999);
+    });
+
+    // PEND-SEC-03c: Owner teacher -> sees all student submissions
+    it('PEND-SEC-03c. Owner teacher -> sees all student submissions', async () => {
+      mockPrisma.assignment.findUnique.mockResolvedValue({
+        id: 101,
+        classId: 202,
+        class: { id: 202, name: 'Math 101', teacherId: 50 },
+        submissions: [
+          { id: 1, userId: 999, content: 'Student 1 submission' },
+          { id: 2, userId: 888, content: 'Student 2 submission' },
+        ],
+      });
+
+      const res = await service.getAssignmentDetail(101, 50, 'TEACHER');
+      expect(res.submissions).toHaveLength(2);
+    });
+
+    // PEND-SEC-03d: Non-owner teacher -> 403 Forbidden
+    it('PEND-SEC-03d. Non-owner teacher -> 403 Forbidden', async () => {
+      mockPrisma.assignment.findUnique.mockResolvedValue({
+        id: 101,
+        classId: 202,
+        class: { id: 202, name: 'Math 101', teacherId: 50 },
+        submissions: [],
+      });
+
+      await expect(
+        service.getAssignmentDetail(101, 51, 'TEACHER'),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 });

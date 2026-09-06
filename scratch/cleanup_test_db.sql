@@ -1,0 +1,3 @@
+DELETE FROM "Class" WHERE id >= 9000;
+DELETE FROM "Course" WHERE id >= 9000;
+DELETE FROM "User" WHERE id >= 9000;

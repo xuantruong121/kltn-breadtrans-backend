@@ -167,6 +167,7 @@ model Class {
   endDate     DateTime?
   meetingLink String? // Google Meet/Zoom link
   capacity    Int?    @default(30)
+  tuitionFeeVnd Int   @default(0)
 
   // Bổ sung các trường từ Firestore Classes Schema
   status             ClassStatus @default(UPCOMING)

@@ -25,6 +25,7 @@ export declare class CreateClassDto {
     endDate?: string;
     meetingLink?: string;
     capacity?: number;
+    tuitionFeeVnd?: number;
 }
 export declare class UpdateClassDto {
     name?: string;
@@ -33,7 +34,16 @@ export declare class UpdateClassDto {
     endDate?: string;
     meetingLink?: string;
     capacity?: number;
+    tuitionFeeVnd?: number;
     status?: ClassStatus;
+}
+export declare class EnrollResponseDto {
+    enrollmentId: number;
+    classId: number;
+    status: 'ACTIVE' | 'PENDING_PAYMENT';
+    tuitionFeeVnd: number;
+    accessGranted: boolean;
+    message: string;
 }
 export declare class CreateLessonDto {
     title: string;
