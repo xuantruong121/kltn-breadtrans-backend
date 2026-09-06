@@ -6,13 +6,19 @@ import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../../common/decorators/roles.decorator';
 import { HttpStatus } from '@nestjs/common';
 
+type MockPaymentService = {
+  getMyPayments: jest.Mock;
+  getPaymentDetailById: jest.Mock;
+  reportTransfer: jest.Mock;
+};
+
 describe('PaymentController', () => {
   let controller: PaymentController;
-  let service: any;
+  let service: MockPaymentService;
   let reflector: Reflector;
 
   beforeEach(async () => {
-    const mockService = {
+    const mockService: MockPaymentService = {
       getMyPayments: jest.fn(),
       getPaymentDetailById: jest.fn(),
       reportTransfer: jest.fn(),
@@ -27,7 +33,9 @@ describe('PaymentController', () => {
     }).compile();
 
     controller = module.get<PaymentController>(PaymentController);
-    service = module.get<PaymentService>(PaymentService);
+    service = module.get<PaymentService>(
+      PaymentService,
+    ) as unknown as MockPaymentService;
     reflector = module.get<Reflector>(Reflector);
   });
 

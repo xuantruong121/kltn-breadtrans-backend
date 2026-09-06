@@ -8,9 +8,19 @@ import {
   STUDENT_PAYMENT_DETAIL_SELECT,
 } from './payment.constants';
 
+type MockPrismaService = {
+  payment: {
+    findMany: jest.Mock;
+    findFirst: jest.Mock;
+    update: jest.Mock;
+  };
+  $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
+};
+
 describe('PaymentService', () => {
   let service: PaymentService;
-  let prisma: any;
+  let prisma: MockPrismaService;
   const originalEnv = { ...process.env };
 
   beforeAll(() => {
@@ -25,7 +35,7 @@ describe('PaymentService', () => {
   });
 
   beforeEach(async () => {
-    const mockPrisma = {
+    const mockPrisma: MockPrismaService = {
       payment: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
@@ -49,7 +59,9 @@ describe('PaymentService', () => {
     }).compile();
 
     service = module.get<PaymentService>(PaymentService);
-    prisma = module.get<PrismaService>(PrismaService);
+    prisma = module.get<PrismaService>(
+      PrismaService,
+    ) as unknown as MockPrismaService;
   });
 
   describe('buildVietQrUrl', () => {
@@ -123,10 +135,16 @@ describe('PaymentService', () => {
       ]);
 
       // Verify internal fields are not queried in select whitelist
-      expect((STUDENT_PAYMENT_SUMMARY_SELECT as any).reviewedById).toBeUndefined();
+      expect(
+        (STUDENT_PAYMENT_SUMMARY_SELECT as any).reviewedById,
+      ).toBeUndefined();
       expect((STUDENT_PAYMENT_SUMMARY_SELECT as any).adminNote).toBeUndefined();
-      expect((STUDENT_PAYMENT_SUMMARY_SELECT as any).activationIssue).toBeUndefined();
-      expect((STUDENT_PAYMENT_SUMMARY_SELECT as any).activationNotifiedAt).toBeUndefined();
+      expect(
+        (STUDENT_PAYMENT_SUMMARY_SELECT as any).activationIssue,
+      ).toBeUndefined();
+      expect(
+        (STUDENT_PAYMENT_SUMMARY_SELECT as any).activationNotifiedAt,
+      ).toBeUndefined();
     });
   });
 

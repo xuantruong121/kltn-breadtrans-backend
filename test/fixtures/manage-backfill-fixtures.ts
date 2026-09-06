@@ -12,7 +12,8 @@ const FIXTURE_TAG = 'bf_fixture_test_';
 export async function assertTestDatabaseSafety(prisma: PrismaClient) {
   const configuredUrl = process.env.DATABASE_URL || '';
   const urlMatches =
-    (configuredUrl.includes('localhost') || configuredUrl.includes('127.0.0.1')) &&
+    (configuredUrl.includes('localhost') ||
+      configuredUrl.includes('127.0.0.1')) &&
     configuredUrl.includes('5432') &&
     configuredUrl.includes('kltn_test_db');
 
@@ -32,7 +33,9 @@ export async function assertTestDatabaseSafety(prisma: PrismaClient) {
     );
   }
 
-  console.log(`[SAFETY FUSE PASSED] Verified exact target: ${dbInfo.db}.${dbInfo.schema}`);
+  console.log(
+    `[SAFETY FUSE PASSED] Verified exact target: ${dbInfo.db}.${dbInfo.schema}`,
+  );
 }
 
 export async function setupFixtures(prisma: PrismaClient) {
@@ -163,9 +166,15 @@ export async function setupFixtures(prisma: PrismaClient) {
   });
 
   console.log(`Fixtures initialized:`);
-  console.log(`- Fixture 1 (Valid candidate)        : Enrollment #${f1.id} (Paid class, 500,000 VND)`);
-  console.log(`- Fixture 2 (Inconsistent candidate) : Enrollment #${f2.id} (Free class, 0 VND)`);
-  console.log(`- Fixture 3 (Non-candidate)          : Enrollment #${f3.id} (ACTIVE, 500,000 VND)`);
+  console.log(
+    `- Fixture 1 (Valid candidate)        : Enrollment #${f1.id} (Paid class, 500,000 VND)`,
+  );
+  console.log(
+    `- Fixture 2 (Inconsistent candidate) : Enrollment #${f2.id} (Free class, 0 VND)`,
+  );
+  console.log(
+    `- Fixture 3 (Non-candidate)          : Enrollment #${f3.id} (ACTIVE, 500,000 VND)`,
+  );
 }
 
 export async function verifyDryRun(prisma: PrismaClient) {
@@ -250,20 +259,28 @@ export async function verifyLive(prisma: PrismaClient) {
 
   // Verify Fixture 2 (Inconsistent): zero Payments
   if (f2?.payment) {
-    throw new Error('Fixture 2 failed: Inconsistent row received unexpected Payment!');
+    throw new Error(
+      'Fixture 2 failed: Inconsistent row received unexpected Payment!',
+    );
   }
 
   // Verify Fixture 3 (ACTIVE): zero Payments
   if (f3?.payment) {
-    throw new Error('Fixture 3 failed: ACTIVE row received unexpected Payment!');
+    throw new Error(
+      'Fixture 3 failed: ACTIVE row received unexpected Payment!',
+    );
   }
 
-  console.log('[PASSED] Live backfill verified: Fixture 1 has valid Payment, Fixtures 2 and 3 have zero Payments.');
+  console.log(
+    '[PASSED] Live backfill verified: Fixture 1 has valid Payment, Fixtures 2 and 3 have zero Payments.',
+  );
 }
 
 export async function cleanupFixtures(prisma: PrismaClient) {
   await assertTestDatabaseSafety(prisma);
-  console.log('Cleaning up backfill fixtures from kltn_test_db in FK-safe order...');
+  console.log(
+    'Cleaning up backfill fixtures from kltn_test_db in FK-safe order...',
+  );
 
   const userEmails = [
     `${FIXTURE_TAG}teacher@breadtrans.com`,
@@ -313,7 +330,9 @@ export async function cleanupFixtures(prisma: PrismaClient) {
     });
   }
 
-  console.log('[PASSED] Backfill test fixtures cleanly removed from kltn_test_db.');
+  console.log(
+    '[PASSED] Backfill test fixtures cleanly removed from kltn_test_db.',
+  );
 }
 
 // CLI handler
@@ -336,7 +355,9 @@ async function main() {
         await cleanupFixtures(prisma);
         break;
       default:
-        console.log('Usage: ts-node test/fixtures/manage-backfill-fixtures.ts [setup | verify-dry-run | verify-live | cleanup]');
+        console.log(
+          'Usage: ts-node test/fixtures/manage-backfill-fixtures.ts [setup | verify-dry-run | verify-live | cleanup]',
+        );
         process.exit(1);
     }
   } finally {

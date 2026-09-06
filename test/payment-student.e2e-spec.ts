@@ -254,22 +254,30 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
           await prisma.enrollment
             .deleteMany({
               where: {
-                id: { in: [enrollmentA.id, enrollmentB.id, enrollmentFreeA.id] },
+                id: {
+                  in: [enrollmentA.id, enrollmentB.id, enrollmentFreeA.id],
+                },
               },
             })
-            .catch(() => {});
+            .catch(() => undefined);
         }
-        if (paidClass?.id) {
+        if (paidClass?.id || freeClass?.id) {
           await prisma.class
             .deleteMany({
-              where: { id: { in: [paidClass.id, freeClass.id] } },
+              where: {
+                id: {
+                  in: [paidClass?.id, freeClass?.id].filter(
+                    (id): id is number => typeof id === 'number',
+                  ),
+                },
+              },
             })
-            .catch(() => {});
+            .catch(() => undefined);
         }
         if (testCourse?.id) {
           await prisma.course
             .delete({ where: { id: testCourse.id } })
-            .catch(() => {});
+            .catch(() => undefined);
         }
         await prisma.user
           .deleteMany({
@@ -283,9 +291,11 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
               },
             },
           })
-          .catch(() => {});
+          .catch(() => undefined);
       }
-    } catch {}
+    } catch (err) {
+      void err;
+    }
 
     if (app) {
       await app.close();
@@ -505,11 +515,17 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
       .set('Authorization', `Bearer ${tokenStudentA}`)
       .expect(200);
 
-    const classes = res.body.data;
-    const paidClassEntry = classes.find((c: any) => c.classId === paidClass.id);
+    const classes = res.body.data as Array<{
+      classId: number;
+      meetingLink: string | null;
+      enrollmentStatus: EnrollmentStatus;
+    }>;
+    const paidClassEntry = classes.find((c) => c.classId === paidClass.id);
     expect(paidClassEntry).toBeDefined();
-    expect(paidClassEntry.meetingLink).toBeNull();
-    expect(paidClassEntry.enrollmentStatus).toBe(EnrollmentStatus.PENDING_PAYMENT);
+    expect(paidClassEntry?.meetingLink).toBeNull();
+    expect(paidClassEntry?.enrollmentStatus).toBe(
+      EnrollmentStatus.PENDING_PAYMENT,
+    );
   });
 
   it('16. Client body attempting status=CONFIRMED cannot alter payment or enrollment status', async () => {
@@ -547,10 +563,13 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
       .set('Authorization', `Bearer ${tokenStudentA}`)
       .expect(200);
 
-    const freeClassEntry = res.body.data.find(
-      (c: any) => c.classId === freeClass.id,
-    );
+    const classes = res.body.data as Array<{
+      classId: number;
+      meetingLink: string | null;
+      enrollmentStatus: EnrollmentStatus;
+    }>;
+    const freeClassEntry = classes.find((c) => c.classId === freeClass.id);
     expect(freeClassEntry).toBeDefined();
-    expect(freeClassEntry.enrollmentStatus).toBe(EnrollmentStatus.ACTIVE);
+    expect(freeClassEntry?.enrollmentStatus).toBe(EnrollmentStatus.ACTIVE);
   });
 });

@@ -604,7 +604,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       ]);
 
       const statuses = [dup1.status, dup2.status];
-      const successCount = statuses.filter((s) => [200, 201].includes(s)).length;
+      const successCount = statuses.filter((s) =>
+        [200, 201].includes(s),
+      ).length;
       const conflictCount = statuses.filter((s) => s === 409).length;
 
       expect(successCount).toBe(1);
@@ -625,8 +627,12 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       expect(paymentRows[0].status).toBe(PaymentStatus.PENDING);
 
       // Cleanup fresh user
-      await prisma.payment.deleteMany({ where: { enrollmentId: enrollmentRows[0].id } });
-      await prisma.enrollment.deleteMany({ where: { userId: freshStudent.id } });
+      await prisma.payment.deleteMany({
+        where: { enrollmentId: enrollmentRows[0].id },
+      });
+      await prisma.enrollment.deleteMany({
+        where: { userId: freshStudent.id },
+      });
       await prisma.user.delete({ where: { id: freshStudent.id } });
     });
 
@@ -645,7 +651,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       ]);
 
       const statuses = [resC.status, resD.status];
-      const successCount = statuses.filter((s) => [200, 201].includes(s)).length;
+      const successCount = statuses.filter((s) =>
+        [200, 201].includes(s),
+      ).length;
       const conflictCount = statuses.filter((s) => s === 409).length;
 
       expect(successCount).toBe(1);
@@ -720,7 +728,11 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
 
       // Cleanup
       await prisma.payment.deleteMany({
-        where: { enrollmentId: { in: [resP1.body.enrollmentId, resP2.body.enrollmentId] } },
+        where: {
+          enrollmentId: {
+            in: [resP1.body.enrollmentId, resP2.body.enrollmentId],
+          },
+        },
       });
       await prisma.enrollment.deleteMany({
         where: { userId: { in: [studentP1.id, studentP2.id] } },
