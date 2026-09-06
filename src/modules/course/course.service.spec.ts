@@ -7,6 +7,7 @@ import {
   CourseStatus,
   ClassStatus,
   EnrollmentStatus,
+  PaymentStatus,
 } from '@prisma/client';
 import {
   BadRequestException,
@@ -65,7 +66,12 @@ describe('CourseService - Business Logic & Rules', () => {
       deleteMany: jest.fn(),
       count: jest.fn(),
     },
-    payment: { count: jest.fn() },
+    payment: {
+      create: jest.fn(),
+      count: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+    },
     $queryRaw: jest.fn(),
     $transaction: jest.fn((input: unknown): unknown => {
       if (typeof input === 'function') {
@@ -476,10 +482,11 @@ describe('CourseService - Business Logic & Rules', () => {
           }),
         }),
       );
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
     });
 
-    // 17b. Student enroll PAID class (tuitionFeeVnd > 0) -> PENDING_PAYMENT
-    it('17b. Student enroll PAID class (tuitionFeeVnd > 0) -> PENDING_PAYMENT (no access)', async () => {
+    // 17b. Student enroll PAID class (tuitionFeeVnd > 0) -> PENDING_PAYMENT + Payment record created
+    it('17b. Student enroll PAID class (tuitionFeeVnd > 0) -> PENDING_PAYMENT + Payment created', async () => {
       mockPrisma.$queryRaw.mockResolvedValue([
         {
           id: 2,
@@ -496,6 +503,13 @@ describe('CourseService - Business Logic & Rules', () => {
         classId: 2,
         status: EnrollmentStatus.PENDING_PAYMENT,
       });
+      mockPrisma.payment.create.mockResolvedValue({
+        id: 1,
+        enrollmentId: 202,
+        amountVnd: 1500000,
+        transferCode: 'BT-202',
+        status: PaymentStatus.PENDING,
+      });
 
       const result = await service.enrollInClass(2, 100);
 
@@ -509,10 +523,52 @@ describe('CourseService - Business Logic & Rules', () => {
           }),
         }),
       );
+      expect(mockPrisma.payment.create).toHaveBeenCalledWith({
+        data: {
+          enrollmentId: 202,
+          amountVnd: 1500000,
+          transferCode: 'BT-202',
+          status: PaymentStatus.PENDING,
+          activationIssue: null,
+          reportedAt: null,
+          reviewedAt: null,
+          confirmedAt: null,
+          reviewedById: null,
+          adminNote: null,
+          activationNotifiedAt: null,
+        },
+      });
     });
 
-    // 18. Student enroll trùng -> bị từ chối 409 Conflict
-    it('18. Student enroll trùng -> bị từ chối 409 Conflict', async () => {
+    // 17c. Unit-level transaction failure propagation: payment.create throws -> transaction rejects
+    it('17c. Unit-level transaction failure propagation: payment.create failure rejects transaction', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 2,
+          status: ClassStatus.UPCOMING,
+          capacity: 25,
+          tuitionFeeVnd: 1500000,
+        },
+      ]);
+      mockPrisma.enrollment.findUnique.mockResolvedValue(null);
+      mockPrisma.enrollment.count.mockResolvedValue(10);
+      mockPrisma.enrollment.create.mockResolvedValue({
+        id: 202,
+        userId: 100,
+        classId: 2,
+        status: EnrollmentStatus.PENDING_PAYMENT,
+      });
+      mockPrisma.payment.create.mockRejectedValue(
+        new Error('Payment DB write failed'),
+      );
+
+      await expect(service.enrollInClass(2, 100)).rejects.toThrow(
+        'Payment DB write failed',
+      );
+    });
+
+    // 18. Student enroll trùng ACTIVE -> bị từ chối 409 Conflict
+    it('18. Student enroll trùng ACTIVE -> bị từ chối 409 Conflict', async () => {
       mockPrisma.$queryRaw.mockResolvedValue([
         {
           id: 1,
@@ -525,7 +581,74 @@ describe('CourseService - Business Logic & Rules', () => {
         id: 201,
         userId: 100,
         classId: 1,
-      }); // Đã tồn tại
+        status: EnrollmentStatus.ACTIVE,
+      });
+
+      await expect(service.enrollInClass(1, 100)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    // 18b. Student enroll trùng PENDING_PAYMENT -> bị từ chối 409 Conflict
+    it('18b. Student enroll trùng PENDING_PAYMENT -> bị từ chối 409 Conflict', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 2,
+          status: ClassStatus.UPCOMING,
+          capacity: 30,
+          tuitionFeeVnd: 500000,
+        },
+      ]);
+      mockPrisma.enrollment.findUnique.mockResolvedValue({
+        id: 202,
+        userId: 100,
+        classId: 2,
+        status: EnrollmentStatus.PENDING_PAYMENT,
+      });
+
+      await expect(service.enrollInClass(2, 100)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    // 18c. Student enroll trùng COMPLETED -> bị từ chối 409 Conflict
+    it('18c. Student enroll trùng COMPLETED -> bị từ chối 409 Conflict', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.UPCOMING,
+          capacity: 30,
+          tuitionFeeVnd: 0,
+        },
+      ]);
+      mockPrisma.enrollment.findUnique.mockResolvedValue({
+        id: 203,
+        userId: 100,
+        classId: 1,
+        status: EnrollmentStatus.COMPLETED,
+      });
+
+      await expect(service.enrollInClass(1, 100)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    // 18d. Student enroll trùng DROPPED -> bị từ chối 409 Conflict
+    it('18d. Student enroll trùng DROPPED -> bị từ chối 409 Conflict', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 1,
+          status: ClassStatus.UPCOMING,
+          capacity: 30,
+          tuitionFeeVnd: 0,
+        },
+      ]);
+      mockPrisma.enrollment.findUnique.mockResolvedValue({
+        id: 204,
+        userId: 100,
+        classId: 1,
+        status: EnrollmentStatus.DROPPED,
+      });
 
       await expect(service.enrollInClass(1, 100)).rejects.toThrow(
         ConflictException,
@@ -548,6 +671,43 @@ describe('CourseService - Business Logic & Rules', () => {
       await expect(service.enrollInClass(1, 101)).rejects.toThrow(
         ConflictException,
       );
+    });
+
+    // 19b. Capacity check counts ACTIVE only: PENDING_PAYMENT does not consume seat
+    it('19b. Capacity check counts ACTIVE only: PENDING_PAYMENT does not consume seat', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 2,
+          status: ClassStatus.UPCOMING,
+          capacity: 10,
+          tuitionFeeVnd: 500000,
+        },
+      ]);
+      mockPrisma.enrollment.findUnique.mockResolvedValue(null);
+      // ACTIVE count is 0 even if there are 20 PENDING_PAYMENT enrollments in the system
+      mockPrisma.enrollment.count.mockResolvedValue(0);
+      mockPrisma.enrollment.create.mockResolvedValue({
+        id: 205,
+        userId: 102,
+        classId: 2,
+        status: EnrollmentStatus.PENDING_PAYMENT,
+      });
+      mockPrisma.payment.create.mockResolvedValue({
+        id: 2,
+        enrollmentId: 205,
+        amountVnd: 500000,
+        transferCode: 'BT-205',
+        status: PaymentStatus.PENDING,
+      });
+
+      const result = await service.enrollInClass(2, 102);
+      expect(result.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      expect(mockPrisma.enrollment.count).toHaveBeenCalledWith({
+        where: {
+          classId: 2,
+          status: EnrollmentStatus.ACTIVE,
+        },
+      });
     });
 
     // 20. Enroll vào Class CANCELLED -> bị từ chối 400
@@ -623,6 +783,7 @@ describe('CourseService - Business Logic & Rules', () => {
 
       expect(result.status).toBe(EnrollmentStatus.ACTIVE);
       expect(result.accessGranted).toBe(true);
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
     });
 
     // 20e. Admin override CANNOT bypass capacity
@@ -685,6 +846,7 @@ describe('CourseService - Business Logic & Rules', () => {
       expect(result.status).toBe(EnrollmentStatus.ACTIVE);
       expect(result.accessGranted).toBe(true);
       expect(result.tuitionFeeVnd).toBe(500000);
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
     });
 
     // ADM-OVR-02: Admin manually enrolls Student already enrolled -> 409 Conflict

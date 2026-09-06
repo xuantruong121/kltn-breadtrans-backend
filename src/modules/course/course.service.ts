@@ -23,6 +23,7 @@ import {
   CourseStatus,
   ClassStatus,
   EnrollmentStatus,
+  PaymentStatus,
 } from '@prisma/client';
 
 @Injectable()
@@ -1104,6 +1105,25 @@ export class CourseService {
             progress: 0,
           },
         });
+
+        // 7. For paid Student self-enrollment only, atomically create Payment using transaction client
+        if (!options?.isAdminOverride && tuitionFeeVnd > 0) {
+          await tx.payment.create({
+            data: {
+              enrollmentId: enrollment.id,
+              amountVnd: tuitionFeeVnd,
+              transferCode: `BT-${enrollment.id}`,
+              status: PaymentStatus.PENDING,
+              activationIssue: null,
+              reportedAt: null,
+              reviewedAt: null,
+              confirmedAt: null,
+              reviewedById: null,
+              adminNote: null,
+              activationNotifiedAt: null,
+            },
+          });
+        }
 
         return {
           enrollmentId: enrollment.id,
