@@ -15,11 +15,12 @@ export async function assertTestDatabaseSafety(prisma: PrismaClient) {
     (configuredUrl.includes('localhost') ||
       configuredUrl.includes('127.0.0.1')) &&
     configuredUrl.includes('5432') &&
-    configuredUrl.includes('kltn_test_db');
+    (configuredUrl.includes('kltn_test_db') ||
+      configuredUrl.includes('kltn_test'));
 
   if (!urlMatches) {
     throw new Error(
-      `SAFETY FUSE ABORT: Configured DATABASE_URL must point to kltn_test_db on localhost:5432. Found: ${configuredUrl.replace(/:[^:@]+@/, ':***@')}`,
+      `SAFETY FUSE ABORT: Configured DATABASE_URL must point to kltn_test_db or kltn_test on localhost:5432. Found: ${configuredUrl.replace(/:[^:@]+@/, ':***@')}`,
     );
   }
 
@@ -27,9 +28,12 @@ export async function assertTestDatabaseSafety(prisma: PrismaClient) {
     Array<{ db: string; schema: string }>
   >`SELECT current_database() AS db, current_schema() AS schema;`;
 
-  if (dbInfo?.db !== 'kltn_test_db' || dbInfo?.schema !== 'public') {
+  if (
+    (dbInfo?.db !== 'kltn_test_db' && dbInfo?.db !== 'kltn_test') ||
+    dbInfo?.schema !== 'public'
+  ) {
     throw new Error(
-      `SAFETY FUSE ABORT: Connected PostgreSQL database is '${dbInfo?.db}' (schema: '${dbInfo?.schema}'). Refusing to proceed on non-kltn_test_db public schema!`,
+      `SAFETY FUSE ABORT: Connected PostgreSQL database is '${dbInfo?.db}' (schema: '${dbInfo?.schema}'). Refusing to proceed on non-test public schema!`,
     );
   }
 

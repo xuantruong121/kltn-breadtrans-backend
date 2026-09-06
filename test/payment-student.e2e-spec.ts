@@ -51,11 +51,11 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
     const urlMatches =
       (dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1')) &&
       dbUrl.includes('5432') &&
-      dbUrl.includes('kltn_test_db');
+      (dbUrl.includes('kltn_test_db') || dbUrl.includes('kltn_test'));
 
     if (!urlMatches) {
       throw new Error(
-        `SAFETY FUSE TRIGGERED: Refusing to run destructive E2E tests outside isolated test DB! DATABASE_URL must point to localhost:5432/kltn_test_db. Current: ${dbUrl.replace(/:[^:@]+@/, ':***@')}`,
+        `SAFETY FUSE TRIGGERED: Refusing to run destructive E2E tests outside isolated test DB! DATABASE_URL must point to localhost:5432/kltn_test_db or localhost:5432/kltn_test. Current: ${dbUrl.replace(/:[^:@]+@/, ':***@')}`,
       );
     }
 
@@ -84,9 +84,12 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
       Array<{ db: string; schema: string }>
     >`SELECT current_database() AS db, current_schema() AS schema;`;
 
-    if (dbInfo?.db !== 'kltn_test_db' || dbInfo?.schema !== 'public') {
+    if (
+      (dbInfo?.db !== 'kltn_test_db' && dbInfo?.db !== 'kltn_test') ||
+      dbInfo?.schema !== 'public'
+    ) {
       throw new Error(
-        `SAFETY FUSE ABORT: Connected PostgreSQL database is '${dbInfo?.db}' (schema: '${dbInfo?.schema}'). Must be kltn_test_db.public!`,
+        `SAFETY FUSE ABORT: Connected PostgreSQL database is '${dbInfo?.db}' (schema: '${dbInfo?.schema}'). Must be kltn_test_db.public or kltn_test.public!`,
       );
     }
     console.log(
