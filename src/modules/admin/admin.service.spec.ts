@@ -6,6 +6,7 @@ import { R2CleanupService } from '../upload/r2-cleanup.service';
 import { CourseService } from '../course/course.service';
 import { EmailService } from '../../common/email/email.service';
 import { ClassStatus } from '@prisma/client';
+import { ConflictException } from '@nestjs/common';
 
 describe('AdminService - Enrollment Count Semantics (R1)', () => {
   let service: AdminService;
@@ -22,7 +23,10 @@ describe('AdminService - Enrollment Count Semantics (R1)', () => {
     enrollment: {
       findMany: jest.fn(),
       count: jest.fn(),
+      deleteMany: jest.fn(),
     },
+    payment: { count: jest.fn() },
+    user: { delete: jest.fn() },
   };
 
   const mockR2Service = {};
@@ -149,6 +153,53 @@ describe('AdminService - Enrollment Count Semantics (R1)', () => {
       expect(result[0].activeEnrollmentCount).toBe(2);
       expect(result[0].totalEnrollmentCount).toBe(3);
       expect(result[0].hasEnrollments).toBe(true);
+    });
+  });
+
+  describe('Phase 3C-1 financial-history delete guards', () => {
+    it('DEL-PAY-01: removes an Enrollment when it has no Payment', async () => {
+      mockPrisma.payment.count.mockResolvedValue(0);
+      mockPrisma.enrollment.deleteMany.mockResolvedValue({ count: 1 });
+
+      await expect(service.removeEnrollment(7, 11)).resolves.toEqual({
+        count: 1,
+      });
+      expect(mockPrisma.payment.count).toHaveBeenCalledWith({
+        where: { enrollment: { userId: 7, classId: 11 } },
+      });
+    });
+
+    it('DEL-PAY-02: rejects Enrollment removal when retained Payment exists', async () => {
+      mockPrisma.payment.count.mockResolvedValue(1);
+
+      await expect(service.removeEnrollment(7, 11)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(mockPrisma.enrollment.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('DEL-PAY-03: deletes a User without Payment-bearing Enrollment', async () => {
+      mockPrisma.payment.count.mockResolvedValue(0);
+      mockPrisma.user.delete.mockResolvedValue({ id: 7 });
+
+      await expect(service.deleteUser(7)).resolves.toEqual({ id: 7 });
+    });
+
+    it('DEL-PAY-04: rejects User deletion when retained Payment exists', async () => {
+      mockPrisma.payment.count.mockResolvedValue(1);
+
+      await expect(service.deleteUser(7)).rejects.toThrow(ConflictException);
+      expect(mockPrisma.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('DEL-PAY-08: an unrelated Payment does not block scoped deletion', async () => {
+      mockPrisma.payment.count.mockResolvedValue(0);
+      mockPrisma.user.delete.mockResolvedValue({ id: 8 });
+
+      await service.deleteUser(8);
+      expect(mockPrisma.payment.count).toHaveBeenCalledWith({
+        where: { enrollment: { userId: 8 } },
+      });
     });
   });
 });

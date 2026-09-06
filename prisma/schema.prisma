@@ -35,6 +35,19 @@ enum EnrollmentStatus {
   DROPPED
 }
 
+enum PaymentStatus {
+  PENDING
+  REPORTED
+  CONFIRMED
+  REJECTED
+  REVIEW_REQUIRED
+}
+
+enum PaymentActivationIssue {
+  CLASS_FULL
+  CLASS_NOT_ELIGIBLE
+}
+
 model User {
   id             Int      @id @default(autoincrement())
   email          String   @unique
@@ -80,6 +93,7 @@ model User {
   pushSubscriptions   PushSubscription[]
   userGrammarRewards  UserGrammarReward[]
   userQuizRewards     UserQuizReward[]
+  reviewedPayments    Payment[]             @relation("PaymentReviewer")
 }
 
 model Profile {
@@ -195,8 +209,32 @@ model Enrollment {
   joinedAt DateTime @default(now())
   progress Float    @default(0) // Percentage 0-100
   status   EnrollmentStatus @default(ACTIVE)
+  payment  Payment?
 
   @@unique([userId, classId])
+}
+
+model Payment {
+  id                   Int                     @id @default(autoincrement())
+  enrollmentId         Int                     @unique
+  amountVnd            Int
+  transferCode         String                  @unique
+  status               PaymentStatus           @default(PENDING)
+  activationIssue      PaymentActivationIssue?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  reportedAt           DateTime?
+  reviewedAt           DateTime?
+  confirmedAt          DateTime?
+  reviewedById         Int?
+  adminNote            String?
+  activationNotifiedAt DateTime?
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  reviewedBy User?      @relation("PaymentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([reviewedById])
 }
 
 model Lesson {
@@ -892,5 +930,3 @@ model UserQuizReward {
 
   @@unique([userId, quizId])
 }
-
-

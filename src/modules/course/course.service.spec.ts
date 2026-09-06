@@ -65,6 +65,7 @@ describe('CourseService - Business Logic & Rules', () => {
       deleteMany: jest.fn(),
       count: jest.fn(),
     },
+    payment: { count: jest.fn() },
     $queryRaw: jest.fn(),
     $transaction: jest.fn((input: unknown): unknown => {
       if (typeof input === 'function') {
@@ -1664,6 +1665,64 @@ describe('CourseService - Business Logic & Rules', () => {
 
       expect(result.classes[0].remainingSeats).toBe(0);
       expect(result.classes[0].isSoldOut).toBe(true);
+    });
+  });
+
+  describe('Phase 3C-1 financial-history delete guards', () => {
+    it('DEL-PAY-05: deletes a Course when no retained Payment exists', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({
+        id: 77,
+        teacherId: 10,
+        status: CourseStatus.DRAFT,
+      });
+      mockPrisma.payment.count.mockResolvedValue(0);
+      mockPrisma.course.delete.mockResolvedValue({ id: 77 });
+
+      await expect(
+        service.deleteCourse(77, { id: 10, role: Role.TEACHER }),
+      ).resolves.toEqual({ id: 77 });
+    });
+
+    it('DEL-PAY-06: rejects Course deletion when retained Payment exists', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({
+        id: 77,
+        teacherId: 10,
+        status: CourseStatus.DRAFT,
+      });
+      mockPrisma.payment.count.mockResolvedValue(1);
+
+      await expect(
+        service.deleteCourse(77, { id: 10, role: Role.TEACHER }),
+      ).rejects.toThrow(ConflictException);
+      expect(mockPrisma.course.delete).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.count).toHaveBeenCalledWith({
+        where: { enrollment: { class: { courseId: 77 } } },
+      });
+    });
+
+    it('DEL-PAY-07: Class deletion remains blocked when Enrollment history exists', async () => {
+      mockPrisma.class.findUnique.mockResolvedValue({ id: 88, teacherId: 10 });
+      mockPrisma.enrollment.count.mockResolvedValue(1);
+
+      await expect(
+        service.deleteClass(88, { id: 10, role: Role.TEACHER }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.class.delete).not.toHaveBeenCalled();
+    });
+
+    it('DEL-PAY-08: unrelated Payment does not block scoped Course deletion', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({
+        id: 78,
+        teacherId: 10,
+        status: CourseStatus.DRAFT,
+      });
+      mockPrisma.payment.count.mockResolvedValue(0);
+      mockPrisma.course.delete.mockResolvedValue({ id: 78 });
+
+      await service.deleteCourse(78, { id: 10, role: Role.TEACHER });
+      expect(mockPrisma.payment.count).toHaveBeenCalledWith({
+        where: { enrollment: { class: { courseId: 78 } } },
+      });
     });
   });
 });

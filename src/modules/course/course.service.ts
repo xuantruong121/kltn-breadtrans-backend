@@ -509,6 +509,15 @@ export class CourseService {
       }
     }
 
+    const paymentCount = await this.prisma.payment.count({
+      where: { enrollment: { class: { courseId: id } } },
+    });
+    if (paymentCount > 0) {
+      throw new ConflictException(
+        'Không thể xóa khóa học vì tồn tại lịch sử thanh toán cần được lưu giữ.',
+      );
+    }
+
     const deleted = await this.prisma.course.delete({ where: { id } });
     this.eventsGateway.broadcastCourseUpdate();
     return deleted;
@@ -853,7 +862,7 @@ export class CourseService {
     });
     if (enrollmentCount > 0) {
       throw new BadRequestException(
-        `Lớp học đã có ${enrollmentCount} học viên đăng ký. Không thể xóa trực tiếp, vui lòng chuyển trạng thái sang CANCELLED để bảo lưu lịch sử học tập.`,
+        `Lớp học đã có ${enrollmentCount} học viên đăng ký hoặc lịch sử thanh toán. Không thể xóa trực tiếp, vui lòng chuyển trạng thái sang CANCELLED để bảo lưu lịch sử.`,
       );
     }
 
