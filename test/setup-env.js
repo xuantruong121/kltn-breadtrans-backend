@@ -1,4 +1,4 @@
-﻿// jest globalSetup: loads .env.test and performs two-layer safety check before
+// jest globalSetup: loads .env.test and performs two-layer safety check before
 // any E2E test module is required.
 // Plain JS — no TypeScript lint rules apply here.
 const path = require('path');
@@ -6,18 +6,21 @@ const fs   = require('fs');
 
 const envPath = path.resolve(__dirname, '../.env.test');
 
-// --- Layer 0: file existence ---
-if (!fs.existsSync(envPath)) {
+// --- Layer 0: environment file resolution ---
+if (fs.existsSync(envPath)) {
+  const result = require('dotenv').config({ path: envPath, override: true });
+  if (result.error) {
+    throw new Error('[setup-env] Failed to parse .env.test: ' + result.error.message);
+  }
+} else if (process.env.CI || process.env.GITHUB_ACTIONS) {
+  // In CI environments (e.g. GitHub Actions), environment variables are injected directly by the runner.
+  // Layers 1 & 2 below will strictly verify DATABASE_URL and the live database identity.
+} else {
   throw new Error(
     '[setup-env] .env.test not found at ' + envPath + '\n' +
     'Create it from .env.test.example before running E2E tests.\n' +
     'DATABASE_URL must point to kltn_test_db.'
   );
-}
-
-const result = require('dotenv').config({ path: envPath, override: true });
-if (result.error) {
-  throw new Error('[setup-env] Failed to parse .env.test: ' + result.error.message);
 }
 
 // --- Layer 1: URL string check (fast, pre-connection) ---
