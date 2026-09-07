@@ -1,8 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentService, buildVietQrUrl } from './payment.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PaymentStatus } from '@prisma/client';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  PaymentStatus,
+  EnrollmentStatus,
+  ClassStatus,
+  PaymentActivationIssue,
+} from '@prisma/client';
+import {
+  NotFoundException,
+  ConflictException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import {
   STUDENT_PAYMENT_SUMMARY_SELECT,
   STUDENT_PAYMENT_DETAIL_SELECT,
@@ -16,6 +25,10 @@ type MockPrismaService = {
     findMany: jest.Mock;
     findFirst: jest.Mock;
     findUnique: jest.Mock;
+    update: jest.Mock;
+    count: jest.Mock;
+  };
+  enrollment: {
     update: jest.Mock;
     count: jest.Mock;
   };
@@ -45,6 +58,10 @@ describe('PaymentService', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
         findUnique: jest.fn(),
+        update: jest.fn(),
+        count: jest.fn(),
+      },
+      enrollment: {
         update: jest.fn(),
         count: jest.fn(),
       },
@@ -668,6 +685,808 @@ describe('PaymentService', () => {
         }),
       ).rejects.toThrow(ConflictException);
       expect(prisma.payment.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('confirmPayment', () => {
+    const paymentId = 100;
+    const adminId = 1;
+    const enrollmentId = 50;
+    const classId = 20;
+
+    const preliminarySuccess = {
+      id: paymentId,
+      enrollmentId,
+      enrollment: {
+        id: enrollmentId,
+        classId,
+      },
+    };
+
+    const buildDetail = (overrides: Record<string, any> = {}) => ({
+      id: paymentId,
+      enrollmentId,
+      amountVnd: 1500000,
+      transferCode: 'BT-100',
+      status: PaymentStatus.CONFIRMED,
+      activationIssue: null,
+      createdAt: new Date('2026-09-06T08:00:00.000Z'),
+      updatedAt: new Date('2026-09-06T08:30:00.000Z'),
+      reportedAt: new Date('2026-09-06T08:15:00.000Z'),
+      reviewedAt: new Date('2026-09-06T08:30:00.000Z'),
+      confirmedAt: new Date('2026-09-06T08:30:00.000Z'),
+      adminNote: null,
+      enrollment: {
+        id: enrollmentId,
+        status: EnrollmentStatus.ACTIVE,
+        joinedAt: new Date('2026-09-06T08:00:00.000Z'),
+        user: {
+          id: 7,
+          email: 'student@example.com',
+          profile: { fullName: 'Student C', phone: '0912345678' },
+        },
+        class: {
+          id: classId,
+          name: 'Class Node',
+          tuitionFeeVnd: 1500000,
+          course: { id: 5, title: 'Node Course' },
+        },
+      },
+      reviewedBy: {
+        id: adminId,
+        email: 'admin@breadtrans.vn',
+        profile: { fullName: 'Admin User' },
+      },
+      ...overrides,
+    });
+
+    it('successfully confirms payment and activates enrollment when UPCOMING and capacity available (Case A)', async () => {
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(preliminarySuccess) // Preliminary lookup
+        .mockResolvedValueOnce(buildDetail()); // formatAdminPaymentDetail
+
+      // Lock sequence: 1. Class, 2. Payment, 3. Enrollment
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      prisma.enrollment.count.mockResolvedValue(5); // activeCount < capacity
+
+      const result = await service.confirmPayment(paymentId, adminId);
+
+      expect(prisma.enrollment.update).toHaveBeenCalledWith({
+        where: { id: enrollmentId },
+        data: { status: EnrollmentStatus.ACTIVE },
+      });
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: paymentId },
+        data: {
+          status: PaymentStatus.CONFIRMED,
+          confirmedAt: expect.any(Date),
+          reviewedAt: expect.any(Date),
+          reviewedById: adminId,
+          activationIssue: null,
+        },
+      });
+      expect(result.status).toBe(PaymentStatus.CONFIRMED);
+      expect(result.activationIssue).toBeNull();
+      expect(result.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+    });
+
+    it('confirms payment with CLASS_FULL and leaves enrollment PENDING_PAYMENT when class is full (Case B)', async () => {
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(preliminarySuccess)
+        .mockResolvedValueOnce(
+          buildDetail({
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+            enrollment: {
+              id: enrollmentId,
+              status: EnrollmentStatus.PENDING_PAYMENT,
+              joinedAt: new Date(),
+              user: { id: 7, email: 'student@example.com', profile: null },
+              class: {
+                id: classId,
+                name: 'Full Class',
+                tuitionFeeVnd: 1500000,
+                course: { id: 5, title: 'Node' },
+              },
+            },
+          }),
+        );
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 10 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      prisma.enrollment.count.mockResolvedValue(10); // activeCount >= capacity
+
+      const result = await service.confirmPayment(paymentId, adminId);
+
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: paymentId },
+        data: {
+          status: PaymentStatus.CONFIRMED,
+          confirmedAt: expect.any(Date),
+          reviewedAt: expect.any(Date),
+          reviewedById: adminId,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+        },
+      });
+      expect(result.status).toBe(PaymentStatus.CONFIRMED);
+      expect(result.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+      expect(result.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+    });
+
+    it('confirms payment with CLASS_NOT_ELIGIBLE when class status is ONGOING (Case C)', async () => {
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(preliminarySuccess)
+        .mockResolvedValueOnce(
+          buildDetail({
+            activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+            enrollment: {
+              id: enrollmentId,
+              status: EnrollmentStatus.PENDING_PAYMENT,
+              joinedAt: new Date(),
+              user: { id: 7, email: 's@ex.com', profile: null },
+              class: {
+                id: classId,
+                name: 'Ongoing Class',
+                tuitionFeeVnd: 1500000,
+                course: { id: 5, title: 'Node' },
+              },
+            },
+          }),
+        );
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.ONGOING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      const result = await service.confirmPayment(paymentId, adminId);
+
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: paymentId },
+        data: {
+          status: PaymentStatus.CONFIRMED,
+          confirmedAt: expect.any(Date),
+          reviewedAt: expect.any(Date),
+          reviewedById: adminId,
+          activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        },
+      });
+      expect(result.status).toBe(PaymentStatus.CONFIRMED);
+      expect(result.activationIssue).toBe(
+        PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+      );
+      expect(result.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+    });
+
+    it('confirms payment with CLASS_NOT_ELIGIBLE when class status is COMPLETED (Case C)', async () => {
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(preliminarySuccess)
+        .mockResolvedValueOnce(
+          buildDetail({
+            activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+            enrollment: {
+              id: enrollmentId,
+              status: EnrollmentStatus.PENDING_PAYMENT,
+              joinedAt: new Date(),
+              user: { id: 7, email: 's@ex.com', profile: null },
+              class: {
+                id: classId,
+                name: 'Completed Class',
+                tuitionFeeVnd: 1500000,
+                course: { id: 5, title: 'Node' },
+              },
+            },
+          }),
+        );
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.COMPLETED, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      const result = await service.confirmPayment(paymentId, adminId);
+
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: paymentId },
+        data: expect.objectContaining({
+          status: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        }),
+      });
+      expect(result.activationIssue).toBe(
+        PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+      );
+    });
+
+    it('confirms payment with CLASS_NOT_ELIGIBLE when class status is CANCELLED (Case C)', async () => {
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(preliminarySuccess)
+        .mockResolvedValueOnce(
+          buildDetail({
+            activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+            enrollment: {
+              id: enrollmentId,
+              status: EnrollmentStatus.PENDING_PAYMENT,
+              joinedAt: new Date(),
+              user: { id: 7, email: 's@ex.com', profile: null },
+              class: {
+                id: classId,
+                name: 'Cancelled Class',
+                tuitionFeeVnd: 1500000,
+                course: { id: 5, title: 'Node' },
+              },
+            },
+          }),
+        );
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.CANCELLED, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      const result = await service.confirmPayment(paymentId, adminId);
+
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: paymentId },
+        data: expect.objectContaining({
+          status: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        }),
+      });
+      expect(result.activationIssue).toBe(
+        PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+      );
+    });
+
+    it('throws ConflictException when payment status is PENDING', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(preliminarySuccess);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.PENDING,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      await expect(service.confirmPayment(paymentId, adminId)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException when payment status is REJECTED', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(preliminarySuccess);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REJECTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      await expect(service.confirmPayment(paymentId, adminId)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException when payment status is REVIEW_REQUIRED', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(preliminarySuccess);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REVIEW_REQUIRED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      await expect(service.confirmPayment(paymentId, adminId)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    });
+
+    it('returns existing state idempotently for already CONFIRMED active payment without re-running activation', async () => {
+      const existingConfirmedAt = new Date('2026-09-06T08:00:00.000Z');
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(preliminarySuccess)
+        .mockResolvedValueOnce(
+          buildDetail({
+            confirmedAt: existingConfirmedAt,
+            reviewedAt: existingConfirmedAt,
+            reviewedById: adminId,
+          }),
+        );
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.CONFIRMED,
+            enrollmentId,
+            confirmedAt: existingConfirmedAt,
+            reviewedAt: existingConfirmedAt,
+            reviewedById: adminId,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.ACTIVE,
+            classId,
+          },
+        ]);
+
+      const result = await service.confirmPayment(paymentId, adminId);
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+      expect(result.status).toBe(PaymentStatus.CONFIRMED);
+      expect(result.confirmedAt).toEqual(existingConfirmedAt);
+    });
+
+    it('returns existing state idempotently for already CONFIRMED CLASS_FULL without retrying activation even if capacity is free', async () => {
+      const existingConfirmedAt = new Date('2026-09-06T08:00:00.000Z');
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(preliminarySuccess)
+        .mockResolvedValueOnce(
+          buildDetail({
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+            enrollment: {
+              id: enrollmentId,
+              status: EnrollmentStatus.PENDING_PAYMENT,
+              joinedAt: new Date(),
+              user: { id: 7, email: 's@ex.com', profile: null },
+              class: {
+                id: classId,
+                name: 'Node',
+                tuitionFeeVnd: 1500000,
+                course: { id: 5, title: 'Node' },
+              },
+            },
+            confirmedAt: existingConfirmedAt,
+          }),
+        );
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.CONFIRMED,
+            enrollmentId,
+            confirmedAt: existingConfirmedAt,
+            reviewedAt: existingConfirmedAt,
+            reviewedById: adminId,
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      const result = await service.confirmPayment(paymentId, adminId);
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+      expect(result.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+      expect(result.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+    });
+
+    it('returns existing state idempotently for already CONFIRMED CLASS_NOT_ELIGIBLE without retrying activation', async () => {
+      const existingConfirmedAt = new Date('2026-09-06T08:00:00.000Z');
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(preliminarySuccess)
+        .mockResolvedValueOnce(
+          buildDetail({
+            activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+            enrollment: {
+              id: enrollmentId,
+              status: EnrollmentStatus.PENDING_PAYMENT,
+              joinedAt: new Date(),
+              user: { id: 7, email: 's@ex.com', profile: null },
+              class: {
+                id: classId,
+                name: 'Node',
+                tuitionFeeVnd: 1500000,
+                course: { id: 5, title: 'Node' },
+              },
+            },
+            confirmedAt: existingConfirmedAt,
+          }),
+        );
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.CONFIRMED,
+            enrollmentId,
+            confirmedAt: existingConfirmedAt,
+            reviewedAt: existingConfirmedAt,
+            reviewedById: adminId,
+            activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      const result = await service.confirmPayment(paymentId, adminId);
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+      expect(result.activationIssue).toBe(
+        PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+      );
+    });
+
+    it('throws UnprocessableEntityException when REPORTED payment points to an already ACTIVE enrollment (Invariant Check)', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(preliminarySuccess);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.ACTIVE,
+            classId,
+          },
+        ]);
+
+      await expect(service.confirmPayment(paymentId, adminId)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    });
+
+    it('throws UnprocessableEntityException when REPORTED payment points to a COMPLETED enrollment (Invariant Check)', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(preliminarySuccess);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.COMPLETED,
+            classId,
+          },
+        ]);
+
+      await expect(service.confirmPayment(paymentId, adminId)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    });
+
+    it('throws UnprocessableEntityException when REPORTED payment points to a DROPPED enrollment (Invariant Check)', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(preliminarySuccess);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.DROPPED,
+            classId,
+          },
+        ]);
+
+      await expect(service.confirmPayment(paymentId, adminId)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    });
+
+    it('throws UnprocessableEntityException when payment enrollmentId does not match locked enrollment id', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(preliminarySuccess);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId: 9999, // Mismatched
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      await expect(service.confirmPayment(paymentId, adminId)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    });
+
+    it('throws UnprocessableEntityException when enrollment classId does not match locked class id', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(preliminarySuccess);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId: 8888, // Mismatched class
+          },
+        ]);
+
+      await expect(service.confirmPayment(paymentId, adminId)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    });
+
+    it('preserves financial immutability (amountVnd and transferCode remain unchanged)', async () => {
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(preliminarySuccess)
+        .mockResolvedValueOnce(buildDetail());
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: enrollmentId,
+            status: EnrollmentStatus.PENDING_PAYMENT,
+            classId,
+          },
+        ]);
+
+      prisma.enrollment.count.mockResolvedValue(1);
+
+      const result = await service.confirmPayment(paymentId, adminId);
+
+      expect(result.amountVnd).toBe(1500000);
+      expect(result.transferCode).toBe('BT-100');
+    });
+
+    it('throws NotFoundException when preliminary payment lookup returns null', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(null);
+
+      await expect(service.confirmPayment(999, adminId)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });
 });

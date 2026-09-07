@@ -101,4 +101,35 @@ export class PaymentAdminController {
   ): Promise<AdminPaymentDetailDto> {
     return this.paymentService.rejectPayment(id, req.user.id, dto);
   }
+
+  @Post(':id/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Admin xác nhận thanh toán và tự động kích hoạt ghi danh nếu đủ điều kiện',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Xác nhận thanh toán thành công (CONFIRMED)',
+    type: AdminPaymentDetailDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Không tìm thấy thông tin thanh toán hoặc lớp học',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Thanh toán không ở trạng thái REPORTED',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'Dữ liệu thanh toán không hợp lệ hoặc ghi danh không ở trạng thái PENDING_PAYMENT',
+  })
+  confirmPayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ): Promise<AdminPaymentDetailDto> {
+    return this.paymentService.confirmPayment(id, req.user.id);
+  }
 }

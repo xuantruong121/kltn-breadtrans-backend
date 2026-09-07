@@ -2,9 +2,16 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PaymentStatus, Prisma } from '@prisma/client';
+import {
+  ClassStatus,
+  EnrollmentStatus,
+  PaymentActivationIssue,
+  PaymentStatus,
+  Prisma,
+} from '@prisma/client';
 import { getPaymentBankConfig } from '../../common/config/payment-bank.config';
 import {
   STUDENT_PAYMENT_SUMMARY_SELECT,
@@ -246,6 +253,7 @@ export class PaymentService {
         amountVnd: p.amountVnd,
         transferCode: p.transferCode,
         status: p.status,
+        activationIssue: p.activationIssue,
         createdAt: p.createdAt,
         reportedAt: p.reportedAt,
         reviewedAt: p.reviewedAt,
@@ -345,6 +353,188 @@ export class PaymentService {
     });
   }
 
+  async confirmPayment(
+    paymentId: number,
+    adminId: number,
+  ): Promise<AdminPaymentDetailDto> {
+    // 1. Preliminary non-locking lookup for routing identity only
+    const preliminary = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: {
+        id: true,
+        enrollmentId: true,
+        enrollment: {
+          select: {
+            id: true,
+            classId: true,
+          },
+        },
+      },
+    });
+
+    if (!preliminary || !preliminary.enrollment) {
+      throw new NotFoundException('Thông tin thanh toán không tồn tại');
+    }
+
+    const preliminaryClassId = preliminary.enrollment.classId;
+
+    // 2. Interactive transaction with strict lock order: Class -> Payment -> Enrollment
+    return await this.prisma.$transaction(async (tx) => {
+      // Step 1: Lock Class FOR UPDATE
+      const lockedClasses = await tx.$queryRaw<
+        Array<{
+          id: number;
+          status: ClassStatus;
+          capacity: number | null;
+        }>
+      >`
+        SELECT id, status, capacity
+        FROM "Class"
+        WHERE id = ${preliminaryClassId}
+        FOR UPDATE;
+      `;
+
+      if (!lockedClasses || lockedClasses.length === 0) {
+        throw new NotFoundException('Lớp học không tồn tại');
+      }
+      const lockedClass = lockedClasses[0];
+
+      // Step 2: Lock Payment FOR UPDATE
+      const lockedPayments = await tx.$queryRaw<
+        Array<{
+          id: number;
+          status: PaymentStatus;
+          enrollmentId: number;
+          confirmedAt: Date | null;
+          reviewedAt: Date | null;
+          reviewedById: number | null;
+          activationIssue: PaymentActivationIssue | null;
+        }>
+      >`
+        SELECT id, status, "enrollmentId", "confirmedAt", "reviewedAt", "reviewedById", "activationIssue"
+        FROM "Payment"
+        WHERE id = ${paymentId}
+        FOR UPDATE;
+      `;
+
+      if (!lockedPayments || lockedPayments.length === 0) {
+        throw new NotFoundException('Thông tin thanh toán không tồn tại');
+      }
+      const lockedPayment = lockedPayments[0];
+
+      // Step 3: Lock Enrollment FOR UPDATE
+      const lockedEnrollments = await tx.$queryRaw<
+        Array<{
+          id: number;
+          status: EnrollmentStatus;
+          classId: number;
+        }>
+      >`
+        SELECT id, status, "classId"
+        FROM "Enrollment"
+        WHERE id = ${lockedPayment.enrollmentId}
+        FOR UPDATE;
+      `;
+
+      if (!lockedEnrollments || lockedEnrollments.length === 0) {
+        throw new NotFoundException('Thông tin ghi danh không tồn tại');
+      }
+      const lockedEnrollment = lockedEnrollments[0];
+
+      // Step 4: Relationship Revalidation
+      if (
+        lockedPayment.enrollmentId !== lockedEnrollment.id ||
+        lockedEnrollment.classId !== lockedClass.id ||
+        lockedClass.id !== preliminaryClassId
+      ) {
+        throw new UnprocessableEntityException(
+          'Dữ liệu thanh toán, ghi danh và lớp học không đồng nhất',
+        );
+      }
+
+      // Step 5: Idempotency check: Already CONFIRMED returns existing state without mutation or retry
+      if (lockedPayment.status === PaymentStatus.CONFIRMED) {
+        return this.formatAdminPaymentDetail(paymentId, tx);
+      }
+
+      // Step 6: Strict state machine check: First confirmation allowed ONLY from REPORTED
+      if (lockedPayment.status !== PaymentStatus.REPORTED) {
+        throw new ConflictException(
+          `Chỉ có thể xác nhận thanh toán ở trạng thái CHỜ KIỂM TRA (REPORTED). Trạng thái hiện tại: ${lockedPayment.status}`,
+        );
+      }
+
+      // Step 7: Required First-Confirm Invariant: Enrollment MUST be PENDING_PAYMENT
+      if (lockedEnrollment.status !== EnrollmentStatus.PENDING_PAYMENT) {
+        throw new UnprocessableEntityException(
+          `Ghi danh liên kết không ở trạng thái chờ thanh toán (PENDING_PAYMENT). Trạng thái hiện tại: ${lockedEnrollment.status}`,
+        );
+      }
+
+      // Step 8: Single server timestamp & Decision logic
+      const now = new Date();
+
+      if (lockedClass.status === ClassStatus.UPCOMING) {
+        // Count ONLY ACTIVE Enrollments while Class lock is held
+        const activeCount = await tx.enrollment.count({
+          where: {
+            classId: lockedClass.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+
+        if (
+          lockedClass.capacity === null ||
+          activeCount < lockedClass.capacity
+        ) {
+          // Case A: Eligible + Capacity available -> Activate Enrollment & Confirm Payment
+          await tx.enrollment.update({
+            where: { id: lockedEnrollment.id },
+            data: { status: EnrollmentStatus.ACTIVE },
+          });
+
+          await tx.payment.update({
+            where: { id: paymentId },
+            data: {
+              status: PaymentStatus.CONFIRMED,
+              confirmedAt: now,
+              reviewedAt: now,
+              reviewedById: adminId,
+              activationIssue: null,
+            },
+          });
+        } else {
+          // Case B: UPCOMING but Full Capacity -> Payment CONFIRMED, CLASS_FULL, Enrollment remains PENDING_PAYMENT
+          await tx.payment.update({
+            where: { id: paymentId },
+            data: {
+              status: PaymentStatus.CONFIRMED,
+              confirmedAt: now,
+              reviewedAt: now,
+              reviewedById: adminId,
+              activationIssue: PaymentActivationIssue.CLASS_FULL,
+            },
+          });
+        }
+      } else {
+        // Case C: Ineligible Class (ONGOING, COMPLETED, CANCELLED) -> Payment CONFIRMED, CLASS_NOT_ELIGIBLE, Enrollment remains PENDING_PAYMENT
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: {
+            status: PaymentStatus.CONFIRMED,
+            confirmedAt: now,
+            reviewedAt: now,
+            reviewedById: adminId,
+            activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+          },
+        });
+      }
+
+      // Re-read and return authoritative snapshot
+      return this.formatAdminPaymentDetail(paymentId, tx);
+    });
+  }
+
   private async formatAdminPaymentDetail(
     paymentId: number,
     client: Prisma.TransactionClient | PrismaService,
@@ -383,6 +573,7 @@ export class PaymentService {
       amountVnd: payment.amountVnd,
       transferCode: payment.transferCode,
       status: payment.status,
+      activationIssue: payment.activationIssue,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
       reportedAt: payment.reportedAt,

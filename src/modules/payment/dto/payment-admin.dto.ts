@@ -11,7 +11,11 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaymentStatus, EnrollmentStatus } from '@prisma/client';
+import {
+  PaymentStatus,
+  EnrollmentStatus,
+  PaymentActivationIssue,
+} from '@prisma/client';
 import { BankTransferInstructionsDto } from './payment.dto';
 
 export class AdminPaymentFilterDto {
@@ -170,6 +174,14 @@ export class AdminPaymentSummaryDto {
 
   @ApiProperty({ type: () => AdminReviewerSummaryDto, nullable: true })
   reviewedBy: AdminReviewerSummaryDto | null;
+
+  @ApiPropertyOptional({
+    enum: PaymentActivationIssue,
+    nullable: true,
+    description:
+      'Vấn đề phát sinh khi kích hoạt ghi danh sau thanh toán (CLASS_FULL, CLASS_NOT_ELIGIBLE)',
+  })
+  activationIssue?: PaymentActivationIssue | null;
 }
 
 export class AdminEnrollmentDetailDto {
@@ -225,6 +237,14 @@ export class AdminPaymentDetailDto {
     description: 'Ghi chú lý do từ chối hoặc xử lý nội bộ của Admin',
   })
   adminNote: string | null;
+
+  @ApiPropertyOptional({
+    enum: PaymentActivationIssue,
+    nullable: true,
+    description:
+      'Vấn đề phát sinh khi kích hoạt ghi danh sau thanh toán (CLASS_FULL, CLASS_NOT_ELIGIBLE)',
+  })
+  activationIssue?: PaymentActivationIssue | null;
 
   @ApiProperty({ type: () => AdminStudentDetailDto })
   student: AdminStudentDetailDto;

@@ -10,6 +10,7 @@ import {
   ClassStatus,
   EnrollmentStatus,
   PaymentStatus,
+  PaymentActivationIssue,
 } from '@prisma/client';
 import { TransformInterceptor } from './../src/common/interceptors/transform.interceptor';
 import * as crypto from 'crypto';
@@ -31,11 +32,13 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
   let adminUser2: any;
   let teacherUser: any;
   let studentUser: any;
+  let studentUser2: any;
 
   let tokenAdmin: string;
   let tokenAdmin2: string;
   let tokenTeacher: string;
   let tokenStudent: string;
+  let tokenStudent2: string;
 
   let testCourse: any;
   let testClass: any;
@@ -181,6 +184,36 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       include: { profile: true },
     });
 
+    studentUser2 = await prisma.user.upsert({
+      where: { email: 'e2e_student_payment_target2@breadtrans.com' },
+      update: {
+        profile: {
+          upsert: {
+            create: {
+              fullName: 'Target Student Name Two',
+              phone: '0912345679',
+            },
+            update: {
+              fullName: 'Target Student Name Two',
+              phone: '0912345679',
+            },
+          },
+        },
+      },
+      create: {
+        email: 'e2e_student_payment_target2@breadtrans.com',
+        password: 'hashed_password_123',
+        role: Role.STUDENT,
+        profile: {
+          create: {
+            fullName: 'Target Student Name Two',
+            phone: '0912345679',
+          },
+        },
+      },
+      include: { profile: true },
+    });
+
     makeToken = (user: any) =>
       jwtService.sign({
         sub: user.id,
@@ -195,6 +228,7 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
     tokenAdmin2 = makeToken(adminUser2);
     tokenTeacher = makeToken(teacherUser);
     tokenStudent = makeToken(studentUser);
+    tokenStudent2 = makeToken(studentUser2);
 
     // 3. Setup Course and Class
     testCourse = await prisma.course.create({
@@ -383,6 +417,7 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           adminUser2?.id,
           teacherUser?.id,
           studentUser?.id,
+          studentUser2?.id,
         ].filter(Boolean);
 
         if (uIds.length > 0) {
@@ -823,6 +858,806 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       expect(finalPayment!.status).toBe(PaymentStatus.REJECTED);
       expect(finalPayment!.reviewedById).toBe(winnerAdminId);
       expect(finalPayment!.adminNote).toBe(winnerReason);
+    });
+  });
+
+  // =========================================================================
+  // PHASE 3C-5 ADMIN PAYMENT CONFIRMATION & ATOMIC ACTIVATION (E2E)
+  // =========================================================================
+  describe('Phase 3C-5: Admin Payment Confirmation & Atomic Enrollment Activation (e2e)', () => {
+    // Helper to create disposable class
+    const createClass = async (
+      name: string,
+      options: {
+        capacity?: number | null;
+        status?: ClassStatus;
+        tuitionFeeVnd?: number;
+      } = {},
+    ) => {
+      return prisma.class.create({
+        data: {
+          courseId: testCourse.id,
+          teacherId: teacherUser.id,
+          name,
+          tuitionFeeVnd: options.tuitionFeeVnd ?? 1000000,
+          capacity: options.capacity !== undefined ? options.capacity : 20,
+          status: options.status ?? ClassStatus.UPCOMING,
+          meetingLink: 'https://breadtrans.com/meet/phase3c5-class',
+        },
+      });
+    };
+
+    // Helper to create disposable enrollment & payment
+    const createPayment = async (
+      clsId: number,
+      userId: number,
+      options: {
+        paymentStatus?: PaymentStatus;
+        enrollmentStatus?: EnrollmentStatus;
+        amountVnd?: number;
+        activationIssue?: PaymentActivationIssue | null;
+        confirmedAt?: Date | null;
+        reviewedAt?: Date | null;
+        reviewedById?: number | null;
+      } = {},
+    ) => {
+      const enrollment = await prisma.enrollment.create({
+        data: {
+          userId,
+          classId: clsId,
+          status: options.enrollmentStatus ?? EnrollmentStatus.PENDING_PAYMENT,
+        },
+      });
+
+      const payment = await prisma.payment.create({
+        data: {
+          enrollmentId: enrollment.id,
+          amountVnd: options.amountVnd ?? 1000000,
+          transferCode: `BT-3C5-${crypto.randomBytes(3).toString('hex')}`,
+          status: options.paymentStatus ?? PaymentStatus.REPORTED,
+          activationIssue: options.activationIssue,
+          reportedAt:
+            options.paymentStatus === PaymentStatus.PENDING
+              ? null
+              : new Date(Date.now() - 60000),
+          confirmedAt: options.confirmedAt,
+          reviewedAt: options.reviewedAt,
+          reviewedById: options.reviewedById,
+        },
+      });
+
+      return { enrollment, payment };
+    };
+
+    // -----------------------------------------------------------------------
+    // 32. Authorization & Namespace on /admin/payments/:id/confirm
+    // -----------------------------------------------------------------------
+    describe('32. Authorization & Role Protection on POST /admin/payments/:id/confirm', () => {
+      it('32.1. Admin POST /admin/payments/:id/confirm succeeds with 200', async () => {
+        const cls = await createClass('Auth Test Class 1');
+        const { payment } = await createPayment(cls.id, studentUser.id);
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.statusCode).toBe(200);
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+      });
+
+      it('32.2. Student gets 403 Forbidden on confirm', async () => {
+        const cls = await createClass('Auth Test Class 2');
+        const { payment } = await createPayment(cls.id, studentUser.id);
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(403);
+      });
+
+      it('32.3. Teacher gets 403 Forbidden on confirm', async () => {
+        const cls = await createClass('Auth Test Class 3');
+        const { payment } = await createPayment(cls.id, studentUser.id);
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenTeacher}`)
+          .expect(403);
+      });
+
+      it('32.4. Unauthenticated gets 401 Unauthorized on confirm', async () => {
+        const cls = await createClass('Auth Test Class 4');
+        const { payment } = await createPayment(cls.id, studentUser.id);
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .expect(401);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 33. Case A: UPCOMING + Capacity Available (Happy Path)
+    // -----------------------------------------------------------------------
+    describe('33. Case A: UPCOMING + Capacity Available (Happy Path Activation)', () => {
+      it('33.1. Payment becomes CONFIRMED, Enrollment becomes ACTIVE, student gets 200 access', async () => {
+        const cls = await createClass('Happy Path Class', { capacity: 5 });
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+        );
+
+        // Verify initial access is blocked (403)
+        await request(app.getHttpServer())
+          .get(`/courses/classes/${cls.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(403);
+
+        const beforeConfirm = Date.now();
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        const afterConfirm = Date.now();
+
+        // 1. Response verification
+        expect(res.body.statusCode).toBe(200);
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBeNull();
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+        expect(res.body.data.reviewedBy.id).toBe(adminUser.id);
+
+        // 2. Database verification
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.CONFIRMED);
+        expect(dbPayment!.activationIssue).toBeNull();
+        expect(dbPayment!.reviewedById).toBe(adminUser.id);
+        expect(dbPayment!.confirmedAt).not.toBeNull();
+        expect(dbPayment!.reviewedAt).not.toBeNull();
+        expect(
+          new Date(dbPayment!.confirmedAt!).getTime(),
+        ).toBeGreaterThanOrEqual(beforeConfirm - 2000);
+        expect(new Date(dbPayment!.confirmedAt!).getTime()).toBeLessThanOrEqual(
+          afterConfirm + 2000,
+        );
+        expect(dbPayment!.amountVnd).toBe(1000000); // immutable
+        expect(dbPayment!.transferCode).toBe(payment.transferCode); // immutable
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.ACTIVE);
+
+        // 3. Access Truth verification: Student now enters private classroom (200)
+        await request(app.getHttpServer())
+          .get(`/courses/classes/${cls.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(200);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 34. Case B: UPCOMING + Full Capacity (CLASS_FULL)
+    // -----------------------------------------------------------------------
+    describe('34. Case B: UPCOMING + Full Capacity (CLASS_FULL Decision)', () => {
+      it('34.1. Payment CONFIRMED with CLASS_FULL, Enrollment remains PENDING_PAYMENT, student gets 403', async () => {
+        const cls = await createClass('Full Class Test', { capacity: 1 });
+
+        // Occupy the only seat with an ACTIVE enrollment
+        await prisma.enrollment.create({
+          data: {
+            userId: studentUser2.id,
+            classId: cls.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+
+        // Student 1 reports payment for this class
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+        );
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        // 1. Response verification
+        expect(res.body.statusCode).toBe(200);
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
+
+        // 2. Database verification
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.CONFIRMED);
+        expect(dbPayment!.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+        expect(dbPayment!.reviewedById).toBe(adminUser.id);
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+
+        // 3. Access truth: Student still gets 403 Forbidden
+        await request(app.getHttpServer())
+          .get(`/courses/classes/${cls.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(403);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 35. Case C: Ineligible Class Statuses (CLASS_NOT_ELIGIBLE)
+    // -----------------------------------------------------------------------
+    describe('35. Case C: Ineligible Class Statuses (CLASS_NOT_ELIGIBLE Decision)', () => {
+      it('35.1. ONGOING class -> Payment CONFIRMED, CLASS_NOT_ELIGIBLE, Enrollment PENDING_PAYMENT', async () => {
+        const cls = await createClass('Ongoing Class Test', {
+          status: ClassStatus.ONGOING,
+        });
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+        );
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+
+        await request(app.getHttpServer())
+          .get(`/courses/classes/${cls.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(403);
+      });
+
+      it('35.2. COMPLETED class -> Payment CONFIRMED, CLASS_NOT_ELIGIBLE, Enrollment PENDING_PAYMENT', async () => {
+        const cls = await createClass('Completed Class Test', {
+          status: ClassStatus.COMPLETED,
+        });
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+        );
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      });
+
+      it('35.3. CANCELLED class -> Payment CONFIRMED, CLASS_NOT_ELIGIBLE, Enrollment PENDING_PAYMENT', async () => {
+        const cls = await createClass('Cancelled Class Test', {
+          status: ClassStatus.CANCELLED,
+        });
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+        );
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 36. Conflict on Non-REPORTED Payments
+    // -----------------------------------------------------------------------
+    describe('36. State Machine Guards (409 Conflict on Non-REPORTED Payments)', () => {
+      it('36.1. PENDING payment returns 409 Conflict', async () => {
+        const cls = await createClass('Pending Confirm Test');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.PENDING,
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(409);
+
+        expect(res.body.message).toContain('PENDING');
+      });
+
+      it('36.2. REJECTED payment returns 409 Conflict', async () => {
+        const cls = await createClass('Rejected Confirm Test');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REJECTED,
+          reviewedById: adminUser.id,
+          reviewedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(409);
+
+        expect(res.body.message).toContain('REJECTED');
+      });
+
+      it('36.3. REVIEW_REQUIRED payment returns 409 Conflict', async () => {
+        const cls = await createClass('ReviewReq Confirm Test');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REVIEW_REQUIRED,
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(409);
+
+        expect(res.body.message).toContain('REVIEW_REQUIRED');
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 37. Idempotency Across All 3 Confirmation Outcomes
+    // -----------------------------------------------------------------------
+    describe('37. Idempotency Across All 3 Confirmation Outcomes (No Re-execution, No Retry)', () => {
+      it('37.1. Idempotent repeat on CONFIRMED + ACTIVE returns 200, preserves original timestamps and state', async () => {
+        const cls = await createClass('Idempotent Active Class');
+        const { payment } = await createPayment(cls.id, studentUser.id);
+
+        // First confirm
+        const firstRes = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        const firstConfirmedAt = firstRes.body.data.confirmedAt;
+        const firstReviewedAt = firstRes.body.data.reviewedAt;
+
+        // Repeat confirm
+        const secondRes = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(secondRes.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(secondRes.body.data.activationIssue).toBeNull();
+        expect(secondRes.body.data.confirmedAt).toBe(firstConfirmedAt);
+        expect(secondRes.body.data.reviewedAt).toBe(firstReviewedAt);
+        expect(secondRes.body.data.enrollment.status).toBe(
+          EnrollmentStatus.ACTIVE,
+        );
+      });
+
+      it('37.2. Idempotent repeat on CONFIRMED + CLASS_FULL does NOT auto-retry when seat becomes available', async () => {
+        const cls = await createClass('Idempotent Full Class', { capacity: 1 });
+
+        // Competing active student occupying the seat
+        const competitorEnrollment = await prisma.enrollment.create({
+          data: {
+            userId: studentUser2.id,
+            classId: cls.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+        );
+
+        // First confirm -> CLASS_FULL
+        const firstRes = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(firstRes.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+
+        // Now seat becomes available (competitor dropped/deleted)
+        await prisma.enrollment.delete({
+          where: { id: competitorEnrollment.id },
+        });
+
+        // Repeat confirm MUST NOT retry activation in Phase 3C-5!
+        const repeatRes = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(repeatRes.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(repeatRes.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+        expect(repeatRes.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      });
+
+      it('37.3. Idempotent repeat on CONFIRMED + CLASS_NOT_ELIGIBLE does NOT auto-retry when class becomes UPCOMING', async () => {
+        const cls = await createClass('Idempotent Not Eligible Class', {
+          status: ClassStatus.ONGOING,
+        });
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+        );
+
+        // First confirm -> CLASS_NOT_ELIGIBLE
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        // Change class status back to UPCOMING
+        await prisma.class.update({
+          where: { id: cls.id },
+          data: { status: ClassStatus.UPCOMING },
+        });
+
+        // Repeat confirm MUST NOT auto-retry
+        const repeatRes = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(repeatRes.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(repeatRes.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        );
+        expect(repeatRes.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 38. First-Confirm Invariants (422 Unprocessable Entity & Zero Mutation)
+    // -----------------------------------------------------------------------
+    describe('38. First-Confirm Invariants (422 Unprocessable Entity & Zero Mutation)', () => {
+      it('38.1. REPORTED payment pointing to ACTIVE enrollment returns 422 with zero mutation', async () => {
+        const cls = await createClass('Invariant Test Class 1');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.ACTIVE,
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(422);
+
+        // Verify zero mutation
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.REPORTED);
+        expect(dbPayment!.confirmedAt).toBeNull();
+        expect(dbPayment!.reviewedAt).toBeNull();
+      });
+
+      it('38.2. REPORTED payment pointing to COMPLETED enrollment returns 422 with zero mutation', async () => {
+        const cls = await createClass('Invariant Test Class 2');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.COMPLETED,
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(422);
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.REPORTED);
+      });
+
+      it('38.3. REPORTED payment pointing to DROPPED enrollment returns 422 with zero mutation', async () => {
+        const cls = await createClass('Invariant Test Class 3');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.DROPPED,
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(422);
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.REPORTED);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 39. Client Body Has Zero Authority (Tampering Protection)
+    // -----------------------------------------------------------------------
+    describe('39. Client Body Has Zero Authority (Tampering Protection)', () => {
+      it('39.1. Malicious client body cannot override status, activationIssue, reviewer or amount', async () => {
+        const cls = await createClass('Tamper Protection Class');
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+        );
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({
+            status: 'REJECTED',
+            activationIssue: 'CLASS_FULL',
+            reviewedById: 9999,
+            amountVnd: 0,
+            transferCode: 'TAMPERED_CODE',
+            confirmedAt: '2020-01-01T00:00:00.000Z',
+          })
+          .expect(200);
+
+        // Server decides everything
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBeNull();
+        expect(res.body.data.reviewedBy.id).toBe(adminUser.id);
+        expect(res.body.data.amountVnd).toBe(1000000);
+        expect(res.body.data.transferCode).toBe(payment.transferCode);
+        expect(res.body.data.enrollment.id).toBe(enrollment.id);
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.CONFIRMED);
+        expect(dbPayment!.activationIssue).toBeNull();
+        expect(dbPayment!.reviewedById).toBe(adminUser.id);
+        expect(dbPayment!.amountVnd).toBe(1000000);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 40. Concurrency: Parallel Capacity Race (Capacity = 1)
+    // -----------------------------------------------------------------------
+    describe('40. Concurrency: Parallel Capacity Race on Single-Seat Class (Capacity = 1)', () => {
+      it('40.1. Exactly one Enrollment ACTIVE, exactly one PENDING_PAYMENT, exactly one CLASS_FULL, total ACTIVE = 1', async () => {
+        const cls = await createClass('Capacity Race Class', { capacity: 1 });
+
+        // Two students both reported payments for this class
+        const p1 = await createPayment(cls.id, studentUser.id);
+        const p2 = await createPayment(cls.id, studentUser2.id);
+
+        // Run both confirms concurrently
+        const [res1, res2] = await Promise.all([
+          request(app.getHttpServer())
+            .post(`/admin/payments/${p1.payment.id}/confirm`)
+            .set('Authorization', `Bearer ${tokenAdmin}`),
+          request(app.getHttpServer())
+            .post(`/admin/payments/${p2.payment.id}/confirm`)
+            .set('Authorization', `Bearer ${tokenAdmin2}`),
+        ]);
+
+        // Both HTTP calls succeed with 200
+        expect(res1.status).toBe(200);
+        expect(res2.status).toBe(200);
+
+        // Verify both payments in database
+        const dbP1 = await prisma.payment.findUnique({
+          where: { id: p1.payment.id },
+        });
+        const dbP2 = await prisma.payment.findUnique({
+          where: { id: p2.payment.id },
+        });
+
+        expect(dbP1!.status).toBe(PaymentStatus.CONFIRMED);
+        expect(dbP2!.status).toBe(PaymentStatus.CONFIRMED);
+
+        const issues = [dbP1!.activationIssue, dbP2!.activationIssue];
+        expect(issues).toContain(null);
+        expect(issues).toContain(PaymentActivationIssue.CLASS_FULL);
+
+        // Verify both enrollments in database
+        const dbE1 = await prisma.enrollment.findUnique({
+          where: { id: p1.enrollment.id },
+        });
+        const dbE2 = await prisma.enrollment.findUnique({
+          where: { id: p2.enrollment.id },
+        });
+
+        const enrollStatuses = [dbE1!.status, dbE2!.status];
+        expect(enrollStatuses).toContain(EnrollmentStatus.ACTIVE);
+        expect(enrollStatuses).toContain(EnrollmentStatus.PENDING_PAYMENT);
+
+        // CRITICAL: ACTIVE count in database must strictly be 1!
+        const totalActive = await prisma.enrollment.count({
+          where: { classId: cls.id, status: EnrollmentStatus.ACTIVE },
+        });
+        expect(totalActive).toBe(1);
+
+        // Access Truth: Active winner gets 200, pending loser gets 403
+        const activeToken =
+          dbE1!.status === EnrollmentStatus.ACTIVE
+            ? tokenStudent
+            : tokenStudent2;
+        const pendingToken =
+          dbE1!.status === EnrollmentStatus.ACTIVE
+            ? tokenStudent2
+            : tokenStudent;
+
+        await request(app.getHttpServer())
+          .get(`/courses/classes/${cls.id}`)
+          .set('Authorization', `Bearer ${activeToken}`)
+          .expect(200);
+
+        await request(app.getHttpServer())
+          .get(`/courses/classes/${cls.id}`)
+          .set('Authorization', `Bearer ${pendingToken}`)
+          .expect(403);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 41. Concurrency: Confirm vs. Reject Race
+    // -----------------------------------------------------------------------
+    describe('41. Concurrency: Confirm vs. Reject Race on Same REPORTED Payment', () => {
+      it('41.1. Exactly one 200, exactly one 409, final database state is strictly either CONFIRMED or REJECTED', async () => {
+        const cls = await createClass('Confirm vs Reject Class');
+        const { payment } = await createPayment(cls.id, studentUser.id);
+
+        const [confirmRes, rejectRes] = await Promise.all([
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/confirm`)
+            .set('Authorization', `Bearer ${tokenAdmin}`),
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/reject`)
+            .set('Authorization', `Bearer ${tokenAdmin2}`)
+            .send({
+              reason: 'Lý do từ chối đồng thời trong bài kiểm thử concurrency',
+            }),
+        ]);
+
+        const statuses = [confirmRes.status, rejectRes.status];
+        expect(statuses).toContain(200);
+        expect(statuses).toContain(409);
+
+        // Authoritative database check
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect([PaymentStatus.CONFIRMED, PaymentStatus.REJECTED]).toContain(
+          dbPayment!.status,
+        );
+
+        if (dbPayment!.status === PaymentStatus.CONFIRMED) {
+          expect(dbPayment!.confirmedAt).not.toBeNull();
+          expect(dbPayment!.adminNote).toBeNull();
+        } else {
+          expect(dbPayment!.adminNote).toContain('Lý do từ chối đồng thời');
+          expect(dbPayment!.confirmedAt).toBeNull();
+        }
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 42. Concurrency: Report Transfer vs. Confirm Race
+    // -----------------------------------------------------------------------
+    describe('42. Concurrency: Report Transfer vs. Confirm Race', () => {
+      it('42.1. Serialized cleanly without 500: either report wins first (CONFIRMED) or confirm 409 (REPORTED)', async () => {
+        const cls = await createClass('Report vs Confirm Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.PENDING,
+        });
+
+        const [reportRes, confirmRes] = await Promise.all([
+          request(app.getHttpServer())
+            .post(`/payments/${payment.id}/report-transfer`)
+            .set('Authorization', `Bearer ${tokenStudent}`),
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/confirm`)
+            .set('Authorization', `Bearer ${tokenAdmin}`),
+        ]);
+
+        // Report transfer should always return 200
+        expect(reportRes.status).toBe(200);
+
+        // Confirm can return 200 (if report serialized first) or 409 (if confirm locked first and saw PENDING)
+        expect([200, 409]).toContain(confirmRes.status);
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        if (confirmRes.status === 200) {
+          expect(dbPayment!.status).toBe(PaymentStatus.CONFIRMED);
+        } else {
+          expect(dbPayment!.status).toBe(PaymentStatus.REPORTED);
+        }
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 43. Student Reviewer & ActivationIssue Privacy Regressions
+    // -----------------------------------------------------------------------
+    describe('43. Student Reviewer & ActivationIssue Privacy Regressions', () => {
+      it('43.1. Student GET /payments/:id hides reviewedById, reviewedBy, adminNote, and activationIssue', async () => {
+        const cls = await createClass('Student Privacy Class');
+        const { payment } = await createPayment(cls.id, studentUser.id);
+
+        // Confirm payment
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        // Student fetches their payment detail
+        const studentRes = await request(app.getHttpServer())
+          .get(`/payments/${payment.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(200);
+
+        expect(studentRes.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(studentRes.body.data.reviewedById).toBeUndefined();
+        expect(studentRes.body.data.reviewedBy).toBeUndefined();
+        expect(studentRes.body.data.adminNote).toBeUndefined();
+        expect(studentRes.body.data.activationIssue).toBeUndefined();
+      });
     });
   });
 });

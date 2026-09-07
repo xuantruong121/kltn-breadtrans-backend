@@ -16,6 +16,7 @@ type MockPaymentService = {
   getAdminPayments: jest.Mock<any, any>;
   getAdminPaymentDetail: jest.Mock<any, any>;
   rejectPayment: jest.Mock<any, any>;
+  confirmPayment: jest.Mock<any, any>;
 };
 
 describe('PaymentAdminController', () => {
@@ -28,6 +29,7 @@ describe('PaymentAdminController', () => {
       getAdminPayments: jest.fn(),
       getAdminPaymentDetail: jest.fn(),
       rejectPayment: jest.fn(),
+      confirmPayment: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -66,6 +68,14 @@ describe('PaymentAdminController', () => {
       const httpCode = Reflect.getMetadata(
         '__httpCode__',
         controller.rejectPayment,
+      );
+      expect(httpCode).toBe(HttpStatus.OK);
+    });
+
+    it('has @HttpCode(HttpStatus.OK) (200) metadata on confirmPayment', () => {
+      const httpCode = Reflect.getMetadata(
+        '__httpCode__',
+        controller.confirmPayment,
       );
       expect(httpCode).toBe(HttpStatus.OK);
     });
@@ -124,6 +134,26 @@ describe('PaymentAdminController', () => {
         dto,
       );
       expect(result).toEqual(mockRejected);
+    });
+
+    it('delegates confirmPayment to service using param id and req.user.id with zero client authority', async () => {
+      const paymentId = 99;
+      const req = { user: { id: 10, role: Role.ADMIN } };
+      const mockConfirmed = {
+        id: paymentId,
+        status: PaymentStatus.CONFIRMED,
+        reviewedById: 10,
+        activationIssue: null,
+      };
+      service.confirmPayment.mockResolvedValue(mockConfirmed);
+
+      const result = await controller.confirmPayment(paymentId, req);
+
+      expect(service.confirmPayment).toHaveBeenCalledWith(
+        paymentId,
+        req.user.id,
+      );
+      expect(result).toEqual(mockConfirmed);
     });
   });
 });
