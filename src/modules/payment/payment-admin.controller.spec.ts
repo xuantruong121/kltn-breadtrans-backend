@@ -17,6 +17,7 @@ type MockPaymentService = {
   getAdminPaymentDetail: jest.Mock<any, any>;
   rejectPayment: jest.Mock<any, any>;
   confirmPayment: jest.Mock<any, any>;
+  retryActivation: jest.Mock<any, any>;
 };
 
 describe('PaymentAdminController', () => {
@@ -30,6 +31,7 @@ describe('PaymentAdminController', () => {
       getAdminPaymentDetail: jest.fn(),
       rejectPayment: jest.fn(),
       confirmPayment: jest.fn(),
+      retryActivation: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -76,6 +78,14 @@ describe('PaymentAdminController', () => {
       const httpCode = Reflect.getMetadata(
         '__httpCode__',
         controller.confirmPayment,
+      );
+      expect(httpCode).toBe(HttpStatus.OK);
+    });
+
+    it('has @HttpCode(HttpStatus.OK) (200) metadata on retryActivation', () => {
+      const httpCode = Reflect.getMetadata(
+        '__httpCode__',
+        controller.retryActivation,
       );
       expect(httpCode).toBe(HttpStatus.OK);
     });
@@ -154,6 +164,21 @@ describe('PaymentAdminController', () => {
         req.user.id,
       );
       expect(result).toEqual(mockConfirmed);
+    });
+
+    it('delegates retryActivation to service using param id with zero client authority', async () => {
+      const paymentId = 101;
+      const mockRetried = {
+        id: paymentId,
+        status: PaymentStatus.CONFIRMED,
+        activationIssue: null,
+      };
+      service.retryActivation.mockResolvedValue(mockRetried);
+
+      const result = await controller.retryActivation(paymentId);
+
+      expect(service.retryActivation).toHaveBeenCalledWith(paymentId);
+      expect(result).toEqual(mockRetried);
     });
   });
 });

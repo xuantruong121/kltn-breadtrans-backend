@@ -132,4 +132,34 @@ export class PaymentAdminController {
   ): Promise<AdminPaymentDetailDto> {
     return this.paymentService.confirmPayment(id, req.user.id);
   }
+
+  @Post(':id/retry-activation')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Admin thử kích hoạt lại ghi danh cho thanh toán đã CONFIRMED gặp vấn đề CLASS_FULL hoặc CLASS_NOT_ELIGIBLE',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Thử kích hoạt lại thành công',
+    type: AdminPaymentDetailDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Không tìm thấy thông tin thanh toán hoặc lớp học',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Trạng thái thanh toán không hợp lệ (không phải CONFIRMED)',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'Dữ liệu không đồng nhất hoặc ghi danh không ở trạng thái hợp lệ để thử lại',
+  })
+  retryActivation(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<AdminPaymentDetailDto> {
+    return this.paymentService.retryActivation(id);
+  }
 }

@@ -535,6 +535,210 @@ export class PaymentService {
     });
   }
 
+  async retryActivation(paymentId: number): Promise<AdminPaymentDetailDto> {
+    // 1. Non-locking preliminary lookup to discover classId
+    const preliminary = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: {
+        id: true,
+        enrollmentId: true,
+        enrollment: {
+          select: {
+            id: true,
+            classId: true,
+          },
+        },
+      },
+    });
+
+    if (!preliminary || !preliminary.enrollment) {
+      throw new NotFoundException('Thông tin thanh toán không tồn tại');
+    }
+
+    const preliminaryClassId = preliminary.enrollment.classId;
+
+    // 2. Interactive transaction with strict lock order: Class -> Payment -> Enrollment
+    return await this.prisma.$transaction(async (tx) => {
+      // Step 1: Lock Class FOR UPDATE
+      const lockedClasses = await tx.$queryRaw<
+        Array<{
+          id: number;
+          status: ClassStatus;
+          capacity: number | null;
+        }>
+      >`
+        SELECT id, status, capacity
+        FROM "Class"
+        WHERE id = ${preliminaryClassId}
+        FOR UPDATE;
+      `;
+
+      if (!lockedClasses || lockedClasses.length === 0) {
+        throw new NotFoundException('Lớp học không tồn tại');
+      }
+      const lockedClass = lockedClasses[0];
+
+      // Step 2: Lock Payment FOR UPDATE
+      const lockedPayments = await tx.$queryRaw<
+        Array<{
+          id: number;
+          status: PaymentStatus;
+          enrollmentId: number;
+          activationIssue: PaymentActivationIssue | null;
+        }>
+      >`
+        SELECT id, status, "enrollmentId", "activationIssue"
+        FROM "Payment"
+        WHERE id = ${paymentId}
+        FOR UPDATE;
+      `;
+
+      if (!lockedPayments || lockedPayments.length === 0) {
+        throw new NotFoundException('Thông tin thanh toán không tồn tại');
+      }
+      const lockedPayment = lockedPayments[0];
+
+      // Step 3: Lock Enrollment FOR UPDATE
+      const lockedEnrollments = await tx.$queryRaw<
+        Array<{
+          id: number;
+          status: EnrollmentStatus;
+          classId: number;
+        }>
+      >`
+        SELECT id, status, "classId"
+        FROM "Enrollment"
+        WHERE id = ${lockedPayment.enrollmentId}
+        FOR UPDATE;
+      `;
+
+      if (!lockedEnrollments || lockedEnrollments.length === 0) {
+        throw new NotFoundException('Thông tin ghi danh không tồn tại');
+      }
+      const lockedEnrollment = lockedEnrollments[0];
+
+      // Step 4: Relationship Revalidation
+      if (
+        lockedPayment.enrollmentId !== lockedEnrollment.id ||
+        lockedEnrollment.classId !== lockedClass.id ||
+        lockedClass.id !== preliminaryClassId
+      ) {
+        throw new UnprocessableEntityException(
+          'Dữ liệu thanh toán, ghi danh và lớp học không đồng nhất',
+        );
+      }
+
+      // Step 5: Status Guards
+      if (lockedPayment.status !== PaymentStatus.CONFIRMED) {
+        throw new ConflictException(
+          `Chỉ có thể thử kích hoạt lại thanh toán ở trạng thái ĐÃ XÁC NHẬN (CONFIRMED). Trạng thái hiện tại: ${lockedPayment.status}`,
+        );
+      }
+
+      // Step 6: Inconsistency Matrix
+      // Case A: CONFIRMED + activationIssue === null + ACTIVE -> idempotent HTTP 200, no mutation
+      if (
+        lockedPayment.activationIssue === null &&
+        lockedEnrollment.status === EnrollmentStatus.ACTIVE
+      ) {
+        return this.formatAdminPaymentDetail(paymentId, tx);
+      }
+
+      // Case B: CONFIRMED + activationIssue === null + PENDING_PAYMENT -> 422
+      if (
+        lockedPayment.activationIssue === null &&
+        lockedEnrollment.status === EnrollmentStatus.PENDING_PAYMENT
+      ) {
+        throw new UnprocessableEntityException(
+          'Thanh toán đã xác nhận nhưng không có ghi nhận lý do chưa kích hoạt (activationIssue)',
+        );
+      }
+
+      // Case C: CONFIRMED + activationIssue !== null + ACTIVE -> 422
+      if (
+        lockedPayment.activationIssue !== null &&
+        lockedEnrollment.status === EnrollmentStatus.ACTIVE
+      ) {
+        throw new UnprocessableEntityException(
+          'Dữ liệu không đồng nhất: Ghi danh đã kích hoạt (ACTIVE) nhưng thanh toán vẫn còn tồn tại lỗi kích hoạt',
+        );
+      }
+
+      // Case D: CONFIRMED + activationIssue !== null + (COMPLETED or DROPPED) -> 422
+      if (
+        lockedPayment.activationIssue !== null &&
+        (lockedEnrollment.status === EnrollmentStatus.COMPLETED ||
+          lockedEnrollment.status === EnrollmentStatus.DROPPED)
+      ) {
+        throw new UnprocessableEntityException(
+          `Không thể kích hoạt lại ghi danh ở trạng thái ${lockedEnrollment.status}`,
+        );
+      }
+
+      // Any other non-PENDING_PAYMENT status -> 422
+      if (lockedEnrollment.status !== EnrollmentStatus.PENDING_PAYMENT) {
+        throw new UnprocessableEntityException(
+          `Không thể kích hoạt lại ghi danh ở trạng thái ${lockedEnrollment.status}`,
+        );
+      }
+
+      // Precondition: Normal retry requires activationIssue in [CLASS_FULL, CLASS_NOT_ELIGIBLE]
+      if (
+        lockedPayment.activationIssue !== PaymentActivationIssue.CLASS_FULL &&
+        lockedPayment.activationIssue !== PaymentActivationIssue.CLASS_NOT_ELIGIBLE
+      ) {
+        throw new UnprocessableEntityException(
+          `Lý do kích hoạt không hợp lệ để thử lại: ${lockedPayment.activationIssue}`,
+        );
+      }
+
+      // Step 7: Decision Logic & Current-State Reevaluation
+      if (lockedClass.status === ClassStatus.UPCOMING) {
+        const activeCount = await tx.enrollment.count({
+          where: {
+            classId: lockedClass.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+
+        if (
+          lockedClass.capacity === null ||
+          activeCount < lockedClass.capacity
+        ) {
+          // Success: Activate Enrollment & Clear issue
+          await tx.enrollment.update({
+            where: { id: lockedEnrollment.id },
+            data: { status: EnrollmentStatus.ACTIVE },
+          });
+
+          await tx.payment.update({
+            where: { id: paymentId },
+            data: { activationIssue: null },
+          });
+        } else {
+          // Still Full or transition to CLASS_FULL
+          if (lockedPayment.activationIssue !== PaymentActivationIssue.CLASS_FULL) {
+            await tx.payment.update({
+              where: { id: paymentId },
+              data: { activationIssue: PaymentActivationIssue.CLASS_FULL },
+            });
+          }
+        }
+      } else {
+        // Still or now not eligible (ONGOING, COMPLETED, CANCELLED)
+        if (lockedPayment.activationIssue !== PaymentActivationIssue.CLASS_NOT_ELIGIBLE) {
+          await tx.payment.update({
+            where: { id: paymentId },
+            data: { activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE },
+          });
+        }
+      }
+
+      // Return authoritative snapshot
+      return this.formatAdminPaymentDetail(paymentId, tx);
+    });
+  }
+
   private async formatAdminPaymentDetail(
     paymentId: number,
     client: Prisma.TransactionClient | PrismaService,

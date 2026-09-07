@@ -430,7 +430,20 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
     }
 
     if (app) {
+      try {
+        const { getRedisConnectionToken } = await import('@nestjs-modules/ioredis');
+        const redis = app.get(getRedisConnectionToken());
+        if (redis && typeof redis.quit === 'function') {
+          await redis.quit().catch(() => null);
+        }
+      } catch {
+        // Redis optional
+      }
       await app.close();
+    }
+
+    if (prisma) {
+      await prisma.$disconnect().catch(() => null);
     }
   });
 
@@ -1657,6 +1670,665 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         expect(studentRes.body.data.reviewedBy).toBeUndefined();
         expect(studentRes.body.data.adminNote).toBeUndefined();
         expect(studentRes.body.data.activationIssue).toBeUndefined();
+      });
+    });
+
+    // =======================================================================
+    // PHASE 3C-6: RETRY ACTIVATION OPERATIONAL RESOLUTION
+    // =======================================================================
+
+    // -----------------------------------------------------------------------
+    // 44. Authorization & Role Protection on POST /admin/payments/:id/retry-activation
+    // -----------------------------------------------------------------------
+    describe('44. Authorization & Role Protection on POST /admin/payments/:id/retry-activation', () => {
+      it('44.1. Admin POST /admin/payments/:id/retry-activation succeeds with 200', async () => {
+        const cls = await createClass('Retry Auth Class 1', { capacity: 5 });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.statusCode).toBe(200);
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBeNull();
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+      });
+
+      it('44.2. Student gets 403 Forbidden on retry-activation', async () => {
+        const cls = await createClass('Retry Auth Class 2');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(403);
+      });
+
+      it('44.3. Teacher gets 403 Forbidden on retry-activation', async () => {
+        const cls = await createClass('Retry Auth Class 3');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenTeacher}`)
+          .expect(403);
+      });
+
+      it('44.4. Guest gets 401 Unauthorized on retry-activation', async () => {
+        const cls = await createClass('Retry Auth Class 4');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .expect(401);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 45. Current-State Decision Reevaluation & Dynamic Issue Transitions
+    // -----------------------------------------------------------------------
+    describe('45. Current-State Decision Reevaluation & Dynamic Issue Transitions', () => {
+      it('45.1. CLASS_FULL -> seat becomes available -> Enrollment ACTIVE, activationIssue null', async () => {
+        const cls = await createClass('Seat Freed Class', { capacity: 1 });
+        const { payment, enrollment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBeNull();
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.ACTIVE);
+      });
+
+      it('45.2. CLASS_NOT_ELIGIBLE -> Class now UPCOMING + available -> Enrollment ACTIVE, activationIssue null', async () => {
+        const cls = await createClass('Class Status Recovered Class', {
+          status: ClassStatus.UPCOMING,
+          capacity: 5,
+        });
+        const { payment, enrollment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBeNull();
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.ACTIVE);
+      });
+
+      it('45.3. CLASS_NOT_ELIGIBLE -> Class now UPCOMING but full -> transitions to CLASS_FULL', async () => {
+        const cls = await createClass('Not Eligible to Full Class', {
+          status: ClassStatus.UPCOMING,
+          capacity: 1,
+        });
+        // Occupy seat
+        await prisma.enrollment.create({
+          data: {
+            userId: studentUser2.id,
+            classId: cls.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+
+        const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+        expect(dbPayment!.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+      });
+
+      it('45.4. CLASS_FULL -> Class now non-UPCOMING (ONGOING) -> transitions to CLASS_NOT_ELIGIBLE', async () => {
+        const cls = await createClass('Full to Ineligible Class', {
+          status: ClassStatus.ONGOING,
+          capacity: 10,
+        });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_NOT_ELIGIBLE);
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+
+        const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+        expect(dbPayment!.activationIssue).toBe(PaymentActivationIssue.CLASS_NOT_ELIGIBLE);
+      });
+
+      it('45.5. Still CLASS_FULL: Class UPCOMING and full -> remains CLASS_FULL and PENDING_PAYMENT', async () => {
+        const cls = await createClass('Still Full Class', {
+          status: ClassStatus.UPCOMING,
+          capacity: 1,
+        });
+        await prisma.enrollment.create({
+          data: {
+            userId: studentUser2.id,
+            classId: cls.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      });
+
+      it('45.6. Still CLASS_NOT_ELIGIBLE: Class ONGOING -> remains CLASS_NOT_ELIGIBLE and PENDING_PAYMENT', async () => {
+        const cls = await createClass('Still Ineligible Class', {
+          status: ClassStatus.ONGOING,
+          capacity: 10,
+        });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_NOT_ELIGIBLE);
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 46. Inconsistency Matrix & Status Guards
+    // -----------------------------------------------------------------------
+    describe('46. Inconsistency Matrix & Status Guards', () => {
+      it('46.1. Confirmed ACTIVE + issue null -> idempotent 200 without mutation (Case A)', async () => {
+        const cls = await createClass('Idempotent Retry Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          enrollmentStatus: EnrollmentStatus.ACTIVE,
+          activationIssue: null,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBeNull();
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+      });
+
+      it('46.2. Confirmed PENDING_PAYMENT + issue null -> 422 Unprocessable Entity (Case B)', async () => {
+        const cls = await createClass('Pending No Issue Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+          activationIssue: null,
+          confirmedAt: new Date(),
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(422);
+      });
+
+      it('46.3. Confirmed ACTIVE + unresolved issue -> 422 Unprocessable Entity (Case C)', async () => {
+        const cls = await createClass('Active With Issue Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          enrollmentStatus: EnrollmentStatus.ACTIVE,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(422);
+      });
+
+      it('46.4. Confirmed + COMPLETED enrollment -> 422 Unprocessable Entity (Case D)', async () => {
+        const cls = await createClass('Completed Enrollment Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          enrollmentStatus: EnrollmentStatus.COMPLETED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(422);
+      });
+
+      it('46.5. Confirmed + DROPPED enrollment -> 422 Unprocessable Entity (Case D)', async () => {
+        const cls = await createClass('Dropped Enrollment Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          enrollmentStatus: EnrollmentStatus.DROPPED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(422);
+      });
+
+      it('46.6. Non-CONFIRMED statuses (PENDING, REPORTED, REJECTED, REVIEW_REQUIRED) return 409 Conflict', async () => {
+        for (const st of [
+          PaymentStatus.PENDING,
+          PaymentStatus.REPORTED,
+          PaymentStatus.REJECTED,
+          PaymentStatus.REVIEW_REQUIRED,
+        ]) {
+          const cls = await createClass('Status Guard Class ' + st);
+          const { payment } = await createPayment(cls.id, studentUser.id, {
+            paymentStatus: st,
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+          });
+
+          await request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/retry-activation`)
+            .set('Authorization', `Bearer ${tokenAdmin}`)
+            .expect(409);
+        }
+      });
+
+      it('46.7. Relationship mismatch returns 422 Unprocessable Entity', async () => {
+        const cls = await createClass('Rel Mismatch Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+        });
+
+        // Intercept $queryRaw to inject mismatched classId on Enrollment lock
+        const originalQueryRaw = (prisma as any).$queryRaw.bind(prisma);
+        const spy = jest.spyOn(prisma as any, '$queryRaw').mockImplementation(async (strings: any, ...values: any[]) => {
+          const result: any = await originalQueryRaw(strings, ...values);
+          const queryText = Array.isArray(strings) ? strings.join('') : String(strings);
+          if (queryText.includes('FROM "Enrollment"')) {
+            return [{ ...result[0], classId: 999999 }];
+          }
+          return result;
+        });
+
+        try {
+          await request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/retry-activation`)
+            .set('Authorization', `Bearer ${tokenAdmin}`)
+            .expect(422);
+        } finally {
+          spy.mockRestore();
+        }
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 47. Confirm-No-Retry & Financial Immutability Regressions
+    // -----------------------------------------------------------------------
+    describe('47. Confirm-No-Retry & Financial Immutability Regressions', () => {
+      it('47.1. POST /admin/payments/:id/confirm on CONFIRMED + CLASS_FULL returns existing snapshot and does NOT retry', async () => {
+        const cls = await createClass('Confirm No Retry Class', {
+          capacity: 10,
+        });
+        const { payment, enrollment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date('2026-09-06T10:00:00.000Z'),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+
+        const dbEnrollment = await prisma.enrollment.findUnique({ where: { id: enrollment.id } });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      });
+
+      it('47.2. Financial and reviewer fields remain strictly immutable during retry (Before/After Proof for Success and Blocked)', async () => {
+        // Scenario A: Successful Retry -> ACTIVE
+        const clsA = await createClass('Financial Immutability Class A', { capacity: 5 });
+        const confirmedTimestampA = new Date('2026-09-05T12:00:00.000Z');
+        const reviewedTimestampA = new Date('2026-09-05T12:00:00.000Z');
+        const reportedTimestampA = new Date('2026-09-05T11:45:00.000Z');
+        const { payment: payA, enrollment: enrA } = await createPayment(clsA.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          amountVnd: 2500000,
+          confirmedAt: confirmedTimestampA,
+          reviewedAt: reviewedTimestampA,
+          reviewedById: adminUser.id,
+        });
+
+        // Set reportedAt explicitly on payA
+        await prisma.payment.update({
+          where: { id: payA.id },
+          data: { reportedAt: reportedTimestampA, adminNote: 'Original review note' },
+        });
+
+        // 1. Capture BEFORE state
+        const beforePayA = await prisma.payment.findUnique({ where: { id: payA.id } });
+        const beforeEnrA = await prisma.enrollment.findUnique({ where: { id: enrA.id } });
+
+        expect(beforePayA!.status).toBe(PaymentStatus.CONFIRMED);
+        expect(beforePayA!.amountVnd).toBe(2500000);
+        expect(beforePayA!.reviewedById).toBe(adminUser.id);
+        expect(beforePayA!.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+        expect(beforeEnrA!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+
+        // 2. Execute retry activation by DIFFERENT admin (adminUser2)
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payA.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin2}`)
+          .expect(200);
+
+        // 3. Capture AFTER state
+        const afterPayA = await prisma.payment.findUnique({ where: { id: payA.id } });
+        const afterEnrA = await prisma.enrollment.findUnique({ where: { id: enrA.id } });
+
+        // Financial & Reviewer Metadata MUST BE UNCHANGED
+        expect(afterPayA!.status).toBe(beforePayA!.status);
+        expect(afterPayA!.amountVnd).toBe(beforePayA!.amountVnd);
+        expect(afterPayA!.transferCode).toBe(beforePayA!.transferCode);
+        expect(new Date(afterPayA!.reportedAt!).toISOString()).toBe(new Date(beforePayA!.reportedAt!).toISOString());
+        expect(new Date(afterPayA!.confirmedAt!).toISOString()).toBe(new Date(beforePayA!.confirmedAt!).toISOString());
+        expect(new Date(afterPayA!.reviewedAt!).toISOString()).toBe(new Date(beforePayA!.reviewedAt!).toISOString());
+        expect(afterPayA!.reviewedById).toBe(adminUser.id); // NOT overwritten by adminUser2!
+        expect(afterPayA!.adminNote).toBe(beforePayA!.adminNote);
+
+        // ONLY allowed changes
+        expect(afterPayA!.activationIssue).toBeNull();
+        expect(afterEnrA!.status).toBe(EnrollmentStatus.ACTIVE);
+
+        // Scenario B: Blocked Retry -> Still CLASS_FULL
+        const clsB = await createClass('Financial Immutability Class B', { capacity: 1 });
+        // Fill class
+        await prisma.enrollment.create({
+          data: { userId: studentUser2.id, classId: clsB.id, status: EnrollmentStatus.ACTIVE },
+        });
+
+        const reportedTimestampB = new Date('2026-09-05T11:50:00.000Z');
+        const { payment: payB, enrollment: enrB } = await createPayment(clsB.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          amountVnd: 1800000,
+          confirmedAt: confirmedTimestampA,
+          reviewedAt: reviewedTimestampA,
+          reviewedById: adminUser.id,
+        });
+
+        await prisma.payment.update({
+          where: { id: payB.id },
+          data: { reportedAt: reportedTimestampB, adminNote: 'Original blocked review note' },
+        });
+
+        const beforePayB = await prisma.payment.findUnique({ where: { id: payB.id } });
+        const beforeEnrB = await prisma.enrollment.findUnique({ where: { id: enrB.id } });
+
+        // Execute blocked retry
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payB.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin2}`)
+          .expect(200);
+
+        const afterPayB = await prisma.payment.findUnique({ where: { id: payB.id } });
+        const afterEnrB = await prisma.enrollment.findUnique({ where: { id: enrB.id } });
+
+        // ALL fields unchanged including activationIssue and Enrollment.status
+        expect(afterPayB!.status).toBe(beforePayB!.status);
+        expect(afterPayB!.amountVnd).toBe(beforePayB!.amountVnd);
+        expect(afterPayB!.transferCode).toBe(beforePayB!.transferCode);
+        expect(new Date(afterPayB!.reportedAt!).toISOString()).toBe(new Date(beforePayB!.reportedAt!).toISOString());
+        expect(new Date(afterPayB!.confirmedAt!).toISOString()).toBe(new Date(beforePayB!.confirmedAt!).toISOString());
+        expect(new Date(afterPayB!.reviewedAt!).toISOString()).toBe(new Date(beforePayB!.reviewedAt!).toISOString());
+        expect(afterPayB!.reviewedById).toBe(adminUser.id); // Still adminUser.id, NOT overwritten by adminUser2
+        expect(afterPayB!.adminNote).toBe(beforePayB!.adminNote);
+        expect(afterPayB!.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+        expect(afterEnrB!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 48. Concurrency & Capacity Races
+    // -----------------------------------------------------------------------
+    describe('48. Concurrency & Capacity Races', () => {
+      it('48.1. Concurrent retry on same Payment: both return 200, no duplicates or corruption', async () => {
+        const cls = await createClass('Concurrent Same Payment Class', { capacity: 5 });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        const [res1, res2] = await Promise.all([
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/retry-activation`)
+            .set('Authorization', `Bearer ${tokenAdmin}`),
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/retry-activation`)
+            .set('Authorization', `Bearer ${tokenAdmin}`),
+        ]);
+
+        expect(res1.status).toBe(200);
+        expect(res2.status).toBe(200);
+        expect(res1.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+        expect(res2.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+      });
+
+      it('48.2. Two retry Payments race for capacity=1: exactly 1 ACTIVE, exactly 1 CLASS_FULL', async () => {
+        const cls = await createClass('Retry Race Class', { capacity: 1 });
+        const { payment: payA, enrollment: enrA } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+        const { payment: payB, enrollment: enrB } = await createPayment(cls.id, studentUser2.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        const [resA, resB] = await Promise.all([
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payA.id}/retry-activation`)
+            .set('Authorization', `Bearer ${tokenAdmin}`),
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payB.id}/retry-activation`)
+            .set('Authorization', `Bearer ${tokenAdmin}`),
+        ]);
+
+        expect(resA.status).toBe(200);
+        expect(resB.status).toBe(200);
+
+        const enrollments = await prisma.enrollment.findMany({
+          where: { id: { in: [enrA.id, enrB.id] } },
+        });
+        const activeEnrollments = enrollments.filter((e) => e.status === EnrollmentStatus.ACTIVE);
+        const pendingEnrollments = enrollments.filter((e) => e.status === EnrollmentStatus.PENDING_PAYMENT);
+
+        expect(activeEnrollments.length).toBe(1);
+        expect(pendingEnrollments.length).toBe(1);
+
+        const totalActive = await prisma.enrollment.count({
+          where: { classId: cls.id, status: EnrollmentStatus.ACTIVE },
+        });
+        expect(totalActive).toBe(1);
+      });
+
+      it('48.3. Retry vs New Enrollment Race for final seat: exactly one ACTIVE', async () => {
+        const cls = await createClass('Retry vs Free Enroll Class', {
+          capacity: 1,
+          tuitionFeeVnd: 0,
+        });
+
+        const { payment: payRetry } = await createPayment(
+          cls.id,
+          studentUser.id,
+          {
+            paymentStatus: PaymentStatus.CONFIRMED,
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+            confirmedAt: new Date(),
+          },
+        );
+
+        const [retryRes, enrollRes] = await Promise.all([
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payRetry.id}/retry-activation`)
+            .set('Authorization', `Bearer ${tokenAdmin}`),
+          request(app.getHttpServer())
+            .post(`/courses/classes/${cls.id}/enroll`)
+            .set('Authorization', `Bearer ${tokenStudent2}`)
+            .send(),
+        ]);
+
+        expect([200, 201, 400, 409]).toContain(enrollRes.status);
+        expect(retryRes.status).toBe(200);
+
+        const totalActive = await prisma.enrollment.count({
+          where: { classId: cls.id, status: EnrollmentStatus.ACTIVE },
+        });
+        expect(totalActive).toBe(1);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // 49. Student Access Truth & Privacy Regressions
+    // -----------------------------------------------------------------------
+    describe('49. Student Access Truth & Privacy Regressions', () => {
+      it('49.1. Student access is 403 while blocked, becomes 200 only after retry activation succeeds', async () => {
+        const cls = await createClass('Student Truth Class', { capacity: 1 });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+        });
+
+        // 1. Before retry: Student classroom access is 403 Forbidden
+        await request(app.getHttpServer())
+          .get(`/courses/classes/${cls.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(403);
+
+        // 2. Retry activation succeeds
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        // 3. After retry: Student classroom access is 200 OK
+        await request(app.getHttpServer())
+          .get(`/courses/classes/${cls.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(200);
+      });
+
+      it('49.2. Student GET /payments/:id hides activationIssue and reviewer audit fields before and after retry', async () => {
+        const cls = await createClass('Student Privacy Retry Class', { capacity: 5 });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          confirmedAt: new Date(),
+          reviewedById: adminUser.id,
+          reviewedAt: new Date(),
+        });
+
+        // Fetch before retry
+        const beforeRes = await request(app.getHttpServer())
+          .get(`/payments/${payment.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(200);
+
+        expect(beforeRes.body.data.activationIssue).toBeUndefined();
+        expect(beforeRes.body.data.reviewedById).toBeUndefined();
+        expect(beforeRes.body.data.reviewedBy).toBeUndefined();
+
+        // Perform retry
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        // Fetch after retry
+        const afterRes = await request(app.getHttpServer())
+          .get(`/payments/${payment.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(200);
+
+        expect(afterRes.body.data.activationIssue).toBeUndefined();
+        expect(afterRes.body.data.reviewedById).toBeUndefined();
+        expect(afterRes.body.data.reviewedBy).toBeUndefined();
       });
     });
   });
