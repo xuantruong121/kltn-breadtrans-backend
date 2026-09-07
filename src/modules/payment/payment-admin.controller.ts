@@ -1,0 +1,165 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Query,
+  Body,
+  UseGuards,
+  Request,
+  ParseIntPipe,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
+import { PaymentService } from './payment.service';
+import {
+  AdminPaymentFilterDto,
+  PaginatedAdminPaymentsDto,
+  AdminPaymentDetailDto,
+  RejectPaymentDto,
+} from './dto/payment-admin.dto';
+
+@ApiTags('admin-payments')
+@Controller('admin/payments')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
+@Roles(Role.ADMIN)
+export class PaymentAdminController {
+  constructor(private readonly paymentService: PaymentService) {}
+
+  @Get()
+  @ApiOperation({
+    summary:
+      'Admin lấy danh sách thanh toán và hàng đợi kiểm tra (Review Queue)',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Danh sách thanh toán phân trang phục vụ đối soát',
+    type: PaginatedAdminPaymentsDto,
+  })
+  getAdminPayments(
+    @Query() query: AdminPaymentFilterDto,
+  ): Promise<PaginatedAdminPaymentsDto> {
+    return this.paymentService.getAdminPayments(query);
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary:
+      'Admin lấy chi tiết đối soát thanh toán kèm ngữ cảnh ghi danh và lớp học',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Chi tiết đối soát thanh toán an toàn',
+    type: AdminPaymentDetailDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Không tìm thấy thông tin thanh toán',
+  })
+  getAdminPaymentDetail(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<AdminPaymentDetailDto> {
+    return this.paymentService.getAdminPaymentDetail(id);
+  }
+
+  @Post(':id/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Admin từ chối thanh toán đã báo chuyển khoản kèm lý do nội bộ (REPORTED -> REJECTED)',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Từ chối thanh toán thành công, ghi nhận người duyệt và thời gian',
+    type: AdminPaymentDetailDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Không tìm thấy thông tin thanh toán',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      'Thanh toán không ở trạng thái REPORTED hoặc đã bị từ chối trước đó',
+  })
+  rejectPayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @Body() dto: RejectPaymentDto,
+  ): Promise<AdminPaymentDetailDto> {
+    return this.paymentService.rejectPayment(id, req.user.id, dto);
+  }
+
+  @Post(':id/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Admin xác nhận thanh toán và tự động kích hoạt ghi danh nếu đủ điều kiện',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Xác nhận thanh toán thành công (CONFIRMED)',
+    type: AdminPaymentDetailDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Không tìm thấy thông tin thanh toán hoặc lớp học',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Thanh toán không ở trạng thái REPORTED',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'Dữ liệu thanh toán không hợp lệ hoặc ghi danh không ở trạng thái PENDING_PAYMENT',
+  })
+  confirmPayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ): Promise<AdminPaymentDetailDto> {
+    return this.paymentService.confirmPayment(id, req.user.id);
+  }
+
+  @Post(':id/retry-activation')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Admin thử kích hoạt lại ghi danh cho thanh toán đã CONFIRMED gặp vấn đề CLASS_FULL hoặc CLASS_NOT_ELIGIBLE',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Thử kích hoạt lại thành công',
+    type: AdminPaymentDetailDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Không tìm thấy thông tin thanh toán hoặc lớp học',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Trạng thái thanh toán không hợp lệ (không phải CONFIRMED)',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'Dữ liệu không đồng nhất hoặc ghi danh không ở trạng thái hợp lệ để thử lại',
+  })
+  retryActivation(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<AdminPaymentDetailDto> {
+    return this.paymentService.retryActivation(id);
+  }
+}
