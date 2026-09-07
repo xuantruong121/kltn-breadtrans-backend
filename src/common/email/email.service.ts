@@ -51,4 +51,52 @@ export class EmailService {
       `<p>Tài khoản giáo viên của bạn đã được tạo.</p><p><a href="${activationUrl}">Nhấn vào đây để kích hoạt và đặt mật khẩu</a>.</p><p>Liên kết có hiệu lực trong 24 giờ.</p>`,
     );
   }
+
+  sendPaymentActivatedEmail(
+    to: string,
+    data: {
+      studentName: string;
+      className: string;
+      courseTitle: string;
+      transferCode: string;
+    },
+  ): Promise<void> {
+    return this.send(
+      to,
+      'BreadTrans - Kích hoạt khóa học thành công',
+      `<p>Xin chào <strong>${data.studentName || 'Học viên'}</strong>,</p><p>Thanh toán cho lớp <strong>${data.className}</strong> (Khóa học: ${data.courseTitle}) với mã giao dịch <strong>${data.transferCode}</strong> đã được xác nhận và ghi danh của bạn đã được kích hoạt.</p><p>Bạn có thể vào học ngay trên BreadTrans.</p>`,
+    );
+  }
+
+  sendPaymentPendingActivationEmail(
+    to: string,
+    data: {
+      studentName: string;
+      className: string;
+      courseTitle: string;
+      transferCode: string;
+    },
+  ): Promise<void> {
+    return this.send(
+      to,
+      'BreadTrans - Thông tin xác nhận thanh toán',
+      `<p>Xin chào <strong>${data.studentName || 'Học viên'}</strong>,</p><p>Thanh toán của bạn cho lớp <strong>${data.className}</strong> (Khóa học: ${data.courseTitle}) với mã giao dịch <strong>${data.transferCode}</strong> đã được xác nhận thành công.</p><p>Tuy nhiên, quyền vào lớp hiện đang chờ xử lý bổ sung. Vui lòng liên hệ trung tâm để được hỗ trợ kiểm tra chi tiết.</p>`,
+    );
+  }
+
+  sendPaymentRejectedEmail(
+    to: string,
+    data: {
+      studentName: string;
+      className: string;
+      courseTitle: string;
+      transferCode: string;
+    },
+  ): Promise<void> {
+    return this.send(
+      to,
+      'BreadTrans - Thông báo trạng thái thanh toán',
+      `<p>Xin chào <strong>${data.studentName || 'Học viên'}</strong>,</p><p>Khoản thanh toán cho lớp <strong>${data.className}</strong> (Khóa học: ${data.courseTitle}) với mã giao dịch <strong>${data.transferCode}</strong> chưa thể đối soát thành công.</p><p>Vui lòng kiểm tra lại thông tin giao dịch hoặc liên hệ BreadTrans để được hỗ trợ.</p>`,
+    );
+  }
 }

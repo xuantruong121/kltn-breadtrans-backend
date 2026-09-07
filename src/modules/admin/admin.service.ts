@@ -3,6 +3,7 @@ import {
   Optional,
   ConflictException,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Role, CourseStatus, EnrollmentStatus } from '@prisma/client';
@@ -276,15 +277,32 @@ export class AdminService {
   }
 
   async deleteUser(userId: number) {
-    const paymentCount = await this.prisma.payment.count({
-      where: { enrollment: { userId } },
+    return await this.prisma.$transaction(async (tx) => {
+      const lockedUsers = await tx.$queryRaw<Array<{ id: number; role: Role }>>`
+        SELECT id, role
+        FROM "User"
+        WHERE id = ${userId}
+        FOR UPDATE;
+      `;
+
+      if (!lockedUsers || lockedUsers.length === 0) {
+        throw new NotFoundException('Người dùng không tồn tại');
+      }
+
+      const paymentCount = await tx.payment.count({
+        where: {
+          OR: [{ enrollment: { userId } }, { reviewedById: userId }],
+        },
+      });
+
+      if (paymentCount > 0) {
+        throw new ConflictException(
+          'Không thể xóa người dùng vì tồn tại lịch sử thanh toán hoặc lịch sử duyệt cần được lưu giữ.',
+        );
+      }
+
+      return tx.user.delete({ where: { id: userId } });
     });
-    if (paymentCount > 0) {
-      throw new ConflictException(
-        'Không thể xóa người dùng vì tồn tại lịch sử thanh toán cần được lưu giữ.',
-      );
-    }
-    return this.prisma.user.delete({ where: { id: userId } });
   }
 
   async enrollUserInClass(userId: number, classId: number) {

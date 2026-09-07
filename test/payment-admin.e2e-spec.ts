@@ -13,12 +13,26 @@ import {
   PaymentActivationIssue,
 } from '@prisma/client';
 import { TransformInterceptor } from './../src/common/interceptors/transform.interceptor';
+import { EmailService } from './../src/common/email/email.service';
+import { NotificationsService } from './../src/modules/notifications/notifications.service';
 import * as crypto from 'crypto';
 
 describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
+
+  let emailServiceMock: {
+    sendRegistrationOtp: jest.Mock;
+    sendTeacherActivation: jest.Mock;
+    sendPaymentActivatedEmail: jest.Mock;
+    sendPaymentPendingActivationEmail: jest.Mock;
+    sendPaymentRejectedEmail: jest.Mock;
+  };
+  let notificationsServiceMock: {
+    sendPushToUser: jest.Mock;
+    sendPushToMultipleUsers: jest.Mock;
+  };
 
   // Environment isolation snapshot
   const originalEnv = {
@@ -58,7 +72,9 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
   let makeToken: (user: any) => string;
 
   beforeAll(async () => {
-    // 0. Safety Fuse: Refuse to run against any non-test database!
+    // -----------------------------------------------------------------------
+    // 0. SAFETY FUSE — Layer 1: URL string check (fast, pre-connection)
+    // -----------------------------------------------------------------------
     const dbUrl = process.env.DATABASE_URL || '';
     const urlMatches =
       (dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1')) &&
@@ -71,15 +87,36 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       );
     }
 
+    // Layer 2 live DB check (current_database / current_schema) is performed
+    // in test/setup-env.js (jest globalSetup) before any test module loads.
+
     // 1. Establish deterministic bank configuration BEFORE Nest module compilation
     process.env.PAYMENT_BANK_BIN = '970436';
     process.env.PAYMENT_BANK_NAME = 'Test Bank';
     process.env.PAYMENT_BANK_ACCOUNT_NUMBER = '1234567890';
     process.env.PAYMENT_BANK_ACCOUNT_NAME = 'BREADTRANS TEST CENTER';
 
+    emailServiceMock = {
+      sendRegistrationOtp: jest.fn().mockResolvedValue(undefined),
+      sendTeacherActivation: jest.fn().mockResolvedValue(undefined),
+      sendPaymentActivatedEmail: jest.fn().mockResolvedValue(undefined),
+      sendPaymentPendingActivationEmail: jest.fn().mockResolvedValue(undefined),
+      sendPaymentRejectedEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
+    notificationsServiceMock = {
+      sendPushToUser: jest.fn().mockResolvedValue({ sent: 1, failed: 0 }),
+      sendPushToMultipleUsers: jest.fn().mockResolvedValue([]),
+    };
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(EmailService)
+      .useValue(emailServiceMock)
+      .overrideProvider(NotificationsService)
+      .useValue(notificationsServiceMock)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
@@ -431,8 +468,11 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
 
     if (app) {
       try {
-        const { getRedisConnectionToken } = await import('@nestjs-modules/ioredis');
-        const redis = app.get(getRedisConnectionToken());
+        const { getRedisConnectionToken } =
+          await import('@nestjs-modules/ioredis');
+        const redis = app.get<{ quit: () => Promise<void> }>(
+          getRedisConnectionToken(),
+        );
         if (redis && typeof redis.quit === 'function') {
           await redis.quit().catch(() => null);
         }
@@ -1745,11 +1785,15 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
     describe('45. Current-State Decision Reevaluation & Dynamic Issue Transitions', () => {
       it('45.1. CLASS_FULL -> seat becomes available -> Enrollment ACTIVE, activationIssue null', async () => {
         const cls = await createClass('Seat Freed Class', { capacity: 1 });
-        const { payment, enrollment } = await createPayment(cls.id, studentUser.id, {
-          paymentStatus: PaymentStatus.CONFIRMED,
-          activationIssue: PaymentActivationIssue.CLASS_FULL,
-          confirmedAt: new Date(),
-        });
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+          {
+            paymentStatus: PaymentStatus.CONFIRMED,
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+            confirmedAt: new Date(),
+          },
+        );
 
         const res = await request(app.getHttpServer())
           .post(`/admin/payments/${payment.id}/retry-activation`)
@@ -1771,11 +1815,15 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           status: ClassStatus.UPCOMING,
           capacity: 5,
         });
-        const { payment, enrollment } = await createPayment(cls.id, studentUser.id, {
-          paymentStatus: PaymentStatus.CONFIRMED,
-          activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
-          confirmedAt: new Date(),
-        });
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+          {
+            paymentStatus: PaymentStatus.CONFIRMED,
+            activationIssue: PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+            confirmedAt: new Date(),
+          },
+        );
 
         const res = await request(app.getHttpServer())
           .post(`/admin/payments/${payment.id}/retry-activation`)
@@ -1818,11 +1866,19 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           .expect(200);
 
         expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
-        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
-        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
 
-        const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
-        expect(dbPayment!.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
       });
 
       it('45.4. CLASS_FULL -> Class now non-UPCOMING (ONGOING) -> transitions to CLASS_NOT_ELIGIBLE', async () => {
@@ -1842,11 +1898,19 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           .expect(200);
 
         expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
-        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_NOT_ELIGIBLE);
-        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
 
-        const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
-        expect(dbPayment!.activationIssue).toBe(PaymentActivationIssue.CLASS_NOT_ELIGIBLE);
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        );
       });
 
       it('45.5. Still CLASS_FULL: Class UPCOMING and full -> remains CLASS_FULL and PENDING_PAYMENT', async () => {
@@ -1873,8 +1937,12 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           .set('Authorization', `Bearer ${tokenAdmin}`)
           .expect(200);
 
-        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
-        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
       });
 
       it('45.6. Still CLASS_NOT_ELIGIBLE: Class ONGOING -> remains CLASS_NOT_ELIGIBLE and PENDING_PAYMENT', async () => {
@@ -1893,8 +1961,12 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           .set('Authorization', `Bearer ${tokenAdmin}`)
           .expect(200);
 
-        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_NOT_ELIGIBLE);
-        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_NOT_ELIGIBLE,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
       });
     });
 
@@ -2008,16 +2080,30 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           activationIssue: PaymentActivationIssue.CLASS_FULL,
         });
 
-        // Intercept $queryRaw to inject mismatched classId on Enrollment lock
-        const originalQueryRaw = (prisma as any).$queryRaw.bind(prisma);
-        const spy = jest.spyOn(prisma as any, '$queryRaw').mockImplementation(async (strings: any, ...values: any[]) => {
-          const result: any = await originalQueryRaw(strings, ...values);
-          const queryText = Array.isArray(strings) ? strings.join('') : String(strings);
-          if (queryText.includes('FROM "Enrollment"')) {
-            return [{ ...result[0], classId: 999999 }];
-          }
-          return result;
-        });
+        // Intercept $queryRaw to inject mismatched classId on Enrollment lock.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const originalQueryRaw = (prisma as any).$queryRaw.bind(prisma) as (
+          strings: unknown,
+          ...values: unknown[]
+        ) => Promise<unknown[]>;
+        const spy = jest
+
+          .spyOn(prisma as any, '$queryRaw')
+          .mockImplementation(
+            async (strings: unknown, ...values: unknown[]) => {
+              const result = (await originalQueryRaw(
+                strings,
+                ...values,
+              )) as Record<string, unknown>[];
+              const queryText = Array.isArray(strings)
+                ? strings.join('')
+                : String(strings);
+              if (queryText.includes('FROM "Enrollment"')) {
+                return [{ ...result[0], classId: 999999 }];
+              }
+              return result;
+            },
+          );
 
         try {
           await request(app.getHttpServer())
@@ -2038,11 +2124,15 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         const cls = await createClass('Confirm No Retry Class', {
           capacity: 10,
         });
-        const { payment, enrollment } = await createPayment(cls.id, studentUser.id, {
-          paymentStatus: PaymentStatus.CONFIRMED,
-          activationIssue: PaymentActivationIssue.CLASS_FULL,
-          confirmedAt: new Date('2026-09-06T10:00:00.000Z'),
-        });
+        const { payment, enrollment } = await createPayment(
+          cls.id,
+          studentUser.id,
+          {
+            paymentStatus: PaymentStatus.CONFIRMED,
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+            confirmedAt: new Date('2026-09-06T10:00:00.000Z'),
+          },
+        );
 
         const res = await request(app.getHttpServer())
           .post(`/admin/payments/${payment.id}/confirm`)
@@ -2050,42 +2140,63 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           .expect(200);
 
         expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
-        expect(res.body.data.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
-        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
 
-        const dbEnrollment = await prisma.enrollment.findUnique({ where: { id: enrollment.id } });
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: enrollment.id },
+        });
         expect(dbEnrollment!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
       });
 
       it('47.2. Financial and reviewer fields remain strictly immutable during retry (Before/After Proof for Success and Blocked)', async () => {
         // Scenario A: Successful Retry -> ACTIVE
-        const clsA = await createClass('Financial Immutability Class A', { capacity: 5 });
+        const clsA = await createClass('Financial Immutability Class A', {
+          capacity: 5,
+        });
         const confirmedTimestampA = new Date('2026-09-05T12:00:00.000Z');
         const reviewedTimestampA = new Date('2026-09-05T12:00:00.000Z');
         const reportedTimestampA = new Date('2026-09-05T11:45:00.000Z');
-        const { payment: payA, enrollment: enrA } = await createPayment(clsA.id, studentUser.id, {
-          paymentStatus: PaymentStatus.CONFIRMED,
-          activationIssue: PaymentActivationIssue.CLASS_FULL,
-          amountVnd: 2500000,
-          confirmedAt: confirmedTimestampA,
-          reviewedAt: reviewedTimestampA,
-          reviewedById: adminUser.id,
-        });
+        const { payment: payA, enrollment: enrA } = await createPayment(
+          clsA.id,
+          studentUser.id,
+          {
+            paymentStatus: PaymentStatus.CONFIRMED,
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+            amountVnd: 2500000,
+            confirmedAt: confirmedTimestampA,
+            reviewedAt: reviewedTimestampA,
+            reviewedById: adminUser.id,
+          },
+        );
 
         // Set reportedAt explicitly on payA
         await prisma.payment.update({
           where: { id: payA.id },
-          data: { reportedAt: reportedTimestampA, adminNote: 'Original review note' },
+          data: {
+            reportedAt: reportedTimestampA,
+            adminNote: 'Original review note',
+          },
         });
 
         // 1. Capture BEFORE state
-        const beforePayA = await prisma.payment.findUnique({ where: { id: payA.id } });
-        const beforeEnrA = await prisma.enrollment.findUnique({ where: { id: enrA.id } });
+        const beforePayA = await prisma.payment.findUnique({
+          where: { id: payA.id },
+        });
+        const beforeEnrA = await prisma.enrollment.findUnique({
+          where: { id: enrA.id },
+        });
 
         expect(beforePayA!.status).toBe(PaymentStatus.CONFIRMED);
         expect(beforePayA!.amountVnd).toBe(2500000);
         expect(beforePayA!.reviewedById).toBe(adminUser.id);
-        expect(beforePayA!.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+        expect(beforePayA!.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
         expect(beforeEnrA!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
 
         // 2. Execute retry activation by DIFFERENT admin (adminUser2)
@@ -2095,16 +2206,26 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           .expect(200);
 
         // 3. Capture AFTER state
-        const afterPayA = await prisma.payment.findUnique({ where: { id: payA.id } });
-        const afterEnrA = await prisma.enrollment.findUnique({ where: { id: enrA.id } });
+        const afterPayA = await prisma.payment.findUnique({
+          where: { id: payA.id },
+        });
+        const afterEnrA = await prisma.enrollment.findUnique({
+          where: { id: enrA.id },
+        });
 
         // Financial & Reviewer Metadata MUST BE UNCHANGED
         expect(afterPayA!.status).toBe(beforePayA!.status);
         expect(afterPayA!.amountVnd).toBe(beforePayA!.amountVnd);
         expect(afterPayA!.transferCode).toBe(beforePayA!.transferCode);
-        expect(new Date(afterPayA!.reportedAt!).toISOString()).toBe(new Date(beforePayA!.reportedAt!).toISOString());
-        expect(new Date(afterPayA!.confirmedAt!).toISOString()).toBe(new Date(beforePayA!.confirmedAt!).toISOString());
-        expect(new Date(afterPayA!.reviewedAt!).toISOString()).toBe(new Date(beforePayA!.reviewedAt!).toISOString());
+        expect(new Date(afterPayA!.reportedAt!).toISOString()).toBe(
+          new Date(beforePayA!.reportedAt!).toISOString(),
+        );
+        expect(new Date(afterPayA!.confirmedAt!).toISOString()).toBe(
+          new Date(beforePayA!.confirmedAt!).toISOString(),
+        );
+        expect(new Date(afterPayA!.reviewedAt!).toISOString()).toBe(
+          new Date(beforePayA!.reviewedAt!).toISOString(),
+        );
         expect(afterPayA!.reviewedById).toBe(adminUser.id); // NOT overwritten by adminUser2!
         expect(afterPayA!.adminNote).toBe(beforePayA!.adminNote);
 
@@ -2113,29 +2234,45 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         expect(afterEnrA!.status).toBe(EnrollmentStatus.ACTIVE);
 
         // Scenario B: Blocked Retry -> Still CLASS_FULL
-        const clsB = await createClass('Financial Immutability Class B', { capacity: 1 });
+        const clsB = await createClass('Financial Immutability Class B', {
+          capacity: 1,
+        });
         // Fill class
         await prisma.enrollment.create({
-          data: { userId: studentUser2.id, classId: clsB.id, status: EnrollmentStatus.ACTIVE },
+          data: {
+            userId: studentUser2.id,
+            classId: clsB.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
         });
 
         const reportedTimestampB = new Date('2026-09-05T11:50:00.000Z');
-        const { payment: payB, enrollment: enrB } = await createPayment(clsB.id, studentUser.id, {
-          paymentStatus: PaymentStatus.CONFIRMED,
-          activationIssue: PaymentActivationIssue.CLASS_FULL,
-          amountVnd: 1800000,
-          confirmedAt: confirmedTimestampA,
-          reviewedAt: reviewedTimestampA,
-          reviewedById: adminUser.id,
-        });
+        const { payment: payB, enrollment: enrB } = await createPayment(
+          clsB.id,
+          studentUser.id,
+          {
+            paymentStatus: PaymentStatus.CONFIRMED,
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+            amountVnd: 1800000,
+            confirmedAt: confirmedTimestampA,
+            reviewedAt: reviewedTimestampA,
+            reviewedById: adminUser.id,
+          },
+        );
 
         await prisma.payment.update({
           where: { id: payB.id },
-          data: { reportedAt: reportedTimestampB, adminNote: 'Original blocked review note' },
+          data: {
+            reportedAt: reportedTimestampB,
+            adminNote: 'Original blocked review note',
+          },
         });
 
-        const beforePayB = await prisma.payment.findUnique({ where: { id: payB.id } });
-        const beforeEnrB = await prisma.enrollment.findUnique({ where: { id: enrB.id } });
+        const beforePayB = await prisma.payment.findUnique({
+          where: { id: payB.id },
+        });
+        // beforeEnrB intentionally not read — only existence is checked via retry result
+        await prisma.enrollment.findUnique({ where: { id: enrB.id } });
 
         // Execute blocked retry
         await request(app.getHttpServer())
@@ -2143,19 +2280,31 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           .set('Authorization', `Bearer ${tokenAdmin2}`)
           .expect(200);
 
-        const afterPayB = await prisma.payment.findUnique({ where: { id: payB.id } });
-        const afterEnrB = await prisma.enrollment.findUnique({ where: { id: enrB.id } });
+        const afterPayB = await prisma.payment.findUnique({
+          where: { id: payB.id },
+        });
+        const afterEnrB = await prisma.enrollment.findUnique({
+          where: { id: enrB.id },
+        });
 
         // ALL fields unchanged including activationIssue and Enrollment.status
         expect(afterPayB!.status).toBe(beforePayB!.status);
         expect(afterPayB!.amountVnd).toBe(beforePayB!.amountVnd);
         expect(afterPayB!.transferCode).toBe(beforePayB!.transferCode);
-        expect(new Date(afterPayB!.reportedAt!).toISOString()).toBe(new Date(beforePayB!.reportedAt!).toISOString());
-        expect(new Date(afterPayB!.confirmedAt!).toISOString()).toBe(new Date(beforePayB!.confirmedAt!).toISOString());
-        expect(new Date(afterPayB!.reviewedAt!).toISOString()).toBe(new Date(beforePayB!.reviewedAt!).toISOString());
+        expect(new Date(afterPayB!.reportedAt!).toISOString()).toBe(
+          new Date(beforePayB!.reportedAt!).toISOString(),
+        );
+        expect(new Date(afterPayB!.confirmedAt!).toISOString()).toBe(
+          new Date(beforePayB!.confirmedAt!).toISOString(),
+        );
+        expect(new Date(afterPayB!.reviewedAt!).toISOString()).toBe(
+          new Date(beforePayB!.reviewedAt!).toISOString(),
+        );
         expect(afterPayB!.reviewedById).toBe(adminUser.id); // Still adminUser.id, NOT overwritten by adminUser2
         expect(afterPayB!.adminNote).toBe(beforePayB!.adminNote);
-        expect(afterPayB!.activationIssue).toBe(PaymentActivationIssue.CLASS_FULL);
+        expect(afterPayB!.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
         expect(afterEnrB!.status).toBe(EnrollmentStatus.PENDING_PAYMENT);
       });
     });
@@ -2165,7 +2314,9 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
     // -----------------------------------------------------------------------
     describe('48. Concurrency & Capacity Races', () => {
       it('48.1. Concurrent retry on same Payment: both return 200, no duplicates or corruption', async () => {
-        const cls = await createClass('Concurrent Same Payment Class', { capacity: 5 });
+        const cls = await createClass('Concurrent Same Payment Class', {
+          capacity: 5,
+        });
         const { payment } = await createPayment(cls.id, studentUser.id, {
           paymentStatus: PaymentStatus.CONFIRMED,
           activationIssue: PaymentActivationIssue.CLASS_FULL,
@@ -2189,16 +2340,24 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
 
       it('48.2. Two retry Payments race for capacity=1: exactly 1 ACTIVE, exactly 1 CLASS_FULL', async () => {
         const cls = await createClass('Retry Race Class', { capacity: 1 });
-        const { payment: payA, enrollment: enrA } = await createPayment(cls.id, studentUser.id, {
-          paymentStatus: PaymentStatus.CONFIRMED,
-          activationIssue: PaymentActivationIssue.CLASS_FULL,
-          confirmedAt: new Date(),
-        });
-        const { payment: payB, enrollment: enrB } = await createPayment(cls.id, studentUser2.id, {
-          paymentStatus: PaymentStatus.CONFIRMED,
-          activationIssue: PaymentActivationIssue.CLASS_FULL,
-          confirmedAt: new Date(),
-        });
+        const { payment: payA, enrollment: enrA } = await createPayment(
+          cls.id,
+          studentUser.id,
+          {
+            paymentStatus: PaymentStatus.CONFIRMED,
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+            confirmedAt: new Date(),
+          },
+        );
+        const { payment: payB, enrollment: enrB } = await createPayment(
+          cls.id,
+          studentUser2.id,
+          {
+            paymentStatus: PaymentStatus.CONFIRMED,
+            activationIssue: PaymentActivationIssue.CLASS_FULL,
+            confirmedAt: new Date(),
+          },
+        );
 
         const [resA, resB] = await Promise.all([
           request(app.getHttpServer())
@@ -2215,8 +2374,12 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         const enrollments = await prisma.enrollment.findMany({
           where: { id: { in: [enrA.id, enrB.id] } },
         });
-        const activeEnrollments = enrollments.filter((e) => e.status === EnrollmentStatus.ACTIVE);
-        const pendingEnrollments = enrollments.filter((e) => e.status === EnrollmentStatus.PENDING_PAYMENT);
+        const activeEnrollments = enrollments.filter(
+          (e) => e.status === EnrollmentStatus.ACTIVE,
+        );
+        const pendingEnrollments = enrollments.filter(
+          (e) => e.status === EnrollmentStatus.PENDING_PAYMENT,
+        );
 
         expect(activeEnrollments.length).toBe(1);
         expect(pendingEnrollments.length).toBe(1);
@@ -2295,7 +2458,9 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       });
 
       it('49.2. Student GET /payments/:id hides activationIssue and reviewer audit fields before and after retry', async () => {
-        const cls = await createClass('Student Privacy Retry Class', { capacity: 5 });
+        const cls = await createClass('Student Privacy Retry Class', {
+          capacity: 5,
+        });
         const { payment } = await createPayment(cls.id, studentUser.id, {
           paymentStatus: PaymentStatus.CONFIRMED,
           activationIssue: PaymentActivationIssue.CLASS_FULL,
@@ -2329,6 +2494,965 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         expect(afterRes.body.data.activationIssue).toBeUndefined();
         expect(afterRes.body.data.reviewedById).toBeUndefined();
         expect(afterRes.body.data.reviewedBy).toBeUndefined();
+      });
+    });
+
+    // =======================================================================
+    // PHASE 3C-7: PAYMENT LIFECYCLE HARDENING & CONCURRENCY MATRIX
+    // =======================================================================
+    describe('50. Phase 3C-7 Lifecycle Hardening, IDOR, Delete Guards & Concurrency Matrix', () => {
+      it('50.1. Foreign Student Payment GET -> 404 (IDOR Prevention)', async () => {
+        const cls = await createClass('IDOR GET Class');
+        const { payment } = await createPayment(cls.id, studentUser.id);
+
+        const res = await request(app.getHttpServer())
+          .get(`/payments/${payment.id}`)
+          .set('Authorization', `Bearer ${tokenStudent2}`)
+          .expect(404);
+
+        expect(res.body.data).toBeUndefined();
+      });
+
+      it('50.2. Foreign Student report-transfer -> 404 with zero mutation (IDOR Prevention)', async () => {
+        const cls = await createClass('IDOR Report Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.PENDING,
+        });
+
+        await request(app.getHttpServer())
+          .post(`/payments/${payment.id}/report-transfer`)
+          .set('Authorization', `Bearer ${tokenStudent2}`)
+          .expect(404);
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.PENDING);
+        expect(dbPayment!.reportedAt).toBeNull();
+      });
+
+      it('50.3. Malicious body tampering has zero authority', async () => {
+        const cls = await createClass('Tamper Test Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          amountVnd: 1000000,
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/reject`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({
+            reason: 'Tamper attempt reason',
+            status: 'CONFIRMED',
+            amountVnd: 0,
+            transferCode: 'HACKED-CODE',
+            activationIssue: 'CLASS_FULL',
+            reviewedById: 9999,
+          })
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.REJECTED);
+        expect(res.body.data.amountVnd).toBe(1000000);
+        expect(res.body.data.transferCode).not.toBe('HACKED-CODE');
+        expect(res.body.data.reviewedBy.id).toBe(adminUser.id);
+        expect(res.body.data.activationIssue).toBeNull();
+      });
+
+      it('50.4. Payment hard-delete API absent', async () => {
+        const cls = await createClass('Hard Delete Absence Class');
+        const { payment } = await createPayment(cls.id, studentUser.id);
+
+        await request(app.getHttpServer())
+          .delete(`/payments/${payment.id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(404);
+
+        await request(app.getHttpServer())
+          .delete(`/admin/payments/${payment.id}`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(404);
+      });
+
+      it('50.5. Payment-linked Enrollment deletion blocked with 409 Conflict', async () => {
+        const cls = await createClass('Enrollment Delete Guard Test');
+        await createPayment(cls.id, studentUser.id);
+
+        const res = await request(app.getHttpServer())
+          .delete('/admin/enroll')
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({ userId: studentUser.id, classId: cls.id })
+          .expect(409);
+        expect(res.body.message).toContain(
+          'Không thể xóa ghi danh vì tồn tại lịch sử thanh toán cần được lưu giữ.',
+        );
+      });
+
+      it('50.6. Student with Payment deletion blocked with 409 Conflict', async () => {
+        const cls = await createClass('Student Delete Guard Test');
+        await createPayment(cls.id, studentUser.id);
+
+        const res = await request(app.getHttpServer())
+          .delete(`/admin/users/${studentUser.id}`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(409);
+        expect(res.body.message).toContain(
+          'Không thể xóa người dùng vì tồn tại lịch sử thanh toán hoặc lịch sử duyệt cần được lưu giữ.',
+        );
+      });
+
+      it('50.7. Admin reviewer deletion blocked with 409 Conflict after reviewing payment', async () => {
+        const adminReviewer = await prisma.user.create({
+          data: {
+            email: `e2e_admin_rev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}@breadtrans.com`,
+            password: 'hashed_password',
+            role: Role.ADMIN,
+            profile: { create: { fullName: 'Admin Reviewer Del Guard' } },
+          },
+        });
+        const tokenAdminRev = makeToken(adminReviewer);
+
+        const cls = await createClass('Admin Rev Del Guard Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+        });
+
+        // Admin reviews (rejects) payment
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/reject`)
+          .set('Authorization', `Bearer ${tokenAdminRev}`)
+          .send({ reason: 'Test review guard' })
+          .expect(200);
+
+        // Another admin attempts to delete adminReviewer
+        const res = await request(app.getHttpServer())
+          .delete(`/admin/users/${adminReviewer.id}`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(409);
+        expect(res.body.message).toContain(
+          'Không thể xóa người dùng vì tồn tại lịch sử thanh toán hoặc lịch sử duyệt cần được lưu giữ.',
+        );
+      });
+
+      it('50.8. Concurrent reviewer-delete vs review race cannot erase reviewer identity', async () => {
+        // Create an isolated Admin A reviewer
+        const adminA = await prisma.user.create({
+          data: {
+            email: `e2e_admin_race_${Date.now()}_${Math.random().toString(36).substring(2, 6)}@breadtrans.com`,
+            password: 'hashed_password_race',
+            role: Role.ADMIN,
+            profile: {
+              create: { fullName: 'Admin Race Reviewer' },
+            },
+          },
+          include: { profile: true },
+        });
+        const tokenAdminA = makeToken(adminA);
+
+        const cls = await createClass('Reviewer Race Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+        });
+
+        // Run concurrently: Admin A rejects payment vs Admin B deletes Admin A
+        const [rejectRes, deleteRes] = await Promise.all([
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/reject`)
+            .set('Authorization', `Bearer ${tokenAdminA}`)
+            .send({ reason: 'Race rejection audit' }),
+          request(app.getHttpServer())
+            .delete(`/admin/users/${adminA.id}`)
+            .set('Authorization', `Bearer ${tokenAdmin}`)
+            .send(),
+        ]);
+
+        // Neither request may return 500
+        expect(rejectRes.status).not.toBe(500);
+        expect(deleteRes.status).not.toBe(500);
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        const dbAdminA = await prisma.user.findUnique({
+          where: { id: adminA.id },
+        });
+
+        if (rejectRes.status === 200) {
+          // Outcome A: Review won first!
+          // Reject committed with reviewedById.
+          // Delete must return 409 Conflict.
+          expect(deleteRes.status).toBe(409);
+          expect(dbPayment!.status).toBe(PaymentStatus.REJECTED);
+          expect(dbPayment!.reviewedById).toBe(adminA.id);
+          expect(dbPayment!.reviewedById).not.toBeNull();
+          expect(dbAdminA).not.toBeNull();
+        } else {
+          // Outcome B: Delete won first!
+          // Delete committed (200).
+          // Review must fail with controlled 409 Conflict.
+          expect(deleteRes.status).toBe(200);
+          expect(rejectRes.status).toBe(409);
+          expect(dbPayment!.status).toBe(PaymentStatus.REPORTED);
+          expect(dbPayment!.reviewedById).toBeNull();
+          expect(dbAdminA).toBeNull();
+        }
+
+        // Under NO circumstance can reviewedById be null on a committed REJECTED payment!
+        if (dbPayment!.status === PaymentStatus.REJECTED) {
+          expect(dbPayment!.reviewedById).not.toBeNull();
+        }
+      });
+
+      it('50.9. Class deletion blocked when class has enrollment / payment', async () => {
+        const cls = await createClass('Class Delete Guard Test');
+        await createPayment(cls.id, studentUser.id);
+
+        const res = await request(app.getHttpServer())
+          .delete(`/courses/classes/${cls.id}`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(400);
+        expect(res.body.message).toContain('học viên đăng ký');
+      });
+
+      it('50.10. Both Course deletion entry points protected by financial-history guard', async () => {
+        // Course 1 with payment: Test DELETE /courses/:id
+        const course1 = await prisma.course.create({
+          data: {
+            title: `Course Delete Test 1 ${Date.now()}`,
+            description: 'Testing delete',
+            status: CourseStatus.PUBLISHED,
+            level: 'BEGINNER',
+            teacherId: teacherUser.id,
+          },
+        });
+        const cls1 = await prisma.class.create({
+          data: {
+            courseId: course1.id,
+            teacherId: teacherUser.id,
+            name: 'Class For Course 1',
+            tuitionFeeVnd: 500000,
+            capacity: 10,
+            status: ClassStatus.UPCOMING,
+          },
+        });
+        await createPayment(cls1.id, studentUser.id);
+
+        const res1 = await request(app.getHttpServer())
+          .delete(`/courses/${course1.id}`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(409);
+        expect(res1.body.message).toContain('lịch sử thanh toán');
+
+        // Course 2 with payment: Test DELETE /admin/courses/:id
+        const course2 = await prisma.course.create({
+          data: {
+            title: `Course Delete Test 2 ${Date.now()}`,
+            description: 'Testing delete',
+            status: CourseStatus.PUBLISHED,
+            level: 'BEGINNER',
+            teacherId: teacherUser.id,
+          },
+        });
+        const cls2 = await prisma.class.create({
+          data: {
+            courseId: course2.id,
+            teacherId: teacherUser.id,
+            name: 'Class For Course 2',
+            tuitionFeeVnd: 500000,
+            capacity: 10,
+            status: ClassStatus.UPCOMING,
+          },
+        });
+        await createPayment(cls2.id, studentUser.id);
+
+        const res2 = await request(app.getHttpServer())
+          .delete(`/admin/courses/${course2.id}`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(409);
+        expect(res2.body.message).toContain('lịch sử thanh toán');
+      });
+
+      it('50.11. PENDING Payment + ACTIVE Enrollment report blocked with 422', async () => {
+        const cls = await createClass('Invalid Report Active Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.PENDING,
+          enrollmentStatus: EnrollmentStatus.ACTIVE,
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/payments/${payment.id}/report-transfer`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(422);
+
+        expect(res.body.message).toContain('PENDING_PAYMENT');
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.PENDING);
+        expect(dbPayment!.reportedAt).toBeNull();
+      });
+
+      it('50.12. REPORTED Payment + ACTIVE Enrollment reject blocked with 422', async () => {
+        const cls = await createClass('Invalid Reject Active Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.ACTIVE,
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/reject`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({ reason: 'Should not reject active' })
+          .expect(422);
+
+        expect(res.body.message).toContain('PENDING_PAYMENT');
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.REPORTED);
+        expect(dbPayment!.reviewedById).toBeNull();
+        expect(dbPayment!.adminNote).toBeNull();
+      });
+
+      it('50.13. COMPLETED/DROPPED consistency guards return 422 with zero mutation', async () => {
+        // PENDING + COMPLETED -> report 422
+        const cls1 = await createClass('Completed Invariant Class 1');
+        const p1 = await createPayment(cls1.id, studentUser.id, {
+          paymentStatus: PaymentStatus.PENDING,
+          enrollmentStatus: EnrollmentStatus.COMPLETED,
+        });
+        await request(app.getHttpServer())
+          .post(`/payments/${p1.payment.id}/report-transfer`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(422);
+
+        // PENDING + DROPPED -> report 422
+        const cls2 = await createClass('Dropped Invariant Class 2');
+        const p2 = await createPayment(cls2.id, studentUser.id, {
+          paymentStatus: PaymentStatus.PENDING,
+          enrollmentStatus: EnrollmentStatus.DROPPED,
+        });
+        await request(app.getHttpServer())
+          .post(`/payments/${p2.payment.id}/report-transfer`)
+          .set('Authorization', `Bearer ${tokenStudent}`)
+          .expect(422);
+
+        // REPORTED + COMPLETED -> reject 422
+        const cls3 = await createClass('Completed Reject Class 3');
+        const p3 = await createPayment(cls3.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.COMPLETED,
+        });
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${p3.payment.id}/reject`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({ reason: 'Completed test' })
+          .expect(422);
+
+        // REPORTED + DROPPED -> reject 422
+        const cls4 = await createClass('Dropped Reject Class 4');
+        const p4 = await createPayment(cls4.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.DROPPED,
+        });
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${p4.payment.id}/reject`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({ reason: 'Dropped test' })
+          .expect(422);
+      });
+
+      it('50.14. Report vs Reject concurrency exact semantics', async () => {
+        const cls = await createClass('Report Reject Race Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.PENDING,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+        });
+
+        const [reportRes, rejectRes] = await Promise.all([
+          request(app.getHttpServer())
+            .post(`/payments/${payment.id}/report-transfer`)
+            .set('Authorization', `Bearer ${tokenStudent}`)
+            .send(),
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/reject`)
+            .set('Authorization', `Bearer ${tokenAdmin}`)
+            .send({ reason: 'Concurrent reject test' }),
+        ]);
+
+        expect(reportRes.status).not.toBe(500);
+        expect(rejectRes.status).not.toBe(500);
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+
+        if (rejectRes.status === 200) {
+          // OUTCOME A: Report obtained payment first, transitioned PENDING -> REPORTED (200),
+          // then Reject obtained payment, saw REPORTED, and transitioned REPORTED -> REJECTED (200).
+          expect(reportRes.status).toBe(200);
+          expect(dbPayment!.status).toBe(PaymentStatus.REJECTED);
+          expect(dbPayment!.reviewedById).toBe(adminUser.id);
+        } else {
+          // OUTCOME B: Reject obtained payment first, saw PENDING, rejected with 409 Conflict.
+          // Then Report obtained payment, transitioned PENDING -> REPORTED (200).
+          expect(rejectRes.status).toBe(409);
+          expect(reportRes.status).toBe(200);
+          expect(dbPayment!.status).toBe(PaymentStatus.REPORTED);
+        }
+      });
+
+      it('50.15. Confirm idempotency & no-retry regression', async () => {
+        const cls = await createClass('Confirm Idempotency Regression Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          confirmedAt: new Date(),
+          reviewedById: adminUser.id,
+          reviewedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+      });
+
+      it('50.16. Retry financial/reviewer immutability regression', async () => {
+        const cls = await createClass('Retry Immutability Regression Class', {
+          capacity: 10,
+        });
+        const confirmedAtDate = new Date(Date.now() - 3600000);
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          amountVnd: 1000000,
+          confirmedAt: confirmedAtDate,
+          reviewedById: adminUser.id,
+          reviewedAt: confirmedAtDate,
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBeNull();
+        expect(res.body.data.amountVnd).toBe(1000000);
+        expect(res.body.data.reviewedBy.id).toBe(adminUser.id);
+      });
+    });
+
+    // =========================================================================
+    // 51. PHASE 3C-8 PAYMENT LIFECYCLE NOTIFICATIONS & DISPATCH CLAIMS
+    // =========================================================================
+    describe('51. Phase 3C-8 Payment Lifecycle Notifications & Atomic Dispatch Claims', () => {
+      beforeEach(() => {
+        jest.clearAllMocks();
+      });
+
+      // 51.1 first confirm ACTIVE -> activation dispatch once
+      it('51.1. First confirm ACTIVE -> activation email and push dispatched once', async () => {
+        const cls = await createClass('Phase 3C-8 Confirm Active Class', {
+          capacity: 10,
+        });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+
+        expect(
+          emailServiceMock.sendPaymentActivatedEmail,
+        ).toHaveBeenCalledTimes(1);
+        expect(emailServiceMock.sendPaymentActivatedEmail).toHaveBeenCalledWith(
+          studentUser.email,
+          expect.objectContaining({
+            className: cls.name,
+            transferCode: res.body.data.transferCode,
+          }),
+        );
+
+        expect(notificationsServiceMock.sendPushToUser).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(notificationsServiceMock.sendPushToUser).toHaveBeenCalledWith(
+          studentUser.id,
+          expect.objectContaining({
+            body: expect.stringContaining('kích hoạt'),
+            url: '/my-courses',
+          }),
+        );
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.activationNotifiedAt).not.toBeNull();
+      });
+
+      // 51.2 repeated confirm -> no duplicate
+      it('51.2. Repeated confirm on already CONFIRMED+ACTIVE -> no duplicate notifications', async () => {
+        const cls = await createClass('Phase 3C-8 Idempotent Confirm Class', {
+          capacity: 10,
+        });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+        });
+
+        // First confirm
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        const initialNotifiedAt = (await prisma.payment.findUnique({
+          where: { id: payment.id },
+        }))!.activationNotifiedAt;
+        expect(initialNotifiedAt).not.toBeNull();
+
+        jest.clearAllMocks();
+
+        // Repeated confirm
+        const res2 = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res2.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(
+          emailServiceMock.sendPaymentActivatedEmail,
+        ).not.toHaveBeenCalled();
+        expect(notificationsServiceMock.sendPushToUser).not.toHaveBeenCalled();
+
+        const dbPayment2 = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment2!.activationNotifiedAt).toEqual(initialNotifiedAt);
+      });
+
+      // 51.3 legacy CONFIRMED+ACTIVE+null marker repeated confirm -> no send
+      it('51.3. Legacy CONFIRMED+ACTIVE with activationNotifiedAt=null -> zero notifications on repeated confirm', async () => {
+        const cls = await createClass('Phase 3C-8 Legacy Active Class', {
+          capacity: 10,
+        });
+        const confirmedAtDate = new Date();
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          enrollmentStatus: EnrollmentStatus.ACTIVE,
+          confirmedAt: confirmedAtDate,
+          reviewedById: adminUser.id,
+          reviewedAt: confirmedAtDate,
+        });
+
+        // Ensure activationNotifiedAt is null in DB
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: { activationNotifiedAt: null },
+        });
+
+        jest.clearAllMocks();
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(
+          emailServiceMock.sendPaymentActivatedEmail,
+        ).not.toHaveBeenCalled();
+        expect(notificationsServiceMock.sendPushToUser).not.toHaveBeenCalled();
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        // Still null because this request did not activate enrollment
+        expect(dbPayment!.activationNotifiedAt).toBeNull();
+      });
+
+      // 51.4 first confirm CLASS_FULL -> one pending email only
+      it('51.4. First confirm CLASS_FULL -> pending email only (no Web Push)', async () => {
+        const cls = await createClass('Phase 3C-8 Full Confirm Class', {
+          capacity: 1,
+        });
+        // Fill class
+        await prisma.enrollment.create({
+          data: {
+            userId: studentUser2.id,
+            classId: cls.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
+
+        expect(
+          emailServiceMock.sendPaymentPendingActivationEmail,
+        ).toHaveBeenCalledTimes(1);
+        expect(
+          emailServiceMock.sendPaymentPendingActivationEmail,
+        ).toHaveBeenCalledWith(
+          studentUser.email,
+          expect.objectContaining({
+            className: cls.name,
+          }),
+        );
+        expect(notificationsServiceMock.sendPushToUser).not.toHaveBeenCalled();
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        // activationNotifiedAt is strictly for activation, not pending
+        expect(dbPayment!.activationNotifiedAt).toBeNull();
+      });
+
+      // 51.5 repeated CLASS_FULL confirm -> no duplicate
+      it('51.5. Repeated CLASS_FULL confirm -> zero duplicate pending emails', async () => {
+        const cls = await createClass('Phase 3C-8 Full Idempotent Class', {
+          capacity: 1,
+        });
+        await prisma.enrollment.create({
+          data: {
+            userId: studentUser2.id,
+            classId: cls.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+        });
+
+        // First confirm
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        jest.clearAllMocks();
+
+        // Repeated confirm
+        const res2 = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res2.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res2.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+        expect(
+          emailServiceMock.sendPaymentPendingActivationEmail,
+        ).not.toHaveBeenCalled();
+        expect(notificationsServiceMock.sendPushToUser).not.toHaveBeenCalled();
+      });
+
+      // 51.6 reject -> one rejection dispatch
+      it('51.6. Payment rejected -> rejection email and push dispatched without adminNote', async () => {
+        const cls = await createClass('Phase 3C-8 Reject Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+        });
+
+        const reason = 'Admin internal rejection: fraudulent transaction code';
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/reject`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({ reason })
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.REJECTED);
+        expect(res.body.data.adminNote).toBe(reason);
+
+        expect(emailServiceMock.sendPaymentRejectedEmail).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(emailServiceMock.sendPaymentRejectedEmail).toHaveBeenCalledWith(
+          studentUser.email,
+          expect.objectContaining({
+            className: cls.name,
+          }),
+        );
+        // Student email must NOT contain adminNote
+        expect(
+          emailServiceMock.sendPaymentRejectedEmail,
+        ).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ adminNote: expect.anything() }),
+        );
+
+        expect(notificationsServiceMock.sendPushToUser).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(notificationsServiceMock.sendPushToUser).toHaveBeenCalledWith(
+          studentUser.id,
+          expect.objectContaining({
+            body: expect.stringContaining('chưa thể đối soát'),
+            url: '/my-courses',
+          }),
+        );
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.activationNotifiedAt).toBeNull();
+      });
+
+      // 51.7 repeated reject -> no duplicate
+      it('51.7. Repeated reject -> 409 Conflict and zero duplicate notifications', async () => {
+        const cls = await createClass('Phase 3C-8 Reject Dup Class');
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+        });
+
+        // First reject
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/reject`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({ reason: 'Initial reject' })
+          .expect(200);
+
+        jest.clearAllMocks();
+
+        // Repeated reject
+        await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/reject`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({ reason: 'Second reject attempt' })
+          .expect(409);
+
+        expect(
+          emailServiceMock.sendPaymentRejectedEmail,
+        ).not.toHaveBeenCalled();
+        expect(notificationsServiceMock.sendPushToUser).not.toHaveBeenCalled();
+      });
+
+      // 51.8 retry blocked -> no notification
+      it('51.8. Blocked retry (class still full) -> zero notifications', async () => {
+        const cls = await createClass('Phase 3C-8 Retry Blocked Class', {
+          capacity: 1,
+        });
+        await prisma.enrollment.create({
+          data: {
+            userId: studentUser2.id,
+            classId: cls.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.activationIssue).toBe(
+          PaymentActivationIssue.CLASS_FULL,
+        );
+        expect(res.body.data.enrollment.status).toBe(
+          EnrollmentStatus.PENDING_PAYMENT,
+        );
+
+        expect(
+          emailServiceMock.sendPaymentActivatedEmail,
+        ).not.toHaveBeenCalled();
+        expect(notificationsServiceMock.sendPushToUser).not.toHaveBeenCalled();
+      });
+
+      // 51.9 retry success -> activation dispatch once
+      it('51.9. Successful retry activation -> activation email and push dispatched once', async () => {
+        const cls = await createClass('Phase 3C-8 Retry Success Class', {
+          capacity: 5, // Capacity now available!
+        });
+
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+          confirmedAt: new Date(),
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/retry-activation`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.activationIssue).toBeNull();
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+
+        expect(
+          emailServiceMock.sendPaymentActivatedEmail,
+        ).toHaveBeenCalledTimes(1);
+        expect(notificationsServiceMock.sendPushToUser).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(notificationsServiceMock.sendPushToUser).toHaveBeenCalledWith(
+          studentUser.id,
+          expect.objectContaining({
+            body: expect.stringContaining('kích hoạt'),
+            url: '/my-courses',
+          }),
+        );
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.activationNotifiedAt).not.toBeNull();
+      });
+
+      // 51.10 atomic activation claim concurrency -> exactly one dispatch attempt
+      it('51.10. Concurrent eligible activation attempts -> exactly one dispatch claim wins', async () => {
+        const cls = await createClass('Phase 3C-8 Concurrency Class', {
+          capacity: 10,
+        });
+
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.CONFIRMED,
+          activationIssue: PaymentActivationIssue.CLASS_FULL,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+          confirmedAt: new Date(),
+        });
+
+        // Launch 2 concurrent retry requests
+        const [res1, res2] = await Promise.all([
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/retry-activation`)
+            .set('Authorization', `Bearer ${tokenAdmin}`),
+          request(app.getHttpServer())
+            .post(`/admin/payments/${payment.id}/retry-activation`)
+            .set('Authorization', `Bearer ${tokenAdmin2}`),
+        ]);
+
+        expect(res1.status).toBe(200);
+        expect(res2.status).toBe(200);
+
+        // Exactly one dispatch attempt across both
+        expect(
+          emailServiceMock.sendPaymentActivatedEmail,
+        ).toHaveBeenCalledTimes(1);
+        expect(notificationsServiceMock.sendPushToUser).toHaveBeenCalledTimes(
+          1,
+        );
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.activationNotifiedAt).not.toBeNull();
+      });
+
+      // 51.11 provider failures do not alter committed financial/access state
+      it('51.11. Provider failures do not alter committed financial/access state or return 500', async () => {
+        const cls = await createClass('Phase 3C-8 Provider Fail Class', {
+          capacity: 10,
+        });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+        });
+
+        // Mock providers to fail
+        emailServiceMock.sendPaymentActivatedEmail.mockRejectedValueOnce(
+          new Error('Simulated SMTP down'),
+        );
+        notificationsServiceMock.sendPushToUser.mockResolvedValueOnce({
+          sent: 0,
+          failed: 1,
+        });
+
+        const res = await request(app.getHttpServer())
+          .post(`/admin/payments/${payment.id}/confirm`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .expect(200);
+
+        expect(res.body.data.status).toBe(PaymentStatus.CONFIRMED);
+        expect(res.body.data.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+
+        const dbPayment = await prisma.payment.findUnique({
+          where: { id: payment.id },
+        });
+        expect(dbPayment!.status).toBe(PaymentStatus.CONFIRMED);
+        expect(dbPayment!.activationNotifiedAt).not.toBeNull();
+
+        const dbEnrollment = await prisma.enrollment.findUnique({
+          where: { id: payment.enrollmentId },
+        });
+        expect(dbEnrollment!.status).toBe(EnrollmentStatus.ACTIVE);
+      });
+
+      // 51.12 stale activation descriptor cannot claim/send
+      it('51.12. Stale activation condition cannot claim or send notification if DB state invalid', async () => {
+        const cls = await createClass('Phase 3C-8 Stale Class', {
+          capacity: 10,
+        });
+        const { payment } = await createPayment(cls.id, studentUser.id, {
+          paymentStatus: PaymentStatus.REPORTED,
+          enrollmentStatus: EnrollmentStatus.PENDING_PAYMENT,
+        });
+
+        // Authoritatively set Payment to REJECTED before claim could succeed
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: PaymentStatus.REJECTED },
+        });
+
+        // Direct parameterized test of atomic claim query
+        const claimed = await prisma.$queryRaw<Array<{ id: number }>>`
+          UPDATE "Payment" p
+          SET "activationNotifiedAt" = NOW()
+          WHERE p.id = ${payment.id}
+            AND p.status = 'CONFIRMED'
+            AND p."activationNotifiedAt" IS NULL
+            AND EXISTS (
+              SELECT 1
+              FROM "Enrollment" e
+              WHERE e.id = p."enrollmentId"
+                AND e.status = 'ACTIVE'
+            )
+          RETURNING p.id;
+        `;
+
+        expect(claimed.length).toBe(0);
+        expect(
+          emailServiceMock.sendPaymentActivatedEmail,
+        ).not.toHaveBeenCalled();
+        expect(notificationsServiceMock.sendPushToUser).not.toHaveBeenCalled();
       });
     });
   });

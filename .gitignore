@@ -1,4 +1,4 @@
-node_modules
+﻿node_modules
 dist
 
 # Keep environment variables out of version control
@@ -12,3 +12,7 @@ dist
 scratch/
 cloudflared.exe
 *.exe
+
+# Test environment — local only, never commit secrets
+.env.test
+.env.test.local
