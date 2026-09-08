@@ -72,6 +72,13 @@ export class QuizController {
     return this.quizService.getListeningPractices(req.user.id);
   }
 
+  @Get('toeic-papers')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy danh sách đề TOEIC 2 và 4 kỹ năng' })
+  getToeicPapers(@Request() req: any) {
+    return this.quizService.getToeicPapers(req.user.id);
+  }
+
   @Get(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy chi tiết Quiz và danh sách Questions' })

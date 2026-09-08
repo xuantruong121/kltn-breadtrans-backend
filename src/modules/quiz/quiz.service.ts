@@ -116,6 +116,35 @@ export class QuizService {
     }));
   }
 
+  async getToeicPapers(userId: number) {
+    const quizzes = await this.prisma.quiz.findMany({
+      where: {
+        type: 'TOEIC',
+        OR: [
+          { bilingualContent: { path: ['examFormat'], equals: 'TWO_SKILL' } },
+          { bilingualContent: { path: ['examFormat'], equals: 'FOUR_SKILL' } },
+        ],
+      },
+      include: { _count: { select: { questions: true } } },
+      orderBy: { id: 'asc' },
+    });
+    const userSubmissions = await this.prisma.submission.findMany({
+      where: {
+        userId,
+        quizId: { in: quizzes.map((quiz) => quiz.id) },
+      },
+      select: { quizId: true },
+    });
+    const completedQuizIds = new Set(
+      userSubmissions.map((submission) => submission.quizId),
+    );
+
+    return quizzes.map((quiz) => ({
+      ...quiz,
+      isCompleted: completedQuizIds.has(quiz.id),
+    }));
+  }
+
   async getQuizById(id: number, includeAnswers = false) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },

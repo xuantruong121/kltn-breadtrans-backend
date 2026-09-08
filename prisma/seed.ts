@@ -245,10 +245,14 @@ async function main() {
     };
     offerings.push(
       await prisma.class.upsert({
-        where: { id: definition.id },
+        where: {
+          courseId_name: {
+            courseId: offeringData.courseId,
+            name: offeringData.name,
+          },
+        },
         update: offeringData,
         create: {
-          id: definition.id,
           ...offeringData,
           startDate: new Date(
             `2026-${String(9 + (index % 3)).padStart(2, '0')}-15T08:00:00.000Z`,
@@ -540,6 +544,914 @@ async function main() {
             options: ['A', 'B', 'C', 'D'],
             correctIndex: order % 4,
           },
+        },
+      });
+      questionId += 1;
+    }
+  }
+
+  const toeicPaperDefinitions = [
+    {
+      id: 5,
+      title: 'TOEIC 2 kỹ năng - Listening & Reading Mock 01',
+      description:
+        'Đề thi thử TOEIC 2 kỹ năng, tập trung Listening và Reading.',
+      examFormat: 'TWO_SKILL',
+      skillLabel: '2 kỹ năng',
+      sections: ['LISTENING', 'READING'],
+      durationMinutes: 120,
+    },
+    {
+      id: 6,
+      title: 'TOEIC 2 kỹ năng - Listening & Reading Mock 02',
+      description:
+        'Đề luyện tổng hợp Listening và Reading theo định dạng TOEIC.',
+      examFormat: 'TWO_SKILL',
+      skillLabel: '2 kỹ năng',
+      sections: ['LISTENING', 'READING'],
+      durationMinutes: 120,
+    },
+    {
+      id: 7,
+      title: 'TOEIC 4 kỹ năng - Full Skills Mock 01',
+      description: 'Bộ đề mô phỏng đủ Listening, Reading, Speaking và Writing.',
+      examFormat: 'FOUR_SKILL',
+      skillLabel: '4 kỹ năng',
+      sections: ['LISTENING', 'READING', 'SPEAKING', 'WRITING'],
+      durationMinutes: 180,
+    },
+    {
+      id: 8,
+      title: 'TOEIC 4 kỹ năng - Full Skills Mock 02',
+      description: 'Đề thi thử 4 kỹ năng với tình huống giao tiếp công sở.',
+      examFormat: 'FOUR_SKILL',
+      skillLabel: '4 kỹ năng',
+      sections: ['LISTENING', 'READING', 'SPEAKING', 'WRITING'],
+      durationMinutes: 180,
+    },
+    {
+      id: 9,
+      title: 'TOEIC 2 kỹ năng - Part 5 & Listening Challenge',
+      description:
+        'Bài luyện tăng tốc ngữ pháp Reading và bắt từ khóa Listening.',
+      examFormat: 'TWO_SKILL',
+      skillLabel: '2 kỹ năng',
+      sections: ['LISTENING', 'READING'],
+      durationMinutes: 90,
+    },
+    {
+      id: 10,
+      title: 'TOEIC 4 kỹ năng - Workplace Communication Test',
+      description: 'Đề thực hành tiếng Anh công sở đủ 4 kỹ năng.',
+      examFormat: 'FOUR_SKILL',
+      skillLabel: '4 kỹ năng',
+      sections: ['LISTENING', 'READING', 'SPEAKING', 'WRITING'],
+      durationMinutes: 180,
+    },
+  ] as const;
+
+  type SeedToeicQuestion = {
+    section: 'LISTENING' | 'READING' | 'SPEAKING' | 'WRITING';
+    text: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+    audioText?: string;
+  };
+
+  const toeicPaperQuestionBanks: Record<number, SeedToeicQuestion[]> = {
+    5: [
+      {
+        section: 'LISTENING',
+        audioText: 'The marketing meeting has been moved to Thursday morning.',
+        text: 'What has changed?',
+        options: [
+          'The meeting location',
+          'The meeting time',
+          'The meeting leader',
+          'The meeting topic',
+        ],
+        correctIndex: 1,
+        explanation:
+          'The speaker says the meeting was moved to Thursday morning, so its time changed.',
+      },
+      {
+        section: 'LISTENING',
+        audioText: 'Could you send me the revised invoice before noon?',
+        text: 'What does the speaker want?',
+        options: [
+          'A revised schedule',
+          'An invoice before noon',
+          'A new supplier',
+          'A payment receipt',
+        ],
+        correctIndex: 1,
+        explanation:
+          'The request is specifically for the revised invoice before noon.',
+      },
+      {
+        section: 'LISTENING',
+        audioText: 'The train to the airport leaves from platform six.',
+        text: 'Where should the passenger go?',
+        options: [
+          'The airport terminal',
+          'Platform six',
+          'The ticket office',
+          'The bus station',
+        ],
+        correctIndex: 1,
+        explanation: 'The announcement clearly identifies platform six.',
+      },
+      {
+        section: 'LISTENING',
+        audioText: 'Ms. Tran will be out of the office until next Tuesday.',
+        text: 'When will Ms. Tran return?',
+        options: ['Tomorrow', 'This Friday', 'Next Tuesday', 'Next month'],
+        correctIndex: 2,
+        explanation: 'Until next Tuesday means she returns next Tuesday.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'Please place all outgoing packages beside the reception desk.',
+        text: 'Where should the packages be placed?',
+        options: [
+          'In the storage room',
+          'Beside reception',
+          'At the loading dock',
+          'On the manager’s desk',
+        ],
+        correctIndex: 1,
+        explanation:
+          'The speaker gives the location: beside the reception desk.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'I am calling to confirm your appointment at three thirty this afternoon.',
+        text: 'Why is the caller calling?',
+        options: [
+          'To cancel an appointment',
+          'To confirm an appointment',
+          'To change an address',
+          'To offer a discount',
+        ],
+        correctIndex: 1,
+        explanation:
+          'The caller explicitly says the purpose is to confirm the appointment.',
+      },
+      {
+        section: 'READING',
+        text: 'The annual report _____ by the finance team yesterday.',
+        options: ['prepared', 'was prepared', 'is preparing', 'has prepare'],
+        correctIndex: 1,
+        explanation:
+          'A completed passive action in the past requires “was prepared”.',
+      },
+      {
+        section: 'READING',
+        text: 'Employees should submit travel requests _____ Friday.',
+        options: ['by', 'from', 'during', 'since'],
+        correctIndex: 0,
+        explanation: '“By Friday” gives a deadline.',
+      },
+      {
+        section: 'READING',
+        text: 'The new software is easier to use _____ the previous version.',
+        options: ['than', 'then', 'that', 'as'],
+        correctIndex: 0,
+        explanation: 'Comparative adjective “easier” takes “than”.',
+      },
+      {
+        section: 'READING',
+        text: 'Please _____ the attached file before the meeting.',
+        options: ['review', 'reviews', 'reviewed', 'reviewing'],
+        correctIndex: 0,
+        explanation: 'After “please”, use the base verb form.',
+      },
+      {
+        section: 'READING',
+        text: 'Our customers value prompt and _____ service.',
+        options: ['reliable', 'reliably', 'reliability', 'rely'],
+        correctIndex: 0,
+        explanation: 'An adjective is needed before the noun “service”.',
+      },
+      {
+        section: 'READING',
+        text: 'The store will remain open _____ 9 P.M. on weekends.',
+        options: ['until', 'among', 'within', 'beside'],
+        correctIndex: 0,
+        explanation: '“Until” indicates the closing time.',
+      },
+    ],
+    6: [
+      {
+        section: 'LISTENING',
+        audioText: 'Your package is scheduled for delivery on Monday.',
+        text: 'When will the package arrive?',
+        options: ['Today', 'Tomorrow', 'On Monday', 'Next month'],
+        correctIndex: 2,
+        explanation: 'The delivery date stated is Monday.',
+      },
+      {
+        section: 'LISTENING',
+        audioText: 'The cafeteria is closed today for equipment repairs.',
+        text: 'Why is the cafeteria closed?',
+        options: [
+          'For a private event',
+          'For staff training',
+          'For equipment repairs',
+          'For cleaning supplies',
+        ],
+        correctIndex: 2,
+        explanation: 'The announcement gives equipment repairs as the reason.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'Would you like me to reserve a conference room for the presentation?',
+        text: 'What is being offered?',
+        options: [
+          'A hotel reservation',
+          'A room reservation',
+          'A new presentation',
+          'A printed report',
+        ],
+        correctIndex: 1,
+        explanation: 'The speaker offers to reserve a conference room.',
+      },
+      {
+        section: 'LISTENING',
+        audioText: 'This flight is now boarding at gate twenty-two.',
+        text: 'What should passengers do?',
+        options: [
+          'Collect their luggage',
+          'Go to gate twenty-two',
+          'Change their tickets',
+          'Wait at the café',
+        ],
+        correctIndex: 1,
+        explanation: 'Boarding is happening at gate twenty-two.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'I will email the contract as soon as the director signs it.',
+        text: 'What will happen after the director signs?',
+        options: [
+          'The contract will be emailed',
+          'The meeting will start',
+          'The office will close',
+          'The contract will be printed',
+        ],
+        correctIndex: 0,
+        explanation: 'The speaker will email the contract after it is signed.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'The technician should arrive sometime between one and three.',
+        text: 'When is the technician expected?',
+        options: [
+          'Before noon',
+          'Between one and three',
+          'At exactly three',
+          'After five',
+        ],
+        correctIndex: 1,
+        explanation: 'The expected arrival window is between one and three.',
+      },
+      {
+        section: 'READING',
+        text: 'The manager asked all staff _____ the safety training.',
+        options: ['attend', 'to attend', 'attending', 'attended'],
+        correctIndex: 1,
+        explanation: '“Ask someone to do something” takes the infinitive.',
+      },
+      {
+        section: 'READING',
+        text: 'Neither the manager nor the assistants _____ available this afternoon.',
+        options: ['is', 'are', 'was', 'be'],
+        correctIndex: 1,
+        explanation:
+          'The verb agrees with the nearest plural subject “assistants”.',
+      },
+      {
+        section: 'READING',
+        text: 'Sales increased _____ fifteen percent last quarter.',
+        options: ['by', 'for', 'with', 'at'],
+        correctIndex: 0,
+        explanation: 'Use “increase by” with the amount of change.',
+      },
+      {
+        section: 'READING',
+        text: 'The brochure provides _____ information about our services.',
+        options: ['useful', 'usefully', 'use', 'used'],
+        correctIndex: 0,
+        explanation: 'An adjective modifies “information”.',
+      },
+      {
+        section: 'READING',
+        text: 'Ms. Lee has worked here _____ 2019.',
+        options: ['for', 'since', 'during', 'until'],
+        correctIndex: 1,
+        explanation: 'Use “since” with a starting point in time.',
+      },
+      {
+        section: 'READING',
+        text: 'All visitors must wear a badge _____ entering the building.',
+        options: ['before', 'although', 'because', 'unless'],
+        correctIndex: 0,
+        explanation: 'A badge is required before entering.',
+      },
+    ],
+    7: [
+      {
+        section: 'LISTENING',
+        audioText:
+          'Please take a seat while I check the availability of the product.',
+        text: 'What will the speaker do next?',
+        options: [
+          'Process a refund',
+          'Check product availability',
+          'Close the store',
+          'Call a taxi',
+        ],
+        correctIndex: 1,
+        explanation:
+          'The speaker says they will check whether the product is available.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'The workshop begins at nine, but registration opens at eight thirty.',
+        text: 'When does registration open?',
+        options: ['At eight thirty', 'At nine', 'At noon', 'At five'],
+        correctIndex: 0,
+        explanation: 'Registration opens before the workshop, at 8:30.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'We need two more volunteers to help with the customer survey.',
+        text: 'What is needed?',
+        options: [
+          'More customer surveys',
+          'Two volunteers',
+          'A new manager',
+          'A larger office',
+        ],
+        correctIndex: 1,
+        explanation: 'The speaker requests two additional volunteers.',
+      },
+      {
+        section: 'READING',
+        text: 'The company’s newest branch _____ in Da Nang last month.',
+        options: ['opens', 'opened', 'was opening', 'has open'],
+        correctIndex: 1,
+        explanation: '“Last month” calls for the simple past tense.',
+      },
+      {
+        section: 'READING',
+        text: 'Customers can receive a discount _____ joining the loyalty program.',
+        options: ['by', 'from', 'until', 'without'],
+        correctIndex: 0,
+        explanation: 'Use “by + gerund” to describe a method.',
+      },
+      {
+        section: 'READING',
+        text: 'The conference room is large enough _____ fifty people.',
+        options: ['hold', 'to hold', 'holding', 'held'],
+        correctIndex: 1,
+        explanation: '“Enough to + verb” is the correct structure.',
+      },
+      {
+        section: 'SPEAKING',
+        text: 'A colleague asks: “Could you help me carry these boxes?” What is the best response?',
+        options: [
+          'Sure, I’ll help you with those.',
+          'The boxes were delivered yesterday.',
+          'I work in accounting.',
+          'It is on the third floor.',
+        ],
+        correctIndex: 0,
+        explanation:
+          'The first response directly accepts the request politely.',
+      },
+      {
+        section: 'SPEAKING',
+        text: 'You are late for a meeting. Which sentence is most appropriate?',
+        options: [
+          'I apologize for being late.',
+          'The meeting is a room.',
+          'I will late yesterday.',
+          'Please arrive the report.',
+        ],
+        correctIndex: 0,
+        explanation: 'A clear apology is appropriate when arriving late.',
+      },
+      {
+        section: 'SPEAKING',
+        text: 'A client asks when a report will be ready. Choose the best reply.',
+        options: [
+          'It should be ready by Friday afternoon.',
+          'The report is very blue.',
+          'I am ready at the desk.',
+          'Friday has many reports.',
+        ],
+        correctIndex: 0,
+        explanation:
+          'The first option directly and professionally answers the client’s question.',
+      },
+      {
+        section: 'WRITING',
+        text: 'Choose the best opening for a professional email to a customer.',
+        options: [
+          'Dear Ms. Nguyen,',
+          'Hey customer!',
+          'What is up?',
+          'To whom it maybe concern',
+        ],
+        correctIndex: 0,
+        explanation:
+          '“Dear Ms. Nguyen,” is professional and correctly punctuated.',
+      },
+      {
+        section: 'WRITING',
+        text: 'Choose the most polite request.',
+        options: [
+          'Could you please review the attached proposal?',
+          'Review this now.',
+          'You must look proposal.',
+          'Why you do not review it?',
+        ],
+        correctIndex: 0,
+        explanation: '“Could you please…” is polite and grammatically correct.',
+      },
+      {
+        section: 'WRITING',
+        text: 'Choose the best closing sentence for an email.',
+        options: [
+          'Thank you for your time and consideration.',
+          'Close this message now.',
+          'I finish writing.',
+          'You answer quickly.',
+        ],
+        correctIndex: 0,
+        explanation:
+          'The first sentence is a standard professional email closing.',
+      },
+    ],
+    8: [
+      {
+        section: 'LISTENING',
+        audioText:
+          'The supplier has agreed to extend the payment deadline by ten days.',
+        text: 'What did the supplier agree to do?',
+        options: [
+          'Reduce the price',
+          'Extend the payment deadline',
+          'Send more products',
+          'Cancel the order',
+        ],
+        correctIndex: 1,
+        explanation: 'The supplier agreed to give ten more days for payment.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'The museum tour starts near the main entrance at eleven o’clock.',
+        text: 'Where will the tour begin?',
+        options: [
+          'At the café',
+          'Near the main entrance',
+          'In the parking lot',
+          'At the ticket office',
+        ],
+        correctIndex: 1,
+        explanation: 'The starting point is near the main entrance.',
+      },
+      {
+        section: 'LISTENING',
+        audioText: 'Please print the agenda in color for the board members.',
+        text: 'How should the agenda be printed?',
+        options: [
+          'In black and white',
+          'On both sides',
+          'In color',
+          'In a larger size',
+        ],
+        correctIndex: 2,
+        explanation: 'The instruction is to print the agenda in color.',
+      },
+      {
+        section: 'READING',
+        text: 'The new policy will take effect _____ the first of July.',
+        options: ['on', 'at', 'in', 'for'],
+        correctIndex: 0,
+        explanation: 'Use “on” with a specific date.',
+      },
+      {
+        section: 'READING',
+        text: 'Our team has completed the project _____ schedule.',
+        options: ['ahead of', 'between', 'outside', 'beneath'],
+        correctIndex: 0,
+        explanation: 'The fixed expression is “ahead of schedule”.',
+      },
+      {
+        section: 'READING',
+        text: 'The receptionist will notify you _____ the visitor arrives.',
+        options: ['when', 'than', 'while', 'because of'],
+        correctIndex: 0,
+        explanation: '“When” correctly introduces the arrival time.',
+      },
+      {
+        section: 'SPEAKING',
+        text: 'You need clarification during a presentation. Choose the best question.',
+        options: [
+          'Could you clarify the last point, please?',
+          'You clarify last point.',
+          'What last point means?',
+          'Clarification is needed.',
+        ],
+        correctIndex: 0,
+        explanation: 'The first option is polite, complete, and professional.',
+      },
+      {
+        section: 'SPEAKING',
+        text: 'A visitor asks for directions to the elevator. Choose the best response.',
+        options: [
+          'It is around the corner on your left.',
+          'I elevate every day.',
+          'The elevator has arrived yesterday.',
+          'You are direction.',
+        ],
+        correctIndex: 0,
+        explanation: 'The first response gives clear directions.',
+      },
+      {
+        section: 'SPEAKING',
+        text: 'Choose the best way to introduce yourself in a meeting.',
+        options: [
+          'Hello, I’m Mai from the sales department.',
+          'I am department sales hello.',
+          'Sales is my meeting.',
+          'Hello department is Mai.',
+        ],
+        correctIndex: 0,
+        explanation:
+          'The first sentence is natural and suitable for a professional meeting.',
+      },
+      {
+        section: 'WRITING',
+        text: 'Choose the clearest subject line for an email about a postponed meeting.',
+        options: [
+          'Meeting Rescheduled: May 12',
+          'Important Thing',
+          'Hello Again',
+          'Read This Today',
+        ],
+        correctIndex: 0,
+        explanation: 'A useful subject line states the topic and the new date.',
+      },
+      {
+        section: 'WRITING',
+        text: 'Which sentence is grammatically correct?',
+        options: [
+          'Please let me know if you have any questions.',
+          'Please let me know if you has questions.',
+          'Please let me knowing your questions.',
+          'Please let know me questions.',
+        ],
+        correctIndex: 0,
+        explanation:
+          'The first sentence uses the correct verb form and word order.',
+      },
+      {
+        section: 'WRITING',
+        text: 'Choose the best sentence for confirming a delivery.',
+        options: [
+          'We confirm that your order will arrive tomorrow.',
+          'Your order arrive confirm tomorrow.',
+          'We are confirm your order.',
+          'Tomorrow is your order confirmed.',
+        ],
+        correctIndex: 0,
+        explanation:
+          'The first option is complete, clear, and grammatically correct.',
+      },
+    ],
+    9: [
+      {
+        section: 'LISTENING',
+        audioText:
+          'The finance department will release the budget figures after lunch.',
+        text: 'When will the budget figures be released?',
+        options: [
+          'Before lunch',
+          'After lunch',
+          'Tomorrow morning',
+          'At the end of the month',
+        ],
+        correctIndex: 1,
+        explanation:
+          'The speaker says the figures will be released after lunch.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'Please contact the help desk if you cannot access the shared folder.',
+        text: 'Whom should employees contact?',
+        options: [
+          'The finance department',
+          'The help desk',
+          'The client',
+          'The delivery driver',
+        ],
+        correctIndex: 1,
+        explanation: 'The instruction is to contact the help desk.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'The restaurant is offering a free dessert with every dinner order tonight.',
+        text: 'What is being offered?',
+        options: [
+          'A free drink',
+          'A free dessert',
+          'A dinner discount',
+          'A free breakfast',
+        ],
+        correctIndex: 1,
+        explanation: 'Each dinner order includes a free dessert.',
+      },
+      {
+        section: 'LISTENING',
+        audioText: 'The copy machine on the second floor is out of service.',
+        text: 'What is the problem?',
+        options: [
+          'The floor is closed',
+          'The copy machine is not working',
+          'The machine is on sale',
+          'The elevator is broken',
+        ],
+        correctIndex: 1,
+        explanation: '“Out of service” means the copy machine is not working.',
+      },
+      {
+        section: 'READING',
+        text: 'The candidate _____ extensive experience in customer support.',
+        options: ['has', 'have', 'having', 'to have'],
+        correctIndex: 0,
+        explanation: 'The singular subject “candidate” takes “has”.',
+      },
+      {
+        section: 'READING',
+        text: 'Please make sure that every form is _____ completed.',
+        options: ['fully', 'full', 'fulfill', 'fullness'],
+        correctIndex: 0,
+        explanation: 'An adverb is needed to modify “completed”.',
+      },
+      {
+        section: 'READING',
+        text: 'The director was impressed _____ the team’s presentation.',
+        options: ['by', 'at', 'from', 'for'],
+        correctIndex: 0,
+        explanation: 'The fixed phrase is “impressed by”.',
+      },
+      {
+        section: 'READING',
+        text: 'If the shipment arrives early, we _____ you immediately.',
+        options: ['will notify', 'notified', 'are notifying', 'have notify'],
+        correctIndex: 0,
+        explanation: 'The first conditional uses “will” in the main clause.',
+      },
+      {
+        section: 'READING',
+        text: 'This offer is valid _____ the end of the month.',
+        options: ['through', 'between', 'near', 'among'],
+        correctIndex: 0,
+        explanation:
+          '“Through the end of the month” means until the month ends.',
+      },
+      {
+        section: 'READING',
+        text: 'The company is looking for a _____ assistant.',
+        options: ['reliable', 'reliably', 'reliability', 'rely'],
+        correctIndex: 0,
+        explanation: 'An adjective is required before the noun “assistant”.',
+      },
+      {
+        section: 'READING',
+        text: 'The office will be closed _____ the national holiday.',
+        options: ['because of', 'although', 'despite', 'however'],
+        correctIndex: 0,
+        explanation:
+          '“Because of” is followed by the noun phrase “the national holiday”.',
+      },
+      {
+        section: 'READING',
+        text: 'We have not received the signed agreement _____.',
+        options: ['yet', 'already', 'still', 'ever'],
+        correctIndex: 0,
+        explanation:
+          '“Yet” is used in negative statements about something expected to happen.',
+      },
+    ],
+    10: [
+      {
+        section: 'LISTENING',
+        audioText:
+          'The client would like to discuss the proposal over a video call tomorrow.',
+        text: 'How does the client want to discuss the proposal?',
+        options: [
+          'By email',
+          'Over a video call',
+          'At a restaurant',
+          'By postal mail',
+        ],
+        correctIndex: 1,
+        explanation: 'The client requests a video call.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'Please remember to bring your identification card to the interview.',
+        text: 'What should the applicant bring?',
+        options: [
+          'A portfolio',
+          'An identification card',
+          'A laptop',
+          'A business card',
+        ],
+        correctIndex: 1,
+        explanation:
+          'The speaker specifically mentions an identification card.',
+      },
+      {
+        section: 'LISTENING',
+        audioText:
+          'The maintenance team repaired the air conditioner this morning.',
+        text: 'What was repaired?',
+        options: [
+          'The elevator',
+          'The air conditioner',
+          'The printer',
+          'The lighting',
+        ],
+        correctIndex: 1,
+        explanation: 'The maintenance team repaired the air conditioner.',
+      },
+      {
+        section: 'READING',
+        text: 'The manager will review the application _____ making a final decision.',
+        options: ['before', 'while', 'although', 'despite'],
+        correctIndex: 0,
+        explanation: 'The review happens before the final decision.',
+      },
+      {
+        section: 'READING',
+        text: 'All attendees are encouraged to _____ questions after the session.',
+        options: ['ask', 'asks', 'asked', 'asking'],
+        correctIndex: 0,
+        explanation: 'After “to”, use the base form “ask”.',
+      },
+      {
+        section: 'READING',
+        text: 'The company expanded its services _____ meet customer demand.',
+        options: ['to', 'for', 'by', 'with'],
+        correctIndex: 0,
+        explanation: 'Use “to + verb” to express purpose.',
+      },
+      {
+        section: 'SPEAKING',
+        text: 'A customer says a product is damaged. Choose the best response.',
+        options: [
+          'I’m sorry to hear that. Let me help you replace it.',
+          'The product was damaged.',
+          'You should buy a new store.',
+          'Damage is not a customer.',
+        ],
+        correctIndex: 0,
+        explanation:
+          'The first response is empathetic and offers a practical solution.',
+      },
+      {
+        section: 'SPEAKING',
+        text: 'Choose the best sentence to ask for a meeting time.',
+        options: [
+          'Would Tuesday at 10 A.M. work for you?',
+          'Tuesday work you ten?',
+          'You are work Tuesday?',
+          'Meeting time has Tuesday.',
+        ],
+        correctIndex: 0,
+        explanation: 'The first option is polite and clearly proposes a time.',
+      },
+      {
+        section: 'SPEAKING',
+        text: 'A coworker thanks you for your help. Choose the best reply.',
+        options: [
+          'You’re welcome. I’m happy to help.',
+          'I am thanks you.',
+          'Help is welcome.',
+          'You were happy.',
+        ],
+        correctIndex: 0,
+        explanation: 'The first reply is natural and polite.',
+      },
+      {
+        section: 'WRITING',
+        text: 'Choose the best sentence to request a meeting agenda.',
+        options: [
+          'Could you send me the meeting agenda in advance?',
+          'Send agenda me before.',
+          'I request the agenda advance.',
+          'Meeting agenda is send.',
+        ],
+        correctIndex: 0,
+        explanation: 'The first sentence is polite and grammatically correct.',
+      },
+      {
+        section: 'WRITING',
+        text: 'Which sentence is best for reporting a completed task?',
+        options: [
+          'I have completed the requested update.',
+          'I completed request update have.',
+          'The update completing me.',
+          'Requested have completed.',
+        ],
+        correctIndex: 0,
+        explanation:
+          'The first sentence is clear and appropriate in a work update.',
+      },
+      {
+        section: 'WRITING',
+        text: 'Choose the best closing for a formal email.',
+        options: ['Best regards,', 'See you maybe,', 'Bye now!', 'Finished,'],
+        correctIndex: 0,
+        explanation: '“Best regards,” is a standard formal email closing.',
+      },
+    ],
+  };
+
+  for (const paper of toeicPaperDefinitions) {
+    const quiz = await prisma.quiz.upsert({
+      where: { id: paper.id },
+      update: {
+        title: paper.title,
+        description: paper.description,
+        type: QuizType.TOEIC,
+        bilingualContent: {
+          examFormat: paper.examFormat,
+          skillLabel: paper.skillLabel,
+          sections: paper.sections,
+          durationMinutes: paper.durationMinutes,
+        },
+        timeLimit: paper.durationMinutes,
+      },
+      create: {
+        id: paper.id,
+        title: paper.title,
+        description: paper.description,
+        type: QuizType.TOEIC,
+        bilingualContent: {
+          examFormat: paper.examFormat,
+          skillLabel: paper.skillLabel,
+          sections: paper.sections,
+          durationMinutes: paper.durationMinutes,
+        },
+        timeLimit: paper.durationMinutes,
+      },
+    });
+
+    for (const [index, question] of toeicPaperQuestionBanks[
+      paper.id
+    ].entries()) {
+      const order = index + 1;
+      const content = {
+        section: question.section,
+        text: question.text,
+        options: question.options,
+        correct: question.options[question.correctIndex],
+        correctIndex: question.correctIndex,
+        explanation: question.explanation,
+        ...(question.audioText ? { audioText: question.audioText } : {}),
+      };
+      await prisma.question.upsert({
+        where: { id: questionId },
+        update: {
+          quizId: quiz.id,
+          type: 'MULTIPLE_CHOICE',
+          order,
+          content,
+        },
+        create: {
+          id: questionId,
+          quizId: quiz.id,
+          type: 'MULTIPLE_CHOICE',
+          order,
+          content,
         },
       });
       questionId += 1;

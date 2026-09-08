@@ -13,6 +13,7 @@ const mockPrismaService = {
   },
   submission: {
     create: jest.fn(),
+    findMany: jest.fn(),
   },
 };
 
@@ -68,6 +69,37 @@ describe('QuizService', () => {
       mockPrismaService.quiz.findUnique.mockResolvedValue(null);
 
       await expect(service.getQuizById(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getToeicPapers', () => {
+    it('only queries TOEIC papers with a supported examFormat', async () => {
+      mockPrismaService.quiz.findMany.mockResolvedValue([]);
+      mockPrismaService.submission.findMany.mockResolvedValue([]);
+
+      await service.getToeicPapers(7);
+
+      expect(prisma.quiz.findMany).toHaveBeenCalledWith({
+        where: {
+          type: 'TOEIC',
+          OR: [
+            {
+              bilingualContent: {
+                path: ['examFormat'],
+                equals: 'TWO_SKILL',
+              },
+            },
+            {
+              bilingualContent: {
+                path: ['examFormat'],
+                equals: 'FOUR_SKILL',
+              },
+            },
+          ],
+        },
+        include: { _count: { select: { questions: true } } },
+        orderBy: { id: 'asc' },
+      });
     });
   });
 });
