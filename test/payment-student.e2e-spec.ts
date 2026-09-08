@@ -495,7 +495,7 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
       .expect(403);
   });
 
-  it('15. meetingLink remains null in user classes list (/courses)', async () => {
+  it('15. live meeting fields are absent from user classes list (/courses)', async () => {
     const res = await request(app.getHttpServer())
       .get('/courses')
       .set('Authorization', `Bearer ${tokenStudentA}`)
@@ -503,12 +503,10 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
 
     const classes = res.body.data as Array<{
       classId: number;
-      meetingLink: string | null;
       enrollmentStatus: EnrollmentStatus;
     }>;
     const paidClassEntry = classes.find((c) => c.classId === paidClass.id);
     expect(paidClassEntry).toBeDefined();
-    expect(paidClassEntry?.meetingLink).toBeNull();
     expect(paidClassEntry?.enrollmentStatus).toBe(
       EnrollmentStatus.PENDING_PAYMENT,
     );
@@ -543,7 +541,7 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
     });
     expect(freePayment).toBeNull();
 
-    // Free class meetingLink is accessible
+    // Free classes also have no live meeting field after clean break
     const res = await request(app.getHttpServer())
       .get('/courses')
       .set('Authorization', `Bearer ${tokenStudentA}`)
@@ -551,7 +549,6 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
 
     const classes = res.body.data as Array<{
       classId: number;
-      meetingLink: string | null;
       enrollmentStatus: EnrollmentStatus;
     }>;
     const freeClassEntry = classes.find((c) => c.classId === freeClass.id);

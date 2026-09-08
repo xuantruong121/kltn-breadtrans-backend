@@ -56,7 +56,7 @@ export class ClassService {
     if (role === 'STUDENT') {
       const isEnrolled = cls.enrollments.some(
         (e) =>
-          (e.user.id === userId || (e as any).userId === userId) &&
+          (e.user?.id ?? (e as any).userId) === userId &&
           (e.status === 'ACTIVE' || e.status === 'COMPLETED'),
       );
       if (!isEnrolled) {

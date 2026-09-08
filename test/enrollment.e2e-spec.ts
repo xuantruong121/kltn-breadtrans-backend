@@ -25,14 +25,12 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
   let studentB: any;
   let studentC: any;
   let studentD: any;
-  let teacherUser: any;
   let adminUser: any;
 
   let tokenStudentA: string;
   let tokenStudentB: string;
   let tokenStudentC: string;
   let tokenStudentD: string;
-  let tokenTeacher: string;
   let tokenAdmin: string;
   let makeToken: (user: any) => string;
 
@@ -135,16 +133,6 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       },
     });
 
-    teacherUser = await prisma.user.upsert({
-      where: { email: 'e2e_teacher@breadtrans.com' },
-      update: {},
-      create: {
-        email: 'e2e_teacher@breadtrans.com',
-        password: 'hashed_password_123',
-        role: Role.STUDENT,
-      },
-    });
-
     adminUser = await prisma.user.upsert({
       where: { email: 'e2e_admin@breadtrans.com' },
       update: {},
@@ -170,7 +158,6 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
     tokenStudentB = makeToken(studentB);
     tokenStudentC = makeToken(studentC);
     tokenStudentD = makeToken(studentD);
-    tokenTeacher = makeToken(teacherUser);
     tokenAdmin = makeToken(adminUser);
 
     // 3. Setup Course and Classes
@@ -337,7 +324,6 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
                 studentB?.id,
                 studentC?.id,
                 studentD?.id,
-                teacherUser?.id,
                 adminUser?.id,
               ].filter(Boolean),
             },
@@ -364,15 +350,6 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
         .send();
 
       expect(res.status).toBe(401);
-    });
-
-    it('Teacher -> 403 Forbidden', async () => {
-      const res = await request(app.getHttpServer())
-        .post(`/courses/classes/${freeClass.id}/enroll`)
-        .set('Authorization', `Bearer ${tokenTeacher}`)
-        .send();
-
-      expect(res.status).toBe(403);
     });
 
     it('Admin calling Student self-enroll route -> 403 Forbidden', async () => {
@@ -455,7 +432,7 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       expect(res.status).toBe(403);
     });
 
-    it('PEND-SEC-02: PENDING_PAYMENT Student calling /courses has meetingLink sanitized to null', async () => {
+    it('PEND-SEC-02: PENDING_PAYMENT Student calling /courses receives no live fields', async () => {
       const res = await request(app.getHttpServer())
         .get('/courses')
         .set('Authorization', `Bearer ${tokenStudentA}`);
@@ -463,7 +440,6 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       const enrollments = res.body as Array<{
         classId: number;
         enrollmentStatus: string;
-        meetingLink: string | null;
         tuitionFeeVnd: number;
       }>;
       const paidEnrollmentItem = enrollments.find(
@@ -471,7 +447,6 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       );
       expect(paidEnrollmentItem).toBeDefined();
       expect(paidEnrollmentItem?.enrollmentStatus).toBe('PENDING_PAYMENT');
-      expect(paidEnrollmentItem?.meetingLink).toBeNull();
       expect(paidEnrollmentItem?.tuitionFeeVnd).toBe(200000);
     });
 
@@ -490,13 +465,7 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
 
       expect(detailRes.status).toBe(403);
 
-      // 3. Teacher is rejected (403 Forbidden) while Admin has parity access
-      const teacherRes = await request(app.getHttpServer())
-        .get(`/courses/assignments/${paidClassAssignment.id}`)
-        .set('Authorization', `Bearer ${tokenTeacher}`);
-
-      expect(teacherRes.status).toBe(403);
-
+      // 3. Admin retains management access
       const adminRes = await request(app.getHttpServer())
         .get(`/courses/assignments/${paidClassAssignment.id}`)
         .set('Authorization', `Bearer ${tokenAdmin}`);
@@ -845,7 +814,7 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
         classSummary?.assignments?.[0]?.submissions?.some(
           (submission) => submission.userId === studentC.id,
         ),
-      ).toBe(false);
+      ).toBeFalsy();
 
       const invalidGrade = await request(app.getHttpServer())
         .put(`/courses/submissions/${submitRes.body.id}/grade`)

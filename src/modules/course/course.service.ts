@@ -625,8 +625,8 @@ export class CourseService {
       );
     return {
       ...course,
-      classes: course.classes.map((cls) => {
-        const current = cls.enrollments.length;
+      classes: course.classes.map(({ enrollments, ...cls }) => {
+        const current = enrollments.length;
         const remaining =
           cls.capacity === null ? null : Math.max(0, cls.capacity - current);
         return {

@@ -67,7 +67,7 @@ export class ClassController {
 
   @Get(':classId')
   @ApiOperation({
-    summary: 'Lấy chi tiết lớp học (Course, Lessons, Sessions, Assignments)',
+    summary: 'Lấy chi tiết lớp học tự học (Course, Lessons, Assignments)',
   })
   getClassDetail(
     @Param('classId', ParseIntPipe) classId: number,

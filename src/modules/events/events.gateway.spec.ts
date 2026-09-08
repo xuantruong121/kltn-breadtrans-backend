@@ -165,7 +165,7 @@ describe('EventsGateway Security & Authentication Tests', () => {
     expect(mockSocket.join).toHaveBeenCalledWith('support_staff');
   });
 
-  it('should reject and disconnect TEACHER connection (Teacher role retired)', async () => {
+  it('should reject and disconnect a retired-role connection', async () => {
     const mockSocket: Partial<Socket> = {
       id: 'socket-5',
       handshake: {
@@ -195,7 +195,7 @@ describe('EventsGateway Security & Authentication Tests', () => {
     await gateway.handleConnection(mockSocket as Socket);
 
     expect(mockSocket.emit).toHaveBeenCalledWith('auth:error', {
-      message: 'Teacher role is retired',
+      message: 'Invalid or expired authentication token',
     });
     expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
     expect(mockSocket.join).not.toHaveBeenCalledWith('support_staff');
