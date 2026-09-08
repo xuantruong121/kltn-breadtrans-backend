@@ -236,18 +236,19 @@ async function main() {
   ];
   const offerings = [];
   for (const [index, definition] of offeringDefinitions.entries()) {
-    const { id, ...offeringData } = definition;
+    const offeringData = {
+      courseId: definition.courseId,
+      name: definition.name,
+      capacity: definition.capacity,
+      tuitionFeeVnd: definition.tuitionFeeVnd,
+      status: definition.status,
+    };
     offerings.push(
       await prisma.class.upsert({
-        where: {
-          courseId_name: {
-            courseId: definition.courseId,
-            name: definition.name,
-          },
-        },
+        where: { id: definition.id },
         update: offeringData,
         create: {
-          id,
+          id: definition.id,
           ...offeringData,
           startDate: new Date(
             `2026-${String(9 + (index % 3)).padStart(2, '0')}-15T08:00:00.000Z`,

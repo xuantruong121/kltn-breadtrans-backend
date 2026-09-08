@@ -33,7 +33,6 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
-
   async register(registerDto: RegisterDto) {
     const { email, password, fullName } = registerDto;
     const existingUser = await this.prisma.user.findUnique({
@@ -71,7 +70,6 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid)
       throw new UnauthorizedException('Invalid credentials');
-
 
     // Update login count and last login timestamp
     await this.prisma.user.update({
@@ -374,7 +372,7 @@ export class AuthService {
     const deviceId = dto.deviceId || crypto.randomUUID();
 
     // 1. Kiểm tra AuthAccount đã liên kết với Google Sub này chưa
-    const authAccount = await (this.prisma as any).authAccount.findUnique({
+    const authAccount = await this.prisma.authAccount.findUnique({
       where: {
         provider_providerAccountId: {
           provider: 'GOOGLE',
@@ -418,7 +416,7 @@ export class AuthService {
     }
 
     // 3. Tạo User mới (LUÔN LUÔN Role.STUDENT) kèm AuthAccount
-    const newUser = await (this.prisma as any).user.create({
+    const newUser = await this.prisma.user.create({
       data: {
         email,
         role: Role.STUDENT,
@@ -450,7 +448,9 @@ export class AuthService {
   async linkGoogleWithPassword(dto: LinkGoogleAccountDto) {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
-      throw new ServiceUnavailableException('Google Client ID chưa được cấu hình.');
+      throw new ServiceUnavailableException(
+        'Google Client ID chưa được cấu hình.',
+      );
     }
 
     let payload;
@@ -483,7 +483,9 @@ export class AuthService {
     });
 
     if (!user || !user.password) {
-      throw new UnauthorizedException('Tài khoản hoặc mật khẩu không chính xác.');
+      throw new UnauthorizedException(
+        'Tài khoản hoặc mật khẩu không chính xác.',
+      );
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
@@ -493,7 +495,7 @@ export class AuthService {
 
     const deviceId = dto.deviceId || crypto.randomUUID();
 
-    await (this.prisma as any).authAccount.upsert({
+    await this.prisma.authAccount.upsert({
       where: {
         provider_providerAccountId: {
           provider: 'GOOGLE',
@@ -523,7 +525,6 @@ export class AuthService {
    * always STUDENT and existing email accounts are linked by verified email.
    */
   async createGoogleLoginCode(profile: GoogleProfile, deviceId: string) {
-
     const user = await this.getOrCreateGoogleUser(profile);
     await this.prisma.user.update({
       where: { id: user.id },

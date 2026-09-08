@@ -7,7 +7,6 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-
 export class RegisterDto {
   @ApiProperty({ example: 'student@test.com' })
   @IsEmail({}, { message: 'Invalid email format' })
@@ -100,7 +99,9 @@ export class GoogleExchangeDto {
 }
 
 export class GoogleLoginDto {
-  @ApiProperty({ description: 'Google ID token (credential) từ Google Identity Services' })
+  @ApiProperty({
+    description: 'Google ID token (credential) từ Google Identity Services',
+  })
   @IsString()
   @IsNotEmpty()
   credential: string;
@@ -121,7 +122,9 @@ export class LinkGoogleAccountDto {
   @IsNotEmpty()
   password: string;
 
-  @ApiProperty({ description: 'Google ID token (credential) từ Google Identity Services' })
+  @ApiProperty({
+    description: 'Google ID token (credential) từ Google Identity Services',
+  })
   @IsString()
   @IsNotEmpty()
   credential: string;
@@ -131,4 +134,3 @@ export class LinkGoogleAccountDto {
   @IsOptional()
   deviceId?: string;
 }
-

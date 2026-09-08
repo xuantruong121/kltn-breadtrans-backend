@@ -69,7 +69,9 @@ export class AuthController {
 
   @Post('google')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Đăng nhập bằng Google Identity Services (ID token)' })
+  @ApiOperation({
+    summary: 'Đăng nhập bằng Google Identity Services (ID token)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Trả về access token và refresh token.',
@@ -96,7 +98,6 @@ export class AuthController {
   }
 
   @Get('google')
-
   @UseGuards(AuthGuard('google'))
   @ApiOperation({ summary: 'Đăng nhập bằng Google' })
   googleLogin() {

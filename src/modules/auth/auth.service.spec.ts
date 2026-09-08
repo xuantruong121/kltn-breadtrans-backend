@@ -222,11 +222,8 @@ describe('AuthService', () => {
     const originalEnv = process.env.GOOGLE_CLIENT_ID;
 
     beforeEach(() => {
-      process.env.GOOGLE_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
-      (mockCtx.prisma as any).authAccount = {
-        findUnique: jest.fn(),
-        upsert: jest.fn(),
-      };
+      process.env.GOOGLE_CLIENT_ID =
+        'test-client-id.apps.googleusercontent.com';
     });
 
     afterEach(() => {
@@ -234,23 +231,28 @@ describe('AuthService', () => {
     });
 
     it('should create a new STUDENT user and AuthAccount on first Google login', async () => {
-      jest.spyOn((service as any).googleClient, 'verifyIdToken').mockResolvedValue({
-        getPayload: () => ({
-          sub: 'google-sub-123',
-          email: 'newuser@gmail.com',
-          email_verified: true,
-          name: 'Google Learner',
-          picture: 'https://lh3.googleusercontent.com/pic.jpg',
-        }),
-      });
+      jest
+        .spyOn((service as any).googleClient, 'verifyIdToken')
+        .mockResolvedValue({
+          getPayload: () => ({
+            sub: 'google-sub-123',
+            email: 'newuser@gmail.com',
+            email_verified: true,
+            name: 'Google Learner',
+            picture: 'https://lh3.googleusercontent.com/pic.jpg',
+          }),
+        });
 
-      (mockCtx.prisma as any).authAccount.findUnique.mockResolvedValue(null);
+      mockCtx.prisma.authAccount.findUnique.mockResolvedValue(null);
       mockCtx.prisma.user.findUnique.mockResolvedValue(null);
       mockCtx.prisma.user.create.mockResolvedValue({
         id: 99,
         email: 'newuser@gmail.com',
         role: Role.STUDENT,
-        profile: { fullName: 'Google Learner', avatar: 'https://lh3.googleusercontent.com/pic.jpg' },
+        profile: {
+          fullName: 'Google Learner',
+          avatar: 'https://lh3.googleusercontent.com/pic.jpg',
+        },
       } as any);
 
       const res = await service.loginWithGoogle({
@@ -278,16 +280,18 @@ describe('AuthService', () => {
     });
 
     it('should login immediately if AuthAccount already exists', async () => {
-      jest.spyOn((service as any).googleClient, 'verifyIdToken').mockResolvedValue({
-        getPayload: () => ({
-          sub: 'existing-google-sub',
-          email: 'existing@gmail.com',
-          email_verified: true,
-          name: 'Existing User',
-        }),
-      });
+      jest
+        .spyOn((service as any).googleClient, 'verifyIdToken')
+        .mockResolvedValue({
+          getPayload: () => ({
+            sub: 'existing-google-sub',
+            email: 'existing@gmail.com',
+            email_verified: true,
+            name: 'Existing User',
+          }),
+        });
 
-      (mockCtx.prisma as any).authAccount.findUnique.mockResolvedValue({
+      mockCtx.prisma.authAccount.findUnique.mockResolvedValue({
         id: 1,
         provider: 'GOOGLE',
         providerAccountId: 'existing-google-sub',
@@ -297,7 +301,7 @@ describe('AuthService', () => {
           role: Role.STUDENT,
           profile: { fullName: 'Existing User' },
         },
-      });
+      } as never);
 
       mockCtx.prisma.user.update.mockResolvedValue({} as any);
 
@@ -311,16 +315,18 @@ describe('AuthService', () => {
     });
 
     it('should throw ACCOUNT_LINK_REQUIRED if email already exists as a password account', async () => {
-      jest.spyOn((service as any).googleClient, 'verifyIdToken').mockResolvedValue({
-        getPayload: () => ({
-          sub: 'unlinked-sub',
-          email: 'passworduser@gmail.com',
-          email_verified: true,
-          name: 'Password User',
-        }),
-      });
+      jest
+        .spyOn((service as any).googleClient, 'verifyIdToken')
+        .mockResolvedValue({
+          getPayload: () => ({
+            sub: 'unlinked-sub',
+            email: 'passworduser@gmail.com',
+            email_verified: true,
+            name: 'Password User',
+          }),
+        });
 
-      (mockCtx.prisma as any).authAccount.findUnique.mockResolvedValue(null);
+      mockCtx.prisma.authAccount.findUnique.mockResolvedValue(null);
       mockCtx.prisma.user.findUnique.mockResolvedValue({
         id: 12,
         email: 'passworduser@gmail.com',
@@ -339,14 +345,16 @@ describe('AuthService', () => {
     });
 
     it('should successfully link account when providing correct password', async () => {
-      jest.spyOn((service as any).googleClient, 'verifyIdToken').mockResolvedValue({
-        getPayload: () => ({
-          sub: 'google-sub-to-link',
-          email: 'linkme@gmail.com',
-          email_verified: true,
-          name: 'Link Me',
-        }),
-      });
+      jest
+        .spyOn((service as any).googleClient, 'verifyIdToken')
+        .mockResolvedValue({
+          getPayload: () => ({
+            sub: 'google-sub-to-link',
+            email: 'linkme@gmail.com',
+            email_verified: true,
+            name: 'Link Me',
+          }),
+        });
 
       mockCtx.prisma.user.findUnique.mockResolvedValue({
         id: 15,
@@ -355,7 +363,7 @@ describe('AuthService', () => {
         role: Role.STUDENT,
         profile: { fullName: 'Link Me' },
       } as any);
-      (mockCtx.prisma as any).authAccount.upsert.mockResolvedValue({});
+      mockCtx.prisma.authAccount.upsert.mockResolvedValue({} as never);
       mockCtx.prisma.user.update.mockResolvedValue({} as any);
 
       const res = await service.linkGoogleWithPassword({
@@ -366,7 +374,7 @@ describe('AuthService', () => {
       });
 
       expect(res.user.id).toBe(15);
-      expect((mockCtx.prisma as any).authAccount.upsert).toHaveBeenCalledWith(
+      expect(mockCtx.prisma.authAccount.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             provider_providerAccountId: {
@@ -379,4 +387,3 @@ describe('AuthService', () => {
     });
   });
 });
-
