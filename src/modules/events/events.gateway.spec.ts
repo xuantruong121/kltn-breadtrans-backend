@@ -165,7 +165,7 @@ describe('EventsGateway Security & Authentication Tests', () => {
     expect(mockSocket.join).toHaveBeenCalledWith('support_staff');
   });
 
-  it('should authenticate valid TEACHER and join support_staff but NOT admins', async () => {
+  it('should reject and disconnect TEACHER connection (Teacher role retired)', async () => {
     const mockSocket: Partial<Socket> = {
       id: 'socket-5',
       handshake: {
@@ -194,8 +194,11 @@ describe('EventsGateway Security & Authentication Tests', () => {
 
     await gateway.handleConnection(mockSocket as Socket);
 
-    expect(mockSocket.join).toHaveBeenCalledWith('user_2');
-    expect(mockSocket.join).toHaveBeenCalledWith('support_staff');
+    expect(mockSocket.emit).toHaveBeenCalledWith('auth:error', {
+      message: 'Teacher role is retired',
+    });
+    expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+    expect(mockSocket.join).not.toHaveBeenCalledWith('support_staff');
     expect(mockSocket.join).not.toHaveBeenCalledWith('admins');
   });
 

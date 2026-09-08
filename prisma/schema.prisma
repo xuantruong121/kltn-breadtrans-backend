@@ -10,15 +10,12 @@ datasource db {
 
 enum Role {
   ADMIN
-  TEACHER
   STUDENT
 }
 
 enum CourseStatus {
   DRAFT
-  PENDING_REVIEW
   PUBLISHED
-  REJECTED
 }
 
 enum ClassStatus {
@@ -49,51 +46,48 @@ enum PaymentActivationIssue {
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
-  email          String   @unique
-  password       String
-  role           Role     @default(STUDENT)
-  emailVerifiedAt DateTime?
-  mustChangePassword Boolean @default(false)
-  refreshToken   String?
-  sessionToken   String?
-  loginCount     Int      @default(0)
-  lastLoginAt    DateTime?
-  lastDeviceType String? // "pc" | "non-pc"
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                 Int       @id @default(autoincrement())
+  email              String    @unique
+  password           String
+  role               Role      @default(STUDENT)
+  emailVerifiedAt    DateTime?
+  mustChangePassword Boolean   @default(false)
+  refreshToken       String?
+  sessionToken       String?
+  loginCount         Int       @default(0)
+  lastLoginAt        DateTime?
+  lastDeviceType     String? // "pc" | "non-pc"
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   // Core Relations
-  profile             Profile?
-  stats               UserStats?
-  billing             UserBilling?
+  profile Profile?
+  stats   UserStats?
+  billing UserBilling?
 
   // Other Relations
-  enrollments         Enrollment[]
-  teachingClasses     Class[]               @relation("TeacherClasses")
-  teachingCourses     Course[]              @relation("TeacherCourses")
-  submissions         Submission[]
-  assignmentSubmissions AssignmentSubmission[]
-  attendances         Attendance[]
-  pointHistory        PointHistory[]
-  userBadges          UserBadge[]
-  leaderboard         Leaderboard?
-  speakingSubmissions SpeakingSubmission[]
-  bookProgresses      UserBookProgress[]
-  marketOrders        MarketOrder[]
-  gamePlays           GamePlay[]
-  watchTracking       WatchTracking?
-  aiUsages            AiUsage[]
-  vocabProgresses     UserVocabWordProgress[]
-  toeicAttempts       ToeicAttempt[]
+  enrollments                     Enrollment[]
+  submissions                     Submission[]
+  assignmentSubmissions           AssignmentSubmission[]
+  pointHistory                    PointHistory[]
+  userBadges                      UserBadge[]
+  leaderboard                     Leaderboard?
+  speakingSubmissions             SpeakingSubmission[]
+  bookProgresses                  UserBookProgress[]
+  marketOrders                    MarketOrder[]
+  gamePlays                       GamePlay[]
+  watchTracking                   WatchTracking?
+  aiUsages                        AiUsage[]
+  vocabProgresses                 UserVocabWordProgress[]
+  toeicAttempts                   ToeicAttempt[]
   toeicSpeakingWritingSubmissions ToeicSpeakingWritingSubmission[]
-  pet                 UserPet?
-  questProgresses     UserQuestProgress[]
-  grammarAttempts     GrammarAttempt[]
-  pushSubscriptions   PushSubscription[]
-  userGrammarRewards  UserGrammarReward[]
-  userQuizRewards     UserQuizReward[]
-  reviewedPayments    Payment[]             @relation("PaymentReviewer")
+  pet                             UserPet?
+  questProgresses                 UserQuestProgress[]
+  grammarAttempts                 GrammarAttempt[]
+  pushSubscriptions               PushSubscription[]
+  userGrammarRewards              UserGrammarReward[]
+  userQuizRewards                 UserQuizReward[]
+  reviewedPayments                Payment[]                        @relation("PaymentReviewer")
 }
 
 model Profile {
@@ -105,30 +99,30 @@ model Profile {
   phone       String?
   address     String?
   targetScore String? // e.g., "IELTS 7.0", "TOEIC 800"
-  
+
   // Thông tin cá nhân & Phụ huynh
-  parentName      String?
-  parentPhone     String?
-  birthYear       Int?
-  nextExamDate    String? // YYYY-MM-DD
-  isSelfClaimed   Boolean @default(false)
+  parentName    String?
+  parentPhone   String?
+  birthYear     Int?
+  nextExamDate  String? // YYYY-MM-DD
+  isSelfClaimed Boolean @default(false)
 }
 
 model UserStats {
-  id                        Int       @id @default(autoincrement())
-  userId                    Int       @unique
-  user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  totalBanhRan              Int       @default(0)
-  streakCount               Int       @default(0)
-  lastStreakUpdate          DateTime?
-  streakFreezes             Int       @default(0)
-  countHeart                Int       @default(0)
-  timesVocabXS              Int       @default(0)
-  timesVocab                Int       @default(0)
-  quizAccuracy              Float     @default(0)
-  speakingAccuracy          Float     @default(0)
-  
+  id     Int  @id @default(autoincrement())
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  totalBanhRan     Int       @default(0)
+  streakCount      Int       @default(0)
+  lastStreakUpdate DateTime?
+  streakFreezes    Int       @default(0)
+  countHeart       Int       @default(0)
+  timesVocabXS     Int       @default(0)
+  timesVocab       Int       @default(0)
+  quizAccuracy     Float     @default(0)
+  speakingAccuracy Float     @default(0)
+
   // Các trường JSON nặng
   movies                    Json?
   gameTickets               Json?
@@ -140,11 +134,11 @@ model UserStats {
 }
 
 model UserBilling {
-  id                Int       @id @default(autoincrement())
-  userId            Int       @unique
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  tuitionFee        Json?     // Record<"YYYY-MM", { amount?, paidAt? }>
+  id     Int  @id @default(autoincrement())
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tuitionFee        Json? // Record<"YYYY-MM", { amount?, paidAt? }>
   bankQrUrl         String?
   bankName          String?
   bankBin           String?
@@ -154,16 +148,14 @@ model UserBilling {
 }
 
 model Course {
-  id          Int      @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   title       String
   description String?
   thumbnail   String?
-  level       String?  // e.g. "BEGINNER", "INTERMEDIATE", "ADVANCED"
-  teacherId   Int?
-  teacher     User?    @relation("TeacherCourses", fields: [teacherId], references: [id])
+  level       String? // e.g. "BEGINNER", "INTERMEDIATE", "ADVANCED"
   status      CourseStatus @default(DRAFT)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   classes Class[]
   lessons Lesson[]
@@ -171,17 +163,14 @@ model Course {
 }
 
 model Class {
-  id          Int       @id @default(autoincrement())
-  courseId    Int
-  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  teacherId   Int
-  teacher     User      @relation("TeacherClasses", fields: [teacherId], references: [id])
-  name        String
-  startDate   DateTime?
-  endDate     DateTime?
-  meetingLink String? // Google Meet/Zoom link
-  capacity    Int?    @default(30)
-  tuitionFeeVnd Int   @default(0)
+  id            Int       @id @default(autoincrement())
+  courseId      Int
+  course        Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  name          String
+  startDate     DateTime?
+  endDate       DateTime?
+  capacity      Int?      @default(30)
+  tuitionFeeVnd Int       @default(0)
 
   // Bổ sung các trường từ Firestore Classes Schema
   status             ClassStatus @default(UPCOMING)
@@ -193,7 +182,6 @@ model Class {
   pendingEvaluations Json? // Record<"studentId_bookId_lessonId", ...>
 
   enrollments   Enrollment[]
-  sessions      Session[]
   assignments   Assignment[]
   announcements Announcement[]
 
@@ -201,13 +189,13 @@ model Class {
 }
 
 model Enrollment {
-  id       Int      @id @default(autoincrement())
+  id       Int              @id @default(autoincrement())
   userId   Int
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   classId  Int
-  class    Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  joinedAt DateTime @default(now())
-  progress Float    @default(0) // Percentage 0-100
+  class    Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  joinedAt DateTime         @default(now())
+  progress Float            @default(0) // Percentage 0-100
   status   EnrollmentStatus @default(ACTIVE)
   payment  Payment?
 
@@ -259,66 +247,38 @@ model Material {
   fileType String? // PDF, DOCX, MP3, vv.
 }
 
-model Session {
-  id          Int      @id @default(autoincrement())
-  classId     Int
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  title       String
-  startTime   DateTime
-  endTime     DateTime
-  meetingLink String?
-  status      String   @default("scheduled")
-  lessonNote  String?  @db.Text
-  recordingUrl String?
-  createdAt   DateTime @default(now())
-
-  attendances Attendance[]
-}
-
-model Attendance {
-  id        Int      @id @default(autoincrement())
-  sessionId Int
-  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  isPresent Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  @@unique([sessionId, userId])
-}
-
 enum AssignmentType {
   ESSAY
   QUIZ
 }
 
 model Assignment {
-  id          Int      @id @default(autoincrement())
+  id          Int            @id @default(autoincrement())
   classId     Int
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class       Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
   title       String
-  description String?  @db.Text
+  description String?        @db.Text
   dueDate     DateTime?
   type        AssignmentType @default(ESSAY)
-  quizData    Json?    // Array of { question, options: string[], correctOptionIndex: number }
-  createdAt   DateTime @default(now())
+  quizData    Json? // Array of { question, options: string[], correctOptionIndex: number }
+  createdAt   DateTime       @default(now())
 
   submissions AssignmentSubmission[]
 }
 
 model AssignmentSubmission {
-  id           Int      @id @default(autoincrement())
-  assignmentId Int
-  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  userId       Int
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content      String?    @db.Text
-  fileUrl      String?
-  quizAnswers  Json?      // Array of selected option indices corresponding to quizData questions
-  grade        Float?
-  feedback     String?    @db.Text
-  isPointsAwarded Boolean @default(false)
-  submittedAt  DateTime   @default(now())
+  id              Int        @id @default(autoincrement())
+  assignmentId    Int
+  assignment      Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  userId          Int
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content         String?    @db.Text
+  fileUrl         String?
+  quizAnswers     Json? // Array of selected option indices corresponding to quizData questions
+  grade           Float?
+  feedback        String?    @db.Text
+  isPointsAwarded Boolean    @default(false)
+  submittedAt     DateTime   @default(now())
 
   @@unique([assignmentId, userId])
 }
@@ -331,7 +291,6 @@ model Announcement {
   content   String   @db.Text
   createdAt DateTime @default(now())
 }
-
 
 enum TopicCategory {
   GRAMMAR_TOPIC
@@ -363,18 +322,18 @@ enum QuizType {
 }
 
 model Quiz {
-  id              Int            @id @default(autoincrement())
-  courseId        Int?
-  course          Course?        @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  practiceTopicId Int?
-  practiceTopic   PracticeTopic? @relation(fields: [practiceTopicId], references: [id], onDelete: SetNull)
-  title           String
-  description     String?
-  theoryContent   String?        @db.Text
+  id               Int            @id @default(autoincrement())
+  courseId         Int?
+  course           Course?        @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  practiceTopicId  Int?
+  practiceTopic    PracticeTopic? @relation(fields: [practiceTopicId], references: [id], onDelete: SetNull)
+  title            String
+  description      String?
+  theoryContent    String?        @db.Text
   bilingualContent Json? // Array of { en: string, vi: string }
-  type            QuizType       @default(TOEIC)
-  timeLimit       Int? // In minutes
-  createdAt       DateTime       @default(now())
+  type             QuizType       @default(TOEIC)
+  timeLimit        Int? // In minutes
+  createdAt        DateTime       @default(now())
 
   questions   Question[]
   submissions Submission[]
@@ -415,10 +374,10 @@ model Result {
 
 // Gamification Models
 model Leaderboard {
-  id          Int  @id @default(autoincrement())
-  userId      Int  @unique
-  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  totalPoints Int  @default(0)
+  id          Int    @id @default(autoincrement())
+  userId      Int    @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalPoints Int    @default(0)
   rank        Int?
   tier        String @default("Đồng") // Đồng, Bạc, Vàng, Bạch Kim, Kim Cương
   weeklyExp   Int    @default(0)
@@ -513,33 +472,6 @@ model CurrencyTransaction {
   gameMeta    Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-}
-
-model CurrencyRequest {
-  id          Int       @id @default(autoincrement())
-  studentId   Int
-  studentName String
-  teacherId   Int
-  teacherName String
-  classId     Int
-  className   String
-  amount      Float
-  reason      String
-  status      String    @default("pending") // "pending" | "approved" | "rejected"
-  createdAt   DateTime  @default(now())
-  reviewedBy  String?
-  reviewedAt  DateTime?
-}
-
-model ClassAttendance {
-  id        Int      @id @default(autoincrement())
-  classId   Int
-  month     Int
-  year      Int
-  days      Json // Record<"YYYY-MM-DD", Record<userId, status>>
-  updatedAt DateTime @default(now()) @updatedAt
-
-  @@unique([classId, month, year])
 }
 
 model ContentTopic {
@@ -664,46 +596,46 @@ model SpeakingEvalRetry {
 
 // Vocab Module Models
 model VocabTopic {
-  id           Int          @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   title        String
-  categoryName String       @default("600 TỪ VỰNG TOEIC")
-  totalWords   Int          @default(12)
-  isPro        Boolean      @default(false)
+  categoryName String   @default("600 TỪ VỰNG TOEIC")
+  totalWords   Int      @default(12)
+  isPro        Boolean  @default(false)
   iconUrl      String?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  words        VocabWord[]
+  words VocabWord[]
 }
 
 model VocabWord {
-  id          Int      @id @default(autoincrement())
-  topicId     Int
-  topic       VocabTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  word        String
-  pos         String   @default("noun") // "verb", "noun", "adjective", "adverb"
-  ipaUs       String?
-  ipaUk       String?
-  meaning     String
-  audioUs     String?
-  audioUk     String?
-  exampleEn   String?  @db.Text
-  exampleVi   String?  @db.Text
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
+  id        Int        @id @default(autoincrement())
+  topicId   Int
+  topic     VocabTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  word      String
+  pos       String     @default("noun") // "verb", "noun", "adjective", "adverb"
+  ipaUs     String?
+  ipaUk     String?
+  meaning   String
+  audioUs   String?
+  audioUk   String?
+  exampleEn String?    @db.Text
+  exampleVi String?    @db.Text
+  order     Int        @default(0)
+  createdAt DateTime   @default(now())
 
   userProgress UserVocabWordProgress[]
 }
 
 model UserVocabWordProgress {
-  id             Int        @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   userId         Int
-  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   wordId         Int
-  word           VocabWord  @relation(fields: [wordId], references: [id], onDelete: Cascade)
-  isStarred      Boolean    @default(false)
-  isMastered     Boolean    @default(false)
-  reviewCount    Int        @default(0)
+  word           VocabWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  isStarred      Boolean   @default(false)
+  isMastered     Boolean   @default(false)
+  reviewCount    Int       @default(0)
   nextReviewAt   DateTime?
   lastReviewedAt DateTime?
 
@@ -733,58 +665,58 @@ model ToeicExamSet {
   createdBy   Int?
   createdAt   DateTime @default(now())
 
-  groups      ToeicQuestionGroup[]
-  attempts    ToeicAttempt[]
+  groups   ToeicQuestionGroup[]
+  attempts ToeicAttempt[]
 }
 
 model ToeicQuestionGroup {
-  id           Int      @id @default(autoincrement())
-  examId       Int
-  exam         ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
-  part         Int      // 1 to 7
-  audioUrl     String?
-  imageUrl     String?
-  passageText  String?  @db.Text
-  groupOrder   Int      @default(0)
+  id          Int          @id @default(autoincrement())
+  examId      Int
+  exam        ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
+  part        Int // 1 to 7
+  audioUrl    String?
+  imageUrl    String?
+  passageText String?      @db.Text
+  groupOrder  Int          @default(0)
 
-  questions    ToeicQuestion[]
+  questions ToeicQuestion[]
 }
 
 model ToeicQuestion {
-  id             Int      @id @default(autoincrement())
+  id             Int                @id @default(autoincrement())
   groupId        Int
   group          ToeicQuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   questionNumber Int
-  text           String?  @db.Text
-  options        Json     // Array of 4 strings
-  correctIndex   Int      // 0, 1, 2, 3
-  explanation    String?  @db.Text
+  text           String?            @db.Text
+  options        Json // Array of 4 strings
+  correctIndex   Int // 0, 1, 2, 3
+  explanation    String?            @db.Text
 
-  attemptAnswers ToeicAttemptAnswer[]
+  attemptAnswers             ToeicAttemptAnswer[]
   speakingWritingSubmissions ToeicSpeakingWritingSubmission[]
 }
 
 model ToeicAttempt {
-  id              Int      @id @default(autoincrement())
-  userId          Int
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  examId          Int
-  exam            ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
-  mode            AttemptMode  @default(PRACTICE)
-  startedAt       DateTime @default(now())
-  submittedAt     DateTime?
-  timeRemaining   Int?     // In seconds
-  listeningScore  Int?
-  readingScore    Int?
-  totalScore      Int?
+  id             Int          @id @default(autoincrement())
+  userId         Int
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId         Int
+  exam           ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
+  mode           AttemptMode  @default(PRACTICE)
+  startedAt      DateTime     @default(now())
+  submittedAt    DateTime?
+  timeRemaining  Int? // In seconds
+  listeningScore Int?
+  readingScore   Int?
+  totalScore     Int?
 
-  answers         ToeicAttemptAnswer[]
+  answers ToeicAttemptAnswer[]
 }
 
 model ToeicAttemptAnswer {
-  id            Int      @id @default(autoincrement())
+  id            Int           @id @default(autoincrement())
   attemptId     Int
-  attempt       ToeicAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  attempt       ToeicAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   questionId    Int
   question      ToeicQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
   selectedIndex Int?
@@ -793,16 +725,16 @@ model ToeicAttemptAnswer {
 }
 
 model ToeicSpeakingWritingSubmission {
-  id            Int      @id @default(autoincrement())
+  id            Int           @id @default(autoincrement())
   userId        Int
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   questionId    Int
   question      ToeicQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
   audioUrl      String?
-  textContent   String?  @db.Text
+  textContent   String?       @db.Text
   aiGradedScore Float?
-  aiTranscript  String?  @db.Text
-  aiFeedback    Json?    // Detailed feedback object
+  aiTranscript  String?       @db.Text
+  aiFeedback    Json? // Detailed feedback object
   gradedAt      DateTime?
 }
 
@@ -811,43 +743,43 @@ model ToeicSpeakingWritingSubmission {
 // ==========================================
 
 model UserPet {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String   @default("Bread")
-  health    Int      @default(100) // 0-100
-  happiness Int      @default(100) // 0-100
-  level     Int      @default(1)
-  exp       Int      @default(0)
-  roster    Json?    // Per-species stats roster: { [speciesId]: { level, exp, health, happiness, lastFedAt } }
+  id        Int       @id @default(autoincrement())
+  userId    Int       @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String    @default("Bread")
+  health    Int       @default(100) // 0-100
+  happiness Int       @default(100) // 0-100
+  level     Int       @default(1)
+  exp       Int       @default(0)
+  roster    Json? // Per-species stats roster: { [speciesId]: { level, exp, health, happiness, lastFedAt } }
   lastFedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 }
 
 model DailyQuest {
-  id          Int      @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   title       String
   description String?
-  targetValue Int      @default(1) // e.g. 50 XP
-  type        String   // "EARN_XP", "DO_SPEAKING", "COMPLETE_LESSON"
-  rewardXP    Int      @default(10)
-  rewardBanh  Int      @default(5)
-  isActive    Boolean  @default(true)
+  targetValue Int     @default(1) // e.g. 50 XP
+  type        String // "EARN_XP", "DO_SPEAKING", "COMPLETE_LESSON"
+  rewardXP    Int     @default(10)
+  rewardBanh  Int     @default(5)
+  isActive    Boolean @default(true)
 
   userProgress UserQuestProgress[]
 }
 
 model UserQuestProgress {
-  id           Int      @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   userId       Int
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   questId      Int
   quest        DailyQuest @relation(fields: [questId], references: [id], onDelete: Cascade)
-  currentValue Int      @default(0)
-  isCompleted  Boolean  @default(false)
+  currentValue Int        @default(0)
+  isCompleted  Boolean    @default(false)
   completedAt  DateTime?
-  dateKey      String   // e.g. "2026-08-13" to refresh daily
+  dateKey      String // e.g. "2026-08-13" to refresh daily
 
   @@unique([userId, questId, dateKey])
 }
@@ -857,19 +789,19 @@ model UserQuestProgress {
 // ==========================================
 
 model GrammarTopic {
-  id             Int               @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   title          String
-  level          String            @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
-  description    String?           @db.Text
+  level          String   @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
+  description    String?  @db.Text
   videoYoutubeId String?
-  keyFormula     String?           @db.Text
-  order          Int               @default(0)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @default(now()) @updatedAt
+  keyFormula     String?  @db.Text
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 
-  questions      GrammarQuestion[]
-  attempts       GrammarAttempt[]
-  rewards        UserGrammarReward[]
+  questions GrammarQuestion[]
+  attempts  GrammarAttempt[]
+  rewards   UserGrammarReward[]
 }
 
 model GrammarQuestion {
@@ -877,7 +809,7 @@ model GrammarQuestion {
   topicId      Int
   topic        GrammarTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
   question     String       @db.Text
-  options      Json         // Array of 4 strings
+  options      Json // Array of 4 strings
   correctIndex Int
   explanation  String?      @db.Text
   order        Int          @default(0)
@@ -891,7 +823,7 @@ model GrammarAttempt {
   topicId   Int
   topic     GrammarTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
   score     Float
-  answers   Json         // User answers mapping / array
+  answers   Json // User answers mapping / array
   createdAt DateTime     @default(now())
 }
 

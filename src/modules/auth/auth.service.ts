@@ -316,24 +316,4 @@ export class AuthService {
     });
     return { message: 'Password changed successfully' };
   }
-
-  async activateTeacher(token: string, newPassword: string) {
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const key = `teacher:activation:${tokenHash}`;
-    const userIdRaw = await this.redis.get(key);
-    if (!userIdRaw)
-      throw new UnauthorizedException('Activation token expired or invalid');
-    const password = await bcrypt.hash(newPassword, 12);
-    const user = await this.prisma.user.update({
-      where: { id: Number(userIdRaw) },
-      data: {
-        password,
-        emailVerifiedAt: new Date(),
-        mustChangePassword: false,
-      },
-      select: { id: true, email: true, role: true, emailVerifiedAt: true },
-    });
-    await this.redis.del(key);
-    return user;
-  }
 }

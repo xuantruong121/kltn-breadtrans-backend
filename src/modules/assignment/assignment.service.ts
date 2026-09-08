@@ -29,10 +29,8 @@ export class AssignmentService {
     const cls = await this.prisma.class.findUnique({ where: { id: classId } });
     if (!cls) throw new NotFoundException('Không tìm thấy lớp học');
 
-    if (role !== 'ADMIN' && cls.teacherId !== userId) {
-      throw new ForbiddenException(
-        'Bạn không phải là giảng viên phụ trách lớp học này',
-      );
+    if (role !== 'ADMIN') {
+      throw new ForbiddenException('Chỉ Admin mới có quyền tạo bài tập');
     }
 
     return this.prisma.assignment.create({
@@ -62,12 +60,6 @@ export class AssignmentService {
       if (!enrollment) {
         throw new ForbiddenException(
           'Bạn chưa ghi danh hoặc không có quyền truy cập bài tập của lớp học này',
-        );
-      }
-    } else if (role === 'TEACHER' && userId) {
-      if (cls.teacherId !== userId) {
-        throw new ForbiddenException(
-          'Bạn không phải là giảng viên phụ trách lớp học này',
         );
       }
     }
@@ -102,7 +94,7 @@ export class AssignmentService {
             },
           },
         },
-        class: { select: { id: true, name: true, teacherId: true } },
+        class: { select: { id: true, name: true } },
       },
     });
     if (!assignment) throw new NotFoundException('Không tìm thấy bài tập');
@@ -124,15 +116,7 @@ export class AssignmentService {
       assignment.submissions = assignment.submissions.filter(
         (s) => s.userId === userId,
       );
-    } else if (role === 'TEACHER' && userId) {
-      if (assignment.class.teacherId !== userId) {
-        throw new ForbiddenException(
-          'Bạn không phải là giảng viên phụ trách lớp học này',
-        );
-      }
-      // Giáo viên phụ trách lớp xem được tất cả submissions của học sinh trong lớp
     }
-    // ADMIN giữ nguyên quyền xem toàn bộ
 
     return assignment;
   }
@@ -225,9 +209,6 @@ export class AssignmentService {
       },
     });
 
-    // Cập nhật tiến độ học tập (Enrollment.progress) của học sinh cho lớp học
-    await this.updateStudentEnrollmentProgress(assignment.classId, userId);
-
     // Đối với QUIZ: Hệ thống tự chấm điểm và thưởng Bánh Mì/EXP ngay (Đảm bảo Idempotency qua CAS isPointsAwarded)
     if (assignment.type === 'QUIZ' && grade !== undefined && grade !== null) {
       const historyKey = `Hoàn thành bài tập trắc nghiệm: ${assignment.title}`;
@@ -250,64 +231,12 @@ export class AssignmentService {
         }
       }
     }
-    // Đối với ESSAY: Điểm thưởng sẽ được hệ thống tính và phát sau khi giáo viên chấm bài xong (Hướng A)
 
     return {
       ...submission,
       isLate,
       isAutoGraded: assignment.type === 'QUIZ',
     };
-  }
-
-  private async updateStudentEnrollmentProgress(
-    classId: number,
-    userId: number,
-  ) {
-    try {
-      const [totalSessions, totalAssignments] = await Promise.all([
-        this.prisma.session.count({ where: { classId } }),
-        this.prisma.assignment.count({ where: { classId } }),
-      ]);
-
-      if (totalSessions === 0 && totalAssignments === 0) return;
-
-      const [attendedSessions, submittedAssignments] = await Promise.all([
-        this.prisma.attendance.count({
-          where: {
-            session: { classId },
-            userId,
-            isPresent: true,
-          },
-        }),
-        this.prisma.assignmentSubmission.count({
-          where: {
-            assignment: { classId },
-            userId,
-          },
-        }),
-      ]);
-
-      let progress = 0;
-      if (totalSessions > 0 && totalAssignments > 0) {
-        const sessionRatio = attendedSessions / totalSessions;
-        const assignmentRatio = submittedAssignments / totalAssignments;
-        progress = (0.5 * sessionRatio + 0.5 * assignmentRatio) * 100;
-      } else if (totalSessions > 0) {
-        progress = (attendedSessions / totalSessions) * 100;
-      } else if (totalAssignments > 0) {
-        progress = (submittedAssignments / totalAssignments) * 100;
-      }
-
-      await this.prisma.enrollment.updateMany({
-        where: { classId, userId },
-        data: { progress: Math.min(100, Math.round(progress)) },
-      });
-    } catch (error) {
-      console.error(
-        `Error recalculating progress for user ${userId} in class ${classId}:`,
-        error,
-      );
-    }
   }
 
   async gradeSubmission(
@@ -325,10 +254,8 @@ export class AssignmentService {
       throw new NotFoundException('Không tìm thấy bài nộp');
     }
 
-    if (role !== 'ADMIN' && existing.assignment.class.teacherId !== userId) {
-      throw new ForbiddenException(
-        'Bạn không phải là giảng viên phụ trách lớp học này',
-      );
+    if (role !== 'ADMIN') {
+      throw new ForbiddenException('Chỉ Admin mới có quyền chấm điểm bài tập');
     }
 
     // Atomic compare-and-swap trên isPointsAwarded để phòng chống cộng thưởng 2 lần

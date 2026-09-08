@@ -91,6 +91,9 @@ export class EventsGateway
         include: { profile: true },
       });
       if (!user) throw new Error('User not found');
+      if (user.role !== 'ADMIN' && user.role !== 'STUDENT') {
+        throw new Error('Unsupported role');
+      }
       client.data.user = {
         userId: user.id,
         email: user.email,
@@ -104,8 +107,6 @@ export class EventsGateway
 
       if (user.role === 'ADMIN') {
         await client.join('admins');
-        await client.join('support_staff');
-      } else if (user.role === 'TEACHER') {
         await client.join('support_staff');
       }
 
@@ -147,11 +148,6 @@ export class EventsGateway
       this.logger.log(
         `Client ${client.id} (ADMIN) joined 'admins' and 'support_staff' rooms`,
       );
-    } else if (authUser.role === 'TEACHER') {
-      await client.join('support_staff');
-      this.logger.log(
-        `Client ${client.id} (TEACHER) joined 'support_staff' room`,
-      );
     }
   }
 
@@ -183,7 +179,7 @@ export class EventsGateway
     }
 
     const userRole = authUser.role;
-    const isStaff = userRole === 'ADMIN' || userRole === 'TEACHER';
+    const isStaff = userRole === 'ADMIN';
 
     this.logger.log(
       `Chat message from ${userRole} (User #${authUser.userId}): "${payload.message?.content?.substring(0, 30)}..."`,
@@ -282,10 +278,7 @@ export class EventsGateway
     },
   ) {
     const authUser = client.data?.user;
-    if (
-      !authUser ||
-      (authUser.role !== 'ADMIN' && authUser.role !== 'TEACHER')
-    ) {
+    if (!authUser || authUser.role !== 'ADMIN') {
       this.logger.warn(
         `[EventsGateway] Unauthorized chat:toggleMode attempt by User #${authUser?.userId}`,
       );

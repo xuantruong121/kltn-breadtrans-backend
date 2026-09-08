@@ -43,16 +43,6 @@ export async function setupFixtures(prisma: PrismaClient) {
   console.log('Setting up dedicated backfill fixtures in kltn_test_db...');
 
   // 1. Users
-  const teacher = await prisma.user.upsert({
-    where: { email: `${FIXTURE_TAG}teacher@breadtrans.com` },
-    update: {},
-    create: {
-      email: `${FIXTURE_TAG}teacher@breadtrans.com`,
-      password: 'fixture_password_123',
-      role: Role.TEACHER,
-    },
-  });
-
   const student1 = await prisma.user.upsert({
     where: { email: `${FIXTURE_TAG}student1@breadtrans.com` },
     update: {},
@@ -93,7 +83,6 @@ export async function setupFixtures(prisma: PrismaClient) {
         title: `${FIXTURE_TAG}Course`,
         description: 'Course for backfill testing',
         status: CourseStatus.PUBLISHED,
-        teacherId: teacher.id,
       },
     });
   }
@@ -107,7 +96,6 @@ export async function setupFixtures(prisma: PrismaClient) {
       data: {
         name: `${FIXTURE_TAG}PaidClass`,
         courseId: course.id,
-        teacherId: teacher.id,
         tuitionFeeVnd: 500000,
         status: ClassStatus.UPCOMING,
         capacity: 20,
@@ -123,7 +111,6 @@ export async function setupFixtures(prisma: PrismaClient) {
       data: {
         name: `${FIXTURE_TAG}FreeClass`,
         courseId: course.id,
-        teacherId: teacher.id,
         tuitionFeeVnd: 0,
         status: ClassStatus.UPCOMING,
         capacity: 20,

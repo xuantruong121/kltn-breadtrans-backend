@@ -24,7 +24,7 @@ import { Role } from '@prisma/client';
 @ApiTags('Admin AI Generator')
 @Controller('admin/ai-generator')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.TEACHER)
+@Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class AiGeneratorController {
   constructor(private readonly aiGeneratorService: AiGeneratorService) {}

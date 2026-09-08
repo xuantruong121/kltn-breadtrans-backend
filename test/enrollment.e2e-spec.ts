@@ -43,6 +43,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
   let singleSeatPaidClass: any;
   let completedClass: any;
   let paidClassAssignment: any;
+  let assignmentFixture: any;
+  let quizFixture: any;
+  let quizQuestionFixture: any;
 
   beforeAll(async () => {
     // 0. Safety Fuse: Refuse to run against any non-test database!
@@ -138,7 +141,7 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       create: {
         email: 'e2e_teacher@breadtrans.com',
         password: 'hashed_password_123',
-        role: Role.TEACHER,
+        role: Role.STUDENT,
       },
     });
 
@@ -177,7 +180,6 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
         description: 'Testing self-enrollment and lifecycle',
         status: CourseStatus.PUBLISHED,
         level: 'BEGINNER',
-        teacherId: teacherUser.id,
         lessons: {
           create: [
             {
@@ -196,11 +198,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       data: {
         name: 'E2E Free Class',
         courseId: testCourse.id,
-        teacherId: teacherUser.id,
         capacity: 30,
         tuitionFeeVnd: 0,
         status: ClassStatus.UPCOMING,
-        meetingLink: 'https://daily.co/e2e-free-class',
       },
     });
 
@@ -209,11 +209,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       data: {
         name: 'E2E Paid Class',
         courseId: testCourse.id,
-        teacherId: teacherUser.id,
         capacity: 20,
         tuitionFeeVnd: 200000,
         status: ClassStatus.UPCOMING,
-        meetingLink: 'https://daily.co/e2e-paid-class',
       },
     });
 
@@ -222,11 +220,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       data: {
         name: 'E2E Single Seat Class',
         courseId: testCourse.id,
-        teacherId: teacherUser.id,
         capacity: 1,
         tuitionFeeVnd: 0,
         status: ClassStatus.UPCOMING,
-        meetingLink: 'https://daily.co/e2e-single-seat',
       },
     });
 
@@ -235,11 +231,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       data: {
         name: 'E2E Single Seat Paid Class',
         courseId: testCourse.id,
-        teacherId: teacherUser.id,
         capacity: 1,
         tuitionFeeVnd: 150000,
         status: ClassStatus.UPCOMING,
-        meetingLink: 'https://daily.co/e2e-single-paid',
       },
     });
 
@@ -248,11 +242,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       data: {
         name: 'E2E Completed Class',
         courseId: testCourse.id,
-        teacherId: teacherUser.id,
         capacity: 10,
         tuitionFeeVnd: 100000,
         status: ClassStatus.COMPLETED,
-        meetingLink: 'https://daily.co/e2e-completed',
       },
     });
 
@@ -265,6 +257,24 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
         type: 'ESSAY',
       },
     });
+
+    const quizResponse = await request(app.getHttpServer())
+      .post('/quizzes')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({ title: 'E2E Phase 4 Quiz', type: 'TOEIC' });
+    expect([200, 201]).toContain(quizResponse.status);
+    quizFixture = quizResponse.body;
+
+    const questionResponse = await request(app.getHttpServer())
+      .post(`/quizzes/${quizFixture.id}/questions`)
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({
+        type: 'MULTIPLE_CHOICE',
+        content: { text: '2 + 2 = ?', options: ['3', '4'], correct: '4' },
+        order: 1,
+      });
+    expect([200, 201]).toContain(questionResponse.status);
+    quizQuestionFixture = questionResponse.body;
   });
 
   afterAll(async () => {
@@ -304,6 +314,17 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
         .catch(() => null);
       await prisma.course
         ?.delete({ where: { id: testCourse.id } })
+        .catch(() => null);
+    }
+    if (quizFixture?.id && prisma) {
+      await prisma.submission
+        .deleteMany({ where: { quizId: quizFixture.id } })
+        .catch(() => null);
+      await prisma.question
+        .deleteMany({ where: { quizId: quizFixture.id } })
+        .catch(() => null);
+      await prisma.quiz
+        .delete({ where: { id: quizFixture.id } })
         .catch(() => null);
     }
     if (prisma) {
@@ -416,6 +437,16 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
   });
 
   describe('3. PENDING_PAYMENT Private Content Isolation (PEND-SEC-01 to PEND-SEC-05)', () => {
+    it('PEND-SEC-06: PENDING_PAYMENT Student is excluded from /classes academic payload', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/classes')
+        .set('Authorization', `Bearer ${tokenStudentA}`);
+
+      expect(res.status).toBe(200);
+      const classes = res.body as Array<{ id: number }>;
+      expect(classes.some((item) => item.id === paidClass.id)).toBe(false);
+    });
+
     it('PEND-SEC-01: PENDING_PAYMENT Student cannot access /courses/classes/:classId -> 403 Forbidden', async () => {
       const res = await request(app.getHttpServer())
         .get(`/courses/classes/${paidClass.id}`)
@@ -459,13 +490,19 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
 
       expect(detailRes.status).toBe(403);
 
-      // 3. Teacher owner CAN access assignment detail and inspect submissions
+      // 3. Teacher is rejected (403 Forbidden) while Admin has parity access
       const teacherRes = await request(app.getHttpServer())
         .get(`/courses/assignments/${paidClassAssignment.id}`)
         .set('Authorization', `Bearer ${tokenTeacher}`);
 
-      expect(teacherRes.status).toBe(200);
-      expect(teacherRes.body.id).toBe(paidClassAssignment.id);
+      expect(teacherRes.status).toBe(403);
+
+      const adminRes = await request(app.getHttpServer())
+        .get(`/courses/assignments/${paidClassAssignment.id}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`);
+
+      expect(adminRes.status).toBe(200);
+      expect(adminRes.body.id).toBe(paidClassAssignment.id);
     });
 
     it('PEND-SEC-04: PENDING_PAYMENT Student cannot submit assignment -> 403 Forbidden', async () => {
@@ -742,6 +779,116 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       await prisma.user.deleteMany({
         where: { id: { in: [studentP1.id, studentP2.id] } },
       });
+    });
+  });
+
+  describe('7. Phase 4 Assignment cross-flow', () => {
+    it('Admin creates, ACTIVE student submits, admin grades, student reads grade', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post(`/courses/classes/${paidClass.id}/assignments`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({
+          title: 'E2E Graded Essay',
+          type: 'ESSAY',
+          description: 'Write a paragraph',
+        });
+      expect([200, 201]).toContain(createRes.status);
+      assignmentFixture = createRes.body;
+
+      const submitRes = await request(app.getHttpServer())
+        .post(`/courses/assignments/${assignmentFixture.id}/submit`)
+        .set('Authorization', `Bearer ${tokenStudentB}`)
+        .send({ content: 'My answer', userId: studentA.id });
+      expect([200, 201]).toContain(submitRes.status);
+      expect(submitRes.body.userId).toBe(studentB.id);
+
+      const gradeRes = await request(app.getHttpServer())
+        .put(`/courses/submissions/${submitRes.body.id}/grade`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ grade: 8, feedback: 'Good work' });
+      expect(gradeRes.status).toBe(200);
+      expect(gradeRes.body.grade).toBe(8);
+
+      const studentView = await request(app.getHttpServer())
+        .get(`/courses/assignments/${assignmentFixture.id}`)
+        .set('Authorization', `Bearer ${tokenStudentB}`);
+      expect(studentView.status).toBe(200);
+      expect(studentView.body.submissions[0].feedback).toBe('Good work');
+
+      await request(app.getHttpServer())
+        .post('/admin/enroll')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ userId: studentC.id, classId: paidClass.id });
+      await request(app.getHttpServer())
+        .post(`/courses/assignments/${assignmentFixture.id}/submit`)
+        .set('Authorization', `Bearer ${tokenStudentC}`)
+        .send({ content: 'Peer answer' });
+
+      const academicPayload = await request(app.getHttpServer())
+        .get('/courses/classes')
+        .set('Authorization', `Bearer ${tokenStudentB}`);
+      expect(academicPayload.status).toBe(200);
+      const payloadText = JSON.stringify(academicPayload.body);
+      expect(payloadText).not.toContain('Peer answer');
+      expect(payloadText).not.toContain('Good work');
+      expect(payloadText).not.toContain('fileUrl');
+      const academicClasses = academicPayload.body as Array<{
+        id: number;
+        assignments?: Array<{
+          submissions?: Array<{ userId?: number }>;
+        }>;
+      }>;
+      const classSummary = academicClasses.find(
+        (item) => item.id === paidClass.id,
+      );
+      expect(
+        classSummary?.assignments?.[0]?.submissions?.some(
+          (submission) => submission.userId === studentC.id,
+        ),
+      ).toBe(false);
+
+      const invalidGrade = await request(app.getHttpServer())
+        .put(`/courses/submissions/${submitRes.body.id}/grade`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ grade: 11 });
+      expect(invalidGrade.status).toBe(400);
+
+      const duplicate = await request(app.getHttpServer())
+        .post(`/courses/assignments/${assignmentFixture.id}/submit`)
+        .set('Authorization', `Bearer ${tokenStudentB}`)
+        .send({ content: 'Second answer' });
+      expect(duplicate.status).toBe(403);
+    });
+  });
+
+  describe('8. Phase 4 Quiz score authority and privacy', () => {
+    it('hides answers, computes score server-side, persists result, and blocks analytics IDOR', async () => {
+      const quizView = await request(app.getHttpServer())
+        .get(`/quizzes/${quizFixture.id}`)
+        .set('Authorization', `Bearer ${tokenStudentB}`);
+      expect(quizView.status).toBe(200);
+      expect(quizView.body.questions[0].content.correct).toBeUndefined();
+
+      const submitRes = await request(app.getHttpServer())
+        .post(`/quizzes/${quizFixture.id}/submit`)
+        .set('Authorization', `Bearer ${tokenStudentB}`)
+        .send({
+          answers: [{ questionId: quizQuestionFixture.id, answer: '4' }],
+          score: 999,
+        });
+      expect([200, 201]).toContain(submitRes.status);
+      expect(submitRes.body.score).toBe(1);
+
+      const analytics = await request(app.getHttpServer())
+        .get(`/quizzes/submissions/${submitRes.body.id}/analytics`)
+        .set('Authorization', `Bearer ${tokenStudentB}`);
+      expect(analytics.status).toBe(200);
+      expect(analytics.body.overallScore).toBe(1);
+
+      const idor = await request(app.getHttpServer())
+        .get(`/quizzes/submissions/${submitRes.body.id}/analytics`)
+        .set('Authorization', `Bearer ${tokenStudentA}`);
+      expect(idor.status).toBe(403);
     });
   });
 });

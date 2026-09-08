@@ -30,17 +30,17 @@ export class QuizController {
   constructor(private readonly quizService: QuizService) {}
 
   @Post()
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Tạo bài trắc nghiệm (chỉ ADMIN/TEACHER)' })
+  @ApiOperation({ summary: 'Tạo bài trắc nghiệm (Admin)' })
   createQuiz(@Body() dto: CreateQuizDto, @Request() req: any) {
     return this.quizService.createQuiz(dto, req.user);
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Cập nhật đề thi (chỉ ADMIN/TEACHER)' })
+  @ApiOperation({ summary: 'Cập nhật đề thi (Admin)' })
   updateQuiz(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: Partial<CreateQuizDto>,
@@ -50,17 +50,17 @@ export class QuizController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Xóa đề thi (chỉ ADMIN/TEACHER)' })
+  @ApiOperation({ summary: 'Xóa đề thi (Admin)' })
   deleteQuiz(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.quizService.deleteQuiz(id, req.user);
   }
 
   @Get()
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy tất cả quizzes (chỉ ADMIN/TEACHER)' })
+  @ApiOperation({ summary: 'Lấy tất cả quizzes (Admin)' })
   getAllQuizzes() {
     return this.quizService.getAllQuizzes();
   }
@@ -76,15 +76,14 @@ export class QuizController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy chi tiết Quiz và danh sách Questions' })
   getQuizById(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    const isStaff =
-      req.user?.role === Role.ADMIN || req.user?.role === Role.TEACHER;
+    const isStaff = req.user?.role === Role.ADMIN;
     return this.quizService.getQuizById(id, isStaff);
   }
 
   @Post(':id/questions')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Thêm câu hỏi vào Quiz' })
+  @ApiOperation({ summary: 'Thêm câu hỏi vào Quiz (Admin)' })
   createQuestion(
     @Param('id', ParseIntPipe) quizId: number,
     @Body() dto: CreateQuestionDto,
@@ -93,9 +92,9 @@ export class QuizController {
   }
 
   @Patch('questions/:questionId')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Cập nhật câu hỏi trong Quiz' })
+  @ApiOperation({ summary: 'Cập nhật câu hỏi trong Quiz (Admin)' })
   updateQuestion(
     @Param('questionId', ParseIntPipe) questionId: number,
     @Body() dto: Partial<CreateQuestionDto>,
@@ -104,9 +103,9 @@ export class QuizController {
   }
 
   @Delete('questions/:questionId')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Xóa câu hỏi khỏi Quiz' })
+  @ApiOperation({ summary: 'Xóa câu hỏi khỏi Quiz (Admin)' })
   deleteQuestion(@Param('questionId', ParseIntPipe) questionId: number) {
     return this.quizService.deleteQuestion(questionId);
   }
@@ -128,8 +127,15 @@ export class QuizController {
     summary:
       'Báo cáo phân tích điểm mạnh, điểm yếu và lỗ hổng kiến thức sau khi nộp bài',
   })
-  getSubmissionAnalytics(@Param('id', ParseIntPipe) id: number) {
-    return this.quizService.getSubmissionAnalytics(id);
+  getSubmissionAnalytics(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.quizService.getSubmissionAnalytics(
+      id,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Post('score-conversion')

@@ -84,16 +84,3 @@ export class ChangePasswordDto {
   @MinLength(8)
   newPassword: string;
 }
-
-export class ActivateTeacherDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  token: string;
-
-  @ApiProperty({ example: 'NewStrongPassword123!' })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(8)
-  newPassword: string;
-}

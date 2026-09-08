@@ -18,7 +18,6 @@ import {
   VerifyOtpDto,
   VerifyRegistrationDto,
   ChangePasswordDto,
-  ActivateTeacherDto,
 } from './dto/auth.dto';
 import {
   ApiTags,
@@ -116,11 +115,6 @@ export class AuthController {
     );
   }
 
-  @Post('activate-teacher')
-  @HttpCode(HttpStatus.OK)
-  async activateTeacher(@Body() body: ActivateTeacherDto) {
-    return this.authService.activateTeacher(body.token, body.newPassword);
-  }
   @Post('otp/generate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tạo mã OTP' })

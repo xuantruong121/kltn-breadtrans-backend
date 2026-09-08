@@ -9,7 +9,6 @@ import {
   UseGuards,
   Request,
   ParseIntPipe,
-  Query,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -40,10 +39,9 @@ export class CourseController {
   constructor(private readonly courseService: CourseService) {}
 
   @Post()
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiOperation({
-    summary:
-      'Tạo khóa học mới (TEACHER tạo mặc định DRAFT, ADMIN có thể chỉ định teacher)',
+    summary: 'Tạo khóa học mới (Admin toàn quyền quản lý nội dung)',
   })
   createCourse(@Body() createCourseDto: CreateCourseDto, @Request() req: any) {
     return this.courseService.createCourse(createCourseDto, req.user);
@@ -51,24 +49,19 @@ export class CourseController {
 
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả khóa học' })
-  getAllCourses(@Request() req: any, @Query('role') role?: string) {
-    const userId = req.user?.id;
-    const userRole = role || req.user?.role;
-    return this.courseService.getAllCourses(userId, userRole);
+  getAllCourses(@Request() req: any) {
+    return this.courseService.getAllCourses(req.user?.id, req.user?.role);
   }
 
   @Get('my-courses')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Lấy danh sách khóa học do mình tạo (Teacher)' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Lấy danh sách khóa học hệ thống (Admin)' })
   getMyCourses(@Request() req: any) {
     return this.courseService.getAllCourses(req.user.id, req.user.role);
   }
 
   @Get('classes')
-  @ApiOperation({
-    summary:
-      'Lấy danh sách các lớp học của người dùng (Giáo viên hoặc Học sinh)',
-  })
+  @ApiOperation({ summary: 'Lấy danh sách các gói học/lớp của người dùng' })
   getUserClasses(@Request() req: any) {
     return this.courseService.getUserClasses(req.user.id, req.user.role);
   }
@@ -92,10 +85,9 @@ export class CourseController {
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiOperation({
-    summary:
-      'Cập nhật khóa học (Teacher cập nhật của mình, Admin cập nhật tất cả)',
+    summary: 'Cập nhật khóa học (Admin)',
   })
   updateCourse(
     @Param('id', ParseIntPipe) id: number,
@@ -106,9 +98,10 @@ export class CourseController {
   }
 
   @Post(':id/submit-review')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiOperation({
-    summary: 'Gửi khóa học để Admin duyệt (DRAFT -> PENDING_REVIEW)',
+    summary:
+      'Gửi khóa học để Admin duyệt (Đã chuyển đổi sang quản lý trực tiếp)',
   })
   submitCourseForReview(
     @Param('id', ParseIntPipe) id: number,
@@ -118,7 +111,7 @@ export class CourseController {
   }
 
   @Post(':id/revert-to-draft')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiOperation({
     summary: 'Chuyển khóa học về Bản nháp (DRAFT) để chỉnh sửa giáo trình',
   })
@@ -154,10 +147,9 @@ export class CourseController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiOperation({
-    summary:
-      'Xóa khóa học (Admin xóa tự do, Teacher xóa khóa học draft của mình)',
+    summary: 'Xóa khóa học (Admin)',
   })
   deleteCourse(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.courseService.deleteCourse(id, req.user);
@@ -166,10 +158,10 @@ export class CourseController {
   // ================= CLASSES =================
 
   @Post(':courseId/classes')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiOperation({
     summary:
-      'Tạo lớp học mới cho khóa học (Bắt buộc Course PUBLISHED, kiểm tra quyền sở hữu)',
+      'Tạo gói học mới cho khóa học (Bắt buộc Course PUBLISHED, Admin quản lý)',
   })
   createClass(
     @Param('courseId', ParseIntPipe) courseId: number,
@@ -180,8 +172,8 @@ export class CourseController {
   }
 
   @Patch('classes/:classId')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Cập nhật thông tin lớp học (kiểm tra ownership)' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Cập nhật thông tin gói học (Admin)' })
   updateClass(
     @Param('classId', ParseIntPipe) classId: number,
     @Body() dto: UpdateClassDto,
@@ -191,8 +183,8 @@ export class CourseController {
   }
 
   @Delete('classes/:classId')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Xóa lớp học (kiểm tra ownership)' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Xóa gói học (Admin)' })
   deleteClass(
     @Param('classId', ParseIntPipe) classId: number,
     @Request() req: any,
@@ -229,8 +221,8 @@ export class CourseController {
   // ================= LESSONS & MATERIALS =================
 
   @Post(':courseId/lessons')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Tạo bài học mới cho khóa học' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Tạo bài học mới cho khóa học (Admin)' })
   createLesson(
     @Param('courseId', ParseIntPipe) courseId: number,
     @Body() dto: CreateLessonDto,
@@ -240,8 +232,8 @@ export class CourseController {
   }
 
   @Patch('lessons/:lessonId')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Cập nhật thông tin bài học' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Cập nhật thông tin bài học (Admin)' })
   updateLesson(
     @Param('lessonId', ParseIntPipe) lessonId: number,
     @Body() dto: UpdateLessonDto,
@@ -251,8 +243,8 @@ export class CourseController {
   }
 
   @Delete('lessons/:lessonId')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Xóa bài học' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Xóa bài học (Admin)' })
   deleteLesson(
     @Param('lessonId', ParseIntPipe) lessonId: number,
     @Request() req: any,
@@ -261,8 +253,10 @@ export class CourseController {
   }
 
   @Post(':courseId/lessons/reorder')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Sắp xếp thứ tự các bài học trong khóa học' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Sắp xếp thứ tự các bài học trong khóa học (Admin)',
+  })
   reorderLessons(
     @Param('courseId', ParseIntPipe) courseId: number,
     @Body() dto: ReorderLessonsDto,
@@ -272,8 +266,8 @@ export class CourseController {
   }
 
   @Post('lessons/:lessonId/materials')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Thêm tài liệu cho bài học' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Thêm tài liệu cho bài học (Admin)' })
   createMaterial(
     @Param('lessonId', ParseIntPipe) lessonId: number,
     @Body() dto: CreateMaterialDto,
@@ -283,8 +277,8 @@ export class CourseController {
   }
 
   @Patch('materials/:materialId')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Cập nhật tài liệu học tập' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Cập nhật tài liệu học tập (Admin)' })
   updateMaterial(
     @Param('materialId', ParseIntPipe) materialId: number,
     @Body() dto: UpdateMaterialDto,
@@ -294,8 +288,8 @@ export class CourseController {
   }
 
   @Delete('materials/:materialId')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Xóa tài liệu học tập' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Xóa tài liệu học tập (Admin)' })
   deleteMaterial(
     @Param('materialId', ParseIntPipe) materialId: number,
     @Request() req: any,

@@ -37,13 +37,6 @@ export class AdminController {
     return this.adminService.getAllUsers(role);
   }
 
-  @Post('teachers')
-  @ApiOperation({ summary: 'Admin tạo tài khoản Teacher qua activation email' })
-  createTeacher(
-    @Body() dto: { email: string; fullName: string; phone?: string },
-  ) {
-    return this.adminService.createTeacher(dto);
-  }
   @Post('users')
   @ApiOperation({ summary: 'Admin tao tai khoan moi (Student hoac Teacher)' })
   createUser(
@@ -118,7 +111,6 @@ export class AdminController {
       description?: string;
       thumbnail?: string;
       level?: string;
-      teacherId?: number;
     },
   ) {
     return this.adminService.adminCreateCourse(dto);
@@ -134,7 +126,6 @@ export class AdminController {
       description?: string;
       thumbnail?: string;
       level?: string;
-      teacherId?: number;
       status?: string;
     },
   ) {
@@ -162,10 +153,8 @@ export class AdminController {
     @Body()
     dto: {
       name: string;
-      teacherId: number;
       startDate?: string;
       endDate?: string;
-      meetingLink?: string;
       capacity?: number;
     },
   ) {
@@ -181,15 +170,6 @@ export class AdminController {
     @Body() dto: { action: 'APPROVE' | 'REJECT' },
   ) {
     return this.adminService.adminReviewCourse(courseId, dto.action);
-  }
-
-  @Post('classes/:classId/assign-teacher')
-  @ApiOperation({ summary: 'Admin: Phan cong giao vien cho lop hoc' })
-  assignTeacher(
-    @Param('classId', ParseIntPipe) classId: number,
-    @Body() dto: { teacherId: number },
-  ) {
-    return this.adminService.adminAssignTeacher(classId, dto.teacherId);
   }
 
   @Get('classes/:classId')

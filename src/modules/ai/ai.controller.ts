@@ -219,7 +219,7 @@ export class AiController {
   @ApiBearerAuth()
   @Post('import-ets-pdf')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @UseInterceptors(
     FileFieldsInterceptor([

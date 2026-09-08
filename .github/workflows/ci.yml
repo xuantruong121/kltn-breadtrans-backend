@@ -51,10 +51,10 @@ jobs:
     - name: Build project
       run: npm run build
 
-    - name: Push Database Schema
+    - name: Deploy Prisma migrations
       env:
         DATABASE_URL: "postgresql://postgres:password@localhost:5432/kltn_test_db?schema=public"
-      run: npx prisma db push
+      run: npx prisma migrate deploy
 
     - name: Run Unit Tests
       run: npm run test

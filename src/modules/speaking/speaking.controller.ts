@@ -41,7 +41,7 @@ export class SpeakingController {
 
   @Post('exercises')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: '[Admin/Teacher] Tạo bài tập phát âm mới' })
   createExercise(@Body() dto: CreateExerciseDto) {
     return this.speakingService.createExercise(dto);

@@ -118,11 +118,9 @@ describe('AiRateLimitGuard on Speaking Endpoints', () => {
     }
   });
 
-  it('TEACHER and ADMIN bypass quota counter', async () => {
-    const teacherCtx = createMockContext({ id: 2, role: Role.TEACHER });
+  it('ADMIN bypasses quota counter', async () => {
     const adminCtx = createMockContext({ id: 1, role: Role.ADMIN });
 
-    expect(await guard.canActivate(teacherCtx)).toBe(true);
     expect(await guard.canActivate(adminCtx)).toBe(true);
     expect(mockRedis.incr).not.toHaveBeenCalled();
   });

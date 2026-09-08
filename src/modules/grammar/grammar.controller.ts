@@ -41,8 +41,7 @@ export class GrammarController {
   })
   getTopicDetail(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const userId = req?.user?.id;
-    const isStaff =
-      req?.user?.role === Role.ADMIN || req?.user?.role === Role.TEACHER;
+    const isStaff = req?.user?.role === Role.ADMIN;
     return this.grammarService.getTopicDetail(id, userId, isStaff);
   }
 
@@ -68,21 +67,21 @@ export class GrammarController {
     return this.grammarService.getMyAttempts(req.user.id);
   }
 
-  // Admin / Teacher APIs
+  // Admin APIs
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Post('topics')
-  @ApiOperation({ summary: '[Admin/Teacher] Tạo chủ đề ngữ pháp mới' })
+  @ApiOperation({ summary: '[Admin] Tạo chủ đề ngữ pháp mới' })
   createTopic(@Body() dto: CreateGrammarTopicDto) {
     return this.grammarService.createTopic(dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Post('topics/:id/questions')
-  @ApiOperation({ summary: '[Admin/Teacher] Thêm câu hỏi cho chủ đề ngữ pháp' })
+  @ApiOperation({ summary: '[Admin] Thêm câu hỏi cho chủ đề ngữ pháp' })
   createQuestion(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateGrammarQuestionDto,
@@ -100,10 +99,10 @@ export class GrammarController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Delete('questions/:id')
-  @ApiOperation({ summary: '[Admin/Teacher] Xóa câu hỏi ngữ pháp' })
+  @ApiOperation({ summary: '[Admin] Xóa câu hỏi ngữ pháp' })
   deleteQuestion(@Param('id', ParseIntPipe) id: number) {
     return this.grammarService.deleteQuestion(id);
   }

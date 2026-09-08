@@ -181,7 +181,7 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       create: {
         email: 'e2e_teacher_payment_denied@breadtrans.com',
         password: 'hashed_password_123',
-        role: Role.TEACHER,
+        role: Role.STUDENT,
         profile: {
           create: {
             fullName: 'Teacher Denied',
@@ -274,7 +274,6 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         description: 'Testing admin payment review and reject',
         status: CourseStatus.PUBLISHED,
         level: 'BEGINNER',
-        teacherId: teacherUser.id,
       },
     });
 
@@ -282,12 +281,10 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       return prisma.class.create({
         data: {
           courseId: testCourse.id,
-          teacherId: teacherUser.id,
           name,
           tuitionFeeVnd: 1200000,
           capacity: 25,
           status: ClassStatus.UPCOMING,
-          meetingLink: 'https://breadtrans.com/meet/secret-class-link',
         },
       });
     };
@@ -439,13 +436,13 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         }
         if (teacherUser?.id) {
           await prisma.payment.deleteMany({
-            where: { enrollment: { class: { teacherId: teacherUser.id } } },
+            where: { enrollment: { class: { courseId: testCourse.id } } },
           });
           await prisma.enrollment.deleteMany({
-            where: { class: { teacherId: teacherUser.id } },
+            where: { class: { courseId: testCourse.id } },
           });
           await prisma.class.deleteMany({
-            where: { teacherId: teacherUser.id },
+            where: { courseId: testCourse.id },
           });
         }
 
@@ -821,7 +818,6 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       const tempClass = await prisma.class.create({
         data: {
           courseId: testCourse.id,
-          teacherId: teacherUser.id,
           name: 'E2E Whitelist Test Class',
           tuitionFeeVnd: 1200000,
           capacity: 25,
@@ -930,12 +926,10 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       return prisma.class.create({
         data: {
           courseId: testCourse.id,
-          teacherId: teacherUser.id,
           name,
           tuitionFeeVnd: options.tuitionFeeVnd ?? 1000000,
           capacity: options.capacity !== undefined ? options.capacity : 20,
           status: options.status ?? ClassStatus.UPCOMING,
-          meetingLink: 'https://breadtrans.com/meet/phase3c5-class',
         },
       });
     };
@@ -2721,13 +2715,11 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
             description: 'Testing delete',
             status: CourseStatus.PUBLISHED,
             level: 'BEGINNER',
-            teacherId: teacherUser.id,
           },
         });
         const cls1 = await prisma.class.create({
           data: {
             courseId: course1.id,
-            teacherId: teacherUser.id,
             name: 'Class For Course 1',
             tuitionFeeVnd: 500000,
             capacity: 10,
@@ -2749,13 +2741,11 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
             description: 'Testing delete',
             status: CourseStatus.PUBLISHED,
             level: 'BEGINNER',
-            teacherId: teacherUser.id,
           },
         });
         const cls2 = await prisma.class.create({
           data: {
             courseId: course2.id,
-            teacherId: teacherUser.id,
             name: 'Class For Course 2',
             tuitionFeeVnd: 500000,
             capacity: 10,

@@ -24,8 +24,7 @@ export class ToeicController {
 
   @Get('exams/:examId')
   getExamDetails(@Param('examId') examId: string, @Req() req: any) {
-    const isStaff =
-      req.user?.role === Role.ADMIN || req.user?.role === Role.TEACHER;
+    const isStaff = req.user?.role === Role.ADMIN;
     return this.toeicService.getExamDetails(+examId, isStaff);
   }
 

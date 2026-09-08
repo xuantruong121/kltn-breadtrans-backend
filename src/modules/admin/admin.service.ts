@@ -13,8 +13,6 @@ import { R2Service } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
 import { CourseService } from '../course/course.service';
-import { EmailService } from '../../common/email/email.service';
-import * as crypto from 'crypto';
 
 @Injectable()
 export class AdminService {
@@ -23,16 +21,13 @@ export class AdminService {
     private r2Service: R2Service,
     private r2CleanupService: R2CleanupService,
     private courseService: CourseService,
-    private readonly emailService: EmailService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
   ) {}
 
   async getDashboardStats() {
     const [
       totalStudents,
-      totalTeachers,
       totalCourses,
-      pendingCourses,
       totalEnrollments,
       recentEnrollments,
       totalVocabTopics,
@@ -45,11 +40,7 @@ export class AdminService {
       breadsAggregate,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: Role.STUDENT } }),
-      this.prisma.user.count({ where: { role: Role.TEACHER } }),
       this.prisma.course.count({ where: { status: CourseStatus.PUBLISHED } }),
-      this.prisma.course.count({
-        where: { status: CourseStatus.PENDING_REVIEW },
-      }),
       this.prisma.enrollment.count(),
       this.prisma.enrollment.findMany({
         take: 10,
@@ -119,9 +110,7 @@ export class AdminService {
     return {
       stats: {
         totalStudents,
-        totalTeachers,
         totalCourses,
-        pendingCourses,
         totalEnrollments,
       },
       monthlyTrends,
@@ -148,53 +137,6 @@ export class AdminService {
     });
   }
 
-  async createTeacher(dto: {
-    email: string;
-    fullName: string;
-    phone?: string;
-  }) {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-    if (existing) throw new ConflictException('Email already exists');
-    if (!this.redis)
-      throw new Error('Redis is required for teacher activation');
-    const activationToken = crypto.randomBytes(32).toString('base64url');
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(activationToken)
-      .digest('hex');
-    const temporaryPassword = crypto.randomBytes(24).toString('base64url');
-    const password = await bcrypt.hash(temporaryPassword, 12);
-    const teacher = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        password,
-        role: Role.TEACHER,
-        mustChangePassword: true,
-        profile: { create: { fullName: dto.fullName, phone: dto.phone } },
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        mustChangePassword: true,
-        profile: { select: { fullName: true, phone: true } },
-      },
-    });
-    await this.redis.set(
-      `teacher:activation:${tokenHash}`,
-      String(teacher.id),
-      'EX',
-      86400,
-    );
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    await this.emailService.sendTeacherActivation(
-      dto.email,
-      `${baseUrl}/activate-teacher?token=${encodeURIComponent(activationToken)}`,
-    );
-    return teacher;
-  }
   async createUser(dto: {
     email: string;
     password: string;
@@ -202,10 +144,9 @@ export class AdminService {
     fullName: string;
     phone?: string;
   }) {
-    if (dto.role !== Role.STUDENT)
-      throw new BadRequestException(
-        'Use /admin/teachers to create a Teacher account.',
-      );
+    if (dto.role !== Role.STUDENT && dto.role !== Role.ADMIN) {
+      throw new BadRequestException('Vai trò người dùng không hợp lệ.');
+    }
     const hashed = await bcrypt.hash(dto.password, 10);
     return this.prisma.user.create({
       data: {
@@ -344,13 +285,6 @@ export class AdminService {
   async getAdminCourses() {
     const courses = await this.prisma.course.findMany({
       include: {
-        teacher: {
-          select: {
-            id: true,
-            email: true,
-            profile: { select: { fullName: true, avatar: true } },
-          },
-        },
         classes: {
           include: {
             _count: { select: { enrollments: true } },
@@ -387,7 +321,6 @@ export class AdminService {
     description?: string;
     thumbnail?: string;
     level?: string;
-    teacherId?: number;
   }) {
     return this.courseService.createCourse(dto, { id: 0, role: Role.ADMIN });
   }
@@ -399,7 +332,6 @@ export class AdminService {
       description?: string;
       thumbnail?: string;
       level?: string;
-      teacherId?: number;
       status?: any;
     },
   ) {
@@ -429,13 +361,6 @@ export class AdminService {
     const classes = await this.prisma.class.findMany({
       include: {
         course: { select: { id: true, title: true, thumbnail: true } },
-        teacher: {
-          select: {
-            id: true,
-            email: true,
-            profile: { select: { fullName: true, avatar: true } },
-          },
-        },
         _count: { select: { enrollments: true } },
         enrollments: {
           where: { status: EnrollmentStatus.ACTIVE },
@@ -463,10 +388,8 @@ export class AdminService {
     courseId: number,
     dto: {
       name: string;
-      teacherId: number;
       startDate?: string;
       endDate?: string;
-      meetingLink?: string;
       capacity?: number;
     },
   ) {
@@ -477,26 +400,11 @@ export class AdminService {
     );
   }
 
-  async adminAssignTeacher(classId: number, teacherId: number) {
-    return this.courseService.updateClass(
-      classId,
-      { id: 0, role: Role.ADMIN },
-      { teacherId },
-    );
-  }
-
   async getClassWithEnrollments(classId: number) {
     return this.prisma.class.findUnique({
       where: { id: classId },
       include: {
         course: { select: { id: true, title: true, thumbnail: true } },
-        teacher: {
-          select: {
-            id: true,
-            email: true,
-            profile: { select: { fullName: true, avatar: true } },
-          },
-        },
         enrollments: {
           include: {
             user: {
@@ -637,7 +545,6 @@ export class AdminService {
       speakingThisMonth,
       archivedSpeakingAudio,
       totalWritingSubmissions,
-      totalDbSessions,
       totalMaterials,
       totalUsers,
     ] = await Promise.all([
@@ -649,7 +556,6 @@ export class AdminService {
         .count({ where: { audioUrl: { contains: 'archived' } } })
         .catch(() => 0),
       this.prisma.submission.count().catch(() => 0),
-      this.prisma.session.count().catch(() => 0),
       this.prisma.material.count().catch(() => 0),
       this.prisma.user.count().catch(() => 0),
     ]);
@@ -714,23 +620,6 @@ export class AdminService {
           )
         : 0;
 
-    // Daily.co Video (Live API stats from Daily.co Developer Dashboard)
-    const dailyLive = await this.getDailyLiveUsage();
-    const totalSessions =
-      dailyLive.totalSessions > 0 ? dailyLive.totalSessions : totalDbSessions;
-    const totalParticipantMinutes = dailyLive.participantMinutes;
-    const dailyFreeQuota = 10000;
-    const dailyUsedPercent = Math.min(
-      100,
-      Math.round((totalParticipantMinutes / dailyFreeQuota) * 100),
-    );
-    const dailyCostUsd =
-      totalParticipantMinutes > dailyFreeQuota
-        ? Number(
-            ((totalParticipantMinutes - dailyFreeQuota) * 0.004).toFixed(2),
-          )
-        : 0;
-
     // Cloudflare R2 Storage (Free Tier 10 GB, $0 Egress)
     const r2Usage = await this.r2Service.getBucketStorageUsage();
     const activeAudioCount = Math.max(
@@ -754,7 +643,7 @@ export class AdminService {
 
     // Totals
     const totalActualCostUsd = Number(
-      (geminiCostUsd + azureCostUsd + dailyCostUsd + r2CostUsd).toFixed(2),
+      (geminiCostUsd + azureCostUsd + r2CostUsd).toFixed(2),
     );
     const totalActualCostVnd = Math.round(totalActualCostUsd * 25400);
 
@@ -763,7 +652,6 @@ export class AdminService {
       (
         cacheHitCount * 0.0002 +
         Math.min(audioMinutesThisMonth, azureFreeQuotaMinutes) * (1.0 / 60) +
-        Math.min(totalParticipantMinutes, dailyFreeQuota) * 0.004 +
         5.0
       ).toFixed(2),
     );
@@ -803,17 +691,6 @@ export class AdminService {
           costUsd: azureCostUsd,
           costVnd: Math.round(azureCostUsd * 25400),
           withinFreeTier: azureCostUsd === 0,
-        },
-        dailyVideo: {
-          name: 'Daily.co Video Classroom',
-          totalSessions,
-          totalRooms: dailyLive.totalRooms,
-          participantMinutes: totalParticipantMinutes,
-          freeQuotaMinutes: dailyFreeQuota,
-          usedPercent: dailyUsedPercent,
-          costUsd: dailyCostUsd,
-          costVnd: Math.round(dailyCostUsd * 25400),
-          withinFreeTier: dailyCostUsd === 0,
         },
         cloudflareR2: {
           name: 'Cloudflare R2 Object Storage',
@@ -855,60 +732,5 @@ export class AdminService {
       message:
         'Đã kích hoạt quét và dọn dẹp file ghi âm cũ trên Cloudflare R2 thành công',
     };
-  }
-
-  private async getDailyLiveUsage(): Promise<{
-    totalSessions: number;
-    participantMinutes: number;
-    totalRooms: number;
-  }> {
-    const apiKey = process.env.DAILY_API_KEY;
-    if (!apiKey) {
-      return { totalSessions: 0, participantMinutes: 0, totalRooms: 0 };
-    }
-
-    try {
-      const headers = {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      };
-
-      const [meetingsRes, roomsRes] = await Promise.all([
-        fetch('https://api.daily.co/v1/meetings', { headers }).then((r) =>
-          r.ok ? r.json() : null,
-        ),
-        fetch('https://api.daily.co/v1/rooms', { headers }).then((r) =>
-          r.ok ? r.json() : null,
-        ),
-      ]);
-
-      const totalSessions =
-        meetingsRes?.total_count ??
-        (Array.isArray(meetingsRes?.data) ? meetingsRes.data.length : 0);
-
-      let totalParticipantSeconds = 0;
-      if (Array.isArray(meetingsRes?.data)) {
-        for (const meeting of meetingsRes.data) {
-          if (Array.isArray(meeting.participants)) {
-            for (const p of meeting.participants) {
-              totalParticipantSeconds += p.duration || 0;
-            }
-          }
-        }
-      }
-
-      const participantMinutes = Math.round(totalParticipantSeconds / 60);
-      const totalRooms =
-        roomsRes?.total_count ??
-        (Array.isArray(roomsRes?.data) ? roomsRes.data.length : 0);
-
-      return {
-        totalSessions,
-        participantMinutes,
-        totalRooms,
-      };
-    } catch {
-      return { totalSessions: 0, participantMinutes: 0, totalRooms: 0 };
-    }
   }
 }

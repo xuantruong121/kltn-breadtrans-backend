@@ -2,9 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  BadRequestException,
 } from '@nestjs/common';
-import { Role, CourseStatus } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateQuizDto,
@@ -23,26 +22,10 @@ export class QuizService {
   ) {}
 
   async createQuiz(dto: CreateQuizDto, user?: { id: number; role: Role }) {
-    if (dto.courseId && user && user.role === Role.TEACHER) {
-      const course = await this.prisma.course.findUnique({
-        where: { id: dto.courseId },
-      });
-      if (!course) throw new NotFoundException('Course not found');
-      if (course.teacherId !== user.id) {
-        throw new ForbiddenException(
-          'Bạn không có quyền tạo bài kiểm tra cho khóa học của giáo viên khác',
-        );
-      }
-      if (course.status === CourseStatus.PENDING_REVIEW) {
-        throw new BadRequestException(
-          'Khóa học đang chờ duyệt, không thể tạo bài kiểm tra',
-        );
-      }
-      if (course.status === CourseStatus.PUBLISHED) {
-        throw new BadRequestException(
-          'Khóa học đã xuất bản không thể thêm bài kiểm tra trực tiếp. Vui lòng chuyển khóa học về Bản nháp.',
-        );
-      }
+    if (user && user.role !== Role.ADMIN) {
+      throw new ForbiddenException(
+        'Chỉ Quản trị viên mới có quyền tạo bài kiểm tra',
+      );
     }
     return this.prisma.quiz.create({ data: dto });
   }
@@ -58,27 +41,10 @@ export class QuizService {
     });
     if (!existing) throw new NotFoundException('Quiz not found');
 
-    if (user && user.role === Role.TEACHER) {
-      if (!existing.course) {
-        throw new ForbiddenException(
-          'Giáo viên không có quyền chỉnh sửa bài kiểm tra độc lập/hệ thống',
-        );
-      }
-      if (existing.course.teacherId !== user.id) {
-        throw new ForbiddenException(
-          'Bạn không có quyền chỉnh sửa bài kiểm tra của khóa học khác',
-        );
-      }
-      if (existing.course.status === CourseStatus.PENDING_REVIEW) {
-        throw new BadRequestException(
-          'Khóa học đang chờ duyệt, không thể chỉnh sửa bài kiểm tra',
-        );
-      }
-      if (existing.course.status === CourseStatus.PUBLISHED) {
-        throw new BadRequestException(
-          'Khóa học đã xuất bản không thể chỉnh sửa bài kiểm tra trực tiếp. Vui lòng chuyển khóa học về Bản nháp.',
-        );
-      }
+    if (user && user.role !== Role.ADMIN) {
+      throw new ForbiddenException(
+        'Chỉ Quản trị viên mới có quyền chỉnh sửa bài kiểm tra',
+      );
     }
 
     return this.prisma.quiz.update({
@@ -94,27 +60,10 @@ export class QuizService {
     });
     if (!existing) throw new NotFoundException('Quiz not found');
 
-    if (user && user.role === Role.TEACHER) {
-      if (!existing.course) {
-        throw new ForbiddenException(
-          'Giáo viên không có quyền xóa bài kiểm tra độc lập/hệ thống',
-        );
-      }
-      if (existing.course.teacherId !== user.id) {
-        throw new ForbiddenException(
-          'Bạn không có quyền xóa bài kiểm tra của khóa học khác',
-        );
-      }
-      if (existing.course.status === CourseStatus.PENDING_REVIEW) {
-        throw new BadRequestException(
-          'Khóa học đang chờ duyệt, không thể xóa bài kiểm tra',
-        );
-      }
-      if (existing.course.status === CourseStatus.PUBLISHED) {
-        throw new BadRequestException(
-          'Khóa học đã xuất bản không thể xóa bài kiểm tra trực tiếp. Vui lòng chuyển khóa học về Bản nháp.',
-        );
-      }
+    if (user && user.role !== Role.ADMIN) {
+      throw new ForbiddenException(
+        'Chỉ Quản trị viên mới có quyền xóa bài kiểm tra',
+      );
     }
 
     return this.prisma.quiz.delete({
@@ -369,7 +318,11 @@ export class QuizService {
   /**
    * Phân tích điểm mạnh / điểm yếu theo Tag & Category sau khi nộp bài (Analytics)
    */
-  async getSubmissionAnalytics(submissionId: number) {
+  async getSubmissionAnalytics(
+    submissionId: number,
+    userId?: number,
+    role?: Role,
+  ) {
     const submission = await this.prisma.submission.findUnique({
       where: { id: submissionId },
       include: {
@@ -383,6 +336,12 @@ export class QuizService {
     });
 
     if (!submission) throw new NotFoundException('Submission not found');
+
+    if (role === Role.STUDENT && submission.userId !== userId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xem kết quả bài thi này',
+      );
+    }
 
     const tagStats: Record<string, { correct: number; total: number }> = {};
     let totalCorrect = 0;
