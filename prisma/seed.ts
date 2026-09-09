@@ -5024,7 +5024,7 @@ async function main() {
           meaning,
           exampleEn,
           exampleVi,
-          collocations: collocations as Prisma.InputJsonValue,
+          collocations,
           order: wordIndex + 1,
         },
         create: {
@@ -5037,7 +5037,7 @@ async function main() {
           meaning,
           exampleEn,
           exampleVi,
-          collocations: collocations as Prisma.InputJsonValue,
+          collocations,
           order: wordIndex + 1,
         },
       });
@@ -5196,7 +5196,7 @@ async function main() {
         meaning: definition.meaning,
         exampleEn: definition.exampleEn,
         exampleVi: definition.exampleVi,
-        collocations: definition.collocations as Prisma.InputJsonValue,
+        collocations: definition.collocations,
       },
       create: {
         id: definition.id,
@@ -5208,7 +5208,7 @@ async function main() {
         meaning: definition.meaning,
         exampleEn: definition.exampleEn,
         exampleVi: definition.exampleVi,
-        collocations: definition.collocations as Prisma.InputJsonValue,
+        collocations: definition.collocations,
       },
     });
   }
