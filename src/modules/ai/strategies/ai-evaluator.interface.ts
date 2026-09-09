@@ -47,7 +47,25 @@ export interface SmartGeneratedContent {
   };
 }
 
+export interface DictionaryEnrichmentInput {
+  word: string;
+  partOfSpeech: string | null;
+  definitionEn: string;
+  exampleEn: string | null;
+}
+
+export interface DictionaryEnrichment {
+  meaningVi: string;
+  shortExplanationVi?: string;
+  exampleVi?: string;
+  collocations?: Array<{ phrase: string; meaningVi: string }>;
+}
+
 export interface IAIEvaluator {
+  /** Optional, bounded enrichment for external dictionary entries. */
+  enrichDictionaryEntry?(
+    input: DictionaryEnrichmentInput,
+  ): Promise<DictionaryEnrichment | null>;
   /**
    * Đánh giá và trả về phản hồi cho bài tập của học viên
    * @param question Câu hỏi gốc

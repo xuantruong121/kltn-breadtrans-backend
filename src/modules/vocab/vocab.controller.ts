@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Param,
   ParseIntPipe,
   UseGuards,
@@ -28,13 +29,37 @@ export class VocabController {
   @ApiBearerAuth()
   @Get('lookup')
   @ApiOperation({
-    summary: 'Tra cứu từ vựng tương tác theo câu phát âm (Local VocabWord)',
+    summary: 'Tra cứu từ vựng nhanh với dữ liệu curated và fallback dictionary',
     description:
-      'Chuẩn hóa chữ thường, lọc dấu câu, ưu tiên khớp chính xác rồi thử biến thể từ.',
+      'Ưu tiên VocabWord curated, sau đó cache Redis và external dictionary fallback.',
   })
   @ApiQuery({ name: 'word', required: true, description: 'Từ cần tra cứu' })
-  lookupWord(@Query('word') word: string) {
-    return this.vocabService.lookupWord(word);
+  lookupWord(@Query('word') word: string, @Request() req: any) {
+    return this.vocabService.lookupWord(word, req.user?.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('saved')
+  @ApiOperation({ summary: 'Lấy danh sách từ vựng cá nhân đã lưu' })
+  listSavedWords(@Request() req: any) {
+    return this.vocabService.listSavedWords(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('saved')
+  @ApiOperation({ summary: 'Lưu một từ vào từ vựng cá nhân' })
+  saveWord(@Body('word') word: string, @Request() req: any) {
+    return this.vocabService.saveWord(req.user.id, word);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Delete('saved/:id')
+  @ApiOperation({ summary: 'Xóa từ khỏi từ vựng cá nhân của chính mình' })
+  removeSavedWord(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.vocabService.removeSavedWord(req.user.id, id);
   }
 
   @UseGuards(OptionalJwtAuthGuard)

@@ -11,6 +11,8 @@ import {
   IAIEvaluator,
   PronunciationFeedback,
   SmartGeneratedContent,
+  DictionaryEnrichment,
+  DictionaryEnrichmentInput,
 } from './ai-evaluator.interface';
 
 @Injectable()
@@ -82,6 +84,64 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
 
   private async sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async enrichDictionaryEntry(
+    input: DictionaryEnrichmentInput,
+  ): Promise<DictionaryEnrichment | null> {
+    if (!this.hasKeys()) return null;
+    const cacheKey = this.getCacheKey('dictionary-enrichment-v1', input);
+    return this.getCachedOrGenerate(cacheKey, 30 * 24 * 60 * 60, async () => {
+      try {
+        const prompt =
+          `Return JSON only for an English learner dictionary entry.\n` +
+          `Word: ${input.word}\nPart of speech: ${input.partOfSpeech || 'unknown'}\n` +
+          `English definition: ${input.definitionEn}\nEnglish example: ${input.exampleEn || 'none'}\n` +
+          `Required JSON shape: {"meaningVi":"...","shortExplanationVi":"...","exampleVi":"...","collocations":[{"phrase":"...","meaningVi":"..."}]}\n` +
+          `Translate and explain in concise Vietnamese. Do not invent IPA, audio, part of speech, or English definitions. Return 1-3 common collocations or an empty array.`;
+        const result = await this.executeWithRotation((m) =>
+          m.generateContent(prompt),
+        );
+        const raw = result.response
+          .text()
+          .trim()
+          .replace(/^```json\s*/i, '')
+          .replace(/```$/i, '')
+          .trim();
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        const value = parsed as Record<string, unknown>;
+        const meaningVi =
+          typeof value.meaningVi === 'string' ? value.meaningVi.trim() : '';
+        if (!meaningVi) return null;
+        const collocations = Array.isArray(value.collocations)
+          ? value.collocations
+              .filter(
+                (item): item is { phrase: string; meaningVi: string } =>
+                  !!item &&
+                  typeof item === 'object' &&
+                  typeof (item as Record<string, unknown>).phrase ===
+                    'string' &&
+                  typeof (item as Record<string, unknown>).meaningVi ===
+                    'string',
+              )
+              .slice(0, 5)
+          : [];
+        return {
+          meaningVi,
+          shortExplanationVi:
+            typeof value.shortExplanationVi === 'string'
+              ? value.shortExplanationVi
+              : undefined,
+          exampleVi:
+            typeof value.exampleVi === 'string' ? value.exampleVi : undefined,
+          collocations,
+        };
+      } catch (error) {
+        this.logger.warn(`Dictionary enrichment failed: ${String(error)}`);
+        return null;
+      }
+    });
   }
 
   private async executeWithRotation<T>(
