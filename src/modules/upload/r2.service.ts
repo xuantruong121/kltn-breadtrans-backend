@@ -155,6 +155,31 @@ export class R2Service {
   }
 
   /**
+   * Tải file buffer từ Cloudflare R2 bucket bằng key.
+   */
+  async downloadFileBuffer(key: string): Promise<Buffer> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    const response = await this.client.send(command);
+    if (!response.Body) {
+      throw new Error(`Empty response body from R2 for key: ${key}`);
+    }
+    const body = response.Body as
+      { transformToByteArray?: () => Promise<Uint8Array> } | undefined;
+    if (body && typeof body.transformToByteArray === 'function') {
+      const bytes = await body.transformToByteArray();
+      return Buffer.from(bytes);
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of response.Body as any) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  /**
    * Tự đoán file extension từ MIME type nếu không có originalName.
    */
   private guessExt(mimeType: string): string {

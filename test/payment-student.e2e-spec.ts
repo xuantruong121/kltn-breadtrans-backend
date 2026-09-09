@@ -29,7 +29,6 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
 
   let studentA: any;
   let studentB: any;
-  let teacherUser: any;
 
   let tokenStudentA: string;
   let tokenStudentB: string;
@@ -114,16 +113,6 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
       },
     });
 
-    teacherUser = await prisma.user.upsert({
-      where: { email: 'e2e_payment_teacher@breadtrans.com' },
-      update: {},
-      create: {
-        email: 'e2e_payment_teacher@breadtrans.com',
-        password: 'hashed_password_123',
-        role: Role.TEACHER,
-      },
-    });
-
     makeToken = (user: any) =>
       jwtService.sign({
         sub: user.id,
@@ -144,14 +133,12 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
         description: 'Testing student payment lifecycle',
         status: CourseStatus.PUBLISHED,
         level: 'BEGINNER',
-        teacherId: teacherUser.id,
       },
     });
 
     paidClass = await prisma.class.create({
       data: {
         courseId: testCourse.id,
-        teacherId: teacherUser.id,
         name: 'E2E Paid Class K1',
         tuitionFeeVnd: 1500000,
         capacity: 30,
@@ -162,7 +149,6 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
     freeClass = await prisma.class.create({
       data: {
         courseId: testCourse.id,
-        teacherId: teacherUser.id,
         name: 'E2E Free Class K1',
         tuitionFeeVnd: 0,
         capacity: 30,
@@ -509,7 +495,7 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
       .expect(403);
   });
 
-  it('15. meetingLink remains null in user classes list (/courses)', async () => {
+  it('15. live meeting fields are absent from user classes list (/courses)', async () => {
     const res = await request(app.getHttpServer())
       .get('/courses')
       .set('Authorization', `Bearer ${tokenStudentA}`)
@@ -517,12 +503,10 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
 
     const classes = res.body.data as Array<{
       classId: number;
-      meetingLink: string | null;
       enrollmentStatus: EnrollmentStatus;
     }>;
     const paidClassEntry = classes.find((c) => c.classId === paidClass.id);
     expect(paidClassEntry).toBeDefined();
-    expect(paidClassEntry?.meetingLink).toBeNull();
     expect(paidClassEntry?.enrollmentStatus).toBe(
       EnrollmentStatus.PENDING_PAYMENT,
     );
@@ -557,7 +541,7 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
     });
     expect(freePayment).toBeNull();
 
-    // Free class meetingLink is accessible
+    // Free classes also have no live meeting field after clean break
     const res = await request(app.getHttpServer())
       .get('/courses')
       .set('Authorization', `Bearer ${tokenStudentA}`)
@@ -565,7 +549,6 @@ describe('Student Payment Lifecycle & Security & Concurrency (e2e)', () => {
 
     const classes = res.body.data as Array<{
       classId: number;
-      meetingLink: string | null;
       enrollmentStatus: EnrollmentStatus;
     }>;
     const freeClassEntry = classes.find((c) => c.classId === freeClass.id);

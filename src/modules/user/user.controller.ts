@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Body,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -30,6 +31,24 @@ export class UserController {
   @ApiOperation({ summary: 'Lấy thống kê học tập tổng hợp của user hiện tại' })
   async getStats(@Request() req: any) {
     return this.userService.getUserStats(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('learning-history')
+  @ApiOperation({
+    summary: 'Lấy lịch sử luyện tập đã được lưu của user hiện tại',
+  })
+  getLearningHistory(
+    @Request() req: { user: { id: number } },
+    @Query('type') type?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.userService.getLearningHistory(
+      req.user.id,
+      type,
+      Number(limit) || 50,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

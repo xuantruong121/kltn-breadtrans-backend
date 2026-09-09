@@ -44,13 +44,11 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
 
   let adminUser: any;
   let adminUser2: any;
-  let teacherUser: any;
   let studentUser: any;
   let studentUser2: any;
 
   let tokenAdmin: string;
   let tokenAdmin2: string;
-  let tokenTeacher: string;
   let tokenStudent: string;
   let tokenStudent2: string;
 
@@ -175,22 +173,6 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       include: { profile: true },
     });
 
-    teacherUser = await prisma.user.upsert({
-      where: { email: 'e2e_teacher_payment_denied@breadtrans.com' },
-      update: {},
-      create: {
-        email: 'e2e_teacher_payment_denied@breadtrans.com',
-        password: 'hashed_password_123',
-        role: Role.TEACHER,
-        profile: {
-          create: {
-            fullName: 'Teacher Denied',
-          },
-        },
-      },
-      include: { profile: true },
-    });
-
     studentUser = await prisma.user.upsert({
       where: { email: 'e2e_student_payment_target@breadtrans.com' },
       update: {
@@ -263,7 +245,6 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
 
     tokenAdmin = makeToken(adminUser);
     tokenAdmin2 = makeToken(adminUser2);
-    tokenTeacher = makeToken(teacherUser);
     tokenStudent = makeToken(studentUser);
     tokenStudent2 = makeToken(studentUser2);
 
@@ -274,7 +255,6 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         description: 'Testing admin payment review and reject',
         status: CourseStatus.PUBLISHED,
         level: 'BEGINNER',
-        teacherId: teacherUser.id,
       },
     });
 
@@ -282,12 +262,10 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       return prisma.class.create({
         data: {
           courseId: testCourse.id,
-          teacherId: teacherUser.id,
           name,
           tuitionFeeVnd: 1200000,
           capacity: 25,
           status: ClassStatus.UPCOMING,
-          meetingLink: 'https://breadtrans.com/meet/secret-class-link',
         },
       });
     };
@@ -437,27 +415,20 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           await prisma.class.deleteMany({ where: { courseId: testCourse.id } });
           await prisma.course.delete({ where: { id: testCourse.id } });
         }
-        if (teacherUser?.id) {
-          await prisma.payment.deleteMany({
-            where: { enrollment: { class: { teacherId: teacherUser.id } } },
-          });
-          await prisma.enrollment.deleteMany({
-            where: { class: { teacherId: teacherUser.id } },
-          });
-          await prisma.class.deleteMany({
-            where: { teacherId: teacherUser.id },
-          });
-        }
-
         const uIds = [
           adminUser?.id,
           adminUser2?.id,
-          teacherUser?.id,
           studentUser?.id,
           studentUser2?.id,
         ].filter(Boolean);
 
         if (uIds.length > 0) {
+          await prisma.payment.deleteMany({
+            where: { enrollment: { userId: { in: uIds } } },
+          });
+          await prisma.enrollment.deleteMany({
+            where: { userId: { in: uIds } },
+          });
           await prisma.profile.deleteMany({ where: { userId: { in: uIds } } });
           await prisma.user.deleteMany({ where: { id: { in: uIds } } });
         }
@@ -509,10 +480,10 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         .expect(403);
     });
 
-    it('3. Teacher gets 403 Forbidden on /admin/payments', async () => {
+    it('3. Student remains forbidden on payment management', async () => {
       await request(app.getHttpServer())
         .get('/admin/payments')
-        .set('Authorization', `Bearer ${tokenTeacher}`)
+        .set('Authorization', `Bearer ${tokenStudent2}`)
         .expect(403);
     });
 
@@ -657,28 +628,6 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         .set('Authorization', `Bearer ${tokenStudent}`)
         .expect(403);
 
-      // 20. meetingLink remains null for Student learning view on GET /courses
-      const coursesRes = await request(app.getHttpServer())
-        .get('/courses')
-        .set('Authorization', `Bearer ${tokenStudent}`)
-        .expect(200);
-      const rawCourses =
-        (
-          coursesRes.body as {
-            data?: Array<{ classId: number; meetingLink: string | null }>;
-          }
-        ).data ||
-        (coursesRes.body as Array<{
-          classId: number;
-          meetingLink: string | null;
-        }>);
-      const studentClassView = rawCourses.find(
-        (c) => c.classId === testClass.id,
-      );
-      if (studentClassView) {
-        expect(studentClassView.meetingLink).toBeNull();
-      }
-
       // 21. ACTIVE capacity count remains unchanged (0 active enrollments in testClass)
       const activeEnrollments = await prisma.enrollment.count({
         where: {
@@ -821,7 +770,6 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       const tempClass = await prisma.class.create({
         data: {
           courseId: testCourse.id,
-          teacherId: teacherUser.id,
           name: 'E2E Whitelist Test Class',
           tuitionFeeVnd: 1200000,
           capacity: 25,
@@ -930,12 +878,10 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
       return prisma.class.create({
         data: {
           courseId: testCourse.id,
-          teacherId: teacherUser.id,
           name,
           tuitionFeeVnd: options.tuitionFeeVnd ?? 1000000,
           capacity: options.capacity !== undefined ? options.capacity : 20,
           status: options.status ?? ClassStatus.UPCOMING,
-          meetingLink: 'https://breadtrans.com/meet/phase3c5-class',
         },
       });
     };
@@ -1009,13 +955,13 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           .expect(403);
       });
 
-      it('32.3. Teacher gets 403 Forbidden on confirm', async () => {
+      it('32.3. Student gets 403 Forbidden on confirm', async () => {
         const cls = await createClass('Auth Test Class 3');
         const { payment } = await createPayment(cls.id, studentUser.id);
 
         await request(app.getHttpServer())
           .post(`/admin/payments/${payment.id}/confirm`)
-          .set('Authorization', `Bearer ${tokenTeacher}`)
+          .set('Authorization', `Bearer ${tokenStudent2}`)
           .expect(403);
       });
 
@@ -1753,7 +1699,7 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
           .expect(403);
       });
 
-      it('44.3. Teacher gets 403 Forbidden on retry-activation', async () => {
+      it('44.3. Student gets 403 Forbidden on retry-activation', async () => {
         const cls = await createClass('Retry Auth Class 3');
         const { payment } = await createPayment(cls.id, studentUser.id, {
           paymentStatus: PaymentStatus.CONFIRMED,
@@ -1762,7 +1708,7 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
 
         await request(app.getHttpServer())
           .post(`/admin/payments/${payment.id}/retry-activation`)
-          .set('Authorization', `Bearer ${tokenTeacher}`)
+          .set('Authorization', `Bearer ${tokenStudent2}`)
           .expect(403);
       });
 
@@ -2709,8 +2655,8 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         const res = await request(app.getHttpServer())
           .delete(`/courses/classes/${cls.id}`)
           .set('Authorization', `Bearer ${tokenAdmin}`)
-          .expect(400);
-        expect(res.body.message).toContain('học viên đăng ký');
+          .expect(409);
+        expect(res.body.message).toContain('thanh toán');
       });
 
       it('50.10. Both Course deletion entry points protected by financial-history guard', async () => {
@@ -2721,13 +2667,11 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
             description: 'Testing delete',
             status: CourseStatus.PUBLISHED,
             level: 'BEGINNER',
-            teacherId: teacherUser.id,
           },
         });
         const cls1 = await prisma.class.create({
           data: {
             courseId: course1.id,
-            teacherId: teacherUser.id,
             name: 'Class For Course 1',
             tuitionFeeVnd: 500000,
             capacity: 10,
@@ -2749,13 +2693,11 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
             description: 'Testing delete',
             status: CourseStatus.PUBLISHED,
             level: 'BEGINNER',
-            teacherId: teacherUser.id,
           },
         });
         const cls2 = await prisma.class.create({
           data: {
             courseId: course2.id,
-            teacherId: teacherUser.id,
             name: 'Class For Course 2',
             tuitionFeeVnd: 500000,
             capacity: 10,

@@ -6,7 +6,7 @@ import { TopicCategory } from '@prisma/client';
 export class ReadingService {
   constructor(private prisma: PrismaService) {}
 
-  async getTopicsByCategory(category: TopicCategory, userId: number) {
+  async getTopicsByCategory(category: TopicCategory, userId?: number) {
     const topics = await this.prisma.practiceTopic.findMany({
       where: { category },
       orderBy: { order: 'asc' },
@@ -19,18 +19,20 @@ export class ReadingService {
       },
     });
 
-    const userResults = await this.prisma.result.findMany({
-      where: {
-        submission: {
-          userId: userId,
-          quiz: {
-            practiceTopic: {
-              category: category,
+    const userResults = userId
+      ? await this.prisma.result.findMany({
+          where: {
+            submission: {
+              userId: userId,
+              quiz: {
+                practiceTopic: {
+                  category: category,
+                },
+              },
             },
           },
-        },
-      },
-    });
+        })
+      : [];
 
     const correctQuestionIds = new Set(
       userResults.filter((r) => r.isCorrect).map((r) => r.questionId),

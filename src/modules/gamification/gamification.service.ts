@@ -11,6 +11,37 @@ import { Cron } from '@nestjs/schedule';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 
+export function getTodayDateKey(timeZone = 'Asia/Ho_Chi_Minh'): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return formatter.format(new Date());
+}
+
+function getQuestAction(type: string): {
+  actionLabel: string;
+  actionUrl: string;
+} {
+  switch (type) {
+    case 'LEARN_VOCAB':
+    case 'DO_VOCAB':
+      return { actionLabel: 'Học từ vựng', actionUrl: '/flashcard' };
+    case 'COMPLETE_QUIZ':
+    case 'DO_LISTENING':
+      return { actionLabel: 'Luyện nghe', actionUrl: '/practice/listening' };
+    case 'DO_SPEAKING':
+    case 'PRACTICE_SPEAKING':
+      return { actionLabel: 'Luyện nói', actionUrl: '/practice/speaking' };
+    case 'COMPLETE_LESSON':
+      return { actionLabel: 'Mở bài học', actionUrl: '/my-courses' };
+    default:
+      return { actionLabel: 'Tiếp tục học', actionUrl: '/practice' };
+  }
+}
+
 @Injectable()
 export class GamificationService {
   private readonly logger = new Logger(GamificationService.name);
@@ -65,6 +96,43 @@ export class GamificationService {
     this.eventEmitter.emit('gamification.xp_earned', { userId, points });
 
     return updatedLeaderboard;
+  }
+
+  /**
+   * Awards a badge to a user if they don't already have it.
+   * Returns true if a new badge was awarded.
+   */
+  async awardBadgeIfEarned(
+    userId: number,
+    badgeName: string,
+  ): Promise<boolean> {
+    const badge = await this.prisma.badge.findFirst({
+      where: { name: badgeName },
+    });
+    if (!badge) return false;
+
+    const exists = await this.prisma.userBadge.findUnique({
+      where: { userId_badgeId: { userId, badgeId: badge.id } },
+    });
+    if (exists) return false;
+
+    await this.prisma.userBadge.create({
+      data: { userId, badgeId: badge.id },
+    });
+
+    this.logger.log(`Awarded badge "${badgeName}" to user ${userId}`);
+
+    // Send push notification for new badge
+    if (this.notificationsService) {
+      void this.notificationsService.sendPushToUser(userId, {
+        title: '🏅 Huy hiệu mới!',
+        body: `Bạn vừa mở khóa huy hiệu "${badgeName}". Tiếp tục cố gắng nhé!`,
+        icon: '/icons/icon-192.png',
+        url: '/arena',
+      });
+    }
+
+    return true;
   }
 
   async recordStreakActivity(userId: number) {
@@ -146,21 +214,123 @@ export class GamificationService {
     }
   }
 
-  async getLeaderboard(tier: string = 'Đồng') {
-    return this.prisma.leaderboard.findMany({
-      where: { tier },
-      orderBy: { weeklyExp: 'desc' },
-      take: 10,
+  async getLeaderboard(
+    tier: string = 'Đồng',
+    scope: string = 'tier',
+    currentUserId?: number,
+  ) {
+    const whereClause: any = {};
+    if (scope === 'tier' && tier) {
+      whereClause.tier = tier;
+    }
+
+    const allTierEntries = await this.prisma.leaderboard.findMany({
+      where: whereClause,
+      orderBy: [
+        { weeklyExp: 'desc' },
+        { totalPoints: 'desc' },
+        { userId: 'asc' },
+      ],
+      take: 20,
       include: {
         user: {
           select: {
             id: true,
-            email: true,
-            profile: true,
+            profile: {
+              select: {
+                fullName: true,
+                avatar: true,
+              },
+            },
           },
         },
       },
     });
+
+    const entries = allTierEntries.map((entry, index) => ({
+      rank: index + 1,
+      userId: entry.userId,
+      displayName: entry.user?.profile?.fullName || `Học viên #${entry.userId}`,
+      avatarUrl: entry.user?.profile?.avatar || null,
+      tier: entry.tier,
+      totalPoints: entry.totalPoints,
+      weeklyExp: entry.weeklyExp,
+      isCurrentUser: currentUserId ? entry.userId === currentUserId : false,
+    }));
+
+    let currentUserRank: {
+      rank: number;
+      userId: number;
+      displayName: string;
+      avatarUrl: string | null;
+      tier: string;
+      totalPoints: number;
+      weeklyExp: number;
+      isCurrentUser: boolean;
+    } | null = null;
+
+    if (currentUserId) {
+      const existingInTop = entries.find((e) => e.userId === currentUserId);
+      if (existingInTop) {
+        currentUserRank = existingInTop;
+      } else {
+        const myBoard = await this.prisma.leaderboard.findUnique({
+          where: { userId: currentUserId },
+          include: {
+            user: {
+              select: {
+                id: true,
+                profile: {
+                  select: {
+                    fullName: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (myBoard) {
+          const higherCount = await this.prisma.leaderboard.count({
+            where: {
+              ...(scope === 'tier' ? { tier: myBoard.tier } : {}),
+              OR: [
+                { weeklyExp: { gt: myBoard.weeklyExp } },
+                {
+                  weeklyExp: myBoard.weeklyExp,
+                  totalPoints: { gt: myBoard.totalPoints },
+                },
+                {
+                  weeklyExp: myBoard.weeklyExp,
+                  totalPoints: myBoard.totalPoints,
+                  userId: { lt: myBoard.userId },
+                },
+              ],
+            },
+          });
+
+          currentUserRank = {
+            rank: higherCount + 1,
+            userId: myBoard.userId,
+            displayName:
+              myBoard.user?.profile?.fullName || `Học viên #${myBoard.userId}`,
+            avatarUrl: myBoard.user?.profile?.avatar || null,
+            tier: myBoard.tier,
+            totalPoints: myBoard.totalPoints,
+            weeklyExp: myBoard.weeklyExp,
+            isCurrentUser: true,
+          };
+        }
+      }
+    }
+
+    return {
+      tier,
+      scope,
+      entries,
+      currentUserRank,
+    };
   }
 
   async getMyBadges(userId: number) {
@@ -494,7 +664,7 @@ export class GamificationService {
     activePetData.lastFedAt = now;
     roster[currentSpecies] = activePetData;
 
-    return this.prisma.userPet.update({
+    const updated = await this.prisma.userPet.update({
       where: { userId },
       data: {
         level: newLevel,
@@ -505,6 +675,13 @@ export class GamificationService {
         roster: roster as any,
       } as any,
     });
+
+    // Award "Chuyên Gia Nuôi Thú" badge when pet reaches level 2
+    if (newLevel >= 2) {
+      await this.awardBadgeIfEarned(userId, 'Chuyên Gia Nuôi Thú');
+    }
+
+    return updated;
   }
 
   async changePetType(userId: number, targetPetName: string) {
@@ -551,83 +728,131 @@ export class GamificationService {
     });
   }
 
-  async getMyDailyQuests(userId: number) {
-    const today = new Date().toISOString().split('T')[0];
+  async getDashboardToday(userId: number) {
+    const dateKey = getTodayDateKey('Asia/Ho_Chi_Minh');
 
-    // Get active quests
-    let activeQuests = await this.prisma.dailyQuest.findMany({
+    const activeQuests = await this.prisma.dailyQuest.findMany({
       where: { isActive: true },
-      take: 3,
+      take: 4,
+      orderBy: { id: 'asc' },
     });
 
-    if (activeQuests.length === 0) {
-      // Auto-create default quests if none exist (since we don't use mock data)
-      await this.prisma.dailyQuest.createMany({
-        data: [
-          {
-            title: 'Hoàn thành 1 bài Luyện Nghe',
-            targetValue: 1,
-            type: 'COMPLETE_QUIZ',
-            rewardXP: 50,
-            rewardBanh: 10,
-          },
-          {
-            title: 'Đạt 100 điểm kinh nghiệm',
-            targetValue: 100,
-            type: 'EARN_XP',
-            rewardXP: 20,
-            rewardBanh: 5,
-          },
-          {
-            title: 'Học 10 từ vựng',
-            targetValue: 10,
-            type: 'LEARN_VOCAB',
-            rewardXP: 30,
-            rewardBanh: 5,
-          },
-        ],
-      });
-      activeQuests = await this.prisma.dailyQuest.findMany({
-        where: { isActive: true },
-        take: 3,
-      });
-    }
+    const progressRows = await this.prisma.userQuestProgress.findMany({
+      where: {
+        userId,
+        dateKey,
+        questId: { in: activeQuests.map((quest) => quest.id) },
+      },
+      include: { quest: true },
+    });
+    const progressByQuestId = new Map(
+      progressRows.map((progress) => [progress.questId, progress]),
+    );
+    const progresses = activeQuests.map((quest) => {
+      const progress = progressByQuestId.get(quest.id);
+      return {
+        id: progress?.id ?? -quest.id,
+        questId: quest.id,
+        currentValue: progress?.currentValue ?? 0,
+        isCompleted: progress?.isCompleted ?? false,
+        quest,
+      };
+    });
 
-    // Ensure user has progress records for today
-    const progresses = [];
-    for (const quest of activeQuests) {
-      const progress = await this.prisma.userQuestProgress.upsert({
-        where: {
-          userId_questId_dateKey: {
-            userId,
-            questId: quest.id,
-            dateKey: today,
-          },
-        },
-        update: {},
-        create: {
-          userId,
-          questId: quest.id,
-          dateKey: today,
-          currentValue: 0, // NO MOCK DATA
-        },
-        include: {
-          quest: true,
-        },
-      });
-      progresses.push(progress);
-    }
+    const startOfToday = new Date(`${dateKey}T00:00:00+07:00`);
+    const endOfToday = new Date(`${dateKey}T23:59:59.999+07:00`);
 
-    return progresses;
+    const activities = await this.prisma.learningActivity.findMany({
+      where: {
+        userId,
+        occurredAt: {
+          gte: startOfToday,
+          lte: endOfToday,
+        },
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: 20,
+    });
+
+    const completedCount = progresses.filter((p) => p.isCompleted).length;
+    const totalCount = progresses.length;
+    // The dashboard summary measures completed quests, not weighted item progress.
+    // Individual quest cards still expose their own value-based progressPercent.
+    const progressPercent =
+      totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    const earnedXp = progresses
+      .filter((p) => p.isCompleted)
+      .reduce((sum, p) => sum + (p.quest?.rewardXP || 0), 0);
+    const earnedBanh = progresses
+      .filter((p) => p.isCompleted)
+      .reduce((sum, p) => sum + (p.quest?.rewardBanh || 0), 0);
+
+    return {
+      dateKey,
+      timezone: 'Asia/Ho_Chi_Minh',
+      activities,
+      quests: progresses.map((p) => ({
+        ...getQuestAction(p.quest.type),
+        id: p.id,
+        questId: p.questId,
+        title: p.quest.title,
+        description: p.quest.description,
+        type: p.quest.type,
+        currentValue: Math.min(p.currentValue, p.quest.targetValue),
+        targetValue: p.quest.targetValue,
+        rewardXP: p.quest.rewardXP,
+        rewardBanh: p.quest.rewardBanh,
+        isCompleted: p.isCompleted,
+        progressPercent:
+          p.quest.targetValue > 0
+            ? Math.min(
+                100,
+                Math.round((p.currentValue / p.quest.targetValue) * 100),
+              )
+            : 0,
+        quest: p.quest,
+      })),
+      summary: {
+        completedCount,
+        totalCount,
+        progressPercent,
+        earnedXp,
+        earnedBanh,
+      },
+    };
   }
 
-  async recordVocabLearned(userId: number, count: number = 1) {
-    const validCount = Math.max(1, count || 1);
-    await this.eventEmitter.emitAsync('vocab.learned', {
-      userId,
-      count: validCount,
+  async getMyDailyQuests(userId: number) {
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+
+    const activeQuests = await this.prisma.dailyQuest.findMany({
+      where: { isActive: true },
+      take: 4,
+      orderBy: { id: 'asc' },
     });
-    return { success: true, count: validCount };
+
+    const progressRows = await this.prisma.userQuestProgress.findMany({
+      where: {
+        userId,
+        dateKey: today,
+        questId: { in: activeQuests.map((quest) => quest.id) },
+      },
+      include: { quest: true },
+    });
+    const progressByQuestId = new Map(
+      progressRows.map((progress) => [progress.questId, progress]),
+    );
+
+    return activeQuests.map((quest) => {
+      const progress = progressByQuestId.get(quest.id);
+      return {
+        id: progress?.id ?? -quest.id,
+        questId: quest.id,
+        currentValue: progress?.currentValue ?? 0,
+        isCompleted: progress?.isCompleted ?? false,
+        quest,
+      };
+    });
   }
 
   async getArenaSnippet(userId: number) {
@@ -636,12 +861,10 @@ export class GamificationService {
     });
     const tier = myLeaderboard?.tier || 'Đồng';
 
-    const leaderboard = await this.getLeaderboard(tier);
-    const myRankIndex = leaderboard.findIndex(
-      (entry) => entry.userId === userId,
-    );
+    const leaderboardRes = await this.getLeaderboard(tier, 'tier', userId);
+    const myRank = leaderboardRes.currentUserRank?.rank;
 
-    if (myRankIndex === -1) {
+    if (!myRank) {
       return {
         rank: null,
         tier: 'Đồng',
@@ -649,76 +872,19 @@ export class GamificationService {
       };
     }
 
-    const nextRank = myRankIndex > 0 ? leaderboard[myRankIndex - 1] : null;
-    const diff = nextRank
-      ? nextRank.weeklyExp - leaderboard[myRankIndex].weeklyExp
-      : 0;
-
     return {
-      rank: myRankIndex + 1,
+      rank: myRank,
       tier,
       message:
-        diff > 0
-          ? `Bạn đang cách Top ${myRankIndex} chỉ ${diff} điểm!`
-          : `Tuyệt vời! Bạn đang dẫn đầu bảng xếp hạng.`,
+        myRank === 1
+          ? `Tuyệt vời! Bạn đang dẫn đầu bảng xếp hạng.`
+          : `Bạn đang ở vị trí Top ${myRank} bảng xếp hạng!`,
     };
   }
 
   // ==========================================
-  // ADVANCED GAMIFICATION (LEAGUES, STREAKS, WHEEL)
+  // ADVANCED GAMIFICATION (LEAGUES, STREAKS)
   // ==========================================
-
-  async spinWheel(userId: number) {
-    const COST = 50;
-    const userStats = await this.prisma.userStats.findUnique({
-      where: { userId },
-    });
-    if (!userStats || userStats.totalBanhRan < COST) {
-      throw new BadRequestException('Không đủ 50 Bánh Rán để quay!');
-    }
-
-    // Trừ tiền
-    await this.prisma.userStats.update({
-      where: { userId },
-      data: { totalBanhRan: { decrement: COST } },
-    });
-    await this.prisma.pointHistory.create({
-      data: { userId, points: -COST, reason: 'Quay vòng quay may mắn' },
-    });
-
-    const rand = Math.random() * 100;
-    let reward = '';
-    let rewardType = '';
-
-    if (rand < 5) {
-      // 5% trúng Jackpot (Vé giảm học phí)
-      reward = '1 Voucher Giảm 5% Học phí';
-      rewardType = 'voucher';
-      await this.prisma.pointHistory.create({
-        data: { userId, points: 0, reason: 'Jackpot: Voucher Giảm 5% Học phí' },
-      });
-    } else if (rand < 20) {
-      // 15% trúng 100 Bánh Rán (lời)
-      reward = '100 Bánh Rán';
-      rewardType = 'points';
-      await this.addPoints(userId, 100, 'Trúng thưởng vòng quay');
-    } else if (rand < 40) {
-      // 20% trúng vé streak
-      reward = '1 Vé Bảo vệ Chuỗi';
-      rewardType = 'streak_freeze';
-      await this.prisma.userStats.update({
-        where: { userId },
-        data: { streakFreezes: { increment: 1 } },
-      });
-    } else {
-      // 60% trúng 20 Bánh Rán (lỗ)
-      reward = '20 Bánh Rán';
-      rewardType = 'points';
-      await this.addPoints(userId, 20, 'Trúng thưởng vòng quay');
-    }
-
-    return { success: true, reward, rewardType };
-  }
 
   async triggerDailyCron() {
     const yesterday = new Date();

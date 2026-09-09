@@ -134,10 +134,16 @@ export class NotificationsService implements OnModuleInit {
           sentCount++;
         } catch (err: any) {
           failedCount++;
-          // Handle 410 Gone / 404 Not Found (expired / uninstalled)
-          if (err.statusCode === 410 || err.statusCode === 404) {
+          // Handle 410 Gone / 404 Not Found (expired / uninstalled) or invalid keys
+          const isInvalid =
+            err.statusCode === 410 ||
+            err.statusCode === 404 ||
+            sub.endpoint.includes('example.com') ||
+            String(err?.message || '').includes('65 bytes long');
+
+          if (isInvalid) {
             this.logger.warn(
-              `Subscription ${sub.id} expired or uninstalled (${err.statusCode}). Cleaning up from DB.`,
+              `Subscription ${sub.id} is invalid or expired (${err.statusCode || err.message}). Cleaning up from DB.`,
             );
             await (this.prisma as any).pushSubscription.delete({
               where: { id: sub.id },
@@ -166,5 +172,76 @@ export class NotificationsService implements OnModuleInit {
       userIds.map((uid) => this.sendPushToUser(uid, payload)),
     );
     return results;
+  }
+
+  async createNotification(data: {
+    userId: number;
+    type: string;
+    title: string;
+    body: string;
+    url?: string;
+  }) {
+    return await this.prisma.notification.create({
+      data: {
+        userId: data.userId,
+        type: data.type,
+        title: data.title,
+        body: data.body,
+        url: data.url || null,
+      },
+    });
+  }
+
+  async getInbox(userId: number, limit = 20, cursor?: number) {
+    const take = Math.min(Math.max(Number(limit) || 20, 1), 50);
+    const cursorNum = cursor ? Number(cursor) : undefined;
+
+    const items = await this.prisma.notification.findMany({
+      where: { userId },
+      take: take + 1,
+      cursor: cursorNum ? { id: cursorNum } : undefined,
+      skip: cursorNum ? 1 : 0,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let nextCursor: number | null = null;
+    if (items.length > take) {
+      const nextItem = items.pop();
+      nextCursor = nextItem?.id || null;
+    }
+
+    return {
+      items,
+      nextCursor,
+    };
+  }
+
+  async getUnreadCount(userId: number) {
+    const count = await this.prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+    return { count };
+  }
+
+  async markRead(userId: number, id: number) {
+    const notif = await this.prisma.notification.findFirst({
+      where: { id, userId },
+    });
+    if (!notif) {
+      return { success: false, message: 'Thông báo không tồn tại' };
+    }
+    const updated = await this.prisma.notification.update({
+      where: { id },
+      data: { isRead: true },
+    });
+    return { success: true, notification: updated };
+  }
+
+  async markAllRead(userId: number) {
+    const res = await this.prisma.notification.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true },
+    });
+    return { success: true, count: res.count };
   }
 }

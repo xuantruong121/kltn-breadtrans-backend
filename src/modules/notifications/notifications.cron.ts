@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
 
@@ -46,76 +46,139 @@ export class NotificationsCronService {
 
       for (const item of usersWithStreak) {
         const studentName = item.user?.profile?.fullName || 'Học viên';
-        await this.notificationsService.sendPushToUser(item.userId, {
-          title: `Đừng để mất ngọn lửa Streak ${item.streakCount} ngày! 🔥`,
-          body: `Chào ${studentName}, bạn chưa hoàn thành bài học hôm nay. Học ngay 5 phút để bảo vệ chuỗi streak nhé!`,
-          icon: '/icons/icon-192.png',
-          url: '/student/practice',
+        const title = `Đừng để mất ngọn lửa Streak ${item.streakCount} ngày! 🔥`;
+        const body = `Chào ${studentName}, bạn chưa hoàn thành bài học hôm nay. Học ngay 5 phút để bảo vệ chuỗi streak nhé!`;
+        const url = '/practice';
+
+        // Check if streak notification already created today for this user
+        const alreadyNotified = await this.prisma.notification.findFirst({
+          where: {
+            userId: item.userId,
+            type: 'streak',
+            createdAt: { gte: today },
+          },
         });
+
+        if (!alreadyNotified) {
+          await this.notificationsService.createNotification({
+            userId: item.userId,
+            type: 'streak',
+            title,
+            body,
+            url,
+          });
+
+          await this.notificationsService.sendPushToUser(item.userId, {
+            title,
+            body,
+            icon: '/icons/icon-192.png',
+            url,
+          });
+        }
       }
     } catch (err) {
       this.logger.error('[Cron] Error in handleDailyStreakReminder:', err);
     }
   }
 
-  // 2. Cron Job: Nhắc nhở lớp học online trước 30 phút (Chạy mỗi 10 phút)
-  @Cron(CronExpression.EVERY_10_MINUTES)
-  async handleUpcomingClassSessionReminder() {
+  // 2. Cron Job: Kiểm tra và gửi thông báo nhắc ôn tập từ vựng Spaced Repetition mỗi 5 phút
+  @Cron('*/5 * * * *')
+  async handleVocabSpacedReview() {
+    this.logger.log('[Cron] Checking due vocabulary spaced reviews...');
+
     try {
       const now = new Date();
-      const in20Mins = new Date(now.getTime() + 20 * 60 * 1000);
-      const in35Mins = new Date(now.getTime() + 35 * 60 * 1000);
 
-      const upcomingSessions = await this.prisma.session.findMany({
+      // Find all vocabulary progress items due for review that haven't been reminded yet
+      const dueItems = await this.prisma.userVocabWordProgress.findMany({
         where: {
-          startTime: {
-            gte: in20Mins,
-            lte: in35Mins,
-          },
+          nextReviewAt: { lte: now },
+          remindedAt: null,
         },
-        include: {
-          class: {
-            include: {
-              enrollments: {
-                where: { status: 'ACTIVE' },
-                select: { userId: true },
+        select: {
+          id: true,
+          userId: true,
+          wordId: true,
+          word: {
+            select: {
+              word: true,
+              topic: {
+                select: { id: true, title: true },
               },
             },
           },
         },
+        take: 200,
       });
 
-      if (upcomingSessions.length === 0) return;
+      if (dueItems.length === 0) {
+        return;
+      }
 
       this.logger.log(
-        `[Cron] Found ${upcomingSessions.length} sessions starting in ~30 minutes.`,
+        `[Cron] Found ${dueItems.length} due vocab items waiting for reminder.`,
       );
 
-      for (const session of upcomingSessions) {
-        const studentUserIds = session.class.enrollments.map((e) => e.userId);
-        if (studentUserIds.length === 0) continue;
-
-        const sessionTimeStr = session.startTime
-          ? new Date(session.startTime).toLocaleTimeString('vi-VN', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '30 phút nữa';
-
-        for (const uid of studentUserIds) {
-          await this.notificationsService.sendPushToUser(uid, {
-            title: `Lớp học trực tuyến sắp bắt đầu! 🎓`,
-            body: `Buổi học "${session.title || 'Buổi học mới'}" của lớp "${session.class.name}" sẽ bắt đầu lúc ${sessionTimeStr}. Hãy sẵn sàng vào lớp nhé!`,
-            icon: '/icons/icon-192.png',
-            url: `/student/classes/${session.classId}`,
-          });
+      // Claim each item with a conditional update so concurrent cron instances
+      // cannot both create a reminder for the same vocabulary word.
+      const claimedItems: typeof dueItems = [];
+      for (const item of dueItems) {
+        const claim = await this.prisma.userVocabWordProgress.updateMany({
+          where: { id: item.id, remindedAt: null },
+          data: { remindedAt: now },
+        });
+        if (claim.count === 1) {
+          claimedItems.push(item);
         }
       }
+
+      if (claimedItems.length === 0) {
+        return;
+      }
+
+      // Group due items by user to batch notifications
+      const userItemsMap = new Map<number, typeof claimedItems>();
+      for (const item of claimedItems) {
+        const list = userItemsMap.get(item.userId) || [];
+        list.push(item);
+        userItemsMap.set(item.userId, list);
+      }
+
+      for (const [userId, items] of userItemsMap.entries()) {
+        const count = items.length;
+        const firstWord = items[0]?.word?.word || 'từ mới';
+        const topicId = items[0]?.word?.topic?.id;
+        const topicTitle = items[0]?.word?.topic?.title || 'Từ vựng';
+
+        const title =
+          count === 1
+            ? `Đã đến giờ ôn tập từ vựng "${firstWord}" ⏰`
+            : `Bạn có ${count} từ vựng cần ôn tập ngay! ⏰`;
+        const body =
+          count === 1
+            ? `Hãy dành 1 phút để ôn tập lại từ "${firstWord}" trong chủ đề "${topicTitle}".`
+            : `Bao gồm "${firstWord}" và ${count - 1} từ khác. Ôn tập đều đặn giúp ghi nhớ sâu hơn!`;
+        const url = topicId ? `/practice/vocab/${topicId}` : '/flashcard';
+
+        // 1. Create persistent in-app notification
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'vocab_review',
+          title,
+          body,
+          url,
+        });
+
+        // 2. Send Web Push
+        await this.notificationsService.sendPushToUser(userId, {
+          title,
+          body,
+          icon: '/icons/icon-192.png',
+          url,
+        });
+      }
     } catch (err) {
-      this.logger.error(
-        '[Cron] Error in handleUpcomingClassSessionReminder:',
-        err,
-      );
+      this.logger.error('[Cron] Error in handleVocabSpacedReview:', err);
     }
   }
 }

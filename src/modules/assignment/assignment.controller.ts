@@ -29,8 +29,8 @@ export class AssignmentController {
   constructor(private readonly assignmentService: AssignmentService) {}
 
   @Post('classes/:classId/assignments')
-  @Roles(Role.TEACHER, Role.ADMIN)
-  @ApiOperation({ summary: 'Giao bài tập mới cho lớp' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Giao bài tập mới cho gói học/lớp (Admin)' })
   createAssignment(
     @Param('classId', ParseIntPipe) classId: number,
     @Body() dto: CreateAssignmentDto,
@@ -82,8 +82,8 @@ export class AssignmentController {
   }
 
   @Put('submissions/:id/grade')
-  @Roles(Role.TEACHER, Role.ADMIN)
-  @ApiOperation({ summary: 'Giáo viên chấm điểm bài tập' })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Chấm điểm bài tập (Admin)' })
   gradeSubmission(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: GradeAssignmentDto,

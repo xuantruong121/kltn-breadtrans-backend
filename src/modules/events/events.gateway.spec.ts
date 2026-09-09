@@ -4,11 +4,19 @@ import { JwtService } from '@nestjs/jwt';
 import { Socket } from 'socket.io';
 import { PrismaService } from '../../prisma/prisma.service';
 import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
+import { SupportService } from '../support/support.service';
 
 describe('EventsGateway Security & Authentication Tests', () => {
   let gateway: EventsGateway;
   let jwtService: JwtService;
   let prismaMock: { user: { findUnique: jest.Mock } };
+  let mockSupportService: {
+    getOrCreateStudentConversation: jest.Mock;
+    sendStudentMessage: jest.Mock;
+    sendAdminMessage: jest.Mock;
+    createAiMessage: jest.Mock;
+    updateConversationMode: jest.Mock;
+  };
 
   beforeEach(async () => {
     prismaMock = {
@@ -21,6 +29,25 @@ describe('EventsGateway Security & Authentication Tests', () => {
         }),
       },
     };
+
+    mockSupportService = {
+      getOrCreateStudentConversation: jest
+        .fn()
+        .mockResolvedValue({ id: 100, studentId: 10 }),
+      sendStudentMessage: jest
+        .fn()
+        .mockResolvedValue({ id: 1, content: 'hello' }),
+      sendAdminMessage: jest
+        .fn()
+        .mockResolvedValue({ id: 2, content: 'admin reply' }),
+      createAiMessage: jest
+        .fn()
+        .mockResolvedValue({ id: 3, content: 'ai reply' }),
+      updateConversationMode: jest
+        .fn()
+        .mockResolvedValue({ id: 100, mode: 'HUMAN' }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EventsGateway,
@@ -37,6 +64,10 @@ describe('EventsGateway Security & Authentication Tests', () => {
         {
           provide: getRedisConnectionToken('default'),
           useValue: { get: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: SupportService,
+          useValue: mockSupportService,
         },
       ],
     }).compile();
@@ -165,7 +196,7 @@ describe('EventsGateway Security & Authentication Tests', () => {
     expect(mockSocket.join).toHaveBeenCalledWith('support_staff');
   });
 
-  it('should authenticate valid TEACHER and join support_staff but NOT admins', async () => {
+  it('should reject and disconnect a retired-role connection', async () => {
     const mockSocket: Partial<Socket> = {
       id: 'socket-5',
       handshake: {
@@ -194,8 +225,11 @@ describe('EventsGateway Security & Authentication Tests', () => {
 
     await gateway.handleConnection(mockSocket as Socket);
 
-    expect(mockSocket.join).toHaveBeenCalledWith('user_2');
-    expect(mockSocket.join).toHaveBeenCalledWith('support_staff');
+    expect(mockSocket.emit).toHaveBeenCalledWith('auth:error', {
+      message: 'Invalid or expired authentication token',
+    });
+    expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+    expect(mockSocket.join).not.toHaveBeenCalledWith('support_staff');
     expect(mockSocket.join).not.toHaveBeenCalledWith('admins');
   });
 
@@ -237,7 +271,6 @@ describe('EventsGateway Security & Authentication Tests', () => {
   });
 
   it('normalizes student chat identity and message role server-side', async () => {
-    const emit = jest.fn();
     const mockSocket: Partial<Socket> = {
       id: 'socket-chat',
       data: {
@@ -248,7 +281,6 @@ describe('EventsGateway Security & Authentication Tests', () => {
           profile: { fullName: 'Student', avatar: null },
         },
       },
-      to: jest.fn().mockReturnValue({ emit }),
     };
     await gateway.handleChatMessage(
       mockSocket as Socket,
@@ -260,12 +292,40 @@ describe('EventsGateway Security & Authentication Tests', () => {
       } as any,
     );
 
-    const supportEmit = ((gateway as any).server.to as jest.Mock).mock
-      .results[0].value.emit as jest.Mock;
-    const payload = supportEmit.mock.calls[0][1];
-    expect(payload.studentId).toBe('student_10');
-    expect(payload.studentName).toBe('Student');
-    expect(payload.fromRole).toBe('STUDENT');
-    expect(payload.message.role).toBe('user');
+    expect(
+      mockSupportService.getOrCreateStudentConversation,
+    ).toHaveBeenCalledWith(10);
+    expect(mockSupportService.sendStudentMessage).toHaveBeenCalledWith(
+      10,
+      100,
+      {
+        content: 'hello',
+        clientMessageId: undefined,
+      },
+    );
+
+    gateway.handleSupportMessageCreated({
+      conversationId: 100,
+      studentId: 10,
+      fromRole: 'STUDENT',
+      targetUserId: 10,
+      message: {
+        id: 1,
+        role: 'user',
+        content: 'hello',
+        senderName: 'Student',
+        timestamp: 1700000000000,
+      },
+      student: {
+        id: 10,
+        name: 'Student',
+        email: 'student@example.com',
+        avatar: null,
+      },
+    });
+
+    const toMock = (gateway as any).server.to as jest.Mock;
+    expect(toMock).toHaveBeenCalledWith('support_staff');
+    expect(toMock).toHaveBeenCalledWith('user_10');
   });
 });

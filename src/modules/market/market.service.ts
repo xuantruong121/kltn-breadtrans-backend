@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
 import { AdjustCurrencyDto } from './dto/adjust-currency.dto';
+import { MarketProductDto } from './dto/market-product.dto';
 
 @Injectable()
 export class MarketService {
@@ -15,59 +16,30 @@ export class MarketService {
     private readonly eventsGateway: EventsGateway,
   ) {}
 
-  async getProducts() {
-    let products = await this.prisma.marketProduct.findMany({
+  async getProducts(): Promise<MarketProductDto[]> {
+    const products = await this.prisma.marketProduct.findMany({
+      where: { isActive: true },
       orderBy: { order: 'asc' },
     });
 
-    if (products.length === 0) {
-      // Auto seed default items
-      await this.prisma.marketProduct.createMany({
-        data: [
-          {
-            name: 'Khiên Bảo Vệ Chuỗi (Streak Freeze)',
-            price: 100,
-            order: 1,
-            imageUrl: '🛡️',
-          },
-          {
-            name: 'Thẻ Nhân Đôi Bánh Mì (24h Boost)',
-            price: 200,
-            order: 2,
-            imageUrl: '⚡',
-          },
-          {
-            name: 'Huy Hiệu Bậc Thầy Từ Vựng',
-            price: 150,
-            order: 3,
-            imageUrl: '🏅',
-          },
-          {
-            name: 'Vương Miện Quán Quân (Avatar Frame)',
-            price: 500,
-            order: 4,
-            imageUrl: '👑',
-          },
-          {
-            name: 'Sổ Tay Học Từ Vựng Mini',
-            price: 1200,
-            order: 5,
-            imageUrl: '📔',
-          },
-          {
-            name: 'Voucher Trà Sữa 20k',
-            price: 2000,
-            order: 6,
-            imageUrl: '🧋',
-          },
-        ],
-      });
-      products = await this.prisma.marketProduct.findMany({
-        orderBy: { order: 'asc' },
-      });
-    }
-
-    return products;
+    return products.map((product) => ({
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      description: product.description || '',
+      category: product.category,
+      rarity: product.rarity,
+      price: product.price,
+      imageUrl:
+        product.imageUrl?.startsWith('/') ||
+        product.imageUrl?.startsWith('http')
+          ? product.imageUrl
+          : `/images/market/${product.imageUrl || product.slug}.svg`,
+      stock: product.stock,
+      available: product.stock > 0 && product.isActive,
+      purchaseCount: product.purchaseCount,
+      isActive: product.isActive,
+    }));
   }
 
   async getCurrencyBalance(userId: number) {
@@ -102,12 +74,10 @@ export class MarketService {
       throw new BadRequestException('Giỏ hàng đổi quà trống');
     }
 
-    // 1. Server tự truy vấn giá niêm yết và kiểm tra tồn kho từ database (KHÔNG tin giá từ client)
-    const dbProducts = await this.prisma.marketProduct.findMany();
-    if (dbProducts.length === 0) {
-      await this.getProducts(); // Tự khởi tạo sản phẩm mặc định nếu bảng trống
-    }
-    const freshDbProducts = await this.prisma.marketProduct.findMany();
+    // 1. Server truy vấn giá niêm yết và kiểm tra tồn kho từ database (Read-only, không tự tạo dữ liệu)
+    const freshDbProducts = await this.prisma.marketProduct.findMany({
+      where: { isActive: true },
+    });
 
     interface ResolvedItem {
       product: (typeof freshDbProducts)[0];
@@ -120,39 +90,26 @@ export class MarketService {
     for (const item of rawItems) {
       const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
       let matchedProduct = freshDbProducts.find(
-        (p) => p.id === Number(item.id),
+        (p) => p.id === Number(item.id) || p.slug === String(item.id),
       );
 
       if (!matchedProduct && item.name) {
         matchedProduct = freshDbProducts.find(
           (p) =>
-            p.name.toLowerCase().trim() === item.name?.toLowerCase().trim(),
+            p.name.toLowerCase().trim() === item.name?.toLowerCase().trim() ||
+            p.slug.toLowerCase().trim() === item.name?.toLowerCase().trim(),
         );
-      }
-
-      if (!matchedProduct && typeof item.id === 'string') {
-        const lowerId = item.id.toLowerCase();
-        matchedProduct = freshDbProducts.find((p) => {
-          const lowerName = p.name.toLowerCase();
-          if (lowerId.includes('streak') && lowerName.includes('khiên'))
-            return true;
-          if (lowerId.includes('bread') && lowerName.includes('nhân đôi'))
-            return true;
-          if (lowerId.includes('master') && lowerName.includes('từ vựng'))
-            return true;
-          if (lowerId.includes('crown') && lowerName.includes('vương miện'))
-            return true;
-          if (lowerId.includes('notebook') && lowerName.includes('sổ tay'))
-            return true;
-          if (lowerId.includes('tea') || lowerId.includes('voucher'))
-            return lowerName.includes('voucher');
-          return false;
-        });
       }
 
       if (!matchedProduct) {
         throw new BadRequestException(
-          `Vật phẩm không tồn tại trong hệ thống: ${item.name || item.id}`,
+          `Vật phẩm không tồn tại hoặc đã ngừng cung cấp: ${item.name || item.id}`,
+        );
+      }
+
+      if (matchedProduct.stock < qty) {
+        throw new BadRequestException(
+          `Sản phẩm "${matchedProduct.name}" không đủ tồn kho (cần ${qty}, còn ${matchedProduct.stock})`,
         );
       }
 
@@ -172,14 +129,9 @@ export class MarketService {
       where: { userId },
     });
 
-    const hasRealGift = resolvedItems.some(({ product }) => {
-      const name = product.name || '';
-      return (
-        name.includes('Voucher') ||
-        name.includes('Sổ Tay') ||
-        name.includes('Quà')
-      );
-    });
+    const hasRealGift = resolvedItems.some(
+      ({ product }) => product.category === 'PHYSICAL',
+    );
 
     const initialStatus = hasRealGift ? 'pending' : 'approved';
     const itemNames = resolvedItems
@@ -248,6 +200,31 @@ export class MarketService {
             data: { streakFreezes: { increment: quantity } },
           });
         }
+
+        // Tự động trao Huy hiệu nếu mua vật phẩm Huy hiệu
+        if (
+          product.name.includes('Huy Hiệu') ||
+          product.name.includes('Bậc Thầy Từ Vựng')
+        ) {
+          const badge = await tx.badge.findFirst({
+            where: {
+              OR: [
+                { name: 'Bậc Thầy Từ Vựng' },
+                { name: { contains: 'Bậc Thầy' } },
+              ],
+            },
+          });
+          if (badge) {
+            const existing = await tx.userBadge.findUnique({
+              where: { userId_badgeId: { userId, badgeId: badge.id } },
+            });
+            if (!existing) {
+              await tx.userBadge.create({
+                data: { userId, badgeId: badge.id },
+              });
+            }
+          }
+        }
       }
 
       const updatedStats = await tx.userStats.findUnique({ where: { userId } });
@@ -296,6 +273,45 @@ export class MarketService {
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getInventory(userId: number) {
+    const orders = await this.prisma.marketOrder.findMany({
+      where: {
+        userId,
+        status: { in: ['approved', 'completed'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const ownedProductIds: number[] = [];
+    const ownedSlugs: string[] = [];
+    const ownedItemNames: string[] = [];
+
+    for (const order of orders) {
+      const items = Array.isArray(order.items) ? (order.items as any[]) : [];
+      for (const item of items) {
+        if (
+          item.productId &&
+          !ownedProductIds.includes(Number(item.productId))
+        ) {
+          ownedProductIds.push(Number(item.productId));
+        }
+        if (item.slug && !ownedSlugs.includes(String(item.slug))) {
+          ownedSlugs.push(String(item.slug));
+        }
+        if (item.name && !ownedItemNames.includes(item.name)) {
+          ownedItemNames.push(item.name);
+        }
+      }
+    }
+
+    return {
+      ownedProductIds,
+      ownedSlugs,
+      ownedItemNames,
+      orders,
+    };
   }
 
   // Admin APIs

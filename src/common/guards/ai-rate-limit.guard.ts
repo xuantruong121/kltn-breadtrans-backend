@@ -27,8 +27,8 @@ export class AiRateLimitGuard implements CanActivate {
       );
     }
 
-    // Miễn giới hạn cho ADMIN và TEACHER
-    if (user.role === Role.ADMIN || user.role === Role.TEACHER) {
+    // Miễn giới hạn cho ADMIN
+    if (user.role === Role.ADMIN) {
       return true;
     }
 

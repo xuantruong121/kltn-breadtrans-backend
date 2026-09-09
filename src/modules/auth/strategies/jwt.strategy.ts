@@ -65,6 +65,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
+    if (user.role !== 'ADMIN' && user.role !== 'STUDENT') {
+      throw new UnauthorizedException('Tài khoản không còn được hỗ trợ.');
+    }
+
     const path = req?.route?.path || req?.path || '';
     if (
       user.mustChangePassword &&

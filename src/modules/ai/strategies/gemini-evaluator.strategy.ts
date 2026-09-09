@@ -250,23 +250,53 @@ Nội dung câu hỏi của học sinh:
         contentType = 'audio/wav; codecs=audio/pcm; samplerate=16000';
       }
 
-      const azureResponse = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Ocp-Apim-Subscription-Key': azureKey,
-          'Content-Type': contentType,
-          Accept: 'application/json',
-          'Pronunciation-Assessment': pronAssessmentHeader,
-        },
-        body: new Uint8Array(audioBuffer),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      let azureResponse: Response;
+
+      try {
+        azureResponse = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Ocp-Apim-Subscription-Key': azureKey,
+            'Content-Type': contentType,
+            Accept: 'application/json',
+            'Pronunciation-Assessment': pronAssessmentHeader,
+          },
+          body: new Uint8Array(audioBuffer),
+          signal: controller.signal,
+        });
+      } catch (fetchErr: unknown) {
+        const isAbort =
+          (fetchErr instanceof Error && fetchErr.name === 'AbortError') ||
+          (fetchErr instanceof Error && fetchErr.message.includes('abort'));
+        if (isAbort) {
+          const err = new Error(
+            'Azure Pronunciation Assessment timed out after 15 seconds',
+          );
+          (err as any).code = 'PROVIDER_TIMEOUT';
+          throw err;
+        }
+        const errMsg =
+          fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+        const err = new Error(`Azure connection failure: ${errMsg}`);
+        (err as any).code = 'PROVIDER_UNAVAILABLE';
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!azureResponse.ok) {
         const errText = await azureResponse.text();
         this.logger.error(
           `Azure API Error: ${azureResponse.status} - ${errText}`,
         );
-        throw new Error(`Azure API error: ${azureResponse.status}`);
+        const err = new Error(`Azure API error: ${azureResponse.status}`);
+        (err as any).code =
+          azureResponse.status >= 500
+            ? 'PROVIDER_UNAVAILABLE'
+            : 'PROVIDER_ERROR';
+        throw err;
       }
 
       const azureData = await azureResponse.json();
@@ -274,18 +304,21 @@ Nội dung câu hỏi của học sinh:
         `Azure response: ${JSON.stringify(azureData).substring(0, 200)}...`,
       );
 
+      // Provider returned error status
+      if (azureData.RecognitionStatus === 'Error') {
+        const err = new Error('Azure Speech returned RecognitionStatus: Error');
+        (err as any).code = 'PROVIDER_UNAVAILABLE';
+        throw err;
+      }
+
       const targetWordsList = targetText
         .split(/\s+/)
         .filter((w) => w.trim().length > 0);
 
-      // 1. Kiểm tra nếu Azure báo không có giọng nói / im lặng
-      const nonSuccessStatuses = [
-        'InitialSilenceTimeout',
-        'BabbleTimeout',
-        'Error',
-      ];
+      // 1. Kiểm tra nếu Azure báo không có giọng nói / im lặng (NO_SPEECH)
+      const silenceStatuses = ['InitialSilenceTimeout', 'BabbleTimeout'];
       if (
-        nonSuccessStatuses.includes(azureData.RecognitionStatus) ||
+        silenceStatuses.includes(azureData.RecognitionStatus) ||
         !azureData.NBest ||
         azureData.NBest.length === 0
       ) {
@@ -303,10 +336,10 @@ Nội dung câu hỏi của học sinh:
           overallScore: 0,
           clarity: 'Poor',
           feedback:
-            'Không phát hiện thấy giọng nói trong bản ghi âm. Vui lòng kiểm tra micro và đọc to, rõ ràng theo đoạn văn mẫu nhé!',
+            'Không phát hiện thấy giọng nói trong bản ghi âm. Vui lòng kiểm tra micro và đọc to, rõ ràng theo câu mẫu nhé!',
           problematicWords: targetWordsList,
           suggestions: [
-            'Hãy đảm bảo micro của bạn hoạt động tốt và không bị tắt tiếng (mute).',
+            'Hãy đảm bảo micro của bạn hoạt động tốt và không bị tắt tiếng.',
             'Đọc to, rõ ràng từng từ theo câu mẫu trên màn hình.',
           ],
           fluencyScore: 0,
@@ -314,6 +347,8 @@ Nội dung câu hỏi của học sinh:
           completenessScore: 0,
           words: allUnspokenWords,
           isSilentOrNoSpeech: true,
+          transcript: '',
+          errorCode: 'NO_SPEECH',
         };
       }
 
@@ -524,7 +559,7 @@ Nội dung câu hỏi của học sinh:
                 : overallScore >= 4
                   ? 'Fair'
                   : 'Poor',
-          feedback: `[No Gemini Key] Azure Score: ${overallScore.toFixed(1)}/10. Accuracy: ${accuracyScore}, Fluency: ${fluencyScore}, Completeness: ${completenessScore}.`,
+          feedback: `Điểm phát âm: ${overallScore.toFixed(1)}/10. Độ chính xác: ${accuracyScore}%, Trôi chảy: ${fluencyScore}%, Hoàn thiện: ${completenessScore}%.`,
           problematicWords,
           suggestions: [],
           fluencyScore,
@@ -532,6 +567,7 @@ Nội dung câu hỏi của học sinh:
           completenessScore,
           words,
           isSilentOrNoSpeech: false,
+          transcript: transcript.trim(),
         };
       }
 
@@ -604,33 +640,15 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
         completenessScore,
         words,
         isSilentOrNoSpeech: false,
+        transcript: transcript.trim(),
       };
     } catch (error: any) {
       this.logger.error(
         `Azure/Gemini pronunciation assessment failed: ${error.message}`,
         error.stack,
       );
-      const targetWordsList = targetText
-        .split(/\s+/)
-        .filter((w) => w.trim().length > 0);
-      return {
-        overallScore: 0,
-        clarity: 'Poor',
-        feedback:
-          'Không thể phân tích được phát âm (có thể do micro chưa thu được tiếng hoặc kết nối mạng). Vui lòng thử lại!',
-        problematicWords: targetWordsList,
-        suggestions: [
-          'Vui lòng kiểm tra lại micro và cấp quyền truy cập âm thanh trên trình duyệt.',
-          'Nói to và rõ ràng hơn khi ghi âm.',
-        ],
-        words: targetWordsList.map((w) => ({
-          word: w,
-          accuracyScore: 0,
-          errorType: 'Unspoken' as const,
-          isCorrect: false,
-        })),
-        isSilentOrNoSpeech: true,
-      };
+      // Re-throw provider errors so background worker handles retries and stable error codes
+      throw error;
     }
   }
 

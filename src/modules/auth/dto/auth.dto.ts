@@ -1,5 +1,11 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
   @ApiProperty({ example: 'student@test.com' })
@@ -85,15 +91,46 @@ export class ChangePasswordDto {
   newPassword: string;
 }
 
-export class ActivateTeacherDto {
-  @ApiProperty()
+export class GoogleExchangeDto {
+  @ApiProperty({ example: 'short-lived-google-login-code' })
   @IsString()
   @IsNotEmpty()
-  token: string;
+  code: string;
+}
 
-  @ApiProperty({ example: 'NewStrongPassword123!' })
+export class GoogleLoginDto {
+  @ApiProperty({
+    description: 'Google ID token (credential) từ Google Identity Services',
+  })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
-  newPassword: string;
+  credential: string;
+
+  @ApiPropertyOptional({ description: 'Mã định danh thiết bị' })
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
+}
+
+export class LinkGoogleAccountDto {
+  @ApiProperty({ example: 'student@example.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: 'MyPassword123' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+
+  @ApiProperty({
+    description: 'Google ID token (credential) từ Google Identity Services',
+  })
+  @IsString()
+  @IsNotEmpty()
+  credential: string;
+
+  @ApiPropertyOptional({ description: 'Mã định danh thiết bị' })
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
 }

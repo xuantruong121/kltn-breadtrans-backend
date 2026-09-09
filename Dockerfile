@@ -8,6 +8,8 @@ RUN apk add --no-cache dumb-init
 
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY tsconfig*.json nest-cli.json ./
+COPY src ./src/
 
 RUN npm ci --only=production --ignore-scripts
 # Tách riêng devDeps để build
@@ -23,6 +25,7 @@ WORKDIR /app
 RUN apk add --no-cache dumb-init
 
 ENV NODE_ENV=production
+ENV PORT=3000
 
 # Copy production node_modules + generated prisma client
 COPY --from=builder /app/node_modules ./node_modules
@@ -30,7 +33,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
-# Copy entrypoint script
+# Copy migration/startup entrypoint
 COPY scripts/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

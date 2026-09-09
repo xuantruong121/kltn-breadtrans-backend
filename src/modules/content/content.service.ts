@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -292,7 +296,10 @@ export class ContentService {
       });
     }
 
-    return topics;
+    return topics.map((topic) => ({
+      ...topic,
+      exercises: this.toStudentExercises(topic.exercises),
+    }));
   }
 
   async getContentTopicById(identifier: string) {
@@ -309,6 +316,116 @@ export class ContentService {
       throw new NotFoundException(`Content topic ${identifier} not found`);
     }
 
+    return {
+      ...topic,
+      exercises: this.toStudentExercises(topic.exercises),
+    };
+  }
+
+  private toStudentExercises(exercises: unknown) {
+    if (!Array.isArray(exercises)) return [];
+    return exercises.map((exercise) => {
+      const item = exercise as {
+        id?: number;
+        question?: string;
+        options?: string[];
+      };
+      return {
+        id: item.id,
+        question: item.question,
+        options: item.options || [],
+      };
+    });
+  }
+
+  async submitAttempt(
+    userId: number,
+    identifier: string,
+    answers: Record<string, number>,
+  ) {
+    if (!answers || typeof answers !== 'object') {
+      throw new BadRequestException('Câu trả lời không hợp lệ');
+    }
+    const topic = await this.findTopic(identifier);
+    const exercises = Array.isArray(topic.exercises)
+      ? (topic.exercises as Array<{
+          id: number;
+          correctIndex: number;
+          explanation?: string;
+        }>)
+      : [];
+    if (exercises.length === 0)
+      throw new BadRequestException('Nội dung này chưa có câu hỏi');
+
+    const questionsResult = exercises.map((exercise) => {
+      const selectedOption = answers[String(exercise.id)];
+      return {
+        exerciseId: exercise.id,
+        selectedOption,
+        correctOption: exercise.correctIndex,
+        isCorrect: selectedOption === exercise.correctIndex,
+        explanation: exercise.explanation || null,
+      };
+    });
+    const correctCount = questionsResult.filter(
+      (item) => item.isCorrect,
+    ).length;
+    const totalCount = exercises.length;
+    const score = Math.round((correctCount / totalCount) * 100);
+    const rewardBanh = correctCount * 5;
+
+    const attempt = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.contentAttempt.create({
+        data: {
+          userId,
+          contentTopicId: topic.id,
+          answers,
+          correctCount,
+          totalCount,
+          score,
+        },
+      });
+      if (rewardBanh > 0) {
+        await tx.userStats.upsert({
+          where: { userId },
+          create: { userId, totalBanhRan: rewardBanh },
+          update: { totalBanhRan: { increment: rewardBanh } },
+        });
+      }
+      await tx.learningActivity.create({
+        data: {
+          userId,
+          type: 'CONTENT',
+          title: topic.title,
+          detail: `${correctCount}/${totalCount} câu đúng`,
+          score,
+          sourceType: 'ContentAttempt',
+          sourceId: String(created.id),
+        },
+      });
+      return created;
+    });
+    return {
+      attemptId: attempt.id,
+      correctCount,
+      totalCount,
+      score,
+      rewardBanh,
+      questionsResult,
+    };
+  }
+
+  private async findTopic(identifier: string) {
+    const isNumeric = !isNaN(Number(identifier));
+    const topic = isNumeric
+      ? await this.prisma.contentTopic.findUnique({
+          where: { id: Number(identifier) },
+        })
+      : await this.prisma.contentTopic.findUnique({
+          where: { topicId: identifier },
+        });
+    if (!topic)
+      throw new NotFoundException(`Content topic ${identifier} not found`);
     return topic;
   }
 

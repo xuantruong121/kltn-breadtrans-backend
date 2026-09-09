@@ -36,3 +36,11 @@ export class SendPushPayload {
   url?: string;
   data?: Record<string, any>;
 }
+
+export class InboxQueryDto {
+  @IsOptional()
+  limit?: number;
+
+  @IsOptional()
+  cursor?: number;
+}

@@ -3,15 +3,20 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AttemptMode } from '@prisma/client';
+import { SpeakingService } from '../speaking/speaking.service';
 
 const TOEIC_DURATION_SECONDS = 120 * 60; // 120 minutes = 7200 seconds
 
 @Injectable()
 export class ToeicService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private speakingService: SpeakingService,
+  ) {}
 
   async getExams() {
     return this.prisma.toeicExamSet.findMany({
@@ -43,7 +48,91 @@ export class ToeicService {
       },
     });
     if (!exam) throw new NotFoundException('Exam not found');
-    return exam;
+    if (includeAnswers) return exam;
+
+    // Listening transcripts are assessment data. Keep them server-side so a
+    // student can hear the prompt without seeing the answer script.
+    return {
+      ...exam,
+      groups: exam.groups.map((group) => ({
+        ...group,
+        passageText: group.part <= 4 ? null : group.passageText,
+      })),
+    };
+  }
+
+  async getBundle(quizId: number, includeAnswers = false) {
+    const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
+    if (!quiz) throw new NotFoundException('TOEIC bundle not found');
+
+    const metadata = (quiz.bilingualContent ?? {}) as Record<string, unknown>;
+    if (metadata.examFormat !== 'FOUR_SKILL' || metadata.isBundle !== true) {
+      throw new BadRequestException('Quiz này không phải gói TOEIC 4 kỹ năng');
+    }
+
+    const examSetId = Number(metadata.listeningReadingExamSetId);
+    const speakingWritingQuizId = Number(metadata.speakingWritingQuizId);
+    if (
+      !Number.isInteger(examSetId) ||
+      !Number.isInteger(speakingWritingQuizId)
+    ) {
+      throw new BadRequestException(
+        'Gói TOEIC chưa liên kết đủ các bài thành phần',
+      );
+    }
+
+    const [listeningReading, speakingWriting] = await Promise.all([
+      this.getExamDetails(examSetId, includeAnswers),
+      this.prisma.quiz.findUnique({
+        where: { id: speakingWritingQuizId },
+        include: { questions: { orderBy: { order: 'asc' } } },
+      }),
+    ]);
+    if (!speakingWriting)
+      throw new NotFoundException('Bài Speaking/Writing không tồn tại');
+
+    return {
+      id: quiz.id,
+      title: quiz.title,
+      description: quiz.description,
+      bilingualContent: quiz.bilingualContent,
+      listeningReading,
+      speakingWriting: {
+        id: speakingWriting.id,
+        title: speakingWriting.title,
+        description: speakingWriting.description,
+        questions: includeAnswers
+          ? speakingWriting.questions
+          : speakingWriting.questions.map((question) => {
+              const content =
+                question.content && typeof question.content === 'object'
+                  ? { ...(question.content as Record<string, unknown>) }
+                  : question.content;
+              if (content && typeof content === 'object') {
+                delete (content as Record<string, unknown>).correct;
+                delete (content as Record<string, unknown>).correctAnswer;
+                delete (content as Record<string, unknown>).explanation;
+              }
+              return { ...question, content };
+            }),
+      },
+    };
+  }
+
+  async generateGroupAudio(groupId: number, accent: 'US' | 'UK', rate: number) {
+    const group = await this.prisma.toeicQuestionGroup.findUnique({
+      where: { id: groupId },
+      select: { part: true, audioUrl: true, passageText: true },
+    });
+    if (!group) throw new NotFoundException('TOEIC question group not found');
+    if (group.audioUrl) {
+      const response = await fetch(group.audioUrl);
+      if (response.ok) return Buffer.from(await response.arrayBuffer());
+    }
+    if (group.part === 1 || !group.passageText) {
+      throw new ServiceUnavailableException('Nhóm câu hỏi này chưa có audio');
+    }
+    return this.speakingService.generateTts(group.passageText, accent, rate);
   }
 
   async startAttempt(userId: number, examId: number, mode: AttemptMode) {

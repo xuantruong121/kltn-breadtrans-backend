@@ -44,14 +44,6 @@ export class EmailService {
     );
   }
 
-  sendTeacherActivation(to: string, activationUrl: string): Promise<void> {
-    return this.send(
-      to,
-      'BreadTrans - Kích hoạt tài khoản giáo viên',
-      `<p>Tài khoản giáo viên của bạn đã được tạo.</p><p><a href="${activationUrl}">Nhấn vào đây để kích hoạt và đặt mật khẩu</a>.</p><p>Liên kết có hiệu lực trong 24 giờ.</p>`,
-    );
-  }
-
   sendPaymentActivatedEmail(
     to: string,
     data: {

@@ -4,6 +4,8 @@ import {
   IsEnum,
   IsNumber,
   IsDateString,
+  Min,
+  Max,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -58,6 +60,8 @@ export class SubmitAssignmentDto {
 export class GradeAssignmentDto {
   @ApiProperty()
   @IsNumber()
+  @Min(0)
+  @Max(10)
   grade: number;
 
   @ApiProperty({ required: false })

@@ -86,6 +86,23 @@ export class UploadService {
     return this.r2.getPresignedUploadUrl(key, mimeType, expiresIn);
   }
 
+  /**
+   * Lấy presigned URL để download audio an toàn với thời hạn ngắn.
+   */
+  async getPresignedDownloadUrl(
+    key: string,
+    expiresIn = 3600,
+  ): Promise<string> {
+    return this.r2.getPresignedDownloadUrl(key, expiresIn);
+  }
+
+  /**
+   * Tải buffer trực tiếp từ R2 để xử lý backend (worker assessment).
+   */
+  async downloadFileBuffer(key: string): Promise<Buffer> {
+    return this.r2.downloadFileBuffer(key);
+  }
+
   /** Phân loại thư mục theo MIME type */
   private resolveFolder(mimeType: string): string {
     if (mimeType.startsWith('image/')) return 'images';

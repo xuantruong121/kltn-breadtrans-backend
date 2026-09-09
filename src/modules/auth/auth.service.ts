@@ -2,10 +2,16 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  GoogleLoginDto,
+  LinkGoogleAccountDto,
+} from './dto/auth.dto';
 import * as bcrypt from 'bcrypt';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
@@ -13,9 +19,13 @@ import * as crypto from 'crypto';
 import { getOtpSecret } from './auth.constants';
 import { Role } from '@prisma/client';
 import { EmailService } from '../../common/email/email.service';
+import { GoogleProfile } from './strategies/google.strategy';
+import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
+  private readonly googleClient = new OAuth2Client();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -54,7 +64,8 @@ export class AuthService {
       where: { email },
       include: { profile: true },
     });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user || !user.password)
+      throw new UnauthorizedException('Invalid credentials');
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid)
@@ -307,8 +318,13 @@ export class AuthService {
     newPassword: string,
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !(await bcrypt.compare(currentPassword, user.password)))
+    if (
+      !user ||
+      !user.password ||
+      !(await bcrypt.compare(currentPassword, user.password))
+    )
       throw new UnauthorizedException('Current password is invalid');
+
     const password = await bcrypt.hash(newPassword, 12);
     await this.prisma.user.update({
       where: { id: userId },
@@ -317,23 +333,284 @@ export class AuthService {
     return { message: 'Password changed successfully' };
   }
 
-  async activateTeacher(token: string, newPassword: string) {
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const key = `teacher:activation:${tokenHash}`;
-    const userIdRaw = await this.redis.get(key);
-    if (!userIdRaw)
-      throw new UnauthorizedException('Activation token expired or invalid');
-    const password = await bcrypt.hash(newPassword, 12);
-    const user = await this.prisma.user.update({
-      where: { id: Number(userIdRaw) },
-      data: {
-        password,
-        emailVerifiedAt: new Date(),
-        mustChangePassword: false,
-      },
-      select: { id: true, email: true, role: true, emailVerifiedAt: true },
+  /**
+   * Google Identity Services (GIS) Sign-In verification & issue tokens.
+   * New users are strictly Role.STUDENT.
+   * If email matches existing password account, throw ACCOUNT_LINK_REQUIRED.
+   */
+  async loginWithGoogle(dto: GoogleLoginDto) {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new ServiceUnavailableException(
+        'Google Client ID chưa được cấu hình trên hệ thống.',
+      );
+    }
+
+    let payload;
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken: dto.credential,
+        audience: clientId,
+      });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException(
+        'Token Google không hợp lệ hoặc đã hết hạn.',
+      );
+    }
+
+    if (!payload?.sub || !payload.email || payload.email_verified !== true) {
+      throw new UnauthorizedException(
+        'Tài khoản Google không hợp lệ hoặc email chưa được xác minh.',
+      );
+    }
+
+    const googleSub = payload.sub;
+    const email = payload.email.toLowerCase();
+    const fullName = payload.name || 'Học viên BreadTrans';
+    const avatar = payload.picture || null;
+    const deviceId = dto.deviceId || crypto.randomUUID();
+
+    const user = await this.resolveGoogleUser({
+      providerId: googleSub,
+      email,
+      fullName,
+      avatar,
     });
-    await this.redis.del(key);
-    return user;
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
+    });
+    return this.issueTokens(user, deviceId);
+  }
+
+  /**
+   * Liên kết tài khoản Google với tài khoản đã tồn tại qua xác nhận mật khẩu.
+   */
+  async linkGoogleWithPassword(dto: LinkGoogleAccountDto) {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new ServiceUnavailableException(
+        'Google Client ID chưa được cấu hình.',
+      );
+    }
+
+    let payload;
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken: dto.credential,
+        audience: clientId,
+      });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Token Google không hợp lệ.');
+    }
+
+    if (!payload?.sub || !payload.email || payload.email_verified !== true) {
+      throw new UnauthorizedException(
+        'Tài khoản Google không hợp lệ hoặc email chưa được xác minh.',
+      );
+    }
+
+    const email = dto.email.toLowerCase();
+    if (payload.email.toLowerCase() !== email) {
+      throw new UnauthorizedException(
+        'Email tài khoản Google không khớp với email đăng nhập.',
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { profile: true },
+    });
+
+    if (!user || !user.password) {
+      throw new UnauthorizedException(
+        'Tài khoản hoặc mật khẩu không chính xác.',
+      );
+    }
+
+    const isPasswordValid = await bcrypt.compare(dto.password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Mật khẩu không chính xác.');
+    }
+
+    const deviceId = dto.deviceId || crypto.randomUUID();
+
+    const linkedAccount = await this.prisma.authAccount.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: 'GOOGLE',
+          providerAccountId: payload.sub,
+        },
+      },
+      select: { userId: true },
+    });
+    if (linkedAccount && linkedAccount.userId !== user.id) {
+      throw new ConflictException(
+        'Tài khoản Google này đã được liên kết với một tài khoản khác.',
+      );
+    }
+
+    await this.prisma.authAccount.upsert({
+      where: {
+        provider_providerAccountId: {
+          provider: 'GOOGLE',
+          providerAccountId: payload.sub,
+        },
+      },
+      update: {
+        userId: user.id,
+      },
+      create: {
+        provider: 'GOOGLE',
+        providerAccountId: payload.sub,
+        userId: user.id,
+      },
+    });
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
+    });
+
+    return this.issueTokens(user, deviceId);
+  }
+
+  /**
+   * Google is an identity provider, not a role provider. New accounts are
+   * always STUDENT and existing email accounts are linked by verified email.
+   */
+  async createGoogleLoginCode(profile: GoogleProfile, deviceId: string) {
+    const user = await this.getOrCreateGoogleUser(profile);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
+    });
+    const code = crypto.randomBytes(32).toString('hex');
+    await this.redis.set(
+      `auth:google:code:${code}`,
+      JSON.stringify({ userId: user.id, deviceId }),
+      'EX',
+      60,
+    );
+    return code;
+  }
+
+  async exchangeGoogleLoginCode(code: string) {
+    const key = `auth:google:code:${code}`;
+    const raw = await this.redis.getdel(key);
+    if (!raw)
+      throw new UnauthorizedException('Mã đăng nhập Google đã hết hạn.');
+    const payload = JSON.parse(raw) as { userId: number; deviceId: string };
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.userId },
+      include: { profile: true },
+    });
+    if (!user || (user.role !== Role.STUDENT && user.role !== Role.ADMIN)) {
+      throw new UnauthorizedException('Tài khoản không còn hợp lệ.');
+    }
+    return this.issueTokens(user, payload.deviceId);
+  }
+
+  private async getOrCreateGoogleUser(profile: GoogleProfile) {
+    return this.resolveGoogleUser(profile);
+  }
+
+  /** Shared account resolution for GIS and Passport OAuth callbacks. */
+  private async resolveGoogleUser(profile: GoogleProfile) {
+    const linkedAccount = await this.prisma.authAccount.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: 'GOOGLE',
+          providerAccountId: profile.providerId,
+        },
+      },
+      include: { user: { include: { profile: true } } },
+    });
+    if (linkedAccount?.user) {
+      if (
+        linkedAccount.user.role !== Role.STUDENT &&
+        linkedAccount.user.role !== Role.ADMIN
+      ) {
+        throw new UnauthorizedException(
+          'Tài khoản không có quyền truy cập hệ thống.',
+        );
+      }
+      return linkedAccount.user;
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: profile.email },
+      include: { profile: true },
+    });
+    if (existing) {
+      throw new UnauthorizedException({
+        code: 'ACCOUNT_LINK_REQUIRED',
+        message:
+          'Email này đã tồn tại trong hệ thống. Hãy xác nhận mật khẩu để liên kết tài khoản Google.',
+      });
+    }
+
+    const randomPassword = await bcrypt.hash(
+      crypto.randomBytes(32).toString('hex'),
+      12,
+    );
+    return this.prisma.user.create({
+      data: {
+        email: profile.email,
+        password: randomPassword,
+        role: Role.STUDENT,
+        emailVerifiedAt: new Date(),
+        profile: {
+          create: { fullName: profile.fullName, avatar: profile.avatar },
+        },
+        authAccounts: {
+          create: {
+            provider: 'GOOGLE',
+            providerAccountId: profile.providerId,
+          },
+        },
+      },
+      include: { profile: true },
+    });
+  }
+
+  private async issueTokens(
+    user: { id: number; email: string; role: Role; profile?: unknown },
+    deviceId: string,
+  ) {
+    const access_token = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        deviceId,
+        type: 'access',
+        jti: crypto.randomUUID(),
+      },
+      { expiresIn: '1d' },
+    );
+    const refresh_token = this.jwtService.sign(
+      { sub: user.id, deviceId, type: 'refresh' },
+      { expiresIn: '30d' },
+    );
+    await this.redis.set(
+      `user:${user.id}:device:${deviceId}`,
+      refresh_token,
+      'EX',
+      30 * 24 * 60 * 60,
+    );
+    return {
+      access_token,
+      refresh_token,
+      deviceId,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
+      },
+    };
   }
 }

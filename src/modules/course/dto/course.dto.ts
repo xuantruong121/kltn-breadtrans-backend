@@ -35,15 +35,6 @@ export class CreateCourseDto {
   @IsString()
   @IsOptional()
   level?: string;
-
-  @ApiPropertyOptional({
-    example: 1,
-    description:
-      'ID của giáo viên phụ trách (Admin có thể gán, Teacher tự động lấy ID của mình)',
-  })
-  @IsNumber()
-  @IsOptional()
-  teacherId?: number;
 }
 
 export class UpdateCourseDto {
@@ -66,11 +57,6 @@ export class UpdateCourseDto {
   @IsString()
   @IsOptional()
   level?: string;
-
-  @ApiPropertyOptional({ example: 2 })
-  @IsNumber()
-  @IsOptional()
-  teacherId?: number;
 
   @ApiPropertyOptional({ enum: CourseStatus })
   @IsEnum(CourseStatus)
@@ -100,15 +86,6 @@ export class CreateClassDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiPropertyOptional({
-    example: 41,
-    description:
-      'ID của giáo viên phụ trách (Admin gán, Teacher tự động lấy ID bản thân)',
-  })
-  @IsNumber()
-  @IsOptional()
-  teacherId?: number;
-
   @ApiPropertyOptional({ example: '2026-08-01T00:00:00.000Z' })
   @IsDateString()
   @IsOptional()
@@ -118,11 +95,6 @@ export class CreateClassDto {
   @IsDateString()
   @IsOptional()
   endDate?: string;
-
-  @ApiPropertyOptional({ example: 'https://meet.google.com/abc-xyz' })
-  @IsString()
-  @IsOptional()
-  meetingLink?: string;
 
   @ApiPropertyOptional({
     example: 30,
@@ -149,11 +121,6 @@ export class UpdateClassDto {
   @IsOptional()
   name?: string;
 
-  @ApiPropertyOptional({ example: 42 })
-  @IsNumber()
-  @IsOptional()
-  teacherId?: number;
-
   @ApiPropertyOptional({ example: '2026-08-05T00:00:00.000Z' })
   @IsDateString()
   @IsOptional()
@@ -163,11 +130,6 @@ export class UpdateClassDto {
   @IsDateString()
   @IsOptional()
   endDate?: string;
-
-  @ApiPropertyOptional({ example: 'https://meet.google.com/new-link' })
-  @IsString()
-  @IsOptional()
-  meetingLink?: string;
 
   @ApiPropertyOptional({ example: 35 })
   @IsNumber()

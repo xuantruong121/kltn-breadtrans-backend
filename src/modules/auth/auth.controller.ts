@@ -7,6 +7,7 @@ import {
   Get,
   UseGuards,
   Request,
+  Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -18,8 +19,11 @@ import {
   VerifyOtpDto,
   VerifyRegistrationDto,
   ChangePasswordDto,
-  ActivateTeacherDto,
+  GoogleExchangeDto,
+  GoogleLoginDto,
+  LinkGoogleAccountDto,
 } from './dto/auth.dto';
+
 import {
   ApiTags,
   ApiOperation,
@@ -28,6 +32,8 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import * as crypto from 'crypto';
+import { AuthGuard } from '@nestjs/passport';
+import type { Response } from 'express';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -59,6 +65,65 @@ export class AuthController {
     // If client doesn't provide a deviceId, generate a temporary one
     const deviceId = loginDto.deviceId || crypto.randomUUID();
     return this.authService.login(loginDto, deviceId);
+  }
+
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Đăng nhập bằng Google Identity Services (ID token)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về access token và refresh token.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Token không hợp lệ hoặc cần liên kết tài khoản.',
+  })
+  async googleSignIn(@Body() dto: GoogleLoginDto) {
+    return this.authService.loginWithGoogle(dto);
+  }
+
+  @Post('google/link')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Liên kết tài khoản Google với tài khoản mật khẩu hiện có',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Liên kết thành công và trả về cặp token.',
+  })
+  async linkGoogleAccount(@Body() dto: LinkGoogleAccountDto) {
+    return this.authService.linkGoogleWithPassword(dto);
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Đăng nhập bằng Google' })
+  googleLogin() {
+    // Passport performs the redirect to Google.
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Google OAuth callback' })
+  async googleCallback(@Request() req: any, @Res() res: Response) {
+    const deviceId = crypto.randomUUID();
+    const code = await this.authService.createGoogleLoginCode(
+      req.user,
+      deviceId,
+    );
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(
+      `${frontendUrl}/auth/callback?code=${encodeURIComponent(code)}`,
+    );
+  }
+
+  @Post('google/exchange')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đổi mã Google OAuth lấy JWT phiên đăng nhập' })
+  async exchangeGoogleCode(@Body() body: GoogleExchangeDto) {
+    return this.authService.exchangeGoogleLoginCode(body.code);
   }
 
   @Post('refresh')
@@ -116,11 +181,6 @@ export class AuthController {
     );
   }
 
-  @Post('activate-teacher')
-  @HttpCode(HttpStatus.OK)
-  async activateTeacher(@Body() body: ActivateTeacherDto) {
-    return this.authService.activateTeacher(body.token, body.newPassword);
-  }
   @Post('otp/generate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tạo mã OTP' })

@@ -1,10 +1,16 @@
 name: CI Pipeline
 
 on:
+  # Run validation for every branch and every PR target. Branch names are
+  # case-sensitive on GitHub, so restricting this to "develop" would skip
+  # repositories using a "Development" or another integration branch.
   push:
-    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "main", "develop" ]
+  workflow_dispatch:
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
@@ -31,35 +37,35 @@ jobs:
           - 6379:6379
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Use Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Generate Prisma Client
-      run: npx prisma generate
+      - name: Generate Prisma Client
+        run: npx prisma generate
 
-    - name: Run Linter
-      run: npm run lint
+      - name: Run Linter
+        run: npm run lint
 
-    - name: Build project
-      run: npm run build
+      - name: Build project
+        run: npm run build
 
-    - name: Push Database Schema
-      env:
-        DATABASE_URL: "postgresql://postgres:password@localhost:5432/kltn_test_db?schema=public"
-      run: npx prisma db push
+      - name: Deploy Prisma migrations
+        env:
+          DATABASE_URL: 'postgresql://postgres:password@localhost:5432/kltn_test_db?schema=public'
+        run: npx prisma migrate deploy
 
-    - name: Run Unit Tests
-      run: npm run test
+      - name: Run Unit Tests
+        run: npm run test
 
-    - name: Run E2E Tests
-      env:
-        DATABASE_URL: "postgresql://postgres:password@localhost:5432/kltn_test_db?schema=public"
-      run: npm run test:e2e
+      - name: Run E2E Tests
+        env:
+          DATABASE_URL: 'postgresql://postgres:password@localhost:5432/kltn_test_db?schema=public'
+        run: npm run test:e2e

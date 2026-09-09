@@ -7,10 +7,17 @@ import {
   UseGuards,
   Request,
   Body,
+  Query,
 } from '@nestjs/common';
 import { VocabService } from './vocab.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 
 @ApiTags('Vocab')
 @Controller('vocab')
@@ -19,6 +26,18 @@ export class VocabController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Get('lookup')
+  @ApiOperation({
+    summary: 'Tra cứu từ vựng tương tác theo câu phát âm (Local VocabWord)',
+    description:
+      'Chuẩn hóa chữ thường, lọc dấu câu, ưu tiên khớp chính xác rồi thử biến thể từ.',
+  })
+  @ApiQuery({ name: 'word', required: true, description: 'Từ cần tra cứu' })
+  lookupWord(@Query('word') word: string) {
+    return this.vocabService.lookupWord(word);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('topics')
   @ApiOperation({ summary: 'Lấy danh sách các chủ đề từ vựng TOEIC' })
   getTopics(@Request() req: any) {
@@ -26,8 +45,7 @@ export class VocabController {
     return this.vocabService.getTopics(userId);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('topics/:id')
   @ApiOperation({ summary: 'Lấy chi tiết 1 chủ đề từ vựng và danh sách từ' })
   getTopicDetails(@Param('id', ParseIntPipe) id: number, @Request() req: any) {

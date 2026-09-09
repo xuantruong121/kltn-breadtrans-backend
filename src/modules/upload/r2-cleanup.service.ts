@@ -58,6 +58,7 @@ export class R2CleanupService {
         select: {
           id: true,
           audioUrl: true,
+          audioKey: true,
         },
         take: 100, // Batch xử lý 100 file mỗi lần để tránh nghẽn I/O
       });
@@ -75,7 +76,9 @@ export class R2CleanupService {
 
       let deletedCount = 0;
       for (const sub of oldSubmissions) {
-        const key = this.extractKeyFromUrl(sub.audioUrl);
+        const key =
+          sub.audioKey ||
+          (sub.audioUrl ? this.extractKeyFromUrl(sub.audioUrl) : null);
         if (key) {
           await this.r2Service.deleteFile(key);
         }
@@ -83,7 +86,7 @@ export class R2CleanupService {
         // Cập nhật URL trong DB đánh dấu đã lưu trữ/dọn dẹp
         await this.prisma.speakingSubmission.update({
           where: { id: sub.id },
-          data: { audioUrl: '[archived_after_90d]' },
+          data: { audioUrl: '[archived_after_90d]', audioKey: null },
         });
 
         deletedCount++;
