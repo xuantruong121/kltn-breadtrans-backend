@@ -27,6 +27,8 @@ import { ContentModule } from './modules/content/content.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { DiagnosticModule } from './modules/diagnostic/diagnostic.module';
+import { SupportModule } from './modules/support/support.module';
 import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { RedisModule } from '@nestjs-modules/ioredis';
 
@@ -66,6 +68,8 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     ContentModule,
     NotificationsModule,
     PaymentModule,
+    DiagnosticModule,
+    SupportModule,
   ],
 
   controllers: [AppController],

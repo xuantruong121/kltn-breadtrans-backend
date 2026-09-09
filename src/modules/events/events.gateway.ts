@@ -10,9 +10,11 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { getJwtSecret } from '../auth/auth.constants';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SupportService } from '../support/support.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
@@ -46,6 +48,7 @@ export class EventsGateway
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     @InjectRedis() private readonly redis: Redis,
+    private readonly supportService: SupportService,
   ) {}
 
   afterInit() {
@@ -151,7 +154,63 @@ export class EventsGateway
     }
   }
 
-  // 2. Chat Real-time giữa Học sinh và Support Staff (Admin / Teacher)
+  // 1.5. Lắng nghe event từ SupportService để phát sóng Socket real-time sau khi đã lưu DB thành công
+  @OnEvent('support.message_created')
+  handleSupportMessageCreated(payload: {
+    conversationId: number;
+    studentId: number;
+    fromRole: string;
+    targetUserId?: number;
+    message: any;
+    student: {
+      id: number;
+      name: string;
+      email: string;
+      avatar?: string | null;
+    };
+  }) {
+    const socketPayload = {
+      conversationId: payload.conversationId,
+      studentId: `student_${payload.studentId}`,
+      studentName: payload.student.name,
+      studentEmail: payload.student.email,
+      studentAvatar: payload.student.avatar,
+      fromRole: payload.fromRole,
+      targetUserId: payload.targetUserId || payload.studentId,
+      message: payload.message,
+    };
+
+    // Gửi cho Support Staff (Admin)
+    this.server.to('support_staff').emit('chat:new_message', socketPayload);
+
+    // Gửi cho phòng cá nhân của học sinh
+    this.server
+      .to(`user_${payload.studentId}`)
+      .emit('chat:new_message', socketPayload);
+  }
+
+  @OnEvent('support.mode_updated')
+  handleSupportModeUpdated(payload: {
+    conversationId: number;
+    studentId: number;
+    mode: 'AI' | 'HUMAN';
+    adminName: string;
+  }) {
+    const socketPayload = {
+      conversationId: payload.conversationId,
+      studentId: `student_${payload.studentId}`,
+      mode: payload.mode,
+      adminName: payload.adminName,
+      targetUserId: payload.studentId,
+    };
+
+    this.server
+      .to(`user_${payload.studentId}`)
+      .emit('chat:mode_updated', socketPayload);
+    this.server.to('support_staff').emit('chat:mode_updated', socketPayload);
+  }
+
+  // 2. Chat Real-time giữa Học sinh và Support Staff (Admin) — Lưu PostgreSQL trước, phát sóng sau
   @SubscribeMessage('chat:sendMessage')
   async handleChatMessage(
     @ConnectedSocket() client: Socket,
@@ -160,7 +219,7 @@ export class EventsGateway
       studentId?: string;
       studentName?: string;
       studentEmail?: string;
-      studentAvatar?: string;
+      studentAvatar?: string | null;
       message?: {
         id?: string;
         role: 'user' | 'assistant' | 'admin' | 'system';
@@ -178,13 +237,6 @@ export class EventsGateway
       return;
     }
 
-    const userRole = authUser.role;
-    const isStaff = userRole === 'ADMIN';
-
-    this.logger.log(
-      `Chat message from ${userRole} (User #${authUser.userId}): "${payload.message?.content?.substring(0, 30)}..."`,
-    );
-
     const content = payload?.message?.content;
     if (
       typeof content !== 'string' ||
@@ -194,78 +246,58 @@ export class EventsGateway
       return;
     }
 
-    if (!isStaff) {
-      const student = await this.prisma.user.findUnique({
-        where: { id: authUser.userId },
-        include: { profile: true },
-      });
-      if (!student) return;
-      // 1. Tin nhắn từ Học sinh gửi lên: gửi cho Support Staff (Admin + Teacher)
-      const sanitizedPayload = {
-        studentName: student.profile?.fullName || student.email,
-        studentEmail: student.email,
-        studentAvatar: student.profile?.avatar || undefined,
-        fromRole: 'STUDENT',
-        studentId: `student_${authUser.userId}`,
-        message: {
-          id: payload.message?.id,
-          role: 'user',
+    const isStaff = authUser.role === 'ADMIN';
+
+    this.logger.log(
+      `Chat message from ${authUser.role} (User #${authUser.userId}): "${content.substring(0, 30)}..."`,
+    );
+
+    try {
+      if (!isStaff) {
+        // 1. Tin nhắn từ Học sinh hoặc phản hồi AI: xác thực, lưu DB trước
+        const conv = await this.supportService.getOrCreateStudentConversation(
+          authUser.userId,
+        );
+        if (payload.message?.role === 'assistant') {
+          await this.supportService.createAiMessage(
+            conv.id,
+            content,
+            payload.message?.id,
+          );
+        } else {
+          await this.supportService.sendStudentMessage(
+            authUser.userId,
+            conv.id,
+            {
+              content,
+              clientMessageId: payload.message?.id,
+            },
+          );
+        }
+      } else {
+        // 2. Tin nhắn từ Support Staff (Admin) trả lời:
+        const targetUserId =
+          payload.targetUserId ||
+          Number(payload.studentId?.replace('student_', '')) ||
+          null;
+        if (!targetUserId) return;
+
+        const conv =
+          await this.supportService.getOrCreateStudentConversation(
+            targetUserId,
+          );
+        await this.supportService.sendAdminMessage(authUser.userId, conv.id, {
           content,
-          senderName: student.profile?.fullName || student.email,
-          timestamp: payload.message?.timestamp || Date.now(),
-        },
-      };
-
-      this.server
-        .to('support_staff')
-        .emit('chat:new_message', sanitizedPayload);
-
-      // Nếu học sinh mở nhiều tab, gửi cho các tab khác của chính học sinh này
-      client
-        .to(`user_${authUser.userId}`)
-        .emit('chat:new_message', sanitizedPayload);
-    } else {
-      // 2. Tin nhắn từ Support Staff (Admin / Teacher) trả lời học sinh:
-      const targetUserId =
-        payload.targetUserId ||
-        Number(payload.studentId?.replace('student_', '')) ||
-        null;
-      if (!targetUserId) return;
-      const student = await this.prisma.user.findUnique({
-        where: { id: targetUserId },
-        include: { profile: true },
-      });
-      if (!student) return;
-
-      const staffPayload = {
-        studentId: `student_${student.id}`,
-        studentName: student.profile?.fullName || student.email,
-        studentEmail: student.email,
-        studentAvatar: student.profile?.avatar || undefined,
-        fromRole: userRole,
-        targetUserId: student.id,
-        message: {
-          id: payload.message?.id,
-          role: 'admin',
-          content,
-          senderName: authUser.profile?.fullName || authUser.email,
-          timestamp: payload.message?.timestamp || Date.now(),
-        },
-      };
-
-      if (targetUserId) {
-        // Gửi thẳng cho học sinh được chỉ định
-        this.server
-          .to(`user_${targetUserId}`)
-          .emit('chat:new_message', staffPayload);
+          clientMessageId: payload.message?.id,
+        });
       }
-
-      // Gửi cho các thành viên support staff khác theo dõi
-      client.to('support_staff').emit('chat:new_message', staffPayload);
+    } catch (err: any) {
+      this.logger.error(`Error handling chat message: ${err?.message}`);
+      client.emit('chat:error', { message: 'Failed to process message' });
     }
   }
 
-  // 3. Support Staff chuyển đổi chế độ AI <-> Human của học sinh Real-time
+  // 3. Chuyển đổi chế độ AI <-> Human của học sinh Real-time — Lưu DB trước
   @SubscribeMessage('chat:toggleMode')
   async handleToggleMode(
     @ConnectedSocket() client: Socket,
@@ -273,53 +305,33 @@ export class EventsGateway
     payload: {
       studentId: string;
       mode: 'AI' | 'HUMAN';
-      adminName: string;
+      adminName?: string;
       targetUserId?: number;
     },
   ) {
     const authUser = client.data?.user;
-    if (!authUser || authUser.role !== 'ADMIN') {
-      this.logger.warn(
-        `[EventsGateway] Unauthorized chat:toggleMode attempt by User #${authUser?.userId}`,
-      );
-      return;
-    }
+    if (!authUser) return;
 
-    const requestedTargetUserId = payload.targetUserId;
-    const targetUserId: number | null =
-      typeof requestedTargetUserId === 'number' &&
-      Number.isInteger(requestedTargetUserId) &&
-      requestedTargetUserId > 0
-        ? requestedTargetUserId
-        : Number(payload.studentId?.replace('student_', '')) || null;
-    if (!targetUserId || !['AI', 'HUMAN'].includes(payload.mode)) return;
-    const student = await this.prisma.user.findUnique({
-      where: { id: targetUserId },
-      include: { profile: true },
-    });
-    if (!student) return;
-    const normalizedPayload = {
-      studentId: `student_${student.id}`,
-      mode: payload.mode,
-      adminName: authUser.profile?.fullName || authUser.email,
-      targetUserId: student.id,
-    };
+    if (!['AI', 'HUMAN'].includes(payload.mode)) return;
 
-    this.logger.log(
-      'Chat mode toggled for ' +
-        normalizedPayload.studentId +
-        ' by ' +
-        authUser.role,
-    );
+    const targetUserId =
+      authUser.role === 'ADMIN'
+        ? payload.targetUserId ||
+          Number(payload.studentId?.replace('student_', '')) ||
+          null
+        : authUser.userId;
 
-    this.server
-      .to('support_staff')
-      .emit('chat:mode_updated', normalizedPayload);
+    if (!targetUserId) return;
 
-    if (targetUserId) {
-      this.server
-        .to(`user_${targetUserId}`)
-        .emit('chat:mode_updated', normalizedPayload);
+    try {
+      const conv =
+        await this.supportService.getOrCreateStudentConversation(targetUserId);
+      await this.supportService.updateConversationMode(conv.id, payload.mode, {
+        id: authUser.userId,
+        role: authUser.role,
+      });
+    } catch (err: any) {
+      this.logger.error(`Error toggling chat mode: ${err?.message}`);
     }
   }
 

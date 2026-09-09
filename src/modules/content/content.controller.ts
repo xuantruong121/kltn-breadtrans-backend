@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  Request,
 } from '@nestjs/common';
 import { ContentService } from './content.service';
 import {
@@ -43,6 +44,20 @@ export class ContentController {
   @ApiOperation({ summary: 'Lấy chi tiết chủ đề học kèm bài tập' })
   getContentTopicById(@Param('id') id: string) {
     return this.contentService.getContentTopicById(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post(':id/attempts')
+  @ApiOperation({
+    summary: 'Nộp bài tập học qua nội dung và nhận kết quả từ server',
+  })
+  submitAttempt(
+    @Request() req: { user: { id: number } },
+    @Param('id') id: string,
+    @Body('answers') answers: Record<string, number>,
+  ) {
+    return this.contentService.submitAttempt(req.user.id, id, answers);
   }
 
   // Admin APIs

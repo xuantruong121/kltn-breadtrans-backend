@@ -1596,46 +1596,103 @@ async function main() {
   }
 
   const vocabTopics = [
-    'Contracts',
-    'Marketing',
-    'Conferences',
-    'Office Technology',
-    'Business Planning',
-    'Travel',
-  ];
+    {
+      title: 'Trường học & đời sống', categoryName: 'Tiếng Anh hằng ngày', isPro: false,
+      words: [
+        ['Schedule', 'noun', '/ˈskedʒ.uːl/', '/ˈʃedʒ.uːl/', 'Lịch trình, thời khóa biểu', 'I need to check my class schedule.', 'Tôi cần kiểm tra lại lịch học của mình.'],
+        ['Assignment', 'noun', '/əˈsaɪn.mənt/', '/əˈsaɪn.mənt/', 'Bài tập, nhiệm vụ', 'The teacher gave us a reading assignment.', 'Giáo viên giao cho chúng tôi một bài đọc.'],
+        ['Presentation', 'noun', '/ˌprez.ənˈteɪ.ʃən/', '/ˌprez.ənˈteɪ.ʃən/', 'Bài thuyết trình', 'Her presentation was very interesting.', 'Bài thuyết trình của cô ấy rất thú vị.'],
+        ['Library', 'noun', '/ˈlaɪ.brer.i/', '/ˈlaɪ.brər.i/', 'Thư viện', 'Students can borrow books from the library.', 'Học sinh có thể mượn sách từ thư viện.'],
+        ['Semester', 'noun', '/sɪˈmes.t̬ɚ/', '/sɪˈmes.tər/', 'Học kỳ', 'This semester is going to be challenging.', 'Học kỳ này sẽ khá thử thách.'],
+        ['Register', 'verb', '/ˈredʒ.ɪ.stɚ/', '/ˈredʒ.ɪ.stər/', 'Đăng ký', 'You must register before Friday.', 'Bạn phải đăng ký trước thứ Sáu.'],
+        ['Introduce', 'verb', '/ˌɪn.trəˈduːs/', '/ˌɪn.trəˈdjuːs/', 'Giới thiệu', 'Let me introduce my new classmate.', 'Để tôi giới thiệu bạn học mới của tôi.'],
+        ['Conversation', 'noun', '/ˌkɑːn.vɚˈseɪ.ʃən/', '/ˌkɒn.vəˈseɪ.ʃən/', 'Cuộc trò chuyện', 'We had a pleasant conversation.', 'Chúng tôi đã có một cuộc trò chuyện vui vẻ.'],
+      ],
+    },
+    {
+      title: 'Văn phòng & công việc', categoryName: 'Tiếng Anh công sở', isPro: false,
+      words: [
+        ['Equipment', 'noun', '/ɪˈkwɪp.mənt/', '/ɪˈkwɪp.mənt/', 'Thiết bị, dụng cụ', 'The office ordered new computer equipment.', 'Văn phòng đã đặt mua thiết bị máy tính mới.'],
+        ['Colleague', 'noun', '/ˈkɑː.liːɡ/', '/ˈkɒl.iːɡ/', 'Đồng nghiệp', 'I work well with my colleagues.', 'Tôi phối hợp tốt với các đồng nghiệp của mình.'],
+        ['Document', 'noun', '/ˈdɑːk.jə.mənt/', '/ˈdɒk.jə.mənt/', 'Tài liệu, văn bản', 'Please sign this document.', 'Vui lòng ký vào tài liệu này.'],
+        ['Conference', 'noun', '/ˈkɑːn.fɚ.əns/', '/ˈkɒn.fər.əns/', 'Hội nghị, hội thảo', 'The annual sales conference is in Tokyo.', 'Hội nghị bán hàng thường niên diễn ra ở Tokyo.'],
+        ['Deadline', 'noun', '/ˈded.laɪn/', '/ˈded.laɪn/', 'Hạn chót', 'The project deadline is next Monday.', 'Hạn chót của dự án là thứ Hai tuần tới.'],
+        ['Negotiate', 'verb', '/nɪˈɡoʊ.ʃi.eɪt/', '/nɪˈɡəʊ.ʃi.eɪt/', 'Thương lượng, đàm phán', 'They negotiated a new contract.', 'Họ đã thương lượng một hợp đồng mới.'],
+        ['Agreement', 'noun', '/əˈɡriː.mənt/', '/əˈɡriː.mənt/', 'Sự thỏa thuận', 'Both parties reached an agreement.', 'Cả hai bên đã đạt được thỏa thuận.'],
+        ['Proposal', 'noun', '/prəˈpoʊ.zəl/', '/prəˈpəʊ.zəl/', 'Đề xuất, bản đề án', 'We submitted the business proposal.', 'Chúng tôi đã nộp bản đề xuất kinh doanh.'],
+      ],
+    },
+    {
+      title: 'Du lịch & khách sạn', categoryName: 'Giao tiếp thực tế', isPro: false,
+      words: [
+        ['Passenger', 'noun', '/ˈpæs.ən.dʒɚ/', '/ˈpæs.ən.dʒər/', 'Hành khách', 'All passengers must fasten their seatbelts.', 'Tất cả hành khách phải thắt dây an toàn.'],
+        ['Reservation', 'noun', '/ˌrez.ɚˈveɪ.ʃən/', '/ˌrez.əˈveɪ.ʃən/', 'Sự đặt chỗ trước', 'I have a reservation for two nights.', 'Tôi đã đặt phòng trước cho hai đêm.'],
+        ['Luggage', 'noun', '/ˈlʌɡ.ɪdʒ/', '/ˈlʌɡ.ɪdʒ/', 'Hành lý', 'You can keep your luggage in the hotel lobby.', 'Bạn có thể gửi hành lý tại sảnh khách sạn.'],
+        ['Departure', 'noun', '/dɪˈpɑːr.tʃɚ/', '/dɪˈpɑː.tʃər/', 'Sự khởi hành', 'The departure time was delayed.', 'Thời gian khởi hành đã bị hoãn lại.'],
+        ['Destination', 'noun', '/ˌdes.təˈneɪ.ʃən/', '/ˌdes.tɪˈneɪ.ʃən/', 'Điểm đến', 'Da Nang is a popular tourist destination.', 'Đà Nẵng là điểm đến du lịch nổi tiếng.'],
+        ['Itinerary', 'noun', '/aɪˈtɪn.ə.rer.i/', '/aɪˈtɪn.ə.rər.i/', 'Lịch trình chuyến đi', 'Please review the travel itinerary.', 'Vui lòng xem lại lịch trình chuyến đi.'],
+        ['Accommodation', 'noun', '/əˌkɑː.məˈdeɪ.ʃən/', '/əˌkɒm.əˈdeɪ.ʃən/', 'Chỗ ở', 'The accommodation is close to the station.', 'Chỗ ở gần nhà ga.'],
+        ['Boarding pass', 'noun', '/ˈbɔːr.dɪŋ pæs/', '/ˈbɔː.dɪŋ pɑːs/', 'Thẻ lên máy bay', 'Show your boarding pass at the gate.', 'Hãy xuất trình thẻ lên máy bay tại cổng.'],
+      ],
+    },
+    {
+      title: 'Công nghệ & đổi mới', categoryName: 'Công nghệ hiện đại', isPro: true,
+      words: [
+        ['Innovation', 'noun', '/ˌɪn.əˈveɪ.ʃən/', '/ˌɪn.əˈveɪ.ʃən/', 'Sự đổi mới, sáng tạo', 'Technological innovation drives growth.', 'Đổi mới công nghệ thúc đẩy tăng trưởng.'],
+        ['Security', 'noun', '/səˈkjʊr.ə.t̬i/', '/sɪˈkjʊə.rə.ti/', 'An ninh, bảo mật', 'Data security is essential for companies.', 'Bảo mật dữ liệu là điều tối quan trọng với doanh nghiệp.'],
+        ['Upgrade', 'verb', '/ʌpˈɡreɪd/', '/ʌpˈɡreɪd/', 'Nâng cấp', 'We must upgrade our operating system.', 'Chúng ta cần nâng cấp hệ điều hành.'],
+        ['Automate', 'verb', '/ˈɑː.t̬ə.meɪt/', '/ˈɔː.tə.meɪt/', 'Tự động hóa', 'The system automates daily tasks.', 'Hệ thống tự động hóa các công việc hằng ngày.'],
+        ['Database', 'noun', '/ˈdeɪ.t̬ə.beɪs/', '/ˈdeɪ.tə.beɪs/', 'Cơ sở dữ liệu', 'The customer data is stored in a secure database.', 'Dữ liệu khách hàng được lưu trong cơ sở dữ liệu an toàn.'],
+        ['Software', 'noun', '/ˈsɔːft.wer/', '/ˈsɒft.weər/', 'Phần mềm', 'This software helps the team collaborate.', 'Phần mềm này giúp đội nhóm cộng tác.'],
+        ['Device', 'noun', '/dɪˈvaɪs/', '/dɪˈvaɪs/', 'Thiết bị', 'Connect the device to the network.', 'Hãy kết nối thiết bị với mạng.'],
+        ['Reliable', 'adjective', '/rɪˈlaɪ.ə.bəl/', '/rɪˈlaɪ.ə.bəl/', 'Đáng tin cậy', 'We need a reliable backup system.', 'Chúng ta cần một hệ thống sao lưu đáng tin cậy.'],
+      ],
+    },
+  ] as const;
   let vocabWordId = 1;
   for (let topicIndex = 0; topicIndex < vocabTopics.length; topicIndex += 1) {
+    const definition = vocabTopics[topicIndex];
     const topic = await prisma.vocabTopic.upsert({
       where: { id: topicIndex + 1 },
       update: {
-        title: vocabTopics[topicIndex],
-        totalWords: 12,
-        isPro: topicIndex > 3,
+        title: definition.title,
+        categoryName: definition.categoryName,
+        totalWords: definition.words.length,
+        isPro: definition.isPro,
       },
       create: {
         id: topicIndex + 1,
-        title: vocabTopics[topicIndex],
-        totalWords: 12,
-        isPro: topicIndex > 3,
+        title: definition.title,
+        categoryName: definition.categoryName,
+        totalWords: definition.words.length,
+        isPro: definition.isPro,
       },
     });
-    for (let wordIndex = 0; wordIndex < 12; wordIndex += 1) {
+    for (let wordIndex = 0; wordIndex < definition.words.length; wordIndex += 1) {
+      const [word, pos, ipaUs, ipaUk, meaning, exampleEn, exampleVi] = definition.words[wordIndex];
       await prisma.vocabWord.upsert({
         where: { id: vocabWordId },
         update: {
           topicId: topic.id,
-          word: `${vocabTopics[topicIndex].toLowerCase()}-${wordIndex + 1}`,
-          meaning: `Từ vựng ${vocabTopics[topicIndex]} số ${wordIndex + 1}`,
+          word,
+          pos,
+          ipaUs,
+          ipaUk,
+          meaning,
+          exampleEn,
+          exampleVi,
+          order: wordIndex + 1,
         },
         create: {
           id: vocabWordId,
           topicId: topic.id,
-          word: `${vocabTopics[topicIndex].toLowerCase()}-${wordIndex + 1}`,
-          meaning: `Từ vựng ${vocabTopics[topicIndex]} số ${wordIndex + 1}`,
-          pos: wordIndex % 3 === 0 ? 'verb' : 'noun',
-          ipaUs: `/ˈwɜːrd${wordIndex + 1}/`,
-          exampleEn: `This is an example for ${vocabTopics[topicIndex]}.`,
-          exampleVi: `Đây là ví dụ cho chủ đề ${vocabTopics[topicIndex]}.`,
+          word,
+          pos,
+          ipaUs,
+          ipaUk,
+          meaning,
+          exampleEn,
+          exampleVi,
           order: wordIndex + 1,
         },
       });
@@ -1655,71 +1712,110 @@ async function main() {
       vocabWordId += 1;
     }
   }
+  // Replace the old numbered placeholder words from the development seed.
+  await prisma.vocabWord.deleteMany({
+    where: { id: { gte: vocabWordId, lte: 72 } },
+  });
+  await prisma.vocabTopic.deleteMany({
+    where: { id: { gt: vocabTopics.length, lte: 6 } },
+  });
 
   const grammarTopics = [
-    'Present Simple',
-    'Past Simple',
-    'Present Perfect',
-    'Modal Verbs',
-    'Conditionals',
-    'Comparatives',
-  ];
+    { title: 'Thì hiện tại đơn', level: 'BEGINNER', description: 'Dùng cho thói quen, sự thật hiển nhiên và lịch trình cố định.', keyFormula: 'S + V(s/es) | do/does + not + V | Do/Does + S + V?', questions: [
+      ['She usually ______ to school by bus every morning.', ['go', 'goes', 'going', 'went'], 1, "Chủ ngữ 'She' ở ngôi thứ ba số ít nên động từ thêm -es: goes."],
+      ['They ______ like spicy food.', ["doesn't", "don't", "aren't", "isn't"], 1, "Với chủ ngữ 'They', câu phủ định hiện tại đơn dùng don't."],
+      ['The train to Da Nang ______ at 8:00 PM tonight.', ['depart', 'departs', 'departed', 'departing'], 1, 'Hiện tại đơn dùng cho lịch trình cố định của tàu xe, máy bay.'],
+    ] },
+    { title: 'Thì quá khứ đơn', level: 'BEGINNER', description: 'Dùng cho hành động đã xảy ra và kết thúc trong quá khứ.', keyFormula: 'S + V2/V-ed | did not + V | Did + S + V?', questions: [
+      ['We ______ a great movie yesterday evening.', ['watch', 'watched', 'watching', 'watches'], 1, "'Yesterday' là dấu hiệu của quá khứ đơn; watch chuyển thành watched."],
+      ['Did you ______ the contract to the client this morning?', ['send', 'sent', 'sending', 'sends'], 0, "Sau trợ động từ 'Did', động từ chính giữ nguyên mẫu: send."],
+      ['The manager ______ the meeting at 9 AM last Monday.', ['start', 'starts', 'started', 'starting'], 2, "'Last Monday' yêu cầu động từ ở quá khứ đơn: started."],
+    ] },
+    { title: 'Thì hiện tại hoàn thành', level: 'INTERMEDIATE', description: 'Nối một hành động trong quá khứ với kết quả hoặc thời gian ở hiện tại.', keyFormula: 'S + have/has + V3/V-ed', questions: [
+      ['Mr. Nam has worked at this company ______ over ten years.', ['since', 'for', 'in', 'from'], 1, "'For' đi với một khoảng thời gian: for over ten years."],
+      ['Have you submitted the financial report ______?', ['already', 'yet', 'since', 'just'], 1, "'Yet' thường đứng cuối câu hỏi hoặc câu phủ định hiện tại hoàn thành."],
+      ['The team ______ the project already.', ['finish', 'finished', 'has finished', 'finishes'], 2, "'Already' kết hợp với hiện tại hoàn thành: has finished."],
+    ] },
+    { title: 'Từ loại cơ bản', level: 'INTERMEDIATE', description: 'Nhận diện danh từ, động từ, tính từ và trạng từ trong ngữ cảnh.', keyFormula: 'Article/Adjective + Noun | Verb + Adverb | be + Adjective', questions: [
+      ['Customer ______ is our company\'s top priority.', ['satisfy', 'satisfaction', 'satisfactory', 'satisfied'], 1, "Sau 'Customer' cần danh từ để tạo cụm Customer satisfaction."],
+      ['The new manager showed great ______ during the crisis.', ['leader', 'leadership', 'lead', 'leading'], 1, "Sau tính từ 'great' cần danh từ trừu tượng: leadership."],
+      ['The report was written very ______.', ['careful', 'carefully', 'care', 'carefulness'], 1, 'Bổ nghĩa cho động từ written cần trạng từ carefully.'],
+    ] },
+    { title: 'Câu bị động', level: 'INTERMEDIATE', description: 'Dùng khi chủ ngữ là đối tượng nhận hành động.', keyFormula: 'S + be + V3/V-ed + (by O)', questions: [
+      ['The annual report ______ by the accounting department yesterday.', ['prepared', 'was prepared', 'is preparing', 'prepares'], 1, "'Yesterday' và chủ ngữ là vật nên dùng bị động quá khứ đơn: was prepared."],
+      ['All employees ______ to attend the safety workshop tomorrow.', ['are required', 'require', 'requiring', 'have required'], 0, "Cấu trúc bị động: be required to do something."],
+      ['The documents ______ before the deadline.', ['must submit', 'must be submitted', 'must submitted', 'are must submit'], 1, "Sau modal 'must' ở câu bị động dùng be + V3: must be submitted."],
+    ] },
+    { title: 'Câu điều kiện', level: 'ADVANCED', description: 'Diễn tả điều kiện có thể xảy ra hoặc giả định.', keyFormula: 'Type 1: If + present, will + V | Type 2: If + past, would + V', questions: [
+      ['If it rains tomorrow, we ______ the outdoor event.', ['cancel', 'will cancel', 'canceled', 'would cancel'], 1, 'Câu điều kiện loại 1: If + hiện tại đơn, will + động từ nguyên mẫu.'],
+      ['If I ______ more time, I would learn a third language.', ['have', 'had', 'will have', 'having'], 1, 'Câu điều kiện loại 2: If + quá khứ đơn, would + động từ nguyên mẫu.'],
+      ['If she had studied harder, she ______ the exam.', ['passes', 'will pass', 'would have passed', 'passed'], 2, 'Câu điều kiện loại 3: If + quá khứ hoàn thành, would have + V3.'],
+    ] },
+  ] as const;
   let grammarQuestionId = 1;
   for (let topicIndex = 0; topicIndex < grammarTopics.length; topicIndex += 1) {
     const topic = await prisma.grammarTopic.upsert({
       where: { id: topicIndex + 1 },
       update: {
-        title: grammarTopics[topicIndex],
-        level: topicIndex < 2 ? 'BEGINNER' : 'INTERMEDIATE',
+        title: grammarTopics[topicIndex].title,
+        level: grammarTopics[topicIndex].level,
+        description: grammarTopics[topicIndex].description,
+        keyFormula: grammarTopics[topicIndex].keyFormula,
+        order: topicIndex + 1,
       },
       create: {
         id: topicIndex + 1,
-        title: grammarTopics[topicIndex],
-        level: topicIndex < 2 ? 'BEGINNER' : 'INTERMEDIATE',
-        description: `Lý thuyết và bài tập về ${grammarTopics[topicIndex]}.`,
-        keyFormula: 'Subject + verb + object',
+        title: grammarTopics[topicIndex].title,
+        level: grammarTopics[topicIndex].level,
+        description: grammarTopics[topicIndex].description,
+        keyFormula: grammarTopics[topicIndex].keyFormula,
         order: topicIndex + 1,
       },
     });
-    for (let questionIndex = 0; questionIndex < 5; questionIndex += 1) {
+    for (let questionIndex = 0; questionIndex < grammarTopics[topicIndex].questions.length; questionIndex += 1) {
+      const [question, options, correctIndex, explanation] = grammarTopics[topicIndex].questions[questionIndex];
       await prisma.grammarQuestion.upsert({
         where: { id: grammarQuestionId },
         update: {
           topicId: topic.id,
-          question: `Choose the correct ${grammarTopics[topicIndex]} sentence ${questionIndex + 1}.`,
+          question,
+          options,
+          correctIndex,
+          explanation,
+          order: questionIndex + 1,
         },
         create: {
           id: grammarQuestionId,
           topicId: topic.id,
-          question: `Choose the correct ${grammarTopics[topicIndex]} sentence ${questionIndex + 1}.`,
-          options: [
-            'I study English.',
-            'I studies English.',
-            'I studying English.',
-            'I studied English tomorrow.',
-          ],
-          correctIndex: 0,
-          explanation: 'Chủ ngữ và thì cần phù hợp với cấu trúc câu.',
+          question,
+          options,
+          correctIndex,
+          explanation,
+          order: questionIndex + 1,
         },
       });
       grammarQuestionId += 1;
     }
   }
+  // The prior seed created generic five-question sets. Remove only its unused IDs.
+  await prisma.grammarQuestion.deleteMany({
+    where: { id: { gte: grammarQuestionId, lte: 30 } },
+  });
   for (let index = 0; index < 3; index += 1) {
     await prisma.grammarAttempt.upsert({
       where: { id: 400 + index },
       update: {
         userId: students[index].id,
         topicId: index + 1,
-        score: 70 + index * 8,
-        answers: { correct: 4, total: 5 },
+        score: 67 + index * 16,
+        answers: { '1': 1, '2': 1, '3': 1 },
       },
       create: {
         id: 400 + index,
         userId: students[index].id,
         topicId: index + 1,
-        score: 70 + index * 8,
-        answers: { correct: 4, total: 5 },
+        score: 67 + index * 16,
+        answers: { '1': 1, '2': 1, '3': 1 },
       },
     });
     await prisma.userGrammarReward.upsert({
@@ -2091,46 +2187,68 @@ async function main() {
       resolvedAt: new Date(),
     },
   });
-  await prisma.pushSubscription.upsert({
-    where: { endpoint: 'https://push.example.com/breadtrans/student1' },
-    update: {
-      userId: students[0].id,
-      p256dh: 'seed-p256dh',
-      auth: 'seed-auth',
-      userAgent: 'Seed Browser',
-    },
-    create: {
-      id: 700,
-      userId: students[0].id,
-      endpoint: 'https://push.example.com/breadtrans/student1',
-      p256dh: 'seed-p256dh',
-      auth: 'seed-auth',
-      userAgent: 'Seed Browser',
-    },
-  });
 
   await prisma.contentTopic.upsert({
     where: { topicId: 'seed-movie-school' },
-    update: { title: 'School Conversations' },
+    update: {
+      title: 'School Conversations',
+      exercises: [
+        { id: 1, question: 'What does the teacher ask students to do?', options: ['Open their books', 'Leave the room', 'Call their parents', 'Take a test'], correctIndex: 0, explanation: 'The dialogue begins with the teacher asking students to open their books.' },
+        { id: 2, question: 'Which phrase is used to ask for clarification?', options: ['Could you repeat that, please?', 'I am fine, thank you.', 'See you tomorrow.', 'It is on the table.'], correctIndex: 0, explanation: 'Could you repeat that, please? is a polite clarification request.' },
+      ],
+    },
     create: {
       topicId: 'seed-movie-school',
       category: 'movie',
       title: 'School Conversations',
       order: 1,
-      exercises: [{ prompt: 'Listen and repeat the sentence.' }],
+      exercises: [
+        { id: 1, question: 'What is the speaker preparing for?', options: ['A presentation', 'A holiday', 'A football match', 'A birthday party'], correctIndex: 0, explanation: 'The listening passage describes preparation for a presentation.' },
+        { id: 2, question: 'Choose the best meaning of “practice every day”.', options: ['Luyện tập hằng ngày', 'Đi học muộn', 'Mua một cuốn sách', 'Gọi điện cho bạn'], correctIndex: 0, explanation: 'Practice every day means luyện tập hằng ngày.' },
+      ],
     },
   });
   await prisma.contentTopic.upsert({
     where: { topicId: 'seed-music-daily' },
-    update: { title: 'Daily English Songs' },
+    update: {
+      title: 'Daily English Songs',
+      exercises: [
+        { id: 1, question: 'Which word best completes: “I listen to music ___ the bus.”', options: ['on', 'at', 'by', 'from'], correctIndex: 0, explanation: 'We say on the bus.' },
+        { id: 2, question: 'What does “catchy tune” mean?', options: ['Giai điệu dễ nhớ', 'Một bài kiểm tra khó', 'Âm thanh rất nhỏ', 'Một cây đàn mới'], correctIndex: 0, explanation: 'Catchy describes a tune that is easy to remember.' },
+      ],
+    },
     create: {
       topicId: 'seed-music-daily',
       category: 'music',
       title: 'Daily English Songs',
       order: 2,
-      exercises: [{ prompt: 'Fill in the missing word.' }],
+      exercises: [
+        { id: 1, question: 'Which word best completes: “I listen to music ___ the bus.”', options: ['on', 'at', 'by', 'from'], correctIndex: 0, explanation: 'We say on the bus.' },
+        { id: 2, question: 'What does “catchy tune” mean?', options: ['Giai điệu dễ nhớ', 'Một bài kiểm tra khó', 'Âm thanh rất nhỏ', 'Một cây đàn mới'], correctIndex: 0, explanation: 'Catchy describes a tune that is easy to remember.' },
+      ],
     },
   });
+
+  const diagnostic = await (prisma as any).diagnosticAssessment.upsert({
+    where: { id: 1 },
+    update: { title: 'Kiểm tra trình độ đầu vào', description: 'Bài kiểm tra ngắn giúp gợi ý điểm bắt đầu phù hợp.', isActive: true },
+    create: { id: 1, title: 'Kiểm tra trình độ đầu vào', description: 'Bài kiểm tra ngắn giúp gợi ý điểm bắt đầu phù hợp.', isActive: true },
+  });
+  const diagnosticQuestions = [
+    ['Listening', 'You hear: “The meeting has been moved to Friday morning.” When is the meeting?', ['Thursday afternoon', 'Friday morning', 'Friday evening', 'Next Monday'], 1],
+    ['Reading', 'Please submit the completed form _____ noon tomorrow.', ['by', 'since', 'during', 'from'], 0],
+    ['Grammar', 'The new software _____ by the IT team last week.', ['install', 'was installed', 'is installing', 'has install'], 1],
+    ['Vocabulary', 'Customers appreciate our prompt and _____ service.', ['reliable', 'reliably', 'reliability', 'rely'], 0],
+    ['Reading', 'What is the main purpose of an email that confirms an appointment?', ['To cancel a meeting', 'To verify the meeting details', 'To request a refund', 'To advertise a product'], 1],
+    ['Speaking', 'Choose the most professional reply: “Could you send the report today?”', ['Yes, I will send it before 5 P.M.', 'Report today.', 'Why?', 'Maybe I send.'], 0],
+  ] as const;
+  for (const [index, [skill, question, options, correctIndex]] of diagnosticQuestions.entries()) {
+    await (prisma as any).diagnosticQuestion.upsert({
+      where: { id: index + 1 },
+      update: { assessmentId: diagnostic.id, skill, question, options, correctIndex, order: index + 1 },
+      create: { id: index + 1, assessmentId: diagnostic.id, skill, question, options, correctIndex, order: index + 1 },
+    });
+  }
 
   console.log(
     `Seed complete: 1 admin, ${students.length} students, ${courses.length} courses, ${offerings.length} offerings, ${lessonId - 1} lessons, ${assignmentId - 1} assignments, vocabulary/grammar/TOEIC/gamification data.`,

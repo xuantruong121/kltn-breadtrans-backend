@@ -93,6 +93,12 @@ model User {
   userGrammarRewards              UserGrammarReward[]
   userQuizRewards                 UserQuizReward[]
   reviewedPayments                Payment[]                        @relation("PaymentReviewer")
+  learningActivities              LearningActivity[]
+  diagnosticAttempts              DiagnosticAttempt[]
+  contentAttempts                 ContentAttempt[]
+  supportConversation             SupportConversation?
+  supportMessages                 SupportMessage[]
+  notifications                   Notification[]
 }
 
 model AuthAccount {
@@ -106,7 +112,6 @@ model AuthAccount {
   @@unique([provider, providerAccountId])
   @@index([userId])
 }
-
 
 model Profile {
   id          Int     @id @default(autoincrement())
@@ -493,15 +498,91 @@ model CurrencyTransaction {
 }
 
 model ContentTopic {
-  id            Int      @id @default(autoincrement())
-  topicId       String   @unique
+  id            Int              @id @default(autoincrement())
+  topicId       String           @unique
   category      String // "grammar" | "movie" | "music"
   title         String
-  order         Int?     @default(0)
+  order         Int?             @default(0)
   materialLinks Json?
   exercises     Json? // Array of ContentExercise
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  attempts      ContentAttempt[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+/// Immutable learning timeline. Each business feature writes a factual activity
+/// after its own transaction succeeds; the UI never fabricates a history row.
+model LearningActivity {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  detail      String?
+  score       Float?
+  durationSec Int?
+  sourceType  String?
+  sourceId    String?
+  occurredAt  DateTime @default(now())
+
+  @@index([userId, occurredAt])
+  @@index([userId, type, occurredAt])
+}
+
+model DiagnosticAssessment {
+  id          Int                  @id @default(autoincrement())
+  title       String
+  description String?
+  isActive    Boolean              @default(true)
+  questions   DiagnosticQuestion[]
+  attempts    DiagnosticAttempt[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+}
+
+model DiagnosticQuestion {
+  id           Int                  @id @default(autoincrement())
+  assessmentId Int
+  assessment   DiagnosticAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  skill        String
+  question     String               @db.Text
+  options      Json
+  correctIndex Int
+  explanation  String?              @db.Text
+  order        Int                  @default(0)
+
+  @@index([assessmentId, order])
+}
+
+model DiagnosticAttempt {
+  id           Int                  @id @default(autoincrement())
+  userId       Int
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessmentId Int
+  assessment   DiagnosticAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  answers      Json
+  correctCount Int
+  totalCount   Int
+  percentage   Float
+  level        String
+  submittedAt  DateTime             @default(now())
+
+  @@index([userId, submittedAt])
+}
+
+model ContentAttempt {
+  id             Int          @id @default(autoincrement())
+  userId         Int
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentTopicId Int
+  contentTopic   ContentTopic @relation(fields: [contentTopicId], references: [id], onDelete: Cascade)
+  answers        Json
+  correctCount   Int
+  totalCount     Int
+  score          Float
+  submittedAt    DateTime     @default(now())
+
+  @@index([userId, contentTopicId, submittedAt])
 }
 
 model MarketProduct {
@@ -656,6 +737,7 @@ model UserVocabWordProgress {
   reviewCount    Int       @default(0)
   nextReviewAt   DateTime?
   lastReviewedAt DateTime?
+  remindedAt     DateTime?
 
   @@unique([userId, wordId])
 }
@@ -880,3 +962,69 @@ model UserQuizReward {
 
   @@unique([userId, quizId])
 }
+
+enum SupportMode {
+  AI
+  HUMAN
+}
+
+enum SupportSenderRole {
+  STUDENT
+  ADMIN
+  AI
+  SYSTEM
+}
+
+model SupportConversation {
+  id            Int              @id @default(autoincrement())
+  studentId     Int              @unique
+  student       User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  mode          SupportMode      @default(AI)
+  status        String           @default("OPEN")
+  lastMessageAt DateTime?        @default(now())
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  messages      SupportMessage[]
+
+  @@index([lastMessageAt])
+  @@index([studentId, status])
+}
+
+model SupportMessage {
+  id              Int                 @id @default(autoincrement())
+  conversationId  Int
+  conversation    SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUserId    Int?
+  senderUser      User?               @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+  senderRole      SupportSenderRole   @default(STUDENT)
+  senderName      String?
+  content         String              @db.Text
+  clientMessageId String?
+  isRead          Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+
+  @@unique([conversationId, clientMessageId])
+  @@index([conversationId, createdAt])
+  @@index([senderUserId])
+}
+
+// ==========================================
+// NOTIFICATIONS INBOX MODULE
+// ==========================================
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  url       String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
+

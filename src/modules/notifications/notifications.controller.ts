@@ -2,7 +2,11 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
+  Query,
+  Param,
+  ParseIntPipe,
   UseGuards,
   Req,
   HttpCode,
@@ -48,7 +52,7 @@ export class NotificationsController {
       title: 'BreadTrans - Kiểm Tra Thông Báo! 🍞',
       body: 'Chúc mừng bạn đã kích hoạt thành công tính năng Web Push Notification trên thiết bị!',
       icon: '/icons/icon-192.png',
-      url: '/student/profile',
+      url: '/practice',
     });
     return {
       success: true,
@@ -56,4 +60,33 @@ export class NotificationsController {
       result,
     };
   }
+
+  @Get('inbox')
+  @UseGuards(JwtAuthGuard)
+  async getInbox(
+    @Req() req: any,
+    @Query('limit') limit?: number,
+    @Query('cursor') cursor?: number,
+  ) {
+    return await this.notificationsService.getInbox(req.user.id, limit, cursor);
+  }
+
+  @Get('inbox/unread-count')
+  @UseGuards(JwtAuthGuard)
+  async getUnreadCount(@Req() req: any) {
+    return await this.notificationsService.getUnreadCount(req.user.id);
+  }
+
+  @Patch('inbox/read-all')
+  @UseGuards(JwtAuthGuard)
+  async markAllRead(@Req() req: any) {
+    return await this.notificationsService.markAllRead(req.user.id);
+  }
+
+  @Patch('inbox/:id/read')
+  @UseGuards(JwtAuthGuard)
+  async markRead(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
+    return await this.notificationsService.markRead(req.user.id, id);
+  }
 }
+

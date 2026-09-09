@@ -55,7 +55,9 @@ export class UserService {
         where: { userId, isMastered: true },
       }),
       this.prisma.submission.count({ where: { userId } }),
-      this.prisma.toeicAttempt.count({ where: { userId } }),
+      this.prisma.toeicAttempt.count({
+        where: { userId, submittedAt: { not: null } },
+      }),
     ]);
 
     return {
@@ -70,6 +72,47 @@ export class UserService {
       masteredVocabCount: vocabProgress,
       totalQuizzesDone: submissionsCount + toeicCount,
       pet: pet || null,
+    };
+  }
+
+  async getLearningHistory(userId: number, type?: string, requestedLimit = 50) {
+    const limit = Math.min(Math.max(requestedLimit, 1), 100);
+    const activities = await this.prisma.learningActivity.findMany({
+      where: { userId, ...(type && type !== 'ALL' ? { type } : {}) },
+      orderBy: { occurredAt: 'desc' },
+      take: limit,
+    });
+    const summary = await this.prisma.learningActivity.groupBy({
+      by: ['type'],
+      where: { userId },
+      _count: { _all: true },
+      _avg: { score: true },
+    });
+    const [stats, diagnostic] = await Promise.all([
+      this.prisma.userStats.findUnique({ where: { userId } }),
+      this.prisma.diagnosticAttempt.findFirst({
+        where: { userId },
+        orderBy: { submittedAt: 'desc' },
+      }),
+    ]);
+    return {
+      activities,
+      summary: {
+        completedCount: activities.length,
+        streakCount: stats?.streakCount || 0,
+        latestDiagnostic: diagnostic
+          ? {
+              level: diagnostic.level,
+              percentage: diagnostic.percentage,
+              submittedAt: diagnostic.submittedAt,
+            }
+          : null,
+        byType: summary.map((item) => ({
+          type: item.type,
+          count: item._count._all,
+          averageScore: item._avg.score,
+        })),
+      },
     };
   }
 }

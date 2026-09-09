@@ -169,28 +169,58 @@ export class VocabService {
     }
   }
 
+  private calculateNextReviewAt(reviewCount: number, isCorrect: boolean): Date {
+    const now = Date.now();
+    if (!isCorrect) {
+      return new Date(now + 10 * 60 * 1000); // 10 minutes
+    }
+    if (reviewCount <= 1) {
+      return new Date(now + 24 * 60 * 60 * 1000); // 1 day
+    }
+    if (reviewCount === 2) {
+      return new Date(now + 3 * 24 * 60 * 60 * 1000); // 3 days
+    }
+    return new Date(now + 7 * 24 * 60 * 60 * 1000); // 7 days
+  }
+
   async setMastered(userId: number, wordId: number, isMastered: boolean) {
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
     });
 
+    const nextReviewAt = isMastered
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      : new Date(Date.now() + 10 * 60 * 1000);
+
     if (existing) {
       const updated = await this.prisma.userVocabWordProgress.update({
         where: { id: existing.id },
-        data: { isMastered },
+        data: {
+          isMastered,
+          nextReviewAt,
+          remindedAt: null,
+          lastReviewedAt: new Date(),
+        },
       });
       if (updated.isMastered && !existing.isMastered) {
         this.eventEmitter.emit('vocab.learned', { userId, count: 1 });
       }
-      return { isMastered: updated.isMastered };
+      return { isMastered: updated.isMastered, nextReviewAt: updated.nextReviewAt };
     } else {
       const created = await this.prisma.userVocabWordProgress.create({
-        data: { userId, wordId, isMastered },
+        data: {
+          userId,
+          wordId,
+          isMastered,
+          nextReviewAt,
+          remindedAt: null,
+          lastReviewedAt: new Date(),
+        },
       });
       if (created.isMastered) {
         this.eventEmitter.emit('vocab.learned', { userId, count: 1 });
       }
-      return { isMastered: created.isMastered };
+      return { isMastered: created.isMastered, nextReviewAt: created.nextReviewAt };
     }
   }
 
@@ -203,26 +233,39 @@ export class VocabService {
     const isMastered = isCorrect
       ? existing?.isMastered || newReviewCount >= 2
       : false;
+    const nextReviewAt = this.calculateNextReviewAt(newReviewCount, isCorrect);
 
     if (existing) {
-      return this.prisma.userVocabWordProgress.update({
+      const updated = await this.prisma.userVocabWordProgress.update({
         where: { id: existing.id },
         data: {
           reviewCount: newReviewCount,
           isMastered,
           lastReviewedAt: new Date(),
+          nextReviewAt,
+          remindedAt: null,
         },
       });
+      if (updated.isMastered && !existing.isMastered) {
+        this.eventEmitter.emit('vocab.learned', { userId, count: 1 });
+      }
+      return updated;
     } else {
-      return this.prisma.userVocabWordProgress.create({
+      const created = await this.prisma.userVocabWordProgress.create({
         data: {
           userId,
           wordId,
           reviewCount: 1,
           isMastered: isCorrect,
           lastReviewedAt: new Date(),
+          nextReviewAt,
+          remindedAt: null,
         },
       });
+      if (created.isMastered) {
+        this.eventEmitter.emit('vocab.learned', { userId, count: 1 });
+      }
+      return created;
     }
   }
 }
