@@ -84,7 +84,7 @@ export class QuizService {
     });
   }
 
-  async getListeningPractices(userId: number) {
+  async getListeningPractices(userId?: number) {
     const quizzes = await this.prisma.quiz.findMany({
       where: {
         type: 'LISTENING_PRACTICE',
@@ -98,6 +98,9 @@ export class QuizService {
         id: 'desc',
       },
     });
+
+    if (!userId)
+      return quizzes.map((quiz) => ({ ...quiz, isCompleted: false }));
 
     // Check user submissions to see which ones are completed
     const userSubmissions = await this.prisma.submission.findMany({
@@ -116,7 +119,7 @@ export class QuizService {
     }));
   }
 
-  async getToeicPapers(userId: number) {
+  async getToeicPapers(userId?: number) {
     const quizzes = await this.prisma.quiz.findMany({
       where: {
         type: 'TOEIC',
@@ -128,21 +131,32 @@ export class QuizService {
       include: { _count: { select: { questions: true } } },
       orderBy: { id: 'asc' },
     });
-    const userSubmissions = await this.prisma.submission.findMany({
-      where: {
-        userId,
-        quizId: { in: quizzes.map((quiz) => quiz.id) },
-      },
-      select: { quizId: true },
-    });
-    const completedQuizIds = new Set(
-      userSubmissions.map((submission) => submission.quizId),
-    );
 
-    return quizzes.map((quiz) => ({
-      ...quiz,
-      isCompleted: completedQuizIds.has(quiz.id),
-    }));
+    const completedQuizIds = new Set<number>();
+    if (userId) {
+      const userSubmissions = await this.prisma.submission.findMany({
+        where: {
+          userId,
+          quizId: { in: quizzes.map((quiz) => quiz.id) },
+        },
+        select: { quizId: true },
+      });
+      userSubmissions.forEach((s) => completedQuizIds.add(s.quizId));
+    }
+
+    return quizzes.map((quiz) => {
+      const metadata = (quiz.bilingualContent ?? {}) as Record<string, unknown>;
+      const linkedCount = Number(metadata.totalQuestions);
+      return {
+        ...quiz,
+        questionsCount:
+          Number.isFinite(linkedCount) && linkedCount > 0
+            ? linkedCount
+            : quiz._count.questions,
+        isBundle: metadata.isBundle === true,
+        isCompleted: completedQuizIds.has(quiz.id),
+      };
+    });
   }
 
   async getQuizById(id: number, includeAnswers = false) {
@@ -210,7 +224,18 @@ export class QuizService {
       if (question) {
         if (question.type === 'MULTIPLE_CHOICE') {
           const content = question.content;
-          if (content.correct === ans.answer) {
+          if (
+            content.correctIndex !== undefined &&
+            Array.isArray(content.options)
+          ) {
+            // Reading-style: options array + correctIndex
+            const correctOption = content.options[content.correctIndex];
+            if (correctOption === ans.answer) {
+              isCorrect = true;
+              score = 1;
+              totalScore += score;
+            }
+          } else if (content.correct === ans.answer) {
             isCorrect = true;
             score = 1;
             totalScore += score;

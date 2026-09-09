@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Query,
   UseGuards,
   Request,
   ForbiddenException,
@@ -14,15 +15,33 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+
 @ApiTags('gamification')
 @Controller('gamification')
 export class GamificationController {
   constructor(private readonly gamificationService: GamificationService) {}
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('leaderboard')
-  @ApiOperation({ summary: 'Lấy top 10 bảng xếp hạng điểm số' })
-  getLeaderboard() {
-    return this.gamificationService.getLeaderboard();
+  @ApiOperation({
+    summary: 'Lấy bảng xếp hạng điểm số (Public / Authenticated)',
+  })
+  getLeaderboard(
+    @Request() req: any,
+    @Query('tier') tier?: string,
+    @Query('scope') scope?: string,
+  ) {
+    const currentUserId = req.user?.id ? Number(req.user.id) : undefined;
+    return this.gamificationService.getLeaderboard(tier, scope, currentUserId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('dashboard/today')
+  @ApiOperation({ summary: 'Lấy hoạt động và mục tiêu học tập hôm nay' })
+  getDashboardToday(@Request() req: any) {
+    return this.gamificationService.getDashboardToday(req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -74,28 +93,10 @@ export class GamificationController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Post('vocab-learned')
-  @ApiOperation({
-    summary: 'Ghi nhận học từ vựng mới để tính tiến độ nhiệm vụ ngày',
-  })
-  recordVocabLearned(@Body('count') count: number, @Request() req: any) {
-    return this.gamificationService.recordVocabLearned(req.user.id, count || 1);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @Get('arena/snippet')
   @ApiOperation({ summary: 'Lấy tóm tắt rank đấu trường cho trang chủ' })
   getArenaSnippet(@Request() req: any) {
     return this.gamificationService.getArenaSnippet(req.user.id);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Post('spin-wheel')
-  @ApiOperation({ summary: 'Quay vòng quay may mắn (tốn 50 Bánh Rán)' })
-  spinWheel(@Request() req: any) {
-    return this.gamificationService.spinWheel(req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)

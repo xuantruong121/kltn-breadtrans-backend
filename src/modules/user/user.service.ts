@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UserService {
@@ -26,7 +27,7 @@ export class UserService {
     return userWithoutSensitiveData;
   }
 
-  async updateUserProfile(userId: number, updateData: any) {
+  async updateUserProfile(userId: number, updateData: UpdateProfileDto) {
     // Upsert profile in case it doesn't exist
     return this.prisma.profile.upsert({
       where: { userId },
@@ -47,6 +48,7 @@ export class UserService {
       vocabProgress,
       submissionsCount,
       toeicCount,
+      diagnosticAttempt,
     ] = await Promise.all([
       this.prisma.userStats.findUnique({ where: { userId } }),
       this.prisma.leaderboard.findUnique({ where: { userId } }),
@@ -57,6 +59,10 @@ export class UserService {
       this.prisma.submission.count({ where: { userId } }),
       this.prisma.toeicAttempt.count({
         where: { userId, submittedAt: { not: null } },
+      }),
+      this.prisma.diagnosticAttempt.findFirst({
+        where: { userId },
+        orderBy: { submittedAt: 'desc' },
       }),
     ]);
 
@@ -72,6 +78,14 @@ export class UserService {
       masteredVocabCount: vocabProgress,
       totalQuizzesDone: submissionsCount + toeicCount,
       pet: pet || null,
+      hasCompletedPlacementTest: !!diagnosticAttempt,
+      latestDiagnostic: diagnosticAttempt
+        ? {
+            level: diagnosticAttempt.level,
+            percentage: diagnosticAttempt.percentage,
+            submittedAt: diagnosticAttempt.submittedAt,
+          }
+        : null,
     };
   }
 

@@ -31,6 +31,9 @@ const mockPrismaService = {
   toeicAttempt: {
     count: jest.fn(),
   },
+  diagnosticAttempt: {
+    findFirst: jest.fn(),
+  },
 };
 
 const mockEventEmitter = {
@@ -122,6 +125,12 @@ describe('UserService', () => {
       mockPrismaService.userVocabWordProgress.count.mockResolvedValue(18);
       mockPrismaService.submission.count.mockResolvedValue(3);
       mockPrismaService.toeicAttempt.count.mockResolvedValue(2);
+      mockPrismaService.diagnosticAttempt.findFirst.mockResolvedValue({
+        id: 1,
+        level: 'Foundation',
+        percentage: 60,
+        submittedAt: new Date('2026-09-09T00:00:00Z'),
+      });
 
       await expect(service.getUserStats(7)).resolves.toMatchObject({
         streakCount: 4,
@@ -131,6 +140,11 @@ describe('UserService', () => {
         tier: 'Bạc',
         masteredVocabCount: 18,
         totalQuizzesDone: 5,
+        hasCompletedPlacementTest: true,
+        latestDiagnostic: {
+          level: 'Foundation',
+          percentage: 60,
+        },
       });
       expect(prisma.toeicAttempt.count).toHaveBeenCalledWith({
         where: { userId: 7, submittedAt: { not: null } },

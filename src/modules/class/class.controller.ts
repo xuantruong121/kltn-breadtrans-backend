@@ -7,6 +7,8 @@ import {
   ParseIntPipe,
   UseGuards,
   Request,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -41,8 +43,12 @@ export class ClassController {
   @Get('watch-tracking')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy dữ liệu theo dõi video đã xem' })
-  getWatchTracking(@Request() req: any) {
-    return this.classService.getWatchTracking(req.user.id);
+  getWatchTracking(@Request() req: any, @Query('classId') classId?: string) {
+    const parsedClassId = classId ? Number(classId) : undefined;
+    if (classId && !Number.isInteger(parsedClassId)) {
+      throw new BadRequestException('classId không hợp lệ');
+    }
+    return this.classService.getWatchTracking(req.user.id, parsedClassId);
   }
 
   @Patch('watch-tracking')
@@ -60,6 +66,7 @@ export class ClassController {
           : NaN;
     return this.classService.updateWatchTracking(
       req.user.id,
+      body.classId,
       body.videoKey,
       played,
     );

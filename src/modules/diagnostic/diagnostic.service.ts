@@ -91,6 +91,10 @@ export class DiagnosticService {
           ? 'Foundation'
           : 'Starter';
 
+    const previousAttempts = await this.prisma.diagnosticAttempt.count({
+      where: { userId },
+    });
+
     const attempt = await this.prisma.$transaction(async (tx) => {
       const created = await tx.diagnosticAttempt.create({
         data: {
@@ -114,6 +118,13 @@ export class DiagnosticService {
           sourceId: String(created.id),
         },
       });
+      if (previousAttempts === 0) {
+        await tx.userStats.upsert({
+          where: { userId },
+          update: { totalBanhRan: { increment: 50 } },
+          create: { userId, totalBanhRan: 50 },
+        });
+      }
       return created;
     });
 

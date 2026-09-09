@@ -65,4 +65,97 @@ describe('GamificationService weekly cron hardening', () => {
       message: 'Weekly cron đang được xử lý bởi tiến trình khác.',
     });
   });
+
+  it('uses completed quest count for dashboard summary percentage', async () => {
+    const quests = [
+      {
+        id: 1,
+        type: 'LEARN_VOCAB',
+        title: 'Học 10 từ vựng',
+        description: 'Học từ mới',
+        targetValue: 10,
+        rewardXP: 15,
+        rewardBanh: 5,
+      },
+      {
+        id: 2,
+        type: 'COMPLETE_QUIZ',
+        title: 'Làm 1 bài luyện nghe',
+        description: 'Hoàn thành bài nghe',
+        targetValue: 1,
+        rewardXP: 20,
+        rewardBanh: 8,
+      },
+      {
+        id: 3,
+        type: 'DO_SPEAKING',
+        title: 'Luyện Speaking',
+        description: 'Nộp bài nói',
+        targetValue: 1,
+        rewardXP: 25,
+        rewardBanh: 10,
+      },
+      {
+        id: 4,
+        type: 'COMPLETE_LESSON',
+        title: 'Hoàn thành bài học',
+        description: 'Xem xong lesson',
+        targetValue: 1,
+        rewardXP: 20,
+        rewardBanh: 8,
+      },
+    ];
+    const prisma: any = {
+      dailyQuest: { findMany: jest.fn().mockResolvedValue(quests) },
+      userQuestProgress: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 101,
+            questId: 1,
+            currentValue: 10,
+            isCompleted: true,
+            quest: quests[0],
+          },
+          {
+            id: 102,
+            questId: 2,
+            currentValue: 0,
+            isCompleted: false,
+            quest: quests[1],
+          },
+          {
+            id: 103,
+            questId: 3,
+            currentValue: 0,
+            isCompleted: false,
+            quest: quests[2],
+          },
+          {
+            id: 104,
+            questId: 4,
+            currentValue: 0,
+            isCompleted: false,
+            quest: quests[3],
+          },
+        ]),
+      },
+      learningActivity: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new GamificationService(
+      prisma,
+      {} as any,
+      { set: jest.fn() } as any,
+    );
+
+    const result = await service.getDashboardToday(1);
+
+    expect(result.summary).toEqual(
+      expect.objectContaining({
+        completedCount: 1,
+        totalCount: 4,
+        progressPercent: 25,
+      }),
+    );
+    expect(result.quests[0].progressPercent).toBe(100);
+  });
 });

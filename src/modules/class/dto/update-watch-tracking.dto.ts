@@ -20,6 +20,17 @@ export class WatchTrackingDataDto {
 }
 
 export class UpdateWatchTrackingDto {
+  @ApiPropertyOptional({
+    example: 12,
+    description:
+      'ID Course Offering/Class dùng để cô lập tiến độ theo enrollment',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(1)
+  classId?: number;
+
   @ApiProperty({
     example: 'https://cdn.example.com/video1.mp4',
     description: 'Video URL hoặc Video Key của bài học',

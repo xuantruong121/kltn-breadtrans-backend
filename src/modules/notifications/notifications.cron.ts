@@ -119,16 +119,26 @@ export class NotificationsCronService {
         `[Cron] Found ${dueItems.length} due vocab items waiting for reminder.`,
       );
 
-      // Claim items atomically to prevent duplicate runs
-      const itemIds = dueItems.map((item) => item.id);
-      await this.prisma.userVocabWordProgress.updateMany({
-        where: { id: { in: itemIds } },
-        data: { remindedAt: now },
-      });
+      // Claim each item with a conditional update so concurrent cron instances
+      // cannot both create a reminder for the same vocabulary word.
+      const claimedItems: typeof dueItems = [];
+      for (const item of dueItems) {
+        const claim = await this.prisma.userVocabWordProgress.updateMany({
+          where: { id: item.id, remindedAt: null },
+          data: { remindedAt: now },
+        });
+        if (claim.count === 1) {
+          claimedItems.push(item);
+        }
+      }
+
+      if (claimedItems.length === 0) {
+        return;
+      }
 
       // Group due items by user to batch notifications
-      const userItemsMap = new Map<number, typeof dueItems>();
-      for (const item of dueItems) {
+      const userItemsMap = new Map<number, typeof claimedItems>();
+      for (const item of claimedItems) {
         const list = userItemsMap.get(item.userId) || [];
         list.push(item);
         userItemsMap.set(item.userId, list);
@@ -172,4 +182,3 @@ export class NotificationsCronService {
     }
   }
 }
-

@@ -51,7 +51,9 @@ describe('NotificationsCronService', () => {
       ],
     }).compile();
 
-    cronService = module.get<NotificationsCronService>(NotificationsCronService);
+    cronService = module.get<NotificationsCronService>(
+      NotificationsCronService,
+    );
   });
 
   it('should be defined', () => {
@@ -82,10 +84,10 @@ describe('NotificationsCronService', () => {
     it('claims due items atomically, writes inbox notification and sends push', async () => {
       await cronService.handleVocabSpacedReview();
 
-      // Verified atomic updateMany
+      // Verified conditional atomic claim
       expect(prisma.userVocabWordProgress.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: { in: [1] } },
+          where: { id: 1, remindedAt: null },
         }),
       );
 

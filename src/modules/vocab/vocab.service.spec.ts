@@ -12,7 +12,13 @@ describe('VocabService', () => {
       providers: [
         VocabService,
         { provide: PrismaService, useValue: {} },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        {
+          provide: EventEmitter2,
+          useValue: {
+            emit: jest.fn(),
+            emitAsync: jest.fn().mockResolvedValue([]),
+          },
+        },
       ],
     }).compile();
 
@@ -28,12 +34,13 @@ describe('VocabService', () => {
       const prisma = (service as any).prisma;
       prisma.userVocabWordProgress = {
         findUnique: jest.fn().mockResolvedValue({ id: 1, isMastered: false }),
-        update: jest.fn().mockImplementation(({ data }) => Promise.resolve(data)),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
       };
 
       const before = Date.now();
       const res = await service.setMastered(1, 10, false);
-      const after = Date.now();
 
       expect(res.isMastered).toBe(false);
       const diffMinutes = (res.nextReviewAt!.getTime() - before) / (60 * 1000);
@@ -44,15 +51,40 @@ describe('VocabService', () => {
       const prisma = (service as any).prisma;
       prisma.userVocabWordProgress = {
         findUnique: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockImplementation(({ data }) => Promise.resolve(data)),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
       };
 
       const before = Date.now();
       const res = await service.setMastered(1, 10, true);
 
       expect(res.isMastered).toBe(true);
-      const diffDays = (res.nextReviewAt!.getTime() - before) / (24 * 60 * 60 * 1000);
+      const diffDays =
+        (res.nextReviewAt!.getTime() - before) / (24 * 60 * 60 * 1000);
       expect(Math.round(diffDays)).toBe(7);
+    });
+
+    it('waits for the gamification event when a word becomes mastered', async () => {
+      const prisma = (service as any).prisma;
+      const eventEmitter = (service as any).eventEmitter;
+      prisma.learningActivity = { create: jest.fn().mockResolvedValue({}) };
+      prisma.userVocabWordProgress = {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ ...data, isMastered: true }),
+          ),
+      };
+
+      await service.setMastered(1, 10, true);
+
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith('vocab.learned', {
+        userId: 1,
+        count: 1,
+        source: 'vocabulary_review',
+      });
     });
   });
 
@@ -61,7 +93,9 @@ describe('VocabService', () => {
       const prisma = (service as any).prisma;
       prisma.userVocabWordProgress = {
         findUnique: jest.fn().mockResolvedValue({ id: 1, reviewCount: 2 }),
-        update: jest.fn().mockImplementation(({ data }) => Promise.resolve(data)),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
       };
 
       const before = Date.now();
@@ -76,14 +110,16 @@ describe('VocabService', () => {
       const prisma = (service as any).prisma;
       prisma.userVocabWordProgress = {
         findUnique: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockImplementation(({ data }) => Promise.resolve(data)),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
       };
 
       const before = Date.now();
       const res = await service.submitReview(1, 10, true);
-      const diffDays = (res.nextReviewAt!.getTime() - before) / (24 * 60 * 60 * 1000);
+      const diffDays =
+        (res.nextReviewAt!.getTime() - before) / (24 * 60 * 60 * 1000);
       expect(Math.round(diffDays)).toBe(1);
     });
   });
 });
-

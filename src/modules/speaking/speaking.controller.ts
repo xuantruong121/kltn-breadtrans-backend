@@ -12,7 +12,12 @@ import {
   MaxFileSizeValidator,
   Request,
   Query,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -21,9 +26,12 @@ import {
   ApiConsumes,
   ApiQuery,
   ApiBody,
+  ApiHeader,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { SpeakingService } from './speaking.service';
 import { CreateExerciseDto } from './dto/create-exercise.dto';
+import { TtsRequestDto } from './dto/tts-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -68,14 +76,33 @@ export class SpeakingController {
 
   @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @Post('exercises/:id/submit')
+  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'Nộp audio để AI chấm phát âm (Azure Speech)',
+    summary: 'Nộp audio để AI chấm phát âm (Bất đồng bộ - Durable Queue)',
     description:
-      'Upload file audio WAV (16kHz). Hệ thống sẽ dùng Azure để lấy điểm chi tiết và Gemini để sinh lời khuyên.',
+      'Upload file audio WAV mono 16kHz. Yêu cầu header Idempotency-Key. Trả về HTTP 202 Accepted ngay lập tức cùng pollUrl.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    description: 'Khóa chống trùng lặp duy nhất cho mỗi lần bấm nộp bài',
+    required: true,
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Yêu cầu chấm điểm đã được tiếp nhận thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        submissionId: { type: 'number', example: 123 },
+        status: { type: 'string', example: 'PENDING' },
+        pollUrl: { type: 'string', example: '/speaking/submissions/123' },
+        acceptedAt: { type: 'string', example: '2026-09-09T00:00:00.000Z' },
+      },
+    },
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    description: 'File audio giọng đọc',
+    description: 'File audio giọng đọc (16kHz mono PCM WAV)',
     schema: {
       type: 'object',
       required: ['audio'],
@@ -92,6 +119,7 @@ export class SpeakingController {
   submitAudio(
     @Param('id', ParseIntPipe) exerciseId: number,
     @Request() req: any,
+    @Headers('idempotency-key') idempotencyKey: string,
     @UploadedFile(
       new ParseFilePipe({
         validators: [new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 })],
@@ -99,7 +127,69 @@ export class SpeakingController {
     )
     audio: Express.Multer.File,
   ) {
-    return this.speakingService.submitAudio(exerciseId, req.user.id, audio);
+    return this.speakingService.submitAudio(
+      exerciseId,
+      req.user.id,
+      audio,
+      idempotencyKey,
+    );
+  }
+
+  @Get('submissions/:submissionId')
+  @ApiOperation({
+    summary: 'Tra cứu trạng thái và kết quả bài nộp phát âm',
+    description:
+      'Chỉ chủ sở hữu bài nộp hoặc Admin mới có quyền truy cập. Trả về thông tin trạng thái, điểm số và audio an toàn.',
+  })
+  getSubmission(
+    @Param('submissionId', ParseIntPipe) submissionId: number,
+    @Request() req: any,
+  ) {
+    return this.speakingService.getSubmission(submissionId, req.user);
+  }
+
+  @Get('submissions/:submissionId/audio')
+  @ApiOperation({
+    summary: 'Lấy đường dẫn URL audio có chữ ký bảo mật ngắn hạn',
+  })
+  getSubmissionAudio(
+    @Param('submissionId', ParseIntPipe) submissionId: number,
+    @Request() req: any,
+  ) {
+    return this.speakingService.getAudioSignedUrl(submissionId, req.user);
+  }
+
+  @Get('my-submissions')
+  @ApiOperation({ summary: 'Xem lịch sử bài luyện phát âm của tôi' })
+  getMySubmissions(@Request() req: any) {
+    return this.speakingService.getMySubmissions(req.user.id);
+  }
+
+  @Post('tts')
+  @UseGuards(AiRateLimitGuard)
+  @ApiOperation({
+    summary: 'Tạo giọng đọc mẫu chuẩn Neural TTS (US/UK)',
+    description:
+      'Hỗ trợ chỉnh giọng Mỹ/Anh và tốc độ đọc (0.5x, 0.75x, 1x, 1.25x, 1.5x) trả về định dạng audio/mpeg.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Audio file stream MP3',
+  })
+  async generateTts(@Body() dto: TtsRequestDto, @Res() res: Response) {
+    const audioBuffer = await this.speakingService.generateTts(
+      dto.text,
+      dto.accent,
+      dto.rate,
+    );
+
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': audioBuffer.length,
+      'Cache-Control': 'public, max-age=604800, immutable',
+    });
+
+    res.send(audioBuffer);
   }
 
   @UseGuards(AiRateLimitGuard)
@@ -128,11 +218,5 @@ export class SpeakingController {
       promptText,
       studentResponse,
     );
-  }
-
-  @Get('my-submissions')
-  @ApiOperation({ summary: 'Xem lịch sử bài luyện phát âm của tôi' })
-  getMySubmissions(@Request() req: any) {
-    return this.speakingService.getMySubmissions(req.user.id);
   }
 }

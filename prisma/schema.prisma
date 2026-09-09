@@ -195,14 +195,7 @@ model Class {
   capacity      Int?      @default(30)
   tuitionFeeVnd Int       @default(0)
 
-  // Bổ sung các trường từ Firestore Classes Schema
-  status             ClassStatus @default(UPCOMING)
-  links              Json? // { zalo?, meet? }
-  summary            Json?
-  noteProcess        String?
-  rank               Json? // ClassRankSnapshot
-  stories            Json? // Record<userId, Record<storyId, IClassStory>>
-  pendingEvaluations Json? // Record<"studentId_bookId_lessonId", ...>
+  status ClassStatus @default(UPCOMING)
 
   enrollments   Enrollment[]
   assignments   Assignment[]
@@ -450,16 +443,43 @@ model SpeakingExercise {
   submissions SpeakingSubmission[]
 }
 
+enum SpeakingSubmissionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model SpeakingSubmission {
-  id           Int              @id @default(autoincrement())
-  exerciseId   Int
-  exercise     SpeakingExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
-  userId       Int
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  audioUrl     String // URL file audio lưu trên Cloudflare R2
-  overallScore Float? // Điểm tổng (0-10)
-  aiFeedback   Json? // JSON structured feedback từ Gemini
-  submittedAt  DateTime         @default(now())
+  id                  Int                      @id @default(autoincrement())
+  exerciseId          Int
+  exercise            SpeakingExercise         @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  userId              Int
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status              SpeakingSubmissionStatus @default(PENDING)
+  audioUrl            String? // Safe or legacy URL
+  audioKey            String? // Storage key in Cloudflare R2
+  audioMimeType       String? // Audio MIME type
+  durationMs          Int? // Spoken audio duration in milliseconds
+  audioQuality        Json? // Audio quality metrics (RMS, peak, clipping, noise)
+  transcript          String?                  @db.Text
+  overallScore        Float? // Overall score (0-10)
+  aiFeedback          Json? // Structured assessment from Azure / provider
+  provider            String?                  @default("azure")
+  scoreVersion        String?                  @default("v1")
+  attemptCount        Int                      @default(0)
+  nextAttemptAt       DateTime?
+  processingStartedAt DateTime?
+  processedAt         DateTime?
+  lastErrorCode       String?
+  lastErrorMessage    String?                  @db.Text
+  idempotencyKey      String?
+  rewardGrantedAt     DateTime?
+  submittedAt         DateTime                 @default(now())
+
+  @@unique([userId, idempotencyKey])
+  @@index([status, nextAttemptAt])
+  @@index([userId, submittedAt])
 }
 
 // ==========================================
@@ -587,12 +607,17 @@ model ContentAttempt {
 
 model MarketProduct {
   id            Int      @id @default(autoincrement())
+  slug          String   @unique
   name          String
+  description   String?  @db.Text
+  category      String   @default("GENERAL")
+  rarity        String   @default("COMMON")
   price         Float
   imageUrl      String?
   order         Int      @default(0)
   stock         Int      @default(100)
   purchaseCount Int      @default(0)
+  isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -671,28 +696,6 @@ model AiUsage {
   @@unique([userId, weekKey])
 }
 
-model SpeakingEvalRetry {
-  id                       Int       @id @default(autoincrement())
-  jobId                    String    @unique
-  studentId                Int
-  bookId                   String
-  lessonId                 String
-  audioUrl                 String
-  audioMimeType            String?
-  recordedDurationSeconds  Float?
-  referenceDurationSeconds Float?
-  script                   String?   @db.Text
-  retryCount               Int       @default(0)
-  maxAttempts              Int       @default(3)
-  status                   String    @default("pending") // "pending" | "failed" | "resolved"
-  nextRetryAt              DateTime?
-  lastError                String?   @db.Text
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @default(now()) @updatedAt
-  failedAt                 DateTime?
-  resolvedAt               DateTime?
-}
-
 // Vocab Module Models
 model VocabTopic {
   id           Int      @id @default(autoincrement())
@@ -708,20 +711,21 @@ model VocabTopic {
 }
 
 model VocabWord {
-  id        Int        @id @default(autoincrement())
-  topicId   Int
-  topic     VocabTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  word      String
-  pos       String     @default("noun") // "verb", "noun", "adjective", "adverb"
-  ipaUs     String?
-  ipaUk     String?
-  meaning   String
-  audioUs   String?
-  audioUk   String?
-  exampleEn String?    @db.Text
-  exampleVi String?    @db.Text
-  order     Int        @default(0)
-  createdAt DateTime   @default(now())
+  id           Int        @id @default(autoincrement())
+  topicId      Int
+  topic        VocabTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  word         String
+  pos          String     @default("noun") // "verb", "noun", "adjective", "adverb"
+  ipaUs        String?
+  ipaUk        String?
+  meaning      String
+  audioUs      String?
+  audioUk      String?
+  exampleEn    String?    @db.Text
+  exampleVi    String?    @db.Text
+  collocations Json?
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now())
 
   userProgress UserVocabWordProgress[]
 }
@@ -976,16 +980,16 @@ enum SupportSenderRole {
 }
 
 model SupportConversation {
-  id            Int              @id @default(autoincrement())
-  studentId     Int              @unique
-  student       User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  mode          SupportMode      @default(AI)
-  status        String           @default("OPEN")
-  lastMessageAt DateTime?        @default(now())
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id            Int         @id @default(autoincrement())
+  studentId     Int         @unique
+  student       User        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  mode          SupportMode @default(AI)
+  status        String      @default("OPEN")
+  lastMessageAt DateTime?   @default(now())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  messages      SupportMessage[]
+  messages SupportMessage[]
 
   @@index([lastMessageAt])
   @@index([studentId, status])
@@ -1027,4 +1031,3 @@ model Notification {
   @@index([userId, isRead])
   @@index([userId, createdAt])
 }
-

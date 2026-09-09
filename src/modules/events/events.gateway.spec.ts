@@ -295,10 +295,14 @@ describe('EventsGateway Security & Authentication Tests', () => {
     expect(
       mockSupportService.getOrCreateStudentConversation,
     ).toHaveBeenCalledWith(10);
-    expect(mockSupportService.sendStudentMessage).toHaveBeenCalledWith(10, 100, {
-      content: 'hello',
-      clientMessageId: undefined,
-    });
+    expect(mockSupportService.sendStudentMessage).toHaveBeenCalledWith(
+      10,
+      100,
+      {
+        content: 'hello',
+        clientMessageId: undefined,
+      },
+    );
 
     gateway.handleSupportMessageCreated({
       conversationId: 100,

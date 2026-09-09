@@ -14,6 +14,7 @@ import { CreateGrammarTopicDto } from './dto/create-grammar-topic.dto';
 import { CreateGrammarQuestionDto } from './dto/create-grammar-question.dto';
 import { SubmitGrammarAttemptDto } from './dto/submit-grammar-attempt.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
@@ -24,8 +25,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 export class GrammarController {
   constructor(private readonly grammarService: GrammarService) {}
 
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('topics')
   @ApiOperation({ summary: 'Lấy danh sách các chủ đề ngữ pháp kèm tiến độ' })
   getTopics(@Request() req: any) {
@@ -33,8 +33,7 @@ export class GrammarController {
     return this.grammarService.getTopics(userId);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('topics/:id')
   @ApiOperation({
     summary: 'Lấy chi tiết một chủ đề ngữ pháp và danh sách câu hỏi',

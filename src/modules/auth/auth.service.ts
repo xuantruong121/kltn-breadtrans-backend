@@ -371,75 +371,17 @@ export class AuthService {
     const avatar = payload.picture || null;
     const deviceId = dto.deviceId || crypto.randomUUID();
 
-    // 1. Kiểm tra AuthAccount đã liên kết với Google Sub này chưa
-    const authAccount = await this.prisma.authAccount.findUnique({
-      where: {
-        provider_providerAccountId: {
-          provider: 'GOOGLE',
-          providerAccountId: googleSub,
-        },
-      },
-      include: {
-        user: {
-          include: { profile: true },
-        },
-      },
+    const user = await this.resolveGoogleUser({
+      providerId: googleSub,
+      email,
+      fullName,
+      avatar,
     });
-
-    if (authAccount?.user) {
-      const user = authAccount.user;
-      if (user.role !== Role.STUDENT && user.role !== Role.ADMIN) {
-        throw new UnauthorizedException(
-          'Tài khoản không có quyền truy cập hệ thống.',
-        );
-      }
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
-      });
-      return this.issueTokens(user, deviceId);
-    }
-
-    // 2. Nếu chưa có AuthAccount, kiểm tra xem email đã tồn tại trong bảng User chưa
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-      include: { profile: true },
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
     });
-
-    if (existingUser) {
-      // Chính sách an toàn: Không tự động liên kết với tài khoản mật khẩu đang tồn tại.
-      throw new UnauthorizedException({
-        code: 'ACCOUNT_LINK_REQUIRED',
-        message:
-          'Email này đã tồn tại trong hệ thống. Hãy xác nhận mật khẩu để liên kết tài khoản Google.',
-      });
-    }
-
-    // 3. Tạo User mới (LUÔN LUÔN Role.STUDENT) kèm AuthAccount
-    const newUser = await this.prisma.user.create({
-      data: {
-        email,
-        role: Role.STUDENT,
-        emailVerifiedAt: new Date(),
-        lastLoginAt: new Date(),
-        loginCount: 1,
-        profile: {
-          create: {
-            fullName,
-            avatar,
-          },
-        },
-        authAccounts: {
-          create: {
-            provider: 'GOOGLE',
-            providerAccountId: googleSub,
-          },
-        },
-      },
-      include: { profile: true },
-    });
-
-    return this.issueTokens(newUser, deviceId);
+    return this.issueTokens(user, deviceId);
   }
 
   /**
@@ -495,6 +437,21 @@ export class AuthService {
 
     const deviceId = dto.deviceId || crypto.randomUUID();
 
+    const linkedAccount = await this.prisma.authAccount.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: 'GOOGLE',
+          providerAccountId: payload.sub,
+        },
+      },
+      select: { userId: true },
+    });
+    if (linkedAccount && linkedAccount.userId !== user.id) {
+      throw new ConflictException(
+        'Tài khoản Google này đã được liên kết với một tài khoản khác.',
+      );
+    }
+
     await this.prisma.authAccount.upsert({
       where: {
         provider_providerAccountId: {
@@ -542,10 +499,9 @@ export class AuthService {
 
   async exchangeGoogleLoginCode(code: string) {
     const key = `auth:google:code:${code}`;
-    const raw = await this.redis.get(key);
+    const raw = await this.redis.getdel(key);
     if (!raw)
       throw new UnauthorizedException('Mã đăng nhập Google đã hết hạn.');
-    await this.redis.del(key);
     const payload = JSON.parse(raw) as { userId: number; deviceId: string };
     const user = await this.prisma.user.findUnique({
       where: { id: payload.userId },
@@ -558,23 +514,42 @@ export class AuthService {
   }
 
   private async getOrCreateGoogleUser(profile: GoogleProfile) {
+    return this.resolveGoogleUser(profile);
+  }
+
+  /** Shared account resolution for GIS and Passport OAuth callbacks. */
+  private async resolveGoogleUser(profile: GoogleProfile) {
+    const linkedAccount = await this.prisma.authAccount.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: 'GOOGLE',
+          providerAccountId: profile.providerId,
+        },
+      },
+      include: { user: { include: { profile: true } } },
+    });
+    if (linkedAccount?.user) {
+      if (
+        linkedAccount.user.role !== Role.STUDENT &&
+        linkedAccount.user.role !== Role.ADMIN
+      ) {
+        throw new UnauthorizedException(
+          'Tài khoản không có quyền truy cập hệ thống.',
+        );
+      }
+      return linkedAccount.user;
+    }
+
     const existing = await this.prisma.user.findUnique({
       where: { email: profile.email },
       include: { profile: true },
     });
     if (existing) {
-      if (!existing.profile) {
-        return this.prisma.user.update({
-          where: { id: existing.id },
-          data: {
-            profile: {
-              create: { fullName: profile.fullName, avatar: profile.avatar },
-            },
-          },
-          include: { profile: true },
-        });
-      }
-      return existing;
+      throw new UnauthorizedException({
+        code: 'ACCOUNT_LINK_REQUIRED',
+        message:
+          'Email này đã tồn tại trong hệ thống. Hãy xác nhận mật khẩu để liên kết tài khoản Google.',
+      });
     }
 
     const randomPassword = await bcrypt.hash(
@@ -589,6 +564,12 @@ export class AuthService {
         emailVerifiedAt: new Date(),
         profile: {
           create: { fullName: profile.fullName, avatar: profile.avatar },
+        },
+        authAccounts: {
+          create: {
+            provider: 'GOOGLE',
+            providerAccountId: profile.providerId,
+          },
         },
       },
       include: { profile: true },

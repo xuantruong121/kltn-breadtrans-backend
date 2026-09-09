@@ -245,4 +245,3 @@ export class NotificationsService implements OnModuleInit {
     return { success: true, count: res.count };
   }
 }
-

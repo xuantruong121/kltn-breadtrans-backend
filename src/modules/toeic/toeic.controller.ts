@@ -7,10 +7,14 @@ import {
   Param,
   Req,
   UseGuards,
+  Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ToeicService } from './toeic.service';
 import { AttemptMode, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Assume this exists based on standard NestJS auth
+import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 
 @Controller('toeic')
 @UseGuards(JwtAuthGuard)
@@ -20,6 +24,37 @@ export class ToeicController {
   @Get('exams')
   getExams() {
     return this.toeicService.getExams();
+  }
+
+  @Get('bundles/:quizId')
+  getBundle(@Param('quizId') quizId: string, @Req() req: any) {
+    const isStaff = req.user?.role === Role.ADMIN;
+    return this.toeicService.getBundle(+quizId, isStaff);
+  }
+
+  @Get('groups/:groupId/audio')
+  @UseGuards(AiRateLimitGuard)
+  async getGroupAudio(
+    @Param('groupId') groupId: string,
+    @Query('accent') accent: string = 'US',
+    @Query('rate') rate = '1',
+    @Res() res: Response,
+  ) {
+    const normalizedAccent = accent.toUpperCase() === 'UK' ? 'UK' : 'US';
+    const parsedRate = Number(rate);
+    const allowedRates = [0.5, 0.75, 1, 1.25, 1.5];
+    const normalizedRate = allowedRates.includes(parsedRate) ? parsedRate : 1;
+    const audioBuffer = await this.toeicService.generateGroupAudio(
+      +groupId,
+      normalizedAccent,
+      normalizedRate,
+    );
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': audioBuffer.length,
+      'Cache-Control': 'private, max-age=3600',
+    });
+    res.send(audioBuffer);
   }
 
   @Get('exams/:examId')

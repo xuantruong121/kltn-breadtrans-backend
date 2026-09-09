@@ -63,6 +63,14 @@ export class MarketController {
     return this.marketService.getMyOrders(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('inventory')
+  @ApiOperation({ summary: 'Lấy kho đồ vật phẩm đã sở hữu của tôi' })
+  getInventory(@Request() req: any) {
+    return this.marketService.getInventory(req.user.id);
+  }
+
   // Admin APIs
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)

@@ -19,6 +19,8 @@ export interface PronunciationFeedback {
   completenessScore?: number;
   words?: WordAssessment[]; // Chi tiết trạng thái từng từ trong câu
   isSilentOrNoSpeech?: boolean; // Cờ báo hiệu không phát hiện giọng nói
+  transcript?: string;
+  errorCode?: string;
 }
 
 export interface SmartGeneratedContent {

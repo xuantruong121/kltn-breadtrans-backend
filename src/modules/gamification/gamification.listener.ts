@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
-import { GamificationService } from './gamification.service';
+import { GamificationService, getTodayDateKey } from './gamification.service';
 
 @Injectable()
 export class GamificationListener {
@@ -65,14 +65,24 @@ export class GamificationListener {
             );
           }
         }
+
+        // Award "Học Bá" badge on perfect quiz score
+        if (payload.score === 100) {
+          await this.gamificationService.awardBadgeIfEarned(
+            payload.userId,
+            'Học Bá',
+          );
+        }
       }
 
-      // 4. Update Daily Quests (COMPLETE_QUIZ & PERFECT_QUIZ)
-      const today = new Date().toISOString().split('T')[0];
+      // 4. Update Daily Quests (canonical and legacy listening quest types)
+      const today = getTodayDateKey('Asia/Ho_Chi_Minh');
       const activeQuests = await this.prisma.dailyQuest.findMany({
         where: {
           isActive: true,
-          type: { in: ['COMPLETE_QUIZ', 'PERFECT_QUIZ'] },
+          type: {
+            in: ['COMPLETE_QUIZ', 'DO_LISTENING', 'PERFECT_QUIZ'],
+          },
         },
       });
 
@@ -168,8 +178,16 @@ export class GamificationListener {
         );
       }
 
+      // Award "Giọng Đọc Vàng" badge when speaking score >= 80
+      if (payload.overallScore >= 80) {
+        await this.gamificationService.awardBadgeIfEarned(
+          payload.userId,
+          'Giọng Đọc Vàng',
+        );
+      }
+
       // 2. Cập nhật tiến độ nhiệm vụ ngày DO_SPEAKING
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayDateKey('Asia/Ho_Chi_Minh');
       const activeQuests = await this.prisma.dailyQuest.findMany({
         where: {
           isActive: true,
@@ -239,52 +257,80 @@ export class GamificationListener {
   }
 
   @OnEvent('vocab.learned')
-  async handleVocabLearnedEvent(payload: { userId: number; count: number }) {
+  async handleVocabLearnedEvent(payload: {
+    userId: number;
+    count: number;
+    source?: string;
+  }) {
     this.logger.log(`Handling vocab.learned event for user ${payload.userId}`);
     try {
-      // Tặng ngay 5 điểm (XP) cho mỗi từ vựng học được
-      if (payload.count > 0) {
-        await this.gamificationService.addPoints(
-          payload.userId,
-          payload.count * 5,
-          `Học ${payload.count} từ vựng mới`,
-        );
-      }
+      const count = Number.isFinite(payload.count)
+        ? Math.max(0, Math.trunc(payload.count))
+        : 0;
+      if (count === 0) return;
 
-      const today = new Date().toISOString().split('T')[0];
+      // Tặng ngay 5 điểm (XP) cho mỗi từ vựng học được
+      await this.gamificationService.addPoints(
+        payload.userId,
+        count * 5,
+        `Học ${count} từ vựng mới`,
+      );
+
+      const today = getTodayDateKey('Asia/Ho_Chi_Minh');
       const activeQuests = await this.prisma.dailyQuest.findMany({
-        where: { isActive: true, type: 'LEARN_VOCAB' },
+        where: { isActive: true, type: { in: ['LEARN_VOCAB', 'DO_VOCAB'] } },
       });
 
       for (const quest of activeQuests) {
-        const progress = await this.prisma.userQuestProgress.upsert({
-          where: {
-            userId_questId_dateKey: {
+        let completedNow = false;
+
+        await this.prisma.$transaction(async (tx) => {
+          const progress = await tx.userQuestProgress.upsert({
+            where: {
+              userId_questId_dateKey: {
+                userId: payload.userId,
+                questId: quest.id,
+                dateKey: today,
+              },
+            },
+            update: {},
+            create: {
               userId: payload.userId,
               questId: quest.id,
               dateKey: today,
+              currentValue: 0,
             },
-          },
-          update: {
-            currentValue: { increment: payload.count },
-          },
-          create: {
-            userId: payload.userId,
-            questId: quest.id,
-            dateKey: today,
-            currentValue: payload.count,
-          },
-        });
-
-        if (
-          progress.currentValue >= quest.targetValue &&
-          !progress.isCompleted
-        ) {
-          await this.prisma.userQuestProgress.update({
-            where: { id: progress.id },
-            data: { isCompleted: true },
           });
 
+          await tx.$queryRaw`
+            SELECT "id"
+            FROM "UserQuestProgress"
+            WHERE "id" = ${progress.id}
+            FOR UPDATE
+          `;
+
+          const lockedProgress = await tx.userQuestProgress.findUnique({
+            where: { id: progress.id },
+          });
+          if (!lockedProgress || lockedProgress.isCompleted) return;
+
+          const nextValue = Math.min(
+            quest.targetValue,
+            lockedProgress.currentValue + count,
+          );
+          completedNow = nextValue >= quest.targetValue;
+
+          await tx.userQuestProgress.update({
+            where: { id: progress.id },
+            data: {
+              currentValue: nextValue,
+              isCompleted: completedNow,
+              completedAt: completedNow ? new Date() : null,
+            },
+          });
+        });
+
+        if (completedNow) {
           if (quest.rewardXP > 0) {
             await this.gamificationService.addPoints(
               payload.userId,
@@ -331,7 +377,7 @@ export class GamificationListener {
       `Handling gamification.xp_earned event for user ${payload.userId}`,
     );
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayDateKey('Asia/Ho_Chi_Minh');
       const activeQuests = await this.prisma.dailyQuest.findMany({
         where: { isActive: true, type: 'EARN_XP' },
       });

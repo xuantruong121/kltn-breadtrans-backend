@@ -89,4 +89,3 @@ export class NotificationsController {
     return await this.notificationsService.markRead(req.user.id, id);
   }
 }
-
