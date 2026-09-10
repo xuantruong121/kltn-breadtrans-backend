@@ -597,6 +597,10 @@ Nội dung câu hỏi của học sinh:
       }
 
       // 4. Tính toán điểm tổng (Overall Score) có hiệu chỉnh theo độ hoàn thiện
+      // ARCHITECTURE NOTE: overallScore is provider-derived directly from Azure's raw PronScore (0-100 mapped to 0-10),
+      // with penalty only applied when completenessScore < 60% or when all words are problematic.
+      // Word-level highlighting on the frontend uses pedagogical display thresholds (e.g. >= 80% for emerald),
+      // which is purely a UI presentation layer and does not overwrite or alter this backend score contract.
       let overallScore = (rawPronScore / 100) * 10;
       if (completenessScore < 60) {
         // Phạt theo tỷ lệ nếu bỏ sót nhiều từ trong câu
