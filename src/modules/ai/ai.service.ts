@@ -3,6 +3,8 @@ import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
 import type {
   IAIEvaluator,
   PronunciationFeedback,
+  DictionaryEnrichment,
+  DictionaryEnrichmentInput,
 } from './strategies/ai-evaluator.interface';
 
 /**
@@ -19,6 +21,13 @@ export class AiService {
     private readonly aiEvaluator: IAIEvaluator,
   ) {
     this.logger.log('AiService initialized with Strategy Pattern');
+  }
+
+  async enrichDictionaryEntry(
+    input: DictionaryEnrichmentInput,
+  ): Promise<DictionaryEnrichment | null> {
+    if (!this.aiEvaluator.enrichDictionaryEntry) return null;
+    return this.aiEvaluator.enrichDictionaryEntry(input);
   }
 
   async generateFeedback(

@@ -3,7 +3,9 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { DictionaryLookupService } from './dictionary-lookup.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -14,17 +16,8 @@ export class VocabService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() private readonly dictionaryLookup?: DictionaryLookupService,
   ) {}
-
-  private isMissingCollocations(error: unknown): boolean {
-    return (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      (error as { code?: string }).code === 'P2022' &&
-      String(error).toLowerCase().includes('collocations')
-    );
-  }
 
   private async emitVocabLearned(userId: number): Promise<void> {
     await this.eventEmitter.emitAsync('vocab.learned', {
@@ -71,27 +64,14 @@ export class VocabService {
       { mastered: number; starred: number; needReview: number }
     > = {};
     if (userId) {
-      let userProgresses: Array<{
-        isMastered: boolean;
-        isStarred: boolean;
-        word: { topicId: number };
-      }>;
-      try {
-        userProgresses = await this.prisma.userVocabWordProgress.findMany({
-          where: { userId },
-          include: { word: true },
-        });
-      } catch (error) {
-        if (!this.isMissingCollocations(error)) throw error;
-        userProgresses = await this.prisma.userVocabWordProgress.findMany({
-          where: { userId },
-          select: {
-            isMastered: true,
-            isStarred: true,
-            word: { select: { topicId: true } },
-          },
-        });
-      }
+      const userProgresses = await this.prisma.userVocabWordProgress.findMany({
+        where: { userId },
+        select: {
+          isMastered: true,
+          isStarred: true,
+          word: { select: { topicId: true } },
+        },
+      });
 
       userProgresses.forEach((p) => {
         const topicId = p.word.topicId;
@@ -158,57 +138,10 @@ export class VocabService {
   }
 
   async getTopicDetails(topicId: number, userId?: number) {
-    let topic: {
-      id: number;
-      title: string;
-      categoryName: string;
-      words: Array<{
-        id: number;
-        word: string;
-        pos: string;
-        ipaUs: string | null;
-        ipaUk: string | null;
-        meaning: string;
-        audioUs: string | null;
-        audioUk: string | null;
-        exampleEn: string | null;
-        exampleVi: string | null;
-        order: number;
-        collocations?: unknown;
-      }>;
-    } | null;
-    try {
-      topic = await this.prisma.vocabTopic.findUnique({
-        where: { id: topicId },
-        include: { words: { orderBy: { order: 'asc' } } },
-      });
-    } catch (error) {
-      if (!this.isMissingCollocations(error)) throw error;
-      topic = await this.prisma.vocabTopic.findUnique({
-        where: { id: topicId },
-        select: {
-          id: true,
-          title: true,
-          categoryName: true,
-          words: {
-            orderBy: { order: 'asc' },
-            select: {
-              id: true,
-              word: true,
-              pos: true,
-              ipaUs: true,
-              ipaUk: true,
-              meaning: true,
-              audioUs: true,
-              audioUk: true,
-              exampleEn: true,
-              exampleVi: true,
-              order: true,
-            },
-          },
-        },
-      });
-    }
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id: topicId },
+      include: { words: { orderBy: { order: 'asc' } } },
+    });
 
     if (!topic) {
       throw new NotFoundException('Topic not found');
@@ -219,22 +152,10 @@ export class VocabService {
       { isStarred: boolean; isMastered: boolean }
     > = {};
     if (userId) {
-      let progresses: Array<{
-        wordId: number;
-        isStarred: boolean;
-        isMastered: boolean;
-      }>;
-      try {
-        progresses = await this.prisma.userVocabWordProgress.findMany({
-          where: { userId, word: { topicId } },
-        });
-      } catch (error) {
-        if (!this.isMissingCollocations(error)) throw error;
-        progresses = await this.prisma.userVocabWordProgress.findMany({
-          where: { userId, word: { topicId } },
-          select: { wordId: true, isStarred: true, isMastered: true },
-        });
-      }
+      const progresses = await this.prisma.userVocabWordProgress.findMany({
+        where: { userId, word: { topicId } },
+        select: { wordId: true, isStarred: true, isMastered: true },
+      });
       progresses.forEach((p) => {
         userProgressMap[p.wordId] = {
           isStarred: p.isStarred,
@@ -409,7 +330,10 @@ export class VocabService {
    * Invalid input is rejected, while a valid but uncatalogued word returns an
    * empty result so the speaking popup can fall back to direct practice.
    */
-  async lookupWord(rawWord: string) {
+  async lookupWord(rawWord: string, userId?: number) {
+    if (this.dictionaryLookup) {
+      return this.dictionaryLookup.lookup(rawWord, userId);
+    }
     if (
       !rawWord ||
       typeof rawWord !== 'string' ||
@@ -443,37 +367,13 @@ export class VocabService {
       audioUk: true,
       collocations: true,
     };
-    const selectFieldsWithoutCollocations = {
-      id: true,
-      word: true,
-      pos: true,
-      ipaUs: true,
-      ipaUk: true,
-      meaning: true,
-      exampleEn: true,
-      exampleVi: true,
-      audioUs: true,
-      audioUk: true,
-    };
-
     // 1. Try exact word match first
-    let exactMatches;
-    try {
-      exactMatches =
-        (await this.prisma.vocabWord.findMany({
-          where: { word: { equals: cleanWord, mode: 'insensitive' } },
-          take: 5,
-          select: selectFields,
-        })) ?? [];
-    } catch (error) {
-      if (!this.isMissingCollocations(error)) throw error;
-      exactMatches =
-        (await this.prisma.vocabWord.findMany({
-          where: { word: { equals: cleanWord, mode: 'insensitive' } },
-          take: 5,
-          select: selectFieldsWithoutCollocations,
-        })) ?? [];
-    }
+    const exactMatches =
+      (await this.prisma.vocabWord.findMany({
+        where: { word: { equals: cleanWord, mode: 'insensitive' } },
+        take: 5,
+        select: selectFields,
+      })) ?? [];
 
     if (exactMatches.length > 0) {
       return {
@@ -487,23 +387,12 @@ export class VocabService {
     // 2. Try common English inflections (plural, past tense, continuous, adverbs)
     const candidates = this.generateInflectionCandidates(cleanWord);
     if (candidates.length > 0) {
-      let inflectionMatches;
-      try {
-        inflectionMatches =
-          (await this.prisma.vocabWord.findMany({
-            where: { word: { in: candidates, mode: 'insensitive' } },
-            take: 5,
-            select: selectFields,
-          })) ?? [];
-      } catch (error) {
-        if (!this.isMissingCollocations(error)) throw error;
-        inflectionMatches =
-          (await this.prisma.vocabWord.findMany({
-            where: { word: { in: candidates, mode: 'insensitive' } },
-            take: 5,
-            select: selectFieldsWithoutCollocations,
-          })) ?? [];
-      }
+      const inflectionMatches =
+        (await this.prisma.vocabWord.findMany({
+          where: { word: { in: candidates, mode: 'insensitive' } },
+          take: 5,
+          select: selectFields,
+        })) ?? [];
 
       if (inflectionMatches.length > 0) {
         return {
@@ -521,6 +410,86 @@ export class VocabService {
       isInflectionMatch: false,
       matches: [],
     };
+  }
+
+  async listSavedWords(userId: number) {
+    const items = await this.prisma.userSavedWord.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return items.map((item) => ({
+      id: item.id,
+      word: item.displayWord,
+      pos: item.partOfSpeech || '',
+      ipaUs: item.ipaUs,
+      ipaUk: item.ipaUk,
+      meaning: item.meaningVi || item.definitionEn || '',
+      audioUs: item.audioUs,
+      audioUk: item.audioUk,
+      exampleEn: item.exampleEn,
+      exampleVi: item.exampleVi,
+      collocations: item.collocations,
+      isStarred: true,
+    }));
+  }
+
+  async saveWord(userId: number, rawWord: string) {
+    if (!this.dictionaryLookup) {
+      throw new NotFoundException('Dictionary service is unavailable');
+    }
+    const lookup = await this.dictionaryLookup.lookup(rawWord, userId);
+    const local = lookup.matches[0];
+    const external = lookup.entries?.[0];
+    if (!lookup.canonicalWord || (!local && !external)) {
+      throw new NotFoundException('Word was not found in the dictionary');
+    }
+
+    const canonicalWord = lookup.canonicalWord.toLowerCase();
+    const partOfSpeech = local?.pos || external?.partOfSpeech || 'unknown';
+    const snapshot = {
+      normalizedWord: rawWord.trim().toLowerCase(),
+      displayWord: rawWord.trim(),
+      canonicalWord,
+      partOfSpeech,
+      meaningVi: local?.meaning || external?.meaningVi || null,
+      definitionEn:
+        external?.definitions?.[0]?.definition || local?.exampleEn || null,
+      ipaUs: local?.ipaUs || external?.ipaUs || null,
+      ipaUk: local?.ipaUk || external?.ipaUk || null,
+      exampleEn: local?.exampleEn || external?.examples?.[0] || null,
+      exampleVi:
+        local?.exampleVi ||
+        external?.exampleVi ||
+        external?.definitions?.[0]?.meaningVi ||
+        null,
+      collocations: local?.collocations || external?.collocations || [],
+      synonyms: external?.synonyms || [],
+      antonyms: external?.antonyms || [],
+      audioUs: local?.audioUs || external?.audio.us || null,
+      audioUk: local?.audioUk || external?.audio.uk || null,
+      source: lookup.source === 'LOCAL' ? 'LOCAL' : 'EXTERNAL',
+    };
+    return this.prisma.userSavedWord.upsert({
+      where: {
+        userId_canonicalWord_partOfSpeech: {
+          userId,
+          canonicalWord,
+          partOfSpeech,
+        },
+      },
+      create: { userId, ...snapshot },
+      update: snapshot,
+    });
+  }
+
+  async removeSavedWord(userId: number, savedWordId: number) {
+    const deleted = await this.prisma.userSavedWord.deleteMany({
+      where: { id: savedWordId, userId },
+    });
+    if (deleted.count === 0) {
+      throw new NotFoundException('Saved word not found');
+    }
+    return { deleted: true };
   }
 
   /**
@@ -544,6 +513,11 @@ export class VocabService {
 
     // -ies -> -y (e.g. companies -> company)
     if (word.endsWith('ies') && word.length > 4) {
+      candidates.add(word.slice(0, -3) + 'y');
+    }
+
+    // -ied -> -y (e.g. studied -> study, tried -> try)
+    if (word.endsWith('ied') && word.length > 4) {
       candidates.add(word.slice(0, -3) + 'y');
     }
 

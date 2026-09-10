@@ -122,17 +122,37 @@ export class ToeicService {
   async generateGroupAudio(groupId: number, accent: 'US' | 'UK', rate: number) {
     const group = await this.prisma.toeicQuestionGroup.findUnique({
       where: { id: groupId },
-      select: { part: true, audioUrl: true, passageText: true },
+      select: {
+        part: true,
+        audioUrl: true,
+        passageText: true,
+        questions: { select: { options: true }, take: 1 },
+      },
     });
     if (!group) throw new NotFoundException('TOEIC question group not found');
     if (group.audioUrl) {
       const response = await fetch(group.audioUrl);
       if (response.ok) return Buffer.from(await response.arrayBuffer());
     }
-    if (group.part === 1 || !group.passageText) {
+    let audioText = group.passageText;
+    if (group.part === 1) {
+      const options = group.questions[0]?.options;
+      if (
+        !Array.isArray(options) ||
+        !options.every((option) => typeof option === 'string')
+      ) {
+        throw new ServiceUnavailableException(
+          'Câu Part 1 chưa có nội dung audio',
+        );
+      }
+      audioText = options
+        .map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`)
+        .join(' ');
+    }
+    if (!audioText) {
       throw new ServiceUnavailableException('Nhóm câu hỏi này chưa có audio');
     }
-    return this.speakingService.generateTts(group.passageText, accent, rate);
+    return this.speakingService.generateTts(audioText, accent, rate);
   }
 
   async startAttempt(userId: number, examId: number, mode: AttemptMode) {

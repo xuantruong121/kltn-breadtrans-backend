@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsEnum,
   IsArray,
+  MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { QuizType } from '@prisma/client';
@@ -68,4 +69,11 @@ export class SubmitQuizDto {
   @ApiProperty({ type: [AnswerDto] })
   @IsArray()
   answers: AnswerDto[];
+}
+
+export class CheckPracticeQuestionDto {
+  @ApiProperty({ example: 'Thursday at 2:30 P.M.' })
+  @IsString()
+  @MinLength(1)
+  answer: string;
 }

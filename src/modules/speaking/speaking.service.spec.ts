@@ -13,6 +13,7 @@ import { UploadService } from '../upload/upload.service';
 type MockFn = jest.Mock;
 type MockPrisma = {
   $queryRaw: MockFn;
+  $executeRaw: MockFn;
   $transaction: MockFn;
   speakingExercise: { findUnique: MockFn; findMany: MockFn };
   speakingSubmission: {
@@ -41,6 +42,7 @@ describe('SpeakingService - Durable Submissions & Security', () => {
   beforeEach(() => {
     mockPrisma = {
       $queryRaw: jest.fn(),
+      $executeRaw: jest.fn(),
       $transaction: jest.fn((callback: (tx: MockPrisma) => unknown) =>
         Promise.resolve(callback(mockPrisma)),
       ),

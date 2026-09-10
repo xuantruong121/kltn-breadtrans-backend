@@ -1428,6 +1428,92 @@ async function main() {
     });
   }
 
+  const listeningCatalogMetadataByQuizId: Record<
+    number,
+    Prisma.InputJsonObject
+  > = {
+    1: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'COMPREHENSION',
+      levels: ['A2'],
+      topics: ['Đời sống', 'Lịch hẹn', 'Mua sắm'],
+      accents: ['US', 'UK'],
+      durationMinutes: 12,
+    },
+    5: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'COMPREHENSION',
+      levels: ['B1'],
+      topics: ['Công việc', 'Cuộc họp'],
+      accents: ['US', 'UK'],
+      durationMinutes: 15,
+    },
+    9: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'COMPREHENSION',
+      levels: ['A1'],
+      topics: ['Đời sống hằng ngày'],
+      accents: ['US', 'UK'],
+      durationMinutes: 12,
+    },
+    10: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'COMPREHENSION',
+      levels: ['A2'],
+      topics: ['Du lịch', 'Dịch vụ'],
+      accents: ['US', 'UK'],
+      durationMinutes: 14,
+    },
+    11: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'COMPREHENSION',
+      levels: ['B1'],
+      topics: ['Công việc', 'Cuộc họp'],
+      accents: ['US', 'UK'],
+      durationMinutes: 16,
+    },
+    12: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'COMPREHENSION',
+      levels: ['B2'],
+      topics: ['Suy luận', 'Thông báo'],
+      accents: ['US', 'UK'],
+      durationMinutes: 18,
+    },
+  };
+
+  // These visuals provide non-answer-bearing context for general listening practice.
+  // TOEIC Part 1 uses question-group images instead, because the image is part of the task.
+  const listeningVisualContextByQuizId: Record<
+    number,
+    { imageUrl: string | null; imageAlt: string }
+  > = {
+    1: {
+      imageUrl: seedAssetUrl('toeic/visuals/grocery-checkout.png'),
+      imageAlt: 'A grocery store checkout counter',
+    },
+    5: {
+      imageUrl: seedAssetUrl('toeic/visuals/office-meeting.png'),
+      imageAlt: 'Colleagues talking in an office meeting',
+    },
+    9: {
+      imageUrl: seedAssetUrl('toeic/visuals/cafe-counter.png'),
+      imageAlt: 'A cafe service counter',
+    },
+    10: {
+      imageUrl: seedAssetUrl('toeic/visuals/departure-board.png'),
+      imageAlt: 'Travellers near an airport departure board',
+    },
+    11: {
+      imageUrl: seedAssetUrl('toeic/visuals/office-meeting.png'),
+      imageAlt: 'A workplace meeting',
+    },
+    12: {
+      imageUrl: seedAssetUrl('toeic/visuals/folders-cabinet.png'),
+      imageAlt: 'An employee organising office documents',
+    },
+  };
+
   const practiceQuizDefinitions = [
     {
       id: 1,
@@ -1451,7 +1537,14 @@ async function main() {
               'Wednesday at 2:00 P.M.',
             ],
             correctIndex: 2,
-            explanation: 'The speaker states Thursday afternoon at 2:30.',
+            explanation: {
+              vi: 'Người nói cho biết nha sĩ có thể khám vào lúc 2:30 chiều thứ Năm. Vì vậy đáp án đúng là C — Thursday at 2:30 P.M.',
+              evidence:
+                'The dentist can see you at two thirty on Thursday afternoon.',
+              keyPhrase: 'two thirty on Thursday afternoon',
+              vocabularyNote:
+                'two thirty = 2:30; on Thursday afternoon = vào chiều thứ Năm',
+            },
           },
         },
         {
@@ -1468,7 +1561,13 @@ async function main() {
               'It costs ten dollars.',
             ],
             correctIndex: 0,
-            explanation: 'The speaker says it is ten percent off.',
+            explanation: {
+              vi: 'Chiếc áo len có giá 20 đô la nhưng hôm nay được giảm giá 10%. Do đó, chiếc áo đang được giảm giá (It is discounted).',
+              evidence: 'it is ten percent off today',
+              keyPhrase: 'ten percent off',
+              vocabularyNote:
+                'percent off = giảm giá phần trăm; discounted = được giảm giá',
+            },
           },
         },
         {
@@ -1485,7 +1584,12 @@ async function main() {
               'At the city center',
             ],
             correctIndex: 2,
-            explanation: 'The bus leaves from stop number four.',
+            explanation: {
+              vi: 'Chuyến xe buýt tiếp theo đi vào trung tâm thành phố khởi hành từ trạm số 4. Hành khách cần đợi tại trạm số 4 (At stop four).',
+              evidence: 'leaves in fifteen minutes from stop number four',
+              keyPhrase: 'from stop number four',
+              vocabularyNote: 'bus stop = điểm dừng/trạm xe buýt',
+            },
           },
         },
         {
@@ -1496,7 +1600,12 @@ async function main() {
             text: 'What time does the café close on Sunday?',
             options: ['7 P.M.', '9 P.M.', '6 P.M.', '8 P.M.'],
             correctIndex: 2,
-            explanation: 'The closing time stated is six.',
+            explanation: {
+              vi: 'Người nói thông báo quán cà phê đóng cửa lúc 6 giờ vào Chủ nhật. Vì vậy đáp án đúng là 6 P.M.',
+              evidence: 'the café closes at six on Sundays',
+              keyPhrase: 'closes at six',
+              vocabularyNote: 'close at + time = đóng cửa vào lúc',
+            },
           },
         },
         {
@@ -1513,7 +1622,13 @@ async function main() {
               'The umbrella is on sale.',
             ],
             correctIndex: 2,
-            explanation: 'The forecast says it may rain.',
+            explanation: {
+              vi: 'Dự báo thời tiết cho biết trời có thể mưa sau bữa trưa, nên người nghe được dặn mang theo ô. Do đó đáp án là trời sắp có mưa (Rain is expected).',
+              evidence: 'The forecast says it may rain after lunch.',
+              keyPhrase: 'it may rain',
+              vocabularyNote:
+                'forecast = dự báo thời tiết; rain is expected = dự kiến có mưa',
+            },
           },
         },
         {
@@ -1530,7 +1645,12 @@ async function main() {
               'At the front desk',
             ],
             correctIndex: 3,
-            explanation: 'The speaker says to collect it at the front desk.',
+            explanation: {
+              vi: 'Bưu kiện đã được giao vào sáng nay và có thể nhận tại quầy lễ tân (At the front desk).',
+              evidence: 'You can collect it at the front desk.',
+              keyPhrase: 'collect it at the front desk',
+              vocabularyNote: 'parcel = bưu kiện; front desk = quầy lễ tân',
+            },
           },
         },
       ],
@@ -1757,7 +1877,12 @@ async function main() {
               'Cancel the shipment',
             ],
             correctIndex: 1,
-            explanation: 'He says he will update the warehouse team.',
+            explanation: {
+              vi: "Sau khi nghe thông báo lô hàng dời sang thứ Tư, người nam nói 'I’ll update the warehouse team', nghĩa là sẽ báo lại cho đội kho (Inform the warehouse team).",
+              evidence: 'I’ll update the warehouse team.',
+              keyPhrase: 'update the warehouse team',
+              vocabularyNote: 'update = cập nhật/báo tin; warehouse = nhà kho',
+            },
           },
         },
         {
@@ -1774,7 +1899,13 @@ async function main() {
               'She sent the wrong link',
             ],
             correctIndex: 1,
-            explanation: 'She says she cannot open the spreadsheet.',
+            explanation: {
+              vi: "Người nữ nói không thể mở bảng tính ngân sách được gửi ('can't open the budget spreadsheet'), tức là cô ấy không thể truy cập tệp tin (She cannot access a file).",
+              evidence: 'I can’t open the budget spreadsheet you sent.',
+              keyPhrase: 'can’t open the budget spreadsheet',
+              vocabularyNote:
+                'spreadsheet = bảng tính; access a file = truy cập tệp tin',
+            },
           },
         },
         {
@@ -1791,8 +1922,13 @@ async function main() {
               'The conference room',
             ],
             correctIndex: 0,
-            explanation:
-              'The client moved the meeting from ten to eleven thirty.',
+            explanation: {
+              vi: "Khách hàng yêu cầu dời cuộc họp từ 10:00 sang 11:30 ('move it to eleven thirty'), vì vậy điều thay đổi là thời gian họp (The meeting time).",
+              evidence: 'They asked to move it to eleven thirty.',
+              keyPhrase: 'move it to eleven thirty',
+              vocabularyNote:
+                'move a meeting = dời lịch họp; meeting time = giờ họp',
+            },
           },
         },
       ],
@@ -1959,7 +2095,8 @@ async function main() {
         timeLimit: definition.timeLimit,
         courseId: definition.courseId,
         practiceTopicId: definition.practiceTopicId,
-        bilingualContent: Prisma.DbNull,
+        bilingualContent:
+          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
       },
       create: {
         id: definition.id,
@@ -1969,19 +2106,35 @@ async function main() {
         timeLimit: definition.timeLimit,
         courseId: definition.courseId,
         practiceTopicId: definition.practiceTopicId,
-        bilingualContent: Prisma.DbNull,
+        bilingualContent:
+          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
       },
     });
     for (let order = 1; order <= definition.questions.length; order += 1) {
       const q = definition.questions[order - 1];
+      const visualContext = listeningVisualContextByQuizId[definition.id];
+      const questionContent =
+        definition.type === 'LISTENING_PRACTICE' && visualContext?.imageUrl
+          ? {
+              ...q.content,
+              imageUrl: visualContext.imageUrl,
+              imageAlt: visualContext.imageAlt,
+              imagePurpose: 'TOPIC_CONTEXT',
+            }
+          : q.content;
       await prisma.question.upsert({
         where: { id: questionId },
-        update: { quizId: quiz.id, type: q.type, content: q.content, order },
+        update: {
+          quizId: quiz.id,
+          type: q.type,
+          content: questionContent,
+          order,
+        },
         create: {
           id: questionId,
           quizId: quiz.id,
           type: q.type,
-          content: q.content,
+          content: questionContent,
           order,
         },
       });
@@ -2008,7 +2161,12 @@ async function main() {
             text: 'When does the shop open?',
             options: ['At 8:00', 'At noon', 'At 10:00', 'At 9:00'],
             correctIndex: 3,
-            explanation: 'The time stated is nine o’clock.',
+            explanation: {
+              vi: 'Người nói cho biết cửa hàng mở cửa vào lúc 9 giờ. Do đó đáp án chính xác là D — At 9:00.',
+              evidence: 'The shop opens at nine o’clock.',
+              keyPhrase: 'opens at nine o’clock',
+              vocabularyNote: 'open at + time = mở cửa vào lúc',
+            },
           },
         },
         {
@@ -2026,7 +2184,12 @@ async function main() {
               'At the door',
             ],
             correctIndex: 1,
-            explanation: 'The speaker gives the location directly.',
+            explanation: {
+              vi: 'Người nói yêu cầu đặt những cuốn sách lên chiếc bàn cạnh cửa sổ. Đáp án đúng là B — On the table by the window.',
+              evidence: 'put the books on the table by the window',
+              keyPhrase: 'on the table by the window',
+              vocabularyNote: 'by the window = bên cạnh cửa sổ',
+            },
           },
         },
         {
@@ -2044,7 +2207,13 @@ async function main() {
               'One bottle of juice',
             ],
             correctIndex: 0,
-            explanation: 'The speaker asks for two bottles of water.',
+            explanation: {
+              vi: "Người nói gọi hai chai nước suối ('two bottles of water'). Vì vậy đáp án đúng là A — Two bottles of water.",
+              evidence: 'I’d like two bottles of water, please.',
+              keyPhrase: 'two bottles of water',
+              vocabularyNote:
+                "I'd like = tôi muốn; bottle of water = chai nước",
+            },
           },
         },
         {
@@ -2057,7 +2226,12 @@ async function main() {
             text: 'What will arrive soon?',
             options: ['A taxi', 'A bus', 'A plane', 'A train'],
             correctIndex: 1,
-            explanation: 'The speaker mentions a bus.',
+            explanation: {
+              vi: 'Người nói thông báo xe buýt của mình sẽ đến trong 5 phút nữa. Phương tiện sắp đến là xe buýt (A bus).',
+              evidence: 'My bus arrives in five minutes.',
+              keyPhrase: 'My bus arrives',
+              vocabularyNote: 'arrive in + time = đến nơi sau khoảng thời gian',
+            },
           },
         },
         {
@@ -2076,7 +2250,13 @@ async function main() {
               'Near the station',
             ],
             correctIndex: 1,
-            explanation: 'The location is stated directly.',
+            explanation: {
+              vi: "Nhà vệ sinh nằm ở tầng 1, ngay cạnh thang máy ('next to the elevator'). Đáp án đúng là B — Next to the elevator.",
+              evidence:
+                'The restroom is on the first floor, next to the elevator.',
+              keyPhrase: 'next to the elevator',
+              vocabularyNote: 'restroom = nhà vệ sinh; elevator = thang máy',
+            },
           },
         },
         {
@@ -2089,7 +2269,12 @@ async function main() {
             text: 'When does the speaker usually have lunch?',
             options: ['11:30', '12:30', '2:00', '1:30'],
             correctIndex: 1,
-            explanation: 'The speaker says twelve thirty.',
+            explanation: {
+              vi: "Người nói thường ăn trưa vào lúc 12:30 ('twelve thirty'). Đáp án đúng là B — 12:30.",
+              evidence: 'I usually have lunch at twelve thirty.',
+              keyPhrase: 'have lunch at twelve thirty',
+              vocabularyNote: 'have lunch = ăn trưa; twelve thirty = 12 giờ 30',
+            },
           },
         },
         {
@@ -2102,7 +2287,13 @@ async function main() {
             text: 'What is the weather like?',
             options: ['Stormy', 'Very sunny', 'Snowy', 'Cloudy'],
             correctIndex: 3,
-            explanation: 'The speaker says it is cloudy.',
+            explanation: {
+              vi: "Thời tiết hôm nay nhiều mây ('cloudy') nhưng không mưa. Do đó tình trạng thời tiết là nhiều mây (Cloudy).",
+              evidence: 'Today is cloudy, but it is not raining.',
+              keyPhrase: 'Today is cloudy',
+              vocabularyNote:
+                'cloudy = nhiều mây, u ám; not raining = không mưa',
+            },
           },
         },
         {
@@ -2120,7 +2311,12 @@ async function main() {
               'Before breakfast',
             ],
             correctIndex: 2,
-            explanation: 'The requested time is after dinner.',
+            explanation: {
+              vi: "Người nói đề nghị gọi lại sau bữa tối ('after dinner'). Đáp án đúng là C — After dinner.",
+              evidence: 'Please call me after dinner.',
+              keyPhrase: 'call me after dinner',
+              vocabularyNote: 'after dinner = sau bữa tối',
+            },
           },
         },
       ],
@@ -2149,7 +2345,12 @@ async function main() {
               'The departure platform',
             ],
             correctIndex: 3,
-            explanation: 'The train now leaves from platform three.',
+            explanation: {
+              vi: 'Tàu đi Bristol chuyển sang khởi hành tại sân ga số 3 thay vì số 5. Thay đổi ở đây là sân ga khởi hành (The departure platform).',
+              evidence: 'depart from platform three instead of platform five',
+              keyPhrase: 'depart from platform three',
+              vocabularyNote: 'platform = sân ga; depart = khởi hành',
+            },
           },
         },
         {
@@ -2163,7 +2364,13 @@ async function main() {
             text: 'What is included?',
             options: ['Airport transport', 'Dinner', 'Laundry', 'Breakfast'],
             correctIndex: 3,
-            explanation: 'Breakfast is included in the room price.',
+            explanation: {
+              vi: "Nhân viên khách sạn cho biết bữa sáng đã được bao gồm trong giá phòng ('breakfast is included'). Đáp án đúng là D — Breakfast.",
+              evidence: 'breakfast is included in the price',
+              keyPhrase: 'breakfast is included',
+              vocabularyNote:
+                'included in the price = đã bao gồm trong giá vé/phòng',
+            },
           },
         },
         {
@@ -2181,7 +2388,13 @@ async function main() {
               'A hotel key',
             ],
             correctIndex: 0,
-            explanation: 'Both documents are requested.',
+            explanation: {
+              vi: 'Người nghe được yêu cầu xuất trình hộ chiếu và thẻ lên máy bay (A passport and boarding pass).',
+              evidence: 'Could I see your passport and boarding pass, please?',
+              keyPhrase: 'passport and boarding pass',
+              vocabularyNote:
+                'passport = hộ chiếu; boarding pass = thẻ lên máy bay',
+            },
           },
         },
         {
@@ -2195,7 +2408,13 @@ async function main() {
             text: 'When is a room available?',
             options: ['Tonight', 'Tomorrow', 'Next week', 'This afternoon'],
             correctIndex: 1,
-            explanation: 'The speaker says tomorrow.',
+            explanation: {
+              vi: "Tối nay khách sạn đã kín phòng nhưng ngày mai sẽ có phòng trống ('a room is available tomorrow'). Đáp án đúng là B — Tomorrow.",
+              evidence: 'a room is available tomorrow',
+              keyPhrase: 'available tomorrow',
+              vocabularyNote:
+                'fully booked = hết phòng/chỗ; available = có sẵn, còn trống',
+            },
           },
         },
         {
@@ -2214,7 +2433,13 @@ async function main() {
               'A hotel room',
             ],
             correctIndex: 2,
-            explanation: 'The guided tour is included.',
+            explanation: {
+              vi: "Vé vào bảo tàng đã bao gồm chuyến tham quan có hướng dẫn viên lúc 2 giờ ('a guided tour'). Đáp án đúng là C — A guided tour.",
+              evidence: 'ticket includes a guided tour at two o’clock',
+              keyPhrase: 'includes a guided tour',
+              vocabularyNote:
+                'guided tour = chuyến tham quan có hướng dẫn viên',
+            },
           },
         },
         {
@@ -2232,7 +2457,13 @@ async function main() {
               'Change the tires',
             ],
             correctIndex: 0,
-            explanation: 'The tank should be full.',
+            explanation: {
+              vi: "Khách hàng được yêu cầu trả xe thuê với bình xăng đã được đổ đầy ('full tank of fuel'), tức là cần đổ đầy xăng (Fill the fuel tank).",
+              evidence: 'return the rental car with a full tank of fuel',
+              keyPhrase: 'full tank of fuel',
+              vocabularyNote:
+                'rental car = xe thuê; full tank = bình nhiên liệu đầy',
+            },
           },
         },
         {
@@ -2251,7 +2482,12 @@ async function main() {
               'A technical problem',
             ],
             correctIndex: 1,
-            explanation: 'Strong winds caused the delay.',
+            explanation: {
+              vi: "Chuyến bay bị hoãn 40 phút do gió mạnh ('because of strong winds'). Vì vậy lý do chậm chuyến là gió lớn (Strong winds).",
+              evidence: 'delayed by forty minutes because of strong winds',
+              keyPhrase: 'because of strong winds',
+              vocabularyNote: 'delayed = bị hoãn/trễ; strong winds = gió mạnh',
+            },
           },
         },
         {
@@ -2269,7 +2505,13 @@ async function main() {
               'Platform six',
             ],
             correctIndex: 2,
-            explanation: 'Luggage is at carousel six.',
+            explanation: {
+              vi: "Hành khách có thể nhận lại hành lý tại băng chuyền số 6 ('carousel six'). Đáp án đúng là C — Carousel six.",
+              evidence: 'collect your luggage from carousel six',
+              keyPhrase: 'carousel six',
+              vocabularyNote:
+                'luggage = hành lý; baggage carousel = băng chuyền hành lý sân bay',
+            },
           },
         },
       ],
@@ -2298,7 +2540,14 @@ async function main() {
               'Thursday is a holiday',
             ],
             correctIndex: 0,
-            explanation: 'The director’s Wednesday visit caused the change.',
+            explanation: {
+              vi: "Lịch họp tuần được dời sang thứ Năm vì giám đốc kinh doanh sẽ đến thăm vào thứ Tư ('the sales director will be visiting on Wednesday').",
+              evidence:
+                'because the sales director will be visiting on Wednesday',
+              keyPhrase: 'sales director will be visiting',
+              vocabularyNote:
+                'sales director = giám đốc kinh doanh; move a meeting = dời lịch họp',
+            },
           },
         },
         {
@@ -2317,7 +2566,12 @@ async function main() {
               'The office closes at noon',
             ],
             correctIndex: 0,
-            explanation: 'The speaker plans to send it this afternoon.',
+            explanation: {
+              vi: 'Hợp đồng cần được xem xét trước bữa trưa để người nói kịp gửi cho khách hàng vào chiều nay (It needs to be sent later today).',
+              evidence: 'so I can send it to the client this afternoon',
+              keyPhrase: 'send it to the client this afternoon',
+              vocabularyNote: 'review = xem xét, rà soát; contract = hợp đồng',
+            },
           },
         },
         {
@@ -2336,7 +2590,14 @@ async function main() {
               'Buy new computers',
             ],
             correctIndex: 2,
-            explanation: 'The remaining task is restarting computers.',
+            explanation: {
+              vi: 'Kỹ thuật viên đã sửa xong lỗi mạng, nhưng việc còn lại cần làm là khởi động lại toàn bộ máy tính phòng họp (Restart the meeting-room computers).',
+              evidence:
+                'we still need to restart all the meeting-room computers',
+              keyPhrase: 'restart all the meeting-room computers',
+              vocabularyNote:
+                'technician = kỹ thuật viên; restart = khởi động lại',
+            },
           },
         },
         {
@@ -2350,7 +2611,13 @@ async function main() {
             text: 'How many applicants were selected for interviews?',
             options: ['20', '12', '120', '10'],
             correctIndex: 1,
-            explanation: 'Twelve candidates were selected.',
+            explanation: {
+              vi: "Trong số 120 hồ sơ nộp, bộ phận tuyển dụng đã chọn ra 12 ứng viên để phỏng vấn ('selected twelve people for interviews'). Đáp án đúng là B — 12.",
+              evidence: 'selected twelve people for interviews next week',
+              keyPhrase: 'selected twelve people',
+              vocabularyNote:
+                'application = hồ sơ ứng tuyển; interview = phỏng vấn',
+            },
           },
         },
         {
@@ -2369,7 +2636,14 @@ async function main() {
               'Final expense figures',
             ],
             correctIndex: 3,
-            explanation: 'The report depends on accounting’s final figures.',
+            explanation: {
+              vi: 'Người nói có thể hoàn thành báo cáo nếu kế toán gửi số liệu chi phí cuối cùng trước 3 giờ. Thứ người nói cần là số liệu chi phí (Final expense figures).',
+              evidence:
+                'if accounting sends me the final expense figures by three',
+              keyPhrase: 'final expense figures',
+              vocabularyNote:
+                'accounting = phòng kế toán; expense figures = số liệu chi phí',
+            },
           },
         },
         {
@@ -2388,7 +2662,13 @@ async function main() {
               'The supplier must change',
             ],
             correctIndex: 1,
-            explanation: 'The discount requires an order of 500 units.',
+            explanation: {
+              vi: "Nhà cung cấp sẽ chiết khấu 5% với điều kiện đơn hàng phải tăng lên 500 sản phẩm ('increase the order to five hundred units').",
+              evidence: 'if we increase the order to five hundred units',
+              keyPhrase: 'increase the order to five hundred units',
+              vocabularyNote:
+                'supplier = nhà cung cấp; discount = chiết khấu/giảm giá',
+            },
           },
         },
         {
@@ -2407,7 +2687,13 @@ async function main() {
               'The topic changed',
             ],
             correctIndex: 1,
-            explanation: 'A new session was added due to full capacity.',
+            explanation: {
+              vi: "Buổi học chuyên đề thứ Sáu đã kín chỗ ('Friday’s workshop is full'), do đó ban tổ chức mở thêm một buổi vào sáng thứ Hai tới.",
+              evidence: 'Because Friday’s workshop is full',
+              keyPhrase: 'workshop is full',
+              vocabularyNote:
+                'workshop = buổi hội thảo/tập huấn; session = phiên/buổi học',
+            },
           },
         },
         {
@@ -2426,7 +2712,14 @@ async function main() {
               'Customers with discounts',
             ],
             correctIndex: 2,
-            explanation: 'The speaker specifies customers who canceled.',
+            explanation: {
+              vi: "Người nói yêu cầu cập nhật danh sách và xoá những khách hàng đã huỷ gói đăng ký ('canceled their subscription'). Đáp án đúng là C — Customers who canceled.",
+              evidence:
+                'remove anyone who has already canceled their subscription',
+              keyPhrase: 'canceled their subscription',
+              vocabularyNote:
+                'remove = loại bỏ; subscription = gói đăng ký dịch vụ định kỳ',
+            },
           },
         },
       ],
@@ -2455,8 +2748,14 @@ async function main() {
               'Present the unfinished prototype',
             ],
             correctIndex: 1,
-            explanation:
-              'The speaker prefers delaying rather than presenting unfinished work.',
+            explanation: {
+              vi: "Người nói thà hoãn buổi thuyết trình còn hơn trình bày sản phẩm mẫu chưa hoàn thiện ('I’d rather delay the presentation'). Vì vậy người nói sẽ hoãn buổi thuyết trình (Postpone the presentation).",
+              evidence:
+                'I’d rather delay the presentation than show the client something unfinished.',
+              keyPhrase: 'rather delay the presentation',
+              vocabularyNote:
+                'postpone = delay = hoãn lại; prototype = sản phẩm mẫu',
+            },
           },
         },
         {
@@ -2475,8 +2774,13 @@ async function main() {
               'Inspect another office',
             ],
             correctIndex: 3,
-            explanation:
-              'The speaker recommends inspecting the alternative office.',
+            explanation: {
+              vi: 'Vì văn phòng mới có diện tích gấp đôi với chi phí tương đương giá thuê mới, người nói đề xuất nên đi khảo sát văn phòng đó trước khi quyết định (Inspect another office).',
+              evidence: 'we should at least inspect it before deciding',
+              keyPhrase: 'inspect it before deciding',
+              vocabularyNote:
+                'inspect = khảo sát, thị sát; lease = hợp đồng thuê',
+            },
           },
         },
         {
@@ -2495,7 +2799,13 @@ async function main() {
               'The survey questions are incorrect',
             ],
             correctIndex: 2,
-            explanation: 'The low response rate motivates the new approach.',
+            explanation: {
+              vi: "Tỷ lệ phản hồi khảo sát chỉ đạt 30% ('only thirty percent'), quá thấp nên người nói mới đề xuất cách tiếp cận mới. Đáp án đúng là có quá ít người phản hồi (Too few people responded).",
+              evidence: 'The survey response rate is only thirty percent.',
+              keyPhrase: 'response rate is only thirty percent',
+              vocabularyNote:
+                'response rate = tỷ lệ phản hồi; survey = khảo sát',
+            },
           },
         },
         {
@@ -2514,7 +2824,13 @@ async function main() {
               'Paying too much for a ticket',
             ],
             correctIndex: 0,
-            explanation: 'The small transfer window creates lateness risk.',
+            explanation: {
+              vi: "Tàu chiều đến sát giờ hội nghị chỉ 20 phút và bất kỳ sự cố trễ nào cũng có thể khiến họ bị muộn ('could make us late'). Nỗi lo của người nói là đến muộn hội nghị (Arriving late to the conference).",
+              evidence: 'Even a small delay could make us late',
+              keyPhrase: 'could make us late',
+              vocabularyNote:
+                'concerned about = lo lắng về; conference = hội nghị',
+            },
           },
         },
         {
@@ -2533,7 +2849,14 @@ async function main() {
               'The client disliked the proposal',
             ],
             correctIndex: 0,
-            explanation: 'The client wants clearer cost estimates first.',
+            explanation: {
+              vi: "Khách hàng yêu cầu dự toán chi phí rõ ràng hơn trước khi ký kết ('asked for clearer cost estimates'). Trở ngại hiện tại là dự toán chi phí cần được làm rõ (The cost estimates need clarification).",
+              evidence:
+                'she asked for clearer cost estimates before signing anything',
+              keyPhrase: 'clearer cost estimates',
+              vocabularyNote:
+                'cost estimate = dự toán chi phí; close the deal = chốt giao dịch',
+            },
           },
         },
         {
@@ -2552,8 +2875,14 @@ async function main() {
               'They are too difficult',
             ],
             correctIndex: 0,
-            explanation:
-              'Fewer tickets after publication suggests the videos help users.',
+            explanation: {
+              vi: "Lượng yêu cầu hỗ trợ giảm đi kể từ khi phát hành video hướng dẫn ('fewer support tickets'). Người nói suy ra rằng các video giúp giảm số lượng yêu cầu hỗ trợ (They reduce support requests).",
+              evidence:
+                'We’ve had fewer support tickets since the tutorial videos went online.',
+              keyPhrase: 'fewer support tickets',
+              vocabularyNote:
+                'support ticket = yêu cầu hỗ trợ kỹ thuật; infer = suy luận',
+            },
           },
         },
         {
@@ -2572,8 +2901,14 @@ async function main() {
               'The more expensive printer',
             ],
             correctIndex: 3,
-            explanation:
-              'Long-term value leads the speaker toward the expensive model.',
+            explanation: {
+              vi: "Người nói nhận định máy in đắt hơn nhưng có độ bền và giá trị sử dụng lâu dài tốt hơn ('the more expensive model may be better value over time'). Do đó người nói ưu tiên máy in đắt hơn (The more expensive printer).",
+              evidence:
+                'the more expensive model may be better value over time',
+              keyPhrase: 'more expensive model may be better value',
+              vocabularyNote:
+                'value over time = giá trị sử dụng lâu dài; running costs = chi phí vận hành',
+            },
           },
         },
         {
@@ -2592,8 +2927,14 @@ async function main() {
               'The trainer is absent Friday',
             ],
             correctIndex: 1,
-            explanation:
-              'Waiting allows the new employees to attend one shared session.',
+            explanation: {
+              vi: "Nếu lùi đến thứ Ba, tất cả nhân viên mới đều có thể tham gia cùng một buổi ('everyone can attend the same session') mà không cần dạy lại. Đáp án đúng là B — All new employees can attend.",
+              evidence:
+                'If we wait until Tuesday, everyone can attend the same session',
+              keyPhrase: 'everyone can attend the same session',
+              vocabularyNote:
+                'attend = tham dự; session = buổi học/phiên làm việc',
+            },
           },
         },
       ],
@@ -3408,7 +3749,8 @@ async function main() {
         type: QuizType[definition.type as keyof typeof QuizType],
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
-        bilingualContent: Prisma.DbNull,
+        bilingualContent:
+          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
       },
       create: {
         id: definition.id,
@@ -3417,19 +3759,35 @@ async function main() {
         type: QuizType[definition.type as keyof typeof QuizType],
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
-        bilingualContent: Prisma.DbNull,
+        bilingualContent:
+          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
       },
     });
     for (let order = 1; order <= definition.questions.length; order += 1) {
       const q = definition.questions[order - 1];
+      const visualContext = listeningVisualContextByQuizId[definition.id];
+      const questionContent =
+        definition.type === 'LISTENING_PRACTICE' && visualContext?.imageUrl
+          ? {
+              ...q.content,
+              imageUrl: visualContext.imageUrl,
+              imageAlt: visualContext.imageAlt,
+              imagePurpose: 'TOPIC_CONTEXT',
+            }
+          : q.content;
       await prisma.question.upsert({
         where: { id: questionId },
-        update: { quizId: quiz.id, type: q.type, content: q.content, order },
+        update: {
+          quizId: quiz.id,
+          type: q.type,
+          content: questionContent,
+          order,
+        },
         create: {
           id: questionId,
           quizId: quiz.id,
           type: q.type,
-          content: q.content,
+          content: questionContent,
           order,
         },
       });
@@ -5024,7 +5382,7 @@ async function main() {
           meaning,
           exampleEn,
           exampleVi,
-          collocations: collocations as Prisma.InputJsonValue,
+          collocations,
           order: wordIndex + 1,
         },
         create: {
@@ -5037,7 +5395,7 @@ async function main() {
           meaning,
           exampleEn,
           exampleVi,
-          collocations: collocations as Prisma.InputJsonValue,
+          collocations,
           order: wordIndex + 1,
         },
       });
@@ -5089,6 +5447,100 @@ async function main() {
         { phrase: 'around the clock', meaningVi: 'suốt ngày đêm' },
       ],
     },
+    {
+      id: 1003,
+      word: 'study',
+      pos: 'verb',
+      ipaUs: '/ˈstʌdi/',
+      ipaUk: '/ˈstʌdi/',
+      meaning: 'học; nghiên cứu',
+      exampleEn: 'I study English every evening.',
+      exampleVi: 'Tôi học tiếng Anh mỗi tối.',
+      collocations: [{ phrase: 'study for an exam', meaningVi: 'học để thi' }],
+    },
+    {
+      id: 1004,
+      word: 'go',
+      pos: 'verb',
+      ipaUs: '/ɡoʊ/',
+      ipaUk: '/ɡəʊ/',
+      meaning: 'đi; tiến hành',
+      exampleEn: 'We go to class at eight o’clock.',
+      exampleVi: 'Chúng tôi đến lớp lúc tám giờ.',
+      collocations: [{ phrase: 'go to class', meaningVi: 'đến lớp' }],
+    },
+    {
+      id: 1005,
+      word: 'watch',
+      pos: 'verb',
+      ipaUs: '/wɑːtʃ/',
+      ipaUk: '/wɒtʃ/',
+      meaning: 'xem; theo dõi',
+      exampleEn: 'Watch the speaker’s mouth carefully.',
+      exampleVi: 'Hãy quan sát kỹ khẩu hình của người nói.',
+      collocations: [{ phrase: 'watch the clock', meaningVi: 'nhìn đồng hồ' }],
+    },
+    {
+      id: 1006,
+      word: 'business',
+      pos: 'noun',
+      ipaUs: '/ˈbɪznəs/',
+      ipaUk: '/ˈbɪznəs/',
+      meaning: 'doanh nghiệp; công việc kinh doanh',
+      exampleEn: 'The business is expanding into a new market.',
+      exampleVi: 'Doanh nghiệp đang mở rộng sang thị trường mới.',
+      collocations: [
+        { phrase: 'business meeting', meaningVi: 'cuộc họp kinh doanh' },
+      ],
+    },
+    {
+      id: 1007,
+      word: 'news',
+      pos: 'noun',
+      ipaUs: '/nuːz/',
+      ipaUk: '/njuːz/',
+      meaning: 'tin tức',
+      exampleEn: 'The evening news starts at six.',
+      exampleVi: 'Bản tin buổi tối bắt đầu lúc sáu giờ.',
+      collocations: [{ phrase: 'evening news', meaningVi: 'tin tức buổi tối' }],
+    },
+    {
+      id: 1008,
+      word: 'library',
+      pos: 'noun',
+      ipaUs: '/ˈlaɪbreri/',
+      ipaUk: '/ˈlaɪbrəri/',
+      meaning: 'thư viện',
+      exampleEn: 'The library opens at eight o’clock.',
+      exampleVi: 'Thư viện mở cửa lúc tám giờ.',
+      collocations: [
+        { phrase: 'public library', meaningVi: 'thư viện công cộng' },
+      ],
+    },
+    {
+      id: 1009,
+      word: 'close',
+      pos: 'verb',
+      ipaUs: '/kloʊz/',
+      ipaUk: '/kləʊz/',
+      meaning: 'đóng; kết thúc',
+      exampleEn: 'The library closes at six in the evening.',
+      exampleVi: 'Thư viện đóng cửa lúc sáu giờ tối.',
+      collocations: [
+        { phrase: 'close a meeting', meaningVi: 'kết thúc cuộc họp' },
+      ],
+    },
+    {
+      id: 1010,
+      word: 'evening',
+      pos: 'noun',
+      ipaUs: '/ˈiːvnɪŋ/',
+      ipaUk: '/ˈiːvnɪŋ/',
+      meaning: 'buổi tối',
+      exampleEn: 'I review vocabulary every evening.',
+      exampleVi: 'Tôi ôn từ vựng mỗi tối.',
+      collocations: [{ phrase: 'this evening', meaningVi: 'tối nay' }],
+    },
   ] as const;
   for (const definition of canonicalLookupWords) {
     await prisma.vocabWord.upsert({
@@ -5102,7 +5554,7 @@ async function main() {
         meaning: definition.meaning,
         exampleEn: definition.exampleEn,
         exampleVi: definition.exampleVi,
-        collocations: definition.collocations as Prisma.InputJsonValue,
+        collocations: definition.collocations,
       },
       create: {
         id: definition.id,
@@ -5114,7 +5566,7 @@ async function main() {
         meaning: definition.meaning,
         exampleEn: definition.exampleEn,
         exampleVi: definition.exampleVi,
-        collocations: definition.collocations as Prisma.InputJsonValue,
+        collocations: definition.collocations,
       },
     });
   }
@@ -8923,6 +9375,8 @@ async function main() {
         examId: toeicPartPractice.id,
         part: sourceGroup.part,
         passageText: sourceGroup.passageText,
+        audioUrl: sourceGroup.audioUrl,
+        imageUrl: sourceGroup.imageUrl,
         groupOrder: sourceGroup.part,
       },
     });

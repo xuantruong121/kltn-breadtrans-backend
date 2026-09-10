@@ -9,12 +9,17 @@ import {
   UseGuards,
   Request,
   ParseIntPipe,
+  Res,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { QuizService } from './quiz.service';
 import {
   CreateQuizDto,
   CreateQuestionDto,
   SubmitQuizDto,
+  CheckPracticeQuestionDto,
 } from './dto/quiz.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -82,12 +87,47 @@ export class QuizController {
     return this.quizService.getToeicPapers(req.user?.id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get(':quizId/questions/:questionId/audio')
+  @ApiOperation({ summary: 'Phát audio cho một câu luyện nghe' })
+  async streamQuestionAudio(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Res() res: Response,
+  ) {
+    const audioBuffer = await this.quizService.streamQuestionAudio(
+      quizId,
+      questionId,
+    );
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': audioBuffer.length,
+      'Cache-Control': 'private, max-age=86400',
+      Vary: 'Authorization',
+    });
+    res.send(audioBuffer);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post(':quizId/questions/:questionId/check')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Kiểm tra đáp án tức thời cho bài luyện nghe' })
+  checkPracticeQuestion(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Body() dto: CheckPracticeQuestionDto,
+  ) {
+    return this.quizService.checkPracticeQuestion(quizId, questionId, dto);
+  }
+
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết Quiz và danh sách Questions' })
   getQuizById(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const isStaff = req.user?.role === Role.ADMIN;
-    return this.quizService.getQuizById(id, isStaff);
+    return this.quizService.getQuizById(id, isStaff, req.user?.id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

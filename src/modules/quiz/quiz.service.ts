@@ -2,16 +2,20 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { QuizType, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateQuizDto,
   CreateQuestionDto,
   SubmitQuizDto,
+  CheckPracticeQuestionDto,
 } from './dto/quiz.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AiService } from '../ai/ai.service';
+import { SpeakingService } from '../speaking/speaking.service';
 
 @Injectable()
 export class QuizService {
@@ -19,6 +23,7 @@ export class QuizService {
     private prisma: PrismaService,
     private eventEmitter: EventEmitter2,
     private aiService: AiService,
+    private speakingService: SpeakingService,
   ) {}
 
   async createQuiz(dto: CreateQuizDto, user?: { id: number; role: Role }) {
@@ -99,8 +104,36 @@ export class QuizService {
       },
     });
 
-    if (!userId)
-      return quizzes.map((quiz) => ({ ...quiz, isCompleted: false }));
+    const toCatalogItem = (
+      quiz: (typeof quizzes)[number],
+      isCompleted: boolean,
+    ) => {
+      const metadata = (quiz.bilingualContent ?? {}) as Record<string, unknown>;
+      const stringArray = (value: unknown): string[] =>
+        Array.isArray(value)
+          ? value.filter((item): item is string => typeof item === 'string')
+          : [];
+      const durationMinutes = Number(metadata.durationMinutes);
+
+      return {
+        ...quiz,
+        mode: metadata.mode === 'DICTATION' ? 'DICTATION' : 'COMPREHENSION',
+        track:
+          metadata.track === 'TOEIC_LISTENING'
+            ? 'TOEIC_LISTENING'
+            : 'GENERAL_ENGLISH',
+        levels: stringArray(metadata.levels),
+        topics: stringArray(metadata.topics),
+        accents: stringArray(metadata.accents),
+        questionCount: quiz._count.questions,
+        durationMinutes: Number.isFinite(durationMinutes)
+          ? durationMinutes
+          : quiz.timeLimit,
+        isCompleted,
+      };
+    };
+
+    if (!userId) return quizzes.map((quiz) => toCatalogItem(quiz, false));
 
     // Check user submissions to see which ones are completed
     const userSubmissions = await this.prisma.submission.findMany({
@@ -113,10 +146,9 @@ export class QuizService {
 
     const completedQuizIds = new Set(userSubmissions.map((s) => s.quizId));
 
-    return quizzes.map((quiz) => ({
-      ...quiz,
-      isCompleted: completedQuizIds.has(quiz.id),
-    }));
+    return quizzes.map((quiz) =>
+      toCatalogItem(quiz, completedQuizIds.has(quiz.id)),
+    );
   }
 
   async getToeicPapers(userId?: number) {
@@ -159,12 +191,16 @@ export class QuizService {
     });
   }
 
-  async getQuizById(id: number, includeAnswers = false) {
+  async getQuizById(id: number, includeAnswers = false, userId?: number) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },
       include: { questions: { orderBy: { order: 'asc' } } },
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
+
+    if (quiz.type === QuizType.LISTENING_PRACTICE && userId === undefined) {
+      throw new UnauthorizedException('Đăng nhập để bắt đầu luyện nghe');
+    }
 
     if (!includeAnswers && quiz.questions) {
       const sanitizedQuestions = quiz.questions.map((q) => {
@@ -172,7 +208,11 @@ export class QuizService {
         const content = { ...(q.content as any) };
         delete content.correct;
         delete content.correctAnswer;
+        delete content.correctIndex;
         delete content.explanation;
+        if (quiz.type === QuizType.LISTENING_PRACTICE) {
+          delete content.audioText;
+        }
         return { ...q, content };
       });
       return { ...quiz, questions: sanitizedQuestions };
@@ -212,7 +252,11 @@ export class QuizService {
   }
 
   async submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto) {
-    const quiz = await this.getQuizById(quizId, true);
+    const quiz = await this.getQuizById(quizId, true, userId);
+
+    if (quiz.type === QuizType.LISTENING_PRACTICE) {
+      this.assertCompleteListeningSubmission(quiz.questions, dto.answers);
+    }
 
     let totalScore = 0;
 
@@ -336,6 +380,109 @@ export class QuizService {
       ...submission,
       isFirstSubmission,
     };
+  }
+
+  async checkPracticeQuestion(
+    quizId: number,
+    questionId: number,
+    dto: CheckPracticeQuestionDto,
+  ) {
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId },
+      include: { quiz: { select: { id: true, type: true } } },
+    });
+    if (!question || question.quizId !== quizId) {
+      throw new NotFoundException('Câu hỏi không thuộc bài luyện này');
+    }
+    if (question.quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new ForbiddenException(
+        'Chỉ hỗ trợ kiểm tra tức thời cho bài luyện nghe',
+      );
+    }
+
+    const content = question.content as Record<string, unknown>;
+    if (
+      question.type !== 'MULTIPLE_CHOICE' ||
+      !Array.isArray(content.options)
+    ) {
+      return {
+        questionId,
+        isCorrect: false,
+        submittedAnswer: dto.answer,
+        feedback: 'Loại câu hỏi này chưa được hỗ trợ kiểm tra tức thời.',
+      };
+    }
+
+    const correctIndex = Number(content.correctIndex);
+    const expectedAnswer = Number.isInteger(correctIndex)
+      ? content.options[correctIndex]
+      : content.correct;
+    if (typeof expectedAnswer !== 'string') {
+      throw new BadRequestException('Câu hỏi chưa có đáp án hợp lệ');
+    }
+
+    return {
+      questionId,
+      isCorrect: dto.answer.trim() === expectedAnswer.trim(),
+      submittedAnswer: dto.answer,
+      correctAnswer: expectedAnswer,
+      explanation:
+        typeof content.explanation === 'string' ||
+        (content.explanation && typeof content.explanation === 'object')
+          ? content.explanation
+          : null,
+      translation:
+        typeof content.translation === 'string' ? content.translation : null,
+    };
+  }
+
+  async streamQuestionAudio(
+    quizId: number,
+    questionId: number,
+  ): Promise<Buffer> {
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId },
+      include: { quiz: { select: { id: true, type: true } } },
+    });
+    if (!question || question.quizId !== quizId) {
+      throw new NotFoundException('Câu hỏi không thuộc bài luyện này');
+    }
+    if (question.quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new ForbiddenException('Chỉ hỗ trợ audio cho bài luyện nghe');
+    }
+
+    const content = question.content as Record<string, unknown>;
+    const audioText =
+      typeof content.audioText === 'string' ? content.audioText.trim() : '';
+    if (!audioText)
+      throw new BadRequestException('Câu hỏi chưa có nội dung audio');
+    const accent = content.accent === 'UK' ? 'UK' : 'US';
+    return this.speakingService.generateTts(audioText, accent, 1);
+  }
+
+  private assertCompleteListeningSubmission(
+    questions: Array<{ id: number }>,
+    answers: Array<{ questionId: number; answer: unknown }>,
+  ) {
+    const questionIds = new Set(questions.map((question) => question.id));
+    if (answers.length !== questionIds.size) {
+      throw new BadRequestException(
+        'Hãy trả lời đầy đủ tất cả câu hỏi trước khi nộp bài',
+      );
+    }
+
+    const seenQuestionIds = new Set<number>();
+    for (const answer of answers) {
+      if (
+        !questionIds.has(answer.questionId) ||
+        seenQuestionIds.has(answer.questionId) ||
+        typeof answer.answer !== 'string' ||
+        answer.answer.trim().length === 0
+      ) {
+        throw new BadRequestException('Dữ liệu câu trả lời không hợp lệ');
+      }
+      seenQuestionIds.add(answer.questionId);
+    }
   }
 
   /**

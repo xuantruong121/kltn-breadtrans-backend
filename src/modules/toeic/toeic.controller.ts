@@ -14,7 +14,6 @@ import type { Response } from 'express';
 import { ToeicService } from './toeic.service';
 import { AttemptMode, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Assume this exists based on standard NestJS auth
-import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 
 @Controller('toeic')
 @UseGuards(JwtAuthGuard)
@@ -33,7 +32,6 @@ export class ToeicController {
   }
 
   @Get('groups/:groupId/audio')
-  @UseGuards(AiRateLimitGuard)
   async getGroupAudio(
     @Param('groupId') groupId: string,
     @Query('accent') accent: string = 'US',

@@ -164,7 +164,9 @@ export class SpeakingService {
     let submission;
     try {
       submission = await this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`
+        // pg_advisory_xact_lock returns PostgreSQL `void`; use executeRaw so
+        // Prisma does not try to deserialize a result row from the lock call.
+        await tx.$executeRaw`
           SELECT pg_advisory_xact_lock(
             hashtext(${`speaking-quota:${userId}:${startOfDay.toISOString().slice(0, 10)}`})
           );

@@ -84,6 +84,7 @@ model User {
   watchTracking                   WatchTracking?
   aiUsages                        AiUsage[]
   vocabProgresses                 UserVocabWordProgress[]
+  savedVocabulary                 UserSavedWord[]
   toeicAttempts                   ToeicAttempt[]
   toeicSpeakingWritingSubmissions ToeicSpeakingWritingSubmission[]
   pet                             UserPet?
@@ -744,6 +745,35 @@ model UserVocabWordProgress {
   remindedAt     DateTime?
 
   @@unique([userId, wordId])
+}
+
+/// Personal dictionary snapshots. This is intentionally separate from
+/// UserVocabWordProgress: saving a word must not mark it as learned or award XP.
+model UserSavedWord {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  normalizedWord String
+  displayWord    String
+  canonicalWord  String
+  partOfSpeech   String?
+  meaningVi      String?
+  definitionEn   String?
+  ipaUs          String?
+  ipaUk          String?
+  exampleEn      String?
+  exampleVi      String?
+  collocations   Json?
+  synonyms       Json?
+  antonyms       Json?
+  audioUs        String?
+  audioUk        String?
+  source         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, canonicalWord, partOfSpeech])
+  @@index([userId, createdAt])
 }
 
 // ==========================================
