@@ -1,6 +1,7 @@
 import {
   AssignmentType,
   AttemptMode,
+  AttemptStatus,
   AuthProvider,
   Class,
   ClassStatus,
@@ -9415,6 +9416,14 @@ async function main() {
       userId: students[0].id,
       examId: toeicExam.id,
       mode: AttemptMode.FULL_TEST,
+      status: AttemptStatus.SUBMITTED,
+      durationSeconds: 7200,
+      createdAt: new Date('2026-09-08T08:00:00.000Z'),
+      startedAt: new Date('2026-09-08T08:00:00.000Z'),
+      deadline: new Date('2026-09-08T10:00:00.000Z'),
+      listeningCorrect: 100,
+      readingCorrect: 100,
+      totalCorrect: 200,
       listeningScore: 495,
       readingScore: 495,
       totalScore: 990,
@@ -9486,7 +9495,7 @@ async function main() {
       title: 'TOEIC 4 kỹ năng — Full Skills Comprehensive Bundle 01',
       description:
         'Gói đề thi tổng hợp TOEIC 4 kỹ năng: Listening & Reading (200 câu) kết hợp Speaking (11 câu) & Writing (8 câu).',
-      type: QuizType.TOEIC,
+      type: QuizType.TOEIC_FOUR_SKILL,
       courseId: courses[5].id,
       timeLimit: 200,
       bilingualContent: {
@@ -9510,7 +9519,7 @@ async function main() {
       title: 'TOEIC 4 kỹ năng — Full Skills Comprehensive Bundle 01',
       description:
         'Gói đề thi tổng hợp TOEIC 4 kỹ năng: Listening & Reading (200 câu) kết hợp Speaking (11 câu) & Writing (8 câu).',
-      type: QuizType.TOEIC,
+      type: QuizType.TOEIC_FOUR_SKILL,
       courseId: courses[5].id,
       timeLimit: 200,
       bilingualContent: {

@@ -27,6 +27,16 @@ const mockPrismaService = {
   },
   submission: {
     count: jest.fn(),
+    findMany: jest.fn(),
+  },
+  quiz: {
+    findMany: jest.fn(),
+  },
+  speakingExercise: {
+    count: jest.fn(),
+  },
+  speakingSubmission: {
+    findMany: jest.fn(),
   },
   toeicAttempt: {
     count: jest.fn(),
@@ -149,6 +159,89 @@ describe('UserService', () => {
       expect(prisma.toeicAttempt.count).toHaveBeenCalledWith({
         where: { userId: 7, submittedAt: { not: null } },
       });
+    });
+  });
+
+  describe('getUserSkillsSummary', () => {
+    it('returns 0 completed and 0% for a new user with empty catalog or no completions', async () => {
+      mockPrismaService.quiz.findMany
+        .mockResolvedValueOnce([]) // listening quizzes
+        .mockResolvedValueOnce([]) // reading quizzes
+        .mockResolvedValueOnce([]); // writing quizzes
+      mockPrismaService.submission.findMany
+        .mockResolvedValueOnce([]) // listening submissions
+        .mockResolvedValueOnce([]) // reading submissions
+        .mockResolvedValueOnce([]); // writing submissions
+      mockPrismaService.speakingExercise.count.mockResolvedValue(0);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue([]);
+
+      const result = await service.getUserSkillsSummary(99);
+
+      expect(result.overall).toEqual({
+        totalItems: 0,
+        completedItems: 0,
+        progressPercent: 0,
+      });
+      expect(result.skills).toHaveLength(4);
+      result.skills.forEach((s) => {
+        expect(s.totalItems).toBe(0);
+        expect(s.completedItems).toBe(0);
+        expect(s.progressPercent).toBe(0);
+      });
+    });
+
+    it('calculates aggregate math correctly across 4 skills and clamps progress to 100%', async () => {
+      // Listening: 10 total, 5 completed (50%)
+      // Reading: 10 total, 10 completed (100%)
+      // Speaking: 10 total, 3 completed (30%)
+      // Writing: 10 total, 2 completed (20%)
+      // Total: 40, Completed: 20 => 50%
+      mockPrismaService.quiz.findMany
+        .mockResolvedValueOnce(
+          Array.from({ length: 10 }, (_, i) => ({ id: i + 1 })),
+        ) // listening
+        .mockResolvedValueOnce(
+          Array.from({ length: 10 }, (_, i) => ({ id: i + 11 })),
+        ) // reading
+        .mockResolvedValueOnce(
+          Array.from({ length: 10 }, (_, i) => ({ id: i + 21 })),
+        ); // writing
+
+      mockPrismaService.submission.findMany
+        .mockResolvedValueOnce(
+          Array.from({ length: 5 }, (_, i) => ({ quizId: i + 1 })),
+        ) // listening completed
+        .mockResolvedValueOnce(
+          Array.from({ length: 10 }, (_, i) => ({ quizId: i + 11 })),
+        ) // reading completed
+        .mockResolvedValueOnce(
+          Array.from({ length: 2 }, (_, i) => ({ quizId: i + 21 })),
+        ); // writing completed
+
+      mockPrismaService.speakingExercise.count.mockResolvedValue(10);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue(
+        Array.from({ length: 3 }, (_, i) => ({ exerciseId: i + 1 })),
+      );
+
+      const result = await service.getUserSkillsSummary(1);
+
+      expect(result.overall).toEqual({
+        totalItems: 40,
+        completedItems: 20,
+        progressPercent: 50,
+      });
+
+      const listening = result.skills.find((s) => s.skill === 'LISTENING');
+      expect(listening?.progressPercent).toBe(50);
+      expect(listening?.completedItems).toBe(5);
+      expect(listening?.totalItems).toBe(10);
+
+      const reading = result.skills.find((s) => s.skill === 'READING');
+      expect(reading?.progressPercent).toBe(100);
+
+      // Verify progress percent never exceeds 100
+      expect(result.overall.progressPercent).toBeLessThanOrEqual(100);
+      expect(result.overall.progressPercent).toBeGreaterThanOrEqual(0);
     });
   });
 });

@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TopicCategory, QuizType } from '@prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UserSkillsSummaryResponse } from './dto/user-skills-summary.dto';
 
 @Injectable()
 export class UserService {
@@ -126,6 +128,157 @@ export class UserService {
           count: item._count._all,
           averageScore: item._avg.score,
         })),
+      },
+    };
+  }
+
+  async getUserSkillsSummary(
+    userId: number,
+  ): Promise<UserSkillsSummaryResponse> {
+    const [
+      listeningQuizzes,
+      listeningSubmissions,
+      readingQuizzes,
+      readingSubmissions,
+      speakingCount,
+      speakingSubmissions,
+      writingQuizzes,
+      writingSubmissions,
+    ] = await Promise.all([
+      // 1. Listening (QuizType.LISTENING_PRACTICE)
+      this.prisma.quiz.findMany({
+        where: { type: QuizType.LISTENING_PRACTICE },
+        select: { id: true },
+      }),
+      this.prisma.submission.findMany({
+        where: {
+          userId,
+          quiz: { type: QuizType.LISTENING_PRACTICE },
+        },
+        select: { quizId: true },
+        distinct: ['quizId'],
+      }),
+
+      // 2. Reading (TopicCategory.BILINGUAL_LEVEL)
+      this.prisma.quiz.findMany({
+        where: { practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL } },
+        select: { id: true },
+      }),
+      this.prisma.submission.findMany({
+        where: {
+          userId,
+          quiz: { practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL } },
+        },
+        select: { quizId: true },
+        distinct: ['quizId'],
+      }),
+
+      // 3. Speaking (SpeakingExercise & SpeakingSubmission)
+      this.prisma.speakingExercise.count(),
+      this.prisma.speakingSubmission.findMany({
+        where: { userId, status: 'COMPLETED' },
+        select: { exerciseId: true },
+        distinct: ['exerciseId'],
+      }),
+
+      // 4. Writing (TopicCategory.WRITING_PART1)
+      this.prisma.quiz.findMany({
+        where: { practiceTopic: { category: TopicCategory.WRITING_PART1 } },
+        select: { id: true },
+      }),
+      this.prisma.submission.findMany({
+        where: {
+          userId,
+          quiz: { practiceTopic: { category: TopicCategory.WRITING_PART1 } },
+        },
+        select: { quizId: true },
+        distinct: ['quizId'],
+      }),
+    ]);
+
+    const calcPercent = (completed: number, total: number) =>
+      total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+
+    return {
+      skills: [
+        {
+          skill: 'LISTENING',
+          title: 'Listening Studio',
+          categoryLabel: 'Part 1 – Part 4',
+          totalItems: listeningQuizzes.length,
+          completedItems: listeningSubmissions.length,
+          progressPercent: calcPercent(
+            listeningSubmissions.length,
+            listeningQuizzes.length,
+          ),
+          levelRange: 'B1 - C1',
+          badge: 'Tốc độ 1.0x–1.5x',
+          unitLabel: 'Bài luyện',
+        },
+        {
+          skill: 'READING',
+          title: 'Reading Mastery',
+          categoryLabel: 'Part 5 – Part 7',
+          totalItems: readingQuizzes.length,
+          completedItems: readingSubmissions.length,
+          progressPercent: calcPercent(
+            readingSubmissions.length,
+            readingQuizzes.length,
+          ),
+          levelRange: 'A2 - C1',
+          badge: 'Dịch song ngữ',
+          unitLabel: 'Bài đọc',
+        },
+        {
+          skill: 'SPEAKING',
+          title: 'Speaking AI Lab',
+          categoryLabel: 'Azure AI Speech',
+          totalItems: speakingCount,
+          completedItems: speakingSubmissions.length,
+          progressPercent: calcPercent(
+            speakingSubmissions.length,
+            speakingCount,
+          ),
+          levelRange: 'B1 - C1',
+          badge: 'Chấm IPA tức thì',
+          unitLabel: 'Tình huống',
+        },
+        {
+          skill: 'WRITING',
+          title: 'Writing AI Tutor',
+          categoryLabel: 'Structured AI',
+          totalItems: writingQuizzes.length,
+          completedItems: writingSubmissions.length,
+          progressPercent: calcPercent(
+            writingSubmissions.length,
+            writingQuizzes.length,
+          ),
+          levelRange: 'B1 - C1',
+          badge: 'Góp ý từng câu',
+          unitLabel: 'Đề bài',
+        },
+      ],
+      overall: {
+        totalItems:
+          listeningQuizzes.length +
+          readingQuizzes.length +
+          speakingCount +
+          writingQuizzes.length,
+        completedItems:
+          listeningSubmissions.length +
+          readingSubmissions.length +
+          speakingSubmissions.length +
+          writingSubmissions.length,
+        progressPercent: calcPercent(
+          listeningSubmissions.length +
+            readingSubmissions.length +
+            speakingSubmissions.length +
+            writingSubmissions.length,
+          listeningQuizzes.length +
+            readingQuizzes.length +
+            speakingCount +
+            writingQuizzes.length,
+        ),
       },
     };
   }

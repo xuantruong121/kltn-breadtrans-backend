@@ -170,7 +170,7 @@ describe('QuizService', () => {
 
       expect(prisma.quiz.findMany).toHaveBeenCalledWith({
         where: {
-          type: 'TOEIC',
+          type: { in: ['TOEIC', 'TOEIC_FOUR_SKILL'] },
           OR: [
             {
               bilingualContent: {
