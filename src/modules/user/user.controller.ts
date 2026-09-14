@@ -35,6 +35,16 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Get('skills-summary')
+  @ApiOperation({
+    summary: 'Lấy tiến độ và thống kê 4 kỹ năng chuyên sâu của user hiện tại',
+  })
+  async getSkillsSummary(@Request() req: any) {
+    return this.userService.getUserSkillsSummary(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('learning-history')
   @ApiOperation({
     summary: 'Lấy lịch sử luyện tập đã được lưu của user hiện tại',

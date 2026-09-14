@@ -154,7 +154,7 @@ export class QuizService {
   async getToeicPapers(userId?: number) {
     const quizzes = await this.prisma.quiz.findMany({
       where: {
-        type: 'TOEIC',
+        type: { in: [QuizType.TOEIC, QuizType.TOEIC_FOUR_SKILL] },
         OR: [
           { bilingualContent: { path: ['examFormat'], equals: 'TWO_SKILL' } },
           { bilingualContent: { path: ['examFormat'], equals: 'FOUR_SKILL' } },

@@ -332,6 +332,7 @@ model PracticeTopic {
 
 enum QuizType {
   TOEIC
+  TOEIC_FOUR_SKILL
   LISTENING_PRACTICE
   BILINGUAL_READING
   WRITING_PICTURE
@@ -791,27 +792,29 @@ enum AttemptMode {
 }
 
 model ToeicExamSet {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String?  @db.Text
-  type        ExamType @default(FULL_TEST)
-  difficulty  String   @default("medium") // "easy" | "medium" | "hard"
-  createdBy   Int?
-  createdAt   DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  title           String
+  description     String?  @db.Text
+  type            ExamType @default(FULL_TEST)
+  difficulty      String   @default("medium") // "easy" | "medium" | "hard"
+  durationSeconds Int      @default(7200)
+  createdBy       Int?
+  createdAt       DateTime @default(now())
 
   groups   ToeicQuestionGroup[]
   attempts ToeicAttempt[]
 }
 
 model ToeicQuestionGroup {
-  id          Int          @id @default(autoincrement())
-  examId      Int
-  exam        ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
-  part        Int // 1 to 7
-  audioUrl    String?
-  imageUrl    String?
-  passageText String?      @db.Text
-  groupOrder  Int          @default(0)
+  id              Int          @id @default(autoincrement())
+  examId          Int
+  exam            ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
+  part            Int // 1 to 7
+  canonicalAccent String       @default("US")
+  audioUrl        String?
+  imageUrl        String?
+  passageText     String?      @db.Text
+  groupOrder      Int          @default(0)
 
   questions ToeicQuestion[]
 }
@@ -831,20 +834,56 @@ model ToeicQuestion {
 }
 
 model ToeicAttempt {
-  id             Int          @id @default(autoincrement())
-  userId         Int
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  examId         Int
-  exam           ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
-  mode           AttemptMode  @default(PRACTICE)
-  startedAt      DateTime     @default(now())
-  submittedAt    DateTime?
-  timeRemaining  Int? // In seconds
-  listeningScore Int?
-  readingScore   Int?
-  totalScore     Int?
+  id               Int           @id @default(autoincrement())
+  userId           Int
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId           Int
+  exam             ToeicExamSet  @relation(fields: [examId], references: [id], onDelete: Cascade)
+  mode             AttemptMode   @default(PRACTICE)
+  status           AttemptStatus @default(PENDING_START)
+  createdAt        DateTime      @default(now())
+  startedAt        DateTime?
+  deadline         DateTime?
+  durationSeconds  Int
+  submittedAt      DateTime?
+  timeRemaining    Int? // In seconds
+  listeningScore   Int?
+  readingScore     Int?
+  totalScore       Int?
+  listeningCorrect Int?
+  readingCorrect   Int?
+  totalCorrect     Int?
 
-  answers ToeicAttemptAnswer[]
+  answers         ToeicAttemptAnswer[]
+  integrityEvents ToeicIntegrityEvent[]
+}
+
+enum AttemptStatus {
+  PENDING_START
+  IN_PROGRESS
+  SUBMITTED
+}
+
+enum IntegrityEventType {
+  FULLSCREEN_EXIT
+  TAB_HIDDEN
+  WINDOW_BLUR
+  COPY_ATTEMPT
+  PASTE_ATTEMPT
+  CONTEXT_MENU_ATTEMPT
+}
+
+model ToeicIntegrityEvent {
+  id         Int                @id @default(autoincrement())
+  attemptId  Int
+  attempt    ToeicAttempt       @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  eventType  IntegrityEventType
+  questionId Int?
+  part       Int?
+  createdAt  DateTime           @default(now())
+  metadata   Json?
+
+  @@index([attemptId, createdAt])
 }
 
 model ToeicAttemptAnswer {
