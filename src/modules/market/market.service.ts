@@ -180,12 +180,26 @@ export class MarketService {
         );
       }
 
-      // 2c. Ghi nhận lịch sử trừ điểm
-      await tx.pointHistory.create({
+      // 2c. Write to immutable BanhTransaction ledger
+      const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+
+      const updatedStats = await tx.userStats.findUnique({ where: { userId } });
+
+      await tx.banhTransaction.create({
         data: {
           userId,
-          points: -calculatedTotalBanh,
-          reason: `Đổi vật phẩm cửa hàng: ${itemNames}`,
+          amount: -calculatedTotalBanh,
+          source: 'MARKET_PURCHASE',
+          reference: null,
+          dateKey: today,
+          isCapped: false,
+          balanceAfter: updatedStats?.totalBanhRan ?? 0,
+          metadata: { itemNames } as any,
         },
       });
 
@@ -198,6 +212,20 @@ export class MarketService {
           await tx.userStats.update({
             where: { userId },
             data: { streakFreezes: { increment: quantity } },
+          });
+        }
+
+        // Double-bread boost: activate for 7 days
+        if (
+          product.slug.includes('double-bread') ||
+          product.name.toLowerCase().includes('double bread') ||
+          product.name.toLowerCase().includes('bánh x2')
+        ) {
+          const boostedUntil = new Date();
+          boostedUntil.setDate(boostedUntil.getDate() + 7 * quantity);
+          await tx.userStats.update({
+            where: { userId },
+            data: { doubleBanhUntil: boostedUntil },
           });
         }
 
@@ -226,8 +254,6 @@ export class MarketService {
           }
         }
       }
-
-      const updatedStats = await tx.userStats.findUnique({ where: { userId } });
 
       // 2e. Tạo bản ghi đơn hàng MarketOrder
       const orderItems = resolvedItems.map(({ product, quantity }) => ({
@@ -366,11 +392,23 @@ export class MarketService {
           create: { userId: order.userId, totalBanhRan: order.totalBanh },
         });
 
-        await tx.pointHistory.create({
+        const today = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date());
+
+        await tx.banhTransaction.create({
           data: {
             userId: order.userId,
-            points: order.totalBanh,
-            reason: `Hoàn lại ${order.totalBanh} Bánh Mì do đơn hàng #${orderId} bị từ chối bởi ${reviewerName}`,
+            amount: order.totalBanh,
+            source: 'MARKET_REFUND',
+            reference: `refund:order:${orderId}`,
+            dateKey: today,
+            isCapped: false,
+            balanceAfter: updatedStats.totalBanhRan,
+            metadata: { orderId, reviewerName } as any,
           },
         });
 
@@ -442,6 +480,27 @@ export class MarketService {
       where: { userId: dto.userId },
       update: { totalBanhRan: { increment: dto.amount } },
       create: { userId: dto.userId, totalBanhRan: Math.max(0, dto.amount) },
+    });
+
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    // Write to immutable BanhTransaction ledger
+    await this.prisma.banhTransaction.create({
+      data: {
+        userId: dto.userId,
+        amount: dto.amount,
+        source: 'ADMIN_ADJUSTMENT',
+        reference: null,
+        dateKey: today,
+        isCapped: false,
+        balanceAfter: updatedStats.totalBanhRan,
+        metadata: { adminName, reason: dto.reason } as any,
+      },
     });
 
     await this.prisma.pointHistory.create({

@@ -19,10 +19,15 @@ export class VocabService {
     @Optional() private readonly dictionaryLookup?: DictionaryLookupService,
   ) {}
 
-  private async emitVocabLearned(userId: number): Promise<void> {
+  private async emitVocabLearned(
+    userId: number,
+    wordId: number,
+  ): Promise<void> {
     await this.eventEmitter.emitAsync('vocab.learned', {
       userId,
       count: 1,
+      wordId,
+      wordIds: [wordId],
       source: 'vocabulary_review',
     });
   }
@@ -249,7 +254,7 @@ export class VocabService {
       });
       if (updated.isMastered && !existing.isMastered) {
         await this.recordMasteryActivity(userId, wordId);
-        await this.emitVocabLearned(userId);
+        await this.emitVocabLearned(userId, wordId);
       }
       return {
         isMastered: updated.isMastered,
@@ -268,7 +273,7 @@ export class VocabService {
       });
       if (created.isMastered) {
         await this.recordMasteryActivity(userId, wordId);
-        await this.emitVocabLearned(userId);
+        await this.emitVocabLearned(userId, wordId);
       }
       return {
         isMastered: created.isMastered,
@@ -301,7 +306,7 @@ export class VocabService {
       });
       if (updated.isMastered && !existing.isMastered) {
         await this.recordMasteryActivity(userId, wordId);
-        await this.emitVocabLearned(userId);
+        await this.emitVocabLearned(userId, wordId);
       }
       return updated;
     } else {
@@ -318,7 +323,7 @@ export class VocabService {
       });
       if (created.isMastered) {
         await this.recordMasteryActivity(userId, wordId);
-        await this.emitVocabLearned(userId);
+        await this.emitVocabLearned(userId, wordId);
       }
       return created;
     }

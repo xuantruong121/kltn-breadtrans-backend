@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Cron } from '@nestjs/schedule';
@@ -29,9 +30,13 @@ function getQuestAction(type: string): {
     case 'LEARN_VOCAB':
     case 'DO_VOCAB':
       return { actionLabel: 'Học từ vựng', actionUrl: '/flashcard' };
-    case 'COMPLETE_QUIZ':
     case 'DO_LISTENING':
       return { actionLabel: 'Luyện nghe', actionUrl: '/practice/listening' };
+    case 'COMPLETE_QUIZ':
+      return {
+        actionLabel: 'Làm bài kiểm tra',
+        actionUrl: '/practice/quizzes',
+      };
     case 'DO_SPEAKING':
     case 'PRACTICE_SPEAKING':
       return { actionLabel: 'Luyện nói', actionUrl: '/practice/speaking' };
@@ -53,28 +58,35 @@ export class GamificationService {
     @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
-  async addPoints(userId: number, points: number, reason: string) {
-    let myLeaderboard = await this.prisma.leaderboard.findUnique({
+  /**
+   * Awards EXP (XP) to a user.
+   * Updates Leaderboard.totalPoints + weeklyExp, records PointHistory, triggers streak, emits xp_earned.
+   * Does NOT touch UserStats.totalBanhRan.
+   */
+  async awardXp(
+    userId: number,
+    points: number,
+    reason: string,
+    options?: { tx?: Prisma.TransactionClient },
+  ) {
+    if (points <= 0) return null;
+    const client = options?.tx ?? this.prisma;
+    let myLeaderboard = await client.leaderboard.findUnique({
       where: { userId },
     });
-
     if (!myLeaderboard) {
-      myLeaderboard = await this.prisma.leaderboard.create({
+      myLeaderboard = await client.leaderboard.create({
         data: { userId, tier: 'Đồng' },
       });
     }
 
-    // 1. Lưu PointHistory
-    await this.prisma.pointHistory.create({
-      data: {
-        userId,
-        points,
-        reason,
-      },
+    // Record EXP history
+    await client.pointHistory.create({
+      data: { userId, points, reason },
     });
 
-    // 2. Cập nhật Leaderboard
-    const updatedLeaderboard = await this.prisma.leaderboard.update({
+    // Update Leaderboard (EXP only, NOT Bánh Mì)
+    const updatedLeaderboard = await client.leaderboard.update({
       where: { userId },
       data: {
         totalPoints: { increment: points },
@@ -82,20 +94,519 @@ export class GamificationService {
       },
     });
 
-    // 3. Cập nhật UserStats (nếu cần dùng totalBanhRan thay thế điểm)
-    await this.prisma.userStats.upsert({
-      where: { userId },
-      update: { totalBanhRan: { increment: points } },
-      create: { userId, totalBanhRan: points },
-    });
-
-    // 4. Ghi nhận và cộng chuỗi Streak tự động
+    // Record streak activity in Vietnam timezone
     await this.recordStreakActivity(userId);
 
-    // Phát sự kiện xp_earned để listener cập nhật nhiệm vụ
-    this.eventEmitter.emit('gamification.xp_earned', { userId, points });
+    // Emit for quest progress only when outside an internal quest transaction
+    if (!options?.tx) {
+      this.eventEmitter.emit('gamification.xp_earned', { userId, points });
+    }
 
     return updatedLeaderboard;
+  }
+
+  /**
+   * @deprecated Use awardXp instead. Kept for backward compatibility during migration.
+   * No longer writes to UserStats.totalBanhRan.
+   */
+  async addPoints(userId: number, points: number, reason: string) {
+    return this.awardXp(userId, points, reason);
+  }
+
+  /** Constants for the daily cap and daily quotas */
+  static readonly MAX_DAILY_EARNABLE_BANH = 150;
+  static readonly MAX_DAILY_VOCAB_REWARDS = 30;
+  static readonly MAX_DAILY_SPEAKING_REWARDS = 3;
+
+  /**
+   * Awards Bánh Mì to a user.
+   * - Checks idempotency: (userId, source, reference) must be unique in BanhTransaction.
+   * - Enforces MAX_DAILY_EARNABLE_BANH cap atomically using row lock & advisory lock.
+   * - Applies 2x double-bread boost if active.
+   * - Does NOT touch Leaderboard or PointHistory (EXP is separate).
+   * - Returns idempotent result on duplicate without throwing P2002.
+   */
+  async awardBanh(
+    userId: number,
+    requestedAmount: number,
+    source: string,
+    reference: string | null,
+    options: {
+      isCapped?: boolean; // false = exempt from daily cap (admin, refund, system)
+      metadata?: Record<string, unknown>;
+    } = {},
+    externalTx?: Prisma.TransactionClient,
+  ): Promise<{
+    requested: number;
+    granted: number;
+    rejected: number;
+    remainingDaily: number;
+    newBalance: number;
+    isCapped: boolean;
+  }> {
+    const isCapped = options.isCapped !== false;
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+
+    const run = async (tx: Prisma.TransactionClient) => {
+      // 1. Transaction-safe idempotency check with advisory lock
+      if (reference !== null) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`award_banh:${userId}:${source}:${reference}`}))`;
+
+        const existing = await tx.banhTransaction.findUnique({
+          where: {
+            userId_source_reference: { userId, source, reference },
+          },
+        });
+        if (existing) {
+          const stats = await tx.userStats.findUnique({ where: { userId } });
+          const dailyRow = await tx.dailyBanhEarning.findUnique({
+            where: { userId_dateKey: { userId, dateKey: today } },
+          });
+          return {
+            requested: requestedAmount,
+            granted: 0,
+            rejected: requestedAmount,
+            remainingDaily: Math.max(
+              0,
+              GamificationService.MAX_DAILY_EARNABLE_BANH -
+                (dailyRow?.earnedBanh ?? 0),
+            ),
+            newBalance: stats?.totalBanhRan ?? 0,
+            isCapped,
+          };
+        }
+      }
+
+      // 2. Check double-bread boost
+      const statsNow = await tx.userStats.findUnique({ where: { userId } });
+      const boostActive =
+        statsNow?.doubleBanhUntil &&
+        new Date(statsNow.doubleBanhUntil) > new Date();
+      const effectiveAmount = boostActive
+        ? requestedAmount * 2
+        : requestedAmount;
+
+      let granted = effectiveAmount;
+      let remaining = GamificationService.MAX_DAILY_EARNABLE_BANH;
+
+      if (isCapped) {
+        // Row-lock the daily earning row
+        await tx.$queryRaw`
+          INSERT INTO "DailyBanhEarning" ("userId", "dateKey", "earnedBanh", "vocabCount", "speakingCount", "updatedAt")
+          VALUES (${userId}, ${today}, 0, 0, 0, NOW())
+          ON CONFLICT ("userId", "dateKey") DO NOTHING
+        `;
+
+        const [dailyRow] = await tx.$queryRaw<
+          { id: number; earnedBanh: number }[]
+        >`
+          SELECT id, "earnedBanh" FROM "DailyBanhEarning"
+          WHERE "userId" = ${userId} AND "dateKey" = ${today}
+          FOR UPDATE
+        `;
+
+        remaining = Math.max(
+          0,
+          GamificationService.MAX_DAILY_EARNABLE_BANH -
+            (dailyRow?.earnedBanh ?? 0),
+        );
+        granted = Math.min(effectiveAmount, remaining);
+
+        if (granted > 0) {
+          await tx.dailyBanhEarning.update({
+            where: { userId_dateKey: { userId, dateKey: today } },
+            data: { earnedBanh: { increment: granted } },
+          });
+        }
+      }
+
+      if (granted <= 0) {
+        const currentStats = await tx.userStats.findUnique({
+          where: { userId },
+        });
+        return {
+          requested: requestedAmount,
+          granted: 0,
+          rejected: requestedAmount,
+          remainingDaily: remaining,
+          newBalance: currentStats?.totalBanhRan ?? 0,
+          isCapped,
+        };
+      }
+
+      // 3. Update wallet
+      const updatedStats = await tx.userStats.upsert({
+        where: { userId },
+        update: { totalBanhRan: { increment: granted } },
+        create: { userId, totalBanhRan: granted },
+      });
+
+      // 4. Immutable ledger entry
+      await tx.banhTransaction.create({
+        data: {
+          userId,
+          amount: granted,
+          source,
+          reference,
+          dateKey: today,
+          isCapped,
+          balanceAfter: updatedStats.totalBanhRan,
+          metadata: options.metadata ? (options.metadata as any) : undefined,
+        },
+      });
+
+      this.logger.log(
+        `[awardBanh] user=${userId} source=${source} requested=${requestedAmount} granted=${granted} balance=${updatedStats.totalBanhRan}`,
+      );
+
+      return {
+        requested: requestedAmount,
+        granted,
+        rejected: requestedAmount - granted,
+        remainingDaily: isCapped
+          ? Math.max(0, remaining - granted)
+          : GamificationService.MAX_DAILY_EARNABLE_BANH,
+        newBalance: updatedStats.totalBanhRan,
+        isCapped,
+      };
+    };
+
+    if (externalTx) {
+      return run(externalTx);
+    }
+    return this.prisma.$transaction(run);
+  }
+
+  /**
+   * Reusable transactional helper to advance a daily quest progress row and grant rewards atomically.
+   * - Uses advisory lock & SELECT FOR UPDATE to prevent concurrency races.
+   * - Clamps currentValue to quest.targetValue.
+   * - Grants quest XP and Bánh Mì (capped) exactly once on transition from false -> true.
+   */
+  async advanceDailyQuestAndGrantRewardsTx(
+    userId: number,
+    quest: {
+      id: number;
+      title: string;
+      rewardXP: number;
+      rewardBanh: number;
+      targetValue: number;
+    },
+    incrementCount: number,
+    today: string,
+    externalTx?: Prisma.TransactionClient,
+  ): Promise<{ completedNow: boolean; currentValue: number }> {
+    const run = async (tx: Prisma.TransactionClient) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`quest_prog:${userId}:${quest.id}:${today}`}))`;
+
+      const progress = await tx.userQuestProgress.upsert({
+        where: {
+          userId_questId_dateKey: {
+            userId,
+            questId: quest.id,
+            dateKey: today,
+          },
+        },
+        update: {},
+        create: {
+          userId,
+          questId: quest.id,
+          dateKey: today,
+          currentValue: 0,
+        },
+      });
+
+      const [locked] = await tx.$queryRaw<
+        { id: number; currentValue: number; isCompleted: boolean }[]
+      >`
+        SELECT id, "currentValue", "isCompleted"
+        FROM "UserQuestProgress"
+        WHERE id = ${progress.id}
+        FOR UPDATE
+      `;
+
+      if (!locked || locked.isCompleted) {
+        return {
+          completedNow: false,
+          currentValue: locked?.currentValue ?? quest.targetValue,
+        };
+      }
+
+      const nextValue = Math.min(
+        quest.targetValue,
+        locked.currentValue + incrementCount,
+      );
+      const completedNow = nextValue >= quest.targetValue;
+
+      await tx.userQuestProgress.update({
+        where: { id: progress.id },
+        data: {
+          currentValue: nextValue,
+          isCompleted: completedNow,
+          completedAt: completedNow ? new Date() : null,
+        },
+      });
+
+      if (completedNow) {
+        if (quest.rewardXP > 0) {
+          await this.awardXp(
+            userId,
+            quest.rewardXP,
+            `Hoàn thành nhiệm vụ: ${quest.title}`,
+            { tx },
+          );
+        }
+
+        if (quest.rewardBanh > 0) {
+          await this.awardBanh(
+            userId,
+            quest.rewardBanh,
+            'DAILY_QUEST',
+            `quest:${quest.id}:${today}`,
+            { isCapped: true, metadata: { questTitle: quest.title } },
+            tx,
+          );
+        }
+
+        this.logger.log(
+          `User ${userId} completed quest ${quest.id} and received rewards atomically.`,
+        );
+      }
+
+      return { completedNow, currentValue: nextValue };
+    };
+
+    if (externalTx) {
+      return run(externalTx);
+    }
+    return this.prisma.$transaction(run);
+  }
+
+  /**
+   * Awards vocabulary first-mastery Bánh Mì with lifetime guard & daily quota (max 30/day).
+   * - Enforces UserVocabMasteryReward uniqueness (lifetime once per word).
+   * - Updates DailyBanhEarning.vocabCount atomically inside the transaction.
+   */
+  async awardVocabMasteryReward(
+    userId: number,
+    wordId: number,
+  ): Promise<{ granted: number; reason?: string }> {
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`vocab_mast:${userId}:${wordId}`}))`;
+
+      const existing = await tx.userVocabMasteryReward.findUnique({
+        where: { userId_wordId: { userId, wordId } },
+      });
+      if (existing) {
+        return { granted: 0, reason: 'ALREADY_MASTERED' };
+      }
+
+      await tx.$queryRaw`
+        INSERT INTO "DailyBanhEarning" ("userId", "dateKey", "earnedBanh", "vocabCount", "speakingCount", "updatedAt")
+        VALUES (${userId}, ${today}, 0, 0, 0, NOW())
+        ON CONFLICT ("userId", "dateKey") DO NOTHING
+      `;
+
+      const [dailyRow] = await tx.$queryRaw<
+        { id: number; vocabCount: number }[]
+      >`
+        SELECT id, "vocabCount" FROM "DailyBanhEarning"
+        WHERE "userId" = ${userId} AND "dateKey" = ${today}
+        FOR UPDATE
+      `;
+
+      if (
+        (dailyRow?.vocabCount ?? 0) >=
+        GamificationService.MAX_DAILY_VOCAB_REWARDS
+      ) {
+        await tx.userVocabMasteryReward.create({
+          data: { userId, wordId },
+        });
+        return { granted: 0, reason: 'DAILY_QUOTA_EXCEEDED' };
+      }
+
+      const awardResult = await this.awardBanh(
+        userId,
+        1,
+        'VOCAB_MASTERY',
+        `vocab:word:${wordId}`,
+        { isCapped: true, metadata: { wordId } },
+        tx,
+      );
+
+      await tx.userVocabMasteryReward.create({
+        data: { userId, wordId },
+      });
+
+      if (awardResult.granted > 0) {
+        await tx.dailyBanhEarning.update({
+          where: { userId_dateKey: { userId, dateKey: today } },
+          data: { vocabCount: { increment: 1 } },
+        });
+      }
+
+      return { granted: awardResult.granted };
+    });
+  }
+
+  /**
+   * Awards speaking practice Bánh Mì atomically with daily quota (max 3/day).
+   * - Uses submission-level idempotency reference: speaking:submission:<submissionId>.
+   * - Updates DailyBanhEarning.speakingCount atomically inside the transaction.
+   */
+  async awardSpeakingReward(
+    userId: number,
+    submissionId: number,
+    score: number,
+  ): Promise<{ granted: number; reason?: string }> {
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`speaking_sub:${submissionId}`}))`;
+
+      const existing = await tx.banhTransaction.findUnique({
+        where: {
+          userId_source_reference: {
+            userId,
+            source: 'SPEAKING_SUBMISSION',
+            reference: `speaking:submission:${submissionId}`,
+          },
+        },
+      });
+      if (existing) {
+        return { granted: 0, reason: 'ALREADY_REWARDED' };
+      }
+
+      await tx.$queryRaw`
+        INSERT INTO "DailyBanhEarning" ("userId", "dateKey", "earnedBanh", "vocabCount", "speakingCount", "updatedAt")
+        VALUES (${userId}, ${today}, 0, 0, 0, NOW())
+        ON CONFLICT ("userId", "dateKey") DO NOTHING
+      `;
+
+      const [dailyRow] = await tx.$queryRaw<
+        { id: number; speakingCount: number }[]
+      >`
+        SELECT id, "speakingCount" FROM "DailyBanhEarning"
+        WHERE "userId" = ${userId} AND "dateKey" = ${today}
+        FOR UPDATE
+      `;
+
+      if (
+        (dailyRow?.speakingCount ?? 0) >=
+        GamificationService.MAX_DAILY_SPEAKING_REWARDS
+      ) {
+        return { granted: 0, reason: 'DAILY_QUOTA_EXCEEDED' };
+      }
+
+      const awardResult = await this.awardBanh(
+        userId,
+        5,
+        'SPEAKING_SUBMISSION',
+        `speaking:submission:${submissionId}`,
+        { isCapped: true, metadata: { score, submissionId } },
+        tx,
+      );
+
+      if (awardResult.granted > 0) {
+        await tx.dailyBanhEarning.update({
+          where: { userId_dateKey: { userId, dateKey: today } },
+          data: { speakingCount: { increment: 1 } },
+        });
+      }
+
+      return { granted: awardResult.granted };
+    });
+  }
+
+  /**
+   * Awards TOEIC test Bánh Mì: 120 for FULL_TEST, 30 for PRACTICE / part.
+   * - Guarded by UserToeicReward unique constraint (userId, examId, mode).
+   * - Counts toward the daily 150 cap.
+   */
+  async awardToeicReward(
+    userId: number,
+    examId: number,
+    mode: string,
+    attemptId?: number,
+  ): Promise<{ granted: number; reason?: string }> {
+    const rewardAmount = mode === 'FULL_TEST' ? 120 : 30;
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`toeic_reward:${userId}:${examId}:${mode}`}))`;
+
+      const existing = await tx.userToeicReward.findUnique({
+        where: { userId_examId_mode: { userId, examId, mode } },
+      });
+      if (existing) {
+        return { granted: 0, reason: 'ALREADY_REWARDED' };
+      }
+
+      await tx.userToeicReward.create({
+        data: { userId, examId, mode },
+      });
+
+      const awardResult = await this.awardBanh(
+        userId,
+        rewardAmount,
+        'TOEIC_COMPLETION',
+        `toeic:${examId}:${mode}`,
+        { isCapped: true, metadata: { examId, mode, attemptId } },
+        tx,
+      );
+
+      return { granted: awardResult.granted };
+    });
+  }
+
+  /**
+   * Deducts Bánh Rán from a user's wallet atomically.
+   * Uses CAS (compare-and-swap via conditional updateMany) to prevent overdraft.
+   */
+  async deductBanh(
+    userId: number,
+    amount: number,
+    reason: string,
+    source: string,
+    reference: string | null = null,
+    options: { metadata?: Record<string, unknown> } = {},
+  ): Promise<{ success: boolean; newBalance: number; message?: string }> {
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+
+    return this.prisma.$transaction(async (tx) => {
+      // Atomic CAS: only deduct if balance is sufficient
+      const cas = await tx.userStats.updateMany({
+        where: { userId, totalBanhRan: { gte: amount } },
+        data: { totalBanhRan: { decrement: amount } },
+      });
+
+      if (cas.count === 0) {
+        const stats = await tx.userStats.findUnique({ where: { userId } });
+        return {
+          success: false,
+          newBalance: stats?.totalBanhRan ?? 0,
+          message: `Không đủ Bánh Mì (Cần ${amount}, hiện có ${stats?.totalBanhRan ?? 0})`,
+        };
+      }
+
+      const updated = await tx.userStats.findUnique({ where: { userId } });
+
+      await tx.banhTransaction.create({
+        data: {
+          userId,
+          amount: -amount,
+          source,
+          reference,
+          dateKey: today,
+          isCapped: false,
+          balanceAfter: updated?.totalBanhRan ?? 0,
+          metadata: options.metadata ? (options.metadata as any) : null,
+        },
+      });
+
+      return { success: true, newBalance: updated?.totalBanhRan ?? 0 };
+    });
   }
 
   /**
@@ -138,6 +649,9 @@ export class GamificationService {
   async recordStreakActivity(userId: number) {
     try {
       const now = new Date();
+      // Use Vietnam timezone consistently for streak day boundaries
+      const nowDateStr = getTodayDateKey('Asia/Ho_Chi_Minh');
+
       const stats = await this.prisma.userStats.findUnique({
         where: { userId },
       });
@@ -164,22 +678,31 @@ export class GamificationService {
         return;
       }
 
-      const nowDateStr = now.toISOString().split('T')[0];
-      const lastDateStr = lastUpdate.toISOString().split('T')[0];
+      // Use Vietnam timezone for last streak date
+      const lastDateStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(lastUpdate);
 
-      // Nếu đã học trong cùng một ngày, không tăng thêm
+      // Same Vietnam day - no change
       if (nowDateStr === lastDateStr) {
         return;
       }
 
-      const nowMidnight = new Date(nowDateStr).getTime();
-      const lastMidnight = new Date(lastDateStr).getTime();
+      // Parse dates to Vietnam midnight boundaries for diffing
+      const toVietnamMidnight = (dateKey: string) =>
+        new Date(`${dateKey}T00:00:00+07:00`).getTime();
+
+      const nowMidnight = toVietnamMidnight(nowDateStr);
+      const lastMidnight = toVietnamMidnight(lastDateStr);
       const diffDays = Math.round(
         (nowMidnight - lastMidnight) / (1000 * 60 * 60 * 24),
       );
 
       if (diffDays === 1) {
-        // Học liên tiếp ngày hôm sau -> Tăng 1 ngày streak!
+        // Consecutive day - increment streak
         await this.prisma.userStats.update({
           where: { userId },
           data: {
@@ -188,7 +711,7 @@ export class GamificationService {
           },
         });
       } else if (diffDays > 1) {
-        // Cách hơn 1 ngày: Kiểm tra khiên bảo vệ
+        // Missed day(s) - check streak freeze
         if (stats.streakFreezes > 0) {
           await this.prisma.userStats.update({
             where: { userId },
@@ -199,7 +722,7 @@ export class GamificationService {
             },
           });
         } else {
-          // Bị ngắt chuỗi -> Bắt đầu lại từ 1
+          // Streak broken - reset to 1
           await this.prisma.userStats.update({
             where: { userId },
             data: {
@@ -210,7 +733,10 @@ export class GamificationService {
         }
       }
     } catch (err) {
-      console.error('[Streak] Failed to update streak for user:', userId, err);
+      this.logger.error(
+        '[Streak] Failed to update streak for user:' + userId,
+        err,
+      );
     }
   }
 
@@ -590,8 +1116,11 @@ export class GamificationService {
       const healthDecay = daysPassed * 10;
       const happinessDecay = daysPassed * 15;
 
-      const newHealth = Math.max(20, 100 - healthDecay);
-      const newHappiness = Math.max(20, 100 - happinessDecay);
+      // Decay from CURRENT state, not hardcoded 100
+      const currentHealth = activePetData.health ?? 100;
+      const currentHappiness = activePetData.happiness ?? 100;
+      const newHealth = Math.max(20, currentHealth - healthDecay);
+      const newHappiness = Math.max(20, currentHappiness - happinessDecay);
 
       if (
         newHealth !== activePetData.health ||
@@ -616,72 +1145,132 @@ export class GamificationService {
   }
 
   async feedPet(userId: number) {
-    const pet = await this.getMyPet(userId);
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
 
-    // Check if UserStats exists and has enough Banh Ran
-    let userStats = await this.prisma.userStats.findUnique({
-      where: { userId },
-    });
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Advisory lock for user's pet
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pet_feed:${userId}`}))`;
 
-    if (!userStats) {
-      userStats = await this.prisma.userStats.create({
-        data: { userId, totalBanhRan: 0 },
+      // 2. Find or create UserPet
+      let pet = await tx.userPet.findUnique({ where: { userId } });
+      if (!pet) {
+        pet = await tx.userPet.create({
+          data: {
+            userId,
+            name: 'Mèo Máy Bánh Mì',
+            health: 100,
+            happiness: 100,
+            level: 1,
+            exp: 0,
+            roster: {
+              meo: {
+                level: 1,
+                exp: 0,
+                health: 100,
+                happiness: 100,
+                lastFedAt: null,
+              },
+            },
+          },
+        });
+      }
+
+      // 3. Current active pet data
+      const currentSpecies = this.normalizeSpeciesKey(pet.name);
+      const roster = ((pet as any).roster as Record<string, any>) || {};
+      const activePetData = roster[currentSpecies] || {
+        level: pet.level || 1,
+        exp: pet.exp || 0,
+        health: pet.health ?? 100,
+        happiness: pet.happiness ?? 100,
+        lastFedAt: null,
+      };
+
+      // 4. 24-hour cooldown check
+      const lastFedAt: Date | null = activePetData.lastFedAt
+        ? new Date(activePetData.lastFedAt)
+        : pet.lastFedAt
+          ? new Date(pet.lastFedAt)
+          : null;
+
+      if (lastFedAt) {
+        const hoursSinceFed =
+          (Date.now() - lastFedAt.getTime()) / (1000 * 60 * 60);
+        if (hoursSinceFed < 24) {
+          const hoursLeft = Math.ceil(24 - hoursSinceFed);
+          throw new BadRequestException(
+            `Thú cưng chưa đói! Hãy quay lại sau ${hoursLeft} giờ nữa.`,
+          );
+        }
+      }
+
+      // 5. CAS Deduct exactly 10 Bánh Mì
+      const cas = await tx.userStats.updateMany({
+        where: { userId, totalBanhRan: { gte: 10 } },
+        data: { totalBanhRan: { decrement: 10 } },
       });
-    }
 
-    if (userStats.totalBanhRan < 10) {
-      throw new BadRequestException(
-        'Bạn không đủ 10 Bánh Rán để cho thú cưng ăn!',
-      );
-    }
+      if (cas.count === 0) {
+        const stats = await tx.userStats.findUnique({ where: { userId } });
+        throw new BadRequestException(
+          `Bạn không đủ 10 Bánh Mì để cho thú cưng ăn! (Hiện có: ${stats?.totalBanhRan ?? 0})`,
+        );
+      }
 
-    // Tiêu thụ 10 Bánh Rán
-    await this.prisma.userStats.update({
-      where: { userId },
-      data: { totalBanhRan: { decrement: 10 } },
+      const updatedStats = await tx.userStats.findUnique({ where: { userId } });
+
+      // 6. Write negative ledger entry
+      await tx.banhTransaction.create({
+        data: {
+          userId,
+          amount: -10,
+          source: 'PET_FEED',
+          reference: `pet:feed:${userId}:${Date.now()}`,
+          dateKey: today,
+          isCapped: false,
+          balanceAfter: updatedStats?.totalBanhRan ?? 0,
+        },
+      });
+
+      // 7. Calculate new pet stats based on CURRENT values
+      const EXP_PER_FEED = 50;
+      const newPetExp = (activePetData.exp || 0) + EXP_PER_FEED;
+      const newLevel = Math.floor(newPetExp / 1000) + 1;
+      const currentHealth = activePetData.health ?? 100;
+      const currentHappiness = activePetData.happiness ?? 100;
+      const newHealth = Math.min(100, currentHealth + 10);
+      const newHappiness = Math.min(100, currentHappiness + 20);
+      const now = new Date();
+
+      activePetData.exp = newPetExp;
+      activePetData.level = newLevel;
+      activePetData.happiness = newHappiness;
+      activePetData.health = newHealth;
+      activePetData.lastFedAt = now;
+      roster[currentSpecies] = activePetData;
+
+      // 8. Update pet
+      const updatedPet = await tx.userPet.update({
+        where: { userId },
+        data: {
+          level: newLevel,
+          exp: newPetExp,
+          happiness: newHappiness,
+          health: newHealth,
+          lastFedAt: now,
+          roster: roster as any,
+        } as any,
+      });
+
+      return { updatedPet, newLevel };
     });
 
-    const currentSpecies = this.normalizeSpeciesKey(pet.name);
-    const roster = ((pet as any).roster as Record<string, any>) || {};
-    const activePetData = roster[currentSpecies] || {
-      level: pet.level || 1,
-      exp: pet.exp || 0,
-      health: pet.health ?? 100,
-      happiness: pet.happiness ?? 100,
-      lastFedAt: null,
-    };
-
-    const newExp = (activePetData.exp || 0) + 50;
-    const newLevel = Math.floor(newExp / 1000) + 1;
-    const newHappiness = Math.min((activePetData.happiness ?? 100) + 20, 100);
-    const newHealth = Math.min((activePetData.health ?? 100) + 10, 100);
-    const now = new Date();
-
-    activePetData.exp = newExp;
-    activePetData.level = newLevel;
-    activePetData.happiness = newHappiness;
-    activePetData.health = newHealth;
-    activePetData.lastFedAt = now;
-    roster[currentSpecies] = activePetData;
-
-    const updated = await this.prisma.userPet.update({
-      where: { userId },
-      data: {
-        level: newLevel,
-        exp: newExp,
-        happiness: newHappiness,
-        health: newHealth,
-        lastFedAt: now,
-        roster: roster as any,
-      } as any,
-    });
-
-    // Award "Chuyên Gia Nuôi Thú" badge when pet reaches level 2
-    if (newLevel >= 2) {
+    // Award badge at level 2
+    if (result.newLevel >= 2) {
       await this.awardBadgeIfEarned(userId, 'Chuyên Gia Nuôi Thú');
     }
 
-    return updated;
+    return result.updatedPet;
   }
 
   async changePetType(userId: number, targetPetName: string) {

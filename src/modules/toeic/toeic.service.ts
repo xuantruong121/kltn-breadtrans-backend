@@ -4,8 +4,10 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AttemptMode,
   AttemptStatus,
@@ -29,6 +31,7 @@ export class ToeicService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly speakingService: SpeakingService,
+    @Optional() private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   private lockKey(userId: number, examId: number, mode: AttemptMode) {
@@ -572,7 +575,7 @@ export class ToeicService {
   }
 
   async submitAttempt(attemptId: number, userId: number) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const initial = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
@@ -589,19 +592,39 @@ export class ToeicService {
       if (attempt.userId !== userId)
         throw new ForbiddenException('Bạn không có quyền nộp bài thi này');
       if (attempt.status === AttemptStatus.SUBMITTED)
-        return this.formatResult(
+        return {
+          formatted: this.formatResult(
+            attempt,
+            await this.getQuestionCounts(tx, attempt.examId),
+          ),
+          shouldEmit: false,
           attempt,
-          await this.getQuestionCounts(tx, attempt.examId),
-        );
+        };
       const submittedAt =
         attempt.deadline && attempt.deadline < new Date()
           ? attempt.deadline
           : new Date();
-      return this.formatResult(
-        await this.computeAndSubmitTx(tx, attempt, submittedAt),
-        await this.getQuestionCounts(tx, attempt.examId),
-      );
+      const updated = await this.computeAndSubmitTx(tx, attempt, submittedAt);
+      return {
+        formatted: this.formatResult(
+          updated,
+          await this.getQuestionCounts(tx, attempt.examId),
+        ),
+        shouldEmit: true,
+        attempt: updated,
+      };
     });
+
+    if (result.shouldEmit && this.eventEmitter) {
+      await this.eventEmitter.emitAsync('toeic.submitted', {
+        userId,
+        examId: result.attempt.examId,
+        mode: result.attempt.mode,
+        attemptId: result.attempt.id,
+      });
+    }
+
+    return result.formatted;
   }
 
   private formatResult(
