@@ -83,6 +83,8 @@ describe('VocabService', () => {
       expect(eventEmitter.emitAsync).toHaveBeenCalledWith('vocab.learned', {
         userId: 1,
         count: 1,
+        wordId: 10,
+        wordIds: [10],
         source: 'vocabulary_review',
       });
     });

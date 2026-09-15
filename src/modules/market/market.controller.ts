@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   UseGuards,
   Request,
+  Headers,
 } from '@nestjs/common';
 import { MarketService } from './market.service';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
@@ -51,8 +52,12 @@ export class MarketController {
   @ApiBearerAuth()
   @Post('orders')
   @ApiOperation({ summary: 'Đặt hàng đổi vật phẩm bằng Bánh Mì' })
-  createOrder(@Request() req: any, @Body() dto: CreateMarketOrderDto) {
-    return this.marketService.createOrder(req.user.id, dto);
+  createOrder(
+    @Request() req: any,
+    @Body() dto: CreateMarketOrderDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.marketService.createOrder(req.user.id, dto, idempotencyKey);
   }
 
   @UseGuards(JwtAuthGuard)

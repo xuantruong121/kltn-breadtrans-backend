@@ -100,6 +100,10 @@ model User {
   supportConversation             SupportConversation?
   supportMessages                 SupportMessage[]
   notifications                   Notification[]
+  banhTransactions                BanhTransaction[]
+  dailyBanhEarnings               DailyBanhEarning[]
+  vocabMasteryRewards             UserVocabMasteryReward[]
+  toeicRewards                    UserToeicReward[]
 }
 
 model AuthAccount {
@@ -146,6 +150,9 @@ model UserStats {
   timesVocab       Int       @default(0)
   quizAccuracy     Float     @default(0)
   speakingAccuracy Float     @default(0)
+
+  // Double Bánh Mì boost expiry (set when user purchases double-bread item)
+  doubleBanhUntil DateTime?
 
   // Các trường JSON nặng
   movies                    Json?
@@ -614,7 +621,7 @@ model MarketProduct {
   description   String?  @db.Text
   category      String   @default("GENERAL")
   rarity        String   @default("COMMON")
-  price         Float
+  price         Int // Integer Bánh Mì units only
   imageUrl      String?
   order         Int      @default(0)
   stock         Int      @default(100)
@@ -631,15 +638,17 @@ model MarketOrder {
   studentName       String
   items             Json // Array of item objects
   totalK            Float
-  totalBanh         Float
+  totalBanh         Int // Integer Bánh Mì units
   status            String    @default("pending") // "pending" | "approved" | "rejected"
   bankSnapshot      Json?
   createdAt         DateTime  @default(now())
   paidAtCheckout    Boolean?
-  balanceAtCheckout Float?
+  balanceAtCheckout Int? // Integer Bánh Mì units at checkout time
   reviewedAt        DateTime?
   reviewedBy        String?
   currencyTxId      Int?
+  /// Client-generated idempotency key for a single checkout request.
+  idempotencyKey    String?   @unique
 }
 
 model GameSettings {
@@ -729,7 +738,8 @@ model VocabWord {
   order        Int        @default(0)
   createdAt    DateTime   @default(now())
 
-  userProgress UserVocabWordProgress[]
+  userProgress   UserVocabWordProgress[]
+  masteryRewards UserVocabMasteryReward[]
 }
 
 model UserVocabWordProgress {
@@ -801,8 +811,9 @@ model ToeicExamSet {
   createdBy       Int?
   createdAt       DateTime @default(now())
 
-  groups   ToeicQuestionGroup[]
-  attempts ToeicAttempt[]
+  groups       ToeicQuestionGroup[]
+  attempts     ToeicAttempt[]
+  toeicRewards UserToeicReward[]
 }
 
 model ToeicQuestionGroup {
@@ -1099,4 +1110,72 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([userId, createdAt])
+}
+
+// ==========================================
+// ECONOMY SEPARATION — PHASE 1
+// ==========================================
+
+/// Atomic daily cap ledger for Bánh Mì earnings (per user, per Vietnam date)
+model DailyBanhEarning {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateKey       String // "YYYY-MM-DD" in Asia/Ho_Chi_Minh
+  earnedBanh    Int      @default(0) // Cumulative capped earnings for this day
+  vocabCount    Int      @default(0) // Words rewarded today (max 30)
+  speakingCount Int      @default(0) // Speaking submissions rewarded today (max 3)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, dateKey])
+  @@index([dateKey])
+}
+
+/// Immutable Bánh Mì ledger — every credit and debit recorded here
+model BanhTransaction {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount       Int // Positive = credit, Negative = debit
+  source       String // VOCAB_MASTERY | QUIZ_FIRST_COMPLETION | QUIZ_RETAKE | TOEIC_COMPLETION | TOEIC_PRACTICE | SPEAKING_SUBMISSION | GRAMMAR_COMPLETION | ASSIGNMENT_COMPLETION | DAILY_QUEST | PET_FEED | MARKET_PURCHASE | MARKET_REFUND | ADMIN_ADJUSTMENT | ARENA_WIN | GAME_REWARD | CONTENT_COMPLETION
+  reference    String? // Unique idempotency key (e.g. "quiz:42", "vocab:word:7", "quest:1:2026-09-15")
+  dateKey      String // "YYYY-MM-DD" in Asia/Ho_Chi_Minh at time of transaction
+  isCapped     Boolean  @default(true) // false = exempt from daily cap (admin, refund, system)
+  balanceAfter Int // Snapshot of totalBanhRan after this transaction
+  metadata     Json? // Extra context (score, questTitle, etc)
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, source, reference])
+  @@index([userId, dateKey])
+  @@index([userId, createdAt])
+}
+
+/// Lifetime-unique vocabulary first-mastery reward ledger (prevents re-mastery farming)
+model UserVocabMasteryReward {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId      Int
+  word        VocabWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  rewardedAt  DateTime  @default(now())
+  banhGranted Int       @default(0)
+
+  @@unique([userId, wordId])
+  @@index([userId])
+}
+
+/// Idempotent TOEIC completion reward ledger (per user/exam/mode)
+model UserToeicReward {
+  id          Int          @id @default(autoincrement())
+  userId      Int
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId      Int
+  exam        ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
+  mode        String // "PRACTICE" | "FULL_TEST" | "PART:{n}"
+  rewardedAt  DateTime     @default(now())
+  banhGranted Int          @default(0)
+
+  @@unique([userId, examId, mode])
+  @@index([userId])
 }

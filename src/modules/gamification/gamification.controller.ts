@@ -67,7 +67,7 @@ export class GamificationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('pet/feed')
-  @ApiOperation({ summary: 'Cho thú cưng ăn (Tiêu hao bánh rán)' })
+  @ApiOperation({ summary: 'Cho thú cưng ăn (Tiêu hao Bánh Mì)' })
   feedPet(@Request() req: any) {
     return this.gamificationService.feedPet(req.user.id);
   }
