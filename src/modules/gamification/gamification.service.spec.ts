@@ -267,6 +267,7 @@ describe('GamificationService weekly cron hardening', () => {
             .fn()
             .mockResolvedValue({ totalBanhRan: 10, doubleBanhUntil: null }),
           upsert: jest.fn().mockResolvedValue({ totalBanhRan: 20 }),
+          update: jest.fn().mockResolvedValue({}),
         },
         dailyBanhEarning: {
           update: jest.fn().mockResolvedValue({}),
@@ -440,13 +441,16 @@ describe('GamificationService weekly cron hardening', () => {
             .fn()
             .mockImplementation(() =>
               Promise.resolve(
-                isMastered ? { id: 1, userId: 3, wordId: 99 } : null,
+                isMastered
+                  ? { id: 1, userId: 3, wordId: 99, banhGranted: 1 }
+                  : null,
               ),
             ),
           create: jest.fn().mockImplementation(() => {
             isMastered = true;
             return Promise.resolve({ id: 1 });
           }),
+          update: jest.fn().mockResolvedValue({}),
         },
         dailyBanhEarning: {
           update: jest.fn().mockResolvedValue({}),
@@ -489,19 +493,24 @@ describe('GamificationService weekly cron hardening', () => {
           .mockResolvedValueOnce([]) // INSERT
           .mockResolvedValueOnce([{ id: 1, earnedBanh: 0 }]), // SELECT
         userToeicReward: {
-          findUnique: jest
-            .fn()
-            .mockImplementation(() =>
-              Promise.resolve(
-                rewarded
-                  ? { id: 1, userId: 4, examId: 1, mode: 'FULL_TEST' }
-                  : null,
-              ),
+          findUnique: jest.fn().mockImplementation(() =>
+            Promise.resolve(
+              rewarded
+                ? {
+                    id: 1,
+                    userId: 4,
+                    examId: 1,
+                    mode: 'FULL_TEST',
+                    banhGranted: 120,
+                  }
+                : null,
             ),
+          ),
           create: jest.fn().mockImplementation(() => {
             rewarded = true;
             return Promise.resolve({ id: 1 });
           }),
+          update: jest.fn().mockResolvedValue({}),
         },
         userStats: {
           findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 0 }),

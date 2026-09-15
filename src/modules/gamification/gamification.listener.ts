@@ -38,8 +38,8 @@ export class GamificationListener {
         // Banh only for first submission (idempotent via quizId)
         if (payload.quizId && payload.isFirstSubmission !== false) {
           const banhReward = Math.min(
-            150,
-            Math.max(20, Math.round(payload.score * 1.5)),
+            40,
+            Math.max(10, Math.round(payload.score * 0.4)),
           );
           if (banhReward > 0) {
             await this.gamificationService.awardBanh(
@@ -139,7 +139,7 @@ export class GamificationListener {
         await this.gamificationService.awardXp(
           payload.userId,
           xpEarned,
-          'Luyện phát âm AI (Speaking)',
+          'Hoàn thành bài luyện nói',
         );
       }
 
@@ -200,13 +200,6 @@ export class GamificationListener {
         : 0;
       if (count === 0) return;
 
-      // XP: 5 per word (separate from Bánh Mì)
-      await this.gamificationService.awardXp(
-        payload.userId,
-        count * 5,
-        `Học ${count} từ vựng mới`,
-      );
-
       // Collect wordIds for lifetime first-mastery guard
       const wordIds: number[] = [];
       if (typeof payload.wordId === 'number') {
@@ -220,33 +213,45 @@ export class GamificationListener {
         }
       }
 
-      // Safe guard: Never award Bánh Mì for unidentified vocab events
+      // Safe guard: Never reward unidentified vocabulary events.
       if (wordIds.length === 0) {
         this.logger.warn(
           `[vocab.learned] Missing wordId for user ${payload.userId}. No Bánh Mì awarded.`,
         );
+        return;
       } else {
+        let firstMasteryCount = 0;
         for (const wordId of wordIds) {
-          await this.gamificationService.awardVocabMasteryReward(
+          const reward = await this.gamificationService.awardVocabMasteryReward(
             payload.userId,
             wordId,
           );
+          if (reward.firstMastery) firstMasteryCount += 1;
         }
-      }
 
-      // Advance daily quests atomically & capped
-      const today = getTodayDateKey('Asia/Ho_Chi_Minh');
-      const activeQuests = await this.prisma.dailyQuest.findMany({
-        where: { isActive: true, type: { in: ['LEARN_VOCAB', 'DO_VOCAB'] } },
-      });
+        // A word contributes EXP and a daily quest only once in its lifetime.
+        if (firstMasteryCount === 0) return;
 
-      for (const quest of activeQuests) {
-        await this.gamificationService.advanceDailyQuestAndGrantRewardsTx(
+        await this.gamificationService.awardXp(
           payload.userId,
-          quest,
-          count,
-          today,
+          firstMasteryCount * 5,
+          `Học ${firstMasteryCount} từ vựng mới`,
         );
+
+        // Advance daily quests with the exact number of first masteries.
+        const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+        const activeQuests = await this.prisma.dailyQuest.findMany({
+          where: { isActive: true, type: { in: ['LEARN_VOCAB', 'DO_VOCAB'] } },
+        });
+
+        for (const quest of activeQuests) {
+          await this.gamificationService.advanceDailyQuestAndGrantRewardsTx(
+            payload.userId,
+            quest,
+            firstMasteryCount,
+            today,
+          );
+        }
       }
     } catch (error) {
       this.logger.error(

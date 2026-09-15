@@ -647,6 +647,8 @@ model MarketOrder {
   reviewedAt        DateTime?
   reviewedBy        String?
   currencyTxId      Int?
+  /// Client-generated idempotency key for a single checkout request.
+  idempotencyKey    String?   @unique
 }
 
 model GameSettings {
@@ -1151,12 +1153,13 @@ model BanhTransaction {
 
 /// Lifetime-unique vocabulary first-mastery reward ledger (prevents re-mastery farming)
 model UserVocabMasteryReward {
-  id         Int       @id @default(autoincrement())
-  userId     Int
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wordId     Int
-  word       VocabWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
-  rewardedAt DateTime  @default(now())
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId      Int
+  word        VocabWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  rewardedAt  DateTime  @default(now())
+  banhGranted Int       @default(0)
 
   @@unique([userId, wordId])
   @@index([userId])
@@ -1164,13 +1167,14 @@ model UserVocabMasteryReward {
 
 /// Idempotent TOEIC completion reward ledger (per user/exam/mode)
 model UserToeicReward {
-  id         Int          @id @default(autoincrement())
-  userId     Int
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  examId     Int
-  exam       ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
-  mode       String // "PRACTICE" | "FULL_TEST" | "PART:{n}"
-  rewardedAt DateTime     @default(now())
+  id          Int          @id @default(autoincrement())
+  userId      Int
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId      Int
+  exam        ToeicExamSet @relation(fields: [examId], references: [id], onDelete: Cascade)
+  mode        String // "PRACTICE" | "FULL_TEST" | "PART:{n}"
+  rewardedAt  DateTime     @default(now())
+  banhGranted Int          @default(0)
 
   @@unique([userId, examId, mode])
   @@index([userId])

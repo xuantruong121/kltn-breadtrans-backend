@@ -746,16 +746,33 @@ export class ToeicService {
         await this.finalizeExpired(attemptId, attempt.userId);
       else throw new BadRequestException('Bài thi đang diễn ra, chưa nộp bài');
     }
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const current = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
         include: { answers: { include: { question: true } } },
       });
       if (!current) throw new NotFoundException('Result not found');
-      return this.formatResult(
-        current,
-        await this.getQuestionCounts(tx, current.examId),
-      );
+      return {
+        formatted: this.formatResult(
+          current,
+          await this.getQuestionCounts(tx, current.examId),
+        ),
+        shouldSettleReward: current.status === AttemptStatus.SUBMITTED,
+        examId: current.examId,
+        mode: current.mode,
+      };
     });
+
+    // Retry a capped completion reward when the learner returns on a later day.
+    if (result.shouldSettleReward && role !== 'ADMIN' && this.eventEmitter) {
+      await this.eventEmitter.emitAsync('toeic.submitted', {
+        userId,
+        examId: result.examId,
+        mode: result.mode,
+        attemptId,
+      });
+    }
+
+    return result.formatted;
   }
 }

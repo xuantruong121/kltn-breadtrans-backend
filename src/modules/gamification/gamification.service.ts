@@ -94,8 +94,8 @@ export class GamificationService {
       },
     });
 
-    // Record streak activity in Vietnam timezone
-    await this.recordStreakActivity(userId);
+    // Record streak activity in the same transaction when one is supplied.
+    await this.recordStreakActivity(userId, options?.tx);
 
     // Emit for quest progress only when outside an internal quest transaction
     if (!options?.tx) {
@@ -390,7 +390,7 @@ export class GamificationService {
   async awardVocabMasteryReward(
     userId: number,
     wordId: number,
-  ): Promise<{ granted: number; reason?: string }> {
+  ): Promise<{ granted: number; firstMastery: boolean; reason?: string }> {
     const today = getTodayDateKey('Asia/Ho_Chi_Minh');
 
     return this.prisma.$transaction(async (tx) => {
@@ -399,8 +399,14 @@ export class GamificationService {
       const existing = await tx.userVocabMasteryReward.findUnique({
         where: { userId_wordId: { userId, wordId } },
       });
-      if (existing) {
-        return { granted: 0, reason: 'ALREADY_MASTERED' };
+      const firstMastery = !existing;
+      const alreadyGranted = existing?.banhGranted ?? 0;
+      if (alreadyGranted >= 1) {
+        return { granted: 0, firstMastery: false, reason: 'ALREADY_MASTERED' };
+      }
+
+      if (!existing) {
+        await tx.userVocabMasteryReward.create({ data: { userId, wordId } });
       }
 
       await tx.$queryRaw`
@@ -421,10 +427,7 @@ export class GamificationService {
         (dailyRow?.vocabCount ?? 0) >=
         GamificationService.MAX_DAILY_VOCAB_REWARDS
       ) {
-        await tx.userVocabMasteryReward.create({
-          data: { userId, wordId },
-        });
-        return { granted: 0, reason: 'DAILY_QUOTA_EXCEEDED' };
+        return { granted: 0, firstMastery, reason: 'DAILY_QUOTA_EXCEEDED' };
       }
 
       const awardResult = await this.awardBanh(
@@ -436,18 +439,18 @@ export class GamificationService {
         tx,
       );
 
-      await tx.userVocabMasteryReward.create({
-        data: { userId, wordId },
-      });
-
       if (awardResult.granted > 0) {
+        await tx.userVocabMasteryReward.update({
+          where: { userId_wordId: { userId, wordId } },
+          data: { banhGranted: { increment: awardResult.granted } },
+        });
         await tx.dailyBanhEarning.update({
           where: { userId_dateKey: { userId, dateKey: today } },
           data: { vocabCount: { increment: 1 } },
         });
       }
 
-      return { granted: awardResult.granted };
+      return { granted: awardResult.granted, firstMastery };
     });
   }
 
@@ -539,29 +542,38 @@ export class GamificationService {
       const existing = await tx.userToeicReward.findUnique({
         where: { userId_examId_mode: { userId, examId, mode } },
       });
-      if (existing) {
+      const previouslyGranted = existing?.banhGranted ?? 0;
+      const remainingReward = Math.max(0, rewardAmount - previouslyGranted);
+      if (remainingReward === 0) {
         return { granted: 0, reason: 'ALREADY_REWARDED' };
       }
 
-      await tx.userToeicReward.create({
-        data: { userId, examId, mode },
-      });
+      if (!existing) {
+        await tx.userToeicReward.create({ data: { userId, examId, mode } });
+      }
 
       const awardResult = await this.awardBanh(
         userId,
-        rewardAmount,
+        remainingReward,
         'TOEIC_COMPLETION',
-        `toeic:${examId}:${mode}`,
+        `toeic:${examId}:${mode}:remaining:${previouslyGranted}`,
         { isCapped: true, metadata: { examId, mode, attemptId } },
         tx,
       );
+
+      if (awardResult.granted > 0) {
+        await tx.userToeicReward.update({
+          where: { userId_examId_mode: { userId, examId, mode } },
+          data: { banhGranted: { increment: awardResult.granted } },
+        });
+      }
 
       return { granted: awardResult.granted };
     });
   }
 
   /**
-   * Deducts Bánh Rán from a user's wallet atomically.
+   * Deducts Bánh Mì from a user's wallet atomically.
    * Uses CAS (compare-and-swap via conditional updateMany) to prevent overdraft.
    */
   async deductBanh(
@@ -646,95 +658,111 @@ export class GamificationService {
     return true;
   }
 
-  async recordStreakActivity(userId: number) {
-    try {
-      const now = new Date();
-      // Use Vietnam timezone consistently for streak day boundaries
-      const nowDateStr = getTodayDateKey('Asia/Ho_Chi_Minh');
+  async recordStreakActivity(
+    userId: number,
+    externalTx?: Prisma.TransactionClient,
+  ) {
+    const run = async (client: Prisma.TransactionClient) => {
+      try {
+        await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`streak:${userId}`}))`;
+        const now = new Date();
+        // Use Vietnam timezone consistently for streak day boundaries
+        const nowDateStr = getTodayDateKey('Asia/Ho_Chi_Minh');
 
-      const stats = await this.prisma.userStats.findUnique({
-        where: { userId },
-      });
-
-      if (!stats) {
-        await this.prisma.userStats.create({
-          data: {
-            userId,
-            streakCount: 1,
-            lastStreakUpdate: now,
-          },
-        });
-        return;
-      }
-
-      const lastUpdate = stats.lastStreakUpdate
-        ? new Date(stats.lastStreakUpdate)
-        : null;
-      if (!lastUpdate) {
-        await this.prisma.userStats.update({
+        const stats = await client.userStats.findUnique({
           where: { userId },
-          data: { streakCount: 1, lastStreakUpdate: now },
         });
-        return;
-      }
 
-      // Use Vietnam timezone for last streak date
-      const lastDateStr = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(lastUpdate);
-
-      // Same Vietnam day - no change
-      if (nowDateStr === lastDateStr) {
-        return;
-      }
-
-      // Parse dates to Vietnam midnight boundaries for diffing
-      const toVietnamMidnight = (dateKey: string) =>
-        new Date(`${dateKey}T00:00:00+07:00`).getTime();
-
-      const nowMidnight = toVietnamMidnight(nowDateStr);
-      const lastMidnight = toVietnamMidnight(lastDateStr);
-      const diffDays = Math.round(
-        (nowMidnight - lastMidnight) / (1000 * 60 * 60 * 24),
-      );
-
-      if (diffDays === 1) {
-        // Consecutive day - increment streak
-        await this.prisma.userStats.update({
-          where: { userId },
-          data: {
-            streakCount: { increment: 1 },
-            lastStreakUpdate: now,
-          },
-        });
-      } else if (diffDays > 1) {
-        // Missed day(s) - check streak freeze
-        if (stats.streakFreezes > 0) {
-          await this.prisma.userStats.update({
-            where: { userId },
+        if (!stats) {
+          await client.userStats.create({
             data: {
-              streakFreezes: { decrement: 1 },
-              streakCount: { increment: 1 },
-              lastStreakUpdate: now,
-            },
-          });
-        } else {
-          // Streak broken - reset to 1
-          await this.prisma.userStats.update({
-            where: { userId },
-            data: {
+              userId,
               streakCount: 1,
               lastStreakUpdate: now,
             },
           });
+          return;
         }
+
+        const lastUpdate = stats.lastStreakUpdate
+          ? new Date(stats.lastStreakUpdate)
+          : null;
+        if (!lastUpdate) {
+          await client.userStats.update({
+            where: { userId },
+            data: { streakCount: 1, lastStreakUpdate: now },
+          });
+          return;
+        }
+
+        // Use Vietnam timezone for last streak date
+        const lastDateStr = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(lastUpdate);
+
+        // Same Vietnam day - no change
+        if (nowDateStr === lastDateStr) {
+          return;
+        }
+
+        // Parse dates to Vietnam midnight boundaries for diffing
+        const toVietnamMidnight = (dateKey: string) =>
+          new Date(`${dateKey}T00:00:00+07:00`).getTime();
+
+        const nowMidnight = toVietnamMidnight(nowDateStr);
+        const lastMidnight = toVietnamMidnight(lastDateStr);
+        const diffDays = Math.round(
+          (nowMidnight - lastMidnight) / (1000 * 60 * 60 * 24),
+        );
+
+        if (diffDays === 1) {
+          // Consecutive day - increment streak
+          await client.userStats.update({
+            where: { userId },
+            data: {
+              streakCount: { increment: 1 },
+              lastStreakUpdate: now,
+            },
+          });
+        } else if (diffDays > 1) {
+          // Missed day(s) - check streak freeze
+          if (stats.streakFreezes > 0) {
+            await client.userStats.update({
+              where: { userId },
+              data: {
+                streakFreezes: { decrement: 1 },
+                streakCount: { increment: 1 },
+                lastStreakUpdate: now,
+              },
+            });
+          } else {
+            // Streak broken - reset to 1
+            await client.userStats.update({
+              where: { userId },
+              data: {
+                streakCount: 1,
+                lastStreakUpdate: now,
+              },
+            });
+          }
+        }
+      } catch (err) {
+        this.logger.error(
+          '[Streak] Failed to update streak for user:' + userId,
+          err,
+        );
       }
+    };
+
+    if (externalTx) return run(externalTx);
+    try {
+      return await this.prisma.$transaction(run);
     } catch (err) {
       this.logger.error(
-        '[Streak] Failed to update streak for user:' + userId,
+        '[Streak] Failed to start transaction for user:' + userId,
         err,
       );
     }

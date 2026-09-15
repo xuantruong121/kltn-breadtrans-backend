@@ -56,7 +56,9 @@ describe('GamificationListener', () => {
     gamificationServiceMock = {
       awardXp: jest.fn().mockResolvedValue({ totalPoints: 100 }),
       awardBanh: jest.fn().mockResolvedValue({ granted: 5, newBalance: 15 }),
-      awardVocabMasteryReward: jest.fn().mockResolvedValue({ granted: 1 }),
+      awardVocabMasteryReward: jest
+        .fn()
+        .mockResolvedValue({ granted: 1, firstMastery: true }),
       awardSpeakingReward: jest.fn().mockResolvedValue({ granted: 5 }),
       awardToeicReward: jest.fn().mockResolvedValue({ granted: 120 }),
       awardBadgeIfEarned: jest.fn().mockResolvedValue(true),
@@ -77,7 +79,7 @@ describe('GamificationListener', () => {
       await listener.handleVocabLearnedEvent({
         userId: 11,
         count: 10,
-        wordId: 101,
+        wordIds: Array.from({ length: 10 }, (_, index) => 101 + index),
         source: 'vocabulary_review',
       });
 
@@ -99,27 +101,45 @@ describe('GamificationListener', () => {
       );
     });
 
-    it('grants zero Bánh Mì if wordId is missing', async () => {
+    it('does not grant EXP, Bánh Mì, or quest progress if word identity is missing', async () => {
       await listener.handleVocabLearnedEvent({
         userId: 11,
         count: 5,
         source: 'legacy_call',
       });
 
-      expect(gamificationServiceMock.awardXp).toHaveBeenCalledWith(
-        11,
-        25,
-        'Học 5 từ vựng mới',
-      );
+      expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
       expect(
         gamificationServiceMock.awardVocabMasteryReward,
       ).not.toHaveBeenCalled();
       expect(gamificationServiceMock.awardBanh).not.toHaveBeenCalled();
+      expect(
+        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does not grant EXP or quest progress for an already mastered word', async () => {
+      gamificationServiceMock.awardVocabMasteryReward.mockResolvedValue({
+        granted: 0,
+        firstMastery: false,
+      });
+
+      await listener.handleVocabLearnedEvent({
+        userId: 11,
+        count: 1,
+        wordId: 101,
+        source: 'vocabulary_review',
+      });
+
+      expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
+      expect(
+        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
+      ).not.toHaveBeenCalled();
     });
   });
 
   describe('handleQuizCompletedEvent', () => {
-    it('calculates score 70 as 105 Bánh Mì and delegates quest progression', async () => {
+    it('calculates score 70 as 28 Bánh Mì and delegates quest progression', async () => {
       prismaMock.dailyQuest.findMany.mockResolvedValueOnce([
         {
           id: 5,
@@ -143,10 +163,10 @@ describe('GamificationListener', () => {
         700,
         'Hoàn thành bài thi (Quiz)',
       );
-      // Math.round(70 * 1.5) = 105 Bánh Mì, capped at 150
+      // Math.round(70 * 0.4) = 28 Bánh Mì, capped at 40.
       expect(gamificationServiceMock.awardBanh).toHaveBeenCalledWith(
         12,
-        105,
+        28,
         'QUIZ_FIRST_COMPLETION',
         'quiz:44',
         expect.objectContaining({ isCapped: true }),
