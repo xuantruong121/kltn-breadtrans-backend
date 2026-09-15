@@ -86,22 +86,14 @@ export class OpenAIEvaluatorStrategy implements IAIEvaluator {
     emailPrompt: string,
     userResponse: string,
   ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
-    return {
-      score: 3,
-      feedback: '[OpenAI Mock] Phản hồi email giả lập.',
-      suggestions: ['Sử dụng thêm từ nối.'],
-    };
+    throw new Error('OpenAI writing evaluation is not configured');
   }
 
   async evaluateWritingPart3(
     essayTopic: string,
     userEssay: string,
   ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
-    return {
-      score: 4,
-      feedback: '[OpenAI Mock] Bài luận giả lập.',
-      suggestions: ['Mở rộng lập luận.'],
-    };
+    throw new Error('OpenAI writing evaluation is not configured');
   }
 
   async evaluateSpeakingPart3To5(

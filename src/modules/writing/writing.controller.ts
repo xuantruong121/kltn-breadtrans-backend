@@ -12,6 +12,14 @@ import { WritingService } from './writing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+
+class SubmitWritingDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20000)
+  answer!: string;
+}
 
 @ApiTags('Writing')
 @Controller('writing')
@@ -48,9 +56,9 @@ export class WritingController {
   submitWriting(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: any,
-    @Body('answer') answer: string,
+    @Body() body: SubmitWritingDto,
   ) {
-    return this.writingService.submitWriting(id, req.user.id, answer);
+    return this.writingService.submitWriting(id, req.user.id, body.answer);
   }
 
   @Post('part2/submit')

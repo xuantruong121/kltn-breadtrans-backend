@@ -1405,11 +1405,12 @@ async function main() {
       'Bài kiểm tra ngữ pháp',
       'GRAMMAR_MOCK_TEST',
     ],
-    ['Reading A2', 'Đọc hiểu A2', 'BILINGUAL_LEVEL'],
+    ['Reading A1–A2', 'Đọc hiểu A1–A2', 'BILINGUAL_LEVEL'],
     ['Reading B1–B2', 'Đọc hiểu B1–B2', 'BILINGUAL_LEVEL'],
     ['Writing Sentence', 'Viết câu', 'WRITING_PART1'],
     ['Writing Email', 'Viết email', 'WRITING_PART2'],
     ['Writing Opinion', 'Viết đoạn/bài nêu quan điểm', 'WRITING_PART2'],
+    ['Reading C1', 'Đọc hiểu C1', 'BILINGUAL_LEVEL'],
   ].map(([name, vietnameseName, category], index) => ({
     id: index + 1,
     name,
@@ -1480,6 +1481,59 @@ async function main() {
       topics: ['Suy luận', 'Thông báo'],
       accents: ['US', 'UK'],
       durationMinutes: 18,
+    },
+  };
+
+  const readingCatalogMetadataByQuizId: Record<number, Prisma.InputJsonObject> = {
+    2: {
+      skill: 'READING',
+      levelRange: 'A2',
+      passageTypes: ['notice', 'message', 'advertisement', 'appointment', 'rules'],
+      durationMinutes: 15,
+    },
+    6: {
+      skill: 'READING',
+      levelRange: 'B1',
+      passageTypes: ['email', 'order correspondence'],
+      durationMinutes: 20,
+    },
+    13: {
+      skill: 'READING',
+      levelRange: 'A1–A2',
+      passageTypes: ['notice', 'email'],
+      durationMinutes: 20,
+    },
+    14: {
+      skill: 'READING',
+      levelRange: 'B1',
+      passageTypes: ['memo', 'article'],
+      durationMinutes: 20,
+    },
+    15: {
+      skill: 'READING',
+      levelRange: 'B2',
+      passageTypes: ['email', 'report'],
+      durationMinutes: 25,
+    },
+    16: {
+      skill: 'READING',
+      levelRange: 'C1',
+      passageTypes: ['article', 'memo'],
+      durationMinutes: 25,
+    },
+  };
+
+  const legacyReadingQuestionMetadata: Record<
+    number,
+    { level: string; questionTypes: string[] }
+  > = {
+    2: {
+      level: 'A2',
+      questionTypes: ['DETAIL', 'DETAIL', 'PROMOTION', 'DETAIL', 'DETAIL'],
+    },
+    6: {
+      level: 'B1',
+      questionTypes: ['PURPOSE', 'DETAIL', 'PURPOSE'],
     },
   };
 
@@ -1936,10 +1990,10 @@ async function main() {
     },
     {
       id: 6,
-      title: 'Reading B1–B2 — Workplace Documents',
+      title: 'Reading B1 — Workplace Documents',
       type: 'BILINGUAL_READING',
       description:
-        'Đọc email, memo và thông báo để suy luận mục đích và kết nối chi tiết.',
+        'Đọc email, thông báo và thư trao đổi công việc để xác định mục đích và thông tin chi tiết.',
       timeLimit: 20,
       practiceTopicId: 5,
       questions: [
@@ -2097,7 +2151,9 @@ async function main() {
         courseId: definition.courseId,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
-          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
+          listeningCatalogMetadataByQuizId[definition.id] ??
+          readingCatalogMetadataByQuizId[definition.id] ??
+          Prisma.DbNull,
       },
       create: {
         id: definition.id,
@@ -2108,21 +2164,42 @@ async function main() {
         courseId: definition.courseId,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
-          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
+          listeningCatalogMetadataByQuizId[definition.id] ??
+          readingCatalogMetadataByQuizId[definition.id] ??
+          Prisma.DbNull,
       },
     });
     for (let order = 1; order <= definition.questions.length; order += 1) {
       const q = definition.questions[order - 1];
       const visualContext = listeningVisualContextByQuizId[definition.id];
+      const readingMetadata = legacyReadingQuestionMetadata[definition.id];
+      const sourceContent = q.content as Record<string, unknown>;
+      const normalizedReadingContent =
+        definition.type === 'BILINGUAL_READING' && readingMetadata
+          ? {
+              ...q.content,
+              skill: 'READING',
+              level:
+                typeof sourceContent.level === 'string'
+                  ? sourceContent.level
+                  : readingMetadata.level,
+              questionType:
+                (typeof sourceContent.questionType === 'string'
+                  ? sourceContent.questionType
+                  : undefined) ??
+                readingMetadata.questionTypes[order - 1] ??
+                'DETAIL',
+            }
+          : q.content;
       const questionContent =
         definition.type === 'LISTENING_PRACTICE' && visualContext?.imageUrl
           ? {
-              ...q.content,
+              ...normalizedReadingContent,
               imageUrl: visualContext.imageUrl,
               imageAlt: visualContext.imageAlt,
               imagePurpose: 'TOPIC_CONTEXT',
             }
-          : q.content;
+          : normalizedReadingContent;
       await prisma.question.upsert({
         where: { id: questionId },
         update: {
@@ -3269,7 +3346,7 @@ async function main() {
       description:
         'Đọc văn bản nguyên bản và luyện ý chính, chi tiết, suy luận, mục đích và từ vựng theo ngữ cảnh.',
       timeLimit: 25,
-      practiceTopicId: 5,
+      practiceTopicId: 9,
       questions: [
         {
           type: 'MULTIPLE_CHOICE',
@@ -3751,7 +3828,9 @@ async function main() {
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
-          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
+          listeningCatalogMetadataByQuizId[definition.id] ??
+          readingCatalogMetadataByQuizId[definition.id] ??
+          Prisma.DbNull,
       },
       create: {
         id: definition.id,
@@ -3761,21 +3840,42 @@ async function main() {
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
-          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
+          listeningCatalogMetadataByQuizId[definition.id] ??
+          readingCatalogMetadataByQuizId[definition.id] ??
+          Prisma.DbNull,
       },
     });
     for (let order = 1; order <= definition.questions.length; order += 1) {
       const q = definition.questions[order - 1];
       const visualContext = listeningVisualContextByQuizId[definition.id];
+      const readingMetadata = legacyReadingQuestionMetadata[definition.id];
+      const sourceContent = q.content as Record<string, unknown>;
+      const normalizedReadingContent =
+        definition.type === 'BILINGUAL_READING' && readingMetadata
+          ? {
+              ...q.content,
+              skill: 'READING',
+              level:
+                typeof sourceContent.level === 'string'
+                  ? sourceContent.level
+                  : readingMetadata.level,
+              questionType:
+                (typeof sourceContent.questionType === 'string'
+                  ? sourceContent.questionType
+                  : undefined) ??
+                readingMetadata.questionTypes[order - 1] ??
+                'DETAIL',
+            }
+          : q.content;
       const questionContent =
         definition.type === 'LISTENING_PRACTICE' && visualContext?.imageUrl
           ? {
-              ...q.content,
+              ...normalizedReadingContent,
               imageUrl: visualContext.imageUrl,
               imageAlt: visualContext.imageAlt,
               imagePurpose: 'TOPIC_CONTEXT',
             }
-          : q.content;
+          : normalizedReadingContent;
       await prisma.question.upsert({
         where: { id: questionId },
         update: {
