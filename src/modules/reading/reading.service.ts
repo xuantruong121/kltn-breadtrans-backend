@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { TopicCategory } from '@prisma/client';
+import { QuizType, TopicCategory } from '@prisma/client';
 
 @Injectable()
 export class ReadingService {
@@ -12,32 +12,45 @@ export class ReadingService {
       orderBy: { order: 'asc' },
       include: {
         quizzes: {
-          include: {
-            questions: true,
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            type: true,
+            bilingualContent: true,
+            timeLimit: true,
+            questions: { select: { id: true } },
+            _count: { select: { questions: true } },
           },
         },
       },
     });
 
     const userResults = userId
-      ? await this.prisma.result.findMany({
+      ? await this.prisma.submission.findMany({
           where: {
-            submission: {
-              userId: userId,
-              quiz: {
-                practiceTopic: {
-                  category: category,
-                },
-              },
+            userId,
+            quiz: { practiceTopic: { category } },
+          },
+          orderBy: { submittedAt: 'desc' },
+          select: {
+            quizId: true,
+            results: {
+              select: { questionId: true, isCorrect: true },
             },
           },
         })
       : [];
 
-    const correctQuestionIds = new Set(
-      userResults.filter((r) => r.isCorrect).map((r) => r.questionId),
-    );
-    const completedQuestionIds = new Set(userResults.map((r) => r.questionId));
+    const latestByQuiz = new Map<
+      number,
+      { questionId: number; isCorrect: boolean | null }[]
+    >();
+    for (const submission of userResults) {
+      if (!latestByQuiz.has(submission.quizId)) {
+        latestByQuiz.set(submission.quizId, submission.results);
+      }
+    }
 
     return topics.map((topic) => {
       let totalQuestions = 0;
@@ -46,22 +59,21 @@ export class ReadingService {
       let completedArticles = 0;
 
       topic.quizzes.forEach((quiz) => {
-        const allQuestions = quiz.questions;
-        totalQuestions += allQuestions.length;
-
-        let isQuizCompleted = true;
-        if (allQuestions.length === 0) isQuizCompleted = false;
-
-        allQuestions.forEach((q) => {
-          if (completedQuestionIds.has(q.id)) {
-            completedCount++;
-          } else {
-            isQuizCompleted = false;
-          }
-          if (correctQuestionIds.has(q.id)) correctCount++;
-        });
-
-        if (isQuizCompleted) completedArticles++;
+        const questionCount = quiz._count.questions;
+        totalQuestions += questionCount;
+        const questionIds = new Set(
+          quiz.questions.map((question) => question.id),
+        );
+        const latestResults = (latestByQuiz.get(quiz.id) ?? []).filter(
+          (result) => questionIds.has(result.questionId),
+        );
+        completedCount += latestResults.length;
+        correctCount += latestResults.filter(
+          (result) => result.isCorrect,
+        ).length;
+        if (latestResults.length === questionCount && questionCount > 0) {
+          completedArticles++;
+        }
       });
 
       return {
@@ -84,6 +96,7 @@ export class ReadingService {
       where: { id: topicId },
       include: {
         quizzes: {
+          where: { type: QuizType.BILINGUAL_READING },
           select: {
             id: true,
             title: true,
@@ -100,7 +113,9 @@ export class ReadingService {
       },
     });
 
-    if (!topic) throw new NotFoundException('Topic not found');
+    if (!topic || topic.category !== TopicCategory.BILINGUAL_LEVEL) {
+      throw new NotFoundException('Reading topic not found');
+    }
     return topic;
   }
 
@@ -110,49 +125,64 @@ export class ReadingService {
       select: {
         id: true,
         title: true,
+        type: true,
         theoryContent: true,
+        practiceTopic: { select: { category: true } },
       },
     });
-    if (!quiz) throw new NotFoundException('Quiz not found');
+    if (
+      !quiz ||
+      quiz.practiceTopic?.category !== TopicCategory.BILINGUAL_LEVEL ||
+      quiz.type !== QuizType.BILINGUAL_READING
+    ) {
+      throw new NotFoundException('Reading quiz not found');
+    }
     return quiz;
   }
 
   async getBilingualProgress(userId: number) {
-    // Tìm tất cả quizzes thuộc BILINGUAL_LEVEL
     const bilingualQuizzes = await this.prisma.quiz.findMany({
       where: {
-        practiceTopic: {
-          category: TopicCategory.BILINGUAL_LEVEL,
-        },
+        type: QuizType.BILINGUAL_READING,
+        practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
       },
-      include: {
-        questions: true,
+      select: {
+        id: true,
+        title: true,
+        bilingualContent: true,
+        _count: { select: { questions: true } },
+        questions: { select: { id: true } },
       },
     });
 
-    const userResults = await this.prisma.result.findMany({
+    const userSubmissions = await this.prisma.submission.findMany({
       where: {
-        submission: {
-          userId: userId,
-          quiz: {
-            practiceTopic: {
-              category: TopicCategory.BILINGUAL_LEVEL,
-            },
-          },
+        userId,
+        quiz: {
+          type: QuizType.BILINGUAL_READING,
+          practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
         },
       },
+      orderBy: { submittedAt: 'desc' },
+      select: {
+        quizId: true,
+        results: { select: { questionId: true, isCorrect: true } },
+      },
     });
-
-    const correctQuestionIds = new Set(
-      userResults.filter((r) => r.isCorrect).map((r) => r.questionId),
-    );
-    const completedQuestionIds = new Set(userResults.map((r) => r.questionId));
+    const latestByQuiz = new Map<
+      number,
+      (typeof userSubmissions)[number]['results']
+    >();
+    for (const submission of userSubmissions) {
+      if (!latestByQuiz.has(submission.quizId)) {
+        latestByQuiz.set(submission.quizId, submission.results);
+      }
+    }
 
     let completedArticles = 0;
     let sentencesRead = 0;
     let questionsAnswered = 0;
     let correctAnswers = 0;
-
     const completedArticlesList: {
       title: string;
       sentencesCount: number;
@@ -160,34 +190,29 @@ export class ReadingService {
     }[] = [];
 
     bilingualQuizzes.forEach((quiz) => {
-      let isCompleted = true;
-      let qAnswered = 0;
-      let qCorrect = 0;
+      const results = latestByQuiz.get(quiz.id) ?? [];
+      const resultIds = new Set(results.map((result) => result.questionId));
+      const questionIds = new Set(
+        quiz.questions.map((question) => question.id),
+      );
+      const answered = results.filter((result) =>
+        questionIds.has(result.questionId),
+      );
+      const complete =
+        questionIds.size > 0 && questionIds.size === resultIds.size;
+      questionsAnswered += answered.length;
+      correctAnswers += answered.filter((result) => result.isCorrect).length;
 
-      if (quiz.questions.length === 0) isCompleted = false; // Bỏ qua nếu không có câu hỏi
-
-      quiz.questions.forEach((q) => {
-        if (completedQuestionIds.has(q.id)) {
-          qAnswered++;
-        } else {
-          isCompleted = false; // Phải làm hết mới tính là Đã đọc xong
-        }
-        if (correctQuestionIds.has(q.id)) qCorrect++;
-      });
-
-      questionsAnswered += qAnswered;
-      correctAnswers += qCorrect;
-
-      if (isCompleted) {
+      if (complete) {
         completedArticles++;
-        const contentArray = quiz.bilingualContent as any[];
-        const sCount = contentArray ? contentArray.length : 0;
-        sentencesRead += sCount;
-
+        const content = Array.isArray(quiz.bilingualContent)
+          ? quiz.bilingualContent
+          : [];
+        sentencesRead += content.length;
         completedArticlesList.push({
           title: quiz.title,
-          sentencesCount: sCount,
-          questionsCount: quiz.questions.length,
+          sentencesCount: content.length,
+          questionsCount: questionIds.size,
         });
       }
     });

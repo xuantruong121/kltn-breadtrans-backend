@@ -987,13 +987,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
     userResponse: string,
   ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
     if (!this.hasKeys()) {
-      return {
-        score: 3,
-        feedback: '[Mock Gemini] Email đáp ứng cơ bản các yêu cầu đề bài.',
-        suggestions: [
-          'Nên dùng từ nối trang trọng hơn như "Furthermore", "However".',
-        ],
-      };
+      throw new Error('Thiếu GEMINI_API_KEY');
     }
     try {
       const prompt = `
@@ -1027,11 +1021,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       return JSON.parse(text);
     } catch (error: any) {
       this.logger.error(`Error evaluating writing part 2: ${error.message}`);
-      return {
-        score: 3,
-        feedback: 'Đã hoàn thành bài viết email.',
-        suggestions: ['Kiểm tra lại cấu trúc ngữ pháp và từ vựng.'],
-      };
+      throw new Error('Lỗi khi chấm điểm Writing Part 2');
     }
   }
 
@@ -1040,12 +1030,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
     userEssay: string,
   ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
     if (!this.hasKeys()) {
-      return {
-        score: 4,
-        feedback:
-          '[Mock Gemini] Bài luận có lập luận rõ ràng, cấu trúc đủ 3 phần.',
-        suggestions: ['Mở rộng thêm các ví dụ thực tế ở phần thân bài.'],
-      };
+      throw new Error('Thiếu GEMINI_API_KEY');
     }
     try {
       const prompt = `
@@ -1080,11 +1065,7 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       return JSON.parse(text);
     } catch (error: any) {
       this.logger.error(`Error evaluating writing part 3: ${error.message}`);
-      return {
-        score: 4,
-        feedback: 'Bài viết đạt yêu cầu cơ bản về độ dài và nội dung.',
-        suggestions: ['Tăng cường sử dụng từ nối và cấu trúc phức.'],
-      };
+      throw new Error('Lỗi khi chấm điểm Writing Part 3');
     }
   }
 
