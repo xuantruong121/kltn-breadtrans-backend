@@ -434,7 +434,7 @@ export class AdminService {
     });
     if (paymentCount > 0) {
       throw new ConflictException(
-        'Không thể xóa quyền truy cập vì tồn tại lịch sử thanh toán cần được lưu giữ.',
+        'Không thể xóa ghi danh vì tồn tại lịch sử thanh toán cần được lưu giữ.',
       );
     }
     return this.prisma.enrollment.deleteMany({ where: { userId, classId } });
