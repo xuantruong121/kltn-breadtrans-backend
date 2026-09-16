@@ -8,9 +8,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationsService } from '../notifications/notifications.service';
-import { Cron } from '@nestjs/schedule';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import {
+  getBusinessDayKey,
+  getBusinessDayStart,
+  getPreviousBusinessDayKey,
+  getBusinessWeekKey,
+} from '../../common/time/business-time.util';
 
 export function getTodayDateKey(timeZone = 'Asia/Ho_Chi_Minh'): string {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -1065,6 +1070,49 @@ export class GamificationService {
     return 'bready';
   }
 
+  private getPetSatiety(
+    lastFedAt?: Date | string | null,
+  ): 'FULL' | 'NORMAL' | 'HUNGRY' | 'VERY_HUNGRY' {
+    if (!lastFedAt) return 'HUNGRY';
+    const hoursSinceFed =
+      (Date.now() - new Date(lastFedAt).getTime()) / (1000 * 60 * 60);
+    if (hoursSinceFed < 4) return 'FULL';
+    if (hoursSinceFed < 8) return 'NORMAL';
+    if (hoursSinceFed < 12) return 'HUNGRY';
+    return 'VERY_HUNGRY';
+  }
+
+  private getPetFeedCost(feedCount: number) {
+    const safeCount = Number.isFinite(feedCount)
+      ? Math.max(0, Math.floor(feedCount))
+      : 0;
+    return [10, 20, 30][Math.min(safeCount, 2)];
+  }
+
+  private withPetFeedStatus<T extends { lastFedAt: Date | null }>(
+    pet: T,
+    activeLastFedAt?: Date | string | null,
+    dailyFeedCount = 0,
+    dailyRewardedFeedCount = 0,
+  ) {
+    const satietyState = this.getPetSatiety(activeLastFedAt ?? pet.lastFedAt);
+    const feedCost = this.getPetFeedCost(dailyFeedCount);
+    const canFeed = satietyState !== 'FULL';
+
+    return {
+      ...pet,
+      canFeed,
+      // Kept nullable for backwards-compatible clients; the new UX uses satietyState.
+      nextFeedAt: null,
+      feedCost,
+      satietyState,
+      dailyFeedCount,
+      dailyRewardedFeedCount,
+      dailyRewardLimit: 3,
+      feedExpReward: dailyRewardedFeedCount < 3 ? 5 : 0,
+    };
+  }
+
   async getMyPet(userId: number) {
     let pet = await this.prisma.userPet.findUnique({
       where: { userId },
@@ -1112,7 +1160,7 @@ export class GamificationService {
           roster: initialRoster,
         } as any,
       });
-      return pet;
+      return this.withPetFeedStatus(pet, null, 0, 0);
     }
 
     const currentSpecies = this.normalizeSpeciesKey(pet.name);
@@ -1169,7 +1217,22 @@ export class GamificationService {
       }
     }
 
-    return pet;
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+    const dailyFeedCount =
+      activePetData.dailyFeedDateKey === today
+        ? Number(activePetData.dailyFeedCount ?? 0)
+        : 0;
+    const dailyRewardedFeedCount =
+      activePetData.dailyFeedDateKey === today
+        ? Number(activePetData.dailyRewardedFeedCount ?? 0)
+        : 0;
+    return this.withPetFeedStatus(
+      pet,
+      (activePetData.lastFedAt as Date | string | null | undefined) ??
+        pet.lastFedAt,
+      dailyFeedCount,
+      dailyRewardedFeedCount,
+    );
   }
 
   async feedPet(userId: number) {
@@ -1214,34 +1277,39 @@ export class GamificationService {
         lastFedAt: null,
       };
 
-      // 4. 24-hour cooldown check
+      // 4. Derive satiety and daily reward counters from the active roster entry.
       const lastFedAt: Date | null = activePetData.lastFedAt
         ? new Date(activePetData.lastFedAt)
         : pet.lastFedAt
           ? new Date(pet.lastFedAt)
           : null;
-
-      if (lastFedAt) {
-        const hoursSinceFed =
-          (Date.now() - lastFedAt.getTime()) / (1000 * 60 * 60);
-        if (hoursSinceFed < 24) {
-          const hoursLeft = Math.ceil(24 - hoursSinceFed);
-          throw new BadRequestException(
-            `Thú cưng chưa đói! Hãy quay lại sau ${hoursLeft} giờ nữa.`,
-          );
-        }
+      if (this.getPetSatiety(lastFedAt) === 'FULL') {
+        throw new BadRequestException(
+          'Thú cưng đang no, chưa cần ăn thêm. Hãy quay lại khi pet đói hơn.',
+        );
       }
+      const dailyFeedDateKey = activePetData.dailyFeedDateKey;
+      const feedCount =
+        dailyFeedDateKey === today
+          ? Number(activePetData.dailyFeedCount ?? 0)
+          : 0;
+      const rewardedFeedCount =
+        dailyFeedDateKey === today
+          ? Number(activePetData.dailyRewardedFeedCount ?? 0)
+          : 0;
+      const feedCost = this.getPetFeedCost(feedCount);
+      const isRewardedFeed = rewardedFeedCount < 3;
 
-      // 5. CAS Deduct exactly 10 Bánh Mì
+      // 5. CAS deduct the server-calculated escalating cost.
       const cas = await tx.userStats.updateMany({
-        where: { userId, totalBanhRan: { gte: 10 } },
-        data: { totalBanhRan: { decrement: 10 } },
+        where: { userId, totalBanhRan: { gte: feedCost } },
+        data: { totalBanhRan: { decrement: feedCost } },
       });
 
       if (cas.count === 0) {
         const stats = await tx.userStats.findUnique({ where: { userId } });
         throw new BadRequestException(
-          `Bạn không đủ 10 Bánh Mì để cho thú cưng ăn! (Hiện có: ${stats?.totalBanhRan ?? 0})`,
+          `Bạn không đủ ${feedCost} Bánh Mì để cho thú cưng ăn! (Hiện có: ${stats?.totalBanhRan ?? 0})`,
         );
       }
 
@@ -1251,7 +1319,7 @@ export class GamificationService {
       await tx.banhTransaction.create({
         data: {
           userId,
-          amount: -10,
+          amount: -feedCost,
           source: 'PET_FEED',
           reference: `pet:feed:${userId}:${Date.now()}`,
           dateKey: today,
@@ -1260,14 +1328,21 @@ export class GamificationService {
         },
       });
 
-      // 7. Calculate new pet stats based on CURRENT values
-      const EXP_PER_FEED = 50;
+      // 7. Reward only the first three feeds each day; later feeds have diminishing returns.
+      const benefits = isRewardedFeed
+        ? [
+            { health: 20, happiness: 10, exp: 5 },
+            { health: 15, happiness: 8, exp: 5 },
+            { health: 10, happiness: 5, exp: 5 },
+          ][Math.min(rewardedFeedCount, 2)]
+        : { health: 5, happiness: 2, exp: 0 };
+      const EXP_PER_FEED = benefits.exp;
       const newPetExp = (activePetData.exp || 0) + EXP_PER_FEED;
       const newLevel = Math.floor(newPetExp / 1000) + 1;
       const currentHealth = activePetData.health ?? 100;
       const currentHappiness = activePetData.happiness ?? 100;
-      const newHealth = Math.min(100, currentHealth + 10);
-      const newHappiness = Math.min(100, currentHappiness + 20);
+      const newHealth = Math.min(100, currentHealth + benefits.health);
+      const newHappiness = Math.min(100, currentHappiness + benefits.happiness);
       const now = new Date();
 
       activePetData.exp = newPetExp;
@@ -1275,6 +1350,11 @@ export class GamificationService {
       activePetData.happiness = newHappiness;
       activePetData.health = newHealth;
       activePetData.lastFedAt = now;
+      activePetData.dailyFeedDateKey = today;
+      activePetData.dailyFeedCount = feedCount + 1;
+      activePetData.dailyRewardedFeedCount = isRewardedFeed
+        ? rewardedFeedCount + 1
+        : rewardedFeedCount;
       roster[currentSpecies] = activePetData;
 
       // 8. Update pet
@@ -1290,7 +1370,12 @@ export class GamificationService {
         } as any,
       });
 
-      return { updatedPet, newLevel };
+      return {
+        updatedPet,
+        newLevel,
+        feedExpAwarded: EXP_PER_FEED,
+        rewardedFeedCount: activePetData.dailyRewardedFeedCount,
+      };
     });
 
     // Award badge at level 2
@@ -1298,7 +1383,15 @@ export class GamificationService {
       await this.awardBadgeIfEarned(userId, 'Chuyên Gia Nuôi Thú');
     }
 
-    return result.updatedPet;
+    const activePetData = ((result.updatedPet as any).roster ?? {})[
+      this.normalizeSpeciesKey(result.updatedPet.name)
+    ];
+    return this.withPetFeedStatus(
+      result.updatedPet,
+      activePetData?.lastFedAt ?? result.updatedPet.lastFedAt,
+      Number(activePetData?.dailyFeedCount ?? 0),
+      Number(activePetData?.dailyRewardedFeedCount ?? 0),
+    );
   }
 
   async changePetType(userId: number, targetPetName: string) {
@@ -1309,12 +1402,16 @@ export class GamificationService {
     const roster = ((pet as any).roster as Record<string, any>) || {};
 
     // 1. Save current active pet stats into roster
+    const currentData = roster[currentSpecies] || {};
     roster[currentSpecies] = {
       level: pet.level || 1,
       exp: pet.exp || 0,
       health: pet.health ?? 100,
       happiness: pet.happiness ?? 100,
       lastFedAt: pet.lastFedAt,
+      dailyFeedDateKey: currentData.dailyFeedDateKey,
+      dailyFeedCount: currentData.dailyFeedCount,
+      dailyRewardedFeedCount: currentData.dailyRewardedFeedCount,
     };
 
     // 2. Retrieve or initialize target pet stats
@@ -1325,13 +1422,16 @@ export class GamificationService {
         health: 100,
         happiness: 100,
         lastFedAt: null,
+        dailyFeedDateKey: null,
+        dailyFeedCount: 0,
+        dailyRewardedFeedCount: 0,
       };
     }
 
     const targetData = roster[targetSpecies];
 
     // 3. Switch active pet to target pet stats
-    return this.prisma.userPet.update({
+    const updatedPet = await this.prisma.userPet.update({
       where: { userId },
       data: {
         name: targetPetName,
@@ -1343,6 +1443,18 @@ export class GamificationService {
         roster: roster as any,
       } as any,
     });
+
+    return this.withPetFeedStatus(
+      updatedPet,
+      (targetData.lastFedAt as Date | string | null | undefined) ??
+        updatedPet.lastFedAt,
+      targetData.dailyFeedDateKey === getTodayDateKey('Asia/Ho_Chi_Minh')
+        ? Number(targetData.dailyFeedCount ?? 0)
+        : 0,
+      targetData.dailyFeedDateKey === getTodayDateKey('Asia/Ho_Chi_Minh')
+        ? Number(targetData.dailyRewardedFeedCount ?? 0)
+        : 0,
+    );
   }
 
   async getDashboardToday(userId: number) {
@@ -1503,52 +1615,100 @@ export class GamificationService {
   // ADVANCED GAMIFICATION (LEAGUES, STREAKS)
   // ==========================================
 
-  async triggerDailyCron() {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
+  async triggerDailyCron(dayKey = getBusinessDayKey()) {
+    const previousDayStart = getBusinessDayStart(
+      getPreviousBusinessDayKey(dayKey),
+    );
+    const processedAt = new Date();
+    const batchSize = 200;
+    let processedCount = 0;
 
-    const stats = await this.prisma.userStats.findMany({
-      where: {
-        lastStreakUpdate: { lt: yesterday },
-        streakCount: { gt: 0 },
-      },
-    });
+    // Each batch has its own short transaction. The predicate is intentionally
+    // idempotent, so a retry after a partial failure cannot decrement twice.
+    while (true) {
+      const batch = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('cron-daily-streak'))`;
+        const setting = await tx.gameSettings.findUnique({
+          where: { gameId: 'cron-daily-streak' },
+        });
+        const config =
+          (setting?.config as Record<string, unknown> | null) || {};
+        if (config.lastProcessedDay === dayKey) {
+          return { done: true, count: 0 };
+        }
 
-    for (const stat of stats) {
-      if (stat.streakFreezes > 0) {
-        await this.prisma.userStats.update({
-          where: { id: stat.id },
-          data: {
-            streakFreezes: { decrement: 1 },
-            lastStreakUpdate: new Date(), // giả vờ như đã học để không bị trừ tiếp vào ngày mai
+        const stats = await tx.userStats.findMany({
+          where: {
+            lastStreakUpdate: { lt: previousDayStart },
+            streakCount: { gt: 0 },
+          },
+          orderBy: { id: 'asc' },
+          take: batchSize,
+        });
+
+        for (const stat of stats) {
+          if (stat.streakFreezes > 0) {
+            await tx.userStats.update({
+              where: { id: stat.id },
+              data: {
+                streakFreezes: { decrement: 1 },
+                lastStreakUpdate: processedAt,
+              },
+            });
+          } else {
+            await tx.userStats.update({
+              where: { id: stat.id },
+              data: { streakCount: 0, lastStreakUpdate: processedAt },
+            });
+          }
+        }
+        return { done: stats.length === 0, count: stats.length };
+      });
+
+      processedCount += batch.count;
+      if (batch.done) break;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('cron-daily-streak'))`;
+      const setting = await tx.gameSettings.findUnique({
+        where: { gameId: 'cron-daily-streak' },
+      });
+      const config = (setting?.config as Record<string, unknown> | null) || {};
+      if (config.lastProcessedDay !== dayKey) {
+        await tx.gameSettings.upsert({
+          where: { gameId: 'cron-daily-streak' },
+          update: {
+            config: {
+              lastProcessedDay: dayKey,
+              processedAt: processedAt.toISOString(),
+            },
+          },
+          create: {
+            gameId: 'cron-daily-streak',
+            config: {
+              lastProcessedDay: dayKey,
+              processedAt: processedAt.toISOString(),
+            },
           },
         });
-      } else {
-        await this.prisma.userStats.update({
-          where: { id: stat.id },
-          data: { streakCount: 0 },
-        });
       }
-    }
+    });
+
     return {
       success: true,
-      message: `Processed ${stats.length} inactive users.`,
+      noop: processedCount === 0,
+      message:
+        processedCount === 0
+          ? `Ngày ${dayKey} không có người dùng cần xử lý.`
+          : `Processed ${processedCount} inactive users for ${dayKey}.`,
     };
   }
 
-  async triggerWeeklyCron(isManualTrigger = false) {
+  async triggerWeeklyCron(isManualTrigger = false, weekKeyOverride?: string) {
     const tiers = ['Đồng', 'Bạc', 'Vàng', 'Bạch Kim', 'Kim Cương'];
     const now = new Date();
-    const year = now.getFullYear();
-    const firstDay = new Date(year, 0, 1);
-    const week = Math.ceil(
-      ((now.getTime() - firstDay.getTime()) / 86400000 +
-        firstDay.getDay() +
-        1) /
-        7,
-    );
-    const weekKey = `${year}-W${String(week).padStart(2, '0')}`;
+    const weekKey = weekKeyOverride || getBusinessWeekKey(now);
     const maxAttempts = isManualTrigger ? 3 : 1;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -1646,48 +1806,6 @@ export class GamificationService {
       noop: true,
       message: 'Weekly cron đang được xử lý bởi tiến trình khác.',
     };
-  }
-
-  // ================= CRON SCHEDULES (Asia/Ho_Chi_Minh) =================
-
-  @Cron('0 0 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
-  async handleDailyCronSchedule() {
-    if (process.env.CRON_INTERNAL_ENABLED === 'true') {
-      this.logger.log(
-        '[GamificationService] Executing automated daily streak cronjob...',
-      );
-      try {
-        const res = await this.triggerDailyCron();
-        this.logger.log(
-          `[GamificationService] Daily streak cron completed: ${res.message}`,
-        );
-      } catch (err) {
-        this.logger.error(
-          '[GamificationService] Daily streak cron failed:',
-          err,
-        );
-      }
-    }
-  }
-
-  @Cron('0 0 * * 0', { timeZone: 'Asia/Ho_Chi_Minh' })
-  async handleWeeklyCronSchedule() {
-    if (process.env.CRON_INTERNAL_ENABLED === 'true') {
-      this.logger.log(
-        '[GamificationService] Executing automated weekly leagues cronjob...',
-      );
-      try {
-        const res = await this.triggerWeeklyCron();
-        this.logger.log(
-          `[GamificationService] Weekly leagues cron completed: ${res.message}`,
-        );
-      } catch (err) {
-        this.logger.error(
-          '[GamificationService] Weekly leagues cron failed:',
-          err,
-        );
-      }
-    }
   }
 
   async sendAdmiration(

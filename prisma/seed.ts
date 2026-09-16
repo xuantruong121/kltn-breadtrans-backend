@@ -387,58 +387,58 @@ async function main() {
     {
       courseIndex: 0,
       name: 'English Foundations — Free Access',
-      capacity: 200,
+      capacity: null,
       tuitionFeeVnd: 0,
-      status: 'UPCOMING',
+      status: 'ONGOING',
     },
     {
       courseIndex: 2,
       name: 'TOEIC 450–650 — Standard Access',
-      capacity: 80,
+      capacity: null,
       tuitionFeeVnd: 1490000,
-      status: 'UPCOMING',
+      status: 'ONGOING',
     },
     {
       courseIndex: 1,
       name: 'Four Skills B1 — Free Practice',
-      capacity: 150,
+      capacity: null,
       tuitionFeeVnd: 0,
-      status: 'UPCOMING',
+      status: 'ONGOING',
     },
     {
       courseIndex: 5,
       name: 'TOEIC 4 Skills — Complete Access',
-      capacity: 60,
+      capacity: null,
       tuitionFeeVnd: 2490000,
-      status: 'UPCOMING',
+      status: 'ONGOING',
     },
     {
       courseIndex: 3,
       name: 'TOEIC 650–850+ — Intensive Access',
-      capacity: 50,
+      capacity: null,
       tuitionFeeVnd: 1990000,
-      status: 'UPCOMING',
+      status: 'ONGOING',
     },
     {
       courseIndex: 4,
       name: 'TOEIC Speaking & Writing — Practice Access',
-      capacity: 80,
+      capacity: null,
       tuitionFeeVnd: 1290000,
-      status: 'UPCOMING',
+      status: 'ONGOING',
     },
     {
       courseIndex: 6,
       name: 'Business English — Self Study',
-      capacity: 120,
+      capacity: null,
       tuitionFeeVnd: 990000,
-      status: 'UPCOMING',
+      status: 'ONGOING',
     },
     {
       courseIndex: 7,
       name: 'Grammar & Vocabulary — Open Practice',
-      capacity: 200,
+      capacity: null,
       tuitionFeeVnd: 0,
-      status: 'UPCOMING',
+      status: 'ONGOING',
     },
   ].map((item) => ({
     courseId: courses[item.courseIndex].id,
@@ -470,13 +470,15 @@ async function main() {
   }
 
   const offerings: Class[] = [];
-  for (const [index, definition] of offeringDefinitions.entries()) {
+  for (const definition of offeringDefinitions) {
     const offeringData = {
       courseId: definition.courseId,
       name: definition.name,
       capacity: definition.capacity,
       tuitionFeeVnd: definition.tuitionFeeVnd,
       status: definition.status,
+      startDate: null,
+      endDate: null,
     };
     offerings.push(
       await prisma.class.upsert({
@@ -487,15 +489,7 @@ async function main() {
           },
         },
         update: offeringData,
-        create: {
-          ...offeringData,
-          startDate: new Date(
-            `2026-${String(9 + (index % 3)).padStart(2, '0')}-15T08:00:00.000Z`,
-          ),
-          endDate: new Date(
-            `2026-${String(11 + (index % 2)).padStart(2, '0')}-30T08:00:00.000Z`,
-          ),
-        },
+        create: offeringData,
       }),
     );
   }
@@ -1378,10 +1372,17 @@ async function main() {
         where: { enrollmentId: enrollment.id },
         update: {
           amountVnd: paidOffering.tuitionFeeVnd,
-          status:
+          status: status === EnrollmentStatus.PENDING_PAYMENT
+            ? PaymentStatus.PENDING
+            : PaymentStatus.CONFIRMED,
+          reportedAt:
             status === EnrollmentStatus.PENDING_PAYMENT
-              ? PaymentStatus.PENDING
-              : PaymentStatus.CONFIRMED,
+              ? null
+              : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
+          confirmedAt:
+            status === EnrollmentStatus.PENDING_PAYMENT
+              ? null
+              : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
         },
         create: {
           enrollmentId: enrollment.id,
@@ -1391,6 +1392,14 @@ async function main() {
             status === EnrollmentStatus.PENDING_PAYMENT
               ? PaymentStatus.PENDING
               : PaymentStatus.CONFIRMED,
+          reportedAt:
+            status === EnrollmentStatus.PENDING_PAYMENT
+              ? null
+              : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
+          confirmedAt:
+            status === EnrollmentStatus.PENDING_PAYMENT
+              ? null
+              : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
         },
       });
       enrollmentIndex += 1;

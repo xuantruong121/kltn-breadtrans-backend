@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { R2Service } from './r2.service';
 
@@ -36,9 +35,8 @@ export class R2CleanupService {
    * Chạy vào lúc 03:00 sáng mỗi Chủ Nhật hàng tuần.
    * Giúp tiết kiệm chi phí lưu trữ Cloudflare R2 theo chính sách TTL.
    */
-  @Cron(CronExpression.EVERY_WEEK)
-  async cleanupOldSpeakingAudioFiles() {
-    this.logger.log('Starting automated R2 audio TTL cleanup job...');
+  async runCleanup() {
+    this.logger.log('Starting queued R2 audio TTL cleanup job...');
 
     const retentionDays = 90;
     const thresholdDate = new Date();
@@ -54,6 +52,7 @@ export class R2CleanupService {
           audioUrl: {
             not: '',
           },
+          NOT: { audioUrl: { startsWith: '[archived' } },
         },
         select: {
           id: true,
@@ -97,6 +96,12 @@ export class R2CleanupService {
       );
     } catch (error) {
       this.logger.error('Failed to cleanup expired R2 audio files', error);
+      throw error;
     }
+  }
+
+  // Backward-compatible admin entry point. Automated execution uses the queue.
+  async cleanupOldSpeakingAudioFiles() {
+    return this.runCleanup();
   }
 }

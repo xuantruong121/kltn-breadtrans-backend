@@ -107,19 +107,50 @@ export class SupportService {
 
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(100, Math.max(1, query.limit || 50));
-    const skip = (page - 1) * limit;
+    const beforeId = query.beforeId ? Number(query.beforeId) : undefined;
 
-    const [total, messages] = await Promise.all([
-      this.db.supportMessage.count({
-        where: { conversationId },
-      }),
-      this.db.supportMessage.findMany({
-        where: { conversationId },
-        orderBy: { createdAt: 'asc' },
-        skip,
-        take: limit,
-      }),
-    ]);
+    let messages: any[] = [];
+    let hasMore = false;
+    let total = 0;
+
+    if (beforeId || !query.page || query.page === 1) {
+      const whereClause: any = { conversationId };
+      if (beforeId) {
+        whereClause.id = { lt: beforeId };
+      }
+
+      const [totalCount, fetchedDesc] = await Promise.all([
+        this.db.supportMessage.count({ where: { conversationId } }),
+        this.db.supportMessage.findMany({
+          where: whereClause,
+          orderBy: { id: 'desc' },
+          take: limit,
+        }),
+      ]);
+      total = totalCount;
+      messages = fetchedDesc.reverse();
+      const oldestId = messages.length > 0 ? messages[0].id : null;
+      if (oldestId) {
+        const olderCount = await this.db.supportMessage.count({
+          where: { conversationId, id: { lt: oldestId } },
+        });
+        hasMore = olderCount > 0;
+      }
+    } else {
+      const skip = (page - 1) * limit;
+      const [totalCount, legacyMessages] = await Promise.all([
+        this.db.supportMessage.count({ where: { conversationId } }),
+        this.db.supportMessage.findMany({
+          where: { conversationId },
+          orderBy: { createdAt: 'asc' },
+          skip,
+          take: limit,
+        }),
+      ]);
+      total = totalCount;
+      messages = legacyMessages;
+      hasMore = skip + messages.length < total;
+    }
 
     // Mark admin messages as read
     await this.db.supportMessage.updateMany({
@@ -138,6 +169,7 @@ export class SupportService {
       limit,
       totalPages: Math.ceil(total / limit),
       mode: conversation.mode,
+      hasMore,
     };
   }
 
@@ -457,19 +489,50 @@ export class SupportService {
 
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(100, Math.max(1, query.limit || 50));
-    const skip = (page - 1) * limit;
+    const beforeId = query.beforeId ? Number(query.beforeId) : undefined;
 
-    const [total, messages] = await Promise.all([
-      this.db.supportMessage.count({
-        where: { conversationId },
-      }),
-      this.db.supportMessage.findMany({
-        where: { conversationId },
-        orderBy: { createdAt: 'asc' },
-        skip,
-        take: limit,
-      }),
-    ]);
+    let messages: any[] = [];
+    let hasMore = false;
+    let total = 0;
+
+    if (beforeId || !query.page || query.page === 1) {
+      const whereClause: any = { conversationId };
+      if (beforeId) {
+        whereClause.id = { lt: beforeId };
+      }
+
+      const [totalCount, fetchedDesc] = await Promise.all([
+        this.db.supportMessage.count({ where: { conversationId } }),
+        this.db.supportMessage.findMany({
+          where: whereClause,
+          orderBy: { id: 'desc' },
+          take: limit,
+        }),
+      ]);
+      total = totalCount;
+      messages = fetchedDesc.reverse();
+      const oldestId = messages.length > 0 ? messages[0].id : null;
+      if (oldestId) {
+        const olderCount = await this.db.supportMessage.count({
+          where: { conversationId, id: { lt: oldestId } },
+        });
+        hasMore = olderCount > 0;
+      }
+    } else {
+      const skip = (page - 1) * limit;
+      const [totalCount, legacyMessages] = await Promise.all([
+        this.db.supportMessage.count({ where: { conversationId } }),
+        this.db.supportMessage.findMany({
+          where: { conversationId },
+          orderBy: { createdAt: 'asc' },
+          skip,
+          take: limit,
+        }),
+      ]);
+      total = totalCount;
+      messages = legacyMessages;
+      hasMore = skip + messages.length < total;
+    }
 
     // Mark student messages as read by admin
     await this.db.supportMessage.updateMany({
@@ -488,6 +551,7 @@ export class SupportService {
       limit,
       totalPages: Math.ceil(total / limit),
       mode: conversation.mode,
+      hasMore,
     };
   }
 
@@ -631,8 +695,8 @@ export class SupportService {
 
     const sysContent =
       mode === 'HUMAN'
-        ? `👨‍🏫 ${actorName} đã chuyển sang chế độ TRỰC TIẾP HỖ TRỢ. Mọi câu hỏi sẽ được phản hồi bởi thầy cô / ban quản trị!`
-        : '🤖 Đã kích hoạt lại TRỢ LÝ AI. Bánh Mì Assistant sẽ tự động giải đáp thắc mắc học tập ngay tức thì! 🍞';
+        ? `${actorName} đã chuyển sang chế độ TRỰC TIẾP HỖ TRỢ. Mọi thắc mắc sẽ được phản hồi trực tiếp bởi Quản trị viên!`
+        : 'Đã kích hoạt lại TRỢ LÝ AI. Bánh Mì Assistant sẽ tự động giải đáp thắc mắc học tập!';
 
     await this.db.supportMessage.create({
       data: {

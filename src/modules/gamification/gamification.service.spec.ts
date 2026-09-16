@@ -325,7 +325,7 @@ describe('GamificationService weekly cron hardening', () => {
   });
 
   describe('feedPet atomic transaction', () => {
-    it('checks 24h cooldown, deducts 10 Bánh Mì via CAS, and updates stats from current baseline', async () => {
+    it('uses satiety, escalates the daily feed cost, and updates stats from current baseline', async () => {
       const now = new Date();
       const pastTime = new Date(now.getTime() - 25 * 60 * 60 * 1000); // 25 hours ago
       const tx: any = {
@@ -390,13 +390,18 @@ describe('GamificationService weekly cron hardening', () => {
           }),
         }),
       );
-      // Health 80 + 10 = 90, Happiness 70 + 20 = 90, Exp 100 + 50 = 150
-      expect(pet.health).toBe(90);
-      expect(pet.happiness).toBe(90);
-      expect(pet.exp).toBe(150);
+      // First rewarded feed: +20 health, +10 happiness, +5 pet EXP, 10 Bánh Mì.
+      expect(tx.userStats.updateMany).toHaveBeenCalledWith({
+        where: { userId: 5, totalBanhRan: { gte: 10 } },
+        data: { totalBanhRan: { decrement: 10 } },
+      });
+      expect(pet.health).toBe(100);
+      expect(pet.happiness).toBe(80);
+      expect(pet.exp).toBe(105);
+      expect(pet.dailyRewardedFeedCount).toBe(1);
     });
 
-    it('rejects feeding if 24 hours have not elapsed', async () => {
+    it('rejects feeding while the pet is naturally full, without a 24h cooldown', async () => {
       const recentTime = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
       const tx: any = {
         $executeRaw: jest.fn().mockResolvedValue(1),
@@ -421,7 +426,7 @@ describe('GamificationService weekly cron hardening', () => {
         {} as any,
       );
 
-      await expect(service.feedPet(5)).rejects.toThrow('Thú cưng chưa đói');
+      await expect(service.feedPet(5)).rejects.toThrow('Thú cưng đang no');
     });
   });
 

@@ -6,7 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Role, CourseStatus, EnrollmentStatus } from '@prisma/client';
+import {
+  Role,
+  CourseStatus,
+  EnrollmentStatus,
+  PaymentStatus,
+  TopicCategory,
+} from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { R2Service } from '../upload/r2.service';
@@ -25,23 +31,81 @@ export class AdminService {
   ) {}
 
   async getDashboardStats() {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const [
       totalStudents,
+      activeStudents,
       totalCourses,
+      pendingCourses,
       totalEnrollments,
+      activeEnrollments,
+      pendingPayments,
       recentEnrollments,
       totalVocabTopics,
       totalGrammarTopics,
       totalQuizzes,
       totalSpeaking,
+      totalAssignments,
       totalContentTopics,
       marketOrdersCount,
       approvedOrdersCount,
+      pendingOrdersCount,
       breadsAggregate,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: Role.STUDENT } }),
+      this.prisma.user.count({
+        where: {
+          role: Role.STUDENT,
+          OR: [
+            { lastLoginAt: { gte: thirtyDaysAgo } },
+            {
+              learningActivities: {
+                some: { occurredAt: { gte: thirtyDaysAgo } },
+              },
+            },
+            { submissions: { some: { submittedAt: { gte: thirtyDaysAgo } } } },
+            {
+              speakingSubmissions: {
+                some: { submittedAt: { gte: thirtyDaysAgo } },
+              },
+            },
+            {
+              assignmentSubmissions: {
+                some: { submittedAt: { gte: thirtyDaysAgo } },
+              },
+            },
+            {
+              diagnosticAttempts: {
+                some: { submittedAt: { gte: thirtyDaysAgo } },
+              },
+            },
+            {
+              contentAttempts: {
+                some: { submittedAt: { gte: thirtyDaysAgo } },
+              },
+            },
+            {
+              grammarAttempts: { some: { createdAt: { gte: thirtyDaysAgo } } },
+            },
+            { toeicAttempts: { some: { createdAt: { gte: thirtyDaysAgo } } } },
+          ],
+        },
+      }),
       this.prisma.course.count({ where: { status: CourseStatus.PUBLISHED } }),
+      this.prisma.course.count({ where: { status: CourseStatus.DRAFT } }),
       this.prisma.enrollment.count(),
+      this.prisma.enrollment.count({
+        where: { status: EnrollmentStatus.ACTIVE },
+      }),
+      this.prisma.payment.count({
+        where: {
+          status: {
+            in: [PaymentStatus.REPORTED, PaymentStatus.REVIEW_REQUIRED],
+          },
+        },
+      }),
       this.prisma.enrollment.findMany({
         take: 10,
         orderBy: { joinedAt: 'desc' },
@@ -62,56 +126,88 @@ export class AdminService {
           },
         },
       }),
-      this.prisma.vocabTopic.count().catch(() => 12),
-      this.prisma.grammarTopic.count().catch(() => 6),
-      this.prisma.quiz.count().catch(() => 8),
-      this.prisma.speakingExercise.count().catch(() => 15),
-      this.prisma.contentTopic.count().catch(() => 4),
-      this.prisma.marketOrder.count().catch(() => 0),
-      this.prisma.marketOrder
-        .count({ where: { status: 'approved' } })
-        .catch(() => 0),
-      this.prisma.userStats
-        .aggregate({ _sum: { totalBanhRan: true } })
-        .catch(() => ({ _sum: { totalBanhRan: 1250 } })),
+      this.prisma.vocabTopic.count(),
+      this.prisma.grammarTopic.count(),
+      this.prisma.quiz.count(),
+      this.prisma.speakingExercise.count(),
+      this.prisma.assignment.count(),
+      this.prisma.contentTopic.count(),
+      this.prisma.marketOrder.count(),
+      this.prisma.marketOrder.count({ where: { status: 'approved' } }),
+      this.prisma.marketOrder.count({ where: { status: 'pending' } }),
+      this.prisma.userStats.aggregate({
+        where: { user: { role: Role.STUDENT } },
+        _sum: { totalBanhRan: true },
+      }),
     ]);
 
     const recentActivity = recentEnrollments.map((e) => ({
       id: e.id,
       type: 'enrollment',
-      message: `${e.user.profile?.fullName || e.user.email} vừa được ghi danh vào "${e.class.course.title}"`,
+      message: `${e.user.profile?.fullName || e.user.email} vừa được cấp quyền truy cập "${e.class.course.title}"`,
       avatar: e.user.profile?.avatar || null,
       createdAt: e.joinedAt,
     }));
 
-    // Generate monthly trends for the last 6 months
-    const monthNames = ['T3', 'T4', 'T5', 'T6', 'T7', 'T8'];
-    const baseEnrollment = Math.max(totalEnrollments, 6);
-    const monthlyTrends = monthNames.map((m, idx) => ({
-      month: m,
-      enrollments: Math.max(1, Math.round((baseEnrollment * (idx + 1)) / 6)),
-      activityCount: Math.round(baseEnrollment * (idx + 1.5) * 4 + idx * 12),
-    }));
+    // Generate accurate monthly trends for the last 6 calendar months
+    const now = new Date();
+    const monthWindows: { label: string; start: Date; end: Date }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const year = now.getFullYear();
+      const month = now.getMonth() - i;
+      const start = new Date(year, month, 1, 0, 0, 0, 0);
+      const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
+      const label = `T${start.getMonth() + 1}`;
+      monthWindows.push({ label, start, end });
+    }
+
+    const monthlyTrends = await Promise.all(
+      monthWindows.map(async ({ label, start, end }) => {
+        const [enrollmentCount, submissionCount, speakingCount] =
+          await Promise.all([
+            this.prisma.enrollment.count({
+              where: { joinedAt: { gte: start, lte: end } },
+            }),
+            this.prisma.submission.count({
+              where: { submittedAt: { gte: start, lte: end } },
+            }),
+            this.prisma.speakingSubmission.count({
+              where: { submittedAt: { gte: start, lte: end } },
+            }),
+          ]);
+
+        return {
+          month: label,
+          enrollments: enrollmentCount,
+          activityCount: submissionCount + speakingCount,
+        };
+      }),
+    );
 
     const contentBreakdown = {
-      vocab: totalVocabTopics || 12,
-      grammar: totalGrammarTopics || 6,
-      quizzes: totalQuizzes || 8,
-      speaking: totalSpeaking || 15,
-      media: totalContentTopics || 4,
+      vocab: totalVocabTopics,
+      grammar: totalGrammarTopics,
+      quizzes: totalQuizzes,
+      speaking: totalSpeaking,
+      media: totalContentTopics + totalAssignments,
     };
 
     const gamification = {
-      totalBreads: breadsAggregate?._sum?.totalBanhRan || 1250,
-      totalOrders: marketOrdersCount || 0,
-      approvedOrders: approvedOrdersCount || 0,
+      totalBreads: breadsAggregate?._sum?.totalBanhRan ?? 0,
+      totalOrders: marketOrdersCount,
+      approvedOrders: approvedOrdersCount,
+      pendingOrders: pendingOrdersCount,
     };
 
     return {
       stats: {
         totalStudents,
+        activeStudents,
         totalCourses,
+        pendingCourses,
         totalEnrollments,
+        activeEnrollments,
+        pendingPayments,
       },
       monthlyTrends,
       contentBreakdown,
@@ -121,7 +217,7 @@ export class AdminService {
   }
 
   async getAllUsers(role?: string) {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       where: role ? { role: role as Role } : undefined,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -132,8 +228,88 @@ export class AdminService {
         lastLoginAt: true,
         loginCount: true,
         profile: { select: { fullName: true, avatar: true, phone: true } },
-        stats: { select: { totalBanhRan: true, streakCount: true } },
+        stats: {
+          select: {
+            totalBanhRan: true,
+            streakCount: true,
+            lastStreakUpdate: true,
+          },
+        },
+        learningActivities: {
+          orderBy: { occurredAt: 'desc' },
+          take: 1,
+          select: { occurredAt: true },
+        },
+        submissions: {
+          orderBy: { submittedAt: 'desc' },
+          take: 1,
+          select: { submittedAt: true },
+        },
+        speakingSubmissions: {
+          orderBy: { submittedAt: 'desc' },
+          take: 1,
+          select: { submittedAt: true },
+        },
+        assignmentSubmissions: {
+          orderBy: { submittedAt: 'desc' },
+          take: 1,
+          select: { submittedAt: true },
+        },
+        diagnosticAttempts: {
+          orderBy: { submittedAt: 'desc' },
+          take: 1,
+          select: { submittedAt: true },
+        },
+        contentAttempts: {
+          orderBy: { submittedAt: 'desc' },
+          take: 1,
+          select: { submittedAt: true },
+        },
+        grammarAttempts: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true },
+        },
+        toeicAttempts: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true },
+        },
       },
+    });
+
+    return users.map((user) => {
+      const activityDates = [
+        user.lastLoginAt,
+        user.stats?.lastStreakUpdate,
+        user.learningActivities[0]?.occurredAt,
+        user.submissions[0]?.submittedAt,
+        user.speakingSubmissions[0]?.submittedAt,
+        user.assignmentSubmissions[0]?.submittedAt,
+        user.diagnosticAttempts[0]?.submittedAt,
+        user.contentAttempts[0]?.submittedAt,
+        user.grammarAttempts[0]?.createdAt,
+        user.toeicAttempts[0]?.createdAt,
+      ].filter((value): value is Date => value instanceof Date);
+
+      const userData = { ...user };
+      delete (userData as Record<string, unknown>).learningActivities;
+      delete (userData as Record<string, unknown>).submissions;
+      delete (userData as Record<string, unknown>).speakingSubmissions;
+      delete (userData as Record<string, unknown>).assignmentSubmissions;
+      delete (userData as Record<string, unknown>).diagnosticAttempts;
+      delete (userData as Record<string, unknown>).contentAttempts;
+      delete (userData as Record<string, unknown>).grammarAttempts;
+      delete (userData as Record<string, unknown>).toeicAttempts;
+      return {
+        ...userData,
+        lastActivityAt:
+          activityDates.length > 0
+            ? new Date(
+                Math.max(...activityDates.map((value) => value.getTime())),
+              )
+            : null,
+      };
     });
   }
 
@@ -258,7 +434,7 @@ export class AdminService {
     });
     if (paymentCount > 0) {
       throw new ConflictException(
-        'Không thể xóa ghi danh vì tồn tại lịch sử thanh toán cần được lưu giữ.',
+        'Không thể xóa quyền truy cập vì tồn tại lịch sử thanh toán cần được lưu giữ.',
       );
     }
     return this.prisma.enrollment.deleteMany({ where: { userId, classId } });
@@ -514,16 +690,20 @@ export class AdminService {
   async createPracticeTopic(dto: {
     name: string;
     vietnameseName?: string;
-    category?: string;
+    category?: TopicCategory;
     iconUrl?: string;
     order?: number;
   }) {
+    const category = dto.category ?? TopicCategory.BILINGUAL_LEVEL;
+    if (!Object.values(TopicCategory).includes(category)) {
+      throw new BadRequestException('Danh mục chủ đề luyện tập không hợp lệ');
+    }
     return this.prisma.practiceTopic.create({
       data: {
         name: dto.name,
         vietnameseName: dto.vietnameseName,
-        category: (dto.category as any) || 'BILINGUAL_READING',
-        iconUrl: dto.iconUrl || '🎯',
+        category,
+        iconUrl: dto.iconUrl || 'target',
         order: dto.order || 1,
       },
     });
@@ -539,172 +719,98 @@ export class AdminService {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // 1. Gather stats from Database
+    // Only return measurements that have a real source. Provider billing,
+    // token usage and cache hit counts are not available in this deployment;
+    // never manufacture them from submission counts.
     const [
       totalSpeakingSubmissions,
       speakingThisMonth,
       archivedSpeakingAudio,
-      totalWritingSubmissions,
       totalMaterials,
       totalUsers,
     ] = await Promise.all([
-      this.prisma.speakingSubmission.count().catch(() => 0),
-      this.prisma.speakingSubmission
-        .count({ where: { submittedAt: { gte: startOfMonth } } })
-        .catch(() => 0),
-      this.prisma.speakingSubmission
-        .count({ where: { audioUrl: { contains: 'archived' } } })
-        .catch(() => 0),
-      this.prisma.submission.count().catch(() => 0),
-      this.prisma.material.count().catch(() => 0),
-      this.prisma.user.count().catch(() => 0),
+      this.prisma.speakingSubmission.count(),
+      this.prisma.speakingSubmission.count({
+        where: { submittedAt: { gte: startOfMonth } },
+      }),
+      this.prisma.speakingSubmission.count({
+        where: { audioUrl: { contains: 'archived' } },
+      }),
+      this.prisma.material.count(),
+      this.prisma.user.count(),
     ]);
 
-    // 2. Scan Redis Cache for Gemini entries
     let cachedGeminiCount = 0;
     if (this.redis) {
       try {
         const keys = await this.redis.keys('gemini:*');
         cachedGeminiCount = keys.length;
       } catch {
-        cachedGeminiCount = 0;
+        // Cache inventory is optional telemetry, not a billing estimate.
       }
     }
 
-    // 3. Compute Metrics
-    // Gemini AI
-    const totalAiRequests =
-      totalWritingSubmissions * 2 +
-      totalSpeakingSubmissions +
-      cachedGeminiCount * 3 +
-      45;
-    const cacheHitCount =
-      cachedGeminiCount > 0 ? cachedGeminiCount * 2 + 15 : 0;
-    const cacheHitRate =
-      totalAiRequests > 0
-        ? Math.min(
-            95,
-            Math.round(
-              (cacheHitCount / (totalAiRequests + cacheHitCount)) * 100,
-            ),
-          )
-        : 40;
-    const geminiInputTokens = totalAiRequests * 450;
-    const geminiOutputTokens = totalAiRequests * 250;
-    const geminiCostUsd = Math.max(
-      0,
-      Number(
-        (
-          (geminiInputTokens / 1_000_000) * 0.075 +
-          (geminiOutputTokens / 1_000_000) * 0.3
-        ).toFixed(4),
-      ),
-    );
-
-    // Azure AI Speech (Free Tier 5h/tháng = 300 phút)
-    const audioMinutesThisMonth = Number(
-      ((speakingThisMonth * 15) / 60).toFixed(1),
-    );
-    const azureFreeQuotaMinutes = 300; // 5 hours
-    const azureUsedPercent = Math.min(
-      100,
-      Math.round((audioMinutesThisMonth / azureFreeQuotaMinutes) * 100),
-    );
-    const azureCostUsd =
-      audioMinutesThisMonth > azureFreeQuotaMinutes
-        ? Number(
-            (
-              ((audioMinutesThisMonth - azureFreeQuotaMinutes) / 60) *
-              1.0
-            ).toFixed(2),
-          )
-        : 0;
-
-    // Cloudflare R2 Storage (Free Tier 10 GB, $0 Egress)
-    const r2Usage = await this.r2Service.getBucketStorageUsage();
+    let r2Usage: { totalMb: number } | null = null;
+    try {
+      r2Usage = await this.r2Service.getBucketStorageUsage();
+    } catch {
+      // R2 telemetry is unavailable; do not replace it with an estimate.
+    }
     const activeAudioCount = Math.max(
       0,
       totalSpeakingSubmissions - archivedSpeakingAudio,
     );
-    const estimatedStorageMb =
-      r2Usage.totalMb > 0
-        ? r2Usage.totalMb
-        : Number((activeAudioCount * 0.25).toFixed(2));
-    const r2StorageGb = Number((estimatedStorageMb / 1024).toFixed(3));
-    const r2FreeQuotaGb = 10;
-    const r2UsedPercent = Math.min(
-      100,
-      Math.round((r2StorageGb / r2FreeQuotaGb) * 100),
-    );
-    const r2CostUsd =
-      r2StorageGb > r2FreeQuotaGb
-        ? Number(((r2StorageGb - r2FreeQuotaGb) * 0.015).toFixed(2))
-        : 0;
-
-    // Totals
-    const totalActualCostUsd = Number(
-      (geminiCostUsd + azureCostUsd + r2CostUsd).toFixed(2),
-    );
-    const totalActualCostVnd = Math.round(totalActualCostUsd * 25400);
-
-    // Theoretical Cost without Free Tiers and Redis Cache
-    const theoreticalSavingsUsd = Number(
-      (
-        cacheHitCount * 0.0002 +
-        Math.min(audioMinutesThisMonth, azureFreeQuotaMinutes) * (1.0 / 60) +
-        5.0
-      ).toFixed(2),
-    );
-    const theoreticalSavingsVnd = Math.round(theoreticalSavingsUsd * 25400);
+    const measuredStorageMb = r2Usage?.totalMb ?? 0;
+    const r2StorageGb = Number((measuredStorageMb / 1024).toFixed(3));
 
     return {
       summary: {
-        totalCostUsd: totalActualCostUsd,
-        totalCostVnd: totalActualCostVnd,
-        savedCostUsd: theoreticalSavingsUsd,
-        savedCostVnd: theoreticalSavingsVnd,
-        status: totalActualCostUsd === 0 ? 'FREE_TIER_ACTIVE' : 'PAY_AS_YOU_GO',
+        totalCostUsd: 0,
+        totalCostVnd: 0,
+        savedCostUsd: 0,
+        savedCostVnd: 0,
+        status: 'UNAVAILABLE',
         activeUsers: totalUsers,
       },
       services: {
         gemini: {
           name: 'Google Gemini Generative AI',
           model: process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite',
-          totalRequests: totalAiRequests,
+          totalRequests: 0,
           cachedEntries: cachedGeminiCount,
-          cacheHitCount,
-          cacheHitRate,
-          inputTokens: geminiInputTokens,
-          outputTokens: geminiOutputTokens,
-          costUsd: geminiCostUsd,
-          costVnd: Math.round(geminiCostUsd * 25400),
-          freeTierStatus: '1.500 RPD (Miễn phí)',
-          withinFreeTier: true,
+          cacheHitCount: 0,
+          cacheHitRate: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+          costVnd: 0,
+          freeTierStatus: 'Chưa kết nối dữ liệu billing',
+          withinFreeTier: false,
         },
         azureSpeech: {
           name: 'Microsoft Azure AI Speech',
           totalSubmissions: totalSpeakingSubmissions,
           submissionsThisMonth: speakingThisMonth,
-          audioMinutesThisMonth,
-          freeQuotaMinutes: azureFreeQuotaMinutes,
-          usedPercent: azureUsedPercent,
-          costUsd: azureCostUsd,
-          costVnd: Math.round(azureCostUsd * 25400),
-          withinFreeTier: azureCostUsd === 0,
+          audioMinutesThisMonth: 0,
+          freeQuotaMinutes: 0,
+          usedPercent: 0,
+          costUsd: 0,
+          costVnd: 0,
+          withinFreeTier: false,
         },
         cloudflareR2: {
           name: 'Cloudflare R2 Object Storage',
           activeAudioFiles: activeAudioCount,
           archivedAudioFiles: archivedSpeakingAudio,
           totalMaterials,
-          usedStorageMb: estimatedStorageMb,
+          usedStorageMb: measuredStorageMb,
           usedStorageGb: r2StorageGb,
-          freeQuotaGb: r2FreeQuotaGb,
-          usedPercent: r2UsedPercent,
+          freeQuotaGb: 0,
+          usedPercent: 0,
           egressCostUsd: 0,
-          costUsd: r2CostUsd,
-          costVnd: Math.round(r2CostUsd * 25400),
-          withinFreeTier: r2CostUsd === 0,
+          costUsd: 0,
+          costVnd: 0,
+          withinFreeTier: false,
         },
       },
     };
