@@ -271,7 +271,9 @@ export class CourseService {
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
         capacity: dto.capacity ?? 30,
         tuitionFeeVnd: dto.tuitionFeeVnd ?? 0,
-        status: ClassStatus.UPCOMING,
+        // Offerings are self-paced; publishing a package makes it available
+        // immediately. Date windows can still be supplied for reporting.
+        status: ClassStatus.ONGOING,
       },
       include: { course: { select: { id: true, title: true } } },
     });
@@ -358,21 +360,6 @@ export class CourseService {
         current.status === ClassStatus.COMPLETED
       ) {
         throw new BadRequestException('Không thể ghi danh vào gói học đã đóng');
-      }
-      if (
-        !options?.isAdminOverride &&
-        current.status !== ClassStatus.UPCOMING
-      ) {
-        throw new BadRequestException('Gói học hiện không mở ghi danh');
-      }
-      if (
-        options?.isAdminOverride &&
-        current.status !== ClassStatus.UPCOMING &&
-        current.status !== ClassStatus.ONGOING
-      ) {
-        throw new BadRequestException(
-          'Admin chỉ có thể ghi danh vào gói UPCOMING hoặc ONGOING',
-        );
       }
       const duplicate = await tx.enrollment.findUnique({
         where: { userId_classId: { userId, classId } },

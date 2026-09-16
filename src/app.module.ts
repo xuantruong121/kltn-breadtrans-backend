@@ -31,6 +31,7 @@ import { DiagnosticModule } from './modules/diagnostic/diagnostic.module';
 import { SupportModule } from './modules/support/support.module';
 import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { RedisModule } from '@nestjs-modules/ioredis';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     PaymentModule,
     DiagnosticModule,
     SupportModule,
+    JobsModule,
   ],
 
   controllers: [AppController],

@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
+import {
+  getBusinessDayKey,
+  getBusinessDayStart,
+} from '../../common/time/business-time.util';
 
 @Injectable()
 export class NotificationsCronService {
@@ -12,14 +15,12 @@ export class NotificationsCronService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  // 1. Cron Job: Nhắc nhở giữ chuỗi Streak lúc 20:00 hàng ngày (Giờ Việt Nam)
-  @Cron('0 20 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
-  async handleDailyStreakReminder() {
-    this.logger.log('[Cron] Running daily streak reminder check...');
+  // Queue worker entry point: nhắc nhở giữ chuỗi lúc 20:00 (Giờ Việt Nam).
+  async runDailyStreakReminder(dayKey = getBusinessDayKey()) {
+    this.logger.log('[Queue] Running daily streak reminder check...');
 
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = getBusinessDayStart(dayKey);
 
       // Find students with active streak who haven't studied today
       const usersWithStreak = await this.prisma.userStats.findMany({
@@ -41,7 +42,7 @@ export class NotificationsCronService {
       });
 
       this.logger.log(
-        `[Cron] Found ${usersWithStreak.length} students at risk of losing streak.`,
+        `[Queue] Found ${usersWithStreak.length} students at risk of losing streak.`,
       );
 
       for (const item of usersWithStreak) {
@@ -77,14 +78,14 @@ export class NotificationsCronService {
         }
       }
     } catch (err) {
-      this.logger.error('[Cron] Error in handleDailyStreakReminder:', err);
+      this.logger.error('[Queue] Error in runDailyStreakReminder:', err);
+      throw err;
     }
   }
 
-  // 2. Cron Job: Kiểm tra và gửi thông báo nhắc ôn tập từ vựng Spaced Repetition mỗi 5 phút
-  @Cron('*/5 * * * *')
-  async handleVocabSpacedReview() {
-    this.logger.log('[Cron] Checking due vocabulary spaced reviews...');
+  // Queue worker entry point: kiểm tra các mục từ vựng đến hạn mỗi 5 phút.
+  async runVocabSpacedReview() {
+    this.logger.log('[Queue] Checking due vocabulary spaced reviews...');
 
     try {
       const now = new Date();
@@ -116,7 +117,7 @@ export class NotificationsCronService {
       }
 
       this.logger.log(
-        `[Cron] Found ${dueItems.length} due vocab items waiting for reminder.`,
+        `[Queue] Found ${dueItems.length} due vocab items waiting for reminder.`,
       );
 
       // Claim each item with a conditional update so concurrent cron instances
@@ -178,7 +179,17 @@ export class NotificationsCronService {
         });
       }
     } catch (err) {
-      this.logger.error('[Cron] Error in handleVocabSpacedReview:', err);
+      this.logger.error('[Queue] Error in runVocabSpacedReview:', err);
+      throw err;
     }
+  }
+
+  // Backward-compatible manual/admin entry points. Automated execution uses the queue.
+  async handleDailyStreakReminder() {
+    return this.runDailyStreakReminder();
+  }
+
+  async handleVocabSpacedReview() {
+    return this.runVocabSpacedReview();
   }
 }

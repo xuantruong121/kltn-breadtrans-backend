@@ -15,7 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { Role, TopicCategory } from '@prisma/client';
 
 @ApiTags('admin')
 @Controller('admin')
@@ -38,7 +38,9 @@ export class AdminController {
   }
 
   @Post('users')
-  @ApiOperation({ summary: 'Admin tao tai khoan moi (Student hoac Teacher)' })
+  @ApiOperation({
+    summary: 'Admin tạo tài khoản mới (Học viên hoặc Quản trị viên)',
+  })
   createUser(
     @Body()
     dto: {
@@ -77,13 +79,15 @@ export class AdminController {
   }
 
   @Post('enroll')
-  @ApiOperation({ summary: 'Admin ghi danh hoc vien vao lop hoc' })
+  @ApiOperation({ summary: 'Admin cấp quyền truy cập gói học cho học viên' })
   enrollUser(@Body() dto: { userId: number; classId: number }) {
     return this.adminService.enrollUserInClass(dto.userId, dto.classId);
   }
 
   @Delete('enroll')
-  @ApiOperation({ summary: 'Admin xoa ghi danh hoc vien khoi lop hoc' })
+  @ApiOperation({
+    summary: 'Admin thu hồi quyền truy cập gói học của học viên',
+  })
   removeEnrollment(@Body() dto: { userId: number; classId: number }) {
     return this.adminService.removeEnrollment(dto.userId, dto.classId);
   }
@@ -225,7 +229,7 @@ export class AdminController {
     dto: {
       title: string;
       targetText: string;
-      category?: string;
+      category?: TopicCategory;
       difficulty?: string;
     },
   ) {
@@ -252,7 +256,7 @@ export class AdminController {
     dto: {
       name: string;
       vietnameseName?: string;
-      category?: string;
+      category?: TopicCategory;
       iconUrl?: string;
       order?: number;
     },
