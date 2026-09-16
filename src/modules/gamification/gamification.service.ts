@@ -708,8 +708,17 @@ export class GamificationService {
           day: '2-digit',
         }).format(lastUpdate);
 
-        // Same Vietnam day - no change
+        // Same Vietnam day - no change unless streak was cleared (count is 0)
         if (nowDateStr === lastDateStr) {
+          if (stats.streakCount === 0) {
+            await client.userStats.update({
+              where: { userId },
+              data: {
+                streakCount: 1,
+                lastStreakUpdate: now,
+              },
+            });
+          }
           return;
         }
 
@@ -733,8 +742,8 @@ export class GamificationService {
             },
           });
         } else if (diffDays > 1) {
-          // Missed day(s) - check streak freeze
-          if (stats.streakFreezes > 0) {
+          // Missed day(s) - check streak freeze (only if streak was active)
+          if (stats.streakCount > 0 && stats.streakFreezes > 0) {
             await client.userStats.update({
               where: { userId },
               data: {
@@ -744,7 +753,7 @@ export class GamificationService {
               },
             });
           } else {
-            // Streak broken - reset to 1
+            // Streak broken or starting from 0 - reset to 1
             await client.userStats.update({
               where: { userId },
               data: {
@@ -1658,7 +1667,7 @@ export class GamificationService {
           } else {
             await tx.userStats.update({
               where: { id: stat.id },
-              data: { streakCount: 0, lastStreakUpdate: processedAt },
+              data: { streakCount: 0 },
             });
           }
         }

@@ -94,4 +94,46 @@ describe('CourseService self-paced business rules', () => {
     const result = await service.enrollInClass(1, 7);
     expect(result.status).toBe('PENDING_PAYMENT');
   });
+
+  it('allows changing tuition on an ONGOING class if enrollment count is 0', async () => {
+    prisma.class.findUnique.mockResolvedValue({
+      id: 10,
+      status: ClassStatus.ONGOING,
+      tuitionFeeVnd: 50000,
+    });
+    prisma.enrollment.count.mockResolvedValue(0);
+    prisma.class.update.mockResolvedValue({
+      id: 10,
+      status: ClassStatus.ONGOING,
+      tuitionFeeVnd: 75000,
+    });
+
+    const updated = await service.updateClass(
+      10,
+      { id: 1, role: 'ADMIN' },
+      { tuitionFeeVnd: 75000 },
+    );
+    expect(updated.tuitionFeeVnd).toBe(75000);
+    expect(prisma.class.update).toHaveBeenCalledWith({
+      where: { id: 10 },
+      data: expect.objectContaining({ tuitionFeeVnd: 75000 }),
+    });
+  });
+
+  it('rejects changing tuition on an ONGOING class if enrollments exist', async () => {
+    prisma.class.findUnique.mockResolvedValue({
+      id: 10,
+      status: ClassStatus.ONGOING,
+      tuitionFeeVnd: 50000,
+    });
+    prisma.enrollment.count.mockResolvedValue(2);
+
+    await expect(
+      service.updateClass(
+        10,
+        { id: 1, role: 'ADMIN' as any },
+        { tuitionFeeVnd: 75000 },
+      ),
+    ).rejects.toThrow('Không thể thay đổi học phí');
+  });
 });

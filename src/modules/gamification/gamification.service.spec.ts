@@ -546,4 +546,83 @@ describe('GamificationService weekly cron hardening', () => {
       expect(res2.reason).toBe('ALREADY_REWARDED');
     });
   });
+
+  describe('Streak management and rollover', () => {
+    it('clears streakCount to 0 without overwriting lastStreakUpdate when freezes are 0', async () => {
+      const updates: any[] = [];
+      const tx: any = {
+        userStats: {
+          findMany: jest
+            .fn()
+            .mockResolvedValueOnce([
+              {
+                id: 10,
+                streakCount: 5,
+                streakFreezes: 0,
+                lastStreakUpdate: new Date('2026-09-10T00:00:00Z'),
+              },
+            ])
+            .mockResolvedValueOnce([]),
+          update: jest.fn().mockImplementation((args) => {
+            updates.push(args);
+            return Promise.resolve(args);
+          }),
+        },
+        gameSettings: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+        $executeRaw: jest.fn().mockResolvedValue(1),
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      const res = await service.triggerDailyCron('2026-09-16');
+      expect(res.success).toBe(true);
+      expect(updates[0]).toEqual({
+        where: { id: 10 },
+        data: { streakCount: 0 },
+      });
+      // lastStreakUpdate should NOT be updated in the data payload
+      expect(updates[0].data.lastStreakUpdate).toBeUndefined();
+    });
+
+    it('restores streak to 1 when user studies on same day if streakCount is 0', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        userStats: {
+          findUnique: jest.fn().mockResolvedValue({
+            userId: 15,
+            streakCount: 0,
+            streakFreezes: 0,
+            lastStreakUpdate: new Date(),
+          }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      await service.recordStreakActivity(15);
+
+      expect(tx.userStats.update).toHaveBeenCalledWith({
+        where: { userId: 15 },
+        data: expect.objectContaining({
+          streakCount: 1,
+        }),
+      });
+    });
+  });
 });

@@ -143,10 +143,80 @@ describe('SupportService', () => {
 
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
+      expect(mockPrisma.supportMessage.findMany).toHaveBeenCalledWith({
+        where: { conversationId: 100 },
+        orderBy: { createdAt: 'asc' },
+        skip: 0,
+        take: 50,
+      });
       expect(mockPrisma.supportMessage.updateMany).toHaveBeenCalledWith({
         where: { conversationId: 100, senderRole: 'ADMIN', isRead: false },
         data: { isRead: true },
       });
+    });
+
+    it('should paginate page 2 in ascending order without using cursor mode', async () => {
+      mockPrisma.supportConversation.findUnique.mockResolvedValue(
+        mockConversation,
+      );
+      mockPrisma.supportMessage.count.mockResolvedValue(120);
+      mockPrisma.supportMessage.findMany.mockResolvedValue([
+        {
+          id: 51,
+          content: 'msg 51',
+          senderRole: 'STUDENT',
+          createdAt: new Date(),
+        },
+      ]);
+      mockPrisma.supportMessage.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.getStudentMessages(10, 100, {
+        page: 2,
+        limit: 50,
+      });
+
+      expect(result.page).toBe(2);
+      expect(mockPrisma.supportMessage.findMany).toHaveBeenCalledWith({
+        where: { conversationId: 100 },
+        orderBy: { createdAt: 'asc' },
+        skip: 50,
+        take: 50,
+      });
+    });
+
+    it('should use cursor pagination when beforeId is provided', async () => {
+      mockPrisma.supportConversation.findUnique.mockResolvedValue(
+        mockConversation,
+      );
+      mockPrisma.supportMessage.count.mockResolvedValue(120);
+      mockPrisma.supportMessage.findMany.mockResolvedValue([
+        {
+          id: 50,
+          content: 'msg 50',
+          senderRole: 'STUDENT',
+          createdAt: new Date(),
+        },
+        {
+          id: 49,
+          content: 'msg 49',
+          senderRole: 'STUDENT',
+          createdAt: new Date(),
+        },
+      ]);
+      mockPrisma.supportMessage.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.getStudentMessages(10, 100, {
+        page: 1,
+        limit: 50,
+        beforeId: 51,
+      });
+
+      expect(mockPrisma.supportMessage.findMany).toHaveBeenCalledWith({
+        where: { conversationId: 100, id: { lt: 51 } },
+        orderBy: { id: 'desc' },
+        take: 50,
+      });
+      expect(result.data).toHaveLength(2);
     });
   });
 

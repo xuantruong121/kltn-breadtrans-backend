@@ -40,7 +40,7 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
           attempts: 4,
           backoff: { type: 'exponential', delay: 5_000 },
           removeOnComplete: { age: 30 * 86400, count: 500 },
-          removeOnFail: { age: 90 * 86400, count: 1_000 },
+          removeOnFail: { age: 7 * 86400, count: 500 },
         },
       },
     );
@@ -113,6 +113,22 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     payload: SystemJobPayload,
     options?: { jobId?: string; delay?: number },
   ): Promise<string> {
+    if (options?.jobId) {
+      try {
+        const existing = await this.queue.getJob(options.jobId);
+        if (existing) {
+          const state = await existing.getState();
+          if (state === 'failed') {
+            await existing.remove();
+          }
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to inspect or remove existing failed job ${options.jobId}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
     const job = await this.queue.add(name, payload, {
       jobId: options?.jobId,
       delay: options?.delay,
