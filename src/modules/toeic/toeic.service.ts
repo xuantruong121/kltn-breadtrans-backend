@@ -288,9 +288,10 @@ export class ToeicService {
         throw new ServiceUnavailableException(
           'Câu Part 1 chưa có nội dung audio',
         );
-      text = options
-        .map((item, index) => `${String.fromCharCode(65 + index)}. ${item}`)
-        .join(' ');
+      text = options.map((item) => item).join(' ');
+    }
+    if (group.part === 2 && text) {
+      text = text.replace(/^\s*AUDIO\s+PROMPT\s*:\s*/i, '');
     }
     if (!text)
       throw new ServiceUnavailableException('Nhóm câu hỏi này chưa có audio');
@@ -441,6 +442,18 @@ export class ToeicService {
             } = question;
             void _correctIndex;
             void _explanation;
+            // In a full-test attempt Part 1 and Part 2 prompts/options are
+            // audio-only. Keep option cardinality for the answer UI, but do
+            // not send the answer text to the browser before submission.
+            if (current.mode === AttemptMode.FULL_TEST && group.part <= 2) {
+              return {
+                ...safeQuestion,
+                text: null,
+                options: Array.isArray(question.options)
+                  ? question.options.map(() => '')
+                  : [],
+              };
+            }
             return safeQuestion;
           }),
         })),

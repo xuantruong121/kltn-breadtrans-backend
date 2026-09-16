@@ -25,7 +25,11 @@ const SEED_ASSET_BASE_URL =
   process.env.SEED_ASSET_BASE_URL ?? process.env.R2_PUBLIC_URL ?? '';
 const seedAssetUrl = (key: string): string | null => {
   const base = SEED_ASSET_BASE_URL.replace(/\/$/, '');
-  return base ? `${base}/${key}` : null;
+  const normalizedKey = key.replace(
+    /^toeic\/visuals\//,
+    'catalog/toeic/shared/images/',
+  );
+  return base ? `${base}/${normalizedKey}` : null;
 };
 
 type SeedCollocation = {
@@ -301,7 +305,7 @@ async function main() {
       status: 'PUBLISHED',
       description:
         'Lộ trình nền tảng cho người mới: phát âm, nghe câu ngắn, giao tiếp hằng ngày, đọc thông báo và viết tin nhắn cơ bản.',
-      thumbnail: '/images/courses/english-foundations.jpg',
+      thumbnail: null,
     },
     {
       id: 2,
@@ -310,7 +314,7 @@ async function main() {
       status: 'PUBLISHED',
       description:
         'Phát triển đồng đều Listening, Speaking, Reading và Writing ở mức B1 qua tình huống đời sống, học tập và công việc.',
-      thumbnail: '/images/courses/four-skills-b1.jpg',
+      thumbnail: null,
     },
     {
       id: 3,
@@ -318,8 +322,8 @@ async function main() {
       level: 'INTERMEDIATE',
       status: 'PUBLISHED',
       description:
-        'Lộ trình TOEIC 2 kỹ năng tập trung đủ Part 1–7, từ vựng công sở và chiến thuật làm bài cho mục tiêu 450–650.',
-      thumbnail: '/images/courses/toeic-450-650.jpg',
+        'Lộ trình TOEIC L&R tập trung đủ Part 1–7, từ vựng công sở và chiến thuật làm bài cho mục tiêu 450–650.',
+      thumbnail: null,
     },
     {
       id: 4,
@@ -328,7 +332,7 @@ async function main() {
       status: 'PUBLISHED',
       description:
         'Luyện TOEIC Listening & Reading nâng cao với hội thoại dài, suy luận, Part 6–7 đa văn bản và quản lý thời gian.',
-      thumbnail: '/images/courses/toeic-650-850.jpg',
+      thumbnail: null,
     },
     {
       id: 5,
@@ -337,7 +341,7 @@ async function main() {
       status: 'PUBLISHED',
       description:
         'Luyện đúng các dạng nhiệm vụ TOEIC Speaking và Writing: đọc thành tiếng, mô tả, phản hồi, email và bài luận ý kiến.',
-      thumbnail: '/images/courses/toeic-speaking-writing.jpg',
+      thumbnail: null,
     },
     {
       id: 6,
@@ -346,7 +350,7 @@ async function main() {
       status: 'PUBLISHED',
       description:
         'Lộ trình 4 kỹ năng kết hợp TOEIC Listening & Reading với TOEIC Speaking & Writing, phù hợp cho học viên cần đánh giá toàn diện.',
-      thumbnail: '/images/courses/toeic-4-skills.jpg',
+      thumbnail: null,
     },
     {
       id: 7,
@@ -355,7 +359,7 @@ async function main() {
       status: 'PUBLISHED',
       description:
         'Tiếng Anh công sở thực tế: họp, email, điện thoại, chăm sóc khách hàng, báo cáo, thuyết trình và giải quyết vấn đề.',
-      thumbnail: '/images/courses/business-english.jpg',
+      thumbnail: null,
     },
     {
       id: 8,
@@ -364,7 +368,7 @@ async function main() {
       status: 'PUBLISHED',
       description:
         'Củng cố ngữ pháp cốt lõi và vốn từ thông dụng/TOEIC theo chủ đề để hỗ trợ cả bốn kỹ năng.',
-      thumbnail: '/images/courses/grammar-vocabulary.jpg',
+      thumbnail: null,
     },
   ].map((item) => ({
     ...item,
@@ -1372,9 +1376,10 @@ async function main() {
         where: { enrollmentId: enrollment.id },
         update: {
           amountVnd: paidOffering.tuitionFeeVnd,
-          status: status === EnrollmentStatus.PENDING_PAYMENT
-            ? PaymentStatus.PENDING
-            : PaymentStatus.CONFIRMED,
+          status:
+            status === EnrollmentStatus.PENDING_PAYMENT
+              ? PaymentStatus.PENDING
+              : PaymentStatus.CONFIRMED,
           reportedAt:
             status === EnrollmentStatus.PENDING_PAYMENT
               ? null
@@ -1493,44 +1498,51 @@ async function main() {
     },
   };
 
-  const readingCatalogMetadataByQuizId: Record<number, Prisma.InputJsonObject> = {
-    2: {
-      skill: 'READING',
-      levelRange: 'A2',
-      passageTypes: ['notice', 'message', 'advertisement', 'appointment', 'rules'],
-      durationMinutes: 15,
-    },
-    6: {
-      skill: 'READING',
-      levelRange: 'B1',
-      passageTypes: ['email', 'order correspondence'],
-      durationMinutes: 20,
-    },
-    13: {
-      skill: 'READING',
-      levelRange: 'A1–A2',
-      passageTypes: ['notice', 'email'],
-      durationMinutes: 20,
-    },
-    14: {
-      skill: 'READING',
-      levelRange: 'B1',
-      passageTypes: ['memo', 'article'],
-      durationMinutes: 20,
-    },
-    15: {
-      skill: 'READING',
-      levelRange: 'B2',
-      passageTypes: ['email', 'report'],
-      durationMinutes: 25,
-    },
-    16: {
-      skill: 'READING',
-      levelRange: 'C1',
-      passageTypes: ['article', 'memo'],
-      durationMinutes: 25,
-    },
-  };
+  const readingCatalogMetadataByQuizId: Record<number, Prisma.InputJsonObject> =
+    {
+      2: {
+        skill: 'READING',
+        levelRange: 'A2',
+        passageTypes: [
+          'notice',
+          'message',
+          'advertisement',
+          'appointment',
+          'rules',
+        ],
+        durationMinutes: 15,
+      },
+      6: {
+        skill: 'READING',
+        levelRange: 'B1',
+        passageTypes: ['email', 'order correspondence'],
+        durationMinutes: 20,
+      },
+      13: {
+        skill: 'READING',
+        levelRange: 'A1–A2',
+        passageTypes: ['notice', 'email'],
+        durationMinutes: 20,
+      },
+      14: {
+        skill: 'READING',
+        levelRange: 'B1',
+        passageTypes: ['memo', 'article'],
+        durationMinutes: 20,
+      },
+      15: {
+        skill: 'READING',
+        levelRange: 'B2',
+        passageTypes: ['email', 'report'],
+        durationMinutes: 25,
+      },
+      16: {
+        skill: 'READING',
+        levelRange: 'C1',
+        passageTypes: ['article', 'memo'],
+        durationMinutes: 25,
+      },
+    };
 
   const legacyReadingQuestionMetadata: Record<
     number,
@@ -3915,7 +3927,7 @@ async function main() {
       courseId: courses[4].id,
       timeLimit: 80,
       bilingualContent: {
-        examFormat: 'SPEAKING_WRITING',
+        examFormat: 'TOEIC_SW',
         speakingQuestions: 11,
         writingQuestions: 8,
         speakingMinutes: 20,
@@ -3946,7 +3958,7 @@ async function main() {
       courseId: courses[4].id,
       timeLimit: 80,
       bilingualContent: {
-        examFormat: 'SPEAKING_WRITING',
+        examFormat: 'TOEIC_SW',
         speakingQuestions: 11,
         writingQuestions: 8,
         speakingMinutes: 20,
@@ -4645,36 +4657,20 @@ async function main() {
       create: { id: index + 1, ...item },
     });
   }
-  for (let index = 0; index < 3; index += 1) {
-    await prisma.speakingSubmission.upsert({
-      where: { id: 300 + index },
-      update: {
-        exerciseId: index + 1,
-        userId: students[index].id,
-        audioUrl: `/seed/audio/speaking-${index + 1}.webm`,
-        overallScore: 7.5 + index * 0.5,
-        aiFeedback: {
-          pronunciation: 7.5 + index * 0.4,
-          fluency: 7 + index * 0.5,
-          advice:
-            'Giữ tốc độ ổn định, nhấn trọng âm từ khóa và nối âm tự nhiên.',
-        },
+  // Remove legacy demo submissions that referenced non-existent seed audio.
+  // The URL guard prevents touching a real learner submission if an ID is reused.
+  await prisma.speakingSubmission.deleteMany({
+    where: {
+      id: { in: [300, 301, 302] },
+      audioUrl: {
+        in: [
+          '/seed/audio/speaking-1.webm',
+          '/seed/audio/speaking-2.webm',
+          '/seed/audio/speaking-3.webm',
+        ],
       },
-      create: {
-        id: 300 + index,
-        exerciseId: index + 1,
-        userId: students[index].id,
-        audioUrl: `/seed/audio/speaking-${index + 1}.webm`,
-        overallScore: 7.5 + index * 0.5,
-        aiFeedback: {
-          pronunciation: 7.5 + index * 0.4,
-          fluency: 7 + index * 0.5,
-          advice:
-            'Giữ tốc độ ổn định, nhấn trọng âm từ khóa và nối âm tự nhiên.',
-        },
-      },
-    });
-  }
+    },
+  });
 
   const vocabTopics = [
     {
@@ -9554,15 +9550,15 @@ async function main() {
   await prisma.quiz.upsert({
     where: { id: 21 },
     update: {
-      title: 'TOEIC 2 kỹ năng — Đề thi chuẩn Listening & Reading 01',
+      title: 'TOEIC L&R — Đề thi chuẩn Listening & Reading 01',
       description:
-        'Đề thi thử TOEIC 2 kỹ năng Listening (100 câu / 45 phút) và Reading (100 câu / 75 phút) chuẩn cấu trúc 200 câu.',
+        'Đề thi thử TOEIC Listening & Reading gồm 100 câu Listening (45 phút) và 100 câu Reading (75 phút), tổng 200 câu.',
       type: QuizType.TOEIC,
       courseId: courses[2].id,
       timeLimit: 120,
       bilingualContent: {
-        examFormat: 'TWO_SKILL',
-        skillLabel: '2 kỹ năng',
+        examFormat: 'TOEIC_LR',
+        skillLabel: 'Listening & Reading',
         examSetId: toeicExam.id,
         durationMinutes: 120,
         listeningMinutes: 45,
@@ -9576,15 +9572,15 @@ async function main() {
     },
     create: {
       id: 21,
-      title: 'TOEIC 2 kỹ năng — Đề thi chuẩn Listening & Reading 01',
+      title: 'TOEIC L&R — Đề thi chuẩn Listening & Reading 01',
       description:
-        'Đề thi thử TOEIC 2 kỹ năng Listening (100 câu / 45 phút) và Reading (100 câu / 75 phút) chuẩn cấu trúc 200 câu.',
+        'Đề thi thử TOEIC Listening & Reading gồm 100 câu Listening (45 phút) và 100 câu Reading (75 phút), tổng 200 câu.',
       type: QuizType.TOEIC,
       courseId: courses[2].id,
       timeLimit: 120,
       bilingualContent: {
-        examFormat: 'TWO_SKILL',
-        skillLabel: '2 kỹ năng',
+        examFormat: 'TOEIC_LR',
+        skillLabel: 'Listening & Reading',
         examSetId: toeicExam.id,
         durationMinutes: 120,
         listeningMinutes: 45,
@@ -9608,8 +9604,8 @@ async function main() {
       courseId: courses[5].id,
       timeLimit: 200,
       bilingualContent: {
-        examFormat: 'FOUR_SKILL',
-        skillLabel: '4 kỹ năng',
+        examFormat: 'TOEIC_4_SKILLS',
+        skillLabel: 'Listening · Reading · Speaking · Writing',
         isBundle: true,
         listeningReadingExamSetId: toeicExam.id,
         speakingWritingQuizId: toeicSpeakingWritingQuiz.id,
@@ -9632,8 +9628,8 @@ async function main() {
       courseId: courses[5].id,
       timeLimit: 200,
       bilingualContent: {
-        examFormat: 'FOUR_SKILL',
-        skillLabel: '4 kỹ năng',
+        examFormat: 'TOEIC_4_SKILLS',
+        skillLabel: 'Listening · Reading · Speaking · Writing',
         isBundle: true,
         listeningReadingExamSetId: toeicExam.id,
         speakingWritingQuizId: toeicSpeakingWritingQuiz.id,
@@ -9882,7 +9878,14 @@ async function main() {
     },
   ];
 
-  for (const product of marketProducts) {
+  const catalogMarketProducts = marketProducts.map((product) => ({
+    ...product,
+    imageUrl:
+      seedAssetUrl(`catalog/market/products/${product.slug}/image.svg`) ??
+      product.imageUrl,
+  }));
+
+  for (const product of catalogMarketProducts) {
     await prisma.marketProduct.upsert({
       where: { id: product.id },
       update: {

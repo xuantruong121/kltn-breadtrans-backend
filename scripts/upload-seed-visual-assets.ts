@@ -10,7 +10,9 @@ const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 const publicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
 
 if (!accountId || !bucket || !accessKeyId || !secretAccessKey || !publicUrl) {
-  throw new Error('R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_PUBLIC_URL are required.');
+  throw new Error(
+    'R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_PUBLIC_URL are required.',
+  );
 }
 
 const client = new S3Client({
@@ -37,7 +39,7 @@ const root = path.resolve(__dirname, '..', 'prisma', 'seed-assets');
 async function main(): Promise<void> {
   for (const name of assets) {
     const body = await readFile(path.join(root, name));
-    const key = `toeic/visuals/${name}`;
+    const key = `catalog/toeic/shared/images/${name}`;
     await client.send(
       new PutObjectCommand({
         Bucket: bucket,

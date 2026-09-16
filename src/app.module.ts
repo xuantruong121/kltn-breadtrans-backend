@@ -32,6 +32,7 @@ import { SupportModule } from './modules/support/support.module';
 import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { RedisModule } from '@nestjs-modules/ioredis';
 import { JobsModule } from './jobs/jobs.module';
+import { IssueReportModule } from './modules/issue-report/issue-report.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { JobsModule } from './jobs/jobs.module';
     DiagnosticModule,
     SupportModule,
     JobsModule,
+    IssueReportModule,
   ],
 
   controllers: [AppController],

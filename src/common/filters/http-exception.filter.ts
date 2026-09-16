@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -21,6 +22,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
+    const requestId = randomUUID();
 
     let message = 'Internal server error';
     let errorDetails: any = null;
@@ -37,8 +39,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exception.message;
     }
 
+    if (status >= 500) {
+      message = 'Máy chủ gặp sự cố tạm thời. Vui lòng thử lại sau ít phút.';
+      errorDetails = 'INTERNAL_ERROR';
+    }
+
     // Log detailed error for debugging
-    const logDetails = `[${request.method}] ${request.url} - Status: ${status} - Error: ${
+    const logDetails = `[${request.method}] ${request.url} - Status: ${status} - Request: ${requestId} - Error: ${
       Array.isArray(message) ? message.join(', ') : message
     }`;
 
@@ -52,6 +59,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
+      requestId,
       message,
       error: errorDetails,
     });

@@ -156,7 +156,21 @@ export class QuizService {
       where: {
         type: { in: [QuizType.TOEIC, QuizType.TOEIC_FOUR_SKILL] },
         OR: [
+          { bilingualContent: { path: ['examFormat'], equals: 'TOEIC_LR' } },
+          { bilingualContent: { path: ['examFormat'], equals: 'TOEIC_SW' } },
+          {
+            bilingualContent: {
+              path: ['examFormat'],
+              equals: 'TOEIC_4_SKILLS',
+            },
+          },
           { bilingualContent: { path: ['examFormat'], equals: 'TWO_SKILL' } },
+          {
+            bilingualContent: {
+              path: ['examFormat'],
+              equals: 'SPEAKING_WRITING',
+            },
+          },
           { bilingualContent: { path: ['examFormat'], equals: 'FOUR_SKILL' } },
         ],
       },

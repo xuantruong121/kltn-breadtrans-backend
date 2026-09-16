@@ -175,7 +175,31 @@ describe('QuizService', () => {
             {
               bilingualContent: {
                 path: ['examFormat'],
+                equals: 'TOEIC_LR',
+              },
+            },
+            {
+              bilingualContent: {
+                path: ['examFormat'],
+                equals: 'TOEIC_SW',
+              },
+            },
+            {
+              bilingualContent: {
+                path: ['examFormat'],
+                equals: 'TOEIC_4_SKILLS',
+              },
+            },
+            {
+              bilingualContent: {
+                path: ['examFormat'],
                 equals: 'TWO_SKILL',
+              },
+            },
+            {
+              bilingualContent: {
+                path: ['examFormat'],
+                equals: 'SPEAKING_WRITING',
               },
             },
             {

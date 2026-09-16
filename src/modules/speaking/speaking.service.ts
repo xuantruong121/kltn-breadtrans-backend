@@ -146,14 +146,16 @@ export class SpeakingService {
       audioFile.mimetype || undefined,
     );
 
-    // 5. Upload original audio to R2 storage
+    // 5. Upload original audio to the catalog namespace in R2.
+    // The submission id is created after upload, so the storage service
+    // uses a stable catalog prefix plus a generated object name.
     this.logger.log(
       `Uploading audio for exercise #${exerciseId} by user #${userId} (${audioValidation.durationMs}ms)`,
     );
     const uploadResult = await this.uploadService.uploadRawBuffer(
       audioFile.buffer,
       audioValidation.audioMimeType,
-      'speaking_audio',
+      'catalog/speaking/submissions',
     );
 
     // 6. Count and create under a per-user/day PostgreSQL advisory lock.

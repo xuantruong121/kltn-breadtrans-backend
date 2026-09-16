@@ -100,6 +100,8 @@ model User {
   supportConversation             SupportConversation?
   supportMessages                 SupportMessage[]
   notifications                   Notification[]
+  issueReportsSubmitted           IssueReport[]                    @relation("IssueReporter")
+  issueReportsAssigned            IssueReport[]                    @relation("IssueAssignee")
   banhTransactions                BanhTransaction[]
   dailyBanhEarnings               DailyBanhEarning[]
   vocabMasteryRewards             UserVocabMasteryReward[]
@@ -1059,6 +1061,48 @@ enum SupportSenderRole {
   SYSTEM
 }
 
+enum IssueReportArea {
+  LISTENING
+  SPEAKING
+  READING
+  WRITING
+  VOCABULARY
+  GRAMMAR
+  TOEIC
+  COURSE
+  DASHBOARD
+  MARKET
+  PET
+  AUTH
+  ADMIN
+  OTHER
+}
+
+enum IssueReportCategory {
+  CONTENT_ERROR
+  ANSWER_ERROR
+  EXPLANATION_ERROR
+  AUDIO_ERROR
+  IMAGE_ERROR
+  SCORING_ERROR
+  TECHNICAL_ERROR
+  ACCESSIBILITY
+  OTHER
+}
+
+enum IssueReportImpact {
+  NON_BLOCKING
+  BLOCKING
+}
+
+enum IssueReportStatus {
+  NEW
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+  DUPLICATE
+}
+
 model SupportConversation {
   id            Int         @id @default(autoincrement())
   studentId     Int         @unique
@@ -1110,6 +1154,33 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([userId, createdAt])
+}
+
+model IssueReport {
+  id              Int                 @id @default(autoincrement())
+  reportCode      String              @unique
+  reporterId      Int
+  reporter        User                @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  assignedAdminId Int?
+  assignedAdmin   User?               @relation("IssueAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  area            IssueReportArea
+  category        IssueReportCategory
+  impact          IssueReportImpact   @default(NON_BLOCKING)
+  status          IssueReportStatus   @default(NEW)
+  description     String              @db.Text
+  route           String?
+  sourceType      String?
+  sourceId        String?
+  questionId      Int?
+  context         Json?
+  resolutionNote  String?             @db.Text
+  resolvedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([status, createdAt])
+  @@index([area, category])
+  @@index([reporterId, createdAt])
 }
 
 // ==========================================
