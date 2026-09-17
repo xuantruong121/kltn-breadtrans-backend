@@ -30,6 +30,106 @@ const VOICE_MAPPING = {
   UK: { voice: 'en-GB-SoniaNeural', lang: 'en-GB' },
 } as const;
 
+type SpeakingExerciseCatalogItem = {
+  id: number;
+  title: string;
+  difficulty: string;
+  category: string;
+};
+
+/**
+ * Catalog-level grouping keeps the storage model backward compatible while
+ * presenting a real multi-sentence practice set to learners. Each sentence
+ * remains an independent SpeakingExercise for scoring and idempotency.
+ */
+function resolvePracticeSet(item: SpeakingExerciseCatalogItem) {
+  const title = item.title.toLowerCase();
+  if (title.startsWith('read aloud')) {
+    return item.category.toUpperCase() === 'TOEIC'
+      ? {
+          key: 'read-aloud-toeic',
+          title: 'Đọc thành tiếng — Ngữ cảnh TOEIC',
+          description:
+            'Luyện đọc các thông báo và tình huống thường gặp trong môi trường công việc.',
+        }
+      : {
+          key: 'read-aloud-general',
+          title: 'Đọc thành tiếng — Giao tiếp hằng ngày',
+          description:
+            'Luyện đọc các câu tiếng Anh đời sống với nhịp điệu và phát âm rõ ràng.',
+        };
+  }
+  if (title.startsWith('pronunciation')) {
+    return {
+      key: 'pronunciation-foundations',
+      title: 'Nền tảng phát âm',
+      description:
+        'Củng cố âm cuối, trọng âm, nối âm và cách đọc số liệu trong câu thực tế.',
+    };
+  }
+  if (title.startsWith('question response')) {
+    return item.category.toUpperCase() === 'BUSINESS'
+      ? {
+          key: 'question-response-business',
+          title: 'Phản hồi câu hỏi — Công việc',
+          description:
+            'Luyện trả lời câu hỏi trong các tình huống họp, dịch vụ và giao tiếp công sở.',
+        }
+      : {
+          key: 'question-response-general',
+          title: 'Phản hồi câu hỏi — Đời sống',
+          description:
+            'Luyện phản xạ trả lời các câu hỏi quen thuộc bằng câu nói tự nhiên.',
+        };
+  }
+  if (title.startsWith('opinion')) {
+    return item.category.toUpperCase() === 'BUSINESS'
+      ? {
+          key: 'opinion-business',
+          title: 'Trình bày quan điểm — Công việc',
+          description:
+            'Trình bày ý kiến có lý do và ví dụ trong các chủ đề nghề nghiệp.',
+        }
+      : {
+          key: 'opinion-general',
+          title: 'Trình bày quan điểm — Hằng ngày',
+          description:
+            'Luyện diễn đạt quan điểm cá nhân mạch lạc, tự nhiên và có dẫn chứng.',
+        };
+  }
+  if (title.startsWith('toeic speaking')) {
+    return {
+      key: 'toeic-speaking-practice',
+      title: 'Luyện nhiệm vụ TOEIC Speaking',
+      description:
+        'Luyện theo nhóm nhiệm vụ đọc thành tiếng, mô tả và phản hồi trong TOEIC Speaking.',
+    };
+  }
+  return {
+    key: `custom-${item.category.toLowerCase()}`,
+    title: `Luyện nói — ${item.category}`,
+    description: 'Một bộ câu luyện nói theo chủ đề.',
+  };
+}
+
+function difficultyLabel(values: string[]) {
+  const rank: Record<string, number> = {
+    BEGINNER: 1,
+    INTERMEDIATE: 2,
+    ADVANCED: 3,
+  };
+  const labels: Record<string, string> = {
+    BEGINNER: 'Cơ bản',
+    INTERMEDIATE: 'Trung cấp',
+    ADVANCED: 'Nâng cao',
+  };
+  const unique = [...new Set(values.map((value) => value.toUpperCase()))]
+    .filter((value) => rank[value])
+    .sort((a, b) => rank[a] - rank[b]);
+  if (unique.length <= 1) return labels[unique[0]] ?? 'Cơ bản';
+  return `${labels[unique[0]]} – ${labels[unique[unique.length - 1]]}`;
+}
+
 @Injectable()
 export class SpeakingService {
   private readonly logger = new Logger(SpeakingService.name);
@@ -63,10 +163,58 @@ export class SpeakingService {
       userSubmissions.map((s) => s.exerciseId),
     );
 
-    return exercises.map((exercise) => ({
-      ...exercise,
-      isCompleted: completedExerciseIds.has(exercise.id),
-    }));
+    const grouped = new Map<string, Array<(typeof exercises)[number]>>();
+    for (const exercise of exercises) {
+      const set = resolvePracticeSet(exercise);
+      const current = grouped.get(set.key) ?? [];
+      current.push(exercise);
+      grouped.set(set.key, current);
+    }
+
+    const setSummaries = new Map<
+      string,
+      {
+        key: string;
+        title: string;
+        description: string;
+        category: string;
+        exerciseCount: number;
+        completedCount: number;
+        exerciseIds: number[];
+        difficultyLabel: string;
+      }
+    >();
+
+    for (const [key, items] of grouped.entries()) {
+      const set = resolvePracticeSet(items[0]);
+      setSummaries.set(key, {
+        ...set,
+        category: items[0].category,
+        exerciseCount: items.length,
+        completedCount: items.filter((item) =>
+          completedExerciseIds.has(item.id),
+        ).length,
+        exerciseIds: items.map((item) => item.id),
+        difficultyLabel: difficultyLabel(items.map((item) => item.difficulty)),
+      });
+    }
+
+    const positions = new Map<string, number>();
+    return exercises.map((exercise) => {
+      const set = setSummaries.get(resolvePracticeSet(exercise).key)!;
+      const setKey = set.key;
+      const position = (positions.get(setKey) ?? 0) + 1;
+      positions.set(setKey, position);
+      return {
+        ...exercise,
+        isCompleted: completedExerciseIds.has(exercise.id),
+        practiceSet: {
+          ...set,
+          position,
+          isCompleted: set.completedCount === set.exerciseCount,
+        },
+      };
+    });
   }
 
   async findExerciseById(id: number) {

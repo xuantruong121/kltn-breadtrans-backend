@@ -18,6 +18,11 @@ import {
   User,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import {
+  SPEAKING_DICTIONARY_ENTRIES,
+  SPEAKING_DICTIONARY_METADATA,
+  tokenizeSpeakingDictionaryText,
+} from './data/speaking-dictionary';
 
 const prisma = new PrismaClient();
 const PASSWORD = 'Password123!';
@@ -5676,6 +5681,166 @@ async function main() {
       },
     });
   }
+
+  // This topic is a local dictionary for the speaking workspace, not a
+  // learner-facing flashcard deck. Keeping it in VocabWord lets the existing
+  // lookup service resolve every seeded speaking token before using a remote
+  // provider, while the public topic API filters SYSTEM_DICTIONARY topics out.
+  const speakingDictionaryTopicId = 100;
+  const speakingDictionaryTotalWords =
+    SPEAKING_DICTIONARY_ENTRIES.length +
+    SPEAKING_DICTIONARY_ENTRIES.reduce(
+      (total, [word]) =>
+        total + (SPEAKING_DICTIONARY_METADATA[word]?.variants?.length ?? 0),
+      0,
+    );
+  const speakingDictionaryMissingIpa = SPEAKING_DICTIONARY_ENTRIES.filter(
+    ([word]) => {
+      const metadata = SPEAKING_DICTIONARY_METADATA[word];
+      return !metadata?.ipaUs || !metadata.ipaUk;
+    },
+  ).map(([word]) => word);
+  if (speakingDictionaryMissingIpa.length > 0) {
+    throw new Error(
+      `Speaking dictionary IPA coverage failed for: ${speakingDictionaryMissingIpa.join(', ')}`,
+    );
+  }
+  const speakingDictionaryTopic = await prisma.vocabTopic.upsert({
+    where: { id: speakingDictionaryTopicId },
+    update: {
+      title: 'Speaking Practice Dictionary',
+      categoryName: 'SYSTEM_DICTIONARY',
+      totalWords: speakingDictionaryTotalWords,
+      isPro: false,
+    },
+    create: {
+      id: speakingDictionaryTopicId,
+      title: 'Speaking Practice Dictionary',
+      categoryName: 'SYSTEM_DICTIONARY',
+      totalWords: speakingDictionaryTotalWords,
+      isPro: false,
+    },
+  });
+
+  const speakingExerciseTokens = speakingExercises.map((exercise) => ({
+    targetText: exercise.targetText,
+    tokens: new Set(tokenizeSpeakingDictionaryText(exercise.targetText)),
+  }));
+  const speakingDictionaryWordIds: number[] = [];
+
+  for (let index = 0; index < SPEAKING_DICTIONARY_ENTRIES.length; index += 1) {
+    const [word, pos, meaning] = SPEAKING_DICTIONARY_ENTRIES[index];
+    const metadata = SPEAKING_DICTIONARY_METADATA[word];
+    const id = 2000 + index;
+    const exampleEn =
+      speakingExerciseTokens.find((exercise) => exercise.tokens.has(word))
+        ?.targetText ?? null;
+
+    speakingDictionaryWordIds.push(id);
+    await prisma.vocabWord.upsert({
+      where: { id },
+      update: {
+        topicId: speakingDictionaryTopic.id,
+        word,
+        pos,
+        meaning,
+        ipaUs: metadata?.ipaUs ?? null,
+        ipaUk: metadata?.ipaUk ?? null,
+        exampleEn,
+        exampleVi: null,
+        collocations: metadata?.collocations ?? [],
+        order: index + 1,
+      },
+      create: {
+        id,
+        topicId: speakingDictionaryTopic.id,
+        word,
+        pos,
+        meaning,
+        ipaUs: metadata?.ipaUs ?? null,
+        ipaUk: metadata?.ipaUk ?? null,
+        exampleEn,
+        exampleVi: null,
+        collocations: metadata?.collocations ?? [],
+        order: index + 1,
+      },
+    });
+
+    const variants = metadata?.variants ?? [];
+    for (
+      let variantIndex = 0;
+      variantIndex < variants.length;
+      variantIndex += 1
+    ) {
+      const variant = variants[variantIndex];
+      const variantId = 3000 + index * 10 + variantIndex;
+      speakingDictionaryWordIds.push(variantId);
+      await prisma.vocabWord.upsert({
+        where: { id: variantId },
+        update: {
+          topicId: speakingDictionaryTopic.id,
+          word,
+          pos: variant.partOfSpeech,
+          meaning: variant.meaningVi,
+          ipaUs: variant.ipaUs,
+          ipaUk: variant.ipaUk,
+          exampleEn,
+          exampleVi: null,
+          collocations: [],
+          order: index + 1,
+        },
+        create: {
+          id: variantId,
+          topicId: speakingDictionaryTopic.id,
+          word,
+          pos: variant.partOfSpeech,
+          meaning: variant.meaningVi,
+          ipaUs: variant.ipaUs,
+          ipaUk: variant.ipaUk,
+          exampleEn,
+          exampleVi: null,
+          collocations: [],
+          order: index + 1,
+        },
+      });
+    }
+  }
+
+  // Remove only stale entries previously owned by the reserved system topic.
+  await prisma.vocabWord.deleteMany({
+    where: {
+      topicId: speakingDictionaryTopic.id,
+      id: { notIn: speakingDictionaryWordIds },
+    },
+  });
+
+  const uniqueSpeakingTokens = [
+    ...new Set(
+      speakingExerciseTokens.flatMap((exercise) => [...exercise.tokens]),
+    ),
+  ];
+  const locallySeededWords = await prisma.vocabWord.findMany({
+    where: {
+      word: { in: uniqueSpeakingTokens, mode: 'insensitive' },
+    },
+    select: { word: true },
+  });
+  const localWordSet = new Set(
+    locallySeededWords.map((entry) => entry.word.toLowerCase()),
+  );
+  const unresolvedSpeakingTokens = uniqueSpeakingTokens.filter(
+    (word) => !localWordSet.has(word),
+  );
+
+  if (unresolvedSpeakingTokens.length > 0) {
+    throw new Error(
+      `Speaking dictionary seed coverage failed for: ${unresolvedSpeakingTokens.join(', ')}`,
+    );
+  }
+  console.log(
+    `Speaking dictionary coverage: ${uniqueSpeakingTokens.length}/${uniqueSpeakingTokens.length} tokens`,
+  );
+
   // Replace the old numbered placeholder words from the development seed.
   await prisma.vocabWord.deleteMany({
     where: { id: { gte: vocabWordId, lte: 72 } },

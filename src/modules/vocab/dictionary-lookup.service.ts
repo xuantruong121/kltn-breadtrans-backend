@@ -138,6 +138,48 @@ export class DictionaryLookupService {
     return this.attachSaved(external, userId);
   }
 
+  /**
+   * Fetch richer provider data without delaying the curated/local lookup.
+   * The client calls this after it has already rendered the local result.
+   */
+  async lookupExtended(
+    rawWord: string,
+    userId?: number,
+  ): Promise<DictionaryLookupResponse> {
+    const query = this.normalize(rawWord);
+    const cacheKey = `dictionary:extended:v1:en:${query}`;
+    const cached = await this.readCache(cacheKey);
+    if (cached) {
+      return this.attachSaved({ ...cached, source: 'CACHE' }, userId);
+    }
+
+    let providerEntries: ProviderDictionaryEntry[];
+    try {
+      providerEntries = await this.provider.lookup(query);
+    } catch {
+      const unavailable = this.emptyResponse(query, false);
+      unavailable.providerUnavailable = true;
+      await this.writeCache(cacheKey, unavailable, 5 * 60);
+      return unavailable;
+    }
+
+    if (providerEntries.length === 0) {
+      const empty = this.emptyResponse(query, false);
+      await this.writeCache(cacheKey, empty, this.negativeTtl);
+      return empty;
+    }
+
+    const response = await this.enrichExternal(
+      this.normalizeProviderResult(query, providerEntries),
+    );
+    await this.writeCache(
+      cacheKey,
+      response,
+      response.meaningViStatus === 'UNAVAILABLE' ? 5 * 60 : this.positiveTtl,
+    );
+    return this.attachSaved(response, userId);
+  }
+
   async getSavedStatus(userId: number, canonicalWord: string) {
     try {
       return await this.prisma.userSavedWord.findFirst({
@@ -198,14 +240,29 @@ export class DictionaryLookupService {
         collocations: true,
       },
     });
-    return this.toLocalResponse(query, rows);
+    const canonicalRow =
+      rows.find((row) => candidates.includes(String(row.word).toLowerCase())) ??
+      rows.find((row) => String(row.word).toLowerCase() === query);
+    const orderedRows = canonicalRow
+      ? [canonicalRow, ...rows.filter((row) => row.id !== canonicalRow.id)]
+      : rows;
+    return this.toLocalResponse(query, orderedRows);
   }
 
   private toLocalResponse(query: string, rows: Array<Record<string, unknown>>) {
     if (rows.length === 0) return null;
     const canonical = String(rows[0].word);
     const inflection = canonical.toLowerCase() !== query;
-    const entries = rows.map((row) => ({
+    const uniqueRows = rows.filter((row, index) => {
+      const partOfSpeech = String(row.pos || '').toLowerCase();
+      return (
+        rows.findIndex(
+          (candidate) =>
+            String(candidate.pos || '').toLowerCase() === partOfSpeech,
+        ) === index
+      );
+    });
+    const entries = uniqueRows.map((row) => ({
       word: String(row.word),
       partOfSpeech: (row.pos as string | null) || null,
       ipaUs: (row.ipaUs as string | null) || null,
@@ -213,8 +270,8 @@ export class DictionaryLookupService {
       meaningVi: (row.meaning as string | null) || null,
       definitions: [
         {
-          definition: (row.exampleEn as string | null) || '',
-          meaningVi: (row.exampleVi as string | null) || null,
+          definition: (row.meaning as string | null) || '',
+          meaningVi: (row.meaning as string | null) || null,
           example: (row.exampleEn as string | null) || null,
         },
       ],
@@ -242,7 +299,21 @@ export class DictionaryLookupService {
     items: ProviderDictionaryEntry[],
   ) {
     const canonical = items[0]?.word || query;
-    const entries = items.map((item) => ({
+    const groupedItems = new Map<string, ProviderDictionaryEntry>();
+    for (const item of items) {
+      const key = item.partOfSpeech?.toLowerCase() || 'unknown';
+      const existing = groupedItems.get(key);
+      if (!existing) {
+        groupedItems.set(key, { ...item, definitions: [...item.definitions] });
+        continue;
+      }
+      existing.ipaUs ||= item.ipaUs;
+      existing.ipaUk ||= item.ipaUk;
+      existing.audioUs ||= item.audioUs;
+      existing.audioUk ||= item.audioUk;
+      existing.definitions.push(...item.definitions);
+    }
+    const entries = [...groupedItems.values()].map((item) => ({
       word: item.word,
       partOfSpeech: item.partOfSpeech,
       ipaUs: item.ipaUs,
@@ -284,51 +355,54 @@ export class DictionaryLookupService {
   private async enrichExternal(
     response: DictionaryLookupResponse,
   ): Promise<DictionaryLookupResponse> {
-    if (!this.aiService || response.source !== 'EXTERNAL') return response;
-    const first = response.entries[0];
-    const definition = first?.definitions[0];
-    if (!first || !definition) return response;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    try {
-      const timeout = new Promise<null>((resolve) => {
-        timeoutId = setTimeout(() => resolve(null), 3500);
-      });
-      const enrichment = await Promise.race([
-        this.aiService.enrichDictionaryEntry({
-          word: first.word,
-          partOfSpeech: first.partOfSpeech,
-          definitionEn: definition.definition,
-          exampleEn: definition.example,
-        }),
-        timeout,
-      ]);
-      if (timeoutId) clearTimeout(timeoutId);
-      if (!enrichment) {
-        return { ...response, meaningViStatus: 'UNAVAILABLE' };
-      }
-      const entries = response.entries.map((entry, index) =>
-        index === 0
-          ? {
-              ...entry,
-              meaningVi: enrichment.meaningVi,
-              exampleVi: enrichment.exampleVi || null,
-              definitions: entry.definitions.map((item, itemIndex) =>
-                itemIndex === 0
-                  ? {
-                      ...item,
-                      meaningVi: enrichment.meaningVi,
-                    }
-                  : item,
-              ),
-              collocations: enrichment.collocations || entry.collocations,
-            }
-          : entry,
-      );
-      return { ...response, entries, meaningViStatus: 'ENRICHED' };
-    } catch {
-      if (timeoutId) clearTimeout(timeoutId);
-      return { ...response, meaningViStatus: 'UNAVAILABLE' };
-    }
+    if (!this.aiService || response.source === 'LOCAL') return response;
+
+    let enrichedCount = 0;
+    const entries = await Promise.all(
+      response.entries.map(async (entry, index) => {
+        const definition = entry.definitions[0];
+        if (!definition || index >= 5) return entry;
+
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const timeout = new Promise<null>((resolve) => {
+            timeoutId = setTimeout(() => resolve(null), 3500);
+          });
+          const enrichment = await Promise.race([
+            this.aiService!.enrichDictionaryEntry({
+              word: entry.word,
+              partOfSpeech: entry.partOfSpeech,
+              definitionEn: definition.definition,
+              exampleEn: definition.example,
+            }),
+            timeout,
+          ]);
+          if (!enrichment) return entry;
+          enrichedCount += 1;
+          return {
+            ...entry,
+            meaningVi: enrichment.meaningVi,
+            exampleVi: enrichment.exampleVi || null,
+            definitions: entry.definitions.map((item, itemIndex) =>
+              itemIndex === 0
+                ? { ...item, meaningVi: enrichment.meaningVi }
+                : item,
+            ),
+            collocations: enrichment.collocations || entry.collocations,
+          };
+        } catch {
+          return entry;
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
+        }
+      }),
+    );
+
+    return {
+      ...response,
+      entries,
+      meaningViStatus: enrichedCount > 0 ? 'ENRICHED' : 'UNAVAILABLE',
+    };
   }
 
   private emptyResponse(query: string, isInflectionMatch: boolean) {
