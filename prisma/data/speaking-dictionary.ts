@@ -36,6 +36,18 @@ export const SPEAKING_DICTIONARY_METADATA: Record<
   client: { ipaUs: '/ˈklaɪənt/', ipaUk: '/ˈklaɪənt/' },
   company: { ipaUs: '/ˈkʌmpəni/', ipaUk: '/ˈkʌmpəni/' },
   computer: { ipaUs: '/kəmˈpjuːtər/', ipaUk: '/kəmˈpjuːtə/' },
+  copy: {
+    ipaUs: '/ˈkɑːpi/',
+    ipaUk: '/ˈkɒpi/',
+    variants: [
+      {
+        partOfSpeech: 'verb',
+        meaningVi: 'sao chép; chép lại; photo tài liệu',
+        ipaUs: '/ˈkɑːpi/',
+        ipaUk: '/ˈkɒpi/',
+      },
+    ],
+  },
   describe: { ipaUs: '/dɪˈskraɪb/', ipaUk: '/dɪˈskraɪb/' },
   effective: { ipaUs: '/ɪˈfektɪv/', ipaUk: '/ɪˈfektɪv/' },
   employee: { ipaUs: '/ɪmˈplɔɪiː/', ipaUk: '/ɪmˈplɔɪiː/' },
@@ -77,13 +89,52 @@ export const SPEAKING_DICTIONARY_METADATA: Record<
     ipaUs: '/ˌtrænspərˈteɪʃən/',
     ipaUk: '/ˌtrænspɔːˈteɪʃən/',
   },
-  travel: { ipaUs: '/ˈtrævəl/', ipaUk: '/ˈtrævəl/' },
+  travel: {
+    ipaUs: '/ˈtrævəl/',
+    ipaUk: '/ˈtrævəl/',
+    variants: [
+      {
+        partOfSpeech: 'noun',
+        meaningVi: 'việc đi lại; chuyến du lịch',
+        ipaUs: '/ˈtrævəl/',
+        ipaUk: '/ˈtrævəl/',
+      },
+    ],
+  },
   unavailable: { ipaUs: '/ˌʌnəˈveɪləbəl/', ipaUk: '/ˌʌnəˈveɪləbəl/' },
   weather: { ipaUs: '/ˈweðər/', ipaUk: '/ˈweðə/' },
   weekend: { ipaUs: '/ˈwiːkend/', ipaUk: '/ˌwiːkˈend/' },
-  welcome: { ipaUs: '/ˈwelkəm/', ipaUk: '/ˈwelkəm/' },
+  welcome: {
+    ipaUs: '/ˈwelkəm/',
+    ipaUk: '/ˈwelkəm/',
+    variants: [
+      {
+        partOfSpeech: 'noun',
+        meaningVi: 'sự chào đón; lời chào mừng',
+        ipaUs: '/ˈwelkəm/',
+        ipaUk: '/ˈwelkəm/',
+      },
+      {
+        partOfSpeech: 'adjective',
+        meaningVi: 'được hoan nghênh; đáng hoan nghênh',
+        ipaUs: '/ˈwelkəm/',
+        ipaUk: '/ˈwelkəm/',
+      },
+    ],
+  },
   workshop: { ipaUs: '/ˈwɜːrkʃɑːp/', ipaUk: '/ˈwɜːkʃɒp/' },
-  work: { ipaUs: '/wɜːrk/', ipaUk: '/wɜːk/' },
+  work: {
+    ipaUs: '/wɜːrk/',
+    ipaUk: '/wɜːk/',
+    variants: [
+      {
+        partOfSpeech: 'verb',
+        meaningVi: 'làm việc; hoạt động',
+        ipaUs: '/wɜːrk/',
+        ipaUk: '/wɜːk/',
+      },
+    ],
+  },
   one: { ipaUs: '/wʌn/', ipaUk: '/wʌn/' },
   five: { ipaUs: '/faɪv/', ipaUk: '/faɪv/' },
   eight: { ipaUs: '/eɪt/', ipaUk: '/eɪt/' },
@@ -165,6 +216,132 @@ export const SPEAKING_DICTIONARY_METADATA: Record<
         meaningVi: 'ánh sáng; đèn',
         ipaUs: '/laɪt/',
         ipaUk: '/laɪt/',
+      },
+    ],
+  },
+  after: {
+    ipaUs: '/ˈæftər/',
+    ipaUk: '/ˈɑːftə/',
+    variants: [
+      {
+        partOfSpeech: 'adverb',
+        meaningVi: 'sau đó; về sau',
+        ipaUs: '/ˈæftər/',
+        ipaUk: '/ˈɑːftə/',
+      },
+      {
+        partOfSpeech: 'conjunction',
+        meaningVi: 'sau khi',
+        ipaUs: '/ˈæftər/',
+        ipaUk: '/ˈɑːftə/',
+      },
+    ],
+  },
+  before: {
+    ipaUs: '/bɪˈfɔːr/',
+    ipaUk: '/bɪˈfɔː/',
+    variants: [
+      {
+        partOfSpeech: 'adverb',
+        meaningVi: 'trước đó; trước đây',
+        ipaUs: '/bɪˈfɔːr/',
+        ipaUk: '/bɪˈfɔː/',
+      },
+      {
+        partOfSpeech: 'conjunction',
+        meaningVi: 'trước khi',
+        ipaUs: '/bɪˈfɔːr/',
+        ipaUk: '/bɪˈfɔː/',
+      },
+    ],
+  },
+  center: {
+    ipaUs: '/ˈsentər/',
+    ipaUk: '/ˈsentə/',
+    variants: [
+      {
+        partOfSpeech: 'verb',
+        meaningVi: 'đặt ở trung tâm; tập trung vào',
+        ipaUs: '/ˈsentər/',
+        ipaUk: '/ˈsentə/',
+      },
+    ],
+  },
+  note: {
+    ipaUs: '/noʊt/',
+    ipaUk: '/nəʊt/',
+    variants: [
+      {
+        partOfSpeech: 'noun',
+        meaningVi: 'ghi chú; lời lưu ý',
+        ipaUs: '/noʊt/',
+        ipaUk: '/nəʊt/',
+      },
+    ],
+  },
+  rain: {
+    ipaUs: '/reɪn/',
+    ipaUk: '/reɪn/',
+    variants: [
+      {
+        partOfSpeech: 'verb',
+        meaningVi: 'mưa; rơi như mưa',
+        ipaUs: '/reɪn/',
+        ipaUk: '/reɪn/',
+      },
+    ],
+  },
+  return: {
+    ipaUs: '/rɪˈtɜːrn/',
+    ipaUk: '/rɪˈtɜːn/',
+    variants: [
+      {
+        partOfSpeech: 'noun',
+        meaningVi: 'sự trở lại; việc trả lại',
+        ipaUs: '/rɪˈtɜːrn/',
+        ipaUk: '/rɪˈtɜːn/',
+      },
+    ],
+  },
+  total: {
+    ipaUs: '/ˈtoʊtəl/',
+    ipaUk: '/ˈtəʊtəl/',
+    variants: [
+      {
+        partOfSpeech: 'adjective',
+        meaningVi: 'toàn bộ; hoàn toàn',
+        ipaUs: '/ˈtoʊtəl/',
+        ipaUk: '/ˈtəʊtəl/',
+      },
+      {
+        partOfSpeech: 'verb',
+        meaningVi: 'cộng lại; phá hủy hoàn toàn',
+        ipaUs: '/ˈtoʊtəl/',
+        ipaUk: '/ˈtəʊtəl/',
+      },
+    ],
+  },
+  train: {
+    ipaUs: '/treɪn/',
+    ipaUk: '/treɪn/',
+    variants: [
+      {
+        partOfSpeech: 'verb',
+        meaningVi: 'đào tạo; huấn luyện',
+        ipaUs: '/treɪn/',
+        ipaUk: '/treɪn/',
+      },
+    ],
+  },
+  within: {
+    ipaUs: '/wɪˈθɪn/',
+    ipaUk: '/wɪˈðɪn/',
+    variants: [
+      {
+        partOfSpeech: 'adverb',
+        meaningVi: 'ở bên trong; ở trong phạm vi đó',
+        ipaUs: '/wɪˈθɪn/',
+        ipaUk: '/wɪˈðɪn/',
       },
     ],
   },
