@@ -20,6 +20,7 @@ import {
   CreateQuestionDto,
   SubmitQuizDto,
   CheckPracticeQuestionDto,
+  SaveListeningAttemptDto,
 } from './dto/quiz.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -85,6 +86,35 @@ export class QuizController {
   @ApiOperation({ summary: 'Lấy danh sách đề TOEIC 2 và 4 kỹ năng' })
   getToeicPapers(@Request() req: any) {
     return this.quizService.getToeicPapers(req.user?.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post(':quizId/listening-attempts')
+  @ApiOperation({ summary: 'Tạo hoặc khôi phục phiên luyện nghe' })
+  getOrCreateListeningAttempt(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Request() req: any,
+  ) {
+    return this.quizService.getOrCreateListeningAttempt(req.user.id, quizId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch(':quizId/listening-attempts/:attemptId')
+  @ApiOperation({ summary: 'Lưu tiến độ phiên luyện nghe' })
+  saveListeningAttempt(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+    @Body() dto: SaveListeningAttemptDto,
+    @Request() req: any,
+  ) {
+    return this.quizService.saveListeningAttempt(
+      req.user.id,
+      quizId,
+      attemptId,
+      dto,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

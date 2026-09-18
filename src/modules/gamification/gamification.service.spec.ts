@@ -1,4 +1,17 @@
-import { GamificationService } from './gamification.service';
+import {
+  GamificationService,
+  getPetSatietyState,
+  reconcilePetDecay,
+  normalizeSpeciesPetState,
+  normalizeDailyCounters,
+  SATIETY_DECAY_INTERVAL_HOURS,
+  SATIETY_DECAY_AMOUNT,
+  HAPPINESS_DECAY_INTERVAL_HOURS,
+  HAPPINESS_DECAY_AMOUNT,
+  STARVATION_THRESHOLD,
+  HEALTH_DECAY_INTERVAL_HOURS,
+  HEALTH_DECAY_AMOUNT,
+} from './gamification.service';
 
 describe('GamificationService weekly cron hardening', () => {
   it('uses a fixed snapshot and records the processed week in GameSettings', async () => {
@@ -324,10 +337,135 @@ describe('GamificationService weekly cron hardening', () => {
     });
   });
 
+  describe('pet domain logic & decay rules', () => {
+    it('defines named domain decay constants', () => {
+      expect(SATIETY_DECAY_INTERVAL_HOURS).toBe(4);
+      expect(SATIETY_DECAY_AMOUNT).toBe(8);
+      expect(HAPPINESS_DECAY_INTERVAL_HOURS).toBe(24);
+      expect(HAPPINESS_DECAY_AMOUNT).toBe(5);
+      expect(STARVATION_THRESHOLD).toBe(20);
+      expect(HEALTH_DECAY_INTERVAL_HOURS).toBe(6);
+      expect(HEALTH_DECAY_AMOUNT).toBe(5);
+    });
+
+    it('maps satiety levels to deterministic satiety states', () => {
+      expect(getPetSatietyState(100)).toBe('FULL');
+      expect(getPetSatietyState(80)).toBe('FULL');
+      expect(getPetSatietyState(79)).toBe('NORMAL');
+      expect(getPetSatietyState(50)).toBe('NORMAL');
+      expect(getPetSatietyState(49)).toBe('HUNGRY');
+      expect(getPetSatietyState(20)).toBe('HUNGRY');
+      expect(getPetSatietyState(19)).toBe('VERY_HUNGRY');
+      expect(getPetSatietyState(0)).toBe('VERY_HUNGRY');
+    });
+
+    it('reconciles decay idempotently: repeated calls do not re-decay without elapsed time', () => {
+      const now = new Date('2026-09-18T10:00:00.000Z');
+      const past = new Date('2026-09-18T05:00:00.000Z'); // 5 hours ago
+      const state = normalizeSpeciesPetState({
+        level: 1,
+        exp: 0,
+        health: 100,
+        happiness: 100,
+        satiety: 100,
+        stateUpdatedAt: past.toISOString(),
+      });
+
+      // Call 1: 5 hours elapsed -> 1 interval (4h) -> satiety -8 -> 92
+      const firstRun = reconcilePetDecay(state, now);
+      expect(firstRun.changed).toBe(true);
+      expect(firstRun.state.satiety).toBe(92);
+      expect(firstRun.state.stateUpdatedAt).toBe(now.toISOString());
+
+      // Call 2 (immediate repeated call with same now timestamp): 0 elapsed -> NO additional decay
+      const secondRun = reconcilePetDecay(firstRun.state, now);
+      expect(secondRun.changed).toBe(false);
+      expect(secondRun.state.satiety).toBe(92);
+      expect(secondRun.state.stateUpdatedAt).toBe(now.toISOString());
+    });
+
+    it('health does not decay merely from normal time, but decreases only during prolonged starvation (satiety < 20)', () => {
+      const now = new Date('2026-09-18T12:00:00.000Z');
+      // Case A: Satiety is 100, 20 hours passed.
+      // Satiety decays: floor(20/4) * 8 = 40 -> 60 (>= 20, never reached starvation).
+      const wellFedState = normalizeSpeciesPetState({
+        level: 1,
+        exp: 0,
+        health: 100,
+        happiness: 100,
+        satiety: 100,
+        stateUpdatedAt: new Date(
+          now.getTime() - 20 * 3600 * 1000,
+        ).toISOString(),
+      });
+      const wellFedResult = reconcilePetDecay(wellFedState, now);
+      expect(wellFedResult.state.satiety).toBe(60);
+      expect(wellFedResult.state.health).toBe(100); // Health MUST NOT decay!
+
+      // Case B: Pet is already starving (satiety = 10 < 20). 12 hours pass.
+      // 12 hours of starvation / 6 hours interval = 2 intervals * 5 = -10 health.
+      const starvingState = normalizeSpeciesPetState({
+        level: 1,
+        exp: 0,
+        health: 90,
+        happiness: 80,
+        satiety: 10,
+        stateUpdatedAt: new Date(
+          now.getTime() - 12 * 3600 * 1000,
+        ).toISOString(),
+      });
+      const starvingResult = reconcilePetDecay(starvingState, now);
+      expect(starvingResult.state.health).toBe(80); // 90 - 10 = 80
+      expect(starvingResult.state.satiety).toBe(0); // 10 - floor(12/4)*8 = 0
+    });
+
+    it('happiness decay is independent from feeding timestamp (5 points per 24 hours)', () => {
+      const now = new Date('2026-09-18T12:00:00.000Z');
+      const state = normalizeSpeciesPetState({
+        level: 1,
+        exp: 0,
+        health: 100,
+        happiness: 95,
+        satiety: 100,
+        lastFedAt: new Date(now.getTime() - 1 * 3600 * 1000).toISOString(), // fed 1h ago
+        stateUpdatedAt: new Date(
+          now.getTime() - 24 * 3600 * 1000,
+        ).toISOString(), // state anchor 24h ago
+      });
+      const result = reconcilePetDecay(state, now);
+      expect(result.state.happiness).toBe(90); // 95 - 5 = 90
+    });
+
+    it('daily counters reset only when date changes, without resetting pet stats', () => {
+      const state = normalizeSpeciesPetState({
+        level: 2,
+        exp: 1500,
+        health: 85,
+        happiness: 75,
+        satiety: 60,
+        dailyFeedDateKey: '2026-09-17',
+        dailyFeedCount: 4,
+        dailyRewardedFeedCount: 3,
+      });
+
+      const norm = normalizeDailyCounters(state, '2026-09-18');
+      expect(norm.reset).toBe(true);
+      expect(norm.state.dailyFeedCount).toBe(0);
+      expect(norm.state.dailyRewardedFeedCount).toBe(0);
+      expect(norm.state.dailyFeedDateKey).toBe('2026-09-18');
+      // Stats must remain completely untouched
+      expect(norm.state.level).toBe(2);
+      expect(norm.state.exp).toBe(1500);
+      expect(norm.state.health).toBe(85);
+      expect(norm.state.happiness).toBe(75);
+      expect(norm.state.satiety).toBe(60);
+    });
+  });
+
   describe('feedPet atomic transaction', () => {
-    it('uses satiety, escalates the daily feed cost, and updates stats from current baseline', async () => {
+    it('uses satiety, escalates feed cost (10 -> 20 -> 30), and clamps increments', async () => {
       const now = new Date();
-      const pastTime = new Date(now.getTime() - 25 * 60 * 60 * 1000); // 25 hours ago
+      const pastTime = new Date(now.getTime() - 2 * 60 * 60 * 1000); // 2 hours ago
       const tx: any = {
         $executeRaw: jest.fn().mockResolvedValue(1),
         userPet: {
@@ -346,14 +484,19 @@ describe('GamificationService weekly cron hardening', () => {
                 exp: 100,
                 health: 80,
                 happiness: 70,
-                lastFedAt: pastTime,
+                satiety: 40, // HUNGRY (< 80)
+                lastFedAt: pastTime.toISOString(),
+                stateUpdatedAt: pastTime.toISOString(),
+                dailyFeedDateKey: '2026-09-18',
+                dailyFeedCount: 0,
+                dailyRewardedFeedCount: 0,
               },
             },
           }),
           update: jest
             .fn()
             .mockImplementation(({ data }) =>
-              Promise.resolve({ ...data, id: 1 }),
+              Promise.resolve({ ...data, id: 1, name: 'Mèo Máy Bánh Mì' }),
             ),
         },
         userStats: {
@@ -376,6 +519,7 @@ describe('GamificationService weekly cron hardening', () => {
 
       const pet = await service.feedPet(5);
 
+      // Cost for feed #1 is 10 Bánh Mì
       expect(tx.userStats.updateMany).toHaveBeenCalledWith({
         where: { userId: 5, totalBanhRan: { gte: 10 } },
         data: { totalBanhRan: { decrement: 10 } },
@@ -390,19 +534,16 @@ describe('GamificationService weekly cron hardening', () => {
           }),
         }),
       );
-      // First rewarded feed: +20 health, +10 happiness, +5 pet EXP, 10 Bánh Mì.
-      expect(tx.userStats.updateMany).toHaveBeenCalledWith({
-        where: { userId: 5, totalBanhRan: { gte: 10 } },
-        data: { totalBanhRan: { decrement: 10 } },
-      });
-      expect(pet.health).toBe(100);
-      expect(pet.happiness).toBe(80);
+      // Feeding benefits: Satiety +35, Health +10, Happiness +5, EXP +5 (first 3 feeds)
+      expect(pet.health).toBe(90);
+      expect(pet.happiness).toBe(75);
+      expect(pet.satiety).toBe(75);
       expect(pet.exp).toBe(105);
+      expect(pet.dailyFeedCount).toBe(1);
       expect(pet.dailyRewardedFeedCount).toBe(1);
     });
 
-    it('rejects feeding while the pet is naturally full, without a 24h cooldown', async () => {
-      const recentTime = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
+    it('rejects feeding when satiety >= 80 (FULL)', async () => {
       const tx: any = {
         $executeRaw: jest.fn().mockResolvedValue(1),
         userPet: {
@@ -410,9 +551,15 @@ describe('GamificationService weekly cron hardening', () => {
             id: 1,
             userId: 5,
             name: 'Mèo Máy Bánh Mì',
-            lastFedAt: recentTime,
             roster: {
-              meo: { lastFedAt: recentTime },
+              meo: {
+                level: 1,
+                exp: 100,
+                health: 40,
+                happiness: 30,
+                satiety: 85, // FULL
+                stateUpdatedAt: new Date().toISOString(),
+              },
             },
           }),
         },
@@ -426,7 +573,182 @@ describe('GamificationService weekly cron hardening', () => {
         {} as any,
       );
 
-      await expect(service.feedPet(5)).rejects.toThrow('Thú cưng đang no');
+      await expect(service.feedPet(5)).rejects.toThrow(
+        'Thú cưng đang no, chưa cần ăn thêm. Hãy quay lại khi pet đói hơn.',
+      );
+    });
+
+    it('feed 4+ awards 0 EXP and costs 30 Bánh Mì', async () => {
+      const now = new Date();
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        userPet: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 1,
+            userId: 5,
+            name: 'Bready',
+            level: 1,
+            exp: 100,
+            health: 80,
+            happiness: 70,
+            roster: {
+              bready: {
+                level: 1,
+                exp: 100,
+                health: 80,
+                happiness: 70,
+                satiety: 30,
+                stateUpdatedAt: now.toISOString(),
+                dailyFeedDateKey: '2026-09-18',
+                dailyFeedCount: 3, // 4th feed
+                dailyRewardedFeedCount: 3, // reached reward limit
+              },
+            },
+          }),
+          update: jest
+            .fn()
+            .mockImplementation(({ data }) =>
+              Promise.resolve({ ...data, id: 1, name: 'Bready' }),
+            ),
+        },
+        userStats: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 100 }),
+        },
+        banhTransaction: { create: jest.fn().mockResolvedValue({ id: 11 }) },
+        badge: { findFirst: jest.fn().mockResolvedValue(null) },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      const pet = await service.feedPet(5);
+
+      // Cost is 30
+      expect(tx.userStats.updateMany).toHaveBeenCalledWith({
+        where: { userId: 5, totalBanhRan: { gte: 30 } },
+        data: { totalBanhRan: { decrement: 30 } },
+      });
+      // Zero EXP awarded on 4th feed
+      expect(pet.exp).toBe(100);
+      expect(pet.dailyFeedCount).toBe(4);
+      expect(pet.dailyRewardedFeedCount).toBe(3);
+    });
+
+    it('rejects feeding when user does not have enough Bánh Mì (CAS fails)', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        userPet: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 1,
+            userId: 5,
+            name: 'Bready',
+            roster: {
+              bready: {
+                level: 1,
+                exp: 0,
+                health: 50,
+                happiness: 50,
+                satiety: 30,
+                stateUpdatedAt: new Date().toISOString(),
+                dailyFeedCount: 0,
+                dailyRewardedFeedCount: 0,
+              },
+            },
+          }),
+        },
+        userStats: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }), // CAS failure
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 5 }),
+        },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      await expect(service.feedPet(5)).rejects.toThrow(
+        'Bạn không đủ 10 Bánh Mì để cho thú cưng ăn!',
+      );
+    });
+  });
+
+  describe('changePetType', () => {
+    it('switches species and preserves each species state without +15 happiness bump', async () => {
+      const currentPet = {
+        id: 1,
+        userId: 5,
+        name: 'Bánh Mì Dũng Cảm', // bready
+        level: 3,
+        exp: 2500,
+        health: 88,
+        happiness: 72,
+        satiety: 65,
+        lastFedAt: new Date().toISOString(),
+        stateUpdatedAt: new Date().toISOString(),
+        roster: {
+          bready: {
+            level: 3,
+            exp: 2500,
+            health: 88,
+            happiness: 72,
+            satiety: 65,
+            lastFedAt: new Date().toISOString(),
+            stateUpdatedAt: new Date().toISOString(),
+          },
+          owly: {
+            level: 1,
+            exp: 100,
+            health: 90,
+            happiness: 80,
+            satiety: 70,
+            lastFedAt: null,
+            stateUpdatedAt: new Date().toISOString(),
+          },
+        },
+      };
+
+      const prisma: any = {
+        userPet: {
+          findUnique: jest.fn().mockResolvedValue(currentPet),
+          update: jest.fn().mockImplementation(({ data }) =>
+            Promise.resolve({
+              id: 1,
+              userId: 5,
+              name: data.name,
+              level: data.level,
+              exp: data.exp,
+              health: data.health,
+              happiness: data.happiness,
+              roster: data.roster,
+            }),
+          ),
+        },
+      };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      const switched = await service.changePetType(5, 'Cú Thông Thái'); // owly
+
+      expect(switched.name).toBe('Cú Thông Thái');
+      expect(switched.level).toBe(1);
+      expect(switched.exp).toBe(100);
+      expect(switched.health).toBe(90);
+      // MUST NOT have arbitrary +15 happiness bonus
+      expect(switched.happiness).toBe(80);
+      expect(switched.satiety).toBe(70);
     });
   });
 

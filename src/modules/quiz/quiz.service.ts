@@ -5,17 +5,74 @@ import {
   BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { QuizType, Role } from '@prisma/client';
+import {
+  ListeningPracticeAttemptStatus,
+  Prisma,
+  QuizType,
+  Role,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateQuizDto,
   CreateQuestionDto,
   SubmitQuizDto,
   CheckPracticeQuestionDto,
+  SaveListeningAttemptDto,
 } from './dto/quiz.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AiService } from '../ai/ai.service';
 import { SpeakingService } from '../speaking/speaking.service';
+
+/**
+ * Compare learner dictation without penalising typography that does not change
+ * what was heard (capitalisation, punctuation, curly apostrophes or spacing).
+ */
+export function normalizeListeningAnswer(value: unknown): string {
+  return String(value ?? '')
+    .toLocaleLowerCase('en-US')
+    .replace(/[’‘]/g, "'")
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeStrictListeningAnswer(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .replace(/[’‘]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function calculateDictationWordAccuracy(
+  expected: string,
+  submitted: string,
+  mode: 'STANDARD' | 'STRICT',
+): number {
+  const normalize =
+    mode === 'STRICT'
+      ? normalizeStrictListeningAnswer
+      : normalizeListeningAnswer;
+  const expectedWords = normalize(expected).split(/\s+/).filter(Boolean);
+  const submittedWords = normalize(submitted).split(/\s+/).filter(Boolean);
+  if (expectedWords.length === 0) return 0;
+
+  const dp = Array.from({ length: expectedWords.length + 1 }, () =>
+    new Array<number>(submittedWords.length + 1).fill(0),
+  );
+  for (let i = 1; i <= expectedWords.length; i += 1) {
+    for (let j = 1; j <= submittedWords.length; j += 1) {
+      dp[i][j] =
+        expectedWords[i - 1] === submittedWords[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return Math.round(
+    (dp[expectedWords.length][submittedWords.length] / expectedWords.length) *
+      100,
+  );
+}
 
 @Injectable()
 export class QuizService {
@@ -117,7 +174,12 @@ export class QuizService {
 
       return {
         ...quiz,
-        mode: metadata.mode === 'DICTATION' ? 'DICTATION' : 'COMPREHENSION',
+        mode:
+          metadata.mode === 'DICTATION'
+            ? 'DICTATION'
+            : metadata.mode === 'DIALOGUE'
+              ? 'DIALOGUE'
+              : 'COMPREHENSION',
         track:
           metadata.track === 'TOEIC_LISTENING'
             ? 'TOEIC_LISTENING'
@@ -149,6 +211,108 @@ export class QuizService {
     return quizzes.map((quiz) =>
       toCatalogItem(quiz, completedQuizIds.has(quiz.id)),
     );
+  }
+
+  private async assertListeningPracticeQuiz(quizId: number) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, type: true },
+    });
+    if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
+    if (quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new ForbiddenException('Phiên chỉ dành cho bài luyện nghe');
+    }
+    return quiz;
+  }
+
+  async getOrCreateListeningAttempt(userId: number, quizId: number) {
+    await this.assertListeningPracticeQuiz(quizId);
+    const existing = await this.prisma.listeningPracticeAttempt.findFirst({
+      where: {
+        userId,
+        quizId,
+        status: ListeningPracticeAttemptStatus.IN_PROGRESS,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    let attempt = existing;
+    if (!attempt) {
+      try {
+        attempt = await this.prisma.listeningPracticeAttempt.create({
+          data: { userId, quizId },
+        });
+      } catch (error: any) {
+        if (error?.code !== 'P2002') throw error;
+        attempt = await this.prisma.listeningPracticeAttempt.findFirst({
+          where: {
+            userId,
+            quizId,
+            status: ListeningPracticeAttemptStatus.IN_PROGRESS,
+          },
+          orderBy: { updatedAt: 'desc' },
+        });
+        if (!attempt) throw error;
+      }
+    }
+    return {
+      id: attempt.id,
+      quizId: attempt.quizId,
+      currentQuestionId: attempt.currentQuestionId,
+      answers: attempt.answers,
+      questionStates: attempt.questionStates,
+      status: attempt.status,
+      startedAt: attempt.startedAt,
+      updatedAt: attempt.updatedAt,
+    };
+  }
+
+  async saveListeningAttempt(
+    userId: number,
+    quizId: number,
+    attemptId: number,
+    dto: SaveListeningAttemptDto,
+  ) {
+    await this.assertListeningPracticeQuiz(quizId);
+    const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
+      where: { id: attemptId, userId, quizId },
+    });
+    if (!attempt)
+      throw new NotFoundException('Không tìm thấy phiên luyện nghe');
+    if (attempt.status !== ListeningPracticeAttemptStatus.IN_PROGRESS) {
+      throw new ForbiddenException('Phiên luyện nghe đã kết thúc');
+    }
+    if (dto.currentQuestionId !== undefined) {
+      const question = await this.prisma.question.findFirst({
+        where: { id: dto.currentQuestionId, quizId },
+        select: { id: true },
+      });
+      if (!question)
+        throw new BadRequestException('Câu hỏi không thuộc bài luyện này');
+    }
+    const updated = await this.prisma.listeningPracticeAttempt.update({
+      where: { id: attemptId },
+      data: {
+        ...(dto.currentQuestionId !== undefined
+          ? { currentQuestionId: dto.currentQuestionId }
+          : {}),
+        ...(dto.answers !== undefined
+          ? { answers: dto.answers as Prisma.InputJsonValue }
+          : {}),
+        ...(dto.questionStates !== undefined
+          ? { questionStates: dto.questionStates as Prisma.InputJsonValue }
+          : {}),
+      },
+    });
+    return {
+      id: updated.id,
+      quizId: updated.quizId,
+      currentQuestionId: updated.currentQuestionId,
+      answers: updated.answers,
+      questionStates: updated.questionStates,
+      status: updated.status,
+      startedAt: updated.startedAt,
+      updatedAt: updated.updatedAt,
+    };
   }
 
   async getToeicPapers(userId?: number) {
@@ -272,6 +436,23 @@ export class QuizService {
       this.assertCompleteListeningSubmission(quiz.questions, dto.answers);
     }
 
+    if (
+      dto.attemptId !== undefined &&
+      quiz.type === QuizType.LISTENING_PRACTICE
+    ) {
+      const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
+        where: {
+          id: dto.attemptId,
+          userId,
+          quizId,
+          status: ListeningPracticeAttemptStatus.IN_PROGRESS,
+        },
+        select: { id: true },
+      });
+      if (!attempt)
+        throw new ForbiddenException('Phiên luyện nghe không còn hiệu lực');
+    }
+
     let totalScore = 0;
 
     const resultsData = dto.answers.map((ans) => {
@@ -303,16 +484,10 @@ export class QuizService {
           question.type === 'FILL_IN_BLANK'
         ) {
           const content = question.content;
-          const cleanCorrect = String(
+          const cleanCorrect = normalizeListeningAnswer(
             content.correctAnswer || content.correct || '',
-          )
-            .toLowerCase()
-            .replace(/[.,!?]/g, '')
-            .trim();
-          const cleanAns = String(ans.answer || '')
-            .toLowerCase()
-            .replace(/[.,!?]/g, '')
-            .trim();
+          );
+          const cleanAns = normalizeListeningAnswer(ans.answer);
           if (cleanCorrect === cleanAns) {
             isCorrect = true;
             score = 1;
@@ -362,6 +537,47 @@ export class QuizService {
         results: true,
       },
     });
+
+    if (
+      dto.attemptId !== undefined &&
+      quiz.type === QuizType.LISTENING_PRACTICE
+    ) {
+      const completed = await this.prisma.listeningPracticeAttempt.updateMany({
+        where: {
+          id: dto.attemptId,
+          userId,
+          quizId,
+          status: ListeningPracticeAttemptStatus.IN_PROGRESS,
+        },
+        data: {
+          status: ListeningPracticeAttemptStatus.COMPLETED,
+          completedAt: new Date(),
+        },
+      });
+      if (completed.count !== 1) {
+        throw new ForbiddenException('Phiên luyện nghe không còn hiệu lực');
+      }
+    }
+
+    if (
+      quiz.type === QuizType.LISTENING_PRACTICE &&
+      this.prisma.learningActivity?.create
+    ) {
+      await this.prisma.learningActivity.create({
+        data: {
+          userId,
+          type: 'LISTENING_PRACTICE_COMPLETED',
+          title: quiz.title,
+          detail: `${totalScore}/${quiz.questions.length} câu đúng`,
+          score:
+            quiz.questions.length > 0
+              ? Math.round((totalScore / quiz.questions.length) * 100)
+              : 0,
+          sourceType: 'QUIZ',
+          sourceId: String(quizId),
+        },
+      });
+    }
 
     // Chống farm điểm thưởng Quiz bằng UserQuizReward (Atomic @@unique([userId, quizId]))
     let isFirstSubmission = false;
@@ -415,6 +631,49 @@ export class QuizService {
     }
 
     const content = question.content as Record<string, unknown>;
+    if (question.type === 'DICTATION') {
+      const expectedAnswer =
+        typeof content.correctAnswer === 'string'
+          ? content.correctAnswer
+          : typeof content.correct === 'string'
+            ? content.correct
+            : null;
+      if (!expectedAnswer) {
+        throw new BadRequestException('Câu nghe chép chưa có đáp án hợp lệ');
+      }
+
+      const evaluationMode =
+        content.dictationMode === 'STRICT' ? 'STRICT' : 'STANDARD';
+      const normalizedSubmitted =
+        evaluationMode === 'STRICT'
+          ? normalizeStrictListeningAnswer(dto.answer)
+          : normalizeListeningAnswer(dto.answer);
+      const normalizedExpected =
+        evaluationMode === 'STRICT'
+          ? normalizeStrictListeningAnswer(expectedAnswer)
+          : normalizeListeningAnswer(expectedAnswer);
+
+      return {
+        questionId,
+        isCorrect: normalizedSubmitted === normalizedExpected,
+        submittedAnswer: dto.answer,
+        correctAnswer: expectedAnswer,
+        evaluationMode,
+        wordAccuracy: calculateDictationWordAccuracy(
+          expectedAnswer,
+          dto.answer,
+          evaluationMode,
+        ),
+        explanation:
+          typeof content.explanation === 'string' ||
+          (content.explanation && typeof content.explanation === 'object')
+            ? content.explanation
+            : null,
+        translation:
+          typeof content.translation === 'string' ? content.translation : null,
+      };
+    }
+
     if (
       question.type !== 'MULTIPLE_CHOICE' ||
       !Array.isArray(content.options)
@@ -606,6 +865,7 @@ export class QuizService {
 
     return {
       submissionId,
+      quizId: submission.quizId,
       quizTitle: submission.quiz.title,
       overallScore: submission.score,
       totalQuestions,

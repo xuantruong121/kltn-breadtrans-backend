@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { QuizService } from './quiz.service';
+import { normalizeListeningAnswer, QuizService } from './quiz.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
@@ -18,6 +18,13 @@ const mockPrismaService = {
   },
   question: {
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
+  },
+  listeningPracticeAttempt: {
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
   },
 };
 
@@ -158,6 +165,124 @@ describe('QuizService', () => {
       });
       expect(res.isCorrect).toBe(true);
       expect(res.explanation).toEqual(structuredExplanation);
+    });
+
+    it('checks dictation on the server while tolerating punctuation and spacing', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 93,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: {
+          correctAnswer: "Let's meet at 8:30.",
+          translation: 'Hãy gặp nhau lúc 8:30.',
+        },
+      });
+
+      await expect(
+        service.checkPracticeQuestion(23, 93, {
+          answer: ' lets meet at 8:30 ',
+        }),
+      ).resolves.toMatchObject({
+        isCorrect: true,
+        correctAnswer: "Let's meet at 8:30.",
+      });
+      expect(mockPrismaService.submission.create).not.toHaveBeenCalled();
+    });
+
+    it('returns word-level accuracy for an incomplete dictation answer', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 94,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: {
+          correctAnswer: 'The meeting starts at nine tomorrow.',
+        },
+      });
+
+      await expect(
+        service.checkPracticeQuestion(23, 94, {
+          answer: 'The meeting starts at nine.',
+        }),
+      ).resolves.toMatchObject({
+        isCorrect: false,
+        evaluationMode: 'STANDARD',
+        wordAccuracy: 83,
+      });
+    });
+
+    it('keeps strict dictation punctuation and casing meaningful', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 95,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: {
+          correctAnswer: 'Hello, team.',
+          dictationMode: 'STRICT',
+        },
+      });
+
+      await expect(
+        service.checkPracticeQuestion(23, 95, { answer: 'hello team.' }),
+      ).resolves.toMatchObject({
+        isCorrect: false,
+        evaluationMode: 'STRICT',
+        wordAccuracy: 50,
+      });
+    });
+
+    it('normalizes curly apostrophes as optional dictation punctuation', () => {
+      expect(normalizeListeningAnswer('  Don’t   worry!  ')).toBe('dont worry');
+    });
+  });
+
+  describe('listening practice attempts', () => {
+    it('reuses an in-progress server session', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 23,
+        type: 'LISTENING_PRACTICE',
+      });
+      mockPrismaService.listeningPracticeAttempt.findFirst.mockResolvedValue({
+        id: 7,
+        quizId: 23,
+        currentQuestionId: 101,
+        answers: { '101': 'draft' },
+        questionStates: {},
+        status: 'IN_PROGRESS',
+        startedAt: new Date('2026-09-18T08:00:00.000Z'),
+        updatedAt: new Date('2026-09-18T08:01:00.000Z'),
+      });
+
+      await expect(
+        service.getOrCreateListeningAttempt(12, 23),
+      ).resolves.toMatchObject({
+        id: 7,
+        currentQuestionId: 101,
+        answers: { '101': 'draft' },
+      });
+      expect(
+        mockPrismaService.listeningPracticeAttempt.create,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects checkpoint questions from another quiz', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 23,
+        type: 'LISTENING_PRACTICE',
+      });
+      mockPrismaService.listeningPracticeAttempt.findFirst.mockResolvedValue({
+        id: 7,
+        quizId: 23,
+        userId: 12,
+        status: 'IN_PROGRESS',
+      });
+      mockPrismaService.question.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.saveListeningAttempt(12, 23, 7, { currentQuestionId: 999 }),
+      ).rejects.toThrow('Câu hỏi không thuộc bài luyện này');
     });
   });
 

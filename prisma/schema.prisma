@@ -73,6 +73,7 @@ model User {
   // Other Relations
   enrollments                     Enrollment[]
   submissions                     Submission[]
+  listeningPracticeAttempts       ListeningPracticeAttempt[]
   assignmentSubmissions           AssignmentSubmission[]
   pointHistory                    PointHistory[]
   userBadges                      UserBadge[]
@@ -348,6 +349,12 @@ enum QuizType {
   WRITING_EMAIL
 }
 
+enum ListeningPracticeAttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
 model Quiz {
   id               Int            @id @default(autoincrement())
   courseId         Int?
@@ -362,9 +369,27 @@ model Quiz {
   timeLimit        Int? // In minutes
   createdAt        DateTime       @default(now())
 
-  questions   Question[]
-  submissions Submission[]
-  rewards     UserQuizReward[]
+  questions                 Question[]
+  submissions               Submission[]
+  rewards                   UserQuizReward[]
+  listeningPracticeAttempts ListeningPracticeAttempt[]
+}
+
+model ListeningPracticeAttempt {
+  id                Int                            @id @default(autoincrement())
+  userId            Int
+  user              User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId            Int
+  quiz              Quiz                           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  currentQuestionId Int?
+  answers           Json                           @default("{}")
+  questionStates    Json                           @default("{}")
+  status            ListeningPracticeAttemptStatus @default(IN_PROGRESS)
+  startedAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+  completedAt       DateTime?
+
+  @@index([userId, quizId, status])
 }
 
 model Question {

@@ -37,6 +37,39 @@ const seedAssetUrl = (key: string): string | null => {
   return base ? `${base}/${normalizedKey}` : null;
 };
 
+// General listening practice assets have their own catalog namespace. They
+// must not be classified as TOEIC exam media because they belong to the
+// four-skill practice library (QuizType.LISTENING_PRACTICE).
+const listeningPracticeAssetUrl = (filename: string): string | null => {
+  const base = SEED_ASSET_BASE_URL.replace(/\/$/, '');
+  return base ? `${base}/catalog/listening/practice/images/${filename}` : null;
+};
+
+// General reading practice assets have their own catalog namespace under catalog/reading/practice/.
+const readingPracticeAssetUrl = (
+  filename: string,
+  subfolder: 'images' | 'passages' | 'attachments' = 'images',
+): string | null => {
+  const base = SEED_ASSET_BASE_URL.replace(/\/$/, '');
+  return base
+    ? `${base}/catalog/reading/practice/${subfolder}/${filename}`
+    : null;
+};
+
+// General writing practice assets have their own catalog namespace under catalog/writing/practice/.
+const writingPracticeAssetUrl = (
+  filename: string,
+  subfolder:
+    | 'prompt-images'
+    | 'reference-materials'
+    | 'attachments' = 'prompt-images',
+): string | null => {
+  const base = SEED_ASSET_BASE_URL.replace(/\/$/, '');
+  return base
+    ? `${base}/catalog/writing/practice/${subfolder}/${filename}`
+    : null;
+};
+
 type SeedCollocation = {
   phrase: string;
   meaningVi: string;
@@ -1501,6 +1534,54 @@ async function main() {
       accents: ['US', 'UK'],
       durationMinutes: 18,
     },
+    23: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'DICTATION',
+      levels: ['A1'],
+      topics: ['Đời sống hằng ngày', 'Tin nhắn'],
+      accents: ['UK'],
+      durationMinutes: 10,
+    },
+    24: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'DICTATION',
+      levels: ['A2'],
+      topics: ['Du lịch', 'Chỉ đường'],
+      accents: ['US'],
+      durationMinutes: 12,
+    },
+    25: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'DICTATION',
+      levels: ['B1'],
+      topics: ['Công việc', 'Cập nhật'],
+      accents: ['US', 'UK'],
+      durationMinutes: 14,
+    },
+    26: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'DIALOGUE',
+      levels: ['A2'],
+      topics: ['Ăn uống', 'Dịch vụ'],
+      accents: ['US'],
+      durationMinutes: 12,
+    },
+    27: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'DIALOGUE',
+      levels: ['B1'],
+      topics: ['Công việc', 'Lập kế hoạch'],
+      accents: ['US', 'UK'],
+      durationMinutes: 15,
+    },
+    28: {
+      track: 'GENERAL_ENGLISH',
+      mode: 'DIALOGUE',
+      levels: ['B2'],
+      topics: ['Dịch vụ khách hàng', 'Giải quyết vấn đề'],
+      accents: ['US'],
+      durationMinutes: 18,
+    },
   };
 
   const readingCatalogMetadataByQuizId: Record<number, Prisma.InputJsonObject> =
@@ -1570,28 +1651,40 @@ async function main() {
     { imageUrl: string | null; imageAlt: string }
   > = {
     1: {
-      imageUrl: seedAssetUrl('toeic/visuals/grocery-checkout.png'),
+      imageUrl: listeningPracticeAssetUrl('grocery-checkout.png'),
       imageAlt: 'A grocery store checkout counter',
     },
     5: {
-      imageUrl: seedAssetUrl('toeic/visuals/office-meeting.png'),
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
       imageAlt: 'Colleagues talking in an office meeting',
     },
     9: {
-      imageUrl: seedAssetUrl('toeic/visuals/cafe-counter.png'),
+      imageUrl: listeningPracticeAssetUrl('cafe-counter.png'),
       imageAlt: 'A cafe service counter',
     },
     10: {
-      imageUrl: seedAssetUrl('toeic/visuals/departure-board.png'),
+      imageUrl: listeningPracticeAssetUrl('departure-board.png'),
       imageAlt: 'Travellers near an airport departure board',
     },
     11: {
-      imageUrl: seedAssetUrl('toeic/visuals/office-meeting.png'),
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
       imageAlt: 'A workplace meeting',
     },
     12: {
-      imageUrl: seedAssetUrl('toeic/visuals/folders-cabinet.png'),
+      imageUrl: listeningPracticeAssetUrl('folders-cabinet.png'),
       imageAlt: 'An employee organising office documents',
+    },
+    26: {
+      imageUrl: listeningPracticeAssetUrl('cafe-counter.png'),
+      imageAlt: 'Customers ordering at a cafe counter',
+    },
+    27: {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Colleagues planning work at a meeting',
+    },
+    28: {
+      imageUrl: listeningPracticeAssetUrl('delivery-boxes.png'),
+      imageAlt: 'A delivery service preparing customer orders',
     },
   };
 
@@ -2164,9 +2257,672 @@ async function main() {
         },
       ],
     },
+    {
+      id: 23,
+      title: 'Nghe chép A1 — Tin nhắn hằng ngày',
+      type: 'LISTENING_PRACTICE',
+      description:
+        'Nghe và chép lại các câu ngắn về lịch hẹn, thời tiết và sinh hoạt thường ngày.',
+      timeLimit: 10,
+      bilingualContent: {
+        mode: 'DICTATION',
+        track: 'GENERAL_ENGLISH',
+        levels: ['A1'],
+        topics: ['Sinh hoạt hằng ngày', 'Tin nhắn ngắn'],
+        accents: ['UK'],
+        durationMinutes: 10,
+      },
+      questions: [
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A1',
+            accent: 'UK',
+            audioText: 'Please call me after lunch.',
+            correctAnswer: 'Please call me after lunch.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Hãy gọi cho tôi sau bữa trưa.',
+            explanation: {
+              vi: 'Câu nhắc gọi lại sau bữa trưa.',
+              evidence: 'Please call me after lunch.',
+              vocabularyNote: 'after lunch = sau bữa trưa',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A1',
+            accent: 'UK',
+            audioText: 'The bus leaves at seven fifteen.',
+            correctAnswer: 'The bus leaves at seven fifteen.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Xe buýt khởi hành lúc 7 giờ 15.',
+            explanation: {
+              vi: 'Thông tin cần nghe là giờ xe buýt khởi hành.',
+              evidence: 'The bus leaves at seven fifteen.',
+              vocabularyNote: 'leaves at = khởi hành lúc',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A1',
+            accent: 'UK',
+            audioText: 'It is sunny but cold today.',
+            correctAnswer: 'It is sunny but cold today.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Hôm nay trời nắng nhưng lạnh.',
+            explanation: {
+              vi: 'Câu mô tả hai đặc điểm thời tiết đối lập.',
+              evidence: 'It is sunny but cold today.',
+              vocabularyNote: 'sunny but cold = nắng nhưng lạnh',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A1',
+            accent: 'UK',
+            audioText: "Let's meet near the library.",
+            correctAnswer: "Let's meet near the library.",
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Hãy gặp nhau gần thư viện.',
+            explanation: {
+              vi: 'Người nói đề xuất địa điểm gặp.',
+              evidence: "Let's meet near the library.",
+              vocabularyNote: 'near = gần',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A1',
+            accent: 'UK',
+            audioText: 'My sister works on Saturdays.',
+            correctAnswer: 'My sister works on Saturdays.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Chị/em gái tôi làm việc vào các thứ Bảy.',
+            explanation: {
+              vi: 'Câu nói về lịch làm việc vào cuối tuần.',
+              evidence: 'My sister works on Saturdays.',
+              vocabularyNote: 'on Saturdays = vào các thứ Bảy',
+            },
+          },
+        },
+      ],
+    },
+    {
+      id: 24,
+      title: 'Nghe chép A2 — Du lịch và chỉ đường',
+      type: 'LISTENING_PRACTICE',
+      description:
+        'Luyện ghi lại thông tin thiết thực khi đi lại: điểm đến, giờ giấc và chỉ dẫn.',
+      timeLimit: 12,
+      bilingualContent: {
+        mode: 'DICTATION',
+        track: 'GENERAL_ENGLISH',
+        levels: ['A2'],
+        topics: ['Du lịch', 'Chỉ đường'],
+        accents: ['US'],
+        durationMinutes: 12,
+      },
+      questions: [
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A2',
+            accent: 'US',
+            audioText: 'The museum is across from the train station.',
+            correctAnswer: 'The museum is across from the train station.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Bảo tàng nằm đối diện ga tàu.',
+            explanation: {
+              vi: 'Câu chỉ vị trí của bảo tàng.',
+              evidence: 'The museum is across from the train station.',
+              vocabularyNote: 'across from = đối diện',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A2',
+            accent: 'US',
+            audioText: 'Your flight boards at gate twelve.',
+            correctAnswer: 'Your flight boards at gate twelve.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Chuyến bay của bạn lên máy bay tại cửa số 12.',
+            explanation: {
+              vi: 'Thông báo nêu rõ cửa lên máy bay.',
+              evidence: 'Your flight boards at gate twelve.',
+              vocabularyNote: 'board at gate = lên máy bay tại cửa',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A2',
+            accent: 'US',
+            audioText: 'Turn left after the second traffic light.',
+            correctAnswer: 'Turn left after the second traffic light.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Rẽ trái sau đèn giao thông thứ hai.',
+            explanation: {
+              vi: 'Chỉ dẫn đường đi với một mốc cụ thể.',
+              evidence: 'Turn left after the second traffic light.',
+              vocabularyNote: 'turn left = rẽ trái',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A2',
+            accent: 'US',
+            audioText: 'The hotel breakfast starts at six thirty.',
+            correctAnswer: 'The hotel breakfast starts at six thirty.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Bữa sáng ở khách sạn bắt đầu lúc 6 giờ 30.',
+            explanation: {
+              vi: 'Nghe để ghi đúng giờ phục vụ bữa sáng.',
+              evidence: 'The hotel breakfast starts at six thirty.',
+              vocabularyNote: 'starts at = bắt đầu lúc',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'A2',
+            accent: 'US',
+            audioText: 'You can buy tickets online in advance.',
+            correctAnswer: 'You can buy tickets online in advance.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Bạn có thể mua vé trực tuyến trước.',
+            explanation: {
+              vi: 'Câu gợi ý cách mua vé.',
+              evidence: 'You can buy tickets online in advance.',
+              vocabularyNote: 'in advance = trước',
+            },
+          },
+        },
+      ],
+    },
+    {
+      id: 25,
+      title: 'Nghe chép B1 — Cập nhật công việc',
+      type: 'LISTENING_PRACTICE',
+      description:
+        'Nghe chép các cập nhật, yêu cầu và thời hạn thường gặp trong môi trường công việc.',
+      timeLimit: 14,
+      bilingualContent: {
+        mode: 'DICTATION',
+        track: 'GENERAL_ENGLISH',
+        levels: ['B1'],
+        topics: ['Công việc', 'Cuộc họp'],
+        accents: ['US', 'UK'],
+        durationMinutes: 14,
+      },
+      questions: [
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'B1',
+            accent: 'US',
+            audioText: 'The client asked us to revise the proposal by Friday.',
+            correctAnswer:
+              'The client asked us to revise the proposal by Friday.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation:
+              'Khách hàng yêu cầu chúng ta chỉnh sửa đề xuất trước thứ Sáu.',
+            explanation: {
+              vi: 'Thông tin trọng tâm là yêu cầu và hạn hoàn thành.',
+              evidence: 'The client asked us to revise the proposal by Friday.',
+              vocabularyNote: 'revise the proposal = chỉnh sửa đề xuất',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'B1',
+            accent: 'UK',
+            audioText: 'Please upload the final report before the meeting.',
+            correctAnswer: 'Please upload the final report before the meeting.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Vui lòng tải báo cáo cuối cùng lên trước cuộc họp.',
+            explanation: {
+              vi: 'Câu yêu cầu hoàn thành một việc trước cuộc họp.',
+              evidence: 'Please upload the final report before the meeting.',
+              vocabularyNote: 'final report = báo cáo cuối cùng',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'B1',
+            accent: 'US',
+            audioText: 'We need to postpone the presentation until next week.',
+            correctAnswer:
+              'We need to postpone the presentation until next week.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Chúng ta cần hoãn bài thuyết trình đến tuần sau.',
+            explanation: {
+              vi: 'Câu thông báo thay đổi lịch trình.',
+              evidence: 'We need to postpone the presentation until next week.',
+              vocabularyNote: 'postpone until = hoãn đến',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'B1',
+            accent: 'UK',
+            audioText: 'The finance team has approved the new budget.',
+            correctAnswer: 'The finance team has approved the new budget.',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Nhóm tài chính đã phê duyệt ngân sách mới.',
+            explanation: {
+              vi: 'Câu nêu một quyết định đã được phê duyệt.',
+              evidence: 'The finance team has approved the new budget.',
+              vocabularyNote: 'approve a budget = phê duyệt ngân sách',
+            },
+          },
+        },
+        {
+          type: 'DICTATION',
+          content: {
+            skill: 'LISTENING',
+            level: 'B1',
+            accent: 'US',
+            audioText: 'Could you send the updated schedule this afternoon?',
+            correctAnswer:
+              'Could you send the updated schedule this afternoon?',
+            text: 'Nghe và chép lại câu bạn vừa nghe.',
+            translation: 'Bạn có thể gửi lịch cập nhật vào chiều nay không?',
+            explanation: {
+              vi: 'Một yêu cầu lịch sự về lịch cập nhật.',
+              evidence: 'Could you send the updated schedule this afternoon?',
+              vocabularyNote: 'updated schedule = lịch đã cập nhật',
+            },
+          },
+        },
+      ],
+    },
+    {
+      id: 26,
+      title: 'Hội thoại A2 — Gọi món tại quán cà phê',
+      type: 'LISTENING_PRACTICE',
+      description:
+        'Theo dõi từng lượt lời trong một cuộc gọi món và trả lời câu hỏi theo ngữ cảnh.',
+      timeLimit: 12,
+      bilingualContent: {
+        mode: 'DIALOGUE',
+        track: 'GENERAL_ENGLISH',
+        levels: ['A2'],
+        topics: ['Đồ ăn', 'Dịch vụ'],
+        accents: ['US'],
+        durationMinutes: 12,
+      },
+      questions: [
+        {
+          type: 'MULTIPLE_CHOICE',
+          content: {
+            skill: 'LISTENING',
+            level: 'A2',
+            accent: 'US',
+            audioText:
+              'Customer: Good morning. Can I have a latte and a cheese sandwich? Barista: Of course. Would you like the latte hot or iced? Customer: Iced, please. Barista: That will be eight dollars. Your order will be ready in five minutes.',
+            transcriptSegments: [
+              {
+                speaker: 'Khách hàng',
+                text: 'Good morning. Can I have a latte and a cheese sandwich?',
+                translation:
+                  'Chào buổi sáng. Tôi muốn một latte và bánh sandwich phô mai.',
+              },
+              {
+                speaker: 'Nhân viên',
+                text: 'Of course. Would you like the latte hot or iced?',
+                translation: 'Được ạ. Bạn muốn latte nóng hay đá?',
+              },
+              {
+                speaker: 'Khách hàng',
+                text: 'Iced, please.',
+                translation: 'Cho tôi loại đá.',
+              },
+              {
+                speaker: 'Nhân viên',
+                text: 'That will be eight dollars. Your order will be ready in five minutes.',
+                translation:
+                  'Tổng cộng là tám đô. Đơn của bạn sẽ sẵn sàng trong năm phút.',
+              },
+            ],
+            text: 'What kind of latte does the customer order?',
+            options: [
+              'A hot latte',
+              'An iced latte',
+              'A large latte',
+              'A free latte',
+            ],
+            correctIndex: 1,
+            translation: 'Khách hàng gọi latte loại nào?',
+            explanation: {
+              vi: 'Khách hàng trả lời “Iced, please”, nên chọn B.',
+              evidence: 'Iced, please.',
+              vocabularyNote: 'iced = có đá',
+            },
+          },
+        },
+        {
+          type: 'MULTIPLE_CHOICE',
+          content: {
+            skill: 'LISTENING',
+            level: 'A2',
+            accent: 'US',
+            audioText:
+              'Customer: Good morning. Can I have a latte and a cheese sandwich? Barista: Of course. Would you like the latte hot or iced? Customer: Iced, please. Barista: That will be eight dollars. Your order will be ready in five minutes.',
+            transcriptSegments: [
+              {
+                speaker: 'Khách hàng',
+                text: 'Good morning. Can I have a latte and a cheese sandwich?',
+                translation:
+                  'Chào buổi sáng. Tôi muốn một latte và bánh sandwich phô mai.',
+              },
+              {
+                speaker: 'Nhân viên',
+                text: 'Of course. Would you like the latte hot or iced?',
+                translation: 'Được ạ. Bạn muốn latte nóng hay đá?',
+              },
+              {
+                speaker: 'Khách hàng',
+                text: 'Iced, please.',
+                translation: 'Cho tôi loại đá.',
+              },
+              {
+                speaker: 'Nhân viên',
+                text: 'That will be eight dollars. Your order will be ready in five minutes.',
+                translation:
+                  'Tổng cộng là tám đô. Đơn của bạn sẽ sẵn sàng trong năm phút.',
+              },
+            ],
+            text: 'How much does the order cost?',
+            options: [
+              'Five dollars',
+              'Six dollars',
+              'Eight dollars',
+              'Ten dollars',
+            ],
+            correctIndex: 2,
+            translation: 'Đơn hàng có giá bao nhiêu?',
+            explanation: {
+              vi: 'Nhân viên nói tổng cộng là tám đô, nên chọn C.',
+              evidence: 'That will be eight dollars.',
+              vocabularyNote: 'That will be = Tổng cộng là',
+            },
+          },
+        },
+      ],
+    },
+    {
+      id: 27,
+      title: 'Hội thoại B1 — Lên kế hoạch dự án',
+      type: 'LISTENING_PRACTICE',
+      description:
+        'Nghe hội thoại công sở và theo dõi ai làm gì, khi nào và vì sao kế hoạch thay đổi.',
+      timeLimit: 15,
+      bilingualContent: {
+        mode: 'DIALOGUE',
+        track: 'GENERAL_ENGLISH',
+        levels: ['B1'],
+        topics: ['Công việc', 'Lập kế hoạch'],
+        accents: ['UK'],
+        durationMinutes: 15,
+      },
+      questions: [
+        {
+          type: 'MULTIPLE_CHOICE',
+          content: {
+            skill: 'LISTENING',
+            level: 'B1',
+            accent: 'UK',
+            audioText:
+              'Linh: Are we still presenting the project on Wednesday? Mark: Not anymore. The client moved the meeting to Thursday morning. Linh: Then I will finish the budget slides today. Mark: Great. I will update the timeline and send it to everyone before noon.',
+            transcriptSegments: [
+              {
+                speaker: 'Linh',
+                text: 'Are we still presenting the project on Wednesday?',
+                translation: 'Chúng ta vẫn thuyết trình dự án vào thứ Tư chứ?',
+              },
+              {
+                speaker: 'Mark',
+                text: 'Not anymore. The client moved the meeting to Thursday morning.',
+                translation:
+                  'Không còn nữa. Khách hàng đã chuyển cuộc họp sang sáng thứ Năm.',
+              },
+              {
+                speaker: 'Linh',
+                text: 'Then I will finish the budget slides today.',
+                translation:
+                  'Vậy tôi sẽ hoàn thành các slide ngân sách hôm nay.',
+              },
+              {
+                speaker: 'Mark',
+                text: 'Great. I will update the timeline and send it to everyone before noon.',
+                translation:
+                  'Tốt. Tôi sẽ cập nhật tiến độ và gửi cho mọi người trước trưa.',
+              },
+            ],
+            text: 'Why was the presentation schedule changed?',
+            options: [
+              'Linh needs more time',
+              'The client moved the meeting',
+              'The budget is incomplete',
+              'Mark is unavailable',
+            ],
+            correctIndex: 1,
+            translation: 'Vì sao lịch thuyết trình thay đổi?',
+            explanation: {
+              vi: 'Mark nói rõ khách hàng đã chuyển cuộc họp, nên chọn B.',
+              evidence: 'The client moved the meeting to Thursday morning.',
+              vocabularyNote: 'move a meeting = chuyển lịch cuộc họp',
+            },
+          },
+        },
+        {
+          type: 'MULTIPLE_CHOICE',
+          content: {
+            skill: 'LISTENING',
+            level: 'B1',
+            accent: 'UK',
+            audioText:
+              'Linh: Are we still presenting the project on Wednesday? Mark: Not anymore. The client moved the meeting to Thursday morning. Linh: Then I will finish the budget slides today. Mark: Great. I will update the timeline and send it to everyone before noon.',
+            transcriptSegments: [
+              {
+                speaker: 'Linh',
+                text: 'Are we still presenting the project on Wednesday?',
+                translation: 'Chúng ta vẫn thuyết trình dự án vào thứ Tư chứ?',
+              },
+              {
+                speaker: 'Mark',
+                text: 'Not anymore. The client moved the meeting to Thursday morning.',
+                translation:
+                  'Không còn nữa. Khách hàng đã chuyển cuộc họp sang sáng thứ Năm.',
+              },
+              {
+                speaker: 'Linh',
+                text: 'Then I will finish the budget slides today.',
+                translation:
+                  'Vậy tôi sẽ hoàn thành các slide ngân sách hôm nay.',
+              },
+              {
+                speaker: 'Mark',
+                text: 'Great. I will update the timeline and send it to everyone before noon.',
+                translation:
+                  'Tốt. Tôi sẽ cập nhật tiến độ và gửi cho mọi người trước trưa.',
+              },
+            ],
+            text: 'What will Mark do?',
+            options: [
+              'Prepare the budget slides',
+              'Call the client',
+              'Update and share the timeline',
+              'Cancel the project',
+            ],
+            correctIndex: 2,
+            translation: 'Mark sẽ làm gì?',
+            explanation: {
+              vi: 'Mark nói sẽ cập nhật tiến độ và gửi cho mọi người, nên chọn C.',
+              evidence: 'I will update the timeline and send it to everyone.',
+              vocabularyNote: 'timeline = tiến độ/kế hoạch thời gian',
+            },
+          },
+        },
+      ],
+    },
+    {
+      id: 28,
+      title: 'Hội thoại B2 — Hỗ trợ khách hàng',
+      type: 'LISTENING_PRACTICE',
+      description:
+        'Theo dõi cuộc trao đổi dịch vụ khách hàng có tình huống, nguyên nhân và phương án xử lý.',
+      timeLimit: 18,
+      bilingualContent: {
+        mode: 'DIALOGUE',
+        track: 'GENERAL_ENGLISH',
+        levels: ['B2'],
+        topics: ['Dịch vụ khách hàng', 'Giải quyết vấn đề'],
+        accents: ['US'],
+        durationMinutes: 18,
+      },
+      questions: [
+        {
+          type: 'MULTIPLE_CHOICE',
+          content: {
+            skill: 'LISTENING',
+            level: 'B2',
+            accent: 'US',
+            audioText:
+              'Customer: My package was supposed to arrive yesterday, but the tracking page has not changed. Agent: I am sorry about that. I can see that the delivery was delayed because of severe weather. Customer: Will it arrive tomorrow? Agent: Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
+            transcriptSegments: [
+              {
+                speaker: 'Khách hàng',
+                text: 'My package was supposed to arrive yesterday, but the tracking page has not changed.',
+                translation:
+                  'Gói hàng của tôi lẽ ra đến hôm qua, nhưng trang theo dõi không thay đổi.',
+              },
+              {
+                speaker: 'Nhân viên hỗ trợ',
+                text: 'I am sorry about that. I can see that the delivery was delayed because of severe weather.',
+                translation:
+                  'Tôi rất tiếc. Tôi thấy việc giao hàng bị chậm do thời tiết xấu.',
+              },
+              {
+                speaker: 'Khách hàng',
+                text: 'Will it arrive tomorrow?',
+                translation: 'Nó sẽ đến vào ngày mai chứ?',
+              },
+              {
+                speaker: 'Nhân viên hỗ trợ',
+                text: 'Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
+                translation:
+                  'Có. Nó được lên lịch giao trước 6 giờ chiều và tôi đã gửi email xác nhận.',
+              },
+            ],
+            text: 'What caused the delivery delay?',
+            options: [
+              'A payment problem',
+              'Severe weather',
+              'A wrong address',
+              'A missing email',
+            ],
+            correctIndex: 1,
+            translation: 'Điều gì gây ra việc giao hàng chậm?',
+            explanation: {
+              vi: 'Nhân viên nói giao hàng chậm do thời tiết xấu, nên chọn B.',
+              evidence: 'The delivery was delayed because of severe weather.',
+              vocabularyNote: 'delayed because of = bị chậm vì',
+            },
+          },
+        },
+        {
+          type: 'MULTIPLE_CHOICE',
+          content: {
+            skill: 'LISTENING',
+            level: 'B2',
+            accent: 'US',
+            audioText:
+              'Customer: My package was supposed to arrive yesterday, but the tracking page has not changed. Agent: I am sorry about that. I can see that the delivery was delayed because of severe weather. Customer: Will it arrive tomorrow? Agent: Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
+            transcriptSegments: [
+              {
+                speaker: 'Khách hàng',
+                text: 'My package was supposed to arrive yesterday, but the tracking page has not changed.',
+                translation:
+                  'Gói hàng của tôi lẽ ra đến hôm qua, nhưng trang theo dõi không thay đổi.',
+              },
+              {
+                speaker: 'Nhân viên hỗ trợ',
+                text: 'I am sorry about that. I can see that the delivery was delayed because of severe weather.',
+                translation:
+                  'Tôi rất tiếc. Tôi thấy việc giao hàng bị chậm do thời tiết xấu.',
+              },
+              {
+                speaker: 'Khách hàng',
+                text: 'Will it arrive tomorrow?',
+                translation: 'Nó sẽ đến vào ngày mai chứ?',
+              },
+              {
+                speaker: 'Nhân viên hỗ trợ',
+                text: 'Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
+                translation:
+                  'Có. Nó được lên lịch giao trước 6 giờ chiều và tôi đã gửi email xác nhận.',
+              },
+            ],
+            text: 'What will the agent do for the customer?',
+            options: [
+              'Cancel the order',
+              'Offer a refund',
+              'Send a confirmation email',
+              'Change the address',
+            ],
+            correctIndex: 2,
+            translation: 'Nhân viên sẽ làm gì cho khách hàng?',
+            explanation: {
+              vi: 'Nhân viên nói đã gửi email xác nhận, nên chọn C.',
+              evidence: 'I have sent you a confirmation email.',
+              vocabularyNote: 'confirmation email = email xác nhận',
+            },
+          },
+        },
+      ],
+    },
   ];
   let questionId = 1;
-  for (const definition of practiceQuizDefinitions) {
+  // Keep legacy question IDs stable. New listening catalog exercises are seeded
+  // after the established curriculum below rather than shifting existing rows.
+  for (const definition of practiceQuizDefinitions.filter(
+    (item) => item.id < 23,
+  )) {
     const quiz = await prisma.quiz.upsert({
       where: { id: definition.id },
       update: {
@@ -4343,6 +5099,67 @@ async function main() {
       },
     });
     questionId += 1;
+  }
+
+  // Append the expanded general-listening catalog after all legacy rows so a
+  // seed refresh never reassigns existing question IDs referenced by results.
+  for (const definition of practiceQuizDefinitions.filter(
+    (item) => item.id >= 23,
+  )) {
+    const quiz = await prisma.quiz.upsert({
+      where: { id: definition.id },
+      update: {
+        title: definition.title,
+        description: definition.description,
+        type: QuizType[definition.type as keyof typeof QuizType],
+        timeLimit: definition.timeLimit,
+        courseId: definition.courseId,
+        practiceTopicId: definition.practiceTopicId,
+        bilingualContent:
+          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
+      },
+      create: {
+        id: definition.id,
+        title: definition.title,
+        description: definition.description,
+        type: QuizType[definition.type as keyof typeof QuizType],
+        timeLimit: definition.timeLimit,
+        courseId: definition.courseId,
+        practiceTopicId: definition.practiceTopicId,
+        bilingualContent:
+          listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
+      },
+    });
+
+    for (let order = 1; order <= definition.questions.length; order += 1) {
+      const q = definition.questions[order - 1];
+      const visualContext = listeningVisualContextByQuizId[definition.id];
+      const questionContent = visualContext?.imageUrl
+        ? {
+            ...q.content,
+            imageUrl: visualContext.imageUrl,
+            imageAlt: visualContext.imageAlt,
+            imagePurpose: 'TOPIC_CONTEXT',
+          }
+        : q.content;
+      await prisma.question.upsert({
+        where: { id: questionId },
+        update: {
+          quizId: quiz.id,
+          type: q.type,
+          content: questionContent,
+          order,
+        },
+        create: {
+          id: questionId,
+          quizId: quiz.id,
+          type: q.type,
+          content: questionContent,
+          order,
+        },
+      });
+      questionId += 1;
+    }
   }
 
   for (let index = 0; index < 4; index += 1) {

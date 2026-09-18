@@ -27,6 +27,239 @@ export function getTodayDateKey(timeZone = 'Asia/Ho_Chi_Minh'): string {
   return formatter.format(new Date());
 }
 
+export const SATIETY_DECAY_INTERVAL_HOURS = 4;
+export const SATIETY_DECAY_AMOUNT = 8;
+
+export const HAPPINESS_DECAY_INTERVAL_HOURS = 24;
+export const HAPPINESS_DECAY_AMOUNT = 5;
+
+export const STARVATION_THRESHOLD = 20;
+export const HEALTH_DECAY_INTERVAL_HOURS = 6;
+export const HEALTH_DECAY_AMOUNT = 5;
+
+export const FEED_COST_TIERS = [10, 20, 30] as const;
+
+export type PetSatietyState = 'FULL' | 'NORMAL' | 'HUNGRY' | 'VERY_HUNGRY';
+
+export function getPetSatietyState(satiety: number): PetSatietyState {
+  const safeSatiety = Math.min(100, Math.max(0, satiety));
+  if (safeSatiety >= 80) return 'FULL';
+  if (safeSatiety >= 50) return 'NORMAL';
+  if (safeSatiety >= 20) return 'HUNGRY';
+  return 'VERY_HUNGRY';
+}
+
+export interface SpeciesPetState {
+  level: number;
+  exp: number;
+  health: number;
+  happiness: number;
+  satiety: number;
+  lastFedAt: string | null;
+  stateUpdatedAt: string;
+  dailyFeedDateKey: string | null;
+  dailyFeedCount: number;
+  dailyRewardedFeedCount: number;
+  [key: string]: any;
+}
+
+export function normalizeSpeciesPetState(
+  raw: any,
+  rootSnapshot?: {
+    level?: number;
+    exp?: number;
+    health?: number;
+    happiness?: number;
+    lastFedAt?: Date | string | null;
+    createdAt?: Date | string | null;
+  },
+  now = new Date(),
+): SpeciesPetState {
+  const level = Number.isFinite(raw?.level)
+    ? Math.max(1, Math.floor(raw.level))
+    : (rootSnapshot?.level ?? 1);
+  const exp = Number.isFinite(raw?.exp)
+    ? Math.max(0, Math.floor(raw.exp))
+    : (rootSnapshot?.exp ?? 0);
+  const health = Number.isFinite(raw?.health)
+    ? Math.min(100, Math.max(0, Math.floor(raw.health)))
+    : Math.min(100, Math.max(0, Math.floor(rootSnapshot?.health ?? 100)));
+  const happiness = Number.isFinite(raw?.happiness)
+    ? Math.min(100, Math.max(0, Math.floor(raw.happiness)))
+    : Math.min(100, Math.max(0, Math.floor(rootSnapshot?.happiness ?? 100)));
+
+  const effectiveLastFedAt =
+    raw?.lastFedAt !== undefined
+      ? raw.lastFedAt
+        ? new Date(raw.lastFedAt).toISOString()
+        : null
+      : rootSnapshot?.lastFedAt
+        ? new Date(rootSnapshot.lastFedAt).toISOString()
+        : null;
+
+  let satiety: number;
+  if (Number.isFinite(raw?.satiety)) {
+    satiety = Math.min(100, Math.max(0, Math.floor(raw.satiety)));
+  } else if (effectiveLastFedAt) {
+    const hoursSinceLastFed = Math.max(
+      0,
+      Math.floor(
+        (now.getTime() - new Date(effectiveLastFedAt).getTime()) /
+          (1000 * 60 * 60),
+      ),
+    );
+    satiety = Math.min(
+      100,
+      Math.max(
+        0,
+        100 -
+          Math.floor(hoursSinceLastFed / SATIETY_DECAY_INTERVAL_HOURS) *
+            SATIETY_DECAY_AMOUNT,
+      ),
+    );
+  } else {
+    satiety = 25;
+  }
+
+  let stateUpdatedAt: string;
+  if (raw?.stateUpdatedAt) {
+    stateUpdatedAt = new Date(raw.stateUpdatedAt).toISOString();
+  } else if (effectiveLastFedAt) {
+    stateUpdatedAt = effectiveLastFedAt;
+  } else if (rootSnapshot?.createdAt) {
+    stateUpdatedAt = new Date(rootSnapshot.createdAt).toISOString();
+  } else {
+    stateUpdatedAt = now.toISOString();
+  }
+
+  const dailyFeedDateKey =
+    typeof raw?.dailyFeedDateKey === 'string' ? raw.dailyFeedDateKey : null;
+  const dailyFeedCount = Number.isFinite(raw?.dailyFeedCount)
+    ? Math.max(0, Math.floor(raw.dailyFeedCount))
+    : 0;
+  const dailyRewardedFeedCount = Number.isFinite(raw?.dailyRewardedFeedCount)
+    ? Math.max(0, Math.floor(raw.dailyRewardedFeedCount))
+    : 0;
+
+  return {
+    ...raw,
+    level,
+    exp,
+    health,
+    happiness,
+    satiety,
+    lastFedAt: effectiveLastFedAt,
+    stateUpdatedAt,
+    dailyFeedDateKey,
+    dailyFeedCount,
+    dailyRewardedFeedCount,
+  };
+}
+
+export function reconcilePetDecay(
+  state: SpeciesPetState,
+  now = new Date(),
+): { state: SpeciesPetState; changed: boolean } {
+  const updated = { ...state };
+  const lastUpdate = new Date(updated.stateUpdatedAt || now).getTime();
+  const nowMs = now.getTime();
+  if (Number.isNaN(lastUpdate) || nowMs <= lastUpdate) {
+    return { state: updated, changed: false };
+  }
+
+  const elapsedHours = (nowMs - lastUpdate) / (1000 * 60 * 60);
+  if (elapsedHours < 0.01) {
+    return { state: updated, changed: false };
+  }
+
+  let changed = false;
+
+  // 1. Satiety decay: -8 every 4 hours
+  const satietySteps = Math.floor(elapsedHours / SATIETY_DECAY_INTERVAL_HOURS);
+  const initialSatiety = updated.satiety;
+  if (satietySteps > 0) {
+    const newSatiety = Math.min(
+      100,
+      Math.max(0, initialSatiety - satietySteps * SATIETY_DECAY_AMOUNT),
+    );
+    if (newSatiety !== updated.satiety) {
+      updated.satiety = newSatiety;
+      changed = true;
+    }
+  }
+
+  // 2. Happiness decay: -5 every 24 hours (independent of feeding)
+  const happinessSteps = Math.floor(
+    elapsedHours / HAPPINESS_DECAY_INTERVAL_HOURS,
+  );
+  if (happinessSteps > 0) {
+    const newHappiness = Math.min(
+      100,
+      Math.max(0, updated.happiness - happinessSteps * HAPPINESS_DECAY_AMOUNT),
+    );
+    if (newHappiness !== updated.happiness) {
+      updated.happiness = newHappiness;
+      changed = true;
+    }
+  }
+
+  // 3. Health decay: -5 every 6 hours ONLY when satiety remains below 20 (starvation)
+  let starvationHours = 0;
+  if (initialSatiety < STARVATION_THRESHOLD) {
+    starvationHours = elapsedHours;
+  } else {
+    const stepsToStarvation =
+      Math.floor(
+        (initialSatiety - STARVATION_THRESHOLD) / SATIETY_DECAY_AMOUNT,
+      ) + 1;
+    const hoursToStarvation = stepsToStarvation * SATIETY_DECAY_INTERVAL_HOURS;
+    if (elapsedHours > hoursToStarvation) {
+      starvationHours = elapsedHours - hoursToStarvation;
+    }
+  }
+
+  if (starvationHours > 0) {
+    const healthSteps = Math.floor(
+      starvationHours / HEALTH_DECAY_INTERVAL_HOURS,
+    );
+    if (healthSteps > 0) {
+      const newHealth = Math.min(
+        100,
+        Math.max(0, updated.health - healthSteps * HEALTH_DECAY_AMOUNT),
+      );
+      if (newHealth !== updated.health) {
+        updated.health = newHealth;
+        changed = true;
+      }
+    }
+  }
+
+  if (changed || elapsedHours >= SATIETY_DECAY_INTERVAL_HOURS) {
+    updated.stateUpdatedAt = now.toISOString();
+    changed = true;
+  }
+
+  return { state: updated, changed };
+}
+
+export function normalizeDailyCounters(
+  state: SpeciesPetState,
+  today = getTodayDateKey('Asia/Ho_Chi_Minh'),
+): { state: SpeciesPetState; reset: boolean } {
+  if (state.dailyFeedDateKey === today) {
+    return { state, reset: false };
+  }
+  return {
+    state: {
+      ...state,
+      dailyFeedDateKey: today,
+      dailyFeedCount: 0,
+      dailyRewardedFeedCount: 0,
+    },
+    reset: true,
+  };
+}
+
 function getQuestAction(type: string): {
   actionLabel: string;
   actionUrl: string;
@@ -1059,7 +1292,8 @@ export class GamificationService {
       return 'owly';
     }
     if (
-      n.includes('mèo bánh cá') ||
+      n.includes('mèo') ||
+      n.includes('meo') ||
       n.includes('taiyaki') ||
       n === 'mimi' ||
       n.includes('mimi') ||
@@ -1079,85 +1313,110 @@ export class GamificationService {
     return 'bready';
   }
 
-  private getPetSatiety(
-    lastFedAt?: Date | string | null,
-  ): 'FULL' | 'NORMAL' | 'HUNGRY' | 'VERY_HUNGRY' {
-    if (!lastFedAt) return 'HUNGRY';
-    const hoursSinceFed =
-      (Date.now() - new Date(lastFedAt).getTime()) / (1000 * 60 * 60);
-    if (hoursSinceFed < 4) return 'FULL';
-    if (hoursSinceFed < 8) return 'NORMAL';
-    if (hoursSinceFed < 12) return 'HUNGRY';
-    return 'VERY_HUNGRY';
-  }
-
-  private getPetFeedCost(feedCount: number) {
+  private getPetFeedCost(feedCount: number): number {
     const safeCount = Number.isFinite(feedCount)
       ? Math.max(0, Math.floor(feedCount))
       : 0;
-    return [10, 20, 30][Math.min(safeCount, 2)];
+    return FEED_COST_TIERS[Math.min(safeCount, 2)];
   }
 
-  private withPetFeedStatus<T extends { lastFedAt: Date | null }>(
+  private withPetFeedStatus<T extends { id: number; name: string }>(
     pet: T,
-    activeLastFedAt?: Date | string | null,
-    dailyFeedCount = 0,
-    dailyRewardedFeedCount = 0,
+    activePetData: SpeciesPetState,
   ) {
-    const satietyState = this.getPetSatiety(activeLastFedAt ?? pet.lastFedAt);
-    const feedCost = this.getPetFeedCost(dailyFeedCount);
-    const canFeed = satietyState !== 'FULL';
+    const satiety = Math.min(100, Math.max(0, activePetData.satiety));
+    const satietyState = getPetSatietyState(satiety);
+    const canFeed = satiety < 80;
+    const feedCost = this.getPetFeedCost(activePetData.dailyFeedCount);
+    const dailyRewardLimit = 3;
+    const feedExpReward =
+      activePetData.dailyRewardedFeedCount < dailyRewardLimit ? 5 : 0;
 
     return {
       ...pet,
-      canFeed,
-      // Kept nullable for backwards-compatible clients; the new UX uses satietyState.
-      nextFeedAt: null,
-      feedCost,
+      health: activePetData.health,
+      happiness: activePetData.happiness,
+      satiety,
+      level: activePetData.level,
+      exp: activePetData.exp,
+      lastFedAt: activePetData.lastFedAt
+        ? new Date(activePetData.lastFedAt).toISOString()
+        : null,
+      stateUpdatedAt: activePetData.stateUpdatedAt
+        ? new Date(activePetData.stateUpdatedAt).toISOString()
+        : new Date().toISOString(),
       satietyState,
-      dailyFeedCount,
-      dailyRewardedFeedCount,
-      dailyRewardLimit: 3,
-      feedExpReward: dailyRewardedFeedCount < 3 ? 5 : 0,
+      canFeed,
+      feedCost,
+      dailyFeedCount: activePetData.dailyFeedCount,
+      dailyRewardedFeedCount: activePetData.dailyRewardedFeedCount,
+      dailyRewardLimit,
+      feedExpReward,
+      nextFeedAt: null,
     };
   }
 
   async getMyPet(userId: number) {
+    const now = new Date();
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+
     let pet = await this.prisma.userPet.findUnique({
       where: { userId },
     });
 
     if (!pet) {
-      const initialRoster = {
+      const nowIso = now.toISOString();
+      const initialRoster: Record<string, SpeciesPetState> = {
         bready: {
           level: 1,
           exp: 0,
           health: 100,
           happiness: 100,
+          satiety: 80,
           lastFedAt: null,
+          stateUpdatedAt: nowIso,
+          dailyFeedDateKey: today,
+          dailyFeedCount: 0,
+          dailyRewardedFeedCount: 0,
         },
         owly: {
           level: 1,
           exp: 0,
           health: 100,
           happiness: 100,
+          satiety: 80,
           lastFedAt: null,
+          stateUpdatedAt: nowIso,
+          dailyFeedDateKey: today,
+          dailyFeedCount: 0,
+          dailyRewardedFeedCount: 0,
         },
         mimi: {
           level: 1,
           exp: 0,
           health: 100,
           happiness: 100,
+          satiety: 80,
           lastFedAt: null,
+          stateUpdatedAt: nowIso,
+          dailyFeedDateKey: today,
+          dailyFeedCount: 0,
+          dailyRewardedFeedCount: 0,
         },
         foxy: {
           level: 1,
           exp: 0,
           health: 100,
           happiness: 100,
+          satiety: 80,
           lastFedAt: null,
+          stateUpdatedAt: nowIso,
+          dailyFeedDateKey: today,
+          dailyFeedCount: 0,
+          dailyRewardedFeedCount: 0,
         },
       };
+
       pet = await this.prisma.userPet.create({
         data: {
           userId,
@@ -1166,86 +1425,58 @@ export class GamificationService {
           happiness: 100,
           level: 1,
           exp: 0,
-          roster: initialRoster,
+          roster: initialRoster as any,
         } as any,
       });
-      return this.withPetFeedStatus(pet, null, 0, 0);
+
+      return this.withPetFeedStatus(pet, initialRoster.bready);
     }
 
     const currentSpecies = this.normalizeSpeciesKey(pet.name);
-    const roster = ((pet as any).roster as Record<string, any>) || {};
+    const rawRoster = ((pet as any).roster as Record<string, any>) || {};
 
-    // Ensure roster has current species initialized
-    if (!roster[currentSpecies]) {
-      roster[currentSpecies] = {
-        level: pet.level || 1,
-        exp: pet.exp || 0,
-        health: pet.health ?? 100,
-        happiness: pet.happiness ?? 100,
-        lastFedAt: pet.lastFedAt,
-      };
+    // 1. Normalize active pet state from roster or root snapshot
+    const currentEntry =
+      rawRoster[currentSpecies] ||
+      (currentSpecies === 'mimi' ? rawRoster['meo'] : undefined);
+    let activePetData = normalizeSpeciesPetState(currentEntry, pet, now);
+
+    // 2. Normalize daily counters for today
+    const dailyNorm = normalizeDailyCounters(activePetData, today);
+    activePetData = dailyNorm.state;
+
+    // 3. Reconcile decay using stateUpdatedAt
+    const decayResult = reconcilePetDecay(activePetData, now);
+    activePetData = decayResult.state;
+
+    // 4. Persist if state changed or if legacy entry lacked stateUpdatedAt
+    if (
+      decayResult.changed ||
+      dailyNorm.reset ||
+      !rawRoster[currentSpecies]?.stateUpdatedAt
+    ) {
+      rawRoster[currentSpecies] = activePetData;
+      pet = await this.prisma.userPet.update({
+        where: { userId },
+        data: {
+          health: activePetData.health,
+          happiness: activePetData.happiness,
+          level: activePetData.level,
+          exp: activePetData.exp,
+          lastFedAt: activePetData.lastFedAt
+            ? new Date(activePetData.lastFedAt)
+            : null,
+          roster: rawRoster as any,
+        } as any,
+      });
     }
 
-    // Dynamic Time-Based Decay for active pet
-    const activePetData = roster[currentSpecies];
-    const now = new Date().getTime();
-    const lastFedTime = activePetData.lastFedAt
-      ? new Date(activePetData.lastFedAt).getTime()
-      : new Date(pet.createdAt).getTime();
-    const hoursSinceLastFed = Math.floor(
-      (now - lastFedTime) / (1000 * 60 * 60),
-    );
-
-    if (hoursSinceLastFed >= 24) {
-      const daysPassed = Math.floor(hoursSinceLastFed / 24);
-      const healthDecay = daysPassed * 10;
-      const happinessDecay = daysPassed * 15;
-
-      // Decay from CURRENT state, not hardcoded 100
-      const currentHealth = activePetData.health ?? 100;
-      const currentHappiness = activePetData.happiness ?? 100;
-      const newHealth = Math.max(20, currentHealth - healthDecay);
-      const newHappiness = Math.max(20, currentHappiness - happinessDecay);
-
-      if (
-        newHealth !== activePetData.health ||
-        newHappiness !== activePetData.happiness
-      ) {
-        activePetData.health = newHealth;
-        activePetData.happiness = newHappiness;
-        roster[currentSpecies] = activePetData;
-
-        pet = await this.prisma.userPet.update({
-          where: { userId },
-          data: {
-            health: newHealth,
-            happiness: newHappiness,
-            roster: roster as any,
-          } as any,
-        });
-      }
-    }
-
-    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
-    const dailyFeedCount =
-      activePetData.dailyFeedDateKey === today
-        ? Number(activePetData.dailyFeedCount ?? 0)
-        : 0;
-    const dailyRewardedFeedCount =
-      activePetData.dailyFeedDateKey === today
-        ? Number(activePetData.dailyRewardedFeedCount ?? 0)
-        : 0;
-    return this.withPetFeedStatus(
-      pet,
-      (activePetData.lastFedAt as Date | string | null | undefined) ??
-        pet.lastFedAt,
-      dailyFeedCount,
-      dailyRewardedFeedCount,
-    );
+    return this.withPetFeedStatus(pet, activePetData);
   }
 
   async feedPet(userId: number) {
     const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+    const now = new Date();
 
     const result = await this.prisma.$transaction(async (tx) => {
       // 1. Advisory lock for user's pet
@@ -1268,48 +1499,47 @@ export class GamificationService {
                 exp: 0,
                 health: 100,
                 happiness: 100,
+                satiety: 50,
                 lastFedAt: null,
+                stateUpdatedAt: now.toISOString(),
+                dailyFeedDateKey: today,
+                dailyFeedCount: 0,
+                dailyRewardedFeedCount: 0,
               },
             },
           },
         });
       }
 
-      // 3. Current active pet data
+      // 3. Load active pet state
       const currentSpecies = this.normalizeSpeciesKey(pet.name);
       const roster = ((pet as any).roster as Record<string, any>) || {};
-      const activePetData = roster[currentSpecies] || {
-        level: pet.level || 1,
-        exp: pet.exp || 0,
-        health: pet.health ?? 100,
-        happiness: pet.happiness ?? 100,
-        lastFedAt: null,
-      };
+      const currentEntry =
+        roster[currentSpecies] ||
+        (currentSpecies === 'mimi' ? roster['meo'] : undefined);
+      let activePetData = normalizeSpeciesPetState(currentEntry, pet, now);
 
-      // 4. Derive satiety and daily reward counters from the active roster entry.
-      const lastFedAt: Date | null = activePetData.lastFedAt
-        ? new Date(activePetData.lastFedAt)
-        : pet.lastFedAt
-          ? new Date(pet.lastFedAt)
-          : null;
-      if (this.getPetSatiety(lastFedAt) === 'FULL') {
+      // Reconcile decay using stateUpdatedAt
+      const decayResult = reconcilePetDecay(activePetData, now);
+      activePetData = decayResult.state;
+
+      // Normalize daily counters
+      const dailyNorm = normalizeDailyCounters(activePetData, today);
+      activePetData = dailyNorm.state;
+
+      // 4. Reject operation when satiety >= 80
+      if (activePetData.satiety >= 80) {
         throw new BadRequestException(
           'Thú cưng đang no, chưa cần ăn thêm. Hãy quay lại khi pet đói hơn.',
         );
       }
-      const dailyFeedDateKey = activePetData.dailyFeedDateKey;
-      const feedCount =
-        dailyFeedDateKey === today
-          ? Number(activePetData.dailyFeedCount ?? 0)
-          : 0;
-      const rewardedFeedCount =
-        dailyFeedDateKey === today
-          ? Number(activePetData.dailyRewardedFeedCount ?? 0)
-          : 0;
-      const feedCost = this.getPetFeedCost(feedCount);
-      const isRewardedFeed = rewardedFeedCount < 3;
 
-      // 5. CAS deduct the server-calculated escalating cost.
+      // 5. Calculate feed cost: 10 -> 20 -> 30 -> 30
+      const feedCost = this.getPetFeedCost(activePetData.dailyFeedCount);
+      const isRewardedFeed = activePetData.dailyRewardedFeedCount < 3;
+      const EXP_PER_FEED = isRewardedFeed ? 5 : 0;
+
+      // 6. CAS deduct totalBanhRan atomically
       const cas = await tx.userStats.updateMany({
         where: { userId, totalBanhRan: { gte: feedCost } },
         data: { totalBanhRan: { decrement: feedCost } },
@@ -1324,7 +1554,7 @@ export class GamificationService {
 
       const updatedStats = await tx.userStats.findUnique({ where: { userId } });
 
-      // 6. Write negative ledger entry
+      // 7. Write negative ledger entry
       await tx.banhTransaction.create({
         data: {
           userId,
@@ -1337,43 +1567,36 @@ export class GamificationService {
         },
       });
 
-      // 7. Reward only the first three feeds each day; later feeds have diminishing returns.
-      const benefits = isRewardedFeed
-        ? [
-            { health: 20, happiness: 10, exp: 5 },
-            { health: 15, happiness: 8, exp: 5 },
-            { health: 10, happiness: 5, exp: 5 },
-          ][Math.min(rewardedFeedCount, 2)]
-        : { health: 5, happiness: 2, exp: 0 };
-      const EXP_PER_FEED = benefits.exp;
+      // 8. Apply feeding benefits: Satiety +35, Health +10, Happiness +5, clamped to 100
+      const newSatiety = Math.min(100, activePetData.satiety + 35);
+      const newHealth = Math.min(100, activePetData.health + 10);
+      const newHappiness = Math.min(100, activePetData.happiness + 5);
       const newPetExp = (activePetData.exp || 0) + EXP_PER_FEED;
       const newLevel = Math.floor(newPetExp / 1000) + 1;
-      const currentHealth = activePetData.health ?? 100;
-      const currentHappiness = activePetData.happiness ?? 100;
-      const newHealth = Math.min(100, currentHealth + benefits.health);
-      const newHappiness = Math.min(100, currentHappiness + benefits.happiness);
-      const now = new Date();
 
+      activePetData.satiety = newSatiety;
+      activePetData.health = newHealth;
+      activePetData.happiness = newHappiness;
       activePetData.exp = newPetExp;
       activePetData.level = newLevel;
-      activePetData.happiness = newHappiness;
-      activePetData.health = newHealth;
-      activePetData.lastFedAt = now;
+      activePetData.lastFedAt = now.toISOString();
+      activePetData.stateUpdatedAt = now.toISOString();
       activePetData.dailyFeedDateKey = today;
-      activePetData.dailyFeedCount = feedCount + 1;
+      activePetData.dailyFeedCount = activePetData.dailyFeedCount + 1;
       activePetData.dailyRewardedFeedCount = isRewardedFeed
-        ? rewardedFeedCount + 1
-        : rewardedFeedCount;
+        ? activePetData.dailyRewardedFeedCount + 1
+        : activePetData.dailyRewardedFeedCount;
+
       roster[currentSpecies] = activePetData;
 
-      // 8. Update pet
+      // 9. Update pet with synchronized root snapshot
       const updatedPet = await tx.userPet.update({
         where: { userId },
         data: {
           level: newLevel,
           exp: newPetExp,
-          happiness: newHappiness,
           health: newHealth,
+          happiness: newHappiness,
           lastFedAt: now,
           roster: roster as any,
         } as any,
@@ -1381,29 +1604,23 @@ export class GamificationService {
 
       return {
         updatedPet,
+        activePetData,
         newLevel,
         feedExpAwarded: EXP_PER_FEED,
-        rewardedFeedCount: activePetData.dailyRewardedFeedCount,
       };
     });
 
-    // Award badge at level 2
+    // Award badge at level 2 if earned
     if (result.newLevel >= 2) {
       await this.awardBadgeIfEarned(userId, 'Chuyên Gia Nuôi Thú');
     }
 
-    const activePetData = ((result.updatedPet as any).roster ?? {})[
-      this.normalizeSpeciesKey(result.updatedPet.name)
-    ];
-    return this.withPetFeedStatus(
-      result.updatedPet,
-      activePetData?.lastFedAt ?? result.updatedPet.lastFedAt,
-      Number(activePetData?.dailyFeedCount ?? 0),
-      Number(activePetData?.dailyRewardedFeedCount ?? 0),
-    );
+    return this.withPetFeedStatus(result.updatedPet, result.activePetData);
   }
 
   async changePetType(userId: number, targetPetName: string) {
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+    const now = new Date();
     const pet = await this.getMyPet(userId);
     const currentSpecies = this.normalizeSpeciesKey(pet.name);
     const targetSpecies = this.normalizeSpeciesKey(targetPetName);
@@ -1413,14 +1630,20 @@ export class GamificationService {
     // 1. Save current active pet stats into roster
     const currentData = roster[currentSpecies] || {};
     roster[currentSpecies] = {
+      ...currentData,
       level: pet.level || 1,
       exp: pet.exp || 0,
       health: pet.health ?? 100,
       happiness: pet.happiness ?? 100,
+      satiety: (pet as any).satiety ?? currentData.satiety ?? 80,
       lastFedAt: pet.lastFedAt,
-      dailyFeedDateKey: currentData.dailyFeedDateKey,
-      dailyFeedCount: currentData.dailyFeedCount,
-      dailyRewardedFeedCount: currentData.dailyRewardedFeedCount,
+      stateUpdatedAt:
+        (pet as any).stateUpdatedAt ??
+        currentData.stateUpdatedAt ??
+        now.toISOString(),
+      dailyFeedDateKey: currentData.dailyFeedDateKey ?? today,
+      dailyFeedCount: currentData.dailyFeedCount ?? 0,
+      dailyRewardedFeedCount: currentData.dailyRewardedFeedCount ?? 0,
     };
 
     // 2. Retrieve or initialize target pet stats
@@ -1430,16 +1653,29 @@ export class GamificationService {
         exp: 0,
         health: 100,
         happiness: 100,
+        satiety: 80,
         lastFedAt: null,
-        dailyFeedDateKey: null,
+        stateUpdatedAt: now.toISOString(),
+        dailyFeedDateKey: today,
         dailyFeedCount: 0,
         dailyRewardedFeedCount: 0,
       };
     }
 
-    const targetData = roster[targetSpecies];
+    let targetData = normalizeSpeciesPetState(
+      roster[targetSpecies],
+      undefined,
+      now,
+    );
+    // Normalize daily counters for target pet
+    const dailyNorm = normalizeDailyCounters(targetData, today);
+    targetData = dailyNorm.state;
+    // Reconcile decay for target pet
+    const decayResult = reconcilePetDecay(targetData, now);
+    targetData = decayResult.state;
+    roster[targetSpecies] = targetData;
 
-    // 3. Switch active pet to target pet stats
+    // 3. Switch active pet to target pet stats (without arbitrary +15 happiness bump)
     const updatedPet = await this.prisma.userPet.update({
       where: { userId },
       data: {
@@ -1447,23 +1683,13 @@ export class GamificationService {
         level: targetData.level || 1,
         exp: targetData.exp || 0,
         health: targetData.health ?? 100,
-        happiness: Math.min((targetData.happiness ?? 100) + 15, 100),
-        lastFedAt: targetData.lastFedAt,
+        happiness: targetData.happiness ?? 100,
+        lastFedAt: targetData.lastFedAt ? new Date(targetData.lastFedAt) : null,
         roster: roster as any,
       } as any,
     });
 
-    return this.withPetFeedStatus(
-      updatedPet,
-      (targetData.lastFedAt as Date | string | null | undefined) ??
-        updatedPet.lastFedAt,
-      targetData.dailyFeedDateKey === getTodayDateKey('Asia/Ho_Chi_Minh')
-        ? Number(targetData.dailyFeedCount ?? 0)
-        : 0,
-      targetData.dailyFeedDateKey === getTodayDateKey('Asia/Ho_Chi_Minh')
-        ? Number(targetData.dailyRewardedFeedCount ?? 0)
-        : 0,
-    );
+    return this.withPetFeedStatus(updatedPet, targetData);
   }
 
   async getDashboardToday(userId: number) {

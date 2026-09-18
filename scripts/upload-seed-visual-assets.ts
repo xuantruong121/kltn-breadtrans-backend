@@ -35,21 +35,27 @@ const assets = [
 ];
 
 const root = path.resolve(__dirname, '..', 'prisma', 'seed-assets');
+const destinationPrefixes = [
+  'catalog/toeic/shared/images',
+  'catalog/listening/practice/images',
+];
 
 async function main(): Promise<void> {
   for (const name of assets) {
     const body = await readFile(path.join(root, name));
-    const key = `catalog/toeic/shared/images/${name}`;
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: body,
-        ContentType: 'image/png',
-        CacheControl: 'public, max-age=31536000, immutable',
-      }),
-    );
-    console.log(`${name}: ${publicUrl}/${key}`);
+    for (const prefix of destinationPrefixes) {
+      const key = `${prefix}/${name}`;
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: body,
+          ContentType: 'image/png',
+          CacheControl: 'public, max-age=31536000, immutable',
+        }),
+      );
+      console.log(`${name}: ${publicUrl}/${key}`);
+    }
   }
 }
 
