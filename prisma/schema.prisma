@@ -349,6 +349,12 @@ enum QuizType {
   WRITING_EMAIL
 }
 
+enum QuizPublicationStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 enum ListeningPracticeAttemptStatus {
   IN_PROGRESS
   COMPLETED
@@ -356,18 +362,20 @@ enum ListeningPracticeAttemptStatus {
 }
 
 model Quiz {
-  id               Int            @id @default(autoincrement())
-  courseId         Int?
-  course           Course?        @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  practiceTopicId  Int?
-  practiceTopic    PracticeTopic? @relation(fields: [practiceTopicId], references: [id], onDelete: SetNull)
-  title            String
-  description      String?
-  theoryContent    String?        @db.Text
-  bilingualContent Json? // Array of { en: string, vi: string }
-  type             QuizType       @default(TOEIC)
-  timeLimit        Int? // In minutes
-  createdAt        DateTime       @default(now())
+  id                Int                   @id @default(autoincrement())
+  courseId          Int?
+  course            Course?               @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  practiceTopicId   Int?
+  practiceTopic     PracticeTopic?        @relation(fields: [practiceTopicId], references: [id], onDelete: SetNull)
+  title             String
+  description       String?
+  theoryContent     String?               @db.Text
+  bilingualContent  Json? // Array of { en: string, vi: string }
+  type              QuizType              @default(TOEIC)
+  publicationStatus QuizPublicationStatus @default(PUBLISHED)
+  publishedAt       DateTime?
+  timeLimit         Int? // In minutes
+  createdAt         DateTime              @default(now())
 
   questions                 Question[]
   submissions               Submission[]
@@ -399,6 +407,41 @@ model Question {
   type    String // MULTIPLE_CHOICE, FILL_IN_BLANK, WRITING, SPEAKING
   content Json // Flexible structure for different question types (JSONB)
   order   Int    @default(0)
+
+  audioAssets     QuizAudioAsset[]
+  diagnosticClips ListeningDiagnosticClip[]
+}
+
+/// Versioned source audio for a listening question. Only one asset is active at a time.
+model QuizAudioAsset {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  version    Int
+  key        String
+  url        String
+  mimeType   String
+  durationMs Int?
+  isActive   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([questionId, version])
+  @@index([questionId, isActive])
+}
+
+/// Optional short clips used to replay a diagnostic segment of a listening item.
+model ListeningDiagnosticClip {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  label      String
+  key        String
+  url        String
+  startMs    Int?
+  endMs      Int?
+  createdAt  DateTime @default(now())
+
+  @@index([questionId, createdAt])
 }
 
 model Submission {

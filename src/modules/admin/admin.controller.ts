@@ -31,6 +31,12 @@ export class AdminController {
     return this.adminService.getDashboardStats();
   }
 
+  @Get('listening-analytics')
+  @ApiOperation({ summary: 'Thống kê thực tế các bài luyện nghe' })
+  getListeningAnalytics() {
+    return this.adminService.getListeningAnalytics();
+  }
+
   @Get('users')
   @ApiOperation({ summary: 'Lay danh sach tat ca nguoi dung' })
   getAllUsers(@Query('role') role?: string) {

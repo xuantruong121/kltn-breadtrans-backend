@@ -12,6 +12,11 @@ import {
   Res,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { QuizService } from './quiz.service';
@@ -21,8 +26,15 @@ import {
   SubmitQuizDto,
   CheckPracticeQuestionDto,
   SaveListeningAttemptDto,
+  PublishQuizDto,
 } from './dto/quiz.dto';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiConsumes,
+} from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -54,6 +66,18 @@ export class QuizController {
     @Request() req: any,
   ) {
     return this.quizService.updateQuiz(id, dto, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Patch(':id/publication')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Đổi trạng thái xuất bản bài luyện nghe' })
+  publishQuiz(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: PublishQuizDto,
+  ) {
+    return this.quizService.publishQuiz(id, dto.status);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -170,6 +194,47 @@ export class QuizController {
     @Body() dto: CreateQuestionDto,
   ) {
     return this.quizService.createQuestion(quizId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post('questions/:questionId/audio-assets')
+  @Roles(Role.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Tải audio phiên bản mới cho câu luyện nghe' })
+  createAudioAsset(
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /^audio\// }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.quizService.createAudioAsset(questionId, file);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post('questions/:questionId/diagnostic-clips')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Gắn clip audio chẩn đoán cho câu luyện nghe' })
+  createDiagnosticClip(
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Body()
+    dto: {
+      label: string;
+      key: string;
+      url: string;
+      startMs?: number;
+      endMs?: number;
+    },
+  ) {
+    return this.quizService.createDiagnosticClip(questionId, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

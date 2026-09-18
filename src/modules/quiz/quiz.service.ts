@@ -18,10 +18,12 @@ import {
   SubmitQuizDto,
   CheckPracticeQuestionDto,
   SaveListeningAttemptDto,
+  PublishQuizDto,
 } from './dto/quiz.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AiService } from '../ai/ai.service';
 import { SpeakingService } from '../speaking/speaking.service';
+import { UploadService } from '../upload/upload.service';
 
 /**
  * Compare learner dictation without penalising typography that does not change
@@ -81,6 +83,7 @@ export class QuizService {
     private eventEmitter: EventEmitter2,
     private aiService: AiService,
     private speakingService: SpeakingService,
+    private uploadService: UploadService,
   ) {}
 
   async createQuiz(dto: CreateQuizDto, user?: { id: number; role: Role }) {
@@ -112,6 +115,18 @@ export class QuizService {
     return this.prisma.quiz.update({
       where: { id },
       data: dto,
+    });
+  }
+
+  async publishQuiz(id: number, status: PublishQuizDto['status']) {
+    const quiz = await this.prisma.quiz.findUnique({ where: { id } });
+    if (!quiz) throw new NotFoundException('Quiz not found');
+    return this.prisma.quiz.update({
+      where: { id },
+      data: {
+        publicationStatus: status,
+        publishedAt: status === 'PUBLISHED' ? new Date() : quiz.publishedAt,
+      },
     });
   }
 
@@ -150,6 +165,7 @@ export class QuizService {
     const quizzes = await this.prisma.quiz.findMany({
       where: {
         type: 'LISTENING_PRACTICE',
+        publicationStatus: 'PUBLISHED',
       },
       include: {
         _count: {
@@ -372,12 +388,33 @@ export class QuizService {
   async getQuizById(id: number, includeAnswers = false, userId?: number) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },
-      include: { questions: { orderBy: { order: 'asc' } } },
+      include: {
+        questions: {
+          orderBy: { order: 'asc' },
+          include: {
+            audioAssets: {
+              where: { isActive: true },
+              orderBy: { version: 'desc' },
+            },
+            diagnosticClips: { orderBy: { createdAt: 'asc' } },
+          },
+        },
+      },
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
 
     if (quiz.type === QuizType.LISTENING_PRACTICE && userId === undefined) {
       throw new UnauthorizedException('Đăng nhập để bắt đầu luyện nghe');
+    }
+
+    // Draft and archived content is visible to administrators only. Learners
+    // must never deep-link around the published catalog filter.
+    if (
+      !includeAnswers &&
+      quiz.publicationStatus !== undefined &&
+      quiz.publicationStatus !== 'PUBLISHED'
+    ) {
+      throw new NotFoundException('Bài luyện chưa được xuất bản');
     }
 
     if (!includeAnswers && quiz.questions) {
@@ -405,6 +442,72 @@ export class QuizService {
         ...dto,
         quizId,
       },
+    });
+  }
+
+  async createAudioAsset(questionId: number, file: Express.Multer.File) {
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId },
+      include: {
+        quiz: { select: { id: true, type: true } },
+        audioAssets: {
+          where: { isActive: true },
+          orderBy: { version: 'desc' },
+          take: 1,
+        },
+      },
+    });
+    if (!question || question.quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new NotFoundException('Không tìm thấy câu luyện nghe');
+    }
+    const next = await this.prisma.quizAudioAsset.aggregate({
+      where: { questionId },
+      _max: { version: true },
+    });
+    const version = (next._max.version ?? 0) + 1;
+    const upload = await this.uploadService.uploadRawBuffer(
+      file.buffer,
+      file.mimetype,
+      `listening/quiz-${question.quiz.id}/question-${questionId}/v${version}`,
+      file.originalname,
+    );
+    return this.prisma.$transaction(async (tx) => {
+      await tx.quizAudioAsset.updateMany({
+        where: { questionId },
+        data: { isActive: false },
+      });
+      return tx.quizAudioAsset.create({
+        data: {
+          questionId,
+          version,
+          key: upload.key,
+          url: upload.url,
+          mimeType: upload.contentType,
+          isActive: true,
+        },
+      });
+    });
+  }
+
+  async createDiagnosticClip(
+    questionId: number,
+    dto: {
+      label: string;
+      key: string;
+      url: string;
+      startMs?: number;
+      endMs?: number;
+    },
+  ) {
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId },
+      select: { id: true, quiz: { select: { type: true } } },
+    });
+    if (!question || question.quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new NotFoundException('Không tìm thấy câu luyện nghe');
+    }
+    return this.prisma.listeningDiagnosticClip.create({
+      data: { questionId, ...dto },
     });
   }
 
@@ -619,7 +722,14 @@ export class QuizService {
   ) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
-      include: { quiz: { select: { id: true, type: true } } },
+      include: {
+        quiz: { select: { id: true, type: true } },
+        audioAssets: {
+          where: { isActive: true },
+          orderBy: { version: 'desc' },
+          take: 1,
+        },
+      },
     });
     if (!question || question.quizId !== quizId) {
       throw new NotFoundException('Câu hỏi không thuộc bài luyện này');
@@ -715,7 +825,14 @@ export class QuizService {
   ): Promise<Buffer> {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
-      include: { quiz: { select: { id: true, type: true } } },
+      include: {
+        quiz: { select: { id: true, type: true } },
+        audioAssets: {
+          where: { isActive: true },
+          orderBy: { version: 'desc' },
+          take: 1,
+        },
+      },
     });
     if (!question || question.quizId !== quizId) {
       throw new NotFoundException('Câu hỏi không thuộc bài luyện này');
@@ -723,6 +840,10 @@ export class QuizService {
     if (question.quiz.type !== QuizType.LISTENING_PRACTICE) {
       throw new ForbiddenException('Chỉ hỗ trợ audio cho bài luyện nghe');
     }
+
+    const activeAsset = question.audioAssets[0];
+    if (activeAsset)
+      return this.uploadService.downloadFileBuffer(activeAsset.key);
 
     const content = question.content as Record<string, unknown>;
     const audioText =

@@ -5,6 +5,7 @@ import { AiService } from '../ai/ai.service';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SpeakingService } from '../speaking/speaking.service';
+import { UploadService } from '../upload/upload.service';
 
 const mockPrismaService = {
   quiz: {
@@ -40,6 +41,11 @@ const mockSpeakingService = {
   generateTts: jest.fn(),
 };
 
+const mockUploadService = {
+  uploadRawBuffer: jest.fn(),
+  downloadFileBuffer: jest.fn(),
+};
+
 describe('QuizService', () => {
   let service: QuizService;
   let prisma: PrismaService;
@@ -52,6 +58,7 @@ describe('QuizService', () => {
         { provide: AiService, useValue: mockAiService },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: SpeakingService, useValue: mockSpeakingService },
+        { provide: UploadService, useValue: mockUploadService },
       ],
     }).compile();
 
@@ -76,7 +83,18 @@ describe('QuizService', () => {
 
       expect(prisma.quiz.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
-        include: { questions: { orderBy: { order: 'asc' } } },
+        include: {
+          questions: {
+            orderBy: { order: 'asc' },
+            include: {
+              audioAssets: {
+                where: { isActive: true },
+                orderBy: { version: 'desc' },
+              },
+              diagnosticClips: { orderBy: { createdAt: 'asc' } },
+            },
+          },
+        },
       });
       expect(result).toEqual(mockQuiz);
     });

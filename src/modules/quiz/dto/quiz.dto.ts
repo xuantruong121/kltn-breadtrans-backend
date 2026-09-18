@@ -101,3 +101,9 @@ export class CheckPracticeQuestionDto {
   @MinLength(1)
   answer: string;
 }
+
+export class PublishQuizDto {
+  @ApiProperty({ enum: ['DRAFT', 'PUBLISHED', 'ARCHIVED'] })
+  @IsEnum(['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const)
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+}

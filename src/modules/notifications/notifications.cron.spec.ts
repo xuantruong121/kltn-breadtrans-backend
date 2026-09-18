@@ -106,5 +106,26 @@ describe('NotificationsCronService', () => {
         }),
       );
     });
+
+    it('releases claims when inbox notification creation fails so retries can recover', async () => {
+      (
+        notificationsService.createNotification as jest.Mock
+      ).mockRejectedValueOnce(new Error('notification database unavailable'));
+
+      await expect(cronService.handleVocabSpacedReview()).rejects.toThrow(
+        'notification database unavailable',
+      );
+
+      expect(prisma.userVocabWordProgress.updateMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: {
+            id: { in: [1] },
+            remindedAt: expect.any(Date),
+          },
+          data: { remindedAt: null },
+        }),
+      );
+      expect(notificationsService.sendPushToUser).not.toHaveBeenCalled();
+    });
   });
 });
