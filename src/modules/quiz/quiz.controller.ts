@@ -143,6 +143,23 @@ export class QuizController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Post(':quizId/listening-attempts/:attemptId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Hủy phiên luyện nghe đang làm dở' })
+  cancelListeningAttempt(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+    @Request() req: any,
+  ) {
+    return this.quizService.cancelListeningAttempt(
+      req.user.id,
+      quizId,
+      attemptId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get(':quizId/questions/:questionId/audio')
   @ApiOperation({ summary: 'Phát audio cho một câu luyện nghe' })
   async streamQuestionAudio(
@@ -216,6 +233,15 @@ export class QuizController {
     file: Express.Multer.File,
   ) {
     return this.quizService.createAudioAsset(questionId, file);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post('questions/:questionId/audio-assets/generate-dialogue')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Sinh audio đa giọng cho câu hội thoại' })
+  generateDialogueAudio(@Param('questionId', ParseIntPipe) questionId: number) {
+    return this.quizService.generateDialogueAudioAsset(questionId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

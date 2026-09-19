@@ -1,5 +1,6 @@
 import {
   GamificationService,
+  getTodayDateKey,
   getPetSatietyState,
   reconcilePetDecay,
   normalizeSpeciesPetState,
@@ -487,7 +488,7 @@ describe('GamificationService weekly cron hardening', () => {
                 satiety: 40, // HUNGRY (< 80)
                 lastFedAt: pastTime.toISOString(),
                 stateUpdatedAt: pastTime.toISOString(),
-                dailyFeedDateKey: '2026-09-18',
+                dailyFeedDateKey: getTodayDateKey('Asia/Ho_Chi_Minh'),
                 dailyFeedCount: 0,
                 dailyRewardedFeedCount: 0,
               },
@@ -599,7 +600,7 @@ describe('GamificationService weekly cron hardening', () => {
                 happiness: 70,
                 satiety: 30,
                 stateUpdatedAt: now.toISOString(),
-                dailyFeedDateKey: '2026-09-18',
+                dailyFeedDateKey: getTodayDateKey('Asia/Ho_Chi_Minh'),
                 dailyFeedCount: 3, // 4th feed
                 dailyRewardedFeedCount: 3, // reached reward limit
               },

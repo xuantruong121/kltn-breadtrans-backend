@@ -1,0 +1,334 @@
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[NestFactory][39m [32mStarting Nest application...[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mRedisModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mPassportModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mPrismaModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mRedisCoreModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mThrottlerModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mJwtModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mDiscoveryModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[AiService][39m [32mAiService initialized with Strategy Pattern[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mEventEmitterModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mScheduleModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mEventsModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mJobsModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mAppModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mUploadModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mReadingModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mContentModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mDiagnosticModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mSupportModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mClassModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mGrammarModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mIssueReportModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mUserModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mCourseModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mNotificationsModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mPaymentModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mAuthModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mMarketModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mAssignmentModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mGamificationModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mAdminModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mWritingModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mAiModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mVocabModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mSpeakingModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mToeicModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[InstanceLoader][39m [32mQuizModule dependencies initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[EventsGateway][39m [32mWebSocket Gateway initialized[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[WebSocketsController][39m [32mEventsGateway subscribed to the "joinUserRoom" message[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[WebSocketsController][39m [32mEventsGateway subscribed to the "chat:sendMessage" message[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[WebSocketsController][39m [32mEventsGateway subscribed to the "chat:toggleMode" message[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[WebSocketsController][39m [32mArenaGateway subscribed to the "join_queue" message[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[WebSocketsController][39m [32mArenaGateway subscribed to the "cancel_queue" message[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[WebSocketsController][39m [32mArenaGateway subscribed to the "submit_answer" message[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[WebSocketsController][39m [32mArenaGateway subscribed to the "reconnect_match" message[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mAppController {/}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mAuthController {/auth}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/register, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/register/verify, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/login, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/google, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/google/link, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/google, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/google/callback, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/google/exchange, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/refresh, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/logout, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/change-password, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/otp/generate, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/otp/verify, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/auth/profile, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mUserController {/users}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/users/profile, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/users/stats, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/users/skills-summary, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/users/learning-history, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/users/profile, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mCoursePublicController {/public/courses}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/public/courses, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/public/courses/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mCourseController {/courses}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/my-courses, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/classes, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:courseId/my-enrollments, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:id, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:id/submit-review, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:id/revert-to-draft, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:id/review, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:id/status, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:courseId/classes, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/classes/:classId, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/classes/:classId, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/classes/:classId/enroll, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/classes/:classId, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:courseId/lessons, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/lessons/:lessonId, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/lessons/:lessonId, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/:courseId/lessons/reorder, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/lessons/:lessonId/materials, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/materials/:materialId, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/materials/:materialId, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mSupportController {/support}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/support/conversations/me, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/support/conversations/:id/messages, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/support/conversations/:id/messages, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/support/conversations/:id/ai-messages, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/support/conversations/:id/mode, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mAdminSupportController {/admin/support}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/support/conversations, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/support/conversations/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/support/conversations/:id/messages, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/support/conversations/:id/messages, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/support/conversations/:id/mode, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mQuizController {/quizzes}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:id, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:id/publication, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/listening-practice, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/toeic-papers, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:quizId/listening-attempts, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:quizId/listening-attempts/:attemptId, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:quizId/listening-attempts/:attemptId/cancel, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:quizId/questions/:questionId/audio, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:quizId/questions/:questionId/check, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:id/questions, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/questions/:questionId/audio-assets, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/questions/:questionId/diagnostic-clips, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/questions/:questionId, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/questions/:questionId, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/:id/submit, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/submissions/:id/analytics, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/quizzes/score-conversion, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mAiController {/ai}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/ai/chat, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/ai/generate-dictation, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/ai/generate-toeic-quiz, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/ai/explain-toeic-error/:questionId, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/ai/import-ets-pdf, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/ai/tts/vietnamese, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mAiGeneratorController {/admin/ai-generator}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/ai-generator/quota-status, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/ai-generator/upload, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/ai-generator/:jobId/status, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/ai-generator/:jobId/result, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/ai-generator/:jobId/publish, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mUploadController {/upload}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/upload, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/upload/*key, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/upload/presign, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mSpeakingController {/speaking}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/speaking/exercises, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/speaking/exercises, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/speaking/exercises/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/speaking/exercises/:id/submit, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/speaking/submissions/:submissionId, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/speaking/submissions/:submissionId/audio, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/speaking/my-submissions, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/speaking/tts, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/speaking/part3-5/submit, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mGamificationController {/gamification}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/leaderboard, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/dashboard/today, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/badges/me, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/pet, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/pet/feed, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/pet/change-type, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/quests, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/arena/snippet, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/admiration/send, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/trigger-daily-cron, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/gamification/trigger-weekly-cron, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mNotificationsController {/notifications}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/notifications/public-key, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/notifications/subscribe, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/notifications/unsubscribe, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/notifications/test, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/notifications/inbox, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/notifications/inbox/unread-count, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/notifications/inbox/read-all, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/notifications/inbox/:id/read, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mReadingController {/reading}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/reading/topics, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/reading/topics/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/reading/quizzes/:id/theory, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/reading/bilingual-progress, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mWritingController {/writing}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/writing/topics, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/writing/quizzes/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/writing/quizzes/:id/community, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/writing/quizzes/:id/submit, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/writing/part2/submit, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/writing/part3/submit, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mVocabController {/vocab}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/lookup, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/lookup/details, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/saved, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/saved, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/saved/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/topics, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/topics/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/words/:id/star, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/words/:id/master, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/vocab/words/:id/review, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mToeicController {/toeic}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/exams, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/exams/:examId/briefing, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/exams/:examId, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/bundles/:quizId, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/groups/:groupId/audio, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/exams/:examId/attempts, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/attempts/:id/begin, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/attempts/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/attempts/:id/cancel, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/attempts/:id/remaining-time, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/attempts/:id/answers, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/attempts/:id/submit, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/attempts/:id/integrity-events, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/toeic/attempts/:id/result, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mClassController {/classes}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/classes, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/classes/my-classes, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/classes/watch-tracking, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/classes/watch-tracking, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/classes/:classId, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mAdminController {/admin}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/dashboard-stats, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/listening-analytics, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/users, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/users, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/users/:id, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/users/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/enroll, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/enroll, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/classes/:classId/enrollments, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/courses, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/courses, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/courses/:courseId/update, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/courses/:courseId, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/classes, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/courses/:courseId/classes, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/courses/:courseId/review, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/classes/:classId, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/vocab/topics, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/vocab/topics, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/vocab/topics/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/vocab/topics/:id/words, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/vocab/words/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/speaking/exercises, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/speaking/exercises, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/speaking/exercises/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/practice-topics, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/practice-topics, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/practice-topics/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/system-costs, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/system-costs/purge-ai-cache, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/system-costs/trigger-r2-cleanup, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mAssignmentController {/courses}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/classes/:classId/assignments, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/classes/:classId/assignments, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/assignments/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/assignments/:id/submit, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/courses/submissions/:id/grade, PUT} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mGrammarController {/grammar}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/grammar/topics, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/grammar/topics/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/grammar/topics/:id/attempt, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/grammar/my-attempts, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/grammar/topics, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/grammar/topics/:id/questions, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/grammar/topics/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/grammar/questions/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mMarketController {/market}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/products, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/currency/balance, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/currency/history, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/orders, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/orders/my, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/orders/mine, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/inventory, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/orders, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/orders/:id/review, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/market/currency/adjust, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mContentController {/content-topics}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/content-topics, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/content-topics/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/content-topics/:id/attempts, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/content-topics, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/content-topics/:id, DELETE} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mPaymentAdminController {/admin/payments}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/payments, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/payments/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/payments/:id/reject, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/payments/:id/confirm, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/payments/:id/retry-activation, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mPaymentController {/payments}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/payments/me, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/payments/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/payments/:id/report-transfer, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mDiagnosticController {/diagnostic}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/diagnostic/current, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/diagnostic/:id/attempts, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mIssueReportController {/issue-reports}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/issue-reports, POST} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RoutesResolver][39m [32mAdminIssueReportController {/admin/issue-reports}:[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/issue-reports, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/issue-reports/:id, GET} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[RouterExplorer][39m [32mMapped {/admin/issue-reports/:id, PATCH} route[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[NotificationsService][39m [32mVAPID details successfully configured for Web Push.[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:10:18 PM [32m    LOG[39m [33m[NestApplication][39m [32mNest application successfully started[39m
+prisma:info Starting a postgresql pool with 9 connections.
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:15:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_started jobId=vocabulary-review-2026-09-19-5966043 name=vocabulary-review attempt=1[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:15:00 PM [32m    LOG[39m [33m[NotificationsCronService][39m [32m[Queue] Checking due vocabulary spaced reviews...[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:15:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_completed jobId=vocabulary-review-2026-09-19-5966043 name=vocabulary-review[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:25:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_started jobId=vocabulary-review-2026-09-19-5966045 name=vocabulary-review attempt=1[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:25:00 PM [32m    LOG[39m [33m[NotificationsCronService][39m [32m[Queue] Checking due vocabulary spaced reviews...[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:25:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_completed jobId=vocabulary-review-2026-09-19-5966045 name=vocabulary-review[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:30:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_started jobId=vocabulary-review-2026-09-19-5966046 name=vocabulary-review attempt=1[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:30:00 PM [32m    LOG[39m [33m[NotificationsCronService][39m [32m[Queue] Checking due vocabulary spaced reviews...[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:30:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_completed jobId=vocabulary-review-2026-09-19-5966046 name=vocabulary-review[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:35:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_started jobId=vocabulary-review-2026-09-19-5966047 name=vocabulary-review attempt=1[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:35:00 PM [32m    LOG[39m [33m[NotificationsCronService][39m [32m[Queue] Checking due vocabulary spaced reviews...[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:35:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_completed jobId=vocabulary-review-2026-09-19-5966047 name=vocabulary-review[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:53:35 PM [32m    LOG[39m [33m[HTTP][39m [32mGET /notifications/inbox/unread-count [304] +40ms - 0b (127.0.0.1)[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:55:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_started jobId=vocabulary-review-2026-09-19-5966051 name=vocabulary-review attempt=1[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:55:00 PM [32m    LOG[39m [33m[NotificationsCronService][39m [32m[Queue] Checking due vocabulary spaced reviews...[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 5:55:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_completed jobId=vocabulary-review-2026-09-19-5966051 name=vocabulary-review[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:07:27 PM [32m    LOG[39m [33m[HTTP][39m [32mGET /notifications/inbox/unread-count [304] +17ms - 0b (127.0.0.1)[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:10:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_started jobId=vocabulary-review-2026-09-19-5966054 name=vocabulary-review attempt=1[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:10:00 PM [32m    LOG[39m [33m[NotificationsCronService][39m [32m[Queue] Checking due vocabulary spaced reviews...[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:10:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_completed jobId=vocabulary-review-2026-09-19-5966054 name=vocabulary-review[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:15:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_started jobId=vocabulary-review-2026-09-19-5966055 name=vocabulary-review attempt=1[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:15:00 PM [32m    LOG[39m [33m[NotificationsCronService][39m [32m[Queue] Checking due vocabulary spaced reviews...[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:15:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_completed jobId=vocabulary-review-2026-09-19-5966055 name=vocabulary-review[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:25:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_started jobId=vocabulary-review-2026-09-19-5966057 name=vocabulary-review attempt=1[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:25:00 PM [32m    LOG[39m [33m[NotificationsCronService][39m [32m[Queue] Checking due vocabulary spaced reviews...[39m
+[32m[KLTN][39m [32m456[39m 9/19/2026, 6:25:00 PM [32m    LOG[39m [33m[SystemJobsService][39m [32msystem_job_completed jobId=vocabulary-review-2026-09-19-5966057 name=vocabulary-review[39m

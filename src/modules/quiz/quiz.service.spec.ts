@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { normalizeListeningAnswer, QuizService } from './quiz.service';
+import {
+  buildNaturalListeningAudioText,
+  normalizeDialogueSegments,
+  normalizeListeningAnswer,
+  QuizService,
+} from './quiz.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
@@ -39,6 +44,7 @@ const mockEventEmitter = {
 
 const mockSpeakingService = {
   generateTts: jest.fn(),
+  generateDialogueTts: jest.fn(),
 };
 
 const mockUploadService = {
@@ -72,6 +78,19 @@ describe('QuizService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('normalizes dialogue rows and drops incomplete rows', () => {
+    expect(
+      normalizeDialogueSegments([
+        { speaker: ' Customer ', text: ' Hello ', translation: ' Xin chào ' },
+        { speaker: '', text: 'ignored' },
+        { speaker: 'Agent', text: ' How can I help? ' },
+      ]),
+    ).toEqual([
+      { speaker: 'Customer', text: 'Hello', translation: 'Xin chào' },
+      { speaker: 'Agent', text: 'How can I help?' },
+    ]);
   });
 
   describe('getQuizById', () => {
@@ -135,6 +154,24 @@ describe('QuizService', () => {
   });
 
   describe('listening practice checks', () => {
+    it('builds natural dialogue audio without speaking speaker labels', () => {
+      expect(
+        buildNaturalListeningAudioText({
+          audioText: 'Customer: Hello. Agent: How can I help?',
+          transcriptSegments: [
+            { speaker: 'Customer', text: 'Hello.' },
+            { speaker: 'Agent', text: 'How can I help?' },
+          ],
+        }),
+      ).toBe('Hello. How can I help?');
+
+      expect(
+        buildNaturalListeningAudioText({
+          audioText: 'Customer: Hello. Agent: How can I help?',
+        }),
+      ).toBe('Hello. How can I help?');
+    });
+
     it('grades on the server without creating a submission', async () => {
       mockPrismaService.question.findUnique.mockResolvedValue({
         id: 91,
@@ -253,6 +290,84 @@ describe('QuizService', () => {
 
     it('normalizes curly apostrophes as optional dictation punctuation', () => {
       expect(normalizeListeningAnswer('  Don’t   worry!  ')).toBe('dont worry');
+    });
+  });
+
+  describe('listening audio', () => {
+    it('re-synthesizes dialogue from spoken lines instead of using legacy labeled assets', async () => {
+      const audio = Buffer.from('natural-dialogue-audio');
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 96,
+        quizId: 28,
+        quiz: { id: 28, type: 'LISTENING_PRACTICE' },
+        audioAssets: [{ key: 'legacy/dialogue.mp3' }],
+        content: {
+          accent: 'US',
+          audioText: 'Customer: Hello. Agent: How can I help?',
+          transcriptSegments: [
+            { speaker: 'Customer', text: 'Hello.' },
+            { speaker: 'Agent', text: 'How can I help?' },
+          ],
+        },
+      });
+      mockSpeakingService.generateDialogueTts.mockResolvedValue(audio);
+
+      await expect(service.streamQuestionAudio(28, 96)).resolves.toBe(audio);
+      expect(mockSpeakingService.generateDialogueTts).toHaveBeenCalledWith(
+        [
+          { speaker: 'Customer', text: 'Hello.' },
+          { speaker: 'Agent', text: 'How can I help?' },
+        ],
+        'US',
+        1,
+      );
+      expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    });
+
+    it('keeps using a static asset for non-dialogue listening questions', async () => {
+      const audio = Buffer.from('stored-audio');
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 97,
+        quizId: 9,
+        quiz: { id: 9, type: 'LISTENING_PRACTICE' },
+        audioAssets: [{ key: 'catalog/listening/question-97.mp3' }],
+        content: { audioText: 'The shop opens at nine.' },
+      });
+      mockUploadService.downloadFileBuffer.mockResolvedValue(audio);
+
+      await expect(service.streamQuestionAudio(9, 97)).resolves.toBe(audio);
+      expect(mockUploadService.downloadFileBuffer).toHaveBeenCalledWith(
+        'catalog/listening/question-97.mp3',
+      );
+      expect(mockSpeakingService.generateTts).not.toHaveBeenCalled();
+    });
+
+    it('serves a generated catalog dialogue asset without re-synthesizing it', async () => {
+      const audio = Buffer.from('stored-dialogue-audio');
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 98,
+        quizId: 28,
+        quiz: { id: 28, type: 'LISTENING_PRACTICE' },
+        audioAssets: [
+          {
+            key: 'catalog/listening/practice/dialogue/quiz-28/question-98/v1/asset.mp3',
+          },
+        ],
+        content: {
+          accent: 'US',
+          transcriptSegments: [
+            { speaker: 'Customer', text: 'Hello.' },
+            { speaker: 'Agent', text: 'How can I help?' },
+          ],
+        },
+      });
+      mockUploadService.downloadFileBuffer.mockResolvedValue(audio);
+
+      await expect(service.streamQuestionAudio(28, 98)).resolves.toBe(audio);
+      expect(mockUploadService.downloadFileBuffer).toHaveBeenCalledWith(
+        'catalog/listening/practice/dialogue/quiz-28/question-98/v1/asset.mp3',
+      );
+      expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
     });
   });
 

@@ -2593,7 +2593,7 @@ async function main() {
             level: 'A2',
             accent: 'US',
             audioText:
-              'Customer: Good morning. Can I have a latte and a cheese sandwich? Barista: Of course. Would you like the latte hot or iced? Customer: Iced, please. Barista: That will be eight dollars. Your order will be ready in five minutes.',
+              'Good morning. Can I have a latte and a cheese sandwich? Of course. Would you like the latte hot or iced? Iced, please. That will be eight dollars. Your order will be ready in five minutes.',
             transcriptSegments: [
               {
                 speaker: 'Khách hàng',
@@ -2641,7 +2641,7 @@ async function main() {
             level: 'A2',
             accent: 'US',
             audioText:
-              'Customer: Good morning. Can I have a latte and a cheese sandwich? Barista: Of course. Would you like the latte hot or iced? Customer: Iced, please. Barista: That will be eight dollars. Your order will be ready in five minutes.',
+              'Good morning. Can I have a latte and a cheese sandwich? Of course. Would you like the latte hot or iced? Iced, please. That will be eight dollars. Your order will be ready in five minutes.',
             transcriptSegments: [
               {
                 speaker: 'Khách hàng',
@@ -2823,7 +2823,7 @@ async function main() {
             level: 'B2',
             accent: 'US',
             audioText:
-              'Customer: My package was supposed to arrive yesterday, but the tracking page has not changed. Agent: I am sorry about that. I can see that the delivery was delayed because of severe weather. Customer: Will it arrive tomorrow? Agent: Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
+              'My package was supposed to arrive yesterday, but the tracking page has not changed. I am sorry about that. I can see that the delivery was delayed because of severe weather. Will it arrive tomorrow? Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
             transcriptSegments: [
               {
                 speaker: 'Khách hàng',
@@ -2872,7 +2872,7 @@ async function main() {
             level: 'B2',
             accent: 'US',
             audioText:
-              'Customer: My package was supposed to arrive yesterday, but the tracking page has not changed. Agent: I am sorry about that. I can see that the delivery was delayed because of severe weather. Customer: Will it arrive tomorrow? Agent: Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
+              'My package was supposed to arrive yesterday, but the tracking page has not changed. I am sorry about that. I can see that the delivery was delayed because of severe weather. Will it arrive tomorrow? Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
             transcriptSegments: [
               {
                 speaker: 'Khách hàng',
