@@ -57,14 +57,24 @@ export class DictionaryApiDevProvider implements DictionaryProvider {
     };
     const word = typeof value.word === 'string' ? value.word : null;
     if (!word) return [];
-    const phonetics = Array.isArray(value.phonetics) ? value.phonetics : [];
-    const ipa = typeof value.phonetic === 'string' ? value.phonetic : null;
-    const audio = phonetics.find(
-      (item) =>
-        item &&
-        typeof item === 'object' &&
-        typeof (item as { audio?: unknown }).audio === 'string',
-    ) as { audio?: string } | undefined;
+    const phonetics = (Array.isArray(value.phonetics) ? value.phonetics : [])
+      .filter((item): item is Record<string, unknown> => {
+        return !!item && typeof item === 'object';
+      })
+      .map((item) => ({
+        text: typeof item.text === 'string' ? item.text : null,
+        audio: typeof item.audio === 'string' ? item.audio : null,
+      }));
+    const genericIpa =
+      typeof value.phonetic === 'string' ? value.phonetic : null;
+    const usPhonetic = phonetics.find((item) =>
+      /(?:_|-|\b)(?:us|american)(?:_|-|\b)/i.test(item.audio || ''),
+    );
+    const ukPhonetic = phonetics.find((item) =>
+      /(?:_|-|\b)(?:gb|uk|british)(?:_|-|\b)/i.test(item.audio || ''),
+    );
+    const firstWithText = phonetics.find((item) => item.text);
+    const firstWithAudio = phonetics.find((item) => item.audio);
     const meanings = Array.isArray(value.meanings) ? value.meanings : [];
     return meanings.map((meaning: unknown) => {
       const item = meaning as {
@@ -78,10 +88,10 @@ export class DictionaryApiDevProvider implements DictionaryProvider {
         word,
         partOfSpeech:
           typeof item.partOfSpeech === 'string' ? item.partOfSpeech : null,
-        ipaUs: ipa,
-        ipaUk: ipa,
-        audioUs: audio?.audio || null,
-        audioUk: audio?.audio || null,
+        ipaUs: usPhonetic?.text || genericIpa || firstWithText?.text || null,
+        ipaUk: ukPhonetic?.text || genericIpa || firstWithText?.text || null,
+        audioUs: usPhonetic?.audio || firstWithAudio?.audio || null,
+        audioUk: ukPhonetic?.audio || firstWithAudio?.audio || null,
         definitions: definitions.map((definition: unknown) => {
           const detail = definition as {
             definition?: unknown;

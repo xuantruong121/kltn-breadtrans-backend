@@ -57,6 +57,7 @@ export class VocabService {
 
   async getTopics(userId?: number) {
     const topics = await this.prisma.vocabTopic.findMany({
+      where: { categoryName: { not: 'SYSTEM_DICTIONARY' } },
       include: {
         _count: { select: { words: true } },
       },
@@ -415,6 +416,13 @@ export class VocabService {
       isInflectionMatch: false,
       matches: [],
     };
+  }
+
+  async lookupExtendedWord(rawWord: string, userId?: number) {
+    if (!this.dictionaryLookup) {
+      throw new NotFoundException('Dictionary service is unavailable');
+    }
+    return this.dictionaryLookup.lookupExtended(rawWord, userId);
   }
 
   async listSavedWords(userId: number) {

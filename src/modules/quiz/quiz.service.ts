@@ -5,17 +5,179 @@ import {
   BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { QuizType, Role } from '@prisma/client';
+import {
+  ListeningPracticeAttemptStatus,
+  Prisma,
+  QuizType,
+  Role,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateQuizDto,
   CreateQuestionDto,
   SubmitQuizDto,
   CheckPracticeQuestionDto,
+  SaveListeningAttemptDto,
+  PublishQuizDto,
 } from './dto/quiz.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AiService } from '../ai/ai.service';
 import { SpeakingService } from '../speaking/speaking.service';
+import { UploadService } from '../upload/upload.service';
+
+/**
+ * Compare learner dictation without penalising typography that does not change
+ * what was heard (capitalisation, punctuation, curly apostrophes or spacing).
+ */
+export function normalizeListeningAnswer(value: unknown): string {
+  return String(value ?? '')
+    .toLocaleLowerCase('en-US')
+    .replace(/[’‘]/g, "'")
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Keep speaker labels for the visual transcript, but never send labels such as
+ * "Customer:" or "Agent:" to speech synthesis. Reading those labels aloud
+ * makes a dialogue sound like metadata instead of a natural conversation.
+ */
+export function buildNaturalListeningAudioText(
+  content: Record<string, unknown>,
+): string {
+  const segments = content.transcriptSegments;
+  if (Array.isArray(segments)) {
+    const spokenLines = segments
+      .filter(
+        (segment): segment is { text: string } =>
+          Boolean(segment) &&
+          typeof segment === 'object' &&
+          typeof (segment as { text?: unknown }).text === 'string',
+      )
+      .map((segment) => segment.text.trim())
+      .filter(Boolean);
+
+    if (spokenLines.length > 0) return spokenLines.join(' ');
+  }
+
+  const audioText =
+    typeof content.audioText === 'string' ? content.audioText : '';
+  return audioText
+    .replace(
+      /(^|\s)(?:customer|agent|barista|assistant|employee|manager|interviewer|caller|staff|speaker\s*\d*)\s*:\s*/gi,
+      '$1',
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export interface NormalizedDialogueSegment {
+  speaker: string;
+  text: string;
+  translation?: string;
+}
+
+/**
+ * Normalize the CMS dialogue contract once at the trust boundary. Speaker
+ * labels stay in the transcript, while audioText is always speech-only.
+ */
+export function normalizeDialogueSegments(
+  value: unknown,
+): NormalizedDialogueSegment[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((segment) => {
+      if (!segment || typeof segment !== 'object') return null;
+      const raw = segment as Record<string, unknown>;
+      const speaker = typeof raw.speaker === 'string' ? raw.speaker.trim() : '';
+      const text = typeof raw.text === 'string' ? raw.text.trim() : '';
+      const translation =
+        typeof raw.translation === 'string' ? raw.translation.trim() : '';
+      if (!speaker || !text) return null;
+      return {
+        speaker,
+        text,
+        ...(translation ? { translation } : {}),
+      } satisfies NormalizedDialogueSegment;
+    })
+    .filter(
+      (segment): segment is NormalizedDialogueSegment => segment !== null,
+    );
+}
+
+function normalizeQuestionContent(
+  quizType: QuizType,
+  questionType: string,
+  value: unknown,
+): Record<string, unknown> {
+  const content =
+    value && typeof value === 'object'
+      ? { ...(value as Record<string, unknown>) }
+      : {};
+
+  if (
+    quizType === QuizType.LISTENING_PRACTICE &&
+    questionType.toUpperCase() === 'DIALOGUE'
+  ) {
+    const transcriptSegments = normalizeDialogueSegments(
+      content.transcriptSegments,
+    );
+    const speakers = new Set(
+      transcriptSegments.map((segment) => segment.speaker),
+    );
+    if (transcriptSegments.length < 2 || speakers.size < 2) {
+      throw new BadRequestException(
+        'Hội thoại cần ít nhất 2 lượt lời và 2 người nói khác nhau.',
+      );
+    }
+    content.transcriptSegments = transcriptSegments;
+    content.audioText = transcriptSegments
+      .map((segment) => segment.text)
+      .join(' ');
+  }
+
+  return content;
+}
+
+function normalizeStrictListeningAnswer(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .replace(/[’‘]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function calculateDictationWordAccuracy(
+  expected: string,
+  submitted: string,
+  mode: 'STANDARD' | 'STRICT',
+): number {
+  const normalize =
+    mode === 'STRICT'
+      ? normalizeStrictListeningAnswer
+      : normalizeListeningAnswer;
+  const expectedWords = normalize(expected).split(/\s+/).filter(Boolean);
+  const submittedWords = normalize(submitted).split(/\s+/).filter(Boolean);
+  if (expectedWords.length === 0) return 0;
+
+  const dp = Array.from({ length: expectedWords.length + 1 }, () =>
+    new Array<number>(submittedWords.length + 1).fill(0),
+  );
+  for (let i = 1; i <= expectedWords.length; i += 1) {
+    for (let j = 1; j <= submittedWords.length; j += 1) {
+      dp[i][j] =
+        expectedWords[i - 1] === submittedWords[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return Math.round(
+    (dp[expectedWords.length][submittedWords.length] / expectedWords.length) *
+      100,
+  );
+}
 
 @Injectable()
 export class QuizService {
@@ -24,6 +186,7 @@ export class QuizService {
     private eventEmitter: EventEmitter2,
     private aiService: AiService,
     private speakingService: SpeakingService,
+    private uploadService: UploadService,
   ) {}
 
   async createQuiz(dto: CreateQuizDto, user?: { id: number; role: Role }) {
@@ -55,6 +218,32 @@ export class QuizService {
     return this.prisma.quiz.update({
       where: { id },
       data: dto,
+    });
+  }
+
+  async publishQuiz(id: number, status: PublishQuizDto['status']) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      include: { questions: { select: { type: true } } },
+    });
+    if (!quiz) throw new NotFoundException('Quiz not found');
+    if (
+      status === 'PUBLISHED' &&
+      quiz.type === QuizType.LISTENING_PRACTICE &&
+      quiz.questions.length > 0 &&
+      quiz.questions.every((question) => question.type === 'DICTATION') &&
+      quiz.questions.length < 20
+    ) {
+      throw new BadRequestException(
+        'Bài nghe chép cần có ít nhất 20 câu trước khi xuất bản',
+      );
+    }
+    return this.prisma.quiz.update({
+      where: { id },
+      data: {
+        publicationStatus: status,
+        publishedAt: status === 'PUBLISHED' ? new Date() : quiz.publishedAt,
+      },
     });
   }
 
@@ -93,6 +282,7 @@ export class QuizService {
     const quizzes = await this.prisma.quiz.findMany({
       where: {
         type: 'LISTENING_PRACTICE',
+        publicationStatus: 'PUBLISHED',
       },
       include: {
         _count: {
@@ -117,7 +307,12 @@ export class QuizService {
 
       return {
         ...quiz,
-        mode: metadata.mode === 'DICTATION' ? 'DICTATION' : 'COMPREHENSION',
+        mode:
+          metadata.mode === 'DICTATION'
+            ? 'DICTATION'
+            : metadata.mode === 'DIALOGUE'
+              ? 'DIALOGUE'
+              : 'COMPREHENSION',
         track:
           metadata.track === 'TOEIC_LISTENING'
             ? 'TOEIC_LISTENING'
@@ -151,12 +346,161 @@ export class QuizService {
     );
   }
 
+  private async assertListeningPracticeQuiz(quizId: number) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, type: true },
+    });
+    if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
+    if (quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new ForbiddenException('Phiên chỉ dành cho bài luyện nghe');
+    }
+    return quiz;
+  }
+
+  async getOrCreateListeningAttempt(userId: number, quizId: number) {
+    await this.assertListeningPracticeQuiz(quizId);
+    const existing = await this.prisma.listeningPracticeAttempt.findFirst({
+      where: {
+        userId,
+        quizId,
+        status: ListeningPracticeAttemptStatus.IN_PROGRESS,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    let attempt = existing;
+    if (!attempt) {
+      try {
+        attempt = await this.prisma.listeningPracticeAttempt.create({
+          data: { userId, quizId },
+        });
+      } catch (error: any) {
+        if (error?.code !== 'P2002') throw error;
+        attempt = await this.prisma.listeningPracticeAttempt.findFirst({
+          where: {
+            userId,
+            quizId,
+            status: ListeningPracticeAttemptStatus.IN_PROGRESS,
+          },
+          orderBy: { updatedAt: 'desc' },
+        });
+        if (!attempt) throw error;
+      }
+    }
+    return {
+      id: attempt.id,
+      quizId: attempt.quizId,
+      currentQuestionId: attempt.currentQuestionId,
+      answers: attempt.answers,
+      questionStates: attempt.questionStates,
+      status: attempt.status,
+      startedAt: attempt.startedAt,
+      updatedAt: attempt.updatedAt,
+    };
+  }
+
+  async saveListeningAttempt(
+    userId: number,
+    quizId: number,
+    attemptId: number,
+    dto: SaveListeningAttemptDto,
+  ) {
+    await this.assertListeningPracticeQuiz(quizId);
+    const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
+      where: { id: attemptId, userId, quizId },
+    });
+    if (!attempt)
+      throw new NotFoundException('Không tìm thấy phiên luyện nghe');
+    if (attempt.status !== ListeningPracticeAttemptStatus.IN_PROGRESS) {
+      throw new ForbiddenException('Phiên luyện nghe đã kết thúc');
+    }
+    if (dto.currentQuestionId !== undefined) {
+      const question = await this.prisma.question.findFirst({
+        where: { id: dto.currentQuestionId, quizId },
+        select: { id: true },
+      });
+      if (!question)
+        throw new BadRequestException('Câu hỏi không thuộc bài luyện này');
+    }
+    const updated = await this.prisma.listeningPracticeAttempt.update({
+      where: { id: attemptId },
+      data: {
+        ...(dto.currentQuestionId !== undefined
+          ? { currentQuestionId: dto.currentQuestionId }
+          : {}),
+        ...(dto.answers !== undefined
+          ? { answers: dto.answers as Prisma.InputJsonValue }
+          : {}),
+        ...(dto.questionStates !== undefined
+          ? { questionStates: dto.questionStates as Prisma.InputJsonValue }
+          : {}),
+      },
+    });
+    return {
+      id: updated.id,
+      quizId: updated.quizId,
+      currentQuestionId: updated.currentQuestionId,
+      answers: updated.answers,
+      questionStates: updated.questionStates,
+      status: updated.status,
+      startedAt: updated.startedAt,
+      updatedAt: updated.updatedAt,
+    };
+  }
+
+  /**
+   * Discard an unfinished listening session.  This is deliberately separate
+   * from saving progress: confirming "Thoát bài luyện" must make the next
+   * launch start clean instead of restoring a server checkpoint.
+   */
+  async cancelListeningAttempt(
+    userId: number,
+    quizId: number,
+    attemptId: number,
+  ) {
+    await this.assertListeningPracticeQuiz(quizId);
+    const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
+      where: { id: attemptId, userId, quizId },
+      select: { id: true, status: true },
+    });
+    if (!attempt) {
+      throw new NotFoundException('Không tìm thấy phiên luyện nghe');
+    }
+    if (attempt.status !== ListeningPracticeAttemptStatus.IN_PROGRESS) {
+      return { id: attempt.id, status: attempt.status, discarded: false };
+    }
+
+    const updated = await this.prisma.listeningPracticeAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        status: ListeningPracticeAttemptStatus.ABANDONED,
+        completedAt: new Date(),
+      },
+      select: { id: true, status: true },
+    });
+    return { id: updated.id, status: updated.status, discarded: true };
+  }
+
   async getToeicPapers(userId?: number) {
     const quizzes = await this.prisma.quiz.findMany({
       where: {
         type: { in: [QuizType.TOEIC, QuizType.TOEIC_FOUR_SKILL] },
         OR: [
+          { bilingualContent: { path: ['examFormat'], equals: 'TOEIC_LR' } },
+          { bilingualContent: { path: ['examFormat'], equals: 'TOEIC_SW' } },
+          {
+            bilingualContent: {
+              path: ['examFormat'],
+              equals: 'TOEIC_4_SKILLS',
+            },
+          },
           { bilingualContent: { path: ['examFormat'], equals: 'TWO_SKILL' } },
+          {
+            bilingualContent: {
+              path: ['examFormat'],
+              equals: 'SPEAKING_WRITING',
+            },
+          },
           { bilingualContent: { path: ['examFormat'], equals: 'FOUR_SKILL' } },
         ],
       },
@@ -194,12 +538,33 @@ export class QuizService {
   async getQuizById(id: number, includeAnswers = false, userId?: number) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },
-      include: { questions: { orderBy: { order: 'asc' } } },
+      include: {
+        questions: {
+          orderBy: { order: 'asc' },
+          include: {
+            audioAssets: {
+              where: { isActive: true },
+              orderBy: { version: 'desc' },
+            },
+            diagnosticClips: { orderBy: { createdAt: 'asc' } },
+          },
+        },
+      },
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
 
     if (quiz.type === QuizType.LISTENING_PRACTICE && userId === undefined) {
       throw new UnauthorizedException('Đăng nhập để bắt đầu luyện nghe');
+    }
+
+    // Draft and archived content is visible to administrators only. Learners
+    // must never deep-link around the published catalog filter.
+    if (
+      !includeAnswers &&
+      quiz.publicationStatus !== undefined &&
+      quiz.publicationStatus !== 'PUBLISHED'
+    ) {
+      throw new NotFoundException('Bài luyện chưa được xuất bản');
     }
 
     if (!includeAnswers && quiz.questions) {
@@ -221,23 +586,237 @@ export class QuizService {
     return quiz;
   }
 
+  /**
+   * Transcript is intentionally loaded on demand. The regular learner quiz
+   * payload redacts answers/audio text until the learner asks to review them;
+   * this endpoint is limited to published listening-practice dictation items
+   * and never serves TOEIC or other assessment content.
+   */
+  async getListeningTranscript(quizId: number) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: {
+        id: true,
+        type: true,
+        publicationStatus: true,
+        questions: {
+          where: { type: 'DICTATION' },
+          orderBy: { order: 'asc' },
+          select: { id: true, order: true, content: true },
+        },
+      },
+    });
+
+    if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
+    if (quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new ForbiddenException(
+        'Transcript chỉ khả dụng cho bài luyện nghe chép',
+      );
+    }
+    if (quiz.publicationStatus !== 'PUBLISHED') {
+      throw new NotFoundException('Bài luyện chưa được xuất bản');
+    }
+
+    const items = quiz.questions
+      .map((question) => {
+        const content = (question.content ?? {}) as Record<string, unknown>;
+        const transcript =
+          typeof content.correctAnswer === 'string'
+            ? content.correctAnswer.trim()
+            : typeof content.audioText === 'string'
+              ? content.audioText.trim()
+              : '';
+        return {
+          questionId: question.id,
+          order: question.order,
+          transcript,
+          translation:
+            typeof content.translation === 'string'
+              ? content.translation.trim() || null
+              : null,
+        };
+      })
+      .filter((item) => item.transcript.length > 0);
+
+    return { quizId: quiz.id, items };
+  }
+
   async createQuestion(quizId: number, dto: CreateQuestionDto) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, type: true },
+    });
+    if (!quiz) throw new NotFoundException('Không tìm thấy đề thi');
+
+    const content = normalizeQuestionContent(quiz.type, dto.type, dto.content);
     return this.prisma.question.create({
       data: {
-        ...dto,
+        type: dto.type,
+        content: content as Prisma.InputJsonValue,
+        order: dto.order ?? 0,
         quizId,
       },
+    });
+  }
+
+  async createAudioAsset(questionId: number, file: Express.Multer.File) {
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId },
+      include: {
+        quiz: { select: { id: true, type: true } },
+        audioAssets: {
+          where: { isActive: true },
+          orderBy: { version: 'desc' },
+          take: 1,
+        },
+      },
+    });
+    if (!question || question.quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new NotFoundException('Không tìm thấy câu luyện nghe');
+    }
+    const next = await this.prisma.quizAudioAsset.aggregate({
+      where: { questionId },
+      _max: { version: true },
+    });
+    const version = (next._max.version ?? 0) + 1;
+    const isDialogue =
+      question.type.toUpperCase() === 'DIALOGUE' &&
+      Array.isArray(
+        (question.content as Record<string, unknown>).transcriptSegments,
+      );
+    const folder = isDialogue
+      ? `catalog/listening/practice/dialogue/quiz-${question.quiz.id}/question-${questionId}/v${version}`
+      : `listening/quiz-${question.quiz.id}/question-${questionId}/v${version}`;
+    const upload = await this.uploadService.uploadRawBuffer(
+      file.buffer,
+      file.mimetype,
+      folder,
+      file.originalname,
+    );
+    return this.prisma.$transaction(async (tx) => {
+      await tx.quizAudioAsset.updateMany({
+        where: { questionId },
+        data: { isActive: false },
+      });
+      return tx.quizAudioAsset.create({
+        data: {
+          questionId,
+          version,
+          key: upload.key,
+          url: upload.url,
+          mimeType: upload.contentType,
+          isActive: true,
+        },
+      });
+    });
+  }
+
+  async generateDialogueAudioAsset(questionId: number) {
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId },
+      include: { quiz: { select: { id: true, type: true } } },
+    });
+    if (
+      !question ||
+      question.quiz.type !== QuizType.LISTENING_PRACTICE ||
+      question.type.toUpperCase() !== 'DIALOGUE'
+    ) {
+      throw new NotFoundException('Không tìm thấy câu hội thoại luyện nghe');
+    }
+
+    const content = question.content as Record<string, unknown>;
+    const normalizedContent = normalizeQuestionContent(
+      question.quiz.type,
+      question.type,
+      content,
+    );
+    const segments =
+      normalizedContent.transcriptSegments as NormalizedDialogueSegment[];
+    const accent = normalizedContent.accent === 'UK' ? 'UK' : 'US';
+    const audioBuffer = await this.speakingService.generateDialogueTts(
+      segments,
+      accent,
+      1,
+    );
+    const next = await this.prisma.quizAudioAsset.aggregate({
+      where: { questionId },
+      _max: { version: true },
+    });
+    const version = (next._max.version ?? 0) + 1;
+    const upload = await this.uploadService.uploadRawBuffer(
+      audioBuffer,
+      'audio/mpeg',
+      `catalog/listening/practice/dialogue/quiz-${question.quiz.id}/question-${questionId}/v${version}`,
+      'dialogue.mp3',
+    );
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.quizAudioAsset.updateMany({
+          where: { questionId },
+          data: { isActive: false },
+        });
+        await tx.question.update({
+          where: { id: questionId },
+          data: { content: normalizedContent as Prisma.InputJsonValue },
+        });
+        return tx.quizAudioAsset.create({
+          data: {
+            questionId,
+            version,
+            key: upload.key,
+            url: upload.url,
+            mimeType: upload.contentType,
+            isActive: true,
+          },
+        });
+      });
+    } catch (error) {
+      await this.uploadService.deleteFile(upload.key).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async createDiagnosticClip(
+    questionId: number,
+    dto: {
+      label: string;
+      key: string;
+      url: string;
+      startMs?: number;
+      endMs?: number;
+    },
+  ) {
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId },
+      select: { id: true, quiz: { select: { type: true } } },
+    });
+    if (!question || question.quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new NotFoundException('Không tìm thấy câu luyện nghe');
+    }
+    return this.prisma.listeningDiagnosticClip.create({
+      data: { questionId, ...dto },
     });
   }
 
   async updateQuestion(questionId: number, dto: Partial<CreateQuestionDto>) {
     const existing = await this.prisma.question.findUnique({
       where: { id: questionId },
+      include: { quiz: { select: { type: true } } },
     });
     if (!existing) throw new NotFoundException('Question not found');
+
+    const data = { ...dto };
+    if (dto.content !== undefined) {
+      data.content = normalizeQuestionContent(
+        existing.quiz.type,
+        dto.type ?? existing.type,
+        dto.content,
+      ) as any;
+    }
     return this.prisma.question.update({
       where: { id: questionId },
-      data: dto,
+      data,
     });
   }
 
@@ -256,6 +835,23 @@ export class QuizService {
 
     if (quiz.type === QuizType.LISTENING_PRACTICE) {
       this.assertCompleteListeningSubmission(quiz.questions, dto.answers);
+    }
+
+    if (
+      dto.attemptId !== undefined &&
+      quiz.type === QuizType.LISTENING_PRACTICE
+    ) {
+      const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
+        where: {
+          id: dto.attemptId,
+          userId,
+          quizId,
+          status: ListeningPracticeAttemptStatus.IN_PROGRESS,
+        },
+        select: { id: true },
+      });
+      if (!attempt)
+        throw new ForbiddenException('Phiên luyện nghe không còn hiệu lực');
     }
 
     let totalScore = 0;
@@ -289,16 +885,10 @@ export class QuizService {
           question.type === 'FILL_IN_BLANK'
         ) {
           const content = question.content;
-          const cleanCorrect = String(
+          const cleanCorrect = normalizeListeningAnswer(
             content.correctAnswer || content.correct || '',
-          )
-            .toLowerCase()
-            .replace(/[.,!?]/g, '')
-            .trim();
-          const cleanAns = String(ans.answer || '')
-            .toLowerCase()
-            .replace(/[.,!?]/g, '')
-            .trim();
+          );
+          const cleanAns = normalizeListeningAnswer(ans.answer);
           if (cleanCorrect === cleanAns) {
             isCorrect = true;
             score = 1;
@@ -334,38 +924,77 @@ export class QuizService {
       }
     }
 
-    const submission = await this.prisma.submission.create({
-      data: {
-        quizId,
-        userId,
-        score: totalScore,
-        aiFeedback: overallAiFeedback ? overallAiFeedback : null,
-        results: {
-          create: resultsData,
-        },
-      },
-      include: {
-        results: true,
-      },
-    });
-
-    // Chống farm điểm thưởng Quiz bằng UserQuizReward (Atomic @@unique([userId, quizId]))
-    let isFirstSubmission = false;
-    try {
-      await this.prisma.userQuizReward.create({
+    // Persist the submission and close the listening attempt atomically. This
+    // prevents a successful submission from being left behind while its
+    // server checkpoint remains IN_PROGRESS (or vice versa).
+    const submission = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.submission.create({
         data: {
-          userId,
           quizId,
+          userId,
+          score: totalScore,
+          aiFeedback: overallAiFeedback ? overallAiFeedback : null,
+          results: {
+            create: resultsData,
+          },
+        },
+        include: {
+          results: true,
         },
       });
-      isFirstSubmission = true;
-    } catch (e: any) {
-      if (e.code === 'P2002') {
-        isFirstSubmission = false;
-      } else {
-        throw e;
+
+      if (
+        dto.attemptId !== undefined &&
+        quiz.type === QuizType.LISTENING_PRACTICE
+      ) {
+        const completed = await tx.listeningPracticeAttempt.updateMany({
+          where: {
+            id: dto.attemptId,
+            userId,
+            quizId,
+            status: ListeningPracticeAttemptStatus.IN_PROGRESS,
+          },
+          data: {
+            status: ListeningPracticeAttemptStatus.COMPLETED,
+            completedAt: new Date(),
+          },
+        });
+        if (completed.count !== 1) {
+          throw new ForbiddenException('Phiên luyện nghe không còn hiệu lực');
+        }
       }
+
+      return created;
+    });
+
+    if (
+      quiz.type === QuizType.LISTENING_PRACTICE &&
+      this.prisma.learningActivity?.create
+    ) {
+      await this.prisma.learningActivity.create({
+        data: {
+          userId,
+          type: 'LISTENING_PRACTICE_COMPLETED',
+          title: quiz.title,
+          detail: `${totalScore}/${quiz.questions.length} câu đúng`,
+          score:
+            quiz.questions.length > 0
+              ? Math.round((totalScore / quiz.questions.length) * 100)
+              : 0,
+          sourceType: 'QUIZ',
+          sourceId: String(quizId),
+        },
+      });
     }
+
+    // Chống farm điểm thưởng Quiz bằng một insert idempotent.
+    // createMany + skipDuplicates tránh ném/log P2002 trong lần nộp lại,
+    // đồng thời vẫn giữ được tính nguyên tử của @@unique([userId, quizId]).
+    const rewardInsert = await this.prisma.userQuizReward.createMany({
+      data: { userId, quizId },
+      skipDuplicates: true,
+    });
+    const isFirstSubmission = rewardInsert.count === 1;
 
     // Phát ra sự kiện cho Gamification kèm cờ isFirstSubmission
     this.eventEmitter.emit('quiz.submitted', {
@@ -389,7 +1018,14 @@ export class QuizService {
   ) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
-      include: { quiz: { select: { id: true, type: true } } },
+      include: {
+        quiz: { select: { id: true, type: true } },
+        audioAssets: {
+          where: { isActive: true },
+          orderBy: { version: 'desc' },
+          take: 1,
+        },
+      },
     });
     if (!question || question.quizId !== quizId) {
       throw new NotFoundException('Câu hỏi không thuộc bài luyện này');
@@ -401,6 +1037,49 @@ export class QuizService {
     }
 
     const content = question.content as Record<string, unknown>;
+    if (question.type === 'DICTATION') {
+      const expectedAnswer =
+        typeof content.correctAnswer === 'string'
+          ? content.correctAnswer
+          : typeof content.correct === 'string'
+            ? content.correct
+            : null;
+      if (!expectedAnswer) {
+        throw new BadRequestException('Câu nghe chép chưa có đáp án hợp lệ');
+      }
+
+      const evaluationMode =
+        content.dictationMode === 'STRICT' ? 'STRICT' : 'STANDARD';
+      const normalizedSubmitted =
+        evaluationMode === 'STRICT'
+          ? normalizeStrictListeningAnswer(dto.answer)
+          : normalizeListeningAnswer(dto.answer);
+      const normalizedExpected =
+        evaluationMode === 'STRICT'
+          ? normalizeStrictListeningAnswer(expectedAnswer)
+          : normalizeListeningAnswer(expectedAnswer);
+
+      return {
+        questionId,
+        isCorrect: normalizedSubmitted === normalizedExpected,
+        submittedAnswer: dto.answer,
+        correctAnswer: expectedAnswer,
+        evaluationMode,
+        wordAccuracy: calculateDictationWordAccuracy(
+          expectedAnswer,
+          dto.answer,
+          evaluationMode,
+        ),
+        explanation:
+          typeof content.explanation === 'string' ||
+          (content.explanation && typeof content.explanation === 'object')
+            ? content.explanation
+            : null,
+        translation:
+          typeof content.translation === 'string' ? content.translation : null,
+      };
+    }
+
     if (
       question.type !== 'MULTIPLE_CHOICE' ||
       !Array.isArray(content.options)
@@ -442,7 +1121,14 @@ export class QuizService {
   ): Promise<Buffer> {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
-      include: { quiz: { select: { id: true, type: true } } },
+      include: {
+        quiz: { select: { id: true, type: true } },
+        audioAssets: {
+          where: { isActive: true },
+          orderBy: { version: 'desc' },
+          take: 1,
+        },
+      },
     });
     if (!question || question.quizId !== quizId) {
       throw new NotFoundException('Câu hỏi không thuộc bài luyện này');
@@ -452,11 +1138,40 @@ export class QuizService {
     }
 
     const content = question.content as Record<string, unknown>;
-    const audioText =
-      typeof content.audioText === 'string' ? content.audioText.trim() : '';
+    const hasDialogueSegments =
+      Array.isArray(content.transcriptSegments) &&
+      content.transcriptSegments.length > 0;
+    const activeAsset = question.audioAssets[0];
+    const isCatalogDialogueAsset =
+      activeAsset?.key.startsWith('catalog/listening/practice/dialogue/') ??
+      false;
+
+    // Dialogue assets must preserve distinct voices per speaker. Until the
+    // static multi-voice asset is materialized, synthesize the segment list
+    // as one SSML document (without reading speaker labels aloud).
+    if (
+      activeAsset &&
+      (!hasDialogueSegments ||
+        activeAsset.key.endsWith('/dialogue-v3.mp3') ||
+        isCatalogDialogueAsset)
+    )
+      return this.uploadService.downloadFileBuffer(activeAsset.key);
+
+    const audioText = buildNaturalListeningAudioText(content);
     if (!audioText)
       throw new BadRequestException('Câu hỏi chưa có nội dung audio');
     const accent = content.accent === 'UK' ? 'UK' : 'US';
+    if (hasDialogueSegments) {
+      const segments = (
+        content.transcriptSegments as Array<Record<string, unknown>>
+      )
+        .filter((segment) => typeof segment.text === 'string')
+        .map((segment) => ({
+          speaker: typeof segment.speaker === 'string' ? segment.speaker : '',
+          text: segment.text as string,
+        }));
+      return this.speakingService.generateDialogueTts(segments, accent, 1);
+    }
     return this.speakingService.generateTts(audioText, accent, 1);
   }
 
@@ -592,6 +1307,7 @@ export class QuizService {
 
     return {
       submissionId,
+      quizId: submission.quizId,
       quizTitle: submission.quiz.title,
       overallScore: submission.score,
       totalQuestions,

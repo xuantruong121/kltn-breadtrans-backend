@@ -29,6 +29,21 @@ describe('VocabService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('getTopics', () => {
+    it('keeps the speaking system dictionary out of the flashcard catalog', async () => {
+      const prisma = (service as any).prisma;
+      prisma.vocabTopic = { findMany: jest.fn().mockResolvedValue([]) };
+
+      await service.getTopics();
+
+      expect(prisma.vocabTopic.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { categoryName: { not: 'SYSTEM_DICTIONARY' } },
+        }),
+      );
+    });
+  });
+
   describe('setMastered', () => {
     it('sets 10 minutes nextReviewAt when isMastered is false', async () => {
       const prisma = (service as any).prisma;

@@ -34,6 +34,7 @@ import {
   IsNumber,
   IsOptional,
   IsArray,
+  Min,
 } from 'class-validator';
 
 export class ChatDto {
@@ -75,9 +76,14 @@ export class GenerateDictationDto {
   @IsNotEmpty()
   topic: string;
 
-  @ApiProperty({ example: 5, description: 'Number of sentences to generate' })
+  @ApiProperty({
+    example: 20,
+    minimum: 20,
+    description: 'Minimum 20 sentences per dictation exercise',
+  })
   @IsNumber()
   @IsNotEmpty()
+  @Min(20)
   count: number;
 }
 

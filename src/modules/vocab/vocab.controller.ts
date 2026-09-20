@@ -40,6 +40,19 @@ export class VocabController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Get('lookup/details')
+  @ApiOperation({
+    summary: 'Bổ sung IPA và các loại từ từ nguồn từ điển mở rộng',
+    description:
+      'Được gọi sau tra cứu local để cập nhật progressive, không chặn kết quả ban đầu.',
+  })
+  @ApiQuery({ name: 'word', required: true, description: 'Từ cần tra cứu' })
+  lookupWordDetails(@Query('word') word: string, @Request() req: any) {
+    return this.vocabService.lookupExtendedWord(word, req.user?.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('saved')
   @ApiOperation({ summary: 'Lấy danh sách từ vựng cá nhân đã lưu' })
   listSavedWords(@Request() req: any) {

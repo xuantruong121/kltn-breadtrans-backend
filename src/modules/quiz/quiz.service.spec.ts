@@ -1,10 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { QuizService } from './quiz.service';
+import {
+  buildNaturalListeningAudioText,
+  normalizeDialogueSegments,
+  normalizeListeningAnswer,
+  QuizService,
+} from './quiz.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SpeakingService } from '../speaking/speaking.service';
+import { UploadService } from '../upload/upload.service';
 
 const mockPrismaService = {
   quiz: {
@@ -18,6 +24,13 @@ const mockPrismaService = {
   },
   question: {
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
+  },
+  listeningPracticeAttempt: {
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
   },
 };
 
@@ -31,6 +44,12 @@ const mockEventEmitter = {
 
 const mockSpeakingService = {
   generateTts: jest.fn(),
+  generateDialogueTts: jest.fn(),
+};
+
+const mockUploadService = {
+  uploadRawBuffer: jest.fn(),
+  downloadFileBuffer: jest.fn(),
 };
 
 describe('QuizService', () => {
@@ -45,6 +64,7 @@ describe('QuizService', () => {
         { provide: AiService, useValue: mockAiService },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: SpeakingService, useValue: mockSpeakingService },
+        { provide: UploadService, useValue: mockUploadService },
       ],
     }).compile();
 
@@ -60,6 +80,19 @@ describe('QuizService', () => {
     expect(service).toBeDefined();
   });
 
+  it('normalizes dialogue rows and drops incomplete rows', () => {
+    expect(
+      normalizeDialogueSegments([
+        { speaker: ' Customer ', text: ' Hello ', translation: ' Xin chào ' },
+        { speaker: '', text: 'ignored' },
+        { speaker: 'Agent', text: ' How can I help? ' },
+      ]),
+    ).toEqual([
+      { speaker: 'Customer', text: 'Hello', translation: 'Xin chào' },
+      { speaker: 'Agent', text: 'How can I help?' },
+    ]);
+  });
+
   describe('getQuizById', () => {
     it('should return a quiz if it exists', async () => {
       const mockQuiz = { id: 1, title: 'Test Quiz', questions: [] };
@@ -69,7 +102,18 @@ describe('QuizService', () => {
 
       expect(prisma.quiz.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
-        include: { questions: { orderBy: { order: 'asc' } } },
+        include: {
+          questions: {
+            orderBy: { order: 'asc' },
+            include: {
+              audioAssets: {
+                where: { isActive: true },
+                orderBy: { version: 'desc' },
+              },
+              diagnosticClips: { orderBy: { createdAt: 'asc' } },
+            },
+          },
+        },
       });
       expect(result).toEqual(mockQuiz);
     });
@@ -110,6 +154,24 @@ describe('QuizService', () => {
   });
 
   describe('listening practice checks', () => {
+    it('builds natural dialogue audio without speaking speaker labels', () => {
+      expect(
+        buildNaturalListeningAudioText({
+          audioText: 'Customer: Hello. Agent: How can I help?',
+          transcriptSegments: [
+            { speaker: 'Customer', text: 'Hello.' },
+            { speaker: 'Agent', text: 'How can I help?' },
+          ],
+        }),
+      ).toBe('Hello. How can I help?');
+
+      expect(
+        buildNaturalListeningAudioText({
+          audioText: 'Customer: Hello. Agent: How can I help?',
+        }),
+      ).toBe('Hello. How can I help?');
+    });
+
     it('grades on the server without creating a submission', async () => {
       mockPrismaService.question.findUnique.mockResolvedValue({
         id: 91,
@@ -159,6 +221,220 @@ describe('QuizService', () => {
       expect(res.isCorrect).toBe(true);
       expect(res.explanation).toEqual(structuredExplanation);
     });
+
+    it('checks dictation on the server while tolerating punctuation and spacing', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 93,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: {
+          correctAnswer: "Let's meet at 8:30.",
+          translation: 'Hãy gặp nhau lúc 8:30.',
+        },
+      });
+
+      await expect(
+        service.checkPracticeQuestion(23, 93, {
+          answer: ' lets meet at 8:30 ',
+        }),
+      ).resolves.toMatchObject({
+        isCorrect: true,
+        correctAnswer: "Let's meet at 8:30.",
+      });
+      expect(mockPrismaService.submission.create).not.toHaveBeenCalled();
+    });
+
+    it('returns word-level accuracy for an incomplete dictation answer', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 94,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: {
+          correctAnswer: 'The meeting starts at nine tomorrow.',
+        },
+      });
+
+      await expect(
+        service.checkPracticeQuestion(23, 94, {
+          answer: 'The meeting starts at nine.',
+        }),
+      ).resolves.toMatchObject({
+        isCorrect: false,
+        evaluationMode: 'STANDARD',
+        wordAccuracy: 83,
+      });
+    });
+
+    it('returns feedback and the answer when dictation is submitted empty', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 941,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: { correctAnswer: 'The meeting starts at nine tomorrow.' },
+      });
+
+      await expect(
+        service.checkPracticeQuestion(23, 941, { answer: '' }),
+      ).resolves.toMatchObject({
+        isCorrect: false,
+        submittedAnswer: '',
+        correctAnswer: 'The meeting starts at nine tomorrow.',
+      });
+    });
+
+    it('keeps strict dictation punctuation and casing meaningful', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 95,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: {
+          correctAnswer: 'Hello, team.',
+          dictationMode: 'STRICT',
+        },
+      });
+
+      await expect(
+        service.checkPracticeQuestion(23, 95, { answer: 'hello team.' }),
+      ).resolves.toMatchObject({
+        isCorrect: false,
+        evaluationMode: 'STRICT',
+        wordAccuracy: 50,
+      });
+    });
+
+    it('normalizes curly apostrophes as optional dictation punctuation', () => {
+      expect(normalizeListeningAnswer('  Don’t   worry!  ')).toBe('dont worry');
+    });
+  });
+
+  describe('listening audio', () => {
+    it('re-synthesizes dialogue from spoken lines instead of using legacy labeled assets', async () => {
+      const audio = Buffer.from('natural-dialogue-audio');
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 96,
+        quizId: 28,
+        quiz: { id: 28, type: 'LISTENING_PRACTICE' },
+        audioAssets: [{ key: 'legacy/dialogue.mp3' }],
+        content: {
+          accent: 'US',
+          audioText: 'Customer: Hello. Agent: How can I help?',
+          transcriptSegments: [
+            { speaker: 'Customer', text: 'Hello.' },
+            { speaker: 'Agent', text: 'How can I help?' },
+          ],
+        },
+      });
+      mockSpeakingService.generateDialogueTts.mockResolvedValue(audio);
+
+      await expect(service.streamQuestionAudio(28, 96)).resolves.toBe(audio);
+      expect(mockSpeakingService.generateDialogueTts).toHaveBeenCalledWith(
+        [
+          { speaker: 'Customer', text: 'Hello.' },
+          { speaker: 'Agent', text: 'How can I help?' },
+        ],
+        'US',
+        1,
+      );
+      expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    });
+
+    it('keeps using a static asset for non-dialogue listening questions', async () => {
+      const audio = Buffer.from('stored-audio');
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 97,
+        quizId: 9,
+        quiz: { id: 9, type: 'LISTENING_PRACTICE' },
+        audioAssets: [{ key: 'catalog/listening/question-97.mp3' }],
+        content: { audioText: 'The shop opens at nine.' },
+      });
+      mockUploadService.downloadFileBuffer.mockResolvedValue(audio);
+
+      await expect(service.streamQuestionAudio(9, 97)).resolves.toBe(audio);
+      expect(mockUploadService.downloadFileBuffer).toHaveBeenCalledWith(
+        'catalog/listening/question-97.mp3',
+      );
+      expect(mockSpeakingService.generateTts).not.toHaveBeenCalled();
+    });
+
+    it('serves a generated catalog dialogue asset without re-synthesizing it', async () => {
+      const audio = Buffer.from('stored-dialogue-audio');
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 98,
+        quizId: 28,
+        quiz: { id: 28, type: 'LISTENING_PRACTICE' },
+        audioAssets: [
+          {
+            key: 'catalog/listening/practice/dialogue/quiz-28/question-98/v1/asset.mp3',
+          },
+        ],
+        content: {
+          accent: 'US',
+          transcriptSegments: [
+            { speaker: 'Customer', text: 'Hello.' },
+            { speaker: 'Agent', text: 'How can I help?' },
+          ],
+        },
+      });
+      mockUploadService.downloadFileBuffer.mockResolvedValue(audio);
+
+      await expect(service.streamQuestionAudio(28, 98)).resolves.toBe(audio);
+      expect(mockUploadService.downloadFileBuffer).toHaveBeenCalledWith(
+        'catalog/listening/practice/dialogue/quiz-28/question-98/v1/asset.mp3',
+      );
+      expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listening practice attempts', () => {
+    it('reuses an in-progress server session', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 23,
+        type: 'LISTENING_PRACTICE',
+      });
+      mockPrismaService.listeningPracticeAttempt.findFirst.mockResolvedValue({
+        id: 7,
+        quizId: 23,
+        currentQuestionId: 101,
+        answers: { '101': 'draft' },
+        questionStates: {},
+        status: 'IN_PROGRESS',
+        startedAt: new Date('2026-09-18T08:00:00.000Z'),
+        updatedAt: new Date('2026-09-18T08:01:00.000Z'),
+      });
+
+      await expect(
+        service.getOrCreateListeningAttempt(12, 23),
+      ).resolves.toMatchObject({
+        id: 7,
+        currentQuestionId: 101,
+        answers: { '101': 'draft' },
+      });
+      expect(
+        mockPrismaService.listeningPracticeAttempt.create,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects checkpoint questions from another quiz', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 23,
+        type: 'LISTENING_PRACTICE',
+      });
+      mockPrismaService.listeningPracticeAttempt.findFirst.mockResolvedValue({
+        id: 7,
+        quizId: 23,
+        userId: 12,
+        status: 'IN_PROGRESS',
+      });
+      mockPrismaService.question.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.saveListeningAttempt(12, 23, 7, { currentQuestionId: 999 }),
+      ).rejects.toThrow('Câu hỏi không thuộc bài luyện này');
+    });
   });
 
   describe('getToeicPapers', () => {
@@ -175,7 +451,31 @@ describe('QuizService', () => {
             {
               bilingualContent: {
                 path: ['examFormat'],
+                equals: 'TOEIC_LR',
+              },
+            },
+            {
+              bilingualContent: {
+                path: ['examFormat'],
+                equals: 'TOEIC_SW',
+              },
+            },
+            {
+              bilingualContent: {
+                path: ['examFormat'],
+                equals: 'TOEIC_4_SKILLS',
+              },
+            },
+            {
+              bilingualContent: {
+                path: ['examFormat'],
                 equals: 'TWO_SKILL',
+              },
+            },
+            {
+              bilingualContent: {
+                path: ['examFormat'],
+                equals: 'SPEAKING_WRITING',
               },
             },
             {

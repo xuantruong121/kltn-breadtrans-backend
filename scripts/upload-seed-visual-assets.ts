@@ -10,7 +10,9 @@ const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 const publicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
 
 if (!accountId || !bucket || !accessKeyId || !secretAccessKey || !publicUrl) {
-  throw new Error('R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_PUBLIC_URL are required.');
+  throw new Error(
+    'R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_PUBLIC_URL are required.',
+  );
 }
 
 const client = new S3Client({
@@ -33,21 +35,27 @@ const assets = [
 ];
 
 const root = path.resolve(__dirname, '..', 'prisma', 'seed-assets');
+const destinationPrefixes = [
+  'catalog/toeic/shared/images',
+  'catalog/listening/practice/images',
+];
 
 async function main(): Promise<void> {
   for (const name of assets) {
     const body = await readFile(path.join(root, name));
-    const key = `toeic/visuals/${name}`;
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: body,
-        ContentType: 'image/png',
-        CacheControl: 'public, max-age=31536000, immutable',
-      }),
-    );
-    console.log(`${name}: ${publicUrl}/${key}`);
+    for (const prefix of destinationPrefixes) {
+      const key = `${prefix}/${name}`;
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: body,
+          ContentType: 'image/png',
+          CacheControl: 'public, max-age=31536000, immutable',
+        }),
+      );
+      console.log(`${name}: ${publicUrl}/${key}`);
+    }
   }
 }
 

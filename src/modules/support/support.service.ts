@@ -113,11 +113,8 @@ export class SupportService {
     let hasMore = false;
     let total = 0;
 
-    if (beforeId || !query.page || query.page === 1) {
-      const whereClause: any = { conversationId };
-      if (beforeId) {
-        whereClause.id = { lt: beforeId };
-      }
+    if (beforeId !== undefined) {
+      const whereClause: any = { conversationId, id: { lt: beforeId } };
 
       const [totalCount, fetchedDesc] = await Promise.all([
         this.db.supportMessage.count({ where: { conversationId } }),
@@ -495,11 +492,8 @@ export class SupportService {
     let hasMore = false;
     let total = 0;
 
-    if (beforeId || !query.page || query.page === 1) {
-      const whereClause: any = { conversationId };
-      if (beforeId) {
-        whereClause.id = { lt: beforeId };
-      }
+    if (beforeId !== undefined) {
+      const whereClause: any = { conversationId, id: { lt: beforeId } };
 
       const [totalCount, fetchedDesc] = await Promise.all([
         this.db.supportMessage.count({ where: { conversationId } }),

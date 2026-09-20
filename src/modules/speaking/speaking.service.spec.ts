@@ -4,7 +4,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { SpeakingService } from './speaking.service';
+import { buildDialogueSsml, SpeakingService } from './speaking.service';
 import { createWavBuffer } from './speaking-audio-validator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
@@ -84,6 +84,34 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       mockUploadService as unknown as UploadService,
       mockWorker as unknown as import('./speaking-worker.service').SpeakingWorkerService,
     );
+  });
+
+  it('builds dialogue SSML with distinct voices and no spoken speaker labels', () => {
+    const ssml = buildDialogueSsml(
+      [
+        { speaker: 'Customer', text: 'My package is late.' },
+        { speaker: 'Agent', text: 'I can check that for you.' },
+      ],
+      'US',
+    );
+
+    expect(ssml).toContain("voice name='en-US-GuyNeural'");
+    expect(ssml).toContain("voice name='en-US-JennyNeural'");
+    expect(ssml).toContain('My package is late.');
+    expect(ssml).toContain('I can check that for you.');
+    expect(ssml).not.toContain('Customer:');
+    expect(ssml).not.toContain('Agent:');
+    expect(ssml).not.toContain('<break');
+
+    const namedSpeakers = buildDialogueSsml(
+      [
+        { speaker: 'Linh', text: 'Are we still presenting on Wednesday?' },
+        { speaker: 'Mark', text: 'Not anymore. The client moved it.' },
+      ],
+      'US',
+    );
+    expect(namedSpeakers).toContain("voice name='en-US-GuyNeural'");
+    expect(namedSpeakers).toContain("voice name='en-US-JennyNeural'");
   });
 
   describe('submitAudio', () => {

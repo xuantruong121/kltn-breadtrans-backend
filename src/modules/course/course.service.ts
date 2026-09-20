@@ -317,7 +317,10 @@ export class CourseService {
       dto.tuitionFeeVnd !== current.tuitionFeeVnd
     ) {
       const total = await this.prisma.enrollment.count({ where: { classId } });
-      if (current.status !== ClassStatus.UPCOMING || total > 0) {
+      const isModifiableStatus =
+        current.status === ClassStatus.UPCOMING ||
+        current.status === ClassStatus.ONGOING;
+      if (!isModifiableStatus || total > 0) {
         throw new BadRequestException(
           'Không thể thay đổi học phí sau khi gói học đã được sử dụng',
         );

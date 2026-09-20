@@ -122,11 +122,12 @@ export class NotificationsCronService {
 
       // Claim each item with a conditional update so concurrent cron instances
       // cannot both create a reminder for the same vocabulary word.
+      const claimTimestamp = now;
       const claimedItems: typeof dueItems = [];
       for (const item of dueItems) {
         const claim = await this.prisma.userVocabWordProgress.updateMany({
           where: { id: item.id, remindedAt: null },
-          data: { remindedAt: now },
+          data: { remindedAt: claimTimestamp },
         });
         if (claim.count === 1) {
           claimedItems.push(item);
@@ -145,6 +146,7 @@ export class NotificationsCronService {
         userItemsMap.set(item.userId, list);
       }
 
+      const notificationErrors: unknown[] = [];
       for (const [userId, items] of userItemsMap.entries()) {
         const count = items.length;
         const firstWord = items[0]?.word?.word || 'từ mới';
@@ -161,22 +163,54 @@ export class NotificationsCronService {
             : `Bao gồm "${firstWord}" và ${count - 1} từ khác. Ôn tập đều đặn giúp ghi nhớ sâu hơn!`;
         const url = topicId ? `/practice/vocab/${topicId}` : '/flashcard';
 
-        // 1. Create persistent in-app notification
-        await this.notificationsService.createNotification({
-          userId,
-          type: 'vocab_review',
-          title,
-          body,
-          url,
-        });
+        try {
+          // 1. Create persistent in-app notification. This is the
+          // authoritative delivery channel for the reminder.
+          await this.notificationsService.createNotification({
+            userId,
+            type: 'vocab_review',
+            title,
+            body,
+            url,
+          });
+        } catch (error) {
+          // The claim happens before notification creation to prevent duplicate
+          // reminders. If creation fails, release only this run's claims so the
+          // queue retry can deliver the reminder instead of losing it forever.
+          await this.prisma.userVocabWordProgress.updateMany({
+            where: {
+              id: { in: items.map((item) => item.id) },
+              remindedAt: claimTimestamp,
+            },
+            data: { remindedAt: null },
+          });
+          notificationErrors.push(error);
+          this.logger.error(
+            `[Queue] Failed to create vocabulary reminder for user ${userId}; claims released for retry.`,
+            error,
+          );
+          continue;
+        }
 
-        // 2. Send Web Push
-        await this.notificationsService.sendPushToUser(userId, {
-          title,
-          body,
-          icon: '/icons/icon-192.png',
-          url,
-        });
+        // 2. Send Web Push. This service deliberately swallows per-device
+        // push failures so the inbox notification remains authoritative.
+        try {
+          await this.notificationsService.sendPushToUser(userId, {
+            title,
+            body,
+            icon: '/icons/icon-192.png',
+            url,
+          });
+        } catch (error) {
+          this.logger.warn(
+            `[Queue] Inbox reminder created but push delivery failed for user ${userId}.`,
+            error,
+          );
+        }
+      }
+
+      if (notificationErrors.length > 0) {
+        throw notificationErrors[0];
       }
     } catch (err) {
       this.logger.error('[Queue] Error in runVocabSpacedReview:', err);

@@ -216,6 +216,75 @@ export class AdminService {
     };
   }
 
+  async getListeningAnalytics() {
+    const quizzes = await this.prisma.quiz.findMany({
+      where: { type: 'LISTENING_PRACTICE' },
+      select: {
+        id: true,
+        title: true,
+        publicationStatus: true,
+        questions: { select: { id: true, type: true, content: true } },
+      },
+      orderBy: { id: 'desc' },
+    });
+    const quizIds = quizzes.map((quiz) => quiz.id);
+    const [attempts, submissions] = await Promise.all([
+      this.prisma.listeningPracticeAttempt.findMany({
+        where: { quizId: { in: quizIds } },
+        select: { quizId: true, status: true },
+      }),
+      this.prisma.submission.findMany({
+        where: { quizId: { in: quizIds } },
+        select: { quizId: true, score: true },
+      }),
+    ]);
+    const byQuiz = (id: number) => ({
+      attempts: attempts.filter((item) => item.quizId === id),
+      submissions: submissions.filter((item) => item.quizId === id),
+    });
+    const items = quizzes.map((quiz) => {
+      const stats = byQuiz(quiz.id);
+      const scored = stats.submissions
+        .map((item) => item.score)
+        .filter((score): score is number => typeof score === 'number');
+      const dictationCount = quiz.questions.filter((question) => {
+        const content = question.content as Record<string, unknown>;
+        return (
+          question.type === 'DICTATION' || content.practiceKind === 'DICTATION'
+        );
+      }).length;
+      return {
+        quizId: quiz.id,
+        title: quiz.title,
+        publicationStatus: quiz.publicationStatus,
+        questionCount: quiz.questions.length,
+        dictationCount,
+        attemptCount: stats.attempts.length,
+        completedAttemptCount: stats.attempts.filter(
+          (item) => item.status === 'COMPLETED',
+        ).length,
+        submissionCount: stats.submissions.length,
+        averageScore: scored.length
+          ? Number(
+              (
+                scored.reduce((sum, score) => sum + score, 0) / scored.length
+              ).toFixed(2),
+            )
+          : null,
+      };
+    });
+    return {
+      generatedAt: new Date().toISOString(),
+      totals: {
+        quizzes: items.length,
+        questions: items.reduce((sum, item) => sum + item.questionCount, 0),
+        attempts: items.reduce((sum, item) => sum + item.attemptCount, 0),
+        submissions: items.reduce((sum, item) => sum + item.submissionCount, 0),
+      },
+      items,
+    };
+  }
+
   async getAllUsers(role?: string) {
     const users = await this.prisma.user.findMany({
       where: role ? { role: role as Role } : undefined,

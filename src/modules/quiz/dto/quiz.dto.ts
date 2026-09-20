@@ -5,7 +5,8 @@ import {
   IsNotEmpty,
   IsEnum,
   IsArray,
-  MinLength,
+  IsInt,
+  IsObject,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { QuizType } from '@prisma/client';
@@ -69,11 +70,41 @@ export class SubmitQuizDto {
   @ApiProperty({ type: [AnswerDto] })
   @IsArray()
   answers: AnswerDto[];
+
+  @ApiPropertyOptional({ example: 12 })
+  @IsInt()
+  @IsOptional()
+  attemptId?: number;
+}
+
+export class SaveListeningAttemptDto {
+  @ApiPropertyOptional({ example: 3 })
+  @IsInt()
+  @IsOptional()
+  currentQuestionId?: number;
+
+  @ApiPropertyOptional({ example: { '101': 'answer' } })
+  @IsObject()
+  @IsOptional()
+  answers?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ example: { '101': { checked: true } } })
+  @IsObject()
+  @IsOptional()
+  questionStates?: Record<string, unknown>;
 }
 
 export class CheckPracticeQuestionDto {
-  @ApiProperty({ example: 'Thursday at 2:30 P.M.' })
+  @ApiProperty({
+    example: 'Thursday at 2:30 P.M.',
+    description: 'Có thể để trống khi người học chưa nghe được câu.',
+  })
   @IsString()
-  @MinLength(1)
   answer: string;
+}
+
+export class PublishQuizDto {
+  @ApiProperty({ enum: ['DRAFT', 'PUBLISHED', 'ARCHIVED'] })
+  @IsEnum(['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const)
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 }

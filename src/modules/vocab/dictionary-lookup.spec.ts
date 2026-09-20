@@ -40,6 +40,89 @@ describe('DictionaryLookupService', () => {
     expect(result.canonicalWord).toBe('open');
     expect(result.isInflectionMatch).toBe(true);
     expect(provider.lookup).not.toHaveBeenCalled();
+    expect(result.entries[0].definitions[0]).toEqual({
+      definition: 'mở',
+      meaningVi: 'mở',
+      example: 'Open the door.',
+    });
+  });
+
+  it('keeps IPA available for common function words such as within', async () => {
+    const { prisma, service } = createService();
+    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...localWord,
+        id: 20,
+        word: 'within',
+        pos: 'preposition',
+        ipaUs: '/wɪˈθɪn/',
+        ipaUk: '/wɪˈðɪn/',
+        meaning: 'trong vòng; bên trong',
+      },
+    ]);
+
+    const result = await service.lookup('within');
+
+    expect(result.source).toBe('LOCAL');
+    expect(result.entries[0].ipaUs).toBe('/wɪˈθɪn/');
+    expect(result.entries[0].ipaUk).toBe('/wɪˈðɪn/');
+  });
+
+  it('uses the canonical lemma and removes duplicate local part-of-speech tabs', async () => {
+    const { prisma, service } = createService();
+    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...localWord,
+        id: 2,
+        word: 'opens',
+        ipaUs: null,
+        ipaUk: null,
+      },
+      localWord,
+    ]);
+
+    const result = await service.lookup('opens');
+
+    expect(result.canonicalWord).toBe('open');
+    expect(result.isInflectionMatch).toBe(true);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].ipaUs).toBe('/oʊpən/');
+  });
+
+  it('returns every curated local part of speech with its own IPA', async () => {
+    const { prisma, service } = createService();
+    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...localWord,
+        id: 10,
+        word: 'present',
+        pos: 'verb',
+        ipaUs: '/prɪˈzent/',
+        ipaUk: '/prɪˈzent/',
+        meaning: 'trình bày; giới thiệu',
+      },
+      {
+        ...localWord,
+        id: 11,
+        word: 'present',
+        pos: 'noun',
+        ipaUs: '/ˈprezənt/',
+        ipaUk: '/ˈprezənt/',
+        meaning: 'hiện tại; món quà',
+      },
+    ]);
+
+    const result = await service.lookup('present');
+
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries.map((entry) => entry.partOfSpeech)).toEqual([
+      'verb',
+      'noun',
+    ]);
+    expect(result.entries.map((entry) => entry.ipaUs)).toEqual([
+      '/prɪˈzent/',
+      '/ˈprezənt/',
+    ]);
   });
 
   it('normalizes an external result and caches it', async () => {
@@ -151,5 +234,81 @@ describe('DictionaryLookupService', () => {
     expect(result.entries[0].meaningVi).toBe('khả năng tương tác');
     expect(result.entries[0].ipaUs).toContain('ɑ');
     expect(ai.enrichDictionaryEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads and enriches multiple parts of speech for progressive details', async () => {
+    const redis = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue('OK'),
+    };
+    const { prisma } = createService(redis);
+    const provider = {
+      lookup: jest.fn().mockResolvedValue([
+        {
+          word: 'present',
+          partOfSpeech: 'noun',
+          ipaUs: '/ˈprezənt/',
+          ipaUk: '/ˈprezənt/',
+          audioUs: null,
+          audioUk: null,
+          definitions: [
+            {
+              definition: 'the current time',
+              example: 'Focus on the present.',
+              synonyms: ['now'],
+              antonyms: ['past'],
+            },
+          ],
+        },
+        {
+          word: 'present',
+          partOfSpeech: 'verb',
+          ipaUs: '/prɪˈzent/',
+          ipaUk: '/prɪˈzent/',
+          audioUs: null,
+          audioUk: null,
+          definitions: [
+            {
+              definition: 'to show or explain something',
+              example: 'She will present the report.',
+              synonyms: ['show'],
+              antonyms: [],
+            },
+          ],
+        },
+      ]),
+    } satisfies jest.Mocked<DictionaryProvider>;
+    const ai = {
+      enrichDictionaryEntry: jest
+        .fn()
+        .mockResolvedValueOnce({ meaningVi: 'hiện tại' })
+        .mockResolvedValueOnce({ meaningVi: 'trình bày' }),
+    };
+    const service = new DictionaryLookupService(
+      prisma,
+      redis as never,
+      ai as never,
+    );
+    (service as unknown as { provider: DictionaryProvider }).provider =
+      provider;
+
+    const result = await service.lookupExtended('present');
+
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries.map((entry) => entry.partOfSpeech)).toEqual([
+      'noun',
+      'verb',
+    ]);
+    expect(result.entries.map((entry) => entry.meaningVi)).toEqual([
+      'hiện tại',
+      'trình bày',
+    ]);
+    expect(ai.enrichDictionaryEntry).toHaveBeenCalledTimes(2);
+    expect(redis.set).toHaveBeenCalledWith(
+      'dictionary:extended:v1:en:present',
+      expect.any(String),
+      'EX',
+      30 * 24 * 60 * 60,
+    );
   });
 });
