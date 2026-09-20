@@ -193,6 +193,14 @@ export class QuizController {
     return this.quizService.checkPracticeQuestion(quizId, questionId, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get(':quizId/transcript')
+  @ApiOperation({ summary: 'Lấy toàn bộ transcript của bài nghe chép' })
+  getListeningTranscript(@Param('quizId', ParseIntPipe) quizId: number) {
+    return this.quizService.getListeningTranscript(quizId);
+  }
+
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết Quiz và danh sách Questions' })

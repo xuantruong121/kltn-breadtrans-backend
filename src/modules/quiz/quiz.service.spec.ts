@@ -267,6 +267,24 @@ describe('QuizService', () => {
       });
     });
 
+    it('returns feedback and the answer when dictation is submitted empty', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 941,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: { correctAnswer: 'The meeting starts at nine tomorrow.' },
+      });
+
+      await expect(
+        service.checkPracticeQuestion(23, 941, { answer: '' }),
+      ).resolves.toMatchObject({
+        isCorrect: false,
+        submittedAnswer: '',
+        correctAnswer: 'The meeting starts at nine tomorrow.',
+      });
+    });
+
     it('keeps strict dictation punctuation and casing meaningful', async () => {
       mockPrismaService.question.findUnique.mockResolvedValue({
         id: 95,

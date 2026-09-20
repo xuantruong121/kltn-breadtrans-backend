@@ -1955,9 +1955,13 @@ export class GamificationService {
           return { acquired: false, noop: true };
         }
 
+        // Prisma creates this table and column with quoted, case-sensitive
+        // identifiers. Keep the row lock query aligned with the actual
+        // PostgreSQL names; unquoted `GameSettings` is folded to
+        // `gamesettings` and fails with 42P01.
         await tx.$queryRaw`
-          SELECT * FROM GameSettings
-          WHERE gameId = 'cron-weekly-league'
+          SELECT * FROM "GameSettings"
+          WHERE "gameId" = 'cron-weekly-league'
           FOR UPDATE
         `;
         const setting = await tx.gameSettings.findUnique({

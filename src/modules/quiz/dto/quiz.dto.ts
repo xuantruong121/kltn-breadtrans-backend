@@ -5,7 +5,6 @@ import {
   IsNotEmpty,
   IsEnum,
   IsArray,
-  MinLength,
   IsInt,
   IsObject,
 } from 'class-validator';
@@ -96,9 +95,11 @@ export class SaveListeningAttemptDto {
 }
 
 export class CheckPracticeQuestionDto {
-  @ApiProperty({ example: 'Thursday at 2:30 P.M.' })
+  @ApiProperty({
+    example: 'Thursday at 2:30 P.M.',
+    description: 'Có thể để trống khi người học chưa nghe được câu.',
+  })
   @IsString()
-  @MinLength(1)
   answer: string;
 }
 

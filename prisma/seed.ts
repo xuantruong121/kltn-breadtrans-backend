@@ -37,9 +37,6 @@ const seedAssetUrl = (key: string): string | null => {
   return base ? `${base}/${normalizedKey}` : null;
 };
 
-// General listening practice assets have their own catalog namespace. They
-// must not be classified as TOEIC exam media because they belong to the
-// four-skill practice library (QuizType.LISTENING_PRACTICE).
 const listeningPracticeAssetUrl = (filename: string): string | null => {
   const base = SEED_ASSET_BASE_URL.replace(/\/$/, '');
   return base ? `${base}/catalog/listening/practice/images/${filename}` : null;
@@ -68,6 +65,315 @@ const writingPracticeAssetUrl = (
   return base
     ? `${base}/catalog/writing/practice/${subfolder}/${filename}`
     : null;
+};
+
+type DictationSeedSentence = {
+  audioText: string;
+  translation: string;
+  explanationVi: string;
+  vocabularyNote: string;
+};
+
+const createDictationQuestions = (
+  level: string,
+  accent: string,
+  sentences: DictationSeedSentence[],
+) =>
+  sentences.map((sentence) => ({
+    type: 'DICTATION' as const,
+    content: {
+      skill: 'LISTENING',
+      level,
+      accent,
+      audioText: sentence.audioText,
+      correctAnswer: sentence.audioText,
+      text: 'Nghe và chép lại câu bạn vừa nghe.',
+      translation: sentence.translation,
+      explanation: {
+        vi: sentence.explanationVi,
+        evidence: sentence.audioText,
+        vocabularyNote: sentence.vocabularyNote,
+      },
+    },
+  }));
+
+const DICTATION_EXPANSION: Record<number, DictationSeedSentence[]> = {
+  23: [
+    {
+      audioText: 'I have a dentist appointment tomorrow morning.',
+      translation: 'Tôi có lịch hẹn nha sĩ vào sáng mai.',
+      explanationVi: 'Câu nêu một lịch hẹn vào sáng ngày hôm sau.',
+      vocabularyNote: 'dentist appointment = lịch hẹn nha sĩ',
+    },
+    {
+      audioText: 'Please leave the package by the front door.',
+      translation: 'Vui lòng để gói hàng cạnh cửa trước.',
+      explanationVi: 'Người nói hướng dẫn vị trí để gói hàng.',
+      vocabularyNote: 'front door = cửa trước',
+    },
+    {
+      audioText: 'The meeting starts at half past ten.',
+      translation: 'Cuộc họp bắt đầu lúc mười giờ rưỡi.',
+      explanationVi: 'Thông tin chính là thời điểm bắt đầu cuộc họp.',
+      vocabularyNote: 'half past ten = mười giờ rưỡi',
+    },
+    {
+      audioText: 'Could you send me the address again?',
+      translation: 'Bạn có thể gửi lại địa chỉ cho tôi không?',
+      explanationVi: 'Đây là một lời nhờ gửi lại địa chỉ.',
+      vocabularyNote: 'send the address again = gửi lại địa chỉ',
+    },
+    {
+      audioText: 'The library closes at six o’clock today.',
+      translation: 'Hôm nay thư viện đóng cửa lúc sáu giờ.',
+      explanationVi: 'Câu thông báo giờ đóng cửa của thư viện.',
+      vocabularyNote: 'closes at = đóng cửa lúc',
+    },
+    {
+      audioText: 'My brother is cooking dinner in the kitchen.',
+      translation: 'Anh/em trai tôi đang nấu bữa tối trong bếp.',
+      explanationVi: 'Câu mô tả hoạt động đang diễn ra trong bếp.',
+      vocabularyNote: 'cook dinner = nấu bữa tối',
+    },
+    {
+      audioText: 'Please bring an umbrella because it may rain.',
+      translation: 'Vui lòng mang ô vì trời có thể mưa.',
+      explanationVi: 'Người nói đưa ra lời nhắc dựa trên khả năng trời mưa.',
+      vocabularyNote: 'may rain = có thể mưa',
+    },
+    {
+      audioText: 'The pharmacy is next to the supermarket.',
+      translation: 'Hiệu thuốc ở cạnh siêu thị.',
+      explanationVi: 'Câu chỉ vị trí của hiệu thuốc.',
+      vocabularyNote: 'next to = ở cạnh',
+    },
+    {
+      audioText: 'I usually walk to work on Fridays.',
+      translation: 'Tôi thường đi bộ đến chỗ làm vào thứ Sáu.',
+      explanationVi: 'Câu mô tả thói quen đi làm vào thứ Sáu.',
+      vocabularyNote: 'walk to work = đi bộ đến chỗ làm',
+    },
+    {
+      audioText: 'The children are playing in the garden.',
+      translation: 'Bọn trẻ đang chơi trong vườn.',
+      explanationVi: 'Câu mô tả hoạt động của bọn trẻ trong vườn.',
+      vocabularyNote: 'play in the garden = chơi trong vườn',
+    },
+    {
+      audioText: 'Please turn off the lights before you leave.',
+      translation: 'Vui lòng tắt đèn trước khi bạn rời đi.',
+      explanationVi: 'Đây là lời nhắc tắt đèn trước khi ra khỏi phòng.',
+      vocabularyNote: 'turn off the lights = tắt đèn',
+    },
+    {
+      audioText: 'Our English class is in room twelve.',
+      translation: 'Lớp tiếng Anh của chúng ta ở phòng mười hai.',
+      explanationVi: 'Câu cho biết địa điểm của lớp học.',
+      vocabularyNote: 'English class = lớp tiếng Anh',
+    },
+    {
+      audioText: 'The train is late because of heavy snow.',
+      translation: 'Tàu đến muộn vì tuyết rơi dày.',
+      explanationVi: 'Câu nêu nguyên nhân khiến tàu bị trễ.',
+      vocabularyNote: 'because of = bởi vì; heavy snow = tuyết dày',
+    },
+    {
+      audioText: 'I need to buy some milk and fresh bread.',
+      translation: 'Tôi cần mua một ít sữa và bánh mì tươi.',
+      explanationVi: 'Câu nêu hai món đồ cần mua.',
+      vocabularyNote: 'fresh bread = bánh mì tươi',
+    },
+    {
+      audioText: 'See you at the bus stop after school.',
+      translation: 'Hẹn gặp bạn ở trạm xe buýt sau giờ học.',
+      explanationVi: 'Người nói hẹn gặp tại trạm xe buýt sau giờ học.',
+      vocabularyNote: 'bus stop = trạm xe buýt',
+    },
+  ],
+  24: [
+    {
+      audioText: 'The next train leaves from platform three.',
+      translation: 'Chuyến tàu tiếp theo khởi hành từ sân ga số ba.',
+      explanationVi: 'Thông tin cần ghi nhớ là số sân ga.',
+      vocabularyNote: 'platform three = sân ga số ba',
+    },
+    {
+      audioText: 'Please show your passport at the information desk.',
+      translation: 'Vui lòng xuất trình hộ chiếu tại quầy thông tin.',
+      explanationVi: 'Câu hướng dẫn hành khách xuất trình hộ chiếu.',
+      vocabularyNote: 'information desk = quầy thông tin',
+    },
+    {
+      audioText: 'The taxi will pick us up outside the hotel.',
+      translation: 'Taxi sẽ đón chúng ta bên ngoài khách sạn.',
+      explanationVi: 'Câu cho biết nơi taxi sẽ đón khách.',
+      vocabularyNote: 'pick us up = đón chúng ta',
+    },
+    {
+      audioText: 'Walk straight for two blocks and turn right.',
+      translation: 'Đi thẳng hai dãy nhà rồi rẽ phải.',
+      explanationVi: 'Đây là chỉ dẫn gồm khoảng cách và hướng rẽ.',
+      vocabularyNote: 'walk straight = đi thẳng; turn right = rẽ phải',
+    },
+    {
+      audioText: 'Our room is on the second floor near the lift.',
+      translation: 'Phòng của chúng ta ở tầng hai gần thang máy.',
+      explanationVi: 'Câu chỉ tầng và vị trí của căn phòng.',
+      vocabularyNote: 'second floor = tầng hai; lift = thang máy',
+    },
+    {
+      audioText: 'The tour bus departs at eight thirty.',
+      translation: 'Xe buýt tham quan khởi hành lúc tám giờ rưỡi.',
+      explanationVi: 'Thông tin chính là giờ xe tham quan khởi hành.',
+      vocabularyNote: 'tour bus = xe buýt tham quan; departs at = khởi hành lúc',
+    },
+    {
+      audioText: 'You can exchange money at the airport bank.',
+      translation: 'Bạn có thể đổi tiền tại ngân hàng ở sân bay.',
+      explanationVi: 'Câu cho biết nơi có thể đổi tiền.',
+      vocabularyNote: 'exchange money = đổi tiền',
+    },
+    {
+      audioText: 'The beach is about ten minutes from here.',
+      translation: 'Bãi biển cách đây khoảng mười phút.',
+      explanationVi: 'Câu ước lượng thời gian đi đến bãi biển.',
+      vocabularyNote: 'about ten minutes = khoảng mười phút',
+    },
+    {
+      audioText: 'Keep your ticket until you leave the station.',
+      translation: 'Hãy giữ vé cho đến khi bạn rời nhà ga.',
+      explanationVi: 'Đây là lời nhắc giữ vé trong suốt chuyến đi.',
+      vocabularyNote: 'keep your ticket = giữ vé',
+    },
+    {
+      audioText: 'The hotel offers free breakfast for all guests.',
+      translation: 'Khách sạn phục vụ bữa sáng miễn phí cho mọi khách.',
+      explanationVi: 'Câu nêu một tiện ích miễn phí của khách sạn.',
+      vocabularyNote: 'free breakfast = bữa sáng miễn phí',
+    },
+    {
+      audioText: 'Our flight has been delayed by thirty minutes.',
+      translation: 'Chuyến bay của chúng ta bị hoãn ba mươi phút.',
+      explanationVi: 'Thông báo cho biết thời gian chuyến bay bị hoãn.',
+      vocabularyNote: 'has been delayed = đã bị hoãn',
+    },
+    {
+      audioText: 'The museum closes early on Mondays.',
+      translation: 'Bảo tàng đóng cửa sớm vào các ngày thứ Hai.',
+      explanationVi: 'Câu nêu lịch đóng cửa sớm theo ngày trong tuần.',
+      vocabularyNote: 'closes early = đóng cửa sớm',
+    },
+    {
+      audioText: 'Could you recommend a quiet restaurant nearby?',
+      translation: 'Bạn có thể giới thiệu một nhà hàng yên tĩnh gần đây không?',
+      explanationVi: 'Đây là lời nhờ giới thiệu địa điểm ăn uống.',
+      vocabularyNote: 'recommend a restaurant = giới thiệu nhà hàng',
+    },
+    {
+      audioText: 'The entrance is behind the large blue sign.',
+      translation: 'Lối vào ở phía sau tấm biển xanh lớn.',
+      explanationVi: 'Câu chỉ vị trí lối vào bằng một mốc dễ nhận biết.',
+      vocabularyNote: 'behind the sign = phía sau tấm biển',
+    },
+    {
+      audioText: 'Please check the departure time before booking.',
+      translation: 'Vui lòng kiểm tra giờ khởi hành trước khi đặt vé.',
+      explanationVi: 'Câu khuyên kiểm tra thời gian trước khi đặt vé.',
+      vocabularyNote: 'departure time = giờ khởi hành; book = đặt vé',
+    },
+  ],
+  25: [
+    {
+      audioText: 'The sales team will review the figures this afternoon.',
+      translation: 'Nhóm kinh doanh sẽ xem lại các số liệu vào chiều nay.',
+      explanationVi: 'Câu nêu kế hoạch xem lại số liệu trong ngày.',
+      vocabularyNote: 'review the figures = xem lại số liệu',
+    },
+    {
+      audioText: 'Please confirm your availability for next Monday.',
+      translation: 'Vui lòng xác nhận bạn có rảnh vào thứ Hai tới không.',
+      explanationVi: 'Đây là yêu cầu xác nhận lịch làm việc.',
+      vocabularyNote: 'confirm your availability = xác nhận thời gian rảnh',
+    },
+    {
+      audioText: 'The manager will join the call at two o’clock.',
+      translation: 'Quản lý sẽ tham gia cuộc gọi lúc hai giờ.',
+      explanationVi: 'Câu cho biết thời điểm quản lý tham gia cuộc gọi.',
+      vocabularyNote: 'join the call = tham gia cuộc gọi',
+    },
+    {
+      audioText: 'We have moved the training session to Friday.',
+      translation: 'Chúng ta đã chuyển buổi đào tạo sang thứ Sáu.',
+      explanationVi: 'Câu thông báo thay đổi ngày đào tạo.',
+      vocabularyNote: 'move a session to = chuyển buổi học sang',
+    },
+    {
+      audioText: 'Please review the contract before signing it.',
+      translation: 'Vui lòng xem lại hợp đồng trước khi ký.',
+      explanationVi: 'Đây là lời nhắc kiểm tra hợp đồng trước khi ký.',
+      vocabularyNote: 'review the contract = xem lại hợp đồng',
+    },
+    {
+      audioText: 'The updated schedule is attached to this email.',
+      translation: 'Lịch trình cập nhật được đính kèm email này.',
+      explanationVi: 'Câu chỉ vị trí của lịch trình được cập nhật.',
+      vocabularyNote: 'attached to = được đính kèm với',
+    },
+    {
+      audioText: 'Our project is currently ahead of schedule.',
+      translation: 'Dự án của chúng ta hiện đang sớm hơn tiến độ.',
+      explanationVi: 'Câu đánh giá dự án đang hoàn thành sớm hơn kế hoạch.',
+      vocabularyNote: 'ahead of schedule = sớm hơn tiến độ',
+    },
+    {
+      audioText: 'The client requested a short progress report.',
+      translation: 'Khách hàng yêu cầu một báo cáo tiến độ ngắn.',
+      explanationVi: 'Câu nêu yêu cầu của khách hàng về báo cáo.',
+      vocabularyNote: 'progress report = báo cáo tiến độ',
+    },
+    {
+      audioText: 'Could you reserve a meeting room for us?',
+      translation: 'Bạn có thể đặt một phòng họp cho chúng tôi không?',
+      explanationVi: 'Đây là lời nhờ đặt phòng họp.',
+      vocabularyNote: 'reserve a meeting room = đặt phòng họp',
+    },
+    {
+      audioText: 'The invoice should be paid by the end of the month.',
+      translation: 'Hóa đơn cần được thanh toán trước cuối tháng.',
+      explanationVi: 'Câu nêu hạn thanh toán hóa đơn.',
+      vocabularyNote: 'by the end of the month = trước cuối tháng',
+    },
+    {
+      audioText: 'I will send the presentation slides after lunch.',
+      translation: 'Tôi sẽ gửi các slide thuyết trình sau bữa trưa.',
+      explanationVi: 'Câu cam kết gửi tài liệu vào buổi chiều.',
+      vocabularyNote: 'presentation slides = slide thuyết trình',
+    },
+    {
+      audioText: 'The new policy applies to all full-time employees.',
+      translation: 'Chính sách mới áp dụng cho tất cả nhân viên toàn thời gian.',
+      explanationVi: 'Câu nêu đối tượng áp dụng của chính sách.',
+      vocabularyNote: 'apply to = áp dụng cho; full-time employee = nhân viên toàn thời gian',
+    },
+    {
+      audioText: 'We need more information before making a decision.',
+      translation: 'Chúng ta cần thêm thông tin trước khi đưa ra quyết định.',
+      explanationVi: 'Câu giải thích cần thêm thông tin trước quyết định.',
+      vocabularyNote: 'make a decision = đưa ra quyết định',
+    },
+    {
+      audioText: 'The conference room is available after three.',
+      translation: 'Phòng hội nghị còn trống sau ba giờ.',
+      explanationVi: 'Câu cho biết thời gian phòng hội nghị có thể sử dụng.',
+      vocabularyNote: 'be available = còn trống; conference room = phòng hội nghị',
+    },
+    {
+      audioText: 'Please let me know if the deadline changes.',
+      translation: 'Vui lòng cho tôi biết nếu thời hạn thay đổi.',
+      explanationVi: 'Đây là lời nhờ thông báo khi có thay đổi thời hạn.',
+      vocabularyNote: 'let me know = cho tôi biết; deadline changes = thời hạn thay đổi',
+    },
+  ],
 };
 
 type SeedCollocation = {
@@ -1644,47 +1950,111 @@ async function main() {
     },
   };
 
-  // These visuals provide non-answer-bearing context for general listening practice.
-  // TOEIC Part 1 uses question-group images instead, because the image is part of the task.
-  const listeningVisualContextByQuizId: Record<
-    number,
+  // Visuals are assigned per question, never per quiz. These are optional,
+  // non-answer-bearing context images for questions with a concrete setting.
+  const listeningVisualContextByQuestionKey: Record<
+    string,
     { imageUrl: string | null; imageAlt: string }
   > = {
-    1: {
-      imageUrl: listeningPracticeAssetUrl('grocery-checkout.png'),
-      imageAlt: 'A grocery store checkout counter',
-    },
-    5: {
-      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
-      imageAlt: 'Colleagues talking in an office meeting',
-    },
-    9: {
-      imageUrl: listeningPracticeAssetUrl('cafe-counter.png'),
-      imageAlt: 'A cafe service counter',
-    },
-    10: {
+    '1:3': {
       imageUrl: listeningPracticeAssetUrl('departure-board.png'),
-      imageAlt: 'Travellers near an airport departure board',
+      imageAlt: 'Passengers waiting near a departure board',
     },
-    11: {
-      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
-      imageAlt: 'A workplace meeting',
-    },
-    12: {
-      imageUrl: listeningPracticeAssetUrl('folders-cabinet.png'),
-      imageAlt: 'An employee organising office documents',
-    },
-    26: {
+    '1:4': {
       imageUrl: listeningPracticeAssetUrl('cafe-counter.png'),
       imageAlt: 'Customers ordering at a cafe counter',
     },
-    27: {
-      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
-      imageAlt: 'Colleagues planning work at a meeting',
-    },
-    28: {
+    '1:6': {
       imageUrl: listeningPracticeAssetUrl('delivery-boxes.png'),
-      imageAlt: 'A delivery service preparing customer orders',
+      imageAlt: 'Packages prepared for customer collection',
+    },
+    '5:1': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Colleagues discussing a delivery plan in an office',
+    },
+    '5:2': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Colleagues working with a shared office document',
+    },
+    '5:3': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Colleagues preparing for a client meeting',
+    },
+    '9:1': {
+      imageUrl: listeningPracticeAssetUrl('grocery-checkout.png'),
+      imageAlt: 'A customer at a shop checkout counter',
+    },
+    '9:2': {
+      imageUrl: listeningPracticeAssetUrl('folders-cabinet.png'),
+      imageAlt: 'Books and documents arranged on office shelves',
+    },
+    '9:3': {
+      imageUrl: listeningPracticeAssetUrl('cafe-counter.png'),
+      imageAlt: 'A customer ordering a drink at a cafe counter',
+    },
+    '9:4': {
+      imageUrl: listeningPracticeAssetUrl('departure-board.png'),
+      imageAlt: 'Passengers waiting for public transport',
+    },
+    '10:1': {
+      imageUrl: listeningPracticeAssetUrl('departure-board.png'),
+      imageAlt: 'Travellers checking a departure board',
+    },
+    '10:3': {
+      imageUrl: listeningPracticeAssetUrl('departure-board.png'),
+      imageAlt: 'A traveller preparing documents at an airport',
+    },
+    '10:8': {
+      imageUrl: listeningPracticeAssetUrl('departure-board.png'),
+      imageAlt: 'Travellers collecting luggage at an airport',
+    },
+    '11:1': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Colleagues meeting in a workplace',
+    },
+    '11:2': {
+      imageUrl: listeningPracticeAssetUrl('folders-cabinet.png'),
+      imageAlt: 'A professional reviewing office documents',
+    },
+    '11:3': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'A team working with meeting-room equipment',
+    },
+    '11:7': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Employees attending a workplace workshop',
+    },
+    '12:1': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'A team preparing a presentation in an office',
+    },
+    '12:2': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Colleagues discussing an office location',
+    },
+    '12:4': {
+      imageUrl: listeningPracticeAssetUrl('departure-board.png'),
+      imageAlt: 'Travellers checking a train departure board',
+    },
+    '12:5': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Colleagues reviewing a business proposal',
+    },
+    '12:8': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Employees attending a training session',
+    },
+    '26:1': {
+      imageUrl: listeningPracticeAssetUrl('cafe-counter.png'),
+      imageAlt: 'A customer ordering a drink at a cafe',
+    },
+    '27:1': {
+      imageUrl: listeningPracticeAssetUrl('office-meeting.png'),
+      imageAlt: 'Colleagues preparing a project presentation',
+    },
+    '28:1': {
+      imageUrl: listeningPracticeAssetUrl('delivery-boxes.png'),
+      imageAlt: 'Packages prepared for delivery',
     },
   };
 
@@ -2953,7 +3323,6 @@ async function main() {
     });
     for (let order = 1; order <= definition.questions.length; order += 1) {
       const q = definition.questions[order - 1];
-      const visualContext = listeningVisualContextByQuizId[definition.id];
       const readingMetadata = legacyReadingQuestionMetadata[definition.id];
       const sourceContent = q.content as Record<string, unknown>;
       const normalizedReadingContent =
@@ -2973,15 +3342,20 @@ async function main() {
                 'DETAIL',
             }
           : q.content;
-      const questionContent =
-        definition.type === 'LISTENING_PRACTICE' && visualContext?.imageUrl
-          ? {
-              ...normalizedReadingContent,
-              imageUrl: visualContext.imageUrl,
-              imageAlt: visualContext.imageAlt,
-              imagePurpose: 'TOPIC_CONTEXT',
-            }
-          : normalizedReadingContent;
+      // General listening visuals are opt-in per question. This prevents an
+      // unrelated quiz-level asset from leaking into every audio item.
+      const visualContext =
+        definition.type === 'LISTENING_PRACTICE'
+          ? listeningVisualContextByQuestionKey[`${definition.id}:${order}`]
+          : undefined;
+      const questionContent = visualContext?.imageUrl
+        ? {
+            ...normalizedReadingContent,
+            imageUrl: visualContext.imageUrl,
+            imageAlt: visualContext.imageAlt,
+            imagePurpose: 'TOPIC_CONTEXT',
+          }
+        : normalizedReadingContent;
       await prisma.question.upsert({
         where: { id: questionId },
         update: {
@@ -4629,7 +5003,6 @@ async function main() {
     });
     for (let order = 1; order <= definition.questions.length; order += 1) {
       const q = definition.questions[order - 1];
-      const visualContext = listeningVisualContextByQuizId[definition.id];
       const readingMetadata = legacyReadingQuestionMetadata[definition.id];
       const sourceContent = q.content as Record<string, unknown>;
       const normalizedReadingContent =
@@ -4649,15 +5022,18 @@ async function main() {
                 'DETAIL',
             }
           : q.content;
-      const questionContent =
-        definition.type === 'LISTENING_PRACTICE' && visualContext?.imageUrl
-          ? {
-              ...normalizedReadingContent,
-              imageUrl: visualContext.imageUrl,
-              imageAlt: visualContext.imageAlt,
-              imagePurpose: 'TOPIC_CONTEXT',
-            }
-          : normalizedReadingContent;
+      const visualContext =
+        definition.type === 'LISTENING_PRACTICE'
+          ? listeningVisualContextByQuestionKey[`${definition.id}:${order}`]
+          : undefined;
+      const questionContent = visualContext?.imageUrl
+        ? {
+            ...normalizedReadingContent,
+            imageUrl: visualContext.imageUrl,
+            imageAlt: visualContext.imageAlt,
+            imagePurpose: 'TOPIC_CONTEXT',
+          }
+        : normalizedReadingContent;
       await prisma.question.upsert({
         where: { id: questionId },
         update: {
@@ -5103,6 +5479,16 @@ async function main() {
 
   // Append the expanded general-listening catalog after all legacy rows so a
   // seed refresh never reassigns existing question IDs referenced by results.
+  // Earlier seed sections intentionally preserve legacy question IDs. Align
+  // PostgreSQL's serial sequence before creating newly added dictation rows so
+  // a fresh or repeated seed cannot reuse an existing ID.
+  await prisma.$executeRaw`
+    SELECT setval(
+      pg_get_serial_sequence('"Question"', 'id'),
+      COALESCE((SELECT MAX("id") FROM "Question"), 1),
+      true
+    )
+  `;
   for (const definition of practiceQuizDefinitions.filter(
     (item) => item.id >= 23,
   )) {
@@ -5131,9 +5517,29 @@ async function main() {
       },
     });
 
-    for (let order = 1; order <= definition.questions.length; order += 1) {
-      const q = definition.questions[order - 1];
-      const visualContext = listeningVisualContextByQuizId[definition.id];
+    const questions =
+      DICTATION_EXPANSION[definition.id] &&
+      definition.questions.every((question) => question.type === 'DICTATION')
+        ? [
+            ...definition.questions,
+            ...createDictationQuestions(
+              String(
+                (definition.questions[0]?.content as { level?: string })
+                  ?.level ?? 'A1',
+              ),
+              String(
+                (definition.questions[0]?.content as { accent?: string })
+                  ?.accent ?? 'US',
+              ),
+              DICTATION_EXPANSION[definition.id],
+            ),
+          ]
+        : definition.questions;
+
+    for (let order = 1; order <= questions.length; order += 1) {
+      const q = questions[order - 1];
+      const visualContext =
+        listeningVisualContextByQuestionKey[`${definition.id}:${order}`];
       const questionContent = visualContext?.imageUrl
         ? {
             ...q.content,
@@ -5142,23 +5548,39 @@ async function main() {
             imagePurpose: 'TOPIC_CONTEXT',
           }
         : q.content;
-      await prisma.question.upsert({
-        where: { id: questionId },
-        update: {
-          quizId: quiz.id,
-          type: q.type,
-          content: questionContent,
-          order,
-        },
-        create: {
-          id: questionId,
-          quizId: quiz.id,
-          type: q.type,
-          content: questionContent,
-          order,
-        },
+      const existingQuestion = await prisma.question.findFirst({
+        where: { quizId: quiz.id, order },
+        select: { id: true },
       });
-      questionId += 1;
+      if (existingQuestion) {
+        await prisma.question.update({
+          where: { id: existingQuestion.id },
+          data: {
+            type: q.type,
+            content: questionContent,
+          },
+        });
+      } else {
+        await prisma.question.create({
+          data: {
+            quizId: quiz.id,
+            type: q.type,
+            content: questionContent,
+            order,
+          },
+        });
+      }
+    }
+  }
+
+  for (const quizId of Object.keys(DICTATION_EXPANSION).map(Number)) {
+    const dictationCount = await prisma.question.count({
+      where: { quizId, type: 'DICTATION' },
+    });
+    if (dictationCount < 20) {
+      throw new Error(
+        `Dictation seed invalid for quiz ${quizId}: expected at least 20 questions, got ${dictationCount}.`,
+      );
     }
   }
 

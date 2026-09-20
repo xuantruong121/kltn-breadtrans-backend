@@ -222,8 +222,22 @@ export class QuizService {
   }
 
   async publishQuiz(id: number, status: PublishQuizDto['status']) {
-    const quiz = await this.prisma.quiz.findUnique({ where: { id } });
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      include: { questions: { select: { type: true } } },
+    });
     if (!quiz) throw new NotFoundException('Quiz not found');
+    if (
+      status === 'PUBLISHED' &&
+      quiz.type === QuizType.LISTENING_PRACTICE &&
+      quiz.questions.length > 0 &&
+      quiz.questions.every((question) => question.type === 'DICTATION') &&
+      quiz.questions.length < 20
+    ) {
+      throw new BadRequestException(
+        'Bài nghe chép cần có ít nhất 20 câu trước khi xuất bản',
+      );
+    }
     return this.prisma.quiz.update({
       where: { id },
       data: {
@@ -570,6 +584,61 @@ export class QuizService {
     }
 
     return quiz;
+  }
+
+  /**
+   * Transcript is intentionally loaded on demand. The regular learner quiz
+   * payload redacts answers/audio text until the learner asks to review them;
+   * this endpoint is limited to published listening-practice dictation items
+   * and never serves TOEIC or other assessment content.
+   */
+  async getListeningTranscript(quizId: number) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: {
+        id: true,
+        type: true,
+        publicationStatus: true,
+        questions: {
+          where: { type: 'DICTATION' },
+          orderBy: { order: 'asc' },
+          select: { id: true, order: true, content: true },
+        },
+      },
+    });
+
+    if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
+    if (quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new ForbiddenException(
+        'Transcript chỉ khả dụng cho bài luyện nghe chép',
+      );
+    }
+    if (quiz.publicationStatus !== 'PUBLISHED') {
+      throw new NotFoundException('Bài luyện chưa được xuất bản');
+    }
+
+    const items = quiz.questions
+      .map((question) => {
+        const content = (question.content ?? {}) as Record<string, unknown>;
+        const transcript =
+          typeof content.correctAnswer === 'string'
+            ? content.correctAnswer.trim()
+            : typeof content.audioText === 'string'
+              ? content.audioText.trim()
+              : '';
+        return {
+          questionId: question.id,
+          order: question.order,
+          transcript,
+          translation:
+            typeof content.translation === 'string'
+              ? content.translation.trim() || null
+              : null,
+        };
+      })
+      .filter((item) => item.transcript.length > 0);
+
+    return { quizId: quiz.id, items };
   }
 
   async createQuestion(quizId: number, dto: CreateQuestionDto) {
