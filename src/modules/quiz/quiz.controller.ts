@@ -201,6 +201,27 @@ export class QuizController {
     return this.quizService.getListeningTranscript(quizId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get(':quizId/transcript/audio')
+  @ApiOperation({
+    summary: 'Phát một audio liền mạch cho toàn bộ bài nghe chép',
+  })
+  async streamListeningTranscriptAudio(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Res() res: Response,
+  ) {
+    const audioBuffer =
+      await this.quizService.streamListeningTranscriptAudio(quizId);
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': audioBuffer.length,
+      'Cache-Control': 'private, max-age=86400',
+      Vary: 'Authorization',
+    });
+    res.send(audioBuffer);
+  }
+
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết Quiz và danh sách Questions' })

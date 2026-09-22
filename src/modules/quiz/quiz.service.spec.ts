@@ -360,6 +360,36 @@ describe('QuizService', () => {
       expect(mockSpeakingService.generateTts).not.toHaveBeenCalled();
     });
 
+    it('uses the dictation speaker voice instead of a legacy single-voice asset', async () => {
+      const audio = Buffer.from('speaker-line-audio');
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 99,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        audioAssets: [
+          {
+            key: 'catalog/listening/practice/audio/quiz-23/question-99/v1.mp3',
+          },
+        ],
+        content: {
+          accent: 'US',
+          speaker: 'Daniel',
+          audioText: 'The meeting starts at ten.',
+          correctAnswer: 'The meeting starts at ten.',
+        },
+      });
+      mockSpeakingService.generateDialogueTts.mockResolvedValue(audio);
+
+      await expect(service.streamQuestionAudio(23, 99)).resolves.toBe(audio);
+      expect(mockSpeakingService.generateDialogueTts).toHaveBeenCalledWith(
+        [{ speaker: 'Daniel', text: 'The meeting starts at ten.' }],
+        'US',
+        1,
+      );
+      expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    });
+
     it('serves a generated catalog dialogue asset without re-synthesizing it', async () => {
       const audio = Buffer.from('stored-dialogue-audio');
       mockPrismaService.question.findUnique.mockResolvedValue({
@@ -386,6 +416,40 @@ describe('QuizService', () => {
         'catalog/listening/practice/dialogue/quiz-28/question-98/v1/asset.mp3',
       );
       expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
+    });
+
+    it('generates one continuous multi-speaker track for a dictation transcript', async () => {
+      const audio = Buffer.from('full-dictation-dialogue');
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 23,
+        type: 'LISTENING_PRACTICE',
+        publicationStatus: 'PUBLISHED',
+        questions: [
+          {
+            content: {
+              accent: 'UK',
+              correctAnswer: 'First line.',
+              speaker: 'Maya',
+            },
+          },
+          { content: { correctAnswer: 'Second line.', speaker: 'Daniel' } },
+          { content: { correctAnswer: 'Third line.', speaker: 'Maya' } },
+        ],
+      });
+      mockSpeakingService.generateDialogueTts.mockResolvedValue(audio);
+
+      await expect(service.streamListeningTranscriptAudio(23)).resolves.toBe(
+        audio,
+      );
+      expect(mockSpeakingService.generateDialogueTts).toHaveBeenCalledWith(
+        [
+          { speaker: 'Maya', text: 'First line.' },
+          { speaker: 'Daniel', text: 'Second line.' },
+          { speaker: 'Maya', text: 'Third line.' },
+        ],
+        'UK',
+        1,
+      );
     });
   });
 

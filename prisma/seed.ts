@@ -5536,18 +5536,30 @@ async function main() {
           ]
         : definition.questions;
 
+    const dictationSpeakers: Record<number, string[]> = {
+      23: ['Maya', 'Daniel'],
+      24: ['Nora', 'Ethan', 'Sofia'],
+      25: ['Priya', 'Daniel'],
+    };
+    const speakerRotation = dictationSpeakers[definition.id];
+
     for (let order = 1; order <= questions.length; order += 1) {
       const q = questions[order - 1];
       const visualContext =
         listeningVisualContextByQuestionKey[`${definition.id}:${order}`];
-      const questionContent = visualContext?.imageUrl
-        ? {
-            ...q.content,
-            imageUrl: visualContext.imageUrl,
-            imageAlt: visualContext.imageAlt,
-            imagePurpose: 'TOPIC_CONTEXT',
-          }
-        : q.content;
+      const questionContent = {
+        ...q.content,
+        ...(speakerRotation && q.type === 'DICTATION'
+          ? { speaker: speakerRotation[(order - 1) % speakerRotation.length] }
+          : {}),
+        ...(visualContext?.imageUrl
+          ? {
+              imageUrl: visualContext.imageUrl,
+              imageAlt: visualContext.imageAlt,
+              imagePurpose: 'TOPIC_CONTEXT',
+            }
+          : {}),
+      };
       const existingQuestion = await prisma.question.findFirst({
         where: { quizId: quiz.id, order },
         select: { id: true },

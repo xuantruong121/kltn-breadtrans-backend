@@ -630,6 +630,10 @@ export class QuizService {
           questionId: question.id,
           order: question.order,
           transcript,
+          speaker:
+            typeof content.speaker === 'string' && content.speaker.trim()
+              ? content.speaker.trim()
+              : null,
           translation:
             typeof content.translation === 'string'
               ? content.translation.trim() || null
@@ -639,6 +643,67 @@ export class QuizService {
       .filter((item) => item.transcript.length > 0);
 
     return { quizId: quiz.id, items };
+  }
+
+  /**
+   * Builds one continuous audio track for a dictation exercise. The transcript
+   * playlist may still move between individual lines, but playback must not
+   * tear down and reload a new audio element for every line.
+   */
+  async streamListeningTranscriptAudio(quizId: number): Promise<Buffer> {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: {
+        id: true,
+        type: true,
+        publicationStatus: true,
+        questions: {
+          where: { type: 'DICTATION' },
+          orderBy: { order: 'asc' },
+          select: { content: true },
+        },
+      },
+    });
+
+    if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
+    if (quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new ForbiddenException('Chỉ hỗ trợ audio cho bài luyện nghe chép');
+    }
+    if (quiz.publicationStatus !== 'PUBLISHED') {
+      throw new NotFoundException('Bài luyện chưa được xuất bản');
+    }
+
+    const speakers = ['Maya', 'Daniel', 'Sofia'];
+    const segments = quiz.questions.flatMap((question, index) => {
+      const content = (question.content ?? {}) as Record<string, unknown>;
+      const text =
+        typeof content.correctAnswer === 'string'
+          ? content.correctAnswer.trim()
+          : typeof content.audioText === 'string'
+            ? content.audioText.trim()
+            : '';
+      if (!text) return [];
+
+      const explicitSpeaker =
+        typeof content.speaker === 'string' ? content.speaker.trim() : '';
+      return [
+        {
+          speaker: explicitSpeaker || speakers[index % speakers.length],
+          text,
+        },
+      ];
+    });
+
+    if (segments.length === 0) {
+      throw new BadRequestException('Bài nghe chép chưa có nội dung audio');
+    }
+
+    const firstContent = (quiz.questions[0]?.content ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const accent = firstContent.accent === 'UK' ? 'UK' : 'US';
+    return this.speakingService.generateDialogueTts(segments, accent, 1);
   }
 
   async createQuestion(quizId: number, dto: CreateQuestionDto) {
@@ -1145,6 +1210,24 @@ export class QuizService {
     const isCatalogDialogueAsset =
       activeAsset?.key.startsWith('catalog/listening/practice/dialogue/') ??
       false;
+    const accent = content.accent === 'UK' ? 'UK' : 'US';
+    const speaker =
+      typeof content.speaker === 'string' ? content.speaker.trim() : '';
+
+    // Dictation lines with speaker metadata are rendered with the same
+    // voice mapping as the aggregate transcript, so a dialogue never falls
+    // back to an old single-speaker object in R2.
+    if (question.type === 'DICTATION' && speaker) {
+      const audioText = buildNaturalListeningAudioText(content);
+      if (!audioText) {
+        throw new BadRequestException('Câu hỏi chưa có nội dung audio');
+      }
+      return this.speakingService.generateDialogueTts(
+        [{ speaker, text: audioText }],
+        accent,
+        1,
+      );
+    }
 
     // Dialogue assets must preserve distinct voices per speaker. Until the
     // static multi-voice asset is materialized, synthesize the segment list
@@ -1160,7 +1243,6 @@ export class QuizService {
     const audioText = buildNaturalListeningAudioText(content);
     if (!audioText)
       throw new BadRequestException('Câu hỏi chưa có nội dung audio');
-    const accent = content.accent === 'UK' ? 'UK' : 'US';
     if (hasDialogueSegments) {
       const segments = (
         content.transcriptSegments as Array<Record<string, unknown>>
