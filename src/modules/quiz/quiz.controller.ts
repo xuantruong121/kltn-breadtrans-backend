@@ -8,6 +8,8 @@ import {
   Param,
   UseGuards,
   Request,
+  Req,
+  Query,
   ParseIntPipe,
   Res,
   HttpCode,
@@ -40,11 +42,15 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { ListeningAudioAuthoringService } from './listening-audio-authoring.service';
 
 @ApiTags('quizzes')
 @Controller('quizzes')
 export class QuizController {
-  constructor(private readonly quizService: QuizService) {}
+  constructor(
+    private readonly quizService: QuizService,
+    private readonly listeningAudioAuthoringService: ListeningAudioAuthoringService,
+  ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
@@ -165,19 +171,80 @@ export class QuizController {
   async streamQuestionAudio(
     @Param('quizId', ParseIntPipe) quizId: number,
     @Param('questionId', ParseIntPipe) questionId: number,
+    @Query('artifactId') artifactId: string | undefined,
+    @Query('v') version: string | undefined,
+    @Query('checksum') checksumSha256: string | undefined,
+    @Req() req: any,
     @Res() res: Response,
   ) {
-    const audioBuffer = await this.quizService.streamQuestionAudio(
+    const result = await this.quizService.streamQuestionAudio(
       quizId,
       questionId,
+      this.parseAudioIdentity(artifactId, version, checksumSha256),
     );
+    return this.sendListeningAudio(res, req, result);
+  }
+
+  private parseAudioIdentity(
+    artifactId?: string,
+    version?: string,
+    checksumSha256?: string,
+  ) {
+    return {
+      ...(artifactId && Number.isInteger(Number(artifactId))
+        ? { artifactId: Number(artifactId) }
+        : {}),
+      ...(version && Number.isInteger(Number(version))
+        ? { version: Number(version) }
+        : {}),
+      ...(checksumSha256 ? { checksumSha256 } : {}),
+    };
+  }
+
+  private sendListeningAudio(
+    res: Response,
+    req: any,
+    result:
+      | Buffer
+      | {
+          buffer: Buffer;
+          artifact?: {
+            id: number;
+            version: number;
+            checksumSha256: string | null;
+            durationMs: number | null;
+          } | null;
+        },
+  ) {
+    const payload = Buffer.isBuffer(result)
+      ? { buffer: result, artifact: null }
+      : result;
+    const checksum = payload.artifact?.checksumSha256;
+    const etag = checksum ? `"${checksum}"` : undefined;
+    if (etag && req.headers?.['if-none-match'] === etag) {
+      res.status(HttpStatus.NOT_MODIFIED).end();
+      return;
+    }
     res.set({
       'Content-Type': 'audio/mpeg',
-      'Content-Length': audioBuffer.length,
-      'Cache-Control': 'private, max-age=86400',
+      'Content-Length': payload.buffer.length,
+      'Cache-Control': etag
+        ? 'private, max-age=31536000, immutable'
+        : 'private, no-cache',
       Vary: 'Authorization',
+      ...(etag ? { ETag: etag } : {}),
+      ...(payload.artifact
+        ? {
+            'X-Listening-Audio-Artifact-Id': String(payload.artifact.id),
+            'X-Listening-Audio-Version': String(payload.artifact.version),
+            'X-Listening-Audio-Checksum': payload.artifact.checksumSha256 ?? '',
+            'X-Listening-Audio-Duration-Ms': String(
+              payload.artifact.durationMs ?? '',
+            ),
+          }
+        : {}),
     });
-    res.send(audioBuffer);
+    res.send(payload.buffer);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -195,10 +262,108 @@ export class QuizController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Post(':quizId/transcript/reveal')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ghi nhận học viên chủ động xem transcript' })
+  revealListeningTranscript(
+    @Request() req: any,
+    @Param('quizId', ParseIntPipe) quizId: number,
+  ) {
+    return this.quizService.revealListeningTranscript(req.user.id, quizId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get(':quizId/transcript')
   @ApiOperation({ summary: 'Lấy toàn bộ transcript của bài nghe chép' })
-  getListeningTranscript(@Param('quizId', ParseIntPipe) quizId: number) {
-    return this.quizService.getListeningTranscript(quizId);
+  getListeningTranscript(
+    @Request() req: any,
+    @Param('quizId', ParseIntPipe) quizId: number,
+  ) {
+    return this.quizService.getListeningTranscript(req.user.id, quizId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get(':quizId/transcript/audio')
+  @ApiOperation({
+    summary: 'Phát một audio liền mạch cho toàn bộ bài nghe chép',
+  })
+  async streamListeningTranscriptAudio(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Query('artifactId') artifactId: string | undefined,
+    @Query('v') version: string | undefined,
+    @Query('checksum') checksumSha256: string | undefined,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
+    const result = await this.quizService.streamListeningTranscriptAudio(
+      quizId,
+      this.parseAudioIdentity(artifactId, version, checksumSha256),
+    );
+    return this.sendListeningAudio(res, req, result);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post(':quizId/listening-audio/validate')
+  @Roles(Role.ADMIN)
+  validateListeningAudio(@Param('quizId', ParseIntPipe) quizId: number) {
+    return this.listeningAudioAuthoringService.validateContent(quizId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post(':quizId/listening-audio/generate-preview')
+  @Roles(Role.ADMIN)
+  generateListeningAudioPreview(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Request() req: any,
+  ) {
+    return this.listeningAudioAuthoringService.generatePreview(
+      quizId,
+      req.user.id,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get(':quizId/listening-audio')
+  @Roles(Role.ADMIN)
+  getListeningAudioArtifact(@Param('quizId', ParseIntPipe) quizId: number) {
+    return this.listeningAudioAuthoringService.listArtifacts(quizId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post(':quizId/listening-audio/:artifactId/approve')
+  @Roles(Role.ADMIN)
+  approveListeningAudio(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Param('artifactId', ParseIntPipe) artifactId: number,
+    @Request() req: any,
+  ) {
+    return this.listeningAudioAuthoringService.approve(
+      quizId,
+      artifactId,
+      req.user.id,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post(':quizId/listening-audio/:artifactId/publish')
+  @Roles(Role.ADMIN)
+  publishListeningAudio(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Param('artifactId', ParseIntPipe) artifactId: number,
+    @Request() req: any,
+  ) {
+    return this.listeningAudioAuthoringService.publish(
+      quizId,
+      artifactId,
+      req.user.id,
+    );
   }
 
   @UseGuards(OptionalJwtAuthGuard)

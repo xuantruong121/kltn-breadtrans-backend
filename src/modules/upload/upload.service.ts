@@ -68,6 +68,23 @@ export class UploadService {
     };
   }
 
+  async putObjectAtKey(
+    key: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<UploadResult> {
+    const result = await this.r2.putObjectAtKey(key, buffer, mimeType);
+    return {
+      url: result.url,
+      key: result.key,
+      contentType: result.contentType,
+    };
+  }
+
+  async objectExists(key: string): Promise<boolean> {
+    return this.r2.objectExists(key);
+  }
+
   /**
    * Xóa file theo key (khi user đổi avatar / xóa tài liệu).
    */

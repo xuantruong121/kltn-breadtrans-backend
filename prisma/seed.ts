@@ -42,36 +42,490 @@ const listeningPracticeAssetUrl = (filename: string): string | null => {
   return base ? `${base}/catalog/listening/practice/images/${filename}` : null;
 };
 
-// General reading practice assets have their own catalog namespace under catalog/reading/practice/.
-const readingPracticeAssetUrl = (
-  filename: string,
-  subfolder: 'images' | 'passages' | 'attachments' = 'images',
-): string | null => {
-  const base = SEED_ASSET_BASE_URL.replace(/\/$/, '');
-  return base
-    ? `${base}/catalog/reading/practice/${subfolder}/${filename}`
-    : null;
-};
-
-// General writing practice assets have their own catalog namespace under catalog/writing/practice/.
-const writingPracticeAssetUrl = (
-  filename: string,
-  subfolder:
-    | 'prompt-images'
-    | 'reference-materials'
-    | 'attachments' = 'prompt-images',
-): string | null => {
-  const base = SEED_ASSET_BASE_URL.replace(/\/$/, '');
-  return base
-    ? `${base}/catalog/writing/practice/${subfolder}/${filename}`
-    : null;
-};
-
 type DictationSeedSentence = {
   audioText: string;
   translation: string;
   explanationVi: string;
   vocabularyNote: string;
+};
+
+type CoherentDictationTurn = {
+  speakerId: string;
+  speaker: string;
+  text: string;
+  translation: string;
+  voiceKey: 'female-01' | 'male-01';
+  tone: 'NEUTRAL' | 'FRIENDLY' | 'THOUGHTFUL' | 'POLITE';
+  rate: string;
+  pauseMs: number;
+};
+
+type DialogueSeedTuple = [
+  string,
+  string,
+  string,
+  string,
+  'female-01' | 'male-01',
+];
+
+const toDialogueTurns = (turns: DialogueSeedTuple[]): CoherentDictationTurn[] =>
+  turns.map(([speakerId, speaker, text, translation, voiceKey]) => {
+    const trimmed = text.trim();
+    const thoughtful = /^(Hmm|Let me think|Actually)/i.test(trimmed);
+    const friendly =
+      /^(Great|Nice|Perfect|Sounds good|Yeah|Sure|Right|Okay)/i.test(trimmed);
+    const polite = /\?|Could you|Please/i.test(trimmed);
+    return {
+      speakerId,
+      speaker,
+      text: trimmed,
+      translation,
+      voiceKey,
+      tone: thoughtful
+        ? 'THOUGHTFUL'
+        : friendly
+          ? 'FRIENDLY'
+          : polite
+            ? 'POLITE'
+            : 'NEUTRAL',
+      rate: thoughtful ? '-4%' : friendly ? '2%' : polite ? '-2%' : '0%',
+      pauseMs: thoughtful ? 340 : polite ? 280 : friendly ? 210 : 250,
+    };
+  });
+
+/**
+ * Quiz 23–25 are intentionally authored as complete conversations. The
+ * question rows remain the dictation units, while these stable turn records
+ * provide the same scenario, speaker order, and speech-only text to both the
+ * transcript UI and the production-audio authoring pipeline.
+ */
+const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
+  23: toDialogueTurns([
+    [
+      'mia',
+      'Mia',
+      'Hey, Leo. Are we still meeting at the library on Saturday morning?',
+      'Này Leo, chúng ta vẫn gặp nhau ở thư viện vào sáng thứ Bảy chứ?',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      "Yeah, that's the plan. I reserved the study room from nine to eleven.",
+      'Ừ, đúng kế hoạch đó. Mình đã đặt phòng học từ chín giờ đến mười một giờ.',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
+      "Great. I'll bring the vocabulary cards and some paper.",
+      'Tuyệt. Mình sẽ mang thẻ từ vựng và một ít giấy.',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      'Sounds good. Could you bring the grammar worksheet too?',
+      'Được đấy. Bạn mang cả bài tập ngữ pháp nhé?',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
+      'Sure. Oh, did you print the reading passage?',
+      'Được. À, bạn đã in bài đọc chưa?',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      'I did. I printed five copies last night.',
+      'Rồi. Tối qua mình đã in năm bản.',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
+      "Thanks. One classmate still can't find the library.",
+      'Cảm ơn. Một bạn cùng lớp vẫn chưa tìm được thư viện.',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      "No problem. I'll send her the address and a map.",
+      'Không vấn đề gì. Mình sẽ gửi địa chỉ và bản đồ cho bạn ấy.',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
+      'The number twelve bus stops outside, right?',
+      'Xe buýt số mười hai dừng ngay bên ngoài phải không?',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      'Right. Get off after the second stop, near the park.',
+      'Đúng rồi. Xuống sau điểm dừng thứ hai, gần công viên ấy.',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
+      'Okay. What if it rains on Saturday?',
+      'Được. Nếu thứ Bảy trời mưa thì sao?',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      'Then we can meet by the covered entrance instead.',
+      'Khi đó mình có thể gặp nhau ở lối vào có mái che.',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
+      'That works. I should arrive early to unlock the room.',
+      'Thế cũng được. Mình nên đến sớm để mở phòng.',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      'Actually, the librarian said it opens at eight forty-five.',
+      'À, thủ thư nói phòng mở cửa lúc tám giờ bốn mươi lăm.',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
+      "Oh, then I'll arrive at eight thirty.",
+      'Ồ, vậy mình sẽ đến lúc tám giờ rưỡi.',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      "Perfect. I'll bring coffee and a notebook for everyone.",
+      'Tuyệt. Mình sẽ mang cà phê và vở cho mọi người.',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
+      'Please text me if the bus is delayed, okay?',
+      'Nếu xe buýt bị trễ thì nhắn cho mình nhé?',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      "Sure, I'll let the others know too.",
+      'Được, mình cũng sẽ báo cho những người khác.',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
+      'Thanks, Leo. See you at the library on Saturday.',
+      'Cảm ơn Leo. Hẹn gặp bạn ở thư viện vào thứ Bảy.',
+      'female-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      "See you then. We'll get the worksheet done together.",
+      'Hẹn gặp bạn. Chúng ta sẽ cùng làm xong bài tập.',
+      'male-01',
+    ],
+  ]),
+  24: toDialogueTurns([
+    [
+      'maya',
+      'Maya',
+      'Hey, Ben. Are we still taking the morning train to the city museum?',
+      'Này Ben, chúng ta vẫn đi chuyến tàu sáng đến bảo tàng thành phố chứ?',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "Yeah, that's the plan. It leaves from platform three at eight fifteen.",
+      'Ừ, đúng kế hoạch. Tàu rời sân ga số ba lúc tám giờ mười lăm.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Great. I bought our tickets online last night.',
+      'Tuyệt. Tối qua mình đã mua vé trực tuyến cho cả hai rồi.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      'Nice. Keep the QR code ready at the station gate.',
+      'Hay đấy. Nhớ chuẩn bị mã QR ở cổng ga nhé.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Okay. How long is the walk from the station to the museum?',
+      'Được. Từ ga đến bảo tàng đi bộ mất bao lâu?',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "Well, let me think. It's about a ten-minute walk.",
+      'Để mình nghĩ xem. Khoảng mười phút đi bộ.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      "Only ten minutes? That's easy enough.",
+      'Chỉ mười phút thôi à? Vậy thì dễ rồi.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      'Right. We just follow the signs for the main square.',
+      'Đúng rồi. Chúng ta chỉ cần đi theo biển chỉ dẫn đến quảng trường chính.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Should we enter through the north door, or is there another entrance?',
+      'Chúng ta vào bằng cửa phía bắc hay còn lối vào khác?',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "The north door is best. It's across from the information desk.",
+      'Cửa phía bắc là tiện nhất. Nó đối diện quầy thông tin.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Oh, good. I really want to see the space exhibition first.',
+      'Ồ, tốt quá. Mình thật sự muốn xem triển lãm vũ trụ trước.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "Sure. It opens at nine, so we'll have enough time.",
+      'Được thôi. Triển lãm mở cửa lúc chín giờ nên mình sẽ có đủ thời gian.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Could we join the guided tour after lunch?',
+      'Sau bữa trưa chúng ta tham gia chuyến tham quan có hướng dẫn nhé?',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      'Yes, it starts at two and ends at three.',
+      'Được, chuyến tham quan bắt đầu lúc hai giờ và kết thúc lúc ba giờ.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      "Then let's eat at the cafe near the west entrance.",
+      'Vậy mình ăn ở quán gần cửa phía tây nhé.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      'That sounds good. It accepts cards, but it closes at four thirty.',
+      'Nghe được đấy. Quán nhận thẻ nhưng đóng cửa lúc bốn giờ rưỡi.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Right. We should get a map before the tour begins.',
+      'Đúng rồi. Mình nên lấy bản đồ trước khi chuyến tham quan bắt đầu.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "I'll ask the information desk for one.",
+      'Mình sẽ hỏi xin một cái ở quầy thông tin.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      "Perfect. Let's meet by the museum clock at five for the train home.",
+      'Tuyệt. Năm giờ mình gặp nhau ở đồng hồ bảo tàng để về ga nhé.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "Sounds good. I'll carry the tickets. See you there.",
+      'Được đấy. Mình sẽ giữ vé. Hẹn gặp bạn ở đó.',
+      'male-01',
+    ],
+  ]),
+  25: toDialogueTurns([
+    [
+      'nora',
+      'Nora',
+      'Morning, Dan. Do you have a minute to review the client project?',
+      'Chào buổi sáng Dan. Bạn có một phút để xem lại dự án khách hàng không?',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      "Sure, what's up? I have the latest progress report here.",
+      'Được, có chuyện gì vậy? Mình có báo cáo tiến độ mới nhất đây.',
+      'male-01',
+    ],
+    [
+      'nora',
+      'Nora',
+      'The design team finished the first prototype yesterday.',
+      'Hôm qua nhóm thiết kế đã hoàn thành nguyên mẫu đầu tiên.',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      'I saw it. The payment screen still needs a proper test, though.',
+      'Mình đã xem. Tuy vậy, màn hình thanh toán vẫn cần được kiểm thử kỹ.',
+      'male-01',
+    ],
+    [
+      'nora',
+      'Nora',
+      "Right. I'll ask QA to test it this morning.",
+      'Đúng rồi. Sáng nay mình sẽ nhờ QA kiểm thử.',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      'Thanks. Could you also confirm the mobile layout with the client?',
+      'Cảm ơn. Bạn cũng xác nhận giao diện di động với khách hàng nhé?',
+      'male-01',
+    ],
+    [
+      'nora',
+      'Nora',
+      'I can do that. They requested a short demo next Monday.',
+      'Mình làm được. Họ yêu cầu một bản trình diễn ngắn vào thứ Hai tới.',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      'Okay, then we should send the demo agenda by Friday.',
+      'Được, vậy chúng ta nên gửi chương trình trình diễn trước thứ Sáu.',
+      'male-01',
+    ],
+    [
+      'nora',
+      'Nora',
+      "I'll draft it after lunch. Does that timing work?",
+      'Mình sẽ soạn sau bữa trưa. Thời gian đó ổn chứ?',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      "Yes, that's fine. I'll add the test results and open questions.",
+      'Ừ, ổn mà. Mình sẽ thêm kết quả kiểm thử và các câu hỏi còn bỏ ngỏ.',
+      'male-01',
+    ],
+    [
+      'nora',
+      'Nora',
+      'Actually, we still need approval for the new delivery date.',
+      'À, chúng ta vẫn cần phê duyệt ngày bàn giao mới.',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      "You're right. The manager can discuss it in today’s meeting.",
+      'Bạn nói đúng. Quản lý có thể thảo luận việc đó trong cuộc họp hôm nay.',
+      'male-01',
+    ],
+    [
+      'nora',
+      'Nora',
+      "There's one risk if the payment test takes longer than expected.",
+      'Có một rủi ro nếu kiểm thử thanh toán lâu hơn dự kiến.',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      "I'll prepare a backup schedule, just in case.",
+      'Mình sẽ chuẩn bị một lịch dự phòng, đề phòng trường hợp đó.',
+      'male-01',
+    ],
+    [
+      'nora',
+      'Nora',
+      'Good idea. Please share it with the whole team.',
+      'Ý hay đấy. Bạn chia sẻ với cả nhóm nhé.',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      "Sure. I'll upload the report to the project folder.",
+      'Được. Mình sẽ tải báo cáo lên thư mục dự án.',
+      'male-01',
+    ],
+    [
+      'nora',
+      'Nora',
+      'Could you mark the unresolved items in yellow?',
+      'Bạn đánh dấu các mục chưa giải quyết bằng màu vàng được không?',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      'Yes, that will make the next review much easier.',
+      'Được, như vậy lần xem xét tiếp theo sẽ dễ hơn nhiều.',
+      'male-01',
+    ],
+    [
+      'nora',
+      'Nora',
+      "Thanks, Dan. Let's finish the agenda before the meeting.",
+      'Cảm ơn Dan. Mình hoàn thành chương trình trước cuộc họp nhé.',
+      'female-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      "Agreed. I'll send the final version before two o'clock. See you in the meeting.",
+      'Đồng ý. Mình sẽ gửi bản cuối trước hai giờ. Hẹn gặp bạn trong cuộc họp.',
+      'male-01',
+    ],
+  ]),
 };
 
 const createDictationQuestions = (
@@ -225,7 +679,8 @@ const DICTATION_EXPANSION: Record<number, DictationSeedSentence[]> = {
       audioText: 'The tour bus departs at eight thirty.',
       translation: 'Xe buýt tham quan khởi hành lúc tám giờ rưỡi.',
       explanationVi: 'Thông tin chính là giờ xe tham quan khởi hành.',
-      vocabularyNote: 'tour bus = xe buýt tham quan; departs at = khởi hành lúc',
+      vocabularyNote:
+        'tour bus = xe buýt tham quan; departs at = khởi hành lúc',
     },
     {
       audioText: 'You can exchange money at the airport bank.',
@@ -351,9 +806,11 @@ const DICTATION_EXPANSION: Record<number, DictationSeedSentence[]> = {
     },
     {
       audioText: 'The new policy applies to all full-time employees.',
-      translation: 'Chính sách mới áp dụng cho tất cả nhân viên toàn thời gian.',
+      translation:
+        'Chính sách mới áp dụng cho tất cả nhân viên toàn thời gian.',
       explanationVi: 'Câu nêu đối tượng áp dụng của chính sách.',
-      vocabularyNote: 'apply to = áp dụng cho; full-time employee = nhân viên toàn thời gian',
+      vocabularyNote:
+        'apply to = áp dụng cho; full-time employee = nhân viên toàn thời gian',
     },
     {
       audioText: 'We need more information before making a decision.',
@@ -365,13 +822,15 @@ const DICTATION_EXPANSION: Record<number, DictationSeedSentence[]> = {
       audioText: 'The conference room is available after three.',
       translation: 'Phòng hội nghị còn trống sau ba giờ.',
       explanationVi: 'Câu cho biết thời gian phòng hội nghị có thể sử dụng.',
-      vocabularyNote: 'be available = còn trống; conference room = phòng hội nghị',
+      vocabularyNote:
+        'be available = còn trống; conference room = phòng hội nghị',
     },
     {
       audioText: 'Please let me know if the deadline changes.',
       translation: 'Vui lòng cho tôi biết nếu thời hạn thay đổi.',
       explanationVi: 'Đây là lời nhờ thông báo khi có thay đổi thời hạn.',
-      vocabularyNote: 'let me know = cho tôi biết; deadline changes = thời hạn thay đổi',
+      vocabularyNote:
+        'let me know = cho tôi biết; deadline changes = thời hạn thay đổi',
     },
   ],
 };
@@ -1755,7 +2214,9 @@ async function main() {
     }
   }
 
-  const practiceTopics = [
+  const practiceTopicSeedRows: Array<
+    [string, string, keyof typeof TopicCategory]
+  > = [
     ['Grammar Foundation', 'Ngữ pháp nền tảng', 'GRAMMAR_TOPIC'],
     ['Grammar Intermediate', 'Ngữ pháp trung cấp', 'GRAMMAR_LEVEL'],
     [
@@ -1769,12 +2230,15 @@ async function main() {
     ['Writing Email', 'Viết email', 'WRITING_PART2'],
     ['Writing Opinion', 'Viết đoạn/bài nêu quan điểm', 'WRITING_PART2'],
     ['Reading C1', 'Đọc hiểu C1', 'BILINGUAL_LEVEL'],
-  ].map(([name, vietnameseName, category], index) => ({
-    id: index + 1,
-    name,
-    vietnameseName,
-    category: TopicCategory[category as keyof typeof TopicCategory],
-  }));
+  ];
+  const practiceTopics = practiceTopicSeedRows.map(
+    ([name, vietnameseName, category], index) => ({
+      id: index + 1,
+      name,
+      vietnameseName,
+      category: TopicCategory[category],
+    }),
+  );
   for (const topic of practiceTopics) {
     await prisma.practiceTopic.upsert({
       where: { id: topic.id },
@@ -1935,6 +2399,34 @@ async function main() {
         durationMinutes: 25,
       },
     };
+
+  for (const [quizId, turns] of Object.entries(COHERENT_DICTATION_DIALOGUES)) {
+    const id = Number(quizId);
+    const metadata = listeningCatalogMetadataByQuizId[id];
+    if (!metadata) continue;
+    listeningCatalogMetadataByQuizId[id] = {
+      ...metadata,
+      contentForm: 'DIALOGUE',
+      scenario:
+        id === 23
+          ? 'Bạn bè sắp xếp lịch hẹn, phương tiện và việc học trong ngày.'
+          : id === 24
+            ? 'Hai hành khách cùng lên kế hoạch tham quan bảo tàng bằng tàu và đi bộ trong thành phố.'
+            : 'Đồng nghiệp trao đổi lịch họp, tài liệu và tiến độ dự án.',
+      participants: turns
+        .filter(
+          (turn, index, all) =>
+            all.findIndex((item) => item.speakerId === turn.speakerId) ===
+            index,
+        )
+        .map(({ speakerId, speaker, voiceKey }) => ({
+          speakerId,
+          displayName: speaker,
+          voiceKey,
+        })),
+      turnCount: turns.length,
+    };
+  }
 
   const legacyReadingQuestionMetadata: Record<
     number,
@@ -5535,19 +6027,58 @@ async function main() {
             ),
           ]
         : definition.questions;
+    const coherentTurns = COHERENT_DICTATION_DIALOGUES[definition.id];
+    const authoredQuestions = coherentTurns
+      ? questions.map((question, index) => {
+          const turn = coherentTurns[index];
+          if (!turn) return question;
+          return {
+            ...question,
+            content: {
+              ...question.content,
+              audioText: turn.text,
+              correctAnswer: turn.text,
+              translation: turn.translation,
+              targetTurnId: `turn-${String(index + 1).padStart(3, '0')}`,
+              speakerId: turn.speakerId,
+              speaker: turn.speaker,
+              transcriptSegments: [
+                {
+                  speakerId: turn.speakerId,
+                  speaker: turn.speaker,
+                  voiceKey: turn.voiceKey,
+                  text: turn.text,
+                  translation: turn.translation,
+                  tone: turn.tone,
+                  rate: turn.rate,
+                  pauseMs: turn.pauseMs,
+                },
+              ],
+              explanation: {
+                vi: 'Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.',
+                evidence: turn.text,
+                vocabularyNote:
+                  'Nghe cả ngữ cảnh trước và sau để nhận biết từ nối, thời gian và ý định.',
+              },
+            },
+          };
+        })
+      : questions;
 
-    for (let order = 1; order <= questions.length; order += 1) {
-      const q = questions[order - 1];
+    for (let order = 1; order <= authoredQuestions.length; order += 1) {
+      const q = authoredQuestions[order - 1];
       const visualContext =
         listeningVisualContextByQuestionKey[`${definition.id}:${order}`];
-      const questionContent = visualContext?.imageUrl
-        ? {
-            ...q.content,
-            imageUrl: visualContext.imageUrl,
-            imageAlt: visualContext.imageAlt,
-            imagePurpose: 'TOPIC_CONTEXT',
-          }
-        : q.content;
+      const questionContent = {
+        ...q.content,
+        ...(visualContext?.imageUrl
+          ? {
+              imageUrl: visualContext.imageUrl,
+              imageAlt: visualContext.imageAlt,
+              imagePurpose: 'TOPIC_CONTEXT',
+            }
+          : {}),
+      };
       const existingQuestion = await prisma.question.findFirst({
         where: { quizId: quiz.id, order },
         select: { id: true },

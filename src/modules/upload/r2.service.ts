@@ -4,6 +4,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -98,6 +99,40 @@ export class R2Service {
     } catch (err) {
       this.logger.error(`Failed to upload file to R2: ${err}`);
       throw new BadRequestException('Failed to upload file to storage');
+    }
+  }
+
+  /** Upload a deterministic object key (used for immutable authored artifacts). */
+  async putObjectAtKey(
+    key: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<R2UploadResult> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: mimeType,
+      }),
+    );
+    return { key, url: `${this.publicUrl}/${key}`, contentType: mimeType };
+  }
+
+  async objectExists(key: string): Promise<boolean> {
+    try {
+      await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      return true;
+    } catch (error) {
+      const code = (
+        error as { name?: string; $metadata?: { httpStatusCode?: number } }
+      ).$metadata?.httpStatusCode;
+      if (code === 404 || (error as { name?: string }).name === 'NotFound') {
+        return false;
+      }
+      throw error;
     }
   }
 

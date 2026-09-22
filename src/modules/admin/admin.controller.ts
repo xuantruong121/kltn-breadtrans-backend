@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, TopicCategory } from '@prisma/client';
+import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
 
 @ApiTags('admin')
 @Controller('admin')
@@ -47,16 +48,7 @@ export class AdminController {
   @ApiOperation({
     summary: 'Admin tạo tài khoản mới (Học viên hoặc Quản trị viên)',
   })
-  createUser(
-    @Body()
-    dto: {
-      email: string;
-      password: string;
-      role: Role;
-      fullName: string;
-      phone?: string;
-    },
-  ) {
+  createUser(@Body() dto: CreateUserDto) {
     return this.adminService.createUser(dto);
   }
 
@@ -67,13 +59,7 @@ export class AdminController {
   })
   updateUser(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    dto: {
-      fullName?: string;
-      phone?: string;
-      role?: Role;
-      password?: string;
-    },
+    @Body() dto: UpdateUserDto,
   ) {
     return this.adminService.updateUser(id, dto);
   }

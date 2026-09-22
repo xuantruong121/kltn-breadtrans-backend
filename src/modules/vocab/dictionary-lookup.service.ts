@@ -9,6 +9,7 @@ import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import {
+  AiDictionaryProvider,
   DictionaryApiDevProvider,
   DictionaryProvider,
   ProviderDictionaryEntry,
@@ -63,16 +64,47 @@ export interface DictionaryLookupResponse {
 @Injectable()
 export class DictionaryLookupService {
   private readonly logger = new Logger(DictionaryLookupService.name);
-  private readonly provider: DictionaryProvider =
-    new DictionaryApiDevProvider();
+  private primaryProvider: DictionaryProvider = new DictionaryApiDevProvider();
+  private aiProvider: DictionaryProvider = new AiDictionaryProvider();
   private readonly positiveTtl = 30 * 24 * 60 * 60;
-  private readonly negativeTtl = 60 * 60;
+  private readonly negativeTtl = 30 * 60;
+
+  get provider(): DictionaryProvider {
+    return this.primaryProvider;
+  }
+
+  set provider(value: DictionaryProvider) {
+    this.primaryProvider = value;
+  }
+
+  get fallbackProvider(): DictionaryProvider {
+    return this.aiProvider;
+  }
+
+  set fallbackProvider(value: DictionaryProvider) {
+    this.aiProvider = value;
+  }
 
   constructor(
     private readonly prisma: PrismaService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
     @Optional() private readonly aiService?: AiService,
   ) {}
+
+  private async fetchFromProviders(
+    query: string,
+  ): Promise<ProviderDictionaryEntry[]> {
+    try {
+      return await this.primaryProvider.lookup(query);
+    } catch (primaryErr) {
+      this.logger.warn(
+        `Primary dictionary provider failed for "${query}" (${String(
+          primaryErr,
+        )}), falling back to AI provider`,
+      );
+      return await this.aiProvider.lookup(query);
+    }
+  }
 
   async lookup(
     rawWord: string,
@@ -115,11 +147,15 @@ export class DictionaryLookupService {
 
     let providerEntries: ProviderDictionaryEntry[];
     try {
-      providerEntries = await this.provider.lookup(query);
-    } catch {
+      providerEntries = await this.fetchFromProviders(query);
+    } catch (err) {
+      this.logger.error(
+        `All dictionary providers failed for "${query}": ${String(err)}`,
+      );
       const unavailable = this.emptyResponse(query, candidates.length > 0);
       unavailable.providerUnavailable = true;
-      await this.writeCache(cacheKey, unavailable, 5 * 60);
+      // Do not cache transport/provider failures as a negative dictionary result.
+      // A later request must be allowed to retry the provider.
       return unavailable;
     }
     if (providerEntries.length === 0) {
@@ -155,11 +191,16 @@ export class DictionaryLookupService {
 
     let providerEntries: ProviderDictionaryEntry[];
     try {
-      providerEntries = await this.provider.lookup(query);
-    } catch {
+      providerEntries = await this.fetchFromProviders(query);
+    } catch (err) {
+      this.logger.error(
+        `All dictionary providers failed for "${query}" (extended): ${String(
+          err,
+        )}`,
+      );
       const unavailable = this.emptyResponse(query, false);
       unavailable.providerUnavailable = true;
-      await this.writeCache(cacheKey, unavailable, 5 * 60);
+      // Do not cache transport/provider failures as a negative dictionary result.
       return unavailable;
     }
 

@@ -74,6 +74,7 @@ model User {
   enrollments                     Enrollment[]
   submissions                     Submission[]
   listeningPracticeAttempts       ListeningPracticeAttempt[]
+  listeningTranscriptReveals      ListeningTranscriptReveal[]
   assignmentSubmissions           AssignmentSubmission[]
   pointHistory                    PointHistory[]
   userBadges                      UserBadge[]
@@ -84,6 +85,7 @@ model User {
   gamePlays                       GamePlay[]
   watchTracking                   WatchTracking?
   aiUsages                        AiUsage[]
+  listeningAudioUsages            ListeningAudioUsage[]
   vocabProgresses                 UserVocabWordProgress[]
   savedVocabulary                 UserSavedWord[]
   toeicAttempts                   ToeicAttempt[]
@@ -361,6 +363,15 @@ enum ListeningPracticeAttemptStatus {
   ABANDONED
 }
 
+enum ListeningAudioArtifactStatus {
+  GENERATING
+  PREVIEW_READY
+  APPROVED
+  PUBLISHED
+  STALE
+  FAILED
+}
+
 model Quiz {
   id                Int                   @id @default(autoincrement())
   courseId          Int?
@@ -377,10 +388,49 @@ model Quiz {
   timeLimit         Int? // In minutes
   createdAt         DateTime              @default(now())
 
-  questions                 Question[]
-  submissions               Submission[]
-  rewards                   UserQuizReward[]
-  listeningPracticeAttempts ListeningPracticeAttempt[]
+  questions                  Question[]
+  submissions                Submission[]
+  rewards                    UserQuizReward[]
+  listeningPracticeAttempts  ListeningPracticeAttempt[]
+  listeningAudioArtifacts    ListeningAudioArtifact[]
+  listeningTranscriptReveals ListeningTranscriptReveal[]
+  listeningAudioUsages       ListeningAudioUsage[]
+}
+
+/// Immutable, quiz-level production audio with an authoritative turn timeline.
+/// Question-level QuizAudioAsset remains the source for sentence exercises.
+model ListeningAudioArtifact {
+  id                   Int                          @id @default(autoincrement())
+  quizId               Int
+  quiz                 Quiz                         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  version              Int
+  synthesisHash        String
+  contentHash          String
+  status               ListeningAudioArtifactStatus @default(GENERATING)
+  provider             String
+  locale               String
+  accent               String
+  voiceRegistryVersion String
+  outputFormat         String
+  r2Key                String?
+  r2Url                String?
+  durationMs           Int?
+  checksumSha256       String?
+  timeline             Json?
+  error                String?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  approvedAt           DateTime?
+  approvedBy           Int?
+  publishedAt          DateTime?
+  publishedBy          Int?
+
+  usageEvents ListeningAudioUsage[]
+
+  @@unique([quizId, version])
+  @@unique([quizId, synthesisHash])
+  @@index([quizId, status])
+  @@index([synthesisHash])
 }
 
 model ListeningPracticeAttempt {
@@ -398,6 +448,20 @@ model ListeningPracticeAttempt {
   completedAt       DateTime?
 
   @@index([userId, quizId, status])
+}
+
+/// Durable learner action proving that a protected dictation transcript was revealed.
+model ListeningTranscriptReveal {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId     Int
+  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  attemptId  Int
+  revealedAt DateTime @default(now())
+
+  @@unique([userId, quizId])
+  @@index([quizId, revealedAt])
 }
 
 model Question {
@@ -775,6 +839,28 @@ model AiUsage {
   updatedAt DateTime @default(now()) @updatedAt
 
   @@unique([userId, weekKey])
+}
+
+/// Immutable provider-usage evidence for admin-authored listening audio.
+model ListeningAudioUsage {
+  id             Int                     @id @default(autoincrement())
+  quizId         Int
+  quiz           Quiz                    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  artifactId     Int?
+  artifact       ListeningAudioArtifact? @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  actorId        Int?
+  actor          User?                   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  provider       String
+  operation      String
+  synthesisHash  String
+  characterCount Int
+  success        Boolean
+  durationMs     Int?
+  error          String?
+  createdAt      DateTime                @default(now())
+
+  @@index([quizId, createdAt])
+  @@index([synthesisHash])
 }
 
 // Vocab Module Models
