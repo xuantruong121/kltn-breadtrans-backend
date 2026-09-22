@@ -19,6 +19,7 @@ import { R2Service } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
 import { CourseService } from '../course/course.service';
+import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
 
 @Injectable()
 export class AdminService {
@@ -359,7 +360,10 @@ export class AdminService {
         user.contentAttempts[0]?.submittedAt,
         user.grammarAttempts[0]?.createdAt,
         user.toeicAttempts[0]?.createdAt,
-      ].filter((value): value is Date => value instanceof Date);
+      ].filter(
+        (value): value is Date =>
+          value instanceof Date && !isNaN(value.getTime()),
+      );
 
       const userData = { ...user };
       delete (userData as Record<string, unknown>).learningActivities;
@@ -382,13 +386,7 @@ export class AdminService {
     });
   }
 
-  async createUser(dto: {
-    email: string;
-    password: string;
-    role: Role;
-    fullName: string;
-    phone?: string;
-  }) {
+  async createUser(dto: CreateUserDto) {
     if (dto.role !== Role.STUDENT && dto.role !== Role.ADMIN) {
       throw new BadRequestException('Vai trò người dùng không hợp lệ.');
     }
@@ -410,15 +408,24 @@ export class AdminService {
     });
   }
 
-  async updateUser(
-    userId: number,
-    dto: {
-      fullName?: string;
-      phone?: string;
-      role?: Role;
-      password?: string;
-    },
-  ) {
+  async updateUser(userId: number, dto: UpdateUserDto) {
+    if (dto.role && dto.role !== Role.ADMIN) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      if (existingUser?.role === Role.ADMIN) {
+        const adminCount = await this.prisma.user.count({
+          where: { role: Role.ADMIN },
+        });
+        if (adminCount <= 1) {
+          throw new BadRequestException(
+            'Không thể hạ quyền Admin duy nhất trong hệ thống.',
+          );
+        }
+      }
+    }
+
     const updateUserData: any = {};
     if (dto.role) updateUserData.role = dto.role;
     if (dto.password) {

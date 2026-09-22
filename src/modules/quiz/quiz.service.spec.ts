@@ -11,6 +11,7 @@ import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SpeakingService } from '../speaking/speaking.service';
 import { UploadService } from '../upload/upload.service';
+import { ListeningAudioAuthoringService } from './listening-audio-authoring.service';
 
 const mockPrismaService = {
   quiz: {
@@ -52,6 +53,15 @@ const mockUploadService = {
   downloadFileBuffer: jest.fn(),
 };
 
+const mockListeningAudioAuthoringService = {
+  getCurrentPublishedArtifact: jest.fn().mockResolvedValue(null),
+  getPublishedAudio: jest
+    .fn()
+    .mockRejectedValue(
+      new Error('Audio toàn bài chưa được quản trị viên tạo và duyệt'),
+    ),
+};
+
 describe('QuizService', () => {
   let service: QuizService;
   let prisma: PrismaService;
@@ -65,6 +75,10 @@ describe('QuizService', () => {
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: SpeakingService, useValue: mockSpeakingService },
         { provide: UploadService, useValue: mockUploadService },
+        {
+          provide: ListeningAudioAuthoringService,
+          useValue: mockListeningAudioAuthoringService,
+        },
       ],
     }).compile();
 
@@ -74,6 +88,12 @@ describe('QuizService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockListeningAudioAuthoringService.getCurrentPublishedArtifact.mockResolvedValue(
+      null,
+    );
+    mockListeningAudioAuthoringService.getPublishedAudio.mockRejectedValue(
+      new Error('Audio toàn bài chưa được quản trị viên tạo và duyệt'),
+    );
   });
 
   it('should be defined', () => {
@@ -307,13 +327,59 @@ describe('QuizService', () => {
     });
 
     it('normalizes curly apostrophes as optional dictation punctuation', () => {
-      expect(normalizeListeningAnswer('  Don’t   worry!  ')).toBe('dont worry');
+      expect(normalizeListeningAnswer('  Don’t   worry!  ')).toBe(
+        'do not worry',
+      );
+    });
+
+    it('treats standard conversational punctuation and casing as non-lexical', () => {
+      const expected = "Well, let me think. It's about ten minutes.";
+      expect(normalizeListeningAnswer(expected)).toBe(
+        normalizeListeningAnswer('well let me think its about ten minutes'),
+      );
+      expect(
+        normalizeListeningAnswer('well let me think its about twenty minutes'),
+      ).not.toBe(normalizeListeningAnswer(expected));
+      expect(normalizeListeningAnswer('twenty-one minutes')).toBe(
+        normalizeListeningAnswer('twenty one minutes'),
+      );
+    });
+
+    it('treats canonical-aware contractions and full forms as equivalent', () => {
+      const equivalentPairs = [
+        ["We're going.", 'we are going'],
+        ["We've finished.", 'we have finished'],
+        ["We'll meet tomorrow.", 'we will meet tomorrow'],
+        ["I can't come.", 'i cannot come'],
+        ["We'd finished already.", 'we had finished already'],
+        ["We'd like some help.", 'we would like some help'],
+        ['We’re ready.', "we're ready"],
+      ] as const;
+
+      for (const [canonical, learner] of equivalentPairs) {
+        expect(normalizeListeningAnswer(canonical)).toBe(
+          normalizeListeningAnswer(learner),
+        );
+      }
+
+      const rejectedPairs = [
+        ["We're going.", "we've gone"],
+        ["We've finished.", 'we had finished'],
+        ["We'll meet tomorrow.", 'we would meet tomorrow'],
+        ["We'd like some help.", 'we had like some help'],
+        ['We’re ready.', 'were ready'],
+      ] as const;
+
+      for (const [canonical, learner] of rejectedPairs) {
+        expect(normalizeListeningAnswer(canonical)).not.toBe(
+          normalizeListeningAnswer(learner),
+        );
+      }
     });
   });
 
   describe('listening audio', () => {
-    it('re-synthesizes dialogue from spoken lines instead of using legacy labeled assets', async () => {
-      const audio = Buffer.from('natural-dialogue-audio');
+    it('does not synthesize student audio from legacy content at request time', async () => {
       mockPrismaService.question.findUnique.mockResolvedValue({
         id: 96,
         quizId: 28,
@@ -328,17 +394,10 @@ describe('QuizService', () => {
           ],
         },
       });
-      mockSpeakingService.generateDialogueTts.mockResolvedValue(audio);
-
-      await expect(service.streamQuestionAudio(28, 96)).resolves.toBe(audio);
-      expect(mockSpeakingService.generateDialogueTts).toHaveBeenCalledWith(
-        [
-          { speaker: 'Customer', text: 'Hello.' },
-          { speaker: 'Agent', text: 'How can I help?' },
-        ],
-        'US',
-        1,
+      await expect(service.streamQuestionAudio(28, 96)).rejects.toThrow(
+        'Audio bài luyện chưa được quản trị viên tạo và duyệt',
       );
+      expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
       expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
     });
 
@@ -360,7 +419,7 @@ describe('QuizService', () => {
       expect(mockSpeakingService.generateTts).not.toHaveBeenCalled();
     });
 
-    it('uses the dictation speaker voice instead of a legacy single-voice asset', async () => {
+    it('serves an approved dictation asset without synthesizing at playback time', async () => {
       const audio = Buffer.from('speaker-line-audio');
       mockPrismaService.question.findUnique.mockResolvedValue({
         id: 99,
@@ -379,15 +438,13 @@ describe('QuizService', () => {
           correctAnswer: 'The meeting starts at ten.',
         },
       });
-      mockSpeakingService.generateDialogueTts.mockResolvedValue(audio);
+      mockUploadService.downloadFileBuffer.mockResolvedValue(audio);
 
       await expect(service.streamQuestionAudio(23, 99)).resolves.toBe(audio);
-      expect(mockSpeakingService.generateDialogueTts).toHaveBeenCalledWith(
-        [{ speaker: 'Daniel', text: 'The meeting starts at ten.' }],
-        'US',
-        1,
+      expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
+      expect(mockUploadService.downloadFileBuffer).toHaveBeenCalledWith(
+        'catalog/listening/practice/audio/quiz-23/question-99/v1.mp3',
       );
-      expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
     });
 
     it('serves a generated catalog dialogue asset without re-synthesizing it', async () => {
@@ -418,8 +475,71 @@ describe('QuizService', () => {
       expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
     });
 
-    it('generates one continuous multi-speaker track for a dictation transcript', async () => {
-      const audio = Buffer.from('full-dictation-dialogue');
+    it('binds dictation playback to the current quiz-level artifact identity', async () => {
+      const audio = Buffer.from('quiz-track-v5');
+      const artifact = {
+        id: 15,
+        version: 5,
+        checksumSha256: 'checksum-v5',
+        durationMs: 94627,
+      };
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 120,
+        quizId: 24,
+        type: 'DICTATION',
+        quiz: { id: 24, type: 'LISTENING_PRACTICE' },
+        audioAssets: [],
+        content: {
+          targetTurnId: 'turn-001',
+          transcriptSegments: [{ text: 'Hey, Ben.' }],
+        },
+      });
+      mockListeningAudioAuthoringService.getCurrentPublishedArtifact.mockResolvedValue(
+        artifact,
+      );
+      mockListeningAudioAuthoringService.getPublishedAudio.mockResolvedValue({
+        artifact,
+        buffer: audio,
+      });
+
+      const result = await service.streamQuestionAudio(24, 120, {
+        artifactId: 15,
+        version: 5,
+        checksumSha256: 'checksum-v5',
+      });
+
+      expect(result).toEqual({ artifact, buffer: audio });
+      expect(
+        mockListeningAudioAuthoringService.getPublishedAudio,
+      ).toHaveBeenCalledWith(24, {
+        artifactId: 15,
+        version: 5,
+        checksumSha256: 'checksum-v5',
+      });
+      expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    });
+
+    it('does not downgrade an identity-bound request to a legacy clip', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 121,
+        quizId: 24,
+        type: 'DICTATION',
+        quiz: { id: 24, type: 'LISTENING_PRACTICE' },
+        audioAssets: [
+          {
+            key: 'catalog/listening/practice/audio/quiz-24/question-121/v1.mp3',
+          },
+        ],
+        content: { targetTurnId: 'turn-002' },
+      });
+
+      await expect(
+        service.streamQuestionAudio(24, 121, { artifactId: 15, version: 5 }),
+      ).rejects.toThrow('Audio phiên bản hiện tại chưa được quản trị viên tạo');
+      expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when a full-script R2 artifact is not available', async () => {
       mockPrismaService.quiz.findUnique.mockResolvedValue({
         id: 23,
         type: 'LISTENING_PRACTICE',
@@ -436,20 +556,10 @@ describe('QuizService', () => {
           { content: { correctAnswer: 'Third line.', speaker: 'Maya' } },
         ],
       });
-      mockSpeakingService.generateDialogueTts.mockResolvedValue(audio);
-
-      await expect(service.streamListeningTranscriptAudio(23)).resolves.toBe(
-        audio,
+      await expect(service.streamListeningTranscriptAudio(23)).rejects.toThrow(
+        'Audio toàn bài chưa được quản trị viên tạo và duyệt',
       );
-      expect(mockSpeakingService.generateDialogueTts).toHaveBeenCalledWith(
-        [
-          { speaker: 'Maya', text: 'First line.' },
-          { speaker: 'Daniel', text: 'Second line.' },
-          { speaker: 'Maya', text: 'Third line.' },
-        ],
-        'UK',
-        1,
-      );
+      expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
     });
   });
 

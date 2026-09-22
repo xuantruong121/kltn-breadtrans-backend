@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
   UnauthorizedException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   ListeningPracticeAttemptStatus,
@@ -24,18 +25,131 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AiService } from '../ai/ai.service';
 import { SpeakingService } from '../speaking/speaking.service';
 import { UploadService } from '../upload/upload.service';
+import {
+  ListeningAudioAuthoringService,
+  PublishedListeningAudioIdentity,
+} from './listening-audio-authoring.service';
 
 /**
  * Compare learner dictation without penalising typography that does not change
  * what was heard (capitalisation, punctuation, curly apostrophes or spacing).
  */
 export function normalizeListeningAnswer(value: unknown): string {
+  return normalizeStandardListeningTokens(value).join(' ');
+}
+
+const STANDARD_CONTRACTIONS: Record<string, string[]> = {
+  "we're": ['we', 'are'],
+  "you're": ['you', 'are'],
+  "they're": ['they', 'are'],
+  "we've": ['we', 'have'],
+  "i've": ['i', 'have'],
+  "they've": ['they', 'have'],
+  "we'll": ['we', 'will'],
+  "i'll": ['i', 'will'],
+  "they'll": ['they', 'will'],
+  "can't": ['cannot'],
+  "won't": ['will', 'not'],
+  "don't": ['do', 'not'],
+  "doesn't": ['does', 'not'],
+  "didn't": ['did', 'not'],
+  "isn't": ['is', 'not'],
+  "aren't": ['are', 'not'],
+  "wasn't": ['was', 'not'],
+  "weren't": ['were', 'not'],
+  "hasn't": ['has', 'not'],
+  "haven't": ['have', 'not'],
+  "hadn't": ['had', 'not'],
+  "let's": ['let', 'us'],
+  // Apostrophe-free forms remain compatible with STANDARD's punctuation policy.
+  lets: ['let', 'us'],
+  its: ['it', 'is'],
+};
+
+const AMBIGUOUS_CONTRACTIONS: Record<string, [string[], string[]]> = {
+  "i'd": [
+    ['i', 'would'],
+    ['i', 'had'],
+  ],
+  "we'd": [
+    ['we', 'would'],
+    ['we', 'had'],
+  ],
+  "they'd": [
+    ['they', 'would'],
+    ['they', 'had'],
+  ],
+  "he's": [
+    ['he', 'is'],
+    ['he', 'has'],
+  ],
+  "she's": [
+    ['she', 'is'],
+    ['she', 'has'],
+  ],
+  "it's": [
+    ['it', 'is'],
+    ['it', 'has'],
+  ],
+  "that's": [
+    ['that', 'is'],
+    ['that', 'has'],
+  ],
+  "there's": [
+    ['there', 'is'],
+    ['there', 'has'],
+  ],
+};
+
+function tokenizeStandardListeningAnswer(value: unknown): string[] {
   return String(value ?? '')
+    .normalize('NFKC')
     .toLocaleLowerCase('en-US')
-    .replace(/[’‘]/g, "'")
-    .replace(/[^\p{L}\p{N}\s]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/[’‘ʼ`]/g, "'")
+    .replace(/[^\p{L}\p{N}']+/gu, ' ')
+    .replace(/(?<![\p{L}\p{N}])'+|'+(?![\p{L}\p{N}])/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function looksLikePastParticiple(token: string | undefined): boolean {
+  if (!token) return false;
+  return (
+    /(?:ed|en)$/.test(token) ||
+    new Set([
+      'gone',
+      'done',
+      'seen',
+      'been',
+      'had',
+      'made',
+      'left',
+      'read',
+    ]).has(token)
+  );
+}
+
+function expandStandardContraction(
+  token: string,
+  nextToken?: string,
+): string[] {
+  const direct = STANDARD_CONTRACTIONS[token];
+  if (direct) return direct;
+  const ambiguous = AMBIGUOUS_CONTRACTIONS[token];
+  if (!ambiguous) return [token];
+  return looksLikePastParticiple(nextToken) ? ambiguous[1] : ambiguous[0];
+}
+
+/**
+ * STANDARD mode compares lexical content while treating ordinary contractions
+ * and their canonical full forms as equivalent. Ambiguous forms are resolved
+ * from their local sentence context instead of being expanded many-to-many.
+ */
+export function normalizeStandardListeningTokens(value: unknown): string[] {
+  const tokens = tokenizeStandardListeningAnswer(value);
+  return tokens.flatMap((token, index) =>
+    expandStandardContraction(token, tokens[index + 1]),
+  );
 }
 
 /**
@@ -73,9 +187,13 @@ export function buildNaturalListeningAudioText(
 }
 
 export interface NormalizedDialogueSegment {
-  speaker: string;
+  /** Legacy display label. New content should use speakerId. */
+  speaker?: string;
+  speakerId?: string;
   text: string;
   translation?: string;
+  startMs?: number;
+  endMs?: number;
 }
 
 /**
@@ -92,19 +210,45 @@ export function normalizeDialogueSegments(
       if (!segment || typeof segment !== 'object') return null;
       const raw = segment as Record<string, unknown>;
       const speaker = typeof raw.speaker === 'string' ? raw.speaker.trim() : '';
+      const speakerId =
+        typeof raw.speakerId === 'string' ? raw.speakerId.trim() : '';
       const text = typeof raw.text === 'string' ? raw.text.trim() : '';
       const translation =
         typeof raw.translation === 'string' ? raw.translation.trim() : '';
-      if (!speaker || !text) return null;
+      if ((!speaker && !speakerId) || !text) return null;
       return {
-        speaker,
+        ...(speaker ? { speaker } : {}),
+        ...(speakerId ? { speakerId } : {}),
         text,
         ...(translation ? { translation } : {}),
+        ...(Number.isFinite(raw.startMs)
+          ? { startMs: Number(raw.startMs) }
+          : {}),
+        ...(Number.isFinite(raw.endMs) ? { endMs: Number(raw.endMs) } : {}),
       } satisfies NormalizedDialogueSegment;
     })
     .filter(
       (segment): segment is NormalizedDialogueSegment => segment !== null,
     );
+}
+
+function dedupeDialogueBlocks(
+  blocks: NormalizedDialogueSegment[][],
+): NormalizedDialogueSegment[] {
+  const seen = new Set<string>();
+  return blocks.flatMap((block) => {
+    const key = JSON.stringify(
+      block.map(({ speaker, speakerId, text, translation }) => ({
+        speaker,
+        speakerId,
+        text,
+        translation,
+      })),
+    );
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return block;
+  });
 }
 
 function normalizeQuestionContent(
@@ -125,7 +269,7 @@ function normalizeQuestionContent(
       content.transcriptSegments,
     );
     const speakers = new Set(
-      transcriptSegments.map((segment) => segment.speaker),
+      transcriptSegments.map((segment) => segment.speakerId ?? segment.speaker),
     );
     if (transcriptSegments.length < 2 || speakers.size < 2) {
       throw new BadRequestException(
@@ -158,8 +302,14 @@ function calculateDictationWordAccuracy(
     mode === 'STRICT'
       ? normalizeStrictListeningAnswer
       : normalizeListeningAnswer;
-  const expectedWords = normalize(expected).split(/\s+/).filter(Boolean);
-  const submittedWords = normalize(submitted).split(/\s+/).filter(Boolean);
+  const expectedWords =
+    mode === 'STANDARD'
+      ? normalizeStandardListeningTokens(expected)
+      : normalize(expected).split(/\s+/).filter(Boolean);
+  const submittedWords =
+    mode === 'STANDARD'
+      ? normalizeStandardListeningTokens(submitted)
+      : normalize(submitted).split(/\s+/).filter(Boolean);
   if (expectedWords.length === 0) return 0;
 
   const dp = Array.from({ length: expectedWords.length + 1 }, () =>
@@ -187,6 +337,7 @@ export class QuizService {
     private aiService: AiService,
     private speakingService: SpeakingService,
     private uploadService: UploadService,
+    private listeningAudioAuthoringService: ListeningAudioAuthoringService,
   ) {}
 
   async createQuiz(dto: CreateQuizDto, user?: { id: number; role: Role }) {
@@ -553,6 +704,75 @@ export class QuizService {
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
 
+    // Timeline offsets are safe learning metadata (they contain no answers),
+    // so expose them with the dialogue transcript when a published artifact
+    // exists. This keeps the student player authoritative instead of falling
+    // back to text-length timing heuristics.
+    let listeningAudioArtifact: {
+      id: number;
+      version: number;
+      checksumSha256: string | null;
+      durationMs: number | null;
+    } | null = null;
+    if (
+      quiz.type === QuizType.LISTENING_PRACTICE &&
+      userId !== undefined &&
+      quiz.questions.length > 0
+    ) {
+      const artifact =
+        await this.listeningAudioAuthoringService.getCurrentPublishedArtifact(
+          quiz.id,
+        );
+      if (artifact) {
+        listeningAudioArtifact = {
+          id: artifact.id,
+          version: artifact.version,
+          checksumSha256: artifact.checksumSha256,
+          durationMs: artifact.durationMs,
+        };
+      }
+      const timeline = Array.isArray(artifact?.timeline)
+        ? new Map(
+            artifact.timeline
+              .filter(
+                (
+                  item,
+                ): item is { turnId: string; startMs: number; endMs: number } =>
+                  Boolean(item) &&
+                  typeof item === 'object' &&
+                  typeof (item as Record<string, unknown>).turnId ===
+                    'string' &&
+                  Number.isInteger((item as Record<string, unknown>).startMs) &&
+                  Number.isInteger((item as Record<string, unknown>).endMs),
+              )
+              .map((item) => [item.turnId, item]),
+          )
+        : new Map<string, { turnId: string; startMs: number; endMs: number }>();
+      let turnIndex = 0;
+      quiz.questions = quiz.questions.map((question) => {
+        const content =
+          question.content && typeof question.content === 'object'
+            ? { ...(question.content as Record<string, unknown>) }
+            : null;
+        if (!content || !Array.isArray(content.transcriptSegments))
+          return question;
+        const transcriptSegments = content.transcriptSegments.map((segment) => {
+          if (!segment || typeof segment !== 'object') return segment;
+          const turn = timeline.get(
+            `turn-${String(++turnIndex).padStart(3, '0')}`,
+          );
+          return turn
+            ? {
+                ...(segment as Record<string, unknown>),
+                startMs: turn.startMs,
+                endMs: turn.endMs,
+              }
+            : segment;
+        });
+        return { ...question, content: { ...content, transcriptSegments } };
+      });
+    }
+
     if (quiz.type === QuizType.LISTENING_PRACTICE && userId === undefined) {
       throw new UnauthorizedException('Đăng nhập để bắt đầu luyện nghe');
     }
@@ -580,10 +800,17 @@ export class QuizService {
         }
         return { ...q, content };
       });
-      return { ...quiz, questions: sanitizedQuestions };
+      return {
+        ...quiz,
+        ...(listeningAudioArtifact ? { listeningAudioArtifact } : {}),
+        questions: sanitizedQuestions,
+      };
     }
 
-    return quiz;
+    return {
+      ...quiz,
+      ...(listeningAudioArtifact ? { listeningAudioArtifact } : {}),
+    };
   }
 
   /**
@@ -592,7 +819,36 @@ export class QuizService {
    * this endpoint is limited to published listening-practice dictation items
    * and never serves TOEIC or other assessment content.
    */
-  async getListeningTranscript(quizId: number) {
+  async revealListeningTranscript(userId: number, quizId: number) {
+    await this.assertListeningPracticeQuiz(quizId);
+    const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
+      where: {
+        userId,
+        quizId,
+        status: {
+          in: [
+            ListeningPracticeAttemptStatus.IN_PROGRESS,
+            ListeningPracticeAttemptStatus.COMPLETED,
+          ],
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true },
+    });
+    if (!attempt) {
+      throw new ForbiddenException(
+        'Hãy bắt đầu bài luyện trước khi xem toàn bộ kịch bản.',
+      );
+    }
+    return this.prisma.listeningTranscriptReveal.upsert({
+      where: { userId_quizId: { userId, quizId } },
+      create: { userId, quizId, attemptId: attempt.id },
+      update: { attemptId: attempt.id, revealedAt: new Date() },
+      select: { revealedAt: true },
+    });
+  }
+
+  async getListeningTranscript(userId: number, quizId: number) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
       select: {
@@ -600,9 +856,8 @@ export class QuizService {
         type: true,
         publicationStatus: true,
         questions: {
-          where: { type: 'DICTATION' },
           orderBy: { order: 'asc' },
-          select: { id: true, order: true, content: true },
+          select: { id: true, type: true, order: true, content: true },
         },
       },
     });
@@ -616,33 +871,140 @@ export class QuizService {
     if (quiz.publicationStatus !== 'PUBLISHED') {
       throw new NotFoundException('Bài luyện chưa được xuất bản');
     }
+    const transcriptQuestions = quiz.questions.filter((question) => {
+      const content = (question.content ?? {}) as Record<string, unknown>;
+      return (
+        question.type === 'DICTATION' ||
+        question.type === 'DIALOGUE' ||
+        Array.isArray(content.transcriptSegments)
+      );
+    });
+    const containsDictation = transcriptQuestions.some(
+      (question) => question.type === 'DICTATION',
+    );
+    if (containsDictation) {
+      const reveal = await this.prisma.listeningTranscriptReveal.findUnique({
+        where: { userId_quizId: { userId, quizId } },
+        select: { id: true },
+      });
+      if (!reveal) {
+        throw new ForbiddenException(
+          'Hãy xác nhận xem transcript trước khi tải nội dung.',
+        );
+      }
+    }
 
-    const items = quiz.questions
-      .map((question) => {
+    const dialogueBlocks = transcriptQuestions
+      .map((question) =>
+        normalizeDialogueSegments(
+          (question.content as Record<string, unknown> | null)
+            ?.transcriptSegments,
+        ),
+      )
+      .filter((segments) => segments.length > 0);
+    const hasMultiTurnDialogue = dialogueBlocks.some(
+      (segments) => segments.length > 1,
+    );
+    const dedupedDialogueSegments = hasMultiTurnDialogue
+      ? dedupeDialogueBlocks(dialogueBlocks)
+      : dialogueBlocks.flat();
+    let turnNumber = 0;
+    const items = transcriptQuestions
+      .flatMap((question) => {
         const content = (question.content ?? {}) as Record<string, unknown>;
+        const canonicalSegments = normalizeDialogueSegments(
+          content.transcriptSegments,
+        );
+
+        if (canonicalSegments.length > 0) {
+          return canonicalSegments
+            .map(() => {
+              const segment = dedupedDialogueSegments[turnNumber];
+              if (!segment) return null;
+              turnNumber += 1;
+              return {
+                questionId: question.id,
+                turnId: `turn-${String(turnNumber).padStart(3, '0')}`,
+                order: turnNumber,
+                transcript: segment.text,
+                speaker: segment.speaker ?? segment.speakerId ?? null,
+                translation: segment.translation ?? null,
+                startMs: segment.startMs ?? null,
+                endMs: segment.endMs ?? null,
+              };
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null);
+        }
+
         const transcript =
           typeof content.correctAnswer === 'string'
             ? content.correctAnswer.trim()
             : typeof content.audioText === 'string'
               ? content.audioText.trim()
               : '';
-        return {
-          questionId: question.id,
-          order: question.order,
-          transcript,
-          speaker:
-            typeof content.speaker === 'string' && content.speaker.trim()
-              ? content.speaker.trim()
-              : null,
-          translation:
-            typeof content.translation === 'string'
-              ? content.translation.trim() || null
-              : null,
-        };
+        if (!transcript) return [];
+        turnNumber += 1;
+        return [
+          {
+            questionId: question.id,
+            turnId: `turn-${String(turnNumber).padStart(3, '0')}`,
+            order: turnNumber,
+            transcript,
+            speaker:
+              typeof content.speaker === 'string' && content.speaker.trim()
+                ? content.speaker.trim()
+                : null,
+            translation:
+              typeof content.translation === 'string'
+                ? content.translation.trim() || null
+                : null,
+            startMs: null,
+            endMs: null,
+          },
+        ];
       })
       .filter((item) => item.transcript.length > 0);
 
-    return { quizId: quiz.id, items };
+    const artifact =
+      await this.listeningAudioAuthoringService.getCurrentPublishedArtifact(
+        quiz.id,
+      );
+    const timelineByTurn = new Map<
+      string,
+      { startMs: number; endMs: number }
+    >();
+    if (artifact?.timeline && Array.isArray(artifact.timeline)) {
+      for (const item of artifact.timeline) {
+        if (!item || typeof item !== 'object') continue;
+        const timelineItem = item as Record<string, unknown>;
+        if (typeof timelineItem.turnId !== 'string') continue;
+        if (
+          !Number.isInteger(timelineItem.startMs) ||
+          !Number.isInteger(timelineItem.endMs)
+        )
+          continue;
+        timelineByTurn.set(timelineItem.turnId, {
+          startMs: timelineItem.startMs as number,
+          endMs: timelineItem.endMs as number,
+        });
+      }
+    }
+    return {
+      quizId: quiz.id,
+      audioArtifact: artifact
+        ? {
+            id: artifact.id,
+            version: artifact.version,
+            checksumSha256: artifact.checksumSha256,
+            durationMs: artifact.durationMs,
+          }
+        : null,
+      items: items.map((item) => ({
+        ...item,
+        startMs: timelineByTurn.get(item.turnId)?.startMs ?? null,
+        endMs: timelineByTurn.get(item.turnId)?.endMs ?? null,
+      })),
+    };
   }
 
   /**
@@ -650,60 +1012,15 @@ export class QuizService {
    * playlist may still move between individual lines, but playback must not
    * tear down and reload a new audio element for every line.
    */
-  async streamListeningTranscriptAudio(quizId: number): Promise<Buffer> {
-    const quiz = await this.prisma.quiz.findUnique({
-      where: { id: quizId },
-      select: {
-        id: true,
-        type: true,
-        publicationStatus: true,
-        questions: {
-          where: { type: 'DICTATION' },
-          orderBy: { order: 'asc' },
-          select: { content: true },
-        },
-      },
-    });
-
-    if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
-    if (quiz.type !== QuizType.LISTENING_PRACTICE) {
-      throw new ForbiddenException('Chỉ hỗ trợ audio cho bài luyện nghe chép');
-    }
-    if (quiz.publicationStatus !== 'PUBLISHED') {
-      throw new NotFoundException('Bài luyện chưa được xuất bản');
-    }
-
-    const speakers = ['Maya', 'Daniel', 'Sofia'];
-    const segments = quiz.questions.flatMap((question, index) => {
-      const content = (question.content ?? {}) as Record<string, unknown>;
-      const text =
-        typeof content.correctAnswer === 'string'
-          ? content.correctAnswer.trim()
-          : typeof content.audioText === 'string'
-            ? content.audioText.trim()
-            : '';
-      if (!text) return [];
-
-      const explicitSpeaker =
-        typeof content.speaker === 'string' ? content.speaker.trim() : '';
-      return [
-        {
-          speaker: explicitSpeaker || speakers[index % speakers.length],
-          text,
-        },
-      ];
-    });
-
-    if (segments.length === 0) {
-      throw new BadRequestException('Bài nghe chép chưa có nội dung audio');
-    }
-
-    const firstContent = (quiz.questions[0]?.content ?? {}) as Record<
-      string,
-      unknown
-    >;
-    const accent = firstContent.accent === 'UK' ? 'UK' : 'US';
-    return this.speakingService.generateDialogueTts(segments, accent, 1);
+  async streamListeningTranscriptAudio(
+    quizId: number,
+    requestedIdentity: PublishedListeningAudioIdentity = {},
+  ) {
+    const result = await this.listeningAudioAuthoringService.getPublishedAudio(
+      quizId,
+      requestedIdentity,
+    );
+    return result;
   }
 
   async createQuestion(quizId: number, dto: CreateQuestionDto) {
@@ -1183,7 +1500,8 @@ export class QuizService {
   async streamQuestionAudio(
     quizId: number,
     questionId: number,
-  ): Promise<Buffer> {
+    requestedIdentity: PublishedListeningAudioIdentity = {},
+  ) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: {
@@ -1202,59 +1520,46 @@ export class QuizService {
       throw new ForbiddenException('Chỉ hỗ trợ audio cho bài luyện nghe');
     }
 
-    const content = question.content as Record<string, unknown>;
-    const hasDialogueSegments =
-      Array.isArray(content.transcriptSegments) &&
-      content.transcriptSegments.length > 0;
-    const activeAsset = question.audioAssets[0];
-    const isCatalogDialogueAsset =
-      activeAsset?.key.startsWith('catalog/listening/practice/dialogue/') ??
-      false;
-    const accent = content.accent === 'UK' ? 'UK' : 'US';
-    const speaker =
-      typeof content.speaker === 'string' ? content.speaker.trim() : '';
-
-    // Dictation lines with speaker metadata are rendered with the same
-    // voice mapping as the aggregate transcript, so a dialogue never falls
-    // back to an old single-speaker object in R2.
-    if (question.type === 'DICTATION' && speaker) {
-      const audioText = buildNaturalListeningAudioText(content);
-      if (!audioText) {
-        throw new BadRequestException('Câu hỏi chưa có nội dung audio');
+    const content =
+      question.content && typeof question.content === 'object'
+        ? (question.content as Record<string, unknown>)
+        : {};
+    const isArtifactBackedQuestion =
+      question.type === 'DICTATION' ||
+      question.type === 'DIALOGUE' ||
+      typeof content.targetTurnId === 'string';
+    if (isArtifactBackedQuestion) {
+      const artifact =
+        await this.listeningAudioAuthoringService.getCurrentPublishedArtifact(
+          quizId,
+        );
+      if (artifact) {
+        const result =
+          await this.listeningAudioAuthoringService.getPublishedAudio(
+            quizId,
+            requestedIdentity,
+          );
+        return result;
       }
-      return this.speakingService.generateDialogueTts(
-        [{ speaker, text: audioText }],
-        accent,
-        1,
-      );
+
+      // A caller that supplies an artifact identity is explicitly asking for
+      // the quiz-level production track. Never silently downgrade that request
+      // to a legacy question asset when the published artifact is unavailable.
+      if (Object.keys(requestedIdentity).length > 0) {
+        throw new ServiceUnavailableException(
+          'Audio phiên bản hiện tại chưa được quản trị viên tạo và duyệt; vui lòng thử lại sau.',
+        );
+      }
     }
 
-    // Dialogue assets must preserve distinct voices per speaker. Until the
-    // static multi-voice asset is materialized, synthesize the segment list
-    // as one SSML document (without reading speaker labels aloud).
-    if (
-      activeAsset &&
-      (!hasDialogueSegments ||
-        activeAsset.key.endsWith('/dialogue-v3.mp3') ||
-        isCatalogDialogueAsset)
-    )
+    const activeAsset = question.audioAssets[0];
+    // Published student playback is R2-only. Never call Azure from this
+    // request path; content must be synthesized and approved by an author.
+    if (activeAsset && activeAsset.key.startsWith('catalog/listening/'))
       return this.uploadService.downloadFileBuffer(activeAsset.key);
-
-    const audioText = buildNaturalListeningAudioText(content);
-    if (!audioText)
-      throw new BadRequestException('Câu hỏi chưa có nội dung audio');
-    if (hasDialogueSegments) {
-      const segments = (
-        content.transcriptSegments as Array<Record<string, unknown>>
-      )
-        .filter((segment) => typeof segment.text === 'string')
-        .map((segment) => ({
-          speaker: typeof segment.speaker === 'string' ? segment.speaker : '',
-          text: segment.text as string,
-        }));
-      return this.speakingService.generateDialogueTts(segments, accent, 1);
-    }
-    return this.speakingService.generateTts(audioText, accent, 1);
+    throw new ServiceUnavailableException(
+      'Audio bài luyện chưa được quản trị viên tạo và duyệt; vui lòng thử lại sau.',
+    );
   }
 
   private assertCompleteListeningSubmission(

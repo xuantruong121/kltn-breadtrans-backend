@@ -174,18 +174,61 @@ describe('DictionaryLookupService', () => {
   });
 
   it('returns a graceful provider-unavailable response', async () => {
-    const { prisma, service } = createService();
+    const redis = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue('OK'),
+    };
+    const { prisma, service } = createService(redis);
     (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([]);
     const provider = {
       lookup: jest.fn().mockRejectedValue(new Error('timeout')),
     } satisfies jest.Mocked<DictionaryProvider>;
-    (service as unknown as { provider: DictionaryProvider }).provider =
-      provider;
+    service.provider = provider;
+    service.fallbackProvider = provider;
 
     const result = await service.lookup('sustainable');
 
     expect(result.entries).toEqual([]);
     expect(result.providerUnavailable).toBe(true);
+    expect(redis.set).not.toHaveBeenCalled();
+  });
+
+  it('falls back to AI provider when primary provider fails', async () => {
+    const { prisma, service } = createService();
+    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([]);
+    const primary = {
+      lookup: jest.fn().mockRejectedValue(new Error('HTTP timeout')),
+    } satisfies jest.Mocked<DictionaryProvider>;
+    const fallback = {
+      lookup: jest.fn().mockResolvedValue([
+        {
+          word: 'sustainable',
+          partOfSpeech: 'adjective',
+          ipaUs: '/səˈsteɪnəbl/',
+          ipaUk: '/səˈsteɪnəbl/',
+          definitions: [
+            {
+              definition: 'able to be maintained at a certain rate or level',
+              example: 'sustainable development',
+              synonyms: [],
+              antonyms: [],
+            },
+          ],
+          audioUs: null,
+          audioUk: null,
+        },
+      ]),
+    } satisfies jest.Mocked<DictionaryProvider>;
+
+    service.provider = primary;
+    service.fallbackProvider = fallback;
+
+    const result = await service.lookup('sustainable');
+
+    expect(primary.lookup).toHaveBeenCalledWith('sustainable');
+    expect(fallback.lookup).toHaveBeenCalledWith('sustainable');
+    expect(result.source).toBe('EXTERNAL');
+    expect(result.entries[0].definitions[0].definition).toContain('maintained');
   });
 
   it('enriches external entries once and keeps the English provider data', async () => {
