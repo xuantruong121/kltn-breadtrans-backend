@@ -52,10 +52,41 @@ type DictationSeedSentence = {
 type CoherentDictationTurn = {
   speakerId: string;
   speaker: string;
+  speakerTurnId: string;
   text: string;
   translation: string;
   voiceKey: 'female-01' | 'male-01';
   tone: 'NEUTRAL' | 'FRIENDLY' | 'THOUGHTFUL' | 'POLITE';
+  /** Provider-neutral conversational function; never emitted as spoken text. */
+  dialogueAct:
+    | 'GREETING'
+    | 'ACKNOWLEDGE'
+    | 'ASK'
+    | 'ANSWER'
+    | 'ANSWER_AND_EXPLAIN'
+    | 'ANSWER_AND_FOLLOW_UP'
+    | 'POSITIVE_REACTION'
+    | 'NEGATIVE_REACTION'
+    | 'THINKING'
+    | 'CLARIFY'
+    | 'CONFIRM'
+    | 'SUGGEST'
+    | 'REASSURE'
+    | 'CONCERN'
+    | 'AGREE_AND_PLAN'
+    | 'CLOSING';
+  /** Provider-neutral delivery intent resolved by the authoring adapter. */
+  delivery:
+    | 'NEUTRAL'
+    | 'FRIENDLY'
+    | 'FRIENDLY_UPBEAT'
+    | 'CONVERSATIONAL'
+    | 'THOUGHTFUL'
+    | 'CLARIFYING'
+    | 'REASSURING'
+    | 'CONCERNED'
+    | 'EXCITED_LIGHT'
+    | 'PROFESSIONAL';
   rate: string;
   pauseMs: number;
 };
@@ -68,16 +99,69 @@ type DialogueSeedTuple = [
   'female-01' | 'male-01',
 ];
 
-const toDialogueTurns = (turns: DialogueSeedTuple[]): CoherentDictationTurn[] =>
-  turns.map(([speakerId, speaker, text, translation, voiceKey]) => {
+const toDialogueTurns = (turns: DialogueSeedTuple[]): CoherentDictationTurn[] => {
+  let previousSpeakerId = '';
+  let speakerTurnNumber = 0;
+  return turns.map(([speakerId, speaker, text, translation, voiceKey]) => {
     const trimmed = text.trim();
-    const thoughtful = /^(Hmm|Let me think|Actually)/i.test(trimmed);
+    const thoughtful = /^(Let me think|I need to check|I'm not sure|I am not sure)/i.test(trimmed);
     const friendly =
       /^(Great|Nice|Perfect|Sounds good|Yeah|Sure|Right|Okay)/i.test(trimmed);
     const polite = /\?|Could you|Please/i.test(trimmed);
+    const hasQuestion = /\?/.test(trimmed);
+    const hasFollowUp = /\b(I(?:'ll| will| can)|we(?:'ll| will| can)|let's)\b/i.test(trimmed);
+    const dialogueAct: CoherentDictationTurn['dialogueAct'] =
+      /^(Hey|Hi|Good morning|Morning|Hello)\b/i.test(trimmed)
+        ? 'GREETING'
+        : /^(See you|Take care|Have a good|Thanks again)\b/i.test(trimmed)
+          ? 'CLOSING'
+          : thoughtful
+            ? 'THINKING'
+            : /^(Sorry|I am sorry|I'm sorry)\b/i.test(trimmed)
+              ? 'CONCERN'
+              : /^(Actually|I mean|Could you clarify|What do you mean)\b/i.test(trimmed)
+                ? 'CLARIFY'
+                : hasQuestion && hasFollowUp
+                  ? 'ANSWER_AND_FOLLOW_UP'
+                  : hasQuestion
+                    ? 'ASK'
+                    : /\b(because|so|that means|which is why)\b/i.test(trimmed)
+                      ? 'ANSWER_AND_EXPLAIN'
+                      : /^(Thanks|Thank you|I appreciate)\b/i.test(trimmed)
+                        ? 'ACKNOWLEDGE'
+                        : /^(Great|Nice|Perfect)\b/i.test(trimmed)
+                          ? 'POSITIVE_REACTION'
+                          : /^(Let's|We should|I(?:'ll| will)\b)/i.test(trimmed)
+                            ? 'AGREE_AND_PLAN'
+                            : /^(Yes|Yeah|Right|Okay|Sure)\b/i.test(trimmed)
+                              ? 'CONFIRM'
+                              : /^(No|Not yet|I can't|I cannot)\b/i.test(trimmed)
+                                ? 'NEGATIVE_REACTION'
+                                : /^(You can|You should|We can)\b/i.test(trimmed)
+                                  ? 'SUGGEST'
+                                  : 'ANSWER';
+    const delivery: CoherentDictationTurn['delivery'] =
+      dialogueAct === 'THINKING'
+        ? 'THOUGHTFUL'
+        : dialogueAct === 'CONCERN'
+          ? 'CONCERNED'
+          : dialogueAct === 'CLARIFY'
+            ? 'CLARIFYING'
+            : dialogueAct === 'POSITIVE_REACTION'
+              ? 'FRIENDLY_UPBEAT'
+              : dialogueAct === 'GREETING' || dialogueAct === 'CLOSING'
+                ? 'FRIENDLY'
+                : polite || friendly
+                  ? 'CONVERSATIONAL'
+                  : 'NEUTRAL';
+    if (speakerId !== previousSpeakerId) {
+      speakerTurnNumber += 1;
+      previousSpeakerId = speakerId;
+    }
     return {
       speakerId,
       speaker,
+      speakerTurnId: `speaker-turn-${String(speakerTurnNumber).padStart(3, '0')}`,
       text: trimmed,
       translation,
       voiceKey,
@@ -88,10 +172,13 @@ const toDialogueTurns = (turns: DialogueSeedTuple[]): CoherentDictationTurn[] =>
           : polite
             ? 'POLITE'
             : 'NEUTRAL',
+      dialogueAct,
+      delivery,
       rate: thoughtful ? '-4%' : friendly ? '2%' : polite ? '-2%' : '0%',
       pauseMs: thoughtful ? 340 : polite ? 280 : friendly ? 210 : 250,
     };
   });
+};
 
 /**
  * Quiz 23–25 are intentionally authored as complete conversations. The
@@ -111,8 +198,15 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
     [
       'leo',
       'Leo',
-      "Yeah, that's the plan. I reserved the study room from nine to eleven.",
-      'Ừ, đúng kế hoạch đó. Mình đã đặt phòng học từ chín giờ đến mười một giờ.',
+      "Yeah, that's the plan.",
+      'Ừ, đúng kế hoạch đó.',
+      'male-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      'I reserved the study room from nine to eleven.',
+      'Mình đã đặt phòng học từ chín giờ đến mười một giờ.',
       'male-01',
     ],
     [
@@ -123,31 +217,31 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
       'female-01',
     ],
     [
-      'leo',
-      'Leo',
-      'Sounds good. Could you bring the grammar worksheet too?',
-      'Được đấy. Bạn mang cả bài tập ngữ pháp nhé?',
-      'male-01',
-    ],
-    [
       'mia',
       'Mia',
-      'Sure. Oh, did you print the reading passage?',
-      'Được. À, bạn đã in bài đọc chưa?',
+      "I'll also bring the grammar worksheet.",
+      'Mình cũng sẽ mang bài tập ngữ pháp.',
       'female-01',
     ],
     [
       'leo',
       'Leo',
-      'I did. I printed five copies last night.',
-      'Rồi. Tối qua mình đã in năm bản.',
+      'Sounds good. Did you print the reading passage?',
+      'Được đấy. Bạn đã in bài đọc chưa?',
+      'male-01',
+    ],
+    [
+      'leo',
+      'Leo',
+      'We need five copies for the group.',
+      'Chúng ta cần năm bản cho cả nhóm.',
       'male-01',
     ],
     [
       'mia',
       'Mia',
-      "Thanks. One classmate still can't find the library.",
-      'Cảm ơn. Một bạn cùng lớp vẫn chưa tìm được thư viện.',
+      'I did. Thanks for checking.',
+      'Mình in rồi. Cảm ơn bạn đã kiểm tra.',
       'female-01',
     ],
     [
@@ -158,18 +252,18 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
       'male-01',
     ],
     [
-      'mia',
-      'Mia',
-      'The number twelve bus stops outside, right?',
-      'Xe buýt số mười hai dừng ngay bên ngoài phải không?',
-      'female-01',
-    ],
-    [
       'leo',
       'Leo',
+      'The number twelve bus stops outside, right?',
+      'Xe buýt số mười hai dừng ngay bên ngoài phải không?',
+      'male-01',
+    ],
+    [
+      'mia',
+      'Mia',
       'Right. Get off after the second stop, near the park.',
       'Đúng rồi. Xuống sau điểm dừng thứ hai, gần công viên ấy.',
-      'male-01',
+      'female-01',
     ],
     [
       'mia',
@@ -184,13 +278,6 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
       'Then we can meet by the covered entrance instead.',
       'Khi đó mình có thể gặp nhau ở lối vào có mái che.',
       'male-01',
-    ],
-    [
-      'mia',
-      'Mia',
-      'That works. I should arrive early to unlock the room.',
-      'Thế cũng được. Mình nên đến sớm để mở phòng.',
-      'female-01',
     ],
     [
       'leo',
@@ -243,146 +330,26 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
     ],
   ]),
   24: toDialogueTurns([
-    [
-      'maya',
-      'Maya',
-      'Hey, Ben. Are we still taking the morning train to the city museum?',
-      'Này Ben, chúng ta vẫn đi chuyến tàu sáng đến bảo tàng thành phố chứ?',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      "Yeah, that's the plan. It leaves from platform three at eight fifteen.",
-      'Ừ, đúng kế hoạch. Tàu rời sân ga số ba lúc tám giờ mười lăm.',
-      'male-01',
-    ],
-    [
-      'maya',
-      'Maya',
-      'Great. I bought our tickets online last night.',
-      'Tuyệt. Tối qua mình đã mua vé trực tuyến cho cả hai rồi.',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      'Nice. Keep the QR code ready at the station gate.',
-      'Hay đấy. Nhớ chuẩn bị mã QR ở cổng ga nhé.',
-      'male-01',
-    ],
-    [
-      'maya',
-      'Maya',
-      'Okay. How long is the walk from the station to the museum?',
-      'Được. Từ ga đến bảo tàng đi bộ mất bao lâu?',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      "Well, let me think. It's about a ten-minute walk.",
-      'Để mình nghĩ xem. Khoảng mười phút đi bộ.',
-      'male-01',
-    ],
-    [
-      'maya',
-      'Maya',
-      "Only ten minutes? That's easy enough.",
-      'Chỉ mười phút thôi à? Vậy thì dễ rồi.',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      'Right. We just follow the signs for the main square.',
-      'Đúng rồi. Chúng ta chỉ cần đi theo biển chỉ dẫn đến quảng trường chính.',
-      'male-01',
-    ],
-    [
-      'maya',
-      'Maya',
-      'Should we enter through the north door, or is there another entrance?',
-      'Chúng ta vào bằng cửa phía bắc hay còn lối vào khác?',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      "The north door is best. It's across from the information desk.",
-      'Cửa phía bắc là tiện nhất. Nó đối diện quầy thông tin.',
-      'male-01',
-    ],
-    [
-      'maya',
-      'Maya',
-      'Oh, good. I really want to see the space exhibition first.',
-      'Ồ, tốt quá. Mình thật sự muốn xem triển lãm vũ trụ trước.',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      "Sure. It opens at nine, so we'll have enough time.",
-      'Được thôi. Triển lãm mở cửa lúc chín giờ nên mình sẽ có đủ thời gian.',
-      'male-01',
-    ],
-    [
-      'maya',
-      'Maya',
-      'Could we join the guided tour after lunch?',
-      'Sau bữa trưa chúng ta tham gia chuyến tham quan có hướng dẫn nhé?',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      'Yes, it starts at two and ends at three.',
-      'Được, chuyến tham quan bắt đầu lúc hai giờ và kết thúc lúc ba giờ.',
-      'male-01',
-    ],
-    [
-      'maya',
-      'Maya',
-      "Then let's eat at the cafe near the west entrance.",
-      'Vậy mình ăn ở quán gần cửa phía tây nhé.',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      'That sounds good. It accepts cards, but it closes at four thirty.',
-      'Nghe được đấy. Quán nhận thẻ nhưng đóng cửa lúc bốn giờ rưỡi.',
-      'male-01',
-    ],
-    [
-      'maya',
-      'Maya',
-      'Right. We should get a map before the tour begins.',
-      'Đúng rồi. Mình nên lấy bản đồ trước khi chuyến tham quan bắt đầu.',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      "I'll ask the information desk for one.",
-      'Mình sẽ hỏi xin một cái ở quầy thông tin.',
-      'male-01',
-    ],
-    [
-      'maya',
-      'Maya',
-      "Perfect. Let's meet by the museum clock at five for the train home.",
-      'Tuyệt. Năm giờ mình gặp nhau ở đồng hồ bảo tàng để về ga nhé.',
-      'female-01',
-    ],
-    [
-      'ben',
-      'Ben',
-      "Sounds good. I'll carry the tickets. See you there.",
-      'Được đấy. Mình sẽ giữ vé. Hẹn gặp bạn ở đó.',
-      'male-01',
-    ],
+    ['maya', 'Maya', 'Hey, Ben. Are we still taking the morning train to the city museum?', 'Này Ben, chúng ta vẫn đi chuyến tàu sáng đến bảo tàng thành phố chứ?', 'female-01'],
+    ['ben', 'Ben', "Yeah, that's the plan.", 'Ừ, đúng kế hoạch.', 'male-01'],
+    ['ben', 'Ben', 'It leaves from platform three at eight fifteen.', 'Tàu rời sân ga số ba lúc tám giờ mười lăm.', 'male-01'],
+    ['maya', 'Maya', 'Great. I bought our tickets online last night.', 'Tuyệt. Tối qua mình đã mua vé trực tuyến cho cả hai rồi.', 'female-01'],
+    ['ben', 'Ben', 'Nice. Keep the QR code ready at the station gate.', 'Hay đấy. Nhớ chuẩn bị mã QR ở cổng ga nhé.', 'male-01'],
+    ['ben', 'Ben', 'The gate staff may ask for both tickets.', 'Nhân viên ở cổng có thể sẽ yêu cầu cả hai vé.', 'male-01'],
+    ['maya', 'Maya', 'Okay. How long is the walk from the station to the museum?', 'Được. Từ ga đến bảo tàng đi bộ mất bao lâu?', 'female-01'],
+    ['ben', 'Ben', 'Well, let me think. It\'s about a ten-minute walk.', 'Để mình nghĩ xem. Khoảng mười phút đi bộ.', 'male-01'],
+    ['maya', 'Maya', "Only ten minutes? That's easy enough.", 'Chỉ mười phút thôi à? Vậy thì dễ rồi.', 'female-01'],
+    ['maya', 'Maya', 'Should we enter through the north door, or is there another entrance?', 'Chúng ta vào bằng cửa phía bắc hay còn lối vào khác?', 'female-01'],
+    ['ben', 'Ben', 'The north door is best. It is across from the information desk.', 'Cửa phía bắc là tiện nhất. Nó đối diện quầy thông tin.', 'male-01'],
+    ['maya', 'Maya', 'Oh, good. I really want to see the space exhibition first.', 'Ồ, tốt quá. Mình thật sự muốn xem triển lãm vũ trụ trước.', 'female-01'],
+    ['ben', 'Ben', "Sure. It opens at nine, so we'll have enough time.", 'Được thôi. Triển lãm mở cửa lúc chín giờ nên mình sẽ có đủ thời gian.', 'male-01'],
+    ['ben', 'Ben', 'The guided tour starts at two and ends at three.', 'Chuyến tham quan có hướng dẫn bắt đầu lúc hai giờ và kết thúc lúc ba giờ.', 'male-01'],
+    ['maya', 'Maya', "Then let's eat at the cafe near the west entrance.", 'Vậy mình ăn ở quán gần cửa phía tây nhé.', 'female-01'],
+    ['ben', 'Ben', 'That sounds good. It accepts cards, but it closes at four thirty.', 'Nghe được đấy. Quán nhận thẻ nhưng đóng cửa lúc bốn giờ rưỡi.', 'male-01'],
+    ['maya', 'Maya', 'Right. We should get a map before the tour begins.', 'Đúng rồi. Mình nên lấy bản đồ trước khi chuyến tham quan bắt đầu.', 'female-01'],
+    ['maya', 'Maya', "Let's meet by the museum clock at five for the train home.", 'Mình gặp nhau ở đồng hồ bảo tàng lúc năm giờ để về ga nhé.', 'female-01'],
+    ['ben', 'Ben', "I'll ask the information desk for a map.", 'Mình sẽ hỏi xin một tấm bản đồ ở quầy thông tin.', 'male-01'],
+    ['ben', 'Ben', "Sounds good. I'll carry the tickets. See you there.", 'Được đấy. Mình sẽ giữ vé. Hẹn gặp bạn ở đó.', 'male-01'],
   ]),
   25: toDialogueTurns([
     [
@@ -395,8 +362,15 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
     [
       'dan',
       'Dan',
-      "Sure, what's up? I have the latest progress report here.",
-      'Được, có chuyện gì vậy? Mình có báo cáo tiến độ mới nhất đây.',
+      "Sure, what's up?",
+      'Được, có chuyện gì vậy?',
+      'male-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      'I have the latest progress report here.',
+      'Mình có báo cáo tiến độ mới nhất đây.',
       'male-01',
     ],
     [
@@ -409,8 +383,15 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
     [
       'dan',
       'Dan',
-      'I saw it. The payment screen still needs a proper test, though.',
-      'Mình đã xem. Tuy vậy, màn hình thanh toán vẫn cần được kiểm thử kỹ.',
+      'I saw it.',
+      'Mình đã xem.',
+      'male-01',
+    ],
+    [
+      'dan',
+      'Dan',
+      'The payment screen still needs a proper test, though.',
+      'Tuy vậy, màn hình thanh toán vẫn cần được kiểm thử kỹ.',
       'male-01',
     ],
     [
@@ -421,31 +402,17 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
       'female-01',
     ],
     [
-      'dan',
-      'Dan',
-      'Thanks. Could you also confirm the mobile layout with the client?',
-      'Cảm ơn. Bạn cũng xác nhận giao diện di động với khách hàng nhé?',
-      'male-01',
-    ],
-    [
       'nora',
       'Nora',
-      'I can do that. They requested a short demo next Monday.',
-      'Mình làm được. Họ yêu cầu một bản trình diễn ngắn vào thứ Hai tới.',
+      'The client also requested a short demo next Monday.',
+      'Khách hàng cũng yêu cầu một bản trình diễn ngắn vào thứ Hai tới.',
       'female-01',
     ],
     [
-      'dan',
-      'Dan',
-      'Okay, then we should send the demo agenda by Friday.',
-      'Được, vậy chúng ta nên gửi chương trình trình diễn trước thứ Sáu.',
-      'male-01',
-    ],
-    [
       'nora',
       'Nora',
-      "I'll draft it after lunch. Does that timing work?",
-      'Mình sẽ soạn sau bữa trưa. Thời gian đó ổn chứ?',
+      "I'll draft the agenda after lunch. Does that timing work?",
+      'Mình sẽ soạn chương trình sau bữa trưa. Thời gian đó ổn chứ?',
       'female-01',
     ],
     [
@@ -6045,11 +6012,14 @@ async function main() {
               transcriptSegments: [
                 {
                   speakerId: turn.speakerId,
+                  speakerTurnId: turn.speakerTurnId,
                   speaker: turn.speaker,
                   voiceKey: turn.voiceKey,
                   text: turn.text,
                   translation: turn.translation,
                   tone: turn.tone,
+                  dialogueAct: turn.dialogueAct,
+                  delivery: turn.delivery,
                   rate: turn.rate,
                   pauseMs: turn.pauseMs,
                 },

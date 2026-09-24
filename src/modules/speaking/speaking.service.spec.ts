@@ -95,8 +95,12 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       'US',
     );
 
-    expect(ssml).toContain("voice name='en-US-GuyNeural'");
-    expect(ssml).toContain("voice name='en-US-JennyNeural'");
+    expect(ssml).toContain(
+      "<voice name='en-US-JennyNeural'><prosody rate='1.0'>My package is late.",
+    );
+    expect(ssml).toContain(
+      "<voice name='en-US-GuyNeural'><prosody rate='1.0'>I can check that for you.",
+    );
     expect(ssml).toContain('My package is late.');
     expect(ssml).toContain('I can check that for you.');
     expect(ssml).not.toContain('Customer:');
@@ -110,8 +114,26 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       ],
       'US',
     );
-    expect(namedSpeakers).toContain("voice name='en-US-GuyNeural'");
-    expect(namedSpeakers).toContain("voice name='en-US-JennyNeural'");
+    expect(namedSpeakers).toContain(
+      "<voice name='en-US-JennyNeural'><prosody rate='1.0'>Are we still presenting",
+    );
+    expect(namedSpeakers).toContain(
+      "<voice name='en-US-GuyNeural'><prosody rate='1.0'>Not anymore.",
+    );
+
+    const explicitVoiceKeys = buildDialogueSsml(
+      [
+        { speaker: 'Alex', voiceKey: 'male-01', text: 'I will call you back.' },
+        { speaker: 'Taylor', voiceKey: 'female-01', text: 'Thank you.' },
+      ],
+      'US',
+    );
+    expect(explicitVoiceKeys).toContain(
+      "<voice name='en-US-GuyNeural'><prosody rate='1.0'>I will call you back.",
+    );
+    expect(explicitVoiceKeys).toContain(
+      "<voice name='en-US-JennyNeural'><prosody rate='1.0'>Thank you.",
+    );
   });
 
   describe('submitAudio', () => {

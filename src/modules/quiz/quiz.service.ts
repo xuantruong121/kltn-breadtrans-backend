@@ -29,6 +29,11 @@ import {
   ListeningAudioAuthoringService,
   PublishedListeningAudioIdentity,
 } from './listening-audio-authoring.service';
+import {
+  normalizeDialogueSegments,
+  withSpeakerTurnIds,
+  type NormalizedDialogueSegment,
+} from './listening-dialogue.contract';
 
 /**
  * Compare learner dictation without penalising typography that does not change
@@ -36,6 +41,58 @@ import {
  */
 export function normalizeListeningAnswer(value: unknown): string {
   return normalizeStandardListeningTokens(value).join(' ');
+}
+
+/**
+ * Validate a Reading submission against the server-owned current question set.
+ * The validator intentionally runs before any persistence or side effect.
+ */
+export function validateReadingSubmission(
+  questions: Array<{ id: number; type?: string; content?: unknown }>,
+  answers: Array<{ questionId: number; answer: unknown }>,
+) {
+  if (!Array.isArray(answers) || answers.length !== questions.length) {
+    throw new BadRequestException(
+      'Hãy trả lời đầy đủ tất cả câu hỏi trước khi nộp bài',
+    );
+  }
+
+  const questionsById = new Map(
+    questions.map((question) => [question.id, question]),
+  );
+  const seenQuestionIds = new Set<number>();
+
+  for (const submitted of answers) {
+    const question = questionsById.get(submitted.questionId);
+    if (!question) {
+      throw new BadRequestException(
+        'Câu trả lời chứa câu hỏi không thuộc bài này',
+      );
+    }
+    if (seenQuestionIds.has(submitted.questionId)) {
+      throw new BadRequestException('Không được gửi trùng câu hỏi');
+    }
+    if (
+      typeof submitted.answer !== 'string' ||
+      submitted.answer.trim().length === 0
+    ) {
+      throw new BadRequestException('Mỗi câu hỏi phải có một câu trả lời');
+    }
+
+    const content = (question.content ?? {}) as Record<string, unknown>;
+    const options = content.options;
+    if (
+      question.type === 'MULTIPLE_CHOICE' &&
+      Array.isArray(options) &&
+      !options.some((option) => option === submitted.answer)
+    ) {
+      throw new BadRequestException(
+        'Câu trả lời không nằm trong các lựa chọn hiện tại',
+      );
+    }
+
+    seenQuestionIds.add(submitted.questionId);
+  }
 }
 
 const STANDARD_CONTRACTIONS: Record<string, string[]> = {
@@ -186,51 +243,7 @@ export function buildNaturalListeningAudioText(
     .trim();
 }
 
-export interface NormalizedDialogueSegment {
-  /** Legacy display label. New content should use speakerId. */
-  speaker?: string;
-  speakerId?: string;
-  text: string;
-  translation?: string;
-  startMs?: number;
-  endMs?: number;
-}
-
-/**
- * Normalize the CMS dialogue contract once at the trust boundary. Speaker
- * labels stay in the transcript, while audioText is always speech-only.
- */
-export function normalizeDialogueSegments(
-  value: unknown,
-): NormalizedDialogueSegment[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((segment) => {
-      if (!segment || typeof segment !== 'object') return null;
-      const raw = segment as Record<string, unknown>;
-      const speaker = typeof raw.speaker === 'string' ? raw.speaker.trim() : '';
-      const speakerId =
-        typeof raw.speakerId === 'string' ? raw.speakerId.trim() : '';
-      const text = typeof raw.text === 'string' ? raw.text.trim() : '';
-      const translation =
-        typeof raw.translation === 'string' ? raw.translation.trim() : '';
-      if ((!speaker && !speakerId) || !text) return null;
-      return {
-        ...(speaker ? { speaker } : {}),
-        ...(speakerId ? { speakerId } : {}),
-        text,
-        ...(translation ? { translation } : {}),
-        ...(Number.isFinite(raw.startMs)
-          ? { startMs: Number(raw.startMs) }
-          : {}),
-        ...(Number.isFinite(raw.endMs) ? { endMs: Number(raw.endMs) } : {}),
-      } satisfies NormalizedDialogueSegment;
-    })
-    .filter(
-      (segment): segment is NormalizedDialogueSegment => segment !== null,
-    );
-}
+export { normalizeDialogueSegments } from './listening-dialogue.contract';
 
 function dedupeDialogueBlocks(
   blocks: NormalizedDialogueSegment[][],
@@ -265,8 +278,8 @@ function normalizeQuestionContent(
     quizType === QuizType.LISTENING_PRACTICE &&
     questionType.toUpperCase() === 'DIALOGUE'
   ) {
-    const transcriptSegments = normalizeDialogueSegments(
-      content.transcriptSegments,
+    const transcriptSegments = withSpeakerTurnIds(
+      normalizeDialogueSegments(content.transcriptSegments),
     );
     const speakers = new Set(
       transcriptSegments.map((segment) => segment.speakerId ?? segment.speaker),
@@ -905,9 +918,11 @@ export class QuizService {
     const hasMultiTurnDialogue = dialogueBlocks.some(
       (segments) => segments.length > 1,
     );
-    const dedupedDialogueSegments = hasMultiTurnDialogue
-      ? dedupeDialogueBlocks(dialogueBlocks)
-      : dialogueBlocks.flat();
+    const dedupedDialogueSegments = withSpeakerTurnIds(
+      hasMultiTurnDialogue
+        ? dedupeDialogueBlocks(dialogueBlocks)
+        : dialogueBlocks.flat(),
+    );
     let turnNumber = 0;
     const items = transcriptQuestions
       .flatMap((question) => {
@@ -928,6 +943,8 @@ export class QuizService {
                 order: turnNumber,
                 transcript: segment.text,
                 speaker: segment.speaker ?? segment.speakerId ?? null,
+                speakerId: segment.speakerId ?? null,
+                speakerTurnId: segment.speakerTurnId ?? null,
                 translation: segment.translation ?? null,
                 startMs: segment.startMs ?? null,
                 endMs: segment.endMs ?? null,
@@ -954,6 +971,11 @@ export class QuizService {
               typeof content.speaker === 'string' && content.speaker.trim()
                 ? content.speaker.trim()
                 : null,
+            speakerId:
+              typeof content.speakerId === 'string' && content.speakerId.trim()
+                ? content.speakerId.trim()
+                : null,
+            speakerTurnId: null,
             translation:
               typeof content.translation === 'string'
                 ? content.translation.trim() || null
@@ -1217,6 +1239,8 @@ export class QuizService {
 
     if (quiz.type === QuizType.LISTENING_PRACTICE) {
       this.assertCompleteListeningSubmission(quiz.questions, dto.answers);
+    } else if (quiz.type === QuizType.BILINGUAL_READING) {
+      validateReadingSubmission(quiz.questions, dto.answers);
     }
 
     if (
@@ -1237,8 +1261,18 @@ export class QuizService {
     }
 
     let totalScore = 0;
+    const answersByQuestionId = new Map(
+      dto.answers.map((answer) => [answer.questionId, answer.answer]),
+    );
+    const answersForScoring =
+      quiz.type === QuizType.BILINGUAL_READING
+        ? quiz.questions.map((question) => ({
+            questionId: question.id,
+            answer: answersByQuestionId.get(question.id),
+          }))
+        : dto.answers;
 
-    const resultsData = dto.answers.map((ans) => {
+    const resultsData = answersForScoring.map((ans) => {
       const question = quiz.questions.find((q: any) => q.id === ans.questionId);
       let isCorrect = false;
       let score = 0;
@@ -1648,7 +1682,12 @@ export class QuizService {
 
     const tagStats: Record<string, { correct: number; total: number }> = {};
     let totalCorrect = 0;
-    const totalQuestions = submission.results.length;
+    // Reading submissions are complete by contract, but the denominator must
+    // remain owned by the current server question set for historical safety.
+    const totalQuestions =
+      submission.quiz.type === QuizType.BILINGUAL_READING
+        ? submission.quiz.questions.length
+        : submission.results.length;
 
     submission.results.forEach((res) => {
       if (res.isCorrect) totalCorrect++;

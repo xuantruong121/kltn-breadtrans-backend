@@ -32,6 +32,8 @@ const VOICE_MAPPING = {
 
 export interface DialogueTtsSegment {
   speaker?: string;
+  speakerId?: string;
+  voiceKey?: string;
   text: string;
 }
 
@@ -40,8 +42,12 @@ function dialogueVoiceForSpeaker(
   index: number,
   accent: 'US' | 'UK',
   speakerSlots: Map<string, number>,
+  requestedVoiceKey?: string,
 ): string {
   const normalized = (speaker ?? '').trim().toLocaleLowerCase('vi-VN');
+  const normalizedVoiceKey = (requestedVoiceKey ?? '').toLowerCase();
+  const explicitFemale = normalizedVoiceKey.includes('female');
+  const explicitMale = !explicitFemale && normalizedVoiceKey.includes('male');
   const isAgent =
     normalized.includes('agent') ||
     normalized.includes('support') ||
@@ -54,19 +60,34 @@ function dialogueVoiceForSpeaker(
     normalized.includes('client') ||
     normalized.includes('buyer') ||
     normalized.includes('guest');
+  const isMaleName =
+    /\b(ben|dan|leo|mark|ethan|john|michael|david|tom|guy)\b/.test(normalized);
+  const isFemaleName =
+    /\b(mia|maya|nora|linh|jenny|sarah|anna|emma|susan)\b/.test(normalized);
   let slot = speakerSlots.get(normalized);
-  if (slot === undefined) {
-    slot = isAgent ? 1 : isCustomer ? 0 : speakerSlots.size % 2;
+  if (
+    explicitMale ||
+    explicitFemale ||
+    isAgent ||
+    isCustomer ||
+    isMaleName ||
+    isFemaleName
+  ) {
+    slot = explicitMale || isAgent || isMaleName ? 1 : 0;
+  } else if (slot === undefined) {
+    slot = speakerSlots.size % 2;
+  }
+  if (slot !== undefined) {
     speakerSlots.set(normalized, slot);
   }
   if (accent === 'UK') {
     return slot === 1 || (!normalized && index % 2 === 1)
-      ? 'en-GB-SoniaNeural'
-      : 'en-GB-RyanNeural';
+      ? 'en-GB-RyanNeural'
+      : 'en-GB-SoniaNeural';
   }
   return slot === 1 || (!normalized && index % 2 === 1)
-    ? 'en-US-JennyNeural'
-    : 'en-US-GuyNeural';
+    ? 'en-US-GuyNeural'
+    : 'en-US-JennyNeural';
 }
 
 function escapeDialogueSsml(text: string): string {
@@ -107,6 +128,7 @@ export function buildDialogueSsml(
         index,
         accent,
         speakerSlots,
+        segment.voiceKey,
       );
       return `<voice name='${voice}'><prosody rate='${prosodyRate}'>${escapeDialogueSsml(segment.text)}</prosody></voice>`;
     })
@@ -739,6 +761,10 @@ export class SpeakingService {
     const cleanSegments = segments
       .map((segment) => ({
         speaker: typeof segment.speaker === 'string' ? segment.speaker : '',
+        speakerId:
+          typeof segment.speakerId === 'string' ? segment.speakerId : undefined,
+        voiceKey:
+          typeof segment.voiceKey === 'string' ? segment.voiceKey : undefined,
         text: typeof segment.text === 'string' ? segment.text.trim() : '',
       }))
       .filter((segment) => segment.text.length > 0);
@@ -751,7 +777,8 @@ export class SpeakingService {
     }
 
     const source = JSON.stringify({ accent, rate, segments: cleanSegments });
-    const cacheKey = `tts:dialogue:v3:${crypto.createHash('md5').update(source).digest('hex')}`;
+    // v4 invalidates dialogue audio produced before the gender mapping fix.
+    const cacheKey = `tts:dialogue:v4:${crypto.createHash('md5').update(source).digest('hex')}`;
     const ssml = buildDialogueSsml(cleanSegments, accent, rate);
     return this.synthesizeSsml(ssml, cacheKey);
   }
