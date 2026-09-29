@@ -88,6 +88,7 @@
     "globals": "^17.0.0",
     "jest": "^30.0.0",
     "jest-mock-extended": "^4.0.1",
+    "playwright": "^1.63.0",
     "prettier": "^3.4.2",
     "prisma": "^6.2.1",
     "source-map-support": "^0.5.21",
