@@ -33,7 +33,14 @@ export class OpenAIEvaluatorStrategy implements IAIEvaluator {
   async assessPronunciation(
     targetText: string,
     audioBuffer: Buffer,
+    options?: { signal?: AbortSignal },
   ): Promise<PronunciationFeedback> {
+    if (options?.signal?.aborted) {
+      const err = new Error('Aborted');
+      (err as any).name = 'AbortError';
+      (err as any).code = 'PROVIDER_TIMEOUT';
+      throw err;
+    }
     this.logger.log('Using OpenAI Strategy for pronunciation assessment...');
     return {
       overallScore: 7.5,

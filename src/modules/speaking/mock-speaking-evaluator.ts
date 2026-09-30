@@ -30,6 +30,7 @@ export class MockSpeakingEvaluator {
   static async evaluate(
     targetText: string,
     audioBuffer: Buffer,
+    options?: { signal?: AbortSignal },
   ): Promise<MockPronunciationResult> {
     void audioBuffer;
     if (!this.isMockEnabled()) {
@@ -38,10 +39,32 @@ export class MockSpeakingEvaluator {
       );
     }
 
+    if (options?.signal?.aborted) {
+      const err: any = new Error('MOCK_EVALUATOR_ABORTED: Request was aborted');
+      err.code = 'PROVIDER_TIMEOUT';
+      throw err;
+    }
+
     // Configurable simulated delay
     const delayMs = parseInt(process.env.MOCK_AZURE_DELAY_MS || '150', 10);
     if (delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => resolve(), delayMs);
+        if (options?.signal) {
+          options.signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              const err: any = new Error(
+                'MOCK_EVALUATOR_ABORTED: Request was aborted during delay',
+              );
+              err.code = 'PROVIDER_TIMEOUT';
+              reject(err);
+            },
+            { once: true },
+          );
+        }
+      });
     }
 
     // Simulated error triggers for resilience testing

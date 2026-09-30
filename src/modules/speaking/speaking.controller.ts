@@ -161,6 +161,7 @@ export class SpeakingController {
     return this.speakingService.getAudioSignedUrl(submissionId, req.user);
   }
 
+  @Get('submissions/my')
   @Get('my-submissions')
   @ApiOperation({ summary: 'Xem lịch sử bài luyện phát âm của tôi' })
   getMySubmissions(@Request() req: any) {

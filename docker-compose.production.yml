@@ -1,4 +1,4 @@
-version: '3.8'
+name: breadtrans-production
 
 services:
   # ─── PostgreSQL ───────────────────────────────────────────────────────────────
@@ -7,16 +7,16 @@ services:
     container_name: breadtrans-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_test_pw}
+      POSTGRES_DB: ${POSTGRES_DB:-breadtrans_test}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - internal
     # Không expose ra ngoài host — chỉ API mới connect được
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-breadtrans_test}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
     command: >
       redis-server
-      --requirepass ${REDIS_PASSWORD}
+      --requirepass ${REDIS_PASSWORD:-redis_test_pw}
       --appendonly yes
       --appendfsync everysec
     volumes:
@@ -36,7 +36,7 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_test_pw}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -53,10 +53,10 @@ services:
       - path: .env.production
         required: false
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_test_pw}@postgres:5432/${POSTGRES_DB:-breadtrans_test}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_test_pw}
       SPEAKING_PIPELINE_MODE: ${SPEAKING_PIPELINE_MODE:-bullmq}
     depends_on:
       postgres:
@@ -87,15 +87,16 @@ services:
       - path: .env.production
         required: false
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_test_pw}@postgres:5432/${POSTGRES_DB:-breadtrans_test}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_test_pw}
       SPEAKING_PIPELINE_MODE: bullmq
       SPEAKING_WORKER_CONCURRENCY: ${SPEAKING_WORKER_CONCURRENCY:-1}
       SPEAKING_WORKER_RATE_LIMIT_MAX: ${SPEAKING_WORKER_RATE_LIMIT_MAX:-1}
       SPEAKING_WORKER_RATE_LIMIT_DURATION_MS: ${SPEAKING_WORKER_RATE_LIMIT_DURATION_MS:-1000}
       SPEAKING_JOB_TIMEOUT_MS: ${SPEAKING_JOB_TIMEOUT_MS:-20000}
+      MOCK_AZURE_SPEECH: ${MOCK_AZURE_SPEECH:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,13 +105,13 @@ services:
     networks:
       - internal
       - web # outbound Azure Speech and Cloudflare R2
-    # Liveness check: verifies process execution natively in Alpine
+    # Functional liveness check: verifies worker Node event loop is actively updating heartbeat
     healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep -v grep | grep speaking-worker.main.js > /dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "node", "dist/src/worker/speaking-worker-healthcheck.js"]
+      interval: 15s
+      timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 10s
 
   # ─── Caddy (Reverse Proxy + Auto HTTPS) ──────────────────────────────────────
   caddy:

@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import {
   Injectable,
   Logger,
@@ -10,8 +11,11 @@ import {
   SPEAKING_QUEUE_NAME,
   SpeakingJobPayload,
   getSpeakingWorkerConfig,
+  getLeaseTimeoutMs,
 } from '../modules/speaking/speaking.constants';
 import { SpeakingProcessorService } from '../modules/speaking/speaking-processor.service';
+
+const HEARTBEAT_FILE = process.env.WORKER_HEARTBEAT_FILE || '/tmp/worker-heartbeat';
 
 @Injectable()
 export class SpeakingWorkerRunnerService
@@ -20,6 +24,7 @@ export class SpeakingWorkerRunnerService
   private readonly logger = new Logger(SpeakingWorkerRunnerService.name);
   private connection: IORedis;
   private worker: Worker<SpeakingJobPayload, unknown, string>;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly processorService: SpeakingProcessorService) {}
 
@@ -32,6 +37,7 @@ export class SpeakingWorkerRunnerService
 
     const { concurrency, rateLimitMax, rateLimitDurationMs, jobTimeoutMs } =
       getSpeakingWorkerConfig();
+    const leaseTimeoutMs = getLeaseTimeoutMs(jobTimeoutMs);
 
     this.logger.log(
       `[SpeakingWorkerRunner] Initializing BullMQ Worker on queue "${SPEAKING_QUEUE_NAME}"`,
@@ -40,7 +46,7 @@ export class SpeakingWorkerRunnerService
       `[SpeakingWorkerRunner] Loaded Responsibilities: [BullMQ Consumer, Audio Validator, Storage Access, Pronunciation Assessment, DB Persist, Redis Event Publisher]. Zero HTTP controllers, Zero schedulers, Zero gateways.`,
     );
     this.logger.log(
-      `[SpeakingWorkerRunner] Selected Configuration: Concurrency=${concurrency}, RateLimitMax=${rateLimitMax} per ${rateLimitDurationMs}ms, JobTimeout=${jobTimeoutMs}ms`,
+      `[SpeakingWorkerRunner] Selected Configuration: Concurrency=${concurrency}, RateLimitMax=${rateLimitMax} per ${rateLimitDurationMs}ms, JobTimeout=${jobTimeoutMs}ms, LeaseTimeout=${leaseTimeoutMs}ms`,
     );
 
     this.worker = new Worker<SpeakingJobPayload, unknown, string>(
@@ -58,7 +64,8 @@ export class SpeakingWorkerRunnerService
           max: rateLimitMax,
           duration: rateLimitDurationMs,
         },
-        lockDuration: 30000,
+        lockDuration: leaseTimeoutMs,
+        stalledInterval: leaseTimeoutMs,
       },
     );
 
@@ -77,15 +84,44 @@ export class SpeakingWorkerRunnerService
     this.worker.on('error', (err) => {
       this.logger.error(`[SpeakingWorkerRunner] Worker error: ${err.message}`);
     });
+
+    // Start functional healthcheck heartbeat
+    this.writeHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      this.writeHeartbeat();
+    }, 5000);
+  }
+
+  private writeHeartbeat(): void {
+    try {
+      fs.writeFileSync(HEARTBEAT_FILE, String(Date.now()), 'utf8');
+    } catch (err: any) {
+      this.logger.warn(`[SpeakingWorkerRunner] Heartbeat write failed: ${err.message}`);
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
     this.logger.log(`[SpeakingWorkerRunner] Shutting down worker...`);
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    try {
+      if (fs.existsSync(HEARTBEAT_FILE)) {
+        fs.unlinkSync(HEARTBEAT_FILE);
+      }
+    } catch {
+      // ignore
+    }
     if (this.worker) {
       await this.worker.close();
     }
-    if (this.connection) {
-      await this.connection.quit();
+    if (this.connection && this.connection.status !== 'end') {
+      try {
+        await this.connection.quit();
+      } catch {
+        // ignore already closed
+      }
     }
     await this.processorService.close();
     this.logger.log(`[SpeakingWorkerRunner] Worker shutdown complete`);

@@ -261,6 +261,7 @@ Nội dung câu hỏi của học sinh:
   async assessPronunciation(
     targetText: string,
     audioBuffer: Buffer,
+    options?: { signal?: AbortSignal },
   ): Promise<PronunciationFeedback> {
     try {
       if (!process.env.AZURE_SPEECH_KEY || !process.env.AZURE_SPEECH_REGION) {
@@ -312,6 +313,20 @@ Nội dung câu hỏi của học sinh:
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+      // Propagate external abort signal from options
+      if (options?.signal) {
+        if (options.signal.aborted) {
+          controller.abort(options.signal.reason);
+        } else {
+          options.signal.addEventListener(
+            'abort',
+            () => controller.abort(options.signal?.reason),
+            { once: true },
+          );
+        }
+      }
+
       let azureResponse: Response;
 
       try {
@@ -329,10 +344,12 @@ Nội dung câu hỏi của học sinh:
       } catch (fetchErr: unknown) {
         const isAbort =
           (fetchErr instanceof Error && fetchErr.name === 'AbortError') ||
-          (fetchErr instanceof Error && fetchErr.message.includes('abort'));
+          (fetchErr instanceof Error && fetchErr.message.includes('abort')) ||
+          controller.signal.aborted ||
+          Boolean(options?.signal?.aborted);
         if (isAbort) {
           const err = new Error(
-            'Azure Pronunciation Assessment timed out after 15 seconds',
+            'Azure Pronunciation Assessment timed out or was aborted',
           );
           (err as any).code = 'PROVIDER_TIMEOUT';
           throw err;

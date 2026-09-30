@@ -30,18 +30,18 @@ describe('SpeakingQueueService & Config', () => {
   });
 
   it('1. Deterministic job ID helper returns expected format', () => {
-    expect(getSpeakingJobId(1234)).toBe('speaking-assessment:1234');
-    expect(getSpeakingJobId(1)).toBe('speaking-assessment:1');
+    expect(getSpeakingJobId(1234)).toBe('speaking-assessment-1234');
+    expect(getSpeakingJobId(1)).toBe('speaking-assessment-1');
   });
 
   it('2. Enqueues job with deterministic ID preventing duplicate jobs', async () => {
     const jobId = await service.enqueueSubmission(42, 'trace-abc');
 
-    expect(jobId).toBe('speaking-assessment:42');
+    expect(jobId).toBe('speaking-assessment-42');
     expect(mockQueue.add).toHaveBeenCalledWith(
       SPEAKING_JOB_NAME,
       { submissionId: 42, traceId: 'trace-abc' },
-      { jobId: 'speaking-assessment:42' },
+      { jobId: 'speaking-assessment-42' },
     );
   });
 

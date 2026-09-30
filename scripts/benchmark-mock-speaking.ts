@@ -1,5 +1,5 @@
 /**
- * MOCK INTEGRATION BENCHMARK FOR BREADTRANS SPEAKING ASSESSMENT (PHASE 1)
+ * MOCK BULLMQ INTEGRATION BENCHMARK FOR BREADTRANS SPEAKING ASSESSMENT (PHASE 1)
  *
  * Measures queue waiting time, execution time, and end-to-end sojourn time
  * under bounded concurrency with real BullMQ and Redis connections.
@@ -8,7 +8,14 @@
 import { Worker, Queue, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { MockSpeakingEvaluator } from '../src/modules/speaking/mock-speaking-evaluator';
-import { SpeakingJobPayload } from '../src/modules/speaking/speaking.constants';
+import {
+  SPEAKING_QUEUE_NAME,
+  SPEAKING_JOB_NAME,
+  SpeakingJobPayload,
+  getSpeakingJobId,
+  getSpeakingWorkerConfig,
+  getLeaseTimeoutMs,
+} from '../src/modules/speaking/speaking.constants';
 
 interface JobTimingRecord {
   submissionId: number;
@@ -55,16 +62,23 @@ async function runScenario(
   process.env.MOCK_AZURE_SPEECH = 'true';
   process.env.MOCK_AZURE_DELAY_MS = String(simulatedDelayMs);
 
-  const testQueueName = `bench-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const testQueueName = `${SPEAKING_QUEUE_NAME}-bench-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
   const connection = new IORedis(redisUrl, {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
   });
 
+  const workerConfig = getSpeakingWorkerConfig();
+  const leaseTimeoutMs = getLeaseTimeoutMs(workerConfig.jobTimeoutMs);
+
+  // Production Queue options
   const queue = new Queue<SpeakingJobPayload>(testQueueName, {
     connection,
-    defaultJobOptions: { removeOnComplete: true, removeOnFail: true },
+    defaultJobOptions: {
+      removeOnComplete: { age: 86400, count: 500 },
+      removeOnFail: { age: 7 * 86400, count: 500 },
+    },
   });
 
   let activeWorkers = 0;
@@ -77,6 +91,7 @@ async function runScenario(
   const completionPromise = new Promise<void>((resolve) => {
     let completedCount = 0;
 
+    // Production Worker options
     const worker = new Worker<SpeakingJobPayload>(
       testQueueName,
       async (job: Job<SpeakingJobPayload>) => {
@@ -117,6 +132,12 @@ async function runScenario(
       {
         connection,
         concurrency,
+        limiter: {
+          max: 50,
+          duration: 1000,
+        },
+        lockDuration: leaseTimeoutMs,
+        stalledInterval: leaseTimeoutMs,
       },
     );
 
@@ -125,14 +146,32 @@ async function runScenario(
 
   const tStartAll = Date.now();
 
-  // Enqueue all jobs simultaneously, recording exact enqueue timestamp per submission
+  // Enqueue all jobs using production job ID builder and record exact enqueue timestamps
   for (let i = 1; i <= totalSubmissions; i++) {
     const tNow = Date.now();
     enqueueTimestamps.set(i, tNow);
-    await queue.add('speaking-bench-job', {
-      submissionId: i,
-      traceId: `bench-trace-${i}`,
-    });
+    const customJobId = getSpeakingJobId(i);
+
+    // Assert that custom job ID does NOT contain colons
+    if (customJobId.includes(':')) {
+      throw new Error(`Production custom job ID "${customJobId}" contains forbidden colon separator.`);
+    }
+
+    const job = await queue.add(
+      SPEAKING_JOB_NAME,
+      {
+        submissionId: i,
+        traceId: `bench-trace-${i}`,
+      },
+      {
+        jobId: customJobId,
+      },
+    );
+
+    // Verify BullMQ accepted the custom deterministic job ID verbatim
+    if (job.id !== customJobId) {
+      throw new Error(`BullMQ rejected custom job ID. Expected "${customJobId}", got "${job.id}"`);
+    }
   }
 
   // Await completion of all jobs in queue
@@ -173,10 +212,18 @@ async function runScenario(
 
 async function main() {
   console.log('========================================================================');
-  console.log('  BREADTRANS SPEAKING ASSESSMENT: MOCK INTEGRATION BENCHMARK');
-  console.log('  Classification: MOCK INTEGRATION BENCHMARK (Simulated Evaluator, 120ms/req)');
+  console.log('  BREADTRANS SPEAKING ASSESSMENT: MOCK BULLMQ INTEGRATION BENCHMARK');
+  console.log('  Classification: MOCK BULLMQ INTEGRATION BENCHMARK (Simulated Evaluator, 120ms/req)');
   console.log('  Latency dimensions: Queue Wait, Execution, End-to-End Sojourn');
   console.log('========================================================================\n');
+
+  // Verify production Job ID format
+  const sampleJobId = getSpeakingJobId(999);
+  console.log(`[Job ID Verification] Sample Job ID: ${sampleJobId}`);
+  if (sampleJobId.includes(':')) {
+    throw new Error('FAILED: Job ID contains colon!');
+  }
+  console.log('[Job ID Verification] PASSED: No colon separator present.\n');
 
   const results: BenchmarkMetrics[] = [];
 
@@ -197,7 +244,7 @@ async function main() {
   results.push(await runScenario('50 sub (C=5)', 50, 5, 120));
 
   console.log('\n========================================================================');
-  console.log('  MOCK INTEGRATION BENCHMARK RESULTS');
+  console.log('  MOCK BULLMQ INTEGRATION BENCHMARK RESULTS');
   console.log('========================================================================');
   console.table(
     results.map((r) => ({

@@ -3,10 +3,13 @@ import { Interval } from '@nestjs/schedule';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SpeakingQueueService } from './speaking-queue.service';
-import { getSpeakingJobId } from './speaking.constants';
+import {
+  getSpeakingJobId,
+  getLeaseTimeoutMs,
+  getSpeakingWorkerConfig,
+} from './speaking.constants';
 
 const STALE_PENDING_MS = 15 * 1000; // 15 seconds
-const STALE_PROCESSING_LEASE_MS = 5 * 60 * 1000; // 5 minutes lease
 const MAX_ATTEMPTS = 4;
 
 @Injectable()
@@ -42,9 +45,10 @@ export class SpeakingReconciliationScheduler {
     try {
       const now = new Date();
       const pendingCutoff = new Date(now.getTime() - STALE_PENDING_MS);
-      const processingCutoff = new Date(
-        now.getTime() - STALE_PROCESSING_LEASE_MS,
+      const leaseTimeoutMs = getLeaseTimeoutMs(
+        getSpeakingWorkerConfig().jobTimeoutMs,
       );
+      const processingCutoff = new Date(now.getTime() - leaseTimeoutMs);
 
       // 1. Find eligible PENDING submissions respecting nextAttemptAt
       const pendingSubmissions = await this.prisma.speakingSubmission.findMany({

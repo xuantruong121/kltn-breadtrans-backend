@@ -613,6 +613,7 @@ model SpeakingSubmission {
   attemptCount        Int                      @default(0)
   nextAttemptAt       DateTime?
   processingStartedAt DateTime?
+  workerId            String?
   processedAt         DateTime?
   lastErrorCode       String?
   lastErrorMessage    String?                  @db.Text

@@ -56,7 +56,7 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
     mockPrisma = {
       speakingSubmission: {
         findUnique: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         update: jest.fn(),
       },
     };
@@ -93,51 +93,51 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
 
   afterEach(async () => {
     await service.close();
+    jest.restoreAllMocks();
   });
 
-  it('1. Processes a valid BullMQ job successfully with atomic claim PENDING -> PROCESSING and DB commit before PubSub', async () => {
+  it('1. Processes a valid BullMQ job successfully with token-fenced atomic claim and DB commit before PubSub', async () => {
     const submittedAt = new Date(Date.now() - 1000);
     mockPrisma.speakingSubmission.findUnique.mockResolvedValueOnce({
       id: 101,
       userId: 5,
+      exerciseId: 1,
       status: 'PENDING',
       submittedAt,
       attemptCount: 0,
       audioKey: 'catalog/speaking/submissions/test.wav',
       audioMimeType: 'audio/wav',
-      exercise: { targetText: 'Hello world' },
-    });
-
-    mockPrisma.speakingSubmission.updateMany
-      .mockResolvedValueOnce({ count: 1 }) // atomic claim: PENDING -> PROCESSING
-      .mockResolvedValueOnce({ count: 1 }); // gamification reward claim
-
-    mockPrisma.speakingSubmission.update.mockResolvedValueOnce({
-      id: 101,
-      userId: 5,
-      exerciseId: 1,
-      status: 'COMPLETED',
-      overallScore: 8.8,
-      rewardGrantedAt: null,
+      exercise: { id: 1, targetText: 'Hello world' },
     });
 
     await service.processJob({ submissionId: 101, traceId: 'trace-101' });
 
-    // Assert STRICT atomic claim condition: status must be PENDING
+    // Assert atomic claim: PENDING or expired lease
     expect(mockPrisma.speakingSubmission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 101, status: 'PENDING' },
+        where: expect.objectContaining({
+          id: 101,
+          OR: expect.arrayContaining([
+            { status: 'PENDING' },
+            expect.objectContaining({ status: 'PROCESSING' }),
+          ]),
+        }),
         data: expect.objectContaining({
           status: 'PROCESSING',
+          workerId: expect.stringMatching(/^worker-/),
           attemptCount: { increment: 1 },
         }),
       }),
     );
 
-    // Assert persistence to COMPLETED
-    expect(mockPrisma.speakingSubmission.update).toHaveBeenCalledWith(
+    // Assert persistence to COMPLETED with token fencing
+    expect(mockPrisma.speakingSubmission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 101 },
+        where: expect.objectContaining({
+          id: 101,
+          status: 'PROCESSING',
+          workerId: expect.stringMatching(/^worker-/),
+        }),
         data: expect.objectContaining({
           status: 'COMPLETED',
           overallScore: 8.8,
@@ -164,38 +164,36 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
     mockPrisma.speakingSubmission.findUnique.mockResolvedValue({
       id: 200,
       userId: 10,
+      exerciseId: 2,
       status: 'PENDING',
       submittedAt: new Date(),
       attemptCount: 0,
       audioKey: 'catalog/speaking/submissions/race.wav',
-      exercise: { targetText: 'Race condition test' },
+      exercise: { id: 2, targetText: 'Race condition test' },
     });
 
     let claimed = false;
     mockPrisma.speakingSubmission.updateMany.mockImplementation(
       ({ where }: any) => {
-        if (where?.status === 'PENDING') {
+        // Claim query
+        if (where?.OR) {
           if (!claimed) {
             claimed = true;
             return Promise.resolve({ count: 1 });
           }
           return Promise.resolve({ count: 0 });
         }
+        // Score persist query
+        if (where?.status === 'PROCESSING') {
+          return Promise.resolve({ count: 1 });
+        }
+        // Reward claim query
         if (where?.rewardGrantedAt === null) {
           return Promise.resolve({ count: 1 });
         }
         return Promise.resolve({ count: 0 });
       },
     );
-
-    mockPrisma.speakingSubmission.update.mockResolvedValue({
-      id: 200,
-      userId: 10,
-      exerciseId: 2,
-      status: 'COMPLETED',
-      overallScore: 8.5,
-      rewardGrantedAt: null,
-    });
 
     const [res1, res2] = await Promise.all([
       service.processJob({ submissionId: 200, traceId: 'trace-worker-1' }),
@@ -204,9 +202,6 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
 
     expect(res1).toBeUndefined();
     expect(res2).toBeUndefined();
-
-    // Exactly one DB update to COMPLETED
-    expect(mockPrisma.speakingSubmission.update).toHaveBeenCalledTimes(1);
 
     // Exactly one gamification event emitted
     expect(mockEventEmitter.emitAsync).toHaveBeenCalledTimes(1);
@@ -228,7 +223,6 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
 
     expect(mockPrisma.speakingSubmission.updateMany).not.toHaveBeenCalled();
     expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
-    expect(mockPrisma.speakingSubmission.update).not.toHaveBeenCalled();
     expect(publishSpy).not.toHaveBeenCalled();
   });
 
@@ -245,18 +239,14 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
       exercise: { targetText: 'Rate limit test' },
     });
 
-    mockPrisma.speakingSubmission.updateMany.mockResolvedValueOnce({
-      count: 1,
-    });
-
     await expect(
       service.processJob({ submissionId: 103, traceId: 'trace-429' }),
     ).rejects.toThrow('Too Many Requests');
 
     // Should update status to PENDING with nextAttemptAt backoff
-    expect(mockPrisma.speakingSubmission.update).toHaveBeenCalledWith(
+    expect(mockPrisma.speakingSubmission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 103 },
+        where: expect.objectContaining({ id: 103, status: 'PROCESSING' }),
         data: expect.objectContaining({
           status: 'PENDING',
           lastErrorCode: 'TOO_MANY_REQUESTS',
@@ -277,9 +267,6 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
       exercise: { targetText: 'Corrupt audio' },
     });
 
-    mockPrisma.speakingSubmission.updateMany.mockResolvedValueOnce({
-      count: 1,
-    });
     mockUploadService.downloadFileBuffer.mockResolvedValueOnce(
       Buffer.from('not-a-wav-file'),
     );
@@ -289,9 +276,9 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
       service.processJob({ submissionId: 104, traceId: 'trace-corrupt' }),
     ).rejects.toThrow(UnrecoverableError);
 
-    expect(mockPrisma.speakingSubmission.update).toHaveBeenCalledWith(
+    expect(mockPrisma.speakingSubmission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 104 },
+        where: expect.objectContaining({ id: 104, status: 'PROCESSING' }),
         data: expect.objectContaining({
           status: 'FAILED',
           lastErrorCode: 'INVALID_AUDIO',
@@ -319,17 +306,13 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
       exercise: { targetText: 'Max retry test' },
     });
 
-    mockPrisma.speakingSubmission.updateMany.mockResolvedValueOnce({
-      count: 1,
-    });
-
     await expect(
       service.processJob({ submissionId: 105, traceId: 'trace-max' }),
     ).rejects.toThrow();
 
-    expect(mockPrisma.speakingSubmission.update).toHaveBeenCalledWith(
+    expect(mockPrisma.speakingSubmission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 105 },
+        where: expect.objectContaining({ id: 105, status: 'PROCESSING' }),
         data: expect.objectContaining({
           status: 'FAILED',
           lastErrorCode: 'PROVIDER_UNAVAILABLE',
@@ -344,9 +327,8 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
   });
 
   it('7. Timeout Enforcement: Aborts long-running evaluations and discards late evaluator results', async () => {
-    process.env.SPEAKING_JOB_TIMEOUT_MS = '5000'; // minimum allowed is 5000ms
+    process.env.SPEAKING_JOB_TIMEOUT_MS = '5000';
 
-    // Mock upload download taking longer than timeout
     mockPrisma.speakingSubmission.findUnique.mockResolvedValue({
       id: 106,
       userId: 5,
@@ -357,11 +339,6 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
       exercise: { targetText: 'Slow evaluation' },
     });
 
-    mockPrisma.speakingSubmission.updateMany.mockResolvedValueOnce({
-      count: 1,
-    });
-
-    // Download hangs for 100ms with a 50ms test timeout configured via mock
     jest
       .spyOn(mockUploadService, 'downloadFileBuffer')
       .mockImplementation(
@@ -369,7 +346,6 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
           new Promise((resolve) => setTimeout(() => resolve(validWav), 200)),
       );
 
-    // Temporarily override timeout logic via spy
     jest.spyOn(speakingConstants, 'getSpeakingWorkerConfig').mockReturnValue({
       concurrency: 1,
       rateLimitMax: 1,
@@ -382,20 +358,105 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
     ).rejects.toThrow(/JOB_TIMEOUT/);
 
     // Stale completion is NEVER written to DB
-    expect(mockPrisma.speakingSubmission.update).not.toHaveBeenCalledWith(
+    expect(mockPrisma.speakingSubmission.updateMany).not.toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'COMPLETED' }),
       }),
     );
 
     // Submission was updated with JOB_TIMEOUT retry
-    expect(mockPrisma.speakingSubmission.update).toHaveBeenCalledWith(
+    expect(mockPrisma.speakingSubmission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 106 },
+        where: expect.objectContaining({ id: 106, status: 'PROCESSING' }),
         data: expect.objectContaining({
           lastErrorCode: 'JOB_TIMEOUT',
         }),
       }),
     );
+  });
+
+  it('8. Lease-Token Fencing: When Worker A evaluation is delayed and Worker B claims/completes it, Worker A late result is discarded', async () => {
+    const submissionId = 300;
+    mockPrisma.speakingSubmission.findUnique.mockResolvedValue({
+      id: submissionId,
+      userId: 7,
+      exerciseId: 3,
+      status: 'PENDING',
+      submittedAt: new Date(),
+      attemptCount: 0,
+      audioKey: 'catalog/speaking/submissions/lease.wav',
+      exercise: { id: 3, targetText: 'Lease token test' },
+    });
+
+    let currentOwnerToken: string | null = null;
+    let completed = false;
+
+    // Simulate database behavior for lease token fencing
+    mockPrisma.speakingSubmission.updateMany.mockImplementation(
+      ({ where, data }: any) => {
+        // Claim query
+        if (where?.OR) {
+          currentOwnerToken = data.workerId;
+          return Promise.resolve({ count: 1 });
+        }
+        // Score persist query (requires status: 'PROCESSING', workerId: token)
+        if (where?.status === 'PROCESSING') {
+          if (where.workerId === currentOwnerToken && !completed) {
+            completed = true;
+            return Promise.resolve({ count: 1 });
+          }
+          // Fencing token mismatch (lease was reset or stolen) -> count: 0
+          return Promise.resolve({ count: 0 });
+        }
+        // Gamification reward query
+        if (where?.status === 'COMPLETED' && where?.rewardGrantedAt === null) {
+          if (where.workerId === currentOwnerToken) {
+            return Promise.resolve({ count: 1 });
+          }
+          return Promise.resolve({ count: 0 });
+        }
+        return Promise.resolve({ count: 0 });
+      },
+    );
+
+    // Worker A begins, but its evaluation takes 60ms
+    let workerAFinished = false;
+    const workerAPromise = (async () => {
+      // simulate slow audio evaluation
+      jest
+        .spyOn(mockUploadService, 'downloadFileBuffer')
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) =>
+              setTimeout(() => {
+                resolve(validWav);
+              }, 60),
+            ),
+        );
+      await service.processJob({
+        submissionId,
+        traceId: 'trace-worker-a-delayed',
+      });
+      workerAFinished = true;
+    })();
+
+    // Worker B claims the submission after 20ms (simulating lease expiration / recovery)
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await service.processJob({
+      submissionId,
+      traceId: 'trace-worker-b-recovery',
+    });
+
+    // Await Worker A completion
+    await workerAPromise;
+    expect(workerAFinished).toBe(true);
+
+    // Gamification reward must have been granted EXACTLY ONCE (by Worker B)
+    expect(mockEventEmitter.emitAsync).toHaveBeenCalledTimes(1);
+
+    // Redis Pub/Sub completion event must have been published EXACTLY ONCE (by Worker B)
+    expect(publishSpy).toHaveBeenCalledTimes(1);
+    const pubEvent = JSON.parse(publishSpy.mock.calls[0][1]);
+    expect(pubEvent.traceId).toBe('trace-worker-b-recovery');
   });
 });

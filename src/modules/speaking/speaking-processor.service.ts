@@ -7,6 +7,7 @@ import { AiService } from '../ai/ai.service';
 import { UploadService } from '../upload/upload.service';
 import { validateSpeakingAudio } from './speaking-audio-validator';
 import { MockSpeakingEvaluator } from './mock-speaking-evaluator';
+import * as crypto from 'crypto';
 import {
   SPEAKING_EVENTS_CHANNEL,
   SPEAKING_COMPLETED_EVENT,
@@ -14,6 +15,7 @@ import {
   SpeakingJobPayload,
   SpeakingEventPayload,
   getSpeakingWorkerConfig,
+  getLeaseTimeoutMs,
 } from './speaking.constants';
 
 const MAX_ATTEMPTS = 4;
@@ -49,6 +51,7 @@ export class SpeakingProcessorService {
   async processJob(jobPayload: SpeakingJobPayload): Promise<void> {
     const { jobTimeoutMs } = getSpeakingWorkerConfig();
     const abortController = new AbortController();
+    const workerToken = `worker-${crypto.randomUUID()}`;
     let isTimedOut = false;
 
     const timeoutTimer = setTimeout(() => {
@@ -62,7 +65,7 @@ export class SpeakingProcessorService {
 
     try {
       await Promise.race([
-        this.executeJob(jobPayload, abortController.signal),
+        this.executeJob(jobPayload, abortController.signal, workerToken),
         new Promise<never>((_, reject) => {
           abortController.signal.addEventListener('abort', () => {
             const reason = abortController.signal.reason;
@@ -95,6 +98,7 @@ export class SpeakingProcessorService {
             sub.attemptCount,
             'JOB_TIMEOUT',
             `Processing exceeded timeout limit of ${jobTimeoutMs}ms`,
+            workerToken,
           );
         }
       }
@@ -111,6 +115,7 @@ export class SpeakingProcessorService {
   private async executeJob(
     jobPayload: SpeakingJobPayload,
     signal: AbortSignal,
+    workerToken: string,
   ): Promise<void> {
     const { submissionId, traceId } = jobPayload;
     const tJobStart = Date.now();
@@ -136,24 +141,33 @@ export class SpeakingProcessorService {
       return;
     }
 
-    // 2. Atomically claim submission: PENDING -> PROCESSING
-    // STRICT RULE: Condition strictly checks status: 'PENDING'.
-    // If affected row count === 0, another worker already claimed it or it is in terminal state.
+    // 2. Atomically claim submission: PENDING -> PROCESSING (or reclaim expired PROCESSING lease)
+    const { jobTimeoutMs } = getSpeakingWorkerConfig();
+    const leaseTimeoutMs = getLeaseTimeoutMs(jobTimeoutMs);
+    const leaseCutoff = new Date(Date.now() - leaseTimeoutMs);
+
     const claimResult = await this.prisma.speakingSubmission.updateMany({
       where: {
         id: submissionId,
-        status: 'PENDING',
+        OR: [
+          { status: 'PENDING' },
+          {
+            status: 'PROCESSING',
+            processingStartedAt: { lte: leaseCutoff },
+          },
+        ],
       },
       data: {
         status: 'PROCESSING',
         processingStartedAt: new Date(),
+        workerId: workerToken,
         attemptCount: { increment: 1 },
       },
     });
 
     if (claimResult.count === 0) {
       this.logger.warn(
-        `[SpeakingProcessor] Exclusive atomic claim failed for submission #${submissionId}. Status is not PENDING (already PROCESSING, COMPLETED, or FAILED). Aborting duplicate execution. (traceId=${traceId})`,
+        `[SpeakingProcessor] Exclusive atomic claim failed for submission #${submissionId}. Status is not claimable (already actively PROCESSING or terminal). Aborting duplicate execution. (traceId=${traceId})`,
       );
       return;
     }
@@ -172,15 +186,63 @@ export class SpeakingProcessorService {
     let tValidationMs = 0;
     let tScoringMs = 0;
 
-    // 3. Download audio from storage using audioKey
+    // 3. Download audio from storage using audioKey (or synthetic audio in mock mode)
     const tDownloadStart = Date.now();
     try {
-      if (!existing.audioKey) {
-        throw new Error('MISSING_AUDIO_KEY: Submission has no audioKey stored');
+      if (!existing.audioKey || existing.audioKey.startsWith('mock-')) {
+        if (MockSpeakingEvaluator.isMockEnabled()) {
+          const sampleCount = 16000;
+          audioBuffer = Buffer.alloc(44 + sampleCount * 2);
+          audioBuffer.write('RIFF', 0);
+          audioBuffer.writeUInt32LE(36 + sampleCount * 2, 4);
+          audioBuffer.write('WAVEfmt ', 8);
+          audioBuffer.writeUInt32LE(16, 16);
+          audioBuffer.writeUInt16LE(1, 20);
+          audioBuffer.writeUInt16LE(1, 22);
+          audioBuffer.writeUInt32LE(16000, 24);
+          audioBuffer.writeUInt32LE(32000, 28);
+          audioBuffer.writeUInt16LE(2, 32);
+          audioBuffer.writeUInt16LE(16, 34);
+          audioBuffer.write('data', 36);
+          audioBuffer.writeUInt32LE(sampleCount * 2, 40);
+          for (let i = 44; i < audioBuffer.length; i += 2) {
+            audioBuffer.writeInt16LE(Math.round(Math.sin(i / 10) * 10000), i);
+          }
+        } else {
+          throw new Error('MISSING_AUDIO_KEY: Submission has no audioKey stored');
+        }
+      } else {
+        try {
+          audioBuffer = await this.uploadService.downloadFileBuffer(
+            existing.audioKey,
+          );
+        } catch (downloadErr: any) {
+          if (MockSpeakingEvaluator.isMockEnabled()) {
+            this.logger.warn(
+              `Storage download failed in mock mode, falling back to synthetic audio: ${downloadErr.message}`,
+            );
+            const sampleCount = 16000;
+            audioBuffer = Buffer.alloc(44 + sampleCount * 2);
+            audioBuffer.write('RIFF', 0);
+            audioBuffer.writeUInt32LE(36 + sampleCount * 2, 4);
+            audioBuffer.write('WAVEfmt ', 8);
+            audioBuffer.writeUInt32LE(16, 16);
+            audioBuffer.writeUInt16LE(1, 20);
+            audioBuffer.writeUInt16LE(1, 22);
+            audioBuffer.writeUInt32LE(16000, 24);
+            audioBuffer.writeUInt32LE(32000, 28);
+            audioBuffer.writeUInt16LE(2, 32);
+            audioBuffer.writeUInt16LE(16, 34);
+            audioBuffer.write('data', 36);
+            audioBuffer.writeUInt32LE(sampleCount * 2, 40);
+            for (let i = 44; i < audioBuffer.length; i += 2) {
+              audioBuffer.writeInt16LE(Math.round(Math.sin(i / 10) * 10000), i);
+            }
+          } else {
+            throw downloadErr;
+          }
+        }
       }
-      audioBuffer = await this.uploadService.downloadFileBuffer(
-        existing.audioKey,
-      );
       tDownloadMs = Date.now() - tDownloadStart;
     } catch (storageErr: any) {
       tDownloadMs = Date.now() - tDownloadStart;
@@ -194,6 +256,7 @@ export class SpeakingProcessorService {
         currentAttempt,
         'STORAGE_UNAVAILABLE',
         `Storage download failed: ${storageErr.message}`,
+        workerToken,
       );
       throw storageErr; // Rethrow to let BullMQ manage backoff retry
     }
@@ -212,8 +275,12 @@ export class SpeakingProcessorService {
       if (validation.quality.isSilent) {
         if (signal.aborted) throw signal.reason;
 
-        await this.prisma.speakingSubmission.update({
-          where: { id: submissionId },
+        const silentUpdate = await this.prisma.speakingSubmission.updateMany({
+          where: {
+            id: submissionId,
+            status: 'PROCESSING',
+            workerId: workerToken,
+          },
           data: {
             status: 'COMPLETED',
             overallScore: null,
@@ -228,6 +295,13 @@ export class SpeakingProcessorService {
             nextAttemptAt: null,
           },
         });
+
+        if (silentUpdate.count === 0) {
+          this.logger.warn(
+            `[SpeakingProcessor] Lease lost for silent submission #${submissionId} (workerToken=${workerToken}). Discarding stale write.`,
+          );
+          return;
+        }
 
         await this.publishEvent({
           type: SPEAKING_COMPLETED_EVENT,
@@ -256,8 +330,12 @@ export class SpeakingProcessorService {
       );
 
       // Permanent failure — mark DB FAILED, emit event, and throw UnrecoverableError
-      await this.prisma.speakingSubmission.update({
-        where: { id: submissionId },
+      const failUpdate = await this.prisma.speakingSubmission.updateMany({
+        where: {
+          id: submissionId,
+          status: 'PROCESSING',
+          workerId: workerToken,
+        },
         data: {
           status: 'FAILED',
           overallScore: null,
@@ -267,6 +345,13 @@ export class SpeakingProcessorService {
           nextAttemptAt: null,
         },
       });
+
+      if (failUpdate.count === 0) {
+        this.logger.warn(
+          `[SpeakingProcessor] Lease lost for invalid submission #${submissionId} (workerToken=${workerToken}). Discarding stale write.`,
+        );
+        throw new UnrecoverableError(`INVALID_AUDIO: ${valErr.message}`);
+      }
 
       await this.publishEvent({
         type: SPEAKING_FAILED_EVENT,
@@ -301,11 +386,13 @@ export class SpeakingProcessorService {
         assessmentResult = await MockSpeakingEvaluator.evaluate(
           existing.exercise.targetText,
           audioBuffer,
+          { signal },
         );
       } else {
         assessmentResult = await this.aiService.assessPronunciation(
           existing.exercise.targetText,
           audioBuffer,
+          { signal },
         );
       }
       tScoringMs = Date.now() - tScoringStart;
@@ -323,6 +410,7 @@ export class SpeakingProcessorService {
         currentAttempt,
         code,
         providerErr.message,
+        workerToken,
       );
       throw providerErr; // Rethrow to trigger BullMQ backoff retry
     }
@@ -346,10 +434,14 @@ export class SpeakingProcessorService {
     const transcript = assessmentResult.transcript || '';
     const lastErrorCode = isSilent ? 'NO_SPEECH' : null;
 
-    // 7. Persist result and commit COMPLETED status
+    // 7. Persist result and commit COMPLETED status (Token-Fenced)
     const tPersistStart = Date.now();
-    const updated = await this.prisma.speakingSubmission.update({
-      where: { id: submissionId },
+    const persistResult = await this.prisma.speakingSubmission.updateMany({
+      where: {
+        id: submissionId,
+        status: 'PROCESSING',
+        workerId: workerToken,
+      },
       data: {
         status: 'COMPLETED',
         overallScore,
@@ -363,6 +455,14 @@ export class SpeakingProcessorService {
         nextAttemptAt: null,
       },
     });
+
+    if (persistResult.count === 0) {
+      this.logger.warn(
+        `[SpeakingProcessor] Lease lost for submission #${submissionId} (workerToken=${workerToken}). Fencing token mismatch or reclaimed by another worker. Discarding stale scoring result. (traceId=${traceId})`,
+      );
+      return;
+    }
+
     const tPersistMs = Date.now() - tPersistStart;
     const tTotalWorkerMs = Date.now() - tJobStart;
 
@@ -370,10 +470,8 @@ export class SpeakingProcessorService {
       `[SpeakingProcessor] Successfully completed SpeakingSubmission #${submissionId} with score ${overallScore ?? 'NO_SPEECH'} (traceId=${traceId}, total=${tTotalWorkerMs}ms)`,
     );
 
-    // 8. Gamification reward idempotency check
+    // 8. Gamification reward idempotency check (Token-Fenced)
     if (
-      updated &&
-      !updated.rewardGrantedAt &&
       !isSilent &&
       overallScore !== null &&
       overallScore > 0
@@ -382,6 +480,7 @@ export class SpeakingProcessorService {
         where: {
           id: submissionId,
           status: 'COMPLETED',
+          workerId: workerToken,
           rewardGrantedAt: null,
         },
         data: { rewardGrantedAt: new Date() },
@@ -390,9 +489,9 @@ export class SpeakingProcessorService {
       if (rewardClaim.count === 1) {
         try {
           await this.eventEmitter.emitAsync('speaking.submitted', {
-            submissionId: updated.id,
-            userId: updated.userId,
-            exerciseId: updated.exerciseId,
+            submissionId: existing.id,
+            userId: existing.userId,
+            exerciseId: existing.exerciseId,
             overallScore,
             isSilentOrNoSpeech: false,
           });
@@ -429,6 +528,7 @@ export class SpeakingProcessorService {
 
   /**
    * Handles transient errors with exponential backoff and terminal failure transition.
+   * Fenced by workerToken so stale workers cannot overwrite active or recovered jobs.
    */
   private async handleTransientFailure(
     userId: number,
@@ -437,14 +537,19 @@ export class SpeakingProcessorService {
     attemptCount: number,
     errorCode: string,
     errorMessage: string,
+    workerToken?: string,
   ): Promise<void> {
     if (attemptCount >= MAX_ATTEMPTS) {
       this.logger.warn(
         `[SpeakingProcessor] Submission #${submissionId} reached max retry attempts (${MAX_ATTEMPTS}). Marking as FAILED. (traceId=${traceId})`,
       );
 
-      await this.prisma.speakingSubmission.update({
-        where: { id: submissionId },
+      const failResult = await this.prisma.speakingSubmission.updateMany({
+        where: {
+          id: submissionId,
+          status: 'PROCESSING',
+          ...(workerToken ? { workerId: workerToken } : {}),
+        },
         data: {
           status: 'FAILED',
           overallScore: null,
@@ -455,12 +560,14 @@ export class SpeakingProcessorService {
         },
       });
 
-      await this.publishEvent({
-        type: SPEAKING_FAILED_EVENT,
-        userId,
-        submissionId,
-        traceId,
-      });
+      if (failResult.count === 1) {
+        await this.publishEvent({
+          type: SPEAKING_FAILED_EVENT,
+          userId,
+          submissionId,
+          traceId,
+        });
+      }
       return;
     }
 
@@ -471,8 +578,12 @@ export class SpeakingProcessorService {
       `[SpeakingProcessor] Scheduling delayed retry for submission #${submissionId} at ${nextAttemptAt.toISOString()} (Backoff: ${backoffMs / 1000}s, traceId=${traceId})`,
     );
 
-    await this.prisma.speakingSubmission.update({
-      where: { id: submissionId },
+    await this.prisma.speakingSubmission.updateMany({
+      where: {
+        id: submissionId,
+        status: 'PROCESSING',
+        ...(workerToken ? { workerId: workerToken } : {}),
+      },
       data: {
         status: 'PENDING',
         lastErrorCode: errorCode,
@@ -525,8 +636,12 @@ export class SpeakingProcessorService {
   }
 
   async close(): Promise<void> {
-    if (this.pubRedis) {
-      await this.pubRedis.quit();
+    if (this.pubRedis && this.pubRedis.status !== 'end') {
+      try {
+        await this.pubRedis.quit();
+      } catch {
+        // ignore already closed
+      }
     }
   }
 }

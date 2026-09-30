@@ -18,7 +18,11 @@ export interface SpeakingEventPayload {
 }
 
 export const getSpeakingJobId = (submissionId: number): string =>
-  `speaking-assessment:${submissionId}`;
+  `speaking-assessment-${submissionId}`;
+
+export const LEASE_SAFETY_MARGIN_MS = 15000;
+export const getLeaseTimeoutMs = (jobTimeoutMs: number = 20000): number =>
+  jobTimeoutMs + LEASE_SAFETY_MARGIN_MS;
 
 export interface SpeakingWorkerConfig {
   concurrency: number;

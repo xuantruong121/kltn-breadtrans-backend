@@ -64,6 +64,19 @@ describe('SpeakingController - Security & AI Quota', () => {
       feedback: 'Good structure',
     });
   });
+
+  it('getMySubmissions delegates to speakingService.getMySubmissions with req.user.id', async () => {
+    service.getMySubmissions = jest.fn().mockResolvedValue([
+      { id: 101, exerciseId: 5, status: 'COMPLETED', overallScore: 8.5 },
+    ]);
+
+    const req = { user: { id: 42, role: Role.STUDENT } };
+    const result = await controller.getMySubmissions(req);
+
+    expect(service.getMySubmissions).toHaveBeenCalledWith(42);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(101);
+  });
 });
 
 describe('AiRateLimitGuard on Speaking Endpoints', () => {
