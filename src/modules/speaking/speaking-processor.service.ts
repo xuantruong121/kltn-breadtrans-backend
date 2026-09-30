@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UnrecoverableError } from 'bullmq';
 import IORedis from 'ioredis';
@@ -27,9 +27,13 @@ const RETRY_BACKOFF_MS = [
 ];
 
 @Injectable()
-export class SpeakingProcessorService {
+export class SpeakingProcessorService implements OnModuleDestroy {
   private readonly logger = new Logger(SpeakingProcessorService.name);
   private pubRedis: IORedis;
+
+  async onModuleDestroy(): Promise<void> {
+    await this.close();
+  }
 
   constructor(
     private readonly prisma: PrismaService,

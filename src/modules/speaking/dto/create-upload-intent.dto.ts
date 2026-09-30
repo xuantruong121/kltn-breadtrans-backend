@@ -40,19 +40,11 @@ export class CreateUploadIntentDto {
   @Max(45000, { message: 'Thời lượng audio tối đa là 45 giây' })
   durationMs: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: 'spk-key-12345',
     description: 'Client idempotency key for this attempt',
   })
-  @IsOptional()
   @IsString()
-  idempotencyKey?: string;
-
-  @ApiPropertyOptional({
-    example: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    description: 'Optional SHA-256 checksum of the audio payload',
-  })
-  @IsOptional()
-  @IsString()
-  checksum?: string;
+  @IsNotEmpty({ message: 'idempotencyKey is required' })
+  idempotencyKey: string;
 }

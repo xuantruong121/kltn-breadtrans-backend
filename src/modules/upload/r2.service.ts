@@ -188,12 +188,12 @@ export class R2Service {
    * Hữu ích cho file lớn (video, audio recording).
    * @param key      Key trong bucket
    * @param mimeType MIME type
-   * @param expiresIn Thời gian hết hạn (giây), mặc định 15 phút
+   * @param expiresIn Thời gian hết hạn (giây), mặc định 10 phút (600s)
    */
   async getPresignedUploadUrl(
     key: string,
     mimeType: string,
-    expiresIn: number = 900,
+    expiresIn: number = 600,
   ): Promise<string> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,

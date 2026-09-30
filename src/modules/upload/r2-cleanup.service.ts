@@ -115,17 +115,123 @@ export class R2CleanupService {
     intentsInspected: number;
     objectsDeleted: number;
     recordsExpired: number;
+    staleRecoveredToPending: number;
+    staleReconciledToFinalized: number;
     failures: number;
   }> {
     const counts = {
       intentsInspected: 0,
       objectsDeleted: 0,
       recordsExpired: 0,
+      staleRecoveredToPending: 0,
+      staleReconciledToFinalized: 0,
       failures: 0,
     };
 
     const now = new Date();
+    const rawLease = Number(
+      process.env.SPEAKING_FINALIZATION_LEASE_MS || 60000,
+    );
+    const leaseMs = Math.min(
+      Math.max(isNaN(rawLease) ? 60000 : rawLease, 15000),
+      300000,
+    );
+    const staleThreshold = new Date(now.getTime() - leaseMs);
+
     try {
+      // 1. Reconcile stale FINALIZING intents whose lease has expired
+      const staleFinalizingIntents =
+        await this.prisma.speakingUploadIntent.findMany({
+          where: {
+            status: 'FINALIZING',
+            finalizationStartedAt: { lt: staleThreshold },
+          },
+          take: batchSize,
+        });
+
+      for (const stale of staleFinalizingIntents) {
+        counts.intentsInspected++;
+        try {
+          // Check if submission already exists for this intent
+          let linkedSubId = stale.submissionId;
+          if (!linkedSubId) {
+            const sub = await this.prisma.speakingSubmission.findFirst({
+              where: { audioKey: stale.objectKey },
+              select: { id: true },
+            });
+            if (sub) linkedSubId = sub.id;
+          }
+
+          if (linkedSubId) {
+            // Reconcile to FINALIZED
+            const res = await this.prisma.speakingUploadIntent.updateMany({
+              where: {
+                id: stale.id,
+                status: 'FINALIZING',
+              },
+              data: {
+                status: 'FINALIZED',
+                submissionId: linkedSubId,
+                finalizationToken: null,
+                finalizationStartedAt: null,
+              },
+            });
+            if (res.count > 0) {
+              counts.staleReconciledToFinalized++;
+            }
+            continue;
+          }
+
+          // No submission exists
+          if (stale.expiresAt < now) {
+            // Claim directly to EXPIRED for cleanup
+            const claim = await this.prisma.speakingUploadIntent.updateMany({
+              where: {
+                id: stale.id,
+                status: 'FINALIZING',
+                finalizationToken: stale.finalizationToken,
+              },
+              data: {
+                status: 'EXPIRED',
+                finalizationToken: null,
+                finalizationStartedAt: null,
+              },
+            });
+            if (claim.count > 0) {
+              counts.recordsExpired++;
+              const exists = await this.r2Service.objectExists(stale.objectKey);
+              if (exists) {
+                await this.r2Service.deleteFile(stale.objectKey);
+                counts.objectsDeleted++;
+              }
+            }
+          } else {
+            // Intent is still unexpired: safely revert to PENDING
+            const reset = await this.prisma.speakingUploadIntent.updateMany({
+              where: {
+                id: stale.id,
+                status: 'FINALIZING',
+                finalizationToken: stale.finalizationToken,
+              },
+              data: {
+                status: 'PENDING',
+                finalizationToken: null,
+                finalizationStartedAt: null,
+              },
+            });
+            if (reset.count > 0) {
+              counts.staleRecoveredToPending++;
+            }
+          }
+        } catch (staleErr) {
+          counts.failures++;
+          this.logger.error(
+            `Failed to reconcile stale intent ${stale.id}: ${staleErr}`,
+          );
+        }
+      }
+
+      // 2. Clean up ordinary expired or invalid intents
       const expiredIntents = await this.prisma.speakingUploadIntent.findMany({
         where: {
           OR: [
@@ -138,9 +244,8 @@ export class R2CleanupService {
         orderBy: { createdAt: 'asc' },
       });
 
-      counts.intentsInspected = expiredIntents.length;
-
       for (const intent of expiredIntents) {
+        counts.intentsInspected++;
         try {
           // Invariant: NEVER delete audio belonging to a valid finalized submission
           if (intent.submissionId) {
@@ -164,19 +269,29 @@ export class R2CleanupService {
             continue;
           }
 
-          // Safe to delete temporary pending object from R2
+          // Cleanup claim rule: if PENDING, must atomically claim PENDING -> EXPIRED first
+          if (intent.status === 'PENDING') {
+            const claimResult =
+              await this.prisma.speakingUploadIntent.updateMany({
+                where: {
+                  id: intent.id,
+                  status: 'PENDING',
+                  expiresAt: { lt: now },
+                },
+                data: { status: 'EXPIRED' },
+              });
+            if (claimResult.count === 0) {
+              // Another concurrent request claimed or finalized it
+              continue;
+            }
+            counts.recordsExpired++;
+          }
+
+          // Safe to delete temporary object from storage
           const exists = await this.r2Service.objectExists(intent.objectKey);
           if (exists) {
             await this.r2Service.deleteFile(intent.objectKey);
             counts.objectsDeleted++;
-          }
-
-          if (intent.status !== 'EXPIRED') {
-            await this.prisma.speakingUploadIntent.update({
-              where: { id: intent.id },
-              data: { status: 'EXPIRED' },
-            });
-            counts.recordsExpired++;
           }
         } catch (itemErr) {
           counts.failures++;
@@ -187,7 +302,7 @@ export class R2CleanupService {
       }
 
       this.logger.log(
-        `Orphan intent cleanup completed: inspected=${counts.intentsInspected}, deleted=${counts.objectsDeleted}, expired=${counts.recordsExpired}, failures=${counts.failures}`,
+        `Orphan intent cleanup completed: inspected=${counts.intentsInspected}, deleted=${counts.objectsDeleted}, expired=${counts.recordsExpired}, staleToPending=${counts.staleRecoveredToPending}, staleToFinalized=${counts.staleReconciledToFinalized}, failures=${counts.failures}`,
       );
     } catch (err) {
       this.logger.error('Error during cleanupOrphanUploadIntents', err);

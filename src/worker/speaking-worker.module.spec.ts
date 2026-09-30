@@ -33,6 +33,16 @@ describe('SpeakingWorkerModule (Worker Isolation)', () => {
 
   afterAll(async () => {
     if (moduleRef) {
+      try {
+        const processor = moduleRef.get(SpeakingProcessorService, {
+          strict: false,
+        });
+        if (processor) {
+          await processor.close();
+        }
+      } catch {
+        // ignore if not resolved
+      }
       await moduleRef.close();
     }
   });

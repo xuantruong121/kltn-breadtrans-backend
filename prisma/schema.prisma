@@ -632,6 +632,7 @@ model SpeakingSubmission {
 
 enum SpeakingUploadIntentStatus {
   PENDING
+  FINALIZING
   FINALIZED
   EXPIRED
   CANCELLED
@@ -639,28 +640,31 @@ enum SpeakingUploadIntentStatus {
 }
 
 model SpeakingUploadIntent {
-  id                  String                     @id @default(uuid())
-  userId              Int
-  user                User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exerciseId          Int
-  exercise            SpeakingExercise           @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
-  objectKey           String                     @unique
-  expectedContentType String
-  expectedSizeBytes   Int
-  expectedDurationMs  Int
-  checksumSha256      String?
-  idempotencyKey      String?
-  status              SpeakingUploadIntentStatus @default(PENDING)
-  expiresAt           DateTime
-  finalizedAt         DateTime?
-  submissionId        Int?                       @unique
-  submission          SpeakingSubmission?        @relation(fields: [submissionId], references: [id], onDelete: SetNull)
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
+  id                    String                     @id @default(uuid())
+  userId                Int
+  user                  User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId            Int
+  exercise              SpeakingExercise           @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  objectKey             String                     @unique
+  expectedContentType   String
+  expectedSizeBytes     Int
+  expectedDurationMs    Int
+  checksumSha256        String?
+  idempotencyKey        String
+  status                SpeakingUploadIntentStatus @default(PENDING)
+  finalizationStartedAt DateTime?
+  finalizationToken     String?
+  expiresAt             DateTime
+  finalizedAt           DateTime?
+  submissionId          Int?                       @unique
+  submission            SpeakingSubmission?        @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
 
   @@unique([userId, idempotencyKey])
   @@index([userId, status])
   @@index([status, expiresAt])
+  @@index([status, finalizationStartedAt])
   @@index([createdAt])
 }
 

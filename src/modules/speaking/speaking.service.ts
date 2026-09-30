@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   Logger,
   Optional,
   ServiceUnavailableException,
@@ -517,12 +518,21 @@ export class SpeakingService {
     const uploadMode = (
       process.env.SPEAKING_AUDIO_UPLOAD_MODE || 'presigned'
     ).toLowerCase();
+    const rawTtl = Number(
+      process.env.SPEAKING_PRESIGNED_UPLOAD_TTL_SECONDS || 600,
+    );
+    const uploadTtlSeconds = Math.min(
+      Math.max(isNaN(rawTtl) ? 600 : rawTtl, 300),
+      600,
+    );
+
     return {
       uploadMode: uploadMode === 'proxy' ? 'proxy' : 'presigned',
       maxSizeBytes: 10 * 1024 * 1024,
       maxDurationMs: 45000,
       minDurationMs: 300,
       allowedContentTypes: ['audio/wav', 'audio/x-wav'],
+      uploadTtlSeconds,
     };
   }
 
@@ -570,82 +580,134 @@ export class SpeakingService {
       );
     }
 
-    // 4. Idempotency check if idempotencyKey is supplied
-    const cleanIdempotencyKey = dto.idempotencyKey?.trim() || null;
-    if (cleanIdempotencyKey) {
-      const existingIntent = await this.prisma.speakingUploadIntent.findUnique({
-        where: {
-          userId_idempotencyKey: {
-            userId,
-            idempotencyKey: cleanIdempotencyKey,
-          },
+    // 4. Rate-limit / bound active unexpired intents per user (Correction I)
+    const MAX_ACTIVE_INTENTS_PER_USER = 3;
+    const now = new Date();
+    const activeIntentsCount = await this.prisma.speakingUploadIntent.count({
+      where: {
+        userId,
+        status: { in: ['PENDING', 'FINALIZING'] },
+        expiresAt: { gt: now },
+      },
+    });
+    if (activeIntentsCount >= MAX_ACTIVE_INTENTS_PER_USER) {
+      throw new BadRequestException(
+        'Bạn đang có nhiều yêu cầu tải lên chưa hoàn tất. Vui lòng hoàn tất hoặc thử lại sau.',
+      );
+    }
+
+    // 5. Idempotency handling (Correction E)
+    const cleanIdempotencyKey = dto.idempotencyKey.trim();
+    const existingIntent = await this.prisma.speakingUploadIntent.findUnique({
+      where: {
+        userId_idempotencyKey: {
+          userId,
+          idempotencyKey: cleanIdempotencyKey,
         },
-      });
+      },
+    });
 
-      if (existingIntent) {
-        if (
-          existingIntent.status === 'FINALIZED' &&
-          existingIntent.submissionId
-        ) {
-          const existingSubmission =
-            await this.prisma.speakingSubmission.findUnique({
-              where: { id: existingIntent.submissionId },
-            });
-          if (existingSubmission) {
-            this.logger.log(
-              `Upload intent with key "${cleanIdempotencyKey}" already finalized. Returning existing submission #${existingSubmission.id} (traceId=${traceId})`,
-            );
-            return {
-              uploadIntentId: existingIntent.id,
-              status: existingIntent.status,
-              isAlreadyFinalized: true,
-              submissionId: existingSubmission.id,
-              pollUrl: `/speaking/submissions/${existingSubmission.id}`,
-            };
-          }
-        }
+    if (existingIntent) {
+      // Check metadata exact match
+      const isMetadataMatch =
+        existingIntent.exerciseId === exercise.id &&
+        existingIntent.expectedContentType === dto.contentType &&
+        existingIntent.expectedSizeBytes === dto.sizeBytes &&
+        existingIntent.expectedDurationMs === dto.durationMs;
 
-        if (
-          existingIntent.status === 'PENDING' &&
-          existingIntent.expiresAt > new Date()
-        ) {
+      if (!isMetadataMatch) {
+        throw new ConflictException(
+          'Idempotency key reused with different upload metadata',
+        );
+      }
+
+      if (
+        existingIntent.status === 'FINALIZED' &&
+        existingIntent.submissionId
+      ) {
+        const existingSubmission =
+          await this.prisma.speakingSubmission.findUnique({
+            where: { id: existingIntent.submissionId },
+          });
+        if (existingSubmission) {
           this.logger.log(
-            `Returning active upload intent ${existingIntent.id} for user #${userId} with key "${cleanIdempotencyKey}" (traceId=${traceId})`,
-          );
-          const uploadUrl = await this.getStorage().getPresignedUploadUrl(
-            existingIntent.objectKey,
-            existingIntent.expectedContentType,
-            600,
+            `Upload intent with key "${cleanIdempotencyKey}" already finalized. Returning existing submission #${existingSubmission.id} (traceId=${traceId})`,
           );
           return {
             uploadIntentId: existingIntent.id,
-            uploadUrl,
-            signedHeaders: {
-              'Content-Type': existingIntent.expectedContentType,
-            },
-            objectKey: existingIntent.objectKey,
-            expiresAt: existingIntent.expiresAt.toISOString(),
-            maxSizeBytes: 10 * 1024 * 1024,
-            isAlreadyFinalized: false,
+            status: existingIntent.status,
+            isAlreadyFinalized: true,
+            submissionId: existingSubmission.id,
+            pollUrl: `/speaking/submissions/${existingSubmission.id}`,
           };
         }
       }
+
+      if (existingIntent.status === 'FINALIZING') {
+        return {
+          uploadIntentId: existingIntent.id,
+          status: 'FINALIZING',
+          isAlreadyFinalized: false,
+          isFinalizing: true,
+          message: 'Upload is currently being finalized',
+        };
+      }
+
+      if (
+        existingIntent.status === 'PENDING' &&
+        existingIntent.expiresAt > now
+      ) {
+        this.logger.log(
+          `Returning active upload intent ${existingIntent.id} for user #${userId} with key "${cleanIdempotencyKey}" (traceId=${traceId})`,
+        );
+        const remainingSecs = Math.max(
+          Math.floor((existingIntent.expiresAt.getTime() - Date.now()) / 1000),
+          60,
+        );
+        const uploadUrl = await this.getStorage().getPresignedUploadUrl(
+          existingIntent.objectKey,
+          existingIntent.expectedContentType,
+          remainingSecs,
+        );
+        return {
+          uploadIntentId: existingIntent.id,
+          uploadUrl,
+          signedHeaders: {
+            'Content-Type': existingIntent.expectedContentType,
+          },
+          objectKey: existingIntent.objectKey,
+          expiresAt: existingIntent.expiresAt.toISOString(),
+          maxSizeBytes: 10 * 1024 * 1024,
+          isAlreadyFinalized: false,
+        };
+      }
+
+      // Expired, cancelled, or invalid intent with same key
+      throw new ConflictException(
+        'This idempotency key belongs to an expired or failed upload attempt. Please generate a new key.',
+      );
     }
 
-    // 5. Generate secure server-side object key (never client controlled)
+    // 6. Generate secure server-side object key & clamped TTL (Correction D)
+    const rawTtl = Number(
+      process.env.SPEAKING_PRESIGNED_UPLOAD_TTL_SECONDS || 600,
+    );
+    const ttlSeconds = Math.min(
+      Math.max(isNaN(rawTtl) ? 600 : rawTtl, 300),
+      600,
+    );
     const uploadIntentId = crypto.randomUUID();
     const objectKey = `speaking/pending/${userId}/${uploadIntentId}.wav`;
-    const expiresInSeconds = 600; // 10 minutes
-    const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
-    // 6. Generate presigned PUT URL
+    // 7. Generate presigned PUT URL
     const uploadUrl = await this.getStorage().getPresignedUploadUrl(
       objectKey,
       dto.contentType,
-      expiresInSeconds,
+      ttlSeconds,
     );
 
-    // 7. Persist intent
+    // 8. Persist intent
     const intent = await this.prisma.speakingUploadIntent.create({
       data: {
         id: uploadIntentId,
@@ -655,13 +717,13 @@ export class SpeakingService {
         expectedContentType: dto.contentType,
         expectedSizeBytes: dto.sizeBytes,
         expectedDurationMs: dto.durationMs,
-        checksumSha256: dto.checksum?.trim() || null,
         idempotencyKey: cleanIdempotencyKey,
         status: 'PENDING',
         expiresAt,
       },
     });
 
+    // Redact sensitive query parameters when logging (Correction H)
     this.logger.log(
       `Created upload intent ${intent.id} for user #${userId}, exercise #${exercise.id} (objectKey=${objectKey}, traceId=${traceId})`,
     );
@@ -691,7 +753,7 @@ export class SpeakingService {
       traceIdHeader ||
       `trace-finalize-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 
-    // 1. Load intent
+    // 1. Initial intent load
     const intent = await this.prisma.speakingUploadIntent.findUnique({
       where: { id: uploadIntentId },
       include: { submission: true },
@@ -748,15 +810,100 @@ export class SpeakingService {
       );
     }
 
-    if (intent.status !== 'PENDING') {
+    if (intent.status === 'INVALID' || intent.status === 'CANCELLED') {
       throw new BadRequestException(
         `Upload intent cannot be finalized in status: ${intent.status}`,
       );
     }
 
-    // 5. Authoritative R2 verification (Never trust frontend completion claims without checking R2)
+    // 5. Atomic claim: PENDING -> FINALIZING with cryptographically unique token (Correction A)
+    const token = crypto.randomUUID();
+    const claimResult = await this.prisma.speakingUploadIntent.updateMany({
+      where: {
+        id: uploadIntentId,
+        userId,
+        status: 'PENDING',
+        expiresAt: { gt: now },
+      },
+      data: {
+        status: 'FINALIZING',
+        finalizationStartedAt: now,
+        finalizationToken: token,
+      },
+    });
+
+    if (claimResult.count === 0) {
+      // Could not claim: either finalized by concurrent request or currently finalizing
+      const freshIntent = await this.prisma.speakingUploadIntent.findUnique({
+        where: { id: uploadIntentId },
+        include: { submission: true },
+      });
+
+      if (freshIntent?.status === 'FINALIZED' && freshIntent.submissionId) {
+        const sub =
+          freshIntent.submission ??
+          (await this.prisma.speakingSubmission.findUnique({
+            where: { id: freshIntent.submissionId },
+          }));
+        if (sub) {
+          return {
+            submissionId: sub.id,
+            status: sub.status,
+            pollUrl: `/speaking/submissions/${sub.id}`,
+            acceptedAt: sub.submittedAt.toISOString(),
+            traceId,
+          };
+        }
+      }
+
+      if (freshIntent?.status === 'FINALIZING') {
+        // Wait shortly and re-read (bounded retry for concurrent finalize)
+        for (let attempt = 0; attempt < 3; attempt++) {
+          await new Promise((r) => setTimeout(r, 200));
+          const polled = await this.prisma.speakingUploadIntent.findUnique({
+            where: { id: uploadIntentId },
+            include: { submission: true },
+          });
+          if (polled?.status === 'FINALIZED' && polled.submissionId) {
+            const sub =
+              polled.submission ??
+              (await this.prisma.speakingSubmission.findUnique({
+                where: { id: polled.submissionId },
+              }));
+            if (sub) {
+              return {
+                submissionId: sub.id,
+                status: sub.status,
+                pollUrl: `/speaking/submissions/${sub.id}`,
+                acceptedAt: sub.submittedAt.toISOString(),
+                traceId,
+              };
+            }
+          }
+        }
+        throw new ConflictException(
+          'Upload intent is currently being finalized by another request.',
+        );
+      }
+
+      throw new BadRequestException(
+        `Upload intent cannot be finalized in status: ${freshIntent?.status || 'UNKNOWN'}`,
+      );
+    }
+
+    // 6. We hold the FINALIZING lease with token. Authoritative R2 verification (Correction C: exact size)
     const head = await this.getStorage().headObject(intent.objectKey);
     if (!head) {
+      await this.prisma.speakingUploadIntent
+        .updateMany({
+          where: {
+            id: uploadIntentId,
+            status: 'FINALIZING',
+            finalizationToken: token,
+          },
+          data: { status: 'INVALID' },
+        })
+        .catch(() => {});
       throw new BadRequestException(
         'Audio file was not found in storage. Direct upload may have failed or not completed.',
       );
@@ -765,8 +912,12 @@ export class SpeakingService {
     if (head.contentLength <= 0 || head.contentLength > 10 * 1024 * 1024) {
       await this.getStorage().deleteFile(intent.objectKey).catch(() => {});
       await this.prisma.speakingUploadIntent
-        .update({
-          where: { id: intent.id },
+        .updateMany({
+          where: {
+            id: uploadIntentId,
+            status: 'FINALIZING',
+            finalizationToken: token,
+          },
           data: { status: 'INVALID' },
         })
         .catch(() => {});
@@ -775,95 +926,122 @@ export class SpeakingService {
       );
     }
 
-    // Verify size matches within permitted boundary (allow tolerance up to 1024 bytes)
-    const sizeDiff = Math.abs(head.contentLength - intent.expectedSizeBytes);
-    if (sizeDiff > 1024) {
+    // Exact size check (Correction C: no 1024-byte tolerance)
+    if (head.contentLength !== intent.expectedSizeBytes) {
       this.logger.warn(
-        `Size mismatch for intent ${intent.id}: expected ${intent.expectedSizeBytes} bytes, R2 has ${head.contentLength} bytes`,
+        `Exact size mismatch for intent ${intent.id}: expected ${intent.expectedSizeBytes} bytes, R2 has ${head.contentLength} bytes`,
       );
+      await this.getStorage().deleteFile(intent.objectKey).catch(() => {});
+      await this.prisma.speakingUploadIntent
+        .updateMany({
+          where: {
+            id: uploadIntentId,
+            status: 'FINALIZING',
+            finalizationToken: token,
+          },
+          data: { status: 'INVALID' },
+        })
+        .catch(() => {});
       throw new BadRequestException(
         `Uploaded audio size (${head.contentLength} bytes) does not match declared size (${intent.expectedSizeBytes} bytes).`,
       );
     }
 
-    // 6. Atomic creation and quota enforcement under PostgreSQL advisory lock
+    // 7. Atomic creation and quota enforcement under PostgreSQL advisory lock
     const DAILY_LIMIT = 10;
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    const submission = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
-        SELECT pg_advisory_xact_lock(
-          hashtext(${`speaking-quota:${userId}:${startOfDay.toISOString().slice(0, 10)}`})
-        );
-      `;
+    let submission: any;
+    try {
+      submission = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(
+            hashtext(${`speaking-quota:${userId}:${startOfDay.toISOString().slice(0, 10)}`})
+          );
+        `;
 
-      // Re-verify intent status atomically inside transaction
-      const currentIntent = await tx.speakingUploadIntent.findUnique({
+        // Check daily quota
+        const submissionsToday = await tx.speakingSubmission.count({
+          where: { userId, submittedAt: { gte: startOfDay } },
+        });
+        if (submissionsToday >= DAILY_LIMIT) {
+          throw new BadRequestException(
+            `Bạn đã đạt giới hạn chấm điểm phát âm hôm nay (${DAILY_LIMIT} lần). Vui lòng quay lại vào ngày mai để luyện tập tiếp nhé!`,
+          );
+        }
+
+        const publicUrl = this.getStorage().getPublicUrl();
+        const audioUrl = publicUrl
+          ? `${publicUrl}/${intent.objectKey}`
+          : intent.objectKey;
+
+        // Create submission
+        const newSub = await tx.speakingSubmission.create({
+          data: {
+            exerciseId: intent.exerciseId,
+            userId: intent.userId,
+            status: 'PENDING',
+            audioKey: intent.objectKey,
+            audioUrl,
+            audioMimeType: intent.expectedContentType,
+            durationMs: intent.expectedDurationMs,
+            idempotencyKey: intent.idempotencyKey,
+            provider: 'azure',
+            scoreVersion: 'v1',
+          },
+        });
+
+        // Mark intent FINALIZED with token fencing (Correction A)
+        const updateResult = await tx.speakingUploadIntent.updateMany({
+          where: {
+            id: uploadIntentId,
+            status: 'FINALIZING',
+            finalizationToken: token,
+          },
+          data: {
+            status: 'FINALIZED',
+            finalizedAt: new Date(),
+            submissionId: newSub.id,
+          },
+        });
+
+        if (updateResult.count === 0) {
+          throw new ConflictException(
+            'Finalization token expired or superseded by another worker',
+          );
+        }
+
+        return newSub;
+      });
+    } catch (txError) {
+      // Recoverable transient failure: revert FINALIZING -> PENDING with token fencing if submission was not created
+      const current = await this.prisma.speakingUploadIntent.findUnique({
         where: { id: uploadIntentId },
       });
-      if (!currentIntent) {
-        throw new NotFoundException('Upload intent not found');
+      if (
+        current &&
+        current.status === 'FINALIZING' &&
+        current.finalizationToken === token &&
+        !current.submissionId
+      ) {
+        await this.prisma.speakingUploadIntent
+          .updateMany({
+            where: {
+              id: uploadIntentId,
+              status: 'FINALIZING',
+              finalizationToken: token,
+            },
+            data: {
+              status: 'PENDING',
+              finalizationStartedAt: null,
+              finalizationToken: null,
+            },
+          })
+          .catch(() => {});
       }
-
-      // If another concurrent request finalized it first, return the existing submission
-      if (currentIntent.status === 'FINALIZED' && currentIntent.submissionId) {
-        const sub = await tx.speakingSubmission.findUnique({
-          where: { id: currentIntent.submissionId },
-        });
-        if (sub) return sub;
-      }
-
-      if (currentIntent.status !== 'PENDING') {
-        throw new BadRequestException(
-          `Upload intent is no longer pending: ${currentIntent.status}`,
-        );
-      }
-
-      // Check daily quota
-      const submissionsToday = await tx.speakingSubmission.count({
-        where: { userId, submittedAt: { gte: startOfDay } },
-      });
-      if (submissionsToday >= DAILY_LIMIT) {
-        throw new BadRequestException(
-          `Bạn đã đạt giới hạn chấm điểm phát âm hôm nay (${DAILY_LIMIT} lần). Vui lòng quay lại vào ngày mai để luyện tập tiếp nhé!`,
-        );
-      }
-
-      const publicUrl = this.getStorage().getPublicUrl();
-      const audioUrl = publicUrl
-        ? `${publicUrl}/${currentIntent.objectKey}`
-        : currentIntent.objectKey;
-
-      // Create submission
-      const newSub = await tx.speakingSubmission.create({
-        data: {
-          exerciseId: currentIntent.exerciseId,
-          userId: currentIntent.userId,
-          status: 'PENDING',
-          audioKey: currentIntent.objectKey,
-          audioUrl,
-          audioMimeType: currentIntent.expectedContentType,
-          durationMs: currentIntent.expectedDurationMs,
-          idempotencyKey:
-            currentIntent.idempotencyKey || `intent-${currentIntent.id}`,
-          provider: 'azure',
-          scoreVersion: 'v1',
-        },
-      });
-
-      // Mark intent finalized and bind to submission
-      await tx.speakingUploadIntent.update({
-        where: { id: currentIntent.id },
-        data: {
-          status: 'FINALIZED',
-          finalizedAt: new Date(),
-          submissionId: newSub.id,
-        },
-      });
-
-      return newSub;
-    });
+      throw txError;
+    }
 
     if (!submission) {
       throw new InternalServerErrorException(
@@ -871,7 +1049,7 @@ export class SpeakingService {
       );
     }
 
-    // 7. Enqueue BullMQ job only AFTER transaction commits
+    // 8. Enqueue BullMQ job only AFTER transaction commits
     const pipelineMode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
     if (pipelineMode === 'bullmq' && this.speakingQueueService) {
       try {
@@ -891,7 +1069,7 @@ export class SpeakingService {
       this.speakingWorkerService?.triggerProcessing?.();
     }
 
-    // 8. Return HTTP 202 Accepted payload
+    // 9. Return HTTP 202 Accepted payload
     return {
       submissionId: submission.id,
       status: 'PENDING',

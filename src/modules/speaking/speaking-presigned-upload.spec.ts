@@ -2,13 +2,9 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { SpeakingService } from './speaking.service';
-import { PrismaService } from '../../prisma/prisma.service';
-import { AiService } from '../ai/ai.service';
-import { UploadService } from '../upload/upload.service';
-import { SpeakingWorkerService } from './speaking-worker.service';
-import { SpeakingQueueService } from './speaking-queue.service';
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto';
 
 describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
@@ -30,7 +26,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
   beforeEach(() => {
     mockPrisma = {
       $executeRaw: jest.fn().mockResolvedValue(1),
-      $transaction: jest.fn(async (cb) => cb(mockPrisma)),
+      $transaction: jest.fn((cb: (tx: typeof mockPrisma) => Promise<unknown>) =>
+        cb(mockPrisma),
+      ),
       speakingExercise: {
         findUnique: jest.fn().mockResolvedValue(mockExercise),
         findMany: jest.fn().mockResolvedValue([mockExercise]),
@@ -52,6 +50,7 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
         create: jest.fn().mockImplementation(({ data }) =>
           Promise.resolve({
             ...data,
@@ -64,6 +63,7 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
             ...data,
           }),
         ),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
 
@@ -73,9 +73,13 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
     };
 
     mockUploadService = {
-      getPresignedUploadUrl: jest.fn().mockImplementation((key, mime, exp) =>
-        Promise.resolve(`https://r2.storage.example/upload/${key}?signed=true`),
-      ),
+      getPresignedUploadUrl: jest
+        .fn()
+        .mockImplementation((key) =>
+          Promise.resolve(
+            `https://r2.storage.example/upload/${key}?signed=true`,
+          ),
+        ),
       headObject: jest.fn().mockResolvedValue({
         contentLength: 640000,
         contentType: 'audio/wav',
@@ -83,7 +87,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       }),
       deleteFile: jest.fn().mockResolvedValue(undefined),
       getPublicUrl: jest.fn().mockReturnValue('https://r2-public.example.com'),
-      getPresignedDownloadUrl: jest.fn().mockResolvedValue('https://signed-dl.example/audio'),
+      getPresignedDownloadUrl: jest
+        .fn()
+        .mockResolvedValue('https://signed-dl.example/audio'),
     };
 
     mockWorker = {
@@ -95,11 +101,11 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
     };
 
     service = new SpeakingService(
-      mockPrisma as unknown as PrismaService,
-      mockAiService as unknown as AiService,
-      mockUploadService as unknown as UploadService,
-      mockWorker as unknown as SpeakingWorkerService,
-      mockQueueService as unknown as SpeakingQueueService,
+      mockPrisma,
+      mockAiService,
+      mockUploadService,
+      mockWorker,
+      mockQueueService,
     );
   });
 
@@ -137,8 +143,10 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
 
       expect(result.uploadIntentId).toBeDefined();
       expect(result.uploadUrl).toContain('https://r2.storage.example/upload/');
-      expect(result.signedHeaders['Content-Type']).toBe('audio/wav');
-      expect(result.objectKey).toMatch(/^speaking\/pending\/10\/[0-9a-f-]+\.wav$/);
+      expect(result.signedHeaders!['Content-Type']).toBe('audio/wav');
+      expect(result.objectKey).toMatch(
+        /^speaking\/pending\/10\/[0-9a-f-]+\.wav$/,
+      );
       expect(result.maxSizeBytes).toBe(10485760);
       expect(result.isAlreadyFinalized).toBe(false);
 
@@ -157,7 +165,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
     });
 
     it('rejects invalid exercise with NotFoundException', async () => {
-      mockPrisma.speakingExercise.findUnique.mockResolvedValueOnce(null);
+      (
+        mockPrisma.speakingExercise.findUnique as jest.Mock
+      ).mockResolvedValueOnce(null);
 
       await expect(
         service.createUploadIntent(999, 10, validDto),
@@ -189,11 +199,13 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
     });
 
     it('enforces daily speaking quota before generating intent', async () => {
-      mockPrisma.speakingSubmission.count.mockResolvedValueOnce(10); // reached limit
+      (mockPrisma.speakingSubmission.count as jest.Mock).mockResolvedValueOnce(
+        10,
+      ); // reached limit
 
-      await expect(
-        service.createUploadIntent(1, 10, validDto),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createUploadIntent(1, 10, validDto)).rejects.toThrow(
+        BadRequestException,
+      );
       expect(mockUploadService.getPresignedUploadUrl).not.toHaveBeenCalled();
     });
 
@@ -209,7 +221,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
         status: 'PENDING',
         expiresAt: new Date(Date.now() + 300 * 1000), // still valid
       };
-      mockPrisma.speakingUploadIntent.findUnique.mockResolvedValueOnce(existingIntent);
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(existingIntent);
 
       const result = await service.createUploadIntent(1, 10, validDto);
 
@@ -235,7 +249,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
     };
 
     it('enforces ownership: rejects other user with ForbiddenException (IDOR defense)', async () => {
-      mockPrisma.speakingUploadIntent.findUnique.mockResolvedValueOnce(validPendingIntent);
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(validPendingIntent);
 
       await expect(
         service.finalizeUpload('intent-uuid-123', 99), // User 99 != 10
@@ -247,7 +263,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
         ...validPendingIntent,
         expiresAt: new Date(Date.now() - 1000), // expired in past
       };
-      mockPrisma.speakingUploadIntent.findUnique.mockResolvedValueOnce(expiredIntent);
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(expiredIntent);
 
       await expect(
         service.finalizeUpload('intent-uuid-123', 10),
@@ -255,8 +273,10 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
     });
 
     it('rejects if audio was not uploaded to R2 (headObject returns null)', async () => {
-      mockPrisma.speakingUploadIntent.findUnique.mockResolvedValueOnce(validPendingIntent);
-      mockUploadService.headObject.mockResolvedValueOnce(null);
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(validPendingIntent);
+      (mockUploadService.headObject as jest.Mock).mockResolvedValueOnce(null);
 
       await expect(
         service.finalizeUpload('intent-uuid-123', 10),
@@ -264,8 +284,10 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
     });
 
     it('rejects and purges if object size in R2 exceeds 10MB', async () => {
-      mockPrisma.speakingUploadIntent.findUnique.mockResolvedValueOnce(validPendingIntent);
-      mockUploadService.headObject.mockResolvedValueOnce({
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(validPendingIntent);
+      (mockUploadService.headObject as jest.Mock).mockResolvedValueOnce({
         contentLength: 12 * 1024 * 1024, // 12 MB
         contentType: 'audio/wav',
       });
@@ -277,17 +299,19 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       expect(mockUploadService.deleteFile).toHaveBeenCalledWith(
         'speaking/pending/10/intent-uuid-123.wav',
       );
-      expect(mockPrisma.speakingUploadIntent.update).toHaveBeenCalledWith(
+      expect(mockPrisma.speakingUploadIntent.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { status: 'INVALID' },
         }),
       );
     });
 
-    it('rejects if actual R2 size differs significantly from declared size', async () => {
-      mockPrisma.speakingUploadIntent.findUnique.mockResolvedValueOnce(validPendingIntent);
-      mockUploadService.headObject.mockResolvedValueOnce({
-        contentLength: 100000, // declared 640000
+    it('rejects if actual R2 size differs from declared size (exact size requirement)', async () => {
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(validPendingIntent);
+      (mockUploadService.headObject as jest.Mock).mockResolvedValueOnce({
+        contentLength: 640001, // 1 byte larger than 640000
         contentType: 'audio/wav',
       });
 
@@ -301,11 +325,15 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       try {
         process.env.SPEAKING_PIPELINE_MODE = 'bullmq';
 
-        mockPrisma.speakingUploadIntent.findUnique
-          .mockResolvedValueOnce(validPendingIntent) // initial load
-          .mockResolvedValueOnce(validPendingIntent); // inside tx
+        (
+          mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+        ).mockResolvedValueOnce(validPendingIntent);
 
-        const result = await service.finalizeUpload('intent-uuid-123', 10, 'trace-fin-1');
+        const result = await service.finalizeUpload(
+          'intent-uuid-123',
+          10,
+          'trace-fin-1',
+        );
 
         expect(result.submissionId).toBe(101);
         expect(result.status).toBe('PENDING');
@@ -324,8 +352,8 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
           }),
         );
 
-        // Verified intent updated to FINALIZED
-        expect(mockPrisma.speakingUploadIntent.update).toHaveBeenCalledWith(
+        // Verified intent updated to FINALIZED via updateMany with token fencing
+        expect(mockPrisma.speakingUploadIntent.updateMany).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
               status: 'FINALIZED',
@@ -335,7 +363,10 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
         );
 
         // Verified BullMQ job enqueued
-        expect(mockQueueService.enqueueSubmission).toHaveBeenCalledWith(101, 'trace-fin-1');
+        expect(mockQueueService.enqueueSubmission).toHaveBeenCalledWith(
+          101,
+          'trace-fin-1',
+        );
       } finally {
         process.env.SPEAKING_PIPELINE_MODE = origMode;
       }
@@ -352,7 +383,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
           submittedAt: new Date('2026-09-30T10:00:00.000Z'),
         },
       };
-      mockPrisma.speakingUploadIntent.findUnique.mockResolvedValueOnce(finalizedIntent);
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(finalizedIntent);
 
       const result = await service.finalizeUpload('intent-uuid-123', 10);
 
@@ -366,13 +399,19 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       const origMode = process.env.SPEAKING_PIPELINE_MODE;
       try {
         process.env.SPEAKING_PIPELINE_MODE = 'bullmq';
-        mockPrisma.speakingUploadIntent.findUnique
-          .mockResolvedValueOnce(validPendingIntent)
-          .mockResolvedValueOnce(validPendingIntent);
+        (
+          mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+        ).mockResolvedValueOnce(validPendingIntent);
 
-        mockQueueService.enqueueSubmission.mockRejectedValueOnce(new Error('Redis connection failed'));
+        (mockQueueService.enqueueSubmission as jest.Mock).mockRejectedValueOnce(
+          new Error('Redis connection failed'),
+        );
 
-        const result = await service.finalizeUpload('intent-uuid-123', 10, 'trace-err');
+        const result = await service.finalizeUpload(
+          'intent-uuid-123',
+          10,
+          'trace-err',
+        );
 
         expect(result.submissionId).toBe(101);
         expect(result.status).toBe('PENDING');
@@ -380,6 +419,47 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       } finally {
         process.env.SPEAKING_PIPELINE_MODE = origMode;
       }
+    });
+
+    it('rejects reusing the same idempotency key with conflicting metadata (ConflictException)', async () => {
+      const existingIntent = {
+        id: 'existing-id',
+        exerciseId: 1,
+        expectedContentType: 'audio/wav',
+        expectedSizeBytes: 640000,
+        expectedDurationMs: 20000,
+        status: 'PENDING',
+        expiresAt: new Date(Date.now() + 300000),
+      };
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(existingIntent);
+
+      const conflictingDto = {
+        contentType: 'audio/wav',
+        sizeBytes: 800000, // Different size!
+        durationMs: 25000,
+        idempotencyKey: 'idemp-intent-001',
+      };
+
+      await expect(
+        service.createUploadIntent(1, 10, conflictingDto),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('enforces active intent limits: rejects if user has >= 3 unexpired active intents', async () => {
+      (
+        mockPrisma.speakingUploadIntent.count as jest.Mock
+      ).mockResolvedValueOnce(3);
+
+      await expect(
+        service.createUploadIntent(1, 10, {
+          contentType: 'audio/wav',
+          sizeBytes: 640000,
+          durationMs: 20000,
+          idempotencyKey: 'new-idemp-key',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

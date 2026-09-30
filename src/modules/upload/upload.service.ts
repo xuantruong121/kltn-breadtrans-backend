@@ -106,7 +106,7 @@ export class UploadService {
   async getPresignedUploadUrl(
     key: string,
     mimeType: string,
-    expiresIn = 900,
+    expiresIn = 600,
   ): Promise<string> {
     return this.r2.getPresignedUploadUrl(key, mimeType, expiresIn);
   }
