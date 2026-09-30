@@ -55,11 +55,14 @@ export class MockSpeakingEvaluator {
             'abort',
             () => {
               clearTimeout(timer);
-              const err: any = new Error(
-                'MOCK_EVALUATOR_ABORTED: Request was aborted during delay',
+              reject(
+                Object.assign(
+                  new Error(
+                    'MOCK_EVALUATOR_ABORTED: Request was aborted during delay',
+                  ),
+                  { code: 'PROVIDER_TIMEOUT' },
+                ),
               );
-              err.code = 'PROVIDER_TIMEOUT';
-              reject(err);
             },
             { once: true },
           );

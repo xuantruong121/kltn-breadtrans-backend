@@ -3,8 +3,6 @@ import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { SpeakingQueueService } from './speaking-queue.service';
 import {
-  SPEAKING_QUEUE_NAME,
-  SPEAKING_JOB_NAME,
   SpeakingJobPayload,
   getSpeakingJobId,
 } from './speaking.constants';
@@ -106,9 +104,9 @@ describe('SpeakingQueueService (Real BullMQ/Redis Integration)', () => {
 
     const worker = new Worker<SpeakingJobPayload>(
       testQueueName,
-      async (job: Job<SpeakingJobPayload>) => {
+      (job: Job<SpeakingJobPayload>) => {
         processedPayload = job.data;
-        return { status: 'OK' };
+        return Promise.resolve({ status: 'OK' });
       },
       { connection: redisConnection },
     );

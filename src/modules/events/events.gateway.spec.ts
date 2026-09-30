@@ -5,7 +5,6 @@ import { io, Socket as ClientSocket } from 'socket.io-client';
 import { EventsGateway } from './events.gateway';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SupportService } from '../support/support.service';
-import { getJwtSecret } from '../auth/auth.constants';
 
 describe('EventsGateway Socket.IO Room Authentication & Isolation', () => {
   let app: INestApplication;
@@ -72,9 +71,10 @@ describe('EventsGateway Socket.IO Room Authentication & Isolation', () => {
     gateway = moduleFixture.get<EventsGateway>(EventsGateway);
     jwtService = moduleFixture.get<JwtService>(JwtService);
 
-    const httpServer = app.getHttpServer();
+    const httpServer = app.getHttpServer() as import('node:http').Server;
     const address = httpServer.address();
-    serverPort = typeof address === 'string' ? 0 : address.port;
+    serverPort =
+      typeof address === 'object' && address !== null ? address.port : 0;
   });
 
   afterAll(async () => {

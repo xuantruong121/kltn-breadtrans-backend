@@ -22,6 +22,7 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
 import { getSpeakingPipelineMode } from './speaking.constants';
+import type { SpeakingSubmission } from '@prisma/client';
 
 export interface SubmitSpeakingResponse {
   submissionId: number;
@@ -955,7 +956,7 @@ export class SpeakingService {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    let submission: any;
+    let submission: SpeakingSubmission | null;
     try {
       submission = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`
@@ -1069,7 +1070,7 @@ export class SpeakingService {
         );
       }
     } else {
-      this.speakingWorkerService?.triggerProcessing?.();
+      this.speakingWorkerService.triggerProcessing();
     }
 
     // 9. Return HTTP 202 Accepted payload
