@@ -27,8 +27,8 @@ describe('R2CleanupService - Phase 2 Orphan Upload Intent Cleanup', () => {
     };
 
     service = new R2CleanupService(
-      mockPrisma as unknown as PrismaService,
-      mockR2Service as unknown as R2Service,
+      mockPrisma as PrismaService,
+      mockR2Service as R2Service,
     );
   });
 
@@ -48,10 +48,12 @@ describe('R2CleanupService - Phase 2 Orphan Upload Intent Cleanup', () => {
       },
     ];
 
-    mockPrisma.speakingUploadIntent.findMany.mockImplementation((args: any) => {
-      if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
-      return Promise.resolve(expiredIntents);
-    });
+    (mockPrisma.speakingUploadIntent.findMany as jest.Mock).mockImplementation(
+      (args: { where?: { status?: string } }) => {
+        if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
+        return Promise.resolve(expiredIntents);
+      },
+    );
 
     const counts = await service.cleanupOrphanUploadIntents();
 
@@ -60,8 +62,12 @@ describe('R2CleanupService - Phase 2 Orphan Upload Intent Cleanup', () => {
     expect(counts.recordsExpired).toBe(1); // intent-1 is PENDING -> EXPIRED; intent-2 was already INVALID
     expect(counts.failures).toBe(0);
 
-    expect(mockR2Service.deleteFile).toHaveBeenCalledWith('speaking/pending/10/intent-1.wav');
-    expect(mockR2Service.deleteFile).toHaveBeenCalledWith('speaking/pending/11/intent-2.wav');
+    expect(mockR2Service.deleteFile).toHaveBeenCalledWith(
+      'speaking/pending/10/intent-1.wav',
+    );
+    expect(mockR2Service.deleteFile).toHaveBeenCalledWith(
+      'speaking/pending/11/intent-2.wav',
+    );
     expect(mockPrisma.speakingUploadIntent.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ id: 'intent-1', status: 'PENDING' }),
@@ -80,10 +86,12 @@ describe('R2CleanupService - Phase 2 Orphan Upload Intent Cleanup', () => {
       },
     ];
 
-    mockPrisma.speakingUploadIntent.findMany.mockImplementation((args: any) => {
-      if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
-      return Promise.resolve(intentWithSubmission);
-    });
+    (mockPrisma.speakingUploadIntent.findMany as jest.Mock).mockImplementation(
+      (args: { where?: { status?: string } }) => {
+        if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
+        return Promise.resolve(intentWithSubmission);
+      },
+    );
 
     const counts = await service.cleanupOrphanUploadIntents();
 
@@ -102,12 +110,16 @@ describe('R2CleanupService - Phase 2 Orphan Upload Intent Cleanup', () => {
       },
     ];
 
-    mockPrisma.speakingUploadIntent.findMany.mockImplementation((args: any) => {
-      if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
-      return Promise.resolve(unlinkedIntent);
-    });
+    (mockPrisma.speakingUploadIntent.findMany as jest.Mock).mockImplementation(
+      (args: { where?: { status?: string } }) => {
+        if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
+        return Promise.resolve(unlinkedIntent);
+      },
+    );
     // SpeakingSubmission exists with that audioKey!
-    mockPrisma.speakingSubmission.findFirst.mockResolvedValueOnce({ id: 555 });
+    (
+      mockPrisma.speakingSubmission.findFirst as jest.Mock
+    ).mockResolvedValueOnce({ id: 555 });
 
     const counts = await service.cleanupOrphanUploadIntents();
 
@@ -133,11 +145,13 @@ describe('R2CleanupService - Phase 2 Orphan Upload Intent Cleanup', () => {
       },
     ];
 
-    mockPrisma.speakingUploadIntent.findMany.mockImplementation((args: any) => {
-      if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
-      return Promise.resolve(missingObjectIntent);
-    });
-    mockR2Service.objectExists.mockResolvedValueOnce(false); // never uploaded
+    (mockPrisma.speakingUploadIntent.findMany as jest.Mock).mockImplementation(
+      (args: { where?: { status?: string } }) => {
+        if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
+        return Promise.resolve(missingObjectIntent);
+      },
+    );
+    (mockR2Service.objectExists as jest.Mock).mockResolvedValueOnce(false); // never uploaded
 
     const counts = await service.cleanupOrphanUploadIntents();
 
@@ -163,11 +177,13 @@ describe('R2CleanupService - Phase 2 Orphan Upload Intent Cleanup', () => {
       },
     ];
 
-    mockPrisma.speakingUploadIntent.findMany.mockImplementation((args: any) => {
-      if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
-      return Promise.resolve(batch);
-    });
-    mockR2Service.objectExists
+    (mockPrisma.speakingUploadIntent.findMany as jest.Mock).mockImplementation(
+      (args: { where?: { status?: string } }) => {
+        if (args?.where?.status === 'FINALIZING') return Promise.resolve([]);
+        return Promise.resolve(batch);
+      },
+    );
+    (mockR2Service.objectExists as jest.Mock)
       .mockRejectedValueOnce(new Error('S3 500 Network error'))
       .mockResolvedValueOnce(true);
 
@@ -199,10 +215,13 @@ describe('R2CleanupService - Phase 2 Orphan Upload Intent Cleanup', () => {
       },
     ];
 
-    mockPrisma.speakingUploadIntent.findMany.mockImplementation((args: any) => {
-      if (args?.where?.status === 'FINALIZING') return Promise.resolve(staleIntents);
-      return Promise.resolve([]);
-    });
+    (mockPrisma.speakingUploadIntent.findMany as jest.Mock).mockImplementation(
+      (args: { where?: { status?: string } }) => {
+        if (args?.where?.status === 'FINALIZING')
+          return Promise.resolve(staleIntents);
+        return Promise.resolve([]);
+      },
+    );
 
     const counts = await service.cleanupOrphanUploadIntents();
 

@@ -314,10 +314,14 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
         contentLength: 12 * 1024 * 1024,
         contentType: 'audio/wav',
       });
-      (mockPrisma.speakingUploadIntent.updateMany as jest.Mock).mockResolvedValueOnce({
+      (
+        mockPrisma.speakingUploadIntent.updateMany as jest.Mock
+      ).mockResolvedValueOnce({
         count: 1,
       }); // claim
-      (mockPrisma.speakingUploadIntent.updateMany as jest.Mock).mockResolvedValueOnce({
+      (
+        mockPrisma.speakingUploadIntent.updateMany as jest.Mock
+      ).mockResolvedValueOnce({
         count: 0,
       }); // stale invalidation token
 
@@ -450,9 +454,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
         finalizationToken: 'token-b',
         submissionId: null,
       };
-      (
-        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
-      ).mockResolvedValueOnce(validPendingIntent).mockResolvedValueOnce(tokenBIntent);
+      (mockPrisma.speakingUploadIntent.findUnique as jest.Mock)
+        .mockResolvedValueOnce(validPendingIntent)
+        .mockResolvedValueOnce(tokenBIntent);
       (mockPrisma.$transaction as jest.Mock).mockRejectedValueOnce(
         new Error('temporary database outage'),
       );
@@ -461,7 +465,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
         service.finalizeUpload('intent-uuid-123', 10),
       ).rejects.toThrow('temporary database outage');
 
-      expect(mockPrisma.speakingUploadIntent.updateMany).not.toHaveBeenCalledWith(
+      expect(
+        mockPrisma.speakingUploadIntent.updateMany,
+      ).not.toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ status: 'PENDING' }),
         }),
@@ -472,10 +478,14 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       (
         mockPrisma.speakingUploadIntent.findUnique as jest.Mock
       ).mockResolvedValueOnce(validPendingIntent);
-      (mockPrisma.speakingUploadIntent.updateMany as jest.Mock).mockResolvedValueOnce({
+      (
+        mockPrisma.speakingUploadIntent.updateMany as jest.Mock
+      ).mockResolvedValueOnce({
         count: 1,
       }); // claim
-      (mockPrisma.speakingUploadIntent.updateMany as jest.Mock).mockResolvedValueOnce({
+      (
+        mockPrisma.speakingUploadIntent.updateMany as jest.Mock
+      ).mockResolvedValueOnce({
         count: 0,
       }); // token B owns the intent inside the transaction
 
@@ -484,7 +494,9 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       ).rejects.toThrow(ConflictException);
 
       expect(mockQueueService.enqueueSubmission).not.toHaveBeenCalled();
-      expect(mockPrisma.speakingUploadIntent.updateMany).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.speakingUploadIntent.updateMany).toHaveBeenCalledTimes(
+        2,
+      );
     });
 
     it('rejects reusing the same idempotency key with conflicting metadata (ConflictException)', async () => {
