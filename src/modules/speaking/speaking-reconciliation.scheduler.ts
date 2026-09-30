@@ -7,6 +7,7 @@ import {
   getSpeakingJobId,
   getLeaseTimeoutMs,
   getSpeakingWorkerConfig,
+  getSpeakingPipelineMode,
 } from './speaking.constants';
 
 const STALE_PENDING_MS = 15 * 1000; // 15 seconds
@@ -34,7 +35,7 @@ export class SpeakingReconciliationScheduler {
    */
   @Interval(30000)
   async reconcilePendingSubmissions(): Promise<void> {
-    const mode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
+    const mode = getSpeakingPipelineMode();
     if (mode !== 'bullmq') {
       return; // Do not run reconciliation in legacy mode
     }

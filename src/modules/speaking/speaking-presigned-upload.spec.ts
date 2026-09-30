@@ -306,6 +306,28 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       );
     });
 
+    it('does not delete an invalid object when the finalization token is stale', async () => {
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(validPendingIntent);
+      (mockUploadService.headObject as jest.Mock).mockResolvedValueOnce({
+        contentLength: 12 * 1024 * 1024,
+        contentType: 'audio/wav',
+      });
+      (mockPrisma.speakingUploadIntent.updateMany as jest.Mock).mockResolvedValueOnce({
+        count: 1,
+      }); // claim
+      (mockPrisma.speakingUploadIntent.updateMany as jest.Mock).mockResolvedValueOnce({
+        count: 0,
+      }); // stale invalidation token
+
+      await expect(
+        service.finalizeUpload('intent-uuid-123', 10),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockUploadService.deleteFile).not.toHaveBeenCalled();
+    });
+
     it('rejects if actual R2 size differs from declared size (exact size requirement)', async () => {
       (
         mockPrisma.speakingUploadIntent.findUnique as jest.Mock
@@ -419,6 +441,50 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       } finally {
         process.env.SPEAKING_PIPELINE_MODE = origMode;
       }
+    });
+
+    it('does not roll a stale FINALIZING token back to PENDING after a transient transaction failure', async () => {
+      const tokenBIntent = {
+        ...validPendingIntent,
+        status: 'FINALIZING',
+        finalizationToken: 'token-b',
+        submissionId: null,
+      };
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(validPendingIntent).mockResolvedValueOnce(tokenBIntent);
+      (mockPrisma.$transaction as jest.Mock).mockRejectedValueOnce(
+        new Error('temporary database outage'),
+      );
+
+      await expect(
+        service.finalizeUpload('intent-uuid-123', 10),
+      ).rejects.toThrow('temporary database outage');
+
+      expect(mockPrisma.speakingUploadIntent.updateMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'PENDING' }),
+        }),
+      );
+    });
+
+    it('does not enqueue or persist a submission when the finalization token is superseded during the transaction', async () => {
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(validPendingIntent);
+      (mockPrisma.speakingUploadIntent.updateMany as jest.Mock).mockResolvedValueOnce({
+        count: 1,
+      }); // claim
+      (mockPrisma.speakingUploadIntent.updateMany as jest.Mock).mockResolvedValueOnce({
+        count: 0,
+      }); // token B owns the intent inside the transaction
+
+      await expect(
+        service.finalizeUpload('intent-uuid-123', 10),
+      ).rejects.toThrow(ConflictException);
+
+      expect(mockQueueService.enqueueSubmission).not.toHaveBeenCalled();
+      expect(mockPrisma.speakingUploadIntent.updateMany).toHaveBeenCalledTimes(2);
     });
 
     it('rejects reusing the same idempotency key with conflicting metadata (ConflictException)', async () => {

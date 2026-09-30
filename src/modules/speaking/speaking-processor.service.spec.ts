@@ -256,6 +256,45 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
     );
   });
 
+  it('4b. Missing storage object is terminal and publishes one failure event', async () => {
+    mockPrisma.speakingSubmission.findUnique.mockResolvedValueOnce({
+      id: 107,
+      userId: 5,
+      status: 'PENDING',
+      submittedAt: new Date(),
+      attemptCount: 0,
+      audioKey: 'speaking/pending/5/missing.wav',
+      exercise: { targetText: 'Missing audio' },
+    });
+    const missing = Object.assign(
+      new Error('The specified key does not exist.'),
+      { name: 'NoSuchKey' },
+    );
+    mockUploadService.downloadFileBuffer.mockRejectedValueOnce(missing);
+
+    await expect(
+      service.processJob({ submissionId: 107, traceId: 'trace-missing' }),
+    ).rejects.toThrow(UnrecoverableError);
+
+    expect(mockPrisma.speakingSubmission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 107,
+          status: 'PROCESSING',
+          workerId: expect.stringMatching(/^worker-/),
+        }),
+        data: expect.objectContaining({
+          status: 'FAILED',
+          lastErrorCode: 'AUDIO_OBJECT_NOT_FOUND',
+        }),
+      }),
+    );
+    expect(publishSpy).toHaveBeenCalledWith(
+      SPEAKING_EVENTS_CHANNEL,
+      expect.stringContaining(SPEAKING_FAILED_EVENT),
+    );
+  });
+
   it('5. Permanent error: Throws BullMQ UnrecoverableError and marks FAILED for corrupted audio bytes', async () => {
     mockPrisma.speakingSubmission.findUnique.mockResolvedValueOnce({
       id: 104,

@@ -16,6 +16,7 @@ import {
   SpeakingEventPayload,
   getSpeakingWorkerConfig,
   getLeaseTimeoutMs,
+  isMissingStorageError,
 } from './speaking.constants';
 
 const MAX_ATTEMPTS = 4;
@@ -218,36 +219,9 @@ export class SpeakingProcessorService implements OnModuleDestroy {
           );
         }
       } else {
-        try {
-          audioBuffer = await this.uploadService.downloadFileBuffer(
-            existing.audioKey,
-          );
-        } catch (downloadErr: any) {
-          if (MockSpeakingEvaluator.isMockEnabled()) {
-            this.logger.warn(
-              `Storage download failed in mock mode, falling back to synthetic audio: ${downloadErr.message}`,
-            );
-            const sampleCount = 16000;
-            audioBuffer = Buffer.alloc(44 + sampleCount * 2);
-            audioBuffer.write('RIFF', 0);
-            audioBuffer.writeUInt32LE(36 + sampleCount * 2, 4);
-            audioBuffer.write('WAVEfmt ', 8);
-            audioBuffer.writeUInt32LE(16, 16);
-            audioBuffer.writeUInt16LE(1, 20);
-            audioBuffer.writeUInt16LE(1, 22);
-            audioBuffer.writeUInt32LE(16000, 24);
-            audioBuffer.writeUInt32LE(32000, 28);
-            audioBuffer.writeUInt16LE(2, 32);
-            audioBuffer.writeUInt16LE(16, 34);
-            audioBuffer.write('data', 36);
-            audioBuffer.writeUInt32LE(sampleCount * 2, 40);
-            for (let i = 44; i < audioBuffer.length; i += 2) {
-              audioBuffer.writeInt16LE(Math.round(Math.sin(i / 10) * 10000), i);
-            }
-          } else {
-            throw downloadErr;
-          }
-        }
+        audioBuffer = await this.uploadService.downloadFileBuffer(
+          existing.audioKey,
+        );
       }
       tDownloadMs = Date.now() - tDownloadStart;
     } catch (storageErr: any) {
@@ -255,6 +229,32 @@ export class SpeakingProcessorService implements OnModuleDestroy {
       this.logger.error(
         `[SpeakingProcessor] Failed to download audio for submission #${submissionId}: ${storageErr.message} (traceId=${traceId})`,
       );
+      if (isMissingStorageError(storageErr)) {
+        const failed = await this.prisma.speakingSubmission.updateMany({
+          where: {
+            id: submissionId,
+            status: 'PROCESSING',
+            workerId: workerToken,
+          },
+          data: {
+            status: 'FAILED',
+            overallScore: null,
+            lastErrorCode: 'AUDIO_OBJECT_NOT_FOUND',
+            lastErrorMessage: 'Audio object is not available in storage',
+            processedAt: new Date(),
+            nextAttemptAt: null,
+          },
+        });
+        if (failed.count === 1) {
+          await this.publishEvent({
+            type: SPEAKING_FAILED_EVENT,
+            userId: existing.userId,
+            submissionId,
+            traceId,
+          });
+        }
+        throw new UnrecoverableError('AUDIO_OBJECT_NOT_FOUND');
+      }
       await this.handleTransientFailure(
         existing.userId,
         submissionId,

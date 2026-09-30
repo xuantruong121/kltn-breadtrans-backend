@@ -12,6 +12,7 @@ import {
   SpeakingJobPayload,
   getSpeakingWorkerConfig,
   getLeaseTimeoutMs,
+  getSpeakingPipelineMode,
 } from '../modules/speaking/speaking.constants';
 import { SpeakingProcessorService } from '../modules/speaking/speaking-processor.service';
 
@@ -30,6 +31,11 @@ export class SpeakingWorkerRunnerService
   constructor(private readonly processorService: SpeakingProcessorService) {}
 
   onModuleInit(): void {
+    if (getSpeakingPipelineMode() !== 'bullmq') {
+      throw new Error(
+        'Standalone speaking worker requires SPEAKING_PIPELINE_MODE=bullmq',
+      );
+    }
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     this.connection = new IORedis(redisUrl, {
       maxRetriesPerRequest: null,

@@ -4,9 +4,15 @@ dotenv.config();
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { SpeakingWorkerModule } from './speaking-worker.module';
+import { getSpeakingPipelineMode } from '../modules/speaking/speaking.constants';
 
 async function bootstrap() {
   const logger = new Logger('SpeakingWorkerMain');
+  if (getSpeakingPipelineMode() !== 'bullmq') {
+    throw new Error(
+      'Standalone speaking worker requires SPEAKING_PIPELINE_MODE=bullmq',
+    );
+  }
   logger.log('Starting standalone BreadTrans Speaking Worker...');
 
   const app = await NestFactory.createApplicationContext(SpeakingWorkerModule, {

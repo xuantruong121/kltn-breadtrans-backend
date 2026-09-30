@@ -21,6 +21,7 @@ import { SpeakingQueueService } from './speaking-queue.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
+import { getSpeakingPipelineMode } from './speaking.constants';
 
 export interface SubmitSpeakingResponse {
   submissionId: number;
@@ -481,7 +482,7 @@ export class SpeakingService {
     }
 
     // 8. Pipeline dispatch: BullMQ queue vs legacy DB-polling fallback
-    const pipelineMode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
+    const pipelineMode = getSpeakingPipelineMode();
     if (pipelineMode === 'bullmq' && this.speakingQueueService) {
       try {
         await this.speakingQueueService.enqueueSubmission(
@@ -910,8 +911,7 @@ export class SpeakingService {
     }
 
     if (head.contentLength <= 0 || head.contentLength > 10 * 1024 * 1024) {
-      await this.getStorage().deleteFile(intent.objectKey).catch(() => {});
-      await this.prisma.speakingUploadIntent
+      const invalidation = await this.prisma.speakingUploadIntent
         .updateMany({
           where: {
             id: uploadIntentId,
@@ -919,8 +919,10 @@ export class SpeakingService {
             finalizationToken: token,
           },
           data: { status: 'INVALID' },
-        })
-        .catch(() => {});
+        });
+      if (invalidation.count === 1) {
+        await this.getStorage().deleteFile(intent.objectKey).catch(() => {});
+      }
       throw new BadRequestException(
         'Uploaded audio size is invalid or exceeds 10MB limit.',
       );
@@ -931,8 +933,7 @@ export class SpeakingService {
       this.logger.warn(
         `Exact size mismatch for intent ${intent.id}: expected ${intent.expectedSizeBytes} bytes, R2 has ${head.contentLength} bytes`,
       );
-      await this.getStorage().deleteFile(intent.objectKey).catch(() => {});
-      await this.prisma.speakingUploadIntent
+      const invalidation = await this.prisma.speakingUploadIntent
         .updateMany({
           where: {
             id: uploadIntentId,
@@ -940,8 +941,10 @@ export class SpeakingService {
             finalizationToken: token,
           },
           data: { status: 'INVALID' },
-        })
-        .catch(() => {});
+        });
+      if (invalidation.count === 1) {
+        await this.getStorage().deleteFile(intent.objectKey).catch(() => {});
+      }
       throw new BadRequestException(
         `Uploaded audio size (${head.contentLength} bytes) does not match declared size (${intent.expectedSizeBytes} bytes).`,
       );
@@ -1050,7 +1053,7 @@ export class SpeakingService {
     }
 
     // 8. Enqueue BullMQ job only AFTER transaction commits
-    const pipelineMode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
+    const pipelineMode = getSpeakingPipelineMode();
     if (pipelineMode === 'bullmq' && this.speakingQueueService) {
       try {
         await this.speakingQueueService.enqueueSubmission(

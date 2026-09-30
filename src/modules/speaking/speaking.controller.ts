@@ -198,6 +198,18 @@ export class SpeakingController {
     );
   }
 
+  @Get('submissions/my')
+  @ApiOperation({ summary: 'Xem lịch sử bài luyện phát âm của tôi' })
+  getMySubmissions(@Request() req: any) {
+    return this.speakingService.getMySubmissions(req.user.id);
+  }
+
+  @Get('my-submissions')
+  @ApiOperation({ summary: 'Compatibility: xem lịch sử bài luyện phát âm' })
+  getMySubmissionsLegacy(@Request() req: any) {
+    return this.speakingService.getMySubmissions(req.user.id);
+  }
+
   @Get('submissions/:submissionId')
   @ApiOperation({
     summary: 'Tra cứu trạng thái và kết quả bài nộp phát âm',
@@ -220,13 +232,6 @@ export class SpeakingController {
     @Request() req: any,
   ) {
     return this.speakingService.getAudioSignedUrl(submissionId, req.user);
-  }
-
-  @Get('submissions/my')
-  @Get('my-submissions')
-  @ApiOperation({ summary: 'Xem lịch sử bài luyện phát âm của tôi' })
-  getMySubmissions(@Request() req: any) {
-    return this.speakingService.getMySubmissions(req.user.id);
   }
 
   @Post('tts')

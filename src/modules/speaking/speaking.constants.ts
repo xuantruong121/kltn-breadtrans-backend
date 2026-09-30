@@ -5,6 +5,38 @@ export const SPEAKING_EVENTS_CHANNEL = 'breadtrans:speaking:events';
 export const SPEAKING_COMPLETED_EVENT = 'speaking.completed';
 export const SPEAKING_FAILED_EVENT = 'speaking.failed';
 
+export type SpeakingPipelineMode = 'bullmq' | 'legacy';
+
+export function getSpeakingPipelineMode(): SpeakingPipelineMode {
+  const mode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
+  if (mode !== 'bullmq' && mode !== 'legacy') {
+    throw new Error(
+      `Invalid SPEAKING_PIPELINE_MODE "${mode}". Expected "bullmq" or "legacy".`,
+    );
+  }
+  return mode;
+}
+
+export function isMissingStorageError(error: unknown): boolean {
+  const candidate = error as {
+    name?: string;
+    code?: string | number;
+    $metadata?: { httpStatusCode?: number };
+    message?: string;
+  };
+  return (
+    candidate?.name === 'NoSuchKey' ||
+    candidate?.name === 'NotFound' ||
+    candidate?.code === 'NoSuchKey' ||
+    candidate?.code === 'NotFound' ||
+    candidate?.code === 404 ||
+    candidate?.$metadata?.httpStatusCode === 404 ||
+    /specified key does not exist|no such key|not found/i.test(
+      candidate?.message || '',
+    )
+  );
+}
+
 export interface SpeakingJobPayload {
   submissionId: number;
   traceId: string;

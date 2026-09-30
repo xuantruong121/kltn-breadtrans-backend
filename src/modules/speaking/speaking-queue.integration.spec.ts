@@ -134,7 +134,9 @@ describe('SpeakingQueueService (Real BullMQ/Redis Integration)', () => {
     await worker.close();
 
     expect(processedPayload).not.toBeNull();
-    expect(processedPayload?.submissionId).toBe(submissionId);
+    expect(processedPayload).toEqual(
+      expect.objectContaining({ submissionId }),
+    );
 
     const completedJob = await testQueue.getJob(jobId);
     expect(completedJob).not.toBeNull();

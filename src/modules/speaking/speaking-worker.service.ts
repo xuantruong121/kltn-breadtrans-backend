@@ -1,10 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { UploadService } from '../upload/upload.service';
 import { validateSpeakingAudio } from './speaking-audio-validator';
+import {
+  isMissingStorageError,
+  SPEAKING_FAILED_EVENT,
+  getSpeakingPipelineMode,
+} from './speaking.constants';
 
 const MAX_ATTEMPTS = 4;
 const RETRY_BACKOFF_MS = [
@@ -16,9 +21,19 @@ const RETRY_BACKOFF_MS = [
 const LEASE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 @Injectable()
-export class SpeakingWorkerService {
+export class SpeakingWorkerService implements OnModuleInit {
   private readonly logger = new Logger(SpeakingWorkerService.name);
   private isProcessing = false;
+
+  onModuleInit(): void {
+    const mode = getSpeakingPipelineMode();
+    this.logger.log(`Speaking pipeline mode: ${mode}`);
+    this.logger.log(
+      mode === 'bullmq'
+        ? 'Legacy speaking DB poller: disabled; standalone speaking worker expected'
+        : 'Legacy speaking DB poller: enabled; standalone speaking worker must remain stopped',
+    );
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -34,7 +49,7 @@ export class SpeakingWorkerService {
    */
   @Interval(3000)
   async pollAndProcess(): Promise<void> {
-    const pipelineMode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
+    const pipelineMode = getSpeakingPipelineMode();
     if (pipelineMode === 'bullmq') {
       return; // Do not run legacy DB polling loop when BullMQ mode is active
     }
@@ -58,7 +73,7 @@ export class SpeakingWorkerService {
    * Triggered immediately when a submission is created to process without delay in legacy mode.
    */
   triggerProcessing(): void {
-    const pipelineMode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
+    const pipelineMode = getSpeakingPipelineMode();
     if (pipelineMode === 'bullmq') {
       return; // In BullMQ mode, enqueuing handles dispatching
     }
@@ -186,6 +201,25 @@ export class SpeakingWorkerService {
       this.logger.error(
         `Failed to download audio for submission #${submissionId}: ${storageErr.message}`,
       );
+      if (isMissingStorageError(storageErr)) {
+        await this.prisma.speakingSubmission.updateMany({
+          where: { id: submissionId, status: { in: ['PENDING', 'PROCESSING'] } },
+          data: {
+            status: 'FAILED',
+            overallScore: null,
+            lastErrorCode: 'AUDIO_OBJECT_NOT_FOUND',
+            lastErrorMessage: 'Audio object is not available in storage',
+            processedAt: new Date(),
+            nextAttemptAt: null,
+          },
+        });
+        this.eventEmitter.emit(SPEAKING_FAILED_EVENT, {
+          submissionId,
+          userId: submission.userId,
+          exerciseId: submission.exerciseId,
+        });
+        return;
+      }
       await this.handleTransientFailure(
         submissionId,
         submission.attemptCount,
