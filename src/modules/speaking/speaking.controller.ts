@@ -31,6 +31,7 @@ import {
 } from '@nestjs/swagger';
 import { SpeakingService } from './speaking.service';
 import { CreateExerciseDto } from './dto/create-exercise.dto';
+import { CreateUploadIntentDto } from './dto/create-upload-intent.dto';
 import { TtsRequestDto } from './dto/tts-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -74,13 +75,73 @@ export class SpeakingController {
     return this.speakingService.findExerciseById(id);
   }
 
+  @Get('capabilities')
+  @ApiOperation({
+    summary: 'Lấy cấu hình năng lực upload audio phát âm (Phase 2 Direct R2 / Legacy Proxy)',
+  })
+  getCapabilities() {
+    return this.speakingService.getCapabilities();
+  }
+
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  @Post('exercises/:id/upload-intents')
+  @ApiOperation({
+    summary:
+      'Phase 2: Khởi tạo upload intent cho client tải audio trực tiếp lên R2',
+    description:
+      'Backend kiểm tra quyền hạn, quota và tạo presigned PUT URL ngắn hạn (10 phút) có gắn định danh đối tượng máy chủ quy định.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Upload intent được tạo thành công cùng presigned PUT URL',
+  })
+  createUploadIntent(
+    @Param('id', ParseIntPipe) exerciseId: number,
+    @Request() req: any,
+    @Body() dto: CreateUploadIntentDto,
+    @Headers('x-trace-id') traceIdHeader?: string,
+  ) {
+    return this.speakingService.createUploadIntent(
+      exerciseId,
+      req.user.id,
+      dto,
+      traceIdHeader,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  @Post('upload-intents/:uploadIntentId/finalize')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary:
+      'Phase 2: Xác nhận hoàn tất upload trực tiếp lên R2 & Enqueue chấm điểm',
+    description:
+      'Backend xác thực tồn tại và dung lượng file trên R2 qua HEAD request, lưu bản ghi bài nộp và đẩy job vào BullMQ.',
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Bài nộp được xác nhận thành công và chuyển vào hàng đợi chấm điểm',
+  })
+  finalizeUpload(
+    @Param('uploadIntentId') uploadIntentId: string,
+    @Request() req: any,
+    @Headers('x-trace-id') traceIdHeader?: string,
+  ) {
+    return this.speakingService.finalizeUpload(
+      uploadIntentId,
+      req.user.id,
+      traceIdHeader,
+    );
+  }
+
   @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @Post('exercises/:id/submit')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'Nộp audio để AI chấm phát âm (Bất đồng bộ - Durable Queue)',
+    summary:
+      '[Legacy Proxy Fallback] Nộp audio để AI chấm phát âm (Bất đồng bộ - Durable Queue)',
     description:
-      'Upload file audio WAV mono 16kHz. Yêu cầu header Idempotency-Key. Trả về HTTP 202 Accepted ngay lập tức cùng pollUrl.',
+      'Upload file audio WAV mono 16kHz qua NestJS API buffer. Giữ lại tương thích ngược và làm cơ chế dự phòng an toàn.',
   })
   @ApiHeader({
     name: 'Idempotency-Key',
@@ -120,6 +181,7 @@ export class SpeakingController {
     @Param('id', ParseIntPipe) exerciseId: number,
     @Request() req: any,
     @Headers('idempotency-key') idempotencyKey: string,
+    @Headers('x-trace-id') traceIdHeader: string | undefined,
     @UploadedFile(
       new ParseFilePipe({
         validators: [new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 })],
@@ -132,7 +194,20 @@ export class SpeakingController {
       req.user.id,
       audio,
       idempotencyKey,
+      traceIdHeader,
     );
+  }
+
+  @Get('submissions/my')
+  @ApiOperation({ summary: 'Xem lịch sử bài luyện phát âm của tôi' })
+  getMySubmissions(@Request() req: any) {
+    return this.speakingService.getMySubmissions(req.user.id);
+  }
+
+  @Get('my-submissions')
+  @ApiOperation({ summary: 'Compatibility: xem lịch sử bài luyện phát âm' })
+  getMySubmissionsLegacy(@Request() req: any) {
+    return this.speakingService.getMySubmissions(req.user.id);
   }
 
   @Get('submissions/:submissionId')
@@ -157,12 +232,6 @@ export class SpeakingController {
     @Request() req: any,
   ) {
     return this.speakingService.getAudioSignedUrl(submissionId, req.user);
-  }
-
-  @Get('my-submissions')
-  @ApiOperation({ summary: 'Xem lịch sử bài luyện phát âm của tôi' })
-  getMySubmissions(@Request() req: any) {
-    return this.speakingService.getMySubmissions(req.user.id);
   }
 
   @Post('tts')

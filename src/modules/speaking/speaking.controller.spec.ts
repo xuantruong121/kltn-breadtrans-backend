@@ -3,7 +3,7 @@ import { SpeakingController } from './speaking.controller';
 import { SpeakingService } from './speaking.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
-import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { GUARDS_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
 import { Role } from '@prisma/client';
 
@@ -63,6 +63,30 @@ describe('SpeakingController - Security & AI Quota', () => {
       score: 80,
       feedback: 'Good structure',
     });
+  });
+
+  it('getMySubmissions delegates to speakingService.getMySubmissions with req.user.id', async () => {
+    service.getMySubmissions = jest
+      .fn()
+      .mockResolvedValue([
+        { id: 101, exerciseId: 5, status: 'COMPLETED', overallScore: 8.5 },
+      ]);
+
+    const req = { user: { id: 42, role: Role.STUDENT } };
+    const result = await controller.getMySubmissions(req);
+
+    expect(service.getMySubmissions).toHaveBeenCalledWith(42);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(101);
+  });
+
+  it('exposes both static history routes', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, controller.getMySubmissions)).toBe(
+      'submissions/my',
+    );
+    expect(
+      Reflect.getMetadata(PATH_METADATA, controller.getMySubmissionsLegacy),
+    ).toBe('my-submissions');
   });
 });
 

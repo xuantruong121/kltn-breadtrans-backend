@@ -95,8 +95,12 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       'US',
     );
 
-    expect(ssml).toContain("voice name='en-US-GuyNeural'");
-    expect(ssml).toContain("voice name='en-US-JennyNeural'");
+    expect(ssml).toContain(
+      "<voice name='en-US-JennyNeural'><prosody rate='1.0'>My package is late.",
+    );
+    expect(ssml).toContain(
+      "<voice name='en-US-GuyNeural'><prosody rate='1.0'>I can check that for you.",
+    );
     expect(ssml).toContain('My package is late.');
     expect(ssml).toContain('I can check that for you.');
     expect(ssml).not.toContain('Customer:');
@@ -110,8 +114,26 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       ],
       'US',
     );
-    expect(namedSpeakers).toContain("voice name='en-US-GuyNeural'");
-    expect(namedSpeakers).toContain("voice name='en-US-JennyNeural'");
+    expect(namedSpeakers).toContain(
+      "<voice name='en-US-JennyNeural'><prosody rate='1.0'>Are we still presenting",
+    );
+    expect(namedSpeakers).toContain(
+      "<voice name='en-US-GuyNeural'><prosody rate='1.0'>Not anymore.",
+    );
+
+    const explicitVoiceKeys = buildDialogueSsml(
+      [
+        { speaker: 'Alex', voiceKey: 'male-01', text: 'I will call you back.' },
+        { speaker: 'Taylor', voiceKey: 'female-01', text: 'Thank you.' },
+      ],
+      'US',
+    );
+    expect(explicitVoiceKeys).toContain(
+      "<voice name='en-US-GuyNeural'><prosody rate='1.0'>I will call you back.",
+    );
+    expect(explicitVoiceKeys).toContain(
+      "<voice name='en-US-JennyNeural'><prosody rate='1.0'>Thank you.",
+    );
   });
 
   describe('submitAudio', () => {
@@ -158,6 +180,7 @@ describe('SpeakingService - Durable Submissions & Security', () => {
         status: 'PENDING',
         pollUrl: '/speaking/submissions/99',
         acceptedAt: existingDate.toISOString(),
+        traceId: expect.any(String),
       });
       expect(mockPrisma.speakingSubmission.create).not.toHaveBeenCalled();
       expect(mockUploadService.uploadRawBuffer).not.toHaveBeenCalled();
@@ -193,6 +216,7 @@ describe('SpeakingService - Durable Submissions & Security', () => {
         status: 'PENDING',
         pollUrl: '/speaking/submissions/101',
         acceptedAt: submittedAt.toISOString(),
+        traceId: expect.any(String),
       });
       expect(mockUploadService.uploadRawBuffer).toHaveBeenCalled();
       expect(mockWorker.triggerProcessing).toHaveBeenCalled();
@@ -206,6 +230,68 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       await expect(
         service.submitAudio(1, 10, mockFile, 'idemp-key-limit'),
       ).rejects.toThrow('Bạn đã đạt giới hạn chấm điểm phát âm hôm nay');
+    });
+
+    it('returns HTTP 202 with PENDING status when BullMQ enqueue fails after DB commit, allowing polling while reconciliation recovers', async () => {
+      process.env.SPEAKING_PIPELINE_MODE = 'bullmq';
+      const submittedAt = new Date();
+
+      mockPrisma.speakingSubmission.findUnique.mockResolvedValueOnce(null); // No idempotent dup
+      mockPrisma.speakingExercise.findUnique.mockResolvedValueOnce({ id: 1 });
+      mockPrisma.speakingSubmission.count.mockResolvedValueOnce(0); // within quota
+      mockPrisma.speakingSubmission.create.mockResolvedValueOnce({
+        id: 777,
+        exerciseId: 1,
+        userId: 10,
+        status: 'PENDING',
+        submittedAt,
+      });
+
+      const mockQueueService = {
+        enqueueSubmission: jest
+          .fn()
+          .mockRejectedValue(new Error('Redis connection timeout')),
+      };
+
+      const bullmqService = new SpeakingService(
+        mockPrisma as unknown as PrismaService,
+        mockAiService as unknown as AiService,
+        mockUploadService as unknown as UploadService,
+        mockWorker as unknown as any,
+        mockQueueService as unknown as any,
+      );
+
+      // Submission must succeed with HTTP 202 Accepted payload
+      const response = await bullmqService.submitAudio(
+        1,
+        10,
+        mockFile,
+        'idemp-key-enqueue-fail',
+      );
+
+      expect(response).toEqual({
+        submissionId: 777,
+        status: 'PENDING',
+        pollUrl: '/speaking/submissions/777',
+        acceptedAt: submittedAt.toISOString(),
+        traceId: expect.any(String),
+      });
+
+      // User must be able to query submission status while waiting for reconciliation
+      mockPrisma.speakingSubmission.findUnique.mockResolvedValueOnce({
+        id: 777,
+        userId: 10,
+        status: 'PENDING',
+        exerciseId: 1,
+      });
+
+      const polledStatus = await bullmqService.getSubmission(777, {
+        id: 10,
+        role: 'STUDENT',
+      });
+      expect(polledStatus.status).toBe('PENDING');
+
+      delete process.env.SPEAKING_PIPELINE_MODE;
     });
   });
 

@@ -12,58 +12,16 @@ import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UploadService } from '../upload/upload.service';
 import { parseEncodedMp3DurationMs } from './listening-media-metadata';
-interface NormalizedDialogueSegment {
-  speaker?: string;
-  speakerId?: string;
-  voiceKey?: string;
-  text: string;
-  translation?: string;
-  tone?: string;
-  rate?: string;
-  pauseMs?: number;
-}
+import {
+  normalizeDialogueSegments,
+  withSpeakerTurnIds,
+  type NormalizedDialogueSegment,
+} from './listening-dialogue.contract';
 
 export interface PublishedListeningAudioIdentity {
   artifactId?: number;
   version?: number;
   checksumSha256?: string;
-}
-
-function normalizeDialogueSegments(
-  value: unknown,
-): NormalizedDialogueSegment[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    if (!entry || typeof entry !== 'object') return [];
-    const raw = entry as Record<string, unknown>;
-    const text = typeof raw.text === 'string' ? raw.text.trim() : '';
-    const speaker = typeof raw.speaker === 'string' ? raw.speaker.trim() : '';
-    const speakerId =
-      typeof raw.speakerId === 'string' ? raw.speakerId.trim() : '';
-    const voiceKey =
-      typeof raw.voiceKey === 'string' ? raw.voiceKey.trim() : '';
-    const tone = typeof raw.tone === 'string' ? raw.tone.trim() : '';
-    const rate = typeof raw.rate === 'string' ? raw.rate.trim() : '';
-    const pauseMs =
-      typeof raw.pauseMs === 'number' && Number.isFinite(raw.pauseMs)
-        ? Math.min(800, Math.max(100, Math.round(raw.pauseMs)))
-        : undefined;
-    if (!text || (!speaker && !speakerId)) return [];
-    return [
-      {
-        ...(speaker ? { speaker } : {}),
-        ...(speakerId ? { speakerId } : {}),
-        ...(voiceKey ? { voiceKey } : {}),
-        text,
-        ...(typeof raw.translation === 'string' && raw.translation.trim()
-          ? { translation: raw.translation.trim() }
-          : {}),
-        ...(tone ? { tone } : {}),
-        ...(rate ? { rate } : {}),
-        ...(pauseMs !== undefined ? { pauseMs } : {}),
-      },
-    ];
-  });
 }
 
 function dedupeRepeatedDialogueBlocks(
@@ -115,6 +73,7 @@ export interface TimelineTurn {
 
 interface CanonicalTurn {
   turnId: string;
+  speakerTurnId?: string;
   speakerId: string;
   text: string;
   translation?: string;
@@ -123,6 +82,14 @@ interface CanonicalTurn {
   pauseMs: number;
   voiceKey: string;
   providerVoice: string;
+  dialogueAct?: string;
+  delivery?: string;
+  expressiveStyle?: string;
+  styleDegree?: number;
+  emphasis?: Array<{
+    token: string;
+    level: 'reduced' | 'moderate' | 'strong';
+  }>;
 }
 
 interface CanonicalSynthesisPayload {
@@ -140,6 +107,7 @@ export function resolveListeningVoice(
   speakerId: string,
   accent: string,
   requestedVoiceKey?: string,
+  fallbackSlot?: number,
 ): { voiceKey: string; providerVoice: string } {
   const normalizedAccent = accent === 'UK' ? 'en-gb' : 'en-us';
   let gender: 'female' | 'male' | null = null;
@@ -156,11 +124,23 @@ export function resolveListeningVoice(
   }
   if (!gender) {
     const normalizedSpeaker = speakerId.toLowerCase();
-    gender = /male|man|agent|manager|guy|ethan|leo|ben|dan|customer-2/.test(
-      normalizedSpeaker,
-    )
-      ? 'male'
-      : 'female';
+    const isMale =
+      /male|man|agent|manager|guy|ethan|leo|ben|dan|customer-2|nhân viên|nhan vien|hỗ trợ|ho tro|support|assistant|staff|mark/.test(
+        normalizedSpeaker,
+      );
+    const isFemale =
+      /female|woman|lady|maya|nora|jenny|khách hàng|khach hang|customer-1|customer|caller|client|buyer|guest/.test(
+        normalizedSpeaker,
+      );
+    if (isMale && !isFemale) {
+      gender = 'male';
+    } else if (isFemale && !isMale) {
+      gender = 'female';
+    } else if (fallbackSlot !== undefined) {
+      gender = fallbackSlot % 2 === 1 ? 'male' : 'female';
+    } else {
+      gender = isMale ? 'male' : 'female';
+    }
   }
   const key = `${normalizedAccent}-${gender}-01`;
   const resolved = (
@@ -174,15 +154,133 @@ export function resolveListeningVoice(
   return resolved;
 }
 
+const STYLE_DEGREE = {
+  friendly: 0.9,
+  chat: 0.9,
+  cheerful: 0.85,
+  excited: 0.75,
+} as const;
+
+/** Resolve domain delivery metadata to the verified Azure style allowlist. */
+export function resolveDeliveryStyle(
+  providerVoice: string,
+  delivery?: string,
+): { style?: keyof typeof STYLE_DEGREE; styleDegree?: number } {
+  const normalized = delivery?.trim().toUpperCase();
+  const isJenny = providerVoice === 'en-US-JennyNeural';
+  const isGuy = providerVoice === 'en-US-GuyNeural';
+  if (normalized === 'FRIENDLY' && (isJenny || isGuy))
+    return { style: 'friendly', styleDegree: STYLE_DEGREE.friendly };
+  if (normalized === 'CONVERSATIONAL') {
+    if (isJenny) return { style: 'chat', styleDegree: STYLE_DEGREE.chat };
+    if (isGuy) return { style: 'friendly', styleDegree: STYLE_DEGREE.friendly };
+  }
+  if (normalized === 'FRIENDLY_UPBEAT' || normalized === 'POSITIVE_REACTION') {
+    if (isJenny || isGuy)
+      return { style: 'cheerful', styleDegree: STYLE_DEGREE.cheerful };
+  }
+  if (normalized === 'EXCITED_LIGHT' && (isJenny || isGuy))
+    return { style: 'excited', styleDegree: STYLE_DEGREE.excited };
+  // Thoughtful/clarifying/concerned delivery intentionally uses neutral voice
+  // plus restrained rate/pause; no theatrical style is forced.
+  return {};
+}
+
+/** Resolve domain delivery metadata to conservative Azure prosody. */
+export function resolveDeliveryRate(rate: string, delivery?: string): string {
+  if (rate && rate !== '0%') return rate;
+  const normalized = delivery?.trim().toUpperCase();
+  if (normalized === 'URGENT' || normalized === 'EXCITED') return '+4%';
+  if (normalized === 'CALM' || normalized === 'CONCERNED') return '-4%';
+  if (normalized === 'EXCITED_LIGHT' || normalized === 'FRIENDLY_UPBEAT')
+    return '+3%';
+  if (normalized === 'THOUGHTFUL' || normalized === 'CLARIFYING') return '-3%';
+  return rate || '0%';
+}
+
 export function buildListeningSsml(payload: CanonicalSynthesisPayload): string {
-  const body = payload.turns
-    .map((turn, index, turns) => {
+  const groups: CanonicalTurn[][] = [];
+  for (const turn of payload.turns) {
+    const previous = groups.at(-1);
+    if (
+      previous &&
+      (previous[0].speakerTurnId ?? previous[0].turnId) ===
+        (turn.speakerTurnId ?? turn.turnId)
+    )
+      previous.push(turn);
+    else groups.push([turn]);
+  }
+  let turnIndex = 0;
+  const body = groups
+    .map((group, groupIndex) => {
+      const prior = payload.turns[turnIndex - 1];
       const pause =
-        index > 0 ? `<break time="${turns[index - 1].pauseMs}ms"/>` : '';
-      return `<voice name="${turn.providerVoice}">${pause}<bookmark mark="${turn.turnId}:start"/><prosody rate="${turn.rate}">${escapeXml(turn.text)}</prosody><bookmark mark="${turn.turnId}:end"/></voice>`;
+        groupIndex > 0 && prior ? `<break time="${prior.pauseMs}ms"/>` : '';
+      const chunks = group
+        .map((turn, index) => {
+          turnIndex += 1;
+          const betweenChunks =
+            index > 0 ? `<break time="${group[index - 1].pauseMs}ms"/>` : '';
+          const spokenText = renderTextWithEndBookmark(
+            turn.text,
+            turn.emphasis,
+            turn.providerVoice,
+            `${turn.turnId}:end`,
+          );
+          return `${betweenChunks}<bookmark mark="${turn.turnId}:start"/><prosody rate="${resolveDeliveryRate(turn.rate, turn.delivery)}">${spokenText}</prosody>`;
+        })
+        .join('');
+      const style = resolveDeliveryStyle(
+        group[0].providerVoice,
+        group[0].delivery,
+      );
+      const body = style.style
+        ? `<mstts:express-as style="${style.style}" styledegree="${style.styleDegree}">${chunks}</mstts:express-as>`
+        : chunks;
+      return `<voice name="${group[0].providerVoice}">${pause}${body}</voice>`;
     })
     .join('');
-  return `<speak version="1.0" xml:lang="${payload.locale}" xmlns="http://www.w3.org/2001/10/synthesis">${body}</speak>`;
+  return `<speak version="1.0" xml:lang="${payload.locale}" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts">${body}</speak>`;
+}
+
+/**
+ * Azure may drop a bookmark placed after terminal punctuation when the voice
+ * block is followed by another voice. Keeping the marker immediately before
+ * the terminal punctuation preserves the lexical text while producing a
+ * reliable end offset (punctuation itself has no learner word to highlight).
+ */
+export function renderTextWithEndBookmark(
+  text: string,
+  emphasis: CanonicalTurn['emphasis'],
+  providerVoice: string,
+  endMark: string,
+): string {
+  const match = /([.!?…]+["'”’»)]*)\s*$/.exec(text);
+  if (!match || match.index === undefined) {
+    return `${renderEmphasizedText(text, emphasis, providerVoice)}<bookmark mark="${escapeXml(endMark)}"/>`;
+  }
+  const prefix = text.slice(0, match.index);
+  const suffix = text.slice(match.index);
+  return `${renderEmphasizedText(prefix, emphasis, providerVoice)}<bookmark mark="${escapeXml(endMark)}"/>${escapeXml(suffix)}`;
+}
+
+export function renderEmphasizedText(
+  text: string,
+  emphasis: CanonicalTurn['emphasis'],
+  providerVoice: string,
+): string {
+  const escaped = escapeXml(text);
+  // Azure word-level emphasis is verified only for en-US-GuyNeural. Other
+  // voices keep the exact escaped learner text without unsupported markup.
+  if (providerVoice !== 'en-US-GuyNeural' || !emphasis?.length) return escaped;
+  return emphasis.reduce((value, item) => {
+    const token = escapeXml(item.token);
+    if (!token || !value.includes(token)) return value;
+    return value.replace(
+      token,
+      `<emphasis level="${item.level}">${token}</emphasis>`,
+    );
+  }, escaped);
 }
 
 export function escapeXml(value: string): string {
@@ -280,8 +378,8 @@ export class ListeningAudioAuthoringService {
         const blocks: NormalizedDialogueSegment[][] = [];
         const blockQuestions = quiz.questions.map((question) => {
           const content = (question.content ?? {}) as Record<string, unknown>;
-          const segments = normalizeDialogueSegments(
-            content.transcriptSegments,
+          const segments = withSpeakerTurnIds(
+            normalizeDialogueSegments(content.transcriptSegments),
           );
           const source =
             segments.length > 0
@@ -308,16 +406,26 @@ export class ListeningAudioAuthoringService {
         const uniqueSegments = blocks.length
           ? dedupeRepeatedDialogueBlocks(blocks)
           : blockQuestions.flatMap(({ source }) => source);
+        const speakerSlotMap = new Map<string, number>();
         let turnIndex = 0;
-        for (const segment of uniqueSegments) {
+        for (const segment of withSpeakerTurnIds(uniqueSegments)) {
           const speakerId = segment.speakerId ?? segment.speaker ?? 'speaker-1';
+          if (!speakerSlotMap.has(speakerId)) {
+            speakerSlotMap.set(speakerId, speakerSlotMap.size);
+          }
           const voice = resolveListeningVoice(
             speakerId,
             accent,
             segment.voiceKey,
+            speakerSlotMap.get(speakerId),
+          );
+          const expressive = resolveDeliveryStyle(
+            voice.providerVoice,
+            segment.delivery,
           );
           turns.push({
             turnId: `turn-${String(++turnIndex).padStart(3, '0')}`,
+            speakerTurnId: segment.speakerTurnId ?? `speaker-turn-${turnIndex}`,
             speakerId,
             text: segment.text.trim(),
             ...(segment.translation
@@ -326,6 +434,15 @@ export class ListeningAudioAuthoringService {
             tone: segment.tone ?? 'NEUTRAL',
             rate: segment.rate ?? '0%',
             pauseMs: segment.pauseMs ?? 260,
+            ...(segment.dialogueAct
+              ? { dialogueAct: segment.dialogueAct }
+              : {}),
+            ...(segment.delivery ? { delivery: segment.delivery } : {}),
+            ...(expressive.style ? { expressiveStyle: expressive.style } : {}),
+            ...(expressive.styleDegree !== undefined
+              ? { styleDegree: expressive.styleDegree }
+              : {}),
+            ...(segment.emphasis ? { emphasis: segment.emphasis } : {}),
             ...voice,
           });
         }
@@ -337,13 +454,13 @@ export class ListeningAudioAuthoringService {
           ? 'UK'
           : accent;
         return {
-          schemaVersion: 'listening-audio.v1',
+          schemaVersion: 'listening-audio.v2',
           quizId,
           locale: resolvedAccent === 'UK' ? 'en-GB' : 'en-US',
           accent: resolvedAccent,
           outputFormat: 'audio-16khz-128kbitrate-mono-mp3',
           voiceRegistryVersion: LISTENING_VOICE_REGISTRY_VERSION,
-          ssmlPolicyVersion: 'safe-ssml.v1',
+          ssmlPolicyVersion: 'safe-ssml.v2',
           turns,
         };
       });
@@ -649,8 +766,12 @@ export class ListeningAudioAuthoringService {
   async getCurrentPublishedArtifact(quizId: number) {
     const artifact = await this.getArtifact(quizId);
     if (!artifact) return null;
-    const current = await this.validateContent(quizId);
-    return current.synthesisHash === artifact.synthesisHash ? artifact : null;
+    try {
+      const current = await this.validateContent(quizId);
+      return current.synthesisHash === artifact.synthesisHash ? artifact : null;
+    } catch {
+      return null;
+    }
   }
 
   async approve(quizId: number, artifactId: number, actorId: number) {

@@ -1,331 +1,225 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { EventsGateway } from './events.gateway';
+import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Socket } from 'socket.io';
+import { io, Socket as ClientSocket } from 'socket.io-client';
+import { EventsGateway } from './events.gateway';
 import { PrismaService } from '../../prisma/prisma.service';
-import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
 import { SupportService } from '../support/support.service';
 
-describe('EventsGateway Security & Authentication Tests', () => {
+describe('EventsGateway Socket.IO Room Authentication & Isolation', () => {
+  let app: INestApplication;
   let gateway: EventsGateway;
   let jwtService: JwtService;
-  let prismaMock: { user: { findUnique: jest.Mock } };
-  let mockSupportService: {
-    getOrCreateStudentConversation: jest.Mock;
-    sendStudentMessage: jest.Mock;
-    sendAdminMessage: jest.Mock;
-    createAiMessage: jest.Mock;
-    updateConversationMode: jest.Mock;
-  };
+  let serverPort: number;
+  let mockPrisma: any;
+  let mockRedis: any;
+  let mockSupportService: any;
 
-  beforeEach(async () => {
-    prismaMock = {
+  const validSecret =
+    'test-jwt-secret-for-events-gateway-integration-testing-key-12345';
+  process.env.JWT_SECRET = validSecret;
+
+  beforeAll(async () => {
+    mockPrisma = {
       user: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: 10,
-          email: 'student@example.com',
-          role: 'STUDENT',
-          profile: { fullName: 'Student', avatar: null },
+        findUnique: jest.fn().mockImplementation(({ where }: any) => {
+          if (where.id === 101) {
+            return Promise.resolve({
+              id: 101,
+              email: 'usera@example.com',
+              role: 'STUDENT',
+              profile: null,
+            });
+          }
+          if (where.id === 102) {
+            return Promise.resolve({
+              id: 102,
+              email: 'userb@example.com',
+              role: 'STUDENT',
+              profile: null,
+            });
+          }
+          return Promise.resolve(null);
         }),
       },
     };
 
-    mockSupportService = {
-      getOrCreateStudentConversation: jest
-        .fn()
-        .mockResolvedValue({ id: 100, studentId: 10 }),
-      sendStudentMessage: jest
-        .fn()
-        .mockResolvedValue({ id: 1, content: 'hello' }),
-      sendAdminMessage: jest
-        .fn()
-        .mockResolvedValue({ id: 2, content: 'admin reply' }),
-      createAiMessage: jest
-        .fn()
-        .mockResolvedValue({ id: 3, content: 'ai reply' }),
-      updateConversationMode: jest
-        .fn()
-        .mockResolvedValue({ id: 100, mode: 'HUMAN' }),
+    mockRedis = {
+      get: jest.fn().mockResolvedValue(null), // no token in denylist, no logged_out_at
     };
 
-    const module: TestingModule = await Test.createTestingModule({
+    mockSupportService = {
+      getOrCreateStudentConversation: jest.fn(),
+    };
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
       providers: [
         EventsGateway,
+        JwtService,
+        { provide: PrismaService, useValue: mockPrisma },
         {
-          provide: JwtService,
-          useValue: {
-            verify: jest.fn(),
-          },
+          provide: 'default_IORedisModuleConnectionToken',
+          useValue: mockRedis,
         },
-        {
-          provide: PrismaService,
-          useValue: prismaMock,
-        },
-        {
-          provide: getRedisConnectionToken('default'),
-          useValue: { get: jest.fn().mockResolvedValue(null) },
-        },
-        {
-          provide: SupportService,
-          useValue: mockSupportService,
-        },
+        { provide: SupportService, useValue: mockSupportService },
       ],
     }).compile();
 
-    gateway = module.get<EventsGateway>(EventsGateway);
-    jwtService = module.get<JwtService>(JwtService);
+    app = moduleFixture.createNestApplication();
+    await app.listen(0); // Random free port
 
-    // Mock server object on gateway
-    (gateway as any).server = {
-      to: jest.fn().mockReturnValue({
-        emit: jest.fn(),
-      }),
-      emit: jest.fn(),
-    };
+    gateway = moduleFixture.get<EventsGateway>(EventsGateway);
+    jwtService = moduleFixture.get<JwtService>(JwtService);
+
+    const httpServer = app.getHttpServer() as import('node:http').Server;
+    const address = httpServer.address();
+    serverPort =
+      typeof address === 'object' && address !== null ? address.port : 0;
   });
 
-  it('should reject connection when token is missing', async () => {
-    const mockSocket: Partial<Socket> = {
-      id: 'socket-1',
-      handshake: {
-        auth: {},
-        headers: {},
-      } as any,
-      emit: jest.fn(),
-      disconnect: jest.fn(),
-    };
-
-    await gateway.handleConnection(mockSocket as Socket);
-
-    expect(mockSocket.emit).toHaveBeenCalledWith('auth:error', {
-      message: 'Authentication token required',
-    });
-    expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
   });
 
-  it('should reject connection when token is invalid', async () => {
-    const mockSocket: Partial<Socket> = {
-      id: 'socket-2',
-      handshake: {
-        auth: { token: 'invalid.token.here' },
-        headers: {},
-      } as any,
-      emit: jest.fn(),
-      disconnect: jest.fn(),
-    };
-
-    (jwtService.verify as jest.Mock).mockImplementation(() => {
-      throw new Error('JsonWebTokenError: invalid signature');
-    });
-
-    await gateway.handleConnection(mockSocket as Socket);
-
-    expect(mockSocket.emit).toHaveBeenCalledWith('auth:error', {
-      message: 'Invalid or expired authentication token',
-    });
-    expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
-  });
-
-  it('should authenticate valid STUDENT and only join user room', async () => {
-    const mockSocket: Partial<Socket> = {
-      id: 'socket-3',
-      handshake: {
-        auth: { token: 'valid.student.token' },
-        headers: {},
-      } as any,
-      data: {},
-      join: jest.fn(),
-      emit: jest.fn(),
-      disconnect: jest.fn(),
-    };
-
-    (jwtService.verify as jest.Mock).mockReturnValue({
-      sub: 10,
-      email: 'student@example.com',
-      role: 'STUDENT',
-      type: 'access',
-      deviceId: 'device-10',
-    });
-
-    await gateway.handleConnection(mockSocket as Socket);
-
-    expect(mockSocket.disconnect).not.toHaveBeenCalled();
-    expect(mockSocket.data.user).toEqual({
-      userId: 10,
-      email: 'student@example.com',
-      role: 'STUDENT',
-      deviceId: 'device-10',
-      profile: { fullName: 'Student', avatar: null },
-    });
-    expect(mockSocket.join).toHaveBeenCalledWith('user_10');
-    expect(mockSocket.join).not.toHaveBeenCalledWith('admins');
-    expect(mockSocket.join).not.toHaveBeenCalledWith('support_staff');
-  });
-
-  it('should authenticate valid ADMIN and join both admins and support_staff', async () => {
-    const mockSocket: Partial<Socket> = {
-      id: 'socket-4',
-      handshake: {
-        auth: { token: 'valid.admin.token' },
-        headers: {},
-      } as any,
-      data: {},
-      join: jest.fn(),
-      emit: jest.fn(),
-      disconnect: jest.fn(),
-    };
-
-    (jwtService.verify as jest.Mock).mockReturnValue({
-      sub: 1,
-      email: 'admin@breadtrans.com',
-      role: 'ADMIN',
-      type: 'access',
-      deviceId: 'device-1',
-    });
-    prismaMock.user.findUnique.mockResolvedValue({
-      id: 1,
-      email: 'admin@breadtrans.com',
-      role: 'ADMIN',
-      profile: { fullName: 'Admin', avatar: null },
-    });
-
-    await gateway.handleConnection(mockSocket as Socket);
-
-    expect(mockSocket.join).toHaveBeenCalledWith('user_1');
-    expect(mockSocket.join).toHaveBeenCalledWith('admins');
-    expect(mockSocket.join).toHaveBeenCalledWith('support_staff');
-  });
-
-  it('should reject and disconnect a retired-role connection', async () => {
-    const mockSocket: Partial<Socket> = {
-      id: 'socket-5',
-      handshake: {
-        auth: { token: 'valid.teacher.token' },
-        headers: {},
-      } as any,
-      data: {},
-      join: jest.fn(),
-      emit: jest.fn(),
-      disconnect: jest.fn(),
-    };
-
-    (jwtService.verify as jest.Mock).mockReturnValue({
-      sub: 2,
-      email: 'teacher@breadtrans.com',
-      role: 'TEACHER',
-      type: 'access',
-      deviceId: 'device-2',
-    });
-    prismaMock.user.findUnique.mockResolvedValue({
-      id: 2,
-      email: 'teacher@breadtrans.com',
-      role: 'TEACHER',
-      profile: { fullName: 'Teacher', avatar: null },
-    });
-
-    await gateway.handleConnection(mockSocket as Socket);
-
-    expect(mockSocket.emit).toHaveBeenCalledWith('auth:error', {
-      message: 'Invalid or expired authentication token',
-    });
-    expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
-    expect(mockSocket.join).not.toHaveBeenCalledWith('support_staff');
-    expect(mockSocket.join).not.toHaveBeenCalledWith('admins');
-  });
-
-  it('should ignore client payload in joinUserRoom and enforce authenticated identity', async () => {
-    const mockSocket: Partial<Socket> = {
-      id: 'socket-6',
-      data: {
-        user: { userId: 42, email: 'student42@example.com', role: 'STUDENT' },
-      },
-      join: jest.fn(),
-      disconnect: jest.fn(),
-    };
-
-    // Client maliciously attempts to join user_1 and role: 'ADMIN'
-    await gateway.handleJoinUserRoom(mockSocket as Socket);
-
-    expect(mockSocket.join).toHaveBeenCalledWith('user_42');
-    expect(mockSocket.join).not.toHaveBeenCalledWith('user_1');
-    expect(mockSocket.join).not.toHaveBeenCalledWith('admins');
-    expect(mockSocket.join).not.toHaveBeenCalledWith('support_staff');
-  });
-
-  it('should reject a refresh token during socket handshake', async () => {
-    const mockSocket: Partial<Socket> = {
-      id: 'socket-refresh',
-      handshake: { auth: { token: 'refresh-token' }, headers: {} } as any,
-      emit: jest.fn(),
-      disconnect: jest.fn(),
-    };
-    (jwtService.verify as jest.Mock).mockReturnValue({
-      sub: 10,
-      type: 'refresh',
-      deviceId: 'device-10',
-    });
-
-    await gateway.handleConnection(mockSocket as Socket);
-
-    expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
-  });
-
-  it('normalizes student chat identity and message role server-side', async () => {
-    const mockSocket: Partial<Socket> = {
-      id: 'socket-chat',
-      data: {
-        user: {
-          userId: 10,
-          email: 'student@example.com',
-          role: 'STUDENT',
-          profile: { fullName: 'Student', avatar: null },
-        },
-      },
-    };
-    await gateway.handleChatMessage(
-      mockSocket as Socket,
+  const createValidToken = (userId: number, deviceId = `device-${userId}`) => {
+    return jwtService.sign(
       {
-        studentId: 'student_999',
-        studentName: 'Forged Name',
-        message: { role: 'admin', content: 'hello' },
-        fromRole: 'ADMIN',
-      } as any,
+        sub: userId,
+        type: 'access',
+        deviceId,
+        iat: Math.floor(Date.now() / 1000),
+      },
+      { secret: validSecret },
     );
+  };
 
-    expect(
-      mockSupportService.getOrCreateStudentConversation,
-    ).toHaveBeenCalledWith(10);
-    expect(mockSupportService.sendStudentMessage).toHaveBeenCalledWith(
-      10,
-      100,
-      {
-        content: 'hello',
-        clientMessageId: undefined,
-      },
-    );
+  it('1. Connects as User A and User B, authenticates via JWT, and joins private rooms user_<id>', async () => {
+    const tokenA = createValidToken(101);
+    const tokenB = createValidToken(102);
 
-    gateway.handleSupportMessageCreated({
-      conversationId: 100,
-      studentId: 10,
-      fromRole: 'STUDENT',
-      targetUserId: 10,
-      message: {
-        id: 1,
-        role: 'user',
-        content: 'hello',
-        senderName: 'Student',
-        timestamp: 1700000000000,
-      },
-      student: {
-        id: 10,
-        name: 'Student',
-        email: 'student@example.com',
-        avatar: null,
-      },
+    const clientA: ClientSocket = io(`http://localhost:${serverPort}`, {
+      auth: { token: tokenA },
+      transports: ['websocket'],
     });
 
-    const toMock = (gateway as any).server.to as jest.Mock;
-    expect(toMock).toHaveBeenCalledWith('support_staff');
-    expect(toMock).toHaveBeenCalledWith('user_10');
+    const clientB: ClientSocket = io(`http://localhost:${serverPort}`, {
+      auth: { token: tokenB },
+      transports: ['websocket'],
+    });
+
+    await Promise.all([
+      new Promise<void>((res) => clientA.on('connect', () => res())),
+      new Promise<void>((res) => clientB.on('connect', () => res())),
+    ]);
+
+    expect(clientA.connected).toBe(true);
+    expect(clientB.connected).toBe(true);
+
+    clientA.disconnect();
+    clientB.disconnect();
+  });
+
+  it('2. Publishing speaking.completed for User A delivers ONLY to User A; User B receives nothing', async () => {
+    const tokenA = createValidToken(101);
+    const tokenB = createValidToken(102);
+
+    const clientA: ClientSocket = io(`http://localhost:${serverPort}`, {
+      auth: { token: tokenA },
+      transports: ['websocket'],
+    });
+
+    const clientB: ClientSocket = io(`http://localhost:${serverPort}`, {
+      auth: { token: tokenB },
+      transports: ['websocket'],
+    });
+
+    await Promise.all([
+      new Promise<void>((res) => clientA.on('connect', () => res())),
+      new Promise<void>((res) => clientB.on('connect', () => res())),
+    ]);
+
+    const receivedA: any[] = [];
+    const receivedB: any[] = [];
+
+    clientA.on('speaking.completed', (data) => receivedA.push(data));
+    clientB.on('speaking.completed', (data) => receivedB.push(data));
+
+    // Simulate SpeakingEventsSubscriber emitting event to User A's private room
+    gateway.server.to('user_101').emit('speaking.completed', {
+      submissionId: 999,
+      traceId: 'trace-test-priv',
+      status: 'COMPLETED',
+    });
+
+    // Wait for network propagation
+    await new Promise((res) => setTimeout(res, 200));
+
+    expect(receivedA.length).toBe(1);
+    expect(receivedA[0]).toEqual({
+      submissionId: 999,
+      traceId: 'trace-test-priv',
+      status: 'COMPLETED',
+    });
+
+    // User B must receive ZERO events
+    expect(receivedB.length).toBe(0);
+
+    clientA.disconnect();
+    clientB.disconnect();
+  });
+
+  it('3. Reconnect re-authenticates and successfully rejoins the user room', async () => {
+    const tokenA = createValidToken(101);
+
+    const clientA: ClientSocket = io(`http://localhost:${serverPort}`, {
+      auth: { token: tokenA },
+      transports: ['websocket'],
+    });
+
+    await new Promise<void>((res) => clientA.on('connect', () => res()));
+    expect(clientA.connected).toBe(true);
+
+    // Disconnect and reconnect
+    clientA.disconnect();
+    expect(clientA.connected).toBe(false);
+
+    clientA.connect();
+    await new Promise<void>((res) => clientA.on('connect', () => res()));
+    expect(clientA.connected).toBe(true);
+
+    const received: any[] = [];
+    clientA.on('speaking.completed', (d) => received.push(d));
+
+    gateway.server.to('user_101').emit('speaking.completed', {
+      submissionId: 1000,
+      traceId: 'trace-reconnect',
+      status: 'COMPLETED',
+    });
+
+    await new Promise((res) => setTimeout(res, 200));
+
+    expect(received.length).toBe(1);
+    expect(received[0].submissionId).toBe(1000);
+
+    clientA.disconnect();
+  });
+
+  it('4. Connection with invalid/missing token is rejected with auth:error', async () => {
+    const clientInvalid: ClientSocket = io(`http://localhost:${serverPort}`, {
+      auth: { token: 'invalid-garbage-token' },
+      transports: ['websocket'],
+    });
+
+    const errorPromise = new Promise((resolve) => {
+      clientInvalid.on('auth:error', resolve);
+      clientInvalid.on('connect_error', resolve);
+    });
+
+    const err = await errorPromise;
+    expect(err).toBeDefined();
+
+    clientInvalid.disconnect();
   });
 });

@@ -20,7 +20,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "payment:backfill": "ts-node prisma/backfill-payments.ts",
     "materialize:listening-audio": "ts-node scripts/materialize-listening-audio.ts",
-    "reconcile:listening-audio-duration": "ts-node scripts/reconcile-listening-audio-duration.ts"
+    "reconcile:listening-audio-duration": "ts-node scripts/reconcile-listening-audio-duration.ts",
+    "start:speaking-worker": "node dist/src/worker/speaking-worker.main.js",
+    "start:speaking-worker:dev": "ts-node src/worker/speaking-worker.main.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1092.0",
@@ -88,8 +90,10 @@
     "globals": "^17.0.0",
     "jest": "^30.0.0",
     "jest-mock-extended": "^4.0.1",
+    "playwright": "^1.63.0",
     "prettier": "^3.4.2",
     "prisma": "^6.2.1",
+    "socket.io-client": "^4.8.4",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",

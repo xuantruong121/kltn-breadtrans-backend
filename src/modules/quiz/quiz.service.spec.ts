@@ -4,16 +4,24 @@ import {
   normalizeDialogueSegments,
   normalizeListeningAnswer,
   QuizService,
+  validateReadingSubmission,
 } from './quiz.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SpeakingService } from '../speaking/speaking.service';
 import { UploadService } from '../upload/upload.service';
 import { ListeningAudioAuthoringService } from './listening-audio-authoring.service';
 
 const mockPrismaService = {
+  $transaction: jest.fn(),
   quiz: {
     create: jest.fn(),
     findMany: jest.fn(),
@@ -22,6 +30,7 @@ const mockPrismaService = {
   submission: {
     create: jest.fn(),
     findMany: jest.fn(),
+    findUnique: jest.fn(),
   },
   question: {
     findUnique: jest.fn(),
@@ -33,6 +42,8 @@ const mockPrismaService = {
     update: jest.fn(),
     updateMany: jest.fn(),
   },
+  userQuizReward: { createMany: jest.fn() },
+  learningActivity: { create: jest.fn() },
 };
 
 const mockAiService = {
@@ -170,6 +181,217 @@ describe('QuizService', () => {
 
       const result = await service.getQuizById(9, false, 7);
       expect(result.questions[0].content).toEqual({ options: ['A', 'B'] });
+    });
+
+    it('keeps Reading answer keys out of the pre-submission payload', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 10,
+        type: 'BILINGUAL_READING',
+        questions: [
+          {
+            id: 101,
+            content: {
+              text: 'Question',
+              options: ['A', 'B'],
+              correctIndex: 1,
+              correct: 'B',
+              correctAnswer: 'B',
+              explanation: 'Hidden before submission',
+            },
+          },
+        ],
+      });
+
+      const result = await service.getQuizById(10, false, 7);
+      expect(result.questions[0].content).toEqual({
+        text: 'Question',
+        options: ['A', 'B'],
+      });
+    });
+  });
+
+  describe('Reading submission integrity', () => {
+    const questions = [
+      {
+        id: 1,
+        type: 'MULTIPLE_CHOICE',
+        content: { options: ['A', 'B'], correctIndex: 1 },
+      },
+      {
+        id: 2,
+        type: 'MULTIPLE_CHOICE',
+        content: { options: ['C', 'D'], correctIndex: 0 },
+      },
+    ];
+
+    it.each([
+      ['missing', [{ questionId: 1, answer: 'A' }]],
+      [
+        'duplicate',
+        [
+          { questionId: 1, answer: 'A' },
+          { questionId: 1, answer: 'A' },
+        ],
+      ],
+      [
+        'unknown',
+        [
+          { questionId: 1, answer: 'A' },
+          { questionId: 999, answer: 'C' },
+        ],
+      ],
+      [
+        'invalid option',
+        [
+          { questionId: 1, answer: 'Z' },
+          { questionId: 2, answer: 'C' },
+        ],
+      ],
+    ])(
+      'rejects %s Reading submissions before persistence',
+      (_label, answers) => {
+        expect(() => validateReadingSubmission(questions, answers)).toThrow(
+          BadRequestException,
+        );
+      },
+    );
+
+    it('accepts a complete Reading submission and creates one result per server question', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        title: 'Reading',
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      const tx = {
+        submission: {
+          create: jest.fn().mockResolvedValue({
+            id: 77,
+            results: [
+              { questionId: 1, isCorrect: true },
+              { questionId: 2, isCorrect: false },
+            ],
+          }),
+        },
+      };
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (transaction: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      );
+      mockPrismaService.userQuizReward.createMany.mockResolvedValue({
+        count: 1,
+      });
+
+      const result = await service.submitQuiz(24, 7, {
+        answers: [
+          { questionId: 1, answer: 'B' },
+          { questionId: 2, answer: 'D' },
+        ],
+      });
+
+      expect(tx.submission.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            score: 1,
+            results: {
+              create: expect.arrayContaining([
+                expect.objectContaining({ questionId: 1, isCorrect: true }),
+                expect.objectContaining({ questionId: 2, isCorrect: false }),
+              ]),
+            },
+          }),
+        }),
+      );
+      expect(
+        tx.submission.create.mock.calls[0][0].data.results.create,
+      ).toHaveLength(2);
+      expect(result.id).toBe(77);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'quiz.submitted',
+        expect.objectContaining({ quizId: 24, score: 1 }),
+      );
+    });
+
+    it('rejects invalid Reading submission without rows or success event', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+
+      await expect(
+        service.submitQuiz(24, 7, {
+          answers: [{ questionId: 1, answer: 'B' }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      expect(mockPrismaService.submission.create).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('does not emit success when the transaction fails', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      mockPrismaService.$transaction.mockRejectedValue(
+        new Error('database unavailable'),
+      );
+
+      await expect(
+        service.submitQuiz(24, 7, {
+          answers: [
+            { questionId: 1, answer: 'B' },
+            { questionId: 2, answer: 'C' },
+          ],
+        }),
+      ).rejects.toThrow('database unavailable');
+      expect(
+        mockPrismaService.userQuizReward.createMany,
+      ).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('uses the server Reading question count as analytics denominator', async () => {
+      mockPrismaService.submission.findUnique.mockResolvedValue({
+        id: 88,
+        quizId: 24,
+        userId: 7,
+        score: 1,
+        quiz: {
+          id: 24,
+          title: 'Reading',
+          type: 'BILINGUAL_READING',
+          questions,
+        },
+        results: [{ questionId: 1, isCorrect: true }],
+      });
+
+      await expect(
+        service.getSubmissionAnalytics(88, 7, Role.STUDENT),
+      ).resolves.toMatchObject({
+        totalQuestions: 2,
+        totalCorrect: 1,
+        overallAccuracyPercent: 50,
+      });
+    });
+
+    it('preserves submission ownership checks for Reading analytics', async () => {
+      mockPrismaService.submission.findUnique.mockResolvedValue({
+        id: 89,
+        userId: 99,
+        quiz: {
+          id: 24,
+          title: 'Reading',
+          type: 'BILINGUAL_READING',
+          questions,
+        },
+        results: [],
+      });
+      await expect(
+        service.getSubmissionAnalytics(89, 7, Role.STUDENT),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
