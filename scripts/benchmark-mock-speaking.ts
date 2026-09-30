@@ -88,11 +88,12 @@ async function runScenario(
   const jobRecords: JobTimingRecord[] = [];
   const enqueueTimestamps = new Map<number, number>();
 
+  let worker!: Worker<SpeakingJobPayload>;
   const completionPromise = new Promise<void>((resolve) => {
     let completedCount = 0;
 
     // Production Worker options
-    const worker = new Worker<SpeakingJobPayload>(
+    worker = new Worker<SpeakingJobPayload>(
       testQueueName,
       async (job: Job<SpeakingJobPayload>) => {
         activeWorkers++;
@@ -101,11 +102,15 @@ async function runScenario(
         }
 
         const tWorkerStart = Date.now();
-        const tEnqueue = enqueueTimestamps.get(job.data.submissionId) || tWorkerStart;
+        const tEnqueue =
+          enqueueTimestamps.get(job.data.submissionId) || tWorkerStart;
 
         try {
           const dummyBuffer = Buffer.alloc(100);
-          await MockSpeakingEvaluator.evaluate('Sample target sentence', dummyBuffer);
+          await MockSpeakingEvaluator.evaluate(
+            'Sample target sentence',
+            dummyBuffer,
+          );
           const tCompletion = Date.now();
 
           jobRecords.push({
@@ -140,8 +145,6 @@ async function runScenario(
         stalledInterval: leaseTimeoutMs,
       },
     );
-
-    (queue as any).__worker = worker;
   });
 
   const tStartAll = Date.now();
@@ -154,7 +157,9 @@ async function runScenario(
 
     // Assert that custom job ID does NOT contain colons
     if (customJobId.includes(':')) {
-      throw new Error(`Production custom job ID "${customJobId}" contains forbidden colon separator.`);
+      throw new Error(
+        `Production custom job ID "${customJobId}" contains forbidden colon separator.`,
+      );
     }
 
     const job = await queue.add(
@@ -170,7 +175,9 @@ async function runScenario(
 
     // Verify BullMQ accepted the custom deterministic job ID verbatim
     if (job.id !== customJobId) {
-      throw new Error(`BullMQ rejected custom job ID. Expected "${customJobId}", got "${job.id}"`);
+      throw new Error(
+        `BullMQ rejected custom job ID. Expected "${customJobId}", got "${job.id}"`,
+      );
     }
   }
 
@@ -179,15 +186,20 @@ async function runScenario(
   const wallClockMs = Date.now() - tStartAll;
 
   // Cleanup worker and queue
-  const worker = (queue as any).__worker;
   await worker.close();
   await queue.obliterate({ force: true });
   await queue.close();
   await connection.quit();
 
-  const sortedQueueWait = jobRecords.map((r) => r.queueWaitMs).sort((a, b) => a - b);
-  const sortedExecution = jobRecords.map((r) => r.executionMs).sort((a, b) => a - b);
-  const sortedSojourn = jobRecords.map((r) => r.sojournMs).sort((a, b) => a - b);
+  const sortedQueueWait = jobRecords
+    .map((r) => r.queueWaitMs)
+    .sort((a, b) => a - b);
+  const sortedExecution = jobRecords
+    .map((r) => r.executionMs)
+    .sort((a, b) => a - b);
+  const sortedSojourn = jobRecords
+    .map((r) => r.sojournMs)
+    .sort((a, b) => a - b);
 
   return {
     scenarioName,
@@ -211,11 +223,21 @@ async function runScenario(
 }
 
 async function main() {
-  console.log('========================================================================');
-  console.log('  BREADTRANS SPEAKING ASSESSMENT: MOCK BULLMQ INTEGRATION BENCHMARK');
-  console.log('  Classification: MOCK BULLMQ INTEGRATION BENCHMARK (Simulated Evaluator, 120ms/req)');
-  console.log('  Latency dimensions: Queue Wait, Execution, End-to-End Sojourn');
-  console.log('========================================================================\n');
+  console.log(
+    '========================================================================',
+  );
+  console.log(
+    '  BREADTRANS SPEAKING ASSESSMENT: MOCK BULLMQ INTEGRATION BENCHMARK',
+  );
+  console.log(
+    '  Classification: MOCK BULLMQ INTEGRATION BENCHMARK (Simulated Evaluator, 120ms/req)',
+  );
+  console.log(
+    '  Latency dimensions: Queue Wait, Execution, End-to-End Sojourn',
+  );
+  console.log(
+    '========================================================================\n',
+  );
 
   // Verify production Job ID format
   const sampleJobId = getSpeakingJobId(999);
@@ -243,9 +265,13 @@ async function main() {
   console.log('Running Scenario 4: 50 submissions (Concurrency = 5)...');
   results.push(await runScenario('50 sub (C=5)', 50, 5, 120));
 
-  console.log('\n========================================================================');
+  console.log(
+    '\n========================================================================',
+  );
   console.log('  MOCK BULLMQ INTEGRATION BENCHMARK RESULTS');
-  console.log('========================================================================');
+  console.log(
+    '========================================================================',
+  );
   console.table(
     results.map((r) => ({
       Scenario: r.scenarioName,

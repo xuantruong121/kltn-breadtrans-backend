@@ -36,6 +36,11 @@ async function bootstrap() {
   process.on('SIGINT', () => {
     void handleTermination('SIGINT');
   });
+  process.on('message', (msg) => {
+    if (msg === 'SIGTERM' || msg === 'SIGINT') {
+      void handleTermination(msg);
+    }
+  });
 
   logger.log(
     'Standalone BreadTrans Speaking Worker is running and awaiting BullMQ jobs.',

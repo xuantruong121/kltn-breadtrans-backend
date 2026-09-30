@@ -5,9 +5,12 @@ const IORedis = require('ioredis');
 async function main() {
   console.log('--- STARTING CONTAINER RUNTIME BULLMQ JOB TEST ---');
   const prisma = new PrismaClient();
-  const redisConnection = new IORedis(process.env.REDIS_URL || 'redis://:redis_test_pw@redis:6379', {
-    maxRetriesPerRequest: null,
-  });
+  const redisConnection = new IORedis(
+    process.env.REDIS_URL || 'redis://:redis_test_pw@redis:6379',
+    {
+      maxRetriesPerRequest: null,
+    },
+  );
 
   const queue = new Queue('breadtrans-speaking-assessment', {
     connection: redisConnection,
@@ -15,7 +18,9 @@ async function main() {
 
   try {
     // 1. Ensure test user and exercise exist
-    let user = await prisma.user.findFirst({ where: { email: 'worker-test@breadtrans.com' } });
+    let user = await prisma.user.findFirst({
+      where: { email: 'worker-test@breadtrans.com' },
+    });
     if (!user) {
       user = await prisma.user.create({
         data: {
@@ -26,12 +31,15 @@ async function main() {
       console.log(`Created test user #${user.id}`);
     }
 
-    let exercise = await prisma.speakingExercise.findFirst({ where: { title: 'Worker Runtime Test Exercise' } });
+    let exercise = await prisma.speakingExercise.findFirst({
+      where: { title: 'Worker Runtime Test Exercise' },
+    });
     if (!exercise) {
       exercise = await prisma.speakingExercise.create({
         data: {
           title: 'Worker Runtime Test Exercise',
-          targetText: 'Hello world, this is a live container verification test.',
+          targetText:
+            'Hello world, this is a live container verification test.',
           difficulty: 'BEGINNER',
         },
       });
@@ -76,7 +84,9 @@ async function main() {
         where: { id: submission.id },
       });
 
-      console.log(`[${Math.round((Date.now() - startTime) / 1000)}s] Submission #${submission.id} status: ${updatedSub.status}, workerId: ${updatedSub.workerId}`);
+      console.log(
+        `[${Math.round((Date.now() - startTime) / 1000)}s] Submission #${submission.id} status: ${updatedSub.status}, workerId: ${updatedSub.workerId}`,
+      );
 
       if (updatedSub.status === 'COMPLETED' || updatedSub.status === 'FAILED') {
         break;
@@ -85,16 +95,19 @@ async function main() {
     }
 
     if (!updatedSub || updatedSub.status !== 'COMPLETED') {
-      throw new Error(`Worker did not complete submission in time! Final status: ${updatedSub?.status}`);
+      throw new Error(
+        `Worker did not complete submission in time! Final status: ${updatedSub?.status}`,
+      );
     }
 
-    console.log('SUCCESS! Container speaking-worker consumed job and completed evaluation:');
+    console.log(
+      'SUCCESS! Container speaking-worker consumed job and completed evaluation:',
+    );
     console.log(`- Final Status: ${updatedSub.status}`);
     console.log(`- Worker Token: ${updatedSub.workerId}`);
     console.log(`- Overall Score: ${updatedSub.overallScore}`);
     console.log(`- Provider: ${updatedSub.provider}`);
     console.log(`- Processed At: ${updatedSub.processedAt}`);
-
   } finally {
     await queue.close();
     await redisConnection.quit();

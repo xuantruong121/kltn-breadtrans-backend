@@ -209,7 +209,9 @@ export class SpeakingProcessorService {
             audioBuffer.writeInt16LE(Math.round(Math.sin(i / 10) * 10000), i);
           }
         } else {
-          throw new Error('MISSING_AUDIO_KEY: Submission has no audioKey stored');
+          throw new Error(
+            'MISSING_AUDIO_KEY: Submission has no audioKey stored',
+          );
         }
       } else {
         try {
@@ -471,11 +473,7 @@ export class SpeakingProcessorService {
     );
 
     // 8. Gamification reward idempotency check (Token-Fenced)
-    if (
-      !isSilent &&
-      overallScore !== null &&
-      overallScore > 0
-    ) {
+    if (!isSilent && overallScore !== null && overallScore > 0) {
       const rewardClaim = await this.prisma.speakingSubmission.updateMany({
         where: {
           id: submissionId,

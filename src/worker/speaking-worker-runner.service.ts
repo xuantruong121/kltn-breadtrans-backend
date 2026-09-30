@@ -15,7 +15,8 @@ import {
 } from '../modules/speaking/speaking.constants';
 import { SpeakingProcessorService } from '../modules/speaking/speaking-processor.service';
 
-const HEARTBEAT_FILE = process.env.WORKER_HEARTBEAT_FILE || '/tmp/worker-heartbeat';
+const HEARTBEAT_FILE =
+  process.env.WORKER_HEARTBEAT_FILE || '/tmp/worker-heartbeat';
 
 @Injectable()
 export class SpeakingWorkerRunnerService
@@ -96,7 +97,9 @@ export class SpeakingWorkerRunnerService
     try {
       fs.writeFileSync(HEARTBEAT_FILE, String(Date.now()), 'utf8');
     } catch (err: any) {
-      this.logger.warn(`[SpeakingWorkerRunner] Heartbeat write failed: ${err.message}`);
+      this.logger.warn(
+        `[SpeakingWorkerRunner] Heartbeat write failed: ${err.message}`,
+      );
     }
   }
 

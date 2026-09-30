@@ -66,9 +66,11 @@ describe('SpeakingController - Security & AI Quota', () => {
   });
 
   it('getMySubmissions delegates to speakingService.getMySubmissions with req.user.id', async () => {
-    service.getMySubmissions = jest.fn().mockResolvedValue([
-      { id: 101, exerciseId: 5, status: 'COMPLETED', overallScore: 8.5 },
-    ]);
+    service.getMySubmissions = jest
+      .fn()
+      .mockResolvedValue([
+        { id: 101, exerciseId: 5, status: 'COMPLETED', overallScore: 8.5 },
+      ]);
 
     const req = { user: { id: 42, role: Role.STUDENT } };
     const result = await controller.getMySubmissions(req);
