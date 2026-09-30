@@ -21,9 +21,15 @@ import {
 } from '../src/modules/speaking/speaking.constants';
 
 async function main() {
-  console.log('========================================================================');
-  console.log('  TEST 1: ACTIVE-JOB GRACEFUL SHUTDOWN (DRAIN) INTEGRATION TEST');
-  console.log('========================================================================\n');
+  console.log(
+    '========================================================================',
+  );
+  console.log(
+    '  TEST 1: ACTIVE-JOB GRACEFUL SHUTDOWN (DRAIN) INTEGRATION TEST',
+  );
+  console.log(
+    '========================================================================\n',
+  );
 
   const prisma = new PrismaClient();
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -63,8 +69,13 @@ async function main() {
     console.log(`[Setup] Created disposable Submission #1 (ID: ${sub1Id})`);
 
     // 3. Spawn Standalone Worker with MOCK_AZURE_DELAY_MS = 10000 (10 seconds)
-    const workerMainPath = path.resolve(__dirname, '../dist/src/worker/speaking-worker.main.js');
-    console.log(`[Worker] Spawning worker with 10s evaluation delay: node ${workerMainPath}`);
+    const workerMainPath = path.resolve(
+      __dirname,
+      '../dist/src/worker/speaking-worker.main.js',
+    );
+    console.log(
+      `[Worker] Spawning worker with 10s evaluation delay: node ${workerMainPath}`,
+    );
 
     workerProcess = spawn('node', [workerMainPath], {
       env: {
@@ -80,7 +91,7 @@ async function main() {
     let isWorkerReady = false;
     let workerLogs = '';
 
-    workerProcess.stdout?.on('data', (chunk) => {
+    workerProcess.stdout?.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
       workerLogs += text;
       process.stdout.write(`  [Worker stdout] ${text}`);
@@ -89,7 +100,7 @@ async function main() {
       }
     });
 
-    workerProcess.stderr?.on('data', (chunk) => {
+    workerProcess.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
       workerLogs += text;
       process.stderr.write(`  [Worker stderr] ${text}`);
@@ -101,7 +112,9 @@ async function main() {
       await new Promise((r) => setTimeout(r, 200));
     }
     if (!isWorkerReady) {
-      throw new Error('Worker failed to become ready within 15 seconds');
+      throw new Error(
+        `Worker failed to become ready within 15 seconds.\nCaptured output:\n${workerLogs}`,
+      );
     }
     console.log('[Worker] Worker ready and awaiting jobs.\n');
 
@@ -115,8 +128,12 @@ async function main() {
     );
 
     // 5. Poll until Job #1 is ACTIVE and DB status is PROCESSING with workerId non-null
-    console.log('[Monitor] Waiting for Job #1 to enter PROCESSING state in DB with active workerId...');
-    let activeSub1: any = null;
+    console.log(
+      '[Monitor] Waiting for Job #1 to enter PROCESSING state in DB with active workerId...',
+    );
+    let activeSub1: Awaited<
+      ReturnType<typeof prisma.speakingSubmission.findUnique>
+    > = null;
     let tActive = 0;
     const tWaitStart = Date.now();
 
@@ -126,27 +143,41 @@ async function main() {
       });
       const jobState = await job1.getState();
 
-      if (activeSub1?.status === 'PROCESSING' && activeSub1?.workerId && jobState === 'active') {
+      if (
+        activeSub1?.status === 'PROCESSING' &&
+        activeSub1?.workerId &&
+        jobState === 'active'
+      ) {
         tActive = Date.now();
-        console.log(`[Monitor] Job #1 is ACTIVE at ${new Date(tActive).toISOString()}`);
+        console.log(
+          `[Monitor] Job #1 is ACTIVE at ${new Date(tActive).toISOString()}`,
+        );
         console.log(`  - DB Status: ${activeSub1.status}`);
         console.log(`  - Worker Token: ${activeSub1.workerId}`);
-        console.log(`  - Processing Started At: ${activeSub1.processingStartedAt?.toISOString()}`);
+        console.log(
+          `  - Processing Started At: ${activeSub1.processingStartedAt?.toISOString()}`,
+        );
         break;
       }
       await new Promise((r) => setTimeout(r, 200));
     }
 
     if (!tActive || activeSub1?.status !== 'PROCESSING') {
-      throw new Error(`Submission #${sub1Id} never entered active PROCESSING state`);
+      throw new Error(
+        `Submission #${sub1Id} never entered active PROCESSING state`,
+      );
     }
 
     // 6. Wait 2 seconds into the 10-second evaluation, then send SIGTERM
-    console.log('\n[Action] Waiting 2000ms while evaluation is actively running...');
+    console.log(
+      '\n[Action] Waiting 2000ms while evaluation is actively running...',
+    );
     await new Promise((r) => setTimeout(r, 2000));
 
     const tSigterm = Date.now();
-    console.log(`[Action] >>> SENDING SIGTERM TO WORKER AT ${new Date(tSigterm).toISOString()} (elapsed=${tSigterm - tActive}ms / delay=10000ms) <<<`);
+    console.log(
+      `[Action] >>> SENDING SIGTERM TO WORKER AT ${new Date(tSigterm).toISOString()} (elapsed=${tSigterm - tActive}ms / delay=10000ms) <<<`,
+    );
 
     // Concurrently create and enqueue Submission #2 to verify dying worker refuses new jobs
     const sub2 = await prisma.speakingSubmission.create({
@@ -163,7 +194,9 @@ async function main() {
     });
     sub2Id = sub2.id;
     const jobId2 = getSpeakingJobId(sub2Id);
-    console.log(`[Queue] Enqueuing Job #2 (${jobId2}) immediately after SIGTERM to verify drain barrier...`);
+    console.log(
+      `[Queue] Enqueuing Job #2 (${jobId2}) immediately after SIGTERM to verify drain barrier...`,
+    );
     const job2 = await queue.add(
       SPEAKING_JOB_NAME,
       { submissionId: sub2Id, traceId: `trace-shutdown-barrier-${Date.now()}` },
@@ -178,26 +211,37 @@ async function main() {
     }
 
     // 7. Wait for worker process termination
-    console.log('[Monitor] Awaiting worker exit (must finish active job and exit with 0)...');
-    const exitResult = await new Promise<{ code: number | null; signal: string | null }>(
-      (resolve, reject) => {
-        const timeout = setTimeout(() => {
-          workerProcess?.kill('SIGKILL');
-          reject(new Error('Worker process timed out during graceful shutdown (> 20s)'));
-        }, 20000);
-
-        workerProcess?.on('exit', (code, signal) => {
-          clearTimeout(timeout);
-          resolve({ code, signal });
-        });
-      },
+    console.log(
+      '[Monitor] Awaiting worker exit (must finish active job and exit with 0)...',
     );
+    const exitResult = await new Promise<{
+      code: number | null;
+      signal: string | null;
+    }>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        workerProcess?.kill('SIGKILL');
+        reject(
+          new Error(
+            'Worker process timed out during graceful shutdown (> 20s)',
+          ),
+        );
+      }, 20000);
+
+      workerProcess?.on('exit', (code, signal) => {
+        clearTimeout(timeout);
+        resolve({ code, signal });
+      });
+    });
 
     const tExit = Date.now();
-    console.log(`[Monitor] Worker exited at ${new Date(tExit).toISOString()} with exit code ${exitResult.code} (signal=${exitResult.signal})`);
+    console.log(
+      `[Monitor] Worker exited at ${new Date(tExit).toISOString()} with exit code ${exitResult.code} (signal=${exitResult.signal})`,
+    );
 
     if (exitResult.code !== 0) {
-      throw new Error(`Worker exited with unexpected non-zero code: ${exitResult.code}`);
+      throw new Error(
+        `Worker exited with unexpected non-zero code: ${exitResult.code}`,
+      );
     }
 
     // 8. Verify Submission #1 terminal state in PostgreSQL
@@ -211,8 +255,12 @@ async function main() {
     console.log('\n[Verification] Checking Submission #1 DB State:');
     console.log(`  - Final Status: ${finalSub1.status} (Expected: COMPLETED)`);
     console.log(`  - Overall Score: ${finalSub1.overallScore} (Expected: 8.8)`);
-    console.log(`  - Reward Granted At: ${finalSub1.rewardGrantedAt?.toISOString()} (Expected: non-null)`);
-    console.log(`  - Processed At: ${finalSub1.processedAt?.toISOString()} (Expected: non-null)`);
+    console.log(
+      `  - Reward Granted At: ${finalSub1.rewardGrantedAt?.toISOString()} (Expected: non-null)`,
+    );
+    console.log(
+      `  - Processed At: ${finalSub1.processedAt?.toISOString()} (Expected: non-null)`,
+    );
     console.log(`  - Worker ID: ${finalSub1.workerId}`);
 
     if (finalSub1.status !== 'COMPLETED') {
@@ -225,15 +273,27 @@ async function main() {
       throw new Error('Expected rewardGrantedAt to be non-null');
     }
 
-    const tProcessed = finalSub1.processedAt ? finalSub1.processedAt.getTime() : 0;
+    const tProcessed = finalSub1.processedAt
+      ? finalSub1.processedAt.getTime()
+      : 0;
     console.log(`\n[Timeline Proof]:`);
-    console.log(`  1. Job entered PROCESSING at: ${new Date(tActive).toISOString()}`);
-    console.log(`  2. SIGTERM sent at:            ${new Date(tSigterm).toISOString()} (+${tSigterm - tActive}ms)`);
-    console.log(`  3. Evaluation committed at:    ${new Date(tProcessed).toISOString()} (+${tProcessed - tSigterm}ms after SIGTERM)`);
-    console.log(`  4. Worker process exited at:   ${new Date(tExit).toISOString()} (+${tExit - tProcessed}ms after commit)`);
+    console.log(
+      `  1. Job entered PROCESSING at: ${new Date(tActive).toISOString()}`,
+    );
+    console.log(
+      `  2. SIGTERM sent at:            ${new Date(tSigterm).toISOString()} (+${tSigterm - tActive}ms)`,
+    );
+    console.log(
+      `  3. Evaluation committed at:    ${new Date(tProcessed).toISOString()} (+${tProcessed - tSigterm}ms after SIGTERM)`,
+    );
+    console.log(
+      `  4. Worker process exited at:   ${new Date(tExit).toISOString()} (+${tExit - tProcessed}ms after commit)`,
+    );
 
     if (tSigterm >= tProcessed) {
-      throw new Error(`Invariant violated: SIGTERM (${tSigterm}) must precede evaluation completion (${tProcessed})`);
+      throw new Error(
+        `Invariant violated: SIGTERM (${tSigterm}) must precede evaluation completion (${tProcessed})`,
+      );
     }
 
     // 9. Verify Submission #2 was NOT picked up by the shutting down worker
@@ -248,25 +308,35 @@ async function main() {
     console.log(`  - BullMQ Job State: ${job2State} (Expected: waiting)`);
 
     if (finalSub2?.status !== 'PENDING' || finalSub2?.workerId !== null) {
-      throw new Error(`Drain barrier breached: dying worker picked up Submission #${sub2Id}`);
+      throw new Error(
+        `Drain barrier breached: dying worker picked up Submission #${sub2Id}`,
+      );
     }
     if (job2State !== 'waiting') {
-      throw new Error(`Expected Job #2 to remain in waiting state, but was ${job2State}`);
+      throw new Error(
+        `Expected Job #2 to remain in waiting state, but was ${job2State}`,
+      );
     }
 
     // Clean up Job #2 from BullMQ
     await job2.remove();
     await job1.remove();
 
-    console.log('\n========================================================================');
+    console.log(
+      '\n========================================================================',
+    );
     console.log('  TEST 1 PASSED: ACTIVE-JOB GRACEFUL SHUTDOWN FULLY VERIFIED');
-    console.log('========================================================================');
+    console.log(
+      '========================================================================',
+    );
   } finally {
     if (workerProcess && workerProcess.exitCode === null) {
       workerProcess.kill('SIGKILL');
     }
     if (sub1Id) {
-      await prisma.speakingSubmission.deleteMany({ where: { id: { in: [sub1Id, sub2Id].filter(Boolean) } } }).catch(() => {});
+      await prisma.speakingSubmission
+        .deleteMany({ where: { id: { in: [sub1Id, sub2Id].filter(Boolean) } } })
+        .catch(() => {});
     }
     await queue.close();
     await redis.quit();
