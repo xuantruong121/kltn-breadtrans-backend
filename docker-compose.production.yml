@@ -50,12 +50,14 @@ services:
     container_name: breadtrans-api
     restart: unless-stopped
     env_file:
-      - .env.production
+      - path: .env.production
+        required: false
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPEAKING_PIPELINE_MODE: ${SPEAKING_PIPELINE_MODE:-bullmq}
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,6 +73,44 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  # ─── Speaking Worker (BullMQ Consumer) ─────────────────────────────────────────
+  speaking-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: breadtrans-speaking-worker
+    command: ["node", "dist/src/worker/speaking-worker.main.js"]
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPEAKING_PIPELINE_MODE: bullmq
+      SPEAKING_WORKER_CONCURRENCY: ${SPEAKING_WORKER_CONCURRENCY:-1}
+      SPEAKING_WORKER_RATE_LIMIT_MAX: ${SPEAKING_WORKER_RATE_LIMIT_MAX:-1}
+      SPEAKING_WORKER_RATE_LIMIT_DURATION_MS: ${SPEAKING_WORKER_RATE_LIMIT_DURATION_MS:-1000}
+      SPEAKING_JOB_TIMEOUT_MS: ${SPEAKING_JOB_TIMEOUT_MS:-20000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+      - web # outbound Azure Speech and Cloudflare R2
+    # Liveness check: verifies process execution natively in Alpine
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep speaking-worker.main.js > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   # ─── Caddy (Reverse Proxy + Auto HTTPS) ──────────────────────────────────────
   caddy:

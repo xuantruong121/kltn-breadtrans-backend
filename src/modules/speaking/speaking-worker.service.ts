@@ -30,9 +30,15 @@ export class SpeakingWorkerService {
   /**
    * Scheduled loop running every 3 seconds to claim and process pending submissions,
    * and to recover any orphaned or stuck leases.
+   * Inactive when SPEAKING_PIPELINE_MODE=bullmq (independent worker runs instead).
    */
   @Interval(3000)
   async pollAndProcess(): Promise<void> {
+    const pipelineMode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
+    if (pipelineMode === 'bullmq') {
+      return; // Do not run legacy DB polling loop when BullMQ mode is active
+    }
+
     if (this.isProcessing) return;
     this.isProcessing = true;
     try {
@@ -49,9 +55,14 @@ export class SpeakingWorkerService {
   }
 
   /**
-   * Triggered immediately when a submission is created to process without delay.
+   * Triggered immediately when a submission is created to process without delay in legacy mode.
    */
   triggerProcessing(): void {
+    const pipelineMode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
+    if (pipelineMode === 'bullmq') {
+      return; // In BullMQ mode, enqueuing handles dispatching
+    }
+
     setImmediate(() => {
       this.pollAndProcess().catch((err) => {
         this.logger.error(

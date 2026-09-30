@@ -120,6 +120,7 @@ export class SpeakingController {
     @Param('id', ParseIntPipe) exerciseId: number,
     @Request() req: any,
     @Headers('idempotency-key') idempotencyKey: string,
+    @Headers('x-trace-id') traceIdHeader: string | undefined,
     @UploadedFile(
       new ParseFilePipe({
         validators: [new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 })],
@@ -132,6 +133,7 @@ export class SpeakingController {
       req.user.id,
       audio,
       idempotencyKey,
+      traceIdHeader,
     );
   }
 

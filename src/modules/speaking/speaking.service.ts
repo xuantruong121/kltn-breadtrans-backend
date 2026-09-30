@@ -13,6 +13,7 @@ import { UploadService } from '../upload/upload.service';
 import { CreateExerciseDto } from './dto/create-exercise.dto';
 import { validateSpeakingAudio } from './speaking-audio-validator';
 import { SpeakingWorkerService } from './speaking-worker.service';
+import { SpeakingQueueService } from './speaking-queue.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
@@ -22,6 +23,7 @@ export interface SubmitSpeakingResponse {
   status: string;
   pollUrl: string;
   acceptedAt: string;
+  traceId?: string;
 }
 
 const ALLOWED_TTS_RATES = [0.5, 0.75, 1, 1.25, 1.5];
@@ -245,6 +247,7 @@ export class SpeakingService {
     private readonly aiService: AiService,
     private readonly uploadService: UploadService,
     private readonly speakingWorkerService: SpeakingWorkerService,
+    @Optional() private readonly speakingQueueService?: SpeakingQueueService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
   ) {}
 
@@ -353,7 +356,10 @@ export class SpeakingService {
     userId: number,
     audioFile: Express.Multer.File,
     idempotencyKey?: string,
+    traceIdHeader?: string,
   ): Promise<SubmitSpeakingResponse> {
+    const traceId = traceIdHeader?.trim() || crypto.randomUUID();
+
     // 1. Validate Idempotency-Key
     if (
       !idempotencyKey ||
@@ -378,13 +384,14 @@ export class SpeakingService {
 
     if (existingSubmission) {
       this.logger.log(
-        `Idempotent duplicate detected for user #${userId} with key "${cleanIdempotencyKey}". Returning existing submission #${existingSubmission.id}.`,
+        `Idempotent duplicate detected for user #${userId} with key "${cleanIdempotencyKey}". Returning existing submission #${existingSubmission.id}. (traceId=${traceId})`,
       );
       return {
         submissionId: existingSubmission.id,
         status: existingSubmission.status,
         pollUrl: `/speaking/submissions/${existingSubmission.id}`,
         acceptedAt: existingSubmission.submittedAt.toISOString(),
+        traceId,
       };
     }
 
@@ -404,7 +411,7 @@ export class SpeakingService {
     // The submission id is created after upload, so the storage service
     // uses a stable catalog prefix plus a generated object name.
     this.logger.log(
-      `Uploading audio for exercise #${exerciseId} by user #${userId} (${audioValidation.durationMs}ms)`,
+      `Uploading audio for exercise #${exerciseId} by user #${userId} (${audioValidation.durationMs}ms, traceId=${traceId})`,
     );
     const uploadResult = await this.uploadService.uploadRawBuffer(
       audioFile.buffer,
@@ -464,8 +471,26 @@ export class SpeakingService {
       throw error;
     }
 
-    // 8. Trigger background worker immediately
-    this.speakingWorkerService.triggerProcessing();
+    // 8. Pipeline dispatch: BullMQ queue vs legacy DB-polling fallback
+    const pipelineMode = process.env.SPEAKING_PIPELINE_MODE || 'legacy';
+    if (pipelineMode === 'bullmq' && this.speakingQueueService) {
+      try {
+        await this.speakingQueueService.enqueueSubmission(
+          submission.id,
+          traceId,
+        );
+        this.logger.log(
+          `[SpeakingService] Enqueued submission #${submission.id} to BullMQ queue (traceId=${traceId})`,
+        );
+      } catch (queueErr: any) {
+        this.logger.error(
+          `[SpeakingService] Failed to enqueue submission #${submission.id} to BullMQ: ${queueErr.message}. Submission remains PENDING in DB for reconciliation. (traceId=${traceId})`,
+        );
+      }
+    } else {
+      // Legacy DB polling fallback
+      this.speakingWorkerService.triggerProcessing();
+    }
 
     // 9. Return HTTP 202 Accepted payload
     return {
@@ -473,6 +498,7 @@ export class SpeakingService {
       status: 'PENDING',
       pollUrl: `/speaking/submissions/${submission.id}`,
       acceptedAt: submission.submittedAt.toISOString(),
+      traceId,
     };
   }
 
