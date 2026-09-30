@@ -81,6 +81,14 @@ export class UploadService {
     };
   }
 
+  getPublicUrl(): string {
+    return this.r2.getPublicUrl();
+  }
+
+  async headObject(key: string) {
+    return this.r2.headObject(key);
+  }
+
   async objectExists(key: string): Promise<boolean> {
     return this.r2.objectExists(key);
   }
@@ -98,7 +106,7 @@ export class UploadService {
   async getPresignedUploadUrl(
     key: string,
     mimeType: string,
-    expiresIn = 900,
+    expiresIn = 600,
   ): Promise<string> {
     return this.r2.getPresignedUploadUrl(key, mimeType, expiresIn);
   }

@@ -44,8 +44,13 @@ export class AiService {
   async assessPronunciation(
     targetText: string,
     audioBuffer: Buffer,
+    options?: { signal?: AbortSignal },
   ): Promise<PronunciationFeedback> {
-    return this.aiEvaluator.assessPronunciation(targetText, audioBuffer);
+    return this.aiEvaluator.assessPronunciation(
+      targetText,
+      audioBuffer,
+      options,
+    );
   }
 
   async explainToeicError(

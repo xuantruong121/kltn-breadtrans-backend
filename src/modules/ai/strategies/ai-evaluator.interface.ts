@@ -90,6 +90,7 @@ export interface IAIEvaluator {
   assessPronunciation(
     targetText: string,
     audioBuffer: Buffer,
+    options?: { signal?: AbortSignal },
   ): Promise<PronunciationFeedback>;
 
   /**

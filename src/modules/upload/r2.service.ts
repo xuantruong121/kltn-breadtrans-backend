@@ -29,17 +29,74 @@ export class R2Service {
 
   constructor() {
     const accountId = process.env.R2_ACCOUNT_ID;
-    this.bucket = process.env.R2_BUCKET_NAME ?? 'breadtrans-files';
-    this.publicUrl = (process.env.R2_PUBLIC_URL ?? '').replace(/\/$/, '');
+    const localEndpoint = process.env.LOCAL_S3_ENDPOINT?.trim();
+    const localStorage = Boolean(localEndpoint);
+    this.bucket = (
+      (localStorage
+        ? process.env.LOCAL_S3_BUCKET
+        : process.env.R2_BUCKET_NAME) ?? 'breadtrans-files'
+    ).trim();
+
+    const customEndpoint = localEndpoint || process.env.R2_ENDPOINT;
+    const endpoint =
+      customEndpoint ||
+      (accountId
+        ? `https://${accountId}.r2.cloudflarestorage.com`
+        : undefined);
+
+    const configuredPublicUrl = (
+      localStorage
+        ? process.env.LOCAL_S3_PUBLIC_URL
+        : process.env.R2_PUBLIC_URL
+    )?.trim();
+    this.publicUrl = (
+      configuredPublicUrl ||
+      (localStorage && endpoint
+        ? `${endpoint.replace(/\/$/, '')}/${this.bucket}`
+        : '')
+    ).replace(/\/$/, '');
+
+    const accessKeyId =
+      (localStorage
+        ? process.env.LOCAL_S3_ACCESS_KEY_ID
+        : process.env.R2_ACCESS_KEY_ID) ?? '';
+    const secretAccessKey =
+      (localStorage
+        ? process.env.LOCAL_S3_SECRET_ACCESS_KEY
+        : process.env.R2_SECRET_ACCESS_KEY) ?? '';
+    const forcePathStyle = localStorage
+      ? this.parseBoolean(process.env.LOCAL_S3_FORCE_PATH_STYLE, true)
+      : Boolean(customEndpoint);
 
     this.client = new S3Client({
       region: 'auto',
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      ...(endpoint ? { endpoint } : {}),
       credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
+        accessKeyId,
+        secretAccessKey,
       },
+      forcePathStyle,
     });
+
+    this.logger.log(
+      `Storage provider: ${localStorage ? 'local-s3-compatible' : 'cloudflare-r2'}`,
+    );
+    if (endpoint) {
+      try {
+        this.logger.log(`Storage endpoint host: ${new URL(endpoint).host}`);
+      } catch {
+        this.logger.log('Storage endpoint host: configured');
+      }
+    }
+    this.logger.log(`Bucket: ${this.bucket}`);
+    this.logger.log(
+      `Presigned upload mode: ${process.env.SPEAKING_AUDIO_UPLOAD_MODE === 'presigned' ? 'enabled' : 'disabled'}`,
+    );
+  }
+
+  private parseBoolean(value: string | undefined, fallback: boolean): boolean {
+    if (value === undefined) return fallback;
+    return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
   }
 
   /**
@@ -51,7 +108,14 @@ export class R2Service {
     totalMb: number;
   }> {
     try {
-      if (!process.env.R2_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID) {
+      const localStorage = Boolean(process.env.LOCAL_S3_ENDPOINT);
+      const hasCredentials = localStorage
+        ? Boolean(
+            process.env.LOCAL_S3_ACCESS_KEY_ID &&
+              process.env.LOCAL_S3_SECRET_ACCESS_KEY,
+          )
+        : Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID);
+      if (!hasCredentials) {
         return { totalBytes: 0, fileCount: 0, totalMb: 0 };
       }
       const command = new ListObjectsV2Command({
@@ -119,21 +183,42 @@ export class R2Service {
     return { key, url: `${this.publicUrl}/${key}`, contentType: mimeType };
   }
 
-  async objectExists(key: string): Promise<boolean> {
+  getPublicUrl(): string {
+    return this.publicUrl;
+  }
+
+  async headObject(key: string): Promise<{
+    contentLength: number;
+    contentType?: string;
+    etag?: string;
+  } | null> {
     try {
-      await this.client.send(
+      const response = await this.client.send(
         new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
       );
-      return true;
-    } catch (error) {
+      return {
+        contentLength: response.ContentLength ?? 0,
+        contentType: response.ContentType,
+        etag: response.ETag?.replace(/^"|"$/g, ''),
+      };
+    } catch (error: any) {
       const code = (
         error as { name?: string; $metadata?: { httpStatusCode?: number } }
       ).$metadata?.httpStatusCode;
-      if (code === 404 || (error as { name?: string }).name === 'NotFound') {
-        return false;
+      if (
+        code === 404 ||
+        (error as { name?: string }).name === 'NotFound' ||
+        (error as { name?: string }).name === 'NoSuchKey'
+      ) {
+        return null;
       }
       throw error;
     }
+  }
+
+  async objectExists(key: string): Promise<boolean> {
+    const head = await this.headObject(key);
+    return head !== null;
   }
 
   /**
@@ -159,12 +244,12 @@ export class R2Service {
    * Hữu ích cho file lớn (video, audio recording).
    * @param key      Key trong bucket
    * @param mimeType MIME type
-   * @param expiresIn Thời gian hết hạn (giây), mặc định 15 phút
+   * @param expiresIn Thời gian hết hạn (giây), mặc định 10 phút (600s)
    */
   async getPresignedUploadUrl(
     key: string,
     mimeType: string,
-    expiresIn: number = 900,
+    expiresIn: number = 600,
   ): Promise<string> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
