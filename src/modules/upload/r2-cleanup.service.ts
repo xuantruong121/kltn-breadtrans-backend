@@ -94,10 +94,106 @@ export class R2CleanupService {
       this.logger.log(
         `Successfully cleaned up ${deletedCount} expired audio file(s) from Cloudflare R2.`,
       );
+
+      // Also clean up orphan speaking upload intents
+      await this.cleanupOrphanUploadIntents();
     } catch (error) {
       this.logger.error('Failed to cleanup expired R2 audio files', error);
       throw error;
     }
+  }
+
+  /**
+   * Phase 2: Dọn dẹp các upload intents mồ côi (chưa hoàn tất và đã hết hạn)
+   * và xóa các file rác tạm trong R2 thuộc prefix speaking/pending.
+   * Đảm bảo:
+   * - Tuyệt đối không xóa audio thuộc bài nộp hợp lệ (đã finalized hoặc có submissionId).
+   * - Bounded batches (take: 100).
+   * - Trả về structured counts: intentsInspected, objectsDeleted, recordsExpired, failures.
+   */
+  async cleanupOrphanUploadIntents(batchSize: number = 100): Promise<{
+    intentsInspected: number;
+    objectsDeleted: number;
+    recordsExpired: number;
+    failures: number;
+  }> {
+    const counts = {
+      intentsInspected: 0,
+      objectsDeleted: 0,
+      recordsExpired: 0,
+      failures: 0,
+    };
+
+    const now = new Date();
+    try {
+      const expiredIntents = await this.prisma.speakingUploadIntent.findMany({
+        where: {
+          OR: [
+            { status: 'PENDING', expiresAt: { lt: now } },
+            { status: 'EXPIRED' },
+            { status: 'INVALID' },
+          ],
+        },
+        take: batchSize,
+        orderBy: { createdAt: 'asc' },
+      });
+
+      counts.intentsInspected = expiredIntents.length;
+
+      for (const intent of expiredIntents) {
+        try {
+          // Invariant: NEVER delete audio belonging to a valid finalized submission
+          if (intent.submissionId) {
+            continue;
+          }
+
+          // Double check whether a submission references this objectKey
+          const existingSub = await this.prisma.speakingSubmission.findFirst({
+            where: { audioKey: intent.objectKey },
+            select: { id: true },
+          });
+
+          if (existingSub) {
+            this.logger.warn(
+              `Intent ${intent.id} has objectKey ${intent.objectKey} tied to submission #${existingSub.id}. Skipping deletion.`,
+            );
+            await this.prisma.speakingUploadIntent.update({
+              where: { id: intent.id },
+              data: { status: 'FINALIZED', submissionId: existingSub.id },
+            });
+            continue;
+          }
+
+          // Safe to delete temporary pending object from R2
+          const exists = await this.r2Service.objectExists(intent.objectKey);
+          if (exists) {
+            await this.r2Service.deleteFile(intent.objectKey);
+            counts.objectsDeleted++;
+          }
+
+          if (intent.status !== 'EXPIRED') {
+            await this.prisma.speakingUploadIntent.update({
+              where: { id: intent.id },
+              data: { status: 'EXPIRED' },
+            });
+            counts.recordsExpired++;
+          }
+        } catch (itemErr) {
+          counts.failures++;
+          this.logger.error(
+            `Failed to cleanup orphan intent ${intent.id}: ${itemErr}`,
+          );
+        }
+      }
+
+      this.logger.log(
+        `Orphan intent cleanup completed: inspected=${counts.intentsInspected}, deleted=${counts.objectsDeleted}, expired=${counts.recordsExpired}, failures=${counts.failures}`,
+      );
+    } catch (err) {
+      this.logger.error('Error during cleanupOrphanUploadIntents', err);
+    }
+
+    return counts;
   }
 
   // Backward-compatible admin entry point. Automated execution uses the queue.

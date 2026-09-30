@@ -32,13 +32,21 @@ export class R2Service {
     this.bucket = process.env.R2_BUCKET_NAME ?? 'breadtrans-files';
     this.publicUrl = (process.env.R2_PUBLIC_URL ?? '').replace(/\/$/, '');
 
+    const customEndpoint = process.env.R2_ENDPOINT;
+    const endpoint =
+      customEndpoint ||
+      (accountId
+        ? `https://${accountId}.r2.cloudflarestorage.com`
+        : undefined);
+
     this.client = new S3Client({
       region: 'auto',
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      ...(endpoint ? { endpoint } : {}),
       credentials: {
         accessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
       },
+      forcePathStyle: !!customEndpoint,
     });
   }
 
@@ -119,21 +127,42 @@ export class R2Service {
     return { key, url: `${this.publicUrl}/${key}`, contentType: mimeType };
   }
 
-  async objectExists(key: string): Promise<boolean> {
+  getPublicUrl(): string {
+    return this.publicUrl;
+  }
+
+  async headObject(key: string): Promise<{
+    contentLength: number;
+    contentType?: string;
+    etag?: string;
+  } | null> {
     try {
-      await this.client.send(
+      const response = await this.client.send(
         new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
       );
-      return true;
-    } catch (error) {
+      return {
+        contentLength: response.ContentLength ?? 0,
+        contentType: response.ContentType,
+        etag: response.ETag?.replace(/^"|"$/g, ''),
+      };
+    } catch (error: any) {
       const code = (
         error as { name?: string; $metadata?: { httpStatusCode?: number } }
       ).$metadata?.httpStatusCode;
-      if (code === 404 || (error as { name?: string }).name === 'NotFound') {
-        return false;
+      if (
+        code === 404 ||
+        (error as { name?: string }).name === 'NotFound' ||
+        (error as { name?: string }).name === 'NoSuchKey'
+      ) {
+        return null;
       }
       throw error;
     }
+  }
+
+  async objectExists(key: string): Promise<boolean> {
+    const head = await this.headObject(key);
+    return head !== null;
   }
 
   /**

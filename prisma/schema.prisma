@@ -80,6 +80,7 @@ model User {
   userBadges                      UserBadge[]
   leaderboard                     Leaderboard?
   speakingSubmissions             SpeakingSubmission[]
+  speakingUploadIntents           SpeakingUploadIntent[]
   bookProgresses                  UserBookProgress[]
   marketOrders                    MarketOrder[]
   gamePlays                       GamePlay[]
@@ -583,7 +584,8 @@ model SpeakingExercise {
   category   String   @default("TOEIC") // IELTS, TOEIC, GENERAL
   createdAt  DateTime @default(now())
 
-  submissions SpeakingSubmission[]
+  submissions   SpeakingSubmission[]
+  uploadIntents SpeakingUploadIntent[]
 }
 
 enum SpeakingSubmissionStatus {
@@ -621,9 +623,45 @@ model SpeakingSubmission {
   rewardGrantedAt     DateTime?
   submittedAt         DateTime                 @default(now())
 
+  uploadIntent        SpeakingUploadIntent?
+
   @@unique([userId, idempotencyKey])
   @@index([status, nextAttemptAt])
   @@index([userId, submittedAt])
+}
+
+enum SpeakingUploadIntentStatus {
+  PENDING
+  FINALIZED
+  EXPIRED
+  CANCELLED
+  INVALID
+}
+
+model SpeakingUploadIntent {
+  id                  String                     @id @default(uuid())
+  userId              Int
+  user                User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId          Int
+  exercise            SpeakingExercise           @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  objectKey           String                     @unique
+  expectedContentType String
+  expectedSizeBytes   Int
+  expectedDurationMs  Int
+  checksumSha256      String?
+  idempotencyKey      String?
+  status              SpeakingUploadIntentStatus @default(PENDING)
+  expiresAt           DateTime
+  finalizedAt         DateTime?
+  submissionId        Int?                       @unique
+  submission          SpeakingSubmission?        @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@index([createdAt])
 }
 
 // ==========================================
