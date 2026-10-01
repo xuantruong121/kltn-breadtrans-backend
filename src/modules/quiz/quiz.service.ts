@@ -1416,6 +1416,23 @@ export class QuizService {
         }
       }
 
+      if (quiz.type === QuizType.BILINGUAL_READING) {
+        await tx.learningActivity.create({
+          data: {
+            userId,
+            type: 'READING_PRACTICE_COMPLETED',
+            title: quiz.title,
+            detail: `${totalScore}/${quiz.questions.length} câu đúng`,
+            score:
+              quiz.questions.length > 0
+                ? Math.round((totalScore / quiz.questions.length) * 100)
+                : 0,
+            sourceType: 'QUIZ',
+            sourceId: String(quizId),
+          },
+        });
+      }
+
       return created;
     });
 
@@ -1453,6 +1470,7 @@ export class QuizService {
       userId,
       quizId,
       score: totalScore,
+      quizType: quiz.type,
       submissionId: submission.id,
       isFirstSubmission,
     });

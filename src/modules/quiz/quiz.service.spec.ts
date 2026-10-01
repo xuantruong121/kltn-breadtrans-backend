@@ -329,6 +329,9 @@ describe('QuizService', () => {
             ],
           }),
         },
+        learningActivity: {
+          create: jest.fn().mockResolvedValue({ id: 501 }),
+        },
       };
       mockPrismaService.$transaction.mockImplementation(
         (callback: (transaction: typeof tx) => Promise<unknown>) =>
@@ -361,10 +364,23 @@ describe('QuizService', () => {
       expect(
         tx.submission.create.mock.calls[0][0].data.results.create,
       ).toHaveLength(2);
+      expect(tx.learningActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: 7,
+          type: 'READING_PRACTICE_COMPLETED',
+          sourceType: 'QUIZ',
+          sourceId: '24',
+          score: 50,
+        }),
+      });
       expect(result.id).toBe(77);
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         'quiz.submitted',
-        expect.objectContaining({ quizId: 24, score: 1 }),
+        expect.objectContaining({
+          quizId: 24,
+          score: 1,
+          quizType: 'BILINGUAL_READING',
+        }),
       );
     });
 
@@ -382,6 +398,7 @@ describe('QuizService', () => {
       ).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
       expect(mockPrismaService.submission.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.learningActivity.create).not.toHaveBeenCalled();
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
@@ -406,7 +423,46 @@ describe('QuizService', () => {
       expect(
         mockPrismaService.userQuizReward.createMany,
       ).not.toHaveBeenCalled();
+      expect(mockPrismaService.learningActivity.create).not.toHaveBeenCalled();
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('keeps Listening activity creation outside the Reading transaction path', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 9,
+        title: 'Listening',
+        type: 'LISTENING_PRACTICE',
+        questions: [
+          {
+            id: 91,
+            type: 'MULTIPLE_CHOICE',
+            content: { options: ['A', 'B'], correctIndex: 0 },
+          },
+        ],
+      });
+      const tx = {
+        submission: {
+          create: jest.fn().mockResolvedValue({ id: 78, results: [] }),
+        },
+      };
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (transaction: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      );
+      mockPrismaService.userQuizReward.createMany.mockResolvedValue({
+        count: 1,
+      });
+
+      await service.submitQuiz(9, 7, {
+        answers: [{ questionId: 91, answer: 'A' }],
+      });
+
+      expect(mockPrismaService.learningActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          type: 'LISTENING_PRACTICE_COMPLETED',
+          sourceId: '9',
+        }),
+      });
     });
 
     it('uses the server Reading question count as analytics denominator', async () => {

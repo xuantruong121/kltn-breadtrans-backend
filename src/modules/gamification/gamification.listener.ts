@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { Prisma } from '@prisma/client';
+import { Prisma, QuizType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService, getTodayDateKey } from './gamification.service';
 
@@ -19,6 +19,7 @@ export class GamificationListener {
     userId: number;
     quizId?: number;
     score: number;
+    quizType?: QuizType | (string & {});
     isFirstSubmission?: boolean;
   }) {
     this.logger.log(
@@ -101,6 +102,12 @@ export class GamificationListener {
       });
 
       for (const quest of activeQuests) {
+        if (
+          quest.type === 'DO_LISTENING' &&
+          payload.quizType !== QuizType.LISTENING_PRACTICE
+        ) {
+          continue;
+        }
         if (quest.type === 'PERFECT_QUIZ' && payload.score < 100) {
           continue;
         }
