@@ -81,9 +81,9 @@ describe('SpeakingController - Security & AI Quota', () => {
   });
 
   it('exposes both static history routes', () => {
-    expect(Reflect.getMetadata(PATH_METADATA, controller.getMySubmissions)).toBe(
-      'submissions/my',
-    );
+    expect(
+      Reflect.getMetadata(PATH_METADATA, controller.getMySubmissions),
+    ).toBe('submissions/my');
     expect(
       Reflect.getMetadata(PATH_METADATA, controller.getMySubmissionsLegacy),
     ).toBe('my-submissions');

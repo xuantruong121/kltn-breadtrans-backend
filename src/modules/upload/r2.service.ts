@@ -40,14 +40,10 @@ export class R2Service {
     const customEndpoint = localEndpoint || process.env.R2_ENDPOINT;
     const endpoint =
       customEndpoint ||
-      (accountId
-        ? `https://${accountId}.r2.cloudflarestorage.com`
-        : undefined);
+      (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : undefined);
 
     const configuredPublicUrl = (
-      localStorage
-        ? process.env.LOCAL_S3_PUBLIC_URL
-        : process.env.R2_PUBLIC_URL
+      localStorage ? process.env.LOCAL_S3_PUBLIC_URL : process.env.R2_PUBLIC_URL
     )?.trim();
     this.publicUrl = (
       configuredPublicUrl ||
@@ -112,7 +108,7 @@ export class R2Service {
       const hasCredentials = localStorage
         ? Boolean(
             process.env.LOCAL_S3_ACCESS_KEY_ID &&
-              process.env.LOCAL_S3_SECRET_ACCESS_KEY,
+            process.env.LOCAL_S3_SECRET_ACCESS_KEY,
           )
         : Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID);
       if (!hasCredentials) {

@@ -77,7 +77,8 @@ export class SpeakingController {
 
   @Get('capabilities')
   @ApiOperation({
-    summary: 'Lấy cấu hình năng lực upload audio phát âm (Phase 2 Direct R2 / Legacy Proxy)',
+    summary:
+      'Lấy cấu hình năng lực upload audio phát âm (Phase 2 Direct R2 / Legacy Proxy)',
   })
   getCapabilities() {
     return this.speakingService.getCapabilities();
@@ -120,7 +121,8 @@ export class SpeakingController {
   })
   @ApiResponse({
     status: 202,
-    description: 'Bài nộp được xác nhận thành công và chuyển vào hàng đợi chấm điểm',
+    description:
+      'Bài nộp được xác nhận thành công và chuyển vào hàng đợi chấm điểm',
   })
   finalizeUpload(
     @Param('uploadIntentId') uploadIntentId: string,
