@@ -95,7 +95,7 @@ export function validateReadingSubmission(
   }
 }
 
-/** Resolve the learner-facing category without collapsing Reading skills. */
+/** Resolve a pedagogical Reading micro-skill without treating READING as one. */
 export function resolveReadingMicroSkill(
   quizType: QuizType | (string & {}),
   content: unknown,
@@ -113,7 +113,16 @@ export function resolveReadingMicroSkill(
       : legacyQuestionType || 'General';
   }
 
-  for (const key of ['skill', 'questionType', 'category']) {
+  const skill = record.skill;
+  if (
+    typeof skill === 'string' &&
+    skill.trim().length > 0 &&
+    !['READING', 'BILINGUAL_READING'].includes(skill.trim().toUpperCase())
+  ) {
+    return skill.trim().toUpperCase();
+  }
+
+  for (const key of ['questionType', 'category']) {
     const value = record[key];
     if (typeof value === 'string' && value.trim().length > 0) {
       return value.trim().toUpperCase();

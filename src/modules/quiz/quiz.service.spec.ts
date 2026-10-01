@@ -136,6 +136,12 @@ describe('QuizService', () => {
       ).toBe('DETAIL');
       expect(
         resolveReadingMicroSkill('BILINGUAL_READING', {
+          skill: 'READING',
+          questionType: 'detail',
+        }),
+      ).toBe('DETAIL');
+      expect(
+        resolveReadingMicroSkill('BILINGUAL_READING', {
           questionType: 'purpose',
         }),
       ).toBe('PURPOSE');
@@ -460,7 +466,7 @@ describe('QuizService', () => {
         service.getSubmissionAnalytics(90, 7, Role.STUDENT),
       ).resolves.toMatchObject({
         categoriesBreakdown: expect.arrayContaining([
-          expect.objectContaining({ category: 'READING', total: 1 }),
+          expect.objectContaining({ category: 'DETAIL', total: 1 }),
           expect.objectContaining({ category: 'PURPOSE', total: 1 }),
         ]),
       });
