@@ -95,6 +95,33 @@ export function validateReadingSubmission(
   }
 }
 
+/** Resolve the learner-facing category without collapsing Reading skills. */
+export function resolveReadingMicroSkill(
+  quizType: QuizType | (string & {}),
+  content: unknown,
+  legacyQuestionType?: string,
+): string {
+  const record =
+    content && typeof content === 'object' && !Array.isArray(content)
+      ? (content as Record<string, unknown>)
+      : {};
+
+  if (quizType !== QuizType.BILINGUAL_READING) {
+    const category = record.category;
+    return typeof category === 'string' && category.trim().length > 0
+      ? category
+      : legacyQuestionType || 'General';
+  }
+
+  for (const key of ['skill', 'questionType', 'category']) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim().toUpperCase();
+    }
+  }
+  return 'UNKNOWN';
+}
+
 const STANDARD_CONTRACTIONS: Record<string, string[]> = {
   "we're": ['we', 'are'],
   "you're": ['you', 'are'],
@@ -1694,8 +1721,11 @@ export class QuizService {
       const question = submission.quiz.questions.find(
         (q) => q.id === res.questionId,
       );
-      const content = question?.content as any;
-      const category = content?.category || question?.type || 'General';
+      const category = resolveReadingMicroSkill(
+        submission.quiz.type,
+        question?.content,
+        question?.type,
+      );
 
       if (!tagStats[category]) {
         tagStats[category] = { correct: 0, total: 0 };

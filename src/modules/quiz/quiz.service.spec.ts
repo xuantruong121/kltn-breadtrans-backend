@@ -4,6 +4,7 @@ import {
   normalizeDialogueSegments,
   normalizeListeningAnswer,
   QuizService,
+  resolveReadingMicroSkill,
   validateReadingSubmission,
 } from './quiz.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -109,6 +110,55 @@ describe('QuizService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('Reading micro-skill analytics', () => {
+    it.each([
+      'DETAIL',
+      'PURPOSE',
+      'INFERENCE',
+      'MAIN_IDEA',
+      'VOCAB_IN_CONTEXT',
+      'PROMOTION',
+    ])('preserves the Reading skill %s', (skill) => {
+      expect(resolveReadingMicroSkill('BILINGUAL_READING', { skill })).toBe(
+        skill,
+      );
+    });
+
+    it('uses Reading content precedence and a controlled fallback', () => {
+      expect(
+        resolveReadingMicroSkill('BILINGUAL_READING', {
+          skill: 'detail',
+          questionType: 'purpose',
+          category: 'legacy',
+        }),
+      ).toBe('DETAIL');
+      expect(
+        resolveReadingMicroSkill('BILINGUAL_READING', {
+          questionType: 'purpose',
+        }),
+      ).toBe('PURPOSE');
+      expect(
+        resolveReadingMicroSkill('BILINGUAL_READING', { category: 'detail' }),
+      ).toBe('DETAIL');
+      expect(resolveReadingMicroSkill('BILINGUAL_READING', null)).toBe(
+        'UNKNOWN',
+      );
+    });
+
+    it('preserves the generic category fallback for non-Reading quizzes', () => {
+      expect(
+        resolveReadingMicroSkill('LISTENING_PRACTICE', {}, 'MULTIPLE_CHOICE'),
+      ).toBe('MULTIPLE_CHOICE');
+      expect(
+        resolveReadingMicroSkill(
+          'LISTENING_PRACTICE',
+          { category: 'DICTATION' },
+          'MULTIPLE_CHOICE',
+        ),
+      ).toBe('DICTATION');
+    });
   });
 
   it('normalizes dialogue rows and drops incomplete rows', () => {
@@ -374,6 +424,45 @@ describe('QuizService', () => {
         totalQuestions: 2,
         totalCorrect: 1,
         overallAccuracyPercent: 50,
+      });
+    });
+
+    it('reports Reading micro-skills instead of collapsing to MULTIPLE_CHOICE', async () => {
+      mockPrismaService.submission.findUnique.mockResolvedValue({
+        id: 90,
+        quizId: 24,
+        userId: 7,
+        score: 2,
+        quiz: {
+          id: 24,
+          title: 'Reading',
+          type: 'BILINGUAL_READING',
+          questions: [
+            {
+              id: 1,
+              type: 'MULTIPLE_CHOICE',
+              content: { skill: 'READING', questionType: 'DETAIL' },
+            },
+            {
+              id: 2,
+              type: 'MULTIPLE_CHOICE',
+              content: { questionType: 'PURPOSE' },
+            },
+          ],
+        },
+        results: [
+          { questionId: 1, isCorrect: true },
+          { questionId: 2, isCorrect: false },
+        ],
+      });
+
+      await expect(
+        service.getSubmissionAnalytics(90, 7, Role.STUDENT),
+      ).resolves.toMatchObject({
+        categoriesBreakdown: expect.arrayContaining([
+          expect.objectContaining({ category: 'READING', total: 1 }),
+          expect.objectContaining({ category: 'PURPOSE', total: 1 }),
+        ]),
       });
     });
 
