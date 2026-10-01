@@ -4,6 +4,11 @@ export const SPEAKING_JOB_NAME = 'speaking-assessment-job';
 export const SPEAKING_EVENTS_CHANNEL = 'breadtrans:speaking:events';
 export const SPEAKING_COMPLETED_EVENT = 'speaking.completed';
 export const SPEAKING_FAILED_EVENT = 'speaking.failed';
+export const SPEAKING_SCORE_COMPLETED_EVENT = 'speaking.score.completed';
+export const SPEAKING_SCORE_FAILED_EVENT = 'speaking.score.failed';
+export const SPEAKING_FEEDBACK_COMPLETED_EVENT = 'speaking.feedback.completed';
+export const SPEAKING_FEEDBACK_FAILED_EVENT = 'speaking.feedback.failed';
+export const SPEAKING_REWARD_COMPLETED_EVENT = 'speaking.reward.completed';
 
 export type SpeakingPipelineMode = 'bullmq' | 'legacy';
 
@@ -40,10 +45,18 @@ export function isMissingStorageError(error: unknown): boolean {
 export interface SpeakingJobPayload {
   submissionId: number;
   traceId: string;
+  kind?: 'SCORE' | 'FEEDBACK' | 'REWARD';
 }
 
 export interface SpeakingEventPayload {
-  type: typeof SPEAKING_COMPLETED_EVENT | typeof SPEAKING_FAILED_EVENT;
+  type:
+    | typeof SPEAKING_COMPLETED_EVENT
+    | typeof SPEAKING_FAILED_EVENT
+    | typeof SPEAKING_SCORE_COMPLETED_EVENT
+    | typeof SPEAKING_SCORE_FAILED_EVENT
+    | typeof SPEAKING_FEEDBACK_COMPLETED_EVENT
+    | typeof SPEAKING_FEEDBACK_FAILED_EVENT
+    | typeof SPEAKING_REWARD_COMPLETED_EVENT;
   userId: number;
   submissionId: number;
   traceId: string;
@@ -51,6 +64,10 @@ export interface SpeakingEventPayload {
 
 export const getSpeakingJobId = (submissionId: number): string =>
   `speaking-assessment-${submissionId}`;
+export const getSpeakingFeedbackJobId = (submissionId: number): string =>
+  `speaking-feedback-${submissionId}`;
+export const getSpeakingRewardJobId = (submissionId: number): string =>
+  `speaking-reward-${submissionId}`;
 
 export const LEASE_SAFETY_MARGIN_MS = 15000;
 export const getLeaseTimeoutMs = (jobTimeoutMs: number = 20000): number =>

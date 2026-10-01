@@ -8,6 +8,7 @@ describe('GamificationListener', () => {
     badge: { findFirst: jest.Mock };
     userBadge: { findUnique: jest.Mock; create: jest.Mock };
     userStats: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock };
+    pointHistory: { findFirst: jest.Mock };
     dailyBanhEarning: { findUnique: jest.Mock; upsert: jest.Mock };
   };
   let gamificationServiceMock: {
@@ -46,6 +47,9 @@ describe('GamificationListener', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         create: jest.fn(),
+      },
+      pointHistory: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       dailyBanhEarning: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -208,6 +212,7 @@ describe('GamificationListener', () => {
         15,
         99,
         85,
+        expect.objectContaining({ tx: expect.anything() }),
       );
       expect(
         gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
@@ -216,6 +221,7 @@ describe('GamificationListener', () => {
         expect.objectContaining({ id: 9 }),
         1,
         expect.any(String),
+        expect.anything(),
       );
     });
   });

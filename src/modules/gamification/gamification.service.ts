@@ -701,10 +701,11 @@ export class GamificationService {
     userId: number,
     submissionId: number,
     score: number,
+    options?: { tx?: Prisma.TransactionClient },
   ): Promise<{ granted: number; reason?: string }> {
     const today = getTodayDateKey('Asia/Ho_Chi_Minh');
 
-    return this.prisma.$transaction(async (tx) => {
+    const runner = async (tx: Prisma.TransactionClient) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`speaking_sub:${submissionId}`}))`;
 
       const existing = await tx.banhTransaction.findUnique({
@@ -758,7 +759,12 @@ export class GamificationService {
       }
 
       return { granted: awardResult.granted };
-    });
+    };
+
+    if (options?.tx) {
+      return runner(options.tx);
+    }
+    return this.prisma.$transaction(runner);
   }
 
   /**
@@ -866,18 +872,20 @@ export class GamificationService {
   async awardBadgeIfEarned(
     userId: number,
     badgeName: string,
+    options?: { tx?: Prisma.TransactionClient },
   ): Promise<boolean> {
-    const badge = await this.prisma.badge.findFirst({
+    const client = options?.tx ?? this.prisma;
+    const badge = await client.badge.findFirst({
       where: { name: badgeName },
     });
     if (!badge) return false;
 
-    const exists = await this.prisma.userBadge.findUnique({
+    const exists = await client.userBadge.findUnique({
       where: { userId_badgeId: { userId, badgeId: badge.id } },
     });
     if (exists) return false;
 
-    await this.prisma.userBadge.create({
+    await client.userBadge.create({
       data: { userId, badgeId: badge.id },
     });
 

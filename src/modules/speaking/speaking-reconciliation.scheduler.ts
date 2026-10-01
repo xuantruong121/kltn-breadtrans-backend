@@ -1,13 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
+import { Queue } from 'bullmq';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SpeakingQueueService } from './speaking-queue.service';
 import {
   getSpeakingJobId,
+  getSpeakingFeedbackJobId,
+  getSpeakingRewardJobId,
   getLeaseTimeoutMs,
   getSpeakingWorkerConfig,
   getSpeakingPipelineMode,
+  SpeakingJobPayload,
 } from './speaking.constants';
 
 const STALE_PENDING_MS = 15 * 1000; // 15 seconds
@@ -51,6 +55,14 @@ export class SpeakingReconciliationScheduler {
       );
       const processingCutoff = new Date(now.getTime() - leaseTimeoutMs);
 
+      const queue = this.queueService.getQueue();
+      if (!queue) {
+        this.logger.warn(
+          `[SpeakingReconciliation] BullMQ queue instance not ready. Skipping reconciliation cycle.`,
+        );
+        return;
+      }
+
       // 1. Find eligible PENDING submissions respecting nextAttemptAt
       const pendingSubmissions = await this.prisma.speakingSubmission.findMany({
         where: {
@@ -74,19 +86,14 @@ export class SpeakingReconciliationScheduler {
         });
 
       const candidates = [...pendingSubmissions, ...staleProcessingSubmissions];
-      if (candidates.length === 0) return;
-
-      this.logger.log(
-        `[SpeakingReconciliation] Discovered ${candidates.length} candidate submissions (${pendingSubmissions.length} PENDING, ${staleProcessingSubmissions.length} stale PROCESSING)`,
-      );
-
-      const queue = this.queueService.getQueue();
-      if (!queue) {
-        this.logger.warn(
-          `[SpeakingReconciliation] BullMQ queue instance not ready. Skipping reconciliation cycle.`,
-        );
+      if (candidates.length === 0) {
+        await this.reconcilePostProcessingJobs(queue, processingCutoff);
         return;
       }
+
+      this.logger.log(
+        `[SpeakingReconciliation] Discovered ${candidates.length} score candidates (${pendingSubmissions.length} PENDING, ${staleProcessingSubmissions.length} stale PROCESSING)`,
+      );
 
       for (const sub of candidates) {
         const jobId = getSpeakingJobId(sub.id);
@@ -190,12 +197,197 @@ export class SpeakingReconciliationScheduler {
           );
         }
       }
+
+      // Reconcile post-processing feedback and rewards
+      await this.reconcilePostProcessingJobs(queue, processingCutoff);
     } catch (err: any) {
       this.logger.error(
         `[SpeakingReconciliation] Error during reconciliation cycle: ${err.message}`,
       );
     } finally {
       this.isRunning = false;
+    }
+  }
+
+  private async reconcilePostProcessingJobs(
+    queue: Queue<SpeakingJobPayload, unknown, string>,
+    processingCutoff: Date,
+  ): Promise<void> {
+    // 1. Recover stale PROCESSING feedback
+    const staleProcessingFeedback =
+      (await this.prisma.speakingSubmission.findMany({
+        where: {
+          status: 'COMPLETED',
+          feedbackStatus: 'PROCESSING',
+          feedbackStartedAt: { lte: processingCutoff },
+        },
+        take: 10,
+        orderBy: { feedbackStartedAt: 'asc' },
+        select: { id: true },
+      })) ?? [];
+
+    for (const sub of staleProcessingFeedback) {
+      const jobId = getSpeakingFeedbackJobId(sub.id);
+      const traceId = `reconcile-fb-stale-${crypto.randomUUID()}`;
+      try {
+        const job = await queue.getJob(jobId);
+        if (job) {
+          const jobState = await job.getState();
+          if (jobState === 'active') continue;
+          await job.remove();
+        }
+        await this.prisma.speakingSubmission.update({
+          where: { id: sub.id, feedbackStatus: 'PROCESSING' },
+          data: { feedbackStatus: 'PENDING', feedbackWorkerId: null },
+        });
+        await this.queueService.enqueueFeedback(sub.id, traceId);
+        this.logger.log(
+          `[SpeakingReconciliation] Recovered stale PROCESSING feedback for #${sub.id}`,
+        );
+      } catch (err: any) {
+        this.logger.error(
+          `[SpeakingReconciliation] Error recovering feedback #${sub.id}: ${err.message}`,
+        );
+      }
+    }
+
+    // 2. Recover stale PROCESSING rewards
+    const staleProcessingRewards =
+      (await this.prisma.speakingSubmission.findMany({
+        where: {
+          status: 'COMPLETED',
+          rewardStatus: 'PROCESSING',
+          rewardStartedAt: { lte: processingCutoff },
+          rewardGrantedAt: null,
+        },
+        take: 10,
+        orderBy: { rewardStartedAt: 'asc' },
+        select: { id: true },
+      })) ?? [];
+
+    for (const sub of staleProcessingRewards) {
+      const jobId = getSpeakingRewardJobId(sub.id);
+      const traceId = `reconcile-rw-stale-${crypto.randomUUID()}`;
+      try {
+        const job = await queue.getJob(jobId);
+        if (job) {
+          const jobState = await job.getState();
+          if (jobState === 'active') continue;
+          await job.remove();
+        }
+        await this.prisma.speakingSubmission.update({
+          where: { id: sub.id, rewardStatus: 'PROCESSING' },
+          data: { rewardStatus: 'PENDING', rewardWorkerId: null },
+        });
+        await this.queueService.enqueueReward(sub.id, traceId);
+        this.logger.log(
+          `[SpeakingReconciliation] Recovered stale PROCESSING reward for #${sub.id}`,
+        );
+      } catch (err: any) {
+        this.logger.error(
+          `[SpeakingReconciliation] Error recovering reward #${sub.id}: ${err.message}`,
+        );
+      }
+    }
+
+    // 3. Reconcile PENDING feedback jobs
+    const pendingFeedback =
+      (await this.prisma.speakingSubmission.findMany({
+        where: { status: 'COMPLETED', feedbackStatus: 'PENDING' },
+        take: 20,
+        orderBy: { processedAt: 'asc' },
+        select: { id: true },
+      })) ?? [];
+
+    for (const sub of pendingFeedback) {
+      const jobId = getSpeakingFeedbackJobId(sub.id);
+      const traceId = `reconcile-feedback-${crypto.randomUUID()}`;
+      try {
+        const job = await queue.getJob(jobId);
+        if (!job) {
+          await this.queueService.enqueueFeedback(sub.id, traceId);
+          continue;
+        }
+        const state = await job.getState();
+        if (state === 'waiting' || state === 'active' || state === 'delayed') {
+          continue;
+        }
+        if (state === 'completed') {
+          await job.remove();
+          await this.queueService.enqueueFeedback(sub.id, traceId);
+          continue;
+        }
+        if (state === 'failed') {
+          if ((job.attemptsMade ?? 0) < MAX_ATTEMPTS) {
+            await job.remove();
+            await this.queueService.enqueueFeedback(sub.id, traceId);
+          } else {
+            await this.prisma.speakingSubmission.update({
+              where: { id: sub.id },
+              data: {
+                feedbackStatus: 'FAILED',
+                feedbackProcessedAt: new Date(),
+              },
+            });
+          }
+        }
+      } catch (err: any) {
+        this.logger.error(
+          `[SpeakingReconciliation] Error reconciling feedback #${sub.id}: ${err.message}`,
+        );
+      }
+    }
+
+    // 4. Reconcile PENDING reward jobs
+    const pendingRewards =
+      (await this.prisma.speakingSubmission.findMany({
+        where: {
+          status: 'COMPLETED',
+          rewardStatus: 'PENDING',
+          rewardGrantedAt: null,
+        },
+        take: 20,
+        orderBy: { processedAt: 'asc' },
+        select: { id: true },
+      })) ?? [];
+
+    for (const sub of pendingRewards) {
+      const jobId = getSpeakingRewardJobId(sub.id);
+      const traceId = `reconcile-reward-${crypto.randomUUID()}`;
+      try {
+        const job = await queue.getJob(jobId);
+        if (!job) {
+          await this.queueService.enqueueReward(sub.id, traceId);
+          continue;
+        }
+        const state = await job.getState();
+        if (state === 'waiting' || state === 'active' || state === 'delayed') {
+          continue;
+        }
+        if (state === 'completed') {
+          await job.remove();
+          await this.queueService.enqueueReward(sub.id, traceId);
+          continue;
+        }
+        if (state === 'failed') {
+          if ((job.attemptsMade ?? 0) < MAX_ATTEMPTS) {
+            await job.remove();
+            await this.queueService.enqueueReward(sub.id, traceId);
+          } else {
+            await this.prisma.speakingSubmission.update({
+              where: { id: sub.id },
+              data: {
+                rewardStatus: 'FAILED',
+                rewardProcessedAt: new Date(),
+              },
+            });
+          }
+        }
+      } catch (err: any) {
+        this.logger.error(
+          `[SpeakingReconciliation] Error reconciling reward #${sub.id}: ${err.message}`,
+        );
+      }
     }
   }
 }

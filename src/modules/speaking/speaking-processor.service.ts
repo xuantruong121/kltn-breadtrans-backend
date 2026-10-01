@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UnrecoverableError } from 'bullmq';
 import IORedis from 'ioredis';
@@ -18,6 +18,9 @@ import {
   getLeaseTimeoutMs,
   isMissingStorageError,
 } from './speaking.constants';
+import { SpeakingQueueService } from './speaking-queue.service';
+import { SpeakingPostProcessingService } from './speaking-post-processing.service';
+import { SpeakingEventPublisherService } from './speaking-event-publisher.service';
 
 const MAX_ATTEMPTS = 4;
 const RETRY_BACKOFF_MS = [
@@ -41,19 +44,54 @@ export class SpeakingProcessorService implements OnModuleDestroy {
     private readonly aiService: AiService,
     private readonly uploadService: UploadService,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() private readonly queueService?: SpeakingQueueService,
+    @Optional()
+    private readonly postProcessingService?: SpeakingPostProcessingService,
+    @Optional()
+    private readonly eventPublisher?: SpeakingEventPublisherService,
   ) {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    this.pubRedis = new IORedis(redisUrl, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-    });
+    if (this.eventPublisher) {
+      this.pubRedis = this.eventPublisher.pubRedis;
+    } else {
+      const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+      this.pubRedis = new IORedis(redisUrl, {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      });
+    }
   }
 
   /**
    * Top-level entry point for processing a Speaking Assessment job.
    * Wraps processing within an explicit timeout boundary (jobTimeoutMs).
    */
-  async processJob(jobPayload: SpeakingJobPayload): Promise<void> {
+  async processJob(
+    jobPayload: SpeakingJobPayload,
+    attempt = 1,
+    maxAttempts = MAX_ATTEMPTS,
+  ): Promise<void> {
+    if (jobPayload.kind === 'FEEDBACK') {
+      if (!this.postProcessingService) return;
+      return this.postProcessingService.processFeedback(
+        jobPayload.submissionId,
+        jobPayload.traceId,
+        attempt,
+        maxAttempts,
+      );
+    }
+    if (jobPayload.kind === 'REWARD') {
+      if (!this.postProcessingService) return;
+      return this.postProcessingService.processReward(
+        jobPayload.submissionId,
+        jobPayload.traceId,
+        attempt,
+        maxAttempts,
+      );
+    }
+    return this.processScoreJob(jobPayload);
+  }
+
+  private async processScoreJob(jobPayload: SpeakingJobPayload): Promise<void> {
     const { jobTimeoutMs } = getSpeakingWorkerConfig();
     const abortController = new AbortController();
     const workerToken = `worker-${crypto.randomUUID()}`;
@@ -459,6 +497,11 @@ export class SpeakingProcessorService implements OnModuleDestroy {
         lastErrorCode,
         lastErrorMessage: null,
         nextAttemptAt: null,
+        feedbackStatus: 'PENDING',
+        rewardStatus:
+          !isSilent && overallScore !== null && overallScore > 0
+            ? 'PENDING'
+            : 'NOT_REQUESTED',
       },
     });
 
@@ -476,8 +519,32 @@ export class SpeakingProcessorService implements OnModuleDestroy {
       `[SpeakingProcessor] Successfully completed SpeakingSubmission #${submissionId} with score ${overallScore ?? 'NO_SPEECH'} (traceId=${traceId}, total=${tTotalWorkerMs}ms)`,
     );
 
-    // 8. Gamification reward idempotency check (Token-Fenced)
-    if (!isSilent && overallScore !== null && overallScore > 0) {
+    // Notify the learner as soon as the authoritative score row is committed.
+    // Post-processing is deliberately scheduled after this fast-path event.
+    const tEventPublishStart = Date.now();
+    await this.publishEvent({
+      type: SPEAKING_COMPLETED_EVENT,
+      userId: existing.userId,
+      submissionId,
+      traceId,
+    });
+    const scoreEventPublishMs = Date.now() - tEventPublishStart;
+
+    // 8. Schedule post-processing after the score is durable. The legacy event
+    // remains only for unit-test/legacy fallback when no durable queue is wired.
+    if (this.queueService) {
+      try {
+        await this.queueService.enqueueFeedback(submissionId, traceId);
+        if (!isSilent && overallScore !== null && overallScore > 0) {
+          await this.queueService.enqueueReward(submissionId, traceId);
+        }
+      } catch (queueErr: any) {
+        this.logger.error(
+          `[SpeakingProcessor] Failed to enqueue post-processing for submission #${submissionId}: ${queueErr.message}`,
+        );
+      }
+    } else if (!isSilent && overallScore !== null && overallScore > 0) {
+      // Compatibility fallback for the existing isolated processor tests.
       const rewardClaim = await this.prisma.speakingSubmission.updateMany({
         where: {
           id: submissionId,
@@ -505,16 +572,7 @@ export class SpeakingProcessorService implements OnModuleDestroy {
       }
     }
 
-    // 9. ONLY after DB commit succeeds, publish completion notification to Redis Pub/Sub
-    // Security: Pub/Sub payload contains ONLY metadata. No raw overallScore or assessment data.
-    await this.publishEvent({
-      type: SPEAKING_COMPLETED_EVENT,
-      userId: existing.userId,
-      submissionId,
-      traceId,
-    });
-
-    // 10. Record structured latency log
+    // 9. Record structured latency log
     this.logStructuredLatency({
       traceId,
       submissionId,
@@ -524,6 +582,8 @@ export class SpeakingProcessorService implements OnModuleDestroy {
       validationMs: tValidationMs,
       azureScoringMs: tScoringMs,
       dbPersistMs: tPersistMs,
+      scorePersistMs: tPersistMs,
+      scoreEventPublishMs,
       totalWorkerMs: tTotalWorkerMs,
     });
   }
@@ -600,15 +660,24 @@ export class SpeakingProcessorService implements OnModuleDestroy {
    * Strictly emits only type, userId, submissionId, and traceId.
    */
   private async publishEvent(payload: SpeakingEventPayload): Promise<void> {
+    if (this.eventPublisher) {
+      await this.eventPublisher.publishEvent(payload);
+      return;
+    }
     try {
-      const message = JSON.stringify(payload);
+      const message = JSON.stringify({
+        type: payload.type,
+        userId: payload.userId,
+        submissionId: payload.submissionId,
+        traceId: payload.traceId,
+      });
       await this.pubRedis.publish(SPEAKING_EVENTS_CHANNEL, message);
       this.logger.log(
         `[SpeakingProcessor] Published ${payload.type} event to Redis channel "${SPEAKING_EVENTS_CHANNEL}" (submissionId=${payload.submissionId}, userId=${payload.userId}, traceId=${payload.traceId})`,
       );
     } catch (err: any) {
       this.logger.error(
-        `[SpeakingProcessor] Failed to publish event to Redis: ${err.message}`,
+        `[SpeakingProcessor] Failed to publish event to Redis for submission #${payload.submissionId} (traceId=${payload.traceId}): ${err.message}`,
       );
     }
   }
@@ -625,6 +694,8 @@ export class SpeakingProcessorService implements OnModuleDestroy {
     validationMs: number;
     azureScoringMs: number;
     dbPersistMs: number;
+    scorePersistMs?: number;
+    scoreEventPublishMs?: number;
     totalWorkerMs: number;
   }): void {
     this.logger.log(
@@ -638,7 +709,11 @@ export class SpeakingProcessorService implements OnModuleDestroy {
   }
 
   async close(): Promise<void> {
-    if (this.pubRedis && this.pubRedis.status !== 'end') {
+    if (
+      !this.eventPublisher &&
+      this.pubRedis &&
+      this.pubRedis.status !== 'end'
+    ) {
       try {
         await this.pubRedis.quit();
       } catch {

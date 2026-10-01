@@ -20,6 +20,8 @@ describe('SpeakingReconciliationScheduler (BullMQ Job State Recovery)', () => {
     mockQueueService = {
       getQueue: jest.fn().mockReturnValue(mockQueue),
       enqueueSubmission: jest.fn().mockResolvedValue('job-123'),
+      enqueueFeedback: jest.fn().mockResolvedValue('job-fb-123'),
+      enqueueReward: jest.fn().mockResolvedValue('job-rw-123'),
     };
 
     mockPrisma = {
@@ -68,7 +70,11 @@ describe('SpeakingReconciliationScheduler (BullMQ Job State Recovery)', () => {
           attemptCount: 1,
         },
       ]) // PENDING
-      .mockResolvedValueOnce([]); // Stale PROCESSING
+      .mockResolvedValueOnce([]) // Stale PROCESSING
+      .mockResolvedValueOnce([]) // Stale fb
+      .mockResolvedValueOnce([]) // Stale rw
+      .mockResolvedValueOnce([]) // Pending fb
+      .mockResolvedValueOnce([]); // Pending rw
 
     mockQueue.getJob.mockImplementation((jobId: string) => {
       if (jobId.includes('10'))
@@ -96,6 +102,10 @@ describe('SpeakingReconciliationScheduler (BullMQ Job State Recovery)', () => {
           attemptCount: 0,
         },
       ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     mockQueue.getJob.mockResolvedValueOnce(null); // Not found in Redis
@@ -118,6 +128,10 @@ describe('SpeakingReconciliationScheduler (BullMQ Job State Recovery)', () => {
           attemptCount: 1,
         },
       ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const mockCompletedJob = {
@@ -146,6 +160,10 @@ describe('SpeakingReconciliationScheduler (BullMQ Job State Recovery)', () => {
           attemptCount: 2,
         },
       ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const mockFailedJob = {
@@ -173,6 +191,10 @@ describe('SpeakingReconciliationScheduler (BullMQ Job State Recovery)', () => {
           attemptCount: 4,
         },
       ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const mockFailedJob = {
@@ -205,7 +227,11 @@ describe('SpeakingReconciliationScheduler (BullMQ Job State Recovery)', () => {
           processingStartedAt: new Date(Date.now() - 6 * 60 * 1000), // 6 minutes ago
           attemptCount: 1,
         },
-      ]); // Stale PROCESSING
+      ]) // Stale PROCESSING
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
 
     mockQueue.getJob.mockResolvedValueOnce(null); // Worker crashed, job evicted
 
@@ -224,6 +250,85 @@ describe('SpeakingReconciliationScheduler (BullMQ Job State Recovery)', () => {
     expect(mockQueueService.enqueueSubmission).toHaveBeenCalledWith(
       60,
       expect.stringContaining('reconcile-'),
+    );
+  });
+
+  it('7. Recovers missing feedback and reward jobs for completed submissions', async () => {
+    mockPrisma.speakingSubmission.findMany
+      .mockResolvedValueOnce([]) // PENDING score
+      .mockResolvedValueOnce([]) // Stale PROCESSING score
+      .mockResolvedValueOnce([]) // Stale PROCESSING fb
+      .mockResolvedValueOnce([]) // Stale PROCESSING rw
+      .mockResolvedValueOnce([{ id: 70 }]) // PENDING feedback
+      .mockResolvedValueOnce([{ id: 70 }]); // PENDING reward
+
+    mockQueue.getJob.mockResolvedValue(null); // No job in BullMQ
+
+    await scheduler.reconcilePendingSubmissions();
+
+    expect(mockQueueService.enqueueFeedback).toHaveBeenCalledWith(
+      70,
+      expect.stringContaining('reconcile-feedback-'),
+    );
+    expect(mockQueueService.enqueueReward).toHaveBeenCalledWith(
+      70,
+      expect.stringContaining('reconcile-reward-'),
+    );
+  });
+
+  it('8. Recovers stale PROCESSING feedback by resetting to PENDING and re-enqueueing', async () => {
+    mockPrisma.speakingSubmission.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 80 }]) // Stale PROCESSING feedback
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    mockQueue.getJob.mockResolvedValue(null);
+
+    await scheduler.reconcilePendingSubmissions();
+
+    expect(mockPrisma.speakingSubmission.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 80, feedbackStatus: 'PROCESSING' },
+        data: expect.objectContaining({
+          feedbackStatus: 'PENDING',
+          feedbackWorkerId: null,
+        }),
+      }),
+    );
+    expect(mockQueueService.enqueueFeedback).toHaveBeenCalledWith(
+      80,
+      expect.stringContaining('reconcile-fb-stale-'),
+    );
+  });
+
+  it('9. Recovers stale PROCESSING reward by resetting to PENDING and re-enqueueing', async () => {
+    mockPrisma.speakingSubmission.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 90 }]) // Stale PROCESSING reward
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    mockQueue.getJob.mockResolvedValue(null);
+
+    await scheduler.reconcilePendingSubmissions();
+
+    expect(mockPrisma.speakingSubmission.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 90, rewardStatus: 'PROCESSING' },
+        data: expect.objectContaining({
+          rewardStatus: 'PENDING',
+          rewardWorkerId: null,
+        }),
+      }),
+    );
+    expect(mockQueueService.enqueueReward).toHaveBeenCalledWith(
+      90,
+      expect.stringContaining('reconcile-rw-stale-'),
     );
   });
 });

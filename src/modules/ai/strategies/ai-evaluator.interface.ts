@@ -93,6 +93,14 @@ export interface IAIEvaluator {
     options?: { signal?: AbortSignal },
   ): Promise<PronunciationFeedback>;
 
+  /** Optional second-stage feedback; score creation must not depend on it. */
+  generatePronunciationFeedback?(
+    targetText: string,
+    assessment: PronunciationFeedback,
+  ): Promise<
+    Partial<Pick<PronunciationFeedback, 'clarity' | 'feedback' | 'suggestions'>>
+  >;
+
   /**
    * Giải thích lỗi sai cho câu hỏi TOEIC
    * @param questionContent Nội dung câu hỏi (JSON hoặc string)

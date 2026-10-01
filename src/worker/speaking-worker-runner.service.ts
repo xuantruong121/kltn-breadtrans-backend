@@ -62,7 +62,11 @@ export class SpeakingWorkerRunnerService
         this.logger.log(
           `[SpeakingWorkerRunner] Received job #${job.id}: submissionId=${job.data.submissionId}, traceId=${job.data.traceId}`,
         );
-        await this.processorService.processJob(job.data);
+        await this.processorService.processJob(
+          job.data,
+          job.attemptsMade + 1,
+          job.opts.attempts ?? 4,
+        );
       },
       {
         connection: this.connection,
