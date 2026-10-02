@@ -32,6 +32,7 @@ const mockPrismaService = {
     create: jest.fn(),
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
   },
   question: {
     findUnique: jest.fn(),
@@ -382,6 +383,148 @@ describe('QuizService', () => {
           quizType: 'BILINGUAL_READING',
         }),
       );
+    });
+
+    it('replays a keyed Reading submission without duplicating rows or side effects', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        title: 'Reading',
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      mockPrismaService.submission.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      const tx = {
+        submission: {
+          create: jest.fn().mockResolvedValue({
+            id: 90,
+            results: [
+              { questionId: 1, answer: 'B', isCorrect: true },
+              { questionId: 2, answer: 'C', isCorrect: false },
+            ],
+          }),
+        },
+        learningActivity: { create: jest.fn().mockResolvedValue({ id: 601 }) },
+      };
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (transaction: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      );
+      mockPrismaService.userQuizReward.createMany.mockResolvedValue({
+        count: 1,
+      });
+
+      await service.submitQuiz(24, 7, {
+        clientAttemptId: '11111111-1111-4111-8111-111111111111',
+        answers: [
+          { questionId: 1, answer: 'B' },
+          { questionId: 2, answer: 'C' },
+        ],
+      });
+
+      expect(tx.submission.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            clientAttemptId: '11111111-1111-4111-8111-111111111111',
+          }),
+        }),
+      );
+
+      jest.clearAllMocks();
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        title: 'Reading',
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      mockPrismaService.submission.findFirst.mockResolvedValue({
+        id: 90,
+        userId: 7,
+        quizId: 24,
+        clientAttemptId: '11111111-1111-4111-8111-111111111111',
+        results: [
+          { questionId: 1, answer: 'B' },
+          { questionId: 2, answer: 'C' },
+        ],
+      });
+
+      const replay = await service.submitQuiz(24, 7, {
+        clientAttemptId: '11111111-1111-4111-8111-111111111111',
+        answers: [
+          { questionId: 2, answer: 'C' },
+          { questionId: 1, answer: 'B' },
+        ],
+      });
+
+      expect(replay.id).toBe(90);
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      expect(
+        mockPrismaService.userQuizReward.createMany,
+      ).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('rejects a keyed replay with changed answers', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        title: 'Reading',
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      mockPrismaService.submission.findFirst.mockResolvedValue({
+        id: 91,
+        results: [
+          { questionId: 1, answer: 'B' },
+          { questionId: 2, answer: 'C' },
+        ],
+      });
+
+      await expect(
+        service.submitQuiz(24, 7, {
+          clientAttemptId: '22222222-2222-4222-8222-222222222222',
+          answers: [
+            { questionId: 1, answer: 'A' },
+            { questionId: 2, answer: 'C' },
+          ],
+        }),
+      ).rejects.toThrow('ClientAttemptId');
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('recovers the winner after a concurrent idempotency unique conflict', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        title: 'Reading',
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      mockPrismaService.submission.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 92,
+          results: [
+            { questionId: 1, answer: 'B' },
+            { questionId: 2, answer: 'C' },
+          ],
+        });
+      const uniqueError = Object.assign(new Error('unique'), {
+        code: 'P2002',
+        meta: { target: ['userId', 'quizId', 'clientAttemptId'] },
+      });
+      mockPrismaService.$transaction.mockRejectedValue(uniqueError);
+
+      await expect(
+        service.submitQuiz(24, 7, {
+          clientAttemptId: '33333333-3333-4333-8333-333333333333',
+          answers: [
+            { questionId: 1, answer: 'B' },
+            { questionId: 2, answer: 'C' },
+          ],
+        }),
+      ).resolves.toMatchObject({ id: 92 });
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('rejects invalid Reading submission without rows or success event', async () => {

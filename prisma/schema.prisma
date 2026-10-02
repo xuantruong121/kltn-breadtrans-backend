@@ -511,16 +511,20 @@ model ListeningDiagnosticClip {
 }
 
 model Submission {
-  id          Int      @id @default(autoincrement())
-  quizId      Int
-  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  userId      Int
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  score       Float?
-  submittedAt DateTime @default(now())
-  aiFeedback  String?  @db.Text
+  id              Int      @id @default(autoincrement())
+  quizId          Int
+  quiz            Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientAttemptId String?  @db.VarChar(36)
+  score           Float?
+  submittedAt     DateTime @default(now())
+  aiFeedback      String?  @db.Text
 
   results Result[]
+
+  @@unique([userId, quizId, clientAttemptId])
+  @@index([userId, clientAttemptId])
 }
 
 model Result {
@@ -650,8 +654,8 @@ model SpeakingSubmission {
   rewardGrantedAt     DateTime?
   submittedAt         DateTime                 @default(now())
 
-  uploadIntent        SpeakingUploadIntent?
-  rewardLedgers       SpeakingRewardLedger[]
+  uploadIntent  SpeakingUploadIntent?
+  rewardLedgers SpeakingRewardLedger[]
 
   @@unique([userId, idempotencyKey])
   @@index([status, nextAttemptAt])

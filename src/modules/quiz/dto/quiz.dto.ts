@@ -7,6 +7,8 @@ import {
   IsArray,
   IsInt,
   IsObject,
+  IsUUID,
+  MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { QuizType } from '@prisma/client';
@@ -75,6 +77,15 @@ export class SubmitQuizDto {
   @IsInt()
   @IsOptional()
   attemptId?: number;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Stable identity for one Reading attempt',
+  })
+  @IsUUID('4')
+  @MaxLength(36)
+  @IsOptional()
+  clientAttemptId?: string;
 }
 
 export class SaveListeningAttemptDto {
