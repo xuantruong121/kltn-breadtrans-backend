@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -8,8 +8,11 @@ import { validateSpeakingAudio } from './speaking-audio-validator';
 import {
   isMissingStorageError,
   SPEAKING_FAILED_EVENT,
+  SPEAKING_COMPLETED_EVENT,
   getSpeakingPipelineMode,
 } from './speaking.constants';
+import { SpeakingQueueService } from './speaking-queue.service';
+import { SpeakingEventPublisherService } from './speaking-event-publisher.service';
 
 const MAX_ATTEMPTS = 4;
 const RETRY_BACKOFF_MS = [
@@ -40,6 +43,9 @@ export class SpeakingWorkerService implements OnModuleInit {
     private readonly aiService: AiService,
     private readonly uploadService: UploadService,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() private readonly queueService?: SpeakingQueueService,
+    @Optional()
+    private readonly eventPublisher?: SpeakingEventPublisherService,
   ) {}
 
   /**
@@ -183,6 +189,13 @@ export class SpeakingWorkerService implements OnModuleInit {
       return;
     }
 
+    if (submission.status === 'COMPLETED') {
+      this.logger.log(
+        `[SpeakingWorker] Submission #${submissionId} is already COMPLETED. Skipping.`,
+      );
+      return;
+    }
+
     this.logger.log(
       `Processing SpeakingSubmission #${submissionId} (Attempt ${submission.attemptCount}/${MAX_ATTEMPTS})`,
     );
@@ -203,7 +216,10 @@ export class SpeakingWorkerService implements OnModuleInit {
       );
       if (isMissingStorageError(storageErr)) {
         await this.prisma.speakingSubmission.updateMany({
-          where: { id: submissionId, status: { in: ['PENDING', 'PROCESSING'] } },
+          where: {
+            id: submissionId,
+            status: { in: ['PENDING', 'PROCESSING'] },
+          },
           data: {
             status: 'FAILED',
             overallScore: null,
@@ -252,6 +268,15 @@ export class SpeakingWorkerService implements OnModuleInit {
             nextAttemptAt: null,
           },
         });
+        const traceId = `legacy-silent-${submissionId}-${Date.now()}`;
+        if (this.eventPublisher) {
+          await this.eventPublisher.publishEvent({
+            type: SPEAKING_COMPLETED_EVENT,
+            userId: submission.userId,
+            submissionId,
+            traceId,
+          });
+        }
         return;
       }
     } catch (valErr: any) {
@@ -329,7 +354,43 @@ export class SpeakingWorkerService implements OnModuleInit {
       `Successfully completed SpeakingSubmission #${submissionId} with score ${overallScore ?? 'NO_SPEECH'}`,
     );
 
-    // 6. Gamification reward idempotency check
+    const traceId = `legacy-${submissionId}-${Date.now()}`;
+    if (this.eventPublisher) {
+      await this.eventPublisher.publishEvent({
+        type: SPEAKING_COMPLETED_EVENT,
+        userId: submission.userId,
+        submissionId,
+        traceId,
+      });
+    }
+
+    // 6. Durable post-processing starts only after score persistence. Keep the
+    // old event path for isolated legacy tests/consumers without a queue.
+    if (this.queueService) {
+      await this.prisma.speakingSubmission.updateMany({
+        where: { id: submissionId, status: 'COMPLETED' },
+        data: {
+          feedbackStatus: 'PENDING',
+          rewardStatus:
+            !isSilent && overallScore !== null && overallScore > 0
+              ? 'PENDING'
+              : 'NOT_REQUESTED',
+        },
+      });
+      try {
+        await this.queueService.enqueueFeedback(submissionId, traceId);
+        if (!isSilent && overallScore !== null && overallScore > 0) {
+          await this.queueService.enqueueReward(submissionId, traceId);
+        }
+      } catch (queueErr: any) {
+        this.logger.error(
+          `Failed to enqueue speaking post-processing #${submissionId}: ${queueErr.message}`,
+        );
+      }
+      return;
+    }
+
+    // 7. Legacy gamification reward idempotency check
     if (
       !updated.rewardGrantedAt &&
       !isSilent &&

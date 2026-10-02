@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   UnauthorizedException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -34,6 +35,10 @@ import {
   withSpeakerTurnIds,
   type NormalizedDialogueSegment,
 } from './listening-dialogue.contract';
+import {
+  resolveReadingCorrectOption,
+  validateReadingQuestionContent,
+} from './reading-content.validation';
 
 /**
  * Compare learner dictation without penalising typography that does not change
@@ -93,6 +98,73 @@ export function validateReadingSubmission(
 
     seenQuestionIds.add(submitted.questionId);
   }
+}
+
+function canonicalizeAttemptAnswer(value: unknown): unknown {
+  if (typeof value === 'string') return value.normalize('NFKC');
+  return value;
+}
+
+export function canonicalizeReadingAttemptAnswers(
+  answers: Array<{ questionId: number; answer: unknown }>,
+): string {
+  return JSON.stringify(
+    [...answers]
+      .sort((a, b) => a.questionId - b.questionId)
+      .map((answer) => ({
+        questionId: answer.questionId,
+        answer: canonicalizeAttemptAnswer(answer.answer),
+      })),
+  );
+}
+
+function isClientAttemptUniqueConflict(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { code?: string; meta?: { target?: unknown } };
+  if (candidate.code !== 'P2002') return false;
+  const target = candidate.meta?.target;
+  return (
+    Array.isArray(target) &&
+    target.includes('userId') &&
+    target.includes('quizId') &&
+    target.includes('clientAttemptId')
+  );
+}
+
+/** Resolve a pedagogical Reading micro-skill without treating READING as one. */
+export function resolveReadingMicroSkill(
+  quizType: QuizType | (string & {}),
+  content: unknown,
+  legacyQuestionType?: string,
+): string {
+  const record =
+    content && typeof content === 'object' && !Array.isArray(content)
+      ? (content as Record<string, unknown>)
+      : {};
+
+  if (quizType !== QuizType.BILINGUAL_READING) {
+    const category = record.category;
+    return typeof category === 'string' && category.trim().length > 0
+      ? category
+      : legacyQuestionType || 'General';
+  }
+
+  const skill = record.skill;
+  if (
+    typeof skill === 'string' &&
+    skill.trim().length > 0 &&
+    !['READING', 'BILINGUAL_READING'].includes(skill.trim().toUpperCase())
+  ) {
+    return skill.trim().toUpperCase();
+  }
+
+  for (const key of ['questionType', 'category']) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim().toUpperCase();
+    }
+  }
+  return 'UNKNOWN';
 }
 
 const STANDARD_CONTRACTIONS: Record<string, string[]> = {
@@ -268,6 +340,7 @@ function normalizeQuestionContent(
   quizType: QuizType,
   questionType: string,
   value: unknown,
+  readingMode: 'DRAFT' | 'PUBLISHED' = 'DRAFT',
 ): Record<string, unknown> {
   const content =
     value && typeof value === 'object'
@@ -293,6 +366,10 @@ function normalizeQuestionContent(
     content.audioText = transcriptSegments
       .map((segment) => segment.text)
       .join(' ');
+  }
+
+  if (quizType === QuizType.BILINGUAL_READING) {
+    return validateReadingQuestionContent(content, readingMode);
   }
 
   return content;
@@ -388,9 +465,32 @@ export class QuizService {
   async publishQuiz(id: number, status: PublishQuizDto['status']) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },
-      include: { questions: { select: { type: true } } },
+      include: {
+        questions: {
+          select: { id: true, order: true, type: true, content: true },
+        },
+      },
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
+    if (status === 'PUBLISHED' && quiz.type === QuizType.BILINGUAL_READING) {
+      if (quiz.questions.length === 0) {
+        throw new BadRequestException(
+          'Reading quiz cần ít nhất một câu hỏi hợp lệ',
+        );
+      }
+      for (const question of quiz.questions) {
+        try {
+          validateReadingQuestionContent(question.content, 'PUBLISHED');
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw new BadRequestException(
+              `Reading question #${question.id} (order ${question.order}): ${error.message}`,
+            );
+          }
+          throw error;
+        }
+      }
+    }
     if (
       status === 'PUBLISHED' &&
       quiz.type === QuizType.LISTENING_PRACTICE &&
@@ -1048,11 +1148,16 @@ export class QuizService {
   async createQuestion(quizId: number, dto: CreateQuestionDto) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
-      select: { id: true, type: true },
+      select: { id: true, type: true, publicationStatus: true },
     });
     if (!quiz) throw new NotFoundException('Không tìm thấy đề thi');
 
-    const content = normalizeQuestionContent(quiz.type, dto.type, dto.content);
+    const content = normalizeQuestionContent(
+      quiz.type,
+      dto.type,
+      dto.content,
+      quiz.publicationStatus === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT',
+    );
     return this.prisma.question.create({
       data: {
         type: dto.type,
@@ -1206,7 +1311,7 @@ export class QuizService {
   async updateQuestion(questionId: number, dto: Partial<CreateQuestionDto>) {
     const existing = await this.prisma.question.findUnique({
       where: { id: questionId },
-      include: { quiz: { select: { type: true } } },
+      include: { quiz: { select: { type: true, publicationStatus: true } } },
     });
     if (!existing) throw new NotFoundException('Question not found');
 
@@ -1216,6 +1321,7 @@ export class QuizService {
         existing.quiz.type,
         dto.type ?? existing.type,
         dto.content,
+        existing.quiz.publicationStatus === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT',
       ) as any;
     }
     return this.prisma.question.update({
@@ -1234,6 +1340,53 @@ export class QuizService {
     });
   }
 
+  private async replayReadingSubmission(
+    userId: number,
+    quizId: number,
+    clientAttemptId: string,
+    answers: Array<{ questionId: number; answer: unknown }>,
+  ) {
+    const existing = await this.prisma.submission.findFirst({
+      where: { userId, quizId, clientAttemptId },
+      include: { results: true },
+    });
+    if (!existing) return null;
+
+    const persistedAnswers = existing.results.map((result) => ({
+      questionId: result.questionId,
+      answer: result.answer,
+    }));
+    if (
+      canonicalizeReadingAttemptAnswers(persistedAnswers) !==
+      canonicalizeReadingAttemptAnswers(answers)
+    ) {
+      throw new ConflictException(
+        'ClientAttemptId đã được dùng cho một lần nộp khác',
+      );
+    }
+    return { ...existing, isFirstSubmission: false };
+  }
+
+  private async assertReadingAttemptKeyScope(
+    userId: number,
+    quizId: number,
+    clientAttemptId: string,
+  ) {
+    const otherQuizSubmission = await this.prisma.submission.findFirst({
+      where: {
+        userId,
+        clientAttemptId,
+        NOT: { quizId },
+      },
+      select: { id: true },
+    });
+    if (otherQuizSubmission) {
+      throw new ConflictException(
+        'ClientAttemptId đã được dùng cho một bài khác',
+      );
+    }
+  }
+
   async submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto) {
     const quiz = await this.getQuizById(quizId, true, userId);
 
@@ -1241,6 +1394,21 @@ export class QuizService {
       this.assertCompleteListeningSubmission(quiz.questions, dto.answers);
     } else if (quiz.type === QuizType.BILINGUAL_READING) {
       validateReadingSubmission(quiz.questions, dto.answers);
+
+      if (dto.clientAttemptId) {
+        const replay = await this.replayReadingSubmission(
+          userId,
+          quizId,
+          dto.clientAttemptId,
+          dto.answers,
+        );
+        if (replay) return replay;
+        await this.assertReadingAttemptKeyScope(
+          userId,
+          quizId,
+          dto.clientAttemptId,
+        );
+      }
     }
 
     if (
@@ -1280,13 +1448,12 @@ export class QuizService {
       if (question) {
         if (question.type === 'MULTIPLE_CHOICE') {
           const content = question.content;
-          if (
-            content.correctIndex !== undefined &&
-            Array.isArray(content.options)
-          ) {
-            // Reading-style: options array + correctIndex
-            const correctOption = content.options[content.correctIndex];
-            if (correctOption === ans.answer) {
+          const resolvedCorrect =
+            quiz.type === QuizType.BILINGUAL_READING
+              ? resolveReadingCorrectOption(content)
+              : null;
+          if (resolvedCorrect?.status === 'available') {
+            if (resolvedCorrect.answer === ans.answer) {
               isCorrect = true;
               score = 1;
               totalScore += score;
@@ -1343,45 +1510,83 @@ export class QuizService {
     // Persist the submission and close the listening attempt atomically. This
     // prevents a successful submission from being left behind while its
     // server checkpoint remains IN_PROGRESS (or vice versa).
-    const submission = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.submission.create({
-        data: {
-          quizId,
-          userId,
-          score: totalScore,
-          aiFeedback: overallAiFeedback ? overallAiFeedback : null,
-          results: {
-            create: resultsData,
-          },
-        },
-        include: {
-          results: true,
-        },
-      });
-
-      if (
-        dto.attemptId !== undefined &&
-        quiz.type === QuizType.LISTENING_PRACTICE
-      ) {
-        const completed = await tx.listeningPracticeAttempt.updateMany({
-          where: {
-            id: dto.attemptId,
-            userId,
-            quizId,
-            status: ListeningPracticeAttemptStatus.IN_PROGRESS,
-          },
+    let submission;
+    try {
+      submission = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.submission.create({
           data: {
-            status: ListeningPracticeAttemptStatus.COMPLETED,
-            completedAt: new Date(),
+            quizId,
+            userId,
+            ...(quiz.type === QuizType.BILINGUAL_READING && dto.clientAttemptId
+              ? { clientAttemptId: dto.clientAttemptId }
+              : {}),
+            score: totalScore,
+            aiFeedback: overallAiFeedback ? overallAiFeedback : null,
+            results: {
+              create: resultsData,
+            },
+          },
+          include: {
+            results: true,
           },
         });
-        if (completed.count !== 1) {
-          throw new ForbiddenException('Phiên luyện nghe không còn hiệu lực');
-        }
-      }
 
-      return created;
-    });
+        if (
+          dto.attemptId !== undefined &&
+          quiz.type === QuizType.LISTENING_PRACTICE
+        ) {
+          const completed = await tx.listeningPracticeAttempt.updateMany({
+            where: {
+              id: dto.attemptId,
+              userId,
+              quizId,
+              status: ListeningPracticeAttemptStatus.IN_PROGRESS,
+            },
+            data: {
+              status: ListeningPracticeAttemptStatus.COMPLETED,
+              completedAt: new Date(),
+            },
+          });
+          if (completed.count !== 1) {
+            throw new ForbiddenException('Phiên luyện nghe không còn hiệu lực');
+          }
+        }
+
+        if (quiz.type === QuizType.BILINGUAL_READING) {
+          await tx.learningActivity.create({
+            data: {
+              userId,
+              type: 'READING_PRACTICE_COMPLETED',
+              title: quiz.title,
+              detail: `${totalScore}/${quiz.questions.length} câu đúng`,
+              score:
+                quiz.questions.length > 0
+                  ? Math.round((totalScore / quiz.questions.length) * 100)
+                  : 0,
+              sourceType: 'QUIZ',
+              sourceId: String(quizId),
+            },
+          });
+        }
+
+        return created;
+      });
+    } catch (error) {
+      if (
+        quiz.type === QuizType.BILINGUAL_READING &&
+        dto.clientAttemptId &&
+        isClientAttemptUniqueConflict(error)
+      ) {
+        const replay = await this.replayReadingSubmission(
+          userId,
+          quizId,
+          dto.clientAttemptId,
+          dto.answers,
+        );
+        if (replay) return replay;
+      }
+      throw error;
+    }
 
     if (
       quiz.type === QuizType.LISTENING_PRACTICE &&
@@ -1417,6 +1622,7 @@ export class QuizService {
       userId,
       quizId,
       score: totalScore,
+      quizType: quiz.type,
       submissionId: submission.id,
       isFirstSubmission,
     });
@@ -1694,8 +1900,11 @@ export class QuizService {
       const question = submission.quiz.questions.find(
         (q) => q.id === res.questionId,
       );
-      const content = question?.content as any;
-      const category = content?.category || question?.type || 'General';
+      const category = resolveReadingMicroSkill(
+        submission.quiz.type,
+        question?.content,
+        question?.type,
+      );
 
       if (!tagStats[category]) {
         tagStats[category] = { correct: 0, total: 0 };

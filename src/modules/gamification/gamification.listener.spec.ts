@@ -8,6 +8,7 @@ describe('GamificationListener', () => {
     badge: { findFirst: jest.Mock };
     userBadge: { findUnique: jest.Mock; create: jest.Mock };
     userStats: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock };
+    pointHistory: { findFirst: jest.Mock };
     dailyBanhEarning: { findUnique: jest.Mock; upsert: jest.Mock };
   };
   let gamificationServiceMock: {
@@ -46,6 +47,9 @@ describe('GamificationListener', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         create: jest.fn(),
+      },
+      pointHistory: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       dailyBanhEarning: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -180,6 +184,71 @@ describe('GamificationListener', () => {
         expect.any(String),
       );
     });
+
+    it('allows Reading to advance generic and perfect quests but not Listening quests', async () => {
+      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([
+        { id: 1, type: 'COMPLETE_QUIZ', targetValue: 1 },
+        { id: 2, type: 'DO_LISTENING', targetValue: 1 },
+        { id: 3, type: 'PERFECT_QUIZ', targetValue: 1 },
+      ]);
+
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 44,
+        score: 100,
+        quizType: 'BILINGUAL_READING',
+        isFirstSubmission: false,
+      });
+
+      expect(
+        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
+      ).toHaveBeenCalledTimes(2);
+      expect(
+        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx.mock.calls.map(
+          (call) => (call[1] as { type: string }).type,
+        ),
+      ).toEqual(['COMPLETE_QUIZ', 'PERFECT_QUIZ']);
+    });
+
+    it('allows Listening to advance DO_LISTENING', async () => {
+      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([
+        { id: 4, type: 'DO_LISTENING', targetValue: 1 },
+      ]);
+
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 45,
+        score: 80,
+        quizType: 'LISTENING_PRACTICE',
+        isFirstSubmission: false,
+      });
+
+      expect(
+        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
+      ).toHaveBeenCalledWith(
+        12,
+        expect.objectContaining({ type: 'DO_LISTENING' }),
+        1,
+        expect.any(String),
+      );
+    });
+
+    it('does not assume an event without quiz type is Listening', async () => {
+      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([
+        { id: 5, type: 'DO_LISTENING', targetValue: 1 },
+      ]);
+
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 46,
+        score: 100,
+        isFirstSubmission: false,
+      });
+
+      expect(
+        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
+      ).not.toHaveBeenCalled();
+    });
   });
 
   describe('handleSpeakingSubmittedEvent', () => {
@@ -208,6 +277,7 @@ describe('GamificationListener', () => {
         15,
         99,
         85,
+        expect.objectContaining({ tx: expect.anything() }),
       );
       expect(
         gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
@@ -216,6 +286,7 @@ describe('GamificationListener', () => {
         expect.objectContaining({ id: 9 }),
         1,
         expect.any(String),
+        expect.anything(),
       );
     });
   });

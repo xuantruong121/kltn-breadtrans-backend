@@ -57,8 +57,11 @@ export class SpeakingEventsSubscriberService
         this.eventsGateway.server.to(userRoom).emit(payload.type, {
           submissionId: payload.submissionId,
           traceId: payload.traceId,
-          status:
-            payload.type === 'speaking.completed' ? 'COMPLETED' : 'FAILED',
+          status: payload.type.includes('.failed')
+            ? 'FAILED'
+            : payload.type.includes('feedback')
+              ? 'FEEDBACK_COMPLETED'
+              : 'COMPLETED',
         });
 
         this.logger.log(

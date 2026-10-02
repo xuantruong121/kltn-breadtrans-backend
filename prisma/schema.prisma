@@ -81,6 +81,7 @@ model User {
   leaderboard                     Leaderboard?
   speakingSubmissions             SpeakingSubmission[]
   speakingUploadIntents           SpeakingUploadIntent[]
+  speakingRewardLedgers           SpeakingRewardLedger[]
   bookProgresses                  UserBookProgress[]
   marketOrders                    MarketOrder[]
   gamePlays                       GamePlay[]
@@ -510,16 +511,20 @@ model ListeningDiagnosticClip {
 }
 
 model Submission {
-  id          Int      @id @default(autoincrement())
-  quizId      Int
-  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  userId      Int
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  score       Float?
-  submittedAt DateTime @default(now())
-  aiFeedback  String?  @db.Text
+  id              Int      @id @default(autoincrement())
+  quizId          Int
+  quiz            Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientAttemptId String?  @db.VarChar(36)
+  score           Float?
+  submittedAt     DateTime @default(now())
+  aiFeedback      String?  @db.Text
 
   results Result[]
+
+  @@unique([userId, quizId, clientAttemptId])
+  @@index([userId, clientAttemptId])
 }
 
 model Result {
@@ -595,6 +600,22 @@ enum SpeakingSubmissionStatus {
   FAILED
 }
 
+enum SpeakingFeedbackStatus {
+  NOT_REQUESTED
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum SpeakingRewardStatus {
+  NOT_REQUESTED
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model SpeakingSubmission {
   id                  Int                      @id @default(autoincrement())
   exerciseId          Int
@@ -602,6 +623,16 @@ model SpeakingSubmission {
   userId              Int
   user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   status              SpeakingSubmissionStatus @default(PENDING)
+  feedbackStatus      SpeakingFeedbackStatus   @default(NOT_REQUESTED)
+  feedbackError       String?                  @db.Text
+  feedbackProcessedAt DateTime?
+  feedbackStartedAt   DateTime?
+  feedbackWorkerId    String?
+  rewardStatus        SpeakingRewardStatus     @default(NOT_REQUESTED)
+  rewardError         String?                  @db.Text
+  rewardProcessedAt   DateTime?
+  rewardStartedAt     DateTime?
+  rewardWorkerId      String?
   audioUrl            String? // Safe or legacy URL
   audioKey            String? // Storage key in Cloudflare R2
   audioMimeType       String? // Audio MIME type
@@ -623,11 +654,31 @@ model SpeakingSubmission {
   rewardGrantedAt     DateTime?
   submittedAt         DateTime                 @default(now())
 
-  uploadIntent        SpeakingUploadIntent?
+  uploadIntent  SpeakingUploadIntent?
+  rewardLedgers SpeakingRewardLedger[]
 
   @@unique([userId, idempotencyKey])
   @@index([status, nextAttemptAt])
   @@index([userId, submittedAt])
+  @@index([feedbackStatus, feedbackStartedAt])
+  @@index([rewardStatus, rewardStartedAt])
+  @@index([feedbackStatus])
+  @@index([rewardStatus])
+}
+
+model SpeakingRewardLedger {
+  id           Int                @id @default(autoincrement())
+  submissionId Int
+  submission   SpeakingSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  userId       Int
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewardType   String // XP | BANH | QUEST | BADGE
+  reference    String // e.g. xp:speaking:42, quest:7:speaking:42
+  metadata     Json?
+  createdAt    DateTime           @default(now())
+
+  @@unique([submissionId, rewardType, reference])
+  @@index([userId, rewardType])
 }
 
 enum SpeakingUploadIntentStatus {

@@ -8,6 +8,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
   imports: [NotificationsModule],
   providers: [GamificationService, GamificationListener],
   controllers: [GamificationController],
-  exports: [GamificationService],
+  exports: [GamificationService, GamificationListener],
 })
 export class GamificationModule {}

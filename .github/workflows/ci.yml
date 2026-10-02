@@ -63,6 +63,8 @@ jobs:
         run: npx prisma migrate deploy
 
       - name: Run Unit Tests
+        env:
+          DATABASE_URL: 'postgresql://postgres:password@localhost:5432/kltn_test_db?schema=public'
         run: npm run test
 
       - name: Run E2E Tests

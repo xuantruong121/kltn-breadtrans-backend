@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { Prisma, QuizType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService, getTodayDateKey } from './gamification.service';
 
@@ -10,6 +11,7 @@ export class GamificationListener {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
+    @Optional() private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   @OnEvent('quiz.submitted')
@@ -17,6 +19,7 @@ export class GamificationListener {
     userId: number;
     quizId?: number;
     score: number;
+    quizType?: QuizType | (string & {});
     isFirstSubmission?: boolean;
   }) {
     this.logger.log(
@@ -99,6 +102,12 @@ export class GamificationListener {
       });
 
       for (const quest of activeQuests) {
+        if (
+          quest.type === 'DO_LISTENING' &&
+          payload.quizType !== QuizType.LISTENING_PRACTICE
+        ) {
+          continue;
+        }
         if (quest.type === 'PERFECT_QUIZ' && payload.score < 100) {
           continue;
         }
@@ -118,14 +127,85 @@ export class GamificationListener {
     }
   }
 
+  private isUniqueConstraint(err: unknown): boolean {
+    const errorObj = err as { code?: string; message?: string } | null;
+    return (
+      errorObj?.code === 'P2002' ||
+      (typeof errorObj?.message === 'string' &&
+        errorObj.message.includes('Unique constraint'))
+    );
+  }
+
+  private async executeRewardEffect(
+    submissionId: number | undefined,
+    userId: number,
+    rewardType: string,
+    reference: string,
+    effectFn: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<boolean> {
+    if (!submissionId) {
+      await effectFn(this.prisma);
+      return true;
+    }
+
+    const runWithTx = async (tx: Prisma.TransactionClient) => {
+      const txWithLedger = tx as unknown as {
+        speakingRewardLedger?: {
+          create: (args: {
+            data: {
+              submissionId: number;
+              userId: number;
+              rewardType: string;
+              reference: string;
+            };
+          }) => Promise<unknown>;
+        };
+      };
+      if (
+        txWithLedger.speakingRewardLedger &&
+        typeof txWithLedger.speakingRewardLedger.create === 'function'
+      ) {
+        await txWithLedger.speakingRewardLedger.create({
+          data: {
+            submissionId,
+            userId,
+            rewardType,
+            reference,
+          },
+        });
+      }
+      await effectFn(tx);
+    };
+
+    try {
+      if (typeof this.prisma.$transaction === 'function') {
+        await this.prisma.$transaction(runWithTx);
+      } else {
+        await runWithTx(this.prisma);
+      }
+      return true;
+    } catch (err: unknown) {
+      if (this.isUniqueConstraint(err)) {
+        this.logger.log(
+          `Reward effect ${rewardType} already processed for submission #${submissionId} (${reference}). Skipping.`,
+        );
+        return false;
+      }
+      throw err;
+    }
+  }
+
   @OnEvent('speaking.submitted')
-  async handleSpeakingSubmittedEvent(payload: {
-    userId: number;
-    submissionId?: number;
-    exerciseId?: number;
-    overallScore: number;
-    isSilentOrNoSpeech?: boolean;
-  }) {
+  async handleSpeakingSubmittedEvent(
+    payload: {
+      userId: number;
+      submissionId?: number;
+      exerciseId?: number;
+      overallScore: number;
+      isSilentOrNoSpeech?: boolean;
+    },
+    options: { rethrow?: boolean } = {},
+  ) {
     this.logger.log(
       `Handling speaking.submitted event for user ${payload.userId} with score ${payload.overallScore} (submissionId: ${payload.submissionId})`,
     );
@@ -133,48 +213,164 @@ export class GamificationListener {
     try {
       if (payload.isSilentOrNoSpeech) return;
 
-      // XP for speaking practice (min 10, max 50)
+      // 1. XP for speaking practice (min 10, max 50) - atomic per submission
       const xpEarned = Math.max(10, Math.round(payload.overallScore * 5));
       if (xpEarned > 0) {
-        await this.gamificationService.awardXp(
-          payload.userId,
-          xpEarned,
-          'Hoàn thành bài luyện nói',
-        );
-      }
+        const xpReason = payload.submissionId
+          ? `Hoàn thành bài luyện nói #${payload.submissionId}`
+          : 'Hoàn thành bài luyện nói';
+        const xpRef = payload.submissionId
+          ? `xp:speaking:${payload.submissionId}`
+          : xpReason;
 
-      // Bánh Mì for speaking (atomic 3/day quota, idempotent per submissionId)
-      if (payload.submissionId) {
-        await this.gamificationService.awardSpeakingReward(
-          payload.userId,
+        const awarded = await this.executeRewardEffect(
           payload.submissionId,
-          payload.overallScore,
-        );
-      }
-
-      // Badge: high speaking score
-      if (payload.overallScore >= 80) {
-        await this.gamificationService.awardBadgeIfEarned(
           payload.userId,
-          'Giọng Đọc Vàng',
+          'XP',
+          xpRef,
+          async (tx) => {
+            const alreadyAwarded = payload.submissionId
+              ? await tx.pointHistory.findFirst({
+                  where: { userId: payload.userId, reason: xpReason },
+                  select: { id: true },
+                })
+              : null;
+            if (!alreadyAwarded) {
+              await this.gamificationService.awardXp(
+                payload.userId,
+                xpEarned,
+                xpReason,
+                { tx },
+              );
+            }
+          },
+        );
+        if (awarded && this.eventEmitter) {
+          this.eventEmitter.emit('gamification.xp_earned', {
+            userId: payload.userId,
+            points: xpEarned,
+          });
+        }
+      }
+
+      // 2. Bánh Mì for speaking (atomic 3/day quota, idempotent per submissionId)
+      if (payload.submissionId) {
+        const banhRef = `banh:speaking:${payload.submissionId}`;
+        await this.executeRewardEffect(
+          payload.submissionId,
+          payload.userId,
+          'BANH',
+          banhRef,
+          async (tx) => {
+            await this.gamificationService.awardSpeakingReward(
+              payload.userId,
+              payload.submissionId!,
+              payload.overallScore,
+              { tx },
+            );
+          },
         );
       }
 
-      // Daily quest progress for DO_SPEAKING (atomic & capped)
+      // 3. Badge: high speaking score - atomic and conditional on eligibility & unowned
+      const isBadgeEligible =
+        payload.overallScore >= 80 ||
+        (payload.overallScore <= 10 && payload.overallScore >= 8.0);
+      if (isBadgeEligible) {
+        const badge =
+          this.prisma.badge && typeof this.prisma.badge.findFirst === 'function'
+            ? await this.prisma.badge.findFirst({
+                where: { name: 'Giọng Đọc Vàng' },
+              })
+            : null;
+        if (badge) {
+          const alreadyOwned =
+            this.prisma.userBadge &&
+            typeof this.prisma.userBadge.findUnique === 'function'
+              ? await this.prisma.userBadge.findUnique({
+                  where: {
+                    userId_badgeId: {
+                      userId: payload.userId,
+                      badgeId: badge.id,
+                    },
+                  },
+                })
+              : null;
+          if (!alreadyOwned) {
+            const badgeRef = payload.submissionId
+              ? `badge:${badge.id}:speaking:${payload.submissionId}`
+              : `badge:${badge.id}:speaking:${payload.userId}:gold`;
+
+            await this.executeRewardEffect(
+              payload.submissionId,
+              payload.userId,
+              'BADGE',
+              badgeRef,
+              async (tx) => {
+                await this.gamificationService.awardBadgeIfEarned(
+                  payload.userId,
+                  'Giọng Đọc Vàng',
+                  { tx },
+                );
+              },
+            );
+          }
+        }
+      }
+
+      // 4. Daily quest progress for DO_SPEAKING / PRACTICE_SPEAKING (atomic per quest)
       const today = getTodayDateKey('Asia/Ho_Chi_Minh');
-      const activeQuests = await this.prisma.dailyQuest.findMany({
-        where: {
-          isActive: true,
-          type: { in: ['DO_SPEAKING', 'PRACTICE_SPEAKING'] },
-        },
-      });
+      const activeQuests =
+        this.prisma.dailyQuest &&
+        typeof this.prisma.dailyQuest.findMany === 'function'
+          ? await this.prisma.dailyQuest.findMany({
+              where: {
+                isActive: true,
+                type: { in: ['DO_SPEAKING', 'PRACTICE_SPEAKING'] },
+              },
+            })
+          : [];
 
       for (const quest of activeQuests) {
-        await this.gamificationService.advanceDailyQuestAndGrantRewardsTx(
+        if (quest.type === 'PERFECT_QUIZ' && payload.overallScore < 100) {
+          continue;
+        }
+
+        const existingProgress =
+          this.prisma.userQuestProgress &&
+          typeof this.prisma.userQuestProgress.findUnique === 'function'
+            ? await this.prisma.userQuestProgress.findUnique({
+                where: {
+                  userId_questId_dateKey: {
+                    userId: payload.userId,
+                    questId: quest.id,
+                    dateKey: today,
+                  },
+                },
+              })
+            : null;
+        if (existingProgress?.isCompleted) {
+          continue;
+        }
+
+        const questRef = payload.submissionId
+          ? `quest:${quest.id}:speaking:${payload.submissionId}`
+          : `quest:${quest.id}:user:${payload.userId}:${today}`;
+
+        await this.executeRewardEffect(
+          payload.submissionId,
           payload.userId,
-          quest,
-          1,
-          today,
+          'QUEST',
+          questRef,
+          async (tx) => {
+            await this.gamificationService.advanceDailyQuestAndGrantRewardsTx(
+              payload.userId,
+              quest,
+              1,
+              today,
+              tx,
+            );
+          },
         );
       }
     } catch (error) {
@@ -182,6 +378,7 @@ export class GamificationListener {
         `Failed to handle speaking gamification for user ${payload.userId}`,
         error,
       );
+      if (options.rethrow) throw error;
     }
   }
 

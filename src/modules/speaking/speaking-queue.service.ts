@@ -11,6 +11,8 @@ import {
   SPEAKING_JOB_NAME,
   SpeakingJobPayload,
   getSpeakingJobId,
+  getSpeakingFeedbackJobId,
+  getSpeakingRewardJobId,
   getSpeakingWorkerConfig,
 } from './speaking.constants';
 
@@ -66,6 +68,41 @@ export class SpeakingQueueService implements OnModuleInit, OnModuleDestroy {
       `[SpeakingQueue] Enqueued job: jobId=${job.id} submissionId=${submissionId} traceId=${traceId}`,
     );
 
+    return job.id || jobId;
+  }
+
+  async enqueueFeedback(
+    submissionId: number,
+    traceId: string,
+  ): Promise<string> {
+    return this.enqueuePostProcessing(
+      submissionId,
+      traceId,
+      'FEEDBACK',
+      getSpeakingFeedbackJobId(submissionId),
+    );
+  }
+
+  async enqueueReward(submissionId: number, traceId: string): Promise<string> {
+    return this.enqueuePostProcessing(
+      submissionId,
+      traceId,
+      'REWARD',
+      getSpeakingRewardJobId(submissionId),
+    );
+  }
+
+  private async enqueuePostProcessing(
+    submissionId: number,
+    traceId: string,
+    kind: 'FEEDBACK' | 'REWARD',
+    jobId: string,
+  ): Promise<string> {
+    const job = await this.queue.add(
+      `${SPEAKING_JOB_NAME}-${kind.toLowerCase()}`,
+      { submissionId, traceId, kind },
+      { jobId },
+    );
     return job.id || jobId;
   }
 

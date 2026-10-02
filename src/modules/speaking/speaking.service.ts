@@ -912,17 +912,18 @@ export class SpeakingService {
     }
 
     if (head.contentLength <= 0 || head.contentLength > 10 * 1024 * 1024) {
-      const invalidation = await this.prisma.speakingUploadIntent
-        .updateMany({
-          where: {
-            id: uploadIntentId,
-            status: 'FINALIZING',
-            finalizationToken: token,
-          },
-          data: { status: 'INVALID' },
-        });
+      const invalidation = await this.prisma.speakingUploadIntent.updateMany({
+        where: {
+          id: uploadIntentId,
+          status: 'FINALIZING',
+          finalizationToken: token,
+        },
+        data: { status: 'INVALID' },
+      });
       if (invalidation.count === 1) {
-        await this.getStorage().deleteFile(intent.objectKey).catch(() => {});
+        await this.getStorage()
+          .deleteFile(intent.objectKey)
+          .catch(() => {});
       }
       throw new BadRequestException(
         'Uploaded audio size is invalid or exceeds 10MB limit.',
@@ -934,17 +935,18 @@ export class SpeakingService {
       this.logger.warn(
         `Exact size mismatch for intent ${intent.id}: expected ${intent.expectedSizeBytes} bytes, R2 has ${head.contentLength} bytes`,
       );
-      const invalidation = await this.prisma.speakingUploadIntent
-        .updateMany({
-          where: {
-            id: uploadIntentId,
-            status: 'FINALIZING',
-            finalizationToken: token,
-          },
-          data: { status: 'INVALID' },
-        });
+      const invalidation = await this.prisma.speakingUploadIntent.updateMany({
+        where: {
+          id: uploadIntentId,
+          status: 'FINALIZING',
+          finalizationToken: token,
+        },
+        data: { status: 'INVALID' },
+      });
       if (invalidation.count === 1) {
-        await this.getStorage().deleteFile(intent.objectKey).catch(() => {});
+        await this.getStorage()
+          .deleteFile(intent.objectKey)
+          .catch(() => {});
       }
       throw new BadRequestException(
         `Uploaded audio size (${head.contentLength} bytes) does not match declared size (${intent.expectedSizeBytes} bytes).`,
@@ -1126,6 +1128,9 @@ export class SpeakingService {
       exerciseId: submission.exerciseId,
       userId: submission.userId,
       status: submission.status,
+      feedbackStatus: submission.feedbackStatus,
+      feedbackError: submission.feedbackError,
+      rewardStatus: submission.rewardStatus,
       overallScore: submission.overallScore,
       transcript: submission.transcript,
       aiFeedback: submission.aiFeedback,
@@ -1192,6 +1197,7 @@ export class SpeakingService {
       id: s.id,
       exerciseId: s.exerciseId,
       status: s.status,
+      feedbackStatus: s.feedbackStatus,
       overallScore: s.overallScore,
       transcript: s.transcript,
       durationMs: s.durationMs,

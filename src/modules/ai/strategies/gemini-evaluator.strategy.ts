@@ -629,7 +629,10 @@ Nội dung câu hỏi của học sinh:
       overallScore = Math.max(0, Math.min(10, overallScore));
 
       // 5. Gọi Gemini để sinh nhận xét sư phạm
-      if (!this.hasKeys()) {
+      if (
+        !this.hasKeys() ||
+        process.env.SPEAKING_INLINE_GEMINI_FEEDBACK !== 'true'
+      ) {
         return {
           overallScore: Number(overallScore.toFixed(1)),
           clarity:
@@ -731,6 +734,39 @@ Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.`;
       // Re-throw provider errors so background worker handles retries and stable error codes
       throw error;
     }
+  }
+
+  async generatePronunciationFeedback(
+    targetText: string,
+    assessment: PronunciationFeedback,
+  ): Promise<
+    Partial<Pick<PronunciationFeedback, 'clarity' | 'feedback' | 'suggestions'>>
+  > {
+    if (!this.hasKeys()) return {};
+    const prompt = `Học viên vừa đọc câu: "${targetText}"
+Kết quả phát âm: overall=${assessment.overallScore}/10, accuracy=${assessment.accuracyScore ?? 0}, fluency=${assessment.fluencyScore ?? 0}, completeness=${assessment.completenessScore ?? 0}%.
+Các từ cần chú ý: ${assessment.problematicWords.join(', ') || 'Không có'}
+Transcript: "${assessment.transcript || 'Không có âm thanh rõ ràng'}"
+Trả về JSON duy nhất: {"clarity":"Excellent|Good|Fair|Poor","feedback":"2-3 câu tiếng Việt khích lệ","suggestions":["gợi ý ngắn 1","gợi ý ngắn 2"]}`;
+    const result = await this.executeWithRotation((m) =>
+      m.generateContent(prompt),
+    );
+    const match = result.response
+      .text()
+      .trim()
+      .match(/\{[\s\S]*\}/);
+    if (!match) return {};
+    const parsed = JSON.parse(match[0]) as Record<string, unknown>;
+    return {
+      clarity: typeof parsed.clarity === 'string' ? parsed.clarity : undefined,
+      feedback:
+        typeof parsed.feedback === 'string' ? parsed.feedback : undefined,
+      suggestions: Array.isArray(parsed.suggestions)
+        ? parsed.suggestions
+            .filter((item): item is string => typeof item === 'string')
+            .slice(0, 3)
+        : undefined,
+    };
   }
 
   async explainToeicError(

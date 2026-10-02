@@ -2,10 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { SpeakingQueueService } from './speaking-queue.service';
-import {
-  SpeakingJobPayload,
-  getSpeakingJobId,
-} from './speaking.constants';
+import { SpeakingJobPayload, getSpeakingJobId } from './speaking.constants';
 
 describe('SpeakingQueueService (Real BullMQ/Redis Integration)', () => {
   let queueService: SpeakingQueueService;
@@ -132,9 +129,7 @@ describe('SpeakingQueueService (Real BullMQ/Redis Integration)', () => {
     await worker.close();
 
     expect(processedPayload).not.toBeNull();
-    expect(processedPayload).toEqual(
-      expect.objectContaining({ submissionId }),
-    );
+    expect(processedPayload).toEqual(expect.objectContaining({ submissionId }));
 
     const completedJob = await testQueue.getJob(jobId);
     expect(completedJob).not.toBeNull();

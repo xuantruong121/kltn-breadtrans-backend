@@ -53,6 +53,19 @@ export class AiService {
     );
   }
 
+  async generatePronunciationFeedback(
+    targetText: string,
+    assessment: PronunciationFeedback,
+  ): Promise<
+    Partial<Pick<PronunciationFeedback, 'clarity' | 'feedback' | 'suggestions'>>
+  > {
+    if (!this.aiEvaluator.generatePronunciationFeedback) return {};
+    return this.aiEvaluator.generatePronunciationFeedback(
+      targetText,
+      assessment,
+    );
+  }
+
   async explainToeicError(
     questionContent: any,
     userAnswer: string,

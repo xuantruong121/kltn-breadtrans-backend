@@ -4,6 +4,7 @@ import {
   normalizeDialogueSegments,
   normalizeListeningAnswer,
   QuizService,
+  resolveReadingMicroSkill,
   validateReadingSubmission,
 } from './quiz.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -31,6 +32,7 @@ const mockPrismaService = {
     create: jest.fn(),
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
   },
   question: {
     findUnique: jest.fn(),
@@ -109,6 +111,61 @@ describe('QuizService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('Reading micro-skill analytics', () => {
+    it.each([
+      'DETAIL',
+      'PURPOSE',
+      'INFERENCE',
+      'MAIN_IDEA',
+      'VOCAB_IN_CONTEXT',
+      'PROMOTION',
+    ])('preserves the Reading skill %s', (skill) => {
+      expect(resolveReadingMicroSkill('BILINGUAL_READING', { skill })).toBe(
+        skill,
+      );
+    });
+
+    it('uses Reading content precedence and a controlled fallback', () => {
+      expect(
+        resolveReadingMicroSkill('BILINGUAL_READING', {
+          skill: 'detail',
+          questionType: 'purpose',
+          category: 'legacy',
+        }),
+      ).toBe('DETAIL');
+      expect(
+        resolveReadingMicroSkill('BILINGUAL_READING', {
+          skill: 'READING',
+          questionType: 'detail',
+        }),
+      ).toBe('DETAIL');
+      expect(
+        resolveReadingMicroSkill('BILINGUAL_READING', {
+          questionType: 'purpose',
+        }),
+      ).toBe('PURPOSE');
+      expect(
+        resolveReadingMicroSkill('BILINGUAL_READING', { category: 'detail' }),
+      ).toBe('DETAIL');
+      expect(resolveReadingMicroSkill('BILINGUAL_READING', null)).toBe(
+        'UNKNOWN',
+      );
+    });
+
+    it('preserves the generic category fallback for non-Reading quizzes', () => {
+      expect(
+        resolveReadingMicroSkill('LISTENING_PRACTICE', {}, 'MULTIPLE_CHOICE'),
+      ).toBe('MULTIPLE_CHOICE');
+      expect(
+        resolveReadingMicroSkill(
+          'LISTENING_PRACTICE',
+          { category: 'DICTATION' },
+          'MULTIPLE_CHOICE',
+        ),
+      ).toBe('DICTATION');
+    });
   });
 
   it('normalizes dialogue rows and drops incomplete rows', () => {
@@ -273,6 +330,9 @@ describe('QuizService', () => {
             ],
           }),
         },
+        learningActivity: {
+          create: jest.fn().mockResolvedValue({ id: 501 }),
+        },
       };
       mockPrismaService.$transaction.mockImplementation(
         (callback: (transaction: typeof tx) => Promise<unknown>) =>
@@ -305,11 +365,166 @@ describe('QuizService', () => {
       expect(
         tx.submission.create.mock.calls[0][0].data.results.create,
       ).toHaveLength(2);
+      expect(tx.learningActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: 7,
+          type: 'READING_PRACTICE_COMPLETED',
+          sourceType: 'QUIZ',
+          sourceId: '24',
+          score: 50,
+        }),
+      });
       expect(result.id).toBe(77);
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         'quiz.submitted',
-        expect.objectContaining({ quizId: 24, score: 1 }),
+        expect.objectContaining({
+          quizId: 24,
+          score: 1,
+          quizType: 'BILINGUAL_READING',
+        }),
       );
+    });
+
+    it('replays a keyed Reading submission without duplicating rows or side effects', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        title: 'Reading',
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      mockPrismaService.submission.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      const tx = {
+        submission: {
+          create: jest.fn().mockResolvedValue({
+            id: 90,
+            results: [
+              { questionId: 1, answer: 'B', isCorrect: true },
+              { questionId: 2, answer: 'C', isCorrect: false },
+            ],
+          }),
+        },
+        learningActivity: { create: jest.fn().mockResolvedValue({ id: 601 }) },
+      };
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (transaction: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      );
+      mockPrismaService.userQuizReward.createMany.mockResolvedValue({
+        count: 1,
+      });
+
+      await service.submitQuiz(24, 7, {
+        clientAttemptId: '11111111-1111-4111-8111-111111111111',
+        answers: [
+          { questionId: 1, answer: 'B' },
+          { questionId: 2, answer: 'C' },
+        ],
+      });
+
+      expect(tx.submission.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            clientAttemptId: '11111111-1111-4111-8111-111111111111',
+          }),
+        }),
+      );
+
+      jest.clearAllMocks();
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        title: 'Reading',
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      mockPrismaService.submission.findFirst.mockResolvedValue({
+        id: 90,
+        userId: 7,
+        quizId: 24,
+        clientAttemptId: '11111111-1111-4111-8111-111111111111',
+        results: [
+          { questionId: 1, answer: 'B' },
+          { questionId: 2, answer: 'C' },
+        ],
+      });
+
+      const replay = await service.submitQuiz(24, 7, {
+        clientAttemptId: '11111111-1111-4111-8111-111111111111',
+        answers: [
+          { questionId: 2, answer: 'C' },
+          { questionId: 1, answer: 'B' },
+        ],
+      });
+
+      expect(replay.id).toBe(90);
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      expect(
+        mockPrismaService.userQuizReward.createMany,
+      ).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('rejects a keyed replay with changed answers', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        title: 'Reading',
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      mockPrismaService.submission.findFirst.mockResolvedValue({
+        id: 91,
+        results: [
+          { questionId: 1, answer: 'B' },
+          { questionId: 2, answer: 'C' },
+        ],
+      });
+
+      await expect(
+        service.submitQuiz(24, 7, {
+          clientAttemptId: '22222222-2222-4222-8222-222222222222',
+          answers: [
+            { questionId: 1, answer: 'A' },
+            { questionId: 2, answer: 'C' },
+          ],
+        }),
+      ).rejects.toThrow('ClientAttemptId');
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('recovers the winner after a concurrent idempotency unique conflict', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        title: 'Reading',
+        type: 'BILINGUAL_READING',
+        questions,
+      });
+      mockPrismaService.submission.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 92,
+          results: [
+            { questionId: 1, answer: 'B' },
+            { questionId: 2, answer: 'C' },
+          ],
+        });
+      const uniqueError = Object.assign(new Error('unique'), {
+        code: 'P2002',
+        meta: { target: ['userId', 'quizId', 'clientAttemptId'] },
+      });
+      mockPrismaService.$transaction.mockRejectedValue(uniqueError);
+
+      await expect(
+        service.submitQuiz(24, 7, {
+          clientAttemptId: '33333333-3333-4333-8333-333333333333',
+          answers: [
+            { questionId: 1, answer: 'B' },
+            { questionId: 2, answer: 'C' },
+          ],
+        }),
+      ).resolves.toMatchObject({ id: 92 });
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('rejects invalid Reading submission without rows or success event', async () => {
@@ -326,6 +541,7 @@ describe('QuizService', () => {
       ).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
       expect(mockPrismaService.submission.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.learningActivity.create).not.toHaveBeenCalled();
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
@@ -350,7 +566,46 @@ describe('QuizService', () => {
       expect(
         mockPrismaService.userQuizReward.createMany,
       ).not.toHaveBeenCalled();
+      expect(mockPrismaService.learningActivity.create).not.toHaveBeenCalled();
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('keeps Listening activity creation outside the Reading transaction path', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 9,
+        title: 'Listening',
+        type: 'LISTENING_PRACTICE',
+        questions: [
+          {
+            id: 91,
+            type: 'MULTIPLE_CHOICE',
+            content: { options: ['A', 'B'], correctIndex: 0 },
+          },
+        ],
+      });
+      const tx = {
+        submission: {
+          create: jest.fn().mockResolvedValue({ id: 78, results: [] }),
+        },
+      };
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (transaction: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      );
+      mockPrismaService.userQuizReward.createMany.mockResolvedValue({
+        count: 1,
+      });
+
+      await service.submitQuiz(9, 7, {
+        answers: [{ questionId: 91, answer: 'A' }],
+      });
+
+      expect(mockPrismaService.learningActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          type: 'LISTENING_PRACTICE_COMPLETED',
+          sourceId: '9',
+        }),
+      });
     });
 
     it('uses the server Reading question count as analytics denominator', async () => {
@@ -374,6 +629,45 @@ describe('QuizService', () => {
         totalQuestions: 2,
         totalCorrect: 1,
         overallAccuracyPercent: 50,
+      });
+    });
+
+    it('reports Reading micro-skills instead of collapsing to MULTIPLE_CHOICE', async () => {
+      mockPrismaService.submission.findUnique.mockResolvedValue({
+        id: 90,
+        quizId: 24,
+        userId: 7,
+        score: 2,
+        quiz: {
+          id: 24,
+          title: 'Reading',
+          type: 'BILINGUAL_READING',
+          questions: [
+            {
+              id: 1,
+              type: 'MULTIPLE_CHOICE',
+              content: { skill: 'READING', questionType: 'DETAIL' },
+            },
+            {
+              id: 2,
+              type: 'MULTIPLE_CHOICE',
+              content: { questionType: 'PURPOSE' },
+            },
+          ],
+        },
+        results: [
+          { questionId: 1, isCorrect: true },
+          { questionId: 2, isCorrect: false },
+        ],
+      });
+
+      await expect(
+        service.getSubmissionAnalytics(90, 7, Role.STUDENT),
+      ).resolves.toMatchObject({
+        categoriesBreakdown: expect.arrayContaining([
+          expect.objectContaining({ category: 'DETAIL', total: 1 }),
+          expect.objectContaining({ category: 'PURPOSE', total: 1 }),
+        ]),
       });
     });
 
