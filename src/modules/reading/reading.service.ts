@@ -96,6 +96,20 @@ export function isReadingSubmissionComplete(
   );
 }
 
+/** Resolves authoritative CEFR level for a reading practice topic. */
+export function resolveReadingTopicLevel(
+  name: string,
+): 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' {
+  const upper = (name || '').toUpperCase();
+  if (upper.includes('B1') || upper.includes('B2')) {
+    return 'INTERMEDIATE';
+  }
+  if (upper.includes('C1') || upper.includes('C2')) {
+    return 'ADVANCED';
+  }
+  return 'BEGINNER';
+}
+
 @Injectable()
 export class ReadingService {
   constructor(private prisma: PrismaService) {}
@@ -175,6 +189,7 @@ export class ReadingService {
         name: topic.name,
         vietnameseName: topic.vietnameseName,
         iconUrl: topic.iconUrl,
+        level: resolveReadingTopicLevel(topic.name),
         totalQuestions,
         completedQuestions: completedCount,
         correctAnswers: correctCount,

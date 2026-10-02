@@ -3,6 +3,7 @@ import {
   countReadingSentenceUnits,
   countReadingSentences,
   isReadingSubmissionComplete,
+  resolveReadingTopicLevel,
   ReadingService,
 } from './reading.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -104,5 +105,15 @@ describe('ReadingService', () => {
         { title: 'Travel', sentencesCount: 2, questionsCount: 2 },
       ],
     });
+  });
+
+  it('resolves authoritative CEFR levels for reading topics', () => {
+    expect(resolveReadingTopicLevel('Reading A1–A2')).toBe('BEGINNER');
+    expect(resolveReadingTopicLevel('Reading A1-A2')).toBe('BEGINNER');
+    expect(resolveReadingTopicLevel('Reading B1–B2')).toBe('INTERMEDIATE');
+    expect(resolveReadingTopicLevel('Reading B1-B2')).toBe('INTERMEDIATE');
+    expect(resolveReadingTopicLevel('Reading C1')).toBe('ADVANCED');
+    expect(resolveReadingTopicLevel('Reading C2')).toBe('ADVANCED');
+    expect(resolveReadingTopicLevel('General Reading')).toBe('BEGINNER');
   });
 });
