@@ -86,6 +86,21 @@ describe('Speaking Reward Atomicity & Event Parity (Phase S2A Integration)', () 
     });
     testExerciseId = exercise.id;
 
+    // Keep the integration fixture self-contained: CI provisions the schema but
+    // intentionally does not run the application seed before unit/integration tests.
+    const speakingBadge = await prisma.badge.findFirst({
+      where: { name: 'Giọng Đọc Vàng' },
+    });
+    if (!speakingBadge) {
+      await prisma.badge.create({
+        data: {
+          name: 'Giọng Đọc Vàng',
+          description: 'Đạt điểm cao trong bài luyện phát âm.',
+          criteria: { type: 'SPEAKING', threshold: 80 },
+        },
+      });
+    }
+
     // Ensure DO_SPEAKING quest exists
     let q1 = await prisma.dailyQuest.findFirst({
       where: { type: 'DO_SPEAKING' },
