@@ -25,7 +25,11 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AiService } from '../ai/ai.service';
 import { SpeakingService } from '../speaking/speaking.service';
-import { UploadService } from '../upload/upload.service';
+import {
+  isPrivateListeningMediaKey,
+  PRIVATE_LISTENING_MEDIA_PREFIX,
+  UploadService,
+} from '../upload/upload.service';
 import {
   ListeningAudioAuthoringService,
   PublishedListeningAudioIdentity,
@@ -39,6 +43,7 @@ import {
   resolveReadingCorrectOption,
   validateReadingQuestionContent,
 } from './reading-content.validation';
+import { QuizContentAccessService } from './quiz-content-access.service';
 
 /**
  * Compare learner dictation without penalising typography that does not change
@@ -428,12 +433,22 @@ export class QuizService {
     private speakingService: SpeakingService,
     private uploadService: UploadService,
     private listeningAudioAuthoringService: ListeningAudioAuthoringService,
+    private readonly quizContentAccess: QuizContentAccessService,
   ) {}
 
   async createQuiz(dto: CreateQuizDto, user?: { id: number; role: Role }) {
     if (user && user.role !== Role.ADMIN) {
       throw new ForbiddenException(
         'Chỉ Quản trị viên mới có quyền tạo bài kiểm tra',
+      );
+    }
+    if (
+      dto.type === QuizType.LISTENING_PRACTICE &&
+      dto.isPremiumContent === true &&
+      !this.uploadService.isPrivateStorageConfigured()
+    ) {
+      throw new ServiceUnavailableException(
+        'Protected Listening media storage is not configured',
       );
     }
     return this.prisma.quiz.create({ data: dto });
@@ -456,6 +471,14 @@ export class QuizService {
       );
     }
 
+    const effectiveType = dto.type ?? existing.type;
+    if (
+      effectiveType === QuizType.LISTENING_PRACTICE &&
+      dto.isPremiumContent === true
+    ) {
+      await this.assertPremiumListeningMediaReady(id);
+    }
+
     return this.prisma.quiz.update({
       where: { id },
       data: dto,
@@ -472,6 +495,13 @@ export class QuizService {
       },
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
+    if (
+      status === 'PUBLISHED' &&
+      quiz.type === QuizType.LISTENING_PRACTICE &&
+      quiz.isPremiumContent
+    ) {
+      await this.assertPremiumListeningMediaReady(id);
+    }
     if (status === 'PUBLISHED' && quiz.type === QuizType.BILINGUAL_READING) {
       if (quiz.questions.length === 0) {
         throw new BadRequestException(
@@ -542,13 +572,84 @@ export class QuizService {
     });
   }
 
-  async getListeningPractices(userId?: number) {
+  private async assertPremiumListeningMediaReady(quizId: number) {
+    if (!this.uploadService.isPrivateStorageConfigured()) {
+      throw new ServiceUnavailableException(
+        'Protected Listening media storage is not configured',
+      );
+    }
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: {
+        type: true,
+        questions: {
+          select: {
+            audioAssets: {
+              where: { isActive: true },
+              select: { key: true, url: true },
+            },
+            diagnosticClips: { select: { key: true, url: true } },
+          },
+        },
+        listeningAudioArtifacts: {
+          select: { r2Key: true, r2Url: true },
+        },
+      },
+    });
+    if (!quiz || quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new NotFoundException('Không tìm thấy bài luyện nghe');
+    }
+
+    const assets = [
+      ...quiz.questions.flatMap((question) => [
+        ...question.audioAssets,
+        ...question.diagnosticClips,
+      ]),
+      ...quiz.listeningAudioArtifacts
+        .filter((artifact) => artifact.r2Key)
+        .map((artifact) => ({
+          key: artifact.r2Key as string,
+          url: artifact.r2Url ?? '',
+        })),
+    ];
+    const publicAssets = assets.filter(
+      (asset) => !isPrivateListeningMediaKey(asset.key) || asset.url.length > 0,
+    );
+    if (publicAssets.length > 0) {
+      throw new BadRequestException(
+        'Không thể bật premium cho bài nghe còn media public; hãy chuyển media sang private storage trước',
+      );
+    }
+    const missingPrivateObjects = await Promise.all(
+      assets.map(async (asset) =>
+        (await this.uploadService.privateObjectExists(asset.key))
+          ? null
+          : asset,
+      ),
+    );
+    if (missingPrivateObjects.some(Boolean)) {
+      throw new BadRequestException(
+        'Không thể bật premium khi media private chưa tồn tại trong storage',
+      );
+    }
+  }
+
+  async getListeningPractices(userId?: number, role?: Role) {
     const quizzes = await this.prisma.quiz.findMany({
       where: {
         type: 'LISTENING_PRACTICE',
         publicationStatus: 'PUBLISHED',
       },
-      include: {
+      select: {
+        id: true,
+        courseId: true,
+        practiceTopicId: true,
+        title: true,
+        description: true,
+        type: true,
+        bilingualContent: true,
+        timeLimit: true,
+        isPremiumContent: true,
         _count: {
           select: { questions: true },
         },
@@ -557,6 +658,12 @@ export class QuizService {
         id: 'desc',
       },
     });
+
+    const accessByQuiz = await this.quizContentAccess.resolveMany(
+      quizzes,
+      userId,
+      role,
+    );
 
     const toCatalogItem = (
       quiz: (typeof quizzes)[number],
@@ -570,7 +677,13 @@ export class QuizService {
       const durationMinutes = Number(metadata.durationMinutes);
 
       return {
-        ...quiz,
+        id: quiz.id,
+        courseId: quiz.courseId,
+        practiceTopicId: quiz.practiceTopicId,
+        title: quiz.title,
+        description: quiz.description,
+        type: quiz.type,
+        timeLimit: quiz.timeLimit,
         mode:
           metadata.mode === 'DICTATION'
             ? 'DICTATION'
@@ -589,6 +702,8 @@ export class QuizService {
           ? durationMinutes
           : quiz.timeLimit,
         isCompleted,
+        isPremiumContent: accessByQuiz.get(quiz.id)?.isPremiumContent ?? false,
+        isLocked: accessByQuiz.get(quiz.id)?.isLocked ?? false,
       };
     };
 
@@ -610,20 +725,30 @@ export class QuizService {
     );
   }
 
-  private async assertListeningPracticeQuiz(quizId: number) {
+  private async assertListeningPracticeQuiz(
+    quizId: number,
+    userId?: number,
+    role?: Role,
+  ) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
-      select: { id: true, type: true },
+      select: {
+        id: true,
+        type: true,
+        isPremiumContent: true,
+        courseId: true,
+      },
     });
     if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
     if (quiz.type !== QuizType.LISTENING_PRACTICE) {
       throw new ForbiddenException('Phiên chỉ dành cho bài luyện nghe');
     }
+    await this.quizContentAccess.assertAccess(quiz, userId, role);
     return quiz;
   }
 
   async getOrCreateListeningAttempt(userId: number, quizId: number) {
-    await this.assertListeningPracticeQuiz(quizId);
+    await this.assertListeningPracticeQuiz(quizId, userId);
     const existing = await this.prisma.listeningPracticeAttempt.findFirst({
       where: {
         userId,
@@ -669,7 +794,7 @@ export class QuizService {
     attemptId: number,
     dto: SaveListeningAttemptDto,
   ) {
-    await this.assertListeningPracticeQuiz(quizId);
+    await this.assertListeningPracticeQuiz(quizId, userId);
     const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
       where: { id: attemptId, userId, quizId },
     });
@@ -722,7 +847,7 @@ export class QuizService {
     quizId: number,
     attemptId: number,
   ) {
-    await this.assertListeningPracticeQuiz(quizId);
+    await this.assertListeningPracticeQuiz(quizId, userId);
     const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
       where: { id: attemptId, userId, quizId },
       select: { id: true, status: true },
@@ -799,7 +924,39 @@ export class QuizService {
     });
   }
 
-  async getQuizById(id: number, includeAnswers = false, userId?: number) {
+  async getQuizById(
+    id: number,
+    includeAnswers = false,
+    userId?: number,
+    role?: Role,
+  ) {
+    const accessQuiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        type: true,
+        isPremiumContent: true,
+        courseId: true,
+        publicationStatus: true,
+      },
+    });
+    if (!accessQuiz) throw new NotFoundException('Quiz not found');
+
+    if (
+      accessQuiz.type === QuizType.LISTENING_PRACTICE &&
+      userId === undefined
+    ) {
+      throw new UnauthorizedException('Đăng nhập để bắt đầu luyện nghe');
+    }
+    if (
+      !includeAnswers &&
+      accessQuiz.publicationStatus !== undefined &&
+      accessQuiz.publicationStatus !== 'PUBLISHED'
+    ) {
+      throw new NotFoundException('Bài luyện chưa được xuất bản');
+    }
+    await this.quizContentAccess.assertAccess(accessQuiz, userId, role);
+
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },
       include: {
@@ -886,20 +1043,6 @@ export class QuizService {
       });
     }
 
-    if (quiz.type === QuizType.LISTENING_PRACTICE && userId === undefined) {
-      throw new UnauthorizedException('Đăng nhập để bắt đầu luyện nghe');
-    }
-
-    // Draft and archived content is visible to administrators only. Learners
-    // must never deep-link around the published catalog filter.
-    if (
-      !includeAnswers &&
-      quiz.publicationStatus !== undefined &&
-      quiz.publicationStatus !== 'PUBLISHED'
-    ) {
-      throw new NotFoundException('Bài luyện chưa được xuất bản');
-    }
-
     if (!includeAnswers && quiz.questions) {
       const sanitizedQuestions = quiz.questions.map((q) => {
         if (!q.content || typeof q.content !== 'object') return q;
@@ -913,17 +1056,67 @@ export class QuizService {
         }
         return { ...q, content };
       });
+      const safeQuiz = await this.protectPremiumListeningMedia(
+        { ...quiz, questions: sanitizedQuestions },
+        accessQuiz,
+      );
       return {
-        ...quiz,
+        ...safeQuiz,
         ...(listeningAudioArtifact ? { listeningAudioArtifact } : {}),
-        questions: sanitizedQuestions,
       };
     }
 
+    const safeQuiz = await this.protectPremiumListeningMedia(quiz, accessQuiz);
     return {
-      ...quiz,
+      ...safeQuiz,
       ...(listeningAudioArtifact ? { listeningAudioArtifact } : {}),
     };
+  }
+
+  private async protectPremiumListeningMedia<
+    T extends {
+      type?: QuizType;
+      isPremiumContent?: boolean;
+      questions?: Array<{
+        audioAssets?: Array<{ key: string; url: string }>;
+        diagnosticClips?: Array<{ key: string; url: string }>;
+      }>;
+    },
+  >(quiz: T, accessQuiz: { type: QuizType; isPremiumContent: boolean }) {
+    if (
+      accessQuiz.type !== QuizType.LISTENING_PRACTICE ||
+      !accessQuiz.isPremiumContent ||
+      !quiz.questions
+    ) {
+      return quiz;
+    }
+
+    const questions = await Promise.all(
+      quiz.questions.map(async (question) => {
+        const [audioAssets, diagnosticClips] = await Promise.all([
+          Promise.all(
+            (question.audioAssets ?? []).map(async (asset) => ({
+              ...asset,
+              url: await this.uploadService.getPrivatePresignedDownloadUrl(
+                asset.key,
+                300,
+              ),
+            })),
+          ),
+          Promise.all(
+            (question.diagnosticClips ?? []).map(async (clip) => ({
+              ...clip,
+              url: await this.uploadService.getPrivatePresignedDownloadUrl(
+                clip.key,
+                300,
+              ),
+            })),
+          ),
+        ]);
+        return { ...question, audioAssets, diagnosticClips };
+      }),
+    );
+    return { ...quiz, questions };
   }
 
   /**
@@ -932,8 +1125,8 @@ export class QuizService {
    * this endpoint is limited to published listening-practice dictation items
    * and never serves TOEIC or other assessment content.
    */
-  async revealListeningTranscript(userId: number, quizId: number) {
-    await this.assertListeningPracticeQuiz(quizId);
+  async revealListeningTranscript(userId: number, quizId: number, role?: Role) {
+    await this.assertListeningPracticeQuiz(quizId, userId, role);
     const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
       where: {
         userId,
@@ -961,17 +1154,15 @@ export class QuizService {
     });
   }
 
-  async getListeningTranscript(userId: number, quizId: number) {
+  async getListeningTranscript(userId: number, quizId: number, role?: Role) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
       select: {
         id: true,
         type: true,
+        isPremiumContent: true,
+        courseId: true,
         publicationStatus: true,
-        questions: {
-          orderBy: { order: 'asc' },
-          select: { id: true, type: true, order: true, content: true },
-        },
       },
     });
 
@@ -984,7 +1175,13 @@ export class QuizService {
     if (quiz.publicationStatus !== 'PUBLISHED') {
       throw new NotFoundException('Bài luyện chưa được xuất bản');
     }
-    const transcriptQuestions = quiz.questions.filter((question) => {
+    await this.quizContentAccess.assertAccess(quiz, userId, role);
+    const questions = await this.prisma.question.findMany({
+      where: { quizId },
+      orderBy: { order: 'asc' },
+      select: { id: true, type: true, order: true, content: true },
+    });
+    const transcriptQuestions = questions.filter((question) => {
       const content = (question.content ?? {}) as Record<string, unknown>;
       return (
         question.type === 'DICTATION' ||
@@ -1137,7 +1334,26 @@ export class QuizService {
   async streamListeningTranscriptAudio(
     quizId: number,
     requestedIdentity: PublishedListeningAudioIdentity = {},
+    userId?: number,
+    role?: Role,
   ) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: {
+        id: true,
+        type: true,
+        isPremiumContent: true,
+        courseId: true,
+        publicationStatus: true,
+      },
+    });
+    if (!quiz || quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new NotFoundException('Không tìm thấy bài luyện nghe');
+    }
+    if (quiz.publicationStatus !== 'PUBLISHED') {
+      throw new NotFoundException('Bài luyện chưa được xuất bản');
+    }
+    await this.quizContentAccess.assertAccess(quiz, userId, role);
     const result = await this.listeningAudioAuthoringService.getPublishedAudio(
       quizId,
       requestedIdentity,
@@ -1172,7 +1388,7 @@ export class QuizService {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: {
-        quiz: { select: { id: true, type: true } },
+        quiz: { select: { id: true, type: true, isPremiumContent: true } },
         audioAssets: {
           where: { isActive: true },
           orderBy: { version: 'desc' },
@@ -1182,6 +1398,14 @@ export class QuizService {
     });
     if (!question || question.quiz.type !== QuizType.LISTENING_PRACTICE) {
       throw new NotFoundException('Không tìm thấy câu luyện nghe');
+    }
+    if (
+      question.quiz.isPremiumContent &&
+      !this.uploadService.isPrivateStorageConfigured()
+    ) {
+      throw new ServiceUnavailableException(
+        'Protected Listening media storage is not configured',
+      );
     }
     const next = await this.prisma.quizAudioAsset.aggregate({
       where: { questionId },
@@ -1193,15 +1417,23 @@ export class QuizService {
       Array.isArray(
         (question.content as Record<string, unknown>).transcriptSegments,
       );
-    const folder = isDialogue
-      ? `catalog/listening/practice/dialogue/quiz-${question.quiz.id}/question-${questionId}/v${version}`
-      : `listening/quiz-${question.quiz.id}/question-${questionId}/v${version}`;
-    const upload = await this.uploadService.uploadRawBuffer(
-      file.buffer,
-      file.mimetype,
-      folder,
-      file.originalname,
-    );
+    const folder = question.quiz.isPremiumContent
+      ? `${PRIVATE_LISTENING_MEDIA_PREFIX}quiz-${question.quiz.id}/question-${questionId}/v${version}`
+      : isDialogue
+        ? `catalog/listening/practice/dialogue/quiz-${question.quiz.id}/question-${questionId}/v${version}`
+        : `listening/quiz-${question.quiz.id}/question-${questionId}/v${version}`;
+    const upload = question.quiz.isPremiumContent
+      ? await this.uploadService.putPrivateObjectAtKey(
+          `${folder}/${file.originalname || 'audio'}`,
+          file.buffer,
+          file.mimetype,
+        )
+      : await this.uploadService.uploadRawBuffer(
+          file.buffer,
+          file.mimetype,
+          folder,
+          file.originalname,
+        );
     return this.prisma.$transaction(async (tx) => {
       await tx.quizAudioAsset.updateMany({
         where: { questionId },
@@ -1223,7 +1455,9 @@ export class QuizService {
   async generateDialogueAudioAsset(questionId: number) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
-      include: { quiz: { select: { id: true, type: true } } },
+      include: {
+        quiz: { select: { id: true, type: true, isPremiumContent: true } },
+      },
     });
     if (
       !question ||
@@ -1231,6 +1465,14 @@ export class QuizService {
       question.type.toUpperCase() !== 'DIALOGUE'
     ) {
       throw new NotFoundException('Không tìm thấy câu hội thoại luyện nghe');
+    }
+    if (
+      question.quiz.isPremiumContent &&
+      !this.uploadService.isPrivateStorageConfigured()
+    ) {
+      throw new ServiceUnavailableException(
+        'Protected Listening media storage is not configured',
+      );
     }
 
     const content = question.content as Record<string, unknown>;
@@ -1252,12 +1494,18 @@ export class QuizService {
       _max: { version: true },
     });
     const version = (next._max.version ?? 0) + 1;
-    const upload = await this.uploadService.uploadRawBuffer(
-      audioBuffer,
-      'audio/mpeg',
-      `catalog/listening/practice/dialogue/quiz-${question.quiz.id}/question-${questionId}/v${version}`,
-      'dialogue.mp3',
-    );
+    const upload = question.quiz.isPremiumContent
+      ? await this.uploadService.putPrivateObjectAtKey(
+          `${PRIVATE_LISTENING_MEDIA_PREFIX}quiz-${question.quiz.id}/question-${questionId}/v${version}/dialogue.mp3`,
+          audioBuffer,
+          'audio/mpeg',
+        )
+      : await this.uploadService.uploadRawBuffer(
+          audioBuffer,
+          'audio/mpeg',
+          `catalog/listening/practice/dialogue/quiz-${question.quiz.id}/question-${questionId}/v${version}`,
+          'dialogue.mp3',
+        );
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -1637,11 +1885,20 @@ export class QuizService {
     quizId: number,
     questionId: number,
     dto: CheckPracticeQuestionDto,
+    userId?: number,
+    role?: Role,
   ) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: {
-        quiz: { select: { id: true, type: true } },
+        quiz: {
+          select: {
+            id: true,
+            type: true,
+            isPremiumContent: true,
+            courseId: true,
+          },
+        },
         audioAssets: {
           where: { isActive: true },
           orderBy: { version: 'desc' },
@@ -1657,6 +1914,7 @@ export class QuizService {
         'Chỉ hỗ trợ kiểm tra tức thời cho bài luyện nghe',
       );
     }
+    await this.quizContentAccess.assertAccess(question.quiz, userId, role);
 
     const content = question.content as Record<string, unknown>;
     if (question.type === 'DICTATION') {
@@ -1741,11 +1999,20 @@ export class QuizService {
     quizId: number,
     questionId: number,
     requestedIdentity: PublishedListeningAudioIdentity = {},
+    userId?: number,
+    role?: Role,
   ) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: {
-        quiz: { select: { id: true, type: true } },
+        quiz: {
+          select: {
+            id: true,
+            type: true,
+            isPremiumContent: true,
+            courseId: true,
+          },
+        },
         audioAssets: {
           where: { isActive: true },
           orderBy: { version: 'desc' },
@@ -1759,6 +2026,7 @@ export class QuizService {
     if (question.quiz.type !== QuizType.LISTENING_PRACTICE) {
       throw new ForbiddenException('Chỉ hỗ trợ audio cho bài luyện nghe');
     }
+    await this.quizContentAccess.assertAccess(question.quiz, userId, role);
 
     const content =
       question.content && typeof question.content === 'object'
@@ -1795,8 +2063,25 @@ export class QuizService {
     const activeAsset = question.audioAssets[0];
     // Published student playback is R2-only. Never call Azure from this
     // request path; content must be synthesized and approved by an author.
-    if (activeAsset && activeAsset.key.startsWith('catalog/listening/'))
+    if (
+      activeAsset &&
+      question.quiz.isPremiumContent &&
+      isPrivateListeningMediaKey(activeAsset.key)
+    ) {
+      return this.uploadService.downloadPrivateFileBuffer(activeAsset.key);
+    }
+    if (
+      activeAsset &&
+      !question.quiz.isPremiumContent &&
+      (activeAsset.key.startsWith('catalog/listening/') ||
+        activeAsset.key.startsWith('listening/'))
+    )
       return this.uploadService.downloadFileBuffer(activeAsset.key);
+    if (activeAsset && question.quiz.isPremiumContent) {
+      throw new ServiceUnavailableException(
+        'Premium Listening media is not stored in private storage',
+      );
+    }
     throw new ServiceUnavailableException(
       'Audio bài luyện chưa được quản trị viên tạo và duyệt; vui lòng thử lại sau.',
     );

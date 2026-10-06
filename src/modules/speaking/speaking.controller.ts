@@ -66,13 +66,21 @@ export class SpeakingController {
     enum: ['IELTS', 'TOEIC', 'GENERAL'],
   })
   findAllExercises(@Query('category') category: string, @Request() req: any) {
-    return this.speakingService.findAllExercises(category, req?.user?.id);
+    return this.speakingService.findAllExercises(
+      category,
+      req?.user?.id,
+      req?.user?.role,
+    );
   }
 
   @Get('exercises/:id')
   @ApiOperation({ summary: 'Lấy thông tin chi tiết một bài tập' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.speakingService.findExerciseById(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.speakingService.findExerciseById(
+      id,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Get('capabilities')
@@ -107,6 +115,7 @@ export class SpeakingController {
       req.user.id,
       dto,
       traceIdHeader,
+      req.user.role,
     );
   }
 
@@ -133,6 +142,7 @@ export class SpeakingController {
       uploadIntentId,
       req.user.id,
       traceIdHeader,
+      req.user.role,
     );
   }
 
@@ -197,6 +207,7 @@ export class SpeakingController {
       audio,
       idempotencyKey,
       traceIdHeader,
+      req.user.role,
     );
   }
 

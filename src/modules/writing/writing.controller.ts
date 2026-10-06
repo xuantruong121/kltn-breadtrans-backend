@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { WritingService } from './writing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
@@ -27,23 +28,37 @@ export class WritingController {
   constructor(private readonly writingService: WritingService) {}
 
   @Get('topics')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: 'Lấy danh sách các chủ điểm và bài viết Writing Part 1',
   })
   getTopics(@Request() req: any) {
-    return this.writingService.getTopics(req?.user?.id);
+    return this.writingService.getTopics(req?.user?.id, req?.user?.role);
   }
 
   @Get('quizzes/:id')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Lấy chi tiết 1 bài tập Writing Part 1' })
-  getQuizDetails(@Param('id', ParseIntPipe) id: number) {
-    return this.writingService.getQuizDetails(id);
+  getQuizDetails(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.writingService.getQuizDetails(
+      id,
+      req?.user?.id,
+      req?.user?.role,
+    );
   }
 
   @Get('quizzes/:id/community')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Lấy bài nộp của cộng đồng cho 1 bài tập' })
-  getCommunitySubmissions(@Param('id', ParseIntPipe) id: number) {
-    return this.writingService.getCommunitySubmissions(id);
+  getCommunitySubmissions(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.writingService.getCommunitySubmissions(
+      id,
+      req?.user?.id,
+      req?.user?.role,
+    );
   }
 
   @Post('quizzes/:id/submit')
@@ -58,7 +73,12 @@ export class WritingController {
     @Request() req: any,
     @Body() body: SubmitWritingDto,
   ) {
-    return this.writingService.submitWriting(id, req.user.id, body.answer);
+    return this.writingService.submitWriting(
+      id,
+      req.user.id,
+      body.answer,
+      req.user.role,
+    );
   }
 
   @Post('part2/submit')

@@ -12,7 +12,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { UploadService } from '../upload/upload.service';
-import { R2Service } from '../upload/r2.service';
+import { R2Service, isPrivateSpeakingMediaKey } from '../upload/r2.service';
 import { CreateExerciseDto } from './dto/create-exercise.dto';
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto';
 import { validateSpeakingAudio } from './speaking-audio-validator';
@@ -22,7 +22,9 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
 import { getSpeakingPipelineMode } from './speaking.constants';
+import { Role } from '@prisma/client';
 import type { SpeakingSubmission } from '@prisma/client';
+import { SpeakingContentAccessService } from './speaking-content-access.service';
 
 export interface SubmitSpeakingResponse {
   submissionId: number;
@@ -149,6 +151,7 @@ type SpeakingExerciseCatalogItem = {
   title: string;
   difficulty: string;
   category: string;
+  isPremiumContent?: boolean;
 };
 
 /**
@@ -256,17 +259,84 @@ export class SpeakingService {
     @Optional() private readonly speakingQueueService?: SpeakingQueueService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
     @Optional() private readonly r2Service?: R2Service,
+    @Optional()
+    private readonly speakingContentAccess?: SpeakingContentAccessService,
   ) {}
 
   private getStorage() {
     return this.r2Service ?? this.uploadService;
   }
 
-  async findAllExercises(category: string | undefined, userId?: number) {
+  private async findExerciseRecordById(id: number) {
+    const exercise = await this.prisma.speakingExercise.findUnique({
+      where: { id },
+    });
+    if (!exercise) {
+      throw new NotFoundException(`Speaking exercise #${id} not found`);
+    }
+    return exercise;
+  }
+
+  private async projectExercise(
+    exercise: Awaited<ReturnType<SpeakingService['findExerciseRecordById']>>,
+    access: { isPremiumContent: boolean; isLocked: boolean },
+  ) {
+    const safeMetadata = {
+      id: exercise.id,
+      title: exercise.title,
+      difficulty: exercise.difficulty,
+      category: exercise.category,
+      imageUrl: exercise.imageUrl,
+      isPremiumContent: access.isPremiumContent,
+      isLocked: access.isLocked,
+    };
+    if (access.isLocked) return safeMetadata;
+
+    let audioUrl = exercise.audioUrl;
+    if (access.isPremiumContent && audioUrl) {
+      audioUrl = isPrivateSpeakingMediaKey(audioUrl)
+        ? await this.uploadService.getPrivatePresignedDownloadUrl(audioUrl, 300)
+        : null;
+    }
+    return {
+      ...exercise,
+      audioUrl,
+      isPremiumContent: access.isPremiumContent,
+      isLocked: false,
+    };
+  }
+
+  private async assertSpeakingContentAccess(
+    exercise: { id: number; isPremiumContent: boolean },
+    userId?: number,
+    role?: Role,
+  ) {
+    if (this.speakingContentAccess) {
+      await this.speakingContentAccess.assertAccess(exercise, userId, role);
+    }
+  }
+
+  async findAllExercises(
+    category: string | undefined,
+    userId?: number,
+    role?: Role,
+  ) {
     const exercises = await this.prisma.speakingExercise.findMany({
       where: category ? { category } : {},
       orderBy: { createdAt: 'desc' },
     });
+
+    const accessByExercise = this.speakingContentAccess
+      ? await this.speakingContentAccess.resolveMany(exercises, userId, role)
+      : new Map(
+          exercises.map((exercise) => [
+            exercise.id,
+            {
+              isPremiumContent: Boolean(exercise.isPremiumContent),
+              isLocked: false,
+            },
+          ]),
+        );
 
     const userSubmissions = userId
       ? await this.prisma.speakingSubmission.findMany({
@@ -320,38 +390,61 @@ export class SpeakingService {
     }
 
     const positions = new Map<string, number>();
-    return exercises.map((exercise) => {
-      const set = setSummaries.get(resolvePracticeSet(exercise).key)!;
-      const setKey = set.key;
-      const position = (positions.get(setKey) ?? 0) + 1;
-      positions.set(setKey, position);
-      return {
-        ...exercise,
-        isCompleted: completedExerciseIds.has(exercise.id),
-        practiceSet: {
-          ...set,
-          position,
-          isCompleted: set.completedCount === set.exerciseCount,
-        },
-      };
-    });
+    return Promise.all(
+      exercises.map(async (exercise) => {
+        const set = setSummaries.get(resolvePracticeSet(exercise).key)!;
+        const setKey = set.key;
+        const position = (positions.get(setKey) ?? 0) + 1;
+        positions.set(setKey, position);
+        const projected = await this.projectExercise(
+          exercise,
+          accessByExercise.get(exercise.id) ?? {
+            isPremiumContent: Boolean(exercise.isPremiumContent),
+            isLocked: false,
+          },
+        );
+        return {
+          ...projected,
+          isCompleted: completedExerciseIds.has(exercise.id),
+          practiceSet: {
+            ...set,
+            position,
+            isCompleted: set.completedCount === set.exerciseCount,
+          },
+        };
+      }),
+    );
   }
 
-  async findExerciseById(id: number) {
-    const exercise = await this.prisma.speakingExercise.findUnique({
-      where: { id },
-    });
-    if (!exercise) {
-      throw new NotFoundException(`Speaking exercise #${id} not found`);
-    }
-    return exercise;
+  async findExerciseById(id: number, userId?: number, role?: Role) {
+    const exercise = await this.findExerciseRecordById(id);
+    await this.assertSpeakingContentAccess(exercise, userId, role);
+    const access = this.speakingContentAccess
+      ? await this.speakingContentAccess.resolve(exercise, userId, role)
+      : {
+          isPremiumContent: Boolean(exercise.isPremiumContent),
+          isLocked: false,
+        };
+    return this.projectExercise(exercise, access);
   }
 
   async createExercise(dto: CreateExerciseDto) {
+    if (
+      dto.isPremiumContent === true &&
+      dto.audioUrl &&
+      !isPrivateSpeakingMediaKey(dto.audioUrl)
+    ) {
+      throw new BadRequestException(
+        'Premium Speaking audio must use the private storage key namespace',
+      );
+    }
     return this.prisma.speakingExercise.create({
       data: {
         title: dto.title,
         targetText: dto.targetText,
+        imageUrl: dto.imageUrl,
+        audioUrl: dto.audioUrl,
+        isPremiumContent: dto.isPremiumContent ?? false,
         difficulty: dto.difficulty || 'BEGINNER',
         category: dto.category || 'GENERAL',
       },
@@ -368,6 +461,7 @@ export class SpeakingService {
     audioFile: Express.Multer.File,
     idempotencyKey?: string,
     traceIdHeader?: string,
+    role?: Role,
   ): Promise<SubmitSpeakingResponse> {
     const traceId = traceIdHeader?.trim() || crypto.randomUUID();
 
@@ -407,7 +501,8 @@ export class SpeakingService {
     }
 
     // 3. Verify exercise exists
-    const exercise = await this.findExerciseById(exerciseId);
+    const exercise = await this.findExerciseRecordById(exerciseId);
+    await this.assertSpeakingContentAccess(exercise, userId, role);
 
     // 4. Byte-level audio validation
     if (!audioFile || !audioFile.buffer) {
@@ -547,13 +642,15 @@ export class SpeakingService {
     userId: number,
     dto: CreateUploadIntentDto,
     traceIdHeader?: string,
+    role?: Role,
   ) {
     const traceId =
       traceIdHeader ||
       `trace-intent-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 
     // 1. Verify exercise exists
-    const exercise = await this.findExerciseById(exerciseId);
+    const exercise = await this.findExerciseRecordById(exerciseId);
+    await this.assertSpeakingContentAccess(exercise, userId, role);
 
     // 2. Validate declared MIME type, size, duration
     const validMimes = ['audio/wav', 'audio/x-wav'];
@@ -750,6 +847,7 @@ export class SpeakingService {
     uploadIntentId: string,
     userId: number,
     traceIdHeader?: string,
+    role?: Role,
   ) {
     const traceId =
       traceIdHeader ||
@@ -775,6 +873,8 @@ export class SpeakingService {
       );
     }
 
+    const exercise = await this.findExerciseRecordById(intent.exerciseId);
+
     // 3. Idempotent return if already finalized
     if (intent.status === 'FINALIZED' && intent.submissionId) {
       const existingSub =
@@ -795,6 +895,8 @@ export class SpeakingService {
         };
       }
     }
+
+    await this.assertSpeakingContentAccess(exercise, userId, role);
 
     // 4. Reject expired or cancelled intents
     const now = new Date();
@@ -1110,6 +1212,22 @@ export class SpeakingService {
       );
     }
 
+    const safeExercise = submission.exercise
+      ? await this.projectExercise(
+          submission.exercise,
+          this.speakingContentAccess
+            ? await this.speakingContentAccess.resolve(
+                submission.exercise,
+                currentUser.id,
+                currentUser.role === 'ADMIN' ? Role.ADMIN : Role.STUDENT,
+              )
+            : {
+                isPremiumContent: Boolean(submission.exercise.isPremiumContent),
+                isLocked: false,
+              },
+        )
+      : null;
+
     // Provide safe short-lived presigned audio URL if audioKey exists
     let safeAudioUrl: string | null = null;
     if (submission.audioKey) {
@@ -1140,7 +1258,7 @@ export class SpeakingService {
       submittedAt: submission.submittedAt,
       processedAt: submission.processedAt,
       lastErrorCode: submission.lastErrorCode,
-      exercise: submission.exercise,
+      exercise: safeExercise,
     };
   }
 
@@ -1193,6 +1311,22 @@ export class SpeakingService {
       orderBy: { submittedAt: 'desc' },
     });
 
+    const accessByExercise = this.speakingContentAccess
+      ? await this.speakingContentAccess.resolveMany(
+          submissions
+            .filter(
+              (
+                s,
+              ): s is typeof s & {
+                exercise: NonNullable<typeof s.exercise>;
+              } => Boolean(s.exercise),
+            )
+            .map((s) => s.exercise),
+          userId,
+          Role.STUDENT,
+        )
+      : new Map();
+
     return submissions.map((s) => ({
       id: s.id,
       exerciseId: s.exerciseId,
@@ -1205,7 +1339,10 @@ export class SpeakingService {
       processedAt: s.processedAt,
       lastErrorCode: s.lastErrorCode,
       exerciseTitle: s.exercise?.title,
-      targetText: s.exercise?.targetText,
+      targetText:
+        s.exercise && !accessByExercise.get(s.exercise.id)?.isLocked
+          ? s.exercise.targetText
+          : null,
     }));
   }
 

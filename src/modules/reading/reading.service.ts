@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { QuizType, TopicCategory } from '@prisma/client';
+import { QuizType, Role, TopicCategory } from '@prisma/client';
+import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
 
 type ReadingQuestionContent = {
   passage?: unknown;
@@ -112,9 +113,16 @@ export function resolveReadingTopicLevel(
 
 @Injectable()
 export class ReadingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly quizContentAccess: QuizContentAccessService,
+  ) {}
 
-  async getTopicsByCategory(category: TopicCategory, userId?: number) {
+  async getTopicsByCategory(
+    category: TopicCategory,
+    userId?: number,
+    role?: Role,
+  ) {
     const topics = await this.prisma.practiceTopic.findMany({
       where: { category },
       orderBy: { order: 'asc' },
@@ -125,7 +133,8 @@ export class ReadingService {
             title: true,
             description: true,
             type: true,
-            bilingualContent: true,
+            courseId: true,
+            isPremiumContent: true,
             timeLimit: true,
             questions: { select: { id: true } },
             _count: { select: { questions: true } },
@@ -133,6 +142,12 @@ export class ReadingService {
         },
       },
     });
+
+    const accessByQuiz = await this.quizContentAccess.resolveMany(
+      topics.flatMap((topic) => topic.quizzes),
+      userId,
+      role,
+    );
 
     const userResults = userId
       ? await this.prisma.submission.findMany({
@@ -196,11 +211,27 @@ export class ReadingService {
         incorrectAnswers: completedCount - correctCount,
         completedArticles,
         totalArticles: topic.quizzes.length,
+        quizzes: topic.quizzes.map((quiz) => {
+          const access = accessByQuiz.get(quiz.id) ?? {
+            isPremiumContent: quiz.isPremiumContent,
+            isLocked: false,
+          };
+          return {
+            id: quiz.id,
+            title: quiz.title,
+            description: quiz.description,
+            type: quiz.type,
+            timeLimit: quiz.timeLimit,
+            questionCount: quiz._count.questions,
+            isPremiumContent: access.isPremiumContent,
+            isLocked: access.isLocked,
+          };
+        }),
       };
     });
   }
 
-  async getTopicDetails(topicId: number) {
+  async getTopicDetails(topicId: number, userId?: number, role?: Role) {
     const topic = await this.prisma.practiceTopic.findUnique({
       where: { id: topicId },
       include: {
@@ -211,7 +242,8 @@ export class ReadingService {
             title: true,
             description: true,
             type: true,
-            bilingualContent: true,
+            courseId: true,
+            isPremiumContent: true,
             timeLimit: true,
             _count: {
               select: { questions: true },
@@ -225,16 +257,37 @@ export class ReadingService {
     if (!topic || topic.category !== TopicCategory.BILINGUAL_LEVEL) {
       throw new NotFoundException('Reading topic not found');
     }
-    return topic;
+    const accessByQuiz = await this.quizContentAccess.resolveMany(
+      topic.quizzes,
+      userId,
+      role,
+    );
+    return {
+      ...topic,
+      quizzes: topic.quizzes.map((quiz) => {
+        const access = accessByQuiz.get(quiz.id) ?? {
+          isPremiumContent: quiz.isPremiumContent,
+          isLocked: false,
+        };
+        const safeQuiz = quiz;
+        return {
+          ...safeQuiz,
+          isPremiumContent: access.isPremiumContent,
+          isLocked: access.isLocked,
+        };
+      }),
+    };
   }
 
-  async getQuizTheory(quizId: number) {
+  async getQuizTheory(quizId: number, userId: number, role?: Role) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
       select: {
         id: true,
         title: true,
         type: true,
+        isPremiumContent: true,
+        courseId: true,
         theoryContent: true,
         practiceTopic: { select: { category: true } },
       },
@@ -246,6 +299,7 @@ export class ReadingService {
     ) {
       throw new NotFoundException('Reading quiz not found');
     }
+    await this.quizContentAccess.assertAccess(quiz, userId, role);
     return quiz;
   }
 

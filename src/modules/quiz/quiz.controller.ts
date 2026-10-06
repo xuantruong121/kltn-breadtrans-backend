@@ -108,7 +108,7 @@ export class QuizController {
   @Get('listening-practice')
   @ApiOperation({ summary: 'Lấy danh sách các bài Luyện Nghe (Nghe Chép)' })
   getListeningPractices(@Request() req: any) {
-    return this.quizService.getListeningPractices(req.user?.id);
+    return this.quizService.getListeningPractices(req.user?.id, req.user?.role);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -181,6 +181,8 @@ export class QuizController {
       quizId,
       questionId,
       this.parseAudioIdentity(artifactId, version, checksumSha256),
+      req.user?.id,
+      req.user?.role,
     );
     return this.sendListeningAudio(res, req, result);
   }
@@ -256,8 +258,15 @@ export class QuizController {
     @Param('quizId', ParseIntPipe) quizId: number,
     @Param('questionId', ParseIntPipe) questionId: number,
     @Body() dto: CheckPracticeQuestionDto,
+    @Request() req: any,
   ) {
-    return this.quizService.checkPracticeQuestion(quizId, questionId, dto);
+    return this.quizService.checkPracticeQuestion(
+      quizId,
+      questionId,
+      dto,
+      req.user?.id,
+      req.user?.role,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -269,7 +278,11 @@ export class QuizController {
     @Request() req: any,
     @Param('quizId', ParseIntPipe) quizId: number,
   ) {
-    return this.quizService.revealListeningTranscript(req.user.id, quizId);
+    return this.quizService.revealListeningTranscript(
+      req.user.id,
+      quizId,
+      req.user.role,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -280,7 +293,11 @@ export class QuizController {
     @Request() req: any,
     @Param('quizId', ParseIntPipe) quizId: number,
   ) {
-    return this.quizService.getListeningTranscript(req.user.id, quizId);
+    return this.quizService.getListeningTranscript(
+      req.user.id,
+      quizId,
+      req.user.role,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -300,6 +317,8 @@ export class QuizController {
     const result = await this.quizService.streamListeningTranscriptAudio(
       quizId,
       this.parseAudioIdentity(artifactId, version, checksumSha256),
+      req.user?.id,
+      req.user?.role,
     );
     return this.sendListeningAudio(res, req, result);
   }
@@ -371,7 +390,12 @@ export class QuizController {
   @ApiOperation({ summary: 'Lấy chi tiết Quiz và danh sách Questions' })
   getQuizById(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const isStaff = req.user?.role === Role.ADMIN;
-    return this.quizService.getQuizById(id, isStaff, req.user?.id);
+    return this.quizService.getQuizById(
+      id,
+      isStaff,
+      req.user?.id,
+      req.user?.role,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

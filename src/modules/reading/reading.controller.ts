@@ -31,7 +31,11 @@ export class ReadingController {
     @Query('category') category: TopicCategory,
     @Request() req: any,
   ) {
-    return this.readingService.getTopicsByCategory(category, req.user?.id);
+    return this.readingService.getTopicsByCategory(
+      category,
+      req.user?.id,
+      req.user?.role,
+    );
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -39,16 +43,20 @@ export class ReadingController {
   @ApiOperation({
     summary: 'Lấy chi tiết một chủ đề (gồm các bài Quizzes con)',
   })
-  getTopicDetails(@Param('id', ParseIntPipe) id: number) {
-    return this.readingService.getTopicDetails(id);
+  getTopicDetails(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.readingService.getTopicDetails(
+      id,
+      req.user?.id,
+      req.user?.role,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('quizzes/:id/theory')
   @ApiOperation({ summary: 'Lấy nội dung bài học lý thuyết của Quiz' })
-  getQuizTheory(@Param('id', ParseIntPipe) id: number) {
-    return this.readingService.getQuizTheory(id);
+  getQuizTheory(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.readingService.getQuizTheory(id, req.user.id, req.user.role);
   }
 
   @UseGuards(JwtAuthGuard)

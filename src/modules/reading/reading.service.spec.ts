@@ -7,9 +7,11 @@ import {
   ReadingService,
 } from './reading.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
 
 describe('ReadingService', () => {
   let service: ReadingService;
+  let access: { resolveMany: jest.Mock; assertAccess: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -24,10 +26,18 @@ describe('ReadingService', () => {
             submission: { findMany: jest.fn() },
           },
         },
+        {
+          provide: QuizContentAccessService,
+          useValue: {
+            resolveMany: jest.fn().mockResolvedValue(new Map()),
+            assertAccess: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<ReadingService>(ReadingService);
+    access = service['quizContentAccess'] as unknown as typeof access;
   });
 
   it('should be defined', () => {
@@ -105,6 +115,52 @@ describe('ReadingService', () => {
         { title: 'Travel', sentencesCount: 2, questionsCount: 2 },
       ],
     });
+  });
+
+  it('returns safe topic quiz metadata without a premium passage body', async () => {
+    const prisma = service['prisma'] as unknown as {
+      practiceTopic: { findMany: jest.Mock };
+    };
+    prisma.practiceTopic.findMany.mockResolvedValue([
+      {
+        id: 4,
+        name: 'Reading A1',
+        vietnameseName: 'Đọc A1',
+        iconUrl: null,
+        category: 'BILINGUAL_LEVEL',
+        quizzes: [
+          {
+            id: 24,
+            title: 'Museum',
+            description: 'Premium reading',
+            type: 'BILINGUAL_READING',
+            courseId: null,
+            isPremiumContent: true,
+            timeLimit: 10,
+            _count: { questions: 5 },
+            questions: [{ id: 1 }],
+          },
+        ],
+      },
+    ]);
+    access.resolveMany.mockResolvedValue(
+      new Map([[24, { isPremiumContent: true, isLocked: true }]]),
+    );
+
+    const result = await service.getTopicsByCategory(
+      'BILINGUAL_LEVEL',
+      undefined,
+    );
+
+    expect(result[0].quizzes).toEqual([
+      expect.objectContaining({
+        id: 24,
+        isPremiumContent: true,
+        isLocked: true,
+        questionCount: 5,
+      }),
+    ]);
+    expect(result[0].quizzes[0]).not.toHaveProperty('bilingualContent');
   });
 
   it('resolves authoritative CEFR levels for reading topics', () => {

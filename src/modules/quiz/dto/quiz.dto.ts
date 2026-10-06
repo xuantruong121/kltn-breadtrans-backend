@@ -7,6 +7,7 @@ import {
   IsArray,
   IsInt,
   IsObject,
+  IsBoolean,
   IsUUID,
   MaxLength,
 } from 'class-validator';
@@ -38,6 +39,15 @@ export class CreateQuizDto {
   @IsNumber()
   @IsOptional()
   timeLimit?: number;
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Đánh dấu nội dung Reading/Listening thuộc thư viện premium. Mặc định là nội dung miễn phí.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPremiumContent?: boolean;
 }
 
 export class CreateQuestionDto {

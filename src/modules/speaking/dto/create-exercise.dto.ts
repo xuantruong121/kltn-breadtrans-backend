@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsIn,
+  IsBoolean,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateExerciseDto {
@@ -15,6 +21,27 @@ export class CreateExerciseDto {
   @IsString()
   @IsNotEmpty()
   targetText: string;
+
+  @ApiPropertyOptional({
+    example: 'https://cdn.example.com/speaking/thumb.png',
+  })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({
+    example: 'premium/speaking/quiz-1/reference.mp3',
+    description:
+      'Public URL for free content or a private key for premium content',
+  })
+  @IsOptional()
+  @IsString()
+  audioUrl?: string;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  isPremiumContent?: boolean;
 
   @ApiPropertyOptional({
     example: 'INTERMEDIATE',

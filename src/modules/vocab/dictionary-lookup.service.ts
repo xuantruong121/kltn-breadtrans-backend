@@ -4,10 +4,12 @@ import {
   Logger,
   Optional,
 } from '@nestjs/common';
+import { PlanFeatureKey } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 import {
   AiDictionaryProvider,
   DictionaryApiDevProvider,
@@ -89,6 +91,7 @@ export class DictionaryLookupService {
     private readonly prisma: PrismaService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
     @Optional() private readonly aiService?: AiService,
+    @Optional() private readonly subscriptionService?: SubscriptionService,
   ) {}
 
   private async fetchFromProviders(
@@ -112,12 +115,15 @@ export class DictionaryLookupService {
   ): Promise<DictionaryLookupResponse> {
     const query = this.normalize(rawWord);
     const candidates = this.generateInflectionCandidates(query);
-    // v2 invalidates negative entries written before the curated vocabulary
+    const canAccessPremium = await this.canAccessPremium(userId);
+    // v3 separates free/premium local results so a cached premium word cannot
+    // be served to a user without the PREMIUM_VOCAB entitlement.
+    // v2 invalidated negative entries written before the curated vocabulary
     // seed was populated. Keeping the namespace versioned prevents a stale
     // "not found" response from masking a word that now exists locally.
-    const cacheKey = `dictionary:v2:en:${query}`;
+    const cacheKey = `dictionary:v3:${canAccessPremium ? 'premium' : 'free'}:en:${query}`;
     // Curated vocabulary always wins over a stale external cache entry.
-    const local = await this.lookupLocal(query, candidates);
+    const local = await this.lookupLocal(query, candidates, canAccessPremium);
     if (local) {
       await this.writeCache(cacheKey, local, this.positiveTtl);
       return this.attachSaved(local, userId);
@@ -262,10 +268,17 @@ export class DictionaryLookupService {
     return normalized;
   }
 
-  private async lookupLocal(query: string, candidates: string[]) {
+  private async lookupLocal(
+    query: string,
+    candidates: string[],
+    canAccessPremium: boolean,
+  ) {
     const words = [query, ...candidates];
     const rows = await this.prisma.vocabWord.findMany({
-      where: { word: { in: words, mode: 'insensitive' } },
+      where: {
+        word: { in: words, mode: 'insensitive' },
+        ...(canAccessPremium ? {} : { topic: { isPro: false } }),
+      },
       take: 10,
       select: {
         id: true,
@@ -288,6 +301,14 @@ export class DictionaryLookupService {
       ? [canonicalRow, ...rows.filter((row) => row.id !== canonicalRow.id)]
       : rows;
     return this.toLocalResponse(query, orderedRows);
+  }
+
+  private async canAccessPremium(userId?: number): Promise<boolean> {
+    if (!userId || !this.subscriptionService) return false;
+    return this.subscriptionService.hasFeature(
+      userId,
+      PlanFeatureKey.PREMIUM_VOCAB,
+    );
   }
 
   private toLocalResponse(query: string, rows: Array<Record<string, unknown>>) {

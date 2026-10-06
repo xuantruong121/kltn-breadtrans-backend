@@ -47,6 +47,32 @@ describe('DictionaryLookupService', () => {
     });
   });
 
+  it('does not expose premium curated words through the generic lookup route', async () => {
+    const prisma = {
+      vocabWord: { findMany: jest.fn().mockResolvedValue([]) },
+    } as unknown as PrismaService;
+    const subscriptionService = {
+      hasFeature: jest.fn().mockResolvedValue(false),
+    };
+    const service = new DictionaryLookupService(
+      prisma,
+      undefined,
+      undefined,
+      subscriptionService as never,
+    );
+    const provider = { lookup: jest.fn().mockResolvedValue([]) };
+    service.provider = provider;
+    service.fallbackProvider = provider;
+
+    await service.lookup('museum', 7);
+
+    expect(prisma.vocabWord.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ topic: { isPro: false } }),
+      }),
+    );
+  });
+
   it('keeps IPA available for common function words such as within', async () => {
     const { prisma, service } = createService();
     (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([
@@ -161,7 +187,7 @@ describe('DictionaryLookupService', () => {
     expect(result.entries[0].partOfSpeech).toBe('noun');
     expect(result.entries[0].definitions[0].definition).toContain('design');
     expect(redis.set).toHaveBeenCalledWith(
-      expect.stringContaining('dictionary:v2:en:architecture'),
+      expect.stringContaining('dictionary:v3:free:en:architecture'),
       expect.any(String),
       'EX',
       5 * 60,

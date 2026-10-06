@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
@@ -20,12 +25,30 @@ export interface R2UploadResult {
   contentType: string;
 }
 
+/** Keys in this namespace are written only to the separately configured private bucket. */
+export const PRIVATE_LISTENING_MEDIA_PREFIX = 'premium/listening/';
+export const PRIVATE_SPEAKING_MEDIA_PREFIX = 'premium/speaking/';
+
+export function isPrivateListeningMediaKey(key: string): boolean {
+  return key.startsWith(PRIVATE_LISTENING_MEDIA_PREFIX);
+}
+
+export function isPrivateSpeakingMediaKey(key: string): boolean {
+  return key.startsWith(PRIVATE_SPEAKING_MEDIA_PREFIX);
+}
+
+export function isPrivatePremiumMediaKey(key: string): boolean {
+  return isPrivateListeningMediaKey(key) || isPrivateSpeakingMediaKey(key);
+}
+
 @Injectable()
 export class R2Service {
   private readonly logger = new Logger(R2Service.name);
   private readonly client: S3Client;
   private readonly bucket: string;
   private readonly publicUrl: string;
+  private readonly privateClient: S3Client | null;
+  private readonly privateBucket: string | null;
 
   constructor() {
     const accountId = process.env.R2_ACCOUNT_ID;
@@ -73,6 +96,37 @@ export class R2Service {
       },
       forcePathStyle,
     });
+
+    const privateBucket = process.env.R2_PRIVATE_BUCKET_NAME?.trim();
+    const privateEndpoint = process.env.R2_PRIVATE_ENDPOINT?.trim() || endpoint;
+    const privateAccessKeyId =
+      process.env.R2_PRIVATE_ACCESS_KEY_ID?.trim() || accessKeyId;
+    const privateSecretAccessKey =
+      process.env.R2_PRIVATE_SECRET_ACCESS_KEY?.trim() || secretAccessKey;
+    this.privateBucket =
+      privateBucket &&
+      privateBucket !== this.bucket &&
+      privateEndpoint &&
+      privateAccessKeyId &&
+      privateSecretAccessKey
+        ? privateBucket
+        : null;
+    this.privateClient = this.privateBucket
+      ? new S3Client({
+          region: 'auto',
+          endpoint: privateEndpoint,
+          credentials: {
+            accessKeyId: privateAccessKeyId,
+            secretAccessKey: privateSecretAccessKey,
+          },
+          forcePathStyle: this.parseBoolean(
+            process.env.R2_PRIVATE_FORCE_PATH_STYLE,
+            localStorage
+              ? forcePathStyle
+              : Boolean(process.env.R2_PRIVATE_ENDPOINT),
+          ),
+        })
+      : null;
 
     this.logger.log(
       `Storage provider: ${localStorage ? 'local-s3-compatible' : 'cloudflare-r2'}`,
@@ -154,7 +208,7 @@ export class R2Service {
         }),
       );
 
-      const url = `${this.publicUrl}/${key}`;
+      const url = this.getPublicAssetUrl(key);
       return { url, key, contentType: mimeType };
     } catch (err) {
       this.logger.error(`Failed to upload file to R2: ${err}`);
@@ -176,11 +230,59 @@ export class R2Service {
         ContentType: mimeType,
       }),
     );
-    return { key, url: `${this.publicUrl}/${key}`, contentType: mimeType };
+    return { key, url: this.getPublicAssetUrl(key), contentType: mimeType };
+  }
+
+  /** Upload a protected Listening object to the private bucket only. */
+  async putPrivateObjectAtKey(
+    key: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<R2UploadResult> {
+    if (!isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media must use the private key namespace',
+      );
+    }
+    const { client, bucket } = this.requirePrivateStorage();
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: mimeType,
+      }),
+    );
+    return { key, url: '', contentType: mimeType };
   }
 
   getPublicUrl(): string {
     return this.publicUrl;
+  }
+
+  getPublicAssetUrl(key: string): string {
+    if (isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media cannot be addressed by a public URL',
+      );
+    }
+    if (!this.publicUrl) {
+      throw new ServiceUnavailableException('Public storage is not configured');
+    }
+    return `${this.publicUrl}/${key}`;
+  }
+
+  isPrivateStorageConfigured(): boolean {
+    return this.privateClient !== null && this.privateBucket !== null;
+  }
+
+  private requirePrivateStorage(): { client: S3Client; bucket: string } {
+    if (!this.privateClient || !this.privateBucket) {
+      throw new ServiceUnavailableException(
+        'Protected Listening media storage is not configured',
+      );
+    }
+    return { client: this.privateClient, bucket: this.privateBucket };
   }
 
   async headObject(key: string): Promise<{
@@ -188,6 +290,11 @@ export class R2Service {
     contentType?: string;
     etag?: string;
   } | null> {
+    if (isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media requires private storage access',
+      );
+    }
     try {
       const response = await this.client.send(
         new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
@@ -217,10 +324,45 @@ export class R2Service {
     return head !== null;
   }
 
+  async privateObjectExists(key: string): Promise<boolean> {
+    if (!isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media must use the private key namespace',
+      );
+    }
+    const { client, bucket } = this.requirePrivateStorage();
+    try {
+      await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+      return true;
+    } catch (error: any) {
+      const code = error?.$metadata?.httpStatusCode;
+      if (
+        code === 404 ||
+        error?.name === 'NotFound' ||
+        error?.name === 'NoSuchKey'
+      ) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
   /**
    * Xóa file khỏi R2 bucket bằng key.
    */
   async deleteFile(key: string): Promise<void> {
+    if (isPrivatePremiumMediaKey(key)) {
+      const { client, bucket } = this.requirePrivateStorage();
+      try {
+        await client.send(
+          new DeleteObjectCommand({ Bucket: bucket, Key: key }),
+        );
+        return;
+      } catch (err) {
+        this.logger.error(`Failed to delete private file from R2: ${err}`);
+        throw new BadRequestException('Failed to delete file from storage');
+      }
+    }
     try {
       await this.client.send(
         new DeleteObjectCommand({
@@ -247,6 +389,11 @@ export class R2Service {
     mimeType: string,
     expiresIn: number = 600,
   ): Promise<string> {
+    if (isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media requires private storage upload',
+      );
+    }
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,
@@ -263,6 +410,11 @@ export class R2Service {
     key: string,
     expiresIn = 3600,
   ): Promise<string> {
+    if (isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media requires private storage signing',
+      );
+    }
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,
@@ -270,10 +422,32 @@ export class R2Service {
     return getSignedUrl(this.client, command, { expiresIn });
   }
 
+  async getPrivatePresignedDownloadUrl(
+    key: string,
+    expiresIn = 300,
+  ): Promise<string> {
+    if (!isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media must use the private key namespace',
+      );
+    }
+    const { client, bucket } = this.requirePrivateStorage();
+    return getSignedUrl(
+      client,
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+      { expiresIn },
+    );
+  }
+
   /**
    * Tải file buffer từ Cloudflare R2 bucket bằng key.
    */
   async downloadFileBuffer(key: string): Promise<Buffer> {
+    if (isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media requires private storage access',
+      );
+    }
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,
@@ -287,6 +461,33 @@ export class R2Service {
     if (body && typeof body.transformToByteArray === 'function') {
       const bytes = await body.transformToByteArray();
       return Buffer.from(bytes);
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of response.Body as any) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  async downloadPrivateFileBuffer(key: string): Promise<Buffer> {
+    if (!isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media must use the private key namespace',
+      );
+    }
+    const { client, bucket } = this.requirePrivateStorage();
+    const response = await client.send(
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+    );
+    if (!response.Body) {
+      throw new Error(
+        `Empty response body from private storage for key: ${key}`,
+      );
+    }
+    const body = response.Body as
+      { transformToByteArray?: () => Promise<Uint8Array> } | undefined;
+    if (body && typeof body.transformToByteArray === 'function') {
+      return Buffer.from(await body.transformToByteArray());
     }
     const chunks: Buffer[] = [];
     for await (const chunk of response.Body as any) {
