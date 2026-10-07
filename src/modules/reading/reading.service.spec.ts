@@ -24,6 +24,7 @@ describe('ReadingService', () => {
             quiz: { findMany: jest.fn(), findUnique: jest.fn() },
             result: { findMany: jest.fn() },
             submission: { findMany: jest.fn() },
+            userStats: { findUnique: jest.fn() },
           },
         },
         {
@@ -171,5 +172,122 @@ describe('ReadingService', () => {
     expect(resolveReadingTopicLevel('Reading C1')).toBe('ADVANCED');
     expect(resolveReadingTopicLevel('Reading C2')).toBe('ADVANCED');
     expect(resolveReadingTopicLevel('General Reading')).toBe('BEGINNER');
+  });
+
+  it('derives Reading subskills, mistakes, trend and a deterministic recommendation from completed submissions', async () => {
+    const prisma = service['prisma'] as unknown as {
+      submission: { findMany: jest.Mock };
+      quiz: { findMany: jest.Mock };
+      userStats: { findUnique: jest.Mock };
+    };
+    const questions = [
+      {
+        id: 101,
+        type: 'MULTIPLE_CHOICE',
+        order: 1,
+        content: {
+          text: 'What is the main detail?',
+          questionType: 'DETAIL',
+          options: ['A', 'B'],
+          correctIndex: 0,
+          explanation: 'The passage states A.',
+        },
+      },
+      {
+        id: 102,
+        type: 'MULTIPLE_CHOICE',
+        order: 2,
+        content: {
+          text: 'What can be inferred?',
+          questionType: 'INFERENCE',
+          options: ['A', 'B'],
+          correctIndex: 1,
+        },
+      },
+    ];
+    prisma.userStats.findUnique.mockResolvedValue({ streakCount: 2 });
+    prisma.submission.findMany.mockResolvedValue(
+      [1, 2, 3].map((id) => ({
+        id,
+        quizId: 24,
+        submittedAt: new Date(`2026-10-0${id}T10:00:00.000Z`),
+        quiz: {
+          id: 24,
+          title: 'Reading practice',
+          isPremiumContent: false,
+          publicationStatus: 'PUBLISHED',
+          questions,
+        },
+        results: [
+          { questionId: 101, answer: 'B', isCorrect: false },
+          { questionId: 102, answer: 'B', isCorrect: true },
+        ],
+      })),
+    );
+    prisma.quiz.findMany.mockResolvedValue([
+      {
+        id: 30,
+        title: 'Inference and detail review',
+        type: 'BILINGUAL_READING',
+        isPremiumContent: false,
+        courseId: null,
+        questions: [{ content: { questionType: 'DETAIL' } }],
+      },
+    ]);
+    access.resolveMany.mockResolvedValue(
+      new Map([[30, { isPremiumContent: false, isLocked: false }]]),
+    );
+
+    const result = await service.getTracking(7);
+
+    expect(result.progress).toMatchObject({
+      completedExercises: 1,
+      completedAttempts: 3,
+      accuracy: 50,
+      currentStreak: 2,
+    });
+    expect(
+      result.subskills.find((item) => item.key === 'DETAIL'),
+    ).toMatchObject({
+      attempted: 3,
+      correct: 0,
+      accuracy: 0,
+      status: 'NEEDS_IMPROVEMENT',
+    });
+    expect(result.mistakes).toMatchObject({ total: 3 });
+    expect(result.mistakes.items[0]).toMatchObject({
+      subskill: 'DETAIL',
+      correctAnswer: 'A',
+      answerAvailable: true,
+    });
+    expect(result.recommendation).toMatchObject({
+      subskill: 'DETAIL',
+      quizId: 30,
+      isLocked: false,
+    });
+  });
+
+  it('returns an honest zero-state without fake weakness or division by zero', async () => {
+    const prisma = service['prisma'] as unknown as {
+      submission: { findMany: jest.Mock };
+      userStats: { findUnique: jest.Mock };
+    };
+    prisma.submission.findMany.mockResolvedValue([]);
+    prisma.userStats.findUnique.mockResolvedValue(null);
+
+    const result = await service.getTracking(999);
+
+    expect(result.progress).toMatchObject({
+      completedExercises: 0,
+      completedAttempts: 0,
+      accuracy: 0,
+      recentAverage: 0,
+      lastPracticedAt: null,
+    });
+    expect(result.recommendation).toBeNull();
+    expect(
+      result.subskills.every((item) => item.status === 'INSUFFICIENT_DATA'),
+    ).toBe(true);
+    expect(result.mistakes.total).toBe(0);
   });
 });

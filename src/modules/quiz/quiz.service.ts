@@ -2225,10 +2225,47 @@ export class QuizService {
         ? Math.round((totalCorrect / totalQuestions) * 100)
         : 0;
 
+    const isWritingSubmission =
+      submission.quiz.type === QuizType.WRITING_PICTURE ||
+      submission.quiz.type === QuizType.WRITING_EMAIL;
+    let writingFeedback: {
+      feedback: string;
+      suggestions: string[];
+      maxScore: number;
+      score: number;
+      skill: 'WRITING';
+    } | null = null;
+    if (isWritingSubmission && submission.aiFeedback) {
+      try {
+        const parsed = JSON.parse(submission.aiFeedback) as Record<
+          string,
+          unknown
+        >;
+        if (
+          typeof parsed.feedback === 'string' &&
+          typeof parsed.score === 'number' &&
+          typeof parsed.maxScore === 'number' &&
+          Array.isArray(parsed.suggestions) &&
+          parsed.suggestions.every((item) => typeof item === 'string')
+        ) {
+          writingFeedback = {
+            feedback: parsed.feedback,
+            suggestions: parsed.suggestions,
+            maxScore: parsed.maxScore,
+            score: parsed.score,
+            skill: 'WRITING',
+          };
+        }
+      } catch {
+        writingFeedback = null;
+      }
+    }
+
     return {
       submissionId,
       quizId: submission.quizId,
       quizTitle: submission.quiz.title,
+      quizType: submission.quiz.type,
       overallScore: submission.score,
       totalQuestions,
       totalCorrect,
@@ -2246,6 +2283,10 @@ export class QuizService {
         weaknesses.length > 0
           ? `Bạn nên tập trung ôn luyện lại các mảng kiến thức: ${weaknesses.join(', ')}.`
           : 'Thành tích rất tốt! Hãy tiếp tục duy trì và thử sức ở đề thi khó hơn.',
+      writingFeedback,
+      submittedAnswer: isWritingSubmission
+        ? (submission.results[0]?.answer ?? null)
+        : null,
     };
   }
 }

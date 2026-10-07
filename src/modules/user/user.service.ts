@@ -1,12 +1,194 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { TopicCategory, QuizType } from '@prisma/client';
+import { Role, TopicCategory, QuizType } from '@prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UserSkillsSummaryResponse } from './dto/user-skills-summary.dto';
+import { ReadingService } from '../reading/reading.service';
+import {
+  CrossSkillSummaryResponse,
+  CrossSkillSummaryItem,
+  SkillDimensionSummary,
+  SkillStatus,
+  SkillTrend,
+  UserSkillsSummaryResponse,
+} from './dto/user-skills-summary.dto';
+
+const CROSS_SKILL_SAMPLE_SIZE = 3;
+
+type ScoreAttempt = { score: number; submittedAt: Date };
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function finiteNumber(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function normalizeSpeakingScore(value: unknown): number | null {
+  const score = finiteNumber(value);
+  if (score === null) return null;
+  return clampScore(score <= 10 ? score * 10 : score);
+}
+
+function normalizedWritingScore(
+  score: unknown,
+  maxScore: unknown,
+): number | null {
+  const raw = finiteNumber(score);
+  const max = finiteNumber(maxScore);
+  if (raw === null || max === null || max <= 0) return null;
+  return clampScore((raw / max) * 100);
+}
+
+function skillStatus(sampleCount: number, score: number | null): SkillStatus {
+  if (sampleCount < CROSS_SKILL_SAMPLE_SIZE || score === null) {
+    return 'INSUFFICIENT_DATA';
+  }
+  if (score < 50) return 'NEEDS_IMPROVEMENT';
+  if (score < 75) return 'PROGRESSING';
+  return 'GOOD';
+}
+
+function statusLabel(status: SkillStatus): string {
+  switch (status) {
+    case 'NEEDS_IMPROVEMENT':
+      return 'Cần cải thiện';
+    case 'PROGRESSING':
+      return 'Đang tiến bộ';
+    case 'GOOD':
+      return 'Tốt';
+    default:
+      return 'Chưa đủ dữ liệu';
+  }
+}
+
+function asSkillTrend(value: unknown): SkillTrend {
+  return value === 'IMPROVING' ||
+    value === 'DECLINING' ||
+    value === 'STABLE' ||
+    value === 'INSUFFICIENT_DATA'
+    ? value
+    : 'INSUFFICIENT_DATA';
+}
+
+function trendFor(attempts: ScoreAttempt[]): {
+  trend: SkillTrend;
+  delta: number | null;
+} {
+  if (attempts.length < 2) return { trend: 'INSUFFICIENT_DATA', delta: null };
+  const previous = attempts.at(-2)?.score;
+  const latest = attempts.at(-1)?.score;
+  if (previous === undefined || latest === undefined) {
+    return { trend: 'INSUFFICIENT_DATA', delta: null };
+  }
+  const delta = latest - previous;
+  return {
+    delta,
+    trend: delta > 0 ? 'IMPROVING' : delta < 0 ? 'DECLINING' : 'STABLE',
+  };
+}
+
+function average(values: number[]): number | null {
+  return values.length > 0
+    ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+    : null;
+}
+
+function dimensionStatus(sampleCount: number, score: number | null) {
+  const status = skillStatus(sampleCount, score);
+  return { status, statusLabel: statusLabel(status) };
+}
+
+function summarizeDimensions(dimensions: Map<string, { scores: number[] }>): {
+  items: SkillDimensionSummary[];
+  strongest: string | null;
+  weakest: string | null;
+} {
+  const items = [...dimensions.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => {
+      const averageScore = average(value.scores);
+      const status = dimensionStatus(value.scores.length, averageScore);
+      return {
+        key,
+        sampleCount: value.scores.length,
+        averageScore,
+        ...status,
+      };
+    });
+  const eligible = items.filter(
+    (item) =>
+      item.sampleCount >= CROSS_SKILL_SAMPLE_SIZE && item.averageScore !== null,
+  );
+  const strongest =
+    [...eligible].sort(
+      (a, b) =>
+        (b.averageScore ?? 0) - (a.averageScore ?? 0) ||
+        a.key.localeCompare(b.key),
+    )[0]?.key ?? null;
+  const weakest =
+    [...eligible].sort(
+      (a, b) =>
+        (a.averageScore ?? 0) - (b.averageScore ?? 0) ||
+        a.key.localeCompare(b.key),
+    )[0]?.key ?? null;
+  return { items, strongest, weakest };
+}
+
+function buildSkillItem(
+  base: Omit<
+    CrossSkillSummaryItem,
+    | 'completedAttempts'
+    | 'normalizedScore'
+    | 'recentAverage'
+    | 'trend'
+    | 'strongestDimension'
+    | 'weakestDimension'
+    | 'lastPracticedAt'
+    | 'status'
+    | 'statusLabel'
+    | 'hasEnoughData'
+    | 'dimensions'
+  >,
+  attempts: ScoreAttempt[],
+  dimensions: Map<string, { scores: number[] }>,
+  completedAttemptsOverride?: number,
+): CrossSkillSummaryItem {
+  const latestScores = attempts.slice(-5).map((attempt) => attempt.score);
+  const normalizedScore = average(attempts.map((attempt) => attempt.score));
+  const recentAverage = average(latestScores);
+  const trend = trendFor(attempts);
+  const dimensionSummary = summarizeDimensions(dimensions);
+  const status = skillStatus(attempts.length, normalizedScore);
+  return {
+    ...base,
+    completedAttempts: completedAttemptsOverride ?? attempts.length,
+    normalizedScore,
+    recentAverage,
+    trend: trend.trend,
+    strongestDimension: dimensionSummary.strongest,
+    weakestDimension: dimensionSummary.weakest,
+    lastPracticedAt: attempts.at(-1)?.submittedAt.toISOString() ?? null,
+    status,
+    statusLabel: statusLabel(status),
+    hasEnoughData: status !== 'INSUFFICIENT_DATA',
+    dimensions: dimensionSummary.items,
+  };
+}
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly readingService?: ReadingService,
+  ) {}
 
   async getUserProfile(userId: number) {
     const user = await this.prisma.user.findUnique({
@@ -281,5 +463,329 @@ export class UserService {
         ),
       },
     };
+  }
+
+  /**
+   * Cross-skill read projection. Each skill keeps its own durable source;
+   * this method only normalizes the learner-facing contract to 0..100.
+   */
+  async getSkillProgressSummary(
+    userId: number,
+    role: Role = Role.STUDENT,
+  ): Promise<CrossSkillSummaryResponse> {
+    const [
+      listeningSubmissions,
+      speakingSubmissions,
+      writingSubmissions,
+      stats,
+    ] = await Promise.all([
+      this.prisma.submission.findMany({
+        where: { userId, quiz: { type: QuizType.LISTENING_PRACTICE } },
+        orderBy: { submittedAt: 'asc' },
+        include: {
+          quiz: {
+            select: {
+              id: true,
+              title: true,
+              questions: {
+                select: { id: true, type: true, content: true },
+                orderBy: { order: 'asc' },
+              },
+            },
+          },
+          results: true,
+        },
+      }),
+      this.prisma.speakingSubmission.findMany({
+        where: { userId, status: 'COMPLETED' },
+        orderBy: { submittedAt: 'asc' },
+        select: {
+          id: true,
+          overallScore: true,
+          aiFeedback: true,
+          submittedAt: true,
+        },
+      }),
+      this.prisma.submission.findMany({
+        where: {
+          userId,
+          quiz: {
+            type: { in: [QuizType.WRITING_PICTURE, QuizType.WRITING_EMAIL] },
+            practiceTopic: {
+              category: {
+                in: [TopicCategory.WRITING_PART1, TopicCategory.WRITING_PART2],
+              },
+            },
+          },
+        },
+        orderBy: { submittedAt: 'asc' },
+        include: {
+          quiz: {
+            select: {
+              type: true,
+              questions: {
+                select: { content: true },
+                orderBy: { order: 'asc' },
+                take: 1,
+              },
+            },
+          },
+          results: { select: { score: true } },
+        },
+      }),
+      this.prisma.userStats.findUnique({ where: { userId } }),
+    ]);
+
+    const readingTracking = this.readingService
+      ? await this.readingService.getTracking(userId, role)
+      : null;
+
+    const listeningAttempts: ScoreAttempt[] = [];
+    const listeningDimensions = new Map<string, { scores: number[] }>();
+    for (const submission of listeningSubmissions) {
+      const questionIds = submission.quiz.questions.map(
+        (question) => question.id,
+      );
+      const resultIds = submission.results.map((result) => result.questionId);
+      if (
+        questionIds.length === 0 ||
+        resultIds.length !== questionIds.length ||
+        new Set(resultIds).size !== questionIds.length ||
+        !questionIds.every((id) => resultIds.includes(id))
+      ) {
+        continue;
+      }
+      const resultsByQuestion = new Map(
+        submission.results.map((result) => [result.questionId, result]),
+      );
+      let correct = 0;
+      for (const question of submission.quiz.questions) {
+        const result = resultsByQuestion.get(question.id);
+        if (!result) continue;
+        if (result.isCorrect === true) correct += 1;
+        const content = asRecord(question.content);
+        const declared = String(
+          content.questionType ?? content.category ?? '',
+        ).trim();
+        const dimension =
+          question.type === 'DICTATION' || question.type === 'FILL_IN_BLANK'
+            ? 'DICTATION'
+            : question.type === 'MULTIPLE_CHOICE'
+              ? declared && declared !== 'READING'
+                ? declared.toUpperCase()
+                : 'MULTIPLE_CHOICE'
+              : declared
+                ? declared.toUpperCase()
+                : question.type.toUpperCase();
+        const bucket = listeningDimensions.get(dimension) ?? { scores: [] };
+        bucket.scores.push(result.isCorrect === true ? 100 : 0);
+        listeningDimensions.set(dimension, bucket);
+      }
+      listeningAttempts.push({
+        score: clampScore((correct / questionIds.length) * 100),
+        submittedAt: submission.submittedAt,
+      });
+    }
+
+    const speakingAttempts: ScoreAttempt[] = [];
+    const speakingDimensions = new Map<string, { scores: number[] }>();
+    const speakingDimensionKeys = [
+      'accuracyScore',
+      'fluencyScore',
+      'completenessScore',
+      'prosodyScore',
+      'pronunciationScore',
+    ];
+    for (const submission of speakingSubmissions) {
+      const normalized = normalizeSpeakingScore(submission.overallScore);
+      if (normalized !== null) {
+        speakingAttempts.push({
+          score: normalized,
+          submittedAt: submission.submittedAt,
+        });
+      }
+      const feedback = asRecord(submission.aiFeedback);
+      for (const key of speakingDimensionKeys) {
+        const dimensionScore = normalizeSpeakingScore(feedback[key]);
+        if (dimensionScore === null) continue;
+        const bucket = speakingDimensions.get(key) ?? { scores: [] };
+        bucket.scores.push(dimensionScore);
+        speakingDimensions.set(key, bucket);
+      }
+    }
+
+    const writingAttempts: ScoreAttempt[] = [];
+    for (const submission of writingSubmissions) {
+      const content = asRecord(submission.quiz.questions[0]?.content);
+      const feedback = asRecord(
+        submission.aiFeedback ? safeJson(submission.aiFeedback) : null,
+      );
+      const taskType = String(content.taskType ?? '').toUpperCase();
+      const maxScore =
+        finiteNumber(feedback.maxScore) ??
+        ([
+          'PROPOSAL',
+          'OPINION',
+          'ESSAY',
+          'OPINION_ESSAY',
+          'ANALYTICAL_RESPONSE',
+          'ARGUMENT',
+        ].includes(taskType)
+          ? 5
+          : submission.quiz.type === QuizType.WRITING_PICTURE &&
+              content.imageUrl
+            ? 3
+            : 4);
+      const rawScore = submission.score ?? submission.results[0]?.score;
+      const normalized = normalizedWritingScore(rawScore, maxScore);
+      if (normalized !== null) {
+        writingAttempts.push({
+          score: normalized,
+          submittedAt: submission.submittedAt,
+        });
+      }
+    }
+
+    const readingDimensions = new Map<string, { scores: number[] }>();
+    for (const metric of readingTracking?.subskills ?? []) {
+      if (metric.attempted > 0) {
+        readingDimensions.set(metric.key, {
+          scores: Array.from(
+            { length: metric.attempted },
+            () => metric.accuracy,
+          ),
+        });
+      }
+    }
+    const readingAttempts: ScoreAttempt[] = (
+      readingTracking?.recentTrend.attempts ?? []
+    )
+      .slice()
+      .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt))
+      .map((attempt) => ({
+        score: attempt.accuracy,
+        submittedAt: new Date(attempt.submittedAt),
+      }));
+
+    const base = {
+      LISTENING: {
+        skill: 'LISTENING' as const,
+        title: 'Listening',
+        categoryLabel: 'Nghe hiểu',
+        totalItems: 0,
+        completedItems: listeningAttempts.length,
+        progressPercent: listeningAttempts.length > 0 ? 100 : 0,
+        levelRange: 'A1 - C1',
+        badge: 'Nghe chủ động',
+        unitLabel: 'lượt luyện',
+      },
+      SPEAKING: {
+        skill: 'SPEAKING' as const,
+        title: 'Speaking',
+        categoryLabel: 'Nói và phát âm',
+        totalItems: 0,
+        completedItems: speakingSubmissions.length,
+        progressPercent: speakingSubmissions.length > 0 ? 100 : 0,
+        levelRange: 'A1 - C1',
+        badge: 'Phản hồi phát âm',
+        unitLabel: 'lượt luyện',
+      },
+      READING: {
+        skill: 'READING' as const,
+        title: 'Reading',
+        categoryLabel: 'Đọc hiểu',
+        totalItems: 0,
+        completedItems: readingTracking?.progress.completedAttempts ?? 0,
+        progressPercent: readingTracking?.progress.completedAttempts ? 100 : 0,
+        levelRange: 'A1 - C1',
+        badge: 'Phân tích kỹ năng',
+        unitLabel: 'lượt luyện',
+      },
+      WRITING: {
+        skill: 'WRITING' as const,
+        title: 'Writing',
+        categoryLabel: 'Viết và diễn đạt',
+        totalItems: 0,
+        completedItems: writingAttempts.length,
+        progressPercent: writingAttempts.length > 0 ? 100 : 0,
+        levelRange: 'A1 - C1',
+        badge: 'AI phản hồi',
+        unitLabel: 'lượt luyện',
+      },
+    };
+
+    const readingSkill = buildSkillItem(
+      base.READING,
+      readingAttempts,
+      readingDimensions,
+      readingTracking?.progress.completedAttempts ?? 0,
+    );
+    if (readingTracking?.progress.completedAttempts) {
+      readingSkill.normalizedScore = readingTracking.progress.accuracy;
+      readingSkill.recentAverage = readingTracking.progress.recentAverage;
+      readingSkill.lastPracticedAt = readingTracking.progress.lastPracticedAt;
+      readingSkill.status = skillStatus(
+        readingTracking.progress.completedAttempts,
+        readingTracking.progress.accuracy,
+      );
+      readingSkill.statusLabel = statusLabel(readingSkill.status);
+      readingSkill.hasEnoughData = readingSkill.status !== 'INSUFFICIENT_DATA';
+      readingSkill.trend = asSkillTrend(readingTracking.recentTrend.direction);
+    }
+    const skills = [
+      buildSkillItem(base.LISTENING, listeningAttempts, listeningDimensions),
+      buildSkillItem(
+        base.SPEAKING,
+        speakingAttempts,
+        speakingDimensions,
+        speakingSubmissions.length,
+      ),
+      readingSkill,
+      buildSkillItem(base.WRITING, writingAttempts, new Map()),
+    ];
+    const scoreValues = skills
+      .map((skill) => skill.normalizedScore)
+      .filter((score): score is number => score !== null);
+    const recentValues = skills
+      .map((skill) => skill.recentAverage)
+      .filter((score): score is number => score !== null);
+    const overallAttempts = skills.reduce(
+      (sum, skill) => sum + skill.completedAttempts,
+      0,
+    );
+    const overallScore = average(scoreValues);
+    const overallRecent = average(recentValues);
+    const overallTrendAttempts = [
+      ...listeningAttempts,
+      ...speakingAttempts,
+      ...readingAttempts,
+      ...writingAttempts,
+    ];
+    const overallTrend = trendFor(
+      overallTrendAttempts.sort(
+        (a, b) => a.submittedAt.getTime() - b.submittedAt.getTime(),
+      ),
+    );
+
+    return {
+      skills,
+      overall: {
+        totalItems: 0,
+        completedItems: overallAttempts,
+        progressPercent: overallScore ?? 0,
+        normalizedScore: overallScore,
+        recentAverage: overallRecent,
+        trend: overallTrend.trend,
+        currentStreak: stats?.streakCount ?? 0,
+      },
+    };
+  }
+}
+
+function safeJson(value: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
   }
 }

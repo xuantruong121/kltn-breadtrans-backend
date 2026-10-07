@@ -8,5 +8,6 @@ import { QuizModule } from '../quiz/quiz.module';
   imports: [PrismaModule, QuizModule],
   controllers: [ReadingController],
   providers: [ReadingService],
+  exports: [ReadingService],
 })
 export class ReadingModule {}

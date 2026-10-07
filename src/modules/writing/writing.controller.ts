@@ -13,13 +13,52 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 class SubmitWritingDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(20000)
   answer!: string;
+
+  @IsOptional()
+  @IsUUID()
+  clientAttemptId?: string;
+}
+
+class SubmitWritingPart2Dto {
+  @IsInt()
+  quizId!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20000)
+  userResponse!: string;
+
+  @IsOptional()
+  @IsUUID()
+  clientAttemptId?: string;
+}
+
+class SubmitWritingPart3Dto {
+  @IsInt()
+  quizId!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20000)
+  userEssay!: string;
+
+  @IsOptional()
+  @IsUUID()
+  clientAttemptId?: string;
 }
 
 @ApiTags('Writing')
@@ -66,7 +105,13 @@ export class WritingController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Nộp bài và chấm điểm bằng AI (Part 1)' })
   @ApiBody({
-    schema: { type: 'object', properties: { answer: { type: 'string' } } },
+    schema: {
+      type: 'object',
+      properties: {
+        answer: { type: 'string' },
+        clientAttemptId: { type: 'string', format: 'uuid' },
+      },
+    },
   })
   submitWriting(
     @Param('id', ParseIntPipe) id: number,
@@ -78,6 +123,7 @@ export class WritingController {
       req.user.id,
       body.answer,
       req.user.role,
+      body.clientAttemptId,
     );
   }
 
@@ -91,7 +137,10 @@ export class WritingController {
     schema: {
       type: 'object',
       properties: {
-        emailPrompt: { type: 'string', description: 'Nội dung email đề bài' },
+        quizId: {
+          type: 'integer',
+          description: 'ID bài Writing chuẩn trên server',
+        },
         userResponse: {
           type: 'string',
           description: 'Email trả lời của học viên',
@@ -99,15 +148,13 @@ export class WritingController {
       },
     },
   })
-  submitWritingPart2(
-    @Request() req: any,
-    @Body('emailPrompt') emailPrompt: string,
-    @Body('userResponse') userResponse: string,
-  ) {
+  submitWritingPart2(@Request() req: any, @Body() body: SubmitWritingPart2Dto) {
     return this.writingService.submitWritingPart2(
-      emailPrompt,
+      body.quizId,
       req.user.id,
-      userResponse,
+      body.userResponse,
+      req.user.role,
+      body.clientAttemptId,
     );
   }
 
@@ -121,20 +168,21 @@ export class WritingController {
     schema: {
       type: 'object',
       properties: {
-        essayTopic: { type: 'string', description: 'Chủ đề bài luận đề bài' },
+        quizId: {
+          type: 'integer',
+          description: 'ID bài Writing chuẩn trên server',
+        },
         userEssay: { type: 'string', description: 'Bài luận của học viên' },
       },
     },
   })
-  submitWritingPart3(
-    @Request() req: any,
-    @Body('essayTopic') essayTopic: string,
-    @Body('userEssay') userEssay: string,
-  ) {
+  submitWritingPart3(@Request() req: any, @Body() body: SubmitWritingPart3Dto) {
     return this.writingService.submitWritingPart3(
-      essayTopic,
+      body.quizId,
       req.user.id,
-      userEssay,
+      body.userEssay,
+      req.user.role,
+      body.clientAttemptId,
     );
   }
 }
