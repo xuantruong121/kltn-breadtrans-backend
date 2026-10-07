@@ -38,7 +38,7 @@ export class PlanPurchaseQueryDto {
   @IsEnum(PlanPurchaseStatus)
   status?: PlanPurchaseStatus;
 
-  @ApiPropertyOptional({ example: 'BT-PLAN-00000001' })
+  @ApiPropertyOptional({ example: 'BTP00000001' })
   @IsOptional()
   @IsString()
   @MaxLength(120)
@@ -110,6 +110,15 @@ export class PlanPurchasePaymentDto {
 
   @ApiProperty({ nullable: true })
   rejectionReason!: string | null;
+
+  @ApiProperty({ nullable: true })
+  paymentIntentExpiresAt!: Date | null;
+
+  @ApiProperty({ nullable: true })
+  autoMatchUntil!: Date | null;
+
+  @ApiProperty({ nullable: true })
+  supersededAt!: Date | null;
 }
 
 export class PlanPurchaseResponseDto {
@@ -151,6 +160,18 @@ export class PlanPurchaseResponseDto {
 
   @ApiProperty({ type: PlanBankInstructionsDto })
   bankInstructions!: PlanBankInstructionsDto;
+
+  @ApiProperty()
+  isActivePaymentIntent!: boolean;
+
+  @ApiProperty()
+  canReplace!: boolean;
+
+  @ApiProperty({ nullable: true })
+  supersededAt!: Date | null;
+
+  @ApiProperty({ nullable: true })
+  supersededByPurchaseId!: number | null;
 }
 
 export class PlanPurchaseAdminDto extends PlanPurchaseResponseDto {

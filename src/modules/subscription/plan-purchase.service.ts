@@ -13,6 +13,7 @@ import {
   Prisma,
   SubscriptionStatus,
 } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { buildVietQrUrl } from '../payment/payment.service';
 import { getPaymentBankConfig } from '../../common/config/payment-bank.config';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -71,7 +72,7 @@ export class PlanPurchaseService {
         return existing;
       }
 
-      const openPurchase = await tx.planPurchase.findFirst({
+      const openPurchases = await tx.planPurchase.findMany({
         where: {
           userId: studentId,
           planVersionId,
@@ -80,8 +81,20 @@ export class PlanPurchaseService {
         include: this.purchaseInclude,
         orderBy: { createdAt: 'desc' },
       });
-      if (openPurchase) {
-        return openPurchase;
+      const activePurchase = openPurchases.find((candidate) =>
+        this.isActivePaymentIntent(candidate),
+      );
+      if (activePurchase) {
+        return activePurchase;
+      }
+      for (const stalePurchase of openPurchases) {
+        if (stalePurchase.payment) {
+          await this.expirePaymentIntent(
+            tx,
+            stalePurchase.id,
+            stalePurchase.payment.id,
+          );
+        }
       }
 
       const paidSubscription = await tx.subscription.findFirst({
@@ -117,12 +130,25 @@ export class PlanPurchaseService {
           idempotencyKey: key,
         },
       });
+      const bank = getPaymentBankConfig();
+      const createdAt = created.createdAt;
+      const paymentIntentExpiresAt = new Date(
+        createdAt.getTime() + this.paymentIntentTtlMs,
+      );
+      const autoMatchUntil = new Date(
+        createdAt.getTime() + this.autoMatchGraceMs,
+      );
       await tx.planPayment.create({
         data: {
           planPurchaseId: created.id,
           amountVnd: created.amountVnd,
           currency: created.currency,
-          transferCode: `BT-PLAN-${created.id.toString().padStart(8, '0')}`,
+          transferCode: `BTP${created.id.toString().padStart(8, '0')}`,
+          bankBin: bank.bin,
+          bankName: bank.bankName,
+          bankAccountNumber: bank.accountNumber,
+          paymentIntentExpiresAt,
+          autoMatchUntil,
         },
       });
       return tx.planPurchase.findUniqueOrThrow({
@@ -141,6 +167,131 @@ export class PlanPurchaseService {
       orderBy: { createdAt: 'desc' },
     });
     return purchases.map((purchase) => this.toStudentDto(purchase));
+  }
+
+  async replacePayment(
+    studentId: number,
+    purchaseId: number,
+  ): Promise<PlanPurchaseResponseDto> {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const owned = await tx.planPurchase.findFirst({
+        where: { id: purchaseId, userId: studentId },
+        select: { id: true },
+      });
+      if (!owned) {
+        throw new NotFoundException('PlanPurchase not found');
+      }
+
+      await this.lockUser(tx, studentId);
+      await this.lockPurchaseAndPayment(tx, purchaseId);
+      const current = await tx.planPurchase.findUniqueOrThrow({
+        where: { id: purchaseId },
+        include: this.purchaseInclude,
+      });
+      if (!current.payment) {
+        throw new UnprocessableEntityException('PlanPayment is missing');
+      }
+
+      if (current.supersededByPurchaseId) {
+        const replacement = await tx.planPurchase.findUnique({
+          where: { id: current.supersededByPurchaseId },
+          include: this.purchaseInclude,
+        });
+        if (replacement) return replacement;
+      }
+      if (
+        current.status === PlanPurchaseStatus.COMPLETED ||
+        current.payment.status === PlanPaymentStatus.CONFIRMED
+      ) {
+        throw new ConflictException(
+          'A completed plan purchase cannot be replaced',
+        );
+      }
+      if (current.payment.status === PlanPaymentStatus.REVIEW_REQUIRED) {
+        throw new ConflictException(
+          'This payment is under review and cannot be replaced',
+        );
+      }
+      if (
+        current.status !== PlanPurchaseStatus.PENDING_PAYMENT ||
+        !this.isActivePaymentIntent(current)
+      ) {
+        throw new ConflictException(
+          'Only an active payment intent can be replaced',
+        );
+      }
+
+      const currentVersion = await tx.planVersion.findFirst({
+        where: {
+          planId: current.planVersion.planId,
+          isCurrent: true,
+          status: PlanVersionStatus.PUBLISHED,
+        },
+        include: { plan: true, entitlements: true },
+      });
+      if (!currentVersion) {
+        throw new ConflictException('Current PlanVersion is not purchasable');
+      }
+      this.subscriptionService.validatePurchasablePlanVersionRecord(
+        currentVersion,
+      );
+
+      await tx.planPayment.update({
+        where: { id: current.payment.id },
+        data: {
+          status: PlanPaymentStatus.SUPERSEDED,
+          supersededAt: new Date(),
+        },
+      });
+      await tx.planPurchase.update({
+        where: { id: current.id },
+        data: {
+          status: PlanPurchaseStatus.SUPERSEDED,
+          supersededAt: new Date(),
+        },
+      });
+
+      const created = await tx.planPurchase.create({
+        data: {
+          userId: studentId,
+          planVersionId: currentVersion.id,
+          amountVnd: currentVersion.priceVnd!,
+          currency: currentVersion.currency,
+          durationDays: currentVersion.durationDays!,
+          idempotencyKey: `replace:${purchaseId}:${randomUUID()}`,
+        },
+      });
+      const bank = getPaymentBankConfig();
+      const paymentIntentExpiresAt = new Date(
+        created.createdAt.getTime() + this.paymentIntentTtlMs,
+      );
+      const autoMatchUntil = new Date(
+        created.createdAt.getTime() + this.autoMatchGraceMs,
+      );
+      await tx.planPayment.create({
+        data: {
+          planPurchaseId: created.id,
+          amountVnd: created.amountVnd,
+          currency: created.currency,
+          transferCode: `BTP${created.id.toString().padStart(8, '0')}`,
+          bankBin: bank.bin,
+          bankName: bank.bankName,
+          bankAccountNumber: bank.accountNumber,
+          paymentIntentExpiresAt,
+          autoMatchUntil,
+        },
+      });
+      await tx.planPurchase.update({
+        where: { id: current.id },
+        data: { supersededByPurchaseId: created.id },
+      });
+      return tx.planPurchase.findUniqueOrThrow({
+        where: { id: created.id },
+        include: this.purchaseInclude,
+      });
+    });
+
+    return this.toStudentDto(result);
   }
 
   async getMyPurchase(
@@ -258,100 +409,152 @@ export class PlanPurchaseService {
     adminId: number,
   ): Promise<PlanPurchaseAdminDto> {
     const purchase = await this.prisma.$transaction(async (tx) => {
-      const hint = await tx.planPurchase.findUnique({
-        where: { id: purchaseId },
-        select: { userId: true },
-      });
-      if (!hint) {
-        throw new NotFoundException('PlanPurchase not found');
-      }
-      await this.lockUser(tx, hint.userId);
-      await this.lockPurchaseAndPayment(tx, purchaseId);
-      const current = await tx.planPurchase.findUniqueOrThrow({
-        where: { id: purchaseId },
-        include: this.purchaseInclude,
-      });
-      if (!current.payment) {
-        throw new UnprocessableEntityException('PlanPayment is missing');
-      }
-      if (
-        current.payment.planPurchaseId !== current.id ||
-        current.payment.amountVnd !== current.amountVnd ||
-        current.payment.currency !== current.currency
-      ) {
-        throw new ConflictException(
-          'PlanPayment financial snapshot does not match PlanPurchase',
-        );
-      }
-      if (
-        current.status === PlanPurchaseStatus.COMPLETED &&
-        current.payment.status === PlanPaymentStatus.CONFIRMED &&
-        current.subscription
-      ) {
-        return current;
-      }
-      if (current.payment.status !== PlanPaymentStatus.REPORTED) {
-        throw new ConflictException(
-          `Only REPORTED plan payments can be confirmed (current: ${current.payment.status})`,
-        );
-      }
-      if (current.status !== PlanPurchaseStatus.PENDING_PAYMENT) {
-        throw new ConflictException(
-          `Cannot confirm a ${current.status} purchase`,
-        );
-      }
-      this.assertFrozenTerms(current);
-
-      const startsAt = new Date();
-      const endsAt = new Date(
-        startsAt.getTime() + current.durationDays * 24 * 60 * 60 * 1000,
-      );
-      const existingSubscription = await tx.subscription.findFirst({
-        where: {
-          userId: current.userId,
-          status: SubscriptionStatus.ACTIVE,
-          startsAt: { lt: endsAt },
-          endsAt: { gt: startsAt },
-          planVersion: { plan: { code: { not: 'FREE' } } },
-        },
-      });
-      if (existingSubscription) {
-        throw new ConflictException(
-          'An effective or scheduled paid Subscription already exists',
-        );
-      }
-
-      await tx.subscription.create({
-        data: {
-          userId: current.userId,
-          planVersionId: current.planVersionId,
-          planPurchaseId: current.id,
-          status: SubscriptionStatus.ACTIVE,
-          startsAt,
-          endsAt,
-        },
-      });
-      await tx.planPayment.update({
-        where: { id: current.payment.id },
-        data: {
-          status: PlanPaymentStatus.CONFIRMED,
-          confirmedAt: startsAt,
-          confirmedById: adminId,
-        },
-      });
-      await tx.planPurchase.update({
-        where: { id: current.id },
-        data: {
-          status: PlanPurchaseStatus.COMPLETED,
-          completedAt: startsAt,
-        },
-      });
-      return tx.planPurchase.findUniqueOrThrow({
-        where: { id: current.id },
-        include: this.purchaseInclude,
+      return this.confirmPurchaseInTransaction(tx, purchaseId, {
+        source: 'ADMIN',
+        actorId: adminId,
       });
     });
     return this.toAdminDto(purchase);
+  }
+
+  async confirmPurchaseFromWebhook(
+    purchaseId: number,
+    bankTransactionId: number,
+    transaction?: Prisma.TransactionClient,
+  ): Promise<PurchaseWithDetails> {
+    if (transaction) {
+      return this.confirmPurchaseInTransaction(transaction, purchaseId, {
+        source: 'AUTO_WEBHOOK',
+        bankTransactionId,
+      });
+    }
+    return this.prisma.$transaction(async (tx) => {
+      return this.confirmPurchaseInTransaction(tx, purchaseId, {
+        source: 'AUTO_WEBHOOK',
+        bankTransactionId,
+      });
+    });
+  }
+
+  private async confirmPurchaseInTransaction(
+    tx: Prisma.TransactionClient,
+    purchaseId: number,
+    options: {
+      source: 'ADMIN' | 'AUTO_WEBHOOK';
+      actorId?: number;
+      bankTransactionId?: number;
+    },
+  ): Promise<PurchaseWithDetails> {
+    const hint = await tx.planPurchase.findUnique({
+      where: { id: purchaseId },
+      select: { userId: true },
+    });
+    if (!hint) {
+      throw new NotFoundException('PlanPurchase not found');
+    }
+    await this.lockUser(tx, hint.userId);
+    await this.lockPurchaseAndPayment(tx, purchaseId);
+    const current = await tx.planPurchase.findUniqueOrThrow({
+      where: { id: purchaseId },
+      include: this.purchaseInclude,
+    });
+    if (!current.payment) {
+      throw new UnprocessableEntityException('PlanPayment is missing');
+    }
+    if (
+      current.payment.planPurchaseId !== current.id ||
+      current.payment.amountVnd !== current.amountVnd ||
+      current.payment.currency !== current.currency
+    ) {
+      throw new ConflictException(
+        'PlanPayment financial snapshot does not match PlanPurchase',
+      );
+    }
+    if (
+      current.status === PlanPurchaseStatus.COMPLETED &&
+      current.payment.status === PlanPaymentStatus.CONFIRMED &&
+      current.subscription
+    ) {
+      return current;
+    }
+    const canAutoConfirm =
+      options.source === 'AUTO_WEBHOOK' &&
+      (current.payment.status === PlanPaymentStatus.PENDING ||
+        current.payment.status === PlanPaymentStatus.REPORTED);
+    const canAdminConfirm =
+      options.source === 'ADMIN' &&
+      (current.payment.status === PlanPaymentStatus.REPORTED ||
+        current.payment.status === PlanPaymentStatus.REVIEW_REQUIRED);
+    if (!canAutoConfirm && !canAdminConfirm) {
+      throw new ConflictException(
+        `Only reported or review-required plan payments can be confirmed (current: ${current.payment.status})`,
+      );
+    }
+    if (current.status !== PlanPurchaseStatus.PENDING_PAYMENT) {
+      throw new ConflictException(
+        `Cannot confirm a ${current.status} purchase`,
+      );
+    }
+    this.assertFrozenTerms(current);
+
+    const startsAt = new Date();
+    const endsAt = new Date(
+      startsAt.getTime() + current.durationDays * 24 * 60 * 60 * 1000,
+    );
+    const existingSubscription = await tx.subscription.findFirst({
+      where: {
+        userId: current.userId,
+        status: SubscriptionStatus.ACTIVE,
+        startsAt: { lt: endsAt },
+        endsAt: { gt: startsAt },
+        planVersion: { plan: { code: { not: 'FREE' } } },
+      },
+    });
+    if (existingSubscription) {
+      throw new ConflictException(
+        'An effective or scheduled paid Subscription already exists',
+      );
+    }
+
+    await tx.subscription.create({
+      data: {
+        userId: current.userId,
+        planVersionId: current.planVersionId,
+        planPurchaseId: current.id,
+        status: SubscriptionStatus.ACTIVE,
+        startsAt,
+        endsAt,
+      },
+    });
+    await tx.planPayment.update({
+      where: { id: current.payment.id },
+      data: {
+        status: PlanPaymentStatus.CONFIRMED,
+        confirmedAt: startsAt,
+        confirmedById: options.actorId ?? null,
+        confirmationSource: options.source,
+      },
+    });
+    if (options.bankTransactionId !== undefined) {
+      await tx.bankTransaction.update({
+        where: { id: options.bankTransactionId },
+        data: {
+          matchedPlanPaymentId: current.payment.id,
+          matchStatus: 'MATCHED',
+        },
+      });
+    }
+    await tx.planPurchase.update({
+      where: { id: current.id },
+      data: {
+        status: PlanPurchaseStatus.COMPLETED,
+        completedAt: startsAt,
+      },
+    });
+    return tx.planPurchase.findUniqueOrThrow({
+      where: { id: current.id },
+      include: this.purchaseInclude,
+    });
   }
 
   async rejectPurchase(
@@ -423,6 +626,47 @@ export class PlanPurchaseService {
     payment: true,
     subscription: true,
   } as const;
+
+  private readonly paymentIntentTtlMs =
+    Number(process.env.PLAN_PAYMENT_INTENT_TTL_MINUTES || 30) * 60 * 1000;
+
+  private readonly autoMatchGraceMs =
+    Number(process.env.PLAN_PAYMENT_AUTO_MATCH_GRACE_HOURS || 48) *
+    60 *
+    60 *
+    1000;
+
+  private isActivePaymentIntent(purchase: PurchaseWithDetails): boolean {
+    const payment = purchase.payment;
+    const now = Date.now();
+    return Boolean(
+      purchase.status === PlanPurchaseStatus.PENDING_PAYMENT &&
+      payment &&
+      (payment.status === PlanPaymentStatus.PENDING ||
+        payment.status === PlanPaymentStatus.REPORTED) &&
+      /^BTP[0-9]{8}$/.test(payment.transferCode) &&
+      payment.paymentIntentExpiresAt &&
+      payment.paymentIntentExpiresAt.getTime() > now &&
+      payment.autoMatchUntil &&
+      payment.autoMatchUntil.getTime() > now &&
+      payment.bankAccountNumber,
+    );
+  }
+
+  private async expirePaymentIntent(
+    tx: Prisma.TransactionClient,
+    purchaseId: number,
+    paymentId: number,
+  ): Promise<void> {
+    await tx.planPayment.update({
+      where: { id: paymentId },
+      data: { status: PlanPaymentStatus.EXPIRED },
+    });
+    await tx.planPurchase.update({
+      where: { id: purchaseId },
+      data: { status: PlanPurchaseStatus.EXPIRED },
+    });
+  }
 
   private async lockUser(
     tx: Prisma.TransactionClient,
@@ -525,6 +769,10 @@ export class PlanPurchaseService {
       completedAt: purchase.completedAt,
       payment: this.toPaymentDto(purchase.payment),
       bankInstructions: this.toBankInstructions(purchase.payment),
+      isActivePaymentIntent: this.isActivePaymentIntent(purchase),
+      canReplace: this.isActivePaymentIntent(purchase),
+      supersededAt: purchase.supersededAt,
+      supersededByPurchaseId: purchase.supersededByPurchaseId,
     };
   }
 
@@ -555,6 +803,9 @@ export class PlanPurchaseService {
       confirmedAt: payment.confirmedAt,
       rejectedAt: payment.rejectedAt,
       rejectionReason: payment.rejectionReason,
+      paymentIntentExpiresAt: payment.paymentIntentExpiresAt,
+      autoMatchUntil: payment.autoMatchUntil,
+      supersededAt: payment.supersededAt,
     };
   }
 

@@ -52,6 +52,12 @@ describe('PlanPurchaseService', () => {
     rejectedAt: status === PlanPaymentStatus.REJECTED ? now : null,
     rejectedById: status === PlanPaymentStatus.REJECTED ? 99 : null,
     rejectionReason: status === PlanPaymentStatus.REJECTED ? 'No match' : null,
+    bankBin: '970415',
+    bankName: 'Test Bank',
+    bankAccountNumber: '123456789',
+    paymentIntentExpiresAt: new Date(now.getTime() + 60 * 60 * 1000),
+    autoMatchUntil: new Date(now.getTime() + 48 * 60 * 60 * 1000),
+    supersededAt: null,
     createdAt: now,
     updatedAt: now,
   });
@@ -112,6 +118,7 @@ describe('PlanPurchaseService', () => {
       planPurchase: {
         findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockResolvedValue(created),
         findUniqueOrThrow: jest.fn().mockResolvedValue(created),
       },
@@ -127,6 +134,8 @@ describe('PlanPurchaseService', () => {
       prisma as never,
       new SubscriptionService(prisma as never),
     );
+
+    created.payment.transferCode = 'BTP00000031';
 
     const result = await service.createPurchase(7, 12, 'key-1');
 
@@ -145,9 +154,16 @@ describe('PlanPurchaseService', () => {
     expect(tx.planPayment.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         planPurchaseId: 31,
-        transferCode: 'BT-PLAN-00000031',
+        transferCode: 'BTP00000031',
       }),
     });
+    expect(result.payment.transferCode).toMatch(/^BTP[0-9]{8}$/);
+    expect(result.bankInstructions.transferCode).toBe(
+      result.payment.transferCode,
+    );
+    expect(result.bankInstructions.vietQrUrl).toContain(
+      result.payment.transferCode,
+    );
   });
 
   it('returns the existing logical purchase for a repeated idempotency key', async () => {
@@ -169,6 +185,109 @@ describe('PlanPurchaseService', () => {
     const result = await service.createPurchase(7, 12, 'key-1');
 
     expect(result.id).toBe(31);
+    expect(result.payment.transferCode).toBe('BT-PLAN-00000031');
+  });
+
+  it('resumes one valid active payment intent instead of creating another purchase', async () => {
+    const prisma = makePrisma();
+    const active = purchase();
+    active.payment = {
+      ...active.payment,
+      transferCode: 'BTP00000031',
+      bankAccountNumber: '123456789',
+      paymentIntentExpiresAt: new Date(Date.now() + 60_000),
+      autoMatchUntil: new Date(Date.now() + 3_600_000),
+    };
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 7 }]),
+      planPurchase: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([active]),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      planPayment: { create: jest.fn(), update: jest.fn() },
+      subscription: { findFirst: jest.fn() },
+      planVersion: { findUnique: jest.fn() },
+    };
+    prisma.planVersion.findUnique.mockResolvedValue(version());
+    prisma.$transaction.mockImplementation(((
+      callback: (value: typeof tx) => unknown,
+    ) => callback(tx)) as never);
+    const service = new PlanPurchaseService(
+      prisma as never,
+      new SubscriptionService(prisma as never),
+    );
+
+    const result = await service.createPurchase(7, 12, 'new-key');
+
+    expect(result.id).toBe(31);
+    expect(result.payment.transferCode).toBe('BTP00000031');
+    expect(tx.planPurchase.create).not.toHaveBeenCalled();
+    expect(tx.planPayment.create).not.toHaveBeenCalled();
+  });
+
+  it('supersedes an active intent and creates one replacement atomically', async () => {
+    const prisma = makePrisma();
+    const active = purchase();
+    active.payment = {
+      ...active.payment,
+      transferCode: 'BTP00000031',
+      bankAccountNumber: '123456789',
+      paymentIntentExpiresAt: new Date(Date.now() + 60_000),
+      autoMatchUntil: new Date(Date.now() + 3_600_000),
+    };
+    const replacement = {
+      ...active,
+      id: 32,
+      payment: {
+        ...active.payment,
+        id: 22,
+        planPurchaseId: 32,
+        transferCode: 'BTP00000032',
+      },
+    };
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 7 }]),
+      planPurchase: {
+        findFirst: jest.fn().mockResolvedValue({ id: 31 }),
+        findUniqueOrThrow: jest
+          .fn()
+          .mockResolvedValueOnce(active)
+          .mockResolvedValueOnce(replacement),
+        findUnique: jest.fn(),
+        create: jest.fn().mockResolvedValue(replacement),
+        update: jest.fn(),
+      },
+      planPayment: { create: jest.fn(), update: jest.fn() },
+      planVersion: { findFirst: jest.fn().mockResolvedValue(version()) },
+    };
+    prisma.$transaction.mockImplementation(((
+      callback: (value: typeof tx) => unknown,
+    ) => callback(tx)) as never);
+    const service = new PlanPurchaseService(
+      prisma as never,
+      new SubscriptionService(prisma as never),
+    );
+
+    const result = await service.replacePayment(7, 31);
+
+    expect(result.id).toBe(32);
+    expect(result.payment.transferCode).toBe('BTP00000032');
+    expect(tx.planPayment.update).toHaveBeenCalledWith({
+      where: { id: 21 },
+      data: expect.objectContaining({ status: PlanPaymentStatus.SUPERSEDED }),
+    });
+    expect(tx.planPurchase.update).toHaveBeenCalledWith({
+      where: { id: 31 },
+      data: expect.objectContaining({ status: PlanPurchaseStatus.SUPERSEDED }),
+    });
+    expect(tx.planPayment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        planPurchaseId: 32,
+        transferCode: 'BTP00000032',
+      }),
+    });
   });
 
   it('rejects idempotency-key reuse for a different PlanVersion', async () => {
@@ -200,6 +319,7 @@ describe('PlanPurchaseService', () => {
       planPurchase: {
         findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockResolvedValue(created),
         findUniqueOrThrow: jest.fn().mockResolvedValue(created),
       },
@@ -478,7 +598,7 @@ describe('PlanPurchaseService', () => {
       new SubscriptionService(prisma as never),
     );
     await expect(service.confirmPurchase(31, 99)).rejects.toThrow(
-      'Only REPORTED plan payments can be confirmed',
+      'Only reported or review-required plan payments can be confirmed',
     );
 
     const completed = purchase(

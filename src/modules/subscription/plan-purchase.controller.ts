@@ -69,6 +69,17 @@ export class PlanPurchaseController {
     return this.purchaseService.getMyPurchase(request.user.id, id);
   }
 
+  @Post(':id/replace-payment')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Supersede an active payment and create a new one' })
+  @ApiResponse({ status: HttpStatus.OK, type: PlanPurchaseResponseDto })
+  replacePayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() request: StudentRequest,
+  ): Promise<PlanPurchaseResponseDto> {
+    return this.purchaseService.replacePayment(request.user.id, id);
+  }
+
   @Post(':id/report-transfer')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Report a manual bank transfer for review' })
