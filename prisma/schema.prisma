@@ -45,6 +45,82 @@ enum PaymentActivationIssue {
   CLASS_NOT_ELIGIBLE
 }
 
+enum PlanStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PlanVersionStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+enum PlanFeatureKey {
+  AI_SPEAKING_ASSESSMENT
+  AI_WRITING_REVIEW
+  AI_TUTOR_MESSAGE
+  AI_EXPLANATION
+  PREMIUM_VOCAB
+  PREMIUM_READING
+  PREMIUM_LISTENING
+  PREMIUM_SPEAKING_CONTENT
+  PREMIUM_WRITING_CONTENT
+}
+
+enum EntitlementUnit {
+  REQUEST_COUNT
+  SUBMISSIONS
+  CHARACTERS
+  TOKENS
+  AUDIO_SECONDS
+  CONTENT_ACCESS
+}
+
+enum EntitlementPeriod {
+  DAY
+  CALENDAR_MONTH
+  BILLING_CYCLE
+  LIFETIME
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum PlanPurchaseStatus {
+  PENDING_PAYMENT
+  COMPLETED
+  REJECTED
+  EXPIRED
+  SUPERSEDED
+}
+
+enum PlanPaymentStatus {
+  PENDING
+  REPORTED
+  CONFIRMED
+  REJECTED
+  REVIEW_REQUIRED
+  EXPIRED
+  SUPERSEDED
+}
+
+enum PlanPaymentConfirmationSource {
+  ADMIN
+  AUTO_WEBHOOK
+}
+
+enum BankTransactionMatchStatus {
+  RECEIVED
+  MATCHED
+  REVIEW_REQUIRED
+  IGNORED
+  DUPLICATE
+}
+
 enum AuthProvider {
   GOOGLE
 }
@@ -105,6 +181,10 @@ model User {
   supportConversation             SupportConversation?
   supportMessages                 SupportMessage[]
   notifications                   Notification[]
+  subscriptions                  Subscription[]
+  planPurchases                  PlanPurchase[]
+  confirmedPlanPayments          PlanPayment[]                    @relation("PlanPaymentConfirmer")
+  rejectedPlanPayments           PlanPayment[]                    @relation("PlanPaymentRejecter")
   issueReportsSubmitted           IssueReport[]                    @relation("IssueReporter")
   issueReportsAssigned            IssueReport[]                    @relation("IssueAssignee")
   banhTransactions                BanhTransaction[]
@@ -183,6 +263,168 @@ model UserBilling {
   bankAccountNumber String?
   bankAccountName   String?
   bankAccount       String?
+}
+
+model Plan {
+  id          Int        @id @default(autoincrement())
+  code        String     @unique
+  displayName String
+  description String?
+  status      PlanStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  versions PlanVersion[]
+}
+
+model PlanVersion {
+  id            Int               @id @default(autoincrement())
+  planId        Int
+  plan          Plan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  version       Int
+  displayName   String?
+  description   String?
+  durationDays  Int?
+  priceVnd      Int?
+  currency      String            @default("VND")
+  status        PlanVersionStatus @default(DRAFT)
+  isCurrent     Boolean           @default(false)
+  effectiveFrom DateTime?
+  publishedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  entitlements  PlanEntitlement[]
+  subscriptions Subscription[]
+  purchases     PlanPurchase[]
+
+  @@unique([planId, version])
+  @@index([planId, status])
+  @@index([planId, isCurrent, status])
+  @@index([status, effectiveFrom])
+}
+
+model PlanEntitlement {
+  id            Int               @id @default(autoincrement())
+  planVersionId Int
+  planVersion   PlanVersion       @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  featureKey    PlanFeatureKey
+  enabled       Boolean           @default(true)
+  limitValue    Int?
+  unit          EntitlementUnit?
+  period        EntitlementPeriod?
+  scope         Json?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([planVersionId, featureKey])
+  @@index([featureKey, enabled])
+}
+
+model Subscription {
+  id            Int                @id @default(autoincrement())
+  userId        Int
+  user          User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  planVersionId Int
+  planVersion   PlanVersion        @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  status        SubscriptionStatus @default(ACTIVE)
+  startsAt      DateTime
+  endsAt        DateTime
+  planPurchaseId Int?              @unique
+  planPurchase   PlanPurchase?    @relation(fields: [planPurchaseId], references: [id], onDelete: Restrict)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([userId, status, startsAt, endsAt])
+  @@index([planVersionId])
+}
+
+model PlanPurchase {
+  id             Int                @id @default(autoincrement())
+  userId         Int
+  user           User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  planVersionId  Int
+  planVersion    PlanVersion        @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  status         PlanPurchaseStatus @default(PENDING_PAYMENT)
+  amountVnd      Int
+  currency       String             @default("VND")
+  durationDays   Int
+  idempotencyKey String
+  completedAt    DateTime?
+  supersededAt   DateTime?
+  supersededByPurchaseId Int?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  payment      PlanPayment?
+  subscription Subscription?
+  supersededByPurchase PlanPurchase? @relation("PlanPurchaseSupersession", fields: [supersededByPurchaseId], references: [id], onDelete: SetNull)
+  supersededPurchases PlanPurchase[] @relation("PlanPurchaseSupersession")
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([planVersionId])
+  @@index([supersededByPurchaseId])
+}
+
+model PlanPayment {
+  id              Int               @id @default(autoincrement())
+  planPurchaseId  Int               @unique
+  planPurchase    PlanPurchase      @relation(fields: [planPurchaseId], references: [id], onDelete: Restrict)
+  amountVnd       Int
+  currency        String            @default("VND")
+  transferCode    String            @unique
+  bankBin         String?
+  bankName        String?
+  bankAccountNumber String?
+  paymentIntentExpiresAt DateTime?
+  autoMatchUntil  DateTime?
+  status          PlanPaymentStatus @default(PENDING)
+  reportedAt      DateTime?
+  confirmedAt     DateTime?
+  confirmedById   Int?
+  confirmedBy     User?             @relation("PlanPaymentConfirmer", fields: [confirmedById], references: [id], onDelete: SetNull)
+  confirmationSource PlanPaymentConfirmationSource?
+  supersededAt      DateTime?
+  rejectedAt      DateTime?
+  rejectedById    Int?
+  rejectedBy      User?             @relation("PlanPaymentRejecter", fields: [rejectedById], references: [id], onDelete: SetNull)
+  rejectionReason String?
+  bankTransactions BankTransaction[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([confirmedById])
+  @@index([rejectedById])
+  @@index([status, autoMatchUntil])
+}
+
+model BankTransaction {
+  id                    Int                       @id @default(autoincrement())
+  provider              String
+  externalTransactionId String
+  bankReference         String?
+  bankAccount           String?
+  bankCode              String?
+  gateway               String?
+  transferType          String
+  amount                Int
+  currency              String                    @default("VND")
+  paymentCode           String?
+  rawContent            String?
+  occurredAt            DateTime
+  receivedAt            DateTime                  @default(now())
+  matchStatus           BankTransactionMatchStatus @default(RECEIVED)
+  matchedPlanPaymentId  Int?
+  matchedPlanPayment    PlanPayment?              @relation(fields: [matchedPlanPaymentId], references: [id], onDelete: SetNull)
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@unique([provider, externalTransactionId])
+  @@index([matchStatus, receivedAt])
+  @@index([matchedPlanPaymentId])
 }
 
 model Course {
@@ -385,6 +627,7 @@ model Quiz {
   theoryContent     String?               @db.Text
   bilingualContent  Json? // Array of { en: string, vi: string }
   type              QuizType              @default(TOEIC)
+  isPremiumContent  Boolean               @default(false)
   publicationStatus QuizPublicationStatus @default(PUBLISHED)
   publishedAt       DateTime?
   timeLimit         Int? // In minutes
@@ -585,6 +828,7 @@ model SpeakingExercise {
   targetText String   @db.Text // Câu/đoạn văn cần đọc (hoặc script mẫu)
   imageUrl   String? // Dùng cho TOEIC Part 1 (Mô tả tranh)
   audioUrl   String? // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
+  isPremiumContent Boolean @default(false)
   difficulty String   @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
   category   String   @default("TOEIC") // IELTS, TOEIC, GENERAL
   createdAt  DateTime @default(now())

@@ -3,24 +3,74 @@ import {
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QuizType, TopicCategory } from '@prisma/client';
 import { AiService } from '../ai/ai.service';
+import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
 
 const GENERAL_WRITING_TYPES: QuizType[] = [
   QuizType.WRITING_PICTURE,
   QuizType.WRITING_EMAIL,
 ];
 
+function isWritingQuiz(quiz: {
+  type: QuizType;
+  practiceTopic?: { category: TopicCategory } | null;
+}) {
+  return (
+    GENERAL_WRITING_TYPES.includes(quiz.type) &&
+    (quiz.practiceTopic?.category === TopicCategory.WRITING_PART1 ||
+      quiz.practiceTopic?.category === TopicCategory.WRITING_PART2)
+  );
+}
+
 @Injectable()
 export class WritingService {
   constructor(
     private prisma: PrismaService,
     private aiService: AiService,
+    @Optional() private readonly quizContentAccess?: QuizContentAccessService,
   ) {}
 
-  async getTopics(userId?: number) {
+  private async assertWritingAccess(
+    quiz: {
+      id: number;
+      type: QuizType;
+      isPremiumContent: boolean;
+      courseId: number | null;
+    },
+    userId?: number,
+    role?: import('@prisma/client').Role,
+  ) {
+    if (this.quizContentAccess) {
+      await this.quizContentAccess.assertAccess(quiz, userId, role);
+    }
+  }
+
+  private async resolveWritingAccess(
+    quizzes: Array<{
+      id: number;
+      type: QuizType;
+      isPremiumContent: boolean;
+      courseId: number | null;
+    }>,
+    userId?: number,
+    role?: import('@prisma/client').Role,
+  ) {
+    if (this.quizContentAccess) {
+      return this.quizContentAccess.resolveMany(quizzes, userId, role);
+    }
+    return new Map(
+      quizzes.map((quiz) => [
+        quiz.id,
+        { isPremiumContent: quiz.isPremiumContent, isLocked: false },
+      ]),
+    );
+  }
+
+  async getTopics(userId?: number, role?: import('@prisma/client').Role) {
     const categories = await this.prisma.practiceTopic.findMany({
       where: {
         category: {
@@ -66,18 +116,33 @@ export class WritingService {
 
     const completedQuizIds = new Set(userSubmissions.map((s) => s.quizId));
 
+    const accessByQuiz = await this.resolveWritingAccess(quizzes, userId, role);
+
     return {
       categories,
       quizzes: quizzes.map((q) => {
         const question = q.questions[0];
-        const content = question.content as any;
-        return {
+        const content = (question?.content ?? {}) as any;
+        const access = accessByQuiz.get(q.id) ?? {
+          isPremiumContent: Boolean(q.isPremiumContent),
+          isLocked: false,
+        };
+        const safeMetadata = {
           id: q.id,
           title: q.title,
           description: q.description,
           type: q.type,
           topicId: q.practiceTopicId,
           topicName: q.practiceTopic?.name,
+          level: content.level,
+          taskType: content.taskType,
+          isCompleted: completedQuizIds.has(q.id),
+          isPremiumContent: access.isPremiumContent,
+          isLocked: access.isLocked,
+        };
+        if (access.isLocked) return safeMetadata;
+        return {
+          ...safeMetadata,
           level: content.level,
           taskType: content.taskType,
           prompt: content.prompt,
@@ -90,13 +155,16 @@ export class WritingService {
           wordRange: Array.isArray(content.wordRange)
             ? content.wordRange
             : null,
-          isCompleted: completedQuizIds.has(q.id),
         };
       }),
     };
   }
 
-  async getQuizDetails(quizId: number) {
+  async getQuizDetails(
+    quizId: number,
+    userId?: number,
+    role?: import('@prisma/client').Role,
+  ) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
       include: {
@@ -109,18 +177,11 @@ export class WritingService {
       },
     });
 
-    if (
-      !quiz ||
-      !GENERAL_WRITING_TYPES.includes(quiz.type) ||
-      !quiz.practiceTopic ||
-      !(
-        quiz.practiceTopic.category === TopicCategory.WRITING_PART1 ||
-        quiz.practiceTopic.category === TopicCategory.WRITING_PART2
-      ) ||
-      quiz.questions.length === 0
-    ) {
+    if (!quiz || !isWritingQuiz(quiz) || quiz.questions.length === 0) {
       throw new NotFoundException('Quiz not found');
     }
+
+    await this.assertWritingAccess(quiz, userId, role);
 
     const question = quiz.questions[0];
     const content = question.content as any;
@@ -133,7 +194,7 @@ export class WritingService {
       title: quiz.title,
       description: quiz.description,
       type: quiz.type,
-      topicName: quiz.practiceTopic.name,
+      topicName: quiz.practiceTopic?.name ?? '',
       level: content.level,
       taskType: content.taskType,
       prompt: content.prompt,
@@ -150,7 +211,25 @@ export class WritingService {
     };
   }
 
-  async getCommunitySubmissions(quizId: number) {
+  async getCommunitySubmissions(
+    quizId: number,
+    userId?: number,
+    role?: import('@prisma/client').Role,
+  ) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: {
+        id: true,
+        type: true,
+        isPremiumContent: true,
+        courseId: true,
+        practiceTopic: { select: { category: true } },
+      },
+    });
+    if (!quiz || !isWritingQuiz(quiz)) {
+      throw new NotFoundException('Quiz not found');
+    }
+    await this.assertWritingAccess(quiz, userId, role);
     const submissions = await this.prisma.submission.findMany({
       where: { quizId },
       include: {
@@ -175,7 +254,12 @@ export class WritingService {
     }));
   }
 
-  async submitWriting(quizId: number, userId: number, text: string) {
+  async submitWriting(
+    quizId: number,
+    userId: number,
+    text: string,
+    role?: import('@prisma/client').Role,
+  ) {
     const answer = text?.trim();
     if (!answer) throw new BadRequestException('Bài viết không được để trống');
     if (answer.length > 20000)
@@ -192,17 +276,10 @@ export class WritingService {
         },
       },
     });
-    if (
-      !quiz ||
-      !GENERAL_WRITING_TYPES.includes(quiz.type) ||
-      !quiz.practiceTopic ||
-      !(
-        quiz.practiceTopic.category === TopicCategory.WRITING_PART1 ||
-        quiz.practiceTopic.category === TopicCategory.WRITING_PART2
-      ) ||
-      quiz.questions.length === 0
-    )
+    if (!quiz || !isWritingQuiz(quiz) || quiz.questions.length === 0)
       throw new NotFoundException('Quiz not found');
+
+    await this.assertWritingAccess(quiz, userId, role);
 
     const question = quiz.questions[0];
     const content = question.content as any;

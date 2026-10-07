@@ -1,5 +1,21 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import { R2Service, R2UploadResult } from './r2.service';
+import {
+  isPrivateListeningMediaKey,
+  PRIVATE_LISTENING_MEDIA_PREFIX,
+  isPrivateSpeakingMediaKey,
+  isPrivatePremiumMediaKey,
+  PRIVATE_SPEAKING_MEDIA_PREFIX,
+  R2Service,
+  R2UploadResult,
+} from './r2.service';
+
+export {
+  isPrivateListeningMediaKey,
+  PRIVATE_LISTENING_MEDIA_PREFIX,
+  isPrivateSpeakingMediaKey,
+  isPrivatePremiumMediaKey,
+  PRIVATE_SPEAKING_MEDIA_PREFIX,
+};
 
 export interface UploadResult {
   /** URL công khai để truy cập file */
@@ -81,8 +97,29 @@ export class UploadService {
     };
   }
 
+  async putPrivateObjectAtKey(
+    key: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<UploadResult> {
+    const result = await this.r2.putPrivateObjectAtKey(key, buffer, mimeType);
+    return {
+      url: result.url,
+      key: result.key,
+      contentType: result.contentType,
+    };
+  }
+
   getPublicUrl(): string {
     return this.r2.getPublicUrl();
+  }
+
+  getPublicAssetUrl(key: string): string {
+    return this.r2.getPublicAssetUrl(key);
+  }
+
+  isPrivateStorageConfigured(): boolean {
+    return this.r2.isPrivateStorageConfigured();
   }
 
   async headObject(key: string) {
@@ -91,6 +128,10 @@ export class UploadService {
 
   async objectExists(key: string): Promise<boolean> {
     return this.r2.objectExists(key);
+  }
+
+  async privateObjectExists(key: string): Promise<boolean> {
+    return this.r2.privateObjectExists(key);
   }
 
   /**
@@ -121,11 +162,22 @@ export class UploadService {
     return this.r2.getPresignedDownloadUrl(key, expiresIn);
   }
 
+  async getPrivatePresignedDownloadUrl(
+    key: string,
+    expiresIn = 300,
+  ): Promise<string> {
+    return this.r2.getPrivatePresignedDownloadUrl(key, expiresIn);
+  }
+
   /**
    * Tải buffer trực tiếp từ R2 để xử lý backend (worker assessment).
    */
   async downloadFileBuffer(key: string): Promise<Buffer> {
     return this.r2.downloadFileBuffer(key);
+  }
+
+  async downloadPrivateFileBuffer(key: string): Promise<Buffer> {
+    return this.r2.downloadPrivateFileBuffer(key);
   }
 
   /** Phân loại thư mục theo MIME type */

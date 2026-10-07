@@ -1,13 +1,17 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
   Optional,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { PlanFeatureKey } from '@prisma/client';
 import { DictionaryLookupService } from './dictionary-lookup.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
 export class VocabService {
@@ -17,6 +21,7 @@ export class VocabService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     @Optional() private readonly dictionaryLookup?: DictionaryLookupService,
+    @Optional() private readonly subscriptionService?: SubscriptionService,
   ) {}
 
   private async emitVocabLearned(
@@ -56,6 +61,12 @@ export class VocabService {
   }
 
   async getTopics(userId?: number) {
+    const canAccessPremium = userId
+      ? await this.subscriptionService?.hasFeature(
+          userId,
+          PlanFeatureKey.PREMIUM_VOCAB,
+        )
+      : false;
     const topics = await this.prisma.vocabTopic.findMany({
       where: { categoryName: { not: 'SYSTEM_DICTIONARY' } },
       include: {
@@ -111,6 +122,7 @@ export class VocabService {
         learnedCount: prog.mastered,
         needReviewCount: prog.needReview,
         isPro: t.isPro,
+        isLocked: t.isPro && !canAccessPremium,
       });
     });
 
@@ -134,6 +146,7 @@ export class VocabService {
         learnedCount: prog.mastered,
         needReviewCount: prog.needReview,
         isPro: t.isPro,
+        isLocked: t.isPro && !canAccessPremium,
       };
     });
 
@@ -146,12 +159,36 @@ export class VocabService {
   async getTopicDetails(topicId: number, userId?: number) {
     const topic = await this.prisma.vocabTopic.findUnique({
       where: { id: topicId },
-      include: { words: { orderBy: { order: 'asc' } } },
     });
 
     if (!topic) {
       throw new NotFoundException('Topic not found');
     }
+
+    if (topic.isPro) {
+      if (!userId) {
+        throw new UnauthorizedException('Authentication is required');
+      }
+      const canAccess = await this.subscriptionService?.hasFeature(
+        userId,
+        PlanFeatureKey.PREMIUM_VOCAB,
+      );
+      if (!canAccess) {
+        throw new ForbiddenException({
+          statusCode: 403,
+          message: 'Premium vocabulary entitlement is required',
+          error: {
+            code: 'FEATURE_NOT_INCLUDED',
+            featureKey: PlanFeatureKey.PREMIUM_VOCAB,
+          },
+        });
+      }
+    }
+
+    const words = await this.prisma.vocabWord.findMany({
+      where: { topicId },
+      orderBy: { order: 'asc' },
+    });
 
     const userProgressMap: Record<
       number,
@@ -170,7 +207,7 @@ export class VocabService {
       });
     }
 
-    const words = topic.words.map((w) => {
+    const mappedWords = words.map((w) => {
       const prog = userProgressMap[w.id] || {
         isStarred: false,
         isMastered: false,
@@ -196,8 +233,9 @@ export class VocabService {
       topicId: topic.id,
       title: topic.title,
       categoryName: topic.categoryName,
-      totalWords: words.length,
-      words,
+      isPro: topic.isPro,
+      totalWords: mappedWords.length,
+      words: mappedWords,
     };
   }
 

@@ -10,7 +10,11 @@ import { Prisma, QuizType } from '@prisma/client';
 import { createHash } from 'crypto';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UploadService } from '../upload/upload.service';
+import {
+  isPrivateListeningMediaKey,
+  PRIVATE_LISTENING_MEDIA_PREFIX,
+  UploadService,
+} from '../upload/upload.service';
 import { parseEncodedMp3DurationMs } from './listening-media-metadata';
 import {
   normalizeDialogueSegments,
@@ -605,8 +609,43 @@ export class ListeningAudioAuthoringService {
     }
   }
 
+  private async isPremiumListeningQuiz(quizId: number): Promise<boolean> {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { type: true, isPremiumContent: true },
+    });
+    if (!quiz || quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new NotFoundException('Không tìm thấy bài luyện nghe.');
+    }
+    return quiz.isPremiumContent;
+  }
+
+  private assertPremiumArtifactStorage(
+    isPremium: boolean,
+    r2Key: string | null,
+    r2Url: string | null,
+  ) {
+    if (!isPremium) return;
+    if (
+      !this.uploadService.isPrivateStorageConfigured() ||
+      !r2Key ||
+      !isPrivateListeningMediaKey(r2Key) ||
+      Boolean(r2Url)
+    ) {
+      throw new ServiceUnavailableException(
+        'Premium Listening artifact must use configured private storage',
+      );
+    }
+  }
+
   async generatePreview(quizId: number, actorId: number) {
     const payload = await this.loadCanonical(quizId);
+    const isPremium = await this.isPremiumListeningQuiz(quizId);
+    if (isPremium && !this.uploadService.isPrivateStorageConfigured()) {
+      throw new ServiceUnavailableException(
+        'Protected Listening media storage is not configured',
+      );
+    }
     const startedAt = Date.now();
     const synthesisHash = sha256(stableJson(payload));
     const contentHash = sha256(
@@ -625,8 +664,14 @@ export class ListeningAudioAuthoringService {
     if (
       existing &&
       ['PREVIEW_READY', 'APPROVED', 'PUBLISHED'].includes(existing.status)
-    )
+    ) {
+      this.assertPremiumArtifactStorage(
+        isPremium,
+        existing.r2Key,
+        existing.r2Url,
+      );
       return { ...existing, reused: true };
+    }
     if (existing?.status === 'GENERATING') return { ...existing, reused: true };
     if (existing && ['FAILED', 'STALE'].includes(existing.status)) {
       const claimed = await this.prisma.listeningAudioArtifact.updateMany({
@@ -677,18 +722,26 @@ export class ListeningAudioAuthoringService {
     }
     try {
       const synthesized = await this.synthesize(payload);
-      const key = `${PRODUCTION_PREFIX}/quiz-${quizId}/audio/v${artifact.version}/full.mp3`;
-      const uploaded = await this.uploadService.putObjectAtKey(
-        key,
-        synthesized.audio,
-        'audio/mpeg',
-      );
+      const key = isPremium
+        ? `${PRIVATE_LISTENING_MEDIA_PREFIX}quiz-${quizId}/audio/v${artifact.version}/full.mp3`
+        : `${PRODUCTION_PREFIX}/quiz-${quizId}/audio/v${artifact.version}/full.mp3`;
+      const uploaded = isPremium
+        ? await this.uploadService.putPrivateObjectAtKey(
+            key,
+            synthesized.audio,
+            'audio/mpeg',
+          )
+        : await this.uploadService.putObjectAtKey(
+            key,
+            synthesized.audio,
+            'audio/mpeg',
+          );
       await this.prisma.listeningAudioArtifact.update({
         where: { id: artifact.id },
         data: {
           status: 'PREVIEW_READY',
           r2Key: uploaded.key,
-          r2Url: uploaded.url,
+          r2Url: isPremium ? null : uploaded.url,
           durationMs: synthesized.durationMs,
           checksumSha256: sha256(synthesized.audio),
           timeline: synthesized.timeline as unknown as Prisma.InputJsonValue,
@@ -785,6 +838,11 @@ export class ListeningAudioAuthoringService {
       throw new ConflictException(
         'Artifact đã stale do nội dung thay đổi; hãy tạo preview mới.',
       );
+    this.assertPremiumArtifactStorage(
+      await this.isPremiumListeningQuiz(quizId),
+      artifact.r2Key,
+      artifact.r2Url,
+    );
     return this.prisma.listeningAudioArtifact.update({
       where: { id: artifact.id },
       data: { status: 'APPROVED', approvedAt: new Date(), approvedBy: actorId },
@@ -807,7 +865,16 @@ export class ListeningAudioAuthoringService {
     const current = await this.validateContent(quizId);
     if (current.synthesisHash !== artifact.synthesisHash)
       throw new ConflictException('Artifact đã stale do nội dung thay đổi.');
-    if (!(await this.uploadService.objectExists(artifact.r2Key)))
+    const isPremium = await this.isPremiumListeningQuiz(quizId);
+    this.assertPremiumArtifactStorage(
+      isPremium,
+      artifact.r2Key,
+      artifact.r2Url,
+    );
+    const exists = isPremium
+      ? await this.uploadService.privateObjectExists(artifact.r2Key)
+      : await this.uploadService.objectExists(artifact.r2Key);
+    if (!exists)
       throw new ConflictException('Không tìm thấy object audio trên R2.');
     return this.prisma.$transaction(async (tx) => {
       // Serialize the publication pointer per quiz. A row-only updateMany is
@@ -882,9 +949,17 @@ export class ListeningAudioAuthoringService {
         'Checksum audio không khớp phiên bản hiện hành.',
       );
     }
+    const isPremium = await this.isPremiumListeningQuiz(quizId);
+    this.assertPremiumArtifactStorage(
+      isPremium,
+      artifact.r2Key,
+      artifact.r2Url,
+    );
     return {
       artifact,
-      buffer: await this.uploadService.downloadFileBuffer(artifact.r2Key),
+      buffer: isPremium
+        ? await this.uploadService.downloadPrivateFileBuffer(artifact.r2Key)
+        : await this.uploadService.downloadFileBuffer(artifact.r2Key),
     };
   }
 }

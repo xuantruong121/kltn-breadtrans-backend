@@ -20,6 +20,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SpeakingService } from '../speaking/speaking.service';
 import { UploadService } from '../upload/upload.service';
 import { ListeningAudioAuthoringService } from './listening-audio-authoring.service';
+import { QuizContentAccessService } from './quiz-content-access.service';
 
 const mockPrismaService = {
   $transaction: jest.fn(),
@@ -46,6 +47,7 @@ const mockPrismaService = {
   },
   userQuizReward: { createMany: jest.fn() },
   learningActivity: { create: jest.fn() },
+  enrollment: { findFirst: jest.fn(), findMany: jest.fn() },
 };
 
 const mockAiService = {
@@ -63,7 +65,13 @@ const mockSpeakingService = {
 
 const mockUploadService = {
   uploadRawBuffer: jest.fn(),
+  putPrivateObjectAtKey: jest.fn(),
   downloadFileBuffer: jest.fn(),
+  downloadPrivateFileBuffer: jest.fn(),
+  getPresignedDownloadUrl: jest.fn(),
+  getPrivatePresignedDownloadUrl: jest.fn(),
+  isPrivateStorageConfigured: jest.fn().mockReturnValue(true),
+  privateObjectExists: jest.fn(),
 };
 
 const mockListeningAudioAuthoringService = {
@@ -73,6 +81,23 @@ const mockListeningAudioAuthoringService = {
     .mockRejectedValue(
       new Error('Audio toàn bài chưa được quản trị viên tạo và duyệt'),
     ),
+};
+
+const mockQuizContentAccessService = {
+  assertAccess: jest.fn().mockResolvedValue(undefined),
+  resolveMany: jest.fn().mockImplementation(
+    (quizzes: Array<{ id: number; isPremiumContent?: boolean }>) =>
+      new Map(
+        quizzes.map((quiz) => [
+          quiz.id,
+          {
+            isPremiumContent: Boolean(quiz.isPremiumContent),
+            isLocked: false,
+            featureKey: null,
+          },
+        ]),
+      ),
+  ),
 };
 
 describe('QuizService', () => {
@@ -92,6 +117,10 @@ describe('QuizService', () => {
           provide: ListeningAudioAuthoringService,
           useValue: mockListeningAudioAuthoringService,
         },
+        {
+          provide: QuizContentAccessService,
+          useValue: mockQuizContentAccessService,
+        },
       ],
     }).compile();
 
@@ -106,6 +135,20 @@ describe('QuizService', () => {
     );
     mockListeningAudioAuthoringService.getPublishedAudio.mockRejectedValue(
       new Error('Audio toàn bài chưa được quản trị viên tạo và duyệt'),
+    );
+    mockQuizContentAccessService.assertAccess.mockResolvedValue(undefined);
+    mockQuizContentAccessService.resolveMany.mockImplementation(
+      (quizzes: Array<{ id: number; isPremiumContent?: boolean }>) =>
+        new Map(
+          quizzes.map((quiz) => [
+            quiz.id,
+            {
+              isPremiumContent: Boolean(quiz.isPremiumContent),
+              isLocked: false,
+              featureKey: null,
+            },
+          ]),
+        ),
     );
   });
 
@@ -188,7 +231,7 @@ describe('QuizService', () => {
 
       const result = await service.getQuizById(1);
 
-      expect(prisma.quiz.findUnique).toHaveBeenCalledWith({
+      expect(prisma.quiz.findUnique).toHaveBeenLastCalledWith({
         where: { id: 1 },
         include: {
           questions: {
@@ -894,6 +937,88 @@ describe('QuizService', () => {
     });
   });
 
+  describe('premium content projections', () => {
+    it('returns locked Listening metadata without question content or media URLs', async () => {
+      mockPrismaService.quiz.findMany.mockResolvedValue([
+        {
+          id: 41,
+          courseId: null,
+          practiceTopicId: 3,
+          title: 'Premium dialogue',
+          description: 'Metadata only',
+          type: 'LISTENING_PRACTICE',
+          bilingualContent: {
+            mode: 'DIALOGUE',
+            levels: ['B1'],
+            transcript: 'Do not return this transcript',
+          },
+          timeLimit: 10,
+          isPremiumContent: true,
+          _count: { questions: 2 },
+        },
+      ]);
+      mockQuizContentAccessService.resolveMany.mockResolvedValue(
+        new Map([
+          [41, { isPremiumContent: true, isLocked: true, featureKey: null }],
+        ]),
+      );
+
+      const result = await service.getListeningPractices();
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          id: 41,
+          isPremiumContent: true,
+          isLocked: true,
+          questionCount: 2,
+        }),
+      ]);
+      expect(result[0]).not.toHaveProperty('bilingualContent');
+      expect(result[0]).not.toHaveProperty('questions');
+    });
+
+    it('uses short-lived signed URLs for authorized premium Listening media', async () => {
+      mockPrismaService.quiz.findUnique
+        .mockResolvedValueOnce({
+          id: 42,
+          type: 'LISTENING_PRACTICE',
+          isPremiumContent: true,
+          courseId: null,
+          publicationStatus: 'PUBLISHED',
+        })
+        .mockResolvedValueOnce({
+          id: 42,
+          type: 'LISTENING_PRACTICE',
+          isPremiumContent: true,
+          questions: [
+            {
+              id: 420,
+              content: {},
+              audioAssets: [
+                {
+                  key: 'premium/listening/quiz-42.mp3',
+                  url: 'https://public/raw',
+                },
+              ],
+              diagnosticClips: [],
+            },
+          ],
+        });
+      mockUploadService.getPrivatePresignedDownloadUrl.mockResolvedValue(
+        'https://signed.example/premium-42',
+      );
+
+      const result = await service.getQuizById(42, false, 7);
+
+      expect(result.questions[0].audioAssets[0].url).toBe(
+        'https://signed.example/premium-42',
+      );
+      expect(
+        mockUploadService.getPrivatePresignedDownloadUrl,
+      ).toHaveBeenCalledWith('premium/listening/quiz-42.mp3', 300);
+    });
+  });
+
   describe('listening audio', () => {
     it('does not synthesize student audio from legacy content at request time', async () => {
       mockPrismaService.question.findUnique.mockResolvedValue({
@@ -933,6 +1058,52 @@ describe('QuizService', () => {
         'catalog/listening/question-97.mp3',
       );
       expect(mockSpeakingService.generateTts).not.toHaveBeenCalled();
+    });
+
+    it('serves premium question audio only through the private storage path', async () => {
+      const audio = Buffer.from('private-audio');
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 101,
+        quizId: 41,
+        quiz: {
+          id: 41,
+          type: 'LISTENING_PRACTICE',
+          isPremiumContent: true,
+        },
+        audioAssets: [
+          { key: 'premium/listening/quiz-41/question-101/v1/audio.mp3' },
+        ],
+        content: { audioText: 'A protected sentence.' },
+      });
+      mockUploadService.downloadPrivateFileBuffer.mockResolvedValue(audio);
+
+      await expect(service.streamQuestionAudio(41, 101)).resolves.toBe(audio);
+      expect(mockUploadService.downloadPrivateFileBuffer).toHaveBeenCalledWith(
+        'premium/listening/quiz-41/question-101/v1/audio.mp3',
+      );
+      expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    });
+
+    it('rejects premium question audio that still points at public storage', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 102,
+        quizId: 41,
+        quiz: {
+          id: 41,
+          type: 'LISTENING_PRACTICE',
+          isPremiumContent: true,
+        },
+        audioAssets: [{ key: 'catalog/listening/question-102.mp3' }],
+        content: { audioText: 'A legacy public sentence.' },
+      });
+
+      await expect(service.streamQuestionAudio(41, 102)).rejects.toThrow(
+        'Premium Listening media is not stored in private storage',
+      );
+      expect(
+        mockUploadService.downloadPrivateFileBuffer,
+      ).not.toHaveBeenCalled();
+      expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
     });
 
     it('serves an approved dictation asset without synthesizing at playback time', async () => {
