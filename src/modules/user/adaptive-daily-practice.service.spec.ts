@@ -1,6 +1,7 @@
 import {
   buildDailyPracticePlan,
   DailyPracticeSkillProgress,
+  resolveDailyPracticeRoute,
 } from './adaptive-daily-practice.service';
 import { DailyPracticeCandidate } from './adaptive-daily-practice.service';
 
@@ -42,7 +43,14 @@ function candidate(
     skill: skillName,
     exerciseId: id,
     title: `${skillName} ${id}`,
-    route: `/practice/${skillName.toLowerCase()}/${id}`,
+    route:
+      skillName === 'LISTENING'
+        ? `/listening/${id}`
+        : skillName === 'READING'
+          ? `/reading/quizzes/${id}`
+          : skillName === 'SPEAKING'
+            ? `/speaking/${id}`
+            : `/writing/${id}`,
     estimatedMinutes: 5,
     dimensions: [],
     isLocked: false,
@@ -53,6 +61,11 @@ function candidate(
 }
 
 describe('AdaptiveDailyPracticeService deterministic planner', () => {
+  it('resolves recommendations to their canonical skill domains', () => {
+    expect(resolveDailyPracticeRoute('WRITING', 17)).toBe('/writing/17');
+    expect(resolveDailyPracticeRoute('LISTENING', 23)).toBe('/listening/23');
+  });
+
   it('returns a balanced starter plan without labelling a fresh learner weak', () => {
     const result = buildDailyPracticePlan(
       7,

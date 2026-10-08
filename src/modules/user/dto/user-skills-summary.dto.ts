@@ -8,6 +8,9 @@ export interface SkillProgressSummary {
   levelRange: string;
   badge: string;
   unitLabel: string;
+  /** Speaking-only detail: visible practice-set count remains totalItems. */
+  totalExercises?: number;
+  completedExercises?: number;
 }
 
 export interface OverallSkillsProgress {

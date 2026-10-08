@@ -7,6 +7,10 @@ import {
   UseInterceptors,
   UploadedFile,
   UseGuards,
+  Headers,
+  Request,
+  Query,
+  Patch,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -46,15 +50,23 @@ export class AiGeneratorController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file'))
   async uploadDocument(
+    @Request() req: { user: { id: number } },
+    @Headers('Idempotency-Key') idempotencyKey: string | undefined,
     @UploadedFile() file?: Express.Multer.File,
     @Body('text') text?: string,
     @Body('quizCount') quizCount?: string,
     @Body('flashcardCount') flashcardCount?: string,
   ) {
-    return this.aiGeneratorService.startGenerationJob(file, text, {
-      quizCount: quizCount ? parseInt(quizCount, 10) : 5,
-      flashcardCount: flashcardCount ? parseInt(flashcardCount, 10) : 8,
-    });
+    return this.aiGeneratorService.startGenerationJob(
+      file,
+      text,
+      {
+        quizCount: quizCount ? parseInt(quizCount, 10) : 5,
+        flashcardCount: flashcardCount ? parseInt(flashcardCount, 10) : 8,
+      },
+      req.user.id,
+      idempotencyKey,
+    );
   }
 
   @Get(':jobId/status')
@@ -72,14 +84,53 @@ export class AiGeneratorController {
     return this.aiGeneratorService.getJobResult(jobId);
   }
 
+  @Get('jobs')
+  async listJobs(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.aiGeneratorService.listJobs(
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 20,
+    );
+  }
+
+  @Get('jobs/:jobId')
+  async getJobDetail(@Param('jobId') jobId: string) {
+    return this.aiGeneratorService.getJobDetail(jobId);
+  }
+
+  @Patch(':jobId/draft')
+  async updateDraft(
+    @Param('jobId') jobId: string,
+    @Body() payload: PublishContentDto,
+  ) {
+    return this.aiGeneratorService.updateDraft(jobId, payload);
+  }
+
+  @Post(':jobId/approve')
+  async approveDraft(
+    @Request() req: { user: { id: number } },
+    @Param('jobId') jobId: string,
+    @Body() payload: PublishContentDto,
+  ) {
+    return this.aiGeneratorService.approveDraft(jobId, payload, req.user.id);
+  }
+
+  @Post(':jobId/retry')
+  async retryJob(
+    @Request() req: { user: { id: number } },
+    @Param('jobId') jobId: string,
+  ) {
+    return this.aiGeneratorService.retryJob(jobId, req.user.id);
+  }
+
   @Post(':jobId/publish')
   @ApiOperation({
     summary: 'Phê duyệt & Lưu chính thức nội dung đã chỉnh sửa vào Database',
   })
   async publishContent(
+    @Request() req: { user: { id: number } },
     @Param('jobId') jobId: string,
     @Body() payload: PublishContentDto,
   ) {
-    return this.aiGeneratorService.publishContent(jobId, payload);
+    return this.aiGeneratorService.publishContent(jobId, payload, req.user.id);
   }
 }

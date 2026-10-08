@@ -25,6 +25,7 @@ import { getSpeakingPipelineMode } from './speaking.constants';
 import { Role } from '@prisma/client';
 import type { SpeakingSubmission } from '@prisma/client';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
+import { resolveSpeakingPracticeSet } from './speaking-practice-set';
 
 export interface SubmitSpeakingResponse {
   submissionId: number;
@@ -144,89 +145,6 @@ export function buildDialogueSsml(
     })
     .join('');
   return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>${body}</speak>`;
-}
-
-type SpeakingExerciseCatalogItem = {
-  id: number;
-  title: string;
-  difficulty: string;
-  category: string;
-  isPremiumContent?: boolean;
-};
-
-/**
- * Catalog-level grouping keeps the storage model backward compatible while
- * presenting a real multi-sentence practice set to learners. Each sentence
- * remains an independent SpeakingExercise for scoring and idempotency.
- */
-function resolvePracticeSet(item: SpeakingExerciseCatalogItem) {
-  const title = item.title.toLowerCase();
-  if (title.startsWith('read aloud')) {
-    return item.category.toUpperCase() === 'TOEIC'
-      ? {
-          key: 'read-aloud-toeic',
-          title: 'Đọc thành tiếng — Ngữ cảnh TOEIC',
-          description:
-            'Luyện đọc các thông báo và tình huống thường gặp trong môi trường công việc.',
-        }
-      : {
-          key: 'read-aloud-general',
-          title: 'Đọc thành tiếng — Giao tiếp hằng ngày',
-          description:
-            'Luyện đọc các câu tiếng Anh đời sống với nhịp điệu và phát âm rõ ràng.',
-        };
-  }
-  if (title.startsWith('pronunciation')) {
-    return {
-      key: 'pronunciation-foundations',
-      title: 'Nền tảng phát âm',
-      description:
-        'Củng cố âm cuối, trọng âm, nối âm và cách đọc số liệu trong câu thực tế.',
-    };
-  }
-  if (title.startsWith('question response')) {
-    return item.category.toUpperCase() === 'BUSINESS'
-      ? {
-          key: 'question-response-business',
-          title: 'Phản hồi câu hỏi — Công việc',
-          description:
-            'Luyện trả lời câu hỏi trong các tình huống họp, dịch vụ và giao tiếp công sở.',
-        }
-      : {
-          key: 'question-response-general',
-          title: 'Phản hồi câu hỏi — Đời sống',
-          description:
-            'Luyện phản xạ trả lời các câu hỏi quen thuộc bằng câu nói tự nhiên.',
-        };
-  }
-  if (title.startsWith('opinion')) {
-    return item.category.toUpperCase() === 'BUSINESS'
-      ? {
-          key: 'opinion-business',
-          title: 'Trình bày quan điểm — Công việc',
-          description:
-            'Trình bày ý kiến có lý do và ví dụ trong các chủ đề nghề nghiệp.',
-        }
-      : {
-          key: 'opinion-general',
-          title: 'Trình bày quan điểm — Hằng ngày',
-          description:
-            'Luyện diễn đạt quan điểm cá nhân mạch lạc, tự nhiên và có dẫn chứng.',
-        };
-  }
-  if (title.startsWith('toeic speaking')) {
-    return {
-      key: 'toeic-speaking-practice',
-      title: 'Luyện nhiệm vụ TOEIC Speaking',
-      description:
-        'Luyện theo nhóm nhiệm vụ đọc thành tiếng, mô tả và phản hồi trong TOEIC Speaking.',
-    };
-  }
-  return {
-    key: `custom-${item.category.toLowerCase()}`,
-    title: `Luyện nói — ${item.category}`,
-    description: 'Một bộ câu luyện nói theo chủ đề.',
-  };
 }
 
 function difficultyLabel(values: string[]) {
@@ -355,7 +273,7 @@ export class SpeakingService {
 
     const grouped = new Map<string, Array<(typeof exercises)[number]>>();
     for (const exercise of exercises) {
-      const set = resolvePracticeSet(exercise);
+      const set = resolveSpeakingPracticeSet(exercise);
       const current = grouped.get(set.key) ?? [];
       current.push(exercise);
       grouped.set(set.key, current);
@@ -376,7 +294,7 @@ export class SpeakingService {
     >();
 
     for (const [key, items] of grouped.entries()) {
-      const set = resolvePracticeSet(items[0]);
+      const set = resolveSpeakingPracticeSet(items[0]);
       setSummaries.set(key, {
         ...set,
         category: items[0].category,
@@ -392,7 +310,7 @@ export class SpeakingService {
     const positions = new Map<string, number>();
     return Promise.all(
       exercises.map(async (exercise) => {
-        const set = setSummaries.get(resolvePracticeSet(exercise).key)!;
+        const set = setSummaries.get(resolveSpeakingPracticeSet(exercise).key)!;
         const setKey = set.key;
         const position = (positions.get(setKey) ?? 0) + 1;
         positions.set(setKey, position);

@@ -35,6 +35,7 @@ const mockPrismaService = {
   },
   speakingExercise: {
     count: jest.fn(),
+    findMany: jest.fn(),
   },
   speakingSubmission: {
     findMany: jest.fn(),
@@ -84,6 +85,7 @@ describe('UserService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockPrismaService.speakingExercise.findMany.mockReset();
   });
 
   it('should be defined', () => {
@@ -255,6 +257,95 @@ describe('UserService', () => {
   });
 
   describe('getSkillProgressSummary', () => {
+    it('uses visible Speaking practice sets as the primary completion unit', async () => {
+      mockPrismaService.submission.findMany.mockResolvedValue([]);
+      mockPrismaService.speakingExercise.findMany.mockResolvedValue([
+        { id: 1, title: 'Read Aloud — Daily 1', category: 'GENERAL' },
+        { id: 2, title: 'Read Aloud — Daily 2', category: 'GENERAL' },
+        { id: 3, title: 'Read Aloud — Daily 3', category: 'GENERAL' },
+        { id: 4, title: 'Read Aloud — Daily 4', category: 'GENERAL' },
+        { id: 5, title: 'Question Response — Work 1', category: 'BUSINESS' },
+        { id: 6, title: 'Question Response — Work 2', category: 'BUSINESS' },
+      ]);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue([
+        ...[1, 1, 1, 2, 3].map((exerciseId, index) => ({
+          exerciseId,
+          overallScore: 8,
+          aiFeedback: {},
+          submittedAt: new Date(`2026-10-0${index + 1}T00:00:00Z`),
+        })),
+        {
+          exerciseId: 5,
+          overallScore: 9,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-06T00:00:00Z'),
+        },
+        {
+          exerciseId: 6,
+          overallScore: 9,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-07T00:00:00Z'),
+        },
+      ]);
+      mockPrismaService.userStats.findUnique.mockResolvedValue({
+        streakCount: 0,
+      });
+      mockReadingService.getTracking.mockResolvedValue(null);
+
+      const result = await service.getSkillProgressSummary(21);
+      const speaking = result.skills.find(
+        (skill) => skill.skill === 'SPEAKING',
+      );
+
+      expect(speaking).toMatchObject({
+        totalItems: 2,
+        completedItems: 1,
+        progressPercent: 50,
+        totalExercises: 6,
+        completedExercises: 5,
+      });
+      expect(speaking?.completedAttempts).toBe(7);
+    });
+
+    it('counts unique completed Speaking exercises separately from retry attempts', async () => {
+      mockPrismaService.submission.findMany.mockResolvedValue([]);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue([
+        {
+          exerciseId: 12,
+          overallScore: 8,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-01T00:00:00Z'),
+        },
+        {
+          exerciseId: 12,
+          overallScore: 9,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-02T00:00:00Z'),
+        },
+        {
+          exerciseId: 13,
+          overallScore: 7,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-03T00:00:00Z'),
+        },
+      ]);
+      mockPrismaService.speakingExercise.count.mockResolvedValue(10);
+      mockPrismaService.userStats.findUnique.mockResolvedValue({
+        streakCount: 0,
+      });
+      mockReadingService.getTracking.mockResolvedValue(null);
+
+      const result = await service.getSkillProgressSummary(21);
+      const speaking = result.skills.find(
+        (skill) => skill.skill === 'SPEAKING',
+      );
+
+      expect(speaking?.completedItems).toBe(2);
+      expect(speaking?.completedAttempts).toBe(3);
+      expect(speaking?.totalItems).toBe(10);
+      expect(speaking?.progressPercent).toBe(20);
+    });
+
     it('returns a safe zero state for all skills without history', async () => {
       mockPrismaService.submission.findMany.mockResolvedValue([]);
       mockPrismaService.speakingSubmission.findMany.mockResolvedValue([]);
@@ -328,11 +419,13 @@ describe('UserService', () => {
         ]);
       mockPrismaService.speakingSubmission.findMany.mockResolvedValue([
         {
+          exerciseId: 12,
           overallScore: 8.2,
           aiFeedback: { accuracyScore: 80, fluencyScore: 60 },
           submittedAt: new Date('2026-10-01T00:00:00Z'),
         },
         {
+          exerciseId: 13,
           overallScore: 9,
           aiFeedback: { accuracyScore: 90, fluencyScore: 70 },
           submittedAt: new Date('2026-10-02T00:00:00Z'),

@@ -52,7 +52,7 @@ export class NotificationsController {
       title: 'BreadTrans - Kiểm Tra Thông Báo! 🍞',
       body: 'Chúc mừng bạn đã kích hoạt thành công tính năng Web Push Notification trên thiết bị!',
       icon: '/icons/icon-192.png',
-      url: '/practice',
+      url: '/dashboard',
     });
     return {
       success: true,

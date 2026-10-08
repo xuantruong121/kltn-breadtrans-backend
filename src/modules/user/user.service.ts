@@ -11,6 +11,7 @@ import {
   SkillTrend,
   UserSkillsSummaryResponse,
 } from './dto/user-skills-summary.dto';
+import { resolveSpeakingPracticeSet } from '../speaking/speaking-practice-set';
 
 const CROSS_SKILL_SAMPLE_SIZE = 3;
 
@@ -160,6 +161,7 @@ function buildSkillItem(
   attempts: ScoreAttempt[],
   dimensions: Map<string, { scores: number[] }>,
   completedAttemptsOverride?: number,
+  completedItemsOverride?: number,
 ): CrossSkillSummaryItem {
   const latestScores = attempts.slice(-5).map((attempt) => attempt.score);
   const normalizedScore = average(attempts.map((attempt) => attempt.score));
@@ -169,6 +171,7 @@ function buildSkillItem(
   const status = skillStatus(attempts.length, normalizedScore);
   return {
     ...base,
+    completedItems: completedItemsOverride ?? attempts.length,
     completedAttempts: completedAttemptsOverride ?? attempts.length,
     normalizedScore,
     recentAverage,
@@ -261,6 +264,7 @@ export class UserService {
       tier: leaderboard?.tier || 'Đồng',
       masteredVocabCount: vocabProgress,
       totalQuizzesDone: submissionsCount + toeicCount,
+      totalToeicTestsDone: toeicCount,
       pet: pet || null,
       hasCompletedPlacementTest: !!diagnosticAttempt,
       latestDiagnostic: diagnosticAttempt
@@ -501,6 +505,7 @@ export class UserService {
         orderBy: { submittedAt: 'asc' },
         select: {
           id: true,
+          exerciseId: true,
           overallScore: true,
           aiFeedback: true,
           submittedAt: true,
@@ -539,6 +544,60 @@ export class UserService {
     const readingTracking = this.readingService
       ? await this.readingService.getTracking(userId, role)
       : null;
+    const countQuizSafely = async (where: any) => {
+      try {
+        if (typeof this.prisma.quiz?.count === 'function') {
+          const c = await this.prisma.quiz.count({ where });
+          return Number.isFinite(c) ? Math.max(0, Math.floor(c)) : 0;
+        }
+      } catch {
+        // Safe fallback
+      }
+      return 0;
+    };
+
+    const speakingRowsRaw =
+      typeof this.prisma.speakingExercise.findMany === 'function'
+        ? await this.prisma.speakingExercise.findMany({
+            where: { title: { not: '' }, targetText: { not: '' } },
+            select: { id: true, title: true, category: true },
+          })
+        : [];
+    const speakingRows = Array.isArray(speakingRowsRaw) ? speakingRowsRaw : [];
+    const speakingSets = new Map<string, number[]>();
+    for (const row of speakingRows) {
+      const set = resolveSpeakingPracticeSet(row);
+      speakingSets.set(set.key, [...(speakingSets.get(set.key) ?? []), row.id]);
+    }
+    const speakingCatalogCountRaw =
+      speakingRows.length > 0
+        ? speakingSets.size
+        : await this.prisma.speakingExercise.count({
+            where: {
+              title: { not: '' },
+              targetText: { not: '' },
+            },
+          });
+    const speakingCatalogCount = Number.isFinite(speakingCatalogCountRaw)
+      ? Math.max(0, Math.floor(speakingCatalogCountRaw))
+      : 0;
+
+    const [listeningCatalogCount, readingCatalogCount, writingCatalogCount] =
+      await Promise.all([
+        countQuizSafely({ type: QuizType.LISTENING_PRACTICE }),
+        countQuizSafely({
+          type: QuizType.BILINGUAL_READING,
+          practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+        }),
+        countQuizSafely({
+          type: { in: [QuizType.WRITING_PICTURE, QuizType.WRITING_EMAIL] },
+          practiceTopic: {
+            category: {
+              in: [TopicCategory.WRITING_PART1, TopicCategory.WRITING_PART2],
+            },
+          },
+        }),
+      ]);
 
     const listeningAttempts: ScoreAttempt[] = [];
     const listeningDimensions = new Map<string, { scores: number[] }>();
@@ -588,6 +647,9 @@ export class UserService {
     }
 
     const speakingAttempts: ScoreAttempt[] = [];
+    const completedSpeakingExerciseIds = new Set(
+      speakingSubmissions.map((submission) => submission.exerciseId),
+    );
     const speakingDimensions = new Map<string, { scores: number[] }>();
     const speakingDimensionKeys = [
       'accuracyScore',
@@ -667,50 +729,93 @@ export class UserService {
         submittedAt: new Date(attempt.submittedAt),
       }));
 
+    const completedListeningQuizIds = new Set(
+      listeningSubmissions.map((s) => s.quiz.id),
+    );
+    const completedWritingQuizIds = new Set(
+      writingSubmissions.map((s) => s.quizId),
+    );
+    const listeningCompletedItems = completedListeningQuizIds.size;
+    const listeningCompletedAttempts = listeningSubmissions.length;
+    const speakingCompletedItems =
+      speakingRows.length > 0
+        ? [...speakingSets.values()].filter((exerciseIds) =>
+            exerciseIds.every((id) => completedSpeakingExerciseIds.has(id)),
+          ).length
+        : completedSpeakingExerciseIds.size;
+    const speakingCompletedAttempts = speakingSubmissions.length;
+    const readingCompletedItems =
+      readingTracking?.progress.completedExercises ?? 0;
+    const readingCompletedAttempts =
+      readingTracking?.progress.completedAttempts ?? 0;
+    const writingCompletedItems = completedWritingQuizIds.size;
+    const writingCompletedAttempts = writingAttempts.length;
+
+    const calcPercent = (completed: number, total: number) =>
+      total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+
     const base = {
       LISTENING: {
         skill: 'LISTENING' as const,
         title: 'Listening',
         categoryLabel: 'Nghe hiểu',
-        totalItems: 0,
-        completedItems: listeningAttempts.length,
-        progressPercent: listeningAttempts.length > 0 ? 100 : 0,
+        totalItems: listeningCatalogCount,
+        completedItems: listeningCompletedItems,
+        progressPercent: calcPercent(
+          listeningCompletedItems,
+          listeningCatalogCount,
+        ),
         levelRange: 'A1 - C1',
         badge: 'Nghe chủ động',
-        unitLabel: 'lượt luyện',
+        unitLabel: 'bài',
       },
       SPEAKING: {
         skill: 'SPEAKING' as const,
         title: 'Speaking',
         categoryLabel: 'Nói và phát âm',
-        totalItems: 0,
-        completedItems: speakingSubmissions.length,
-        progressPercent: speakingSubmissions.length > 0 ? 100 : 0,
+        totalItems: speakingCatalogCount,
+        completedItems: speakingCompletedItems,
+        progressPercent: calcPercent(
+          speakingCompletedItems,
+          speakingCatalogCount,
+        ),
         levelRange: 'A1 - C1',
         badge: 'Phản hồi phát âm',
-        unitLabel: 'lượt luyện',
+        unitLabel: 'bài luyện',
+        ...(speakingRows.length > 0
+          ? {
+              totalExercises: speakingRows.length,
+              completedExercises: completedSpeakingExerciseIds.size,
+            }
+          : {}),
       },
       READING: {
         skill: 'READING' as const,
         title: 'Reading',
         categoryLabel: 'Đọc hiểu',
-        totalItems: 0,
-        completedItems: readingTracking?.progress.completedAttempts ?? 0,
-        progressPercent: readingTracking?.progress.completedAttempts ? 100 : 0,
+        totalItems: readingCatalogCount,
+        completedItems: readingCompletedItems,
+        progressPercent: calcPercent(
+          readingCompletedItems,
+          readingCatalogCount,
+        ),
         levelRange: 'A1 - C1',
         badge: 'Phân tích kỹ năng',
-        unitLabel: 'lượt luyện',
+        unitLabel: 'bài',
       },
       WRITING: {
         skill: 'WRITING' as const,
         title: 'Writing',
         categoryLabel: 'Viết và diễn đạt',
-        totalItems: 0,
-        completedItems: writingAttempts.length,
-        progressPercent: writingAttempts.length > 0 ? 100 : 0,
+        totalItems: writingCatalogCount,
+        completedItems: writingCompletedItems,
+        progressPercent: calcPercent(
+          writingCompletedItems,
+          writingCatalogCount,
+        ),
         levelRange: 'A1 - C1',
         badge: 'AI phản hồi',
-        unitLabel: 'lượt luyện',
+        unitLabel: 'đề bài',
       },
     };
 
@@ -718,7 +823,8 @@ export class UserService {
       base.READING,
       readingAttempts,
       readingDimensions,
-      readingTracking?.progress.completedAttempts ?? 0,
+      readingCompletedAttempts,
+      readingCompletedItems,
     );
     if (readingTracking?.progress.completedAttempts) {
       readingSkill.normalizedScore = readingTracking.progress.accuracy;
@@ -733,15 +839,28 @@ export class UserService {
       readingSkill.trend = asSkillTrend(readingTracking.recentTrend.direction);
     }
     const skills = [
-      buildSkillItem(base.LISTENING, listeningAttempts, listeningDimensions),
+      buildSkillItem(
+        base.LISTENING,
+        listeningAttempts,
+        listeningDimensions,
+        listeningCompletedAttempts,
+        listeningCompletedItems,
+      ),
       buildSkillItem(
         base.SPEAKING,
         speakingAttempts,
         speakingDimensions,
-        speakingSubmissions.length,
+        speakingCompletedAttempts,
+        speakingCompletedItems,
       ),
       readingSkill,
-      buildSkillItem(base.WRITING, writingAttempts, new Map()),
+      buildSkillItem(
+        base.WRITING,
+        writingAttempts,
+        new Map(),
+        writingCompletedAttempts,
+        writingCompletedItems,
+      ),
     ];
     const scoreValues = skills
       .map((skill) => skill.normalizedScore)
@@ -749,8 +868,12 @@ export class UserService {
     const recentValues = skills
       .map((skill) => skill.recentAverage)
       .filter((score): score is number => score !== null);
-    const overallAttempts = skills.reduce(
-      (sum, skill) => sum + skill.completedAttempts,
+    const overallTotalItems = skills.reduce(
+      (sum, skill) => sum + skill.totalItems,
+      0,
+    );
+    const overallCompletedItems = skills.reduce(
+      (sum, skill) => sum + skill.completedItems,
       0,
     );
     const overallScore = average(scoreValues);
@@ -770,9 +893,9 @@ export class UserService {
     return {
       skills,
       overall: {
-        totalItems: 0,
-        completedItems: overallAttempts,
-        progressPercent: overallScore ?? 0,
+        totalItems: overallTotalItems,
+        completedItems: overallCompletedItems,
+        progressPercent: calcPercent(overallCompletedItems, overallTotalItems),
         normalizedScore: overallScore,
         recentAverage: overallRecent,
         trend: overallTrend.trend,

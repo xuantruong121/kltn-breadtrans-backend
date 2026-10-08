@@ -34,6 +34,22 @@ export type DailyPracticeCandidate = {
   practicedBeforeToday: boolean;
 };
 
+export function resolveDailyPracticeRoute(
+  skill: DailyPracticeSkill,
+  exerciseId: number,
+): string {
+  switch (skill) {
+    case 'LISTENING':
+      return `/listening/${exerciseId}`;
+    case 'READING':
+      return `/reading/quizzes/${exerciseId}`;
+    case 'SPEAKING':
+      return `/speaking/${exerciseId}`;
+    case 'WRITING':
+      return `/writing/${exerciseId}`;
+  }
+}
+
 type CandidateInput = Omit<
   DailyPracticeCandidate,
   'isCompleted' | 'practicedBeforeToday'
@@ -511,10 +527,7 @@ export class AdaptiveDailyPracticeService {
           : quiz.type === QuizType.BILINGUAL_READING
             ? 'READING'
             : 'WRITING';
-      const route =
-        skill === 'WRITING'
-          ? `/practice/writing/${quiz.practiceTopicId ?? quiz.id}`
-          : `/practice/quizzes/${quiz.id}`;
+      const route = resolveDailyPracticeRoute(skill, quiz.id);
       candidates.push({
         skill,
         exerciseId: quiz.id,
@@ -534,7 +547,7 @@ export class AdaptiveDailyPracticeService {
         skill: 'SPEAKING',
         exerciseId: exercise.id,
         title: exercise.title,
-        route: `/practice/speaking/${exercise.id}`,
+        route: `/speaking/${exercise.id}`,
         estimatedMinutes: 4,
         dimensions: [],
         isLocked: access?.isLocked ?? false,

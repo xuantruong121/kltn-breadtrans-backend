@@ -47,7 +47,7 @@ describe('NotificationsService', () => {
         type: 'vocab_review',
         title: 'Ôn từ vựng',
         body: 'Đến giờ ôn tập',
-        url: '/practice/vocab/1',
+        url: '/flashcard/1',
         isRead: false,
       });
 
@@ -56,7 +56,7 @@ describe('NotificationsService', () => {
         type: 'vocab_review',
         title: 'Ôn từ vựng',
         body: 'Đến giờ ôn tập',
-        url: '/practice/vocab/1',
+        url: '/flashcard/1',
       });
 
       expect(prisma.notification.create).toHaveBeenCalledWith({
@@ -65,7 +65,7 @@ describe('NotificationsService', () => {
           type: 'vocab_review',
           title: 'Ôn từ vựng',
           body: 'Đến giờ ôn tập',
-          url: '/practice/vocab/1',
+          url: '/flashcard/1',
         },
       });
       expect(res.id).toBe(1);

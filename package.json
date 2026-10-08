@@ -22,6 +22,7 @@
     "bootstrap:plans": "ts-node scripts/bootstrap-plan-catalog.ts",
     "rollout:premium-content": "ts-node scripts/rollout-premium-content.ts",
     "materialize:listening-audio": "ts-node scripts/materialize-listening-audio.ts",
+    "generate:vocab-accent-audio": "ts-node scripts/generate-vocab-accent-audio.ts",
     "reconcile:listening-audio-duration": "ts-node scripts/reconcile-listening-audio-duration.ts",
     "start:speaking-worker": "node dist/src/worker/speaking-worker.main.js",
     "start:speaking-worker:dev": "ts-node src/worker/speaking-worker.main.ts"

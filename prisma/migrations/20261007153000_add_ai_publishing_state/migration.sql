@@ -1,0 +1,1 @@
+ALTER TYPE "AiGenerationJobStatus" ADD VALUE 'PUBLISHING';
