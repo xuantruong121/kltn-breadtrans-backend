@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Role, TopicCategory, QuizType } from '@prisma/client';
+import {
+  Role,
+  TopicCategory,
+  QuizPublicationStatus,
+  QuizType,
+} from '@prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ReadingService } from '../reading/reading.service';
 import {
@@ -347,13 +352,23 @@ export class UserService {
 
       // 2. Reading (TopicCategory.BILINGUAL_LEVEL)
       this.prisma.quiz.findMany({
-        where: { practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL } },
+        where: {
+          type: QuizType.BILINGUAL_READING,
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
+          practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+          questions: { some: {} },
+        },
         select: { id: true },
       }),
       this.prisma.submission.findMany({
         where: {
           userId,
-          quiz: { practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL } },
+          quiz: {
+            type: QuizType.BILINGUAL_READING,
+            publicationStatus: QuizPublicationStatus.PUBLISHED,
+            practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+            questions: { some: {} },
+          },
         },
         select: { quizId: true },
         distinct: ['quizId'],
@@ -587,7 +602,9 @@ export class UserService {
         countQuizSafely({ type: QuizType.LISTENING_PRACTICE }),
         countQuizSafely({
           type: QuizType.BILINGUAL_READING,
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
           practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+          questions: { some: {} },
         }),
         countQuizSafely({
           type: { in: [QuizType.WRITING_PICTURE, QuizType.WRITING_EMAIL] },
