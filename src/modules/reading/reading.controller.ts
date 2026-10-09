@@ -61,6 +61,16 @@ export class ReadingController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Get('tracking')
+  @ApiOperation({
+    summary: 'Lấy tiến độ, kỹ năng con và lỗi Reading của học viên',
+  })
+  getTracking(@Request() req: any) {
+    return this.readingService.getTracking(req.user.id, req.user.role);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('bilingual-progress')
   @ApiOperation({ summary: 'Lấy thống kê Tiến độ phần Đọc Song Ngữ' })
   getBilingualProgress(@Request() req: any) {

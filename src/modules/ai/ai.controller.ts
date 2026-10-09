@@ -10,12 +10,11 @@ import {
   UploadedFiles,
   BadRequestException,
   HttpStatus,
+  GoneException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from './ai.service';
-import { UploadService } from '../upload/upload.service';
 import {
   ApiTags,
   ApiOperation,
@@ -90,11 +89,7 @@ export class GenerateDictationDto {
 @ApiTags('ai')
 @Controller('ai')
 export class AiController {
-  constructor(
-    private readonly aiService: AiService,
-    private readonly prisma: PrismaService,
-    private readonly uploadService: UploadService,
-  ) {}
+  constructor(private readonly aiService: AiService) {}
 
   @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
@@ -121,72 +116,20 @@ export class AiController {
     return { reply, answer: reply };
   }
 
-  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, AiRateLimitGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Post('generate-dictation')
   @ApiOperation({ summary: 'AI tự động sinh bài Luyện Nghe (Chép chính tả)' })
-  async generateDictation(@Body() dto: GenerateDictationDto) {
-    // 1. Gọi Gemini sinh ra JSON các câu Dictation
-    const questions = await this.aiService.generateDictation(
-      dto.topic,
-      dto.count,
+  generateDictation(@Body() dto: GenerateDictationDto) {
+    void dto;
+    throw new GoneException(
+      'Đường dẫn legacy đã được đóng để bảo vệ quy trình AI soạn bài. Hãy dùng Admin AI Generator để tạo bản nháp, xem duyệt và xuất bản.',
     );
-
-    // 2. Lưu thành 1 Quiz loại LISTENING_PRACTICE
-    const newQuiz = await this.prisma.quiz.create({
-      data: {
-        title: `Bài luyện nghe: ${dto.topic}`,
-        description: 'Được tạo tự động bởi AI',
-        type: 'LISTENING_PRACTICE',
-      },
-    });
-
-    const questionData = [];
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-      let audioUrl = '';
-
-      // Tạo Audio từ văn bản
-      const audioBuffer = await this.aiService.generateTtsAudio(q.transcript);
-      if (audioBuffer) {
-        // Upload lên Cloudflare R2
-        const uploadResult = await this.uploadService.uploadRawBuffer(
-          audioBuffer,
-          'audio/mpeg',
-          'dictation_audio',
-        );
-        audioUrl = uploadResult.url;
-      }
-
-      questionData.push({
-        quizId: newQuiz.id,
-        type: 'DICTATION',
-        content: {
-          part: 1,
-          audioUrl: audioUrl, // Đã có audio xịn
-          transcript: q.transcript,
-          translation: q.translation,
-          words: String(q.transcript)
-            .replace(/[^\w\s']/g, '')
-            .split(' ')
-            .filter((w: string) => w.length > 0),
-        },
-        order: i + 1,
-      });
-    }
-
-    await this.prisma.question.createMany({
-      data: questionData,
-    });
-
-    return {
-      success: true,
-      message: `Đã tạo ${questions.length} câu luyện nghe.`,
-      quizId: newQuiz.id,
-    };
   }
 
-  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, AiRateLimitGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Post('generate-toeic-quiz')
   @ApiOperation({ summary: 'Sinh bộ câu hỏi TOEIC tự động theo chủ đề' })
@@ -238,66 +181,17 @@ export class AiController {
     summary:
       'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB (Chỉ ADMIN/TEACHER)',
   })
-  async importEtsPdf(
+  importEtsPdf(
     @UploadedFiles()
     files: {
       pdfFile?: Express.Multer.File[];
       audioFile?: Express.Multer.File[];
     },
   ) {
-    const pdfFile = files?.pdfFile?.[0];
-    const audioFile = files?.audioFile?.[0];
-
-    if (!pdfFile) {
-      throw new BadRequestException(
-        'Vui lòng upload file PDF hoặc hình ảnh đề thi (pdfFile).',
-      );
-    }
-
-    let audioUrl = '';
-    if (audioFile) {
-      const uploadResult = await this.uploadService.uploadFile(audioFile);
-      audioUrl = uploadResult.url;
-    }
-
-    const questions = await this.aiService.importEtsPdf(
-      pdfFile.buffer,
-      pdfFile.mimetype,
-      audioFile?.buffer,
-      audioFile?.mimetype,
-      audioUrl,
+    throw new GoneException(
+      'Đường dẫn import legacy đã được đóng. Hãy dùng Admin AI Generator có job bền vững và bước xem duyệt.',
     );
-
-    if (!questions || questions.length === 0) {
-      throw new BadRequestException(
-        'AI không tìm thấy câu hỏi nào trong file này.',
-      );
-    }
-
-    const newQuiz = await this.prisma.quiz.create({
-      data: {
-        title: `Đề thi TOEIC ETS tự động - ${new Date().toLocaleDateString('vi-VN')}`,
-        description: 'Tạo tự động bởi AI Importer (PDF + Audio)',
-        type: 'TOEIC',
-      },
-    });
-
-    const questionData = questions.map((q, index) => ({
-      quizId: newQuiz.id,
-      type: q.type || 'MULTIPLE_CHOICE',
-      content: q.content,
-      order: index + 1,
-    }));
-
-    await this.prisma.question.createMany({
-      data: questionData,
-    });
-
-    return {
-      success: true,
-      message: `Đã trích xuất và lưu thành công ${questions.length} câu hỏi.`,
-      quizId: newQuiz.id,
-    };
+    void files;
   }
 
   @Get('tts/vietnamese')

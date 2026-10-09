@@ -8,6 +8,9 @@ export interface SkillProgressSummary {
   levelRange: string;
   badge: string;
   unitLabel: string;
+  /** Speaking-only detail: visible practice-set count remains totalItems. */
+  totalExercises?: number;
+  completedExercises?: number;
 }
 
 export interface OverallSkillsProgress {
@@ -19,4 +22,42 @@ export interface OverallSkillsProgress {
 export interface UserSkillsSummaryResponse {
   skills: SkillProgressSummary[];
   overall: OverallSkillsProgress;
+}
+
+export type SkillTrend =
+  'IMPROVING' | 'DECLINING' | 'STABLE' | 'INSUFFICIENT_DATA';
+
+export type SkillStatus =
+  'INSUFFICIENT_DATA' | 'NEEDS_IMPROVEMENT' | 'PROGRESSING' | 'GOOD';
+
+export interface SkillDimensionSummary {
+  key: string;
+  sampleCount: number;
+  averageScore: number | null;
+  status: SkillStatus;
+  statusLabel: string;
+}
+
+export interface CrossSkillSummaryItem extends SkillProgressSummary {
+  completedAttempts: number;
+  normalizedScore: number | null;
+  recentAverage: number | null;
+  trend: SkillTrend;
+  strongestDimension: string | null;
+  weakestDimension: string | null;
+  lastPracticedAt: string | null;
+  status: SkillStatus;
+  statusLabel: string;
+  hasEnoughData: boolean;
+  dimensions: SkillDimensionSummary[];
+}
+
+export interface CrossSkillSummaryResponse {
+  skills: CrossSkillSummaryItem[];
+  overall: OverallSkillsProgress & {
+    normalizedScore: number | null;
+    recentAverage: number | null;
+    trend: SkillTrend;
+    currentStreak: number;
+  };
 }

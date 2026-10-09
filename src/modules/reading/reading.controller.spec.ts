@@ -15,6 +15,7 @@ describe('ReadingController', () => {
             getTopicsByCategory: jest.fn(),
             getTopicDetails: jest.fn(),
             getQuizTheory: jest.fn(),
+            getTracking: jest.fn(),
             getBilingualProgress: jest.fn(),
           },
         },

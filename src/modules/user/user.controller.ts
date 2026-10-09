@@ -11,11 +11,15 @@ import { UserService } from './user.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdaptiveDailyPracticeService } from './adaptive-daily-practice.service';
 
 @ApiTags('users')
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly adaptiveDailyPractice: AdaptiveDailyPracticeService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -41,6 +45,29 @@ export class UserController {
   })
   async getSkillsSummary(@Request() req: any) {
     return this.userService.getUserSkillsSummary(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('me/skill-progress')
+  @ApiOperation({
+    summary: 'Lấy tiến độ server-owned của bốn kỹ năng học tập',
+  })
+  async getSkillProgress(@Request() req: any) {
+    return this.userService.getSkillProgressSummary(req.user.id, req.user.role);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('me/daily-practice')
+  @ApiOperation({
+    summary: 'Lấy kế hoạch luyện tập hôm nay theo tiến độ thực tế',
+  })
+  async getDailyPractice(@Request() req: any) {
+    return this.adaptiveDailyPractice.getDailyPractice(
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

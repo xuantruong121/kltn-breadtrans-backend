@@ -3,6 +3,7 @@ import { UserService } from './user.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ReadingService } from '../reading/reading.service';
 
 const mockPrismaService = {
   user: {
@@ -34,6 +35,7 @@ const mockPrismaService = {
   },
   speakingExercise: {
     count: jest.fn(),
+    findMany: jest.fn(),
   },
   speakingSubmission: {
     findMany: jest.fn(),
@@ -48,6 +50,10 @@ const mockPrismaService = {
 
 const mockEventEmitter = {
   emit: jest.fn(),
+};
+
+const mockReadingService = {
+  getTracking: jest.fn(),
 };
 
 describe('UserService', () => {
@@ -66,6 +72,10 @@ describe('UserService', () => {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
         },
+        {
+          provide: ReadingService,
+          useValue: mockReadingService,
+        },
       ],
     }).compile();
 
@@ -75,6 +85,7 @@ describe('UserService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockPrismaService.speakingExercise.findMany.mockReset();
   });
 
   it('should be defined', () => {
@@ -242,6 +253,265 @@ describe('UserService', () => {
       // Verify progress percent never exceeds 100
       expect(result.overall.progressPercent).toBeLessThanOrEqual(100);
       expect(result.overall.progressPercent).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('getSkillProgressSummary', () => {
+    it('uses visible Speaking practice sets as the primary completion unit', async () => {
+      mockPrismaService.submission.findMany.mockResolvedValue([]);
+      mockPrismaService.speakingExercise.findMany.mockResolvedValue([
+        { id: 1, title: 'Read Aloud — Daily 1', category: 'GENERAL' },
+        { id: 2, title: 'Read Aloud — Daily 2', category: 'GENERAL' },
+        { id: 3, title: 'Read Aloud — Daily 3', category: 'GENERAL' },
+        { id: 4, title: 'Read Aloud — Daily 4', category: 'GENERAL' },
+        { id: 5, title: 'Question Response — Work 1', category: 'BUSINESS' },
+        { id: 6, title: 'Question Response — Work 2', category: 'BUSINESS' },
+      ]);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue([
+        ...[1, 1, 1, 2, 3].map((exerciseId, index) => ({
+          exerciseId,
+          overallScore: 8,
+          aiFeedback: {},
+          submittedAt: new Date(`2026-10-0${index + 1}T00:00:00Z`),
+        })),
+        {
+          exerciseId: 5,
+          overallScore: 9,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-06T00:00:00Z'),
+        },
+        {
+          exerciseId: 6,
+          overallScore: 9,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-07T00:00:00Z'),
+        },
+      ]);
+      mockPrismaService.userStats.findUnique.mockResolvedValue({
+        streakCount: 0,
+      });
+      mockReadingService.getTracking.mockResolvedValue(null);
+
+      const result = await service.getSkillProgressSummary(21);
+      const speaking = result.skills.find(
+        (skill) => skill.skill === 'SPEAKING',
+      );
+
+      expect(speaking).toMatchObject({
+        totalItems: 2,
+        completedItems: 1,
+        progressPercent: 50,
+        totalExercises: 6,
+        completedExercises: 5,
+      });
+      expect(speaking?.completedAttempts).toBe(7);
+    });
+
+    it('counts unique completed Speaking exercises separately from retry attempts', async () => {
+      mockPrismaService.submission.findMany.mockResolvedValue([]);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue([
+        {
+          exerciseId: 12,
+          overallScore: 8,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-01T00:00:00Z'),
+        },
+        {
+          exerciseId: 12,
+          overallScore: 9,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-02T00:00:00Z'),
+        },
+        {
+          exerciseId: 13,
+          overallScore: 7,
+          aiFeedback: {},
+          submittedAt: new Date('2026-10-03T00:00:00Z'),
+        },
+      ]);
+      mockPrismaService.speakingExercise.count.mockResolvedValue(10);
+      mockPrismaService.userStats.findUnique.mockResolvedValue({
+        streakCount: 0,
+      });
+      mockReadingService.getTracking.mockResolvedValue(null);
+
+      const result = await service.getSkillProgressSummary(21);
+      const speaking = result.skills.find(
+        (skill) => skill.skill === 'SPEAKING',
+      );
+
+      expect(speaking?.completedItems).toBe(2);
+      expect(speaking?.completedAttempts).toBe(3);
+      expect(speaking?.totalItems).toBe(10);
+      expect(speaking?.progressPercent).toBe(20);
+    });
+
+    it('returns a safe zero state for all skills without history', async () => {
+      mockPrismaService.submission.findMany.mockResolvedValue([]);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue([]);
+      mockPrismaService.userStats.findUnique.mockResolvedValue({
+        streakCount: 0,
+      });
+      mockReadingService.getTracking.mockResolvedValue({
+        progress: {
+          completedExercises: 0,
+          completedAttempts: 0,
+          accuracy: 0,
+          recentAverage: 0,
+          lastPracticedAt: null,
+          currentStreak: 0,
+        },
+        subskills: [],
+        recentTrend: {
+          direction: 'INSUFFICIENT_DATA',
+          delta: null,
+          attempts: [],
+        },
+      });
+
+      const result = await service.getSkillProgressSummary(21);
+
+      expect(result.skills).toHaveLength(4);
+      expect(
+        result.skills.every((skill) => skill.status === 'INSUFFICIENT_DATA'),
+      ).toBe(true);
+      expect(
+        result.skills.every((skill) => skill.normalizedScore === null),
+      ).toBe(true);
+      expect(result.overall.trend).toBe('INSUFFICIENT_DATA');
+      expect(result.overall.normalizedScore).toBeNull();
+    });
+
+    it('normalizes speaking and mixed-scale writing scores without counting failed speaking jobs', async () => {
+      mockPrismaService.submission.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            submittedAt: new Date('2026-10-01T00:00:00Z'),
+            score: 4,
+            aiFeedback: JSON.stringify({ maxScore: 4 }),
+            quiz: {
+              type: 'WRITING_EMAIL',
+              questions: [{ content: { taskType: 'EMAIL' } }],
+            },
+            results: [{ score: 4 }],
+          },
+          {
+            submittedAt: new Date('2026-10-02T00:00:00Z'),
+            score: 5,
+            aiFeedback: JSON.stringify({ maxScore: 5 }),
+            quiz: {
+              type: 'WRITING_EMAIL',
+              questions: [{ content: { taskType: 'OPINION' } }],
+            },
+            results: [{ score: 5 }],
+          },
+          {
+            submittedAt: new Date('2026-10-03T00:00:00Z'),
+            score: 2,
+            aiFeedback: JSON.stringify({ maxScore: 5 }),
+            quiz: {
+              type: 'WRITING_EMAIL',
+              questions: [{ content: { taskType: 'OPINION' } }],
+            },
+            results: [{ score: 2 }],
+          },
+        ]);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue([
+        {
+          exerciseId: 12,
+          overallScore: 8.2,
+          aiFeedback: { accuracyScore: 80, fluencyScore: 60 },
+          submittedAt: new Date('2026-10-01T00:00:00Z'),
+        },
+        {
+          exerciseId: 13,
+          overallScore: 9,
+          aiFeedback: { accuracyScore: 90, fluencyScore: 70 },
+          submittedAt: new Date('2026-10-02T00:00:00Z'),
+        },
+      ]);
+      mockPrismaService.userStats.findUnique.mockResolvedValue({
+        streakCount: 4,
+      });
+      mockReadingService.getTracking.mockResolvedValue({
+        progress: { completedAttempts: 3, accuracy: 85 },
+        subskills: [{ key: 'DETAIL', attempted: 3, accuracy: 85 }],
+        recentTrend: {
+          direction: 'IMPROVING',
+          delta: 10,
+          attempts: [
+            { accuracy: 75, submittedAt: '2026-10-01T00:00:00.000Z' },
+            { accuracy: 85, submittedAt: '2026-10-02T00:00:00.000Z' },
+          ],
+        },
+      });
+
+      const result = await service.getSkillProgressSummary(21);
+      const speaking = result.skills.find(
+        (skill) => skill.skill === 'SPEAKING',
+      );
+      const writing = result.skills.find((skill) => skill.skill === 'WRITING');
+
+      expect(speaking?.normalizedScore).toBe(86);
+      expect(speaking?.completedAttempts).toBe(2);
+      expect(writing?.normalizedScore).toBe(80);
+      expect(writing?.completedAttempts).toBe(3);
+      expect(result.overall.currentStreak).toBe(4);
+    });
+
+    it('derives Listening completion, deterministic score and dimensions from persisted results', async () => {
+      const question = {
+        id: 1,
+        type: 'MULTIPLE_CHOICE',
+        content: { category: 'DETAIL' },
+      };
+      const makeAttempt = (score: boolean, date: string) => ({
+        submittedAt: new Date(date),
+        quiz: { questions: [question] },
+        results: [{ questionId: 1, isCorrect: score }],
+      });
+      mockPrismaService.submission.findMany
+        .mockResolvedValueOnce([
+          makeAttempt(true, '2026-10-01T00:00:00Z'),
+          makeAttempt(false, '2026-10-02T00:00:00Z'),
+          makeAttempt(true, '2026-10-03T00:00:00Z'),
+        ])
+        .mockResolvedValueOnce([]);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue([]);
+      mockPrismaService.userStats.findUnique.mockResolvedValue({
+        streakCount: 1,
+      });
+      mockReadingService.getTracking.mockResolvedValue({
+        progress: { completedAttempts: 0, accuracy: 0 },
+        subskills: [],
+        recentTrend: {
+          direction: 'INSUFFICIENT_DATA',
+          delta: null,
+          attempts: [],
+        },
+      });
+
+      const result = await service.getSkillProgressSummary(21);
+      const listening = result.skills.find(
+        (skill) => skill.skill === 'LISTENING',
+      );
+
+      expect(listening?.completedAttempts).toBe(3);
+      expect(listening?.normalizedScore).toBe(67);
+      expect(listening?.trend).toBe('IMPROVING');
+      expect(listening?.dimensions).toEqual([
+        expect.objectContaining({
+          key: 'DETAIL',
+          sampleCount: 3,
+          averageScore: 67,
+        }),
+      ]);
+      expect(
+        mockPrismaService.speakingSubmission.findMany,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 21, status: 'COMPLETED' } }),
+      );
     });
   });
 });

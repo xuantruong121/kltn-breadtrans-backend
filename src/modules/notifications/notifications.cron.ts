@@ -49,7 +49,7 @@ export class NotificationsCronService {
         const studentName = item.user?.profile?.fullName || 'Học viên';
         const title = `Đừng để mất ngọn lửa Streak ${item.streakCount} ngày! 🔥`;
         const body = `Chào ${studentName}, bạn chưa hoàn thành bài học hôm nay. Học ngay 5 phút để bảo vệ chuỗi streak nhé!`;
-        const url = '/practice';
+        const url = '/dashboard';
 
         // Check if streak notification already created today for this user
         const alreadyNotified = await this.prisma.notification.findFirst({
@@ -161,7 +161,7 @@ export class NotificationsCronService {
           count === 1
             ? `Hãy dành 1 phút để ôn tập lại từ "${firstWord}" trong chủ đề "${topicTitle}".`
             : `Bao gồm "${firstWord}" và ${count - 1} từ khác. Ôn tập đều đặn giúp ghi nhớ sâu hơn!`;
-        const url = topicId ? `/practice/vocab/${topicId}` : '/flashcard';
+        const url = topicId ? `/flashcard/${topicId}` : '/flashcard';
 
         try {
           // 1. Create persistent in-app notification. This is the

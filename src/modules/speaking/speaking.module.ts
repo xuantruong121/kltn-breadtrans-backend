@@ -19,6 +19,11 @@ import { SpeakingContentAccessService } from './speaking-content-access.service'
     SpeakingEventsSubscriberService,
     SpeakingContentAccessService,
   ],
-  exports: [SpeakingService, SpeakingWorkerService, SpeakingProcessingModule],
+  exports: [
+    SpeakingService,
+    SpeakingWorkerService,
+    SpeakingProcessingModule,
+    SpeakingContentAccessService,
+  ],
 })
 export class SpeakingModule {}

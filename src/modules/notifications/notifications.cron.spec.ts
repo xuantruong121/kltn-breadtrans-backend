@@ -61,20 +61,20 @@ describe('NotificationsCronService', () => {
   });
 
   describe('handleDailyStreakReminder', () => {
-    it('sends streak reminder and creates inbox notification with /practice URL', async () => {
+    it('sends streak reminder and creates inbox notification with dashboard URL', async () => {
       await cronService.handleDailyStreakReminder();
 
       expect(notificationsService.createNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 101,
           type: 'streak',
-          url: '/practice',
+          url: '/dashboard',
         }),
       );
       expect(notificationsService.sendPushToUser).toHaveBeenCalledWith(
         101,
         expect.objectContaining({
-          url: '/practice',
+          url: '/dashboard',
         }),
       );
     });
@@ -96,13 +96,13 @@ describe('NotificationsCronService', () => {
         expect.objectContaining({
           userId: 202,
           type: 'vocab_review',
-          url: '/practice/vocab/1',
+          url: '/flashcard/1',
         }),
       );
       expect(notificationsService.sendPushToUser).toHaveBeenCalledWith(
         202,
         expect.objectContaining({
-          url: '/practice/vocab/1',
+          url: '/flashcard/1',
         }),
       );
     });

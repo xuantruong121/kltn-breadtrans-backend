@@ -1,12 +1,103 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { QuizType, Role, TopicCategory } from '@prisma/client';
+import {
+  QuizPublicationStatus,
+  QuizType,
+  Role,
+  TopicCategory,
+} from '@prisma/client';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
+import {
+  resolveReadingCorrectOption,
+  READING_MICRO_SKILLS,
+} from '../quiz/reading-content.validation';
 
 type ReadingQuestionContent = {
   passage?: unknown;
   content?: unknown;
+  id?: number;
+  type?: string;
 };
+
+const READING_TRACKING_SAMPLE_SIZE = 3;
+
+export type ReadingSubskillMetric = {
+  key: string;
+  attempted: number;
+  correct: number;
+  accuracy: number;
+  status: 'INSUFFICIENT_DATA' | 'NEEDS_IMPROVEMENT' | 'PROGRESSING' | 'GOOD';
+  statusLabel: string;
+};
+
+export function readingMetricStatus(
+  attempted: number,
+  accuracy: number,
+): ReadingSubskillMetric['status'] {
+  if (attempted < READING_TRACKING_SAMPLE_SIZE) return 'INSUFFICIENT_DATA';
+  if (accuracy < 50) return 'NEEDS_IMPROVEMENT';
+  if (accuracy < 75) return 'PROGRESSING';
+  return 'GOOD';
+}
+
+export function readingMetricStatusLabel(
+  status: ReadingSubskillMetric['status'],
+): string {
+  switch (status) {
+    case 'NEEDS_IMPROVEMENT':
+      return 'Cần cải thiện';
+    case 'PROGRESSING':
+      return 'Đang tiến bộ';
+    case 'GOOD':
+      return 'Tốt';
+    default:
+      return 'Chưa đủ dữ liệu';
+  }
+}
+
+function readContent(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function resolveReadingSubskill(value: unknown): string {
+  const content = readContent(value);
+  for (const key of ['skill', 'questionType', 'category']) {
+    const candidate = content[key];
+    if (typeof candidate === 'string' && candidate.trim()) {
+      const normalized = candidate.trim().toUpperCase();
+      if (normalized !== 'READING' && normalized !== 'BILINGUAL_READING') {
+        return normalized;
+      }
+    }
+  }
+  return 'UNKNOWN';
+}
+
+function safeAnswer(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value === null || value === undefined) return '';
+  try {
+    return JSON.stringify(value) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function safeExplanation(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const parts = ['vi', 'evidence', 'keyPhrase', 'vocabularyNote']
+    .map((key) => (typeof record[key] === 'string' ? record[key].trim() : ''))
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : null;
+}
+
+function scorePercent(correct: number, total: number): number {
+  return total > 0 ? Math.round((correct / total) * 100) : 0;
+}
 
 function normalizedText(value: string): string {
   return value.trim().replace(/\s+/g, ' ');
@@ -301,6 +392,267 @@ export class ReadingService {
     }
     await this.quizContentAccess.assertAccess(quiz, userId, role);
     return quiz;
+  }
+
+  /**
+   * Server-owned Reading progress, subskill, trend and mistake projection.
+   * It intentionally derives from immutable Submission/Result rows instead of
+   * introducing a second attempt or mistake table in this phase.
+   */
+  async getTracking(userId: number, role?: Role) {
+    const [submissions, stats] = await Promise.all([
+      this.prisma.submission.findMany({
+        where: {
+          userId,
+          quiz: {
+            type: QuizType.BILINGUAL_READING,
+            practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+          },
+        },
+        orderBy: { submittedAt: 'asc' },
+        include: {
+          quiz: {
+            select: {
+              id: true,
+              title: true,
+              isPremiumContent: true,
+              publicationStatus: true,
+              questions: {
+                select: { id: true, type: true, content: true, order: true },
+                orderBy: { order: 'asc' },
+              },
+            },
+          },
+          results: true,
+        },
+      }),
+      this.prisma.userStats.findUnique({ where: { userId } }),
+    ]);
+
+    const completed = submissions.filter((submission) =>
+      isReadingSubmissionComplete(
+        submission.quiz.questions.map((question) => question.id),
+        submission.results.map((result) => result.questionId),
+      ),
+    );
+
+    type Attempt = {
+      submissionId: number;
+      quizId: number;
+      quizTitle: string;
+      correct: number;
+      total: number;
+      accuracy: number;
+      submittedAt: string;
+    };
+    const attempts: Attempt[] = [];
+    const subskillStats = new Map<
+      string,
+      { attempted: number; correct: number }
+    >();
+    const mistakes: Array<{
+      question: string;
+      yourAnswer: string;
+      correctAnswer: string | null;
+      answerAvailable: boolean;
+      explanation: string | null;
+      subskill: string;
+      source: string;
+      date: string;
+      status: 'NEEDS_REVIEW';
+    }> = [];
+
+    for (const submission of completed) {
+      const questionById = new Map(
+        submission.quiz.questions.map((question) => [question.id, question]),
+      );
+      let correct = 0;
+      for (const result of submission.results) {
+        const question = questionById.get(result.questionId);
+        if (!question) continue;
+        const subskill = resolveReadingSubskill(question.content);
+        const metric = subskillStats.get(subskill) ?? {
+          attempted: 0,
+          correct: 0,
+        };
+        metric.attempted += 1;
+        if (result.isCorrect === true) {
+          metric.correct += 1;
+          correct += 1;
+        }
+        subskillStats.set(subskill, metric);
+
+        if (result.isCorrect !== true) {
+          const content = readContent(question.content);
+          const resolved = resolveReadingCorrectOption(question.content);
+          mistakes.push({
+            question:
+              typeof content.text === 'string' && content.text.trim()
+                ? content.text.trim()
+                : 'Câu hỏi Reading',
+            yourAnswer: safeAnswer(result.answer),
+            correctAnswer:
+              resolved.status === 'available' ? resolved.answer : null,
+            answerAvailable: resolved.status === 'available',
+            explanation: safeExplanation(content.explanation),
+            subskill,
+            source: submission.quiz.title,
+            date: submission.submittedAt.toISOString(),
+            status: 'NEEDS_REVIEW',
+          });
+        }
+      }
+      attempts.push({
+        submissionId: submission.id,
+        quizId: submission.quizId,
+        quizTitle: submission.quiz.title,
+        correct,
+        total: submission.quiz.questions.length,
+        accuracy: scorePercent(correct, submission.quiz.questions.length),
+        submittedAt: submission.submittedAt.toISOString(),
+      });
+    }
+
+    const subskills = [
+      ...new Set([...READING_MICRO_SKILLS, ...subskillStats.keys()]),
+    ].map((key) => {
+      const metric = subskillStats.get(key) ?? { attempted: 0, correct: 0 };
+      const accuracy = scorePercent(metric.correct, metric.attempted);
+      const status = readingMetricStatus(metric.attempted, accuracy);
+      return {
+        key,
+        attempted: metric.attempted,
+        correct: metric.correct,
+        accuracy,
+        status,
+        statusLabel: readingMetricStatusLabel(status),
+      } satisfies ReadingSubskillMetric;
+    });
+
+    const recentAttempts = attempts.slice(-5).reverse();
+    const chronologicalRecent = [...recentAttempts].reverse();
+    const previous = chronologicalRecent.at(-2);
+    const latest = chronologicalRecent.at(-1);
+    const delta =
+      latest && previous ? latest.accuracy - previous.accuracy : null;
+    const trendDirection =
+      delta === null
+        ? 'INSUFFICIENT_DATA'
+        : delta > 0
+          ? 'IMPROVING'
+          : delta < 0
+            ? 'DECLINING'
+            : 'STABLE';
+
+    const totalQuestions = [...subskillStats.values()].reduce(
+      (sum, metric) => sum + metric.attempted,
+      0,
+    );
+    const totalCorrect = [...subskillStats.values()].reduce(
+      (sum, metric) => sum + metric.correct,
+      0,
+    );
+    const completedQuizIds = new Set(
+      completed.map((submission) => submission.quizId),
+    );
+    const adequatelySampled = subskills
+      .filter((metric) => metric.attempted >= READING_TRACKING_SAMPLE_SIZE)
+      .sort((a, b) => a.accuracy - b.accuracy || a.key.localeCompare(b.key));
+    const weakest = adequatelySampled[0];
+
+    let recommendation: {
+      subskill: string;
+      reason: string;
+      quizId: number;
+      title: string;
+      isLocked: boolean;
+    } | null = null;
+    if (weakest) {
+      const candidates = await this.prisma.quiz.findMany({
+        where: {
+          type: QuizType.BILINGUAL_READING,
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
+          practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+          questions: { some: {} },
+        },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          isPremiumContent: true,
+          courseId: true,
+          questions: { select: { content: true } },
+        },
+        orderBy: { id: 'asc' },
+      });
+      const accessByQuiz = await this.quizContentAccess.resolveMany(
+        candidates,
+        userId,
+        role,
+      );
+      const matchingCandidates = candidates.filter((quiz) =>
+        quiz.questions.some(
+          (question) =>
+            resolveReadingSubskill(question.content) === weakest.key,
+        ),
+      );
+      const candidate =
+        matchingCandidates.find(
+          (quiz) => !(accessByQuiz.get(quiz.id)?.isLocked ?? false),
+        ) ?? matchingCandidates[0];
+      if (candidate) {
+        const access = accessByQuiz.get(candidate.id) ?? {
+          isPremiumContent: candidate.isPremiumContent,
+          isLocked: false,
+        };
+        recommendation = {
+          subskill: weakest.key,
+          reason: `${weakest.key} đang có độ chính xác thấp nhất trong các kỹ năng đã đủ ${READING_TRACKING_SAMPLE_SIZE} lượt trả lời.`,
+          quizId: candidate.id,
+          title: candidate.title,
+          isLocked: access.isLocked,
+        };
+      }
+    }
+
+    return {
+      progress: {
+        completedExercises: completedQuizIds.size,
+        completedAttempts: completed.length,
+        accuracy: scorePercent(totalCorrect, totalQuestions),
+        recentAverage:
+          recentAttempts.length > 0
+            ? Math.round(
+                recentAttempts.reduce(
+                  (sum, attempt) => sum + attempt.accuracy,
+                  0,
+                ) / recentAttempts.length,
+              )
+            : 0,
+        lastPracticedAt: attempts.at(-1)?.submittedAt ?? null,
+        currentStreak: stats?.streakCount ?? 0,
+      },
+      subskills,
+      recentAttempts,
+      recentTrend: {
+        direction: trendDirection,
+        delta,
+        attempts: chronologicalRecent,
+      },
+      mistakes: {
+        total: mistakes.length,
+        bySubskill: subskills
+          .map((metric) => ({
+            subskill: metric.key,
+            count: mistakes.filter((mistake) => mistake.subskill === metric.key)
+              .length,
+          }))
+          .filter((item) => item.count > 0),
+        items: mistakes.slice(-50).reverse(),
+      },
+      recommendation,
+      sampleSize: READING_TRACKING_SAMPLE_SIZE,
+    };
   }
 
   async getBilingualProgress(userId: number) {
