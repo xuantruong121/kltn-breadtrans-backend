@@ -113,6 +113,26 @@ enum PlanPaymentConfirmationSource {
   AUTO_WEBHOOK
 }
 
+enum PaymentProvider {
+  SEPAY
+  PAYOS
+}
+
+enum PayOSPaymentIntentType {
+  PLAN
+  COURSE
+}
+
+enum PayOSPaymentIntentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  CANCELLED
+  EXPIRED
+  UNDERPAID
+  FAILED
+}
+
 enum BankTransactionMatchStatus {
   RECEIVED
   MATCHED
@@ -183,6 +203,7 @@ model User {
   notifications                   Notification[]
   subscriptions                  Subscription[]
   planPurchases                  PlanPurchase[]
+  payosPaymentIntents            PayOSPaymentIntent[]
   confirmedPlanPayments          PlanPayment[]                    @relation("PlanPaymentConfirmer")
   rejectedPlanPayments           PlanPayment[]                    @relation("PlanPaymentRejecter")
   issueReportsSubmitted           IssueReport[]                    @relation("IssueReporter")
@@ -397,6 +418,7 @@ model PlanPayment {
   bankTransactions BankTransaction[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+  payosIntent     PayOSPaymentIntent?
 
   @@index([status, createdAt])
   @@index([confirmedById])
@@ -436,6 +458,7 @@ model Course {
   description String?
   thumbnail   String?
   level       String? // e.g. "BEGINNER", "INTERMEDIATE", "ADVANCED"
+  curriculumType String @default("GENERAL_ENGLISH")
   status      CourseStatus @default(DRAFT)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -443,6 +466,7 @@ model Course {
   classes Class[]
   lessons Lesson[]
   quizzes Quiz[]
+  activities CourseActivity[]
 }
 
 model Class {
@@ -496,9 +520,42 @@ model Payment {
 
   enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
   reviewedBy User?      @relation("PaymentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  payosIntent PayOSPaymentIntent?
 
   @@index([status, createdAt])
   @@index([reviewedById])
+}
+
+model PayOSPaymentIntent {
+  id              Int                     @id @default(autoincrement())
+  userId          Int
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  type            PayOSPaymentIntentType
+  provider        PaymentProvider         @default(PAYOS)
+  orderCode       BigInt                  @unique
+  paymentLinkId   String?                 @unique
+  planPaymentId   Int?                    @unique
+  planPayment     PlanPayment?            @relation(fields: [planPaymentId], references: [id], onDelete: Restrict)
+  coursePaymentId Int?                    @unique
+  coursePayment   Payment?                @relation(fields: [coursePaymentId], references: [id], onDelete: Restrict)
+  amountVnd       Int
+  currency        String                  @default("VND")
+  description     String
+  checkoutUrl     String?
+  qrCode          String?
+  bankBin         String?
+  bankAccountNumber String?
+  bankAccountName  String?
+  status          PayOSPaymentIntentStatus @default(PENDING)
+  providerStatus  String?
+  expiresAt       DateTime?
+  paidAt          DateTime?
+  lastSyncedAt    DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([userId, status, createdAt])
+  @@index([type, status, createdAt])
 }
 
 model Lesson {
@@ -512,6 +569,7 @@ model Lesson {
   createdAt   DateTime @default(now())
 
   materials Material[]
+  activities CourseActivity[]
 }
 
 model Material {
@@ -521,6 +579,34 @@ model Material {
   title    String
   fileUrl  String
   fileType String? // PDF, DOCX, MP3, vv.
+  objective String? @db.Text
+  contentText String? @db.Text
+}
+
+/// Durable, ordered curriculum activity. Targets remain owned by their skill
+/// engines; this table only describes how a course presents them.
+model CourseActivity {
+  id Int @id @default(autoincrement())
+  courseId Int
+  lessonId Int
+  order Int @default(0)
+  kind String
+  title String?
+  isRequired Boolean @default(true)
+  quizId Int?
+  speakingPracticeSetId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  quiz Quiz? @relation(fields: [quizId], references: [id], onDelete: Restrict)
+  speakingPracticeSet SpeakingPracticeSet? @relation(fields: [speakingPracticeSetId], references: [id], onDelete: Restrict)
+
+  @@unique([lessonId, order])
+  @@index([courseId, isRequired, order])
+  @@index([quizId])
+  @@index([speakingPracticeSetId])
 }
 
 enum AssignmentType {
@@ -643,6 +729,7 @@ model Quiz {
   listeningAudioArtifacts    ListeningAudioArtifact[]
   listeningTranscriptReveals ListeningTranscriptReveal[]
   listeningAudioUsages       ListeningAudioUsage[]
+  courseActivities           CourseActivity[]
 }
 
 /// Immutable, quiz-level production audio with an authoritative turn timeline.
@@ -834,10 +921,27 @@ model SpeakingExercise {
   isPremiumContent Boolean @default(false)
   difficulty String   @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
   category   String   @default("TOEIC") // IELTS, TOEIC, GENERAL
+  practiceSetId String?
   createdAt  DateTime @default(now())
 
   submissions   SpeakingSubmission[]
   uploadIntents SpeakingUploadIntent[]
+  practiceSet SpeakingPracticeSet? @relation(fields: [practiceSetId], references: [id], onDelete: SetNull)
+
+  @@index([practiceSetId])
+}
+
+model SpeakingPracticeSet {
+  id String @id
+  title String
+  description String
+  category String
+  level String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exercises SpeakingExercise[]
+  courseActivities CourseActivity[]
 }
 
 enum SpeakingSubmissionStatus {

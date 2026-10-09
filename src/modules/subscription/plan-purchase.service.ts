@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
@@ -26,12 +27,13 @@ import {
   PlanPurchaseResponseDto,
 } from './dto/plan-purchase.dto';
 import { SubscriptionService } from './subscription.service';
+import { PayosPaymentService } from '../payment/payos-payment.service';
 
 type PurchaseWithDetails = Prisma.PlanPurchaseGetPayload<{
   include: {
     user: true;
     planVersion: { include: { plan: true; entitlements: true } };
-    payment: true;
+    payment: { include: { payosIntent: true } };
     subscription: true;
   };
 }>;
@@ -41,6 +43,7 @@ export class PlanPurchaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionService: SubscriptionService,
+    @Optional() private readonly payos?: PayosPaymentService,
   ) {}
 
   async createPurchase(
@@ -51,6 +54,10 @@ export class PlanPurchaseService {
     const key = idempotencyKey.trim();
     if (!key) {
       throw new BadRequestException('idempotencyKey is required');
+    }
+
+    if (this.payos && !this.payos.isEnabled()) {
+      throw new ConflictException('PayOS credentials are not configured');
     }
 
     await this.subscriptionService.assertPurchasablePlanVersion(planVersionId);
@@ -130,23 +137,23 @@ export class PlanPurchaseService {
           idempotencyKey: key,
         },
       });
-      const bank = getPaymentBankConfig();
+      const bank = this.payos ? null : getPaymentBankConfig();
       const createdAt = created.createdAt;
       const paymentIntentExpiresAt = new Date(
         createdAt.getTime() + this.paymentIntentTtlMs,
       );
-      const autoMatchUntil = new Date(
-        createdAt.getTime() + this.autoMatchGraceMs,
-      );
+      const autoMatchUntil = this.payos?.isEnabled()
+        ? null
+        : new Date(createdAt.getTime() + this.autoMatchGraceMs);
       await tx.planPayment.create({
         data: {
           planPurchaseId: created.id,
           amountVnd: created.amountVnd,
           currency: created.currency,
           transferCode: `BTP${created.id.toString().padStart(8, '0')}`,
-          bankBin: bank.bin,
-          bankName: bank.bankName,
-          bankAccountNumber: bank.accountNumber,
+          bankBin: bank?.bin ?? null,
+          bankName: bank?.bankName ?? null,
+          bankAccountNumber: bank?.accountNumber ?? null,
           paymentIntentExpiresAt,
           autoMatchUntil,
         },
@@ -157,7 +164,17 @@ export class PlanPurchaseService {
       });
     });
 
-    return this.toStudentDto(purchase);
+    const response = this.toStudentDto(purchase);
+    if (this.payos && purchase.payment) {
+      response.payos = await this.payos.createForPlanPayment(
+        studentId,
+        purchase.payment.id,
+        purchase.planVersion.displayName ??
+          purchase.planVersion.plan.displayName,
+      );
+      response.bankInstructions = null;
+    }
+    return response;
   }
 
   async getMyPurchases(studentId: number): Promise<PlanPurchaseResponseDto[]> {
@@ -166,13 +183,20 @@ export class PlanPurchaseService {
       include: this.purchaseInclude,
       orderBy: { createdAt: 'desc' },
     });
-    return purchases.map((purchase) => this.toStudentDto(purchase));
+    return Promise.all(
+      purchases.map((purchase) =>
+        this.toStudentDtoWithPayos(purchase, studentId),
+      ),
+    );
   }
 
   async replacePayment(
     studentId: number,
     purchaseId: number,
   ): Promise<PlanPurchaseResponseDto> {
+    if (this.payos && !this.payos.isEnabled()) {
+      throw new ConflictException('PayOS credentials are not configured');
+    }
     const result = await this.prisma.$transaction(async (tx) => {
       const owned = await tx.planPurchase.findFirst({
         where: { id: purchaseId, userId: studentId },
@@ -261,22 +285,22 @@ export class PlanPurchaseService {
           idempotencyKey: `replace:${purchaseId}:${randomUUID()}`,
         },
       });
-      const bank = getPaymentBankConfig();
+      const bank = this.payos ? null : getPaymentBankConfig();
       const paymentIntentExpiresAt = new Date(
         created.createdAt.getTime() + this.paymentIntentTtlMs,
       );
-      const autoMatchUntil = new Date(
-        created.createdAt.getTime() + this.autoMatchGraceMs,
-      );
+      const autoMatchUntil = this.payos?.isEnabled()
+        ? null
+        : new Date(created.createdAt.getTime() + this.autoMatchGraceMs);
       await tx.planPayment.create({
         data: {
           planPurchaseId: created.id,
           amountVnd: created.amountVnd,
           currency: created.currency,
           transferCode: `BTP${created.id.toString().padStart(8, '0')}`,
-          bankBin: bank.bin,
-          bankName: bank.bankName,
-          bankAccountNumber: bank.accountNumber,
+          bankBin: bank?.bin ?? null,
+          bankName: bank?.bankName ?? null,
+          bankAccountNumber: bank?.accountNumber ?? null,
           paymentIntentExpiresAt,
           autoMatchUntil,
         },
@@ -291,7 +315,16 @@ export class PlanPurchaseService {
       });
     });
 
-    return this.toStudentDto(result);
+    const response = this.toStudentDto(result);
+    if (this.payos && result.payment) {
+      response.payos = await this.payos.createForPlanPayment(
+        studentId,
+        result.payment.id,
+        result.planVersion.displayName ?? result.planVersion.plan.displayName,
+      );
+      response.bankInstructions = null;
+    }
+    return response;
   }
 
   async getMyPurchase(
@@ -305,7 +338,7 @@ export class PlanPurchaseService {
     if (!purchase) {
       throw new NotFoundException('PlanPurchase not found');
     }
-    return this.toStudentDto(purchase);
+    return this.toStudentDtoWithPayos(purchase, studentId);
   }
 
   async reportTransfer(
@@ -419,7 +452,7 @@ export class PlanPurchaseService {
 
   async confirmPurchaseFromWebhook(
     purchaseId: number,
-    bankTransactionId: number,
+    bankTransactionId?: number,
     transaction?: Prisma.TransactionClient,
   ): Promise<PurchaseWithDetails> {
     if (transaction) {
@@ -623,15 +656,15 @@ export class PlanPurchaseService {
   private readonly purchaseInclude = {
     user: true,
     planVersion: { include: { plan: true, entitlements: true } },
-    payment: true,
+    payment: { include: { payosIntent: true } },
     subscription: true,
   } as const;
 
   private readonly paymentIntentTtlMs =
-    Number(process.env.PLAN_PAYMENT_INTENT_TTL_MINUTES || 30) * 60 * 1000;
+    Number(process.env.PAYMENT_INTENT_TTL_MINUTES || 15) * 60 * 1000;
 
   private readonly autoMatchGraceMs =
-    Number(process.env.PLAN_PAYMENT_AUTO_MATCH_GRACE_HOURS || 48) *
+    Number(process.env.SEPAY_LEGACY_AUTO_MATCH_GRACE_HOURS || 24) *
     60 *
     60 *
     1000;
@@ -639,15 +672,27 @@ export class PlanPurchaseService {
   private isActivePaymentIntent(purchase: PurchaseWithDetails): boolean {
     const payment = purchase.payment;
     const now = Date.now();
-    return Boolean(
+    const commonValid = Boolean(
       purchase.status === PlanPurchaseStatus.PENDING_PAYMENT &&
       payment &&
       (payment.status === PlanPaymentStatus.PENDING ||
         payment.status === PlanPaymentStatus.REPORTED) &&
       /^BTP[0-9]{8}$/.test(payment.transferCode) &&
       payment.paymentIntentExpiresAt &&
-      payment.paymentIntentExpiresAt.getTime() > now &&
-      payment.autoMatchUntil &&
+      payment.paymentIntentExpiresAt.getTime() > now,
+    );
+    if (!commonValid) return false;
+    if (this.payos?.isEnabled()) {
+      return Boolean(
+        payment?.payosIntent?.checkoutUrl &&
+        payment?.payosIntent?.qrCode &&
+        payment?.payosIntent?.bankBin &&
+        payment?.payosIntent?.bankAccountNumber &&
+        payment?.payosIntent?.bankAccountName,
+      );
+    }
+    return Boolean(
+      payment?.autoMatchUntil &&
       payment.autoMatchUntil.getTime() > now &&
       payment.bankAccountNumber,
     );
@@ -768,12 +813,34 @@ export class PlanPurchaseService {
       createdAt: purchase.createdAt,
       completedAt: purchase.completedAt,
       payment: this.toPaymentDto(purchase.payment),
-      bankInstructions: this.toBankInstructions(purchase.payment),
+      // PayOS is the active provider. Legacy bank instructions are only
+      // materialized when the PayOS provider is not configured.
+      bankInstructions: this.payos?.isEnabled()
+        ? null
+        : this.toBankInstructions(purchase.payment),
+      payos: null,
       isActivePaymentIntent: this.isActivePaymentIntent(purchase),
       canReplace: this.isActivePaymentIntent(purchase),
       supersededAt: purchase.supersededAt,
       supersededByPurchaseId: purchase.supersededByPurchaseId,
     };
+  }
+
+  private async toStudentDtoWithPayos(
+    purchase: PurchaseWithDetails,
+    studentId: number,
+  ): Promise<PlanPurchaseResponseDto> {
+    const dto = this.toStudentDto(purchase);
+    if (this.payos && purchase.payment) {
+      const intent = await this.prisma.payOSPaymentIntent.findUnique({
+        where: { planPaymentId: purchase.payment.id },
+        select: { id: true },
+      });
+      if (intent)
+        dto.payos = await this.payos.getOwnedIntent(studentId, intent.id);
+      if (intent) dto.bankInstructions = null;
+    }
+    return dto;
   }
 
   private toAdminDto(purchase: PurchaseWithDetails): PlanPurchaseAdminDto {

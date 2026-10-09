@@ -3,9 +3,10 @@ import { CourseService } from './course.service';
 import { CourseController } from './course.controller';
 import { CoursePublicController } from './course-public.controller';
 import { EventsModule } from '../events/events.module';
+import { PaymentModule } from '../payment/payment.module';
 
 @Module({
-  imports: [EventsModule],
+  imports: [EventsModule, PaymentModule],
   providers: [CourseService],
   controllers: [CoursePublicController, CourseController],
   exports: [CourseService],

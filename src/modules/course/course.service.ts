@@ -15,6 +15,8 @@ import {
   UpdateLessonDto,
   CreateMaterialDto,
   UpdateMaterialDto,
+  CreateCourseActivityDto,
+  UpdateCourseActivityDto,
   EnrollResponseDto,
 } from './dto/course.dto';
 import {
@@ -24,6 +26,7 @@ import {
   PaymentStatus,
   Role,
 } from '@prisma/client';
+import { buildCourseCurriculum } from './course-curriculum';
 
 @Injectable()
 export class CourseService {
@@ -43,6 +46,7 @@ export class CourseService {
         description: dto.description,
         thumbnail: dto.thumbnail,
         level: dto.level,
+        curriculumType: dto.curriculumType,
         status: CourseStatus.DRAFT,
       },
     });
@@ -129,13 +133,33 @@ export class CourseService {
           },
         },
         lessons: { include: { materials: true }, orderBy: { order: 'asc' } },
-        quizzes: true,
+        quizzes: {
+          include: { _count: { select: { questions: true } } },
+          orderBy: { id: 'asc' },
+        },
+        activities: {
+          include: {
+            quiz: { include: { _count: { select: { questions: true } } } },
+            speakingPracticeSet: {
+              include: { exercises: { select: { id: true } } },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
       },
     });
     if (!course) throw new NotFoundException('Course not found');
 
     if (role === Role.ADMIN) {
-      return course;
+      return {
+        ...course,
+        curriculum: buildCourseCurriculum(
+          course.lessons,
+          course.quizzes,
+          course.activities,
+          course.curriculumType,
+        ),
+      };
     }
 
     const active = userId
@@ -150,8 +174,27 @@ export class CourseService {
         })
       : null;
 
+    const curriculum = buildCourseCurriculum(
+      course.lessons,
+      active ? course.quizzes : [],
+      active ? course.activities : [],
+      course.curriculumType,
+    );
+    const { activities: _activities, ...courseWithoutRawActivities } = course;
+    void _activities;
+    const safeClasses = course.classes.map(
+      ({ enrollments: _enrollments, ...cls }) => {
+        void _enrollments;
+        return cls;
+      },
+    );
     return {
-      ...course,
+      ...courseWithoutRawActivities,
+      classes: safeClasses,
+      curriculum,
+      progress: active
+        ? await this.getCourseProgressFromCurriculum(id, userId!, curriculum)
+        : null,
       lessons: course.lessons.map((lesson) => ({
         ...lesson,
         videoUrl: active ? lesson.videoUrl : null,
@@ -161,6 +204,146 @@ export class CourseService {
         })),
       })),
       quizzes: active ? course.quizzes : [],
+    };
+  }
+
+  async getCourseProgress(courseId: number, userId: number) {
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: {
+        userId,
+        class: { courseId },
+        status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
+      },
+    });
+    if (!enrollment) throw new ForbiddenException('Bạn chưa ghi danh khóa học');
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        lessons: { include: { materials: true }, orderBy: { order: 'asc' } },
+        quizzes: { include: { _count: { select: { questions: true } } } },
+        activities: {
+          include: {
+            quiz: { include: { _count: { select: { questions: true } } } },
+            speakingPracticeSet: {
+              include: { exercises: { select: { id: true } } },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+    if (!course) throw new NotFoundException('Course not found');
+    const curriculum = buildCourseCurriculum(
+      course.lessons,
+      course.quizzes,
+      course.activities,
+      course.curriculumType,
+    );
+    return this.getCourseProgressFromCurriculum(courseId, userId, curriculum);
+  }
+
+  private async getCourseProgressFromCurriculum(
+    courseId: number,
+    userId: number,
+    curriculum: ReturnType<typeof buildCourseCurriculum>,
+  ) {
+    const activityIds = curriculum.lessons
+      .flatMap((lesson) => lesson.activities)
+      .map((activity) => activity.sourceId)
+      .filter((id): id is number => typeof id === 'number');
+    const quizIds = activityIds;
+    const submissions = await this.prisma.submission.findMany({
+      where: { userId, quizId: { in: quizIds } },
+      include: { results: { select: { questionId: true } } },
+    });
+    const completeQuizIds = new Set<number>();
+    for (const submission of submissions) {
+      const quiz = await this.prisma.quiz.findUnique({
+        where: { id: submission.quizId },
+        select: { questions: { select: { id: true } } },
+      });
+      if (!quiz || !quiz.questions.length) continue;
+      const results = new Set(
+        submission.results.map((result) => result.questionId),
+      );
+      if (
+        quiz.questions.every((question) => results.has(question.id)) &&
+        results.size === quiz.questions.length
+      )
+        completeQuizIds.add(submission.quizId);
+    }
+    const speakingSetIds = curriculum.lessons
+      .flatMap((lesson) => lesson.activities)
+      .map((activity) => activity.speakingPracticeSetId)
+      .filter((id): id is string => Boolean(id));
+    const speakingExerciseIds = speakingSetIds.length
+      ? await this.prisma.speakingExercise.findMany({
+          where: { practiceSetId: { in: speakingSetIds } },
+          select: { id: true, practiceSetId: true },
+        })
+      : [];
+    const speakingSubmissions = speakingExerciseIds.length
+      ? await this.prisma.speakingSubmission.findMany({
+          where: {
+            userId,
+            exerciseId: { in: speakingExerciseIds.map((row) => row.id) },
+            status: 'COMPLETED',
+          },
+          select: { exerciseId: true },
+        })
+      : [];
+    const completedSpeaking = new Set(
+      speakingSubmissions.map((row) => row.exerciseId),
+    );
+    const activities = curriculum.lessons
+      .flatMap((lesson) => lesson.activities)
+      .map((activity) => {
+        const complete =
+          activity.skill === 'SPEAKING'
+            ? (() => {
+                const setExercises = speakingExerciseIds.filter(
+                  (row) => row.practiceSetId === activity.speakingPracticeSetId,
+                );
+                return (
+                  setExercises.length > 0 &&
+                  setExercises.every((row) => completedSpeaking.has(row.id))
+                );
+              })()
+            : typeof activity.sourceId === 'number' &&
+              completeQuizIds.has(activity.sourceId);
+        return {
+          id: activity.id,
+          lessonId: activity.lessonId,
+          order: activity.order,
+          kind: activity.kind,
+          title: activity.title,
+          required: activity.required,
+          completed: complete,
+          route: activity.route,
+        };
+      });
+    const required = activities.filter((activity) => activity.required);
+    const optional = activities.filter((activity) => !activity.required);
+    const nextActivity =
+      required.find((activity) => !activity.completed) ?? null;
+    return {
+      requiredCompleted: required.filter((activity) => activity.completed)
+        .length,
+      requiredTotal: required.length,
+      optionalCompleted: optional.filter((activity) => activity.completed)
+        .length,
+      optionalTotal: optional.length,
+      percentage: required.length
+        ? Math.round(
+            (required.filter((activity) => activity.completed).length /
+              required.length) *
+              100,
+          )
+        : 0,
+      isComplete:
+        required.length > 0 && required.every((activity) => activity.completed),
+      nextActivity,
+      activities,
     };
   }
 
@@ -179,6 +362,7 @@ export class CourseService {
         description: dto.description,
         thumbnail: dto.thumbnail,
         level: dto.level,
+        curriculumType: dto.curriculumType,
         status: dto.status,
       },
     });
@@ -520,6 +704,8 @@ export class CourseService {
         title: dto.title.trim(),
         fileUrl: dto.fileUrl.trim(),
         fileType: dto.fileType,
+        objective: dto.objective,
+        contentText: dto.contentText,
       },
     });
   }
@@ -536,6 +722,8 @@ export class CourseService {
         title: dto.title?.trim(),
         fileUrl: dto.fileUrl?.trim(),
         fileType: dto.fileType,
+        objective: dto.objective,
+        contentText: dto.contentText,
       },
     });
   }
@@ -543,6 +731,113 @@ export class CourseService {
   async deleteMaterial(materialId: number, user: { id: number; role: Role }) {
     this.requireAdmin(user.role);
     return this.prisma.material.delete({ where: { id: materialId } });
+  }
+
+  async createCourseActivity(
+    courseId: number,
+    dto: CreateCourseActivityDto,
+    user: { id: number; role: Role },
+  ) {
+    this.requireAdmin(user.role);
+    const [course, lesson] = await Promise.all([
+      this.prisma.course.findUnique({ where: { id: courseId } }),
+      this.prisma.lesson.findUnique({ where: { id: dto.lessonId } }),
+    ]);
+    if (!course) throw new NotFoundException('Course not found');
+    if (!lesson || lesson.courseId !== courseId)
+      throw new BadRequestException('Lesson không thuộc course');
+    const order =
+      dto.order ??
+      (await this.prisma.courseActivity.count({
+        where: { lessonId: dto.lessonId },
+      })) + 1;
+    if (
+      await this.prisma.courseActivity.findUnique({
+        where: { lessonId_order: { lessonId: dto.lessonId, order } },
+      })
+    )
+      throw new ConflictException('Thứ tự activity đã tồn tại trong lesson');
+    const quizId: number | null = dto.quizId ?? null;
+    const speakingPracticeSetId: string | null =
+      dto.speakingPracticeSetId ?? null;
+    if (dto.kind === 'SPEAKING') {
+      if (!speakingPracticeSetId || quizId)
+        throw new BadRequestException(
+          'Speaking activity phải trỏ tới practice set',
+        );
+      const set = await this.prisma.speakingPracticeSet.findUnique({
+        where: { id: speakingPracticeSetId },
+        include: { exercises: { select: { id: true } } },
+      });
+      if (!set || !set.exercises.length)
+        throw new BadRequestException('Speaking practice set không hợp lệ');
+    } else {
+      if (!quizId || speakingPracticeSetId)
+        throw new BadRequestException('Skill activity phải trỏ tới quiz');
+      const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
+      if (!quiz || quiz.courseId !== courseId)
+        throw new BadRequestException('Quiz không thuộc course');
+      const expected =
+        quiz.type === 'LISTENING_PRACTICE'
+          ? 'LISTENING'
+          : quiz.type === 'BILINGUAL_READING'
+            ? 'READING'
+            : ['WRITING_EMAIL', 'WRITING_PICTURE'].includes(quiz.type)
+              ? 'WRITING'
+              : null;
+      if (expected !== dto.kind)
+        throw new BadRequestException('Kind không khớp loại quiz');
+    }
+    return this.prisma.courseActivity.create({
+      data: {
+        courseId,
+        lessonId: dto.lessonId,
+        order,
+        kind: dto.kind,
+        title: dto.title?.trim(),
+        isRequired: dto.isRequired ?? true,
+        quizId,
+        speakingPracticeSetId,
+      },
+    });
+  }
+
+  async updateCourseActivity(
+    activityId: number,
+    dto: UpdateCourseActivityDto,
+    user: { id: number; role: Role },
+  ) {
+    this.requireAdmin(user.role);
+    const existing = await this.prisma.courseActivity.findUnique({
+      where: { id: activityId },
+    });
+    if (!existing) throw new NotFoundException('Không tìm thấy activity');
+    if (
+      dto.order !== undefined &&
+      dto.order !== existing.order &&
+      (await this.prisma.courseActivity.findUnique({
+        where: {
+          lessonId_order: { lessonId: existing.lessonId, order: dto.order },
+        },
+      }))
+    )
+      throw new ConflictException('Thứ tự activity đã tồn tại trong lesson');
+    return this.prisma.courseActivity.update({
+      where: { id: activityId },
+      data: {
+        order: dto.order,
+        isRequired: dto.isRequired,
+        title: dto.title?.trim(),
+      },
+    });
+  }
+
+  async deleteCourseActivity(
+    activityId: number,
+    user: { id: number; role: Role },
+  ) {
+    this.requireAdmin(user.role);
+    return this.prisma.courseActivity.delete({ where: { id: activityId } });
   }
 
   async getPublicCatalog() {
@@ -554,6 +849,7 @@ export class CourseService {
         description: true,
         thumbnail: true,
         level: true,
+        curriculumType: true,
         status: true,
         createdAt: true,
         classes: {
@@ -584,10 +880,34 @@ export class CourseService {
         description: true,
         thumbnail: true,
         level: true,
+        curriculumType: true,
         status: true,
         createdAt: true,
         lessons: {
           select: { id: true, title: true, description: true, order: true },
+          orderBy: { order: 'asc' },
+        },
+        quizzes: {
+          where: { publicationStatus: 'PUBLISHED' },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            type: true,
+            isPremiumContent: true,
+            publicationStatus: true,
+            courseId: true,
+            _count: { select: { questions: true } },
+          },
+          orderBy: { id: 'asc' },
+        },
+        activities: {
+          include: {
+            quiz: { include: { _count: { select: { questions: true } } } },
+            speakingPracticeSet: {
+              include: { exercises: { select: { id: true } } },
+            },
+          },
           orderBy: { order: 'asc' },
         },
         classes: {
@@ -613,8 +933,16 @@ export class CourseService {
       throw new NotFoundException(
         'Khóa học không tồn tại hoặc chưa được công khai',
       );
+    const { activities: _activities, ...publicCourse } = course;
+    void _activities;
     return {
-      ...course,
+      ...publicCourse,
+      curriculum: buildCourseCurriculum(
+        course.lessons,
+        course.quizzes,
+        course.activities,
+        course.curriculumType,
+      ),
       classes: course.classes.map(({ enrollments, ...cls }) => {
         const current = enrollments.length;
         const remaining =

@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  Optional,
 } from '@nestjs/common';
 import { CourseService } from './course.service';
 import {
@@ -24,6 +25,8 @@ import {
   ReorderLessonsDto,
   CreateMaterialDto,
   UpdateMaterialDto,
+  CreateCourseActivityDto,
+  UpdateCourseActivityDto,
 } from './dto/course.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -31,11 +34,15 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, CourseStatus } from '@prisma/client';
+import { PayosPaymentService } from '../payment/payos-payment.service';
 
 @ApiTags('courses')
 @Controller('courses')
 export class CourseController {
-  constructor(private readonly courseService: CourseService) {}
+  constructor(
+    private readonly courseService: CourseService,
+    @Optional() private readonly payos?: PayosPaymentService,
+  ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
@@ -91,6 +98,19 @@ export class CourseController {
   @ApiOperation({ summary: 'Lấy chi tiết một khóa học' })
   getCourseById(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.courseService.getCourseById(id, req.user?.id, req.user?.role);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get(':id/progress')
+  @ApiOperation({
+    summary: 'Tiến độ khóa học được suy ra từ hoạt động kỹ năng',
+  })
+  getCourseProgress(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.courseService.getCourseProgress(id, req.user.id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -227,11 +247,20 @@ export class CourseController {
   @ApiOperation({
     summary: 'Học viên ghi danh vào lớp học (Kiểm tra trạng thái & capacity)',
   })
-  enrollInClass(
+  async enrollInClass(
     @Param('classId', ParseIntPipe) classId: number,
     @Request() req: any,
   ) {
-    return this.courseService.enrollInClass(classId, req.user.id);
+    const result = await this.courseService.enrollInClass(classId, req.user.id);
+    if (this.payos && result.status === 'PENDING_PAYMENT') {
+      const paymentIntent = await this.payos.createForCoursePayment(
+        req.user.id,
+        result.enrollmentId,
+        `Course class ${classId}`,
+      );
+      return { ...result, payos: paymentIntent };
+    }
+    return result;
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -339,5 +368,40 @@ export class CourseController {
     @Request() req: any,
   ) {
     return this.courseService.deleteMaterial(materialId, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post(':courseId/activities')
+  @Roles(Role.ADMIN)
+  createCourseActivity(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Body() dto: CreateCourseActivityDto,
+    @Request() req: any,
+  ) {
+    return this.courseService.createCourseActivity(courseId, dto, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Patch('activities/:activityId')
+  @Roles(Role.ADMIN)
+  updateCourseActivity(
+    @Param('activityId', ParseIntPipe) activityId: number,
+    @Body() dto: UpdateCourseActivityDto,
+    @Request() req: any,
+  ) {
+    return this.courseService.updateCourseActivity(activityId, dto, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Delete('activities/:activityId')
+  @Roles(Role.ADMIN)
+  deleteCourseActivity(
+    @Param('activityId', ParseIntPipe) activityId: number,
+    @Request() req: any,
+  ) {
+    return this.courseService.deleteCourseActivity(activityId, req.user);
   }
 }

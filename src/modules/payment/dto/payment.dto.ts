@@ -1,5 +1,6 @@
 import { PaymentStatus } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
+import type { PayosIntentDto } from '../payos-payment.service';
 
 export class CourseSummaryDto {
   @ApiProperty({ example: 2 })
@@ -79,6 +80,9 @@ export class StudentPaymentDetailDto extends StudentPaymentSummaryDto {
   @ApiProperty()
   updatedAt: Date;
 
-  @ApiProperty({ type: () => BankTransferInstructionsDto })
-  bankInstructions: BankTransferInstructionsDto;
+  @ApiProperty({ type: () => BankTransferInstructionsDto, nullable: true })
+  bankInstructions: BankTransferInstructionsDto | null;
+
+  @ApiProperty({ nullable: true })
+  payos: PayosIntentDto | null;
 }

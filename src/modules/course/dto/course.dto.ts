@@ -8,9 +8,11 @@ import {
   Min,
   IsInt,
   IsArray,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CourseStatus, ClassStatus } from '@prisma/client';
+import type { PayosIntentDto } from '../../payment/payos-payment.service';
 
 export class CreateCourseDto {
   @ApiProperty({ example: 'IELTS Mastery' })
@@ -35,6 +37,11 @@ export class CreateCourseDto {
   @IsString()
   @IsOptional()
   level?: string;
+
+  @ApiPropertyOptional({ example: 'FOUR_SKILLS' })
+  @IsString()
+  @IsOptional()
+  curriculumType?: string;
 }
 
 export class UpdateCourseDto {
@@ -62,6 +69,11 @@ export class UpdateCourseDto {
   @IsEnum(CourseStatus)
   @IsOptional()
   status?: CourseStatus;
+
+  @ApiPropertyOptional({ example: 'FOUR_SKILLS' })
+  @IsString()
+  @IsOptional()
+  curriculumType?: string;
 }
 
 export class ReviewCourseDto {
@@ -170,6 +182,9 @@ export class EnrollResponseDto {
 
   @ApiProperty({ example: 'Đăng ký lớp học thành công.' })
   message: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  payos?: PayosIntentDto | null;
 }
 
 export class CreateLessonDto {
@@ -243,6 +258,18 @@ export class CreateMaterialDto {
   @IsString()
   @IsOptional()
   fileType?: string;
+
+  @ApiPropertyOptional({
+    example: 'Nhận biết thông tin chính trong hội thoại.',
+  })
+  @IsString()
+  @IsOptional()
+  objective?: string;
+
+  @ApiPropertyOptional({ example: 'Mục tiêu bài học...\nTừ khóa: ...' })
+  @IsString()
+  @IsOptional()
+  contentText?: string;
 }
 
 export class UpdateMaterialDto {
@@ -262,4 +289,68 @@ export class UpdateMaterialDto {
   @IsString()
   @IsOptional()
   fileType?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  objective?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  contentText?: string;
+}
+
+export class CreateCourseActivityDto {
+  @ApiProperty({ example: 12 })
+  @IsInt()
+  lessonId: number;
+
+  @ApiProperty({
+    example: 'LISTENING',
+    enum: ['LISTENING', 'SPEAKING', 'READING', 'WRITING'],
+  })
+  @IsString()
+  @IsIn(['LISTENING', 'SPEAKING', 'READING', 'WRITING'])
+  kind: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsInt()
+  @IsOptional()
+  order?: number;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  isRequired?: boolean;
+
+  @ApiPropertyOptional({ example: 23 })
+  @IsInt()
+  @IsOptional()
+  quizId?: number;
+
+  @ApiPropertyOptional({ example: 'read-aloud-general' })
+  @IsString()
+  @IsOptional()
+  speakingPracticeSetId?: string;
+
+  @ApiPropertyOptional({ example: 'Luyện nghe Unit 1' })
+  @IsString()
+  @IsOptional()
+  title?: string;
+}
+
+export class UpdateCourseActivityDto {
+  @ApiPropertyOptional({ example: 2 })
+  @IsInt()
+  @IsOptional()
+  order?: number;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  isRequired?: boolean;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  title?: string;
 }

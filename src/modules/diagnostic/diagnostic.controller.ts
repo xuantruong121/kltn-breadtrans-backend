@@ -25,6 +25,14 @@ export class DiagnosticController {
     return this.diagnosticService.getCurrentAssessment(req.user.id);
   }
 
+  @Get('results/latest')
+  @ApiOperation({
+    summary: 'Lấy kết quả kiểm tra đầu vào gần nhất của học viên',
+  })
+  getLatestResult(@Request() req: { user: { id: number } }) {
+    return this.diagnosticService.getLatestResult(req.user.id);
+  }
+
   @Post(':id/attempts')
   @ApiOperation({
     summary: 'Nộp bài kiểm tra đầu vào và nhận kết quả từ server',
@@ -32,8 +40,14 @@ export class DiagnosticController {
   submit(
     @Request() req: { user: { id: number } },
     @Param('id', ParseIntPipe) id: number,
-    @Body('answers') answers: Record<string, number>,
+    @Body()
+    body: { answers?: unknown; submissionToken?: string },
   ) {
-    return this.diagnosticService.submitAssessment(req.user.id, id, answers);
+    return this.diagnosticService.submitAssessment(
+      req.user.id,
+      id,
+      body?.answers,
+      body?.submissionToken,
+    );
   }
 }

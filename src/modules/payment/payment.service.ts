@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   ConflictException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -33,6 +34,7 @@ import {
   PaginatedAdminPaymentsDto,
   AdminPaymentDetailDto,
 } from './dto/payment-admin.dto';
+import { PayosPaymentService } from './payos-payment.service';
 
 interface InternalPaymentTransitionEvent {
   didPaymentTransition: boolean;
@@ -95,6 +97,7 @@ export class PaymentService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly notificationsService: NotificationsService,
+    @Optional() private readonly payos?: PayosPaymentService,
   ) {}
 
   async getMyPayments(studentId: number): Promise<StudentPaymentSummaryDto[]> {
@@ -213,24 +216,29 @@ export class PaymentService {
       throw new NotFoundException('Thông tin thanh toán không tồn tại');
     }
 
-    const bankConfig = getPaymentBankConfig();
-    const vietQrUrl = buildVietQrUrl({
-      bin: bankConfig.bin,
-      accountNumber: bankConfig.accountNumber,
-      amountVnd: payment.amountVnd,
-      transferCode: payment.transferCode,
-      accountName: bankConfig.accountName,
-    });
-
-    const bankInstructions: BankTransferInstructionsDto = {
-      bin: bankConfig.bin,
-      bankName: bankConfig.bankName,
-      accountNumber: bankConfig.accountNumber,
-      accountName: bankConfig.accountName,
-      amountVnd: payment.amountVnd,
-      transferCode: payment.transferCode,
-      vietQrUrl,
-    };
+    const payosIntent = this.payos
+      ? await client.payOSPaymentIntent.findUnique({
+          where: { coursePaymentId: payment.id },
+        })
+      : null;
+    const bankConfig = this.payosIntentOrLegacyBank(payosIntent);
+    const bankInstructions: BankTransferInstructionsDto | null = bankConfig
+      ? {
+          bin: bankConfig.bin,
+          bankName: bankConfig.bankName,
+          accountNumber: bankConfig.accountNumber,
+          accountName: bankConfig.accountName,
+          amountVnd: payment.amountVnd,
+          transferCode: payment.transferCode,
+          vietQrUrl: buildVietQrUrl({
+            bin: bankConfig.bin,
+            accountNumber: bankConfig.accountNumber,
+            amountVnd: payment.amountVnd,
+            transferCode: payment.transferCode,
+            accountName: bankConfig.accountName,
+          }),
+        }
+      : null;
 
     return {
       id: payment.id,
@@ -251,7 +259,31 @@ export class PaymentService {
         },
       },
       bankInstructions,
+      payos: payosIntent
+        ? {
+            intentId: payosIntent.id,
+            type: payosIntent.type,
+            orderCode: Number(payosIntent.orderCode),
+            description: payosIntent.description,
+            paymentLinkId: payosIntent.paymentLinkId,
+            checkoutUrl: payosIntent.checkoutUrl,
+            qrCode: payosIntent.qrCode,
+            bankBin: payosIntent.bankBin,
+            bankAccountNumber: payosIntent.bankAccountNumber,
+            bankAccountName: payosIntent.bankAccountName,
+            status: payosIntent.status,
+            expiresAt: payosIntent.expiresAt,
+          }
+        : null,
     };
+  }
+
+  private payosIntentOrLegacyBank(intent: { id: number } | null) {
+    // Once PayOS is configured, never require the removed legacy bank
+    // environment variables. Historical payments without an intent simply
+    // have no bank instructions to display.
+    if (intent || this.payos?.isEnabled()) return null;
+    return getPaymentBankConfig();
   }
 
   async getAdminPayments(
@@ -720,6 +752,83 @@ export class PaymentService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Provider fulfillment path. It deliberately does not require an admin
+   * actor: PayOS has already authenticated the payment at the webhook boundary.
+   */
+  async confirmPaymentFromPayos(
+    paymentId: number,
+    providerAmountVnd: number,
+  ): Promise<AdminPaymentDetailDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<
+        Array<{
+          paymentId: number;
+          amountVnd: number;
+          paymentStatus: PaymentStatus;
+          enrollmentId: number;
+          enrollmentStatus: EnrollmentStatus;
+          classId: number;
+          classStatus: ClassStatus;
+          capacity: number | null;
+        }>
+      >`
+        SELECT p.id AS "paymentId", p."amountVnd", p.status AS "paymentStatus",
+               e.id AS "enrollmentId", e.status AS "enrollmentStatus",
+               c.id AS "classId", c.status AS "classStatus", c.capacity
+        FROM "Payment" p
+        JOIN "Enrollment" e ON e.id = p."enrollmentId"
+        JOIN "Class" c ON c.id = e."classId"
+        WHERE p.id = ${paymentId}
+        FOR UPDATE OF p, e, c;
+      `;
+      const current = rows[0];
+      if (!current)
+        throw new NotFoundException('Thông tin thanh toán không tồn tại');
+      if (current.amountVnd !== providerAmountVnd) {
+        throw new ConflictException('PayOS payment amount mismatch');
+      }
+      if (current.paymentStatus === PaymentStatus.CONFIRMED) {
+        return this.formatAdminPaymentDetail(paymentId, tx);
+      }
+      if (
+        current.paymentStatus !== PaymentStatus.PENDING &&
+        current.paymentStatus !== PaymentStatus.REPORTED
+      ) {
+        throw new ConflictException(
+          `Không thể xác nhận thanh toán ở trạng thái ${current.paymentStatus}`,
+        );
+      }
+
+      const now = new Date();
+      let activationIssue: PaymentActivationIssue | null = null;
+      if (current.classStatus === ClassStatus.UPCOMING) {
+        const activeCount = await tx.enrollment.count({
+          where: { classId: current.classId, status: EnrollmentStatus.ACTIVE },
+        });
+        if (current.capacity === null || activeCount < current.capacity) {
+          await tx.enrollment.update({
+            where: { id: current.enrollmentId },
+            data: { status: EnrollmentStatus.ACTIVE },
+          });
+        } else {
+          activationIssue = PaymentActivationIssue.CLASS_FULL;
+        }
+      } else {
+        activationIssue = PaymentActivationIssue.CLASS_NOT_ELIGIBLE;
+      }
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: PaymentStatus.CONFIRMED,
+          confirmedAt: now,
+          activationIssue,
+        },
+      });
+      return this.formatAdminPaymentDetail(paymentId, tx);
+    });
   }
 
   async retryActivation(paymentId: number): Promise<AdminPaymentDetailDto> {

@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Query,
   Param,
@@ -11,6 +12,7 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
@@ -67,8 +69,14 @@ export class NotificationsController {
     @Req() req: any,
     @Query('limit') limit?: number,
     @Query('cursor') cursor?: number,
+    @Query('filter') filter?: 'all' | 'unread' | 'read',
   ) {
-    return await this.notificationsService.getInbox(req.user.id, limit, cursor);
+    return await this.notificationsService.getInbox(
+      req.user.id,
+      limit,
+      cursor,
+      filter,
+    );
   }
 
   @Get('inbox/unread-count')
@@ -86,6 +94,22 @@ export class NotificationsController {
   @Patch('inbox/:id/read')
   @UseGuards(JwtAuthGuard)
   async markRead(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
-    return await this.notificationsService.markRead(req.user.id, id);
+    const result = await this.notificationsService.markRead(req.user.id, id);
+    if (!result.success) throw new NotFoundException(result.message);
+    return result;
+  }
+
+  @Delete('inbox/:id')
+  @UseGuards(JwtAuthGuard)
+  async deleteNotification(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    const result = await this.notificationsService.deleteNotification(
+      req.user.id,
+      id,
+    );
+    if (!result.success) throw new NotFoundException(result.message);
+    return result;
   }
 }

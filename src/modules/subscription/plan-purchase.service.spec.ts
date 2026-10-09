@@ -158,10 +158,10 @@ describe('PlanPurchaseService', () => {
       }),
     });
     expect(result.payment.transferCode).toMatch(/^BTP[0-9]{8}$/);
-    expect(result.bankInstructions.transferCode).toBe(
+    expect(result.bankInstructions!.transferCode).toBe(
       result.payment.transferCode,
     );
-    expect(result.bankInstructions.vietQrUrl).toContain(
+    expect(result.bankInstructions!.vietQrUrl).toContain(
       result.payment.transferCode,
     );
   });

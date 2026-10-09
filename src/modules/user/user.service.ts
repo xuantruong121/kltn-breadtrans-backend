@@ -575,14 +575,22 @@ export class UserService {
       typeof this.prisma.speakingExercise.findMany === 'function'
         ? await this.prisma.speakingExercise.findMany({
             where: { title: { not: '' }, targetText: { not: '' } },
-            select: { id: true, title: true, category: true },
+            select: {
+              id: true,
+              title: true,
+              category: true,
+              practiceSet: {
+                select: { id: true, title: true, description: true },
+              },
+            },
           })
         : [];
     const speakingRows = Array.isArray(speakingRowsRaw) ? speakingRowsRaw : [];
     const speakingSets = new Map<string, number[]>();
     for (const row of speakingRows) {
-      const set = resolveSpeakingPracticeSet(row);
-      speakingSets.set(set.key, [...(speakingSets.get(set.key) ?? []), row.id]);
+      const set = row.practiceSet ?? resolveSpeakingPracticeSet(row);
+      const key = 'id' in set ? set.id : set.key;
+      speakingSets.set(key, [...(speakingSets.get(key) ?? []), row.id]);
     }
     const speakingCatalogCountRaw =
       speakingRows.length > 0
