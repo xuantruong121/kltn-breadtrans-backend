@@ -453,12 +453,13 @@ export class SubscriptionService {
       isPaid,
       subscription,
       entitlements: PLAN_FEATURE_KEYS.map((featureKey) => {
+        const typedFeatureKey = featureKey as PlanFeatureKey;
         const entitlement = version.entitlements.find(
-          (candidate) => candidate.featureKey === featureKey,
+          (candidate) => candidate.featureKey === typedFeatureKey,
         );
         return (
           entitlement ?? {
-            featureKey,
+            featureKey: typedFeatureKey,
             enabled: false,
             limitValue: null,
             unit: null,

@@ -1,6 +1,6 @@
 import { PlanFeatureKey } from '@prisma/client';
 
-export const PLAN_FEATURE_KEYS = Object.freeze([
+export const PLAN_FEATURE_KEYS: readonly string[] = Object.freeze([
   PlanFeatureKey.AI_SPEAKING_ASSESSMENT,
   PlanFeatureKey.AI_WRITING_REVIEW,
   PlanFeatureKey.AI_TUTOR_MESSAGE,
@@ -10,8 +10,10 @@ export const PLAN_FEATURE_KEYS = Object.freeze([
   PlanFeatureKey.PREMIUM_LISTENING,
   PlanFeatureKey.PREMIUM_SPEAKING_CONTENT,
   PlanFeatureKey.PREMIUM_WRITING_CONTENT,
-] as const);
+  // Generated Prisma client is refreshed separately; the database enum is durable.
+  'COURSE_LIBRARY_ACCESS',
+]);
 
 export function isPlanFeatureKey(value: string): value is PlanFeatureKey {
-  return (PLAN_FEATURE_KEYS as readonly string[]).includes(value);
+  return PLAN_FEATURE_KEYS.includes(value);
 }

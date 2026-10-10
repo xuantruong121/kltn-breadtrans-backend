@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   ConflictException,
+  GoneException,
   Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -87,6 +88,24 @@ export function isReviewerForeignKeyError(error: unknown): boolean {
     );
   }
   return false;
+}
+
+export const LEGACY_COURSE_PAYMENT_CONFIRM_GRACE_HOURS = 24;
+
+/**
+ * Legacy individual Course payments are settled from their durable Payment row.
+ * The server clock is authoritative; the exact boundary remains eligible.
+ */
+export function isLegacyCoursePaymentConfirmable(
+  createdAt: Date,
+  now: Date,
+): boolean {
+  const createdAtMs = createdAt.getTime();
+  const nowMs = now.getTime();
+  if (!Number.isFinite(createdAtMs) || !Number.isFinite(nowMs)) return false;
+  const expiresAtMs =
+    createdAtMs + LEGACY_COURSE_PAYMENT_CONFIRM_GRACE_HOURS * 60 * 60 * 1000;
+  return nowMs <= expiresAtMs;
 }
 
 @Injectable()
@@ -543,13 +562,14 @@ export class PaymentService {
               id: number;
               status: PaymentStatus;
               enrollmentId: number;
+              createdAt: Date;
               confirmedAt: Date | null;
               reviewedAt: Date | null;
               reviewedById: number | null;
               activationIssue: PaymentActivationIssue | null;
             }>
           >`
-        SELECT id, status, "enrollmentId", "confirmedAt", "reviewedAt", "reviewedById", "activationIssue"
+        SELECT id, status, "enrollmentId", "createdAt", "confirmedAt", "reviewedAt", "reviewedById", "activationIssue"
         FROM "Payment"
         WHERE id = ${paymentId}
         FOR UPDATE;
@@ -559,6 +579,21 @@ export class PaymentService {
             throw new NotFoundException('Thông tin thanh toán không tồn tại');
           }
           const lockedPayment = lockedPayments[0];
+
+          const now = new Date();
+          // Payment is the durable legacy individual-Course payment domain. Plan
+          // payments use PlanPayment/PayOSPaymentIntent and never enter this path.
+          // The optional check keeps legacy unit fixtures backwards-compatible;
+          // PostgreSQL always supplies the non-null createdAt column.
+          if (
+            lockedPayment.status === PaymentStatus.REPORTED &&
+            lockedPayment.createdAt &&
+            !isLegacyCoursePaymentConfirmable(lockedPayment.createdAt, now)
+          ) {
+            throw new GoneException(
+              'Thanh toán khóa học cũ đã hết thời hạn xác nhận.',
+            );
+          }
 
           // Step 3: Lock Enrollment FOR UPDATE
           const lockedEnrollments = await tx.$queryRaw<
@@ -633,7 +668,6 @@ export class PaymentService {
           }
 
           // Step 8: Single server timestamp & Decision logic
-          const now = new Date();
           let didActivateEnrollment = false;
           let newEnrollmentStatus: EnrollmentStatus = lockedEnrollment.status;
           let finalActivationIssue: PaymentActivationIssue | null = null;

@@ -24,13 +24,121 @@ import {
   CourseStatus,
   EnrollmentStatus,
   PaymentStatus,
+  PlanFeatureKey,
   Role,
 } from '@prisma/client';
 import { buildCourseCurriculum } from './course-curriculum';
+import { SubscriptionService } from '../subscription/subscription.service';
+import {
+  getCourseLearningProfile,
+  getLessonTheory,
+} from './course-learning-content';
+
+const COURSE_LIBRARY_ACCESS = 'COURSE_LIBRARY_ACCESS' as PlanFeatureKey;
 
 @Injectable()
 export class CourseService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subscriptionService?: SubscriptionService,
+  ) {}
+
+  private async hasLegacyCourseOwnership(userId: number, courseId: number) {
+    const owned = await this.prisma.enrollment.findFirst({
+      where: {
+        userId,
+        class: { courseId },
+        status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
+        payment: { status: PaymentStatus.CONFIRMED },
+      },
+      select: { id: true },
+    });
+    return Boolean(owned);
+  }
+
+  private async resolveCourseAccess(
+    courseId: number,
+    userId?: number,
+    role?: string,
+  ): Promise<{
+    canAccess: boolean;
+    accessSource: 'ADMIN' | 'PRO_SUBSCRIPTION' | 'LEGACY_PURCHASE' | null;
+    requiresPro: boolean;
+  }> {
+    if (role === Role.ADMIN) {
+      return { canAccess: true, accessSource: 'ADMIN', requiresPro: false };
+    }
+    if (!userId) {
+      return { canAccess: false, accessSource: null, requiresPro: true };
+    }
+    if (
+      this.subscriptionService &&
+      (await this.subscriptionService.hasFeature(userId, COURSE_LIBRARY_ACCESS))
+    ) {
+      return {
+        canAccess: true,
+        accessSource: 'PRO_SUBSCRIPTION',
+        requiresPro: false,
+      };
+    }
+    if (await this.hasLegacyCourseOwnership(userId, courseId)) {
+      return {
+        canAccess: true,
+        accessSource: 'LEGACY_PURCHASE',
+        requiresPro: false,
+      };
+    }
+    return { canAccess: false, accessSource: null, requiresPro: true };
+  }
+
+  private async ensureSelfStudyEnrollment(courseId: number, userId: number) {
+    const existing = await this.prisma.enrollment.findFirst({
+      where: {
+        userId,
+        class: { courseId },
+        status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
+      },
+      orderBy: { joinedAt: 'asc' },
+    });
+    if (existing) return existing;
+
+    return this.prisma.$transaction(async (tx) => {
+      const course = await tx.course.findUnique({
+        where: { id: courseId },
+        select: { title: true },
+      });
+      if (!course) throw new NotFoundException('Course not found');
+      let selfStudy = await tx.class.findFirst({
+        where: {
+          courseId,
+          tuitionFeeVnd: 0,
+          status: { in: [ClassStatus.ONGOING, ClassStatus.UPCOMING] },
+          name: { startsWith: 'PRO Self Study' },
+        },
+      });
+      if (!selfStudy) {
+        selfStudy = await tx.class.create({
+          data: {
+            courseId,
+            name: `PRO Self Study — ${course.title}`,
+            tuitionFeeVnd: 0,
+            capacity: null,
+            status: ClassStatus.ONGOING,
+          },
+        });
+      }
+      return tx.enrollment.upsert({
+        where: { userId_classId: { userId, classId: selfStudy.id } },
+        create: {
+          userId,
+          classId: selfStudy.id,
+          status: EnrollmentStatus.ACTIVE,
+          progress: 0,
+        },
+        update: {},
+      });
+    });
+  }
 
   private requireAdmin(role: Role) {
     if (role !== Role.ADMIN) {
@@ -55,7 +163,10 @@ export class CourseService {
   async getAllCourses(userId?: number, role?: string) {
     if (role === Role.STUDENT && userId) {
       const enrollments = await this.prisma.enrollment.findMany({
-        where: { userId },
+        where: {
+          userId,
+          status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
+        },
         include: {
           class: {
             include: {
@@ -143,6 +254,8 @@ export class CourseService {
             speakingPracticeSet: {
               include: { exercises: { select: { id: true } } },
             },
+            toeicExam: { include: { groups: { select: { id: true } } } },
+            grammarTopic: { include: { questions: { select: { id: true } } } },
           },
           orderBy: { order: 'asc' },
         },
@@ -162,6 +275,10 @@ export class CourseService {
       };
     }
 
+    const access = await this.resolveCourseAccess(id, userId, role);
+    if (course.status !== CourseStatus.PUBLISHED && !access.canAccess) {
+      throw new NotFoundException('Course not found');
+    }
     const active = userId
       ? await this.prisma.enrollment.findFirst({
           where: {
@@ -176,8 +293,8 @@ export class CourseService {
 
     const curriculum = buildCourseCurriculum(
       course.lessons,
-      active ? course.quizzes : [],
-      active ? course.activities : [],
+      access.canAccess ? course.quizzes : [],
+      access.canAccess ? course.activities : [],
       course.curriculumType,
     );
     const { activities: _activities, ...courseWithoutRawActivities } = course;
@@ -190,24 +307,104 @@ export class CourseService {
     );
     return {
       ...courseWithoutRawActivities,
-      classes: safeClasses,
+      learning: getCourseLearningProfile(id, course.title),
+      classes: role === Role.ADMIN ? safeClasses : [],
       curriculum,
       progress: active
         ? await this.getCourseProgressFromCurriculum(id, userId!, curriculum)
         : null,
+      canAccess: access.canAccess,
+      accessSource: access.accessSource,
+      requiresPro: access.requiresPro,
+      isStarted: Boolean(active),
+      isCompleted: Boolean(active?.status === EnrollmentStatus.COMPLETED),
+      lockedReason: access.canAccess ? null : 'PRO_REQUIRED',
       lessons: course.lessons.map((lesson) => ({
         ...lesson,
-        videoUrl: active ? lesson.videoUrl : null,
+        videoUrl: access.canAccess ? lesson.videoUrl : null,
         materials: lesson.materials.map((material) => ({
           ...material,
-          fileUrl: active ? material.fileUrl : null,
+          fileUrl: access.canAccess ? material.fileUrl : null,
         })),
       })),
-      quizzes: active ? course.quizzes : [],
+      quizzes: access.canAccess ? course.quizzes : [],
+    };
+  }
+
+  async getCourseLesson(
+    courseId: number,
+    lessonId: number,
+    user: { id: number; role: Role },
+  ) {
+    const detail = await this.getCourseById(courseId, user.id, user.role);
+    if (!('canAccess' in detail) || !detail.canAccess) {
+      throw new ForbiddenException('Khóa học này cần gói PRO đang hoạt động');
+    }
+    const lesson = detail.curriculum.lessons.find(
+      (item) => item.id === lessonId,
+    );
+    if (!lesson) throw new NotFoundException('Course lesson not found');
+
+    const progressActivities =
+      'progress' in detail ? (detail.progress?.activities ?? []) : [];
+    const lockedActivity = lesson.activities.find((activity) => {
+      const state = progressActivities.find((item) => item.id === activity.id);
+      return activity.required && state?.unlocked === false;
+    });
+    if (lockedActivity) {
+      throw new ForbiddenException(
+        'Hãy hoàn thành bài học bắt buộc trước đó để mở lesson này',
+      );
+    }
+
+    const lessons = detail.curriculum.lessons;
+    const index = lessons.findIndex((item) => item.id === lessonId);
+    const previous = index > 0 ? lessons[index - 1] : null;
+    const next =
+      index >= 0 && index < lessons.length - 1 ? lessons[index + 1] : null;
+    const material = lesson.materials[0];
+    return {
+      courseId,
+      lesson: {
+        id: lesson.id,
+        order: lesson.order,
+        title: lesson.title,
+        description: lesson.description,
+        materials: lesson.materials,
+        theory: getLessonTheory(
+          lesson.title,
+          lesson.description,
+          material?.objective,
+          material?.contentText,
+        ),
+        activities: lesson.activities.map((activity) => ({
+          ...activity,
+          ...progressActivities.find((item) => item.id === activity.id),
+        })),
+      },
+      course: {
+        id: courseId,
+        title: detail.title,
+        level: detail.level,
+        learning: 'learning' in detail ? detail.learning : undefined,
+      },
+      progress: 'progress' in detail ? detail.progress : null,
+      navigation: {
+        previousLessonId: previous?.id ?? null,
+        nextLessonId: next?.id ?? null,
+      },
     };
   }
 
   async getCourseProgress(courseId: number, userId: number) {
+    const access = await this.resolveCourseAccess(
+      courseId,
+      userId,
+      Role.STUDENT,
+    );
+    if (!access.canAccess) {
+      throw new ForbiddenException('Gói PRO đang cần để truy cập lộ trình này');
+    }
     const enrollment = await this.prisma.enrollment.findFirst({
       where: {
         userId,
@@ -227,6 +424,8 @@ export class CourseService {
             speakingPracticeSet: {
               include: { exercises: { select: { id: true } } },
             },
+            toeicExam: { include: { groups: { select: { id: true } } } },
+            grammarTopic: { include: { questions: { select: { id: true } } } },
           },
           orderBy: { order: 'asc' },
         },
@@ -247,11 +446,18 @@ export class CourseService {
     userId: number,
     curriculum: ReturnType<typeof buildCourseCurriculum>,
   ) {
-    const activityIds = curriculum.lessons
-      .flatMap((lesson) => lesson.activities)
+    const curriculumActivities = curriculum.lessons.flatMap(
+      (lesson) => lesson.activities,
+    );
+    const quizIds = curriculumActivities
+      .filter(
+        (activity) =>
+          activity.kind === 'LISTENING' ||
+          activity.kind === 'READING' ||
+          activity.kind === 'WRITING',
+      )
       .map((activity) => activity.sourceId)
       .filter((id): id is number => typeof id === 'number');
-    const quizIds = activityIds;
     const submissions = await this.prisma.submission.findMany({
       where: { userId, quizId: { in: quizIds } },
       include: { results: { select: { questionId: true } } },
@@ -272,6 +478,38 @@ export class CourseService {
       )
         completeQuizIds.add(submission.quizId);
     }
+    const toeicExamIds = curriculumActivities
+      .filter((activity) => activity.kind === 'TOEIC')
+      .map((activity) => activity.sourceId)
+      .filter((id): id is number => typeof id === 'number');
+    const completedToeicExams = toeicExamIds.length
+      ? new Set(
+          (
+            await this.prisma.toeicAttempt.findMany({
+              where: {
+                userId,
+                examId: { in: toeicExamIds },
+                status: 'SUBMITTED',
+              },
+              select: { examId: true },
+            })
+          ).map((attempt) => attempt.examId),
+        )
+      : new Set<number>();
+    const grammarTopicIds = curriculumActivities
+      .filter((activity) => activity.kind === 'GRAMMAR')
+      .map((activity) => activity.sourceId)
+      .filter((id): id is number => typeof id === 'number');
+    const completedGrammarTopics = grammarTopicIds.length
+      ? new Set(
+          (
+            await this.prisma.grammarAttempt.findMany({
+              where: { userId, topicId: { in: grammarTopicIds } },
+              select: { topicId: true },
+            })
+          ).map((attempt) => attempt.topicId),
+        )
+      : new Set<number>();
     const speakingSetIds = curriculum.lessons
       .flatMap((lesson) => lesson.activities)
       .map((activity) => activity.speakingPracticeSetId)
@@ -295,37 +533,53 @@ export class CourseService {
     const completedSpeaking = new Set(
       speakingSubmissions.map((row) => row.exerciseId),
     );
-    const activities = curriculum.lessons
-      .flatMap((lesson) => lesson.activities)
-      .map((activity) => {
-        const complete =
-          activity.skill === 'SPEAKING'
-            ? (() => {
-                const setExercises = speakingExerciseIds.filter(
-                  (row) => row.practiceSetId === activity.speakingPracticeSetId,
-                );
-                return (
-                  setExercises.length > 0 &&
-                  setExercises.every((row) => completedSpeaking.has(row.id))
-                );
-              })()
-            : typeof activity.sourceId === 'number' &&
-              completeQuizIds.has(activity.sourceId);
-        return {
-          id: activity.id,
-          lessonId: activity.lessonId,
-          order: activity.order,
-          kind: activity.kind,
-          title: activity.title,
-          required: activity.required,
-          completed: complete,
-          route: activity.route,
-        };
-      });
+    const activities = curriculumActivities.map((activity) => {
+      const complete =
+        activity.skill === 'SPEAKING'
+          ? (() => {
+              const setExercises = speakingExerciseIds.filter(
+                (row) => row.practiceSetId === activity.speakingPracticeSetId,
+              );
+              return (
+                setExercises.length > 0 &&
+                setExercises.every((row) => completedSpeaking.has(row.id))
+              );
+            })()
+          : activity.kind === 'TOEIC'
+            ? typeof activity.sourceId === 'number' &&
+              completedToeicExams.has(activity.sourceId)
+            : activity.kind === 'GRAMMAR'
+              ? typeof activity.sourceId === 'number' &&
+                completedGrammarTopics.has(activity.sourceId)
+              : typeof activity.sourceId === 'number' &&
+                completeQuizIds.has(activity.sourceId);
+      return {
+        id: activity.id,
+        lessonId: activity.lessonId,
+        order: activity.order,
+        kind: activity.kind,
+        title: activity.title,
+        required: activity.required,
+        completed: complete,
+        route: activity.route,
+      };
+    });
     const required = activities.filter((activity) => activity.required);
     const optional = activities.filter((activity) => !activity.required);
+    let blocked = false;
+    const sequencedActivities = activities.map((activity) => {
+      const unlocked = !blocked;
+      if (activity.required && !activity.completed) blocked = true;
+      return {
+        ...activity,
+        unlocked,
+        lockedReason: unlocked ? null : 'COMPLETE_PREVIOUS_REQUIRED_ACTIVITY',
+      };
+    });
     const nextActivity =
-      required.find((activity) => !activity.completed) ?? null;
+      sequencedActivities.find(
+        (activity) => activity.required && !activity.completed,
+      ) ?? null;
     return {
       requiredCompleted: required.filter((activity) => activity.completed)
         .length,
@@ -343,8 +597,89 @@ export class CourseService {
       isComplete:
         required.length > 0 && required.every((activity) => activity.completed),
       nextActivity,
-      activities,
+      activities: sequencedActivities,
     };
+  }
+
+  async startCourse(courseId: number, user: { id: number; role: Role }) {
+    if (user.role !== Role.STUDENT) {
+      throw new ForbiddenException('Chỉ học viên mới có thể bắt đầu khóa học');
+    }
+    const access = await this.resolveCourseAccess(courseId, user.id, user.role);
+    if (!access.canAccess) {
+      throw new ForbiddenException('Khóa học này cần gói PRO đang hoạt động');
+    }
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        lessons: { include: { materials: true }, orderBy: { order: 'asc' } },
+        quizzes: { include: { _count: { select: { questions: true } } } },
+        activities: {
+          include: {
+            quiz: { include: { _count: { select: { questions: true } } } },
+            speakingPracticeSet: {
+              include: { exercises: { select: { id: true } } },
+            },
+            toeicExam: { include: { groups: { select: { id: true } } } },
+            grammarTopic: { include: { questions: { select: { id: true } } } },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+    if (!course || course.status !== CourseStatus.PUBLISHED) {
+      throw new NotFoundException('Course is not learner-ready');
+    }
+    const curriculum = buildCourseCurriculum(
+      course.lessons,
+      course.quizzes,
+      course.activities,
+      course.curriculumType,
+    );
+    if (
+      curriculum.readiness !== 'READY' &&
+      curriculum.readiness !== 'FOCUSED' &&
+      curriculum.readiness !== 'TOEIC'
+    ) {
+      throw new ConflictException('Khóa học chưa sẵn sàng cho học viên');
+    }
+    const enrollment = await this.ensureSelfStudyEnrollment(courseId, user.id);
+    const progress = await this.getCourseProgressFromCurriculum(
+      courseId,
+      user.id,
+      curriculum,
+    );
+    return {
+      courseId,
+      enrollmentId: enrollment.id,
+      accessSource: access.accessSource,
+      progress,
+    };
+  }
+
+  async getCourseActivityAccess(
+    courseId: number,
+    activityId: number,
+    user: { id: number; role: Role },
+  ) {
+    const access = await this.resolveCourseAccess(courseId, user.id, user.role);
+    if (!access.canAccess) {
+      throw new ForbiddenException('Khóa học này cần gói PRO đang hoạt động');
+    }
+    const detail = await this.getCourseById(courseId, user.id, user.role);
+    const activity = detail.curriculum.lessons
+      .flatMap((lesson) => lesson.activities)
+      .find((candidate) => candidate.id === `activity:${activityId}`);
+    if (!activity) throw new NotFoundException('Course activity not found');
+    const progressActivity = (
+      'progress' in detail ? detail.progress : null
+    )?.activities.find((item) => item.id === activity.id);
+    if (progressActivity && progressActivity.unlocked === false) {
+      throw new ForbiddenException(
+        'Hãy hoàn thành hoạt động bắt buộc trước đó',
+      );
+    }
+    return { allowed: true, route: activity.route, activity };
   }
 
   async updateCourse(
@@ -531,6 +866,11 @@ export class CourseService {
     userId: number,
     options?: { isAdminOverride?: boolean },
   ): Promise<EnrollResponseDto> {
+    if (!options?.isAdminOverride) {
+      throw new ConflictException(
+        'Khóa học hiện được truy cập thông qua gói PRO.',
+      );
+    }
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         Array<{
@@ -760,8 +1100,10 @@ export class CourseService {
     const quizId: number | null = dto.quizId ?? null;
     const speakingPracticeSetId: string | null =
       dto.speakingPracticeSetId ?? null;
+    const toeicExamId: number | null = dto.toeicExamId ?? null;
+    const grammarTopicId: number | null = dto.grammarTopicId ?? null;
     if (dto.kind === 'SPEAKING') {
-      if (!speakingPracticeSetId || quizId)
+      if (!speakingPracticeSetId || quizId || toeicExamId || grammarTopicId)
         throw new BadRequestException(
           'Speaking activity phải trỏ tới practice set',
         );
@@ -771,6 +1113,28 @@ export class CourseService {
       });
       if (!set || !set.exercises.length)
         throw new BadRequestException('Speaking practice set không hợp lệ');
+    } else if (dto.kind === 'TOEIC') {
+      if (quizId || speakingPracticeSetId || grammarTopicId || !toeicExamId)
+        throw new BadRequestException(
+          'TOEIC activity phải trỏ tới một đề TOEIC',
+        );
+      const exam = await this.prisma.toeicExamSet.findUnique({
+        where: { id: toeicExamId },
+        include: { groups: { select: { id: true } } },
+      });
+      if (!exam || !exam.groups.length)
+        throw new BadRequestException('Đề TOEIC không hợp lệ');
+    } else if (dto.kind === 'GRAMMAR') {
+      if (quizId || speakingPracticeSetId || toeicExamId || !grammarTopicId)
+        throw new BadRequestException(
+          'Grammar activity phải trỏ tới một chủ đề ngữ pháp',
+        );
+      const topic = await this.prisma.grammarTopic.findUnique({
+        where: { id: grammarTopicId },
+        include: { questions: { select: { id: true } } },
+      });
+      if (!topic || !topic.questions.length)
+        throw new BadRequestException('Chủ đề ngữ pháp không hợp lệ');
     } else {
       if (!quizId || speakingPracticeSetId)
         throw new BadRequestException('Skill activity phải trỏ tới quiz');
@@ -798,6 +1162,8 @@ export class CourseService {
         isRequired: dto.isRequired ?? true,
         quizId,
         speakingPracticeSetId,
+        toeicExamId,
+        grammarTopicId,
       },
     });
   }
@@ -840,7 +1206,7 @@ export class CourseService {
     return this.prisma.courseActivity.delete({ where: { id: activityId } });
   }
 
-  async getPublicCatalog() {
+  async getPublicCatalog(userId?: number, role?: string) {
     const courses = await this.prisma.course.findMany({
       where: { status: CourseStatus.PUBLISHED },
       select: {
@@ -852,28 +1218,61 @@ export class CourseService {
         curriculumType: true,
         status: true,
         createdAt: true,
-        classes: {
-          where: { status: ClassStatus.UPCOMING },
-          select: {
-            id: true,
-            name: true,
-            capacity: true,
-            tuitionFeeVnd: true,
-            _count: { select: { enrollments: true } },
+        lessons: { include: { materials: true }, orderBy: { order: 'asc' } },
+        quizzes: { include: { _count: { select: { questions: true } } } },
+        activities: {
+          include: {
+            quiz: { include: { _count: { select: { questions: true } } } },
+            speakingPracticeSet: {
+              include: { exercises: { select: { id: true } } },
+            },
+            toeicExam: { include: { groups: { select: { id: true } } } },
+            grammarTopic: { include: { questions: { select: { id: true } } } },
           },
+          orderBy: { order: 'asc' },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
-    return courses.map((course) => ({
-      ...course,
-      upcomingClassCount: course.classes.length,
-    }));
+    const visible = [];
+    for (const course of courses) {
+      const curriculum = buildCourseCurriculum(
+        course.lessons,
+        course.quizzes,
+        course.activities,
+        course.curriculumType,
+      );
+      if (
+        curriculum.readiness !== 'READY' &&
+        curriculum.readiness !== 'FOCUSED' &&
+        curriculum.readiness !== 'TOEIC'
+      )
+        continue;
+      const access = await this.resolveCourseAccess(course.id, userId, role);
+      visible.push({
+        id: course.id,
+        title: course.title,
+        description: course.description,
+        thumbnail: course.thumbnail,
+        level: course.level,
+        curriculumType: course.curriculumType,
+        learning: getCourseLearningProfile(course.id, course.title),
+        status: course.status,
+        createdAt: course.createdAt,
+        curriculum,
+        canAccess: access.canAccess,
+        accessSource: access.accessSource,
+        requiresPro: access.requiresPro,
+        isSelfPaced: true,
+        upcomingClassCount: 0,
+      });
+    }
+    return visible;
   }
 
-  async getPublicCourseDetail(id: number) {
+  async getPublicCourseDetail(id: number, userId?: number, role?: string) {
     const course = await this.prisma.course.findFirst({
-      where: { id, status: CourseStatus.PUBLISHED },
+      where: { id },
       select: {
         id: true,
         title: true,
@@ -883,77 +1282,77 @@ export class CourseService {
         curriculumType: true,
         status: true,
         createdAt: true,
-        lessons: {
-          select: { id: true, title: true, description: true, order: true },
-          orderBy: { order: 'asc' },
-        },
-        quizzes: {
-          where: { publicationStatus: 'PUBLISHED' },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            type: true,
-            isPremiumContent: true,
-            publicationStatus: true,
-            courseId: true,
-            _count: { select: { questions: true } },
-          },
-          orderBy: { id: 'asc' },
-        },
+        lessons: { include: { materials: true }, orderBy: { order: 'asc' } },
+        quizzes: { include: { _count: { select: { questions: true } } } },
         activities: {
           include: {
             quiz: { include: { _count: { select: { questions: true } } } },
             speakingPracticeSet: {
               include: { exercises: { select: { id: true } } },
             },
+            toeicExam: { include: { groups: { select: { id: true } } } },
+            grammarTopic: { include: { questions: { select: { id: true } } } },
           },
           orderBy: { order: 'asc' },
         },
-        classes: {
-          where: { status: ClassStatus.UPCOMING },
-          select: {
-            id: true,
-            name: true,
-            startDate: true,
-            endDate: true,
-            capacity: true,
-            status: true,
-            tuitionFeeVnd: true,
-            enrollments: {
-              where: { status: EnrollmentStatus.ACTIVE },
-              select: { id: true },
-            },
-          },
-          orderBy: { startDate: 'asc' },
-        },
       },
     });
-    if (!course)
+    if (!course) {
       throw new NotFoundException(
         'Khóa học không tồn tại hoặc chưa được công khai',
       );
-    const { activities: _activities, ...publicCourse } = course;
-    void _activities;
+    }
+    const access = await this.resolveCourseAccess(id, userId, role);
+    const publicCurriculum = buildCourseCurriculum(
+      course.lessons,
+      course.quizzes,
+      course.activities,
+      course.curriculumType,
+    );
+    const curriculum = buildCourseCurriculum(
+      course.lessons,
+      access.canAccess ? course.quizzes : [],
+      access.canAccess ? course.activities : [],
+      course.curriculumType,
+    );
+    if (course.status !== CourseStatus.PUBLISHED && !access.canAccess) {
+      throw new NotFoundException(
+        'Khóa học không tồn tại hoặc chưa được công khai',
+      );
+    }
+    if (
+      !access.canAccess &&
+      publicCurriculum.readiness !== 'READY' &&
+      publicCurriculum.readiness !== 'FOCUSED' &&
+      publicCurriculum.readiness !== 'TOEIC'
+    ) {
+      throw new NotFoundException('Khóa học chưa sẵn sàng cho học viên');
+    }
     return {
-      ...publicCourse,
-      curriculum: buildCourseCurriculum(
-        course.lessons,
-        course.quizzes,
-        course.activities,
-        course.curriculumType,
-      ),
-      classes: course.classes.map(({ enrollments, ...cls }) => {
-        const current = enrollments.length;
-        const remaining =
-          cls.capacity === null ? null : Math.max(0, cls.capacity - current);
-        return {
-          ...cls,
-          currentEnrollmentCount: current,
-          remainingSeats: remaining,
-          isSoldOut: remaining !== null && remaining <= 0,
-        };
-      }),
+      id: course.id,
+      title: course.title,
+      description: course.description,
+      thumbnail: course.thumbnail,
+      level: course.level,
+      curriculumType: course.curriculumType,
+      learning: getCourseLearningProfile(id, course.title),
+      status: course.status,
+      createdAt: course.createdAt,
+      lessons: course.lessons.map((lesson) => ({
+        id: lesson.id,
+        title: lesson.title,
+        description: lesson.description,
+        order: lesson.order,
+        activities:
+          curriculum.lessons.find((item) => item.id === lesson.id)
+            ?.activities ?? [],
+      })),
+      curriculum,
+      classes: [],
+      canAccess: access.canAccess,
+      accessSource: access.accessSource,
+      requiresPro: access.requiresPro,
+      isSelfPaced: true,
     };
   }
 }

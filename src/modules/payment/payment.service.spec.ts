@@ -3,6 +3,7 @@ import {
   PaymentService,
   buildVietQrUrl,
   isReviewerForeignKeyError,
+  isLegacyCoursePaymentConfirmable,
 } from './payment.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../common/email/email.service';
@@ -839,6 +840,35 @@ describe('PaymentService', () => {
       expect(result.status).toBe(PaymentStatus.CONFIRMED);
       expect(result.activationIssue).toBeNull();
       expect(result.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+    });
+
+    it('rejects an expired legacy Course payment before any activation write', async () => {
+      prisma.payment.findUnique.mockResolvedValueOnce(preliminarySuccess);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { id: classId, status: ClassStatus.UPCOMING, capacity: 20 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: paymentId,
+            status: PaymentStatus.REPORTED,
+            enrollmentId,
+            createdAt: new Date('2025-01-01T00:00:00.000Z'),
+            confirmedAt: null,
+            reviewedAt: null,
+            reviewedById: null,
+            activationIssue: null,
+          },
+        ]);
+
+      await expect(service.confirmPayment(paymentId, adminId)).rejects.toThrow(
+        'Thanh toán khóa học cũ đã hết thời hạn xác nhận.',
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.enrollment.update).not.toHaveBeenCalled();
+      expect(
+        isLegacyCoursePaymentConfirmable(new Date('2025-01-01'), new Date()),
+      ).toBe(false);
     });
 
     it('confirms payment with CLASS_FULL and leaves enrollment PENDING_PAYMENT when class is full (Case B)', async () => {

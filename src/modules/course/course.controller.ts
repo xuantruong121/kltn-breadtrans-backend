@@ -100,6 +100,45 @@ export class CourseController {
     return this.courseService.getCourseById(id, req.user?.id, req.user?.role);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post(':id/start')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Bắt đầu hoặc tiếp tục khóa học tự học' })
+  startCourse(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.courseService.startCourse(id, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get(':id/activities/:activityId/access')
+  @Roles(Role.STUDENT)
+  @ApiOperation({
+    summary: 'Kiểm tra quyền mở hoạt động theo lộ trình khóa học',
+  })
+  getCourseActivityAccess(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('activityId', ParseIntPipe) activityId: number,
+    @Request() req: any,
+  ) {
+    return this.courseService.getCourseActivityAccess(id, activityId, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get(':courseId/lessons/:lessonId')
+  @Roles(Role.STUDENT)
+  @ApiOperation({
+    summary: 'Lấy nội dung học tập của một lesson trong khóa học',
+  })
+  getCourseLesson(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('lessonId', ParseIntPipe) lessonId: number,
+    @Request() req: any,
+  ) {
+    return this.courseService.getCourseLesson(courseId, lessonId, req.user);
+  }
+
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get(':id/progress')

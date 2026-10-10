@@ -150,7 +150,7 @@ describe('buildCourseCurriculum', () => {
       buildCourseCurriculum(lessons, [], [], 'FOCUSED_GRAMMAR_VOCAB').readiness,
     ).toBe('FOCUSED');
     expect(buildCourseCurriculum(lessons, [], [], 'TOEIC').readiness).toBe(
-      'DEFERRED_TO_TOEIC_WORKFLOW',
+      'BROKEN',
     );
   });
 });

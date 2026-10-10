@@ -308,10 +308,10 @@ export class CreateCourseActivityDto {
 
   @ApiProperty({
     example: 'LISTENING',
-    enum: ['LISTENING', 'SPEAKING', 'READING', 'WRITING'],
+    enum: ['LISTENING', 'SPEAKING', 'READING', 'WRITING', 'TOEIC', 'GRAMMAR'],
   })
   @IsString()
-  @IsIn(['LISTENING', 'SPEAKING', 'READING', 'WRITING'])
+  @IsIn(['LISTENING', 'SPEAKING', 'READING', 'WRITING', 'TOEIC', 'GRAMMAR'])
   kind: string;
 
   @ApiPropertyOptional({ example: 1 })
@@ -332,6 +332,16 @@ export class CreateCourseActivityDto {
   @IsString()
   @IsOptional()
   speakingPracticeSetId?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsInt()
+  @IsOptional()
+  toeicExamId?: number;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsInt()
+  @IsOptional()
+  grammarTopicId?: number;
 
   @ApiPropertyOptional({ example: 'Luyện nghe Unit 1' })
   @IsString()

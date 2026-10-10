@@ -34,6 +34,7 @@ import { RedisModule } from '@nestjs-modules/ioredis';
 import { JobsModule } from './jobs/jobs.module';
 import { IssueReportModule } from './modules/issue-report/issue-report.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { LocationModule } from './modules/location/location.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     JobsModule,
     IssueReportModule,
     SubscriptionModule,
+    LocationModule,
   ],
 
   controllers: [AppController],

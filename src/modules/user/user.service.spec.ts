@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserService } from './user.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ReadingService } from '../reading/reading.service';
+import { LocationService } from '../location/location.service';
 
 const mockPrismaService = {
   user: {
@@ -13,6 +14,11 @@ const mockPrismaService = {
   },
   profile: {
     upsert: jest.fn(),
+    updateMany: jest.fn(),
+  },
+  userShippingProfile: {
+    upsert: jest.fn(),
+    findUnique: jest.fn(),
   },
   userStats: {
     findUnique: jest.fn(),
@@ -56,6 +62,12 @@ const mockReadingService = {
   getTracking: jest.fn(),
 };
 
+const mockLocationService = {
+  validateWardBelongsToProvince: jest.fn(),
+  getProvinces: jest.fn(),
+  getWards: jest.fn(),
+};
+
 describe('UserService', () => {
   let service: UserService;
   let prisma: PrismaService;
@@ -75,6 +87,10 @@ describe('UserService', () => {
         {
           provide: ReadingService,
           useValue: mockReadingService,
+        },
+        {
+          provide: LocationService,
+          useValue: mockLocationService,
         },
       ],
     }).compile();
@@ -113,6 +129,7 @@ describe('UserService', () => {
           leaderboard: true,
           pet: true,
           billing: true,
+          shippingProfile: true,
         },
       });
       expect(result).toHaveProperty('id', 1);
@@ -124,6 +141,130 @@ describe('UserService', () => {
 
       await expect(service.getUserProfile(999)).rejects.toThrow(
         NotFoundException,
+      );
+    });
+  });
+
+  describe('getShippingProfile', () => {
+    it('returns default uncompleted profile when user has no saved shipping profile', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 1,
+        profile: { fullName: 'Nguyễn Văn QA', phone: '0987654321' },
+        shippingProfile: null,
+      });
+
+      const result = await service.getShippingProfile(1);
+      expect(result.shippingProfileComplete).toBe(false);
+      expect(result.recipientName).toBe('Nguyễn Văn QA');
+      expect(result.phone).toBe('+84987654321');
+      expect(result.provinceCode).toBe('');
+    });
+
+    it('returns complete profile with formattedAddress when saved shipping profile exists', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 1,
+        profile: { fullName: 'Nguyễn Văn QA' },
+        shippingProfile: {
+          recipientName: 'Nguyễn Văn QA',
+          phone: '+84987654321',
+          countryCode: 'VN',
+          provinceCode: '79',
+          provinceName: 'Thành phố Hồ Chí Minh',
+          wardCode: '26734',
+          wardName: 'Phường 1',
+          addressLine: '12 Nguyễn Văn Bảo',
+        },
+      });
+
+      const result = await service.getShippingProfile(1);
+      expect(result.shippingProfileComplete).toBe(true);
+      expect(result.formattedAddress).toBe(
+        '12 Nguyễn Văn Bảo, Phường 1, Thành phố Hồ Chí Minh, Việt Nam',
+      );
+      expect(result.phoneDisplay).toBe('0987654321');
+    });
+  });
+
+  describe('updateShippingProfile', () => {
+    it('rejects invalid Vietnamese phone numbers', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1, profile: {} });
+
+      await expect(
+        service.updateShippingProfile(1, {
+          recipientName: 'Test User',
+          phone: '12345',
+          provinceCode: '79',
+          wardCode: '26734',
+          addressLine: '12 Đường ABC',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects invalid province or mismatched ward', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1, profile: {} });
+      mockLocationService.validateWardBelongsToProvince.mockResolvedValueOnce({
+        valid: false,
+        provinceName: undefined,
+      });
+
+      await expect(
+        service.updateShippingProfile(1, {
+          recipientName: 'Test User',
+          phone: '0987654321',
+          provinceCode: '999',
+          wardCode: '111',
+          addressLine: '12 Đường ABC',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      mockLocationService.validateWardBelongsToProvince.mockResolvedValueOnce({
+        valid: false,
+        provinceName: 'Thành phố Hà Nội',
+      });
+
+      await expect(
+        service.updateShippingProfile(1, {
+          recipientName: 'Test User',
+          phone: '0987654321',
+          provinceCode: '01',
+          wardCode: '26734',
+          addressLine: '12 Đường ABC',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('saves shipping profile when validation passes', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1, profile: {} });
+      mockLocationService.validateWardBelongsToProvince.mockResolvedValue({
+        valid: true,
+        provinceName: 'Thành phố Hồ Chí Minh',
+        wardName: 'Phường Bến Nghé',
+      });
+      mockPrismaService.userShippingProfile.upsert.mockResolvedValue({
+        id: 10,
+        userId: 1,
+        recipientName: 'Nguyễn Văn QA',
+        phone: '+84987654321',
+        countryCode: 'VN',
+        provinceCode: '79',
+        provinceName: 'Thành phố Hồ Chí Minh',
+        wardCode: '26734',
+        wardName: 'Phường Bến Nghé',
+        addressLine: 'Số 10 Lê Lợi',
+      });
+
+      const result = await service.updateShippingProfile(1, {
+        recipientName: 'Nguyễn Văn QA',
+        phone: '0987654321',
+        provinceCode: '79',
+        wardCode: '26734',
+        addressLine: 'Số 10 Lê Lợi',
+      });
+
+      expect(result.shippingProfileComplete).toBe(true);
+      expect(result.phoneDisplay).toBe('0987654321');
+      expect(result.formattedAddress).toBe(
+        'Số 10 Lê Lợi, Phường Bến Nghé, Thành phố Hồ Chí Minh, Việt Nam',
       );
     });
   });

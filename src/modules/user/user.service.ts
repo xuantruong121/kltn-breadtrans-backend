@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Optional,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   Role,
@@ -7,7 +12,13 @@ import {
   QuizType,
 } from '@prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateShippingProfileDto } from './dto/update-shipping-profile.dto';
 import { ReadingService } from '../reading/reading.service';
+import { LocationService } from '../location/location.service';
+import {
+  normalizeVietnamPhone,
+  isValidVietnamPhone,
+} from '../../common/utils/vietnam-phone.util';
 import {
   CrossSkillSummaryResponse,
   CrossSkillSummaryItem,
@@ -191,11 +202,46 @@ function buildSkillItem(
   };
 }
 
+function buildFormattedAddress(
+  addressLine: string,
+  wardName: string,
+  provinceName: string,
+): string {
+  const parts = [addressLine, wardName, provinceName, 'Việt Nam'].filter(
+    (p) => typeof p === 'string' && p.trim().length > 0,
+  );
+  return parts.join(', ');
+}
+
+function isShippingProfileComplete(
+  profile:
+    | {
+        recipientName?: string | null;
+        phone?: string | null;
+        provinceCode?: string | null;
+        wardCode?: string | null;
+        addressLine?: string | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!profile) return false;
+  return Boolean(
+    profile.recipientName?.trim() &&
+      profile.phone?.trim() &&
+      isValidVietnamPhone(profile.phone) &&
+      profile.provinceCode?.trim() &&
+      profile.wardCode?.trim() &&
+      profile.addressLine?.trim(),
+  );
+}
+
 @Injectable()
 export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly readingService?: ReadingService,
+    @Optional() private readonly locationService?: LocationService,
   ) {}
 
   async getUserProfile(userId: number) {
@@ -207,6 +253,7 @@ export class UserService {
         leaderboard: true,
         pet: true,
         billing: true,
+        shippingProfile: true,
       },
     });
 
@@ -216,7 +263,168 @@ export class UserService {
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, refreshToken, ...userWithoutSensitiveData } = user;
-    return userWithoutSensitiveData;
+    const shippingComplete = isShippingProfileComplete(user.shippingProfile);
+    const formattedAddress = user.shippingProfile
+      ? buildFormattedAddress(
+          user.shippingProfile.addressLine,
+          user.shippingProfile.wardName,
+          user.shippingProfile.provinceName,
+        )
+      : '';
+
+    return {
+      ...userWithoutSensitiveData,
+      shippingProfileComplete: shippingComplete,
+      shippingProfile: user.shippingProfile
+        ? {
+            ...user.shippingProfile,
+            formattedAddress,
+            shippingProfileComplete: shippingComplete,
+          }
+        : null,
+    };
+  }
+
+  async getShippingProfile(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        profile: true,
+        shippingProfile: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.shippingProfile) {
+      const isComplete = isShippingProfileComplete(user.shippingProfile);
+      const phoneNorm = normalizeVietnamPhone(user.shippingProfile.phone);
+      return {
+        ...user.shippingProfile,
+        phoneDisplay: phoneNorm?.display || user.shippingProfile.phone,
+        formattedAddress: buildFormattedAddress(
+          user.shippingProfile.addressLine,
+          user.shippingProfile.wardName,
+          user.shippingProfile.provinceName,
+        ),
+        shippingProfileComplete: isComplete,
+      };
+    }
+
+    const defaultRecipient = user.profile?.fullName || '';
+    const phoneNorm = user.profile?.phone
+      ? normalizeVietnamPhone(user.profile.phone)
+      : null;
+
+    return {
+      recipientName: defaultRecipient,
+      phone: phoneNorm?.e164 || user.profile?.phone || '',
+      phoneDisplay: phoneNorm?.display || user.profile?.phone || '',
+      countryCode: 'VN',
+      provinceCode: '',
+      provinceName: '',
+      wardCode: '',
+      wardName: '',
+      addressLine: '',
+      formattedAddress: '',
+      shippingProfileComplete: false,
+    };
+  }
+
+  async updateShippingProfile(userId: number, dto: UpdateShippingProfileDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const normPhone = normalizeVietnamPhone(dto.phone);
+    if (!normPhone) {
+      throw new BadRequestException({
+        code: 'INVALID_VIETNAM_PHONE',
+        message:
+          'Số điện thoại không hợp lệ. Vui lòng nhập số di động Việt Nam hợp lệ (ví dụ: 0987654321 hoặc +84987654321).',
+      });
+    }
+
+    if (!this.locationService) {
+      throw new BadRequestException(
+        'Dịch vụ tra cứu đơn vị hành chính tạm thời không khả dụng',
+      );
+    }
+
+    const validation = await this.locationService.validateWardBelongsToProvince(
+      dto.provinceCode,
+      dto.wardCode,
+    );
+
+    if (!validation.valid) {
+      if (!validation.provinceName) {
+        throw new BadRequestException({
+          code: 'INVALID_PROVINCE',
+          message:
+            'Mã tỉnh/thành phố không hợp lệ trong danh mục hành chính Việt Nam',
+        });
+      }
+      throw new BadRequestException({
+        code: 'WARD_PROVINCE_MISMATCH',
+        message: 'Phường/xã đã chọn không thuộc tỉnh/thành phố tương ứng',
+      });
+    }
+
+    const provinceName = validation.provinceName!;
+    const wardName = validation.wardName!;
+    const addressLine = dto.addressLine.trim();
+    const recipientName = dto.recipientName.trim();
+
+    const saved = await this.prisma.userShippingProfile.upsert({
+      where: { userId },
+      update: {
+        recipientName,
+        phone: normPhone.e164,
+        countryCode: 'VN',
+        provinceCode: dto.provinceCode.trim(),
+        provinceName,
+        wardCode: dto.wardCode.trim(),
+        wardName,
+        addressLine,
+      },
+      create: {
+        userId,
+        recipientName,
+        phone: normPhone.e164,
+        countryCode: 'VN',
+        provinceCode: dto.provinceCode.trim(),
+        provinceName,
+        wardCode: dto.wardCode.trim(),
+        wardName,
+        addressLine,
+      },
+    });
+
+    if (!user.profile?.phone) {
+      await this.prisma.profile.updateMany({
+        where: { userId },
+        data: { phone: normPhone.e164 },
+      });
+    }
+
+    const formattedAddress = buildFormattedAddress(
+      addressLine,
+      wardName,
+      provinceName,
+    );
+
+    return {
+      ...saved,
+      phoneDisplay: normPhone.display,
+      formattedAddress,
+      shippingProfileComplete: true,
+    };
   }
 
   async updateUserProfile(userId: number, updateData: UpdateProfileDto) {

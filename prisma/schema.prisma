@@ -66,6 +66,7 @@ enum PlanFeatureKey {
   PREMIUM_LISTENING
   PREMIUM_SPEAKING_CONTENT
   PREMIUM_WRITING_CONTENT
+  COURSE_LIBRARY_ACCESS
 }
 
 enum EntitlementUnit {
@@ -116,6 +117,11 @@ enum PlanPaymentConfirmationSource {
 enum PaymentProvider {
   SEPAY
   PAYOS
+}
+
+enum MarketFulfillmentType {
+  DIGITAL
+  PHYSICAL
 }
 
 enum PayOSPaymentIntentType {
@@ -215,6 +221,8 @@ model User {
   aiGenerationJobsCreated         AiGenerationJob[] @relation("AiGenerationJobCreator")
   aiGenerationJobsReviewed        AiGenerationJob[] @relation("AiGenerationJobReviewer")
   aiGenerationJobsPublished       AiGenerationJob[] @relation("AiGenerationJobPublisher")
+  shippingProfile                 UserShippingProfile?
+  physicalRedemptions             MarketPhysicalRedemption[]
 }
 
 model AuthAccount {
@@ -595,6 +603,8 @@ model CourseActivity {
   isRequired Boolean @default(true)
   quizId Int?
   speakingPracticeSetId String?
+  toeicExamId Int?
+  grammarTopicId Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -602,11 +612,15 @@ model CourseActivity {
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   quiz Quiz? @relation(fields: [quizId], references: [id], onDelete: Restrict)
   speakingPracticeSet SpeakingPracticeSet? @relation(fields: [speakingPracticeSetId], references: [id], onDelete: Restrict)
+  toeicExam ToeicExamSet? @relation(fields: [toeicExamId], references: [id], onDelete: Restrict)
+  grammarTopic GrammarTopic? @relation(fields: [grammarTopicId], references: [id], onDelete: Restrict)
 
   @@unique([lessonId, order])
   @@index([courseId, isRequired, order])
   @@index([quizId])
   @@index([speakingPracticeSetId])
+  @@index([toeicExamId])
+  @@index([grammarTopicId])
 }
 
 enum AssignmentType {
@@ -1194,40 +1208,87 @@ model ContentAttempt {
 }
 
 model MarketProduct {
-  id            Int      @id @default(autoincrement())
-  slug          String   @unique
-  name          String
-  description   String?  @db.Text
-  category      String   @default("GENERAL")
-  rarity        String   @default("COMMON")
-  price         Int // Integer Bánh Mì units only
-  imageUrl      String?
-  order         Int      @default(0)
-  stock         Int      @default(100)
-  purchaseCount Int      @default(0)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              Int                   @id @default(autoincrement())
+  slug            String                @unique
+  name            String
+  description     String?               @db.Text
+  category        String                @default("GENERAL")
+  rarity          String                @default("COMMON")
+  price           Int // Integer Bánh Mì units only
+  imageUrl        String?
+  order           Int                   @default(0)
+  stock           Int                   @default(100)
+  purchaseCount   Int                   @default(0)
+  isActive        Boolean               @default(true)
+  fulfillmentType MarketFulfillmentType @default(DIGITAL)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 }
 
 model MarketOrder {
-  id                Int       @id @default(autoincrement())
-  userId            Int
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  studentName       String
-  items             Json // Array of item objects
-  totalK            Float
-  totalBanh         Int // Integer Bánh Mì units
-  status            String    @default("pending") // "pending" | "approved" | "rejected"
-  bankSnapshot      Json?
-  createdAt         DateTime  @default(now())
-  paidAtCheckout    Boolean?
-  balanceAtCheckout Int? // Integer Bánh Mì units at checkout time
-  reviewedAt        DateTime?
-  reviewedBy        String?
-  currencyTxId      Int?
+  id                  Int                        @id @default(autoincrement())
+  userId              Int
+  user                User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentName         String
+  items               Json // Array of item objects
+  totalK              Float
+  totalBanh           Int // Integer Bánh Mì units
+  status              String                     @default("pending") // "pending" | "approved" | "rejected"
+  bankSnapshot        Json?
+  createdAt           DateTime                   @default(now())
+  paidAtCheckout      Boolean?
+  balanceAtCheckout   Int? // Integer Bánh Mì units at checkout time
+  reviewedAt          DateTime?
+  reviewedBy          String?
+  currencyTxId        Int?
   /// Client-generated idempotency key for a single checkout request.
-  idempotencyKey    String?   @unique
+  idempotencyKey      String?                    @unique
+  physicalRedemptions MarketPhysicalRedemption[]
+}
+
+model UserShippingProfile {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientName String
+  phone         String
+  countryCode   String   @default("VN")
+  provinceCode  String
+  provinceName  String
+  wardCode      String
+  wardName      String
+  addressLine   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model MarketPhysicalRedemption {
+  id               Int         @id @default(autoincrement())
+  userId           Int
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId          Int
+  order            MarketOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId        Int
+  productName      String
+  quantity         Int         @default(1)
+  status           String      @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+  recipientName    String
+  phone            String
+  countryCode      String      @default("VN")
+  provinceCode     String
+  provinceName     String
+  wardCode         String
+  wardName         String
+  addressLine      String
+  formattedAddress String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
 }
 
 model GameSettings {
@@ -1471,6 +1532,7 @@ model ToeicExamSet {
   groups       ToeicQuestionGroup[]
   attempts     ToeicAttempt[]
   toeicRewards UserToeicReward[]
+  courseActivities CourseActivity[]
 }
 
 model ToeicQuestionGroup {
@@ -1643,6 +1705,7 @@ model GrammarTopic {
   questions GrammarQuestion[]
   attempts  GrammarAttempt[]
   rewards   UserGrammarReward[]
+  courseActivities CourseActivity[]
 }
 
 model GrammarQuestion {

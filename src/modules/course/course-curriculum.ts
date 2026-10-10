@@ -1,6 +1,7 @@
 export type CourseCurriculumSkill =
   'LISTENING' | 'SPEAKING' | 'READING' | 'WRITING';
-export type CourseCurriculumKind = CourseCurriculumSkill | 'LESSON';
+export type CourseCurriculumKind =
+  CourseCurriculumSkill | 'LESSON' | 'TOEIC' | 'GRAMMAR';
 
 type MaterialSource = {
   id: number;
@@ -33,6 +34,18 @@ type SpeakingSetSource = {
   description: string;
   exercises?: Array<{ id: number }>;
 };
+type ToeicExamSource = {
+  id: number;
+  title: string;
+  description?: string | null;
+  groups?: Array<{ id: number }>;
+};
+type GrammarTopicSource = {
+  id: number;
+  title: string;
+  description?: string | null;
+  questions?: Array<{ id: number }>;
+};
 type ActivitySource = {
   id: number;
   lessonId: number;
@@ -42,8 +55,12 @@ type ActivitySource = {
   isRequired: boolean;
   quizId?: number | null;
   speakingPracticeSetId?: string | null;
+  toeicExamId?: number | null;
+  grammarTopicId?: number | null;
   quiz?: QuizSource | null;
   speakingPracticeSet?: SpeakingSetSource | null;
+  toeicExam?: ToeicExamSource | null;
+  grammarTopic?: GrammarTopicSource | null;
 };
 
 export type CourseCurriculumActivity = {
@@ -61,6 +78,10 @@ export type CourseCurriculumActivity = {
   lessonId?: number;
   order?: number;
   speakingPracticeSetId?: string | null;
+  toeicExamId?: number | null;
+  grammarTopicId?: number | null;
+  unlocked?: boolean;
+  lockedReason?: string | null;
 };
 export type CourseCurriculumLesson = {
   id: number;
@@ -82,6 +103,7 @@ export type CourseCurriculum = {
     | 'EMPTY'
     | 'BROKEN'
     | 'FOCUSED'
+    | 'TOEIC'
     | 'DEFERRED_TO_TOEIC_WORKFLOW';
   readinessReasons: string[];
 };
@@ -206,31 +228,66 @@ export function buildCourseCurriculum(
             ? (row.kind as CourseCurriculumSkill)
             : null;
     const validSet = skill === 'SPEAKING' && !!set;
+    const isToeic = row.kind === 'TOEIC';
+    const isGrammar = row.kind === 'GRAMMAR';
+    const targetValid = isToeic
+      ? Boolean(row.toeicExam && (row.toeicExam.groups?.length ?? 0) > 0)
+      : isGrammar
+        ? Boolean(
+            row.grammarTopic && (row.grammarTopic.questions?.length ?? 0) > 0,
+          )
+        : true;
     const activity: CourseCurriculumActivity = {
       id: `activity:${row.id}`,
-      sourceId:
-        skill === 'SPEAKING' ? (set?.id ?? row.id) : (quiz?.id ?? row.id),
-      kind: skill ?? 'LESSON',
+      sourceId: isToeic
+        ? (row.toeicExam?.id ?? row.id)
+        : isGrammar
+          ? (row.grammarTopic?.id ?? row.id)
+          : skill === 'SPEAKING'
+            ? (set?.id ?? row.id)
+            : (quiz?.id ?? row.id),
+      kind: skill ?? (isToeic ? 'TOEIC' : isGrammar ? 'GRAMMAR' : 'LESSON'),
       skill,
-      title: row.title ?? set?.title ?? quiz?.title ?? 'Hoạt động học tập',
-      description: set?.description ?? quiz?.description ?? null,
+      title:
+        row.title ??
+        set?.title ??
+        quiz?.title ??
+        row.toeicExam?.title ??
+        row.grammarTopic?.title ??
+        'Hoạt động học tập',
+      description:
+        set?.description ??
+        quiz?.description ??
+        row.toeicExam?.description ??
+        row.grammarTopic?.description ??
+        null,
       route:
         skill === 'SPEAKING' && set?.exercises?.[0]
           ? `/speaking/${set.exercises[0].id}?set=${encodeURIComponent(set.id)}`
-          : routeForQuiz(skill, quiz?.id ?? 0),
+          : isToeic && row.toeicExam
+            ? `/toeic/${row.toeicExam.id}`
+            : isGrammar && row.grammarTopic
+              ? `/reading?category=grammar&topicId=${row.grammarTopic.id}`
+              : routeForQuiz(skill, quiz?.id ?? 0),
       required: row.isRequired,
       published:
         skill === 'SPEAKING'
           ? validSet
-          : quiz?.publicationStatus === 'PUBLISHED',
+          : isToeic || isGrammar
+            ? targetValid
+            : quiz?.publicationStatus === 'PUBLISHED',
       hasQuestions:
         skill === 'SPEAKING'
           ? validSet && (set?.exercises?.length ?? 0) > 0
-          : (quiz?._count?.questions ?? 0) > 0,
+          : isToeic || isGrammar
+            ? targetValid
+            : (quiz?._count?.questions ?? 0) > 0,
       isPremiumContent: Boolean(quiz?.isPremiumContent),
       lessonId: row.lessonId,
       order: row.order,
       speakingPracticeSetId: row.speakingPracticeSetId ?? null,
+      toeicExamId: row.toeicExamId ?? null,
+      grammarTopicId: row.grammarTopicId ?? null,
     };
     byLesson.get(row.lessonId)?.activities.push(activity);
   }
@@ -272,7 +329,17 @@ export function buildCourseCurriculum(
       readiness: lessonRows.length ? (broken ? 'BROKEN' : 'FOCUSED') : 'EMPTY',
       readinessReasons: reasons,
     };
-  if (curriculumType === 'TOEIC')
+  if (curriculumType === 'TOEIC') {
+    const courseActivities = lessonRows.flatMap((lesson) => lesson.activities);
+    const hasValidToeicTarget =
+      courseActivities.length > 0 &&
+      required.length > 0 &&
+      required.every(
+        (activity) =>
+          activity.published && activity.hasQuestions && activity.route,
+      );
+    if (!hasValidToeicTarget)
+      reasons.push('Chưa có hoạt động TOEIC/Speaking/Writing hợp lệ.');
     return {
       version: 2,
       lessons: lessonRows,
@@ -281,9 +348,15 @@ export function buildCourseCurriculum(
         .flatMap((l) => l.activities)
         .filter((a) => !a.required).length,
       skillCoverage,
-      readiness: 'DEFERRED_TO_TOEIC_WORKFLOW',
-      readinessReasons: ['Course TOEIC chờ quy trình Exam riêng.'],
+      readiness:
+        lessonRows.length && !broken && hasValidToeicTarget
+          ? 'TOEIC'
+          : lessonRows.length
+            ? 'BROKEN'
+            : 'EMPTY',
+      readinessReasons: reasons,
     };
+  }
   for (const skill of [
     'LISTENING',
     'SPEAKING',
