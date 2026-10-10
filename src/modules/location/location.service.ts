@@ -194,8 +194,8 @@ export class LocationService {
           const wards: VietnamWardItem[] = provinceObj.wards.map((w) => ({
             code: String(w.code),
             name: w.name,
-            divisionType: w.division_type,
-            codename: w.codename,
+            divisionType: w.division_type || '',
+            codename: w.codename || '',
             provinceCode: String(w.province_code || normalizedProvinceCode),
           }));
 
