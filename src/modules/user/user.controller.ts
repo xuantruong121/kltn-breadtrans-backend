@@ -114,7 +114,8 @@ export class UserController {
   @ApiBearerAuth()
   @Patch('shipping-profile')
   @ApiOperation({
-    summary: 'Cập nhật thông tin địa chỉ giao hàng / nhận quà của user hiện tại',
+    summary:
+      'Cập nhật thông tin địa chỉ giao hàng / nhận quà của user hiện tại',
   })
   async updateShippingProfile(
     @Request() req: any,
@@ -123,4 +124,3 @@ export class UserController {
     return this.userService.updateShippingProfile(req.user.id, dto);
   }
 }
-

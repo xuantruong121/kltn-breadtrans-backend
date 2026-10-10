@@ -1,4 +1,7 @@
-import { isValidVietnamPhone, normalizeVietnamPhone } from './vietnam-phone.util';
+import {
+  isValidVietnamPhone,
+  normalizeVietnamPhone,
+} from './vietnam-phone.util';
 
 describe('VietnamPhoneUtil', () => {
   it('validates standard 10-digit mobile numbers', () => {

@@ -2,18 +2,27 @@ import { IsString, IsNotEmpty, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateShippingProfileDto {
-  @ApiProperty({ description: 'Họ tên người nhận quà', example: 'Nguyễn Văn A' })
+  @ApiProperty({
+    description: 'Họ tên người nhận quà',
+    example: 'Nguyễn Văn A',
+  })
   @IsString()
   @IsNotEmpty({ message: 'Vui lòng nhập tên người nhận' })
   @MaxLength(100, { message: 'Tên người nhận không quá 100 ký tự' })
   recipientName: string;
 
-  @ApiProperty({ description: 'Số điện thoại liên hệ nhận quà', example: '0987654321' })
+  @ApiProperty({
+    description: 'Số điện thoại liên hệ nhận quà',
+    example: '0987654321',
+  })
   @IsString()
   @IsNotEmpty({ message: 'Vui lòng nhập số điện thoại' })
   phone: string;
 
-  @ApiProperty({ description: 'Mã tỉnh/thành phố trực thuộc trung ương', example: '79' })
+  @ApiProperty({
+    description: 'Mã tỉnh/thành phố trực thuộc trung ương',
+    example: '79',
+  })
   @IsString()
   @IsNotEmpty({ message: 'Vui lòng chọn tỉnh/thành phố' })
   provinceCode: string;

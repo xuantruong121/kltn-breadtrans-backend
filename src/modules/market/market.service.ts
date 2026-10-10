@@ -42,7 +42,7 @@ export class MarketService {
       available: product.stock > 0 && product.isActive,
       purchaseCount: product.purchaseCount,
       isActive: product.isActive,
-      fulfillmentType: product.fulfillmentType as 'DIGITAL' | 'PHYSICAL',
+      fulfillmentType: product.fulfillmentType,
       requiresShippingAddress: product.fulfillmentType === 'PHYSICAL',
     }));
   }
@@ -167,16 +167,19 @@ export class MarketService {
       });
 
       const missingFields: string[] = [];
-      if (!shippingProfile?.recipientName?.trim()) missingFields.push('recipientName');
+      if (!shippingProfile?.recipientName?.trim())
+        missingFields.push('recipientName');
       if (
         !shippingProfile?.phone?.trim() ||
         !isValidVietnamPhone(shippingProfile.phone)
       ) {
         missingFields.push('phone');
       }
-      if (!shippingProfile?.provinceCode?.trim()) missingFields.push('province');
+      if (!shippingProfile?.provinceCode?.trim())
+        missingFields.push('province');
       if (!shippingProfile?.wardCode?.trim()) missingFields.push('ward');
-      if (!shippingProfile?.addressLine?.trim()) missingFields.push('addressLine');
+      if (!shippingProfile?.addressLine?.trim())
+        missingFields.push('addressLine');
 
       if (!shippingProfile || missingFields.length > 0) {
         throw new UnprocessableEntityException({

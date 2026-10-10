@@ -140,34 +140,44 @@ describe('MarketService', () => {
     };
 
     it('allows digital item redemption without any shipping profile', async () => {
-      mockPrismaService.marketProduct.findMany.mockResolvedValue([mockDigitalProduct]);
+      mockPrismaService.marketProduct.findMany.mockResolvedValue([
+        mockDigitalProduct,
+      ]);
       mockPrismaService.marketOrder.findUnique.mockResolvedValue(null);
-      mockPrismaService.profile.findUnique.mockResolvedValue({ fullName: 'Digital Learner' });
-
-      mockPrismaService.$transaction.mockImplementation(async (callback) => {
-        const tx = {
-          $executeRaw: jest.fn(),
-          marketOrder: {
-            findUnique: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockResolvedValue({ id: 99, status: 'approved', totalBanh: 20 }),
-          },
-          marketProduct: {
-            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-          },
-          userStats: {
-            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-            findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 80 }),
-            update: jest.fn(),
-          },
-          banhTransaction: {
-            create: jest.fn().mockResolvedValue({ id: 1 }),
-          },
-          marketPhysicalRedemption: {
-            create: jest.fn(),
-          },
-        };
-        return callback(tx);
+      mockPrismaService.profile.findUnique.mockResolvedValue({
+        fullName: 'Digital Learner',
       });
+
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $executeRaw: jest.fn(),
+            marketOrder: {
+              findUnique: jest.fn().mockResolvedValue(null),
+              create: jest.fn().mockResolvedValue({
+                id: 99,
+                status: 'approved',
+                totalBanh: 20,
+              }),
+            },
+            marketProduct: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+            userStats: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 80 }),
+              update: jest.fn(),
+            },
+            banhTransaction: {
+              create: jest.fn().mockResolvedValue({ id: 1 }),
+            },
+            marketPhysicalRedemption: {
+              create: jest.fn(),
+            },
+          };
+          return await callback(tx);
+        },
+      );
 
       const result = await service.createOrder(1, {
         items: [{ id: 'streak-freeze', quantity: 1 }],
@@ -176,13 +186,19 @@ describe('MarketService', () => {
       expect(result.success).toBe(true);
       expect(result.status).toBe('approved');
       // No userShippingProfile query required for digital items
-      expect(mockPrismaService.userShippingProfile.findUnique).not.toHaveBeenCalled();
+      expect(
+        mockPrismaService.userShippingProfile.findUnique,
+      ).not.toHaveBeenCalled();
     });
 
     it('blocks physical item redemption when user has no shipping profile, with 0 balance deduction', async () => {
-      mockPrismaService.marketProduct.findMany.mockResolvedValue([mockPhysicalProduct]);
+      mockPrismaService.marketProduct.findMany.mockResolvedValue([
+        mockPhysicalProduct,
+      ]);
       mockPrismaService.marketOrder.findUnique.mockResolvedValue(null);
-      mockPrismaService.profile.findUnique.mockResolvedValue({ fullName: 'Learner Without Address' });
+      mockPrismaService.profile.findUnique.mockResolvedValue({
+        fullName: 'Learner Without Address',
+      });
       mockPrismaService.userShippingProfile.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -197,9 +213,13 @@ describe('MarketService', () => {
     });
 
     it('blocks physical item redemption when shipping profile is incomplete (missing phone)', async () => {
-      mockPrismaService.marketProduct.findMany.mockResolvedValue([mockPhysicalProduct]);
+      mockPrismaService.marketProduct.findMany.mockResolvedValue([
+        mockPhysicalProduct,
+      ]);
       mockPrismaService.marketOrder.findUnique.mockResolvedValue(null);
-      mockPrismaService.profile.findUnique.mockResolvedValue({ fullName: 'Learner QA' });
+      mockPrismaService.profile.findUnique.mockResolvedValue({
+        fullName: 'Learner QA',
+      });
       mockPrismaService.userShippingProfile.findUnique.mockResolvedValue({
         recipientName: 'Nguyễn Văn QA',
         phone: '', // missing
@@ -213,9 +233,13 @@ describe('MarketService', () => {
           items: [{ id: 'gift-bottle', quantity: 1 }],
         });
         fail('Expected UnprocessableEntityException');
-      } catch (err: any) {
+      } catch (err: unknown) {
         expect(err).toBeInstanceOf(UnprocessableEntityException);
-        const response = err.getResponse();
+        const exception = err as UnprocessableEntityException;
+        const response = exception.getResponse() as {
+          code: string;
+          missingFields: string[];
+        };
         expect(response.code).toBe('SHIPPING_PROFILE_REQUIRED');
         expect(response.missingFields).toContain('phone');
       }
@@ -224,9 +248,13 @@ describe('MarketService', () => {
     });
 
     it('creates order and snapshots shipping information immutably when shipping profile is complete', async () => {
-      mockPrismaService.marketProduct.findMany.mockResolvedValue([mockPhysicalProduct]);
+      mockPrismaService.marketProduct.findMany.mockResolvedValue([
+        mockPhysicalProduct,
+      ]);
       mockPrismaService.marketOrder.findUnique.mockResolvedValue(null);
-      mockPrismaService.profile.findUnique.mockResolvedValue({ fullName: 'Learner QA' });
+      mockPrismaService.profile.findUnique.mockResolvedValue({
+        fullName: 'Learner QA',
+      });
 
       const mockShipping = {
         id: 5,
@@ -240,40 +268,52 @@ describe('MarketService', () => {
         wardName: 'Phường 1',
         addressLine: '12 Nguyễn Văn Bảo',
       };
-      mockPrismaService.userShippingProfile.findUnique.mockResolvedValue(mockShipping);
+      mockPrismaService.userShippingProfile.findUnique.mockResolvedValue(
+        mockShipping,
+      );
 
-      let createdRedemption: any = null;
+      let createdRedemption: Record<string, unknown> | null = null;
 
-      mockPrismaService.$transaction.mockImplementation(async (callback) => {
-        const tx = {
-          $executeRaw: jest.fn(),
-          marketOrder: {
-            findUnique: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockResolvedValue({ id: 101, status: 'pending', totalBanh: 100 }),
-          },
-          marketProduct: {
-            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-          },
-          userStats: {
-            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-            findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 150 }),
-            update: jest.fn(),
-          },
-          banhTransaction: {
-            create: jest.fn().mockResolvedValue({ id: 10 }),
-          },
-          userShippingProfile: {
-            findUnique: jest.fn().mockResolvedValue(mockShipping),
-          },
-          marketPhysicalRedemption: {
-            create: jest.fn().mockImplementation(({ data }) => {
-              createdRedemption = data;
-              return { id: 1, ...data };
-            }),
-          },
-        };
-        return callback(tx);
-      });
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $executeRaw: jest.fn(),
+            marketOrder: {
+              findUnique: jest.fn().mockResolvedValue(null),
+              create: jest.fn().mockResolvedValue({
+                id: 101,
+                status: 'pending',
+                totalBanh: 100,
+              }),
+            },
+            marketProduct: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+            userStats: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 150 }),
+              update: jest.fn(),
+            },
+            banhTransaction: {
+              create: jest.fn().mockResolvedValue({ id: 10 }),
+            },
+            userShippingProfile: {
+              findUnique: jest.fn().mockResolvedValue(mockShipping),
+            },
+            marketPhysicalRedemption: {
+              create: jest
+                .fn()
+                .mockImplementation(
+                  ({ data }: { data: Record<string, unknown> }) => {
+                    createdRedemption = data;
+                    return { id: 1, ...data };
+                  },
+                ),
+            },
+          };
+          return await callback(tx);
+        },
+      );
 
       const result = await service.createOrder(2, {
         items: [{ id: 'gift-bottle', quantity: 1 }],

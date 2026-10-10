@@ -187,7 +187,10 @@ describe('UserService', () => {
 
   describe('updateShippingProfile', () => {
     it('rejects invalid Vietnamese phone numbers', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1, profile: {} });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 1,
+        profile: {},
+      });
 
       await expect(
         service.updateShippingProfile(1, {
@@ -201,7 +204,10 @@ describe('UserService', () => {
     });
 
     it('rejects invalid province or mismatched ward', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1, profile: {} });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 1,
+        profile: {},
+      });
       mockLocationService.validateWardBelongsToProvince.mockResolvedValueOnce({
         valid: false,
         provinceName: undefined,
@@ -234,7 +240,10 @@ describe('UserService', () => {
     });
 
     it('saves shipping profile when validation passes', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1, profile: {} });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 1,
+        profile: {},
+      });
       mockLocationService.validateWardBelongsToProvince.mockResolvedValue({
         valid: true,
         provinceName: 'Thành phố Hồ Chí Minh',

@@ -24,7 +24,9 @@ describe('LocationService', () => {
     expect(hcmWards.length).toBeGreaterThan(0);
     hcmWards.forEach((w) => {
       expect(w.provinceCode).toBe('79');
-      expect(['phường', 'xã', 'đặc khu']).toContain(w.divisionType.toLowerCase());
+      expect(['phường', 'xã', 'đặc khu']).toContain(
+        w.divisionType.toLowerCase(),
+      );
     });
 
     const emptyWards = await service.getWards('invalid-code');
@@ -36,18 +38,27 @@ describe('LocationService', () => {
     const validWard = hcmWards[0];
 
     // Valid pair
-    const validResult = await service.validateWardBelongsToProvince('79', validWard.code);
+    const validResult = await service.validateWardBelongsToProvince(
+      '79',
+      validWard.code,
+    );
     expect(validResult.valid).toBe(true);
     expect(validResult.provinceName).toBe('Thành phố Hồ Chí Minh');
     expect(validResult.wardName).toBe(validWard.name);
 
     // Cross-province pair: Ha Noi province ('1') with HCM ward
-    const crossResult = await service.validateWardBelongsToProvince('1', validWard.code);
+    const crossResult = await service.validateWardBelongsToProvince(
+      '1',
+      validWard.code,
+    );
     expect(crossResult.valid).toBe(false);
     expect(crossResult.provinceName).toBe('Thành phố Hà Nội');
 
     // Unknown province
-    const unknownProv = await service.validateWardBelongsToProvince('999', '12345');
+    const unknownProv = await service.validateWardBelongsToProvince(
+      '999',
+      '12345',
+    );
     expect(unknownProv.valid).toBe(false);
     expect(unknownProv.provinceName).toBeUndefined();
   });

@@ -51,14 +51,20 @@ export class LocationService {
     if (this.localSnapshot) return this.localSnapshot;
 
     try {
-      const filePath = path.join(__dirname, 'data', 'vietnam-administrative-units-v2.json');
+      const filePath = path.join(
+        __dirname,
+        'data',
+        'vietnam-administrative-units-v2.json',
+      );
       if (fs.existsSync(filePath)) {
         const raw = fs.readFileSync(filePath, 'utf8');
         this.localSnapshot = JSON.parse(raw);
         return this.localSnapshot!;
       }
     } catch (err: any) {
-      this.logger.warn(`Failed to read local location snapshot file: ${err?.message}`);
+      this.logger.warn(
+        `Failed to read local location snapshot file: ${err?.message}`,
+      );
     }
 
     // Default minimal empty fallback if file read failed
@@ -118,7 +124,12 @@ export class LocationService {
 
           if (this.redis) {
             try {
-              await this.redis.set(cacheKey, JSON.stringify(provinces), 'EX', this.CACHE_TTL_SECONDS);
+              await this.redis.set(
+                cacheKey,
+                JSON.stringify(provinces),
+                'EX',
+                this.CACHE_TTL_SECONDS,
+              );
             } catch (err: any) {
               this.logger.warn(`Redis cache set error: ${err?.message}`);
             }
@@ -127,7 +138,9 @@ export class LocationService {
         }
       }
     } catch (err: any) {
-      this.logger.warn(`Province Open API v2 fetch error, using local snapshot: ${err?.message}`);
+      this.logger.warn(
+        `Province Open API v2 fetch error, using local snapshot: ${err?.message}`,
+      );
     }
 
     // Fallback to local verified snapshot
@@ -159,15 +172,26 @@ export class LocationService {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.API_TIMEOUT_MS);
-      const res = await fetch(`${this.PROVINCE_API_BASE}/p/${normalizedProvinceCode}?depth=2`, {
-        signal: controller.signal,
-      });
+      const res = await fetch(
+        `${this.PROVINCE_API_BASE}/p/${normalizedProvinceCode}?depth=2`,
+        {
+          signal: controller.signal,
+        },
+      );
       clearTimeout(timeout);
 
       if (res.ok) {
-        const provinceObj = await res.json();
+        const provinceObj = (await res.json()) as {
+          wards?: Array<{
+            code: string | number;
+            name: string;
+            division_type?: string;
+            codename?: string;
+            province_code?: string | number;
+          }>;
+        } | null;
         if (provinceObj && Array.isArray(provinceObj.wards)) {
-          const wards: VietnamWardItem[] = provinceObj.wards.map((w: any) => ({
+          const wards: VietnamWardItem[] = provinceObj.wards.map((w) => ({
             code: String(w.code),
             name: w.name,
             divisionType: w.division_type,
@@ -177,21 +201,32 @@ export class LocationService {
 
           if (this.redis) {
             try {
-              await this.redis.set(cacheKey, JSON.stringify(wards), 'EX', this.CACHE_TTL_SECONDS);
+              await this.redis.set(
+                cacheKey,
+                JSON.stringify(wards),
+                'EX',
+                this.CACHE_TTL_SECONDS,
+              );
             } catch (err: any) {
-              this.logger.warn(`Redis cache set error for wards: ${err?.message}`);
+              this.logger.warn(
+                `Redis cache set error for wards: ${err?.message}`,
+              );
             }
           }
           return wards;
         }
       }
     } catch (err: any) {
-      this.logger.warn(`Province Open API v2 wards fetch error, using local snapshot: ${err?.message}`);
+      this.logger.warn(
+        `Province Open API v2 wards fetch error, using local snapshot: ${err?.message}`,
+      );
     }
 
     // Fallback to local snapshot filtered by provinceCode
     const snapshot = this.loadLocalSnapshot();
-    return snapshot.wards.filter((w) => String(w.provinceCode) === normalizedProvinceCode);
+    return snapshot.wards.filter(
+      (w) => String(w.provinceCode) === normalizedProvinceCode,
+    );
   }
 
   async validateWardBelongsToProvince(
@@ -206,14 +241,18 @@ export class LocationService {
     }
 
     const provinces = await this.getProvinces();
-    const province = provinces.find((p) => String(p.code) === normalizedProvinceCode);
+    const province = provinces.find(
+      (p) => String(p.code) === normalizedProvinceCode,
+    );
     if (!province) {
       return { valid: false };
     }
 
     const wards = await this.getWards(normalizedProvinceCode);
     const ward = wards.find(
-      (w) => String(w.code) === normalizedWardCode && String(w.provinceCode) === normalizedProvinceCode,
+      (w) =>
+        String(w.code) === normalizedWardCode &&
+        String(w.provinceCode) === normalizedProvinceCode,
     );
     if (!ward) {
       return { valid: false, provinceName: province.name };

@@ -228,11 +228,11 @@ function isShippingProfileComplete(
   if (!profile) return false;
   return Boolean(
     profile.recipientName?.trim() &&
-      profile.phone?.trim() &&
-      isValidVietnamPhone(profile.phone) &&
-      profile.provinceCode?.trim() &&
-      profile.wardCode?.trim() &&
-      profile.addressLine?.trim(),
+    profile.phone?.trim() &&
+    isValidVietnamPhone(profile.phone) &&
+    profile.provinceCode?.trim() &&
+    profile.wardCode?.trim() &&
+    profile.addressLine?.trim(),
   );
 }
 
