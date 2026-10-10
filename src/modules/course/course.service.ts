@@ -165,7 +165,6 @@ export class CourseService {
       const enrollments = await this.prisma.enrollment.findMany({
         where: {
           userId,
-          status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
         },
         include: {
           class: {
@@ -866,11 +865,6 @@ export class CourseService {
     userId: number,
     options?: { isAdminOverride?: boolean },
   ): Promise<EnrollResponseDto> {
-    if (!options?.isAdminOverride) {
-      throw new ConflictException(
-        'Khóa học hiện được truy cập thông qua gói PRO.',
-      );
-    }
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         Array<{
@@ -1231,6 +1225,16 @@ export class CourseService {
           },
           orderBy: { order: 'asc' },
         },
+        classes: {
+          where: { status: ClassStatus.UPCOMING },
+          select: {
+            id: true,
+            name: true,
+            capacity: true,
+            tuitionFeeVnd: true,
+            _count: { select: { enrollments: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -1242,12 +1246,6 @@ export class CourseService {
         course.activities,
         course.curriculumType,
       );
-      if (
-        curriculum.readiness !== 'READY' &&
-        curriculum.readiness !== 'FOCUSED' &&
-        curriculum.readiness !== 'TOEIC'
-      )
-        continue;
       const access = await this.resolveCourseAccess(course.id, userId, role);
       visible.push({
         id: course.id,
@@ -1260,11 +1258,21 @@ export class CourseService {
         status: course.status,
         createdAt: course.createdAt,
         curriculum,
+        classes: (course.classes || []).map((cls) => ({
+          ...cls,
+          currentEnrollmentCount: cls._count.enrollments,
+          remainingSeats:
+            cls.capacity === null
+              ? null
+              : Math.max(0, cls.capacity - cls._count.enrollments),
+          isSoldOut:
+            cls.capacity !== null && cls.capacity - cls._count.enrollments <= 0,
+        })),
         canAccess: access.canAccess,
         accessSource: access.accessSource,
         requiresPro: access.requiresPro,
         isSelfPaced: true,
-        upcomingClassCount: 0,
+        upcomingClassCount: course.classes?.length ?? 0,
       });
     }
     return visible;
@@ -1295,6 +1303,23 @@ export class CourseService {
           },
           orderBy: { order: 'asc' },
         },
+        classes: {
+          where: { status: ClassStatus.UPCOMING },
+          select: {
+            id: true,
+            name: true,
+            startDate: true,
+            endDate: true,
+            capacity: true,
+            status: true,
+            tuitionFeeVnd: true,
+            enrollments: {
+              where: { status: EnrollmentStatus.ACTIVE },
+              select: { id: true },
+            },
+          },
+          orderBy: { startDate: 'asc' },
+        },
       },
     });
     if (!course) {
@@ -1303,12 +1328,6 @@ export class CourseService {
       );
     }
     const access = await this.resolveCourseAccess(id, userId, role);
-    const publicCurriculum = buildCourseCurriculum(
-      course.lessons,
-      course.quizzes,
-      course.activities,
-      course.curriculumType,
-    );
     const curriculum = buildCourseCurriculum(
       course.lessons,
       access.canAccess ? course.quizzes : [],
@@ -1319,14 +1338,6 @@ export class CourseService {
       throw new NotFoundException(
         'Khóa học không tồn tại hoặc chưa được công khai',
       );
-    }
-    if (
-      !access.canAccess &&
-      publicCurriculum.readiness !== 'READY' &&
-      publicCurriculum.readiness !== 'FOCUSED' &&
-      publicCurriculum.readiness !== 'TOEIC'
-    ) {
-      throw new NotFoundException('Khóa học chưa sẵn sàng cho học viên');
     }
     return {
       id: course.id,
@@ -1348,7 +1359,17 @@ export class CourseService {
             ?.activities ?? [],
       })),
       curriculum,
-      classes: [],
+      classes: (course.classes || []).map(({ enrollments, ...cls }) => {
+        const current = enrollments?.length ?? 0;
+        const remaining =
+          cls.capacity === null ? null : Math.max(0, cls.capacity - current);
+        return {
+          ...cls,
+          currentEnrollmentCount: current,
+          remainingSeats: remaining,
+          isSoldOut: remaining !== null && remaining <= 0,
+        };
+      }),
       canAccess: access.canAccess,
       accessSource: access.accessSource,
       requiresPro: access.requiresPro,

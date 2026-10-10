@@ -342,12 +342,16 @@ export class CourseController {
   ) {
     const result = await this.courseService.enrollInClass(classId, req.user.id);
     if (this.payos && result.status === 'PENDING_PAYMENT') {
-      const paymentIntent = await this.payos.createForCoursePayment(
-        req.user.id,
-        result.enrollmentId,
-        `Course class ${classId}`,
-      );
-      return { ...result, payos: paymentIntent };
+      try {
+        const paymentIntent = await this.payos.createForCoursePayment(
+          req.user.id,
+          result.enrollmentId,
+          `Course class ${classId}`,
+        );
+        return { ...result, payos: paymentIntent };
+      } catch {
+        return result;
+      }
     }
     return result;
   }

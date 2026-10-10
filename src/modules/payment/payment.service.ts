@@ -297,11 +297,22 @@ export class PaymentService {
     };
   }
 
-  private payosIntentOrLegacyBank(intent: { id: number } | null) {
-    // Once PayOS is configured, never require the removed legacy bank
-    // environment variables. Historical payments without an intent simply
-    // have no bank instructions to display.
-    if (intent || this.payos?.isEnabled()) return null;
+  private payosIntentOrLegacyBank(
+    intent: {
+      id: number;
+      bankBin?: string | null;
+      bankAccountNumber?: string | null;
+      bankAccountName?: string | null;
+    } | null,
+  ) {
+    if (intent?.bankBin && intent?.bankAccountNumber) {
+      return {
+        bin: intent.bankBin,
+        bankName: 'PayOS Virtual Account',
+        accountNumber: intent.bankAccountNumber,
+        accountName: intent.bankAccountName || 'BREADTRANS',
+      };
+    }
     return getPaymentBankConfig();
   }
 
