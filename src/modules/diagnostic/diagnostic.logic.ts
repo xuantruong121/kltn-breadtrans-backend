@@ -10,6 +10,90 @@ export type DiagnosticQuestionForScoring = {
   order: number;
 };
 
+export type DiagnosticQuestionMeta = {
+  values: string[];
+  stableKey?: string;
+  section?: string;
+  construct?: string;
+  intendedLevel?: 'A1' | 'A2' | 'B1' | 'B2';
+  questionType?: 'MCQ' | 'OPEN_TEXT';
+  passageText?: string | null;
+  audioGroup?: string | null;
+  audioUrl?: string | null;
+  activeInForm?: boolean;
+};
+
+export function getQuestionMeta(
+  question: DiagnosticQuestionForScoring,
+): DiagnosticQuestionMeta {
+  if (Array.isArray(question.options))
+    return {
+      values: question.options.filter(
+        (value): value is string => typeof value === 'string',
+      ),
+      questionType: 'MCQ',
+    };
+  if (!question.options || typeof question.options !== 'object')
+    return { values: [], questionType: 'MCQ' };
+  const raw = question.options as Record<string, unknown>;
+  return {
+    values: Array.isArray(raw.values)
+      ? raw.values.filter((value): value is string => typeof value === 'string')
+      : [],
+    stableKey: typeof raw.stableKey === 'string' ? raw.stableKey : undefined,
+    section: typeof raw.section === 'string' ? raw.section : undefined,
+    construct: typeof raw.construct === 'string' ? raw.construct : undefined,
+    intendedLevel: ['A1', 'A2', 'B1', 'B2'].includes(String(raw.intendedLevel))
+      ? (raw.intendedLevel as DiagnosticQuestionMeta['intendedLevel'])
+      : undefined,
+    questionType: raw.questionType === 'OPEN_TEXT' ? 'OPEN_TEXT' : 'MCQ',
+    passageText: typeof raw.passageText === 'string' ? raw.passageText : null,
+    audioGroup: typeof raw.audioGroup === 'string' ? raw.audioGroup : null,
+    audioUrl: typeof raw.audioUrl === 'string' ? raw.audioUrl : null,
+    activeInForm: raw.activeInForm !== false,
+  };
+}
+
+export function getQuestionOptions(
+  question: DiagnosticQuestionForScoring,
+): string[] {
+  return getQuestionMeta(question).values;
+}
+
+export function isOpenDiagnosticQuestion(
+  question: DiagnosticQuestionForScoring,
+): boolean {
+  return getQuestionMeta(question).questionType === 'OPEN_TEXT';
+}
+
+export function resolvePlacementLevel(
+  sectionScores: Record<string, number>,
+  bandScores: Record<string, number>,
+): string {
+  const bands: Array<'A1' | 'A2' | 'B1' | 'B2'> = ['A1', 'A2', 'B1', 'B2'];
+  const supported = bands.filter((band) => {
+    const index = bands.indexOf(band);
+    const lower = bands.slice(0, index).map((item) => bandScores[item] ?? 0);
+    const lowerEvidence = lower.length
+      ? lower.reduce((sum, value) => sum + value, 0) / lower.length
+      : 100;
+    return (bandScores[band] ?? 0) >= 70 && lowerEvidence >= 60;
+  });
+  const highest = supported.at(-1);
+  if (highest) {
+    return highest;
+  }
+  const weightedCore = sectionScores['CORE'] ?? 0;
+  if (weightedCore >= 65) {
+    if ((bandScores.B2 ?? 0) >= 55) return 'B1 — đang tiến tới B2';
+    if ((bandScores.B1 ?? 0) >= 55) return 'A2 — đang tiến tới B1';
+    if ((bandScores.A2 ?? 0) >= 55) return 'A1 — đang tiến tới A2';
+  }
+  if (weightedCore >= 55) return 'A2';
+  if (weightedCore >= 40) return 'A1';
+  return 'Pre-A1 / Beginner foundation needed';
+}
+
 export type DiagnosticSkillProfile = {
   skill: string;
   correctCount: number;
@@ -36,6 +120,8 @@ export type DiagnosticRecommendation = {
   rank: number;
   relevance: number;
   reason: string;
+  recommendedLesson?: { id: number; title: string } | null;
+  advisoryOnly?: boolean;
 };
 
 export function validateQuestionBank(
@@ -52,28 +138,29 @@ export function validateQuestionBank(
       defects.push(`duplicate order ${question.order}`);
     orders.add(question.order);
     if (!question.question?.trim()) defects.push(`empty prompt ${question.id}`);
-    if (!Array.isArray(question.options) || question.options.length < 2) {
-      defects.push(`invalid options ${question.id}`);
-    }
-    if (
-      Array.isArray(question.options) &&
-      question.options.some((option) => typeof option !== 'string')
-    ) {
-      defects.push(`non-string option ${question.id}`);
-    }
-    if (
-      Array.isArray(question.options) &&
-      new Set(question.options).size !== question.options.length
-    ) {
-      defects.push(`duplicate option ${question.id}`);
-    }
-    if (
-      !Number.isInteger(question.correctIndex) ||
-      !Array.isArray(question.options) ||
-      question.correctIndex < 0 ||
-      question.correctIndex >= question.options.length
-    ) {
-      defects.push(`invalid correct index ${question.id}`);
+    const meta = getQuestionMeta(question);
+    if (meta.questionType === 'OPEN_TEXT') {
+      if (
+        !meta.stableKey ||
+        !meta.section ||
+        !meta.construct ||
+        !meta.intendedLevel
+      )
+        defects.push(`incomplete open task metadata ${question.id}`);
+    } else {
+      if (meta.values.length < 2)
+        defects.push(`invalid options ${question.id}`);
+      if (meta.values.some((option) => typeof option !== 'string'))
+        defects.push(`non-string option ${question.id}`);
+      if (new Set(meta.values).size !== meta.values.length)
+        defects.push(`duplicate option ${question.id}`);
+      if (
+        !Number.isInteger(question.correctIndex) ||
+        question.correctIndex < 0 ||
+        question.correctIndex >= meta.values.length
+      ) {
+        defects.push(`invalid correct index ${question.id}`);
+      }
     }
     if (!question.skill?.trim()) defects.push(`missing skill ${question.id}`);
   }
@@ -153,8 +240,17 @@ function courseBand(
   return null;
 }
 
-function expectedBand(level: string): 'BEGINNER' | 'INTERMEDIATE' {
-  return level === 'Intermediate' ? 'INTERMEDIATE' : 'BEGINNER';
+function expectedBand(level: string): 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' {
+  const normalized = level.toUpperCase();
+  if (
+    normalized.includes('B2') ||
+    normalized.includes('C1') ||
+    normalized.includes('C2')
+  )
+    return 'ADVANCED';
+  if (normalized.includes('B1') || normalized.includes('INTERMEDIATE'))
+    return 'INTERMEDIATE';
+  return 'BEGINNER';
 }
 
 function courseFocus(course: DiagnosticCourseCandidate): string[] {

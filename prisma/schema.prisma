@@ -223,6 +223,7 @@ model User {
   aiGenerationJobsPublished       AiGenerationJob[] @relation("AiGenerationJobPublisher")
   shippingProfile                 UserShippingProfile?
   physicalRedemptions             MarketPhysicalRedemption[]
+  courseLessonAttempts            CourseLessonAttempt[]
 }
 
 model AuthAccount {
@@ -475,6 +476,7 @@ model Course {
   lessons Lesson[]
   quizzes Quiz[]
   activities CourseActivity[]
+  courseLessons CourseLesson[]
 }
 
 model Class {
@@ -621,6 +623,197 @@ model CourseActivity {
   @@index([speakingPracticeSetId])
   @@index([toeicExamId])
   @@index([grammarTopicId])
+}
+
+enum CourseLessonStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum CourseLessonSectionType {
+  INTRO
+  THEORY
+  EXAMPLE
+  TIP
+  COMMON_MISTAKE
+  STRATEGY
+  VOCABULARY
+  GRAMMAR
+  READING_TEXT
+  LISTENING_SCRIPT
+  SPEAKING_GUIDE
+  WRITING_GUIDE
+  CHECKPOINT
+  SUMMARY
+  REFERENCE
+}
+
+enum CourseLessonExerciseType {
+  MULTIPLE_CHOICE
+  MULTI_SELECT
+  FILL_IN_THE_BLANK
+  MATCHING
+  ORDERING
+  TRUE_FALSE
+  READING_COMPREHENSION
+  LISTENING_COMPREHENSION
+  VOCABULARY
+  GRAMMAR
+  SPEAKING_READ_ALOUD
+  SPEAKING_SHORT_RESPONSE
+  WRITING_SHORT_RESPONSE
+  WRITING_GUIDED
+  WRITING_EMAIL
+  TOEIC_STYLE
+  CHECKPOINT
+}
+
+enum CourseLessonAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
+/// Course-owned learning graph. Legacy Lesson/CourseActivity remain readable
+/// for historical compatibility, while this model is authoritative for V5.
+model CourseLesson {
+  id                 Int                @id @default(autoincrement())
+  courseId           Int
+  course             Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  slug               String
+  title              String
+  summary            String             @db.Text
+  learningObjectives Json
+  estimatedMinutes   Int                @default(15)
+  difficulty         String?
+  coverImage         String?
+  order              Int                @default(0)
+  status             CourseLessonStatus @default(DRAFT)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  sections           CourseLessonSection[]
+  exercises          CourseLessonExercise[]
+  references         CourseLessonReference[]
+  media              CourseLessonMedia[]
+  attempts           CourseLessonAttempt[]
+
+  @@unique([courseId, slug])
+  @@unique([courseId, order])
+  @@index([courseId, status, order])
+}
+
+model CourseLessonSection {
+  id        Int                      @id @default(autoincrement())
+  lessonId  Int
+  lesson    CourseLesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  order     Int
+  type      CourseLessonSectionType
+  heading   String
+  content   Json
+  isRequired Boolean                 @default(true)
+
+  @@unique([lessonId, order])
+  @@index([lessonId, type])
+}
+
+model CourseLessonExercise {
+  id               Int                       @id @default(autoincrement())
+  lessonId         Int
+  lesson            CourseLesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  slug             String
+  order            Int
+  type             CourseLessonExerciseType
+  title            String
+  prompt           String                  @db.Text
+  instructions     String?                 @db.Text
+  content          Json
+  rubric           Json?
+  required         Boolean                 @default(true)
+  minimumScore     Int?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  questions        CourseLessonQuestion[]
+  attempts         CourseLessonAttempt[]
+
+  @@unique([lessonId, slug])
+  @@unique([lessonId, order])
+  @@index([lessonId, required, order])
+}
+
+model CourseLessonQuestion {
+  id           Int                    @id @default(autoincrement())
+  exerciseId   Int
+  exercise     CourseLessonExercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  order        Int
+  prompt       String                 @db.Text
+  options      Json?
+  correctAnswer Json
+  explanation  String                 @db.Text
+  answers      CourseLessonExerciseAnswer[]
+
+  @@unique([exerciseId, order])
+}
+
+model CourseLessonReference {
+  id         Int         @id @default(autoincrement())
+  lessonId   Int
+  lesson     CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title      String
+  publisher  String?
+  url        String
+  accessedAt DateTime?
+  note       String?     @db.Text
+
+  @@index([lessonId])
+}
+
+model CourseLessonMedia {
+  id          Int         @id @default(autoincrement())
+  lessonId    Int
+  lesson      CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  type        String
+  url         String
+  altText     String?
+  provenance  String?
+  renderStatus String      @default("READY")
+
+  @@index([lessonId, type])
+}
+
+model CourseLessonAttempt {
+  id          Int                        @id @default(autoincrement())
+  userId      Int
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    Int
+  lesson      CourseLesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  exerciseId  Int
+  exercise    CourseLessonExercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  status      CourseLessonAttemptStatus  @default(IN_PROGRESS)
+  score       Float?
+  maxScore    Int?
+  submittedAt DateTime?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  answers     CourseLessonExerciseAnswer[]
+
+  @@index([userId, lessonId, exerciseId, status])
+  @@index([lessonId, exerciseId, status])
+}
+
+model CourseLessonExerciseAnswer {
+  id         Int                 @id @default(autoincrement())
+  attemptId  Int
+  attempt    CourseLessonAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId Int
+  question   CourseLessonQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answer     Json
+  isCorrect  Boolean?
+  score      Float?
+
+  @@unique([attemptId, questionId])
+  @@index([questionId])
 }
 
 enum AssignmentType {

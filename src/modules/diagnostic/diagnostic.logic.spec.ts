@@ -2,6 +2,8 @@ import {
   buildSkillProfiles,
   buildStrengthsAndWeaknesses,
   rankCourseRecommendations,
+  getQuestionMeta,
+  resolvePlacementLevel,
   resolveEstimatedLevel,
   validateQuestionBank,
 } from './diagnostic.logic';
@@ -124,5 +126,26 @@ describe('diagnostic logic', () => {
       [],
     );
     expect(result).toEqual([]);
+  });
+
+  it('reads v2 metadata without exposing answer-bearing fields', () => {
+    const meta = getQuestionMeta({
+      ...questions[0],
+      options: {
+        values: ['one', 'two'],
+        stableKey: 'lu-a1-01',
+        section: 'LANGUAGE_USE',
+        construct: 'word-choice',
+        intendedLevel: 'A1',
+        questionType: 'MCQ',
+      },
+    });
+    expect(meta).toMatchObject({
+      section: 'LANGUAGE_USE',
+      intendedLevel: 'A1',
+    });
+    expect(
+      resolvePlacementLevel({ CORE: 72 }, { A1: 80, A2: 70, B1: 40, B2: 10 }),
+    ).toBe('A2');
   });
 });

@@ -9,7 +9,11 @@ import {
   buildSkillProfiles,
   buildStrengthsAndWeaknesses,
   DiagnosticQuestionForScoring,
+  getQuestionMeta,
+  getQuestionOptions,
+  isOpenDiagnosticQuestion,
   rankCourseRecommendations,
+  resolvePlacementLevel,
   resolveEstimatedLevel,
   validateQuestionBank,
 } from './diagnostic.logic';
@@ -31,17 +35,25 @@ export class DiagnosticService {
     }
   }
 
+  private formQuestions(questions: DiagnosticQuestionForScoring[]) {
+    return questions.filter(
+      (question) => getQuestionMeta(question).activeInForm !== false,
+    );
+  }
+
   private sanitizeQuestion(question: DiagnosticQuestionForScoring) {
-    const options = Array.isArray(question.options)
-      ? question.options.filter(
-          (option): option is string => typeof option === 'string',
-        )
-      : [];
+    const meta = getQuestionMeta(question);
     return {
       id: question.id,
       skill: question.skill,
+      section: meta.section ?? question.skill,
+      construct: meta.construct ?? null,
+      questionType: meta.questionType ?? 'MCQ',
       question: question.question,
-      options,
+      options: getQuestionOptions(question),
+      passageText:
+        meta.section === 'READING' ? (meta.passageText ?? null) : null,
+      audioUrl: meta.section === 'LISTENING' ? (meta.audioUrl ?? null) : null,
       order: question.order,
     };
   }
@@ -101,7 +113,7 @@ export class DiagnosticService {
         },
       },
     });
-    return rankCourseRecommendations(
+    const ranked = rankCourseRecommendations(
       courses.map((course) => ({
         id: course.id,
         title: course.title,
@@ -120,6 +132,36 @@ export class DiagnosticService {
       level,
       weaknesses,
     );
+    return ranked.map((recommendation) => {
+      const course = courses.find(
+        (candidate) => candidate.id === recommendation.courseId,
+      );
+      const lesson =
+        course?.lessons.find((candidate) => {
+          const text =
+            `${candidate.title} ${candidate.description ?? ''} ${candidate.materials.map((material) => `${material.title} ${material.objective ?? ''}`).join(' ')}`.toLowerCase();
+          return (
+            weaknesses.some((weakness) =>
+              text.includes(weakness.toLowerCase()),
+            ) ||
+            weaknesses.some(
+              (weakness) =>
+                weakness === 'Grammar' && /grammar|ngữ pháp/.test(text),
+            ) ||
+            weaknesses.some(
+              (weakness) =>
+                weakness === 'Vocabulary' && /vocabulary|từ vựng/.test(text),
+            )
+          );
+        }) ?? course?.lessons[0];
+      return {
+        ...recommendation,
+        recommendedLesson: lesson
+          ? { id: lesson.id, title: lesson.title }
+          : null,
+        advisoryOnly: true,
+      };
+    });
   }
 
   private async toResult(
@@ -135,12 +177,19 @@ export class DiagnosticService {
     questions: DiagnosticQuestionForScoring[],
   ) {
     const answers = this.readAnswerMap(attempt.answers);
-    const profiles = buildSkillProfiles(questions, answers);
+    const objectiveQuestions = questions.filter(
+      (question) => !isOpenDiagnosticQuestion(question),
+    );
+    const productiveTaskCount = questions.length - objectiveQuestions.length;
+    const profiles = buildSkillProfiles(objectiveQuestions, answers);
     const { strengths, weaknesses } = buildStrengthsAndWeaknesses(profiles);
     return {
       attemptId: attempt.id,
       correctCount: attempt.correctCount,
       totalCount: attempt.totalCount,
+      objectiveTotalCount: objectiveQuestions.length,
+      productiveTaskCount,
+      productiveUnavailable: productiveTaskCount > 0,
       percentage: attempt.percentage,
       level: attempt.level,
       submittedAt: attempt.submittedAt,
@@ -150,13 +199,16 @@ export class DiagnosticService {
       recommendations: await this.recommendations(attempt.level, weaknesses),
       questionsResult: questions.map((question) => {
         const selectedOption = answers[String(question.id)];
+        const open = isOpenDiagnosticQuestion(question);
         return {
           questionId: question.id,
           selectedOption:
             typeof selectedOption === 'number' ? selectedOption : undefined,
-          correctOption: question.correctIndex,
-          isCorrect: selectedOption === question.correctIndex,
-          explanation: question.explanation,
+          selectedText:
+            typeof selectedOption === 'string' ? selectedOption : undefined,
+          correctOption: open ? null : question.correctIndex,
+          isCorrect: open ? null : selectedOption === question.correctIndex,
+          explanation: open ? null : question.explanation,
         };
       }),
     };
@@ -177,6 +229,7 @@ export class DiagnosticService {
     if (!assessment)
       throw new NotFoundException('Chưa có bài kiểm tra đầu vào');
     this.assertQuestionBank(assessment.questions);
+    const formQuestions = this.formQuestions(assessment.questions);
 
     const latestAttempt = await this.prisma.diagnosticAttempt.findFirst({
       where: { userId, assessmentId: assessment.id },
@@ -186,7 +239,7 @@ export class DiagnosticService {
       id: assessment.id,
       title: assessment.title,
       description: assessment.description,
-      questions: assessment.questions.map((question) =>
+      questions: formQuestions.map((question) =>
         this.sanitizeQuestion(question),
       ),
       latestAttempt: latestAttempt
@@ -210,11 +263,12 @@ export class DiagnosticService {
     if (!assessment)
       throw new NotFoundException('Chưa có bài kiểm tra đầu vào');
     this.assertQuestionBank(assessment.questions);
+    const formQuestions = this.formQuestions(assessment.questions);
     const attempt = await this.prisma.diagnosticAttempt.findFirst({
       where: { userId, assessmentId: assessment.id },
       orderBy: { submittedAt: 'desc' },
     });
-    return attempt ? this.toResult(attempt, assessment.questions) : null;
+    return attempt ? this.toResult(attempt, formQuestions) : null;
   }
 
   async submitAssessment(
@@ -233,52 +287,94 @@ export class DiagnosticService {
       );
     }
     this.assertQuestionBank(assessment.questions);
+    const formQuestions = this.formQuestions(assessment.questions);
     if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
       throw new BadRequestException('Câu trả lời không hợp lệ');
     }
 
     const answerMap = answers as AnswerMap;
     const expectedIds = new Set(
-      assessment.questions.map((question) => String(question.id)),
+      formQuestions.map((question) => String(question.id)),
     );
     const submittedIds = Object.keys(answerMap);
     const unknownIds = submittedIds.filter((id) => !expectedIds.has(id));
     const missingIds = [...expectedIds].filter((id) => !(id in answerMap));
     if (unknownIds.length || missingIds.length) {
       throw new BadRequestException(
-        `Cần trả lời đúng ${assessment.questions.length} câu hỏi hiện tại`,
+        `Cần trả lời đúng ${formQuestions.length} câu hỏi hiện tại`,
       );
     }
-    for (const question of assessment.questions) {
+    for (const question of formQuestions) {
       const selectedOption = answerMap[String(question.id)];
-      if (
-        !Number.isInteger(selectedOption) ||
-        (selectedOption as number) < 0 ||
-        (selectedOption as number) >= (question.options as unknown[]).length
-      ) {
-        throw new BadRequestException(
-          'Có câu trả lời không thuộc lựa chọn hiện tại',
-        );
+      if (isOpenDiagnosticQuestion(question)) {
+        if (
+          typeof selectedOption !== 'string' ||
+          selectedOption.trim().length < 2 ||
+          selectedOption.length > 2000
+        )
+          throw new BadRequestException('Câu trả lời tự luận không hợp lệ');
+      } else {
+        const options = getQuestionOptions(question);
+        if (
+          !Number.isInteger(selectedOption) ||
+          (selectedOption as number) < 0 ||
+          (selectedOption as number) >= options.length
+        ) {
+          throw new BadRequestException(
+            'Có câu trả lời không thuộc lựa chọn hiện tại',
+          );
+        }
       }
     }
 
-    const questionsResult = assessment.questions.map((question) => {
+    const questionsResult = formQuestions.map((question) => {
       const selectedOption = answerMap[String(question.id)] as number;
+      const open = isOpenDiagnosticQuestion(question);
       return {
         questionId: question.id,
-        selectedOption,
-        correctOption: question.correctIndex,
-        isCorrect: selectedOption === question.correctIndex,
-        explanation: question.explanation,
+        selectedOption: open ? undefined : selectedOption,
+        selectedText: open
+          ? String(answerMap[String(question.id)] ?? '')
+          : undefined,
+        correctOption: open ? null : question.correctIndex,
+        isCorrect: open ? null : selectedOption === question.correctIndex,
+        explanation: open ? null : question.explanation,
       };
     });
+    const objectiveQuestions = formQuestions.filter(
+      (question) => !isOpenDiagnosticQuestion(question),
+    );
     const correctCount = questionsResult.filter(
-      (item) => item.isCorrect,
+      (item) => item.isCorrect === true,
     ).length;
-    const totalCount = assessment.questions.length;
+    const totalCount = objectiveQuestions.length;
     const percentage =
       totalCount === 0 ? 0 : Math.round((correctCount / totalCount) * 100);
-    const level = resolveEstimatedLevel(percentage);
+    const v2 =
+      assessment.id === 2 || assessment.title.toLowerCase().includes('v2');
+    const level = v2
+      ? resolvePlacementLevel(
+          {
+            LANGUAGE_USE: this.sectionPercentage(
+              formQuestions,
+              answerMap,
+              'LANGUAGE_USE',
+            ),
+            READING: this.sectionPercentage(
+              formQuestions,
+              answerMap,
+              'READING',
+            ),
+            LISTENING: this.sectionPercentage(
+              formQuestions,
+              answerMap,
+              'LISTENING',
+            ),
+            CORE: this.weightedCore(formQuestions, answerMap),
+          },
+          this.bandPercentages(formQuestions, answerMap),
+        )
+      : resolveEstimatedLevel(percentage);
     const previousAttempts = await this.prisma.diagnosticAttempt.count({
       where: { userId },
     });
@@ -328,6 +424,62 @@ export class DiagnosticService {
       return created;
     });
 
-    return this.toResult(attempt, assessment.questions);
+    return this.toResult(attempt, formQuestions);
+  }
+
+  private sectionPercentage(
+    questions: DiagnosticQuestionForScoring[],
+    answers: AnswerMap,
+    section: string,
+  ) {
+    const items = questions.filter(
+      (question) =>
+        getQuestionMeta(question).section === section &&
+        !isOpenDiagnosticQuestion(question),
+    );
+    if (!items.length) return 0;
+    return Math.round(
+      (items.filter(
+        (question) => answers[String(question.id)] === question.correctIndex,
+      ).length /
+        items.length) *
+        100,
+    );
+  }
+
+  private weightedCore(
+    questions: DiagnosticQuestionForScoring[],
+    answers: AnswerMap,
+  ) {
+    return Math.round(
+      this.sectionPercentage(questions, answers, 'LANGUAGE_USE') * 0.4 +
+        this.sectionPercentage(questions, answers, 'READING') * 0.3 +
+        this.sectionPercentage(questions, answers, 'LISTENING') * 0.3,
+    );
+  }
+
+  private bandPercentages(
+    questions: DiagnosticQuestionForScoring[],
+    answers: AnswerMap,
+  ) {
+    const result: Record<string, number> = {};
+    for (const band of ['A1', 'A2', 'B1', 'B2']) {
+      const items = questions.filter(
+        (question) =>
+          getQuestionMeta(question).intendedLevel === band &&
+          !isOpenDiagnosticQuestion(question),
+      );
+      result[band] = items.length
+        ? Math.round(
+            (items.filter(
+              (question) =>
+                answers[String(question.id)] === question.correctIndex,
+            ).length /
+              items.length) *
+              100,
+          )
+        : 0;
+    }
+    return result;
   }
 }

@@ -208,4 +208,101 @@ describe('DiagnosticService', () => {
     expect(result.attemptId).toBe(9);
     expect(prisma.$transaction.mock.calls[0][0]).toBeDefined();
   });
+
+  it('scores the v2 objective denominator separately from productive tasks', async () => {
+    const v2Questions = [
+      {
+        id: 101,
+        assessmentId: 2,
+        skill: 'Grammar',
+        question: 'A',
+        options: {
+          values: ['a', 'b'],
+          section: 'LANGUAGE_USE',
+          intendedLevel: 'A1',
+          stableKey: 'a',
+          construct: 'grammar',
+          questionType: 'MCQ',
+        },
+        correctIndex: 1,
+        explanation: 'B',
+        order: 1,
+      },
+      {
+        id: 102,
+        assessmentId: 2,
+        skill: 'Reading',
+        question: 'B',
+        options: {
+          values: ['a', 'b'],
+          section: 'READING',
+          intendedLevel: 'A1',
+          stableKey: 'b',
+          construct: 'detail',
+          questionType: 'MCQ',
+          passageText: 'A short notice.',
+        },
+        correctIndex: 0,
+        explanation: 'A',
+        order: 2,
+      },
+      {
+        id: 103,
+        assessmentId: 2,
+        skill: 'Speaking',
+        question: 'C',
+        options: {
+          values: [],
+          section: 'SPEAKING',
+          intendedLevel: 'A2',
+          stableKey: 'c',
+          construct: 'fluency',
+          questionType: 'OPEN_TEXT',
+        },
+        correctIndex: -1,
+        explanation: 'Supplementary',
+        order: 3,
+      },
+    ];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    prisma.diagnosticAssessment.findFirst.mockResolvedValueOnce({
+      ...assessment,
+      id: 2,
+      title: 'Entry Diagnostic v2',
+      questions: v2Questions,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    prisma.$transaction.mockImplementationOnce(
+      (callback: (tx: any) => unknown) =>
+        callback({
+          diagnosticAttempt: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({
+              id: 10,
+              answers: { '101': 1, '102': 1, '103': 'spoken answer' },
+              correctCount: 1,
+              totalCount: 2,
+              percentage: 50,
+              level: 'A1',
+              submittedAt: new Date(),
+            }),
+          },
+          learningActivity: { create: jest.fn() },
+          userStats: { upsert: jest.fn() },
+        }),
+    );
+    const result = await service.submitAssessment(7, 2, {
+      '101': 1,
+      '102': 1,
+      '103': 'spoken answer',
+    });
+    expect(result.totalCount).toBe(2);
+    expect(result.objectiveTotalCount).toBe(2);
+    expect(result.productiveTaskCount).toBe(1);
+    expect(result.productiveUnavailable).toBe(true);
+    expect(result.correctCount).toBe(1);
+    expect(
+      result.questionsResult.find((item) => item.questionId === 103)?.isCorrect,
+    ).toBeNull();
+  });
 });

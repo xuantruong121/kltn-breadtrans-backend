@@ -35,14 +35,64 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, CourseStatus } from '@prisma/client';
 import { PayosPaymentService } from '../payment/payos-payment.service';
+import { CourseLearningV5Service } from './course-v5.service';
+import { SubmitCourseLessonExerciseDto } from './course-v5.dto';
 
 @ApiTags('courses')
 @Controller('courses')
 export class CourseController {
   constructor(
     private readonly courseService: CourseService,
+    private readonly courseLearningV5Service: CourseLearningV5Service,
     @Optional() private readonly payos?: PayosPaymentService,
   ) {}
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get(':courseId/learning')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Lộ trình Course Learning 5.0' })
+  getCourseLearningOverview(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Request() req: any,
+  ) {
+    return this.courseLearningV5Service.getOverview(courseId, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get(':courseId/learning/lessons/:lessonId')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Nội dung lesson Course Learning 5.0' })
+  getCourseLearningLesson(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('lessonId', ParseIntPipe) lessonId: number,
+    @Request() req: any,
+  ) {
+    return this.courseLearningV5Service.getLesson(courseId, lessonId, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post(':courseId/learning/lessons/:lessonId/exercises/:exerciseId/submit')
+  @Roles(Role.STUDENT)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Chấm bài tập nội bộ của Course Lesson' })
+  submitCourseLearningExercise(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('lessonId', ParseIntPipe) lessonId: number,
+    @Param('exerciseId', ParseIntPipe) exerciseId: number,
+    @Body() dto: SubmitCourseLessonExerciseDto,
+    @Request() req: any,
+  ) {
+    return this.courseLearningV5Service.submitExercise(
+      courseId,
+      lessonId,
+      exerciseId,
+      req.user,
+      dto,
+    );
+  }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
