@@ -202,12 +202,169 @@ export function resolveReadingTopicLevel(
   return 'BEGINNER';
 }
 
+export type ReadingExerciseLevel = string;
+
+function resolveReadingExerciseLevel(
+  title: string,
+  questions: Array<{ content: unknown }>,
+): ReadingExerciseLevel {
+  const firstStructuredLevel = questions
+    .map((question) => readContent(question.content).level)
+    .find(
+      (level): level is string =>
+        typeof level === 'string' && level.trim().length > 0,
+    );
+  const raw = (firstStructuredLevel ?? title).toUpperCase();
+  const match = raw.match(/\b(A1|A2|B1|B2|C1|C2)\b/);
+  return match?.[1] ?? resolveReadingTopicLevel(raw);
+}
+
+function resolveReadingExerciseDifficulty(level: ReadingExerciseLevel) {
+  if (level.includes('C1') || level.includes('C2') || level === 'ADVANCED')
+    return 'ADVANCED';
+  if (level.includes('B1') || level.includes('B2') || level === 'INTERMEDIATE')
+    return 'INTERMEDIATE';
+  return 'BASIC';
+}
+
+function resolveReadingExerciseMicroSkills(
+  questions: Array<{ content: unknown }>,
+): string[] {
+  return [
+    ...new Set(
+      questions
+        .map((question) => {
+          const content = readContent(question.content);
+          const value =
+            content.questionType ?? content.microSkill ?? content.skill;
+          return typeof value === 'string' ? value.trim().toUpperCase() : '';
+        })
+        .filter(
+          (value) =>
+            value && value !== 'READING' && value !== 'BILINGUAL_READING',
+        ),
+    ),
+  ];
+}
+
 @Injectable()
 export class ReadingService {
   constructor(
     private prisma: PrismaService,
     private readonly quizContentAccess: QuizContentAccessService,
   ) {}
+
+  /**
+   * Learner-facing catalog: one safe card per published Reading quiz.
+   * PracticeTopic remains taxonomy metadata and is never a completion unit here.
+   */
+  async getExercises(userId?: number, role?: Role) {
+    const quizzes = await this.prisma.quiz.findMany({
+      where: {
+        type: QuizType.BILINGUAL_READING,
+        publicationStatus: QuizPublicationStatus.PUBLISHED,
+        practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+        questions: { some: {} },
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        type: true,
+        courseId: true,
+        practiceTopicId: true,
+        isPremiumContent: true,
+        timeLimit: true,
+        practiceTopic: {
+          select: { id: true, name: true, vietnameseName: true, order: true },
+        },
+        questions: {
+          select: { id: true, content: true },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    const accessByQuiz = await this.quizContentAccess.resolveMany(
+      quizzes,
+      userId,
+      role,
+    );
+    const userResults = userId
+      ? await this.prisma.submission.findMany({
+          where: {
+            userId,
+            quiz: {
+              type: QuizType.BILINGUAL_READING,
+              publicationStatus: QuizPublicationStatus.PUBLISHED,
+              practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+            },
+          },
+          orderBy: { submittedAt: 'desc' },
+          select: {
+            quizId: true,
+            results: { select: { questionId: true, isCorrect: true } },
+          },
+        })
+      : [];
+
+    const latestByQuiz = new Map<
+      number,
+      (typeof userResults)[number]['results']
+    >();
+    for (const submission of userResults) {
+      if (!latestByQuiz.has(submission.quizId)) {
+        latestByQuiz.set(submission.quizId, submission.results);
+      }
+    }
+
+    return [...quizzes]
+      .sort(
+        (a, b) =>
+          (a.practiceTopic?.order ?? 0) - (b.practiceTopic?.order ?? 0) ||
+          a.id - b.id,
+      )
+      .map((quiz) => {
+        const questionIds = quiz.questions.map((question) => question.id);
+        const latestResults = (latestByQuiz.get(quiz.id) ?? []).filter(
+          (result) => questionIds.includes(result.questionId),
+        );
+        const completedQuestionCount = new Set(
+          latestResults.map((result) => result.questionId),
+        ).size;
+        const isComplete = isReadingSubmissionComplete(
+          questionIds,
+          latestResults.map((result) => result.questionId),
+        );
+        const access = accessByQuiz.get(quiz.id) ?? {
+          isPremiumContent: quiz.isPremiumContent,
+          isLocked: false,
+        };
+        const level = resolveReadingExerciseLevel(quiz.title, quiz.questions);
+
+        return {
+          quizId: quiz.id,
+          title: quiz.title,
+          description: quiz.description,
+          level,
+          difficulty: resolveReadingExerciseDifficulty(level),
+          questionCount: questionIds.length,
+          estimatedMinutes: quiz.timeLimit,
+          parentTopicId: quiz.practiceTopicId,
+          topicName: quiz.practiceTopic?.name ?? null,
+          topicVietnameseName: quiz.practiceTopic?.vietnameseName ?? null,
+          microSkills: resolveReadingExerciseMicroSkills(quiz.questions),
+          isPremiumContent: access.isPremiumContent,
+          isLocked: access.isLocked,
+          completionStatus: isComplete
+            ? 'COMPLETED'
+            : completedQuestionCount > 0
+              ? 'IN_PROGRESS'
+              : 'NOT_STARTED',
+          completedQuestionCount,
+        };
+      });
+  }
 
   async getTopicsByCategory(
     category: TopicCategory,
@@ -406,7 +563,9 @@ export class ReadingService {
           userId,
           quiz: {
             type: QuizType.BILINGUAL_READING,
+            publicationStatus: QuizPublicationStatus.PUBLISHED,
             practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+            questions: { some: {} },
           },
         },
         orderBy: { submittedAt: 'asc' },
@@ -417,6 +576,7 @@ export class ReadingService {
               title: true,
               isPremiumContent: true,
               publicationStatus: true,
+              practiceTopic: { select: { id: true } },
               questions: {
                 select: { id: true, type: true, content: true, order: true },
                 orderBy: { order: 'asc' },
@@ -451,6 +611,9 @@ export class ReadingService {
       { attempted: number; correct: number }
     >();
     const mistakes: Array<{
+      quizId: number;
+      topicId: number | null;
+      questionId: number;
       question: string;
       yourAnswer: string;
       correctAnswer: string | null;
@@ -486,6 +649,9 @@ export class ReadingService {
           const content = readContent(question.content);
           const resolved = resolveReadingCorrectOption(question.content);
           mistakes.push({
+            quizId: submission.quizId,
+            topicId: submission.quiz.practiceTopic?.id ?? null,
+            questionId: question.id,
             question:
               typeof content.text === 'string' && content.text.trim()
                 ? content.text.trim()
@@ -659,7 +825,9 @@ export class ReadingService {
     const bilingualQuizzes = await this.prisma.quiz.findMany({
       where: {
         type: QuizType.BILINGUAL_READING,
+        publicationStatus: QuizPublicationStatus.PUBLISHED,
         practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+        questions: { some: {} },
       },
       select: {
         id: true,
@@ -675,7 +843,9 @@ export class ReadingService {
         userId,
         quiz: {
           type: QuizType.BILINGUAL_READING,
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
           practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+          questions: { some: {} },
         },
       },
       orderBy: { submittedAt: 'desc' },

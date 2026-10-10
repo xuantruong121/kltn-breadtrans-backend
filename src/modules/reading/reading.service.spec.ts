@@ -164,6 +164,95 @@ describe('ReadingService', () => {
     expect(result[0].quizzes[0]).not.toHaveProperty('bilingualContent');
   });
 
+  it('returns one safe learner card per published Reading quiz with exact completion state', async () => {
+    const prisma = service['prisma'] as unknown as {
+      quiz: { findMany: jest.Mock };
+      submission: { findMany: jest.Mock };
+    };
+    prisma.quiz.findMany.mockResolvedValue([
+      {
+        id: 2,
+        title: 'Reading A2 — Notices',
+        description: 'Read short notices.',
+        type: 'BILINGUAL_READING',
+        courseId: null,
+        practiceTopicId: 4,
+        isPremiumContent: false,
+        timeLimit: 15,
+        practiceTopic: {
+          id: 4,
+          name: 'Reading A1–A2',
+          vietnameseName: 'Đọc A1–A2',
+          order: 4,
+        },
+        questions: [
+          { id: 11, content: { level: 'A2', questionType: 'DETAIL' } },
+          { id: 12, content: { level: 'A2', questionType: 'PURPOSE' } },
+        ],
+      },
+      {
+        id: 13,
+        title: 'Reading B1 — Practical English',
+        description: null,
+        type: 'BILINGUAL_READING',
+        courseId: null,
+        practiceTopicId: 5,
+        isPremiumContent: true,
+        timeLimit: 20,
+        practiceTopic: {
+          id: 5,
+          name: 'Reading B1–B2',
+          vietnameseName: 'Đọc B1–B2',
+          order: 5,
+        },
+        questions: [
+          { id: 13, content: { level: 'B1', questionType: 'DETAIL' } },
+        ],
+      },
+    ]);
+    prisma.submission.findMany.mockResolvedValue([
+      {
+        quizId: 2,
+        results: [
+          { questionId: 11, isCorrect: true },
+          { questionId: 12, isCorrect: false },
+        ],
+      },
+    ]);
+    access.resolveMany.mockResolvedValue(
+      new Map([
+        [2, { isPremiumContent: false, isLocked: false }],
+        [13, { isPremiumContent: true, isLocked: true }],
+      ]),
+    );
+
+    const result = await service.getExercises(7);
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        quizId: 2,
+        title: 'Reading A2 — Notices',
+        questionCount: 2,
+        completionStatus: 'COMPLETED',
+        completedQuestionCount: 2,
+        microSkills: ['DETAIL', 'PURPOSE'],
+        isLocked: false,
+      }),
+      expect.objectContaining({
+        quizId: 13,
+        level: 'B1',
+        completionStatus: 'NOT_STARTED',
+        isPremiumContent: true,
+        isLocked: true,
+      }),
+    ]);
+    expect(result[0]).not.toHaveProperty('questions');
+    expect(result[0]).not.toHaveProperty('correctIndex');
+    expect(result[0]).not.toHaveProperty('correct');
+    expect(result[0]).not.toHaveProperty('correctAnswer');
+    expect(result[0]).not.toHaveProperty('explanation');
+  });
+
   it('resolves authoritative CEFR levels for reading topics', () => {
     expect(resolveReadingTopicLevel('Reading A1–A2')).toBe('BEGINNER');
     expect(resolveReadingTopicLevel('Reading A1-A2')).toBe('BEGINNER');
@@ -214,6 +303,7 @@ describe('ReadingService', () => {
         quiz: {
           id: 24,
           title: 'Reading practice',
+          practiceTopic: { id: 4 },
           isPremiumContent: false,
           publicationStatus: 'PUBLISHED',
           questions,
@@ -256,6 +346,9 @@ describe('ReadingService', () => {
     });
     expect(result.mistakes).toMatchObject({ total: 3 });
     expect(result.mistakes.items[0]).toMatchObject({
+      quizId: 24,
+      topicId: 4,
+      questionId: 101,
       subskill: 'DETAIL',
       correctAnswer: 'A',
       answerAvailable: true,

@@ -9,5 +9,6 @@
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/../src/$1"
   },
-  "globalSetup": "<rootDir>/setup-env.js"
+  "globalSetup": "<rootDir>/setup-env.js",
+  "maxWorkers": 1
 }

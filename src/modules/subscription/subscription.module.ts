@@ -13,9 +13,11 @@ import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { PaymentReconciliationScheduler } from './payment-reconciliation.scheduler';
 import { PaymentWebhookController } from './payment-webhook.controller';
 import { SepayTransactionProvider } from './sepay-transaction.provider';
+import { PaymentModule } from '../payment/payment.module';
+import { PayosWebhookController } from './payos-webhook.controller';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, PaymentModule],
   controllers: [
     SubscriptionController,
     PlanCatalogAdminController,
@@ -23,6 +25,7 @@ import { SepayTransactionProvider } from './sepay-transaction.provider';
     PlanPurchaseAdminController,
     PlanCatalogPublicController,
     PaymentWebhookController,
+    PayosWebhookController,
   ],
   providers: [
     SubscriptionService,
@@ -32,6 +35,7 @@ import { SepayTransactionProvider } from './sepay-transaction.provider';
     SepayTransactionProvider,
     PaymentReconciliationService,
     PaymentReconciliationScheduler,
+    { provide: 'PlanPurchaseService', useExisting: PlanPurchaseService },
   ],
   exports: [SubscriptionService],
 })

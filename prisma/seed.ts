@@ -11804,6 +11804,9 @@ async function main() {
         stock: product.stock,
         order: product.order,
         isActive: true,
+        fulfillmentType: ['gift-notebook', 'gift-bottle', 'gift-plush'].includes(product.slug)
+          ? 'PHYSICAL'
+          : 'DIGITAL',
       },
       create: {
         id: product.id,
@@ -11817,6 +11820,9 @@ async function main() {
         stock: product.stock,
         order: product.order,
         isActive: true,
+        fulfillmentType: ['gift-notebook', 'gift-bottle', 'gift-plush'].includes(product.slug)
+          ? 'PHYSICAL'
+          : 'DIGITAL',
       },
     });
   }

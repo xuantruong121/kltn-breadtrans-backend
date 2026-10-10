@@ -24,6 +24,15 @@ export class ReadingController {
   constructor(private readonly readingService: ReadingService) {}
 
   @UseGuards(OptionalJwtAuthGuard)
+  @Get('exercises')
+  @ApiOperation({
+    summary: 'Lấy danh mục bài Reading theo từng bài tập thực tế',
+  })
+  getExercises(@Request() req: any) {
+    return this.readingService.getExercises(req.user?.id, req.user?.role);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('topics')
   @ApiOperation({ summary: 'Lấy danh sách các chủ đề (kèm tiến độ học tập)' })
   @ApiQuery({ name: 'category', enum: TopicCategory })

@@ -6,8 +6,10 @@ import { QuizModule } from '../quiz/quiz.module';
 import { SpeakingModule } from '../speaking/speaking.module';
 import { AdaptiveDailyPracticeService } from './adaptive-daily-practice.service';
 
+import { LocationModule } from '../location/location.module';
+
 @Module({
-  imports: [ReadingModule, QuizModule, SpeakingModule],
+  imports: [ReadingModule, QuizModule, SpeakingModule, LocationModule],
   providers: [UserService, AdaptiveDailyPracticeService],
   controllers: [UserController],
 })

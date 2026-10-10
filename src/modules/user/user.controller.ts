@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateShippingProfileDto } from './dto/update-shipping-profile.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdaptiveDailyPracticeService } from './adaptive-daily-practice.service';
@@ -97,5 +98,29 @@ export class UserController {
     @Body() updateData: UpdateProfileDto,
   ) {
     return this.userService.updateUserProfile(req.user.id, updateData);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('shipping-profile')
+  @ApiOperation({
+    summary: 'Lấy thông tin địa chỉ giao hàng / nhận quà của user hiện tại',
+  })
+  async getShippingProfile(@Request() req: any) {
+    return this.userService.getShippingProfile(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch('shipping-profile')
+  @ApiOperation({
+    summary:
+      'Cập nhật thông tin địa chỉ giao hàng / nhận quà của user hiện tại',
+  })
+  async updateShippingProfile(
+    @Request() req: any,
+    @Body() dto: UpdateShippingProfileDto,
+  ) {
+    return this.userService.updateShippingProfile(req.user.id, dto);
   }
 }

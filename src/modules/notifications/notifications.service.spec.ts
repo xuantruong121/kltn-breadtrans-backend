@@ -16,6 +16,7 @@ describe('NotificationsService', () => {
         findFirst: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
       pushSubscription: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -115,6 +116,35 @@ describe('NotificationsService', () => {
       const res = await service.markAllRead(10);
       expect(res.success).toBe(true);
       expect(res.count).toBe(4);
+    });
+  });
+
+  describe('filters and ownership-safe delete', () => {
+    it('filters the inbox by unread state while retaining cursor pagination', async () => {
+      prisma.notification.findMany.mockResolvedValue([{ id: 4 }]);
+      await service.getInbox(10, 10, undefined, 'unread');
+      expect(prisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 10, isRead: false } }),
+      );
+    });
+
+    it('deletes only the authenticated user notification', async () => {
+      prisma.notification.deleteMany.mockResolvedValue({ count: 1 });
+      await expect(service.deleteNotification(10, 7)).resolves.toEqual({
+        success: true,
+        id: 7,
+      });
+      expect(prisma.notification.deleteMany).toHaveBeenCalledWith({
+        where: { id: 7, userId: 10 },
+      });
+    });
+
+    it('returns a safe not-found result for another user notification', async () => {
+      prisma.notification.deleteMany.mockResolvedValue({ count: 0 });
+      await expect(service.deleteNotification(10, 7)).resolves.toEqual({
+        success: false,
+        message: 'Thông báo không tồn tại',
+      });
     });
   });
 });

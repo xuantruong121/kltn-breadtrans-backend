@@ -26,16 +26,22 @@ export class ToeicController {
     return this.toeicService.getExams();
   }
 
+  @Get('history')
+  @UseGuards(JwtAuthGuard)
+  getHistory(@Req() req: any) {
+    return this.toeicService.getHistory(req.user.id);
+  }
+
   @Get('exams/:examId/briefing')
   @UseGuards(JwtAuthGuard)
-  getExamBriefing(@Param('examId') examId: string) {
-    return this.toeicService.getExamBriefing(+examId);
+  getExamBriefing(@Param('examId') examId: string, @Req() req: any) {
+    return this.toeicService.getExamBriefing(+examId, req.user?.id);
   }
 
   @Get('exams/:examId')
   @UseGuards(JwtAuthGuard)
-  getExamDetails(@Param('examId') examId: string) {
-    return this.toeicService.getExamBriefing(+examId);
+  getExamDetails(@Param('examId') examId: string, @Req() req: any) {
+    return this.toeicService.getExamBriefing(+examId, req.user?.id);
   }
 
   @Get('bundles/:quizId')
@@ -149,5 +155,11 @@ export class ToeicController {
   @UseGuards(JwtAuthGuard)
   getResult(@Param('id') id: string, @Req() req: any) {
     return this.toeicService.getResult(+id, req.user.id, req.user.role);
+  }
+
+  @Get('attempts/:id/review')
+  @UseGuards(JwtAuthGuard)
+  getReview(@Param('id') id: string, @Req() req: any) {
+    return this.toeicService.getReview(+id, req.user.id, req.user.role);
   }
 }

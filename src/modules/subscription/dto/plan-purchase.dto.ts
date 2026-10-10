@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PlanPaymentStatus, PlanPurchaseStatus } from '@prisma/client';
+import type { PayosIntentDto } from '../../payment/payos-payment.service';
 import { Type } from 'class-transformer';
 import {
   IsEnum,
@@ -158,8 +159,11 @@ export class PlanPurchaseResponseDto {
   @ApiProperty({ type: PlanPurchasePaymentDto })
   payment!: PlanPurchasePaymentDto;
 
-  @ApiProperty({ type: PlanBankInstructionsDto })
-  bankInstructions!: PlanBankInstructionsDto;
+  @ApiPropertyOptional({ type: PlanBankInstructionsDto, nullable: true })
+  bankInstructions!: PlanBankInstructionsDto | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  payos!: PayosIntentDto | null;
 
   @ApiProperty()
   isActivePaymentIntent!: boolean;

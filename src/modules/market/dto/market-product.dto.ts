@@ -11,4 +11,6 @@ export class MarketProductDto {
   available: boolean;
   purchaseCount: number;
   isActive: boolean;
+  fulfillmentType?: 'DIGITAL' | 'PHYSICAL';
+  requiresShippingAddress?: boolean;
 }

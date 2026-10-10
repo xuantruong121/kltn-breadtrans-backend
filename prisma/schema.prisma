@@ -66,6 +66,7 @@ enum PlanFeatureKey {
   PREMIUM_LISTENING
   PREMIUM_SPEAKING_CONTENT
   PREMIUM_WRITING_CONTENT
+  COURSE_LIBRARY_ACCESS
 }
 
 enum EntitlementUnit {
@@ -111,6 +112,31 @@ enum PlanPaymentStatus {
 enum PlanPaymentConfirmationSource {
   ADMIN
   AUTO_WEBHOOK
+}
+
+enum PaymentProvider {
+  SEPAY
+  PAYOS
+}
+
+enum MarketFulfillmentType {
+  DIGITAL
+  PHYSICAL
+}
+
+enum PayOSPaymentIntentType {
+  PLAN
+  COURSE
+}
+
+enum PayOSPaymentIntentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  CANCELLED
+  EXPIRED
+  UNDERPAID
+  FAILED
 }
 
 enum BankTransactionMatchStatus {
@@ -183,6 +209,7 @@ model User {
   notifications                   Notification[]
   subscriptions                  Subscription[]
   planPurchases                  PlanPurchase[]
+  payosPaymentIntents            PayOSPaymentIntent[]
   confirmedPlanPayments          PlanPayment[]                    @relation("PlanPaymentConfirmer")
   rejectedPlanPayments           PlanPayment[]                    @relation("PlanPaymentRejecter")
   issueReportsSubmitted           IssueReport[]                    @relation("IssueReporter")
@@ -194,6 +221,9 @@ model User {
   aiGenerationJobsCreated         AiGenerationJob[] @relation("AiGenerationJobCreator")
   aiGenerationJobsReviewed        AiGenerationJob[] @relation("AiGenerationJobReviewer")
   aiGenerationJobsPublished       AiGenerationJob[] @relation("AiGenerationJobPublisher")
+  shippingProfile                 UserShippingProfile?
+  physicalRedemptions             MarketPhysicalRedemption[]
+  courseLessonAttempts            CourseLessonAttempt[]
 }
 
 model AuthAccount {
@@ -397,6 +427,7 @@ model PlanPayment {
   bankTransactions BankTransaction[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+  payosIntent     PayOSPaymentIntent?
 
   @@index([status, createdAt])
   @@index([confirmedById])
@@ -436,6 +467,7 @@ model Course {
   description String?
   thumbnail   String?
   level       String? // e.g. "BEGINNER", "INTERMEDIATE", "ADVANCED"
+  curriculumType String @default("GENERAL_ENGLISH")
   status      CourseStatus @default(DRAFT)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -443,6 +475,8 @@ model Course {
   classes Class[]
   lessons Lesson[]
   quizzes Quiz[]
+  activities CourseActivity[]
+  courseLessons CourseLesson[]
 }
 
 model Class {
@@ -496,9 +530,42 @@ model Payment {
 
   enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
   reviewedBy User?      @relation("PaymentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  payosIntent PayOSPaymentIntent?
 
   @@index([status, createdAt])
   @@index([reviewedById])
+}
+
+model PayOSPaymentIntent {
+  id              Int                     @id @default(autoincrement())
+  userId          Int
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  type            PayOSPaymentIntentType
+  provider        PaymentProvider         @default(PAYOS)
+  orderCode       BigInt                  @unique
+  paymentLinkId   String?                 @unique
+  planPaymentId   Int?                    @unique
+  planPayment     PlanPayment?            @relation(fields: [planPaymentId], references: [id], onDelete: Restrict)
+  coursePaymentId Int?                    @unique
+  coursePayment   Payment?                @relation(fields: [coursePaymentId], references: [id], onDelete: Restrict)
+  amountVnd       Int
+  currency        String                  @default("VND")
+  description     String
+  checkoutUrl     String?
+  qrCode          String?
+  bankBin         String?
+  bankAccountNumber String?
+  bankAccountName  String?
+  status          PayOSPaymentIntentStatus @default(PENDING)
+  providerStatus  String?
+  expiresAt       DateTime?
+  paidAt          DateTime?
+  lastSyncedAt    DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([userId, status, createdAt])
+  @@index([type, status, createdAt])
 }
 
 model Lesson {
@@ -512,6 +579,7 @@ model Lesson {
   createdAt   DateTime @default(now())
 
   materials Material[]
+  activities CourseActivity[]
 }
 
 model Material {
@@ -521,6 +589,231 @@ model Material {
   title    String
   fileUrl  String
   fileType String? // PDF, DOCX, MP3, vv.
+  objective String? @db.Text
+  contentText String? @db.Text
+}
+
+/// Durable, ordered curriculum activity. Targets remain owned by their skill
+/// engines; this table only describes how a course presents them.
+model CourseActivity {
+  id Int @id @default(autoincrement())
+  courseId Int
+  lessonId Int
+  order Int @default(0)
+  kind String
+  title String?
+  isRequired Boolean @default(true)
+  quizId Int?
+  speakingPracticeSetId String?
+  toeicExamId Int?
+  grammarTopicId Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  quiz Quiz? @relation(fields: [quizId], references: [id], onDelete: Restrict)
+  speakingPracticeSet SpeakingPracticeSet? @relation(fields: [speakingPracticeSetId], references: [id], onDelete: Restrict)
+  toeicExam ToeicExamSet? @relation(fields: [toeicExamId], references: [id], onDelete: Restrict)
+  grammarTopic GrammarTopic? @relation(fields: [grammarTopicId], references: [id], onDelete: Restrict)
+
+  @@unique([lessonId, order])
+  @@index([courseId, isRequired, order])
+  @@index([quizId])
+  @@index([speakingPracticeSetId])
+  @@index([toeicExamId])
+  @@index([grammarTopicId])
+}
+
+enum CourseLessonStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum CourseLessonSectionType {
+  INTRO
+  THEORY
+  EXAMPLE
+  TIP
+  COMMON_MISTAKE
+  STRATEGY
+  VOCABULARY
+  GRAMMAR
+  READING_TEXT
+  LISTENING_SCRIPT
+  SPEAKING_GUIDE
+  WRITING_GUIDE
+  CHECKPOINT
+  SUMMARY
+  REFERENCE
+}
+
+enum CourseLessonExerciseType {
+  MULTIPLE_CHOICE
+  MULTI_SELECT
+  FILL_IN_THE_BLANK
+  MATCHING
+  ORDERING
+  TRUE_FALSE
+  READING_COMPREHENSION
+  LISTENING_COMPREHENSION
+  VOCABULARY
+  GRAMMAR
+  SPEAKING_READ_ALOUD
+  SPEAKING_SHORT_RESPONSE
+  WRITING_SHORT_RESPONSE
+  WRITING_GUIDED
+  WRITING_EMAIL
+  TOEIC_STYLE
+  CHECKPOINT
+}
+
+enum CourseLessonAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
+/// Course-owned learning graph. Legacy Lesson/CourseActivity remain readable
+/// for historical compatibility, while this model is authoritative for V5.
+model CourseLesson {
+  id                 Int                @id @default(autoincrement())
+  courseId           Int
+  course             Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  slug               String
+  title              String
+  summary            String             @db.Text
+  learningObjectives Json
+  estimatedMinutes   Int                @default(15)
+  difficulty         String?
+  coverImage         String?
+  order              Int                @default(0)
+  status             CourseLessonStatus @default(DRAFT)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  sections           CourseLessonSection[]
+  exercises          CourseLessonExercise[]
+  references         CourseLessonReference[]
+  media              CourseLessonMedia[]
+  attempts           CourseLessonAttempt[]
+
+  @@unique([courseId, slug])
+  @@unique([courseId, order])
+  @@index([courseId, status, order])
+}
+
+model CourseLessonSection {
+  id        Int                      @id @default(autoincrement())
+  lessonId  Int
+  lesson    CourseLesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  order     Int
+  type      CourseLessonSectionType
+  heading   String
+  content   Json
+  isRequired Boolean                 @default(true)
+
+  @@unique([lessonId, order])
+  @@index([lessonId, type])
+}
+
+model CourseLessonExercise {
+  id               Int                       @id @default(autoincrement())
+  lessonId         Int
+  lesson            CourseLesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  slug             String
+  order            Int
+  type             CourseLessonExerciseType
+  title            String
+  prompt           String                  @db.Text
+  instructions     String?                 @db.Text
+  content          Json
+  rubric           Json?
+  required         Boolean                 @default(true)
+  minimumScore     Int?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  questions        CourseLessonQuestion[]
+  attempts         CourseLessonAttempt[]
+
+  @@unique([lessonId, slug])
+  @@unique([lessonId, order])
+  @@index([lessonId, required, order])
+}
+
+model CourseLessonQuestion {
+  id           Int                    @id @default(autoincrement())
+  exerciseId   Int
+  exercise     CourseLessonExercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  order        Int
+  prompt       String                 @db.Text
+  options      Json?
+  correctAnswer Json
+  explanation  String                 @db.Text
+  answers      CourseLessonExerciseAnswer[]
+
+  @@unique([exerciseId, order])
+}
+
+model CourseLessonReference {
+  id         Int         @id @default(autoincrement())
+  lessonId   Int
+  lesson     CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title      String
+  publisher  String?
+  url        String
+  accessedAt DateTime?
+  note       String?     @db.Text
+
+  @@index([lessonId])
+}
+
+model CourseLessonMedia {
+  id          Int         @id @default(autoincrement())
+  lessonId    Int
+  lesson      CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  type        String
+  url         String
+  altText     String?
+  provenance  String?
+  renderStatus String      @default("READY")
+
+  @@index([lessonId, type])
+}
+
+model CourseLessonAttempt {
+  id          Int                        @id @default(autoincrement())
+  userId      Int
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    Int
+  lesson      CourseLesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  exerciseId  Int
+  exercise    CourseLessonExercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  status      CourseLessonAttemptStatus  @default(IN_PROGRESS)
+  score       Float?
+  maxScore    Int?
+  submittedAt DateTime?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  answers     CourseLessonExerciseAnswer[]
+
+  @@index([userId, lessonId, exerciseId, status])
+  @@index([lessonId, exerciseId, status])
+}
+
+model CourseLessonExerciseAnswer {
+  id         Int                 @id @default(autoincrement())
+  attemptId  Int
+  attempt    CourseLessonAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId Int
+  question   CourseLessonQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answer     Json
+  isCorrect  Boolean?
+  score      Float?
+
+  @@unique([attemptId, questionId])
+  @@index([questionId])
 }
 
 enum AssignmentType {
@@ -643,6 +936,7 @@ model Quiz {
   listeningAudioArtifacts    ListeningAudioArtifact[]
   listeningTranscriptReveals ListeningTranscriptReveal[]
   listeningAudioUsages       ListeningAudioUsage[]
+  courseActivities           CourseActivity[]
 }
 
 /// Immutable, quiz-level production audio with an authoritative turn timeline.
@@ -834,10 +1128,27 @@ model SpeakingExercise {
   isPremiumContent Boolean @default(false)
   difficulty String   @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
   category   String   @default("TOEIC") // IELTS, TOEIC, GENERAL
+  practiceSetId String?
   createdAt  DateTime @default(now())
 
   submissions   SpeakingSubmission[]
   uploadIntents SpeakingUploadIntent[]
+  practiceSet SpeakingPracticeSet? @relation(fields: [practiceSetId], references: [id], onDelete: SetNull)
+
+  @@index([practiceSetId])
+}
+
+model SpeakingPracticeSet {
+  id String @id
+  title String
+  description String
+  category String
+  level String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exercises SpeakingExercise[]
+  courseActivities CourseActivity[]
 }
 
 enum SpeakingSubmissionStatus {
@@ -1090,40 +1401,87 @@ model ContentAttempt {
 }
 
 model MarketProduct {
-  id            Int      @id @default(autoincrement())
-  slug          String   @unique
-  name          String
-  description   String?  @db.Text
-  category      String   @default("GENERAL")
-  rarity        String   @default("COMMON")
-  price         Int // Integer Bánh Mì units only
-  imageUrl      String?
-  order         Int      @default(0)
-  stock         Int      @default(100)
-  purchaseCount Int      @default(0)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              Int                   @id @default(autoincrement())
+  slug            String                @unique
+  name            String
+  description     String?               @db.Text
+  category        String                @default("GENERAL")
+  rarity          String                @default("COMMON")
+  price           Int // Integer Bánh Mì units only
+  imageUrl        String?
+  order           Int                   @default(0)
+  stock           Int                   @default(100)
+  purchaseCount   Int                   @default(0)
+  isActive        Boolean               @default(true)
+  fulfillmentType MarketFulfillmentType @default(DIGITAL)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 }
 
 model MarketOrder {
-  id                Int       @id @default(autoincrement())
-  userId            Int
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  studentName       String
-  items             Json // Array of item objects
-  totalK            Float
-  totalBanh         Int // Integer Bánh Mì units
-  status            String    @default("pending") // "pending" | "approved" | "rejected"
-  bankSnapshot      Json?
-  createdAt         DateTime  @default(now())
-  paidAtCheckout    Boolean?
-  balanceAtCheckout Int? // Integer Bánh Mì units at checkout time
-  reviewedAt        DateTime?
-  reviewedBy        String?
-  currencyTxId      Int?
+  id                  Int                        @id @default(autoincrement())
+  userId              Int
+  user                User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentName         String
+  items               Json // Array of item objects
+  totalK              Float
+  totalBanh           Int // Integer Bánh Mì units
+  status              String                     @default("pending") // "pending" | "approved" | "rejected"
+  bankSnapshot        Json?
+  createdAt           DateTime                   @default(now())
+  paidAtCheckout      Boolean?
+  balanceAtCheckout   Int? // Integer Bánh Mì units at checkout time
+  reviewedAt          DateTime?
+  reviewedBy          String?
+  currencyTxId        Int?
   /// Client-generated idempotency key for a single checkout request.
-  idempotencyKey    String?   @unique
+  idempotencyKey      String?                    @unique
+  physicalRedemptions MarketPhysicalRedemption[]
+}
+
+model UserShippingProfile {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientName String
+  phone         String
+  countryCode   String   @default("VN")
+  provinceCode  String
+  provinceName  String
+  wardCode      String
+  wardName      String
+  addressLine   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model MarketPhysicalRedemption {
+  id               Int         @id @default(autoincrement())
+  userId           Int
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId          Int
+  order            MarketOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId        Int
+  productName      String
+  quantity         Int         @default(1)
+  status           String      @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+  recipientName    String
+  phone            String
+  countryCode      String      @default("VN")
+  provinceCode     String
+  provinceName     String
+  wardCode         String
+  wardName         String
+  addressLine      String
+  formattedAddress String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
 }
 
 model GameSettings {
@@ -1367,6 +1725,7 @@ model ToeicExamSet {
   groups       ToeicQuestionGroup[]
   attempts     ToeicAttempt[]
   toeicRewards UserToeicReward[]
+  courseActivities CourseActivity[]
 }
 
 model ToeicQuestionGroup {
@@ -1539,6 +1898,7 @@ model GrammarTopic {
   questions GrammarQuestion[]
   attempts  GrammarAttempt[]
   rewards   UserGrammarReward[]
+  courseActivities CourseActivity[]
 }
 
 model GrammarQuestion {

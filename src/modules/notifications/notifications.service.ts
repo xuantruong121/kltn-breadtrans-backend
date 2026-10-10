@@ -192,12 +192,24 @@ export class NotificationsService implements OnModuleInit {
     });
   }
 
-  async getInbox(userId: number, limit = 20, cursor?: number) {
+  async getInbox(
+    userId: number,
+    limit = 20,
+    cursor?: number,
+    filter: 'all' | 'unread' | 'read' = 'all',
+  ) {
     const take = Math.min(Math.max(Number(limit) || 20, 1), 50);
     const cursorNum = cursor ? Number(cursor) : undefined;
+    const normalizedFilter =
+      filter === 'unread' || filter === 'read' ? filter : 'all';
+    const where = {
+      userId,
+      ...(normalizedFilter === 'unread' ? { isRead: false } : {}),
+      ...(normalizedFilter === 'read' ? { isRead: true } : {}),
+    };
 
     const items = await this.prisma.notification.findMany({
-      where: { userId },
+      where,
       take: take + 1,
       cursor: cursorNum ? { id: cursorNum } : undefined,
       skip: cursorNum ? 1 : 0,
@@ -243,5 +255,15 @@ export class NotificationsService implements OnModuleInit {
       data: { isRead: true },
     });
     return { success: true, count: res.count };
+  }
+
+  async deleteNotification(userId: number, id: number) {
+    const result = await this.prisma.notification.deleteMany({
+      where: { id, userId },
+    });
+    if (result.count === 0) {
+      return { success: false, message: 'Thông báo không tồn tại' };
+    }
+    return { success: true, id };
   }
 }

@@ -283,6 +283,13 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       await prisma.assignment
         ?.deleteMany({ where: { classId: { in: classIds } } })
         .catch(() => null);
+      await prisma.payOSPaymentIntent
+        ?.deleteMany({
+          where: {
+            coursePayment: { enrollment: { classId: { in: classIds } } },
+          },
+        })
+        .catch(() => null);
       await prisma.payment
         ?.deleteMany({
           where: { enrollment: { classId: { in: classIds } } },
@@ -315,6 +322,17 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
         .catch(() => null);
     }
     if (prisma) {
+      await prisma.payOSPaymentIntent
+        ?.deleteMany({
+          where: {
+            userId: {
+              in: [studentA?.id, studentB?.id, adminUser?.id].filter(
+                Boolean,
+              ) as number[],
+            },
+          },
+        })
+        .catch(() => null);
       await prisma.user
         ?.deleteMany({
           where: {
@@ -635,6 +653,9 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       expect(paymentRows[0].status).toBe(PaymentStatus.PENDING);
 
       // Cleanup fresh user
+      await prisma.payOSPaymentIntent
+        .deleteMany({ where: { userId: freshStudent.id } })
+        .catch(() => null);
       await prisma.payment.deleteMany({
         where: { enrollmentId: enrollmentRows[0].id },
       });
@@ -735,6 +756,11 @@ describe('Enrollment Lifecycle & Security & Concurrency (e2e)', () => {
       expect(activeCount).toBe(0);
 
       // Cleanup
+      await prisma.payOSPaymentIntent
+        .deleteMany({
+          where: { userId: { in: [studentP1.id, studentP2.id] } },
+        })
+        .catch(() => null);
       await prisma.payment.deleteMany({
         where: {
           enrollmentId: {

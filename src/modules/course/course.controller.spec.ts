@@ -4,6 +4,7 @@ import { CourseService } from './course.service';
 import { Role } from '@prisma/client';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../../common/decorators/roles.decorator';
+import { CourseLearningV5Service } from './course-v5.service';
 
 describe('CourseController - Self-Enrollment & Controller Layer Spec', () => {
   let controller: CourseController;
@@ -37,6 +38,10 @@ describe('CourseController - Self-Enrollment & Controller Layer Spec', () => {
         {
           provide: CourseService,
           useValue: service,
+        },
+        {
+          provide: CourseLearningV5Service,
+          useValue: {},
         },
       ],
     }).compile();

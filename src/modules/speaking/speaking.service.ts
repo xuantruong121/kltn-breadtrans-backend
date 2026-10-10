@@ -242,6 +242,7 @@ export class SpeakingService {
     const exercises = await this.prisma.speakingExercise.findMany({
       where: category ? { category } : {},
       orderBy: { createdAt: 'desc' },
+      include: { practiceSet: true },
     });
 
     const accessByExercise = this.speakingContentAccess
@@ -271,9 +272,17 @@ export class SpeakingService {
       userSubmissions.map((s) => s.exerciseId),
     );
 
+    const setFor = (exercise: (typeof exercises)[number]) =>
+      exercise.practiceSet
+        ? {
+            key: exercise.practiceSet.id,
+            title: exercise.practiceSet.title,
+            description: exercise.practiceSet.description,
+          }
+        : resolveSpeakingPracticeSet(exercise);
     const grouped = new Map<string, Array<(typeof exercises)[number]>>();
     for (const exercise of exercises) {
-      const set = resolveSpeakingPracticeSet(exercise);
+      const set = setFor(exercise);
       const current = grouped.get(set.key) ?? [];
       current.push(exercise);
       grouped.set(set.key, current);
@@ -294,7 +303,7 @@ export class SpeakingService {
     >();
 
     for (const [key, items] of grouped.entries()) {
-      const set = resolveSpeakingPracticeSet(items[0]);
+      const set = setFor(items[0]);
       setSummaries.set(key, {
         ...set,
         category: items[0].category,
@@ -310,7 +319,7 @@ export class SpeakingService {
     const positions = new Map<string, number>();
     return Promise.all(
       exercises.map(async (exercise) => {
-        const set = setSummaries.get(resolveSpeakingPracticeSet(exercise).key)!;
+        const set = setSummaries.get(setFor(exercise).key)!;
         const setKey = set.key;
         const position = (positions.get(setKey) ?? 0) + 1;
         positions.set(setKey, position);

@@ -68,7 +68,7 @@ describe('CourseService self-paced business rules', () => {
     ).rejects.toThrow();
   });
 
-  it('keeps paid enrollment pending and creates a Payment atomically', async () => {
+  it('allows only explicit admin override for historical class enrollment', async () => {
     prisma.$transaction.mockImplementation(async (cb: any) =>
       cb({
         $queryRaw: jest.fn().mockResolvedValue([
@@ -91,8 +91,8 @@ describe('CourseService self-paced business rules', () => {
         payment: { create: jest.fn().mockResolvedValue({ id: 2 }) },
       }),
     );
-    const result = await service.enrollInClass(1, 7);
-    expect(result.status).toBe('PENDING_PAYMENT');
+    const result = await service.enrollInClass(1, 7, { isAdminOverride: true });
+    expect(result.status).toBe('ACTIVE');
   });
 
   it('allows changing tuition on an ONGOING class if enrollment count is 0', async () => {

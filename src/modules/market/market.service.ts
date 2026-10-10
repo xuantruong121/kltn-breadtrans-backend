@@ -2,12 +2,14 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
 import { AdjustCurrencyDto } from './dto/adjust-currency.dto';
 import { MarketProductDto } from './dto/market-product.dto';
+import { isValidVietnamPhone } from '../../common/utils/vietnam-phone.util';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -40,6 +42,8 @@ export class MarketService {
       available: product.stock > 0 && product.isActive,
       purchaseCount: product.purchaseCount,
       isActive: product.isActive,
+      fulfillmentType: product.fulfillmentType,
+      requiresShippingAddress: product.fulfillmentType === 'PHYSICAL',
     }));
   }
 
@@ -151,10 +155,45 @@ export class MarketService {
       where: { userId },
     });
 
-    const hasRealGift = resolvedItems.some(
-      ({ product }) => product.category === 'PHYSICAL',
+    const physicalItems = resolvedItems.filter(
+      ({ product }) => product.fulfillmentType === 'PHYSICAL',
     );
 
+    let validatedShippingProfile: any = null;
+
+    if (physicalItems.length > 0) {
+      const shippingProfile = await this.prisma.userShippingProfile.findUnique({
+        where: { userId },
+      });
+
+      const missingFields: string[] = [];
+      if (!shippingProfile?.recipientName?.trim())
+        missingFields.push('recipientName');
+      if (
+        !shippingProfile?.phone?.trim() ||
+        !isValidVietnamPhone(shippingProfile.phone)
+      ) {
+        missingFields.push('phone');
+      }
+      if (!shippingProfile?.provinceCode?.trim())
+        missingFields.push('province');
+      if (!shippingProfile?.wardCode?.trim()) missingFields.push('ward');
+      if (!shippingProfile?.addressLine?.trim())
+        missingFields.push('addressLine');
+
+      if (!shippingProfile || missingFields.length > 0) {
+        throw new UnprocessableEntityException({
+          code: 'SHIPPING_PROFILE_REQUIRED',
+          message:
+            'Vui lòng hoàn thiện thông tin nhận quà trước khi đổi quà vật lý.',
+          missingFields,
+        });
+      }
+
+      validatedShippingProfile = shippingProfile;
+    }
+
+    const hasRealGift = physicalItems.length > 0;
     const initialStatus = hasRealGift ? 'pending' : 'approved';
     const itemNames = resolvedItems
       .map(({ product, quantity }) => `${product.name} (x${quantity})`)
@@ -301,6 +340,38 @@ export class MarketService {
         },
       });
 
+      // 2f. Tạo bản ghi MarketPhysicalRedemption (snapshot) cho các món quà vật lý
+      if (physicalItems.length > 0 && validatedShippingProfile) {
+        const currentShipping =
+          (await tx.userShippingProfile.findUnique({
+            where: { userId },
+          })) || validatedShippingProfile;
+
+        const formattedAddress = `${currentShipping.addressLine}, ${currentShipping.wardName}, ${currentShipping.provinceName}, Việt Nam`;
+
+        for (const { product, quantity } of physicalItems) {
+          await tx.marketPhysicalRedemption.create({
+            data: {
+              userId,
+              orderId: order.id,
+              productId: product.id,
+              productName: product.name,
+              quantity,
+              status: 'PENDING',
+              recipientName: currentShipping.recipientName,
+              phone: currentShipping.phone,
+              countryCode: currentShipping.countryCode || 'VN',
+              provinceCode: currentShipping.provinceCode,
+              provinceName: currentShipping.provinceName,
+              wardCode: currentShipping.wardCode,
+              wardName: currentShipping.wardName,
+              addressLine: currentShipping.addressLine,
+              formattedAddress,
+            },
+          });
+        }
+      }
+
       await tx.banhTransaction.create({
         data: {
           userId,
@@ -336,6 +407,9 @@ export class MarketService {
     return this.prisma.marketOrder.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
+      include: {
+        physicalRedemptions: true,
+      },
     });
   }
 
@@ -390,6 +464,7 @@ export class MarketService {
             profile: true,
           },
         },
+        physicalRedemptions: true,
       },
     });
   }
@@ -466,6 +541,12 @@ export class MarketService {
           }
         }
 
+        // Cập nhật trạng thái physical redemption sang CANCELLED nếu có
+        await tx.marketPhysicalRedemption.updateMany({
+          where: { orderId },
+          data: { status: 'CANCELLED' },
+        });
+
         // Bắn sự kiện cập nhật số dư Bánh Mì hoàn tiền cho học sinh
         this.eventsGateway.sendCurrencyUpdate(order.userId, {
           amount: order.totalBanh,
@@ -487,6 +568,13 @@ export class MarketService {
           reviewedAt: new Date(),
         },
       });
+
+      if (status === 'approved' || status === 'completed') {
+        await this.prisma.marketPhysicalRedemption.updateMany({
+          where: { orderId, status: 'PENDING' },
+          data: { status: status === 'completed' ? 'DELIVERED' : 'PROCESSING' },
+        });
+      }
     }
 
     // Bắn sự kiện Real-time thông báo kết quả duyệt đơn cho học sinh

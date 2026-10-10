@@ -2156,7 +2156,9 @@ export class QuizService {
       include: {
         quiz: {
           include: {
-            questions: true,
+            questions: {
+              orderBy: { order: 'asc' },
+            },
           },
         },
         results: true,
