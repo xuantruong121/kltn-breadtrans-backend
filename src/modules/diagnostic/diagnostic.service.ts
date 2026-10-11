@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   buildSkillProfiles,
   buildStrengthsAndWeaknesses,
+  DiagnosticSkillProfile,
   DiagnosticQuestionForScoring,
   getQuestionMeta,
   getQuestionOptions,
@@ -21,6 +22,9 @@ import { Prisma } from '@prisma/client';
 import { buildCourseCurriculum } from '../course/course-curriculum';
 
 type AnswerMap = Record<string, unknown>;
+
+const SPEAKING_FINALIZATION_TIMEOUT_MS = 10_000;
+const SPEAKING_FINALIZATION_POLL_MS = 250;
 
 @Injectable()
 export class DiagnosticService {
@@ -182,16 +186,93 @@ export class DiagnosticService {
     );
     const productiveTaskCount = questions.length - objectiveQuestions.length;
     const profiles = buildSkillProfiles(objectiveQuestions, answers);
-    const { strengths, weaknesses } = buildStrengthsAndWeaknesses(profiles);
+    const speakingRows = this.prisma.diagnosticSpeakingResponse
+      ? await this.prisma.diagnosticSpeakingResponse.findMany({
+          where: { attemptId: attempt.id },
+          orderBy: { questionId: 'asc' },
+        })
+      : [];
+    const gradedSpeaking = speakingRows.filter(
+      (row) => row.status === 'GRADED' && typeof row.score === 'number',
+    );
+    const speakingScore = gradedSpeaking.length
+      ? Math.round(
+          (gradedSpeaking.reduce((sum, row) => sum + Number(row.score), 0) /
+            gradedSpeaking.length) *
+            10,
+        ) / 10
+      : null;
+    const objectiveCoreScore = this.weightedCore(questions, answers);
+    const speakingWeight =
+      gradedSpeaking.length >= 2
+        ? 0.12
+        : gradedSpeaking.length === 1
+          ? 0.08
+          : 0;
+    const finalEvidenceScore =
+      speakingScore === null
+        ? objectiveCoreScore
+        : Math.round(
+            (objectiveCoreScore * (1 - speakingWeight) +
+              speakingScore * speakingWeight) *
+              10,
+          ) / 10;
+    const finalLevel =
+      speakingScore === null
+        ? attempt.level
+        : this.boundedLevel(attempt.level, finalEvidenceScore);
+    const profileWithSpeaking: DiagnosticSkillProfile[] =
+      speakingScore === null
+        ? profiles
+        : [
+            ...profiles,
+            {
+              skill: 'Speaking',
+              correctCount: Math.round(speakingScore),
+              totalCount: 100,
+              percentage: Math.round(speakingScore),
+              evidence:
+                gradedSpeaking.length >= 2 ? 'SUFFICIENT' : 'INSUFFICIENT',
+            },
+          ];
+    const base = buildStrengthsAndWeaknesses(profileWithSpeaking);
+    const strengths =
+      speakingScore !== null && speakingScore >= 75
+        ? [...base.strengths, 'Speaking']
+        : base.strengths;
+    const weaknesses =
+      speakingScore !== null && speakingScore < 60
+        ? [...base.weaknesses, 'Speaking']
+        : base.weaknesses;
     return {
       attemptId: attempt.id,
       correctCount: attempt.correctCount,
       totalCount: attempt.totalCount,
       objectiveTotalCount: objectiveQuestions.length,
       productiveTaskCount,
-      productiveUnavailable: productiveTaskCount > 0,
+      productiveUnavailable: productiveTaskCount > 0 && speakingScore === null,
       percentage: attempt.percentage,
-      level: attempt.level,
+      level: finalLevel,
+      objectiveCoreScore,
+      objectivePlacementBand: attempt.level,
+      speakingEvidenceCount: gradedSpeaking.length,
+      speakingScore,
+      speakingEvidenceConfidence:
+        gradedSpeaking.length >= 2
+          ? 'FULL_DIAGNOSTIC_SAMPLE'
+          : gradedSpeaking.length === 1
+            ? 'PARTIAL'
+            : 'UNAVAILABLE',
+      finalEvidenceScore,
+      finalEstimatedBand: finalLevel,
+      speakingResponses: speakingRows.map((row) => ({
+        id: row.id,
+        questionId: row.questionId,
+        status: row.status,
+        score: row.score,
+        durationMs: row.durationMs,
+        failureReason: row.failureReason,
+      })),
       submittedAt: attempt.submittedAt,
       skillProfiles: profiles,
       strengths,
@@ -204,8 +285,11 @@ export class DiagnosticService {
           questionId: question.id,
           selectedOption:
             typeof selectedOption === 'number' ? selectedOption : undefined,
-          selectedText:
-            typeof selectedOption === 'string' ? selectedOption : undefined,
+          selectedText: open
+            ? (speakingRows.find((row) => row.questionId === question.id)
+                ?.status ??
+              (typeof selectedOption === 'string' ? selectedOption : undefined))
+            : undefined,
           correctOption: open ? null : question.correctIndex,
           isCorrect: open ? null : selectedOption === question.correctIndex,
           explanation: open ? null : question.explanation,
@@ -214,9 +298,75 @@ export class DiagnosticService {
     };
   }
 
+  private boundedLevel(level: string, score: number) {
+    const bands = ['A1', 'A2', 'B1', 'B2'];
+    const current = Math.max(0, bands.indexOf(level));
+    const target = score >= 75 ? 3 : score >= 50 ? 2 : score >= 25 ? 1 : 0;
+    return bands[
+      Math.max(
+        0,
+        Math.min(3, Math.min(current + 1, Math.max(current - 1, target))),
+      )
+    ];
+  }
+
   private readAnswerMap(value: unknown): AnswerMap {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     return value as AnswerMap;
+  }
+
+  private async awaitSpeakingFinalization(
+    attemptId: number,
+    questionIds: number[],
+  ) {
+    const configuredTimeout = Number.parseInt(
+      process.env.DIAGNOSTIC_SPEAKING_FINALIZATION_TIMEOUT_MS || '',
+      10,
+    );
+    const timeoutMs =
+      Number.isFinite(configuredTimeout) && configuredTimeout > 0
+        ? configuredTimeout
+        : SPEAKING_FINALIZATION_TIMEOUT_MS;
+    const deadline = Date.now() + timeoutMs;
+    const terminal = new Set(['GRADED', 'SKIPPED', 'GRADING_FAILED']);
+    let rows = await this.prisma.diagnosticSpeakingResponse.findMany({
+      where: { attemptId },
+    });
+    while (
+      questionIds.some(
+        (questionId) =>
+          !terminal.has(
+            rows.find((row) => row.questionId === questionId)?.status ?? '',
+          ),
+      ) &&
+      Date.now() < deadline
+    ) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, SPEAKING_FINALIZATION_POLL_MS),
+      );
+      rows = await this.prisma.diagnosticSpeakingResponse.findMany({
+        where: { attemptId },
+      });
+    }
+    const pendingIds = questionIds.filter(
+      (questionId) =>
+        !terminal.has(
+          rows.find((row) => row.questionId === questionId)?.status ?? '',
+        ),
+    );
+    if (pendingIds.length) {
+      await this.prisma.diagnosticSpeakingResponse.updateMany({
+        where: { attemptId, questionId: { in: pendingIds } },
+        data: {
+          status: 'GRADING_FAILED',
+          failureReason: 'Chấm Speaking quá thời hạn hoàn tất bài kiểm tra',
+        },
+      });
+      rows = await this.prisma.diagnosticSpeakingResponse.findMany({
+        where: { attemptId },
+      });
+    }
+    return rows;
   }
 
   async getCurrentAssessment(userId: number) {
@@ -232,7 +382,12 @@ export class DiagnosticService {
     const formQuestions = this.formQuestions(assessment.questions);
 
     const latestAttempt = await this.prisma.diagnosticAttempt.findFirst({
-      where: { userId, assessmentId: assessment.id },
+      where: { userId, assessmentId: assessment.id, status: 'COMPLETED' },
+      orderBy: { submittedAt: 'desc' },
+    });
+    const inProgressAttempt = await this.prisma.diagnosticAttempt.findFirst({
+      where: { userId, assessmentId: assessment.id, status: 'IN_PROGRESS' },
+      include: { speakingResponses: true },
       orderBy: { submittedAt: 'desc' },
     });
     return {
@@ -251,6 +406,22 @@ export class DiagnosticService {
             submittedAt: latestAttempt.submittedAt,
           }
         : null,
+      inProgressAttempt: inProgressAttempt
+        ? {
+            id: inProgressAttempt.id,
+            answers: inProgressAttempt.answers,
+            speakingResponses: inProgressAttempt.speakingResponses.map(
+              (response) => ({
+                id: response.id,
+                questionId: response.questionId,
+                status: response.status,
+                score: response.score,
+                durationMs: response.durationMs,
+                failureReason: response.failureReason,
+              }),
+            ),
+          }
+        : null,
     };
   }
 
@@ -265,10 +436,49 @@ export class DiagnosticService {
     this.assertQuestionBank(assessment.questions);
     const formQuestions = this.formQuestions(assessment.questions);
     const attempt = await this.prisma.diagnosticAttempt.findFirst({
-      where: { userId, assessmentId: assessment.id },
+      where: { userId, assessmentId: assessment.id, status: 'COMPLETED' },
       orderBy: { submittedAt: 'desc' },
     });
     return attempt ? this.toResult(attempt, formQuestions) : null;
+  }
+
+  async startAttempt(userId: number, assessmentId: number) {
+    const assessment = await this.prisma.diagnosticAssessment.findFirst({
+      where: { id: assessmentId, isActive: true },
+      include: { questions: { orderBy: { order: 'asc' } } },
+    });
+    if (!assessment)
+      throw new NotFoundException(
+        'Bài kiểm tra không tồn tại hoặc đã ngừng hoạt động',
+      );
+    this.assertQuestionBank(assessment.questions);
+    const existing = await this.prisma.diagnosticAttempt.findFirst({
+      where: { userId, assessmentId, status: 'IN_PROGRESS' },
+      orderBy: { submittedAt: 'desc' },
+    });
+    if (existing)
+      return {
+        attemptId: existing.id,
+        submissionToken: existing.submissionToken,
+      };
+    const submissionToken = `diagnostic-${userId}-${assessmentId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const objectiveCount = this.formQuestions(assessment.questions).filter(
+      (q) => !isOpenDiagnosticQuestion(q),
+    ).length;
+    const created = await this.prisma.diagnosticAttempt.create({
+      data: {
+        userId,
+        assessmentId,
+        answers: {},
+        correctCount: 0,
+        totalCount: objectiveCount,
+        percentage: 0,
+        level: 'IN_PROGRESS',
+        status: 'IN_PROGRESS',
+        submissionToken,
+      },
+    });
+    return { attemptId: created.id, submissionToken };
   }
 
   async submitAssessment(
@@ -276,6 +486,7 @@ export class DiagnosticService {
     assessmentId: number,
     answers: unknown,
     submissionToken?: string,
+    attemptId?: number,
   ) {
     const assessment = await this.prisma.diagnosticAssessment.findFirst({
       where: { id: assessmentId, isActive: true },
@@ -293,20 +504,69 @@ export class DiagnosticService {
     }
 
     const answerMap = answers as AnswerMap;
+    const speakingQuestions = formQuestions.filter(
+      (question) => getQuestionMeta(question).section === 'SPEAKING',
+    );
+    if (speakingQuestions.length > 0 && !attemptId) {
+      throw new BadRequestException('Phiên kiểm tra Speaking không hợp lệ');
+    }
     const expectedIds = new Set(
+      formQuestions
+        .filter((question) => getQuestionMeta(question).section !== 'SPEAKING')
+        .map((question) => String(question.id)),
+    );
+    const formIds = new Set(
       formQuestions.map((question) => String(question.id)),
     );
     const submittedIds = Object.keys(answerMap);
-    const unknownIds = submittedIds.filter((id) => !expectedIds.has(id));
+    const unknownIds = submittedIds.filter((id) => !formIds.has(id));
     const missingIds = [...expectedIds].filter((id) => !(id in answerMap));
     if (unknownIds.length || missingIds.length) {
       throw new BadRequestException(
         `Cần trả lời đúng ${formQuestions.length} câu hỏi hiện tại`,
       );
     }
+    let speakingResponses: Array<{
+      questionId: number;
+      status: string;
+      score: number | null;
+    }> = [];
+    if (attemptId) {
+      const attempt = await this.prisma.diagnosticAttempt.findUnique({
+        where: { id: attemptId },
+        include: { speakingResponses: true },
+      });
+      if (
+        !attempt ||
+        attempt.userId !== userId ||
+        attempt.assessmentId !== assessmentId
+      ) {
+        throw new BadRequestException('Phiên kiểm tra không hợp lệ');
+      }
+      speakingResponses = await this.awaitSpeakingFinalization(
+        attemptId,
+        speakingQuestions.map((question) => question.id),
+      );
+      const terminal = new Set(['GRADED', 'SKIPPED', 'GRADING_FAILED']);
+      if (
+        speakingQuestions.some(
+          (question) =>
+            !terminal.has(
+              speakingResponses.find((row) => row.questionId === question.id)
+                ?.status ?? '',
+            ),
+        )
+      ) {
+        throw new BadRequestException(
+          'Cần hoàn tất hoặc bỏ qua toàn bộ nhiệm vụ Speaking',
+        );
+      }
+    }
     for (const question of formQuestions) {
       const selectedOption = answerMap[String(question.id)];
       if (isOpenDiagnosticQuestion(question)) {
+        if (getQuestionMeta(question).section === 'SPEAKING' && attemptId)
+          continue;
         if (
           typeof selectedOption !== 'string' ||
           selectedOption.trim().length < 2 ||
@@ -328,13 +588,18 @@ export class DiagnosticService {
     }
 
     const questionsResult = formQuestions.map((question) => {
-      const selectedOption = answerMap[String(question.id)] as number;
       const open = isOpenDiagnosticQuestion(question);
+      const selectedOption = answerMap[String(question.id)] as number;
+      const speakingResponse = speakingResponses.find(
+        (row) => row.questionId === question.id,
+      );
       return {
         questionId: question.id,
         selectedOption: open ? undefined : selectedOption,
         selectedText: open
-          ? String(answerMap[String(question.id)] ?? '')
+          ? getQuestionMeta(question).section === 'SPEAKING' && attemptId
+            ? (speakingResponse?.status ?? 'SKIPPED')
+            : String(answerMap[String(question.id)] ?? '')
           : undefined,
         correctOption: open ? null : question.correctIndex,
         isCorrect: open ? null : selectedOption === question.correctIndex,
@@ -375,34 +640,57 @@ export class DiagnosticService {
           this.bandPercentages(formQuestions, answerMap),
         )
       : resolveEstimatedLevel(percentage);
-    const previousAttempts = await this.prisma.diagnosticAttempt.count({
-      where: { userId },
-    });
-
     const attempt = await this.prisma.$transaction(async (tx) => {
       if (submissionToken) {
+        // Serialize retries for the same learner/assessment/token without a
+        // schema migration. The lock lives only for this transaction.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`diagnostic:${userId}:${assessmentId}:${submissionToken}`}, 0))`;
         const recent = await tx.diagnosticAttempt.findFirst({
-          where: { userId, assessmentId },
+          where: { userId, assessmentId, status: 'COMPLETED' },
           orderBy: { submittedAt: 'desc' },
         });
         const recentAnswers = this.readAnswerMap(recent?.answers);
         if (recent && recentAnswers.__submissionToken === submissionToken)
           return recent;
       }
+      if (attemptId) {
+        const currentAttempt = await tx.diagnosticAttempt.findUnique({
+          where: { id: attemptId },
+        });
+        if (currentAttempt?.status === 'COMPLETED') return currentAttempt;
+      }
+      const previousAttempts = await tx.diagnosticAttempt.count({
+        where: { userId, status: 'COMPLETED' },
+      });
       const storedAnswers = submissionToken
         ? { ...answerMap, __submissionToken: submissionToken }
         : answerMap;
-      const created = await tx.diagnosticAttempt.create({
-        data: {
-          userId,
-          assessmentId,
-          answers: storedAnswers as Prisma.InputJsonObject,
-          correctCount,
-          totalCount,
-          percentage,
-          level,
-        },
-      });
+      const created = attemptId
+        ? await tx.diagnosticAttempt.update({
+            where: { id: attemptId },
+            data: {
+              answers: storedAnswers as Prisma.InputJsonObject,
+              correctCount,
+              totalCount,
+              percentage,
+              level,
+              status: 'COMPLETED',
+              completedAt: new Date(),
+            },
+          })
+        : await tx.diagnosticAttempt.create({
+            data: {
+              userId,
+              assessmentId,
+              answers: storedAnswers as Prisma.InputJsonObject,
+              correctCount,
+              totalCount,
+              percentage,
+              level,
+              status: 'COMPLETED',
+              completedAt: new Date(),
+            },
+          });
       await tx.learningActivity.create({
         data: {
           userId,
