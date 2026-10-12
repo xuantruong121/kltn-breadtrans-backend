@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { resolve } from 'node:path';
 import {
   CANONICAL_DIAGNOSTIC_BLUEPRINT,
   getAttemptQuestionPermutation,
@@ -452,20 +452,7 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
 
   describe('Language Use Semantic Blueprint & Balance Validation', () => {
     function getArtifactPath(subPath: string) {
-      const p1 = join(process.cwd(), '..', '..', 'artifacts', subPath);
-      if (existsSync(p1)) return p1;
-      const p2 = join(
-        __dirname,
-        '..',
-        '..',
-        '..',
-        '..',
-        '..',
-        'artifacts',
-        subPath,
-      );
-      if (existsSync(p2)) return p2;
-      return p1;
+      return resolve(process.cwd(), 'test', 'fixtures', 'diagnostic', subPath);
     }
 
     interface SemanticMatrixItem {
@@ -485,6 +472,7 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
       questionId?: number;
       id?: number;
       order: number;
+      section?: string;
       stableKey: string;
       stem?: string;
       prompt?: string;
@@ -498,14 +486,9 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
       active?: boolean;
     }
 
-    const artifactPath = getArtifactPath(
-      join(
-        'entry-diagnostic-semantic-blueprint',
-        'final-language-use-matrix.json',
-      ),
-    );
+    const artifactPath = getArtifactPath('final-language-use-matrix.json');
     const bankAuditPath = getArtifactPath(
-      join('entry-diagnostic-2', 'entry-diagnostic-question-audit-after.json'),
+      'entry-diagnostic-question-audit-after.json',
     );
 
     it('enforces exact 8 Grammar + 8 Vocabulary parity with 2 per CEFR band in Language Use', () => {
@@ -548,6 +531,25 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
       const bank = JSON.parse(
         readFileSync(bankAuditPath, 'utf8'),
       ) as BankAuditQuestion[];
+      const activeBank = bank.filter((q) => q.active !== false);
+      expect(activeBank).toHaveLength(52);
+      for (const [section, expected] of [
+        ['LANGUAGE_USE', 16],
+        ['READING', 16],
+        ['LISTENING', 16],
+        ['SPEAKING', 2],
+        ['WRITING', 2],
+      ] as const) {
+        expect(activeBank.filter((q) => q.section === section)).toHaveLength(
+          expected,
+        );
+      }
+      expect(activeBank.filter((q) => q.questionType === 'MCQ')).toHaveLength(
+        48,
+      );
+      expect(activeBank.filter((q) => q.questionType !== 'MCQ')).toHaveLength(
+        4,
+      );
 
       const validBands = new Set(['A1', 'A2', 'B1', 'B2']);
       for (const item of matrix) {

@@ -322,17 +322,21 @@ describe('MarketService', () => {
       expect(result.success).toBe(true);
       expect(result.status).toBe('pending');
       expect(createdRedemption).toBeDefined();
-      expect(createdRedemption.recipientName).toBe('Nguyễn Văn QA');
-      expect(createdRedemption.phone).toBe('+84987654321');
-      expect(createdRedemption.provinceCode).toBe('79');
-      expect(createdRedemption.provinceName).toBe('Thành phố Hồ Chí Minh');
-      expect(createdRedemption.wardCode).toBe('26734');
-      expect(createdRedemption.wardName).toBe('Phường 1');
-      expect(createdRedemption.addressLine).toBe('12 Nguyễn Văn Bảo');
-      expect(createdRedemption.formattedAddress).toBe(
+      const redemption = createdRedemption as Record<string, unknown> | null;
+      if (!redemption) {
+        throw new Error('Expected a physical redemption to be created');
+      }
+      expect(redemption.recipientName).toBe('Nguyễn Văn QA');
+      expect(redemption.phone).toBe('+84987654321');
+      expect(redemption.provinceCode).toBe('79');
+      expect(redemption.provinceName).toBe('Thành phố Hồ Chí Minh');
+      expect(redemption.wardCode).toBe('26734');
+      expect(redemption.wardName).toBe('Phường 1');
+      expect(redemption.addressLine).toBe('12 Nguyễn Văn Bảo');
+      expect(redemption.formattedAddress).toBe(
         '12 Nguyễn Văn Bảo, Phường 1, Thành phố Hồ Chí Minh, Việt Nam',
       );
-      expect(createdRedemption.status).toBe('PENDING');
+      expect(redemption.status).toBe('PENDING');
     });
   });
 });

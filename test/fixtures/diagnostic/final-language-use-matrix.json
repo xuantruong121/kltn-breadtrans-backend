@@ -1,0 +1,163 @@
+[
+  {
+    "id": 2001,
+    "stableKey": "lu-a1-be",
+    "stem": "My name ___ Linh.",
+    "construct": "be",
+    "skill": "Grammar",
+    "cefr": "A1",
+    "CEFR": "A1",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2002,
+    "stableKey": "lu-a1-present",
+    "stem": "Every morning, Sam ___ coffee before work.",
+    "construct": "basic present",
+    "skill": "Grammar",
+    "cefr": "A1",
+    "CEFR": "A1",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2061,
+    "stableKey": "lu-a1-daily-object",
+    "stem": "I drink water from a ___.",
+    "construct": "daily objects",
+    "skill": "Vocabulary",
+    "cefr": "A1",
+    "CEFR": "A1",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2063,
+    "stableKey": "lu-a1-school-object",
+    "stem": "She carries her books in a ___.",
+    "construct": "school objects",
+    "skill": "Vocabulary",
+    "cefr": "A1",
+    "CEFR": "A1",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2005,
+    "stableKey": "lu-a2-past",
+    "stem": "We ___ the museum last Saturday.",
+    "construct": "past contrast",
+    "skill": "Grammar",
+    "cefr": "A2",
+    "CEFR": "A2",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2006,
+    "stableKey": "lu-a2-future",
+    "stem": "Look at those clouds. It ___ rain soon.",
+    "construct": "future expressions",
+    "skill": "Grammar",
+    "cefr": "A2",
+    "CEFR": "A2",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2050,
+    "stableKey": "reserve-lu-a2-01",
+    "stem": "I usually ___ breakfast at seven.",
+    "construct": "daily routines",
+    "skill": "Vocabulary",
+    "cefr": "A2",
+    "CEFR": "A2",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2008,
+    "stableKey": "lu-a2-collocation",
+    "stem": "Please ___ a reservation before Friday.",
+    "construct": "collocation",
+    "skill": "Vocabulary",
+    "cefr": "A2",
+    "CEFR": "A2",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2009,
+    "stableKey": "lu-b1-perfect",
+    "stem": "I ___ this report since Monday.",
+    "construct": "present perfect",
+    "skill": "Grammar",
+    "cefr": "B1",
+    "CEFR": "B1",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2062,
+    "stableKey": "lu-b1-phrasal-postpone",
+    "stem": "We need to ___ the meeting until next Monday because the manager is away.",
+    "construct": "phrasal verbs",
+    "skill": "Vocabulary",
+    "cefr": "B1",
+    "CEFR": "B1",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2011,
+    "stableKey": "lu-b1-condition",
+    "stem": "If the train is late, we ___ a taxi.",
+    "construct": "conditionals",
+    "skill": "Grammar",
+    "cefr": "B1",
+    "CEFR": "B1",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2012,
+    "stableKey": "lu-b1-word-form",
+    "stem": "The manager gave a clear ___ of the new process.",
+    "construct": "word formation",
+    "skill": "Vocabulary",
+    "cefr": "B1",
+    "CEFR": "B1",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2013,
+    "stableKey": "lu-b2-modality",
+    "stem": "The figures ___ indicate a need to revise the forecast.",
+    "construct": "advanced modality",
+    "skill": "Grammar",
+    "cefr": "B2",
+    "CEFR": "B2",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2014,
+    "stableKey": "lu-b2-contrast",
+    "stem": "Although the launch was delayed, the team ___ the target.",
+    "construct": "complex clauses",
+    "skill": "Grammar",
+    "cefr": "B2",
+    "CEFR": "B2",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2015,
+    "stableKey": "lu-b2-register",
+    "stem": "Which phrase is most appropriate in a formal client email?",
+    "construct": "register",
+    "skill": "Vocabulary",
+    "cefr": "B2",
+    "CEFR": "B2",
+    "activeSource": "BREADTRANS_AUTHORED"
+  },
+  {
+    "id": 2016,
+    "stableKey": "lu-b2-collocation",
+    "stem": "The proposal is not ___ with the budget constraints.",
+    "construct": "lexical precision",
+    "skill": "Vocabulary",
+    "cefr": "B2",
+    "CEFR": "B2",
+    "activeSource": "BREADTRANS_AUTHORED"
+  }
+]
+
