@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -23,7 +22,6 @@ import {
   resolveEstimatedLevel,
   validateQuestionBank,
 } from './diagnostic.logic';
-import { Prisma } from '@prisma/client';
 import { buildCourseCurriculum } from '../course/course-curriculum';
 
 type AnswerMap = Record<string, unknown>;
@@ -57,7 +55,11 @@ export class DiagnosticService {
     const meta = getQuestionMeta(question);
     const originalOptions = getQuestionOptions(question);
     let options = originalOptions;
-    if (attemptId && meta.questionType === 'MCQ' && originalOptions.length > 1) {
+    if (
+      attemptId &&
+      meta.questionType === 'MCQ' &&
+      originalOptions.length > 1
+    ) {
       const permutation = getAttemptQuestionPermutation(
         attemptId,
         question.id,
@@ -223,7 +225,9 @@ export class DiagnosticService {
     const permAttemptId =
       typeof (answers as any).__permAttemptId === 'number'
         ? (answers as any).__permAttemptId
-        : (attempt.id >= 50 ? attempt.id : undefined);
+        : attempt.id >= 50
+          ? attempt.id
+          : undefined;
 
     const permutations: Record<number, number[]> = {};
     if (permAttemptId) {
@@ -239,7 +243,11 @@ export class DiagnosticService {
       }
     }
 
-    const profiles = buildSkillProfiles(objectiveQuestions, answers, permutations);
+    const profiles = buildSkillProfiles(
+      objectiveQuestions,
+      answers,
+      permutations,
+    );
     const totalObjectiveCorrect = profiles
       .filter((p) => p.skill !== 'Speaking')
       .reduce((sum, p) => sum + p.correctCount, 0);
@@ -260,7 +268,11 @@ export class DiagnosticService {
             10,
         ) / 10
       : null;
-    const objectiveCoreScore = this.weightedCore(questions, answers, attempt.id);
+    const objectiveCoreScore = this.weightedCore(
+      questions,
+      answers,
+      attempt.id,
+    );
     const speakingWeight =
       gradedSpeaking.length >= 2
         ? 0.12
@@ -333,8 +345,7 @@ export class DiagnosticService {
       }
       return {
         questionId: question.id,
-        selectedOption:
-          typeof rawAnswer === 'number' ? rawAnswer : undefined,
+        selectedOption: typeof rawAnswer === 'number' ? rawAnswer : undefined,
         selectedText,
         correctOption: open ? null : question.correctIndex,
         correctText: open ? null : (options[question.correctIndex] ?? null),
@@ -366,7 +377,9 @@ export class DiagnosticService {
       percentage:
         objectiveQuestions.length === 0
           ? 0
-          : Math.round((totalObjectiveCorrect / objectiveQuestions.length) * 100),
+          : Math.round(
+              (totalObjectiveCorrect / objectiveQuestions.length) * 100,
+            ),
       level: finalLevel,
       objectiveCoreScore,
       objectivePlacementBand: attempt.level,
@@ -389,7 +402,8 @@ export class DiagnosticService {
         failureReason: row.failureReason,
       })),
       submittedAt: attempt.submittedAt,
-      completedAt: (attempt as { completedAt?: Date }).completedAt ?? attempt.submittedAt,
+      completedAt:
+        (attempt as { completedAt?: Date }).completedAt ?? attempt.submittedAt,
       skillProfiles: profiles,
       strengths,
       weaknesses,
@@ -511,8 +525,7 @@ export class DiagnosticService {
             percentage: latestAttempt.percentage,
             level: latestAttempt.level,
             submittedAt: latestAttempt.submittedAt,
-            completedAt:
-              latestAttempt.completedAt ?? latestAttempt.submittedAt,
+            completedAt: latestAttempt.completedAt ?? latestAttempt.submittedAt,
           }
         : null,
       inProgressAttempt: inProgressAttempt
@@ -731,7 +744,7 @@ export class DiagnosticService {
         const options = getQuestionOptions(question);
         const isStringValid =
           typeof selectedOption === 'string' &&
-          options.some((opt) => opt.trim() === (selectedOption as string).trim());
+          options.some((opt) => opt.trim() === selectedOption.trim());
         const isIndexValid =
           Number.isInteger(selectedOption) &&
           (selectedOption as number) >= 0 &&
@@ -755,7 +768,11 @@ export class DiagnosticService {
       const options = getQuestionOptions(question);
       const perm =
         attemptId && !open && options.length > 1
-          ? getAttemptQuestionPermutation(attemptId, question.id, options.length)
+          ? getAttemptQuestionPermutation(
+              attemptId,
+              question.id,
+              options.length,
+            )
           : undefined;
       const isCorrect = open
         ? null
@@ -853,7 +870,7 @@ export class DiagnosticService {
         ? await tx.diagnosticAttempt.update({
             where: { id: attemptId },
             data: {
-              answers: storedAnswers as Prisma.InputJsonObject,
+              answers: storedAnswers,
               correctCount,
               totalCount,
               percentage,
@@ -866,7 +883,7 @@ export class DiagnosticService {
             data: {
               userId,
               assessmentId,
-              answers: storedAnswers as Prisma.InputJsonObject,
+              answers: storedAnswers,
               correctCount,
               totalCount,
               percentage,

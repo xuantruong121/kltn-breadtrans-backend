@@ -18,7 +18,8 @@ const profiles: Record<number, CourseLearningProfile> = {
     studyGuidance:
       'Học lần lượt từng bài. Đọc phần giải thích, tự nói lại ví dụ, sau đó mới mở bài luyện tập. Hoạt động bắt buộc quyết định tiến độ; hoạt động tùy chọn dùng để ôn thêm.',
     mediaLabel: 'Minh họa nền tảng giao tiếp hằng ngày',
-    coverImage: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/cover/v2-c85e2a13a7d6956f.jpg',
+    coverImage:
+      'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/cover/v2-c85e2a13a7d6956f.jpg',
   },
   2: {
     introduction:
@@ -109,7 +110,8 @@ const profiles: Record<number, CourseLearningProfile> = {
     studyGuidance:
       'Đọc công thức, tự đặt một ví dụ và làm hoạt động ngay sau lesson. Khi sai, quay lại phần giải thích thay vì chỉ làm lại liên tục; các bước vẫn mở theo thứ tự bắt buộc.',
     mediaLabel: 'Minh họa bảng ngữ pháp và từ vựng',
-    coverImage: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/cover/v2-19c44391cc6450c5.jpg',
+    coverImage:
+      'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/cover/v2-19c44391cc6450c5.jpg',
   },
   12: {
     introduction:
@@ -122,7 +124,8 @@ const profiles: Record<number, CourseLearningProfile> = {
     studyGuidance:
       'Xem hình minh họa, nghe mẫu và tự ghi âm lại từng âm. Ưu tiên độ rõ và sự ổn định trước khi tăng tốc độ.',
     mediaLabel: 'Minh họa IPA và cơ quan phát âm',
-    coverImage: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/cover/v2-1e69646244474471.jpg',
+    coverImage:
+      'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/cover/v2-1e69646244474471.jpg',
   },
 };
 
