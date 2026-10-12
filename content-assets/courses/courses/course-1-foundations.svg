@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">English Foundations</title><desc id="desc">Letters, sounds and a friendly speech bubble.</desc>
+  <rect width="960" height="540" rx="32" fill="#eff6ff"/><circle cx="780" cy="120" r="92" fill="#bfdbfe"/><circle cx="150" cy="430" r="120" fill="#dbeafe"/>
+  <rect x="120" y="130" width="520" height="250" rx="32" fill="#fff" stroke="#2563eb" stroke-width="8"/><path d="M180 380l-20 70 90-70" fill="#fff" stroke="#2563eb" stroke-width="8" stroke-linejoin="round"/>
+  <text x="180" y="235" font-family="Arial,sans-serif" font-size="78" font-weight="700" fill="#0f172a">A B C</text><text x="180" y="310" font-family="Arial,sans-serif" font-size="32" fill="#2563eb">sound · word · sentence</text>
+  <circle cx="760" cy="330" r="72" fill="#f59e0b"/><path d="M720 330h80M760 290v80" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
+</svg>

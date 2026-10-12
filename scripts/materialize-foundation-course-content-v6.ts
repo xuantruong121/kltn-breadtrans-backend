@@ -2646,7 +2646,7 @@ const courseSpecs: CourseSpec[] = [
       'Lộ trình nền tảng dành cho người Việt mới học: giao tiếp hằng ngày, nghe, nói, đọc, viết, ngữ pháp, từ vựng và phát âm trong ngữ cảnh thực tế.',
     level: 'A1-A2',
     curriculumType: 'FOUR_SKILLS',
-    thumbnail: '/images/courses/course-1-foundations.svg',
+    thumbnail: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/cover/v2-c85e2a13a7d6956f.jpg',
     lessons: foundationLessons,
   },
   {
@@ -2656,7 +2656,7 @@ const courseSpecs: CourseSpec[] = [
       'Giải thích bằng tiếng Việt các cấu trúc ngữ pháp và cụm từ thiết yếu A1–A2, kèm ví dụ song ngữ, lỗi thường gặp và bài tập có phản hồi.',
     level: 'A1-A2',
     curriculumType: 'FOCUSED_GRAMMAR_VOCAB',
-    thumbnail: '/images/courses/course-8-grammar-vocabulary.svg',
+    thumbnail: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/cover/v2-19c44391cc6450c5.jpg',
     lessons: grammarLessons,
   },
   {
@@ -2665,63 +2665,53 @@ const courseSpecs: CourseSpec[] = [
       'Khóa học phát âm nhập môn cho người Việt: hiểu IPA, luyện nguyên âm, phụ âm, âm cuối, trọng âm, schwa, nối âm và tự nghe lại giọng nói.',
     level: 'A1-A2',
     curriculumType: 'PRONUNCIATION_FOUNDATION',
-    thumbnail: '/images/courses/course-8-grammar-vocabulary.svg',
+    thumbnail: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/cover/v2-1e69646244474471.jpg',
     lessons: pronunciationLessons,
   },
 ];
 
 const course8LessonMedia: Record<string, { url: string; altText: string }> = {
   'present-simple-and-continuous': {
-    url: '/images/courses/course-8-present-simple-continuous.svg',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v2-0474169db370734c.png',
     altText:
       'Sơ đồ so sánh hiện tại đơn cho thói quen với hiện tại tiếp diễn cho hành động đang xảy ra.',
   },
   'nouns-articles-and-quantity': {
-    url: '/images/courses/course-8-nouns-articles-quantity.svg',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-58/media/v1-8efb42c89b598320.svg',
     altText:
       'Sơ đồ phân biệt danh từ đếm được, không đếm được và các từ chỉ lượng.',
   },
   'past-simple': {
-    url: '/images/courses/course-8-past-simple.svg',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-59/media/v1-570c4d8b75682482.svg',
     altText:
       'Dòng thời gian minh họa thì quá khứ đơn và các mốc thời gian đã hoàn thành.',
   },
   'future-will-going-to': {
-    url: '/images/courses/course-8-future-will-going-to.svg',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-60/media/v1-5e441a3ec310eac5.svg',
     altText:
       'Sơ đồ phân biệt will cho quyết định ngay lúc nói với be going to cho kế hoạch hoặc bằng chứng.',
   },
   'adjectives-adverbs-comparison': {
-    url: '/images/courses/course-8-adjectives-adverbs-comparison.svg',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-61/media/v1-64e8cf42098dd3b5.svg',
     altText:
       'Biểu đồ minh họa tính từ, trạng từ và các dạng so sánh hơn, so sánh nhất.',
   },
   'basic-modal-verbs': {
-    url: '/images/courses/course-8-basic-modal-verbs.svg',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-62/media/v1-2e3b3d9bbc6e0c5b.svg',
     altText:
       'Thang ý nghĩa minh họa can cho khả năng, should cho lời khuyên và must cho nghĩa vụ.',
   },
   'prepositions-and-common-phrases': {
-    url: '/images/courses/course-8-prepositions-of-place-wikimedia.svg',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-63/media/v2-11cc68082bacb3a5.svg',
     altText:
       'Minh họa vị trí của đồ vật trong, trên, dưới, cạnh và phía trước hoặc phía sau để học giới từ.',
   },
   'grammar-vocabulary-review': {
-    url: '/images/courses/course-8-grammar-vocabulary-review.svg',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-64/media/v1-5481b364440919f4.svg',
     altText:
       'Bản đồ khái niệm liên kết ngữ cảnh, dạng động từ, số lượng và cụm giới từ.',
   },
 };
-
-const repeatedLessonMediaUrls = new Set([
-  '/images/courses/course-1-foundations.svg',
-  '/images/courses/course-2-four-skills.svg',
-  '/images/courses/course-3-toeic-foundation.svg',
-  '/images/courses/course-4-toeic-advanced.svg',
-  '/images/courses/course-5-speaking-writing.svg',
-  '/images/courses/course-6-four-skills-mastery.svg',
-  '/images/courses/course-7-business-english.svg',
-]);
 
 function sectionRows(
   lesson: LessonSpec,
@@ -3068,23 +3058,7 @@ async function materializeLesson(
       note: 'Tài liệu chỉ để đọc thêm; toàn bộ kiến thức cần thiết đã nằm trong bài học BreadTrans.',
     },
   });
-  if (courseId >= 1 && courseId <= 7) {
-    await prisma.courseLessonMedia.deleteMany({
-      where: {
-        lessonId: row.id,
-        type: 'IMAGE',
-        url: { in: [...repeatedLessonMediaUrls] },
-      },
-    });
-  }
   if (courseId === 8) {
-    await prisma.courseLessonMedia.deleteMany({
-      where: {
-        lessonId: row.id,
-        type: 'IMAGE',
-        url: '/images/courses/course-8-grammar-vocabulary.svg',
-      },
-    });
     const media = course8LessonMedia[lesson.slug];
     if (media) {
       await prisma.courseLessonMedia.upsert({

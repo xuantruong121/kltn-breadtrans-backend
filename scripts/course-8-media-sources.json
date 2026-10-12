@@ -1,7 +1,7 @@
 {
   "courseId": 8,
   "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
-  "policy": "External media was researched against the real lesson concepts. The strongest reusable candidate is used locally for the prepositions lesson; the other lessons keep original BreadTrans instructional SVGs where they are clearer, Vietnamese-first, or more precise.",
+  "policy": "Internet-first media was re-audited against the real lesson concepts. Verified CC0/CC BY-SA candidates are localized and uploaded to R2 where they improve context; internal BreadTrans SVGs remain explicit fallbacks when they teach the exact Vietnamese concept more clearly.",
   "researchSources": [
     {
       "sourceUrl": "https://commons.wikimedia.org/wiki/File:Grammar_system_diagram.svg",
@@ -64,18 +64,19 @@
       "title": "Thì hiện tại đơn và hiện tại tiếp diễn",
       "slug": "present-simple-and-continuous",
       "image": {
-        "sourceType": "INTERNAL_ORIGINAL",
-        "localAsset": "frontend/public/images/courses/course-8-present-simple-continuous.svg",
-        "finalUrl": "/images/courses/course-8-present-simple-continuous.svg",
-        "sha256": "CC4C633465D9C070376E031F0A99D01A016E0A09A2C82E45E8F130703CCBC7C3",
-        "visualVersion": "visual-upgrade-2026-10-12",
-        "altText": "Sơ đồ so sánh hiện tại đơn cho thói quen với hiện tại tiếp diễn cho hành động đang xảy ra.",
-        "creator": "BreadTrans",
-        "license": "Original project asset",
+        "sourceType": "INTERNET_MEDIA_SELECTED",
+        "localAsset": "content-assets/internet-course-media/course-8-lesson-57-present.png",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v2-0474169db370734c.png",
+        "sha256": "0474169DB370734CC35D1113EA2EA45ED07893014B98163E798E33D2C7D543F0",
+        "visualVersion": "internet-upgrade-2026-10-12",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:English_Grammar_Time_Simple_Present.png",
+        "altText": "Dòng thời gian và ví dụ minh họa cách dùng thì hiện tại đơn cho thói quen.",
+        "creator": "English Grammar Time",
+        "license": "CC0",
         "attributionRequired": false,
         "licenseVerified": true,
         "pedagogicalRelevance": true,
-        "reason": "Side-by-side routine versus now timeline directly supports the lesson contrast."
+        "reason": "Open routine timeline adds Internet-sourced context; the lesson text still explains the present-continuous contrast."
       }
     },
     {
@@ -84,8 +85,8 @@
       "slug": "nouns-articles-and-quantity",
       "image": {
         "sourceType": "INTERNAL_ORIGINAL",
-        "localAsset": "frontend/public/images/courses/course-8-nouns-articles-quantity.svg",
-        "finalUrl": "/images/courses/course-8-nouns-articles-quantity.svg",
+        "localAsset": "content-assets/courses/course-8-nouns-articles-quantity.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-58/media/v1-8efb42c89b598320.svg",
         "altText": "Sơ đồ phân biệt danh từ đếm được, không đếm được và các từ chỉ lượng.",
         "creator": "BreadTrans",
         "license": "Original project asset",
@@ -101,8 +102,8 @@
       "slug": "past-simple",
       "image": {
         "sourceType": "INTERNAL_ORIGINAL",
-        "localAsset": "frontend/public/images/courses/course-8-past-simple.svg",
-        "finalUrl": "/images/courses/course-8-past-simple.svg",
+        "localAsset": "content-assets/courses/course-8-past-simple.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-59/media/v1-570c4d8b75682482.svg",
         "altText": "Dòng thời gian minh họa thì quá khứ đơn và các mốc thời gian đã hoàn thành.",
         "creator": "BreadTrans",
         "license": "Original project asset",
@@ -118,8 +119,8 @@
       "slug": "future-will-going-to",
       "image": {
         "sourceType": "INTERNAL_ORIGINAL",
-        "localAsset": "frontend/public/images/courses/course-8-future-will-going-to.svg",
-        "finalUrl": "/images/courses/course-8-future-will-going-to.svg",
+        "localAsset": "content-assets/courses/course-8-future-will-going-to.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-60/media/v1-5e441a3ec310eac5.svg",
         "altText": "Sơ đồ phân biệt will cho quyết định ngay lúc nói với be going to cho kế hoạch hoặc bằng chứng.",
         "creator": "BreadTrans",
         "license": "Original project asset",
@@ -135,8 +136,8 @@
       "slug": "adjectives-adverbs-comparison",
       "image": {
         "sourceType": "INTERNAL_ORIGINAL",
-        "localAsset": "frontend/public/images/courses/course-8-adjectives-adverbs-comparison.svg",
-        "finalUrl": "/images/courses/course-8-adjectives-adverbs-comparison.svg",
+        "localAsset": "content-assets/courses/course-8-adjectives-adverbs-comparison.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-61/media/v1-64e8cf42098dd3b5.svg",
         "altText": "Biểu đồ minh họa tính từ, trạng từ và các dạng so sánh hơn, so sánh nhất.",
         "creator": "BreadTrans",
         "license": "Original project asset",
@@ -152,8 +153,8 @@
       "slug": "basic-modal-verbs",
       "image": {
         "sourceType": "INTERNAL_ORIGINAL",
-        "localAsset": "frontend/public/images/courses/course-8-basic-modal-verbs.svg",
-        "finalUrl": "/images/courses/course-8-basic-modal-verbs.svg",
+        "localAsset": "content-assets/courses/course-8-basic-modal-verbs.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-62/media/v1-2e3b3d9bbc6e0c5b.svg",
         "altText": "Thang ý nghĩa minh họa can cho khả năng, should cho lời khuyên và must cho nghĩa vụ.",
         "creator": "BreadTrans",
         "license": "Original project asset",
@@ -168,9 +169,9 @@
       "title": "Giới từ và cụm từ thông dụng",
       "slug": "prepositions-and-common-phrases",
       "image": {
-        "sourceType": "INTERNET",
-        "localAsset": "frontend/public/images/courses/course-8-prepositions-of-place-wikimedia.svg",
-        "finalUrl": "/images/courses/course-8-prepositions-of-place-wikimedia.svg",
+        "sourceType": "INTERNET_MEDIA_SELECTED",
+        "localAsset": "content-assets/internet-course-media/course-8-lesson-63-prepositions.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-63/media/v2-11cc68082bacb3a5.svg",
         "sourceUrl": "https://commons.wikimedia.org/wiki/File:Prepositions-of-place.svg",
         "creator": "evilestmark",
         "provider": "Wikimedia Commons / Openclipart",
@@ -188,8 +189,8 @@
       "slug": "grammar-vocabulary-review",
       "image": {
         "sourceType": "INTERNAL_ORIGINAL",
-        "localAsset": "frontend/public/images/courses/course-8-grammar-vocabulary-review.svg",
-        "finalUrl": "/images/courses/course-8-grammar-vocabulary-review.svg",
+        "localAsset": "content-assets/courses/course-8-grammar-vocabulary-review.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-64/media/v1-5481b364440919f4.svg",
         "altText": "Bản đồ khái niệm liên kết ngữ cảnh, dạng động từ, số lượng và cụm giới từ.",
         "creator": "BreadTrans",
         "license": "Original project asset",
