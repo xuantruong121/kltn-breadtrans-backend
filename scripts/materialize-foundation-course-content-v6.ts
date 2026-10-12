@@ -2670,6 +2670,59 @@ const courseSpecs: CourseSpec[] = [
   },
 ];
 
+const course8LessonMedia: Record<string, { url: string; altText: string }> = {
+  'present-simple-and-continuous': {
+    url: '/images/courses/course-8-present-simple-continuous.svg',
+    altText:
+      'Sơ đồ so sánh hiện tại đơn cho thói quen với hiện tại tiếp diễn cho hành động đang xảy ra.',
+  },
+  'nouns-articles-and-quantity': {
+    url: '/images/courses/course-8-nouns-articles-quantity.svg',
+    altText:
+      'Sơ đồ phân biệt danh từ đếm được, không đếm được và các từ chỉ lượng.',
+  },
+  'past-simple': {
+    url: '/images/courses/course-8-past-simple.svg',
+    altText:
+      'Dòng thời gian minh họa thì quá khứ đơn và các mốc thời gian đã hoàn thành.',
+  },
+  'future-will-going-to': {
+    url: '/images/courses/course-8-future-will-going-to.svg',
+    altText:
+      'Sơ đồ phân biệt will cho quyết định ngay lúc nói với be going to cho kế hoạch hoặc bằng chứng.',
+  },
+  'adjectives-adverbs-comparison': {
+    url: '/images/courses/course-8-adjectives-adverbs-comparison.svg',
+    altText:
+      'Biểu đồ minh họa tính từ, trạng từ và các dạng so sánh hơn, so sánh nhất.',
+  },
+  'basic-modal-verbs': {
+    url: '/images/courses/course-8-basic-modal-verbs.svg',
+    altText:
+      'Thang ý nghĩa minh họa can cho khả năng, should cho lời khuyên và must cho nghĩa vụ.',
+  },
+  'prepositions-and-common-phrases': {
+    url: '/images/courses/course-8-prepositions-of-place-wikimedia.svg',
+    altText:
+      'Minh họa vị trí của đồ vật trong, trên, dưới, cạnh và phía trước hoặc phía sau để học giới từ.',
+  },
+  'grammar-vocabulary-review': {
+    url: '/images/courses/course-8-grammar-vocabulary-review.svg',
+    altText:
+      'Bản đồ khái niệm liên kết ngữ cảnh, dạng động từ, số lượng và cụm giới từ.',
+  },
+};
+
+const repeatedLessonMediaUrls = new Set([
+  '/images/courses/course-1-foundations.svg',
+  '/images/courses/course-2-four-skills.svg',
+  '/images/courses/course-3-toeic-foundation.svg',
+  '/images/courses/course-4-toeic-advanced.svg',
+  '/images/courses/course-5-speaking-writing.svg',
+  '/images/courses/course-6-four-skills-mastery.svg',
+  '/images/courses/course-7-business-english.svg',
+]);
+
 function sectionRows(
   lesson: LessonSpec,
   audioExamples: Array<{
@@ -3015,33 +3068,50 @@ async function materializeLesson(
       note: 'Tài liệu chỉ để đọc thêm; toàn bộ kiến thức cần thiết đã nằm trong bài học BreadTrans.',
     },
   });
-  if (courseId === 1 || courseId === 8) {
-    await prisma.courseLessonMedia.upsert({
-      where: { id: courseId * 1000 + order },
-      update: {
+  if (courseId >= 1 && courseId <= 7) {
+    await prisma.courseLessonMedia.deleteMany({
+      where: {
         lessonId: row.id,
         type: 'IMAGE',
-        url:
-          courseId === 1
-            ? '/images/courses/course-1-foundations.svg'
-            : '/images/courses/course-8-grammar-vocabulary.svg',
-        altText: lesson.title,
-        provenance: 'BreadTrans local course asset',
-        renderStatus: 'READY',
-      },
-      create: {
-        id: courseId * 1000 + order,
-        lessonId: row.id,
-        type: 'IMAGE',
-        url:
-          courseId === 1
-            ? '/images/courses/course-1-foundations.svg'
-            : '/images/courses/course-8-grammar-vocabulary.svg',
-        altText: lesson.title,
-        provenance: 'BreadTrans local course asset',
-        renderStatus: 'READY',
+        url: { in: [...repeatedLessonMediaUrls] },
       },
     });
+  }
+  if (courseId === 8) {
+    await prisma.courseLessonMedia.deleteMany({
+      where: {
+        lessonId: row.id,
+        type: 'IMAGE',
+        url: '/images/courses/course-8-grammar-vocabulary.svg',
+      },
+    });
+    const media = course8LessonMedia[lesson.slug];
+    if (media) {
+      await prisma.courseLessonMedia.upsert({
+        where: { id: courseId * 1000 + order },
+        update: {
+          lessonId: row.id,
+          type: 'IMAGE',
+          url: media.url,
+          altText: media.altText,
+          provenance: media.url.includes('wikimedia')
+            ? 'Wikimedia Commons CC0 local asset'
+            : 'BreadTrans original instructional SVG',
+          renderStatus: 'READY',
+        },
+        create: {
+          id: courseId * 1000 + order,
+          lessonId: row.id,
+          type: 'IMAGE',
+          url: media.url,
+          altText: media.altText,
+          provenance: media.url.includes('wikimedia')
+            ? 'Wikimedia Commons CC0 local asset'
+            : 'BreadTrans original instructional SVG',
+          renderStatus: 'READY',
+        },
+      });
+    }
   }
   return row.id;
 }

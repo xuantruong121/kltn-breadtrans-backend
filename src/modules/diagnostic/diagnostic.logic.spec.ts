@@ -146,6 +146,6 @@ describe('diagnostic logic', () => {
     });
     expect(
       resolvePlacementLevel({ CORE: 72 }, { A1: 80, A2: 70, B1: 40, B2: 10 }),
-    ).toBe('A2');
+    ).toBe('A2 – Sơ trung cấp');
   });
 });

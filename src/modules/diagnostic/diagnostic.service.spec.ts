@@ -330,7 +330,7 @@ describe('DiagnosticService', () => {
     const result = await service.submitAssessment(
       7,
       2,
-      { '101': 1, '102': 1, '103': 'SKIPPED' },
+      { '101': { originalIndex: 1 }, '102': 1, '103': 'SKIPPED' },
       'token-v2',
       10,
     );
