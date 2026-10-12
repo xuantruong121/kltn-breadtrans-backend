@@ -1,0 +1,204 @@
+{
+  "courseId": 8,
+  "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
+  "policy": "Internet-first media was re-audited against the real lesson concepts. Verified CC0/CC BY-SA candidates are localized and uploaded to R2 where they improve context; internal BreadTrans SVGs remain explicit fallbacks when they teach the exact Vietnamese concept more clearly.",
+  "researchSources": [
+    {
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Grammar_system_diagram.svg",
+      "provider": "Wikimedia Commons",
+      "creator": "Belakv",
+      "license": "Public domain",
+      "reviewedFor": ["grammar overview", "present tense"],
+      "selected": false,
+      "reasonNotSelected": "Course-wide abstract diagram; it does not teach the specific Vietnamese lesson concepts or provide sufficient context for mobile learners."
+    },
+    {
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Timeline.gif",
+      "provider": "Wikimedia Commons",
+      "creator": "Ccobbs",
+      "license": "Public domain",
+      "reviewedFor": ["past simple", "future timeline"],
+      "selected": false,
+      "reasonNotSelected": "Generic historical timeline without English-learning labels; an original compact timeline is more legible and instructionally precise."
+    },
+    {
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Prepositions-of-place.svg",
+      "provider": "Wikimedia Commons / Openclipart",
+      "creator": "evilestmark",
+      "license": "CC0 1.0",
+      "reviewedFor": ["prepositions and common phrases"],
+      "selected": true,
+      "selectionNote": "Downloaded, localized, and retained as a project-controlled asset because the object-position diagrams directly support the lesson."
+    },
+    {
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:On_and_under.svg",
+      "provider": "Wikimedia Commons",
+      "creator": "すじにくシチュー",
+      "license": "CC0 1.0",
+      "reviewedFor": ["prepositions and common phrases"],
+      "selected": false,
+      "reasonNotSelected": "Only covers two prepositions; the original asset includes the four spatial relationships used in the lesson."
+    },
+    {
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Timeline.png",
+      "provider": "Wikimedia Commons",
+      "creator": "Chem538w10grp5",
+      "license": "Public domain",
+      "reviewedFor": ["past simple"],
+      "selected": false,
+      "reasonNotSelected": "The image is a Sudan political-history table rather than a learner-friendly grammar timeline, so the internal past-tense diagram is more relevant."
+    },
+    {
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:EGG_Future_simple.svg",
+      "provider": "Wikimedia Commons",
+      "creator": "English Grammar Graphics contributor",
+      "license": "License shown on the source page; not used without a local license audit",
+      "reviewedFor": ["future will and going to"],
+      "selected": false,
+      "reasonNotSelected": "The source page was useful for discovery, but the final project does not depend on an external license interpretation."
+    }
+  ],
+  "lessons": [
+    {
+      "lessonId": 57,
+      "title": "Thì hiện tại đơn và hiện tại tiếp diễn",
+      "slug": "present-simple-and-continuous",
+      "image": {
+        "sourceType": "INTERNET_MEDIA_SELECTED",
+        "localAsset": "content-assets/internet-course-media/course-8-lesson-57-present.png",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v2-0474169db370734c.png",
+        "sha256": "0474169DB370734CC35D1113EA2EA45ED07893014B98163E798E33D2C7D543F0",
+        "visualVersion": "internet-upgrade-2026-10-12",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:English_Grammar_Time_Simple_Present.png",
+        "altText": "Dòng thời gian và ví dụ minh họa cách dùng thì hiện tại đơn cho thói quen.",
+        "creator": "English Grammar Time",
+        "license": "CC0",
+        "attributionRequired": false,
+        "licenseVerified": true,
+        "pedagogicalRelevance": true,
+        "reason": "Open routine timeline adds Internet-sourced context; the lesson text still explains the present-continuous contrast."
+      }
+    },
+    {
+      "lessonId": 58,
+      "title": "Danh từ, mạo từ và số lượng",
+      "slug": "nouns-articles-and-quantity",
+      "image": {
+        "sourceType": "INTERNAL_ORIGINAL",
+        "localAsset": "content-assets/courses/course-8-nouns-articles-quantity.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-58/media/v1-8efb42c89b598320.svg",
+        "altText": "Sơ đồ phân biệt danh từ đếm được, không đếm được và các từ chỉ lượng.",
+        "creator": "BreadTrans",
+        "license": "Original project asset",
+        "attributionRequired": false,
+        "licenseVerified": true,
+        "pedagogicalRelevance": true,
+        "reason": "Countable apples and uncountable water make the article and quantity distinction concrete."
+      }
+    },
+    {
+      "lessonId": 59,
+      "title": "Thì quá khứ đơn",
+      "slug": "past-simple",
+      "image": {
+        "sourceType": "INTERNAL_ORIGINAL",
+        "localAsset": "content-assets/courses/course-8-past-simple.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-59/media/v1-570c4d8b75682482.svg",
+        "altText": "Dòng thời gian minh họa thì quá khứ đơn và các mốc thời gian đã hoàn thành.",
+        "creator": "BreadTrans",
+        "license": "Original project asset",
+        "attributionRequired": false,
+        "licenseVerified": true,
+        "pedagogicalRelevance": true,
+        "reason": "A completed-action timeline connects yesterday/last week with V-ed/V2 and did."
+      }
+    },
+    {
+      "lessonId": 60,
+      "title": "Tương lai cơ bản: will và be going to",
+      "slug": "future-will-going-to",
+      "image": {
+        "sourceType": "INTERNAL_ORIGINAL",
+        "localAsset": "content-assets/courses/course-8-future-will-going-to.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-60/media/v1-5e441a3ec310eac5.svg",
+        "altText": "Sơ đồ phân biệt will cho quyết định ngay lúc nói với be going to cho kế hoạch hoặc bằng chứng.",
+        "creator": "BreadTrans",
+        "license": "Original project asset",
+        "attributionRequired": false,
+        "licenseVerified": true,
+        "pedagogicalRelevance": true,
+        "reason": "Two decision paths distinguish an immediate decision from a prior plan or evidence."
+      }
+    },
+    {
+      "lessonId": 61,
+      "title": "Tính từ, trạng từ và so sánh",
+      "slug": "adjectives-adverbs-comparison",
+      "image": {
+        "sourceType": "INTERNAL_ORIGINAL",
+        "localAsset": "content-assets/courses/course-8-adjectives-adverbs-comparison.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-61/media/v1-64e8cf42098dd3b5.svg",
+        "altText": "Biểu đồ minh họa tính từ, trạng từ và các dạng so sánh hơn, so sánh nhất.",
+        "creator": "BreadTrans",
+        "license": "Original project asset",
+        "attributionRequired": false,
+        "licenseVerified": true,
+        "pedagogicalRelevance": true,
+        "reason": "Comparison bars and action examples reinforce adjective/adverb roles and -er/-est."
+      }
+    },
+    {
+      "lessonId": 62,
+      "title": "Động từ khuyết thiếu cơ bản",
+      "slug": "basic-modal-verbs",
+      "image": {
+        "sourceType": "INTERNAL_ORIGINAL",
+        "localAsset": "content-assets/courses/course-8-basic-modal-verbs.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-62/media/v1-2e3b3d9bbc6e0c5b.svg",
+        "altText": "Thang ý nghĩa minh họa can cho khả năng, should cho lời khuyên và must cho nghĩa vụ.",
+        "creator": "BreadTrans",
+        "license": "Original project asset",
+        "attributionRequired": false,
+        "licenseVerified": true,
+        "pedagogicalRelevance": true,
+        "reason": "A rising obligation scale links can, should, and must to their learner-facing meanings."
+      }
+    },
+    {
+      "lessonId": 63,
+      "title": "Giới từ và cụm từ thông dụng",
+      "slug": "prepositions-and-common-phrases",
+      "image": {
+        "sourceType": "INTERNET_MEDIA_SELECTED",
+        "localAsset": "content-assets/internet-course-media/course-8-lesson-63-prepositions.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-63/media/v2-11cc68082bacb3a5.svg",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Prepositions-of-place.svg",
+        "creator": "evilestmark",
+        "provider": "Wikimedia Commons / Openclipart",
+        "license": "CC0 1.0 Universal Public Domain Dedication",
+        "attribution": "Attribution is not required; source retained for provenance.",
+        "attributionRequired": false,
+        "licenseVerified": true,
+        "pedagogicalRelevance": true,
+        "reason": "The original unlabeled object-position diagrams are directly relevant to in/on/under/next to and add authentic reusable Internet media without replacing the lesson's Vietnamese explanations."
+      }
+    },
+    {
+      "lessonId": 64,
+      "title": "Ôn tập ngữ pháp và từ vựng nền tảng",
+      "slug": "grammar-vocabulary-review",
+      "image": {
+        "sourceType": "INTERNAL_ORIGINAL",
+        "localAsset": "content-assets/courses/course-8-grammar-vocabulary-review.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-64/media/v1-5481b364440919f4.svg",
+        "altText": "Bản đồ khái niệm liên kết ngữ cảnh, dạng động từ, số lượng và cụm giới từ.",
+        "creator": "BreadTrans",
+        "license": "Original project asset",
+        "attributionRequired": false,
+        "licenseVerified": true,
+        "pedagogicalRelevance": true,
+        "reason": "A compact concept map gives the review lesson a useful retrieval structure instead of decoration."
+      }
+    }
+  ]
+}

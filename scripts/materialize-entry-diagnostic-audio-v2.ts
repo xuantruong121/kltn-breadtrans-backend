@@ -27,30 +27,95 @@ const bucket = process.env.R2_BUCKET_NAME;
 const accessKeyId = process.env.R2_ACCESS_KEY_ID;
 const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 
-const baseScripts = [
+const scripts = [
+  // A1
   {
+    group: 'diagnostic-a1-1',
     voice: 'en-US-JennyNeural',
     text: 'Hi, this is the community centre. The swimming class starts at six, and please bring a towel.',
   },
   {
+    group: 'diagnostic-a1-2',
     voice: 'en-US-GuyNeural',
-    text: 'The delivery will arrive on Tuesday morning. Please leave the package with reception if I am away.',
+    text: 'Good morning! The library closes early today at four o’clock for maintenance.',
   },
   {
+    group: 'diagnostic-a1-3',
     voice: 'en-GB-SoniaNeural',
-    text: 'We reviewed the proposal and decided to move the launch to May because the testing phase needs more time.',
+    text: 'Attention passengers, the bus to Oxford will depart from platform three.',
   },
   {
+    group: 'diagnostic-a1-4',
+    voice: 'en-US-JennyNeural',
+    text: 'Hello David, please remember to bring your student ID card to the test room.',
+  },
+
+  // A2
+  {
+    group: 'diagnostic-a2-1',
+    voice: 'en-US-GuyNeural',
+    text: 'Hi Mark, I left the apartment keys inside the blue envelope on the kitchen table.',
+  },
+  {
+    group: 'diagnostic-a2-2',
     voice: 'en-GB-RyanNeural',
-    text: 'Although the figures are encouraging, the director wants a second review before we commit resources to the expansion.',
+    text: 'The courier just called. The delivery will arrive on Tuesday morning before noon. Please keep your phone nearby.',
+  },
+  {
+    group: 'diagnostic-a2-3',
+    voice: 'en-GB-SoniaNeural',
+    text: 'Dear customers, due to wet paint, please use the rear stairs to reach the second floor café.',
+  },
+  {
+    group: 'diagnostic-a2-4',
+    voice: 'en-US-JennyNeural',
+    text: 'Hi Lisa, thanks for agreeing to help. Could you buy two cartons of milk on your way home?',
+  },
+
+  // B1
+  {
+    group: 'diagnostic-b1-1',
+    voice: 'en-GB-SoniaNeural',
+    text: 'We reviewed the proposal and decided to move the software launch to May because the user acceptance testing requires two extra weeks.',
+  },
+  {
+    group: 'diagnostic-b1-2',
+    voice: 'en-US-GuyNeural',
+    text: 'Because rainfall is expected throughout the weekend, Saturday’s charity fun run has been rescheduled for next Sunday at the central stadium.',
+  },
+  {
+    group: 'diagnostic-b1-3',
+    voice: 'en-GB-RyanNeural',
+    text: 'Welcome aboard flight VN340 to Tokyo. In compliance with aviation guidelines, all electronic devices must remain in flight mode during takeoff.',
+  },
+  {
+    group: 'diagnostic-b1-4',
+    voice: 'en-US-JennyNeural',
+    text: 'Due to rising raw material costs, the procurement department recommends renegotiating shipping terms with our regional logistics supplier.',
+  },
+
+  // B2
+  {
+    group: 'diagnostic-b2-1',
+    voice: 'en-GB-RyanNeural',
+    text: 'Although preliminary customer feedback is promising, the managing director insists on an independent financial audit before allocating further venture capital to the overseas branch.',
+  },
+  {
+    group: 'diagnostic-b2-2',
+    voice: 'en-GB-SoniaNeural',
+    text: 'The recent survey highlights a significant discrepancy between self-reported employee satisfaction and actual team retention rates across tech startups.',
+  },
+  {
+    group: 'diagnostic-b2-3',
+    voice: 'en-US-GuyNeural',
+    text: 'To mitigate supply-chain disruptions caused by unpredictable port closures, the advisory board suggests adopting a diversified supplier network across Southeast Asia.',
+  },
+  {
+    group: 'diagnostic-b2-4',
+    voice: 'en-US-JennyNeural',
+    text: 'While the proposed environmental initiative is commendable, analysts caution that sudden regulatory compliance deadlines may disproportionately affect small-scale agricultural producers.',
   },
 ] as const;
-const scripts = (['a1', 'a2', 'b1', 'b2'] as const).flatMap((level) =>
-  baseScripts.map((script, index) => ({
-    ...script,
-    group: `diagnostic-${level}-${index + 1}`,
-  })),
-);
 
 function escapeSsml(value: string) {
   return value

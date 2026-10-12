@@ -113,10 +113,13 @@ describe('DiagnosticService', () => {
           },
         ]),
       },
+      $executeRaw: jest.fn().mockResolvedValue(0),
       $transaction: jest.fn((callback: (tx: any) => unknown) =>
         callback({
+          $executeRaw: jest.fn().mockResolvedValue(0),
           diagnosticAttempt: {
             findFirst: jest.fn().mockResolvedValue(null),
+            count: jest.fn().mockResolvedValue(0),
             create: jest.fn().mockResolvedValue({
               id: 4,
               answers: { '1': 0, '2': 1, '3': 0 },
@@ -188,11 +191,14 @@ describe('DiagnosticService', () => {
       level: 'Intermediate',
       submittedAt: new Date(),
     };
+    const executeRaw = jest.fn().mockResolvedValue(0);
     (prisma.$transaction as jest.Mock).mockImplementationOnce(
       (callback: (tx: any) => unknown) =>
         callback({
+          $executeRaw: executeRaw,
           diagnosticAttempt: {
             findFirst: jest.fn().mockResolvedValue(existing),
+            count: jest.fn().mockResolvedValue(1),
             create: jest.fn(),
           },
           learningActivity: { create: jest.fn() },
@@ -206,6 +212,7 @@ describe('DiagnosticService', () => {
       'same-token',
     );
     expect(result.attemptId).toBe(9);
+    expect(executeRaw).toHaveBeenCalledTimes(1);
     expect(prisma.$transaction.mock.calls[0][0]).toBeDefined();
   });
 
@@ -271,12 +278,41 @@ describe('DiagnosticService', () => {
       title: 'Entry Diagnostic v2',
       questions: v2Questions,
     });
+    prisma.diagnosticAttempt.findUnique = jest.fn().mockResolvedValue({
+      id: 10,
+      userId: 7,
+      assessmentId: 2,
+      status: 'IN_PROGRESS',
+      speakingResponses: [{ questionId: 103, status: 'SKIPPED', score: null }],
+    });
+    prisma.diagnosticSpeakingResponse = {
+      findMany: jest
+        .fn()
+        .mockResolvedValue([
+          { questionId: 103, status: 'SKIPPED', score: null },
+        ]),
+      updateMany: jest.fn(),
+    };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     prisma.$transaction.mockImplementationOnce(
       (callback: (tx: any) => unknown) =>
         callback({
+          $executeRaw: jest.fn().mockResolvedValue(0),
           diagnosticAttempt: {
             findFirst: jest.fn().mockResolvedValue(null),
+            count: jest.fn().mockResolvedValue(0),
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({ id: 10, status: 'IN_PROGRESS' }),
+            update: jest.fn().mockResolvedValue({
+              id: 10,
+              answers: { '101': 1, '102': 1, '103': 'SKIPPED' },
+              correctCount: 1,
+              totalCount: 2,
+              percentage: 50,
+              level: 'A1',
+              submittedAt: new Date(),
+            }),
             create: jest.fn().mockResolvedValue({
               id: 10,
               answers: { '101': 1, '102': 1, '103': 'spoken answer' },
@@ -291,11 +327,13 @@ describe('DiagnosticService', () => {
           userStats: { upsert: jest.fn() },
         }),
     );
-    const result = await service.submitAssessment(7, 2, {
-      '101': 1,
-      '102': 1,
-      '103': 'spoken answer',
-    });
+    const result = await service.submitAssessment(
+      7,
+      2,
+      { '101': { originalIndex: 1 }, '102': 1, '103': 'SKIPPED' },
+      'token-v2',
+      10,
+    );
     expect(result.totalCount).toBe(2);
     expect(result.objectiveTotalCount).toBe(2);
     expect(result.productiveTaskCount).toBe(1);

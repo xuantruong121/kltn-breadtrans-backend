@@ -21,6 +21,8 @@ type Level = 'A1' | 'A2' | 'B1' | 'B2';
 type Section =
   'LANGUAGE_USE' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
 type Item = {
+  id?: number;
+  order?: number;
   stableKey: string;
   section: Section;
   skill: string;
@@ -47,7 +49,9 @@ const objective = (
   options: string[],
   correctIndex: number,
   explanation: string,
-  extra: Partial<Pick<Item, 'passageText' | 'audioGroup'>> = {},
+  extra: Partial<
+    Pick<Item, 'passageText' | 'audioGroup' | 'id' | 'order' | 'activeInForm'>
+  > = {},
 ): Item => ({
   stableKey: key,
   section,
@@ -60,6 +64,7 @@ const objective = (
   correctIndex,
   explanation,
   source: 'BREADTRANS_AUTHORED',
+  activeInForm: extra.activeInForm ?? true,
   ...extra,
 });
 
@@ -70,6 +75,7 @@ const open = (
   construct: string,
   question: string,
   explanation: string,
+  extra: Partial<Pick<Item, 'id' | 'order' | 'activeInForm'>> = {},
 ): Item => ({
   stableKey: key,
   section,
@@ -81,9 +87,47 @@ const open = (
   options: [],
   explanation,
   source: 'BREADTRANS_AUTHORED',
+  activeInForm: extra.activeInForm ?? true,
+  ...extra,
 });
 
 const reserveItems: Item[] = [
+  objective(
+    'LANGUAGE_USE',
+    'Grammar',
+    'A1',
+    'lu-a1-article',
+    'articles',
+    'There is ___ orange on the table.',
+    ['a', 'an', 'the', 'some'],
+    1,
+    'Use “an” before a vowel sound.',
+    { id: 2003, order: 49, activeInForm: false },
+  ),
+  objective(
+    'LANGUAGE_USE',
+    'Grammar',
+    'A2',
+    'lu-a2-modal',
+    'common modals',
+    'You ___ show your ID at the front desk.',
+    ['might to', 'must', 'must to', 'can to'],
+    1,
+    '“Must” expresses a requirement without “to”.',
+    { id: 2007, order: 50, activeInForm: false },
+  ),
+  objective(
+    'LANGUAGE_USE',
+    'Grammar',
+    'B1',
+    'lu-b1-relative',
+    'relative clauses',
+    'The colleague ___ sits beside me handles the invoices.',
+    ['which', 'where', 'who', 'when'],
+    2,
+    '“Who” refers to a person.',
+    { id: 2010, order: 51, activeInForm: false },
+  ),
   objective(
     'LANGUAGE_USE',
     'Grammar',
@@ -94,17 +138,7 @@ const reserveItems: Item[] = [
     ['Are', 'Is', 'Am', 'Be'],
     0,
     'Use are with you.',
-  ),
-  objective(
-    'LANGUAGE_USE',
-    'Vocabulary',
-    'A2',
-    'reserve-lu-a2-01',
-    'daily routines',
-    'I usually ___ breakfast at seven.',
-    ['have', 'do', 'make', 'take'],
-    0,
-    'Have breakfast is the natural collocation.',
+    { id: 2049, order: 52, activeInForm: false },
   ),
   objective(
     'READING',
@@ -117,6 +151,9 @@ const reserveItems: Item[] = [
     0,
     'The notice states the opening date changed.',
     {
+      id: 2051,
+      order: 53,
+      activeInForm: false,
       passageText:
         'NOTICE\nThe opening date has changed to Monday. All other details remain the same.',
     },
@@ -137,6 +174,9 @@ const reserveItems: Item[] = [
     0,
     'The wording implies a flexible approach.',
     {
+      id: 2052,
+      order: 54,
+      activeInForm: false,
       passageText:
         'BRIEF\nThe team can adapt the schedule if the evidence changes. A final review will follow.',
     },
@@ -152,6 +192,9 @@ const reserveItems: Item[] = [
     0,
     'The message is about a class.',
     {
+      id: 2053,
+      order: 55,
+      activeInForm: false,
       audioGroup: 'diagnostic-a1-1',
       passageText:
         'Hi, this is the community centre. The swimming class starts at six, and please bring a towel.',
@@ -168,6 +211,9 @@ const reserveItems: Item[] = [
     0,
     'The speaker says to leave it with reception.',
     {
+      id: 2054,
+      order: 56,
+      activeInForm: false,
       audioGroup: 'diagnostic-a2-2',
       passageText:
         'The delivery will arrive on Tuesday morning. Please leave the package with reception if I am away.',
@@ -189,6 +235,9 @@ const reserveItems: Item[] = [
     0,
     'The speaker cites the testing phase.',
     {
+      id: 2055,
+      order: 61,
+      activeInForm: false,
       audioGroup: 'diagnostic-b1-3',
       passageText:
         'We reviewed the proposal and decided to move the launch to May because the testing phase needs more time.',
@@ -205,12 +254,27 @@ const reserveItems: Item[] = [
     0,
     'The director wants a second review.',
     {
+      id: 2056,
+      order: 62,
+      activeInForm: false,
       audioGroup: 'diagnostic-b2-4',
       passageText:
         'Although the figures are encouraging, the director wants a second review before we commit resources to the expansion.',
     },
   ),
-].map((item) => ({ ...item, activeInForm: false }));
+  objective(
+    'LANGUAGE_USE',
+    'Grammar',
+    'A1',
+    'lu-a1-preposition',
+    'prepositions of place',
+    'The keys are ___ the drawer.',
+    ['at', 'in', 'on', 'to'],
+    1,
+    '“In the drawer” expresses location inside it.',
+    { id: 2004, order: 63, activeInForm: false },
+  ),
+];
 
 const items: Item[] = [
   objective(
@@ -223,6 +287,7 @@ const items: Item[] = [
     ['am', 'is', 'are', 'be'],
     1,
     'The subject “my name” is singular, so use “is”.',
+    { id: 2001, order: 1 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -234,28 +299,31 @@ const items: Item[] = [
     ['drink', 'drinks', 'drinking', 'drank'],
     1,
     'Third-person singular present takes -s.',
-  ),
-  objective(
-    'LANGUAGE_USE',
-    'Grammar',
-    'A1',
-    'lu-a1-article',
-    'articles',
-    'There is ___ orange on the table.',
-    ['a', 'an', 'the', 'some'],
-    1,
-    'Use “an” before a vowel sound.',
+    { id: 2002, order: 2 },
   ),
   objective(
     'LANGUAGE_USE',
     'Vocabulary',
     'A1',
-    'lu-a1-preposition',
-    'basic prepositions',
-    'The keys are ___ the drawer.',
-    ['at', 'in', 'on', 'to'],
-    1,
-    '“In the drawer” expresses location inside it.',
+    'lu-a1-daily-object',
+    'daily objects',
+    'I drink water from a ___.',
+    ['bottle', 'chair', 'window', 'pencil'],
+    0,
+    'A bottle is a container used for drinks such as water.',
+    { id: 2061, order: 3 },
+  ),
+  objective(
+    'LANGUAGE_USE',
+    'Vocabulary',
+    'A1',
+    'lu-a1-school-object',
+    'school objects',
+    'She carries her books in a ___.',
+    ['backpack', 'mirror', 'blanket', 'spoon'],
+    0,
+    'A backpack is a bag carried on the back and is commonly used to carry books and other personal items.',
+    { id: 2063, order: 4 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -267,6 +335,7 @@ const items: Item[] = [
     ['visit', 'visited', 'are visiting', 'have visit'],
     1,
     'A finished past time takes the past form “visited”.',
+    { id: 2005, order: 5 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -278,17 +347,19 @@ const items: Item[] = [
     ['is going to', 'went to', 'has', 'would'],
     0,
     'Evidence in the present supports “is going to”.',
+    { id: 2006, order: 6 },
   ),
   objective(
     'LANGUAGE_USE',
-    'Grammar',
+    'Vocabulary',
     'A2',
-    'lu-a2-modal',
-    'common modals',
-    'You ___ show your ID at the front desk.',
-    ['might to', 'must', 'must to', 'can to'],
-    1,
-    '“Must” expresses a requirement without “to”.',
+    'reserve-lu-a2-01',
+    'daily routines',
+    'I usually ___ breakfast at seven.',
+    ['have', 'do', 'make', 'take'],
+    0,
+    'Have breakfast is the natural collocation.',
+    { id: 2050, order: 7, activeInForm: true },
   ),
   objective(
     'LANGUAGE_USE',
@@ -300,6 +371,7 @@ const items: Item[] = [
     ['make', 'do', 'take', 'put'],
     0,
     'The natural collocation is “make a reservation”.',
+    { id: 2008, order: 8 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -311,17 +383,19 @@ const items: Item[] = [
     ['write', 'wrote', 'have been writing', 'am write'],
     2,
     '“Since Monday” supports the present perfect continuous.',
+    { id: 2009, order: 9 },
   ),
   objective(
     'LANGUAGE_USE',
-    'Grammar',
+    'Vocabulary',
     'B1',
-    'lu-b1-relative',
-    'relative clauses',
-    'The colleague ___ sits beside me handles the invoices.',
-    ['which', 'where', 'who', 'when'],
-    2,
-    '“Who” refers to a person.',
+    'lu-b1-phrasal-postpone',
+    'phrasal verbs',
+    'We need to ___ the meeting until next Monday because the manager is away.',
+    ['put off', 'look after', 'turn on', 'give back'],
+    0,
+    '"Put off" means to postpone something until a later time.',
+    { id: 2062, order: 10 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -333,6 +407,7 @@ const items: Item[] = [
     ['take', 'took', 'will take', 'would took'],
     2,
     'First conditional: if + present, will + verb.',
+    { id: 2011, order: 11 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -344,6 +419,7 @@ const items: Item[] = [
     ['explain', 'explanation', 'explaining', 'explained'],
     1,
     'The noun “explanation” fits after “a clear”.',
+    { id: 2012, order: 12 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -355,6 +431,7 @@ const items: Item[] = [
     ['could', 'must to', 'are can', 'would have to be'],
     0,
     '“Could indicate” expresses a cautious interpretation.',
+    { id: 2013, order: 13 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -366,6 +443,7 @@ const items: Item[] = [
     ['met', 'has meet', 'meeting', 'would met'],
     0,
     'The past event requires the finite past form “met”.',
+    { id: 2014, order: 14 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -382,6 +460,7 @@ const items: Item[] = [
     ],
     2,
     'The third option is polite and precise in formal correspondence.',
+    { id: 2015, order: 15 },
   ),
   objective(
     'LANGUAGE_USE',
@@ -393,6 +472,7 @@ const items: Item[] = [
     ['consistent', 'consistency', 'consist', 'consistently'],
     0,
     '“Consistent with” is the required adjective collocation.',
+    { id: 2016, order: 16 },
   ),
 
   objective(
@@ -691,64 +771,330 @@ const items: Item[] = [
     },
   ),
 
-  ...(['A1', 'A2', 'B1', 'B2'] as Level[]).flatMap((level) => {
-    const scripts = [
-      {
-        text: 'Hi, this is the community centre. The swimming class starts at six, and please bring a towel.',
-        q: [
-          'What starts at six?',
-          ['The swimming class', 'The bus', 'The meeting', 'The shop'],
-          0,
-        ],
-      },
-      {
-        text: 'The delivery will arrive on Tuesday morning. Please leave the package with reception if I am away.',
-        q: [
-          'When will the delivery arrive?',
-          ['Tuesday morning', 'Friday afternoon', 'Tonight', 'Next month'],
-          0,
-        ],
-      },
-      {
-        text: 'We reviewed the proposal and decided to move the launch to May because the testing phase needs more time.',
-        q: [
-          'Why was the launch moved?',
-          [
-            'Testing needs more time',
-            'The proposal was lost',
-            'May is cheaper',
-            'The office closed',
-          ],
-          0,
-        ],
-      },
-      {
-        text: 'Although the figures are encouraging, the director wants a second review before we commit resources to the expansion.',
-        q: [
-          'What does the director want before committing resources?',
-          ['A second review', 'A new office', 'A lower price', 'A staff party'],
-          0,
-        ],
-      },
-    ];
-    return scripts.map((script, index) =>
-      objective(
-        'LISTENING',
-        'Listening',
-        level,
-        `listen-${level.toLowerCase()}-${index + 1}`,
-        index % 2 ? 'specific detail' : 'gist',
-        `Listen to the message. ${String(script.q[0])}`,
-        script.q[1] as string[],
-        script.q[2] as number,
-        'The answer is stated in the original BreadTrans-authored message.',
-        {
-          audioGroup: `diagnostic-${level.toLowerCase()}-${index + 1}`,
-          passageText: script.text,
-        },
-      ),
-    );
-  }),
+  objective(
+    'LISTENING',
+    'Listening',
+    'A1',
+    'listen-a1-1',
+    'gist',
+    'Listen to the message. What starts at six?',
+    [
+      'The swimming class',
+      'The tennis match',
+      'The dance practice',
+      'The film screening',
+    ],
+    0,
+    'The speaker says the swimming class starts at six.',
+    {
+      audioGroup: 'diagnostic-a1-1',
+      passageText:
+        'Hi, this is the community centre. The swimming class starts at six, and please bring a towel.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'A1',
+    'listen-a1-2',
+    'specific detail',
+    'Listen to the announcement. What time does the library close today?',
+    ['At two o’clock', 'At four o’clock', 'At five o’clock', 'At six o’clock'],
+    1,
+    'The speaker announces the library closes early at four o’clock.',
+    {
+      audioGroup: 'diagnostic-a1-2',
+      passageText:
+        'Good morning! The library closes early today at four o’clock for maintenance.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'A1',
+    'listen-a1-3',
+    'specific detail',
+    'Listen to the announcement. Which platform does the bus leave from?',
+    ['Platform one', 'Platform two', 'Platform three', 'Platform four'],
+    2,
+    'The announcement specifies platform three.',
+    {
+      audioGroup: 'diagnostic-a1-3',
+      passageText:
+        'Attention passengers, the bus to Oxford will depart from platform three.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'A1',
+    'listen-a1-4',
+    'specific detail',
+    'Listen to the voice message. What should David bring to the test room?',
+    ['His laptop', 'His dictionary', 'A notebook', 'His student ID card'],
+    3,
+    'The speaker asks David to bring his student ID card.',
+    {
+      audioGroup: 'diagnostic-a1-4',
+      passageText:
+        'Hello David, please remember to bring your student ID card to the test room.',
+    },
+  ),
+
+  objective(
+    'LISTENING',
+    'Listening',
+    'A2',
+    'listen-a2-1',
+    'specific detail',
+    'Listen to the voice message. Where did the speaker leave the keys?',
+    [
+      'In the blue envelope on the table',
+      'Inside the mailbox',
+      'In the car',
+      'Under the front mat',
+    ],
+    0,
+    'The message states the keys are in the blue envelope on the kitchen table.',
+    {
+      audioGroup: 'diagnostic-a2-1',
+      passageText:
+        'Hi Mark, I left the apartment keys inside the blue envelope on the kitchen table.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'A2',
+    'listen-a2-2',
+    'specific detail',
+    'Listen to the message. When is the delivery scheduled to arrive?',
+    [
+      'Monday afternoon',
+      'Tuesday morning',
+      'Wednesday evening',
+      'Thursday night',
+    ],
+    1,
+    'The courier will arrive on Tuesday morning before noon.',
+    {
+      audioGroup: 'diagnostic-a2-2',
+      passageText:
+        'The courier just called. The delivery will arrive on Tuesday morning before noon. Please keep your phone nearby.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'A2',
+    'listen-a2-3',
+    'gist',
+    'Listen to the store announcement. Why should customers take the rear stairs?',
+    [
+      'The elevator is broken',
+      'The front door is locked',
+      'There is wet paint on the main route',
+      'The café is closed',
+    ],
+    2,
+    'The announcement points out wet paint as the reason.',
+    {
+      audioGroup: 'diagnostic-a2-3',
+      passageText:
+        'Dear customers, due to wet paint, please use the rear stairs to reach the second floor café.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'A2',
+    'listen-a2-4',
+    'specific detail',
+    'Listen to the voicemail. What does the speaker ask Lisa to buy?',
+    [
+      'A bag of apples',
+      'A loaf of bread',
+      'Some orange juice',
+      'Two cartons of milk',
+    ],
+    3,
+    'The speaker asks Lisa for two cartons of milk.',
+    {
+      audioGroup: 'diagnostic-a2-4',
+      passageText:
+        'Hi Lisa, thanks for agreeing to help. Could you buy two cartons of milk on your way home?',
+    },
+  ),
+
+  objective(
+    'LISTENING',
+    'Listening',
+    'B1',
+    'listen-b1-1',
+    'gist',
+    'Listen to the project update. Why has the product launch been postponed?',
+    [
+      'Additional time is needed for user testing',
+      'The marketing budget was reduced',
+      'The lead developer resigned',
+      'Hardware supplies were delayed',
+    ],
+    0,
+    'The speaker explains user acceptance testing requires two extra weeks.',
+    {
+      audioGroup: 'diagnostic-b1-1',
+      passageText:
+        'We reviewed the proposal and decided to move the software launch to May because the user acceptance testing requires two extra weeks.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'B1',
+    'listen-b1-2',
+    'specific detail',
+    'Listen to the event notice. What will happen to the charity fun run?',
+    [
+      'It is permanently canceled',
+      'It is moved to next Sunday',
+      'It will take place indoors tomorrow',
+      'It will start three hours earlier',
+    ],
+    1,
+    'The fun run is rescheduled for next Sunday at the central stadium.',
+    {
+      audioGroup: 'diagnostic-b1-2',
+      passageText:
+        'Because rainfall is expected throughout the weekend, Saturday’s charity fun run has been rescheduled for next Sunday at the central stadium.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'B1',
+    'listen-b1-3',
+    'specific detail',
+    'Listen to the in-flight announcement. What are passengers instructed to do?',
+    [
+      'Fasten life jackets immediately',
+      'Remain seated until dinner service',
+      'Switch electronic devices to flight mode',
+      'Store overhead bags under the front seat',
+    ],
+    2,
+    'Passengers must keep devices in flight mode during takeoff.',
+    {
+      audioGroup: 'diagnostic-b1-3',
+      passageText:
+        'Welcome aboard flight VN340 to Tokyo. In compliance with aviation guidelines, all electronic devices must remain in flight mode during takeoff.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'B1',
+    'listen-b1-4',
+    'inference',
+    'Listen to the business memo. What action does the procurement department recommend?',
+    [
+      'Canceling all customer orders',
+      'Hiring more warehouse staff',
+      'Closing regional distribution centers',
+      'Renegotiating shipping terms with the supplier',
+    ],
+    3,
+    'The memo recommends renegotiating shipping terms with the regional supplier.',
+    {
+      audioGroup: 'diagnostic-b1-4',
+      passageText:
+        'Due to rising raw material costs, the procurement department recommends renegotiating shipping terms with our regional logistics supplier.',
+    },
+  ),
+
+  objective(
+    'LISTENING',
+    'Listening',
+    'B2',
+    'listen-b2-1',
+    'inference',
+    'Listen to the executive meeting summary. What condition must be met before funds are allocated?',
+    [
+      'An independent financial audit must be conducted',
+      'The branch manager must hire new staff',
+      'The competitor’s patent must expire',
+      'A new marketing campaign must launch',
+    ],
+    0,
+    'The director insists on an independent financial audit before allocating venture capital.',
+    {
+      audioGroup: 'diagnostic-b2-1',
+      passageText:
+        'Although preliminary customer feedback is promising, the managing director insists on an independent financial audit before allocating further venture capital to the overseas branch.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'B2',
+    'listen-b2-2',
+    'gist',
+    'Listen to the research presentation. What key discrepancy does the speaker point out?',
+    [
+      'Between company profit margins and salaries',
+      'Between reported satisfaction and retention rates',
+      'Between remote workers and office attendance',
+      'Between hiring quotas and project outcomes',
+    ],
+    1,
+    'The survey found a gap between reported satisfaction and actual retention rates.',
+    {
+      audioGroup: 'diagnostic-b2-2',
+      passageText:
+        'The recent survey highlights a significant discrepancy between self-reported employee satisfaction and actual team retention rates across tech startups.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'B2',
+    'listen-b2-3',
+    'inference',
+    'Listen to the board recommendation. How does the speaker propose handling supply chain disruptions?',
+    [
+      'By halting all international exports',
+      'By increasing reliance on single-source contracts',
+      'By diversifying the supplier network in Southeast Asia',
+      'By eliminating buffer inventory completely',
+    ],
+    2,
+    'The advisory board suggests a diversified supplier network in Southeast Asia.',
+    {
+      audioGroup: 'diagnostic-b2-3',
+      passageText:
+        'To mitigate supply-chain disruptions caused by unpredictable port closures, the advisory board suggests adopting a diversified supplier network across Southeast Asia.',
+    },
+  ),
+  objective(
+    'LISTENING',
+    'Listening',
+    'B2',
+    'listen-b2-4',
+    'inference',
+    'Listen to the policy analysis. What potential downside of the environmental initiative is highlighted?',
+    [
+      'Consumer boycotts against green branding',
+      'Severe drops in urban industrial output',
+      'A lack of international scientific backing',
+      'Disproportionate strain on small-scale producers',
+    ],
+    3,
+    'Sudden compliance deadlines may disproportionately affect small-scale agricultural producers.',
+    {
+      audioGroup: 'diagnostic-b2-4',
+      passageText:
+        'While the proposed environmental initiative is commendable, analysts caution that sudden regulatory compliance deadlines may disproportionately affect small-scale agricultural producers.',
+    },
+  ),
   ...reserveItems,
   open(
     'SPEAKING',
@@ -757,6 +1103,7 @@ const items: Item[] = [
     'task fulfilment',
     'Record a short introduction: say your name, where you live and one thing you do every day.',
     'This task is supplementary productive evidence. Review task fulfilment, intelligibility, fluency, grammar and vocabulary; provider failure must not lower the core placement.',
+    { id: 2057, order: 57, activeInForm: true },
   ),
   open(
     'SPEAKING',
@@ -765,6 +1112,7 @@ const items: Item[] = [
     'short opinion',
     'Record a 45–60 second response: describe one study habit that helps you and explain why.',
     'This task is supplementary productive evidence and is not a TOEIC Speaking exam.',
+    { id: 2058, order: 58, activeInForm: true },
   ),
   open(
     'WRITING',
@@ -773,6 +1121,7 @@ const items: Item[] = [
     'functional writing',
     'Write a 50–80 word message to a classmate explaining a schedule change and suggesting a new time.',
     'Review task fulfilment, grammar, vocabulary and basic coherence.',
+    { id: 2059, order: 59, activeInForm: true },
   ),
   open(
     'WRITING',
@@ -781,6 +1130,7 @@ const items: Item[] = [
     'email writing',
     'Write a 90–130 word workplace email explaining a small delay and proposing a practical next step.',
     'Review task fulfilment, grammar, vocabulary, organization and coherence.',
+    { id: 2060, order: 60, activeInForm: true },
   ),
 ];
 
@@ -878,8 +1228,13 @@ async function main() {
     },
   });
   for (const [index, item] of items.entries()) {
-    const id = 2001 + index;
-    const options = asStoredOptions(item);
+    const id = item.id ?? 2001 + index;
+    const order = item.order ?? index + 1;
+    const existing = await prisma.diagnosticQuestion.findUnique({
+      where: { id },
+    });
+    const existingAudioUrl = (existing?.options as any)?.audioUrl;
+    const options = asStoredOptions(item, existingAudioUrl);
     await prisma.diagnosticQuestion.upsert({
       where: { id },
       update: {
@@ -889,7 +1244,7 @@ async function main() {
         options,
         correctIndex: item.correctIndex ?? -1,
         explanation: item.explanation,
-        order: index + 1,
+        order,
       },
       create: {
         id,
@@ -899,7 +1254,7 @@ async function main() {
         options,
         correctIndex: item.correctIndex ?? -1,
         explanation: item.explanation,
-        order: index + 1,
+        order,
       },
     });
   }
@@ -918,7 +1273,8 @@ async function main() {
       ]),
     );
   const after = items.map((item, index) => ({
-    questionId: 2001 + index,
+    questionId: item.id ?? 2001 + index,
+    order: item.order ?? index + 1,
     stableKey: item.stableKey,
     section: item.section,
     skill: item.skill,
@@ -1181,6 +1537,35 @@ async function main() {
           : 'requires server scoring and skill profile',
     })),
   );
+
+  const semanticBlueprintDir = join(
+    process.cwd(),
+    '..',
+    '..',
+    'artifacts',
+    'entry-diagnostic-semantic-blueprint',
+  );
+  await mkdir(semanticBlueprintDir, { recursive: true });
+  const activeLanguageUseMatrix = items
+    .filter(
+      (item) => item.section === 'LANGUAGE_USE' && item.activeInForm !== false,
+    )
+    .map((item, index) => ({
+      id: item.id ?? 2001 + index,
+      stableKey: item.stableKey,
+      stem: item.question,
+      construct: item.construct,
+      skill: item.skill,
+      cefr: item.intendedLevel,
+      CEFR: item.intendedLevel,
+      activeSource: item.source,
+    }));
+  await writeFile(
+    join(semanticBlueprintDir, 'final-language-use-matrix.json'),
+    `${JSON.stringify(activeLanguageUseMatrix, null, 2)}\n`,
+    'utf8',
+  );
+
   console.log(
     JSON.stringify(
       {

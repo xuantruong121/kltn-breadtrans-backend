@@ -1,12 +1,74 @@
 export const MIN_DOMAIN_EVIDENCE = 3;
 
+export const CANONICAL_DIAGNOSTIC_BLUEPRINT = {
+  version: '2.0',
+  totalItems: 52,
+  objectiveCount: 48,
+  productiveCount: 4,
+  sections: {
+    LANGUAGE_USE: {
+      name: 'Ngữ pháp & Từ vựng',
+      total: 16,
+      objective: 16,
+      productive: 0,
+      skills: ['Grammar', 'Vocabulary'],
+      grammarTotal: 8,
+      vocabularyTotal: 8,
+    },
+    READING: {
+      name: 'Đọc hiểu',
+      total: 16,
+      objective: 16,
+      productive: 0,
+      skills: ['Reading'],
+    },
+    LISTENING: {
+      name: 'Nghe hiểu',
+      total: 16,
+      objective: 16,
+      productive: 0,
+      skills: ['Listening'],
+    },
+    SPEAKING: {
+      name: 'Nói',
+      total: 2,
+      objective: 0,
+      productive: 2,
+      skills: ['Speaking'],
+    },
+    WRITING: {
+      name: 'Viết',
+      total: 2,
+      objective: 0,
+      productive: 2,
+      skills: ['Writing'],
+    },
+  },
+};
+
+export function getAttemptQuestionPermutation(
+  attemptId: number,
+  questionId: number,
+  optionCount: number,
+): number[] {
+  const indices = Array.from({ length: optionCount }, (_, i) => i);
+  if (optionCount <= 1) return indices;
+  let seed = (Math.abs(attemptId) * 10007 + questionId * 37) % 2147483647;
+  for (let i = indices.length - 1; i > 0; i--) {
+    seed = (seed * 16807 + 11) % 2147483647;
+    const j = seed % (i + 1);
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  return indices;
+}
+
 export type DiagnosticQuestionForScoring = {
   id: number;
   skill: string;
   question: string;
   options: unknown;
   correctIndex: number;
-  explanation: string | null;
+  explanation?: string | null;
   order: number;
 };
 
@@ -22,6 +84,55 @@ export type DiagnosticQuestionMeta = {
   audioUrl?: string | null;
   activeInForm?: boolean;
 };
+
+export function isDiagnosticAnswerCorrect(
+  question: DiagnosticQuestionForScoring,
+  answer: unknown,
+  permutation?: number[],
+): boolean {
+  if (isOpenDiagnosticQuestion(question)) return false;
+  if (answer === undefined || answer === null) return false;
+
+  const meta = getQuestionMeta(question);
+  const options = meta.values;
+  const correctText = options[question.correctIndex];
+
+  // 1. Exact string match against original correct option text
+  if (typeof answer === 'string' && typeof correctText === 'string') {
+    if (answer.trim() === correctText.trim()) return true;
+  }
+
+  // 2. Object with text, value, or stable originalIndex
+  if (typeof answer === 'object' && answer !== null) {
+    const rawObj = answer as Record<string, unknown>;
+    if (typeof rawObj.originalIndex === 'number') {
+      return rawObj.originalIndex === question.correctIndex;
+    }
+    if (typeof rawObj.value === 'string' && typeof correctText === 'string') {
+      if (rawObj.value.trim() === correctText.trim()) return true;
+    }
+    if (typeof rawObj.text === 'string' && typeof correctText === 'string') {
+      if (rawObj.text.trim() === correctText.trim()) return true;
+    }
+    if (typeof rawObj.index === 'number') {
+      answer = rawObj.index;
+    }
+  }
+
+  // 3. Numeric index
+  if (typeof answer === 'number') {
+    if (
+      permutation &&
+      Array.isArray(permutation) &&
+      permutation[answer] !== undefined
+    ) {
+      return permutation[answer] === question.correctIndex;
+    }
+    return answer === question.correctIndex;
+  }
+
+  return false;
+}
 
 export function getQuestionMeta(
   question: DiagnosticQuestionForScoring,
@@ -81,17 +192,21 @@ export function resolvePlacementLevel(
   });
   const highest = supported.at(-1);
   if (highest) {
+    if (highest === 'B2') return 'B2 – Trung cấp trên';
+    if (highest === 'B1') return 'B1 – Trung cấp';
+    if (highest === 'A2') return 'A2 – Sơ trung cấp';
+    if (highest === 'A1') return 'A1 – Sơ cấp';
     return highest;
   }
   const weightedCore = sectionScores['CORE'] ?? 0;
   if (weightedCore >= 65) {
-    if ((bandScores.B2 ?? 0) >= 55) return 'B1 — đang tiến tới B2';
-    if ((bandScores.B1 ?? 0) >= 55) return 'A2 — đang tiến tới B1';
-    if ((bandScores.A2 ?? 0) >= 55) return 'A1 — đang tiến tới A2';
+    if ((bandScores.B2 ?? 0) >= 55) return 'B1 – Đang tiến tới B2';
+    if ((bandScores.B1 ?? 0) >= 55) return 'A2 – Đang tiến tới B1';
+    if ((bandScores.A2 ?? 0) >= 55) return 'A1 – Đang tiến tới A2';
   }
-  if (weightedCore >= 55) return 'A2';
-  if (weightedCore >= 40) return 'A1';
-  return 'Pre-A1 / Beginner foundation needed';
+  if (weightedCore >= 55) return 'A2 – Sơ trung cấp';
+  if (weightedCore >= 40) return 'A1 – Sơ cấp';
+  return 'Pre-A1 – Cần củng cố nền tảng';
 }
 
 export type DiagnosticSkillProfile = {
@@ -176,13 +291,17 @@ export function resolveEstimatedLevel(percentage: number): string {
 export function buildSkillProfiles(
   questions: DiagnosticQuestionForScoring[],
   answers: Record<string, unknown>,
+  permutations?: Record<number, number[]>,
 ): DiagnosticSkillProfile[] {
   const grouped = new Map<string, { correct: number; total: number }>();
   for (const question of questions) {
     const current = grouped.get(question.skill) ?? { correct: 0, total: 0 };
     current.total += 1;
-    if (answers[String(question.id)] === question.correctIndex)
+    const answer = answers[String(question.id)];
+    const perm = permutations?.[question.id];
+    if (isDiagnosticAnswerCorrect(question, answer, perm)) {
       current.correct += 1;
+    }
     grouped.set(question.skill, current);
   }
   return [...grouped.entries()].map(([skill, value]) => ({
@@ -203,15 +322,371 @@ export function buildStrengthsAndWeaknesses(
 ) {
   const measured = profiles.filter((profile) => profile.percentage !== null);
   return {
-    strengths: measured
-      .filter((profile) => (profile.percentage ?? 0) >= 75)
-      .sort((a, b) => (b.percentage ?? 0) - (a.percentage ?? 0))
-      .map((profile) => profile.skill),
-    weaknesses: measured
-      .filter((profile) => (profile.percentage ?? 0) < 60)
-      .sort((a, b) => (a.percentage ?? 0) - (b.percentage ?? 0))
-      .map((profile) => profile.skill),
+    strengths: Array.from(
+      new Set(
+        measured
+          .filter((profile) => (profile.percentage ?? 0) >= 75)
+          .sort((a, b) => (b.percentage ?? 0) - (a.percentage ?? 0))
+          .map((profile) => profile.skill),
+      ),
+    ),
+    weaknesses: Array.from(
+      new Set(
+        measured
+          .filter((profile) => (profile.percentage ?? 0) < 60)
+          .sort((a, b) => (a.percentage ?? 0) - (b.percentage ?? 0))
+          .map((profile) => profile.skill),
+      ),
+    ),
   };
+}
+
+export type DiagnosticPracticeRecommendation = {
+  id: string;
+  skill: string;
+  title: string;
+  description: string;
+  route: string;
+  badge: string;
+  fallback?: boolean;
+};
+
+export function buildPracticeRecommendations(
+  level: string,
+  weaknesses: string[],
+  wrongQuestions?: DiagnosticQuestionForScoring[],
+): DiagnosticPracticeRecommendation[] {
+  const recommendations: DiagnosticPracticeRecommendation[] = [];
+  const addedIds = new Set<string>();
+
+  const pushRec = (rec: DiagnosticPracticeRecommendation) => {
+    if (!addedIds.has(rec.id) && recommendations.length < 5) {
+      addedIds.add(rec.id);
+      recommendations.push(rec);
+    }
+  };
+
+  // 1. Specific recommendation derived from wrong questions
+  if (wrongQuestions && wrongQuestions.length > 0) {
+    for (const q of wrongQuestions) {
+      if (isOpenDiagnosticQuestion(q)) continue;
+      const meta = getQuestionMeta(q);
+      const construct = (meta.construct || '').toLowerCase();
+      const intendedLevel = meta.intendedLevel || 'A1';
+      const skill = q.skill;
+
+      if (skill === 'Grammar') {
+        if (
+          construct.includes('present') ||
+          construct.includes('be') ||
+          construct.includes('singular')
+        ) {
+          pushRec({
+            id: 'rec-gram-present',
+            skill: 'Ngữ pháp',
+            title: 'Present Simple & Adverbs of Frequency',
+            description:
+              'Củng cố thì hiện tại đơn, chia động từ to be và vị trí trạng từ tần suất.',
+            route: '/reading?category=grammar&topicId=1',
+            badge: 'Ngữ pháp A1',
+          });
+        } else if (construct.includes('past')) {
+          pushRec({
+            id: 'rec-gram-past',
+            skill: 'Ngữ pháp',
+            title: 'Past Simple & Time Expressions',
+            description:
+              'Ôn tập thì quá khứ đơn, động từ bất quy tắc và dấu hiệu mốc thời gian đã kết thúc.',
+            route: '/reading?category=grammar&topicId=2',
+            badge: 'Ngữ pháp A2',
+          });
+        } else if (construct.includes('future')) {
+          pushRec({
+            id: 'rec-gram-future',
+            skill: 'Ngữ pháp',
+            title: 'Future Forms & Diễn đạt tương lai',
+            description:
+              'Nắm vững phân biệt will và be going to khi diễn đạt dự định và dự đoán có căn cứ.',
+            route: '/reading?category=grammar&topicId=4',
+            badge: 'Ngữ pháp A2',
+          });
+        } else if (construct.includes('modal')) {
+          pushRec({
+            id: 'rec-gram-modal',
+            skill: 'Ngữ pháp',
+            title: 'Modals & Polite Requests',
+            description:
+              'Củng cố cách dùng động từ khuyết thiếu (must, should, can) và yêu cầu lịch sự.',
+            route: '/reading?category=grammar&topicId=6',
+            badge: 'Ngữ pháp A2',
+          });
+        } else if (construct.includes('perfect')) {
+          pushRec({
+            id: 'rec-gram-perfect',
+            skill: 'Ngữ pháp',
+            title: 'Present Perfect & Thì hoàn thành',
+            description:
+              'Rèn luyện thì hiện tại hoàn thành với since, for và đối chiếu quá khứ đơn.',
+            route: '/reading?category=grammar&topicId=3',
+            badge: 'Ngữ pháp B1',
+          });
+        } else if (construct.includes('relative')) {
+          pushRec({
+            id: 'rec-gram-relative',
+            skill: 'Ngữ pháp',
+            title: 'Relative Clauses & Mệnh đề quan hệ',
+            description:
+              'Phân biệt chính xác đại từ quan hệ who, which, that trong câu phức.',
+            route: '/reading?category=grammar&topicId=10',
+            badge: 'Ngữ pháp B1',
+          });
+        } else if (construct.includes('condition')) {
+          pushRec({
+            id: 'rec-gram-conditionals',
+            skill: 'Ngữ pháp',
+            title: 'Conditionals & Câu điều kiện',
+            description:
+              'Nắm chắc cấu trúc câu điều kiện loại 1 & 2 khi sử dụng mệnh đề if.',
+            route: '/reading?category=grammar&topicId=9',
+            badge: 'Ngữ pháp B1',
+          });
+        }
+      } else if (skill === 'Vocabulary') {
+        if (
+          construct.includes('preposition') ||
+          construct.includes('article') ||
+          construct.includes('daily') ||
+          construct.includes('school') ||
+          construct.includes('object')
+        ) {
+          pushRec({
+            id: 'rec-vocab-routines',
+            skill: 'Từ vựng',
+            title: 'Daily Routines & Time',
+            description:
+              'Mở rộng từ vựng sinh hoạt thường ngày, đồ dùng và mốc thời gian.',
+            route: '/vocabulary/study?topicId=1',
+            badge: 'Từ vựng A1',
+          });
+        } else if (
+          construct.includes('collocation') ||
+          construct.includes('travel')
+        ) {
+          pushRec({
+            id: 'rec-vocab-travel',
+            skill: 'Từ vựng',
+            title: 'Travel & Transportation',
+            description:
+              'Trau dồi các cụm từ kết hợp (collocations) và từ vựng di chuyển thực tế.',
+            route: '/vocabulary/study?topicId=2',
+            badge: 'Từ vựng A2',
+          });
+        } else if (
+          construct.includes('formation') ||
+          construct.includes('register') ||
+          construct.includes('precision') ||
+          construct.includes('word-form') ||
+          construct.includes('phrasal') ||
+          construct.includes('workplace')
+        ) {
+          pushRec({
+            id: 'rec-vocab-office',
+            skill: 'Từ vựng',
+            title: 'Office & Meetings',
+            description:
+              'Rèn luyện từ vựng công sở, chuyển đổi từ loại và văn phong trang trọng.',
+            route: '/vocabulary/study?topicId=3',
+            badge: 'Từ vựng B1',
+          });
+        }
+      } else if (skill === 'Reading') {
+        if (intendedLevel === 'A1' || intendedLevel === 'A2') {
+          pushRec({
+            id: 'rec-read-notices',
+            skill: 'Đọc hiểu',
+            title: 'Reading A2 — Notices & Messages',
+            description:
+              'Luyện kỹ năng đọc quét thông tin (scanning) trong thông báo ngắn và biển hiệu.',
+            route: '/reading/2',
+            badge: 'Đọc hiểu A2',
+          });
+        } else if (intendedLevel === 'B1') {
+          pushRec({
+            id: 'rec-read-workplace',
+            skill: 'Đọc hiểu',
+            title: 'Reading B1 — Workplace Documents',
+            description:
+              'Đọc hiểu email trao đổi công việc và tài liệu nội bộ để xác định mục đích chính.',
+            route: '/reading/6',
+            badge: 'Đọc hiểu B1',
+          });
+        } else if (intendedLevel === 'B2') {
+          pushRec({
+            id: 'rec-read-reports',
+            skill: 'Đọc hiểu',
+            title: 'Reading B2 — Workplace & Reports',
+            description:
+              'Nâng cao khả năng phân tích báo cáo công việc và suy luận ý đồ tác giả.',
+            route: '/reading/15',
+            badge: 'Đọc hiểu B2',
+          });
+        }
+      } else if (skill === 'Listening') {
+        if (intendedLevel === 'A1') {
+          pushRec({
+            id: 'rec-listen-essential',
+            skill: 'Nghe hiểu',
+            title: 'Listening A1 — Essential Everyday English',
+            description:
+              'Luyện nghe các thông báo ngắn về thời gian, địa điểm và sinh hoạt hằng ngày.',
+            route: '/listening/9',
+            badge: 'Nghe hiểu A1',
+          });
+        } else if (intendedLevel === 'A2') {
+          pushRec({
+            id: 'rec-listen-comm',
+            skill: 'Nghe hiểu',
+            title: 'Listening A2 — Everyday Communication',
+            description:
+              'Luyện nghe hội thoại giao tiếp thường nhật và tin nhắn thoại có nhiều chi tiết.',
+            route: '/listening/1',
+            badge: 'Nghe hiểu A2',
+          });
+        } else {
+          pushRec({
+            id: 'rec-listen-workplace',
+            skill: 'Nghe hiểu',
+            title: 'Listening B1 — Workplace Conversations',
+            description:
+              'Nghe hội thoại nơi làm việc, nắm bắt thay đổi lịch trình và hành động tiếp theo.',
+            route: '/listening/5',
+            badge: 'Nghe hiểu B1',
+          });
+        }
+      }
+    }
+  }
+
+  // 2. Specific recommendations from weaknesses if still under 3
+  for (const weakness of weaknesses) {
+    if (recommendations.length >= 4) break;
+    if (weakness === 'Grammar') {
+      pushRec({
+        id: 'rec-gram-fallback',
+        skill: 'Ngữ pháp',
+        title: 'Present Simple & Adverbs of Frequency',
+        description:
+          'Củng cố các cấu trúc câu, trật tự từ và các thì ngữ pháp trọng tâm.',
+        route: '/reading?category=grammar&topicId=1',
+        badge: 'Ngữ pháp A1',
+        fallback: true,
+      });
+    } else if (weakness === 'Vocabulary') {
+      pushRec({
+        id: 'rec-vocab-fallback',
+        skill: 'Từ vựng',
+        title: 'Daily Routines & Time',
+        description:
+          'Mở rộng vốn từ vựng nền tảng thông qua bài tập phản xạ và ngữ cảnh.',
+        route: '/vocabulary/study?topicId=1',
+        badge: 'Từ vựng A1',
+        fallback: true,
+      });
+    } else if (weakness === 'Reading') {
+      pushRec({
+        id: 'rec-read-fallback',
+        skill: 'Đọc hiểu',
+        title: 'Reading A1–A2 — Everyday Texts',
+        description:
+          'Rèn luyện khả năng đọc hiểu ý chính và thông tin chi tiết qua đoạn văn ngắn.',
+        route: '/reading/13',
+        badge: 'Đọc hiểu A1–A2',
+        fallback: true,
+      });
+    } else if (weakness === 'Listening') {
+      pushRec({
+        id: 'rec-listen-fallback',
+        skill: 'Nghe hiểu',
+        title: 'Listening A1 — Essential Everyday English',
+        description:
+          'Luyện nghe các thông báo ngắn và câu hỏi phản xạ thường nhật.',
+        route: '/listening/9',
+        badge: 'Nghe hiểu A1',
+        fallback: true,
+      });
+    } else if (weakness === 'Speaking') {
+      pushRec({
+        id: 'rec-speak-fallback',
+        skill: 'Nói',
+        title: 'Pronunciation Foundations',
+        description:
+          'Thực hành phát âm chuẩn IPA, ngữ điệu câu và phản xạ giao tiếp cơ bản.',
+        route: '/speaking/pronunciation-foundations',
+        badge: 'Kỹ năng Nói',
+        fallback: true,
+      });
+    } else if (weakness === 'Writing') {
+      pushRec({
+        id: 'rec-write-fallback',
+        skill: 'Viết',
+        title: 'Writing A2–B1 — Sentence Builder',
+        description:
+          'Luyện kỹ năng xây dựng câu hoàn chỉnh và diễn đạt ý mạch lạc.',
+        route: '/writing/3',
+        badge: 'Kỹ năng Viết',
+        fallback: true,
+      });
+    }
+  }
+
+  // 3. Fallback fill if fewer than 3 items
+  const fallbacks: DiagnosticPracticeRecommendation[] = [
+    {
+      id: 'rec-gram-default',
+      skill: 'Ngữ pháp',
+      title: 'Present Simple & Adverbs of Frequency',
+      description: 'Củng cố nền tảng ngữ pháp câu và thì cơ bản.',
+      route: '/reading?category=grammar&topicId=1',
+      badge: 'Ngữ pháp A1',
+      fallback: true,
+    },
+    {
+      id: 'rec-vocab-default',
+      skill: 'Từ vựng',
+      title: 'Daily Routines & Time',
+      description:
+        'Trau dồi từ vựng thông dụng và cấu trúc giao tiếp hằng ngày.',
+      route: '/vocabulary/study?topicId=1',
+      badge: 'Từ vựng A1',
+      fallback: true,
+    },
+    {
+      id: 'rec-read-default',
+      skill: 'Đọc hiểu',
+      title: 'Reading A1–A2 — Everyday Texts',
+      description:
+        'Luyện đọc các đoạn văn thực tế ngắn với câu hỏi trắc nghiệm.',
+      route: '/reading/13',
+      badge: 'Đọc hiểu A1–A2',
+      fallback: true,
+    },
+    {
+      id: 'rec-listen-default',
+      skill: 'Nghe hiểu',
+      title: 'Listening A1 — Essential Everyday English',
+      description: 'Luyện nghe phản xạ với các bài nghe ngắn kèm transcript.',
+      route: '/listening/9',
+      badge: 'Nghe hiểu A1',
+      fallback: true,
+    },
+  ];
+
+  for (const item of fallbacks) {
+    if (recommendations.length >= 3) break;
+    pushRec(item);
+  }
+
+  return recommendations.slice(0, 5);
 }
 
 function courseBand(

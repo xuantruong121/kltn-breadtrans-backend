@@ -1,73 +1,108 @@
-name: CI Pipeline
+name: Backend CI
 
 on:
-  # Run validation for every branch and every PR target. Branch names are
-  # case-sensitive on GitHub, so restricting this to "develop" would skip
-  # repositories using a "Development" or another integration branch.
   push:
+    branches:
+      - develop
+      - main
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 concurrency:
-  group: backend-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
+permissions:
+  contents: read
 
+jobs:
+  quality:
+    name: Backend CI / quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:15-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: kltn_test_db
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d kltn_test_db"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
-
+          --health-retries 10
       redis:
         image: redis:7-alpine
         ports:
           - 6379:6379
-
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      CI: 'true'
+      CI_DATABASE_IS_EPHEMERAL: 'true'
+      PRODUCTION_DATABASE_NOT_USED: 'true'
+      LOCAL_OWNER_DATABASE_NOT_USED: 'true'
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kltn_test_db?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-only-jwt-secret
+      JWT_REFRESH_SECRET: ci-only-refresh-secret
+      OTP_SECRET: ci-only-otp-secret
+      MOCK_AZURE_SPEECH: 'true'
+      MOCK_GEMINI: 'true'
+      MOCK_OPENAI: 'true'
+      MOCK_R2: 'true'
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Use Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Prisma Client
+      - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Run Linter
-        run: npm run lint
+      - name: Validate Prisma schema
+        run: npx prisma validate
 
-      - name: Build project
-        run: npm run build
-
-      - name: Deploy Prisma migrations
-        env:
-          DATABASE_URL: 'postgresql://postgres:password@localhost:5432/kltn_test_db?schema=public'
+      - name: Apply migrations to ephemeral database
         run: npx prisma migrate deploy
 
-      - name: Run Unit Tests
-        env:
-          DATABASE_URL: 'postgresql://postgres:password@localhost:5432/kltn_test_db?schema=public'
-        run: npm run test
+      - name: Lint
+        run: npm run lint:check
 
-      - name: Run E2E Tests
-        env:
-          DATABASE_URL: 'postgresql://postgres:password@localhost:5432/kltn_test_db?schema=public'
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit and integration tests
+        run: npm test -- --ci --runInBand
+
+      - name: E2E tests
         run: npm run test:e2e
+
+      - name: Upload Jest diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-output
+          path: |
+            coverage
+            test-results
+          if-no-files-found: ignore

@@ -1,0 +1,11 @@
+{
+  "auditedCourses": [1,2,3,4,5,6,7,8,12],
+  "auditedLessonCount": 72,
+  "course8LessonCount": 8,
+  "course1To7LessonCount": 56,
+  "course1To7RepeatedImageRowsRemoved": 56,
+  "decision": "REMOVE",
+  "reason": "The same course-level generic illustration was repeated for every lesson and did not teach the lesson concept. No replacement image was fabricated; the existing instructional audio and lesson content remain intact.",
+  "preservedMedia": {"audio": true, "video": true, "legitimateNonRepeatedImages": true},
+  "course12": {"lessonMediaRows": 0, "decision": "NO_IMAGE_PREFERRED", "reason": "No lesson image was present and pronunciation lessons do not require a decorative image to convey the core activity."}
+}
