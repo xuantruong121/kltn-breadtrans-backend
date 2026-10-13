@@ -110,7 +110,7 @@ const openQ = (
   explanation,
 });
 
-const foundationLessons: LessonSpec[] = [
+export const foundationLessons: LessonSpec[] = [
   {
     title: 'Chào hỏi và giới thiệu bản thân',
     slug: 'greetings-and-introductions',
@@ -235,6 +235,7 @@ const foundationLessons: LessonSpec[] = [
     theory: [
       'Dùng “This is my…” để giới thiệu một người. “He/She is…” giúp nói về nghề nghiệp hoặc đặc điểm.',
       'Danh từ số nhiều thường thêm -s: brother/brothers. Với một người, dùng “a/an” trước nghề nghiệp.',
+      'Khi hỏi về quan hệ, hãy bắt đầu bằng “Who is he/she?” rồi trả lời bằng một cụm quan hệ đầy đủ. Chỉ chia sẻ thông tin gia đình cần thiết trong ngữ cảnh học tập.',
     ],
     formulas: [
       'This is my + family member.',
@@ -251,7 +252,7 @@ const foundationLessons: LessonSpec[] = [
       ex(
         'She is a nurse at a local clinic.',
         'Chị ấy là y tá tại một phòng khám địa phương.',
-        'Dùng “a” trước nghề nghiệp bắt đầu bằng âm phụ âm.',
+        'Dùng “a” trước nghề nghiệp bắt đầu bằng âm phụ âm; câu này vừa giới thiệu nghề vừa đặt người nghe vào một bối cảnh cụ thể.',
       ),
       ex(
         'I have two brothers.',
@@ -445,6 +446,7 @@ const foundationLessons: LessonSpec[] = [
     theory: [
       'Hiện tại tiếp diễn có am/is/are + V-ing, dùng cho hành động đang diễn ra hoặc tình huống tạm thời.',
       'Các từ now, at the moment, today thường gợi ý hiện tại tiếp diễn; every day, on Mondays thường gợi ý hiện tại đơn.',
+      'Khi gặp một câu về thời gian, hãy hỏi: đây là việc lặp lại theo lịch hay việc đang xảy ra quanh lúc nói? Câu trả lời quyết định thì trước khi bạn chọn công thức.',
     ],
     formulas: [
       'I am + V-ing. / He/She/It is + V-ing. / We/They are + V-ing.',
@@ -465,7 +467,7 @@ const foundationLessons: LessonSpec[] = [
       ex(
         'What time does the class start?',
         'Lớp học bắt đầu lúc mấy giờ?',
-        'Dùng hiện tại đơn cho lịch cố định.',
+        'Dùng hiện tại đơn cho lịch cố định; “does” đi với start vì đây không phải hành động đang diễn ra ngay lúc hỏi.',
       ),
     ],
     mistakes: [
@@ -538,6 +540,7 @@ const foundationLessons: LessonSpec[] = [
     theory: [
       'There is dùng với một vật; there are dùng với nhiều vật. Giới từ in, on, under, next to, between mô tả vị trí.',
       'Khi chỉ đường, dùng go straight, turn left/right và near/opposite để người nghe theo dõi dễ hơn.',
+      'Hãy hình dung điểm mốc trước rồi mới chọn giới từ: vật nằm trong không gian dùng in, chạm trên bề mặt dùng on, còn quan hệ cạnh nhau dùng next to. Cách này giúp tránh dịch từng từ từ tiếng Việt.',
     ],
     formulas: [
       'There is + a/an + danh từ số ít.',
@@ -559,7 +562,7 @@ const foundationLessons: LessonSpec[] = [
       ex(
         'Go straight and turn left at the bank.',
         'Đi thẳng rồi rẽ trái ở ngân hàng.',
-        'Hai động từ mệnh lệnh nối tiếp nhau tạo hướng dẫn ngắn.',
+        'Hai động từ mệnh lệnh nối tiếp nhau tạo hướng dẫn ngắn; “at the bank” là điểm mốc để người nghe biết lúc nào rẽ.',
       ),
     ],
     mistakes: [
@@ -761,6 +764,7 @@ const foundationLessons: LessonSpec[] = [
     theory: [
       'Một tin nhắn rõ ràng thường có mục đích, thông tin chính và hành động tiếp theo. Could you…? và Could you clarify…? lịch sự hơn mệnh lệnh trực tiếp.',
       'Dùng because để nêu lý do; dùng by + thời điểm để nói hạn chót.',
+      'Trước khi viết, hãy xác định người nhận cần biết điều gì và cần làm gì tiếp theo. Sau đó đặt mục đích ở đầu tin nhắn, thêm thời hạn hoặc lý do, rồi kết thúc bằng yêu cầu cụ thể.',
     ],
     formulas: [
       'Could you + verb nguyên mẫu…?',
@@ -782,7 +786,7 @@ const foundationLessons: LessonSpec[] = [
       ex(
         'Please send the file by 5 p.m.',
         'Vui lòng gửi tệp trước 5 giờ chiều.',
-        'By + thời điểm nêu hạn chót.',
+        'By + thời điểm nêu hạn chót; người nhận hiểu rằng tệp cần đến trước hoặc muộn nhất vào 5 giờ.',
       ),
     ],
     mistakes: [
@@ -858,6 +862,7 @@ const foundationLessons: LessonSpec[] = [
     theory: [
       'Khi gặp câu mới, xác định mục đích trước: giới thiệu, mô tả thói quen, nói việc đang diễn ra, hỏi giá hay yêu cầu hỗ trợ.',
       'Sau đó kiểm tra chủ ngữ, thì, số ít/số nhiều và từ chỉ thời gian.',
+      'Nếu còn phân vân, đọc cả câu trong tình huống thay vì chọn theo một từ riêng lẻ. Một câu tự nhiên phải đúng cả ý định giao tiếp lẫn hình thức ngữ pháp.',
     ],
     formulas: [
       'Giới thiệu: My name is… / I am from…',
@@ -879,7 +884,7 @@ const foundationLessons: LessonSpec[] = [
       ex(
         'Can I have the receipt, please?',
         'Cho tôi xin hóa đơn được không?',
-        'Mẫu câu phù hợp sau khi mua hàng.',
+        'Mẫu câu phù hợp sau khi mua hàng; “please” làm yêu cầu mềm và tự nhiên hơn.',
       ),
     ],
     mistakes: [
@@ -2638,6 +2643,549 @@ for (const lesson of [...foundationLessons, ...pronunciationLessons]) {
   lesson.questions.push(...(authoredQuestionComplements[lesson.slug] ?? []));
 }
 
+/**
+ * Final checks deliberately use new contexts.  The guided questions above are
+ * the low-load rehearsal; these deterministic sets are the independent check
+ * and are kept in the same source file so a fresh database receives the same
+ * content.
+ */
+export const finalQuestionsBySlug: Record<string, Question[]> = {
+  'greetings-and-introductions': [
+    q(
+      'You meet a new classmate in the afternoon. Which greeting fits?',
+      ['Good night.', 'Good afternoon.', 'Good bye morning.', 'I am afternoon.'],
+      'Good afternoon.',
+      'Use “Good afternoon” when meeting someone after midday.',
+    ),
+    q(
+      'Which reply gives a place of origin?',
+      ['I am from Can Tho.', 'I am name Can Tho.', 'I work from Can Tho?', 'My from is Can Tho.'],
+      'I am from Can Tho.',
+      '“I am from + place” tells someone where you come from.',
+    ),
+    q(
+      'Choose the polite answer: “What do you do?”',
+      ['I am a designer.', 'I from a designer.', 'My do designer.', 'I doing a designer.'],
+      'I am a designer.',
+      'Use “I am a/an + job” to answer a question about work.',
+    ),
+    openQ('Introduce yourself to a new classmate in one sentence.', 'Hi, I am Linh. Nice to meet you.', 'A short greeting, name and polite closing complete the introduction.'),
+    openQ('Ask a new classmate where they are from.', 'Where are you from?', '“Where are you from?” is the taught question for origin.'),
+  ],
+  'family-and-personal-information': [
+    q(
+      'Mai is talking about her father. Which sentence is correct?',
+      ['This is my father.', 'This my father is.', 'This is father my.', 'My this father.'],
+      'This is my father.',
+      'Use “This is my + family member” to introduce someone.',
+    ),
+    q(
+      'Which sentence uses the plural form correctly?',
+      ['I have two sister.', 'I have two sisters.', 'I have two sisteres.', 'I have two sister’s.'],
+      'I have two sisters.',
+      'A count of two needs the plural noun “sisters”.',
+    ),
+    q(
+      'Choose the safe, basic personal question.',
+      ['What is your bank password?', 'Where are you from?', 'What is your ID number?', 'What is your PIN?'],
+      'Where are you from?',
+      'Origin is a suitable basic learning-context question; passwords and PINs are private.',
+    ),
+    openQ('Say who you live with.', 'I live with my family.', '“I live with + person/group” gives a simple household answer.'),
+    openQ('Say how many brothers or sisters you have.', 'I have two brothers.', 'Use “I have + number + plural family noun.”'),
+  ],
+  'daily-routines': [
+    q(
+      'Every Saturday, Nam ___ football with his friends.',
+      ['play', 'plays', 'is play', 'playing'],
+      'plays',
+      'A repeated routine with “every Saturday” uses present simple; Nam takes -s.',
+    ),
+    q(
+      'Which sentence describes a regular morning action?',
+      ['I usually walk to work.', 'I am walk to work.', 'I usually walking work.', 'I walk yesterday work.'],
+      'I usually walk to work.',
+      '“Usually” introduces a repeated routine and is followed by the base verb with I.',
+    ),
+    q(
+      'Choose the correct negative sentence about a routine.',
+      ['She does not cooks at night.', 'She does not cook at night.', 'She do not cook at night.', 'She not cooks at night.'],
+      'She does not cook at night.',
+      'After “does not”, the main verb returns to its base form.',
+    ),
+    openQ('Write one routine you do before bed.', 'I usually read before bed.', 'Use “usually” and the base verb to describe a repeated habit.'),
+    openQ('Change “He watches TV.” to a sentence with I.', 'I watch TV.', 'With I, the main verb has no third-person -s.'),
+  ],
+  'time-schedules-and-now': [
+    q(
+      'Look! The children ___ in the garden now.',
+      ['play', 'are playing', 'plays', 'playing'],
+      'are playing',
+      '“Look!” and “now” point to an action happening at this moment.',
+    ),
+    q(
+      'The train ___ at 8:15 every morning.',
+      ['leave', 'leaves', 'is leaving', 'leaving'],
+      'leaves',
+      'A fixed timetable uses present simple; “the train” is singular.',
+    ),
+    q(
+      'Which question asks about an activity happening today?',
+      ['What are you doing today?', 'What do you doing today?', 'What are you do today?', 'What you are today doing?'],
+      'What are you doing today?',
+      'Present continuous questions use am/is/are + subject + V-ing.',
+    ),
+    openQ('Write a sentence about a fixed class schedule.', 'The class starts at nine.', 'A regular schedule uses present simple.'),
+    openQ('Write a sentence about what you are doing this afternoon.', 'I am studying this afternoon.', 'A temporary activity uses am/is/are + V-ing.'),
+  ],
+  'home-and-places': [
+    q(
+      'There ___ two windows in the bedroom.',
+      ['is', 'are', 'be', 'am'],
+      'are',
+      'Use “there are” with the plural noun “two windows”.',
+    ),
+    q(
+      'The shoes are ___ the bed.',
+      ['under', 'between to', 'at inside', 'on to'],
+      'under',
+      '“Under” describes a position below something.',
+    ),
+    q(
+      'Which direction is clear and complete?',
+      ['Turn left at the museum.', 'Left turn museum.', 'Turning left the.', 'You left at?'],
+      'Turn left at the museum.',
+      'An imperative plus a landmark gives a usable direction.',
+    ),
+    openQ('Describe one object next to another object.', 'The lamp is next to the sofa.', '“Next to” describes two objects that are side by side.'),
+    openQ('Give one short direction to the station.', 'Go straight to the station.', 'Use an imperative verb and name the destination.'),
+  ],
+  'food-and-shopping': [
+    q(
+      'At a café, which request is polite?',
+      ['Give me tea.', 'Could I have some tea, please?', 'Tea you now.', 'I tea have.'],
+      'Could I have some tea, please?',
+      '“Could I have… please?” is a polite request for an item.',
+    ),
+    q(
+      '___ oranges do we need for the salad?',
+      ['How much', 'How many', 'How is', 'How any'],
+      'How many',
+      'Use “How many” with a plural countable noun such as oranges.',
+    ),
+    q(
+      'Choose the correct sentence about rice.',
+      ['We need many rice.', 'We need some rice.', 'We need a rice.', 'We need ricees.'],
+      'We need some rice.',
+      'Rice is uncountable, so “some rice” is natural here.',
+    ),
+    openQ('Ask the price of two sandwiches.', 'How much are these sandwiches?', 'Plural items use “How much are…?”'),
+    openQ('Ask for a receipt politely.', 'Could I have the receipt, please?', 'A polite request includes “Could I have… please?”'),
+  ],
+  'study-work-basic-communication': [
+    q(
+      'Which message clearly states its purpose?',
+      ['I am writing to confirm our class.', 'Class Tuesday thing.', 'Confirm now!', 'You know the class.'],
+      'I am writing to confirm our class.',
+      'The opening “I am writing to…” tells the reader the purpose immediately.',
+    ),
+    q(
+      'Choose the phrase that gives a deadline.',
+      ['until Friday at five', 'by Friday at five', 'from Friday at five', 'in Friday at five'],
+      'by Friday at five',
+      '“By + time” states the latest time an action should be finished.',
+    ),
+    q(
+      'Which request asks for clarification politely?',
+      ['Explain this now.', 'Could you clarify the meeting time?', 'Meeting time!', 'You clarify this.'],
+      'Could you clarify the meeting time?',
+      '“Could you + base verb” softens a request for information.',
+    ),
+    openQ('Write a short message confirming a meeting tomorrow.', 'I am writing to confirm our meeting tomorrow.', 'Start with the purpose and add the relevant time.'),
+    openQ('Ask a colleague to send a file by noon.', 'Could you send the file by noon, please?', 'Combine a polite request with the deadline phrase “by noon”.'),
+  ],
+  'foundation-review': [
+    q(
+      'Linh usually takes the bus, but today she ___.',
+      ['walks', 'is walking', 'walk', 'walking'],
+      'is walking',
+      '“Today” describes a temporary action, so use present continuous.',
+    ),
+    q(
+      'Which sentence is a polite request in a shop?',
+      ['Give me the receipt.', 'Could I have the receipt, please?', 'Receipt now.', 'You receipt me.'],
+      'Could I have the receipt, please?',
+      '“Could I have… please?” is the polite shopping pattern from the course.',
+    ),
+    q(
+      'Which sentence gives a person’s origin?',
+      ['I am from Hue.', 'I from Hue am.', 'I am Hue.', 'From I Hue.'],
+      'I am from Hue.',
+      'Use “I am from + place” to introduce where you come from.',
+    ),
+    openQ('Write one sentence about a regular study habit.', 'I usually study English in the evening.', 'Use present simple with “usually”.'),
+    openQ('Write one polite question asking for directions.', 'Could you tell me where the station is?', 'Use “Could you tell me…?” for a polite question.'),
+  ],
+  'present-simple-and-continuous': [
+    q(
+      'Look! Minh ___ for the bus now.',
+      ['waits', 'is waiting', 'wait', 'waiting'],
+      'is waiting',
+      '“Look!” and “now” describe an action happening at this moment.',
+    ),
+    q(
+      'My sister usually works from home, but this week she ___ at the office.',
+      ['works', 'is working', 'work', 'working'],
+      'is working',
+      '“Usually” marks a routine, while “this week” describes a temporary situation.',
+    ),
+    q(
+      'Choose the corrected sentence for a weekly habit.',
+      ['He is play football every Sunday.', 'He plays football every Sunday.', 'He play football every Sunday.', 'He playing football every Sunday.'],
+      'He plays football every Sunday.',
+      'A weekly habit uses present simple and adds -s with he.',
+    ),
+    openQ('Write one sentence about a routine and one about today.', 'I usually cook at home. I am eating out today.', 'The first sentence is a routine; the second is a temporary action.'),
+    openQ('Correct this sentence: “They is study now.”', 'They are studying now.', 'They takes “are”, followed by the V-ing form.'),
+  ],
+  'nouns-articles-and-quantity': [
+    q(
+      'There is ___ orange and ___ water on the table.',
+      ['a / an', 'an / some', 'some / an', 'an / a'],
+      'an / some',
+      'Use “an” with the singular count noun orange and “some” with uncountable water.',
+    ),
+    q(
+      'How ___ chairs are in the room?',
+      ['much', 'many', 'any much', 'a'],
+      'many',
+      'Chairs are countable plural nouns, so use “many”.',
+    ),
+    q(
+      'Which phrase is natural?',
+      ['a piece of advice', 'an advice', 'many advice', 'advicees'],
+      'a piece of advice',
+      'Advice is uncountable; “a piece of advice” gives one unit.',
+    ),
+    openQ('Ask whether there is any bread.', 'Do we have any bread?', 'Use “any” in a yes/no question about an uncountable noun.'),
+    openQ('Write one sentence with “many” and a plural noun.', 'There are many books here.', '“Many” is followed by a countable plural noun.'),
+  ],
+  'past-simple': [
+    q(
+      'Last weekend, Ana ___ a new café.',
+      ['visit', 'visited', 'visits', 'visiting'],
+      'visited',
+      'A completed past event uses the past form “visited”.',
+    ),
+    q(
+      'Which question asks about a finished trip?',
+      ['Did you visit Da Lat?', 'Do you visited Da Lat?', 'Did you visited Da Lat?', 'You did visit Da Lat?'],
+      'Did you visit Da Lat?',
+      'After “Did”, use the base verb “visit”.',
+    ),
+    q(
+      'Choose the correct negative sentence.',
+      ['We didn’t watched TV.', 'We didn’t watch TV.', 'We not watched TV.', 'We don’t watched TV.'],
+      'We didn’t watch TV.',
+      'After “didn’t”, the main verb stays in its base form.',
+    ),
+    openQ('Write one sentence about something you did yesterday.', 'I cleaned my room yesterday.', 'Use a past verb and a finished-time expression.'),
+    openQ('Ask a friend whether they visited a museum.', 'Did you visit a museum?', 'Use Did + subject + base verb for a past question.'),
+  ],
+  'future-will-going-to': [
+    q(
+      'The phone is ringing. I ___ answer it.',
+      ['will', 'am going to', 'will to', 'going'],
+      'will',
+      'A decision made at the moment of speaking uses “will”.',
+    ),
+    q(
+      'They bought tickets yesterday. They ___ travel on Friday.',
+      ['are going to', 'will to', 'going', 'are go'],
+      'are going to',
+      'A planned action with evidence such as tickets uses “be going to”.',
+    ),
+    q(
+      'Look at those dark clouds! It ___.',
+      ['is going to rain', 'will to rain', 'going rain', 'is rain'],
+      'is going to rain',
+      'Visible evidence supports “is going to rain”.',
+    ),
+    openQ('Write a plan for this weekend with “going to”.', 'I am going to visit my family this weekend.', 'Use am/is/are going to + base verb for a plan.'),
+    openQ('Make a short promise with “will”.', 'I will call you tonight.', 'Use “will + base verb” for a promise.'),
+  ],
+  'adjectives-adverbs-comparison': [
+    q(
+      'The nurse speaks ___.',
+      ['clear', 'clearly', 'clearness', 'more clear'],
+      'clearly',
+      'An adverb describes how someone speaks.',
+    ),
+    q(
+      'Which is the correct comparative form of “easy”?',
+      ['easyer', 'easier', 'more easyer', 'easiest than'],
+      'easier',
+      'For this short adjective, change y to i and add -er.',
+    ),
+    q(
+      'This route is ___ than the old route.',
+      ['short', 'shorter', 'shortest', 'more short'],
+      'shorter',
+      'Use the comparative form with “than”.',
+    ),
+    openQ('Write a sentence using “more useful”.', 'This map is more useful than that one.', 'Use “more + adjective + than” for a longer adjective.'),
+    openQ('Write a sentence with an adverb describing careful work.', 'She works carefully.', 'The adverb “carefully” describes how she works.'),
+  ],
+  'basic-modal-verbs': [
+    q(
+      'Which sentence expresses ability?',
+      ['I can speak English.', 'I can speaks English.', 'I can to speak English.', 'I cans speak English.'],
+      'I can speak English.',
+      'After “can”, use the base verb without to or -s.',
+    ),
+    q(
+      'The doctor says: “You ___ rest today.”',
+      ['should', 'should to', 'should rests', 'should resting'],
+      'should',
+      '“Should + base verb” gives advice.',
+    ),
+    q(
+      'Which sentence states a workplace rule?',
+      ['You must wear a badge.', 'You must to wear a badge.', 'You must wears a badge.', 'You must wearing a badge.'],
+      'You must wear a badge.',
+      '“Must + base verb” expresses an obligation.',
+    ),
+    openQ('Give a learner advice about reviewing words.', 'You should review the words every day.', 'Use should followed by the base verb.'),
+    openQ('Ask whether visitors have to sign in.', 'Do visitors have to sign in?', 'Use do + subject + have to for this obligation question.'),
+  ],
+  'prepositions-and-common-phrases': [
+    q(
+      'The workshop is ___ Tuesday ___ 10 a.m.',
+      ['in / at', 'on / at', 'at / on', 'on / in'],
+      'on / at',
+      'Use “on” for a day and “at” for an exact time.',
+    ),
+    q(
+      'Which phrase means skilled in a subject?',
+      ['good in English', 'good at English', 'good on English', 'good to English'],
+      'good at English',
+      'The fixed phrase is “good at + subject”.',
+    ),
+    q(
+      'Our meeting starts ___ March.',
+      ['at', 'on', 'in', 'to'],
+      'in',
+      'Use “in” with a month.',
+    ),
+    openQ('Write a sentence with “interested in”.', 'I am interested in reading.', '“Interested in” is followed by a noun or V-ing form.'),
+    openQ('Write a sentence with “on time”.', 'She arrived on time.', '“On time” means at the scheduled time.'),
+  ],
+  'grammar-vocabulary-review': [
+    q(
+      'Every morning Hoa ___ tea, but right now she ___.',
+      ['drinks / is reading', 'drink / reads', 'drank / read', 'is drink / reading'],
+      'drinks / is reading',
+      'The routine uses present simple; the action now uses present continuous.',
+    ),
+    q(
+      'Which sentence describes a planned visit?',
+      ['I am going to visit my aunt.', 'I going visit my aunt.', 'I am go visit my aunt.', 'I will to visit my aunt.'],
+      'I am going to visit my aunt.',
+      'A plan uses am/is/are going to + base verb.',
+    ),
+    q(
+      'Choose the correct collocation.',
+      ['She is good in cooking.', 'She is good at cooking.', 'She good at cooks.', 'She is good on cooking.'],
+      'She is good at cooking.',
+      'The taught collocation is “good at + noun/V-ing”.',
+    ),
+    openQ('Write a past-simple sentence with “last night”.', 'I watched a film last night.', 'Use a past verb with a finished-time marker.'),
+    openQ('Give a short recommendation with “should”.', 'You should review your notes.', 'Use should followed by the base verb.'),
+  ],
+  'ipa-and-pronunciation-basics': [
+    q(
+      'Which item shows pronunciation rather than spelling?',
+      ['cat /kæt/', 'cat = con mèo', 'cat has three letters', 'cat is a noun'],
+      'cat /kæt/',
+      'The symbols between slashes represent the sounds of the word.',
+    ),
+    q(
+      'In /ˈpɜːrsən/, what does ˈ mark?',
+      ['The silent letter', 'The primary stress', 'The plural ending', 'The final sound'],
+      'The primary stress',
+      'The mark before a syllable shows primary stress.',
+    ),
+    q(
+      'Which word contains the final /k/ sound in the lesson?',
+      ['book', 'teacher', 'about', 'name'],
+      'book',
+      'Book ends with the /k/ sound shown in the lesson examples.',
+    ),
+    openQ('Write the IPA for “teacher” from the lesson.', '/ˈtiːtʃə/', 'The stress mark comes before the first stressed syllable.'),
+    openQ('State the first step before repeating a new word.', 'Listen to the model first.', 'Listening first gives a reliable sound target.'),
+  ],
+  'important-short-and-long-vowels': [
+    q(
+      'Which word has the short /ɪ/ sound?',
+      ['sheep', 'ship', 'food', 'bad'],
+      'ship',
+      'Ship uses the short /ɪ/ sound; sheep uses /iː/.',
+    ),
+    q(
+      'Which pair contrasts /æ/ and /ʌ/?',
+      ['bad / bud', 'sheep / ship', 'food / good', 'day / go'],
+      'bad / bud',
+      'The vowel changes from /æ/ to /ʌ/ in this minimal pair.',
+    ),
+    q(
+      'Which description fits /iː/?',
+      ['Longer and tense', 'Always silent', 'Only a consonant', 'A two-syllable sound'],
+      'Longer and tense',
+      '/iː/ is a long vowel with a tenser tongue position than /ɪ/.',
+    ),
+    openQ('Write a word from the lesson with /uː/.', 'food', 'Food is the taught example with the long /uː/ vowel.'),
+    openQ('Explain one way to compare a minimal pair.', 'Listen and compare the vowel length and quality.', 'Both duration and vowel quality matter.'),
+  ],
+  'common-diphthongs': [
+    q(
+      'Which word contains /eɪ/?',
+      ['day', 'time', 'go', 'now'],
+      'day',
+      'Day contains the /eɪ/ diphthong.',
+    ),
+    q(
+      'What happens inside one diphthong?',
+      ['The mouth moves smoothly between two vowel positions.', 'The speaker stops between two sounds.', 'Only the first sound is spoken.', 'A consonant is added.'],
+      'The mouth moves smoothly between two vowel positions.',
+      'A diphthong is one smooth movement within one syllable.',
+    ),
+    q(
+      'Which word ends with the /əʊ/ sound in the lesson?',
+      ['go', 'time', 'day', 'now'],
+      'go',
+      'Go is the lesson example for /əʊ/.',
+    ),
+    openQ('Write IPA for “now”.', '/naʊ/', 'Now uses the /aʊ/ diphthong.'),
+    openQ('Describe how to practise a diphthong in a short sentence.', 'Keep the movement smooth in one syllable.', 'The sound should not be split into two separate syllables.'),
+  ],
+  'consonants-vietnamese-learners-confuse': [
+    q(
+      'Which word begins with the voiced /ð/?',
+      ['this', 'think', 'ship', 'chip'],
+      'this',
+      'This begins with the voiced dental fricative /ð/.',
+    ),
+    q(
+      'Which word begins with /tʃ/?',
+      ['chip', 'ship', 'think', 'this'],
+      'chip',
+      'Chip starts with the stop-plus-fricative sound /tʃ/.',
+    ),
+    q(
+      'Which action helps check whether /ð/ is voiced?',
+      ['Touch your throat for vibration.', 'Close both ears.', 'Hold your breath.', 'Whisper every word.'],
+      'Touch your throat for vibration.',
+      'Voiced sounds create a vibration that can be felt at the throat.',
+    ),
+    openQ('Write a word beginning with the voiceless /θ/.', 'three', 'Three is a familiar /θ/ example from the lesson.'),
+    openQ('Say how /ʃ/ and /tʃ/ differ.', 'The /tʃ/ sound has a stop before the fricative.', 'The initial stop is the key contrast in the lesson.'),
+  ],
+  'final-sounds': [
+    q(
+      'Which ending makes “bag” plural?',
+      ['/s/', '/z/', '/t/', '/ɪ/'],
+      '/z/',
+      'After the voiced final consonant in bag, the plural ending is voiced /z/.',
+    ),
+    q(
+      'Which word has a clearly released final /k/?',
+      ['book', 'see', 'say', 'tea'],
+      'book',
+      'Book ends with the /k/ sound that should not disappear.',
+    ),
+    q(
+      'Which word ends with /t/?',
+      ['worked', 'see', 'play', 'know'],
+      'worked',
+      'Worked has a clearly pronounced final /t/ in the lesson practice.',
+    ),
+    openQ('Write the plural of “bag”.', 'bags', 'Keep the final plural sound clear when adding -s.'),
+    openQ('Write the past form of “watch”.', 'watched', 'The -ed ending is part of the word’s final sound practice.'),
+  ],
+  'word-stress': [
+    q(
+      'Which word has stress on the second syllable?',
+      ['TAble', 'reLAX', 'WINdow', 'DOCtor'],
+      'reLAX',
+      'Relax has primary stress on the second syllable.',
+    ),
+    q(
+      'Which symbol marks primary stress in IPA?',
+      ['ˈ', 'ː', '/', 'ə'],
+      'ˈ',
+      'The mark ˈ comes before the stressed syllable.',
+    ),
+    q(
+      'What should be stronger in a stressed syllable?',
+      ['Its beat and clarity', 'Only the spelling', 'The silent letters', 'Every syllable equally'],
+      'Its beat and clarity',
+      'Stress makes the main syllable clearer and more prominent.',
+    ),
+    openQ('Write IPA with stress for “relax”.', '/rɪˈlæks/', 'The stress mark appears before the second syllable.'),
+    openQ('Name one physical way to practise word stress.', 'Tap the stressed syllable.', 'Tapping makes the main beat easier to feel.'),
+  ],
+  'schwa-and-sentence-rhythm': [
+    q(
+      'Where is schwa most likely to appear?',
+      ['In an unstressed syllable', 'In every stressed vowel', 'Only in a question', 'Only in the letter a'],
+      'In an unstressed syllable',
+      'Schwa is the relaxed vowel commonly heard in unstressed syllables.',
+    ),
+    q(
+      'In “We can meet at five”, which words carry the main meaning?',
+      ['meet / five', 'we / can', 'at / the', 'can / at'],
+      'meet / five',
+      'Content words usually receive the strongest sentence stress.',
+    ),
+    q(
+      'Which word contains schwa in the lesson?',
+      ['about', 'ship', 'food', 'cat'],
+      'about',
+      'The first syllable of about is the schwa /ə/.',
+    ),
+    openQ('Write IPA for “about”.', '/əˈbaʊt/', 'The first syllable is unstressed and uses schwa.'),
+    openQ('Name the two main stressed words in “I can meet you at five”.', 'meet and five', 'Meet and five carry the key information.'),
+  ],
+  'linking-and-integrated-practice': [
+    q(
+      'In “Turn it off”, which sounds may link naturally?',
+      ['/n/ in turn with it', '/t/ with turn', '/f/ with off', '/ɪ/ with please'],
+      '/n/ in turn with it',
+      'A final consonant can link smoothly to the next word’s vowel.',
+    ),
+    q(
+      'Which sentence keeps linking natural but clear?',
+      ['Please send it today.', 'Sendit as fast as possible.', 'Erase every final sound.', 'Stress every word equally.'],
+      'Please send it today.',
+      'Linking supports smooth speech without hiding word boundaries or meaning.',
+    ),
+    q(
+      'What should never be lost during connected speech?',
+      ['Clear meaning and key final sounds', 'Every pause', 'All consonants twice', 'The sentence stress everywhere'],
+      'Clear meaning and key final sounds',
+      'Natural linking is useful only while the message stays understandable.',
+    ),
+    openQ('Write a short sentence containing “send it”.', 'Please send it by Friday.', 'The final consonant can connect smoothly to “it”.'),
+    openQ('Write a sentence containing “pick it up”.', 'Please pick it up.', 'Keep the phrase connected but pronounce each word clearly.'),
+  ],
+};
+
+for (const lesson of [...foundationLessons, ...pronunciationLessons, ...grammarLessons]) {
+  if (!finalQuestionsBySlug[lesson.slug]) {
+    throw new Error(`Missing authored final questions for ${lesson.slug}`);
+  }
+}
+
 const courseSpecs: CourseSpec[] = [
   {
     existingId: 1,
@@ -2675,7 +3223,7 @@ const courseSpecs: CourseSpec[] = [
 
 const course8LessonMedia: Record<string, { url: string; altText: string }> = {
   'present-simple-and-continuous': {
-    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v3-99c7517ce7c7137d.svg',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v4-b1f72905e029c247.png',
     altText:
       'Sơ đồ so sánh hiện tại đơn cho thói quen với hiện tại tiếp diễn cho hành động đang xảy ra.',
   },
@@ -2716,7 +3264,7 @@ const course8LessonMedia: Record<string, { url: string; altText: string }> = {
   },
 };
 
-function sectionRows(
+export function sectionRows(
   lesson: LessonSpec,
   audioExamples: Array<{
     term: string;
@@ -2985,7 +3533,7 @@ async function materializeLesson(
       instructions: 'Hoàn thành các câu hỏi để tự kiểm tra mức độ hiểu bài.',
       content: { bilingualSupport: true, transferTask: lesson.nextStep },
       required: true,
-      questions: lesson.questions,
+      questions: finalQuestionsBySlug[lesson.slug],
     },
   ];
   for (let index = 0; index < seeds.length; index += 1) {
@@ -3017,6 +3565,40 @@ async function materializeLesson(
       : await prisma.courseLessonExercise.create({
           data: { ...data, lessonId: row.id },
         });
+    const currentQuestions =
+      index === 1
+        ? await prisma.courseLessonQuestion.findMany({
+            where: { exerciseId: exercise.id },
+            orderBy: { order: 'asc' },
+            select: {
+              order: true,
+              prompt: true,
+              options: true,
+              correctAnswer: true,
+              explanation: true,
+              answers: { select: { id: true } },
+            },
+          })
+        : [];
+    for (const current of currentQuestions) {
+      const desired = seed.questions[current.order - 1];
+      const changed =
+        !desired ||
+        current.prompt !== desired.prompt ||
+        JSON.stringify(current.options) !== JSON.stringify(desired.options ?? null) ||
+        current.correctAnswer !== desired.correctAnswer ||
+        current.explanation !== desired.explanation;
+      if (current.answers.length > 0 && changed) {
+        throw new Error(
+          `Refusing to rewrite answered final-check question ${exercise.id}:${current.order}; create a new version instead.`,
+        );
+      }
+    }
+    if (currentQuestions.some((question) => question.answers.length > 0) && currentQuestions.length !== seed.questions.length) {
+      throw new Error(
+        `Refusing to change answered final-check question count for exercise ${exercise.id}.`,
+      );
+    }
     for (const [questionIndex, question] of seed.questions.entries()) {
       await prisma.courseLessonQuestion.upsert({
         where: {
@@ -3430,6 +4012,15 @@ async function writeReport(courseIds: number[]) {
 
 export async function materializeFoundationCourses() {
   await mkdir(artifactDir, { recursive: true });
+  const managedLessonCount = await prisma.courseLesson.count();
+  if (
+    managedLessonCount > 0 &&
+    process.env.MATERIALIZER_ALLOW_OVERWRITE !== 'true'
+  ) {
+    throw new Error(
+      'V5 CourseLesson content already exists. Set MATERIALIZER_ALLOW_OVERWRITE=true only for an explicit maintenance rewrite.',
+    );
+  }
   const existing = await prisma.course.findMany({
     orderBy: { id: 'asc' },
     select: {

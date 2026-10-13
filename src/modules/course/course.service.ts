@@ -22,6 +22,7 @@ import {
 import {
   ClassStatus,
   CourseStatus,
+  CourseLessonStatus,
   EnrollmentStatus,
   PaymentStatus,
   PlanFeatureKey,
@@ -138,6 +139,50 @@ export class CourseService {
         update: {},
       });
     });
+  }
+
+  private async assertCoursePublishable(courseId: number) {
+    const lessons = await this.prisma.courseLesson.findMany({
+      where: { courseId },
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        learningObjectives: true,
+        status: true,
+        sections: { select: { id: true, isRequired: true } },
+        exercises: {
+          select: {
+            required: true,
+            questions: { select: { id: true } },
+          },
+        },
+      },
+    });
+    const published = lessons.filter(
+      (lesson) => lesson.status === CourseLessonStatus.PUBLISHED,
+    );
+    if (published.length === 0) {
+      throw new BadRequestException(
+        'Không thể xuất bản khóa học khi chưa có bài học V5 đã xuất bản.',
+      );
+    }
+    const incomplete = published.find(
+      (lesson) =>
+        !lesson.title.trim() ||
+        !lesson.summary.trim() ||
+        !Array.isArray(lesson.learningObjectives) ||
+        lesson.learningObjectives.length === 0 ||
+        lesson.sections.filter((section) => section.isRequired).length === 0 ||
+        lesson.exercises.some(
+          (exercise) => exercise.required && exercise.questions.length === 0,
+        ),
+    );
+    if (incomplete) {
+      throw new BadRequestException(
+        `Bài học V5 #${incomplete.id} chưa đủ nội dung bắt buộc để xuất bản.`,
+      );
+    }
   }
 
   private requireAdmin(role: Role) {
@@ -689,6 +734,9 @@ export class CourseService {
     this.requireAdmin(user.role);
     const course = await this.prisma.course.findUnique({ where: { id } });
     if (!course) throw new NotFoundException('Course not found');
+    if (dto.status === CourseStatus.PUBLISHED) {
+      await this.assertCoursePublishable(id);
+    }
     return this.prisma.course.update({
       where: { id },
       data: {
@@ -724,6 +772,9 @@ export class CourseService {
     user: { id: number; role: Role },
   ) {
     this.requireAdmin(user.role);
+    if (action === 'APPROVE') {
+      await this.assertCoursePublishable(id);
+    }
     return this.prisma.course.update({
       where: { id },
       data: {
@@ -734,6 +785,9 @@ export class CourseService {
   }
 
   async updateCourseStatus(id: number, status: CourseStatus) {
+    if (status === CourseStatus.PUBLISHED) {
+      await this.assertCoursePublishable(id);
+    }
     return this.prisma.course.update({ where: { id }, data: { status } });
   }
 

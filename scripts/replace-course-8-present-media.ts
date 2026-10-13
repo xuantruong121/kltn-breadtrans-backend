@@ -15,7 +15,7 @@ const assetPath = join(
   root,
   'content-assets',
   'internet-course-media',
-  'course-8-lesson-57-present.svg',
+  'course-8-lesson-57-present.png',
 );
 async function main() {
   const bytes = await readFile(assetPath);
@@ -27,7 +27,7 @@ async function main() {
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
   if (!publicUrl || !bucket || !accountId || !accessKeyId || !secretAccessKey)
     throw new Error('R2 configuration is incomplete');
-  const key = `catalog/courses/course-8/lessons/lesson-57/media/v3-${checksum.slice(0, 16)}.svg`;
+  const key = `catalog/courses/course-8/lessons/lesson-57/media/v4-${checksum.slice(0, 16)}.png`;
   const url = `${publicUrl}/${key}`;
   const s3 = new S3Client({
     region: 'auto',
@@ -41,9 +41,14 @@ async function main() {
         Bucket: bucket,
         Key: key,
         Body: bytes,
-        ContentType: 'image/svg+xml',
+        ContentType: 'image/png',
         CacheControl: 'public,max-age=31536000,immutable',
-        Metadata: { sha256: checksum, source: 'BreadTrans-original' },
+        Metadata: {
+          sha256: checksum,
+          source: 'Wikimedia-Commons-CC-BY-SA-derivative',
+          sourcePages:
+            'commons.wikimedia.org/wiki/File:EGG_Present_simple.svg;commons.wikimedia.org/wiki/File:EGG_Present_continuous.svg',
+        },
       }),
     );
     const head = await s3.send(
@@ -64,7 +69,7 @@ async function main() {
       url,
       altText:
         'Sơ đồ so sánh hiện tại đơn cho thói quen với hiện tại tiếp diễn cho hành động đang xảy ra.',
-      provenance: `BreadTrans original SVG; INTERNET_SEARCH_COMPLETED; rejected incomplete/less relevant open candidates; sha256:${checksum}`,
+      provenance: `Wikimedia Commons derivative: Robbiemuffin, EGG Present simple.svg + EGG Present continuous.svg; CC BY-SA 3.0 / GFDL; source pages: https://commons.wikimedia.org/wiki/File:EGG_Present_simple.svg and https://commons.wikimedia.org/wiki/File:EGG_Present_continuous.svg; sha256:${checksum}`,
       renderStatus: 'READY',
     };
     if (media)
@@ -86,15 +91,26 @@ async function main() {
       JSON.stringify(
         {
           lessonId: 57,
-          sourceType: 'INTERNAL_ORIGINAL',
+          sourceType: 'INTERNET_MEDIA_DERIVATIVE',
           sourceResearchCompleted: true,
           rejectedCandidates: [
-            'https://commons.wikimedia.org/wiki/File:English_Grammar_Time_Simple_Present.png',
+            'https://www.perfect-english-grammar.com/support-files/tenses-infographics.pdf',
+            'https://www.english-illustrated.com/english-grammar/present-simple-vs-present-continuous',
+            'https://www.woodwardenglish.com/lesson/present-simple-vs-present-continuous/',
+            'https://commons.wikimedia.org/wiki/File:English_Tenses_with_English_-_Turkish_Example_Sentences.jpg',
+            'https://commons.wikimedia.org/wiki/File:Table_of_Tenses.png',
           ],
           checksum,
           r2Key: key,
           r2Url: url,
-          license: 'Original BreadTrans artwork',
+          sourcePages: [
+            'https://commons.wikimedia.org/wiki/File:EGG_Present_simple.svg',
+            'https://commons.wikimedia.org/wiki/File:EGG_Present_continuous.svg',
+          ],
+          creator:
+            'Robbiemuffin (source graphics); BreadTrans (layout derivative)',
+          license:
+            'CC BY-SA 3.0 / GFDL for source graphics; derivative layout shared under CC BY-SA 3.0',
           watermark: false,
         },
         null,

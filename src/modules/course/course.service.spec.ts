@@ -35,6 +35,7 @@ describe('CourseService self-paced business rules', () => {
       create: jest.fn(),
     },
     payment: { count: jest.fn(), create: jest.fn() },
+    courseLesson: { findMany: jest.fn() },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   } as any;
@@ -66,6 +67,35 @@ describe('CourseService self-paced business rules', () => {
     await expect(
       service.createClass(1, { id: 1, role: 'ADMIN' }, { name: 'Open' }),
     ).rejects.toThrow();
+  });
+
+  it('blocks publishing a course without a complete V5 lesson', async () => {
+    prisma.courseLesson.findMany.mockResolvedValue([]);
+    await expect(
+      service.updateCourseStatus(1, CourseStatus.PUBLISHED),
+    ).rejects.toThrow('chưa có bài học V5');
+    expect(prisma.course.update).not.toHaveBeenCalled();
+  });
+
+  it('allows publishing when published V5 lessons have required content', async () => {
+    prisma.courseLesson.findMany.mockResolvedValue([
+      {
+        id: 1,
+        title: 'Lesson 1',
+        summary: 'Summary',
+        learningObjectives: ['Objective'],
+        status: 'PUBLISHED',
+        sections: [{ id: 1, isRequired: true }],
+        exercises: [{ required: true, questions: [{ id: 1 }] }],
+      },
+    ]);
+    prisma.course.update.mockResolvedValue({
+      id: 1,
+      status: CourseStatus.PUBLISHED,
+    });
+    await expect(
+      service.updateCourseStatus(1, CourseStatus.PUBLISHED),
+    ).resolves.toEqual({ id: 1, status: CourseStatus.PUBLISHED });
   });
 
   it('allows only explicit admin override for historical class enrollment', async () => {

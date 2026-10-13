@@ -1,0 +1,78 @@
+{
+  "courseId": 1,
+  "policy": "Internet-first, license-safe media is preferred when it teaches a concrete beginner concept. Lesson 8 remains text-first because it is a synthesis lesson and no compact external concept map matched the authored review scope.",
+  "lessons": [
+    {
+      "lessonId": 1,
+      "title": "Chào hỏi và giới thiệu bản thân",
+      "oldDecision": "IMAGE_USEFUL",
+      "newDecision": "IMAGE_USEFUL",
+      "candidates": ["Wikimedia Commons classroom photograph"],
+      "finalMedia": "course-1-lesson-1-classroom-context.jpg",
+      "rationale": "A real classroom exchange gives greetings and introductions a social context."
+    },
+    {
+      "lessonId": 2,
+      "title": "Gia đình và thông tin cá nhân",
+      "oldDecision": "NO_IMAGE_NEEDED",
+      "newDecision": "IMAGE_USEFUL",
+      "candidates": ["Wikimedia Commons Family Tree.svg", "generic family stock photographs"],
+      "finalMedia": "course-1-lesson-2-family-tree.svg",
+      "rationale": "The CC0 relationship diagram directly supports mother, father, sister, brother and Who is he/she? without decorative stock imagery."
+    },
+    {
+      "lessonId": 3,
+      "title": "Thói quen hằng ngày",
+      "oldDecision": "IMAGE_USEFUL",
+      "newDecision": "IMAGE_USEFUL",
+      "candidates": ["Wikimedia Commons morning coffee photograph"],
+      "finalMedia": "course-1-lesson-3-morning-routine.jpg",
+      "rationale": "The morning coffee scene anchors repeated-routine language."
+    },
+    {
+      "lessonId": 4,
+      "title": "Thời gian, lịch trình và hoạt động hiện tại",
+      "oldDecision": "NO_IMAGE_NEEDED",
+      "newDecision": "IMAGE_USEFUL",
+      "candidates": ["Wikimedia Commons public-domain clock", "generic calendar screenshots"],
+      "finalMedia": "course-1-lesson-4-clock.svg",
+      "rationale": "A simple clock is a direct cue for time and schedules and remains legible on mobile."
+    },
+    {
+      "lessonId": 5,
+      "title": "Nhà cửa và nơi chốn",
+      "oldDecision": "NO_IMAGE_NEEDED",
+      "newDecision": "IMAGE_USEFUL",
+      "candidates": ["Wikimedia Commons HouseFlrPlan.svg", "generic interior stock photographs"],
+      "finalMedia": "course-1-lesson-5-house-floor-plan.svg",
+      "rationale": "A floor plan gives a concrete spatial reference for there is/are and prepositions."
+    },
+    {
+      "lessonId": 6,
+      "title": "Ăn uống và mua sắm",
+      "oldDecision": "IMAGE_USEFUL",
+      "newDecision": "IMAGE_USEFUL",
+      "candidates": ["Wikimedia Commons grocery-shopping photograph"],
+      "finalMedia": "course-1-lesson-6-shopping-context.jpg",
+      "rationale": "The shopping scene supports food, quantity and polite-request language."
+    },
+    {
+      "lessonId": 7,
+      "title": "Học tập, công việc và giao tiếp cơ bản",
+      "oldDecision": "NO_IMAGE_NEEDED",
+      "newDecision": "IMAGE_USEFUL",
+      "candidates": ["Wikimedia Commons meeting photograph", "Unsplash meeting photograph"],
+      "finalMedia": "course-1-lesson-7-meeting-context.jpg",
+      "rationale": "The Unsplash meeting photograph gives clarification and confirmation phrases a realistic workplace context without repeating Lesson 1."
+    },
+    {
+      "lessonId": 8,
+      "title": "Ôn tập nền tảng A1–A2",
+      "oldDecision": "NO_IMAGE_NEEDED",
+      "newDecision": "NO_IMAGE_NEEDED",
+      "candidates": ["external concept maps", "generic course-roadmap illustrations"],
+      "finalMedia": null,
+      "rationale": "This is a compact synthesis lesson. A decorative recap image would compete with the authored checklist and contextual review examples; the review structure itself is the useful visual organizer."
+    }
+  ]
+}

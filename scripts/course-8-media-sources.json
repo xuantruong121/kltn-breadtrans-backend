@@ -64,19 +64,25 @@
       "title": "Thì hiện tại đơn và hiện tại tiếp diễn",
       "slug": "present-simple-and-continuous",
       "image": {
-        "sourceType": "INTERNAL_ORIGINAL",
-        "localAsset": "content-assets/internet-course-media/course-8-lesson-57-present.svg",
-        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v3-99c7517ce7c7137d.svg",
-        "sha256": "99c7517CE7C7137D9F625A74B0D195C182A7F06410F84C970EB72D1CA6E1015D",
-        "visualVersion": "breadtrans-original-2026-10-13",
-        "sourceUrl": null,
+        "sourceType": "INTERNET_MEDIA_DERIVATIVE",
+        "localAsset": "content-assets/internet-course-media/course-8-lesson-57-present.png",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v4-b1f72905e029c247.png",
+        "sha256": "B1F72905E029C247DAD2B0A294171EFE5EFEB8C24CBFE80B9DB2AA37A7E6E14C",
+        "visualVersion": "wikimedia-egg-derivative-2026-10-13",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:EGG_Present_simple.svg",
+        "sourceUrls": [
+          "https://commons.wikimedia.org/wiki/File:EGG_Present_simple.svg",
+          "https://commons.wikimedia.org/wiki/File:EGG_Present_continuous.svg"
+        ],
         "altText": "Sơ đồ so sánh hiện tại đơn cho thói quen với hiện tại tiếp diễn cho hành động đang xảy ra.",
-        "creator": "BreadTrans",
-        "license": "Original BreadTrans artwork",
-        "attributionRequired": false,
+        "creator": "Robbiemuffin (source graphics); BreadTrans (layout derivative)",
+        "provider": "Wikimedia Commons",
+        "license": "CC BY-SA 3.0 / GFDL for source graphics; derivative layout shared under CC BY-SA 3.0",
+        "attribution": "Robbiemuffin, Using English Grammar Graphics: EGG Present simple.svg and EGG Present continuous.svg",
+        "attributionRequired": true,
         "licenseVerified": true,
         "pedagogicalRelevance": true,
-        "reason": "Internet research completed; incomplete single-tense candidates were rejected. Original BreadTrans infographic directly teaches the two-tense contrast without watermark or third-party branding."
+        "reason": "Internet-first review selected two license-verified Wikimedia Commons tense graphics and combined them into one responsive comparison image. The derivative teaches routine/fact versus action happening now without watermark or third-party branding."
       }
     },
     {
