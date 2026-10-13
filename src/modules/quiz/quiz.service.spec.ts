@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   buildNaturalListeningAudioText,
+  calculateProgressiveDictationFeedback,
+  canonicalizeSubmittedDictation,
+  getLexicalLetterCount,
+  maskExpectedWord,
   normalizeDialogueSegments,
   normalizeListeningAnswer,
   QuizService,
@@ -846,7 +850,7 @@ describe('QuizService', () => {
       });
     });
 
-    it('returns feedback and the answer when dictation is submitted empty', async () => {
+    it('does not leak the answer when dictation is submitted empty or incomplete', async () => {
       mockPrismaService.question.findUnique.mockResolvedValue({
         id: 941,
         quizId: 23,
@@ -855,13 +859,217 @@ describe('QuizService', () => {
         content: { correctAnswer: 'The meeting starts at nine tomorrow.' },
       });
 
-      await expect(
-        service.checkPracticeQuestion(23, 941, { answer: '' }),
-      ).resolves.toMatchObject({
-        isCorrect: false,
-        submittedAnswer: '',
-        correctAnswer: 'The meeting starts at nine tomorrow.',
+      const result = await service.checkPracticeQuestion(23, 941, {
+        answer: '',
       });
+      expect(result.isCorrect).toBe(false);
+      expect(result.submittedAnswer).toBe('');
+      expect((result as any).correctAnswer).toBeUndefined();
+      expect(result.tokens).toBeDefined();
+      expect(result.tokens?.every((t) => t.status === 'MISSING')).toBe(true);
+      expect(JSON.stringify(result)).not.toContain('tomorrow');
+    });
+
+    it('handles wrong inflection with masked token and relative grammar hint without leaking target word (Case A)', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 942,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: { correctAnswer: 'She drinks coffee every morning.' },
+      });
+
+      const result = await service.checkPracticeQuestion(23, 942, {
+        answer: 'She drink coffee every morning.',
+      });
+
+      expect(result.isCorrect).toBe(false);
+      expect((result as any).correctAnswer).toBeUndefined();
+      expect(result.verifiedPrefix).toBe('She');
+      expect(result.nextWordMask).toBe('******'); // 6 letters for drinks
+      expect(result.hint).toContain('dạng động từ');
+      expect(result.hint).toContain('She');
+      // Critical negative assertion: target word 'drinks' must NOT be in the wrong attempt response
+      expect(JSON.stringify(result)).not.toContain('drinks');
+    });
+
+    it('handles missing function word with masked token without leaking target word (Case B)', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 943,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: { correctAnswer: 'I go to school by bus.' },
+      });
+
+      const result = await service.checkPracticeQuestion(23, 943, {
+        answer: 'I go school by bus.',
+      });
+
+      expect(result.isCorrect).toBe(false);
+      expect((result as any).correctAnswer).toBeUndefined();
+      expect(result.verifiedPrefix).toBe('I go');
+      expect(result.nextWordMask).toBe('**'); // 2 letters for to
+      expect(result.hint).toContain('giới từ');
+      expect(JSON.stringify(result)).not.toMatch(/"text":"to"/);
+    });
+
+    it('marks extra word as EXTRA without shifting subsequent words into errors (Case C)', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 944,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: { correctAnswer: 'I like coffee.' },
+      });
+
+      const result = await service.checkPracticeQuestion(23, 944, {
+        answer: 'I really like coffee.',
+      });
+
+      expect(result.isCorrect).toBe(false);
+      expect(result.verifiedPrefix).toBe('I');
+      expect(result.nextWordMask).toBe('****'); // 4 letters for like
+      expect(result.nextErrorType).toBe('EXTRA');
+      expect(result.hint).toContain('từ thừa');
+    });
+
+    it('canonicalizes submitted learner input progressively with punctuation restoration and idempotency', () => {
+      const target = 'Hey, Liam. Are we still watching movie?';
+
+      expect(canonicalizeSubmittedDictation(target, 'hey')).toBe('Hey,');
+      expect(canonicalizeSubmittedDictation(target, 'hey liam')).toBe(
+        'Hey, Liam.',
+      );
+      expect(
+        canonicalizeSubmittedDictation(target, 'hey liam are we still watch'),
+      ).toBe('Hey, Liam. Are we still watch');
+      expect(
+        canonicalizeSubmittedDictation(
+          target,
+          'hey liam are we still watching movie',
+        ),
+      ).toBe('Hey, Liam. Are we still watching movie?');
+      expect(canonicalizeSubmittedDictation(target, 'HEY LIAM are WE')).toBe(
+        'Hey, Liam. Are we',
+      );
+      expect(canonicalizeSubmittedDictation(target, 'Hey, Liam.')).toBe(
+        'Hey, Liam.',
+      );
+      expect(canonicalizeSubmittedDictation("I'm ready.", 'im ready')).toBe(
+        "I'm ready.",
+      );
+      expect(
+        canonicalizeSubmittedDictation(
+          'She drinks coffee every morning.',
+          'she drink coffee',
+        ),
+      ).toBe('She drink coffee');
+    });
+
+    it('calculates exact letter counts and masks without punctuation or apostrophe leakage', () => {
+      expect(getLexicalLetterCount('a')).toBe(1);
+      expect(getLexicalLetterCount('to')).toBe(2);
+      expect(getLexicalLetterCount('Are')).toBe(3);
+      expect(getLexicalLetterCount('works')).toBe(5);
+      expect(getLexicalLetterCount('drinks')).toBe(6);
+      expect(getLexicalLetterCount('meeting')).toBe(7);
+      expect(getLexicalLetterCount('Transportation')).toBe(14);
+      expect(getLexicalLetterCount("don't")).toBe(4);
+      expect(getLexicalLetterCount('part-time')).toBe(8);
+
+      expect(maskExpectedWord('Are')).toBe('***');
+      expect(maskExpectedWord('to')).toBe('**');
+      expect(maskExpectedWord('meeting')).toBe('*******');
+      expect(maskExpectedWord('Liam,')).toBe('****,');
+      expect(maskExpectedWord('ready?')).toBe('*****?');
+      expect(maskExpectedWord('meeting.')).toBe('*******.');
+      expect(maskExpectedWord("don't")).toBe('****');
+    });
+
+    it('verifies controlled test cases 1 through 9 for progressive dictation feedback', () => {
+      // Case 1: Short prefix
+      const c1 = calculateProgressiveDictationFeedback(
+        'Hey, Liam. Are we still meeting at the library on Saturday morning?',
+        'hey liam',
+      );
+      expect(c1.isCorrect).toBe(false);
+      expect(c1.verifiedPrefix).toBe('Hey, Liam.');
+      expect(c1.nextWordMask).toBe('***'); // Are = 3 letters
+
+      // Case 2: Later error
+      const c2 = calculateProgressiveDictationFeedback(
+        'Hey, Liam. Are we still meeting at the library on Saturday morning?',
+        'hey liam are we still meet',
+      );
+      expect(c2.isCorrect).toBe(false);
+      expect(c2.verifiedPrefix).toBe('Hey, Liam. Are we still');
+      expect(c2.nextWordMask).toBe('*******'); // meeting = 7 letters
+
+      // Case 3: Missing word
+      const c3 = calculateProgressiveDictationFeedback(
+        'I go to school by bus.',
+        'i go school by bus',
+      );
+      expect(c3.isCorrect).toBe(false);
+      expect(c3.verifiedPrefix).toBe('I go');
+      expect(c3.nextWordMask).toBe('**'); // to = 2 letters
+
+      // Case 4: Morphological error
+      const c4 = calculateProgressiveDictationFeedback(
+        'She drinks coffee every morning.',
+        'she drink coffee every morning',
+      );
+      expect(c4.isCorrect).toBe(false);
+      expect(c4.verifiedPrefix).toBe('She');
+      expect(c4.nextWordMask).toBe('******'); // drinks = 6 letters
+
+      // Case 5: Extra word
+      const c5 = calculateProgressiveDictationFeedback(
+        'I like coffee.',
+        'i really like coffee',
+      );
+      expect(c5.isCorrect).toBe(false);
+      expect(c5.verifiedPrefix).toBe('I');
+      expect(c5.nextWordMask).toBe('****'); // like = 4 letters
+      expect(c5.nextErrorType).toBe('EXTRA');
+      expect(c5.hint).toContain('từ thừa');
+
+      // Case 6: Fully correct with case and punctuation omitted by user
+      const c6 = calculateProgressiveDictationFeedback(
+        'Hey, Liam. Are you ready?',
+        'hey liam are you ready',
+      );
+      expect(c6.isCorrect).toBe(true);
+      expect(c6.verifiedPrefix).toBe('Hey, Liam. Are you ready?');
+      expect(c6.nextWordMask).toBe('');
+
+      // Case 7: Capitalization ignored during comparison
+      const c7 = calculateProgressiveDictationFeedback(
+        'Saturday is busy.',
+        'saturday is busy',
+      );
+      expect(c7.isCorrect).toBe(true);
+      expect(c7.verifiedPrefix).toBe('Saturday is busy.');
+
+      // Case 8: Verb morphology error remains wrong
+      const c8 = calculateProgressiveDictationFeedback(
+        'She works here.',
+        'she work here',
+      );
+      expect(c8.isCorrect).toBe(false);
+      expect(c8.verifiedPrefix).toBe('She');
+      expect(c8.nextWordMask).toBe('*****'); // works = 5 letters
+
+      // Case 9: Empty input
+      const c9 = calculateProgressiveDictationFeedback(
+        'Transportation is available.',
+        '',
+      );
+      expect(c9.isCorrect).toBe(false);
+      expect(c9.verifiedPrefix).toBe('');
+      expect(c9.nextWordMask).toBe('**************'); // Transportation = 14 letters
+      expect(c9.hint).toContain('phần đầu câu');
     });
 
     it('keeps strict dictation punctuation and casing meaningful', async () => {

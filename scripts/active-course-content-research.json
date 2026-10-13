@@ -1,0 +1,950 @@
+{
+  "generatedAt": "2026-10-13T06:58:01.875Z",
+  "purpose": "Internal authoring provenance; not displayed to learners.",
+  "sources": [
+    {
+      "source": "British Council LearnEnglish",
+      "url": "https://learnenglish.britishcouncil.org/grammar",
+      "use": "Grammar usage explanations and beginner-friendly progression checks."
+    },
+    {
+      "source": "Cambridge Dictionary English Grammar Today",
+      "url": "https://dictionary.cambridge.org/grammar/british-grammar/",
+      "use": "Cross-checking form, meaning, and example usage."
+    },
+    {
+      "source": "International Phonetic Association",
+      "url": "https://www.internationalphoneticassociation.org/content/ipa-chart",
+      "use": "IPA symbol and pronunciation terminology verification."
+    },
+    {
+      "source": "Wikimedia Commons",
+      "url": "https://commons.wikimedia.org/",
+      "use": "License-safe contextual media candidates for Course 1."
+    },
+    {
+      "source": "Unsplash",
+      "url": "https://unsplash.com/license",
+      "use": "License-safe meeting context candidate for Course 1 Lesson 7."
+    }
+  ],
+  "courseRoles": {
+    "1": "Beginner foundation and everyday communication.",
+    "8": "Focused grammar and vocabulary with explicit form/meaning contrast.",
+    "12": "Pronunciation and IPA guidance for Vietnamese learners; accepted media retained."
+  },
+  "lessonAuditMatrix": [
+    {
+      "courseId": 1,
+      "courseTitle": "Tiếng Anh Nền Tảng A1–A2",
+      "lessonId": 1,
+      "order": 1,
+      "lessonTitle": "Chào hỏi và giới thiệu bản thân",
+      "slug": "greetings-and-introductions",
+      "existingStructure": [
+        "COMMON_MISTAKE",
+        "SUMMARY",
+        "VOCABULARY",
+        "TIP",
+        "THEORY",
+        "INTRO",
+        "CHECKPOINT",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 9,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/lessons/lesson-1/media/v2-c85e2a13a7d6956f.jpg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Instructor_speaking_to_students_in_classroom.jpg | Ryan Hagerty, U.S. Fish and Wildlife Service (public domain) | R2:catalog/courses/course-1/lessons/lesson-1/media/v2-c85e2a13a7d6956f.jpg | sha256:c85e2a13a7d6956ff74ca40071938a422f8e7d79c467fe6695b41a6d1d127f11",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "IMAGE_USEFUL",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        195,
+        1
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 1,
+      "courseTitle": "Tiếng Anh Nền Tảng A1–A2",
+      "lessonId": 2,
+      "order": 2,
+      "lessonTitle": "Gia đình và thông tin cá nhân",
+      "slug": "family-and-personal-information",
+      "existingStructure": [
+        "THEORY",
+        "VOCABULARY",
+        "COMMON_MISTAKE",
+        "CHECKPOINT",
+        "TIP",
+        "EXAMPLE",
+        "SUMMARY",
+        "INTRO"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 12,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/lessons/lesson-2/media/v2-56a80c79e4624a92.svg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Family_Tree.svg | Wilfredor, “Family Tree” (CC0 1.0) | R2:catalog/courses/course-1/lessons/lesson-2/media/v2-56a80c79e4624a92.svg | sha256:56a80c79e4624a92a59d87e4718aff8c42362ca410e3d0e495cd78acb374827c",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "IMAGE_USEFUL",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        2,
+        197
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 1,
+      "courseTitle": "Tiếng Anh Nền Tảng A1–A2",
+      "lessonId": 3,
+      "order": 3,
+      "lessonTitle": "Thói quen hằng ngày",
+      "slug": "daily-routines",
+      "existingStructure": [
+        "VOCABULARY",
+        "CHECKPOINT",
+        "SUMMARY",
+        "TIP",
+        "INTRO",
+        "THEORY",
+        "COMMON_MISTAKE",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 10,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/lessons/lesson-3/media/v2-26d4baa60423f9ac.jpg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Coffee_cup_in_the_morning_%F0%9F%8C%84.jpg | Jothisettu, “Coffee cup in the morning” (CC0 1.0) | R2:catalog/courses/course-1/lessons/lesson-3/media/v2-26d4baa60423f9ac.jpg | sha256:26d4baa60423f9ac675dd8e523bf6c9567d6eeadadfc293c80b9ac13ae998988",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "IMAGE_USEFUL",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        3,
+        199
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 1,
+      "courseTitle": "Tiếng Anh Nền Tảng A1–A2",
+      "lessonId": 4,
+      "order": 4,
+      "lessonTitle": "Thời gian, lịch trình và hoạt động hiện tại",
+      "slug": "time-schedules-and-now",
+      "existingStructure": [
+        "INTRO",
+        "COMMON_MISTAKE",
+        "TIP",
+        "CHECKPOINT",
+        "THEORY",
+        "EXAMPLE",
+        "SUMMARY"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 13,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/lessons/lesson-4/media/v2-cdf39c35a41c3b2b.svg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Clock_simple.svg | Mothmolevna, “Clock simple” (public domain) | R2:catalog/courses/course-1/lessons/lesson-4/media/v2-cdf39c35a41c3b2b.svg | sha256:cdf39c35a41c3b2b9133c3b82ff743b9964da0a5a76f350e4e3ffc62f3b213e3",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "IMAGE_USEFUL",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        4,
+        201
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 1,
+      "courseTitle": "Tiếng Anh Nền Tảng A1–A2",
+      "lessonId": 5,
+      "order": 5,
+      "lessonTitle": "Nhà cửa và nơi chốn",
+      "slug": "home-and-places",
+      "existingStructure": [
+        "COMMON_MISTAKE",
+        "VOCABULARY",
+        "EXAMPLE",
+        "INTRO",
+        "THEORY",
+        "SUMMARY",
+        "TIP",
+        "CHECKPOINT"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 14,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/lessons/lesson-5/media/v2-7133dbc8effd2983.svg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:HouseFlrPlan.svg | Malyszkz, “HouseFlrPlan” (GPL-2.0-or-later) | R2:catalog/courses/course-1/lessons/lesson-5/media/v2-7133dbc8effd2983.svg | sha256:7133dbc8effd298365c6882e8244cce9a6366109bf31c4b32f4f5023215113d9",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "IMAGE_USEFUL",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        203,
+        5
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 1,
+      "courseTitle": "Tiếng Anh Nền Tảng A1–A2",
+      "lessonId": 6,
+      "order": 6,
+      "lessonTitle": "Ăn uống và mua sắm",
+      "slug": "food-and-shopping",
+      "existingStructure": [
+        "COMMON_MISTAKE",
+        "INTRO",
+        "VOCABULARY",
+        "EXAMPLE",
+        "TIP",
+        "CHECKPOINT",
+        "SUMMARY",
+        "THEORY"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 11,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/lessons/lesson-6/media/v2-5cb4caeddbcb2e4d.jpg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Woman_grocery_shopping.jpg | National Cancer Institute, Woman Grocery Shopping (public domain) | R2:catalog/courses/course-1/lessons/lesson-6/media/v2-5cb4caeddbcb2e4d.jpg | sha256:5cb4caeddbcb2e4d548829f4d01c69bd4e85bacf79638814b32e40717e0341d9",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "IMAGE_USEFUL",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        205,
+        6
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 1,
+      "courseTitle": "Tiếng Anh Nền Tảng A1–A2",
+      "lessonId": 7,
+      "order": 7,
+      "lessonTitle": "Học tập, công việc và giao tiếp cơ bản",
+      "slug": "study-work-basic-communication",
+      "existingStructure": [
+        "TIP",
+        "COMMON_MISTAKE",
+        "EXAMPLE",
+        "CHECKPOINT",
+        "INTRO",
+        "THEORY",
+        "SUMMARY"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 15,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/lessons/lesson-7/media/v2-c1fc9d1a147959c5.jpg",
+          "provenance": "https://unsplash.com/photos/person-gesturing-during-meeting-with-laptop-5QgIuuBxKwM | Headway, meeting photograph via Unsplash | R2:catalog/courses/course-1/lessons/lesson-7/media/v2-c1fc9d1a147959c5.jpg | sha256:c1fc9d1a147959c5989e31c486db9b4ab9d5e9c6d61bae52fd0800aaa82bb71e",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "IMAGE_USEFUL",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        7,
+        207
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 1,
+      "courseTitle": "Tiếng Anh Nền Tảng A1–A2",
+      "lessonId": 8,
+      "order": 8,
+      "lessonTitle": "Ôn tập nền tảng A1–A2",
+      "slug": "foundation-review",
+      "existingStructure": [
+        "COMMON_MISTAKE",
+        "TIP",
+        "CHECKPOINT",
+        "THEORY",
+        "INTRO",
+        "SUMMARY",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [],
+      "mediaDecision": "NO_IMAGE_NEEDED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        209,
+        8
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 8,
+      "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
+      "lessonId": 57,
+      "order": 1,
+      "lessonTitle": "Thì hiện tại đơn và hiện tại tiếp diễn",
+      "slug": "present-simple-and-continuous",
+      "existingStructure": [
+        "INTRO",
+        "TIP",
+        "CHECKPOINT",
+        "EXAMPLE",
+        "COMMON_MISTAKE",
+        "THEORY",
+        "SUMMARY"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 8001,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v4-b1f72905e029c247.png",
+          "provenance": "Wikimedia Commons derivative: Robbiemuffin, EGG Present simple.svg + EGG Present continuous.svg; CC BY-SA 3.0 / GFDL; source pages: https://commons.wikimedia.org/wiki/File:EGG_Present_simple.svg and https://commons.wikimedia.org/wiki/File:EGG_Present_continuous.svg; sha256:b1f72905e029c247dad2b0a294171efe5efeb8c24cbfe80b9db2aa37a7e6e14c",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_ACCEPTED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        57,
+        287
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 8,
+      "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
+      "lessonId": 58,
+      "order": 2,
+      "lessonTitle": "Danh từ, mạo từ và số lượng",
+      "slug": "nouns-articles-and-quantity",
+      "existingStructure": [
+        "VOCABULARY",
+        "EXAMPLE",
+        "COMMON_MISTAKE",
+        "INTRO",
+        "THEORY",
+        "TIP",
+        "CHECKPOINT",
+        "SUMMARY"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 8002,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-58/media/v1-8efb42c89b598320.svg",
+          "provenance": "BreadTrans original instructional SVG | R2:catalog/courses/course-8/lessons/lesson-58/media/v1-8efb42c89b598320.svg",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_ACCEPTED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        58,
+        288
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 8,
+      "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
+      "lessonId": 59,
+      "order": 3,
+      "lessonTitle": "Thì quá khứ đơn",
+      "slug": "past-simple",
+      "existingStructure": [
+        "TIP",
+        "INTRO",
+        "THEORY",
+        "COMMON_MISTAKE",
+        "CHECKPOINT",
+        "SUMMARY",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 8003,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-59/media/v1-570c4d8b75682482.svg",
+          "provenance": "BreadTrans original instructional SVG | R2:catalog/courses/course-8/lessons/lesson-59/media/v1-570c4d8b75682482.svg",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_ACCEPTED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        59,
+        289
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 8,
+      "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
+      "lessonId": 60,
+      "order": 4,
+      "lessonTitle": "Tương lai cơ bản: will và be going to",
+      "slug": "future-will-going-to",
+      "existingStructure": [
+        "COMMON_MISTAKE",
+        "EXAMPLE",
+        "TIP",
+        "THEORY",
+        "CHECKPOINT",
+        "INTRO",
+        "SUMMARY"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 8004,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-60/media/v1-5e441a3ec310eac5.svg",
+          "provenance": "BreadTrans original instructional SVG | R2:catalog/courses/course-8/lessons/lesson-60/media/v1-5e441a3ec310eac5.svg",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_ACCEPTED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        290,
+        60
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 8,
+      "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
+      "lessonId": 61,
+      "order": 5,
+      "lessonTitle": "Tính từ, trạng từ và so sánh",
+      "slug": "adjectives-adverbs-comparison",
+      "existingStructure": [
+        "TIP",
+        "EXAMPLE",
+        "INTRO",
+        "COMMON_MISTAKE",
+        "CHECKPOINT",
+        "THEORY",
+        "SUMMARY"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 8005,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-61/media/v1-64e8cf42098dd3b5.svg",
+          "provenance": "BreadTrans original instructional SVG | R2:catalog/courses/course-8/lessons/lesson-61/media/v1-64e8cf42098dd3b5.svg",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_ACCEPTED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        61,
+        291
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 8,
+      "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
+      "lessonId": 62,
+      "order": 6,
+      "lessonTitle": "Động từ khuyết thiếu cơ bản",
+      "slug": "basic-modal-verbs",
+      "existingStructure": [
+        "EXAMPLE",
+        "TIP",
+        "COMMON_MISTAKE",
+        "CHECKPOINT",
+        "INTRO",
+        "THEORY",
+        "SUMMARY"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 8006,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-62/media/v1-2e3b3d9bbc6e0c5b.svg",
+          "provenance": "BreadTrans original instructional SVG | R2:catalog/courses/course-8/lessons/lesson-62/media/v1-2e3b3d9bbc6e0c5b.svg",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_ACCEPTED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        292,
+        62
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 8,
+      "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
+      "lessonId": 63,
+      "order": 7,
+      "lessonTitle": "Giới từ và cụm từ thông dụng",
+      "slug": "prepositions-and-common-phrases",
+      "existingStructure": [
+        "COMMON_MISTAKE",
+        "VOCABULARY",
+        "INTRO",
+        "EXAMPLE",
+        "TIP",
+        "THEORY",
+        "CHECKPOINT",
+        "SUMMARY"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 8007,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-63/media/v2-11cc68082bacb3a5.svg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Prepositions-of-place.svg | evilestmark / Openclipart (CC0) | R2:catalog/courses/course-8/lessons/lesson-63/media/v2-11cc68082bacb3a5.svg | sha256:11cc68082bacb3a509b125b5841ed688983aa9fa5b6eb30c9d2cf31630e84353",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_ACCEPTED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        63,
+        293
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 8,
+      "courseTitle": "Ngữ pháp & Từ vựng Cơ bản",
+      "lessonId": 64,
+      "order": 8,
+      "lessonTitle": "Ôn tập ngữ pháp và từ vựng nền tảng",
+      "slug": "grammar-vocabulary-review",
+      "existingStructure": [
+        "COMMON_MISTAKE",
+        "TIP",
+        "INTRO",
+        "THEORY",
+        "CHECKPOINT",
+        "SUMMARY",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 8008,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-64/media/v1-5481b364440919f4.svg",
+          "provenance": "BreadTrans original instructional SVG | R2:catalog/courses/course-8/lessons/lesson-64/media/v1-5481b364440919f4.svg",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_ACCEPTED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        64,
+        294
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 12,
+      "courseTitle": "Phát âm Tiếng Anh với IPA",
+      "lessonId": 656,
+      "order": 1,
+      "lessonTitle": "Làm quen với IPA và cách học phát âm",
+      "slug": "ipa-and-pronunciation-basics",
+      "existingStructure": [
+        "THEORY",
+        "INTRO",
+        "COMMON_MISTAKE",
+        "TIP",
+        "CHECKPOINT",
+        "SUMMARY",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 1,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-656/media/v2-2409783a63bbdf8a.svg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:The_International_Phonetic_Alphabet_(revised_to_2015).svg | International Phonetic Association (CC BY-SA 3.0) | R2:catalog/courses/course-12/lessons/lesson-656/media/v2-2409783a63bbdf8a.svg | sha256:2409783a63bbdf8a5297711e4db61052a01f569acb7622471bfe797220bf7c88",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_UNCHANGED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        297,
+        296
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 12,
+      "courseTitle": "Phát âm Tiếng Anh với IPA",
+      "lessonId": 657,
+      "order": 2,
+      "lessonTitle": "Nguyên âm đơn quan trọng",
+      "slug": "important-short-and-long-vowels",
+      "existingStructure": [
+        "COMMON_MISTAKE",
+        "INTRO",
+        "TIP",
+        "CHECKPOINT",
+        "SUMMARY",
+        "THEORY",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 2,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-657/media/v2-6159fc095a65a264.png",
+          "provenance": "https://commons.wikimedia.org/wiki/File:IPA_Vowel_Chart_(Tharthan).png | Tharthan (public domain) | R2:catalog/courses/course-12/lessons/lesson-657/media/v2-6159fc095a65a264.png | sha256:6159fc095a65a26455c3d86d85065b66c35821cc4c6f3e3ff4b7bc010d0c7dfb",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_UNCHANGED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        298,
+        299
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 12,
+      "courseTitle": "Phát âm Tiếng Anh với IPA",
+      "lessonId": 658,
+      "order": 3,
+      "lessonTitle": "Nguyên âm đôi thường gặp",
+      "slug": "common-diphthongs",
+      "existingStructure": [
+        "COMMON_MISTAKE",
+        "TIP",
+        "CHECKPOINT",
+        "SUMMARY",
+        "INTRO",
+        "THEORY",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 3,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-658/media/v2-df9615c74382c571.svg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Abercrave_English_diphthongs_chart.svg | Pauline Hennings, Abercrave English diphthongs chart (CC BY-SA 3.0) | R2:catalog/courses/course-12/lessons/lesson-658/media/v2-df9615c74382c571.svg | sha256:df9615c74382c57118a44406b86167962e1edf4e61d930aaaa066c391faed029",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_UNCHANGED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        301,
+        300
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 12,
+      "courseTitle": "Phát âm Tiếng Anh với IPA",
+      "lessonId": 659,
+      "order": 4,
+      "lessonTitle": "Phụ âm dễ nhầm với người Việt",
+      "slug": "consonants-vietnamese-learners-confuse",
+      "existingStructure": [
+        "CHECKPOINT",
+        "TIP",
+        "SUMMARY",
+        "INTRO",
+        "THEORY",
+        "COMMON_MISTAKE",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 4,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-659/media/v2-fe47c3cbbc71da57.png",
+          "provenance": "https://commons.wikimedia.org/wiki/File:An_outline_of_English_phonetics_fig2.png | Daniel Jones, An outline of English phonetics (public domain) | R2:catalog/courses/course-12/lessons/lesson-659/media/v2-fe47c3cbbc71da57.png | sha256:fe47c3cbbc71da57be1369caffb1ce0b744eb54894cb3ebc72aa436422a29cd0",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_UNCHANGED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        302,
+        303
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 12,
+      "courseTitle": "Phát âm Tiếng Anh với IPA",
+      "lessonId": 660,
+      "order": 5,
+      "lessonTitle": "Âm cuối và cách phát âm rõ",
+      "slug": "final-sounds",
+      "existingStructure": [
+        "INTRO",
+        "THEORY",
+        "SUMMARY",
+        "COMMON_MISTAKE",
+        "TIP",
+        "CHECKPOINT",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 5,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-660/media/v2-b14d12b5a7b10d16.png",
+          "provenance": "https://commons.wikimedia.org/wiki/File:IPA_chart_2005_consonants.png | International Phonetic Association, IPA chart 2005 consonants (CC BY-SA 3.0) | R2:catalog/courses/course-12/lessons/lesson-660/media/v2-b14d12b5a7b10d16.png | sha256:b14d12b5a7b10d162830222d77e3e56801170a022492835964ee5d34093f1b2a",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_UNCHANGED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        304,
+        305
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 12,
+      "courseTitle": "Phát âm Tiếng Anh với IPA",
+      "lessonId": 661,
+      "order": 6,
+      "lessonTitle": "Trọng âm từ",
+      "slug": "word-stress",
+      "existingStructure": [
+        "INTRO",
+        "THEORY",
+        "COMMON_MISTAKE",
+        "TIP",
+        "CHECKPOINT",
+        "SUMMARY",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 6,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-661/media/v2-7c3b9fe614178296.png",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Spring_in_and_out_of_stress.PNG | Nina Paley, Spring in and out of stress (CC BY-SA 3.0) | R2:catalog/courses/course-12/lessons/lesson-661/media/v2-7c3b9fe614178296.png | sha256:7c3b9fe614178296b57b9c64d0f39d388d9ed76b6b2954ac4c736fc154cf2c37",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_UNCHANGED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        306,
+        307
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 12,
+      "courseTitle": "Phát âm Tiếng Anh với IPA",
+      "lessonId": 662,
+      "order": 7,
+      "lessonTitle": "Schwa /ə/ và nhịp điệu câu",
+      "slug": "schwa-and-sentence-rhythm",
+      "existingStructure": [
+        "INTRO",
+        "THEORY",
+        "COMMON_MISTAKE",
+        "TIP",
+        "CHECKPOINT",
+        "SUMMARY",
+        "EXAMPLE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 7,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-662/media/v2-e5948bbb30933e8b.svg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Schwa_IPA_symbol.svg | Holly Cheng (public domain) | R2:catalog/courses/course-12/lessons/lesson-662/media/v2-e5948bbb30933e8b.svg | sha256:e5948bbb30933e8bad503d6d86f4469e3d76116272de3943af819a191dc820fc",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_UNCHANGED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        308,
+        309
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    },
+    {
+      "courseId": 12,
+      "courseTitle": "Phát âm Tiếng Anh với IPA",
+      "lessonId": 663,
+      "order": 8,
+      "lessonTitle": "Nối âm và luyện phát âm tổng hợp",
+      "slug": "linking-and-integrated-practice",
+      "existingStructure": [
+        "TIP",
+        "CHECKPOINT",
+        "SUMMARY",
+        "INTRO",
+        "THEORY",
+        "EXAMPLE",
+        "COMMON_MISTAKE"
+      ],
+      "missingConcepts": [],
+      "exampleQuality": "CONTEXTUAL_3_PLUS",
+      "exampleCount": 3,
+      "tips": "PRESENT",
+      "mistakes": "PRESENT_WITH_REASON_REVIEW",
+      "summary": "PRESENT",
+      "media": [
+        {
+          "id": 8,
+          "url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-663/media/v2-3c2cbd5433327f5e.jpg",
+          "provenance": "https://commons.wikimedia.org/wiki/File:Identifying_Sounds_in_Words.jpg | U.S. Department of Education, Identifying Sounds in Words (CC BY-SA 4.0) | R2:catalog/courses/course-12/lessons/lesson-663/media/v2-3c2cbd5433327f5e.jpg | sha256:3c2cbd5433327f5e27e8bbcb07548b9eea616a8520f81dcca048b1c11010c4a3",
+          "renderStatus": "READY"
+        }
+      ],
+      "mediaDecision": "EXISTING_MEDIA_UNCHANGED",
+      "finalExerciseCount": 2,
+      "finalExerciseIds": [
+        310,
+        311
+      ],
+      "decision": "RENDER_SHARED_GUIDED_FLOW"
+    }
+  ]
+}

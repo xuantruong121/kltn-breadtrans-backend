@@ -424,6 +424,521 @@ function calculateDictationWordAccuracy(
   );
 }
 
+export type DictationTokenStatus = 'CORRECT' | 'WRONG' | 'MISSING' | 'EXTRA';
+
+export interface DictationFeedbackToken {
+  status: DictationTokenStatus;
+  text?: string;
+}
+
+const COMMON_PREPOSITIONS = new Set([
+  'to',
+  'at',
+  'in',
+  'on',
+  'for',
+  'by',
+  'with',
+  'from',
+  'about',
+  'into',
+  'through',
+  'after',
+  'before',
+  'under',
+  'between',
+  'among',
+  'of',
+  'off',
+  'over',
+  'up',
+  'down',
+  'out',
+]);
+
+const COMMON_DETERMINERS = new Set([
+  'a',
+  'an',
+  'the',
+  'this',
+  'that',
+  'these',
+  'those',
+  'my',
+  'your',
+  'his',
+  'her',
+  'their',
+  'our',
+  'its',
+]);
+
+const COMMON_AUXILIARIES = new Set([
+  'do',
+  'does',
+  'did',
+  'have',
+  'has',
+  'had',
+  'is',
+  'am',
+  'are',
+  'was',
+  'were',
+  'will',
+  'would',
+  'can',
+  'could',
+  'should',
+  'must',
+]);
+
+export function alignDictationFeedbackTokens(
+  expected: string,
+  submitted: string,
+  mode: 'STANDARD' | 'STRICT',
+): DictationFeedbackToken[] {
+  const normalize =
+    mode === 'STRICT'
+      ? normalizeStrictListeningAnswer
+      : normalizeListeningAnswer;
+  const expectedWords =
+    mode === 'STANDARD'
+      ? normalizeStandardListeningTokens(expected)
+      : normalize(expected).split(/\s+/).filter(Boolean);
+  const submittedWords =
+    mode === 'STANDARD'
+      ? normalizeStandardListeningTokens(submitted)
+      : normalize(submitted).split(/\s+/).filter(Boolean);
+
+  if (expectedWords.length === 0) {
+    return submittedWords.map((word) => ({ status: 'EXTRA', text: word }));
+  }
+  if (submittedWords.length === 0) {
+    return expectedWords.map(() => ({ status: 'MISSING' }));
+  }
+
+  const rows = expectedWords.length + 1;
+  const cols = submittedWords.length + 1;
+  const dp = Array.from({ length: rows }, () =>
+    new Array<number>(cols).fill(0),
+  );
+
+  for (let i = expectedWords.length - 1; i >= 0; i -= 1) {
+    for (let j = submittedWords.length - 1; j >= 0; j -= 1) {
+      dp[i][j] =
+        expectedWords[i] === submittedWords[j]
+          ? dp[i + 1][j + 1] + 1
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+
+  const rawDiff: Array<{
+    type: 'same' | 'missing' | 'extra';
+    expWord?: string;
+    subWord?: string;
+  }> = [];
+
+  let i = 0;
+  let j = 0;
+  while (i < expectedWords.length || j < submittedWords.length) {
+    if (
+      i < expectedWords.length &&
+      j < submittedWords.length &&
+      expectedWords[i] === submittedWords[j]
+    ) {
+      rawDiff.push({
+        type: 'same',
+        expWord: expectedWords[i],
+        subWord: submittedWords[j],
+      });
+      i += 1;
+      j += 1;
+    } else if (
+      j < submittedWords.length &&
+      (i === expectedWords.length || dp[i][j + 1] >= dp[i + 1][j])
+    ) {
+      rawDiff.push({ type: 'extra', subWord: submittedWords[j] });
+      j += 1;
+    } else {
+      rawDiff.push({ type: 'missing', expWord: expectedWords[i] });
+      i += 1;
+    }
+  }
+
+  // Pair consecutive (extra, missing) or (missing, extra) as WRONG (substituted word)
+  const tokens: DictationFeedbackToken[] = [];
+  let k = 0;
+  while (k < rawDiff.length) {
+    const curr = rawDiff[k];
+    const next = rawDiff[k + 1];
+
+    if (
+      (curr.type === 'extra' && next?.type === 'missing') ||
+      (curr.type === 'missing' && next?.type === 'extra')
+    ) {
+      tokens.push({ status: 'WRONG' });
+      k += 2;
+    } else if (curr.type === 'same') {
+      tokens.push({ status: 'CORRECT', text: curr.subWord });
+      k += 1;
+    } else if (curr.type === 'extra') {
+      tokens.push({ status: 'EXTRA', text: curr.subWord });
+      k += 1;
+    } else {
+      tokens.push({ status: 'MISSING' });
+      k += 1;
+    }
+  }
+
+  return tokens;
+}
+
+export function generateSafeRelativeDictationHint(
+  expected: string,
+  submitted: string,
+  tokens?: DictationFeedbackToken[],
+): string {
+  const safeTokens =
+    tokens ?? alignDictationFeedbackTokens(expected, submitted, 'STANDARD');
+
+  const expTokens = normalizeStandardListeningTokens(expected);
+  const subTokens = normalizeStandardListeningTokens(submitted);
+
+  if (subTokens.length === 0) {
+    return 'Lắng nghe kỹ câu trong audio và nhập những gì bạn nghe được.';
+  }
+
+  const hasExtra = safeTokens.some((t) => t.status === 'EXTRA');
+  const hasWrongOrMissing = safeTokens.some(
+    (t) => t.status === 'WRONG' || t.status === 'MISSING',
+  );
+
+  if (hasExtra && !hasWrongOrMissing) {
+    return 'Có từ thừa trong câu trả lời, hãy nghe kỹ lại và lược bỏ.';
+  }
+
+  let mismatchIdx = -1;
+  for (let idx = 0; idx < expTokens.length; idx += 1) {
+    if (idx >= subTokens.length || expTokens[idx] !== subTokens[idx]) {
+      mismatchIdx = idx;
+      break;
+    }
+  }
+
+  if (mismatchIdx === -1) {
+    if (subTokens.length > expTokens.length) {
+      return 'Có từ thừa trong câu trả lời, hãy nghe kỹ lại và lược bỏ.';
+    }
+    return 'Hãy tiếp tục lắng nghe các từ còn lại.';
+  }
+
+  const expWord = expTokens[mismatchIdx];
+  const subWord = subTokens[mismatchIdx];
+  const prevExpWord = mismatchIdx > 0 ? expTokens[mismatchIdx - 1] : null;
+
+  if (COMMON_PREPOSITIONS.has(expWord)) {
+    return 'Kiểm tra giới từ hoặc từ nối ở vị trí này.';
+  }
+
+  if (COMMON_DETERMINERS.has(expWord)) {
+    return 'Kiểm tra mạo từ (a, an, the) hoặc từ hạn định ở vị trí này.';
+  }
+
+  if (COMMON_AUXILIARIES.has(expWord)) {
+    return 'Kiểm tra trợ động từ hoặc dạng viết tắt (auxiliary verb).';
+  }
+
+  if (subWord) {
+    const baseExp = expWord.replace(/(?:ing|ed|es|s)$/, '');
+    const baseSub = subWord.replace(/(?:ing|ed|es|s)$/, '');
+    if (baseExp.length >= 3 && baseExp === baseSub) {
+      if (expWord.endsWith('s') || expWord.endsWith('es')) {
+        if (prevExpWord && ['he', 'she', 'it'].includes(prevExpWord)) {
+          return `Kiểm tra dạng động từ phù hợp với chủ ngữ ngôi thứ ba số ít (“${prevExpWord}”).`;
+        }
+        return 'Kiểm tra dạng động từ theo chủ ngữ (chú ý ngôi và số ít / số nhiều).';
+      }
+      if (expWord.endsWith('ed')) {
+        return 'Chú ý thì của động từ (kiểm tra âm đuôi quá khứ -ed).';
+      }
+      if (expWord.endsWith('ing')) {
+        return 'Chú ý dạng động từ đuôi -ing (dạng tiếp diễn hoặc danh động từ).';
+      }
+      return 'Chú ý phụ âm cuối hoặc dạng biến đổi của từ.';
+    }
+  }
+
+  if (expWord.endsWith('ed') || looksLikePastParticiple(expWord)) {
+    return 'Câu đang nói về một hành động trong quá khứ, hãy chú ý thì của động từ.';
+  }
+
+  if (
+    prevExpWord &&
+    ['he', 'she', 'it'].includes(prevExpWord) &&
+    (expWord.endsWith('s') || expWord.endsWith('es'))
+  ) {
+    return `Động từ cần phù hợp với chủ ngữ ngôi thứ ba số ít (“${prevExpWord}”).`;
+  }
+
+  if (prevExpWord) {
+    return `Nghe kỹ lại phần ngay sau từ “${prevExpWord}”.`;
+  }
+
+  return 'Nghe kỹ lại phần đầu của câu.';
+}
+
+export function getLexicalLetterCount(word: string): number {
+  return word.replace(/[^A-Za-z]/g, '').length;
+}
+
+export function maskExpectedWord(canonicalToken: string): string {
+  const letterCount = getLexicalLetterCount(canonicalToken);
+  const asterisks = '*'.repeat(letterCount > 0 ? letterCount : 1);
+  const trailingPunctMatch = canonicalToken.match(/([.,!?:;]+)$/);
+  const trailingPunct = trailingPunctMatch ? trailingPunctMatch[1] : '';
+  return `${asterisks}${trailingPunct}`;
+}
+
+export interface ProgressiveDictationFeedback {
+  isCorrect: boolean;
+  verifiedPrefix: string;
+  nextWordMask: string;
+  remainingMasks: string[];
+  nextErrorType: 'WRONG' | 'MISSING' | 'EXTRA' | null;
+  hint: string | null;
+  wordAccuracy: number;
+}
+
+function generateProgressiveRelativeHint(
+  canonicalTokens: string[],
+  normSubmittedTokens: string[],
+  matchedCanonicalCount: number,
+  subIndex: number,
+  nextErrorType: 'WRONG' | 'MISSING' | 'EXTRA',
+): string {
+  if (normSubmittedTokens.length === 0) {
+    return 'Hãy nghe kỹ phần đầu câu.';
+  }
+
+  const prevCanonical =
+    matchedCanonicalCount > 0
+      ? canonicalTokens[matchedCanonicalCount - 1].replace(/[^A-Za-z]/g, '')
+      : null;
+
+  if (nextErrorType === 'EXTRA') {
+    if (prevCanonical) {
+      return `Có một từ thừa ngay sau “${prevCanonical}”. Hãy nghe lại phần này.`;
+    }
+    return 'Có từ thừa ở đầu câu trả lời, hãy nghe lại và lược bỏ.';
+  }
+
+  if (matchedCanonicalCount >= canonicalTokens.length) {
+    return 'Có từ thừa ở cuối câu trả lời, hãy nghe lại và lược bỏ.';
+  }
+
+  const nextCanonical = canonicalTokens[matchedCanonicalCount];
+  const nextExpWord = normalizeStandardListeningTokens(nextCanonical)[0] ?? '';
+  const currentSubWord =
+    subIndex < normSubmittedTokens.length ? normSubmittedTokens[subIndex] : '';
+
+  if (COMMON_PREPOSITIONS.has(nextExpWord)) {
+    if (prevCanonical) {
+      return `Kiểm tra từ nối hoặc giới từ ngay sau “${prevCanonical}”.`;
+    }
+    return 'Kiểm tra giới từ hoặc từ nối ở vị trí này.';
+  }
+
+  if (COMMON_DETERMINERS.has(nextExpWord)) {
+    return 'Kiểm tra mạo từ (a, an, the) hoặc từ hạn định ở vị trí này.';
+  }
+
+  if (COMMON_AUXILIARIES.has(nextExpWord)) {
+    return 'Kiểm tra trợ động từ hoặc dạng viết tắt (auxiliary verb).';
+  }
+
+  if (currentSubWord) {
+    const baseExp = nextExpWord.replace(/(?:ing|ed|es|s)$/, '');
+    const baseSub = currentSubWord.replace(/(?:ing|ed|es|s)$/, '');
+    if (baseExp.length >= 3 && baseExp === baseSub) {
+      if (nextExpWord.endsWith('s') || nextExpWord.endsWith('es')) {
+        if (
+          prevCanonical &&
+          ['he', 'she', 'it'].includes(prevCanonical.toLowerCase())
+        ) {
+          return `Kiểm tra dạng động từ với chủ ngữ “${prevCanonical}”.`;
+        }
+        return 'Kiểm tra dạng động từ theo chủ ngữ (chú ý ngôi và số ít / số nhiều).';
+      }
+      if (nextExpWord.endsWith('ed')) {
+        return 'Chú ý thì của động từ (kiểm tra âm đuôi quá khứ -ed).';
+      }
+      if (nextExpWord.endsWith('ing')) {
+        return 'Chú ý dạng động từ đuôi -ing (dạng tiếp diễn hoặc danh động từ).';
+      }
+      return 'Chú ý phụ âm cuối hoặc dạng biến đổi của từ.';
+    }
+  }
+
+  if (nextExpWord.endsWith('ed') || looksLikePastParticiple(nextExpWord)) {
+    return 'Câu đang nói về một hành động trong quá khứ, hãy chú ý thì của động từ.';
+  }
+
+  if (
+    prevCanonical &&
+    ['he', 'she', 'it'].includes(prevCanonical.toLowerCase()) &&
+    (nextExpWord.endsWith('s') || nextExpWord.endsWith('es'))
+  ) {
+    return `Kiểm tra dạng động từ với chủ ngữ “${prevCanonical}”.`;
+  }
+
+  if (prevCanonical) {
+    return `Nghe kỹ lại phần ngay sau “${prevCanonical}”.`;
+  }
+
+  return 'Hãy nghe kỹ phần đầu câu.';
+}
+
+export function canonicalizeSubmittedDictation(
+  expected: string,
+  submitted: string,
+): string {
+  if (!submitted || typeof submitted !== 'string') return '';
+  const trimmedSubmitted = submitted.trim();
+  if (trimmedSubmitted.length === 0) return '';
+  if (!expected || typeof expected !== 'string') return trimmedSubmitted;
+
+  const expectedWords = expected.trim().split(/\s+/).filter(Boolean);
+  const submittedWords = trimmedSubmitted.split(/\s+/).filter(Boolean);
+  if (expectedWords.length === 0) return trimmedSubmitted;
+
+  let mismatchFound = false;
+  const normalizedWords: string[] = [];
+
+  for (let i = 0; i < submittedWords.length; i += 1) {
+    const subWord = submittedWords[i];
+    const expWord = expectedWords[i];
+
+    const normSub = normalizeStandardListeningTokens(subWord).join(' ');
+    const normExp = normalizeStandardListeningTokens(expWord).join(' ');
+    const strippedSub = normSub.replace(/[^a-z0-9]/g, '');
+    const strippedExp = normExp.replace(/[^a-z0-9]/g, '');
+
+    const isMatch =
+      normSub === normExp ||
+      (strippedSub.length > 0 && strippedSub === strippedExp);
+
+    if (!mismatchFound && expWord && isMatch) {
+      normalizedWords.push(expWord);
+    } else {
+      mismatchFound = true;
+      normalizedWords.push(subWord);
+    }
+  }
+
+  return normalizedWords.join(' ');
+}
+
+export function calculateProgressiveDictationFeedback(
+  expected: string,
+  submitted: string,
+): ProgressiveDictationFeedback {
+  const trimmedExpected = String(expected ?? '').trim();
+  const trimmedSubmitted = String(submitted ?? '').trim();
+
+  const canonicalTokens = trimmedExpected.split(/\s+/).filter(Boolean);
+  const normSubmittedTokens =
+    normalizeStandardListeningTokens(trimmedSubmitted);
+  const normExpectedTokens = normalizeStandardListeningTokens(trimmedExpected);
+
+  const isCorrect =
+    normSubmittedTokens.length === normExpectedTokens.length &&
+    normSubmittedTokens.every((t, i) => t === normExpectedTokens[i]);
+
+  const wordAccuracy = calculateDictationWordAccuracy(
+    trimmedExpected,
+    trimmedSubmitted,
+    'STANDARD',
+  );
+
+  if (isCorrect) {
+    return {
+      isCorrect: true,
+      verifiedPrefix: trimmedExpected,
+      nextWordMask: '',
+      remainingMasks: [],
+      nextErrorType: null,
+      hint: null,
+      wordAccuracy: 100,
+    };
+  }
+
+  let subIndex = 0;
+  let matchedCanonicalCount = 0;
+
+  for (let idx = 0; idx < canonicalTokens.length; idx += 1) {
+    const canonicalToken = canonicalTokens[idx];
+    const expNorm = normalizeStandardListeningTokens(canonicalToken);
+
+    if (
+      expNorm.length > 0 &&
+      subIndex + expNorm.length <= normSubmittedTokens.length &&
+      expNorm.every((token, k) => normSubmittedTokens[subIndex + k] === token)
+    ) {
+      matchedCanonicalCount += 1;
+      subIndex += expNorm.length;
+    } else {
+      break;
+    }
+  }
+
+  const verifiedTokens = canonicalTokens.slice(0, matchedCanonicalCount);
+  const verifiedPrefix = verifiedTokens.join(' ');
+
+  let nextWordMask = '';
+  let remainingMasks: string[] = [];
+  let nextErrorType: 'WRONG' | 'MISSING' | 'EXTRA' = 'WRONG';
+
+  if (matchedCanonicalCount < canonicalTokens.length) {
+    const nextCanonicalToken = canonicalTokens[matchedCanonicalCount];
+    nextWordMask = maskExpectedWord(nextCanonicalToken);
+
+    const remainingTokens = canonicalTokens.slice(matchedCanonicalCount + 1);
+    remainingMasks = remainingTokens.map((t) => maskExpectedWord(t));
+
+    if (subIndex >= normSubmittedTokens.length) {
+      nextErrorType = 'MISSING';
+    } else {
+      const nextExpectedToken =
+        normalizeStandardListeningTokens(nextCanonicalToken)[0];
+      const remainingSubmitted = normSubmittedTokens.slice(subIndex);
+      const foundLater = remainingSubmitted.includes(nextExpectedToken);
+      nextErrorType = foundLater ? 'EXTRA' : 'WRONG';
+    }
+  } else {
+    nextErrorType = 'EXTRA';
+    nextWordMask = '';
+  }
+
+  const hint = generateProgressiveRelativeHint(
+    canonicalTokens,
+    normSubmittedTokens,
+    matchedCanonicalCount,
+    subIndex,
+    nextErrorType,
+  );
+
+  return {
+    isCorrect: false,
+    verifiedPrefix,
+    nextWordMask,
+    remainingMasks,
+    nextErrorType,
+    hint,
+    wordAccuracy,
+  };
+}
+
 @Injectable()
 export class QuizService {
   constructor(
@@ -1127,7 +1642,7 @@ export class QuizService {
    */
   async revealListeningTranscript(userId: number, quizId: number, role?: Role) {
     await this.assertListeningPracticeQuiz(quizId, userId, role);
-    const attempt = await this.prisma.listeningPracticeAttempt.findFirst({
+    let attempt = await this.prisma.listeningPracticeAttempt.findFirst({
       where: {
         userId,
         quizId,
@@ -1142,9 +1657,8 @@ export class QuizService {
       select: { id: true },
     });
     if (!attempt) {
-      throw new ForbiddenException(
-        'Hãy bắt đầu bài luyện trước khi xem toàn bộ kịch bản.',
-      );
+      const created = await this.getOrCreateListeningAttempt(userId, quizId);
+      attempt = { id: created.id };
     }
     return this.prisma.listeningTranscriptReveal.upsert({
       where: { userId_quizId: { userId, quizId } },
@@ -1939,24 +2453,82 @@ export class QuizService {
           ? normalizeStrictListeningAnswer(expectedAnswer)
           : normalizeListeningAnswer(expectedAnswer);
 
+      const progressiveFeedback = calculateProgressiveDictationFeedback(
+        expectedAnswer,
+        dto.answer,
+      );
+
+      const isCorrect =
+        evaluationMode === 'STRICT'
+          ? normalizedSubmitted === normalizedExpected
+          : normalizedSubmitted === normalizedExpected ||
+            progressiveFeedback.isCorrect;
+      const wordAccuracy = isCorrect
+        ? 100
+        : calculateDictationWordAccuracy(
+            expectedAnswer,
+            dto.answer,
+            evaluationMode,
+          );
+
+      if (isCorrect) {
+        const correctTokens = (
+          evaluationMode === 'STANDARD'
+            ? normalizeStandardListeningTokens(expectedAnswer)
+            : expectedAnswer.split(/\s+/).filter(Boolean)
+        ).map((text) => ({ status: 'CORRECT' as const, text }));
+
+        return {
+          questionId,
+          isCorrect: true,
+          submittedAnswer: dto.answer,
+          correctAnswer: expectedAnswer,
+          evaluationMode,
+          wordAccuracy: 100,
+          verifiedPrefix: expectedAnswer,
+          canonicalizedAnswer: expectedAnswer,
+          nextWordMask: '',
+          nextErrorType: null,
+          tokens: correctTokens,
+          hint: null,
+          remainingErrors: 0,
+          explanation:
+            typeof content.explanation === 'string' ||
+            (content.explanation && typeof content.explanation === 'object')
+              ? content.explanation
+              : null,
+          translation:
+            typeof content.translation === 'string'
+              ? content.translation
+              : null,
+        };
+      }
+
+      const safeTokens = alignDictationFeedbackTokens(
+        expectedAnswer,
+        dto.answer,
+        evaluationMode,
+      );
+
       return {
         questionId,
-        isCorrect: normalizedSubmitted === normalizedExpected,
+        isCorrect: false,
         submittedAnswer: dto.answer,
-        correctAnswer: expectedAnswer,
         evaluationMode,
-        wordAccuracy: calculateDictationWordAccuracy(
+        wordAccuracy,
+        verifiedPrefix: progressiveFeedback.verifiedPrefix,
+        nextWordMask: progressiveFeedback.nextWordMask,
+        remainingMasks: progressiveFeedback.remainingMasks,
+        nextErrorType: progressiveFeedback.nextErrorType,
+        canonicalizedAnswer: canonicalizeSubmittedDictation(
           expectedAnswer,
           dto.answer,
-          evaluationMode,
         ),
-        explanation:
-          typeof content.explanation === 'string' ||
-          (content.explanation && typeof content.explanation === 'object')
-            ? content.explanation
-            : null,
-        translation:
-          typeof content.translation === 'string' ? content.translation : null,
+        tokens: safeTokens,
+        hint: progressiveFeedback.hint,
+        remainingErrors: 1,
+        explanation: null,
+        translation: null,
       };
     }
 

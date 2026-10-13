@@ -93,6 +93,84 @@ describe('CourseLearningV5Service', () => {
     expect(result.lesson.exercises[0]).toHaveProperty('rubric');
   });
 
+  it('returns guided and final exercises once with distinct question identities', async () => {
+    prisma.courseLesson.findFirst.mockResolvedValue({
+      id: 12,
+      courseId: 1,
+      slug: 'present-simple',
+      order: 1,
+      title: 'Present simple',
+      summary: 'Summary',
+      learningObjectives: [],
+      estimatedMinutes: 15,
+      difficulty: 'A2',
+      coverImage: null,
+      sections: [],
+      references: [],
+      media: [],
+      exercises: [
+        {
+          id: 44,
+          slug: 'practice-present-simple',
+          order: 1,
+          type: 'MULTIPLE_CHOICE',
+          title: 'Guided practice',
+          prompt: 'Practice',
+          instructions: null,
+          content: {},
+          rubric: null,
+          required: true,
+          minimumScore: null,
+          questions: [
+            {
+              id: 88,
+              order: 1,
+              prompt: 'She ____ coffee every morning.',
+              options: ['drink', 'drinks'],
+            },
+          ],
+        },
+        {
+          id: 45,
+          slug: 'checkpoint-present-simple',
+          order: 2,
+          type: 'CHECKPOINT',
+          title: 'Final check',
+          prompt: 'Check',
+          instructions: null,
+          content: {},
+          rubric: null,
+          required: true,
+          minimumScore: null,
+          questions: [
+            {
+              id: 89,
+              order: 1,
+              prompt: 'Look! Minh ___ for the bus now.',
+              options: ['waits', 'is waiting'],
+            },
+          ],
+        },
+      ],
+    });
+    prisma.courseLesson.findMany.mockResolvedValue([
+      { id: 12, order: 1, title: 'Present simple' },
+    ]);
+    prisma.courseLessonAttempt.findMany.mockResolvedValue([]);
+
+    const result = await service.getLesson(1, 12, user);
+    expect(result.lesson.exercises).toHaveLength(2);
+    expect(result.lesson.exercises.map((exercise) => exercise.id)).toEqual([
+      44, 45,
+    ]);
+    expect(result.lesson.exercises[0].questions[0].id).not.toBe(
+      result.lesson.exercises[1].questions[0].id,
+    );
+    expect(result.lesson.exercises[1].questions[0].prompt).not.toBe(
+      result.lesson.exercises[0].questions[0].prompt,
+    );
+  });
+
   it('scores course-owned answers in a transaction and returns explanations only after submission', async () => {
     prisma.courseLessonExercise.findFirst.mockResolvedValue({
       id: 44,
@@ -148,5 +226,63 @@ describe('CourseLearningV5Service', () => {
       }),
     ).rejects.toThrow();
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects an option that is not part of the current question before persistence', async () => {
+    prisma.courseLessonExercise.findFirst.mockResolvedValue({
+      id: 44,
+      lessonId: 12,
+      questions: [
+        {
+          id: 88,
+          order: 1,
+          options: ['A', 'B'],
+          correctAnswer: 'A',
+          explanation: '',
+        },
+      ],
+    });
+    await expect(
+      service.submitExercise(1, 12, 44, user, {
+        answers: [{ questionId: 88, answer: 'C' }],
+      }),
+    ).rejects.toThrow('Lựa chọn không hợp lệ');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('reuses a matching submitted attempt under the transaction lock', async () => {
+    prisma.courseLessonExercise.findFirst.mockResolvedValue({
+      id: 44,
+      lessonId: 12,
+      minimumScore: null,
+      questions: [
+        {
+          id: 88,
+          order: 1,
+          options: ['A', 'B'],
+          correctAnswer: 'A',
+          explanation: 'Because',
+        },
+      ],
+    });
+    const create = jest.fn();
+    prisma.$transaction.mockImplementation(
+      async (callback: (tx: any) => Promise<unknown>) =>
+        callback({
+          $executeRaw: jest.fn(),
+          courseLessonAttempt: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: 101,
+              answers: [{ questionId: 88, answer: 'A' }],
+            }),
+            create,
+          },
+        }),
+    );
+    const result = await service.submitExercise(1, 12, 44, user, {
+      answers: [{ questionId: 88, answer: 'A' }],
+    });
+    expect(result.attemptId).toBe(101);
+    expect(create).not.toHaveBeenCalled();
   });
 });

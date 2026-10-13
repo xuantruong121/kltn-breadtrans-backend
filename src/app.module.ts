@@ -35,6 +35,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { IssueReportModule } from './modules/issue-report/issue-report.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { LocationModule } from './modules/location/location.module';
+import { SkillCmsModule } from './modules/content/skill-cms.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { LocationModule } from './modules/location/location.module';
     IssueReportModule,
     SubscriptionModule,
     LocationModule,
+    SkillCmsModule,
   ],
 
   controllers: [AppController],
