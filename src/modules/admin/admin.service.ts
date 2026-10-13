@@ -733,24 +733,23 @@ export class AdminService {
     });
   }
 
-  async createSpeakingExercise(dto: {
+  createSpeakingExercise(dto: {
     title: string;
     targetText: string;
     category?: string;
     difficulty?: string;
   }) {
-    return this.prisma.speakingExercise.create({
-      data: {
-        title: dto.title,
-        targetText: dto.targetText,
-        category: dto.category || 'COMMUNICATION',
-        difficulty: dto.difficulty || 'BEGINNER',
-      },
-    });
+    void dto;
+    throw new ConflictException(
+      'Speaking content is managed by the Skill CMS /admin/skill-content/speaking',
+    );
   }
 
-  async deleteSpeakingExercise(id: number) {
-    return this.prisma.speakingExercise.delete({ where: { id } });
+  deleteSpeakingExercise(id: number) {
+    void id;
+    throw new ConflictException(
+      'Speaking content is managed by the Skill CMS /admin/skill-content/speaking',
+    );
   }
 
   // ============== PRACTICE TOPICS MANAGEMENT ==============

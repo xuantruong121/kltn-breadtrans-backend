@@ -26,8 +26,9 @@ Thay vì sử dụng Class làm khối trung tâm như cũ, hệ thống đã ch
 - **Lớp học (Class/Session):** Được lồng vào bên trong Khóa học. Khi Giáo viên dạy qua Google Meet, họ không tạo một lớp đơn lẻ mà tạo các **Buổi học (Session)** bên trong Khóa học. Mỗi Session có link Meet và khoảng thời gian riêng biệt.
   - (Đã khắc phục lỗi xung đột Route: `@Get('classes')` phải đặt trước `@Get(':id')` trong `course.controller.ts`).
 
-### C. Đảo Luyện Tập & TOEIC
+### C. Kỹ Năng & Các Format Chứng Chỉ
 - Các module đã thiết lập: `toeic`, `vocab`, `reading`, `speaking`, `writing`.
+- TOEIC là một format đang được hỗ trợ; kiến trúc module cho phép mở rộng thêm các dạng chứng chỉ khác.
 - Sẵn sàng mở rộng chấm điểm bằng AI (Gemini).
 
 ## 3. Quy Ước Kiến Trúc (Architecture Rules)
@@ -37,4 +38,4 @@ Thay vì sử dụng Class làm khối trung tâm như cũ, hệ thống đã ch
 
 ## 4. Work in Progress / Next Steps
 - Tích hợp thêm các luồng xử lý AI (Gemini) cho việc chấm điểm Speaking/Writing.
-- Xây dựng hệ thống Import Đề thi TOEIC từ PDF.
+- Xây dựng hệ thống Import đề thi theo format chứng chỉ từ PDF; phiên bản hiện tại có luồng TOEIC.

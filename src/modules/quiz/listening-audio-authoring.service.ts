@@ -816,6 +816,33 @@ export class ListeningAudioAuthoringService {
     }));
   }
 
+  async getPreviewAudio(quizId: number, artifactId: number) {
+    const artifact = await this.prisma.listeningAudioArtifact.findFirst({
+      where: {
+        id: artifactId,
+        quizId,
+        status: { in: ['PREVIEW_READY', 'APPROVED', 'PUBLISHED'] },
+      },
+    });
+    if (!artifact?.r2Key)
+      throw new NotFoundException('Không tìm thấy audio preview.');
+    const current = await this.validateContent(quizId);
+    if (current.synthesisHash !== artifact.synthesisHash)
+      throw new ConflictException('Artifact đã stale do nội dung thay đổi.');
+    const isPremium = await this.isPremiumListeningQuiz(quizId);
+    this.assertPremiumArtifactStorage(
+      isPremium,
+      artifact.r2Key,
+      artifact.r2Url,
+    );
+    return {
+      artifact,
+      buffer: isPremium
+        ? await this.uploadService.downloadPrivateFileBuffer(artifact.r2Key)
+        : await this.uploadService.downloadFileBuffer(artifact.r2Key),
+    };
+  }
+
   async getCurrentPublishedArtifact(quizId: number) {
     const artifact = await this.getArtifact(quizId);
     if (!artifact) return null;

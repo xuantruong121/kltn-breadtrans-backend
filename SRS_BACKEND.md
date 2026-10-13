@@ -3,7 +3,7 @@
 
 ## 1. MỤC TIÊU DỰ ÁN VÀ PHẠM VI
 **Mục tiêu:** Xây dựng một hệ thống E-Learning toàn diện, kết hợp Trí tuệ nhân tạo (AI - Google Gemini) để hỗ trợ cá nhân hóa lộ trình học, tự động chấm điểm bài tự luận (Writing) và ứng dụng Gamification (Điểm, Huy hiệu) nhằm tăng động lực học tập.
-**Phạm vi:** Hệ thống tập trung vào việc giảng dạy ngoại ngữ (IELTS, TOEIC), cung cấp môi trường tương tác giữa Học viên và Giáo viên.
+**Phạm vi:** Hệ thống là nền tảng tự học tiếng Anh theo kỹ năng, cấp độ, chủ đề và các khóa học có lộ trình sẵn; hỗ trợ luyện đề theo nhiều dạng chứng chỉ, trong đó TOEIC là một format đang có trong runtime, đồng thời cung cấp môi trường tương tác giữa Học viên và Giáo viên.
 
 ## 2. YÊU CẦU CHỨC NĂNG (Functional Requirements)
 

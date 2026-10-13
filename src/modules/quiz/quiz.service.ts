@@ -966,6 +966,7 @@ export class QuizService {
         'Protected Listening media storage is not configured',
       );
     }
+    if (dto.type) this.assertGenericAdminOwnership(dto.type);
     return this.prisma.quiz.create({ data: dto });
   }
 
@@ -987,6 +988,7 @@ export class QuizService {
     }
 
     const effectiveType = dto.type ?? existing.type;
+    this.assertGenericAdminOwnership(effectiveType);
     if (
       effectiveType === QuizType.LISTENING_PRACTICE &&
       dto.isPremiumContent === true
@@ -1010,6 +1012,7 @@ export class QuizService {
       },
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
+    this.assertGenericAdminOwnership(quiz.type);
     if (
       status === 'PUBLISHED' &&
       quiz.type === QuizType.LISTENING_PRACTICE &&
@@ -1068,6 +1071,7 @@ export class QuizService {
         'Chỉ Quản trị viên mới có quyền xóa bài kiểm tra',
       );
     }
+    this.assertGenericAdminOwnership(existing.type);
 
     return this.prisma.quiz.delete({
       where: { id },
@@ -1881,6 +1885,7 @@ export class QuizService {
       select: { id: true, type: true, publicationStatus: true },
     });
     if (!quiz) throw new NotFoundException('Không tìm thấy đề thi');
+    this.assertGenericAdminOwnership(quiz.type);
 
     const content = normalizeQuestionContent(
       quiz.type,
@@ -2076,6 +2081,7 @@ export class QuizService {
       include: { quiz: { select: { type: true, publicationStatus: true } } },
     });
     if (!existing) throw new NotFoundException('Question not found');
+    this.assertGenericAdminOwnership(existing.quiz.type);
 
     const data = { ...dto };
     if (dto.content !== undefined) {
@@ -2095,11 +2101,26 @@ export class QuizService {
   async deleteQuestion(questionId: number) {
     const existing = await this.prisma.question.findUnique({
       where: { id: questionId },
+      include: { quiz: { select: { type: true } } },
     });
     if (!existing) throw new NotFoundException('Question not found');
+    this.assertGenericAdminOwnership(existing.quiz.type);
     return this.prisma.question.delete({
       where: { id: questionId },
     });
+  }
+
+  private assertGenericAdminOwnership(type: QuizType) {
+    if (
+      type === QuizType.LISTENING_PRACTICE ||
+      type === QuizType.BILINGUAL_READING ||
+      type === QuizType.WRITING_EMAIL ||
+      type === QuizType.WRITING_PICTURE
+    ) {
+      throw new ConflictException(
+        'Nội dung kỹ năng này được quản lý trong Skill CMS chuyên biệt',
+      );
+    }
   }
 
   private async replayReadingSubmission(

@@ -1130,6 +1130,7 @@ model SpeakingExercise {
   difficulty        String                @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
   category          String                @default("TOEIC") // IELTS, TOEIC, GENERAL
   practiceSetId     String?
+  publicationStatus QuizPublicationStatus @default(DRAFT)
   createdAt         DateTime              @default(now())
 
   submissions   SpeakingSubmission[]
@@ -1145,6 +1146,7 @@ model SpeakingPracticeSet {
   description       String
   category          String
   level             String
+  publicationStatus QuizPublicationStatus @default(DRAFT)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 

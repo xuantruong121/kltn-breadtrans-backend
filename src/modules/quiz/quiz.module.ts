@@ -23,6 +23,10 @@ import { QuizContentAccessService } from './quiz-content-access.service';
     QuizContentAccessService,
   ],
   controllers: [QuizController],
-  exports: [QuizContentAccessService],
+  exports: [
+    QuizContentAccessService,
+    QuizService,
+    ListeningAudioAuthoringService,
+  ],
 })
 export class QuizModule {}
