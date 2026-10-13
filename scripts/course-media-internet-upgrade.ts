@@ -102,22 +102,6 @@ const assets: Asset[] = [
     type: 'IMAGE',
   },
   {
-    id: 'course-8-lesson-57-present',
-    courseId: 8,
-    lessonId: 57,
-    role: 'LESSON',
-    fileName: 'course-8-lesson-57-present.png',
-    sourcePage: 'https://commons.wikimedia.org/wiki/File:English_Grammar_Time_Simple_Present.png',
-    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/6d/English_Grammar_Time_Simple_Present.png',
-    creator: 'English Grammar Time',
-    license: 'CC0',
-    licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-    attribution: 'English Grammar Time (CC0)',
-    altText: 'Dòng thời gian và ví dụ minh họa cách dùng thì hiện tại đơn cho thói quen.',
-    reason: 'The open diagram adds a real routine timeline; the existing internal SVG remains the stronger explanation of the two-tense contrast.',
-    type: 'IMAGE',
-  },
-  {
     id: 'course-8-lesson-63-prepositions',
     courseId: 8,
     lessonId: 63,
@@ -264,6 +248,10 @@ const assets: Asset[] = [
 ];
 
 const course8Fallbacks: Record<number, { reason: string; rejectedCandidates: string[] }> = {
+  57: {
+    reason: 'Internet research completed, but available candidates covered only one tense or used less suitable presentation. Keep the original BreadTrans two-panel comparison uploaded to R2.',
+    rejectedCandidates: ['https://commons.wikimedia.org/wiki/File:English_Grammar_Time_Simple_Present.png', 'https://commons.wikimedia.org/wiki/File:English_grammar_tenses.pdf'],
+  },
   58: {
     reason: 'Internet search returned scans or unrelated material; the existing compact diagram is clearer for countable/uncountable quantity at card width.',
     rejectedCandidates: ['https://commons.wikimedia.org/wiki/Category:English_grammar', 'https://commons.wikimedia.org/wiki/File:BOU_-_English_Two_-_Unit_01_-_Article.pdf'],

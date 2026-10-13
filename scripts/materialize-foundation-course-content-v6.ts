@@ -2646,7 +2646,8 @@ const courseSpecs: CourseSpec[] = [
       'Lộ trình nền tảng dành cho người Việt mới học: giao tiếp hằng ngày, nghe, nói, đọc, viết, ngữ pháp, từ vựng và phát âm trong ngữ cảnh thực tế.',
     level: 'A1-A2',
     curriculumType: 'FOUR_SKILLS',
-    thumbnail: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/cover/v2-c85e2a13a7d6956f.jpg',
+    thumbnail:
+      'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-1/cover/v2-c85e2a13a7d6956f.jpg',
     lessons: foundationLessons,
   },
   {
@@ -2656,7 +2657,8 @@ const courseSpecs: CourseSpec[] = [
       'Giải thích bằng tiếng Việt các cấu trúc ngữ pháp và cụm từ thiết yếu A1–A2, kèm ví dụ song ngữ, lỗi thường gặp và bài tập có phản hồi.',
     level: 'A1-A2',
     curriculumType: 'FOCUSED_GRAMMAR_VOCAB',
-    thumbnail: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/cover/v2-19c44391cc6450c5.jpg',
+    thumbnail:
+      'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/cover/v2-19c44391cc6450c5.jpg',
     lessons: grammarLessons,
   },
   {
@@ -2665,14 +2667,15 @@ const courseSpecs: CourseSpec[] = [
       'Khóa học phát âm nhập môn cho người Việt: hiểu IPA, luyện nguyên âm, phụ âm, âm cuối, trọng âm, schwa, nối âm và tự nghe lại giọng nói.',
     level: 'A1-A2',
     curriculumType: 'PRONUNCIATION_FOUNDATION',
-    thumbnail: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/cover/v2-1e69646244474471.jpg',
+    thumbnail:
+      'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/cover/v2-1e69646244474471.jpg',
     lessons: pronunciationLessons,
   },
 ];
 
 const course8LessonMedia: Record<string, { url: string; altText: string }> = {
   'present-simple-and-continuous': {
-    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v2-0474169db370734c.png',
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v3-99c7517ce7c7137d.svg',
     altText:
       'Sơ đồ so sánh hiện tại đơn cho thói quen với hiện tại tiếp diễn cho hành động đang xảy ra.',
   },
@@ -3039,24 +3042,10 @@ async function materializeLesson(
       });
     }
   }
-  const referenceId = courseId * 1000 + order;
-  await prisma.courseLessonReference.upsert({
-    where: { id: referenceId },
-    update: {
-      lessonId: row.id,
-      title: 'Tài liệu tham khảo thêm (không bắt buộc)',
-      publisher: 'BreadTrans editorial note',
-      url: 'https://learnenglish.britishcouncil.org/',
-      note: 'Tài liệu chỉ để đọc thêm; toàn bộ kiến thức cần thiết đã nằm trong bài học BreadTrans.',
-    },
-    create: {
-      id: referenceId,
-      lessonId: row.id,
-      title: 'Tài liệu tham khảo thêm (không bắt buộc)',
-      publisher: 'BreadTrans editorial note',
-      url: 'https://learnenglish.britishcouncil.org/',
-      note: 'Tài liệu chỉ để đọc thêm; toàn bộ kiến thức cần thiết đã nằm trong bài học BreadTrans.',
-    },
+  // External research is retained in authoring manifests only; never materialize
+  // learner-facing reference links into active lessons.
+  await prisma.courseLessonReference.deleteMany({
+    where: { lessonId: row.id },
   });
   if (courseId === 8) {
     const media = course8LessonMedia[lesson.slug];

@@ -176,7 +176,9 @@ export class CourseLearningV5Service {
         coverImage: lesson.coverImage,
         sections: lesson.sections,
         media: lesson.media,
-        references: lesson.references,
+        // Research provenance is authoring-only. Learner lessons are self-contained
+        // and must not expose external learning links.
+        references: [],
         exercises: lesson.exercises.map((exercise) => ({
           id: exercise.id,
           slug: exercise.slug,
@@ -258,6 +260,19 @@ export class CourseLearningV5Service {
     const answerById = new Map(
       answers.map((answer) => [Number(answer.questionId), answer.answer]),
     );
+    for (const question of exercise.questions) {
+      const answer = answerById.get(question.id);
+      if (Array.isArray(question.options) && question.options.length > 0) {
+        const isKnownOption = question.options.some((option) =>
+          this.answersEqual(answer, option),
+        );
+        if (!isKnownOption) {
+          throw new BadRequestException(
+            `Lựa chọn không hợp lệ cho câu hỏi ${question.order}`,
+          );
+        }
+      }
+    }
     const graded = exercise.questions.map((question) => {
       const rawAnswer = answerById.get(question.id);
       const answer = rawAnswer === undefined ? null : rawAnswer;
@@ -273,6 +288,34 @@ export class CourseLearningV5Service {
     const score = graded.reduce((sum, answer) => sum + answer.score, 0);
     const maxScore = exercise.questions.length;
     const attempt = await this.prisma.$transaction(async (tx) => {
+      if (typeof tx.$executeRaw === 'function') {
+        const lockKey = BigInt(user.id) * 1_000_003n + BigInt(exerciseId);
+        await tx.$executeRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(${lockKey})`,
+        );
+      }
+      if (typeof tx.courseLessonAttempt.findFirst === 'function') {
+        const existing = await tx.courseLessonAttempt.findFirst({
+          where: {
+            userId: user.id,
+            lessonId,
+            exerciseId,
+            status: CourseLessonAttemptStatus.SUBMITTED,
+          },
+          orderBy: { createdAt: 'desc' },
+          include: { answers: true },
+        });
+        if (
+          existing &&
+          this.submissionMatches(
+            existing.answers,
+            answerById,
+            exercise.questions,
+          )
+        ) {
+          return existing;
+        }
+      }
       const created = await tx.courseLessonAttempt.create({
         data: {
           userId: user.id,
@@ -302,15 +345,30 @@ export class CourseLearningV5Service {
       maxScore,
       percentage: maxScore ? Math.round((score / maxScore) * 100) : 0,
       completed: this.isSuccessful(score, maxScore, exercise.minimumScore),
-      feedback: graded.map(
-        ({ questionId, answer, isCorrect, explanation }) => ({
-          questionId,
-          answer,
-          isCorrect,
-          explanation,
-        }),
-      ),
+      feedback: graded.map(({ questionId, isCorrect, explanation }) => ({
+        questionId,
+        answer: answerById.get(questionId) ?? null,
+        correctAnswer: exercise.questions.find(
+          (question) => question.id === questionId,
+        )?.correctAnswer,
+        isCorrect,
+        explanation,
+      })),
     };
+  }
+
+  private submissionMatches(
+    persisted: Array<{ questionId: number; answer: Prisma.JsonValue }>,
+    submitted: Map<number, unknown>,
+    questions: Array<{ id: number }>,
+  ) {
+    if (persisted.length !== questions.length) return false;
+    return questions.every((question) =>
+      this.answersEqual(
+        persisted.find((answer) => answer.questionId === question.id)?.answer,
+        submitted.get(question.id),
+      ),
+    );
   }
 
   private isSuccessful(
@@ -335,7 +393,7 @@ export class CourseLearningV5Service {
     return safe;
   }
 
-  private answersEqual(left: unknown, right: Prisma.JsonValue) {
+  private answersEqual(left: unknown, right: unknown) {
     return (
       JSON.stringify(this.normalizeAnswer(left)) ===
       JSON.stringify(this.normalizeAnswer(right))

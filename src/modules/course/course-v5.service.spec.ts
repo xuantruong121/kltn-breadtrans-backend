@@ -149,4 +149,62 @@ describe('CourseLearningV5Service', () => {
     ).rejects.toThrow();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it('rejects an option that is not part of the current question before persistence', async () => {
+    prisma.courseLessonExercise.findFirst.mockResolvedValue({
+      id: 44,
+      lessonId: 12,
+      questions: [
+        {
+          id: 88,
+          order: 1,
+          options: ['A', 'B'],
+          correctAnswer: 'A',
+          explanation: '',
+        },
+      ],
+    });
+    await expect(
+      service.submitExercise(1, 12, 44, user, {
+        answers: [{ questionId: 88, answer: 'C' }],
+      }),
+    ).rejects.toThrow('Lựa chọn không hợp lệ');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('reuses a matching submitted attempt under the transaction lock', async () => {
+    prisma.courseLessonExercise.findFirst.mockResolvedValue({
+      id: 44,
+      lessonId: 12,
+      minimumScore: null,
+      questions: [
+        {
+          id: 88,
+          order: 1,
+          options: ['A', 'B'],
+          correctAnswer: 'A',
+          explanation: 'Because',
+        },
+      ],
+    });
+    const create = jest.fn();
+    prisma.$transaction.mockImplementation(
+      async (callback: (tx: any) => Promise<unknown>) =>
+        callback({
+          $executeRaw: jest.fn(),
+          courseLessonAttempt: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: 101,
+              answers: [{ questionId: 88, answer: 'A' }],
+            }),
+            create,
+          },
+        }),
+    );
+    const result = await service.submitExercise(1, 12, 44, user, {
+      answers: [{ questionId: 88, answer: 'A' }],
+    });
+    expect(result.attemptId).toBe(101);
+    expect(create).not.toHaveBeenCalled();
+  });
 });

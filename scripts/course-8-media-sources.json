@@ -64,19 +64,19 @@
       "title": "Thì hiện tại đơn và hiện tại tiếp diễn",
       "slug": "present-simple-and-continuous",
       "image": {
-        "sourceType": "INTERNET_MEDIA_SELECTED",
-        "localAsset": "content-assets/internet-course-media/course-8-lesson-57-present.png",
-        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v2-0474169db370734c.png",
-        "sha256": "0474169DB370734CC35D1113EA2EA45ED07893014B98163E798E33D2C7D543F0",
-        "visualVersion": "internet-upgrade-2026-10-12",
-        "sourceUrl": "https://commons.wikimedia.org/wiki/File:English_Grammar_Time_Simple_Present.png",
-        "altText": "Dòng thời gian và ví dụ minh họa cách dùng thì hiện tại đơn cho thói quen.",
-        "creator": "English Grammar Time",
-        "license": "CC0",
+        "sourceType": "INTERNAL_ORIGINAL",
+        "localAsset": "content-assets/internet-course-media/course-8-lesson-57-present.svg",
+        "finalUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-57/media/v3-99c7517ce7c7137d.svg",
+        "sha256": "99c7517CE7C7137D9F625A74B0D195C182A7F06410F84C970EB72D1CA6E1015D",
+        "visualVersion": "breadtrans-original-2026-10-13",
+        "sourceUrl": null,
+        "altText": "Sơ đồ so sánh hiện tại đơn cho thói quen với hiện tại tiếp diễn cho hành động đang xảy ra.",
+        "creator": "BreadTrans",
+        "license": "Original BreadTrans artwork",
         "attributionRequired": false,
         "licenseVerified": true,
         "pedagogicalRelevance": true,
-        "reason": "Open routine timeline adds Internet-sourced context; the lesson text still explains the present-continuous contrast."
+        "reason": "Internet research completed; incomplete single-tense candidates were rejected. Original BreadTrans infographic directly teaches the two-tense contrast without watermark or third-party branding."
       }
     },
     {
