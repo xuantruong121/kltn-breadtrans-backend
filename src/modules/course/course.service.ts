@@ -319,10 +319,11 @@ export class CourseService {
       };
     }
 
-    const access = await this.resolveCourseAccess(id, userId, role);
-    if (course.status !== CourseStatus.PUBLISHED && !access.canAccess) {
+    if (course.status !== CourseStatus.PUBLISHED) {
       throw new NotFoundException('Course not found');
     }
+
+    const access = await this.resolveCourseAccess(id, userId, role);
     const active = userId
       ? await this.prisma.enrollment.findFirst({
           where: {

@@ -77,6 +77,18 @@ describe('CourseService self-paced business rules', () => {
     expect(prisma.course.update).not.toHaveBeenCalled();
   });
 
+  it('does not expose draft courses to students', async () => {
+    prisma.course.findUnique.mockResolvedValue({
+      id: 9,
+      status: CourseStatus.DRAFT,
+    });
+
+    await expect(service.getCourseById(9, 7, 'STUDENT')).rejects.toThrow(
+      'Course not found',
+    );
+    expect(prisma.course.findUnique).toHaveBeenCalledTimes(1);
+  });
+
   it('allows publishing when published V5 lessons have required content', async () => {
     prisma.courseLesson.findMany.mockResolvedValue([
       {

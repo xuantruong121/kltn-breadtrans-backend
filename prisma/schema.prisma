@@ -1121,16 +1121,16 @@ model PointHistory {
 
 // Speaking Practice Models
 model SpeakingExercise {
-  id               Int      @id @default(autoincrement())
-  title            String
-  targetText       String   @db.Text // Câu/đoạn văn cần đọc (hoặc script mẫu)
-  imageUrl         String? // Dùng cho TOEIC Part 1 (Mô tả tranh)
-  audioUrl         String? // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
-  isPremiumContent Boolean  @default(false)
-  difficulty       String   @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
-  category         String   @default("TOEIC") // IELTS, TOEIC, GENERAL
-  practiceSetId    String?
-  createdAt        DateTime @default(now())
+  id                Int                   @id @default(autoincrement())
+  title             String
+  targetText        String                @db.Text // Câu/đoạn văn cần đọc (hoặc script mẫu)
+  imageUrl          String? // Dùng cho TOEIC Part 1 (Mô tả tranh)
+  audioUrl          String? // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
+  isPremiumContent  Boolean               @default(false)
+  difficulty        String                @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
+  category          String                @default("TOEIC") // IELTS, TOEIC, GENERAL
+  practiceSetId     String?
+  createdAt         DateTime              @default(now())
 
   submissions   SpeakingSubmission[]
   uploadIntents SpeakingUploadIntent[]
@@ -1140,13 +1140,13 @@ model SpeakingExercise {
 }
 
 model SpeakingPracticeSet {
-  id          String   @id
-  title       String
-  description String
-  category    String
-  level       String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String                @id
+  title             String
+  description       String
+  category          String
+  level             String
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   exercises        SpeakingExercise[]
   courseActivities CourseActivity[]
