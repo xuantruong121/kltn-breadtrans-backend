@@ -3,16 +3,10 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
-import { EmailService } from '../src/common/email/email.service';
-import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
-import Redis from 'ioredis';
 
 describe('AuthModule (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let emailService: EmailService;
-  let redis: Redis;
-  let capturedOtp = '';
   let accessToken = '';
 
   beforeAll(async () => {
@@ -25,25 +19,11 @@ describe('AuthModule (e2e)', () => {
     await app.init();
 
     prisma = app.get<PrismaService>(PrismaService);
-    emailService = app.get<EmailService>(EmailService);
-    redis = app.get<Redis>(getRedisConnectionToken());
-
-    jest
-      .spyOn(emailService, 'sendRegistrationOtp')
-      .mockImplementation((_to: string, otp: string) => {
-        capturedOtp = otp;
-        return Promise.resolve();
-      });
 
     // Dọn dẹp dữ liệu test cũ nếu có
     await prisma.user.deleteMany({
       where: { email: 'test_e2e@breadtrans.com' },
     });
-    if (redis) {
-      await redis.del('register:pending:test_e2e@breadtrans.com');
-      await redis.del('register:otp:test_e2e@breadtrans.com');
-      await redis.del('register:otp:attempts:test_e2e@breadtrans.com');
-    }
   });
 
   afterAll(async () => {
@@ -51,18 +31,12 @@ describe('AuthModule (e2e)', () => {
     await prisma.user.deleteMany({
       where: { email: 'test_e2e@breadtrans.com' },
     });
-    if (redis) {
-      await redis.del('register:pending:test_e2e@breadtrans.com');
-      await redis.del('register:otp:test_e2e@breadtrans.com');
-      await redis.del('register:otp:attempts:test_e2e@breadtrans.com');
-      await redis.quit();
-    }
     await prisma.$disconnect();
     await app.close();
   });
 
-  describe('/auth/register (POST) & /auth/register/verify (POST)', () => {
-    it('should initiate registration and send OTP', () => {
+  describe('/auth/register (POST)', () => {
+    it('should create a student account immediately without email verification', () => {
       return request(app.getHttpServer())
         .post('/auth/register')
         .send({
@@ -71,30 +45,6 @@ describe('AuthModule (e2e)', () => {
           fullName: 'Test E2E User',
         })
         .expect(201)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('message');
-          expect(capturedOtp).toMatch(/^\d{6}$/);
-        });
-    });
-
-    it('should reject verification with invalid OTP', () => {
-      return request(app.getHttpServer())
-        .post('/auth/register/verify')
-        .send({
-          email: 'test_e2e@breadtrans.com',
-          otp: '000000',
-        })
-        .expect(401);
-    });
-
-    it('should complete registration with valid OTP', () => {
-      return request(app.getHttpServer())
-        .post('/auth/register/verify')
-        .send({
-          email: 'test_e2e@breadtrans.com',
-          otp: capturedOtp,
-        })
-        .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty('id');
           expect(res.body.email).toEqual('test_e2e@breadtrans.com');
