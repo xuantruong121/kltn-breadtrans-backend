@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   ConflictException,
   ServiceUnavailableException,
@@ -18,12 +19,13 @@ import Redis from 'ioredis';
 import * as crypto from 'crypto';
 import { getOtpSecret } from './auth.constants';
 import { Role } from '@prisma/client';
-import { EmailService } from '../../common/email/email.service';
 import { GoogleProfile } from './strategies/google.strategy';
 import { OAuth2Client } from 'google-auth-library';
+import { EmailService } from '../../common/email/email.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly googleClient = new OAuth2Client();
 
   constructor(
@@ -40,23 +42,96 @@ export class AuthService {
     });
     if (existingUser) throw new ConflictException('Email already exists');
     const hashedPassword = await bcrypt.hash(password, 12);
-    await this.redis.set(
-      `register:pending:${email}`,
-      JSON.stringify({ email, fullName, password: hashedPassword }),
-      'EX',
-      600,
-    );
-    const otp = crypto.randomInt(100000, 1000000).toString();
-    const otpHash = crypto
-      .createHmac('sha256', getOtpSecret())
-      .update(otp)
-      .digest('hex');
-    await this.redis.set(`register:otp:${email}`, otpHash, 'EX', 300);
-    await this.redis.del(`register:otp:attempts:${email}`);
-    await this.emailService.sendRegistrationOtp(email, otp);
-    return {
-      message: 'Registration started. Verify the OTP sent to your email.',
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        role: Role.STUDENT,
+        emailVerifiedAt: new Date(),
+        profile: { create: { fullName } },
+      },
+      include: { profile: true },
+    });
+    const { password: createdPassword, ...safeUser } = user;
+    void createdPassword;
+    return safeUser;
+  }
+
+  async requestPasswordReset(rawEmail: string) {
+    const email = rawEmail.trim().toLowerCase();
+    const genericResponse = {
+      message:
+        'Nếu email tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi đến hộp thư của bạn.',
     };
+    const cooldownKey = `auth:password-reset:cooldown:${email}`;
+    const accepted = await this.redis.set(cooldownKey, '1', 'EX', 60, 'NX');
+    if (accepted !== 'OK') return genericResponse;
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) return genericResponse;
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
+    const tokenKey = `auth:password-reset:token:${tokenHash}`;
+    const userTokenKey = `auth:password-reset:user:${user.id}`;
+    const previousTokenHash = await this.redis.get(userTokenKey);
+    if (previousTokenHash) {
+      await this.redis.del(`auth:password-reset:token:${previousTokenHash}`);
+    }
+
+    const ttlSeconds = 15 * 60;
+    await this.redis.set(tokenKey, String(user.id), 'EX', ttlSeconds);
+    await this.redis.set(userTokenKey, tokenHash, 'EX', ttlSeconds);
+
+    const frontendUrl = (
+      process.env.FRONTEND_URL || 'http://localhost:3000'
+    ).replace(/\/$/, '');
+    const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
+    try {
+      await this.emailService.sendPasswordResetEmail(email, resetUrl);
+    } catch (error) {
+      this.logger.error(`Password reset email failed for ${email}`, error);
+    }
+
+    return genericResponse;
+  }
+
+  async resetPassword(rawToken: string, newPassword: string) {
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
+    const tokenKey = `auth:password-reset:token:${tokenHash}`;
+    const rawUserId = await this.redis.getdel(tokenKey);
+    if (!rawUserId) {
+      throw new UnauthorizedException(
+        'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.',
+      );
+    }
+
+    const userId = Number(rawUserId);
+    const userTokenKey = `auth:password-reset:user:${userId}`;
+    const currentTokenHash = await this.redis.get(userTokenKey);
+    if (currentTokenHash !== tokenHash) {
+      throw new UnauthorizedException(
+        'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.',
+      );
+    }
+
+    const password = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password, mustChangePassword: false },
+    });
+    await this.redis.del(userTokenKey);
+
+    const sessionKeys = await this.redis.keys(`user:${userId}:device:*`);
+    if (sessionKeys.length > 0) await this.redis.del(...sessionKeys);
+
+    return { message: 'Đặt lại mật khẩu thành công.' };
   }
   async login(loginDto: LoginDto, deviceId: string) {
     const { email, password } = loginDto;
@@ -266,50 +341,6 @@ export class AuthService {
     // Single-use: Destroy OTP
     await this.redis.del(redisKey);
     return { message: 'OTP verified successfully' };
-  }
-
-  async verifyRegistration(email: string, providedOtp: string) {
-    const pendingRaw = await this.redis.get(`register:pending:${email}`);
-    if (!pendingRaw)
-      throw new UnauthorizedException('Registration expired or invalid');
-    const otpKey = `register:otp:${email}`;
-    const storedHash = await this.redis.get(otpKey);
-    if (!storedHash) throw new UnauthorizedException('OTP expired or invalid');
-    const attempts = await this.redis.incr(`register:otp:attempts:${email}`);
-    await this.redis.expire(`register:otp:attempts:${email}`, 300);
-    if (attempts > 5) {
-      await this.redis.del(`register:pending:${email}`, otpKey);
-      throw new UnauthorizedException('Too many invalid OTP attempts');
-    }
-    const computedHash = crypto
-      .createHmac('sha256', getOtpSecret())
-      .update(providedOtp)
-      .digest('hex');
-    if (storedHash !== computedHash)
-      throw new UnauthorizedException('Invalid OTP');
-    const pending = JSON.parse(pendingRaw) as {
-      email: string;
-      fullName: string;
-      password: string;
-    };
-    const user = await this.prisma.user.create({
-      data: {
-        email: pending.email,
-        password: pending.password,
-        role: Role.STUDENT,
-        emailVerifiedAt: new Date(),
-        profile: { create: { fullName: pending.fullName } },
-      },
-      include: { profile: true },
-    });
-    await this.redis.del(
-      `register:pending:${email}`,
-      otpKey,
-      `register:otp:attempts:${email}`,
-    );
-    const { password, ...safeUser } = user;
-    void password;
-    return safeUser;
   }
 
   async changePassword(

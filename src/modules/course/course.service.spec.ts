@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/require-await */
 import { CourseService } from './course.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CourseStatus, ClassStatus, EnrollmentStatus } from '@prisma/client';

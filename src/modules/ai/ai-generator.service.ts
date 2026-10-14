@@ -4,6 +4,7 @@ import {
   BadRequestException,
   NotFoundException,
   ConflictException,
+  GoneException,
 } from '@nestjs/common';
 import { Allow } from 'class-validator';
 import { InjectRedis } from '@nestjs-modules/ioredis';
@@ -604,6 +605,8 @@ export class AiGeneratorService {
     payload: PublishContentDto,
     adminId: number,
   ) {
+    void payload;
+    void adminId;
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
     });
@@ -619,107 +622,10 @@ export class AiGeneratorService {
       throw new ConflictException('Cần phê duyệt bản nháp trước khi xuất bản.');
     const approved = job.approvedSnapshot as unknown as PublishContentDto;
     this.validatePayload(approved);
-    const resources = await this.prisma.$transaction(async (tx) => {
-      const claim = await tx.aiGenerationJob.updateMany({
-        where: { id: jobId, status: AiGenerationJobStatus.APPROVED },
-        data: { status: AiGenerationJobStatus.PUBLISHING },
-      });
-      if (claim.count !== 1) {
-        throw new ConflictException(
-          'Một yêu cầu xuất bản khác đang được xử lý. Vui lòng tải lại lịch sử job.',
-        );
-      }
-      let quizId: number | null = null;
-      let vocabTopicId: number | null = null;
-      let assignmentId: number | null = null;
-      if (approved.publishQuiz !== false && approved.quizQuestions?.length) {
-        const quiz = await tx.quiz.create({
-          data: {
-            title:
-              approved.quizTitle ||
-              `Đề Trắc Nghiệm AI: ${new Date().toLocaleDateString('vi-VN')}`,
-            description: `Bản nháp AI đã được quản trị viên duyệt (${approved.quizQuestions.length} câu hỏi).`,
-            type: 'TOEIC',
-            publicationStatus: 'PUBLISHED',
-            publishedAt: new Date(),
-            timeLimit: Math.max(10, approved.quizQuestions.length * 2),
-            questions: {
-              create: approved.quizQuestions.map((q, idx) => ({
-                type: 'MULTIPLE_CHOICE',
-                order: idx + 1,
-                content: {
-                  text: q.question,
-                  options: q.options,
-                  correctAnswer: q.options[q.correctIndex],
-                  explanation: q.explanation || '',
-                },
-              })),
-            },
-          },
-        });
-        quizId = quiz.id;
-      }
-      if (approved.publishFlashcards !== false && approved.flashcards?.length) {
-        const topic = await tx.vocabTopic.create({
-          data: {
-            title:
-              approved.vocabTopicTitle ||
-              `Từ Vựng AI: ${new Date().toLocaleDateString('vi-VN')}`,
-            categoryName: 'GENERAL ENGLISH',
-            iconUrl: '💡',
-            totalWords: approved.flashcards.length,
-            isPro: false,
-            words: {
-              create: approved.flashcards.map((fc) => ({
-                word: fc.term,
-                pos: fc.pos || 'noun',
-                meaning: fc.meaning,
-                ipaUs: fc.ipa || '',
-                exampleEn: fc.example || '',
-                exampleVi: fc.meaning,
-                audioUs: `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(fc.term)}&type=2`,
-              })),
-            },
-          },
-        });
-        vocabTopicId = topic.id;
-      }
-      if (
-        approved.publishAssignment !== false &&
-        approved.targetClassId &&
-        approved.assignmentTitle
-      ) {
-        const assignment = await tx.assignment.create({
-          data: {
-            classId: approved.targetClassId,
-            title: approved.assignmentTitle,
-            description: approved.assignmentDescription || '',
-            type: 'ESSAY',
-            dueDate: new Date(Date.now() + 86400000 * 7),
-          },
-        });
-        assignmentId = assignment.id;
-      }
-      await tx.aiGenerationJob.update({
-        where: { id: jobId },
-        data: {
-          status: AiGenerationJobStatus.PUBLISHED,
-          publishedByAdminId: adminId,
-          publishedAt: new Date(),
-          publishedResources: { quizId, vocabTopicId, assignmentId },
-        },
-      });
-      return { quizId, vocabTopicId, assignmentId };
-    });
-    this.logger.log(
-      `AI authoring job ${jobId} published resources ${JSON.stringify(resources)}`,
+
+    throw new GoneException(
+      'Đường dẫn xuất bản trực tiếp từ AI-tools cũ đã được đóng để bảo vệ tính toàn vẹn Single-Writer của các Studio chuyên biệt. Hãy sao chép nội dung nháp và tạo bài học trong Course Studio, Exam Studio hoặc Vocabulary Studio tương ứng.',
     );
-    return {
-      success: true,
-      ...resources,
-      status: AiGenerationJobStatus.PUBLISHED,
-      message: 'Đã phê duyệt và xuất bản nội dung an toàn.',
-    };
   }
 
   async retryJob(jobId: string, adminId: number) {

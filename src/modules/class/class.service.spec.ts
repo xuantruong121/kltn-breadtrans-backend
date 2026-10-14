@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { ClassService } from './class.service';
 import { PrismaService } from '../../prisma/prisma.service';
 

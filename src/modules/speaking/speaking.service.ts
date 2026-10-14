@@ -22,7 +22,7 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
 import { getSpeakingPipelineMode } from './speaking.constants';
-import { Role } from '@prisma/client';
+import { QuizPublicationStatus, Role } from '@prisma/client';
 import type { SpeakingSubmission } from '@prisma/client';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
 import { resolveSpeakingPracticeSet } from './speaking-practice-set';
@@ -185,11 +185,23 @@ export class SpeakingService {
     return this.r2Service ?? this.uploadService;
   }
 
-  private async findExerciseRecordById(id: number) {
+  private async findExerciseRecordById(id: number, role?: Role) {
     const exercise = await this.prisma.speakingExercise.findUnique({
       where: { id },
+      include: { practiceSet: true },
     });
     if (!exercise) {
+      throw new NotFoundException(`Speaking exercise #${id} not found`);
+    }
+    if (
+      role !== Role.ADMIN &&
+      ((exercise.publicationStatus !== undefined &&
+        exercise.publicationStatus !== QuizPublicationStatus.PUBLISHED) ||
+        (exercise.practiceSet &&
+          exercise.practiceSet.publicationStatus !== undefined &&
+          exercise.practiceSet.publicationStatus !==
+            QuizPublicationStatus.PUBLISHED))
+    ) {
       throw new NotFoundException(`Speaking exercise #${id} not found`);
     }
     return exercise;
@@ -240,7 +252,23 @@ export class SpeakingService {
     role?: Role,
   ) {
     const exercises = await this.prisma.speakingExercise.findMany({
-      where: category ? { category } : {},
+      where:
+        role === Role.ADMIN
+          ? category
+            ? { category }
+            : {}
+          : {
+              ...(category ? { category } : {}),
+              publicationStatus: QuizPublicationStatus.PUBLISHED,
+              OR: [
+                { practiceSetId: null },
+                {
+                  practiceSet: {
+                    publicationStatus: QuizPublicationStatus.PUBLISHED,
+                  },
+                },
+              ],
+            },
       orderBy: { createdAt: 'desc' },
       include: { practiceSet: true },
     });
@@ -344,7 +372,7 @@ export class SpeakingService {
   }
 
   async findExerciseById(id: number, userId?: number, role?: Role) {
-    const exercise = await this.findExerciseRecordById(id);
+    const exercise = await this.findExerciseRecordById(id, role);
     await this.assertSpeakingContentAccess(exercise, userId, role);
     const access = this.speakingContentAccess
       ? await this.speakingContentAccess.resolve(exercise, userId, role)
@@ -355,27 +383,11 @@ export class SpeakingService {
     return this.projectExercise(exercise, access);
   }
 
-  async createExercise(dto: CreateExerciseDto) {
-    if (
-      dto.isPremiumContent === true &&
-      dto.audioUrl &&
-      !isPrivateSpeakingMediaKey(dto.audioUrl)
-    ) {
-      throw new BadRequestException(
-        'Premium Speaking audio must use the private storage key namespace',
-      );
-    }
-    return this.prisma.speakingExercise.create({
-      data: {
-        title: dto.title,
-        targetText: dto.targetText,
-        imageUrl: dto.imageUrl,
-        audioUrl: dto.audioUrl,
-        isPremiumContent: dto.isPremiumContent ?? false,
-        difficulty: dto.difficulty || 'BEGINNER',
-        category: dto.category || 'GENERAL',
-      },
-    });
+  createExercise(dto: CreateExerciseDto) {
+    void dto;
+    throw new ConflictException(
+      'Speaking content is managed by the Skill CMS /admin/skill-content/speaking',
+    );
   }
 
   /**
@@ -428,7 +440,7 @@ export class SpeakingService {
     }
 
     // 3. Verify exercise exists
-    const exercise = await this.findExerciseRecordById(exerciseId);
+    const exercise = await this.findExerciseRecordById(exerciseId, role);
     await this.assertSpeakingContentAccess(exercise, userId, role);
 
     // 4. Byte-level audio validation
@@ -576,7 +588,7 @@ export class SpeakingService {
       `trace-intent-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 
     // 1. Verify exercise exists
-    const exercise = await this.findExerciseRecordById(exerciseId);
+    const exercise = await this.findExerciseRecordById(exerciseId, role);
     await this.assertSpeakingContentAccess(exercise, userId, role);
 
     // 2. Validate declared MIME type, size, duration
@@ -800,7 +812,7 @@ export class SpeakingService {
       );
     }
 
-    const exercise = await this.findExerciseRecordById(intent.exerciseId);
+    const exercise = await this.findExerciseRecordById(intent.exerciseId, role);
 
     // 3. Idempotent return if already finalized
     if (intent.status === 'FINALIZED' && intent.submissionId) {
@@ -1123,7 +1135,7 @@ export class SpeakingService {
   ) {
     const submission = await this.prisma.speakingSubmission.findUnique({
       where: { id: submissionId },
-      include: { exercise: true },
+      include: { exercise: { include: { practiceSet: true } } },
     });
 
     if (!submission) {

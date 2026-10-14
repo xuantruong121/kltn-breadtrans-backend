@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Role } from '@prisma/client';
 import { CourseLearningV5Service } from './course-v5.service';
 import { PrismaService } from '../../prisma/prisma.service';

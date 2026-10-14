@@ -647,6 +647,23 @@ describe('QuizService', () => {
         answers: [{ questionId: 91, answer: 'A' }],
       });
 
+      expect(tx.submission.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            score: 1,
+            results: {
+              create: [
+                expect.objectContaining({
+                  questionId: 91,
+                  answer: 'A',
+                  isCorrect: true,
+                  score: 1,
+                }),
+              ],
+            },
+          }),
+        }),
+      );
       expect(mockPrismaService.learningActivity.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           type: 'LISTENING_PRACTICE_COMPLETED',

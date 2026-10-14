@@ -27,8 +27,10 @@ describe('AuthService', () => {
     mockCtx = createMockContext();
     redisMock = {
       get: jest.fn(),
+      getdel: jest.fn(),
       set: jest.fn(),
       del: jest.fn(),
+      keys: jest.fn().mockResolvedValue([]),
       incr: jest.fn().mockResolvedValue(1),
       expire: jest.fn(),
     };
@@ -52,8 +54,7 @@ describe('AuthService', () => {
         {
           provide: EmailService,
           useValue: {
-            sendRegistrationOtp: jest.fn(),
-            sendTeacherActivation: jest.fn(),
+            sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -78,41 +79,31 @@ describe('AuthService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('should stage registration and create the student only after OTP verification', async () => {
+    it('should create a student immediately without email verification', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(null);
-      const otp = '123456';
-      const hash = crypto
-        .createHmac('sha256', getOtpSecret())
-        .update(otp)
-        .digest('hex');
-      await service.register({
-        email: 'test@example.com',
-        password: '123456',
-        fullName: 'Test User',
-      });
-      expect(mockCtx.prisma.user.create).not.toHaveBeenCalled();
-      redisMock.get
-        .mockResolvedValueOnce(
-          JSON.stringify({
-            email: 'test@example.com',
-            fullName: 'Test User',
-            password: 'hashedPassword',
-          }),
-        )
-        .mockResolvedValueOnce(hash);
       mockCtx.prisma.user.create.mockResolvedValue({
         id: 1,
         email: 'test@example.com',
         role: Role.STUDENT,
         profile: { fullName: 'Test User' },
       } as any);
-      const result = await service.verifyRegistration('test@example.com', otp);
+
+      const result = await service.register({
+        email: 'test@example.com',
+        password: '123456',
+        fullName: 'Test User',
+      });
+
       expect(result).not.toHaveProperty('password');
       expect(mockCtx.prisma.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ role: Role.STUDENT }),
+          data: expect.objectContaining({
+            role: Role.STUDENT,
+            emailVerifiedAt: expect.any(Date),
+          }),
         }),
       );
+      expect(redisMock.set).not.toHaveBeenCalled();
     });
   });
   describe('login', () => {

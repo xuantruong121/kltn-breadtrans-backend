@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Test, TestingModule } from '@nestjs/testing';
 import { SpeakingReconciliationScheduler } from './speaking-reconciliation.scheduler';
 import { PrismaService } from '../../prisma/prisma.service';

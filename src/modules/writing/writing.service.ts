@@ -7,7 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { QuizType, TopicCategory } from '@prisma/client';
+import { QuizPublicationStatus, QuizType, TopicCategory } from '@prisma/client';
 import { AiService } from '../ai/ai.service';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -318,6 +318,7 @@ export class WritingService {
     const quizzes = await this.prisma.quiz.findMany({
       where: {
         type: { in: GENERAL_WRITING_TYPES },
+        publicationStatus: QuizPublicationStatus.PUBLISHED,
         practiceTopic: {
           category: {
             in: [TopicCategory.WRITING_PART1, TopicCategory.WRITING_PART2],
@@ -408,7 +409,13 @@ export class WritingService {
       },
     });
 
-    if (!quiz || !isWritingQuiz(quiz) || quiz.questions.length === 0) {
+    if (
+      !quiz ||
+      !isWritingQuiz(quiz) ||
+      (quiz.publicationStatus !== undefined &&
+        quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED) ||
+      quiz.questions.length === 0
+    ) {
       throw new NotFoundException('Quiz not found');
     }
 
@@ -455,12 +462,18 @@ export class WritingService {
       select: {
         id: true,
         type: true,
+        publicationStatus: true,
         isPremiumContent: true,
         courseId: true,
         practiceTopic: { select: { category: true } },
       },
     });
-    if (!quiz || !isWritingQuiz(quiz)) {
+    if (
+      !quiz ||
+      !isWritingQuiz(quiz) ||
+      (quiz.publicationStatus !== undefined &&
+        quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED)
+    ) {
       throw new NotFoundException('Quiz not found');
     }
     await this.assertWritingAccess(quiz, userId, role);
@@ -511,7 +524,13 @@ export class WritingService {
         },
       },
     });
-    if (!quiz || !isWritingQuiz(quiz) || quiz.questions.length === 0)
+    if (
+      !quiz ||
+      !isWritingQuiz(quiz) ||
+      (quiz.publicationStatus !== undefined &&
+        quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED) ||
+      quiz.questions.length === 0
+    )
       throw new NotFoundException('Quiz not found');
 
     await this.assertWritingAccess(quiz, userId, role);

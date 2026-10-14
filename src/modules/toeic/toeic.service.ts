@@ -13,6 +13,7 @@ import {
   AttemptStatus,
   IntegrityEventType,
   Prisma,
+  QuizPublicationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SpeakingService } from '../speaking/speaking.service';
@@ -147,8 +148,11 @@ export class ToeicService {
     };
   }
 
-  async getExams() {
+  async getExams(isStaff = false) {
     const exams = await this.prisma.toeicExamSet.findMany({
+      where: isStaff
+        ? {}
+        : { publicationStatus: QuizPublicationStatus.PUBLISHED },
       include: {
         groups: {
           include: { questions: true },
@@ -166,13 +170,14 @@ export class ToeicService {
         type: exam.type,
         difficulty: exam.difficulty,
         durationSeconds: exam.durationSeconds,
+        publicationStatus: exam.publicationStatus,
         learnerReady: validation.learnerReady,
         validation: { counts: validation.counts, issues: validation.issues },
       };
     });
   }
 
-  async getExamBriefing(examId: number, userId?: number) {
+  async getExamBriefing(examId: number, userId?: number, isStaff = false) {
     const exam = await this.prisma.toeicExamSet.findUnique({
       where: { id: examId },
       include: {
@@ -197,7 +202,12 @@ export class ToeicService {
         },
       },
     });
-    if (!exam) throw new NotFoundException('Exam not found');
+    if (
+      !exam ||
+      (!isStaff && exam.publicationStatus === QuizPublicationStatus.DRAFT)
+    ) {
+      throw new NotFoundException('Exam not found');
+    }
     const partQuestionCounts = new Map<number, number>();
     for (const group of exam.groups) {
       partQuestionCounts.set(

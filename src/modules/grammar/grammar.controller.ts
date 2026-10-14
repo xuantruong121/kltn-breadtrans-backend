@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -10,9 +11,14 @@ import {
   Request,
 } from '@nestjs/common';
 import { GrammarService } from './grammar.service';
-import { CreateGrammarTopicDto } from './dto/create-grammar-topic.dto';
-import { CreateGrammarQuestionDto } from './dto/create-grammar-question.dto';
-import { SubmitGrammarAttemptDto } from './dto/submit-grammar-attempt.dto';
+import {
+  CreateGrammarTopicDto,
+  UpdateGrammarTopicDto,
+  CreateGrammarQuestionDto,
+  UpdateGrammarQuestionDto,
+  SubmitGrammarAttemptDto,
+  ReorderGrammarQuestionsDto,
+} from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -30,7 +36,8 @@ export class GrammarController {
   @ApiOperation({ summary: 'Lấy danh sách các chủ đề ngữ pháp kèm tiến độ' })
   getTopics(@Request() req: any) {
     const userId = req?.user?.id;
-    return this.grammarService.getTopics(userId);
+    const isStaff = req?.user?.role === Role.ADMIN;
+    return this.grammarService.getTopics(userId, isStaff);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -66,14 +73,55 @@ export class GrammarController {
     return this.grammarService.getMyAttempts(req.user.id);
   }
 
-  // Admin APIs
+  // Admin APIs (Phase 4 CMS)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Post('topics')
-  @ApiOperation({ summary: '[Admin] Tạo chủ đề ngữ pháp mới' })
+  @ApiOperation({ summary: '[Admin] Tạo chủ đề ngữ pháp mới (DRAFT)' })
   createTopic(@Body() dto: CreateGrammarTopicDto) {
     return this.grammarService.createTopic(dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Patch('topics/:id')
+  @ApiOperation({ summary: '[Admin] Cập nhật chủ đề ngữ pháp' })
+  updateTopic(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateGrammarTopicDto,
+  ) {
+    return this.grammarService.updateTopic(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Post('topics/:id/publish')
+  @ApiOperation({ summary: '[Admin] Kiểm tra hợp lệ và xuất bản chủ đề' })
+  publishTopic(@Param('id', ParseIntPipe) id: number) {
+    return this.grammarService.publishTopic(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Post('topics/:id/unpublish')
+  @ApiOperation({ summary: '[Admin] Gỡ xuất bản chủ đề (về DRAFT)' })
+  unpublishTopic(@Param('id', ParseIntPipe) id: number) {
+    return this.grammarService.unpublishTopic(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Delete('topics/:id')
+  @ApiOperation({
+    summary: '[Admin] Xóa chủ đề ngữ pháp (bảo vệ lịch sử học tập)',
+  })
+  deleteTopic(@Param('id', ParseIntPipe) id: number) {
+    return this.grammarService.deleteTopic(id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -91,18 +139,48 @@ export class GrammarController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @Delete('topics/:id')
-  @ApiOperation({ summary: '[Admin] Xóa chủ đề ngữ pháp' })
-  deleteTopic(@Param('id', ParseIntPipe) id: number) {
-    return this.grammarService.deleteTopic(id);
+  @Patch('topics/:topicId/questions/:questionId')
+  @ApiOperation({ summary: '[Admin] Cập nhật câu hỏi ngữ pháp' })
+  updateQuestion(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Body() dto: UpdateGrammarQuestionDto,
+  ) {
+    return this.grammarService.updateQuestion(topicId, questionId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Delete('topics/:topicId/questions/:questionId')
+  @ApiOperation({
+    summary: '[Admin] Xóa câu hỏi ngữ pháp (kiểm tra ownership & history)',
+  })
+  deleteTopicQuestion(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+  ) {
+    return this.grammarService.deleteQuestion(topicId, questionId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Post('topics/:id/reorder-questions')
+  @ApiOperation({ summary: '[Admin] Sắp xếp lại thứ tự câu hỏi trong chủ đề' })
+  reorderQuestions(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReorderGrammarQuestionsDto,
+  ) {
+    return this.grammarService.reorderQuestions(id, dto.questionIds);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Delete('questions/:id')
-  @ApiOperation({ summary: '[Admin] Xóa câu hỏi ngữ pháp' })
+  @ApiOperation({ summary: '[Admin] Xóa câu hỏi ngữ pháp (legacy shortcut)' })
   deleteQuestion(@Param('id', ParseIntPipe) id: number) {
-    return this.grammarService.deleteQuestion(id);
+    return this.grammarService.deleteQuestionById(id);
   }
 }

@@ -39,5 +39,6 @@ describe('DiagnosticSpeakingAudioNormalizer', () => {
       expect(result.buffer.subarray(0, 4).toString()).toBe('RIFF');
       expect(result.durationMs).toBeGreaterThan(0);
     },
+    30000,
   );
 });

@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsDefined,
   IsEnum,
   IsIn,
   IsInt,
@@ -9,7 +10,11 @@ import {
   IsOptional,
   IsString,
   Min,
+  ArrayMaxSize,
+  ArrayMinSize,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { QuizPublicationStatus } from '@prisma/client';
 
 export class SkillContentDto {
@@ -98,7 +103,160 @@ export class SkillQuestionDto {
   order?: number;
 }
 
+export class ListeningTranscriptSegmentDto {
+  @IsString()
+  @IsNotEmpty()
+  speaker!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  text!: string;
+
+  @IsOptional()
+  @IsString()
+  translation?: string;
+}
+
+export class ListeningQuestionContentDto {
+  @IsOptional()
+  @IsString()
+  prompt?: string;
+
+  @IsOptional()
+  @IsString()
+  text?: string;
+
+  @IsOptional()
+  @IsString()
+  correctAnswer?: string;
+
+  @IsOptional()
+  @IsString()
+  audioText?: string;
+
+  @IsOptional()
+  @IsString()
+  speaker?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ListeningTranscriptSegmentDto)
+  transcriptSegments?: ListeningTranscriptSegmentDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  options?: string[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  correctIndex?: number;
+
+  @IsOptional()
+  @IsString()
+  explanation?: string;
+}
+
+export class ListeningQuestionDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(['DICTATION', 'DIALOGUE', 'MULTIPLE_CHOICE'])
+  type!: string;
+
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => ListeningQuestionContentDto)
+  content!: ListeningQuestionContentDto;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  order?: number;
+}
+
+export class WritingQuestionDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(['WRITING'])
+  type!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  prompt!: string;
+
+  @IsOptional()
+  @IsString()
+  taskType?: string;
+
+  @IsOptional()
+  @IsString()
+  level?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  keywords?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @ArrayMinSize(2)
+  @ArrayMaxSize(2)
+  @Min(1, { each: true })
+  wordRange?: number[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  sampleSentences?: string[];
+
+  @IsOptional()
+  @IsString()
+  explanation?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  order?: number;
+}
+
 export class SkillPublishDto {
   @IsEnum(QuizPublicationStatus)
   status!: QuizPublicationStatus;
+}
+
+export class SpeakingExerciseDto {
+  @IsString()
+  @IsNotEmpty()
+  title!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  targetText!: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsIn(['BEGINNER', 'INTERMEDIATE', 'ADVANCED'])
+  difficulty?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  audioUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPremiumContent?: boolean;
 }

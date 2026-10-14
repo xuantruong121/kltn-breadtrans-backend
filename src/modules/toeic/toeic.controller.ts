@@ -14,6 +14,7 @@ import type { Response } from 'express';
 import { AttemptMode, Role } from '@prisma/client';
 import { ToeicService } from './toeic.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { StartAttemptDto } from './dto/start-attempt.dto';
 import { SaveAnswersDto } from './dto/save-answers.dto';
 import { IntegrityEventDto } from './dto/integrity-event.dto';
@@ -22,8 +23,11 @@ import { IntegrityEventDto } from './dto/integrity-event.dto';
 export class ToeicController {
   constructor(private readonly toeicService: ToeicService) {}
 
-  @Get('exams') getExams() {
-    return this.toeicService.getExams();
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('exams')
+  getExams(@Req() req: any) {
+    const isStaff = req?.user?.role === Role.ADMIN;
+    return this.toeicService.getExams(isStaff);
   }
 
   @Get('history')
@@ -35,13 +39,15 @@ export class ToeicController {
   @Get('exams/:examId/briefing')
   @UseGuards(JwtAuthGuard)
   getExamBriefing(@Param('examId') examId: string, @Req() req: any) {
-    return this.toeicService.getExamBriefing(+examId, req.user?.id);
+    const isStaff = req?.user?.role === Role.ADMIN;
+    return this.toeicService.getExamBriefing(+examId, req.user?.id, isStaff);
   }
 
   @Get('exams/:examId')
   @UseGuards(JwtAuthGuard)
   getExamDetails(@Param('examId') examId: string, @Req() req: any) {
-    return this.toeicService.getExamBriefing(+examId, req.user?.id);
+    const isStaff = req?.user?.role === Role.ADMIN;
+    return this.toeicService.getExamBriefing(+examId, req.user?.id, isStaff);
   }
 
   @Get('bundles/:quizId')

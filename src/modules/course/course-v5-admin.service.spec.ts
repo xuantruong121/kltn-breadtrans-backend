@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { ForbiddenException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CourseV5AdminService } from './course-v5-admin.service';

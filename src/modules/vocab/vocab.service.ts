@@ -7,7 +7,7 @@ import {
   Optional,
   UnauthorizedException,
 } from '@nestjs/common';
-import { PlanFeatureKey } from '@prisma/client';
+import { PlanFeatureKey, QuizPublicationStatus } from '@prisma/client';
 import { DictionaryLookupService } from './dictionary-lookup.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -68,7 +68,10 @@ export class VocabService {
         )
       : false;
     const topics = await this.prisma.vocabTopic.findMany({
-      where: { categoryName: { not: 'SYSTEM_DICTIONARY' } },
+      where: {
+        categoryName: { not: 'SYSTEM_DICTIONARY' },
+        publicationStatus: QuizPublicationStatus.PUBLISHED,
+      },
       include: {
         _count: { select: { words: true } },
       },
@@ -161,7 +164,7 @@ export class VocabService {
       where: { id: topicId },
     });
 
-    if (!topic) {
+    if (!topic || topic.publicationStatus === QuizPublicationStatus.DRAFT) {
       throw new NotFoundException('Topic not found');
     }
 

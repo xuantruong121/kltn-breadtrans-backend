@@ -5,7 +5,7 @@
 <h1 align="center">BreadTrans E-Learning Backend 🚀</h1>
 
 <p align="center">
-  Hệ thống Backend cho nền tảng học và luyện thi TOEIC 4 kỹ năng tích hợp AI — Khóa luận tốt nghiệp.<br/>
+  Hệ thống Backend cho nền tảng tự học tiếng Anh theo kỹ năng, cấp độ và chủ đề; luyện đề theo nhiều dạng chứng chỉ và học theo khóa học có lộ trình sẵn, tích hợp AI và Gamification — Khóa luận tốt nghiệp.<br/>
   Xây dựng với <strong>NestJS 11</strong>, <strong>PostgreSQL (Prisma ORM)</strong>, <strong>Redis</strong>, <strong>Cloudflare R2</strong>, <strong>Azure AI Speech (F0)</strong>, <strong>Google Gemini</strong> và <strong>Daily.co</strong>.
 </p>
 
@@ -26,10 +26,10 @@
 
 | Phân hệ / Tính năng | Chi tiết & Công nghệ sử dụng |
 |---|---|
-| **TOEIC 4 Kỹ Năng (ETS)** | Nghe, Nói, Đọc, Viết — đầy đủ các phần Part 1-7 và Part 1-3 Writing theo chuẩn ETS mới nhất. |
+| **Luyện đề theo format chứng chỉ** | Rèn luyện Nghe, Nói, Đọc, Viết theo các format đang hỗ trợ; runtime hiện có bộ TOEIC 4 kỹ năng theo cấu trúc ETS. |
 | **Azure AI Speech Grader** | Chấm điểm phát âm chuẩn mức **Âm vị (Phoneme-level)**, độ lưu loát (Fluency), độ chính xác (Accuracy), ngữ điệu (Prosody) qua Azure AI Speech SDK/REST (Gói F0 Free). |
 | **AI Writing Tutor (Gemini)** | Chấm bài luận, phân tích lỗi ngữ pháp, gợi ý cấu trúc câu và từ vựng nâng cao tự động. |
-| **AI ETS PDF Importer** | Tự động đọc file đề thi PDF + file âm thanh Audio, trích xuất cấu trúc câu hỏi đưa vào CSDL. |
+| **AI Exam PDF Importer** | Tự động đọc file đề thi chứng chỉ PDF + file âm thanh, trích xuất cấu trúc câu hỏi đưa vào CSDL; hỗ trợ nguồn ETS hiện có. |
 | **Đấu Trường 1v1 (Arena)** | Matchmaking ngẫu nhiên qua Redis Queue, thi đấu đối kháng thời gian thực qua WebSocket (Socket.io). |
 | **Phòng Học Trực Tuyến (Daily.co)** | Tự động sinh link và quản lý phòng học video nhúng trực tiếp vào Web (10.000 phút/tháng miễn phí). |
 | **Vocabulary & Flashcard** | 4 bước học toàn diện (Flashcard 3D → Quiz → Typing → Speaking) tích hợp Text-To-Speech Neural. |

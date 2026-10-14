@@ -23,7 +23,7 @@ sequenceDiagram
     
     BE->>AI: Gửi Prompt yêu cầu chấm bài & Payload của Học viên
     activate AI
-    Note right of BE: System Prompt: Bạn là 1 giám khảo IELTS.<br>Chấm điểm bài viết sau dựa trên 4 tiêu chí...
+    Note right of BE: System Prompt: Bạn là giám khảo tiếng Anh theo rubric của format bài viết đang chấm (ví dụ TOEIC Writing).<br>Chấm điểm bài viết dựa trên các tiêu chí tương ứng...
     AI-->>BE: Trả về Feedback chi tiết và Điểm số (Score)
     deactivate AI
     

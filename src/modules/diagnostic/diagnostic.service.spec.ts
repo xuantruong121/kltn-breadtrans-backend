@@ -271,7 +271,7 @@ describe('DiagnosticService', () => {
         order: 3,
       },
     ];
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
     prisma.diagnosticAssessment.findFirst.mockResolvedValueOnce({
       ...assessment,
       id: 2,
@@ -293,7 +293,7 @@ describe('DiagnosticService', () => {
         ]),
       updateMany: jest.fn(),
     };
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
     prisma.$transaction.mockImplementationOnce(
       (callback: (tx: any) => unknown) =>
         callback({
