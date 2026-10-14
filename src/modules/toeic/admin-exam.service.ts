@@ -146,13 +146,16 @@ export class AdminExamService {
     const groups = exam.groups ?? [];
     const questions = groups.flatMap((g) => g.questions ?? []);
     if (questions.length === 0) {
-      throw new BadRequestException('Đề thi phải có ít nhất 1 câu hỏi để xuất bản');
+      throw new BadRequestException(
+        'Đề thi phải có ít nhất 1 câu hỏi để xuất bản',
+      );
     }
 
     const validation = validateToeicExam(exam);
     if (exam.type === 'FULL_TEST' && !validation.learnerReady) {
       throw new BadRequestException({
-        message: 'Đề Full Test chưa đủ điều kiện xuất bản (cần 200 câu theo chuẩn cấu trúc TOEIC)',
+        message:
+          'Đề Full Test chưa đủ điều kiện xuất bản (cần 200 câu theo chuẩn cấu trúc TOEIC)',
         issues: validation.issues,
       });
     }
@@ -228,11 +231,7 @@ export class AdminExamService {
     });
   }
 
-  async updateGroup(
-    examId: number,
-    groupId: number,
-    dto: UpdateExamGroupDto,
-  ) {
+  async updateGroup(examId: number, groupId: number, dto: UpdateExamGroupDto) {
     const group = await this.prisma.toeicQuestionGroup.findUnique({
       where: { id: groupId },
     });
@@ -432,11 +431,7 @@ export class AdminExamService {
     });
   }
 
-  async deleteQuestion(
-    examId: number,
-    groupId: number,
-    questionId: number,
-  ) {
+  async deleteQuestion(examId: number, groupId: number, questionId: number) {
     const question = await this.prisma.toeicQuestion.findUnique({
       where: { id: questionId },
       include: { group: true },

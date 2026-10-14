@@ -210,7 +210,9 @@ export class AdminController {
   }
 
   @Post('vocab/topics/:id/publish')
-  @ApiOperation({ summary: 'Admin: Kiem tra hop le va xuat ban chu de tu vung' })
+  @ApiOperation({
+    summary: 'Admin: Kiem tra hop le va xuat ban chu de tu vung',
+  })
   publishVocabTopic(@Param('id', ParseIntPipe) id: number) {
     return this.adminService.publishVocabTopic(id);
   }
@@ -222,7 +224,9 @@ export class AdminController {
   }
 
   @Delete('vocab/topics/:id')
-  @ApiOperation({ summary: 'Admin: Xoa chu de tu vung (bao ve lich su hoc tap)' })
+  @ApiOperation({
+    summary: 'Admin: Xoa chu de tu vung (bao ve lich su hoc tap)',
+  })
   deleteVocabTopic(@Param('id', ParseIntPipe) id: number) {
     return this.adminService.deleteVocabTopic(id);
   }

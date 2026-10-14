@@ -2027,7 +2027,7 @@ describe('Admin Payment Review, Detail, Reject & Concurrency (e2e)', () => {
         });
 
         // Intercept $queryRaw to inject mismatched classId on Enrollment lock.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
         const originalQueryRaw = (prisma as any).$queryRaw.bind(prisma) as (
           strings: unknown,
           ...values: unknown[]

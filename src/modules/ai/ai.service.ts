@@ -61,7 +61,6 @@ export class AiService {
     return count;
   }
 
-
   async enrichDictionaryEntry(
     input: DictionaryEnrichmentInput,
   ): Promise<DictionaryEnrichment | null> {
@@ -283,7 +282,9 @@ export class AiService {
   }): Promise<ContextualVocabSuggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestVocabWord) {
-      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý từ vựng');
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý từ vựng',
+      );
     }
     return this.aiEvaluator.suggestVocabWord(input);
   }
@@ -297,7 +298,9 @@ export class AiService {
   }): Promise<ContextualGrammarSuggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestGrammarQuestions) {
-      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý câu hỏi ngữ pháp');
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý câu hỏi ngữ pháp',
+      );
     }
     return this.aiEvaluator.suggestGrammarQuestions(input);
   }
@@ -310,7 +313,9 @@ export class AiService {
   }): Promise<ContextualReadingPassageSuggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestReadingPassage) {
-      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý đoạn đọc');
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý đoạn đọc',
+      );
     }
     return this.aiEvaluator.suggestReadingPassage(input);
   }
@@ -322,7 +327,9 @@ export class AiService {
   }): Promise<ContextualReadingQuestionsSuggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestReadingQuestions) {
-      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý câu hỏi đọc hiểu');
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý câu hỏi đọc hiểu',
+      );
     }
     return this.aiEvaluator.suggestReadingQuestions(input);
   }
@@ -336,7 +343,9 @@ export class AiService {
   }): Promise<ContextualToeicPart5Suggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestToeicPart5) {
-      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý câu hỏi TOEIC Part 5');
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý câu hỏi TOEIC Part 5',
+      );
     }
     return this.aiEvaluator.suggestToeicPart5(input);
   }

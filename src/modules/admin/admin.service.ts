@@ -725,7 +725,9 @@ export class AdminService {
       where: { id },
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
-        ...(dto.categoryName !== undefined && { categoryName: dto.categoryName }),
+        ...(dto.categoryName !== undefined && {
+          categoryName: dto.categoryName,
+        }),
         ...(dto.isPro !== undefined && { isPro: dto.isPro }),
         ...(dto.iconUrl !== undefined && { iconUrl: dto.iconUrl }),
       },
@@ -739,11 +741,17 @@ export class AdminService {
     });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
     if (!topic.words || topic.words.length === 0) {
-      throw new BadRequestException('Chủ đề từ vựng phải có ít nhất 1 từ vựng trước khi xuất bản');
+      throw new BadRequestException(
+        'Chủ đề từ vựng phải có ít nhất 1 từ vựng trước khi xuất bản',
+      );
     }
-    const invalidWords = topic.words.filter(w => !w.word?.trim() || !w.meaning?.trim());
+    const invalidWords = topic.words.filter(
+      (w) => !w.word?.trim() || !w.meaning?.trim(),
+    );
     if (invalidWords.length > 0) {
-      throw new BadRequestException('Tất cả từ vựng phải có đầy đủ thuật ngữ và định nghĩa');
+      throw new BadRequestException(
+        'Tất cả từ vựng phải có đầy đủ thuật ngữ và định nghĩa',
+      );
     }
     return this.prisma.vocabTopic.update({
       where: { id },
@@ -770,20 +778,24 @@ export class AdminService {
     });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
     // History safety guard: if any word has learner progress, block delete
-    const wordIds = topic.words.map(w => w.id);
+    const wordIds = topic.words.map((w) => w.id);
     if (wordIds.length > 0) {
       const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
         where: { wordId: { in: wordIds } },
       });
       if (hasProgress) {
-        throw new ConflictException('Chủ đề từ vựng đã có dữ liệu học tập của học viên, không thể xóa');
+        throw new ConflictException(
+          'Chủ đề từ vựng đã có dữ liệu học tập của học viên, không thể xóa',
+        );
       }
     }
     return this.prisma.vocabTopic.delete({ where: { id } });
   }
 
   async addVocabWord(topicId: number, dto: CreateVocabWordDto) {
-    const topic = await this.prisma.vocabTopic.findUnique({ where: { id: topicId } });
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id: topicId },
+    });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
     const word = await this.prisma.vocabWord.create({
       data: {
@@ -808,20 +820,31 @@ export class AdminService {
     return word;
   }
 
-  async updateVocabWord(topicId: number, wordId: number, dto: UpdateVocabWordDto) {
-    const word = await this.prisma.vocabWord.findUnique({ where: { id: wordId } });
+  async updateVocabWord(
+    topicId: number,
+    wordId: number,
+    dto: UpdateVocabWordDto,
+  ) {
+    const word = await this.prisma.vocabWord.findUnique({
+      where: { id: wordId },
+    });
     if (!word || word.topicId !== topicId) {
       throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
     }
     // History safety guard: if learner progress exists, block semantic identity change
-    const isWordChanged = dto.word && dto.word.trim().toLowerCase() !== word.word.trim().toLowerCase();
-    const isMeaningChanged = dto.meaning && dto.meaning.trim() !== word.meaning.trim();
+    const isWordChanged =
+      dto.word &&
+      dto.word.trim().toLowerCase() !== word.word.trim().toLowerCase();
+    const isMeaningChanged =
+      dto.meaning && dto.meaning.trim() !== word.meaning.trim();
     if (isWordChanged || isMeaningChanged) {
       const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
         where: { wordId },
       });
       if (hasProgress) {
-        throw new ConflictException('Từ vựng đã có dữ liệu học tập của học viên, không thể thay đổi định danh từ vựng');
+        throw new ConflictException(
+          'Từ vựng đã có dữ liệu học tập của học viên, không thể thay đổi định danh từ vựng',
+        );
       }
     }
     return this.prisma.vocabWord.update({
@@ -836,14 +859,18 @@ export class AdminService {
         ...(dto.audioUk !== undefined && { audioUk: dto.audioUk }),
         ...(dto.exampleEn !== undefined && { exampleEn: dto.exampleEn }),
         ...(dto.exampleVi !== undefined && { exampleVi: dto.exampleVi }),
-        ...(dto.collocations !== undefined && { collocations: dto.collocations }),
+        ...(dto.collocations !== undefined && {
+          collocations: dto.collocations,
+        }),
         ...(dto.order !== undefined && { order: dto.order }),
       },
     });
   }
 
   async deleteVocabWord(topicId: number, wordId: number) {
-    const word = await this.prisma.vocabWord.findUnique({ where: { id: wordId } });
+    const word = await this.prisma.vocabWord.findUnique({
+      where: { id: wordId },
+    });
     if (!word || word.topicId !== topicId) {
       throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
     }
@@ -852,9 +879,13 @@ export class AdminService {
       where: { wordId },
     });
     if (hasProgress) {
-      throw new ConflictException('Từ vựng này đã có dữ liệu học tập của học viên, không thể xóa');
+      throw new ConflictException(
+        'Từ vựng này đã có dữ liệu học tập của học viên, không thể xóa',
+      );
     }
-    const deleted = await this.prisma.vocabWord.delete({ where: { id: wordId } });
+    const deleted = await this.prisma.vocabWord.delete({
+      where: { id: wordId },
+    });
     await this.prisma.vocabTopic.update({
       where: { id: topicId },
       data: { totalWords: { decrement: 1 } },
@@ -868,10 +899,12 @@ export class AdminService {
       include: { words: { select: { id: true } } },
     });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
-    const existingIds = new Set(topic.words.map(w => w.id));
+    const existingIds = new Set(topic.words.map((w) => w.id));
     for (const wid of wordIds) {
       if (!existingIds.has(wid)) {
-        throw new BadRequestException(`Từ vựng ID ${wid} không thuộc chủ đề này`);
+        throw new BadRequestException(
+          `Từ vựng ID ${wid} không thuộc chủ đề này`,
+        );
       }
     }
     await this.prisma.$transaction(
@@ -994,7 +1027,9 @@ export class AdminService {
         ]);
         cachedGeminiCount = keys.length;
         let quotaSum = 0;
-        const quotaKeys = keys.filter((k) => k.startsWith('gemini:daily_quota:'));
+        const quotaKeys = keys.filter((k) =>
+          k.startsWith('gemini:daily_quota:'),
+        );
         if (quotaKeys.length > 0) {
           const vals = await this.redis.mget(quotaKeys);
           quotaSum = vals.reduce(
@@ -1009,7 +1044,10 @@ export class AdminService {
 
         // Flash Lite pricing: $0.075 / 1M input, $0.30 / 1M output
         geminiCostUsd = Number(
-          ((geminiInputTokens * 0.075 + geminiOutputTokens * 0.3) / 1000000).toFixed(6),
+          (
+            (geminiInputTokens * 0.075 + geminiOutputTokens * 0.3) /
+            1000000
+          ).toFixed(6),
         );
         geminiCostVnd = Math.round(geminiCostUsd * 25400);
       } catch {

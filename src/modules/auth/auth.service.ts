@@ -107,14 +107,18 @@ export class AuthService {
     const tokenKey = `auth:password-reset:token:${tokenHash}`;
     const rawUserId = await this.redis.getdel(tokenKey);
     if (!rawUserId) {
-      throw new UnauthorizedException('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
+      throw new UnauthorizedException(
+        'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.',
+      );
     }
 
     const userId = Number(rawUserId);
     const userTokenKey = `auth:password-reset:user:${userId}`;
     const currentTokenHash = await this.redis.get(userTokenKey);
     if (currentTokenHash !== tokenHash) {
-      throw new UnauthorizedException('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
+      throw new UnauthorizedException(
+        'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.',
+      );
     }
 
     const password = await bcrypt.hash(newPassword, 12);

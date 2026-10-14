@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { SpeakingPostProcessingService } from './speaking-post-processing.service';
 
 describe('SpeakingPostProcessingService', () => {

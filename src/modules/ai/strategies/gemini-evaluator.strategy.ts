@@ -1400,26 +1400,45 @@ REQUIREMENTS:
     const raw = result.response.text().trim();
     const parsed = JSON.parse(raw) as ContextualVocabSuggestion;
 
-    const meaning = typeof parsed.meaning === 'string' ? parsed.meaning.trim() : '';
+    const meaning =
+      typeof parsed.meaning === 'string' ? parsed.meaning.trim() : '';
     if (!meaning) {
       throw new Error('AI không thể tạo nghĩa tiếng Việt hợp lệ cho từ này');
     }
 
     const validPos = ['noun', 'verb', 'adjective', 'adverb', 'phrase'];
-    const rawPos = typeof parsed.pos === 'string' ? parsed.pos.toLowerCase().trim() : 'noun';
+    const rawPos =
+      typeof parsed.pos === 'string' ? parsed.pos.toLowerCase().trim() : 'noun';
     const pos = validPos.includes(rawPos) ? rawPos : 'noun';
 
     return {
       word: input.word.trim(),
       pos,
       meaning,
-      ipaUs: typeof parsed.ipaUs === 'string' && parsed.ipaUs.trim() ? parsed.ipaUs.trim() : undefined,
-      ipaUk: typeof parsed.ipaUk === 'string' && parsed.ipaUk.trim() ? parsed.ipaUk.trim() : undefined,
-      exampleEn: typeof parsed.exampleEn === 'string' ? parsed.exampleEn.trim() : undefined,
-      exampleVi: typeof parsed.exampleVi === 'string' ? parsed.exampleVi.trim() : undefined,
+      ipaUs:
+        typeof parsed.ipaUs === 'string' && parsed.ipaUs.trim()
+          ? parsed.ipaUs.trim()
+          : undefined,
+      ipaUk:
+        typeof parsed.ipaUk === 'string' && parsed.ipaUk.trim()
+          ? parsed.ipaUk.trim()
+          : undefined,
+      exampleEn:
+        typeof parsed.exampleEn === 'string'
+          ? parsed.exampleEn.trim()
+          : undefined,
+      exampleVi:
+        typeof parsed.exampleVi === 'string'
+          ? parsed.exampleVi.trim()
+          : undefined,
       collocations: Array.isArray(parsed.collocations)
         ? parsed.collocations
-            .filter((c) => c && typeof c.phrase === 'string' && typeof c.meaningVi === 'string')
+            .filter(
+              (c) =>
+                c &&
+                typeof c.phrase === 'string' &&
+                typeof c.meaningVi === 'string',
+            )
             .slice(0, 3)
         : undefined,
     };
@@ -1502,12 +1521,30 @@ REQUIREMENTS:
 
     const validatedCandidates = parsed.candidates
       .filter((c) => {
-        if (!c || typeof c.question !== 'string' || !c.question.trim()) return false;
+        if (!c || typeof c.question !== 'string' || !c.question.trim())
+          return false;
         if (!Array.isArray(c.options) || c.options.length !== 4) return false;
-        if (!Number.isInteger(c.correctIndex) || c.correctIndex < 0 || c.correctIndex >= 4) return false;
-        if (!c.explanation || typeof c.explanation !== 'string' || !c.explanation.trim()) return false;
-        const normalized = c.options.map((opt) => String(opt || '').trim().toLowerCase());
-        return new Set(normalized).size === 4 && normalized.every((opt) => opt.length > 0);
+        if (
+          !Number.isInteger(c.correctIndex) ||
+          c.correctIndex < 0 ||
+          c.correctIndex >= 4
+        )
+          return false;
+        if (
+          !c.explanation ||
+          typeof c.explanation !== 'string' ||
+          !c.explanation.trim()
+        )
+          return false;
+        const normalized = c.options.map((opt) =>
+          String(opt || '')
+            .trim()
+            .toLowerCase(),
+        );
+        return (
+          new Set(normalized).size === 4 &&
+          normalized.every((opt) => opt.length > 0)
+        );
       })
       .map((c) => ({
         question: c.question.trim(),
@@ -1517,7 +1554,9 @@ REQUIREMENTS:
       }));
 
     if (validatedCandidates.length === 0) {
-      throw new Error('Không có câu hỏi ngữ pháp nào đạt chuẩn cấu trúc 4 lựa chọn');
+      throw new Error(
+        'Không có câu hỏi ngữ pháp nào đạt chuẩn cấu trúc 4 lựa chọn',
+      );
     }
 
     return { candidates: validatedCandidates.slice(0, safeCount) };
@@ -1578,7 +1617,8 @@ REQUIREMENTS:
     const parsed = JSON.parse(raw) as ContextualReadingPassageSuggestion;
 
     const title = typeof parsed.title === 'string' ? parsed.title.trim() : '';
-    const passage = typeof parsed.passage === 'string' ? parsed.passage.trim() : '';
+    const passage =
+      typeof parsed.passage === 'string' ? parsed.passage.trim() : '';
 
     if (!title || !passage) {
       throw new Error('AI không thể tạo đoạn văn đọc hợp lệ');
@@ -1671,19 +1711,39 @@ REQUIREMENTS:
 
     const validated = parsed.candidates
       .filter((c) => {
-        if (!c || typeof c.prompt !== 'string' || !c.prompt.trim()) return false;
+        if (!c || typeof c.prompt !== 'string' || !c.prompt.trim())
+          return false;
         if (!Array.isArray(c.options) || c.options.length !== 4) return false;
-        if (!Number.isInteger(c.correctIndex) || c.correctIndex < 0 || c.correctIndex >= 4) return false;
-        if (!c.explanation || typeof c.explanation !== 'string' || !c.explanation.trim()) return false;
-        const normalized = c.options.map((opt) => String(opt || '').trim().toLowerCase());
-        return new Set(normalized).size === 4 && normalized.every((opt) => opt.length > 0);
+        if (
+          !Number.isInteger(c.correctIndex) ||
+          c.correctIndex < 0 ||
+          c.correctIndex >= 4
+        )
+          return false;
+        if (
+          !c.explanation ||
+          typeof c.explanation !== 'string' ||
+          !c.explanation.trim()
+        )
+          return false;
+        const normalized = c.options.map((opt) =>
+          String(opt || '')
+            .trim()
+            .toLowerCase(),
+        );
+        return (
+          new Set(normalized).size === 4 &&
+          normalized.every((opt) => opt.length > 0)
+        );
       })
       .map((c) => ({
         prompt: c.prompt.trim(),
         options: c.options.map((opt) => String(opt).trim()),
         correctIndex: c.correctIndex,
         explanation: c.explanation.trim(),
-        questionType: c.questionType ? String(c.questionType).trim().toUpperCase() : 'DETAIL',
+        questionType: c.questionType
+          ? String(c.questionType).trim().toUpperCase()
+          : 'DETAIL',
       }));
 
     if (validated.length === 0) {
@@ -1770,12 +1830,30 @@ REQUIREMENTS:
 
     const validated = parsed.candidates
       .filter((c) => {
-        if (!c || typeof c.prompt !== 'string' || !c.prompt.trim()) return false;
+        if (!c || typeof c.prompt !== 'string' || !c.prompt.trim())
+          return false;
         if (!Array.isArray(c.options) || c.options.length !== 4) return false;
-        if (!Number.isInteger(c.correctIndex) || c.correctIndex < 0 || c.correctIndex >= 4) return false;
-        if (!c.explanation || typeof c.explanation !== 'string' || !c.explanation.trim()) return false;
-        const normalized = c.options.map((opt) => String(opt || '').trim().toLowerCase());
-        return new Set(normalized).size === 4 && normalized.every((opt) => opt.length > 0);
+        if (
+          !Number.isInteger(c.correctIndex) ||
+          c.correctIndex < 0 ||
+          c.correctIndex >= 4
+        )
+          return false;
+        if (
+          !c.explanation ||
+          typeof c.explanation !== 'string' ||
+          !c.explanation.trim()
+        )
+          return false;
+        const normalized = c.options.map((opt) =>
+          String(opt || '')
+            .trim()
+            .toLowerCase(),
+        );
+        return (
+          new Set(normalized).size === 4 &&
+          normalized.every((opt) => opt.length > 0)
+        );
       })
       .map((c) => ({
         prompt: c.prompt.trim(),
@@ -1846,7 +1924,9 @@ Rules: create a coherent progression by level and topic; avoid duplicate existin
       }),
     );
     await this.recordUsage(result.response?.usageMetadata);
-    const parsed = JSON.parse(result.response.text().trim()) as ContextualCourseCurriculumSuggestion;
+    const parsed = JSON.parse(
+      result.response.text().trim(),
+    ) as ContextualCourseCurriculumSuggestion;
     const candidates = Array.isArray(parsed?.candidates)
       ? parsed.candidates
           .filter(
@@ -1857,19 +1937,25 @@ Rules: create a coherent progression by level and topic; avoid duplicate existin
               typeof candidate.summary === 'string' &&
               candidate.summary.trim() &&
               Array.isArray(candidate.objectives) &&
-              candidate.objectives.some((item) => typeof item === 'string' && item.trim()),
+              candidate.objectives.some(
+                (item) => typeof item === 'string' && item.trim(),
+              ),
           )
           .map((candidate) => ({
             title: candidate.title.trim().slice(0, 180),
             summary: candidate.summary.trim().slice(0, 1000),
             objectives: candidate.objectives
-              .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+              .filter(
+                (item): item is string =>
+                  typeof item === 'string' && item.trim().length > 0,
+              )
               .map((item) => item.trim().slice(0, 300))
               .slice(0, 5),
           }))
           .filter((candidate) => candidate.objectives.length > 0)
       : [];
-    if (!candidates.length) throw new Error('AI không thể tạo curriculum hợp lệ');
+    if (!candidates.length)
+      throw new Error('AI không thể tạo curriculum hợp lệ');
     return { candidates: candidates.slice(0, safeCount) };
   }
 
@@ -1879,7 +1965,11 @@ Rules: create a coherent progression by level and topic; avoid duplicate existin
     level?: string;
     topic?: string;
     currentText?: string;
-    currentTurns?: Array<{ speaker: string; text: string; translation?: string }>;
+    currentTurns?: Array<{
+      speaker: string;
+      text: string;
+      translation?: string;
+    }>;
   }): Promise<ContextualListeningContentSuggestion> {
     if (!this.hasKeys()) throw new Error('Thiếu cấu hình GEMINI_API_KEY');
     const isDialogue = input.mode === 'DIALOGUE';
@@ -1934,10 +2024,16 @@ Return only the requested transcript fields. Do not return audio, duration, imag
       }),
     );
     await this.recordUsage(result.response?.usageMetadata);
-    const parsed = JSON.parse(result.response.text().trim()) as ContextualListeningContentSuggestion;
+    const parsed = JSON.parse(
+      result.response.text().trim(),
+    ) as ContextualListeningContentSuggestion;
     if (input.mode === 'DICTATION') {
-      const text = typeof parsed?.text === 'string' ? parsed.text.trim().slice(0, 4000) : '';
-      if (!text) throw new Error('AI không thể tạo transcript Dictation hợp lệ');
+      const text =
+        typeof parsed?.text === 'string'
+          ? parsed.text.trim().slice(0, 4000)
+          : '';
+      if (!text)
+        throw new Error('AI không thể tạo transcript Dictation hợp lệ');
       return { mode: 'DICTATION', text };
     }
     const turns = Array.isArray(parsed?.turns)
@@ -1982,7 +2078,10 @@ Return only the requested transcript fields. Do not return audio, duration, imag
             type: SchemaType.OBJECT,
             properties: {
               prompt: { type: SchemaType.STRING },
-              options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+              options: {
+                type: SchemaType.ARRAY,
+                items: { type: SchemaType.STRING },
+              },
               correctIndex: { type: SchemaType.INTEGER },
               explanation: { type: SchemaType.STRING },
             },
@@ -2012,7 +2111,9 @@ Each item must have an English prompt, exactly 4 distinct options, one correctIn
       }),
     );
     await this.recordUsage(result.response?.usageMetadata);
-    const parsed = JSON.parse(result.response.text().trim()) as ContextualListeningQuestionsSuggestion;
+    const parsed = JSON.parse(
+      result.response.text().trim(),
+    ) as ContextualListeningQuestionsSuggestion;
     const candidates = Array.isArray(parsed?.candidates)
       ? parsed.candidates
           .filter(
@@ -2030,17 +2131,21 @@ Each item must have an English prompt, exactly 4 distinct options, one correctIn
           )
           .map((candidate) => ({
             prompt: candidate.prompt.trim().slice(0, 1000),
-            options: candidate.options.map((option) => String(option).trim().slice(0, 300)),
+            options: candidate.options.map((option) =>
+              String(option).trim().slice(0, 300),
+            ),
             correctIndex: candidate.correctIndex,
             explanation: candidate.explanation.trim().slice(0, 1200),
           }))
           .filter(
             (candidate) =>
               candidate.options.every(Boolean) &&
-              new Set(candidate.options.map((option) => option.toLowerCase())).size === 4,
+              new Set(candidate.options.map((option) => option.toLowerCase()))
+                .size === 4,
           )
       : [];
-    if (!candidates.length) throw new Error('AI không thể tạo câu hỏi nghe hợp lệ');
+    if (!candidates.length)
+      throw new Error('AI không thể tạo câu hỏi nghe hợp lệ');
     return { candidates: candidates.slice(0, safeCount) };
   }
 
@@ -2066,8 +2171,14 @@ Each item must have an English prompt, exactly 4 distinct options, one correctIn
           type: SchemaType.ARRAY,
           items: { type: SchemaType.INTEGER },
         },
-        keywords: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-        sampleSentences: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+        keywords: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+        },
+        sampleSentences: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+        },
       },
       required: ['taskType', 'prompt'],
     };
@@ -2095,30 +2206,62 @@ Preserve the requested taskType exactly. Return a clear learner-facing prompt an
       }),
     );
     await this.recordUsage(result.response?.usageMetadata);
-    const parsed = JSON.parse(result.response.text().trim()) as ContextualWritingTaskSuggestion;
-    const taskType = typeof parsed?.taskType === 'string' ? parsed.taskType.trim() : '';
-    const taskPrompt = typeof parsed?.prompt === 'string' ? parsed.prompt.trim() : '';
+    const parsed = JSON.parse(
+      result.response.text().trim(),
+    ) as ContextualWritingTaskSuggestion;
+    const taskType =
+      typeof parsed?.taskType === 'string' ? parsed.taskType.trim() : '';
+    const taskPrompt =
+      typeof parsed?.prompt === 'string' ? parsed.prompt.trim() : '';
     if (!taskPrompt || taskType !== input.taskType) {
       throw new Error('AI không thể tạo đề bài Writing hợp lệ');
     }
-    const wordRange = Array.isArray(parsed.wordRange) && parsed.wordRange.length === 2
-      ? [Number(parsed.wordRange[0]), Number(parsed.wordRange[1])] as [number, number]
-      : undefined;
+    const wordRange =
+      Array.isArray(parsed.wordRange) && parsed.wordRange.length === 2
+        ? ([Number(parsed.wordRange[0]), Number(parsed.wordRange[1])] as [
+            number,
+            number,
+          ])
+        : undefined;
     return {
       taskType: input.taskType,
       prompt: taskPrompt.slice(0, 3000),
-      scenario: typeof parsed.scenario === 'string' ? parsed.scenario.trim().slice(0, 1200) : undefined,
-      recipient: typeof parsed.recipient === 'string' ? parsed.recipient.trim().slice(0, 300) : undefined,
-      context: typeof parsed.context === 'string' ? parsed.context.trim().slice(0, 1200) : undefined,
+      scenario:
+        typeof parsed.scenario === 'string'
+          ? parsed.scenario.trim().slice(0, 1200)
+          : undefined,
+      recipient:
+        typeof parsed.recipient === 'string'
+          ? parsed.recipient.trim().slice(0, 300)
+          : undefined,
+      context:
+        typeof parsed.context === 'string'
+          ? parsed.context.trim().slice(0, 1200)
+          : undefined,
       wordRange:
-        wordRange && wordRange.every((value) => Number.isInteger(value) && value > 0 && value <= 1000)
+        wordRange &&
+        wordRange.every(
+          (value) => Number.isInteger(value) && value > 0 && value <= 1000,
+        )
           ? wordRange
           : undefined,
       keywords: Array.isArray(parsed.keywords)
-        ? parsed.keywords.filter((value): value is string => typeof value === 'string' && !!value.trim()).map((value) => value.trim().slice(0, 120)).slice(0, 12)
+        ? parsed.keywords
+            .filter(
+              (value): value is string =>
+                typeof value === 'string' && !!value.trim(),
+            )
+            .map((value) => value.trim().slice(0, 120))
+            .slice(0, 12)
         : undefined,
       sampleSentences: Array.isArray(parsed.sampleSentences)
-        ? parsed.sampleSentences.filter((value): value is string => typeof value === 'string' && !!value.trim()).map((value) => value.trim().slice(0, 300)).slice(0, 5)
+        ? parsed.sampleSentences
+            .filter(
+              (value): value is string =>
+                typeof value === 'string' && !!value.trim(),
+            )
+            .map((value) => value.trim().slice(0, 300))
+            .slice(0, 5)
         : undefined,
     };
   }

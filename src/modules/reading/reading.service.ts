@@ -545,8 +545,8 @@ export class ReadingService {
       !quiz ||
       quiz.practiceTopic?.category !== TopicCategory.BILINGUAL_LEVEL ||
       quiz.type !== QuizType.BILINGUAL_READING ||
-      quiz.publicationStatus !== undefined &&
-      quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED
+      (quiz.publicationStatus !== undefined &&
+        quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
       throw new NotFoundException('Reading quiz not found');
     }

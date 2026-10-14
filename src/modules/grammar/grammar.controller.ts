@@ -117,7 +117,9 @@ export class GrammarController {
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Delete('topics/:id')
-  @ApiOperation({ summary: '[Admin] Xóa chủ đề ngữ pháp (bảo vệ lịch sử học tập)' })
+  @ApiOperation({
+    summary: '[Admin] Xóa chủ đề ngữ pháp (bảo vệ lịch sử học tập)',
+  })
   deleteTopic(@Param('id', ParseIntPipe) id: number) {
     return this.grammarService.deleteTopic(id);
   }
@@ -151,7 +153,9 @@ export class GrammarController {
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Delete('topics/:topicId/questions/:questionId')
-  @ApiOperation({ summary: '[Admin] Xóa câu hỏi ngữ pháp (kiểm tra ownership & history)' })
+  @ApiOperation({
+    summary: '[Admin] Xóa câu hỏi ngữ pháp (kiểm tra ownership & history)',
+  })
   deleteTopicQuestion(
     @Param('topicId', ParseIntPipe) topicId: number,
     @Param('questionId', ParseIntPipe) questionId: number,

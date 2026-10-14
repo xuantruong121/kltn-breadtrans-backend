@@ -12,7 +12,6 @@ import {
   UpdateGrammarTopicDto,
   CreateGrammarQuestionDto,
   UpdateGrammarQuestionDto,
-  ReorderGrammarQuestionsDto,
 } from './dto';
 
 @Injectable()
@@ -107,7 +106,9 @@ export class GrammarService {
     const sanitizedQuestions = isStaff
       ? topic.questions
       : topic.questions?.map((q: any) => {
-          const { correctIndex, explanation, ...rest } = q;
+          const rest = { ...q };
+          delete rest.correctIndex;
+          delete rest.explanation;
           return rest;
         });
 
@@ -251,14 +252,17 @@ export class GrammarService {
 
   async updateTopic(id: number, dto: UpdateGrammarTopicDto) {
     const topic = await this.prisma.grammarTopic.findUnique({ where: { id } });
-    if (!topic) throw new NotFoundException(`Grammar topic with ID ${id} not found`);
+    if (!topic)
+      throw new NotFoundException(`Grammar topic with ID ${id} not found`);
     return this.prisma.grammarTopic.update({
       where: { id },
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
         ...(dto.level !== undefined && { level: dto.level }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.videoYoutubeId !== undefined && { videoYoutubeId: dto.videoYoutubeId }),
+        ...(dto.videoYoutubeId !== undefined && {
+          videoYoutubeId: dto.videoYoutubeId,
+        }),
         ...(dto.keyFormula !== undefined && { keyFormula: dto.keyFormula }),
         ...(dto.order !== undefined && { order: dto.order }),
       },
@@ -270,9 +274,12 @@ export class GrammarService {
       where: { id },
       include: { questions: true },
     });
-    if (!topic) throw new NotFoundException(`Grammar topic with ID ${id} not found`);
+    if (!topic)
+      throw new NotFoundException(`Grammar topic with ID ${id} not found`);
     if (!topic.questions || topic.questions.length === 0) {
-      throw new BadRequestException('Chủ đề ngữ pháp phải có ít nhất 1 câu hỏi trước khi xuất bản');
+      throw new BadRequestException(
+        'Chủ đề ngữ pháp phải có ít nhất 1 câu hỏi trước khi xuất bản',
+      );
     }
     for (const q of topic.questions) {
       if (!q.question?.trim()) {
@@ -280,10 +287,14 @@ export class GrammarService {
       }
       const opts = Array.isArray(q.options) ? q.options : [];
       if (opts.length < 2) {
-        throw new BadRequestException(`Câu hỏi ID ${q.id} phải có ít nhất 2 đáp án lựa chọn`);
+        throw new BadRequestException(
+          `Câu hỏi ID ${q.id} phải có ít nhất 2 đáp án lựa chọn`,
+        );
       }
       if (q.correctIndex < 0 || q.correctIndex >= opts.length) {
-        throw new BadRequestException(`Đáp án đúng của câu hỏi ID ${q.id} không hợp lệ`);
+        throw new BadRequestException(
+          `Đáp án đúng của câu hỏi ID ${q.id} không hợp lệ`,
+        );
       }
     }
     return this.prisma.grammarTopic.update({
@@ -294,7 +305,8 @@ export class GrammarService {
 
   async unpublishTopic(id: number) {
     const topic = await this.prisma.grammarTopic.findUnique({ where: { id } });
-    if (!topic) throw new NotFoundException(`Grammar topic with ID ${id} not found`);
+    if (!topic)
+      throw new NotFoundException(`Grammar topic with ID ${id} not found`);
     return this.prisma.grammarTopic.update({
       where: { id },
       data: { publicationStatus: QuizPublicationStatus.DRAFT },
@@ -303,25 +315,33 @@ export class GrammarService {
 
   async deleteTopic(id: number) {
     const topic = await this.prisma.grammarTopic.findUnique({ where: { id } });
-    if (!topic) throw new NotFoundException(`Grammar topic with ID ${id} not found`);
+    if (!topic)
+      throw new NotFoundException(`Grammar topic with ID ${id} not found`);
     // History safety guard
     const hasAttempts = await this.prisma.grammarAttempt.findFirst({
       where: { topicId: id },
     });
     if (hasAttempts) {
-      throw new ConflictException('Chủ đề ngữ pháp đã có bài làm của học viên, không thể xóa');
+      throw new ConflictException(
+        'Chủ đề ngữ pháp đã có bài làm của học viên, không thể xóa',
+      );
     }
     return this.prisma.grammarTopic.delete({ where: { id } });
   }
 
   async createQuestion(topicId: number, dto: CreateGrammarQuestionDto) {
-    const topic = await this.prisma.grammarTopic.findUnique({ where: { id: topicId } });
-    if (!topic) throw new NotFoundException(`Grammar topic with ID ${topicId} not found`);
+    const topic = await this.prisma.grammarTopic.findUnique({
+      where: { id: topicId },
+    });
+    if (!topic)
+      throw new NotFoundException(`Grammar topic with ID ${topicId} not found`);
     if (!Array.isArray(dto.options) || dto.options.length < 2) {
       throw new BadRequestException('Câu hỏi phải có ít nhất 2 đáp án');
     }
     if (dto.correctIndex < 0 || dto.correctIndex >= dto.options.length) {
-      throw new BadRequestException('Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án');
+      throw new BadRequestException(
+        'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
+      );
     }
     return this.prisma.grammarQuestion.create({
       data: {
@@ -335,29 +355,46 @@ export class GrammarService {
     });
   }
 
-  async updateQuestion(topicId: number, questionId: number, dto: UpdateGrammarQuestionDto) {
-    const question = await this.prisma.grammarQuestion.findUnique({ where: { id: questionId } });
+  async updateQuestion(
+    topicId: number,
+    questionId: number,
+    dto: UpdateGrammarQuestionDto,
+  ) {
+    const question = await this.prisma.grammarQuestion.findUnique({
+      where: { id: questionId },
+    });
     if (!question || question.topicId !== topicId) {
-      throw new NotFoundException('Câu hỏi không tồn tại trong chủ đề ngữ pháp này');
+      throw new NotFoundException(
+        'Câu hỏi không tồn tại trong chủ đề ngữ pháp này',
+      );
     }
     // History safety guard: if attempts exist, block changing options/answers
     const hasAttempts = await this.prisma.grammarAttempt.findFirst({
       where: { topicId },
     });
     if (hasAttempts) {
-      throw new ConflictException('Chủ đề ngữ pháp đã có bài làm của học viên, không thể chỉnh sửa cấu trúc câu hỏi');
+      throw new ConflictException(
+        'Chủ đề ngữ pháp đã có bài làm của học viên, không thể chỉnh sửa cấu trúc câu hỏi',
+      );
     }
     const finalOptions = dto.options ?? (question.options as string[]);
     const finalCorrectIndex = dto.correctIndex ?? question.correctIndex;
-    if (Array.isArray(finalOptions) && (finalCorrectIndex < 0 || finalCorrectIndex >= finalOptions.length)) {
-      throw new BadRequestException('Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án');
+    if (
+      Array.isArray(finalOptions) &&
+      (finalCorrectIndex < 0 || finalCorrectIndex >= finalOptions.length)
+    ) {
+      throw new BadRequestException(
+        'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
+      );
     }
     return this.prisma.grammarQuestion.update({
       where: { id: questionId },
       data: {
         ...(dto.question !== undefined && { question: dto.question }),
         ...(dto.options !== undefined && { options: dto.options }),
-        ...(dto.correctIndex !== undefined && { correctIndex: dto.correctIndex }),
+        ...(dto.correctIndex !== undefined && {
+          correctIndex: dto.correctIndex,
+        }),
         ...(dto.explanation !== undefined && { explanation: dto.explanation }),
         ...(dto.order !== undefined && { order: dto.order }),
       },
@@ -365,16 +402,22 @@ export class GrammarService {
   }
 
   async deleteQuestion(topicId: number, questionId: number) {
-    const question = await this.prisma.grammarQuestion.findUnique({ where: { id: questionId } });
+    const question = await this.prisma.grammarQuestion.findUnique({
+      where: { id: questionId },
+    });
     if (!question || question.topicId !== topicId) {
-      throw new NotFoundException('Câu hỏi không tồn tại trong chủ đề ngữ pháp này');
+      throw new NotFoundException(
+        'Câu hỏi không tồn tại trong chủ đề ngữ pháp này',
+      );
     }
     // History safety guard
     const hasAttempts = await this.prisma.grammarAttempt.findFirst({
       where: { topicId },
     });
     if (hasAttempts) {
-      throw new ConflictException('Chủ đề ngữ pháp đã có bài làm của học viên, không thể xóa câu hỏi');
+      throw new ConflictException(
+        'Chủ đề ngữ pháp đã có bài làm của học viên, không thể xóa câu hỏi',
+      );
     }
     return this.prisma.grammarQuestion.delete({ where: { id: questionId } });
   }
@@ -384,11 +427,14 @@ export class GrammarService {
       where: { id: topicId },
       include: { questions: { select: { id: true } } },
     });
-    if (!topic) throw new NotFoundException(`Grammar topic with ID ${topicId} not found`);
+    if (!topic)
+      throw new NotFoundException(`Grammar topic with ID ${topicId} not found`);
     const existingIds = new Set(topic.questions.map((q) => q.id));
     for (const qid of questionIds) {
       if (!existingIds.has(qid)) {
-        throw new BadRequestException(`Câu hỏi ID ${qid} không thuộc chủ đề này`);
+        throw new BadRequestException(
+          `Câu hỏi ID ${qid} không thuộc chủ đề này`,
+        );
       }
     }
     await this.prisma.$transaction(
@@ -403,7 +449,9 @@ export class GrammarService {
   }
 
   async deleteQuestionById(id: number) {
-    const question = await this.prisma.grammarQuestion.findUnique({ where: { id } });
+    const question = await this.prisma.grammarQuestion.findUnique({
+      where: { id },
+    });
     if (!question) throw new NotFoundException('Câu hỏi không tồn tại');
     return this.deleteQuestion(question.topicId, id);
   }

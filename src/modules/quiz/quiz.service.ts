@@ -2241,10 +2241,18 @@ export class QuizService {
               score = 1;
               totalScore += score;
             }
-          } else if (content.correct === ans.answer) {
-            isCorrect = true;
-            score = 1;
-            totalScore += score;
+          } else {
+            const listeningCorrect =
+              quiz.type === QuizType.LISTENING_PRACTICE &&
+              Array.isArray(content.options) &&
+              Number.isInteger(content.correctIndex)
+                ? content.options[content.correctIndex as number]
+                : content.correct;
+            if (listeningCorrect === ans.answer) {
+              isCorrect = true;
+              score = 1;
+              totalScore += score;
+            }
           }
         } else if (
           question.type === 'DICTATION' ||

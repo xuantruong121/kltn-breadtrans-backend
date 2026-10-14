@@ -53,7 +53,9 @@ describe('AuthService', () => {
         },
         {
           provide: EmailService,
-          useValue: { sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined) },
+          useValue: {
+            sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();

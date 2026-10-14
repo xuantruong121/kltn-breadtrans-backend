@@ -605,6 +605,8 @@ export class AiGeneratorService {
     payload: PublishContentDto,
     adminId: number,
   ) {
+    void payload;
+    void adminId;
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
     });

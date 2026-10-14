@@ -100,7 +100,9 @@ export class AdminExamController {
   }
 
   @Delete(':examId/groups/:groupId')
-  @ApiOperation({ summary: 'Admin: Xóa nhóm câu hỏi (kiểm tra ownership & history)' })
+  @ApiOperation({
+    summary: 'Admin: Xóa nhóm câu hỏi (kiểm tra ownership & history)',
+  })
   deleteGroup(
     @Param('examId', ParseIntPipe) examId: number,
     @Param('groupId', ParseIntPipe) groupId: number,
@@ -145,16 +147,14 @@ export class AdminExamController {
   }
 
   @Delete(':examId/groups/:groupId/questions/:questionId')
-  @ApiOperation({ summary: 'Admin: Xóa câu hỏi (kiểm tra nested ownership & history)' })
+  @ApiOperation({
+    summary: 'Admin: Xóa câu hỏi (kiểm tra nested ownership & history)',
+  })
   deleteQuestion(
     @Param('examId', ParseIntPipe) examId: number,
     @Param('groupId', ParseIntPipe) groupId: number,
     @Param('questionId', ParseIntPipe) questionId: number,
   ) {
-    return this.adminExamService.deleteQuestion(
-      examId,
-      groupId,
-      questionId,
-    );
+    return this.adminExamService.deleteQuestion(examId, groupId, questionId);
   }
 }

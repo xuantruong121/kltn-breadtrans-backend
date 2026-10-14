@@ -41,8 +41,13 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
 
   describe('1. Security & Admin Authorization Guards', () => {
     it('protects the AdminContextualAiController with JwtAuthGuard and RolesGuard', () => {
-      const guards = Reflect.getMetadata('__guards__', AdminContextualAiController);
-      expect(guards).toEqual(expect.arrayContaining([JwtAuthGuard, RolesGuard]));
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        AdminContextualAiController,
+      );
+      expect(guards).toEqual(
+        expect.arrayContaining([JwtAuthGuard, RolesGuard]),
+      );
     });
 
     it('strictly restricts all contextual AI endpoints to ADMIN role', () => {
@@ -105,18 +110,36 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
     });
 
     it('rejects contextual requests outside Phase 5B boundaries', async () => {
-      const curriculumErrors = await validate(plainToInstance(SuggestCourseCurriculumDto, { targetLessonCount: 20 }));
-      expect(curriculumErrors.some((e) => e.property === 'courseTitle')).toBe(true);
-      expect(curriculumErrors.some((e) => e.property === 'targetLessonCount')).toBe(true);
+      const curriculumErrors = await validate(
+        plainToInstance(SuggestCourseCurriculumDto, { targetLessonCount: 20 }),
+      );
+      expect(curriculumErrors.some((e) => e.property === 'courseTitle')).toBe(
+        true,
+      );
+      expect(
+        curriculumErrors.some((e) => e.property === 'targetLessonCount'),
+      ).toBe(true);
 
-      const listeningErrors = await validate(plainToInstance(SuggestListeningContentDto, { mode: 'VIDEO' }));
+      const listeningErrors = await validate(
+        plainToInstance(SuggestListeningContentDto, { mode: 'VIDEO' }),
+      );
       expect(listeningErrors.some((e) => e.property === 'mode')).toBe(true);
 
-      const questionsErrors = await validate(plainToInstance(SuggestListeningQuestionsDto, { mode: 'DICTATION', sourceText: '', count: 0 }));
-      expect(questionsErrors.some((e) => e.property === 'sourceText')).toBe(true);
+      const questionsErrors = await validate(
+        plainToInstance(SuggestListeningQuestionsDto, {
+          mode: 'DICTATION',
+          sourceText: '',
+          count: 0,
+        }),
+      );
+      expect(questionsErrors.some((e) => e.property === 'sourceText')).toBe(
+        true,
+      );
       expect(questionsErrors.some((e) => e.property === 'count')).toBe(true);
 
-      const writingErrors = await validate(plainToInstance(SuggestWritingTaskDto, { taskType: '' }));
+      const writingErrors = await validate(
+        plainToInstance(SuggestWritingTaskDto, { taskType: '' }),
+      );
       expect(writingErrors.some((e) => e.property === 'taskType')).toBe(true);
     });
   });
@@ -176,7 +199,9 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
 
     it('preserves BadRequestException when daily quota limit is reached', async () => {
       mockAiService.suggestGrammarQuestions!.mockRejectedValue(
-        new BadRequestException('Đã vượt quá hạn mức quota AI trong ngày (500 requests).'),
+        new BadRequestException(
+          'Đã vượt quá hạn mức quota AI trong ngày (500 requests).',
+        ),
       );
 
       await expect(
@@ -193,9 +218,9 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         new Error('Gemini API connection timeout'),
       );
 
-      await expect(
-        controller.suggestToeicPart5({ count: 5 }),
-      ).rejects.toThrow(BadGatewayException);
+      await expect(controller.suggestToeicPart5({ count: 5 })).rejects.toThrow(
+        BadGatewayException,
+      );
     });
   });
 
@@ -248,9 +273,20 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
 
   describe('5B. Course, Listening and Writing Contextual Architecture', () => {
     it('passes current Course Studio context to the AI service without persistence', async () => {
-      const resultValue = { candidates: [{ title: 'Lesson 1', summary: 'Basics', objectives: ['Use greetings'] }] };
+      const resultValue = {
+        candidates: [
+          {
+            title: 'Lesson 1',
+            summary: 'Basics',
+            objectives: ['Use greetings'],
+          },
+        ],
+      };
       mockAiService.suggestCourseCurriculum!.mockResolvedValue(resultValue);
-      const result = await controller.suggestCourseCurriculum({ courseTitle: 'English A2', targetLessonCount: 1 });
+      const result = await controller.suggestCourseCurriculum({
+        courseTitle: 'English A2',
+        targetLessonCount: 1,
+      });
       expect(result).toEqual(resultValue);
       expect(mockAiService.suggestCourseCurriculum).toHaveBeenCalledWith({
         courseTitle: 'English A2',
@@ -262,18 +298,66 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
     });
 
     it('uses Listening current editor source and keeps Writing suggestion text-only', async () => {
-      const contentResult = { mode: 'DIALOGUE', turns: [{ speaker: 'A', text: 'Hello' }, { speaker: 'B', text: 'Hi' }] };
-      const questionResult = { candidates: [{ prompt: 'Who says hello?', options: ['A', 'B', 'C', 'D'], correctIndex: 0, explanation: 'Có trong transcript.' }] };
-      const writingResult = { taskType: 'EMAIL', prompt: 'Write an email to your teacher.' };
+      const contentResult = {
+        mode: 'DIALOGUE',
+        turns: [
+          { speaker: 'A', text: 'Hello' },
+          { speaker: 'B', text: 'Hi' },
+        ],
+      };
+      const questionResult = {
+        candidates: [
+          {
+            prompt: 'Who says hello?',
+            options: ['A', 'B', 'C', 'D'],
+            correctIndex: 0,
+            explanation: 'Có trong transcript.',
+          },
+        ],
+      };
+      const writingResult = {
+        taskType: 'EMAIL',
+        prompt: 'Write an email to your teacher.',
+      };
       mockAiService.suggestListeningContent!.mockResolvedValue(contentResult);
-      mockAiService.suggestListeningQuestions!.mockResolvedValue(questionResult);
+      mockAiService.suggestListeningQuestions!.mockResolvedValue(
+        questionResult,
+      );
       mockAiService.suggestWritingTask!.mockResolvedValue(writingResult);
 
-      expect(await controller.suggestListeningContent({ mode: 'DIALOGUE', topic: 'School' })).toEqual(contentResult);
-      expect(await controller.suggestListeningQuestions({ mode: 'DIALOGUE', sourceText: 'A: Hello\nB: Hi', count: 1 })).toEqual(questionResult);
-      expect(await controller.suggestWritingTask({ taskType: 'EMAIL', currentPrompt: 'old prompt' })).toEqual(writingResult);
-      expect(mockAiService.suggestListeningQuestions).toHaveBeenCalledWith({ mode: 'DIALOGUE', sourceText: 'A: Hello\nB: Hi', level: undefined, count: 1 });
-      expect(mockAiService.suggestWritingTask).toHaveBeenCalledWith({ taskType: 'EMAIL', level: undefined, topic: undefined, currentPrompt: 'old prompt', wordMin: undefined, wordMax: undefined });
+      expect(
+        await controller.suggestListeningContent({
+          mode: 'DIALOGUE',
+          topic: 'School',
+        }),
+      ).toEqual(contentResult);
+      expect(
+        await controller.suggestListeningQuestions({
+          mode: 'DIALOGUE',
+          sourceText: 'A: Hello\nB: Hi',
+          count: 1,
+        }),
+      ).toEqual(questionResult);
+      expect(
+        await controller.suggestWritingTask({
+          taskType: 'EMAIL',
+          currentPrompt: 'old prompt',
+        }),
+      ).toEqual(writingResult);
+      expect(mockAiService.suggestListeningQuestions).toHaveBeenCalledWith({
+        mode: 'DIALOGUE',
+        sourceText: 'A: Hello\nB: Hi',
+        level: undefined,
+        count: 1,
+      });
+      expect(mockAiService.suggestWritingTask).toHaveBeenCalledWith({
+        taskType: 'EMAIL',
+        level: undefined,
+        topic: undefined,
+        currentPrompt: 'old prompt',
+        wordMin: undefined,
+        wordMax: undefined,
+      });
     });
   });
 
@@ -283,33 +367,84 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       const domainMutationSpies = {
         vocabTopic: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
         vocabWord: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
-        grammarTopic: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
-        grammarQuestion: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+        grammarTopic: {
+          create: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
+        grammarQuestion: {
+          create: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
         quiz: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
         question: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
-        toeicExamSet: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
-        toeicQuestionGroup: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
-        toeicQuestion: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+        toeicExamSet: {
+          create: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
+        toeicQuestionGroup: {
+          create: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
+        toeicQuestion: {
+          create: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
       };
 
-      mockAiService.suggestVocabWord!.mockResolvedValue({ word: 'w', meaning: 'm' });
-      mockAiService.suggestGrammarQuestions!.mockResolvedValue({ candidates: [] });
-      mockAiService.suggestReadingPassage!.mockResolvedValue({ title: 't', passage: 'p' });
-      mockAiService.suggestReadingQuestions!.mockResolvedValue({ candidates: [] });
+      mockAiService.suggestVocabWord!.mockResolvedValue({
+        word: 'w',
+        meaning: 'm',
+      });
+      mockAiService.suggestGrammarQuestions!.mockResolvedValue({
+        candidates: [],
+      });
+      mockAiService.suggestReadingPassage!.mockResolvedValue({
+        title: 't',
+        passage: 'p',
+      });
+      mockAiService.suggestReadingQuestions!.mockResolvedValue({
+        candidates: [],
+      });
       mockAiService.suggestToeicPart5!.mockResolvedValue({ candidates: [] });
-      mockAiService.suggestCourseCurriculum!.mockResolvedValue({ candidates: [] });
-      mockAiService.suggestListeningContent!.mockResolvedValue({ mode: 'DICTATION', text: 'text' });
-      mockAiService.suggestListeningQuestions!.mockResolvedValue({ candidates: [] });
-      mockAiService.suggestWritingTask!.mockResolvedValue({ taskType: 'EMAIL', prompt: 'text' });
+      mockAiService.suggestCourseCurriculum!.mockResolvedValue({
+        candidates: [],
+      });
+      mockAiService.suggestListeningContent!.mockResolvedValue({
+        mode: 'DICTATION',
+        text: 'text',
+      });
+      mockAiService.suggestListeningQuestions!.mockResolvedValue({
+        candidates: [],
+      });
+      mockAiService.suggestWritingTask!.mockResolvedValue({
+        taskType: 'EMAIL',
+        prompt: 'text',
+      });
 
       await controller.suggestVocabWord({ word: 'test' });
-      await controller.suggestGrammarQuestions({ topicTitle: 't', level: 'A1', count: 1 });
+      await controller.suggestGrammarQuestions({
+        topicTitle: 't',
+        level: 'A1',
+        count: 1,
+      });
       await controller.suggestReadingPassage({ topic: 't', level: 'A1' });
       await controller.suggestReadingQuestions({ passage: 'p', count: 1 });
       await controller.suggestToeicPart5({ count: 1 });
-      await controller.suggestCourseCurriculum({ courseTitle: 't', targetLessonCount: 1 });
+      await controller.suggestCourseCurriculum({
+        courseTitle: 't',
+        targetLessonCount: 1,
+      });
       await controller.suggestListeningContent({ mode: 'DICTATION' });
-      await controller.suggestListeningQuestions({ mode: 'DICTATION', sourceText: 'text', count: 1 });
+      await controller.suggestListeningQuestions({
+        mode: 'DICTATION',
+        sourceText: 'text',
+        count: 1,
+      });
       await controller.suggestWritingTask({ taskType: 'EMAIL' });
 
       // Verify zero calls across all domain mutation methods
@@ -331,17 +466,27 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
   describe('7. Provider Failure Matrix (429, 503, timeout, invalid JSON, schema mismatch)', () => {
     it('AI_PROVIDER_429_PASS: handles 429 Too Many Requests gracefully with BadGatewayException', async () => {
       mockAiService.suggestVocabWord!.mockRejectedValue(
-        new Error('429 Too Many Requests: Rate limit exceeded on Gemini endpoint'),
+        new Error(
+          '429 Too Many Requests: Rate limit exceeded on Gemini endpoint',
+        ),
       );
-      await expect(controller.suggestVocabWord({ word: 'test' })).rejects.toThrow(BadGatewayException);
+      await expect(
+        controller.suggestVocabWord({ word: 'test' }),
+      ).rejects.toThrow(BadGatewayException);
     });
 
     it('AI_PROVIDER_503_PASS: handles 503 Service Unavailable gracefully with BadGatewayException', async () => {
       mockAiService.suggestGrammarQuestions!.mockRejectedValue(
-        new Error('503 Service Unavailable: High server load on Gemini infrastructure'),
+        new Error(
+          '503 Service Unavailable: High server load on Gemini infrastructure',
+        ),
       );
       await expect(
-        controller.suggestGrammarQuestions({ topicTitle: 't', level: 'B1', count: 2 }),
+        controller.suggestGrammarQuestions({
+          topicTitle: 't',
+          level: 'B1',
+          count: 2,
+        }),
       ).rejects.toThrow(BadGatewayException);
     });
 
@@ -365,9 +510,13 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
 
     it('AI_PROVIDER_SCHEMA_MISMATCH_PASS: handles missing required fields with BadGatewayException', async () => {
       mockAiService.suggestToeicPart5!.mockRejectedValue(
-        new Error('ValidationError: AI response missing candidates array in schema output'),
+        new Error(
+          'ValidationError: AI response missing candidates array in schema output',
+        ),
       );
-      await expect(controller.suggestToeicPart5({ count: 2 })).rejects.toThrow(BadGatewayException);
+      await expect(controller.suggestToeicPart5({ count: 2 })).rejects.toThrow(
+        BadGatewayException,
+      );
     });
   });
 });

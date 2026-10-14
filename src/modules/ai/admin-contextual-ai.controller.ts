@@ -198,7 +198,9 @@ export class AdminContextualAiController {
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
-      this.logger.warn(`AI Listening Questions failed: ${error?.message || ''}`);
+      this.logger.warn(
+        `AI Listening Questions failed: ${error?.message || ''}`,
+      );
       throw new BadGatewayException(
         'Không thể tạo câu hỏi nghe từ AI lúc này. Vui lòng thử lại sau.',
       );

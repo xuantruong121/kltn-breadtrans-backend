@@ -45,11 +45,16 @@ export class EmailService {
   }
 
   sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
-    if (!this.transporter || !(process.env.SMTP_FROM || process.env.SMTP_USER)) {
+    if (
+      !this.transporter ||
+      !(process.env.SMTP_FROM || process.env.SMTP_USER)
+    ) {
       if (process.env.NODE_ENV === 'production') {
         throw new Error('SMTP is not configured');
       }
-      this.logger.debug(`[DEV MODE ONLY] Password reset URL for ${to}: ${resetUrl}`);
+      this.logger.debug(
+        `[DEV MODE ONLY] Password reset URL for ${to}: ${resetUrl}`,
+      );
       return Promise.resolve();
     }
 
