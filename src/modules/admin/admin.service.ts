@@ -978,10 +978,40 @@ export class AdminService {
     ]);
 
     let cachedGeminiCount = 0;
+    let geminiTotalRequests = 0;
+    let geminiInputTokens = 0;
+    let geminiOutputTokens = 0;
+    let geminiCostUsd = 0;
+    let geminiCostVnd = 0;
+
     if (this.redis) {
       try {
-        const keys = await this.redis.keys('gemini:*');
+        const [keys, totalReqs, inTok, outTok] = await Promise.all([
+          this.redis.keys('gemini:*'),
+          this.redis.get('gemini:telemetry:total_requests'),
+          this.redis.get('gemini:telemetry:input_tokens'),
+          this.redis.get('gemini:telemetry:output_tokens'),
+        ]);
         cachedGeminiCount = keys.length;
+        let quotaSum = 0;
+        const quotaKeys = keys.filter((k) => k.startsWith('gemini:daily_quota:'));
+        if (quotaKeys.length > 0) {
+          const vals = await this.redis.mget(quotaKeys);
+          quotaSum = vals.reduce(
+            (acc, v) => acc + (v ? parseInt(v, 10) : 0),
+            0,
+          );
+        }
+        const telemetryReqs = totalReqs ? parseInt(totalReqs, 10) : 0;
+        geminiTotalRequests = Math.max(telemetryReqs, quotaSum);
+        if (inTok) geminiInputTokens = parseInt(inTok, 10);
+        if (outTok) geminiOutputTokens = parseInt(outTok, 10);
+
+        // Flash Lite pricing: $0.075 / 1M input, $0.30 / 1M output
+        geminiCostUsd = Number(
+          ((geminiInputTokens * 0.075 + geminiOutputTokens * 0.3) / 1000000).toFixed(6),
+        );
+        geminiCostVnd = Math.round(geminiCostUsd * 25400);
       } catch {
         // Cache inventory is optional telemetry, not a billing estimate.
       }
@@ -1013,15 +1043,18 @@ export class AdminService {
         gemini: {
           name: 'Google Gemini Generative AI',
           model: process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite',
-          totalRequests: 0,
+          totalRequests: geminiTotalRequests,
           cachedEntries: cachedGeminiCount,
           cacheHitCount: 0,
           cacheHitRate: 0,
-          inputTokens: 0,
-          outputTokens: 0,
-          costUsd: 0,
-          costVnd: 0,
-          freeTierStatus: 'Chưa kết nối dữ liệu billing',
+          inputTokens: geminiInputTokens,
+          outputTokens: geminiOutputTokens,
+          costUsd: geminiCostUsd,
+          costVnd: geminiCostVnd,
+          freeTierStatus:
+            geminiTotalRequests > 0
+              ? 'Đang hoạt động (Pay-as-you-go)'
+              : 'Chưa kết nối dữ liệu billing',
           withinFreeTier: false,
         },
         azureSpeech: {
@@ -1057,14 +1090,20 @@ export class AdminService {
     if (!this.redis) {
       return { success: true, count: 0, message: 'Redis không được kết nối' };
     }
-    const keys = await this.redis.keys('gemini:*');
-    if (keys.length > 0) {
-      await this.redis.del(...keys);
+    const allKeys = await this.redis.keys('gemini:*');
+    // Preserve operational telemetry keys and daily quota keys during cache purge
+    const cacheKeys = allKeys.filter(
+      (k) =>
+        !k.startsWith('gemini:telemetry:') &&
+        !k.startsWith('gemini:daily_quota:'),
+    );
+    if (cacheKeys.length > 0) {
+      await this.redis.del(...cacheKeys);
     }
     return {
       success: true,
-      count: keys.length,
-      message: `Đã xóa thành công ${keys.length} mục cache của Gemini AI`,
+      count: cacheKeys.length,
+      message: `Đã xóa thành công ${cacheKeys.length} mục cache của Gemini AI`,
     };
   }
 

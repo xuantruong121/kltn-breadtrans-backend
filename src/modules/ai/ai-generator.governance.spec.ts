@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  GoneException,
+} from '@nestjs/common';
 import { AiGenerationJobStatus, AiGenerationJobType } from '@prisma/client';
 import { AiGeneratorService, PublishContentDto } from './ai-generator.service';
 
@@ -100,5 +104,26 @@ describe('AiGeneratorService Phase 5 governance', () => {
     await expect(
       serviceWith(prisma).publishContent('job-4', payload(), 7),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('closes legacy direct runtime writes with GoneException to preserve domain studio single-writer', async () => {
+    const prisma = {
+      aiGenerationJob: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'job-5',
+          status: AiGenerationJobStatus.APPROVED,
+          approvedSnapshot: payload(),
+        }),
+      },
+      quiz: { create: jest.fn() },
+      vocabTopic: { create: jest.fn() },
+      assignment: { create: jest.fn() },
+    };
+    await expect(
+      serviceWith(prisma).publishContent('job-5', payload(), 7),
+    ).rejects.toBeInstanceOf(GoneException);
+    expect(prisma.quiz.create).not.toHaveBeenCalled();
+    expect(prisma.vocabTopic.create).not.toHaveBeenCalled();
+    expect(prisma.assignment.create).not.toHaveBeenCalled();
   });
 });

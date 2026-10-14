@@ -17,7 +17,8 @@ import {
   RefreshTokenDto,
   GenerateOtpDto,
   VerifyOtpDto,
-  VerifyRegistrationDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
   ChangePasswordDto,
   GoogleExchangeDto,
   GoogleLoginDto,
@@ -48,11 +49,20 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
-  @Post('register/verify')
+  @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  async verifyRegistration(@Body() body: VerifyRegistrationDto) {
-    return this.authService.verifyRegistration(body.email, body.otp);
+  @ApiOperation({ summary: 'Gửi liên kết đặt lại mật khẩu' })
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(body.email);
   }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đặt lại mật khẩu bằng token một lần' })
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(body.token, body.newPassword);
+  }
+
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })

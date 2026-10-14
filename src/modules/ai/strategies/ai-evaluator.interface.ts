@@ -199,4 +199,178 @@ export interface IAIEvaluator {
     documentText: string,
     options?: { quizCount?: number; flashcardCount?: number },
   ): Promise<SmartGeneratedContent>;
+
+  /** Phase 5A: Gợi ý nội dung từ vựng theo chuẩn VocabWord */
+  suggestVocabWord?(input: {
+    word: string;
+    context?: string;
+    level?: string;
+  }): Promise<ContextualVocabSuggestion>;
+
+  /** Phase 5A: Gợi ý danh sách câu hỏi ngữ pháp trắc nghiệm nháp */
+  suggestGrammarQuestions?(input: {
+    topicTitle: string;
+    level: string;
+    theory?: string;
+    keyFormula?: string;
+    count: number;
+  }): Promise<ContextualGrammarSuggestion>;
+
+  /** Phase 5A: Gợi ý đoạn văn đọc (Reading passage) nháp */
+  suggestReadingPassage?(input: {
+    topic: string;
+    level: string;
+    targetLength?: number;
+    microSkill?: string;
+  }): Promise<ContextualReadingPassageSuggestion>;
+
+  /** Phase 5A: Gợi ý câu hỏi trắc nghiệm từ đoạn văn đọc hiện tại trong editor */
+  suggestReadingQuestions?(input: {
+    passage: string;
+    level?: string;
+    count: number;
+  }): Promise<ContextualReadingQuestionsSuggestion>;
+
+  /** Phase 5A: Gợi ý câu hỏi TOEIC Part 5 nháp */
+  suggestToeicPart5?(input: {
+    topic?: string;
+    level?: string;
+    grammarFocus?: string;
+    vocabularyFocus?: string;
+    count: number;
+  }): Promise<ContextualToeicPart5Suggestion>;
+
+  /** Phase 5B: Course curriculum candidates only. */
+  suggestCourseCurriculum?(input: {
+    courseTitle: string;
+    level?: string;
+    description?: string;
+    targetLessonCount: number;
+    existingLessonTitles?: string[];
+  }): Promise<ContextualCourseCurriculumSuggestion>;
+
+  /** Phase 5B: Listening transcript/turn candidates only. */
+  suggestListeningContent?(input: {
+    mode: 'DIALOGUE' | 'DICTATION';
+    level?: string;
+    topic?: string;
+    currentText?: string;
+    currentTurns?: Array<{
+      speaker: string;
+      text: string;
+      translation?: string;
+    }>;
+  }): Promise<ContextualListeningContentSuggestion>;
+
+  /** Phase 5B: Listening multiple-choice candidates from current editor text. */
+  suggestListeningQuestions?(input: {
+    mode: 'DIALOGUE' | 'DICTATION';
+    sourceText: string;
+    level?: string;
+    count: number;
+  }): Promise<ContextualListeningQuestionsSuggestion>;
+
+  /** Phase 5B: Writing task candidates only, without media fabrication. */
+  suggestWritingTask?(input: {
+    taskType: string;
+    level?: string;
+    topic?: string;
+    currentPrompt?: string;
+    wordMin?: number;
+    wordMax?: number;
+  }): Promise<ContextualWritingTaskSuggestion>;
+}
+
+export interface ContextualVocabSuggestion {
+  word: string;
+  pos: string;
+  meaning: string;
+  ipaUs?: string;
+  ipaUk?: string;
+  exampleEn?: string;
+  exampleVi?: string;
+  collocations?: Array<{ phrase: string; meaningVi: string }>;
+}
+
+export interface ContextualGrammarCandidate {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface ContextualGrammarSuggestion {
+  candidates: ContextualGrammarCandidate[];
+}
+
+export interface ContextualReadingPassageSuggestion {
+  title: string;
+  passage: string;
+  topic?: string;
+  level?: string;
+}
+
+export interface ContextualReadingCandidate {
+  prompt: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+  questionType?: string;
+}
+
+export interface ContextualReadingQuestionsSuggestion {
+  candidates: ContextualReadingCandidate[];
+}
+
+export interface ContextualToeicPart5Candidate {
+  prompt: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface ContextualToeicPart5Suggestion {
+  candidates: ContextualToeicPart5Candidate[];
+}
+export interface ContextualCourseLessonCandidate {
+  title: string;
+  summary: string;
+  objectives: string[];
+}
+export interface ContextualCourseCurriculumSuggestion {
+  candidates: ContextualCourseLessonCandidate[];
+}
+
+export interface ContextualListeningTurn {
+  speaker: string;
+  text: string;
+  translation?: string;
+}
+
+export interface ContextualListeningContentSuggestion {
+  mode: 'DIALOGUE' | 'DICTATION';
+  turns?: ContextualListeningTurn[];
+  text?: string;
+}
+
+export interface ContextualListeningQuestionCandidate {
+  prompt: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface ContextualListeningQuestionsSuggestion {
+  candidates: ContextualListeningQuestionCandidate[];
+}
+
+export interface ContextualWritingTaskSuggestion {
+  taskType: string;
+  prompt: string;
+  scenario?: string;
+  recipient?: string;
+  context?: string;
+  wordRange?: [number, number];
+  keywords?: string[];
+  sampleSentences?: string[];
 }

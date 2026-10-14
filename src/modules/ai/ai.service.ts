@@ -1,10 +1,27 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  Optional,
+  BadRequestException,
+} from '@nestjs/common';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
 import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
 import type {
   IAIEvaluator,
   PronunciationFeedback,
   DictionaryEnrichment,
   DictionaryEnrichmentInput,
+  ContextualVocabSuggestion,
+  ContextualGrammarSuggestion,
+  ContextualReadingPassageSuggestion,
+  ContextualReadingQuestionsSuggestion,
+  ContextualToeicPart5Suggestion,
+  ContextualCourseCurriculumSuggestion,
+  ContextualListeningContentSuggestion,
+  ContextualListeningQuestionsSuggestion,
+  ContextualWritingTaskSuggestion,
 } from './strategies/ai-evaluator.interface';
 
 /**
@@ -15,13 +32,35 @@ import type {
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
+  private readonly DAILY_LIMIT = 500;
 
   constructor(
     @Inject(AI_EVALUATOR_TOKEN)
     private readonly aiEvaluator: IAIEvaluator,
+    @Optional() @InjectRedis() private readonly redis?: Redis,
   ) {
     this.logger.log('AiService initialized with Strategy Pattern');
   }
+
+  private getTodayUtcKey(): string {
+    return `gemini:daily_quota:${new Date().toISOString().slice(0, 10)}`;
+  }
+
+  async checkAndIncrementDailyQuota(): Promise<number> {
+    if (!this.redis) return 1;
+    const key = this.getTodayUtcKey();
+    const count = await this.redis.incr(key);
+    if (count === 1) {
+      await this.redis.expire(key, 86400 * 2);
+    }
+    if (count > this.DAILY_LIMIT) {
+      throw new BadRequestException(
+        `Đã vượt quá hạn mức quota AI trong ngày (${this.DAILY_LIMIT} requests). Vui lòng thử lại sau.`,
+      );
+    }
+    return count;
+  }
+
 
   async enrichDictionaryEntry(
     input: DictionaryEnrichmentInput,
@@ -235,5 +274,138 @@ export class AiService {
       documentText,
       options,
     );
+  }
+
+  async suggestVocabWord(input: {
+    word: string;
+    context?: string;
+    level?: string;
+  }): Promise<ContextualVocabSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestVocabWord) {
+      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý từ vựng');
+    }
+    return this.aiEvaluator.suggestVocabWord(input);
+  }
+
+  async suggestGrammarQuestions(input: {
+    topicTitle: string;
+    level: string;
+    theory?: string;
+    keyFormula?: string;
+    count: number;
+  }): Promise<ContextualGrammarSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestGrammarQuestions) {
+      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý câu hỏi ngữ pháp');
+    }
+    return this.aiEvaluator.suggestGrammarQuestions(input);
+  }
+
+  async suggestReadingPassage(input: {
+    topic: string;
+    level: string;
+    targetLength?: number;
+    microSkill?: string;
+  }): Promise<ContextualReadingPassageSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestReadingPassage) {
+      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý đoạn đọc');
+    }
+    return this.aiEvaluator.suggestReadingPassage(input);
+  }
+
+  async suggestReadingQuestions(input: {
+    passage: string;
+    level?: string;
+    count: number;
+  }): Promise<ContextualReadingQuestionsSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestReadingQuestions) {
+      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý câu hỏi đọc hiểu');
+    }
+    return this.aiEvaluator.suggestReadingQuestions(input);
+  }
+
+  async suggestToeicPart5(input: {
+    topic?: string;
+    level?: string;
+    grammarFocus?: string;
+    vocabularyFocus?: string;
+    count: number;
+  }): Promise<ContextualToeicPart5Suggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestToeicPart5) {
+      throw new BadRequestException('Chiến lược AI hiện tại không hỗ trợ gợi ý câu hỏi TOEIC Part 5');
+    }
+    return this.aiEvaluator.suggestToeicPart5(input);
+  }
+
+  async suggestCourseCurriculum(input: {
+    courseTitle: string;
+    level?: string;
+    description?: string;
+    targetLessonCount: number;
+    existingLessonTitles?: string[];
+  }): Promise<ContextualCourseCurriculumSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestCourseCurriculum) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý chương trình học',
+      );
+    }
+    return this.aiEvaluator.suggestCourseCurriculum(input);
+  }
+
+  async suggestListeningContent(input: {
+    mode: 'DIALOGUE' | 'DICTATION';
+    level?: string;
+    topic?: string;
+    currentText?: string;
+    currentTurns?: Array<{
+      speaker: string;
+      text: string;
+      translation?: string;
+    }>;
+  }): Promise<ContextualListeningContentSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestListeningContent) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý nội dung nghe',
+      );
+    }
+    return this.aiEvaluator.suggestListeningContent(input);
+  }
+
+  async suggestListeningQuestions(input: {
+    mode: 'DIALOGUE' | 'DICTATION';
+    sourceText: string;
+    level?: string;
+    count: number;
+  }): Promise<ContextualListeningQuestionsSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestListeningQuestions) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ tạo câu hỏi nghe',
+      );
+    }
+    return this.aiEvaluator.suggestListeningQuestions(input);
+  }
+
+  async suggestWritingTask(input: {
+    taskType: string;
+    level?: string;
+    topic?: string;
+    currentPrompt?: string;
+    wordMin?: number;
+    wordMax?: number;
+  }): Promise<ContextualWritingTaskSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestWritingTask) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý đề bài Writing',
+      );
+    }
+    return this.aiEvaluator.suggestWritingTask(input);
   }
 }
