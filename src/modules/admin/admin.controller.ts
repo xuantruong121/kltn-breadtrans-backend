@@ -17,6 +17,13 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, TopicCategory } from '@prisma/client';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
+import {
+  CreateVocabTopicDto,
+  UpdateVocabTopicDto,
+  CreateVocabWordDto,
+  UpdateVocabWordDto,
+  ReorderVocabWordsDto,
+} from '../vocab/dto';
 
 @ApiTags('admin')
 @Controller('admin')
@@ -174,37 +181,87 @@ export class AdminController {
     return this.adminService.getClassWithEnrollments(classId);
   }
 
-  // ============== VOCAB MANAGEMENT ==============
+  // ============== VOCAB MANAGEMENT (PHASE 4 CMS) ==============
   @Get('vocab/topics')
   @ApiOperation({ summary: 'Admin: Lay danh sach chu de tu vung' })
   getVocabTopics() {
     return this.adminService.getVocabTopics();
   }
 
+  @Get('vocab/topics/:id')
+  @ApiOperation({ summary: 'Admin: Chi tiet chu de tu vung kem danh sach tu' })
+  getVocabTopicDetail(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.getVocabTopicDetail(id);
+  }
+
   @Post('vocab/topics')
-  @ApiOperation({ summary: 'Admin: Tao chu de tu vung moi' })
-  createVocabTopic(
-    @Body() dto: { title: string; categoryName?: string; isPro?: boolean },
-  ) {
+  @ApiOperation({ summary: 'Admin: Tao chu de tu vung moi (DRAFT)' })
+  createVocabTopic(@Body() dto: CreateVocabTopicDto) {
     return this.adminService.createVocabTopic(dto);
   }
 
+  @Patch('vocab/topics/:id')
+  @ApiOperation({ summary: 'Admin: Cap nhat thong tin chu de tu vung' })
+  updateVocabTopic(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateVocabTopicDto,
+  ) {
+    return this.adminService.updateVocabTopic(id, dto);
+  }
+
+  @Post('vocab/topics/:id/publish')
+  @ApiOperation({ summary: 'Admin: Kiem tra hop le va xuat ban chu de tu vung' })
+  publishVocabTopic(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.publishVocabTopic(id);
+  }
+
+  @Post('vocab/topics/:id/unpublish')
+  @ApiOperation({ summary: 'Admin: Go xuat ban (chuyen ve DRAFT)' })
+  unpublishVocabTopic(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.unpublishVocabTopic(id);
+  }
+
   @Delete('vocab/topics/:id')
-  @ApiOperation({ summary: 'Admin: Xoa chu de tu vung' })
+  @ApiOperation({ summary: 'Admin: Xoa chu de tu vung (bao ve lich su hoc tap)' })
   deleteVocabTopic(@Param('id', ParseIntPipe) id: number) {
     return this.adminService.deleteVocabTopic(id);
   }
 
   @Post('vocab/topics/:id/words')
   @ApiOperation({ summary: 'Admin: Them tu vung vao chu de' })
-  addVocabWord(@Param('id', ParseIntPipe) topicId: number, @Body() dto: any) {
+  addVocabWord(
+    @Param('id', ParseIntPipe) topicId: number,
+    @Body() dto: CreateVocabWordDto,
+  ) {
     return this.adminService.addVocabWord(topicId, dto);
   }
 
-  @Delete('vocab/words/:id')
-  @ApiOperation({ summary: 'Admin: Xoa tu vung' })
-  deleteVocabWord(@Param('id', ParseIntPipe) id: number) {
-    return this.adminService.deleteVocabWord(id);
+  @Patch('vocab/topics/:topicId/words/:wordId')
+  @ApiOperation({ summary: 'Admin: Cap nhat tu vung' })
+  updateVocabWord(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Param('wordId', ParseIntPipe) wordId: number,
+    @Body() dto: UpdateVocabWordDto,
+  ) {
+    return this.adminService.updateVocabWord(topicId, wordId, dto);
+  }
+
+  @Delete('vocab/topics/:topicId/words/:wordId')
+  @ApiOperation({ summary: 'Admin: Xoa tu vung (bao ve lich su hoc tap)' })
+  deleteVocabWord(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Param('wordId', ParseIntPipe) wordId: number,
+  ) {
+    return this.adminService.deleteVocabWord(topicId, wordId);
+  }
+
+  @Post('vocab/topics/:id/reorder-words')
+  @ApiOperation({ summary: 'Admin: Sap xep thu tu tu vung trong chu de' })
+  reorderVocabWords(
+    @Param('id', ParseIntPipe) topicId: number,
+    @Body() dto: ReorderVocabWordsDto,
+  ) {
+    return this.adminService.reorderVocabWords(topicId, dto.wordIds);
   }
 
   // ============== SPEAKING MANAGEMENT ==============

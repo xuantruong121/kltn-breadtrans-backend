@@ -12,6 +12,7 @@ import {
   EnrollmentStatus,
   PaymentStatus,
   TopicCategory,
+  QuizPublicationStatus,
 } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
@@ -20,6 +21,12 @@ import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
 import { CourseService } from '../course/course.service';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
+import {
+  CreateVocabTopicDto,
+  UpdateVocabTopicDto,
+  CreateVocabWordDto,
+  UpdateVocabWordDto,
+} from '../vocab/dto';
 
 @Injectable()
 export class AdminService {
@@ -676,7 +683,7 @@ export class AdminService {
     });
   }
 
-  // ============== VOCAB MANAGEMENT ==============
+  // ============== VOCAB MANAGEMENT (PHASE 4 CMS) ==============
   async getVocabTopics() {
     return this.prisma.vocabTopic.findMany({
       include: {
@@ -686,26 +693,99 @@ export class AdminService {
     });
   }
 
-  async createVocabTopic(dto: {
-    title: string;
-    categoryName?: string;
-    isPro?: boolean;
-  }) {
+  async getVocabTopicDetail(id: number) {
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id },
+      include: {
+        words: {
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    return topic;
+  }
+
+  async createVocabTopic(dto: CreateVocabTopicDto) {
     return this.prisma.vocabTopic.create({
       data: {
         title: dto.title,
         categoryName: dto.categoryName || '600 TỪ VỰNG TOEIC',
-        isPro: dto.isPro || false,
+        isPro: dto.isPro ?? false,
+        iconUrl: dto.iconUrl,
+        publicationStatus: QuizPublicationStatus.DRAFT,
       },
     });
   }
 
+  async updateVocabTopic(id: number, dto: UpdateVocabTopicDto) {
+    const topic = await this.prisma.vocabTopic.findUnique({ where: { id } });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    return this.prisma.vocabTopic.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.categoryName !== undefined && { categoryName: dto.categoryName }),
+        ...(dto.isPro !== undefined && { isPro: dto.isPro }),
+        ...(dto.iconUrl !== undefined && { iconUrl: dto.iconUrl }),
+      },
+    });
+  }
+
+  async publishVocabTopic(id: number) {
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id },
+      include: { words: true },
+    });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    if (!topic.words || topic.words.length === 0) {
+      throw new BadRequestException('Chủ đề từ vựng phải có ít nhất 1 từ vựng trước khi xuất bản');
+    }
+    const invalidWords = topic.words.filter(w => !w.word?.trim() || !w.meaning?.trim());
+    if (invalidWords.length > 0) {
+      throw new BadRequestException('Tất cả từ vựng phải có đầy đủ thuật ngữ và định nghĩa');
+    }
+    return this.prisma.vocabTopic.update({
+      where: { id },
+      data: {
+        publicationStatus: QuizPublicationStatus.PUBLISHED,
+        totalWords: topic.words.length,
+      },
+    });
+  }
+
+  async unpublishVocabTopic(id: number) {
+    const topic = await this.prisma.vocabTopic.findUnique({ where: { id } });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    return this.prisma.vocabTopic.update({
+      where: { id },
+      data: { publicationStatus: QuizPublicationStatus.DRAFT },
+    });
+  }
+
   async deleteVocabTopic(id: number) {
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id },
+      include: { words: true },
+    });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    // History safety guard: if any word has learner progress, block delete
+    const wordIds = topic.words.map(w => w.id);
+    if (wordIds.length > 0) {
+      const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
+        where: { wordId: { in: wordIds } },
+      });
+      if (hasProgress) {
+        throw new ConflictException('Chủ đề từ vựng đã có dữ liệu học tập của học viên, không thể xóa');
+      }
+    }
     return this.prisma.vocabTopic.delete({ where: { id } });
   }
 
-  async addVocabWord(topicId: number, dto: any) {
-    return this.prisma.vocabWord.create({
+  async addVocabWord(topicId: number, dto: CreateVocabWordDto) {
+    const topic = await this.prisma.vocabTopic.findUnique({ where: { id: topicId } });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    const word = await this.prisma.vocabWord.create({
       data: {
         topicId,
         word: dto.word,
@@ -713,14 +793,96 @@ export class AdminService {
         ipaUs: dto.ipaUs,
         ipaUk: dto.ipaUk,
         meaning: dto.meaning,
+        audioUs: dto.audioUs,
+        audioUk: dto.audioUk,
         exampleEn: dto.exampleEn,
         exampleVi: dto.exampleVi,
+        collocations: dto.collocations ?? undefined,
+        order: dto.order ?? 0,
+      },
+    });
+    await this.prisma.vocabTopic.update({
+      where: { id: topicId },
+      data: { totalWords: { increment: 1 } },
+    });
+    return word;
+  }
+
+  async updateVocabWord(topicId: number, wordId: number, dto: UpdateVocabWordDto) {
+    const word = await this.prisma.vocabWord.findUnique({ where: { id: wordId } });
+    if (!word || word.topicId !== topicId) {
+      throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
+    }
+    // History safety guard: if learner progress exists, block semantic identity change
+    const isWordChanged = dto.word && dto.word.trim().toLowerCase() !== word.word.trim().toLowerCase();
+    const isMeaningChanged = dto.meaning && dto.meaning.trim() !== word.meaning.trim();
+    if (isWordChanged || isMeaningChanged) {
+      const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
+        where: { wordId },
+      });
+      if (hasProgress) {
+        throw new ConflictException('Từ vựng đã có dữ liệu học tập của học viên, không thể thay đổi định danh từ vựng');
+      }
+    }
+    return this.prisma.vocabWord.update({
+      where: { id: wordId },
+      data: {
+        ...(dto.word !== undefined && { word: dto.word }),
+        ...(dto.meaning !== undefined && { meaning: dto.meaning }),
+        ...(dto.pos !== undefined && { pos: dto.pos }),
+        ...(dto.ipaUs !== undefined && { ipaUs: dto.ipaUs }),
+        ...(dto.ipaUk !== undefined && { ipaUk: dto.ipaUk }),
+        ...(dto.audioUs !== undefined && { audioUs: dto.audioUs }),
+        ...(dto.audioUk !== undefined && { audioUk: dto.audioUk }),
+        ...(dto.exampleEn !== undefined && { exampleEn: dto.exampleEn }),
+        ...(dto.exampleVi !== undefined && { exampleVi: dto.exampleVi }),
+        ...(dto.collocations !== undefined && { collocations: dto.collocations }),
+        ...(dto.order !== undefined && { order: dto.order }),
       },
     });
   }
 
-  async deleteVocabWord(id: number) {
-    return this.prisma.vocabWord.delete({ where: { id } });
+  async deleteVocabWord(topicId: number, wordId: number) {
+    const word = await this.prisma.vocabWord.findUnique({ where: { id: wordId } });
+    if (!word || word.topicId !== topicId) {
+      throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
+    }
+    // History safety guard
+    const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
+      where: { wordId },
+    });
+    if (hasProgress) {
+      throw new ConflictException('Từ vựng này đã có dữ liệu học tập của học viên, không thể xóa');
+    }
+    const deleted = await this.prisma.vocabWord.delete({ where: { id: wordId } });
+    await this.prisma.vocabTopic.update({
+      where: { id: topicId },
+      data: { totalWords: { decrement: 1 } },
+    });
+    return deleted;
+  }
+
+  async reorderVocabWords(topicId: number, wordIds: number[]) {
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id: topicId },
+      include: { words: { select: { id: true } } },
+    });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    const existingIds = new Set(topic.words.map(w => w.id));
+    for (const wid of wordIds) {
+      if (!existingIds.has(wid)) {
+        throw new BadRequestException(`Từ vựng ID ${wid} không thuộc chủ đề này`);
+      }
+    }
+    await this.prisma.$transaction(
+      wordIds.map((id, index) =>
+        this.prisma.vocabWord.update({
+          where: { id },
+          data: { order: index },
+        }),
+      ),
+    );
+    return { success: true };
   }
 
   // ============== SPEAKING MANAGEMENT ==============

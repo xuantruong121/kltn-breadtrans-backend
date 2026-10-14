@@ -534,6 +534,7 @@ export class ReadingService {
         id: true,
         title: true,
         type: true,
+        publicationStatus: true,
         isPremiumContent: true,
         courseId: true,
         theoryContent: true,
@@ -543,7 +544,9 @@ export class ReadingService {
     if (
       !quiz ||
       quiz.practiceTopic?.category !== TopicCategory.BILINGUAL_LEVEL ||
-      quiz.type !== QuizType.BILINGUAL_READING
+      quiz.type !== QuizType.BILINGUAL_READING ||
+      quiz.publicationStatus !== undefined &&
+      quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED
     ) {
       throw new NotFoundException('Reading quiz not found');
     }

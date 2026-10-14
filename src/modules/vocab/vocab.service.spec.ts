@@ -75,7 +75,9 @@ describe('VocabService', () => {
 
       expect(prisma.vocabTopic.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { categoryName: { not: 'SYSTEM_DICTIONARY' } },
+          where: expect.objectContaining({
+            categoryName: { not: 'SYSTEM_DICTIONARY' },
+          }),
         }),
       );
     });

@@ -1664,14 +1664,15 @@ model ListeningAudioUsage {
 
 // Vocab Module Models
 model VocabTopic {
-  id           Int      @id @default(autoincrement())
-  title        String
-  categoryName String   @default("600 TỪ VỰNG TOEIC")
-  totalWords   Int      @default(12)
-  isPro        Boolean  @default(false)
-  iconUrl      String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                Int                   @id @default(autoincrement())
+  title             String
+  categoryName      String                @default("600 TỪ VỰNG TOEIC")
+  totalWords        Int                   @default(12)
+  isPro             Boolean               @default(false)
+  iconUrl           String?
+  publicationStatus QuizPublicationStatus @default(DRAFT)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   words VocabWord[]
 }
@@ -1757,14 +1758,16 @@ enum AttemptMode {
 }
 
 model ToeicExamSet {
-  id              Int      @id @default(autoincrement())
-  title           String
-  description     String?  @db.Text
-  type            ExamType @default(FULL_TEST)
-  difficulty      String   @default("medium") // "easy" | "medium" | "hard"
-  durationSeconds Int      @default(7200)
-  createdBy       Int?
-  createdAt       DateTime @default(now())
+  id                Int                   @id @default(autoincrement())
+  title             String
+  description       String?               @db.Text
+  type              ExamType              @default(FULL_TEST)
+  difficulty        String                @default("medium") // "easy" | "medium" | "hard"
+  durationSeconds   Int                   @default(7200)
+  createdBy         Int?
+  publicationStatus QuizPublicationStatus @default(DRAFT)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @default(now()) @updatedAt
 
   groups           ToeicQuestionGroup[]
   attempts         ToeicAttempt[]
@@ -1929,15 +1932,16 @@ model UserQuestProgress {
 // ==========================================
 
 model GrammarTopic {
-  id             Int      @id @default(autoincrement())
-  title          String
-  level          String   @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
-  description    String?  @db.Text
-  videoYoutubeId String?
-  keyFormula     String?  @db.Text
-  order          Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
+  id                Int                   @id @default(autoincrement())
+  title             String
+  level             String                @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
+  description       String?               @db.Text
+  videoYoutubeId    String?
+  keyFormula        String?               @db.Text
+  order             Int                   @default(0)
+  publicationStatus QuizPublicationStatus @default(DRAFT)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @default(now()) @updatedAt
 
   questions        GrammarQuestion[]
   attempts         GrammarAttempt[]

@@ -8,7 +8,13 @@ import {
   Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { Prisma, QuizPublicationStatus, QuizType, Role } from '@prisma/client';
+import {
+  Prisma,
+  QuizPublicationStatus,
+  QuizType,
+  Role,
+  TopicCategory,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   SkillContentDto,
@@ -67,6 +73,44 @@ export class SkillCmsService {
     return QUIZ_DOMAINS[domain];
   }
 
+  private contentTypeWhere(domain: Exclude<Domain, 'speaking'>) {
+    // Writing CMS owns both picture and email formats.
+    return domain === 'writing'
+      ? { type: { in: [QuizType.WRITING_EMAIL, QuizType.WRITING_PICTURE] } }
+      : { type: this.quizType(domain) };
+  }
+
+  private async practiceTopicId(
+    domain: Exclude<Domain, 'speaking'>,
+    type: QuizType,
+    level?: string,
+  ) {
+    const category =
+      domain === 'reading'
+        ? TopicCategory.BILINGUAL_LEVEL
+        : type === QuizType.WRITING_PICTURE
+          ? TopicCategory.WRITING_PART1
+          : TopicCategory.WRITING_PART2;
+    if (!this.prisma.practiceTopic?.findMany) return undefined;
+    const topics = await this.prisma.practiceTopic.findMany({
+      where: { category },
+      select: { id: true, name: true },
+      orderBy: { order: 'asc' },
+    });
+    if (!topics.length) return undefined;
+    if (domain !== 'reading') return topics[0].id;
+    const normalizedLevel = level?.trim().toUpperCase() ?? '';
+    const marker = normalizedLevel.includes('C1')
+      ? 'C1'
+      : normalizedLevel.includes('B1') || normalizedLevel.includes('B2')
+        ? 'B1'
+        : 'A1';
+    return (
+      topics.find((topic) => topic.name.toUpperCase().includes(marker))?.id ??
+      topics[0].id
+    );
+  }
+
   async list(rawDomain: string, user: Admin) {
     this.admin(user);
     const domain = this.domain(rawDomain);
@@ -82,7 +126,7 @@ export class SkillCmsService {
       });
     }
     return this.prisma.quiz.findMany({
-      where: { type: this.quizType(domain) },
+      where: this.contentTypeWhere(domain),
       orderBy: { id: 'desc' },
       include: { _count: { select: { questions: true, submissions: true } } },
     });
@@ -101,7 +145,7 @@ export class SkillCmsService {
     }
     const id = this.id(rawId);
     const quiz = await this.prisma.quiz.findFirst({
-      where: { id, type: this.quizType(domain) },
+      where: { id, ...this.contentTypeWhere(domain) },
       include: {
         questions: {
           orderBy: { order: 'asc' },
@@ -139,6 +183,11 @@ export class SkillCmsService {
       domain === 'writing' && dto.type === 'WRITING_PICTURE'
         ? QuizType.WRITING_PICTURE
         : type;
+    const practiceTopicId = await this.practiceTopicId(
+      domain,
+      writingType,
+      dto.level,
+    );
     return this.prisma.quiz.create({
       data: {
         title: dto.title.trim(),
@@ -151,6 +200,7 @@ export class SkillCmsService {
         timeLimit: dto.timeLimit,
         isPremiumContent: dto.isPremiumContent ?? false,
         publicationStatus: QuizPublicationStatus.DRAFT,
+        practiceTopicId,
       },
     });
   }
@@ -181,7 +231,7 @@ export class SkillCmsService {
     }
     const id = this.id(rawId);
     const quiz = await this.prisma.quiz.findFirst({
-      where: { id, type: this.quizType(domain) },
+      where: { id, ...this.contentTypeWhere(domain) },
     });
     if (!quiz) throw new NotFoundException('Skill content not found');
     await this.assertNoHistory(id);
@@ -220,7 +270,7 @@ export class SkillCmsService {
       throw new BadRequestException('Speaking questions are exercises');
     const quizId = this.id(rawId);
     const quiz = await this.prisma.quiz.findFirst({
-      where: { id: quizId, type: this.quizType(domain) },
+      where: { id: quizId, ...this.contentTypeWhere(domain) },
     });
     if (!quiz) throw new NotFoundException('Skill content not found');
     await this.assertNoHistory(quizId);
@@ -450,7 +500,11 @@ export class SkillCmsService {
     const quizId = this.id(rawId);
     const questionId = this.id(rawQuestionId);
     const question = await this.prisma.question.findFirst({
-      where: { id: questionId, quizId, quiz: { type: this.quizType(domain) } },
+      where: {
+        id: questionId,
+        quizId,
+        quiz: this.contentTypeWhere(domain),
+      },
     });
     if (!question)
       throw new NotFoundException(
@@ -476,7 +530,11 @@ export class SkillCmsService {
     const quizId = this.id(rawId);
     const questionId = this.id(rawQuestionId);
     const question = await this.prisma.question.findFirst({
-      where: { id: questionId, quizId, quiz: { type: this.quizType(domain) } },
+      where: {
+        id: questionId,
+        quizId,
+        quiz: this.contentTypeWhere(domain),
+      },
     });
     if (!question)
       throw new NotFoundException(
