@@ -386,10 +386,26 @@ export class ContentService {
         },
       });
       if (rewardBanh > 0) {
-        await tx.userStats.upsert({
+        const updatedStats = await tx.userStats.upsert({
           where: { userId },
           create: { userId, totalBanhRan: rewardBanh },
           update: { totalBanhRan: { increment: rewardBanh } },
+        });
+        await tx.banhTransaction.create({
+          data: {
+            userId,
+            amount: rewardBanh,
+            source: 'CONTENT_COMPLETION',
+            reference: `content:attempt:${created.id}`,
+            dateKey: this.getVietnamDateKey(),
+            isCapped: false,
+            balanceAfter: updatedStats.totalBanhRan,
+            metadata: {
+              contentTopicId: topic.id,
+              attemptId: created.id,
+              score,
+            } as any,
+          },
         });
       }
       await tx.learningActivity.create({
@@ -413,6 +429,15 @@ export class ContentService {
       rewardBanh,
       questionsResult,
     };
+  }
+
+  private getVietnamDateKey() {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
   }
 
   private async findTopic(identifier: string) {

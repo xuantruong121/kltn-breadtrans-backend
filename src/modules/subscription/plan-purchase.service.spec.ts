@@ -1,4 +1,5 @@
 import {
+  PayOSPaymentIntentStatus,
   PlanPaymentStatus,
   PlanPurchaseStatus,
   PlanStatus,
@@ -164,6 +165,62 @@ describe('PlanPurchaseService', () => {
     expect(result.bankInstructions!.vietQrUrl).toContain(
       result.payment.transferCode,
     );
+  });
+
+  it.each([
+    PayOSPaymentIntentStatus.CANCELLED,
+    PayOSPaymentIntentStatus.EXPIRED,
+    PayOSPaymentIntentStatus.FAILED,
+    PayOSPaymentIntentStatus.PAID,
+    PayOSPaymentIntentStatus.UNDERPAID,
+  ])('does not keep a %s PayOS intent active', (status) => {
+    const prisma = makePrisma();
+    const service = new PlanPurchaseService(
+      prisma as never,
+      new SubscriptionService(prisma as never),
+      { isEnabled: () => true } as never,
+    );
+    const candidate = purchase() as any;
+    candidate.payment.transferCode = 'BTP00000031';
+    candidate.payment.paymentIntentExpiresAt = new Date(
+      Date.now() + 60 * 60 * 1000,
+    );
+    candidate.payment.payosIntent = {
+      status,
+      expiresAt: new Date(now.getTime() + 60 * 60 * 1000),
+      checkoutUrl: 'https://payos.test/checkout',
+      qrCode: 'qr',
+      bankBin: '970415',
+      bankAccountNumber: '123456789',
+      bankAccountName: 'BREADTRANS',
+    };
+
+    expect((service as any).isActivePaymentIntent(candidate)).toBe(false);
+  });
+
+  it('keeps only a live PayOS intent resumable', () => {
+    const prisma = makePrisma();
+    const service = new PlanPurchaseService(
+      prisma as never,
+      new SubscriptionService(prisma as never),
+      { isEnabled: () => true } as never,
+    );
+    const candidate = purchase() as any;
+    candidate.payment.transferCode = 'BTP00000031';
+    candidate.payment.paymentIntentExpiresAt = new Date(
+      Date.now() + 60 * 60 * 1000,
+    );
+    candidate.payment.payosIntent = {
+      status: PayOSPaymentIntentStatus.PROCESSING,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      checkoutUrl: 'https://payos.test/checkout',
+      qrCode: 'qr',
+      bankBin: '970415',
+      bankAccountNumber: '123456789',
+      bankAccountName: 'BREADTRANS',
+    };
+
+    expect((service as any).isActivePaymentIntent(candidate)).toBe(true);
   });
 
   it('returns the existing logical purchase for a repeated idempotency key', async () => {

@@ -312,6 +312,18 @@ describe('QuizService', () => {
         options: ['A', 'B'],
       });
     });
+
+    it('blocks learner detail and submission access for an unpublished quiz', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 11,
+        type: 'BILINGUAL_READING',
+        publicationStatus: 'DRAFT',
+      });
+
+      await expect(service.getQuizById(11, true, 7)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
   });
 
   describe('Reading submission integrity', () => {

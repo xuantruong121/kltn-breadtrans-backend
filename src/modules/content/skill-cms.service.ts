@@ -36,6 +36,12 @@ const QUIZ_DOMAINS: Record<Exclude<Domain, 'speaking'>, QuizType> = {
   writing: QuizType.WRITING_EMAIL,
 };
 
+const PICTURE_WRITING_TASK_TYPES = new Set([
+  'SENTENCE',
+  'PICTURE_SENTENCE',
+  'DESCRIBE_PICTURE',
+]);
+
 function asJson(value: unknown): Prisma.InputJsonValue {
   return value ?? {};
 }
@@ -303,6 +309,7 @@ export class SkillCmsService {
       },
     });
     if (!quiz) throw new NotFoundException('Writing content not found');
+    this.assertWritingTaskType(quiz.type, dto.taskType);
     await this.assertNoHistory(quizId);
     const last = await this.prisma.question.findFirst({
       where: { quizId },
@@ -394,11 +401,13 @@ export class SkillCmsService {
           type: { in: [QuizType.WRITING_EMAIL, QuizType.WRITING_PICTURE] },
         },
       },
+      include: { quiz: { select: { type: true } } },
     });
     if (!question)
       throw new NotFoundException(
         'Question does not belong to Writing content',
       );
+    this.assertWritingTaskType(question.quiz?.type, dto.taskType);
     await this.assertNoHistory(quizId);
     return this.prisma.question.update({
       where: { id: questionId },
@@ -451,6 +460,9 @@ export class SkillCmsService {
     const exerciseId = this.id(rawExerciseId);
     const exercise = await this.prisma.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
+      include: {
+        practiceSet: { select: { category: true } },
+      },
     });
     if (!exercise) throw new NotFoundException('Speaking exercise not found');
     await this.assertNoSpeakingHistory(rawSetId);
@@ -459,7 +471,10 @@ export class SkillCmsService {
       data: {
         title: dto.title?.trim(),
         targetText: dto.targetText?.trim(),
-        category: dto.category?.trim(),
+        category:
+          dto.category?.trim() ||
+          exercise.practiceSet?.category ||
+          exercise.category,
         difficulty: dto.difficulty,
         imageUrl: dto.imageUrl,
         audioUrl: dto.audioUrl,
@@ -727,6 +742,30 @@ export class SkillCmsService {
         ? { explanation: dto.explanation.trim() }
         : {}),
     };
+  }
+
+  private assertWritingTaskType(
+    quizType: QuizType | undefined,
+    taskType?: string,
+  ) {
+    const normalizedTaskType = taskType?.trim().toUpperCase();
+    if (!normalizedTaskType) return;
+    if (
+      quizType === QuizType.WRITING_PICTURE &&
+      !PICTURE_WRITING_TASK_TYPES.has(normalizedTaskType)
+    ) {
+      throw new BadRequestException(
+        'Writing theo tranh chỉ nhận task family của dạng tranh',
+      );
+    }
+    if (
+      quizType === QuizType.WRITING_EMAIL &&
+      PICTURE_WRITING_TASK_TYPES.has(normalizedTaskType)
+    ) {
+      throw new BadRequestException(
+        'Writing Email không nhận task family của dạng tranh',
+      );
+    }
   }
 
   private requireListeningAuthoring() {

@@ -7,6 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
+  PayOSPaymentIntentStatus,
   PlanPaymentStatus,
   PlanPurchaseStatus,
   PlanStatus,
@@ -683,12 +684,17 @@ export class PlanPurchaseService {
     );
     if (!commonValid) return false;
     if (this.payos?.isEnabled()) {
+      const payosIntent = payment?.payosIntent;
       return Boolean(
-        payment?.payosIntent?.checkoutUrl &&
-        payment?.payosIntent?.qrCode &&
-        payment?.payosIntent?.bankBin &&
-        payment?.payosIntent?.bankAccountNumber &&
-        payment?.payosIntent?.bankAccountName,
+        payosIntent &&
+        (payosIntent.status === PayOSPaymentIntentStatus.PENDING ||
+          payosIntent.status === PayOSPaymentIntentStatus.PROCESSING) &&
+        (!payosIntent.expiresAt || payosIntent.expiresAt.getTime() > now) &&
+        payosIntent.checkoutUrl &&
+        payosIntent.qrCode &&
+        payosIntent.bankBin &&
+        payosIntent.bankAccountNumber &&
+        payosIntent.bankAccountName,
       );
     }
     return Boolean(

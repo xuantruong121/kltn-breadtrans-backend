@@ -1009,6 +1009,9 @@ export class GamificationService {
           '[Streak] Failed to update streak for user:' + userId,
           err,
         );
+        // Do not let XP/reward transactions commit while the streak write has
+        // failed. The caller's transaction must roll back as one unit.
+        throw err;
       }
     };
 
@@ -1020,6 +1023,7 @@ export class GamificationService {
         '[Streak] Failed to start transaction for user:' + userId,
         err,
       );
+      throw err;
     }
   }
 

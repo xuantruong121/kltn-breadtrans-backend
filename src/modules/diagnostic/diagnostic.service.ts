@@ -858,6 +858,9 @@ export class DiagnosticService {
         });
         if (currentAttempt?.status === 'COMPLETED') return currentAttempt;
       }
+      // The first-completion reward is a read-then-write decision. Serialize
+      // it per learner/assessment so concurrent submissions cannot both earn it.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`diagnostic:reward:${userId}:${assessmentId}`}, 0))`;
       const previousAttempts = await tx.diagnosticAttempt.count({
         where: { userId, status: 'COMPLETED' },
       });
@@ -904,16 +907,41 @@ export class DiagnosticService {
         },
       });
       if (previousAttempts === 0) {
-        await tx.userStats.upsert({
+        const updatedStats = await tx.userStats.upsert({
           where: { userId },
           update: { totalBanhRan: { increment: 50 } },
           create: { userId, totalBanhRan: 50 },
+        });
+        await tx.banhTransaction.create({
+          data: {
+            userId,
+            amount: 50,
+            source: 'DIAGNOSTIC_COMPLETION',
+            reference: `diagnostic:assessment:${assessmentId}:first`,
+            dateKey: this.getVietnamDateKey(),
+            isCapped: false,
+            balanceAfter: updatedStats.totalBanhRan,
+            metadata: {
+              assessmentId,
+              attemptId: created.id,
+              rewardType: 'DIAGNOSTIC_FIRST_COMPLETION',
+            } as any,
+          },
         });
       }
       return created;
     });
 
     return this.toResult(attempt, formQuestions);
+  }
+
+  private getVietnamDateKey() {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
   }
 
   private sectionPercentage(

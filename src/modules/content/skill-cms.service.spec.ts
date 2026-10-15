@@ -239,6 +239,65 @@ describe('SkillCmsService', () => {
     });
   });
 
+  it('rejects a Writing task family that contradicts its parent format', async () => {
+    const prisma = {
+      quiz: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 22,
+          type: QuizType.WRITING_PICTURE,
+        }),
+      },
+      submission: { count: jest.fn().mockResolvedValue(0) },
+      question: { findFirst: jest.fn() },
+    };
+    const service = new SkillCmsService(prisma as any);
+
+    await expect(
+      service.addWritingQuestion(
+        '22',
+        {
+          type: 'WRITING',
+          taskType: 'EMAIL',
+          prompt: 'Write a response.',
+        },
+        admin,
+      ),
+    ).rejects.toThrow('task family của dạng tranh');
+    expect(prisma.question.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('restores Speaking child category from the parent when an override is removed', async () => {
+    const prisma = {
+      speakingExercise: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 42,
+          category: 'BUSINESS',
+          difficulty: 'ADVANCED',
+          practiceSet: { category: 'COMMUNICATION' },
+        }),
+        update: jest.fn().mockResolvedValue({ id: 42 }),
+      },
+      speakingSubmission: { count: jest.fn().mockResolvedValue(0) },
+    };
+    const service = new SkillCmsService(prisma as any);
+
+    await service.updateSpeakingExercise(
+      'speaking',
+      'set-42',
+      '42',
+      { title: 'Updated', targetText: 'Hello again.' },
+      admin,
+    );
+
+    expect(prisma.speakingExercise.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          category: 'COMMUNICATION',
+        }),
+      }),
+    );
+  });
+
   it('exposes Listening audio authoring only for a question owned by the quiz', async () => {
     const prisma = {
       question: { findFirst: jest.fn().mockResolvedValue({ id: 8 }) },

@@ -284,5 +284,18 @@ describe('AdminGrammarCMS (Phase 4)', () => {
         }),
       );
     });
+
+    it('blocks attempts against a topic that is not published', async () => {
+      prisma.grammarTopic.findUnique.mockResolvedValue({
+        id: 201,
+        publicationStatus: QuizPublicationStatus.DRAFT,
+        questions: [],
+      });
+
+      await expect(grammarService.submitAttempt(201, 7, {})).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1468,7 +1468,7 @@ export class QuizService {
       throw new UnauthorizedException('Đăng nhập để bắt đầu luyện nghe');
     }
     if (
-      !includeAnswers &&
+      role !== Role.ADMIN &&
       accessQuiz.publicationStatus !== undefined &&
       accessQuiz.publicationStatus !== 'PUBLISHED'
     ) {

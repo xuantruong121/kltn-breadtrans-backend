@@ -9,10 +9,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   Role,
   CourseStatus,
+  CourseLessonAttemptStatus,
+  CourseLessonStatus,
   EnrollmentStatus,
   PaymentStatus,
   TopicCategory,
   QuizPublicationStatus,
+  QuizType,
 } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
@@ -391,6 +394,480 @@ export class AdminService {
             : null,
       };
     });
+  }
+
+  async getLearnerLearningTracking(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        lastLoginAt: true,
+        profile: { select: { fullName: true, avatar: true, phone: true } },
+        stats: {
+          select: {
+            totalBanhRan: true,
+            streakCount: true,
+          },
+        },
+        leaderboard: {
+          select: { totalPoints: true, weeklyExp: true, tier: true },
+        },
+        pet: { select: { level: true, exp: true } },
+        enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
+          select: {
+            class: {
+              select: {
+                course: { select: { id: true, title: true, level: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) throw new NotFoundException('Không tìm thấy học viên');
+
+    const enrolledCourseIds = user.enrollments.map(
+      (enrollment) => enrollment.class.course.id,
+    );
+
+    const [
+      courseLessons,
+      listeningSubmissions,
+      listeningAttempts,
+      speakingSubmissions,
+      readingSubmissions,
+      writingSubmissions,
+      vocabProgress,
+      vocabMasteredCount,
+      vocabDueCount,
+      grammarAttempts,
+      toeicAttempts,
+      recentActivity,
+    ] = await Promise.all([
+      this.prisma.courseLesson.findMany({
+        where: {
+          status: CourseLessonStatus.PUBLISHED,
+          OR: [
+            ...(enrolledCourseIds.length
+              ? [{ courseId: { in: enrolledCourseIds } }]
+              : []),
+            { attempts: { some: { userId } } },
+          ],
+        },
+        orderBy: [{ courseId: 'asc' }, { order: 'asc' }],
+        select: {
+          id: true,
+          title: true,
+          order: true,
+          course: { select: { id: true, title: true, level: true } },
+          exercises: {
+            where: { required: true },
+            select: { id: true, minimumScore: true },
+          },
+          attempts: {
+            where: { userId, status: CourseLessonAttemptStatus.SUBMITTED },
+            orderBy: { createdAt: 'desc' },
+            select: {
+              exerciseId: true,
+              score: true,
+              maxScore: true,
+              submittedAt: true,
+              createdAt: true,
+            },
+          },
+        },
+      }),
+      this.prisma.submission.findMany({
+        where: { userId, quiz: { type: QuizType.LISTENING_PRACTICE } },
+        orderBy: { submittedAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          score: true,
+          submittedAt: true,
+          quiz: { select: { id: true, title: true } },
+        },
+      }),
+      this.prisma.listeningPracticeAttempt.findMany({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          status: true,
+          startedAt: true,
+          completedAt: true,
+          updatedAt: true,
+          quiz: { select: { id: true, title: true } },
+        },
+      }),
+      this.prisma.speakingSubmission.findMany({
+        where: { userId },
+        orderBy: { submittedAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          status: true,
+          overallScore: true,
+          aiFeedback: true,
+          submittedAt: true,
+          exercise: {
+            select: {
+              id: true,
+              title: true,
+              practiceSet: { select: { title: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.submission.findMany({
+        where: {
+          userId,
+          quiz: { type: QuizType.BILINGUAL_READING },
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          score: true,
+          submittedAt: true,
+          quiz: {
+            select: {
+              id: true,
+              title: true,
+              practiceTopic: { select: { name: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.submission.findMany({
+        where: {
+          userId,
+          quiz: {
+            type: { in: [QuizType.WRITING_PICTURE, QuizType.WRITING_EMAIL] },
+          },
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          score: true,
+          aiFeedback: true,
+          submittedAt: true,
+          quiz: { select: { id: true, title: true, type: true } },
+        },
+      }),
+      this.prisma.userVocabWordProgress.findMany({
+        where: { userId },
+        orderBy: { lastReviewedAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          isMastered: true,
+          reviewCount: true,
+          nextReviewAt: true,
+          lastReviewedAt: true,
+          word: { select: { word: true, meaning: true } },
+        },
+      }),
+      this.prisma.userVocabWordProgress.count({
+        where: { userId, isMastered: true },
+      }),
+      this.prisma.userVocabWordProgress.count({
+        where: {
+          userId,
+          isMastered: false,
+          nextReviewAt: { lte: new Date() },
+        },
+      }),
+      this.prisma.grammarAttempt.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          score: true,
+          createdAt: true,
+          topic: { select: { id: true, title: true, level: true } },
+        },
+      }),
+      this.prisma.toeicAttempt.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          mode: true,
+          status: true,
+          createdAt: true,
+          submittedAt: true,
+          listeningScore: true,
+          readingScore: true,
+          totalScore: true,
+          totalCorrect: true,
+          exam: { select: { id: true, title: true, type: true } },
+        },
+      }),
+      this.prisma.learningActivity.findMany({
+        where: { userId },
+        orderBy: { occurredAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          detail: true,
+          score: true,
+          durationSec: true,
+          sourceType: true,
+          sourceId: true,
+          occurredAt: true,
+        },
+      }),
+    ]);
+
+    const isSuccessful = (
+      score: number | null,
+      maxScore: number | null,
+      minimumScore: number | null,
+    ) =>
+      score !== null &&
+      maxScore !== null &&
+      maxScore > 0 &&
+      (minimumScore !== null
+        ? (score / maxScore) * 100 >= minimumScore
+        : score === maxScore);
+
+    const coursesById = new Map<number, any>();
+    for (const enrollment of user.enrollments) {
+      const course = enrollment.class.course;
+      coursesById.set(course.id, {
+        id: course.id,
+        title: course.title,
+        level: course.level,
+        completedLessons: 0,
+        totalLessons: 0,
+        lessons: [],
+      });
+    }
+    for (const lesson of courseLessons) {
+      const latestByExercise = new Map<
+        number,
+        (typeof lesson.attempts)[number]
+      >();
+      for (const attempt of lesson.attempts) {
+        if (!latestByExercise.has(attempt.exerciseId)) {
+          latestByExercise.set(attempt.exerciseId, attempt);
+        }
+      }
+      const completed = lesson.exercises.every((exercise) => {
+        const attempt = latestByExercise.get(exercise.id);
+        return Boolean(
+          attempt &&
+          isSuccessful(attempt.score, attempt.maxScore, exercise.minimumScore),
+        );
+      });
+      const course = coursesById.get(lesson.course.id) ?? {
+        id: lesson.course.id,
+        title: lesson.course.title,
+        level: lesson.course.level,
+        completedLessons: 0,
+        totalLessons: 0,
+        lessons: [],
+      };
+      course.totalLessons += 1;
+      if (completed) course.completedLessons += 1;
+      course.lessons.push({
+        id: lesson.id,
+        title: lesson.title,
+        order: lesson.order,
+        completed,
+        lastActivityAt:
+          lesson.attempts[0]?.submittedAt ??
+          lesson.attempts[0]?.createdAt ??
+          null,
+      });
+      coursesById.set(course.id, course);
+    }
+
+    const asFiniteScore = (value: unknown) =>
+      typeof value === 'number' && Number.isFinite(value) ? value : null;
+    const feedbackScore = (feedback: unknown, keys: string[]) => {
+      if (
+        !feedback ||
+        typeof feedback !== 'object' ||
+        Array.isArray(feedback)
+      ) {
+        return null;
+      }
+      const record = feedback as Record<string, unknown>;
+      for (const key of keys) {
+        const score = asFiniteScore(record[key]);
+        if (score !== null) return score;
+      }
+      return null;
+    };
+    const feedbackSummary = (feedback: string | null) => {
+      if (!feedback) return null;
+      const normalized = feedback.replace(/\s+/g, ' ').trim();
+      return normalized.length > 180
+        ? `${normalized.slice(0, 177)}...`
+        : normalized;
+    };
+
+    const totalCourseLessons = [...coursesById.values()].reduce(
+      (sum, course) => sum + course.totalLessons,
+      0,
+    );
+    const completedCourseLessons = [...coursesById.values()].reduce(
+      (sum, course) => sum + course.completedLessons,
+      0,
+    );
+
+    return {
+      learner: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
+        profile: user.profile,
+      },
+      overview: {
+        courseCount: coursesById.size,
+        completedCourseLessons,
+        totalCourseLessons,
+        courseProgressPercent: totalCourseLessons
+          ? Math.round((completedCourseLessons / totalCourseLessons) * 100)
+          : null,
+        recentActivityCount: recentActivity.length,
+        vocabularyStudied: vocabProgress.length,
+        vocabularyMastered: vocabMasteredCount,
+        grammarAttempts: grammarAttempts.length,
+        examAttempts: toeicAttempts.length,
+      },
+      courses: [...coursesById.values()].map((course) => ({
+        ...course,
+        progressPercent: course.totalLessons
+          ? Math.round((course.completedLessons / course.totalLessons) * 100)
+          : null,
+      })),
+      skills: {
+        listening: {
+          attemptCount: listeningAttempts.length,
+          completedCount: listeningSubmissions.length,
+          recent: listeningSubmissions.map((item) => ({
+            id: item.id,
+            title: item.quiz.title,
+            score: item.score,
+            submittedAt: item.submittedAt,
+          })),
+          recentAttempts: listeningAttempts.map((item) => ({
+            id: item.id,
+            title: item.quiz.title,
+            status: item.status,
+            startedAt: item.startedAt,
+            completedAt: item.completedAt,
+            updatedAt: item.updatedAt,
+          })),
+        },
+        speaking: {
+          attemptCount: speakingSubmissions.length,
+          recent: speakingSubmissions.map((item) => ({
+            id: item.id,
+            exerciseId: item.exercise.id,
+            exerciseTitle: item.exercise.title,
+            practiceSetTitle: item.exercise.practiceSet?.title ?? null,
+            status: item.status,
+            submittedAt: item.submittedAt,
+            overallScore: item.overallScore,
+            accuracy: feedbackScore(item.aiFeedback, ['accuracyScore']),
+            fluency: feedbackScore(item.aiFeedback, ['fluencyScore']),
+            completeness: feedbackScore(item.aiFeedback, ['completenessScore']),
+            pronScore: feedbackScore(item.aiFeedback, [
+              'PronScore',
+              'pronScore',
+              'pronunciationScore',
+            ]),
+          })),
+        },
+        reading: {
+          attemptCount: readingSubmissions.length,
+          recent: readingSubmissions.map((item) => ({
+            id: item.id,
+            title: item.quiz.title,
+            topic: item.quiz.practiceTopic?.name ?? null,
+            score: item.score,
+            submittedAt: item.submittedAt,
+          })),
+        },
+        writing: {
+          attemptCount: writingSubmissions.length,
+          recent: writingSubmissions.map((item) => ({
+            id: item.id,
+            title: item.quiz.title,
+            type: item.quiz.type,
+            score: item.score,
+            feedbackSummary: feedbackSummary(item.aiFeedback),
+            submittedAt: item.submittedAt,
+          })),
+        },
+      },
+      vocabulary: {
+        studiedCount: vocabProgress.length,
+        masteredCount: vocabMasteredCount,
+        dueCount: vocabDueCount,
+        recent: vocabProgress.map((item) => ({
+          id: item.id,
+          word: item.word.word,
+          meaning: item.word.meaning,
+          isMastered: item.isMastered,
+          reviewCount: item.reviewCount,
+          nextReviewAt: item.nextReviewAt,
+          lastReviewedAt: item.lastReviewedAt,
+        })),
+      },
+      grammar: {
+        attemptCount: grammarAttempts.length,
+        recent: grammarAttempts.map((item) => ({
+          id: item.id,
+          topic: item.topic.title,
+          level: item.topic.level,
+          score: item.score,
+          attemptedAt: item.createdAt,
+        })),
+      },
+      exams: {
+        attemptCount: toeicAttempts.length,
+        recent: toeicAttempts.map((item) => ({
+          id: item.id,
+          exam: item.exam.title,
+          mode: item.mode,
+          status: item.status,
+          attemptedAt: item.createdAt,
+          submittedAt: item.submittedAt,
+          listeningScore: item.listeningScore,
+          readingScore: item.readingScore,
+          totalScore: item.totalScore,
+          totalCorrect: item.totalCorrect,
+        })),
+      },
+      recentActivity,
+      gamification: {
+        streakCount: user.stats?.streakCount ?? 0,
+        totalBanhRan: user.stats?.totalBanhRan ?? 0,
+        totalPoints: user.leaderboard?.totalPoints ?? 0,
+        weeklyExp: user.leaderboard?.weeklyExp ?? 0,
+        tier: user.leaderboard?.tier ?? 'Đồng',
+        petLevel: user.pet?.level ?? null,
+        petExp: user.pet?.exp ?? null,
+      },
+    };
   }
 
   async createUser(dto: CreateUserDto) {

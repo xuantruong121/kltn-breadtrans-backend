@@ -90,7 +90,7 @@ export class GrammarService {
 
     if (
       !topic ||
-      (!isStaff && topic.publicationStatus === QuizPublicationStatus.DRAFT)
+      (!isStaff && topic.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
       throw new NotFoundException(`Grammar topic with ID ${id} not found`);
     }
@@ -132,6 +132,9 @@ export class GrammarService {
     if (!topic) {
       throw new NotFoundException(`Topic ${topicId} not found`);
     }
+    if (topic.publicationStatus !== QuizPublicationStatus.PUBLISHED) {
+      throw new NotFoundException(`Topic ${topicId} not found`);
+    }
 
     let correctCount = 0;
     const questionsResult = topic.questions.map((q) => {
@@ -150,56 +153,67 @@ export class GrammarService {
     const totalQuestions = topic.questions.length || 1;
     const score = Math.round((correctCount / totalQuestions) * 100);
 
-    // Save attempt (lịch sử làm bài luôn được lưu đầy đủ)
-    const attempt = await this.prisma.grammarAttempt.create({
-      data: {
-        userId,
-        topicId,
-        score,
-        answers: answers as any,
-      },
-    });
-
-    // Chống farm thưởng Bánh Mì & XP bằng UserGrammarReward (Atomic ở tầng DB với @@unique([userId, topicId]))
+    let rewardBanh = 0;
+    let rewardXP = 0;
     let isFirstCompletion = false;
-    try {
-      await this.prisma.userGrammarReward.create({
+
+    // Attempt, first-completion guard, wallet and immutable ledger must commit
+    // together. The advisory lock makes the read-then-create guard safe even
+    // when two submissions arrive at the same time.
+    const attempt = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`grammar:reward:${userId}:${topicId}`}, 0))`;
+
+      const created = await tx.grammarAttempt.create({
         data: {
           userId,
           topicId,
+          score,
+          answers: answers as any,
         },
       });
-      isFirstCompletion = true;
-    } catch (e: any) {
-      if (e.code === 'P2002') {
-        isFirstCompletion = false;
-      } else {
-        throw e;
-      }
-    }
 
-    let rewardBanh = 0;
-    let rewardXP = 0;
+      const existingReward = await tx.userGrammarReward.findUnique({
+        where: { userId_topicId: { userId, topicId } },
+      });
+
+      if (!existingReward) {
+        await tx.userGrammarReward.create({ data: { userId, topicId } });
+        isFirstCompletion = true;
+        rewardBanh = Math.max(5, Math.floor(score / 10));
+        rewardXP = score;
+
+        const updatedStats = await tx.userStats.upsert({
+          where: { userId },
+          update: { totalBanhRan: { increment: rewardBanh } },
+          create: { userId, totalBanhRan: rewardBanh },
+        });
+
+        await tx.banhTransaction.create({
+          data: {
+            userId,
+            amount: rewardBanh,
+            source: 'GRAMMAR_COMPLETION',
+            reference: `grammar:topic:${topicId}`,
+            dateKey: this.getVietnamDateKey(),
+            isCapped: false,
+            balanceAfter: updatedStats.totalBanhRan,
+            metadata: { topicId, attemptId: created.id, score } as any,
+          },
+        });
+
+        await tx.pointHistory.create({
+          data: {
+            userId,
+            points: rewardBanh,
+            reason: `Hoàn thành bài Ngữ pháp lần đầu: ${topic.title} (${score}%)`,
+          },
+        });
+      }
+
+      return created;
+    });
 
     if (isFirstCompletion) {
-      rewardBanh = Math.max(5, Math.floor(score / 10));
-      rewardXP = score;
-
-      await this.prisma.userStats.upsert({
-        where: { userId },
-        update: { totalBanhRan: { increment: rewardBanh } },
-        create: { userId, totalBanhRan: rewardBanh },
-      });
-
-      await this.prisma.pointHistory.create({
-        data: {
-          userId,
-          points: rewardBanh,
-          reason: `Hoàn thành bài Ngữ pháp lần đầu: ${topic.title} (${score}%)`,
-        },
-      });
-
-      // Emit event for Gamification
       this.eventEmitter.emit('gamification.xp_earned', {
         userId,
         points: rewardXP,
@@ -216,6 +230,15 @@ export class GrammarService {
       isFirstCompletion,
       questionsResult,
     };
+  }
+
+  private getVietnamDateKey() {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
   }
 
   async getMyAttempts(userId: number) {

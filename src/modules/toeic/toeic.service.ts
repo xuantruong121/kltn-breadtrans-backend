@@ -204,7 +204,7 @@ export class ToeicService {
     });
     if (
       !exam ||
-      (!isStaff && exam.publicationStatus === QuizPublicationStatus.DRAFT)
+      (!isStaff && exam.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
       throw new NotFoundException('Exam not found');
     }
@@ -401,6 +401,9 @@ export class ToeicService {
           include: { groups: { include: { questions: true } } },
         });
         if (!exam) throw new NotFoundException('Exam not found');
+        if (exam.publicationStatus !== QuizPublicationStatus.PUBLISHED) {
+          throw new NotFoundException('Exam not found');
+        }
         this.validateDuration(exam.durationSeconds);
         this.validateModeCompatibility(exam.type, mode);
         if (mode === AttemptMode.FULL_TEST) {
