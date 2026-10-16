@@ -4,10 +4,21 @@ import {
   IsOptional,
   IsIn,
   IsBoolean,
+  IsInt,
+  Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  SPEAKING_EXERCISE_DIFFICULTIES,
+  SPEAKING_TASK_TYPES,
+} from '../speaking-contract';
 
 export class CreateExerciseDto {
+  @ApiPropertyOptional({ enum: SPEAKING_TASK_TYPES })
+  @IsOptional()
+  @IsIn([...SPEAKING_TASK_TYPES])
+  taskType?: string;
+
   @ApiProperty({ example: 'IELTS Reading - Sentence Stress' })
   @IsString()
   @IsNotEmpty()
@@ -45,17 +56,23 @@ export class CreateExerciseDto {
 
   @ApiPropertyOptional({
     example: 'INTERMEDIATE',
-    enum: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'],
+    enum: SPEAKING_EXERCISE_DIFFICULTIES,
   })
   @IsOptional()
-  @IsIn(['BEGINNER', 'INTERMEDIATE', 'ADVANCED'])
+  @IsIn([...SPEAKING_EXERCISE_DIFFICULTIES])
   difficulty?: string;
 
   @ApiPropertyOptional({
-    example: 'IELTS',
-    enum: ['IELTS', 'TOEIC', 'GENERAL'],
+    example: 'GENERAL',
+    description: 'Speaking category code validated by the taxonomy service',
   })
   @IsOptional()
-  @IsIn(['IELTS', 'TOEIC', 'GENERAL'])
+  @IsString()
   category?: string;
+
+  @ApiPropertyOptional({ description: 'Reusable shared stimulus ID' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  stimulusId?: number | null;
 }

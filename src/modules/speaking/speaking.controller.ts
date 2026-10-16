@@ -63,7 +63,7 @@ export class SpeakingController {
   @ApiQuery({
     name: 'category',
     required: false,
-    enum: ['IELTS', 'TOEIC', 'GENERAL'],
+    description: 'Speaking category code; resolved by the taxonomy source',
   })
   findAllExercises(@Query('category') category: string, @Request() req: any) {
     return this.speakingService.findAllExercises(

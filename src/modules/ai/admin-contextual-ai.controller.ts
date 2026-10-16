@@ -6,6 +6,7 @@ import {
   Logger,
   BadGatewayException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -13,6 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AiService } from './ai.service';
+import { SpeakingCategoryService } from '../content/speaking-category.service';
 import {
   SuggestVocabWordDto,
   SuggestGrammarQuestionsDto,
@@ -23,6 +25,13 @@ import {
   SuggestListeningContentDto,
   SuggestListeningQuestionsDto,
   SuggestWritingTaskDto,
+  SuggestSpeakingPracticeSetDto,
+  SuggestSpeakingExercisesDto,
+  SuggestSpeakingFullDraftDto,
+  SuggestListeningFullDraftDto,
+  SuggestReadingFullDraftDto,
+  SuggestVocabFullDraftDto,
+  SuggestGrammarFullDraftDto,
 } from './dto/contextual-ai.dto';
 
 @ApiTags('Admin Contextual AI')
@@ -33,7 +42,30 @@ import {
 export class AdminContextualAiController {
   private readonly logger = new Logger(AdminContextualAiController.name);
 
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    @Optional()
+    private readonly speakingCategoryService?: SpeakingCategoryService,
+  ) {}
+
+  private async speakingCategoryContext(code: string) {
+    if (!this.speakingCategoryService) {
+      throw new BadRequestException('Speaking taxonomy service chưa sẵn sàng');
+    }
+    const category = await this.speakingCategoryService.getByCode(
+      code,
+      'practiceSet',
+    );
+    return {
+      category: category.code,
+      categoryContext: {
+        code: category.code,
+        displayLabel: category.name,
+        allowPracticeSet: category.allowPracticeSet,
+        allowExercise: category.allowExercise,
+      },
+    };
+  }
 
   @Post('vocab/ai/suggest-word')
   @ApiOperation({
@@ -225,6 +257,153 @@ export class AdminContextualAiController {
       throw new BadGatewayException(
         'Không thể gợi ý đề bài Writing từ AI lúc này. Vui lòng thử lại sau.',
       );
+    }
+  }
+
+  @Post('speaking/ai/suggest-practice-set')
+  @ApiOperation({ summary: 'Gợi ý bộ luyện nói nháp, cần Admin xem lại' })
+  async suggestSpeakingPracticeSet(@Body() dto: SuggestSpeakingPracticeSetDto) {
+    try {
+      const taxonomy = await this.speakingCategoryContext(dto.category);
+      return await this.aiService.suggestSpeakingPracticeSet({
+        topic: dto.topic,
+        level: dto.level,
+        ...taxonomy,
+        currentTitle: dto.currentTitle,
+        currentDescription: dto.currentDescription,
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.warn(
+        `AI Speaking practice-set failed: ${error?.message || ''}`,
+      );
+      throw new BadGatewayException(
+        'Không thể gợi ý bộ luyện nói từ AI lúc này. Vui lòng thử lại sau.',
+      );
+    }
+  }
+
+  @Post('speaking/ai/suggest-exercises')
+  @ApiOperation({ summary: 'Gợi ý câu luyện nói nháp từ ngữ cảnh bộ luyện' })
+  async suggestSpeakingExercises(@Body() dto: SuggestSpeakingExercisesDto) {
+    try {
+      const taxonomy = await this.speakingCategoryContext(dto.category);
+      return await this.aiService.suggestSpeakingExercises({
+        practiceSetTitle: dto.practiceSetTitle,
+        practiceSetDescription: dto.practiceSetDescription,
+        level: dto.level,
+        ...taxonomy,
+        currentTitle: dto.currentTitle,
+        currentTargetText: dto.currentTargetText,
+        taskType: dto.taskType,
+        existingExerciseTitles: dto.existingExerciseTitles,
+        count: dto.count || 3,
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.warn(`AI Speaking exercises failed: ${error?.message || ''}`);
+      throw new BadGatewayException(
+        'Không thể gợi ý câu luyện nói từ AI lúc này. Vui lòng thử lại sau.',
+      );
+    }
+  }
+
+  @Post('speaking/ai/full-draft')
+  @ApiOperation({ summary: 'Soạn bộ luyện Speaking cùng các câu luyện nháp' })
+  async suggestSpeakingFullDraft(@Body() dto: SuggestSpeakingFullDraftDto) {
+    try {
+      const taxonomy = await this.speakingCategoryContext(dto.category);
+      return await this.aiService.suggestSpeakingFullDraft({
+        topic: dto.topic,
+        level: dto.level,
+        ...taxonomy,
+        objective: dto.objective,
+        taskType: dto.taskType,
+        count: dto.count || 5,
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.warn(
+        `AI Speaking full draft failed: ${error?.message || ''}`,
+      );
+      throw new BadGatewayException(
+        'Không thể soạn bộ luyện Speaking lúc này.',
+      );
+    }
+  }
+
+  @Post('listening/ai/full-draft')
+  @ApiOperation({ summary: 'Soạn bài Listening gồm nội dung và câu hỏi nháp' })
+  async suggestListeningFullDraft(@Body() dto: SuggestListeningFullDraftDto) {
+    try {
+      return await this.aiService.suggestListeningFullDraft({
+        topic: dto.topic,
+        level: dto.level,
+        mode: dto.mode,
+        count: dto.count || 5,
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.warn(
+        `AI Listening full draft failed: ${error?.message || ''}`,
+      );
+      throw new BadGatewayException('Không thể soạn bài Listening lúc này.');
+    }
+  }
+
+  @Post('reading/ai/full-draft')
+  @ApiOperation({ summary: 'Soạn bài Reading gồm đoạn đọc và câu hỏi nháp' })
+  async suggestReadingFullDraft(@Body() dto: SuggestReadingFullDraftDto) {
+    try {
+      return await this.aiService.suggestReadingFullDraft({
+        topic: dto.topic,
+        level: dto.level,
+        targetLength: dto.targetLength,
+        microSkill: dto.microSkill,
+        count: dto.count || 5,
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.warn(`AI Reading full draft failed: ${error?.message || ''}`);
+      throw new BadGatewayException('Không thể soạn bài Reading lúc này.');
+    }
+  }
+
+  @Post('vocab/ai/full-draft')
+  @ApiOperation({ summary: 'Soạn chủ đề Vocabulary cùng danh sách từ nháp' })
+  async suggestVocabFullDraft(@Body() dto: SuggestVocabFullDraftDto) {
+    try {
+      return await this.aiService.suggestVocabFullDraft({
+        topic: dto.topic,
+        level: dto.level,
+        context: dto.context,
+        count: dto.count || 15,
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.warn(
+        `AI Vocabulary full draft failed: ${error?.message || ''}`,
+      );
+      throw new BadGatewayException(
+        'Không thể soạn chủ đề Vocabulary lúc này.',
+      );
+    }
+  }
+
+  @Post('grammar/ai/full-draft')
+  @ApiOperation({ summary: 'Soạn bài Grammar cùng câu hỏi nháp' })
+  async suggestGrammarFullDraft(@Body() dto: SuggestGrammarFullDraftDto) {
+    try {
+      return await this.aiService.suggestGrammarFullDraft({
+        topicTitle: dto.topicTitle,
+        level: dto.level,
+        objective: dto.objective,
+        count: dto.count || 10,
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.warn(`AI Grammar full draft failed: ${error?.message || ''}`);
+      throw new BadGatewayException('Không thể soạn bài Grammar lúc này.');
     }
   }
 }

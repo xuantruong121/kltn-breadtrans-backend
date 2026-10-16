@@ -5,6 +5,7 @@ import {
   IsDefined,
   IsEnum,
   IsInt,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -17,12 +18,13 @@ import {
   CourseLessonSectionType,
   CourseLessonStatus,
 } from '@prisma/client';
+import { COURSE_LEVELS } from './course-level.contract';
 
 export class UpdateV5CourseDto {
   @IsOptional() @IsString() @IsNotEmpty() title?: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() thumbnail?: string;
-  @IsOptional() @IsString() level?: string;
+  @IsOptional() @IsString() @IsIn([...COURSE_LEVELS]) level?: string;
 }
 
 export class CreateV5LessonDto {

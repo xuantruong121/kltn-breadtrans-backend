@@ -1,3 +1,5 @@
+import type { SpeakingTaskType } from '../../speaking/speaking-contract';
+
 export const AI_EVALUATOR_TOKEN = 'AI_EVALUATOR_STRATEGY';
 
 export interface WordAssessment {
@@ -279,6 +281,69 @@ export interface IAIEvaluator {
     wordMin?: number;
     wordMax?: number;
   }): Promise<ContextualWritingTaskSuggestion>;
+
+  /** Phase 8.8: Speaking practice-set draft only; no persistence or media. */
+  suggestSpeakingPracticeSet?(input: {
+    topic: string;
+    level: string;
+    category: string;
+    categoryContext?: SpeakingCategoryAiContext;
+    currentTitle?: string;
+    currentDescription?: string;
+  }): Promise<ContextualSpeakingPracticeSetSuggestion>;
+
+  /** Phase 8.8: Speaking exercise drafts only; parent context stays explicit. */
+  suggestSpeakingExercises?(input: {
+    practiceSetTitle: string;
+    practiceSetDescription?: string;
+    level: string;
+    category: string;
+    categoryContext?: SpeakingCategoryAiContext;
+    currentTitle?: string;
+    currentTargetText?: string;
+    taskType?: SpeakingTaskType;
+    existingExerciseTitles?: string[];
+    count: number;
+  }): Promise<ContextualSpeakingExercisesSuggestion>;
+
+  suggestSpeakingFullDraft?(input: {
+    topic: string;
+    level: string;
+    category: string;
+    categoryContext?: SpeakingCategoryAiContext;
+    objective?: string;
+    taskType?: SpeakingTaskType;
+    count: number;
+  }): Promise<ContextualSpeakingFullDraftSuggestion>;
+
+  suggestListeningFullDraft?(input: {
+    topic: string;
+    level?: string;
+    mode: 'DIALOGUE' | 'DICTATION';
+    count: number;
+  }): Promise<ContextualListeningFullDraftSuggestion>;
+
+  suggestReadingFullDraft?(input: {
+    topic: string;
+    level: string;
+    targetLength?: number;
+    microSkill?: string;
+    count: number;
+  }): Promise<ContextualReadingFullDraftSuggestion>;
+
+  suggestVocabFullDraft?(input: {
+    topic: string;
+    level?: string;
+    context?: string;
+    count: number;
+  }): Promise<ContextualVocabFullDraftSuggestion>;
+
+  suggestGrammarFullDraft?(input: {
+    topicTitle: string;
+    level: string;
+    objective?: string;
+    count: number;
+  }): Promise<ContextualGrammarFullDraftSuggestion>;
 }
 
 export interface ContextualVocabSuggestion {
@@ -373,4 +438,66 @@ export interface ContextualWritingTaskSuggestion {
   wordRange?: [number, number];
   keywords?: string[];
   sampleSentences?: string[];
+}
+
+export interface ContextualSpeakingPracticeSetSuggestion {
+  title: string;
+  description: string;
+  category: string;
+  level: string;
+}
+
+export interface SpeakingCategoryAiContext {
+  code: string;
+  displayLabel: string;
+  allowPracticeSet: boolean;
+  allowExercise: boolean;
+}
+
+export interface ContextualSpeakingExerciseCandidate {
+  title: string;
+  targetText: string;
+  difficulty: string;
+  taskType: SpeakingTaskType;
+}
+
+export interface ContextualSpeakingExercisesSuggestion {
+  candidates: ContextualSpeakingExerciseCandidate[];
+}
+
+export interface ContextualSpeakingFullDraftSuggestion {
+  practiceSet: ContextualSpeakingPracticeSetSuggestion;
+  exercises: ContextualSpeakingExerciseCandidate[];
+}
+
+export interface ContextualListeningFullDraftSuggestion {
+  title: string;
+  description: string;
+  level?: string;
+  mode: 'DIALOGUE' | 'DICTATION';
+  text?: string;
+  turns?: ContextualListeningTurn[];
+  questions: ContextualListeningQuestionCandidate[];
+}
+
+export interface ContextualReadingFullDraftSuggestion {
+  title: string;
+  description: string;
+  level: string;
+  passage: string;
+  questions: ContextualReadingCandidate[];
+}
+
+export interface ContextualVocabFullDraftSuggestion {
+  title: string;
+  categoryName: string;
+  words: ContextualVocabSuggestion[];
+}
+
+export interface ContextualGrammarFullDraftSuggestion {
+  title: string;
+  description: string;
+  level: string;
+  keyFormula: string;
+  questions: ContextualGrammarCandidate[];
 }

@@ -22,10 +22,11 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
 import { getSpeakingPipelineMode } from './speaking.constants';
-import { QuizPublicationStatus, Role } from '@prisma/client';
+import { Prisma, QuizPublicationStatus, Role } from '@prisma/client';
 import type { SpeakingSubmission } from '@prisma/client';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
 import { resolveSpeakingPracticeSet } from './speaking-practice-set';
+import { SpeakingCategoryService } from '../content/speaking-category.service';
 
 export interface SubmitSpeakingResponse {
   submissionId: number;
@@ -47,6 +48,36 @@ export interface DialogueTtsSegment {
   voiceKey?: string;
   text: string;
 }
+
+type SpeakingTaxonomyRef = { code: string; name: string };
+type SpeakingExerciseProjectionInput = {
+  id: number;
+  title: string;
+  difficulty: string;
+  category: string;
+  categoryId?: number | null;
+  imageUrl: string | null;
+  audioUrl: string | null;
+  isPremiumContent: boolean;
+  taskType?: string | null;
+  stimulusId?: number | null;
+  stimulus?: {
+    id: number;
+    kind: string;
+    title: string | null;
+    content: string | null;
+    imageUrl: string | null;
+  } | null;
+  categoryTaxonomy?: SpeakingTaxonomyRef | null;
+  practiceSet?: {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    categoryTaxonomy?: SpeakingTaxonomyRef | null;
+  } | null;
+  [key: string]: unknown;
+};
 
 function dialogueVoiceForSpeaker(
   speaker: string | undefined,
@@ -188,7 +219,11 @@ export class SpeakingService {
   private async findExerciseRecordById(id: number, role?: Role) {
     const exercise = await this.prisma.speakingExercise.findUnique({
       where: { id },
-      include: { practiceSet: true },
+      include: {
+        categoryTaxonomy: true,
+        stimulus: true,
+        practiceSet: { include: { categoryTaxonomy: true } },
+      },
     });
     if (!exercise) {
       throw new NotFoundException(`Speaking exercise #${id} not found`);
@@ -208,15 +243,29 @@ export class SpeakingService {
   }
 
   private async projectExercise(
-    exercise: Awaited<ReturnType<SpeakingService['findExerciseRecordById']>>,
+    exercise: SpeakingExerciseProjectionInput,
     access: { isPremiumContent: boolean; isLocked: boolean },
   ) {
+    const taxonomy =
+      exercise.categoryTaxonomy ?? exercise.practiceSet?.categoryTaxonomy;
+    const effectiveCategory =
+      taxonomy?.code ||
+      (exercise.categoryId == null
+        ? exercise.practiceSet?.category
+        : exercise.category) ||
+      exercise.category;
+    const effectiveCategoryLabel =
+      taxonomy?.name ||
+      SpeakingCategoryService.labelForLegacyCode(effectiveCategory);
     const safeMetadata = {
       id: exercise.id,
       title: exercise.title,
       difficulty: exercise.difficulty,
-      category: exercise.category,
+      taskType: exercise.taskType,
+      category: effectiveCategory,
+      categoryLabel: effectiveCategoryLabel,
       imageUrl: exercise.imageUrl,
+      stimulusId: exercise.stimulusId,
       isPremiumContent: access.isPremiumContent,
       isLocked: access.isLocked,
     };
@@ -231,6 +280,8 @@ export class SpeakingService {
     return {
       ...exercise,
       audioUrl,
+      category: effectiveCategory,
+      categoryLabel: effectiveCategoryLabel,
       isPremiumContent: access.isPremiumContent,
       isLocked: false,
     };
@@ -251,26 +302,50 @@ export class SpeakingService {
     userId?: number,
     role?: Role,
   ) {
+    const normalizedCategory = category?.trim().toUpperCase();
+    const categoryFilter: Prisma.SpeakingExerciseWhereInput = normalizedCategory
+      ? {
+          OR: [
+            { categoryTaxonomy: { code: normalizedCategory } },
+            { categoryTaxonomy: null, category: normalizedCategory },
+            {
+              categoryTaxonomy: null,
+              practiceSet: {
+                OR: [
+                  { categoryTaxonomy: { code: normalizedCategory } },
+                  { category: normalizedCategory },
+                ],
+              },
+            },
+          ],
+        }
+      : {};
     const exercises = await this.prisma.speakingExercise.findMany({
       where:
         role === Role.ADMIN
-          ? category
-            ? { category }
-            : {}
+          ? categoryFilter
           : {
-              ...(category ? { category } : {}),
-              publicationStatus: QuizPublicationStatus.PUBLISHED,
-              OR: [
-                { practiceSetId: null },
+              AND: [
+                categoryFilter,
+                { publicationStatus: QuizPublicationStatus.PUBLISHED },
                 {
-                  practiceSet: {
-                    publicationStatus: QuizPublicationStatus.PUBLISHED,
-                  },
+                  OR: [
+                    { practiceSetId: null },
+                    {
+                      practiceSet: {
+                        publicationStatus: QuizPublicationStatus.PUBLISHED,
+                      },
+                    },
+                  ],
                 },
               ],
             },
       orderBy: { createdAt: 'desc' },
-      include: { practiceSet: true },
+      include: {
+        categoryTaxonomy: true,
+        stimulus: true,
+        practiceSet: { include: { categoryTaxonomy: true } },
+      },
     });
 
     const accessByExercise = this.speakingContentAccess
@@ -323,6 +398,7 @@ export class SpeakingService {
         title: string;
         description: string;
         category: string;
+        categoryLabel: string;
         exerciseCount: number;
         completedCount: number;
         exerciseIds: number[];
@@ -332,9 +408,16 @@ export class SpeakingService {
 
     for (const [key, items] of grouped.entries()) {
       const set = setFor(items[0]);
+      const taxonomy =
+        items[0].practiceSet?.categoryTaxonomy ?? items[0].categoryTaxonomy;
+      const effectiveCategory =
+        taxonomy?.code || items[0].practiceSet?.category || items[0].category;
       setSummaries.set(key, {
         ...set,
-        category: items[0].category,
+        category: effectiveCategory,
+        categoryLabel:
+          taxonomy?.name ||
+          SpeakingCategoryService.labelForLegacyCode(effectiveCategory),
         exerciseCount: items.length,
         completedCount: items.filter((item) =>
           completedExerciseIds.has(item.id),
@@ -1135,7 +1218,14 @@ export class SpeakingService {
   ) {
     const submission = await this.prisma.speakingSubmission.findUnique({
       where: { id: submissionId },
-      include: { exercise: { include: { practiceSet: true } } },
+      include: {
+        exercise: {
+          include: {
+            categoryTaxonomy: true,
+            practiceSet: { include: { categoryTaxonomy: true } },
+          },
+        },
+      },
     });
 
     if (!submission) {

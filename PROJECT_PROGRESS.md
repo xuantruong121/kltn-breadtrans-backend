@@ -31,6 +31,13 @@ Thay vì sử dụng Class làm khối trung tâm như cũ, hệ thống đã ch
 - TOEIC là một format đang được hỗ trợ; kiến trúc module cho phép mở rộng thêm các dạng chứng chỉ khác.
 - Sẵn sàng mở rộng chấm điểm bằng AI (Gemini).
 
+## D. BreadTrans Phase 8.8.1 — CMS Contract Consistency & Full-Draft AI Authoring — 2026-10-15
+- Thêm `speaking-contract.ts` làm source contract runtime cho Speaking parent level/category và child category/difficulty; DTO, CMS service, AI validation và learner summary dùng cùng semantics.
+- Bổ sung Admin-only full-draft endpoints cho Speaking, Listening, Reading, Vocabulary và Grammar. AI chỉ trả source fields hiện có cùng giới hạn count; không trả media, lifecycle fields hoặc persistence command.
+- Full-draft generation dùng quota/rotation/strategy hiện hữu. Review/Apply/Save/Publish vẫn tách biệt; CMS writer là single writer và record mới giữ Draft.
+- Backend focused contextual AI 29/29 và full 98 suites/805 tests PASS; typecheck, targeted lint, build, Prisma validate/migrate baseline PASS; database đang up to date với 51 migrations.
+- Authenticated owner-runtime browser QA không gọi Gemini đã xác nhận full-draft Generate → Review → Apply cho Speaking, Listening, Reading, Vocabulary và Grammar ở 3 viewport; không có DB persistence trước Save, mọi QA prefix đã cleanup. Existing Speaking Save/Draft/Publish/learner isolation evidence vẫn PASS; không tự tạo tiến trình BE thay thế.
+
 ## 3. Quy Ước Kiến Trúc (Architecture Rules)
 - Mọi thay đổi về Database bắt buộc phải cập nhật vào `prisma/schema.prisma` và sau đó chạy `npx prisma db push` hoặc tạo migration. Không sửa DB bằng tay.
 - Mọi hàm trong `Controller` đều phải khai báo Swagger (`@ApiOperation`, `@ApiTags`, `@ApiBearerAuth`) để phục vụ Frontend Developer.

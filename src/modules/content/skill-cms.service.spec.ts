@@ -121,7 +121,11 @@ describe('SkillCmsService', () => {
     await service.addSpeakingExercise(
       'speaking',
       'speaking-qa',
-      { title: 'Prompt', targetText: 'Good morning.' },
+      {
+        title: 'Prompt',
+        targetText: 'Good morning.',
+        taskType: 'READ_ALOUD',
+      },
       admin,
     );
 
@@ -145,7 +149,14 @@ describe('SkillCmsService', () => {
     const set = {
       id: 'speaking-ready',
       title: 'Speaking Ready',
-      exercises: [{ id: 1, title: 'Prompt', targetText: 'Hello.' }],
+      exercises: [
+        {
+          id: 1,
+          title: 'Prompt',
+          targetText: 'Hello.',
+          taskType: 'READ_ALOUD',
+        },
+      ],
     };
     const tx = {
       speakingPracticeSet: {

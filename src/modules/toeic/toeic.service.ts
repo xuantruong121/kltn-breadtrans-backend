@@ -272,7 +272,13 @@ export class ToeicService {
       !Array.isArray(quiz.bilingualContent)
         ? (quiz.bilingualContent as Record<string, unknown>)
         : {};
-    if (metadata.examFormat !== 'FOUR_SKILL' || metadata.isBundle !== true)
+    // Keep the persisted canonical format and the legacy migration alias
+    // readable. Existing seeded bundles use TOEIC_4_SKILLS, while older
+    // lifecycle records may still carry FOUR_SKILL.
+    const isFourSkillFormat =
+      metadata.examFormat === 'TOEIC_4_SKILLS' ||
+      metadata.examFormat === 'FOUR_SKILL';
+    if (!isFourSkillFormat || metadata.isBundle !== true)
       throw new BadRequestException('Quiz này không phải gói TOEIC 4 kỹ năng');
     const examSetId = Number(metadata.listeningReadingExamSetId);
     const speakingWritingQuizId = Number(metadata.speakingWritingQuizId);

@@ -17,11 +17,14 @@ import {
   SuggestListeningContentDto,
   SuggestListeningQuestionsDto,
   SuggestWritingTaskDto,
+  SuggestSpeakingPracticeSetDto,
+  SuggestSpeakingExercisesDto,
 } from './dto/contextual-ai.dto';
 
 describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () => {
   let controller: AdminContextualAiController;
   let mockAiService: Partial<Record<keyof AiService, jest.Mock>>;
+  let mockSpeakingCategoryService: { getByCode: jest.Mock };
 
   beforeEach(() => {
     mockAiService = {
@@ -34,9 +37,24 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       suggestListeningContent: jest.fn(),
       suggestListeningQuestions: jest.fn(),
       suggestWritingTask: jest.fn(),
+      suggestSpeakingPracticeSet: jest.fn(),
+      suggestSpeakingExercises: jest.fn(),
       checkAndIncrementDailyQuota: jest.fn().mockResolvedValue(1),
     };
-    controller = new AdminContextualAiController(mockAiService as any);
+    mockSpeakingCategoryService = {
+      getByCode: jest.fn((code: string) =>
+        Promise.resolve({
+          code,
+          name: code,
+          allowPracticeSet: true,
+          allowExercise: true,
+        }),
+      ),
+    };
+    controller = new AdminContextualAiController(
+      mockAiService as any,
+      mockSpeakingCategoryService as any,
+    );
   });
 
   describe('1. Security & Admin Authorization Guards', () => {
@@ -141,6 +159,34 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         plainToInstance(SuggestWritingTaskDto, { taskType: '' }),
       );
       expect(writingErrors.some((e) => e.property === 'taskType')).toBe(true);
+
+      const speakingSetErrors = await validate(
+        plainToInstance(SuggestSpeakingPracticeSetDto, {
+          topic: '',
+          level: 'A1',
+          category: 'UNKNOWN',
+        }),
+      );
+      expect(speakingSetErrors.some((e) => e.property === 'topic')).toBe(true);
+      expect(speakingSetErrors.some((e) => e.property === 'level')).toBe(true);
+      expect(speakingSetErrors.some((e) => e.property === 'category')).toBe(
+        false,
+      );
+
+      const speakingExerciseErrors = await validate(
+        plainToInstance(SuggestSpeakingExercisesDto, {
+          practiceSetTitle: '',
+          level: 'BEGINNER',
+          category: 'COMMUNICATION',
+          count: 6,
+        }),
+      );
+      expect(
+        speakingExerciseErrors.some((e) => e.property === 'practiceSetTitle'),
+      ).toBe(true);
+      expect(speakingExerciseErrors.some((e) => e.property === 'count')).toBe(
+        true,
+      );
     });
   });
 
@@ -361,6 +407,80 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
     });
   });
 
+  describe('5C. Speaking Contextual Authoring', () => {
+    it('passes set and parent-exercise context to AI without persistence', async () => {
+      const setResult = {
+        title: 'Giới thiệu bản thân cơ bản',
+        description: 'Luyện các câu giới thiệu bản thân ngắn.',
+        category: 'COMMUNICATION',
+        level: 'BEGINNER',
+      };
+      const exerciseResult = {
+        candidates: [
+          {
+            title: 'Nói về nghề nghiệp',
+            targetText: 'I work as a designer.',
+            difficulty: 'BEGINNER',
+            taskType: 'READ_ALOUD',
+          },
+        ],
+      };
+      mockAiService.suggestSpeakingPracticeSet!.mockResolvedValue(setResult);
+      mockAiService.suggestSpeakingExercises!.mockResolvedValue(exerciseResult);
+
+      await expect(
+        controller.suggestSpeakingPracticeSet({
+          topic: 'Giới thiệu bản thân',
+          level: 'BEGINNER',
+          category: 'COMMUNICATION',
+          currentTitle: 'Bản nháp cũ',
+        }),
+      ).resolves.toEqual(setResult);
+      await expect(
+        controller.suggestSpeakingExercises({
+          practiceSetTitle: setResult.title,
+          practiceSetDescription: setResult.description,
+          level: 'BEGINNER',
+          category: 'COMMUNICATION',
+          existingExerciseTitles: ['Chào hỏi'],
+          taskType: 'READ_ALOUD',
+          count: 1,
+        }),
+      ).resolves.toEqual(exerciseResult);
+
+      expect(mockAiService.suggestSpeakingPracticeSet).toHaveBeenCalledWith({
+        topic: 'Giới thiệu bản thân',
+        level: 'BEGINNER',
+        category: 'COMMUNICATION',
+        currentTitle: 'Bản nháp cũ',
+        currentDescription: undefined,
+        categoryContext: {
+          code: 'COMMUNICATION',
+          displayLabel: 'COMMUNICATION',
+          allowPracticeSet: true,
+          allowExercise: true,
+        },
+      });
+      expect(mockAiService.suggestSpeakingExercises).toHaveBeenCalledWith({
+        practiceSetTitle: setResult.title,
+        practiceSetDescription: setResult.description,
+        level: 'BEGINNER',
+        category: 'COMMUNICATION',
+        currentTitle: undefined,
+        currentTargetText: undefined,
+        taskType: 'READ_ALOUD',
+        existingExerciseTitles: ['Chào hỏi'],
+        count: 1,
+        categoryContext: {
+          code: 'COMMUNICATION',
+          displayLabel: 'COMMUNICATION',
+          allowPracticeSet: true,
+          allowExercise: true,
+        },
+      });
+    });
+  });
+
   describe('6. Strong No-Direct-Write Invariant (Zero Prisma Domain Mutation Spies)', () => {
     it('proves zero domain mutations: AI_DOMAIN_CREATE_CALLS=0, AI_DOMAIN_UPDATE_CALLS=0, AI_DOMAIN_DELETE_CALLS=0', async () => {
       // Mock Prisma mutation spies for domain models
@@ -390,6 +510,16 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
           delete: jest.fn(),
         },
         toeicQuestion: {
+          create: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
+        speakingPracticeSet: {
+          create: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
+        speakingExercise: {
           create: jest.fn(),
           update: jest.fn(),
           delete: jest.fn(),
@@ -425,6 +555,15 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         taskType: 'EMAIL',
         prompt: 'text',
       });
+      mockAiService.suggestSpeakingPracticeSet!.mockResolvedValue({
+        title: 't',
+        description: 'd',
+        level: 'BEGINNER',
+        category: 'COMMUNICATION',
+      });
+      mockAiService.suggestSpeakingExercises!.mockResolvedValue({
+        candidates: [],
+      });
 
       await controller.suggestVocabWord({ word: 'test' });
       await controller.suggestGrammarQuestions({
@@ -446,6 +585,17 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         count: 1,
       });
       await controller.suggestWritingTask({ taskType: 'EMAIL' });
+      await controller.suggestSpeakingPracticeSet({
+        topic: 't',
+        level: 'BEGINNER',
+        category: 'COMMUNICATION',
+      });
+      await controller.suggestSpeakingExercises({
+        practiceSetTitle: 't',
+        level: 'BEGINNER',
+        category: 'COMMUNICATION',
+        count: 1,
+      });
 
       // Verify zero calls across all domain mutation methods
       let createCalls = 0;
@@ -518,5 +668,28 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         BadGatewayException,
       );
     });
+
+    it.each([
+      ['429', '429 Too Many Requests'],
+      ['503', '503 Service Unavailable'],
+      ['timeout', 'Gemini request timed out'],
+      ['invalid JSON', 'SyntaxError: Unexpected end of JSON input'],
+      ['schema mismatch', 'ValidationError: targetText is missing'],
+    ])(
+      'AI_SPEAKING_PROVIDER_%s_PASS: returns a controlled BadGatewayException',
+      async (_label, message) => {
+        mockAiService.suggestSpeakingExercises!.mockRejectedValue(
+          new Error(message),
+        );
+        await expect(
+          controller.suggestSpeakingExercises({
+            practiceSetTitle: 'T',
+            level: 'BEGINNER',
+            category: 'COMMUNICATION',
+            count: 1,
+          }),
+        ).rejects.toThrow(BadGatewayException);
+      },
+    );
   });
 });

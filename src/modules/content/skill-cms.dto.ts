@@ -16,6 +16,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { QuizPublicationStatus } from '@prisma/client';
+import {
+  SPEAKING_EXERCISE_DIFFICULTIES,
+  SPEAKING_TASK_TYPES,
+} from '../speaking/speaking-contract';
 
 export class SkillContentDto {
   @IsString()
@@ -85,7 +89,7 @@ export class SkillContentDto {
   audioUrl?: string;
 
   @IsOptional()
-  @IsIn(['BEGINNER', 'INTERMEDIATE', 'ADVANCED'])
+  @IsIn([...SPEAKING_EXERCISE_DIFFICULTIES])
   difficulty?: string;
 }
 
@@ -232,6 +236,10 @@ export class SkillPublishDto {
 }
 
 export class SpeakingExerciseDto {
+  @IsOptional()
+  @IsIn([...SPEAKING_TASK_TYPES])
+  taskType?: string;
+
   @IsString()
   @IsNotEmpty()
   title!: string;
@@ -245,7 +253,7 @@ export class SpeakingExerciseDto {
   category?: string;
 
   @IsOptional()
-  @IsIn(['BEGINNER', 'INTERMEDIATE', 'ADVANCED'])
+  @IsIn([...SPEAKING_EXERCISE_DIFFICULTIES])
   difficulty?: string;
 
   @IsOptional()
@@ -259,4 +267,9 @@ export class SpeakingExerciseDto {
   @IsOptional()
   @IsBoolean()
   isPremiumContent?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  stimulusId?: number | null;
 }
