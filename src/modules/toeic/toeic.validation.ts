@@ -180,6 +180,16 @@ export function validateToeicExam(exam: ToeicValidationExam): {
         message: 'Ảnh cần được rà soát lại sau khi mô tả hình thay đổi',
         groupId: group.id,
       });
+    if (
+      group.part === 1 &&
+      ['STALE', 'FAILED'].includes((media.image as any)?.questionStatus)
+    )
+      issues.push({
+        code: 'STALE_IMAGE_QUESTION',
+        message:
+          'Câu hỏi Part 1 cần được tạo lại hoặc rà soát sau khi ảnh thay đổi',
+        groupId: group.id,
+      });
     if ((group.part === 6 || group.part === 7) && !group.passageText?.trim())
       issues.push({
         code: 'MISSING_PASSAGE',

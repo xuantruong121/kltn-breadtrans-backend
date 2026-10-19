@@ -132,7 +132,7 @@ export class ToeicController {
     @Req() req: any,
     @Body() body: SaveAnswersDto,
   ) {
-    return this.toeicService.saveAnswers(+id, req.user.id, body.answers);
+    return this.toeicService.saveAnswers(+id, req.user.id, body);
   }
 
   @Post('attempts/:id/submit')

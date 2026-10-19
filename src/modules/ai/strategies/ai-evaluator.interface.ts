@@ -64,6 +64,18 @@ export interface DictionaryEnrichment {
 }
 
 export interface IAIEvaluator {
+  analyzeToeicPart1Candidates?(input: {
+    candidates: Array<{
+      candidateId: string;
+      imageBuffer: Buffer;
+      mimeType: string;
+    }>;
+  }): Promise<ToeicPart1CandidateAnalysis[]>;
+
+  generateToeicPart1FromImage?(input: {
+    imageBuffer: Buffer;
+    mimeType: string;
+  }): Promise<ToeicPart1QuestionCandidate>;
   /** Optional, bounded enrichment for external dictionary entries. */
   enrichDictionaryEntry?(
     input: DictionaryEnrichmentInput,
@@ -365,6 +377,24 @@ export interface IAIEvaluator {
     objective?: string;
     count: number;
   }): Promise<ContextualGrammarFullDraftSuggestion>;
+}
+
+export interface ToeicPart1CandidateAnalysis {
+  candidateId: string;
+  status: 'SUITABLE' | 'UNSUITABLE' | 'ANALYSIS_FAILED';
+  suitable: boolean;
+  score: number;
+  sceneSummary: string;
+  visibleFacts: string[];
+  unsafeInferences: string[];
+  rejectionReasons: string[];
+}
+
+export interface ToeicPart1QuestionCandidate {
+  sceneSummary: string;
+  statements: string[];
+  correctIndex: number;
+  explanation: string;
 }
 
 export type ToeicExamBatchQuestion = {

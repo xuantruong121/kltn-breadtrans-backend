@@ -33,7 +33,74 @@ import type {
   ToeicExamBatch,
   ToeicExamBatchRequest,
   ToeicSpeakingWritingDraft,
+  ToeicPart1CandidateAnalysis,
+  ToeicPart1QuestionCandidate,
 } from './strategies/ai-evaluator.interface';
+
+export async function normalizeAzureSpeechResponse(response: {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  arrayBuffer: () => Promise<ArrayBuffer>;
+  text?: () => Promise<string>;
+  headers?: { get: (name: string) => string | null };
+}): Promise<Buffer> {
+  if (!response.ok) {
+    const detail = response.text ? (await response.text()).trim() : '';
+    const safeDetail = detail.replace(/\s+/g, ' ').slice(0, 300);
+    const requestId =
+      response.headers?.get('x-requestid') ??
+      response.headers?.get('x-ms-request-id');
+    throw new Error(
+      `Azure Speech synthesis failed (${response.status} ${response.statusText})${requestId ? ` [requestId:${requestId}]` : ''}${safeDetail ? `: ${safeDetail}` : ''}`,
+    );
+  }
+  const audio = Buffer.from(await response.arrayBuffer());
+  if (!audio.length) {
+    throw new Error('Azure Speech returned empty audio bytes');
+  }
+  return audio;
+}
+
+export function buildToeicListeningSsml(transcript: string): string {
+  const escapeXml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  const turns = transcript
+    .split(/\r?\n/)
+    .map((line) => {
+      const match = /^\s*([^:]{1,40}):\s*(.+)$/.exec(line);
+      return match
+        ? { speaker: match[1].trim(), text: match[2].trim() }
+        : { speaker: 'Narrator', text: line.trim() };
+    })
+    .filter((turn) => turn.text);
+  if (!turns.length) {
+    throw new Error('Transcript không có nội dung để tạo audio');
+  }
+  const voicePool = [
+    'en-US-JennyNeural',
+    'en-US-GuyNeural',
+    'en-US-AriaNeural',
+    'en-US-DavisNeural',
+  ];
+  const voiceBySpeaker = new Map<string, string>();
+  const body = turns
+    .map((turn) => {
+      if (!voiceBySpeaker.has(turn.speaker))
+        voiceBySpeaker.set(
+          turn.speaker,
+          voicePool[voiceBySpeaker.size % voicePool.length],
+        );
+      return `<voice name="${voiceBySpeaker.get(turn.speaker)}">${escapeXml(turn.text)}</voice>`;
+    })
+    .join('');
+  return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">${body}</speak>`;
+}
 
 /**
  * AiService giờ đây hoạt động như một "Context" trong Strategy Pattern.
@@ -160,6 +227,35 @@ export class AiService {
     return this.aiEvaluator.generateToeicExamImage(input);
   }
 
+  async analyzeToeicPart1Candidates(input: {
+    candidates: Array<{
+      candidateId: string;
+      imageBuffer: Buffer;
+      mimeType: string;
+    }>;
+  }): Promise<ToeicPart1CandidateAnalysis[]> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.analyzeToeicPart1Candidates) {
+      throw new BadRequestException(
+        'Nhà cung cấp AI chưa hỗ trợ phân tích ảnh TOEIC',
+      );
+    }
+    return this.aiEvaluator.analyzeToeicPart1Candidates(input);
+  }
+
+  async generateToeicPart1FromImage(input: {
+    imageBuffer: Buffer;
+    mimeType: string;
+  }): Promise<ToeicPart1QuestionCandidate> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.generateToeicPart1FromImage) {
+      throw new BadRequestException(
+        'Nhà cung cấp AI chưa hỗ trợ sinh câu hỏi từ ảnh TOEIC',
+      );
+    }
+    return this.aiEvaluator.generateToeicPart1FromImage(input);
+  }
+
   async generateToeicSpeakingWritingDraft(input: {
     topic?: string;
     difficulty: 'easy' | 'medium' | 'hard';
@@ -222,46 +318,12 @@ export class AiService {
   /** Authoring-only TOEIC Listening TTS. The stored transcript remains the
    * source of truth; speaker labels are mapped deterministically to voices so
    * a Part 3 conversation is not flattened into one random voice. */
-  async generateToeicListeningAudio(
-    transcript: string,
-  ): Promise<Buffer | null> {
+  async generateToeicListeningAudio(transcript: string): Promise<Buffer> {
     const azureKey = process.env.AZURE_SPEECH_KEY;
     const azureRegion = process.env.AZURE_SPEECH_REGION;
-    if (!azureKey || !azureRegion) return null;
-    const escapeXml = (value: string) =>
-      value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-    const turns = transcript
-      .split(/\r?\n/)
-      .map((line) => {
-        const match = /^\s*([^:]{1,40}):\s*(.+)$/.exec(line);
-        return match
-          ? { speaker: match[1].trim(), text: match[2].trim() }
-          : { speaker: 'Narrator', text: line.trim() };
-      })
-      .filter((turn) => turn.text);
-    if (!turns.length) return null;
-    const voicePool = [
-      'en-US-JennyNeural',
-      'en-US-GuyNeural',
-      'en-US-AriaNeural',
-      'en-US-DavisNeural',
-    ];
-    const voiceBySpeaker = new Map<string, string>();
-    const body = turns
-      .map((turn) => {
-        if (!voiceBySpeaker.has(turn.speaker))
-          voiceBySpeaker.set(
-            turn.speaker,
-            voicePool[voiceBySpeaker.size % voicePool.length],
-          );
-        return `<voice name="${voiceBySpeaker.get(turn.speaker)}"><prosody rate="0%">${escapeXml(turn.text)}</prosody></voice><break time="250ms"/>`;
-      })
-      .join('');
+    if (!azureKey || !azureRegion) {
+      throw new Error('AZURE_SPEECH_KEY or AZURE_SPEECH_REGION is missing');
+    }
     try {
       const response = await fetch(
         `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,
@@ -273,14 +335,13 @@ export class AiService {
             'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
             'User-Agent': 'BreadTransToeicAuthoring',
           },
-          body: `<speak version="1.0" xml:lang="en-US">${body}</speak>`,
+          body: buildToeicListeningSsml(transcript),
         },
       );
-      if (!response.ok) return null;
-      return Buffer.from(await response.arrayBuffer());
+      return normalizeAzureSpeechResponse(response);
     } catch (error) {
       this.logger.error('Không thể tạo TOEIC Listening audio', error);
-      return null;
+      throw error instanceof Error ? error : new Error(String(error));
     }
   }
 

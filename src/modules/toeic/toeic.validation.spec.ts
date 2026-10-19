@@ -1,4 +1,9 @@
 import { validateToeicExam } from './toeic.validation';
+import {
+  toeicMediaHash,
+  withManualMedia,
+  withMediaFailure,
+} from './toeic-media';
 import { createHash } from 'crypto';
 
 function makeExam() {
@@ -78,6 +83,76 @@ test('rejects missing durable listening media without weakening count checks', (
   expect(result.learnerReady).toBe(false);
   expect(result.issues.some((issue) => issue.code === 'MISSING_AUDIO')).toBe(
     true,
+  );
+});
+
+test('keeps a complete 200-question Draft reviewable when Part 1 image is unavailable', () => {
+  const exam = makeExam();
+  const group = exam.groups.find((candidate) => candidate.part === 1);
+  group.imageUrl = null;
+  group.imageBrief = 'A manager reviewing a printed report in an office.';
+  group.mediaMetadata = withMediaFailure(
+    {},
+    'image',
+    new Error('429 quota exceeded'),
+    toeicMediaHash(group.imageBrief),
+  );
+
+  const result = validateToeicExam(exam);
+
+  expect(result.counts.total).toBe(200);
+  expect(result.learnerReady).toBe(false);
+  expect(result.issues).toContainEqual(
+    expect.objectContaining({ code: 'MISSING_IMAGE', groupId: group.id }),
+  );
+  expect(group.imageUrl).toBeNull();
+  expect(group.imageBrief).toContain('manager');
+  expect(group.mediaMetadata.image).toMatchObject({
+    source: 'AI_GENERATED',
+    status: 'FAILED',
+    errorCode: 'PROVIDER_UNAVAILABLE',
+  });
+});
+
+test('keeps Listening transcript when audio materialization fails', () => {
+  const exam = makeExam();
+  const group = exam.groups.find((candidate) => candidate.part === 3);
+  group.audioUrl = null;
+  group.transcriptText = 'Woman: The meeting starts at nine.';
+  group.mediaMetadata = withMediaFailure(
+    {},
+    'audio',
+    new Error('Azure provider timeout'),
+    toeicMediaHash(group.transcriptText),
+  );
+
+  const result = validateToeicExam(exam);
+
+  expect(result.issues).toContainEqual(
+    expect.objectContaining({ code: 'MISSING_AUDIO', groupId: group.id }),
+  );
+  expect(group.audioUrl).toBeNull();
+  expect(group.transcriptText).toBe('Woman: The meeting starts at nine.');
+  expect(group.mediaMetadata.audio).toMatchObject({
+    source: 'AI_GENERATED',
+    status: 'FAILED',
+    errorCode: 'PROVIDER_UNAVAILABLE',
+  });
+});
+
+test('marks a manual media replacement as ready with truthful provenance', () => {
+  const metadata = withManualMedia(
+    {},
+    'image',
+    toeicMediaHash('A team meeting in a bright office.'),
+  );
+
+  expect(metadata.image).toMatchObject({
+    source: 'ADMIN_UPLOADED',
+    status: 'READY',
+  });
+  expect(metadata.image.briefHash).toBe(
+    toeicMediaHash('A team meeting in a bright office.'),
   );
 });
 

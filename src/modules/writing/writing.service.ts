@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -43,6 +44,7 @@ export class WritingService {
     userId: number,
     role: import('@prisma/client').Role | undefined,
     expectedPart: 'PART2' | 'PART3' | 'ANY',
+    context?: { attemptId: number; componentId: number },
   ) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
@@ -63,6 +65,8 @@ export class WritingService {
       throw new BadRequestException('Bài viết không thuộc Writing Part 2/3');
     }
     await this.assertWritingAccess(quiz, userId, role);
+    if (role !== 'ADMIN')
+      await this.assertExamInternalWritingAccess(quizId, userId, context);
 
     const question = quiz.questions[0];
     const content = (question.content ?? {}) as Record<string, unknown>;
@@ -280,6 +284,48 @@ export class WritingService {
     }
   }
 
+  private async assertExamInternalWritingAccess(
+    quizId: number,
+    userId: number | undefined,
+    context?: { attemptId: number; componentId: number },
+  ) {
+    const links = await this.prisma.toeicWritingSetItem.findMany({
+      where: { writingQuizId: quizId },
+      select: {
+        writingSetId: true,
+        writingSet: {
+          select: {
+            assessmentComponents: {
+              select: { id: true, assessmentId: true },
+            },
+          },
+        },
+      },
+    });
+    const internalSetIds = links
+      .filter((link) => link.writingSet.assessmentComponents.length > 0)
+      .map((link) => link.writingSetId);
+    if (!internalSetIds.length) return;
+    if (!userId || !context) {
+      throw new NotFoundException('Writing task không tồn tại');
+    }
+    const authorized =
+      await this.prisma.toeicAssessmentAttemptComponent.findFirst({
+        where: {
+          assessmentAttemptId: context.attemptId,
+          assessmentComponentId: context.componentId,
+          status: 'IN_PROGRESS',
+          assessmentAttempt: { userId },
+          assessmentComponent: { writingSetId: { in: internalSetIds } },
+        },
+        select: { id: true },
+      });
+    if (!authorized)
+      throw new ForbiddenException(
+        'Cần mở Writing từ lượt làm bài TOEIC hợp lệ',
+      );
+  }
+
   private async resolveWritingAccess(
     quizzes: Array<{
       id: number;
@@ -396,6 +442,7 @@ export class WritingService {
     quizId: number,
     userId?: number,
     role?: import('@prisma/client').Role,
+    context?: { attemptId: number; componentId: number },
   ) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
@@ -420,6 +467,8 @@ export class WritingService {
     }
 
     await this.assertWritingAccess(quiz, userId, role);
+    if (role !== 'ADMIN')
+      await this.assertExamInternalWritingAccess(quizId, userId, context);
 
     const question = quiz.questions[0];
     const content = question.content as any;
@@ -507,6 +556,7 @@ export class WritingService {
     text: string,
     role?: import('@prisma/client').Role,
     clientAttemptId?: string,
+    context?: { attemptId: number; componentId: number },
   ) {
     const answer = text?.trim();
     if (!answer) throw new BadRequestException('Bài viết không được để trống');
@@ -534,6 +584,8 @@ export class WritingService {
       throw new NotFoundException('Quiz not found');
 
     await this.assertWritingAccess(quiz, userId, role);
+    if (role !== 'ADMIN')
+      await this.assertExamInternalWritingAccess(quizId, userId, context);
 
     const question = quiz.questions[0];
     const content = question.content as any;
@@ -658,6 +710,7 @@ export class WritingService {
     userResponse: string,
     role?: import('@prisma/client').Role,
     clientAttemptId?: string,
+    context?: { attemptId: number; componentId: number },
   ) {
     return this.submitCanonicalWritingAssessment(
       quizId,
@@ -666,6 +719,7 @@ export class WritingService {
       role,
       clientAttemptId,
       'PART2',
+      context,
     );
   }
 
@@ -675,6 +729,7 @@ export class WritingService {
     userEssay: string,
     role?: import('@prisma/client').Role,
     clientAttemptId?: string,
+    context?: { attemptId: number; componentId: number },
   ) {
     return this.submitCanonicalWritingAssessment(
       quizId,
@@ -683,6 +738,7 @@ export class WritingService {
       role,
       clientAttemptId,
       'PART3',
+      context,
     );
   }
 
@@ -693,6 +749,7 @@ export class WritingService {
     role: import('@prisma/client').Role | undefined,
     clientAttemptId: string | undefined,
     expectedPart: 'PART2' | 'PART3',
+    context?: { attemptId: number; componentId: number },
   ) {
     const answer = answerText?.trim();
     if (!answer) throw new BadRequestException('Bài viết không được để trống');
@@ -704,6 +761,7 @@ export class WritingService {
       userId,
       role,
       expectedPart,
+      context,
     );
     const logicalAttemptId = clientAttemptId ?? randomUUID();
     const existing = await this.getIdempotentSubmission(

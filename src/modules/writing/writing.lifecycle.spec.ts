@@ -22,6 +22,7 @@ describe('Writing Part 2/3 durable lifecycle', () => {
   const rewardCreateMany = jest.fn();
   const prisma = {
     quiz: { findUnique: jest.fn().mockResolvedValue(quiz) },
+    toeicWritingSetItem: { findMany: jest.fn().mockResolvedValue([]) },
     submission: { findUnique: submissionFindUnique, create: submissionCreate },
     userQuizReward: { createMany: rewardCreateMany },
     learningActivity: { create: activityCreate },

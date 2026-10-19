@@ -828,21 +828,38 @@ export class ToeicAssessmentService {
   }
 
   private projectAttempt(attempt: any) {
-    const components = attempt.components.map((component: any) => ({
-      id: component.id,
-      assessmentComponentId: component.assessmentComponentId,
-      kind: component.assessmentComponent.kind,
-      order: component.assessmentComponent.order,
-      status: component.status,
-      childAttemptId: component.toeicAttemptId ?? null,
-      linkedSpeakingSubmissionIds:
-        component.speakingSubmissions?.map(
-          (link: any) => link.speakingSubmissionId,
-        ) ?? [],
-      linkedWritingSubmissionIds:
-        component.writingSubmissions?.map((link: any) => link.submissionId) ??
-        [],
-    }));
+    const assessmentSources = attempt.assessment?.components ?? [];
+    const components = attempt.components.map((component: any) => {
+      const source = assessmentSources.find(
+        (candidate: any) => candidate.id === component.assessmentComponentId,
+      );
+      return {
+        id: component.id,
+        assessmentComponentId: component.assessmentComponentId,
+        kind: component.assessmentComponent.kind,
+        order: component.assessmentComponent.order,
+        status: component.status,
+        sourceId:
+          source?.lrExamSetId ??
+          source?.speakingPracticeSetId ??
+          source?.writingSetId ??
+          null,
+        speakingExerciseIds:
+          source?.speakingPracticeSet?.exercises?.map((item: any) => item.id) ??
+          [],
+        writingQuizIds:
+          source?.writingSet?.items?.map((item: any) => item.writingQuizId) ??
+          [],
+        childAttemptId: component.toeicAttemptId ?? null,
+        linkedSpeakingSubmissionIds:
+          component.speakingSubmissions?.map(
+            (link: any) => link.speakingSubmissionId,
+          ) ?? [],
+        linkedWritingSubmissionIds:
+          component.writingSubmissions?.map((link: any) => link.submissionId) ??
+          [],
+      };
+    });
     return {
       id: attempt.id,
       assessmentId: attempt.assessmentId,
@@ -919,28 +936,43 @@ export class ToeicAssessmentService {
       }),
       tx.speakingSubmission.findMany({
         where: {
-          id: { in: uniqueIds },
+          ...(uniqueIds.length > 0 ? { id: { in: uniqueIds } } : {}),
+          exercise: {
+            practiceSetId,
+            publicationStatus: QuizPublicationStatus.PUBLISHED,
+          },
           userId,
           status: 'COMPLETED',
           submittedAt: { gte: startedAt },
         },
+        orderBy: { submittedAt: 'desc' },
         select: { id: true, exerciseId: true },
       }),
     ]);
+    const latestByExercise = new Map<
+      number,
+      { id: number; exerciseId: number }
+    >();
+    for (const submission of submissions)
+      if (!latestByExercise.has(submission.exerciseId))
+        latestByExercise.set(submission.exerciseId, submission);
+    const selectedSubmissions = [...latestByExercise.values()];
     if (
       exercises.length === 0 ||
-      submissions.length !== uniqueIds.length ||
-      new Set(submissions.map((submission) => submission.exerciseId)).size !==
-        exercises.length ||
+      (uniqueIds.length > 0 &&
+        selectedSubmissions.length !== uniqueIds.length) ||
+      selectedSubmissions.length !== exercises.length ||
       !exercises.every((exercise) =>
-        submissions.some((submission) => submission.exerciseId === exercise.id),
+        selectedSubmissions.some(
+          (submission) => submission.exerciseId === exercise.id,
+        ),
       )
     )
       throw new BadRequestException(
         'Speaking component chưa có đủ submission hoàn tất',
       );
     await tx.toeicAssessmentSpeakingSubmission.createMany({
-      data: submissions.map((submission) => ({
+      data: selectedSubmissions.map((submission) => ({
         attemptComponentId,
         speakingSubmissionId: submission.id,
       })),
@@ -965,20 +997,39 @@ export class ToeicAssessmentService {
       where: { id: { in: uniqueIds }, userId, submittedAt: { gte: startedAt } },
       include: { results: true },
     });
-    const byQuiz = new Map(
-      submissions.map((submission) => [submission.quizId, submission]),
-    );
+    const candidateSubmissions = uniqueIds.length
+      ? submissions
+      : await tx.submission.findMany({
+          where: {
+            userId,
+            submittedAt: { gte: startedAt },
+            quizId: {
+              in: set?.items.map((item: any) => item.writingQuizId) ?? [],
+            },
+          },
+          orderBy: { submittedAt: 'desc' },
+          include: { results: true },
+        });
+    const byQuiz = new Map<number, any>();
+    for (const submission of candidateSubmissions)
+      if (
+        !byQuiz.has(submission.quizId) &&
+        (submission.score !== null ||
+          submission.results.some((result: any) => result.score !== null))
+      )
+        byQuiz.set(submission.quizId, submission);
+    const selectedSubmissions = set
+      ? set.items
+          .map((item: any) => byQuiz.get(item.writingQuizId))
+          .filter(Boolean)
+      : [];
     const valid = Boolean(
       set &&
       set.items.length === 8 &&
-      uniqueIds.length === 8 &&
+      (uniqueIds.length === 0 || uniqueIds.length === 8) &&
       set.items.every((item) => {
         const submission = byQuiz.get(item.writingQuizId);
-        return (
-          submission &&
-          (submission.score !== null ||
-            submission.results.some((result) => result.score !== null))
-        );
+        return Boolean(submission);
       }),
     );
     if (!valid)
@@ -986,7 +1037,7 @@ export class ToeicAssessmentService {
         'Writing component cần đủ 8 submission/result hoàn tất theo Set #2',
       );
     await tx.toeicAssessmentWritingSubmission.createMany({
-      data: submissions.map((submission) => ({
+      data: selectedSubmissions.map((submission) => ({
         attemptComponentId,
         submissionId: submission.id,
       })),

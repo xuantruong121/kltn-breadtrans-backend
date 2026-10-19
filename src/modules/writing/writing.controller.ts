@@ -7,6 +7,7 @@ import {
   UseGuards,
   Request,
   Body,
+  Query,
 } from '@nestjs/common';
 import { WritingService } from './writing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -78,11 +79,22 @@ export class WritingController {
   @Get('quizzes/:id')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Lấy chi tiết 1 bài tập Writing Part 1' })
-  getQuizDetails(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+  getQuizDetails(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @Query('parentAttemptId') parentAttemptId?: string,
+    @Query('parentComponentId') parentComponentId?: string,
+  ) {
     return this.writingService.getQuizDetails(
       id,
       req?.user?.id,
       req?.user?.role,
+      parentAttemptId && parentComponentId
+        ? {
+            attemptId: Number(parentAttemptId),
+            componentId: Number(parentComponentId),
+          }
+        : undefined,
     );
   }
 
@@ -117,6 +129,8 @@ export class WritingController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req: any,
     @Body() body: SubmitWritingDto,
+    @Query('parentAttemptId') parentAttemptId?: string,
+    @Query('parentComponentId') parentComponentId?: string,
   ) {
     return this.writingService.submitWriting(
       id,
@@ -124,6 +138,12 @@ export class WritingController {
       body.answer,
       req.user.role,
       body.clientAttemptId,
+      parentAttemptId && parentComponentId
+        ? {
+            attemptId: Number(parentAttemptId),
+            componentId: Number(parentComponentId),
+          }
+        : undefined,
     );
   }
 
@@ -148,13 +168,24 @@ export class WritingController {
       },
     },
   })
-  submitWritingPart2(@Request() req: any, @Body() body: SubmitWritingPart2Dto) {
+  submitWritingPart2(
+    @Request() req: any,
+    @Body() body: SubmitWritingPart2Dto,
+    @Query('parentAttemptId') parentAttemptId?: string,
+    @Query('parentComponentId') parentComponentId?: string,
+  ) {
     return this.writingService.submitWritingPart2(
       body.quizId,
       req.user.id,
       body.userResponse,
       req.user.role,
       body.clientAttemptId,
+      parentAttemptId && parentComponentId
+        ? {
+            attemptId: Number(parentAttemptId),
+            componentId: Number(parentComponentId),
+          }
+        : undefined,
     );
   }
 
@@ -176,13 +207,24 @@ export class WritingController {
       },
     },
   })
-  submitWritingPart3(@Request() req: any, @Body() body: SubmitWritingPart3Dto) {
+  submitWritingPart3(
+    @Request() req: any,
+    @Body() body: SubmitWritingPart3Dto,
+    @Query('parentAttemptId') parentAttemptId?: string,
+    @Query('parentComponentId') parentComponentId?: string,
+  ) {
     return this.writingService.submitWritingPart3(
       body.quizId,
       req.user.id,
       body.userEssay,
       req.user.role,
       body.clientAttemptId,
+      parentAttemptId && parentComponentId
+        ? {
+            attemptId: Number(parentAttemptId),
+            componentId: Number(parentComponentId),
+          }
+        : undefined,
     );
   }
 }

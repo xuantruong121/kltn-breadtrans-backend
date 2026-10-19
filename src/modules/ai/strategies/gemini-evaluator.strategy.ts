@@ -34,12 +34,56 @@ import {
   ToeicExamBatch,
   ToeicExamBatchRequest,
   ToeicSpeakingWritingDraft,
+  ToeicPart1CandidateAnalysis,
+  ToeicPart1QuestionCandidate,
 } from './ai-evaluator.interface';
 import {
   SPEAKING_SET_LEVELS,
   SPEAKING_EXERCISE_DIFFICULTIES,
   SPEAKING_TASK_TYPES,
 } from '../../speaking/speaking-contract';
+
+export function parseGeminiApiKeys(
+  primaryValue?: string,
+  fallbackValue?: string,
+): string[] {
+  const rawValue = primaryValue?.trim() ? primaryValue : fallbackValue || '';
+  return Array.from(
+    new Set(
+      rawValue
+        .split(/[,\r\n]+/)
+        .map((key) => key.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+export function extractGeminiImage(result: unknown): {
+  buffer: Buffer;
+  mimeType: string;
+} {
+  const candidates = Array.isArray((result as any)?.response?.candidates)
+    ? (result as any).response.candidates
+    : [];
+  const parts = candidates.flatMap((candidate: any) =>
+    Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [],
+  );
+  const inline = parts.find(
+    (part: any) =>
+      typeof part?.inlineData?.data === 'string' &&
+      part.inlineData.data.length > 0,
+  )?.inlineData;
+  const mimeType =
+    typeof inline?.mimeType === 'string' ? inline.mimeType.trim() : '';
+  if (!inline?.data || !mimeType.startsWith('image/')) {
+    throw new Error('Nhà cung cấp không trả về ảnh hợp lệ cho đề TOEIC');
+  }
+  const buffer = Buffer.from(inline.data, 'base64');
+  if (!buffer.length) {
+    throw new Error('Nhà cung cấp trả về payload ảnh rỗng cho đề TOEIC');
+  }
+  return { buffer, mimeType };
+}
 
 @Injectable()
 export class GeminiEvaluatorStrategy implements IAIEvaluator {
@@ -48,12 +92,10 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
   private currentKeyIndex = 0;
 
   constructor(@Optional() @InjectRedis() private readonly redis?: Redis) {
-    const keysStr =
-      process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
-    this.apiKeys = keysStr
-      .split(',')
-      .map((k) => k.trim())
-      .filter((k) => k.length > 0);
+    this.apiKeys = parseGeminiApiKeys(
+      process.env.GEMINI_API_KEYS,
+      process.env.GEMINI_API_KEY,
+    );
   }
 
   private hasKeys(): boolean {
@@ -62,6 +104,14 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
 
   private getModelName(): string {
     return process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite';
+  }
+
+  private getVisionModelName(): string {
+    return process.env.GEMINI_VISION_MODEL || this.getModelName();
+  }
+
+  private getImageModelName(): string {
+    return process.env.GEMINI_IMAGE_MODEL_NAME || 'gemini-3.1-flash-lite-image';
   }
 
   private getCacheKey(prefix: string, ...args: any[]): string {
@@ -196,12 +246,12 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
 
   private async executeWithRotation<T>(
     operation: (model: GenerativeModel) => Promise<T>,
+    modelName = this.getModelName(),
   ): Promise<T> {
     if (!this.hasKeys()) {
       throw new Error('Thiếu GEMINI_API_KEYS');
     }
 
-    const modelName = this.getModelName();
     let attempts = 0;
     const maxAttempts = Math.max(this.apiKeys.length * 3, 3);
     const retryDelays = [2000, 4000, 8000];
@@ -986,6 +1036,182 @@ RULES: Return exactly the specified groups and question counts. Every question h
     return parsed;
   }
 
+  async analyzeToeicPart1Candidates(input: {
+    candidates: Array<{
+      candidateId: string;
+      imageBuffer: Buffer;
+      mimeType: string;
+    }>;
+  }): Promise<ToeicPart1CandidateAnalysis[]> {
+    if (!this.hasKeys()) throw new Error('Thiếu cấu hình GEMINI_API_KEY');
+    const candidates = input.candidates.slice(0, 5);
+    if (!candidates.length) return [];
+    const schema: any = {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          candidateId: { type: SchemaType.STRING },
+          suitable: { type: SchemaType.BOOLEAN },
+          score: { type: SchemaType.NUMBER },
+          sceneSummary: { type: SchemaType.STRING },
+          visibleFacts: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING },
+          },
+          unsafeInferences: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING },
+          },
+          rejectionReasons: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING },
+          },
+        },
+        required: [
+          'candidateId',
+          'suitable',
+          'score',
+          'sceneSummary',
+          'visibleFacts',
+          'unsafeInferences',
+          'rejectionReasons',
+        ],
+      },
+    };
+    const prompt = `Evaluate these numbered images for original TOEIC Part 1 practice. Return one object for each candidate ID.
+Use only visible facts. Reject images that are blurry, abstract, text-heavy, branded, unsafe, ambiguous, or do not show a clear objectively describable action. Prefer workplace, travel, public, or everyday scenes. A suitable image must support one clearly correct statement and three plausible visual distractors. Never infer job titles, relationships, emotions, intentions, hidden events, or off-image objects. Scores are 0 to 1. IDs: ${candidates.map((candidate) => candidate.candidateId).join(', ')}.`;
+    const parts: any[] = [{ text: prompt }];
+    candidates.forEach((candidate) => {
+      parts.push({ text: `Candidate ID: ${candidate.candidateId}` });
+      parts.push({
+        inlineData: {
+          data: candidate.imageBuffer.toString('base64'),
+          mimeType: candidate.mimeType,
+        },
+      });
+    });
+    const result = await this.executeWithRotation(
+      (model) =>
+        model.generateContent({
+          contents: [{ role: 'user', parts }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: schema,
+            temperature: 0.1,
+          },
+        }),
+      this.getVisionModelName(),
+    );
+    await this.recordUsage(result.response?.usageMetadata);
+    const parsed = JSON.parse(
+      result.response.text().trim(),
+    ) as ToeicPart1CandidateAnalysis[];
+    if (!Array.isArray(parsed) || parsed.length !== candidates.length)
+      throw new Error('Gemini trả về sai số lượng phân tích ảnh');
+    return parsed.map((item) => ({
+      candidateId: String(item.candidateId),
+      status:
+        typeof item.suitable === 'boolean'
+          ? item.suitable
+            ? 'SUITABLE'
+            : 'UNSUITABLE'
+          : (() => {
+              throw new Error(
+                'Gemini thiếu trường suitable trong phân tích ảnh',
+              );
+            })(),
+      suitable: Boolean(item.suitable),
+      score: Math.max(0, Math.min(1, Number(item.score) || 0)),
+      sceneSummary: String(item.sceneSummary || '').slice(0, 500),
+      visibleFacts: Array.isArray(item.visibleFacts)
+        ? item.visibleFacts.map(String).slice(0, 8)
+        : [],
+      unsafeInferences: Array.isArray(item.unsafeInferences)
+        ? item.unsafeInferences.map(String).slice(0, 8)
+        : [],
+      rejectionReasons: Array.isArray(item.rejectionReasons)
+        ? item.rejectionReasons.map(String).slice(0, 8)
+        : [],
+    }));
+  }
+
+  async generateToeicPart1FromImage(input: {
+    imageBuffer: Buffer;
+    mimeType: string;
+  }): Promise<ToeicPart1QuestionCandidate> {
+    if (!this.hasKeys()) throw new Error('Thiếu cấu hình GEMINI_API_KEY');
+    const schema: any = {
+      type: SchemaType.OBJECT,
+      properties: {
+        sceneSummary: { type: SchemaType.STRING },
+        statements: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+        },
+        correctIndex: { type: SchemaType.INTEGER },
+        explanation: { type: SchemaType.STRING },
+      },
+      required: ['sceneSummary', 'statements', 'correctIndex', 'explanation'],
+    };
+    const prompt = `Create one original TOEIC Part 1 practice item from this image. Return exactly four grammatically valid English statements and exactly one clearly correct statement. The other three must be plausible but visibly false. Use only visible facts: no hidden intentions, assumed job titles or relationships, emotions, off-image objects, future actions, brands, or text that cannot be read clearly. Keep the explanation concise and explain only visible evidence. Do not mention Pixabay, Gemini, or image metadata.`;
+    const result = await this.executeWithRotation(
+      (model) =>
+        model.generateContent({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    data: input.imageBuffer.toString('base64'),
+                    mimeType: input.mimeType,
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: schema,
+            temperature: 0.25,
+          },
+        }),
+      this.getVisionModelName(),
+    );
+    await this.recordUsage(result.response?.usageMetadata);
+    const parsed = JSON.parse(
+      result.response.text().trim(),
+    ) as ToeicPart1QuestionCandidate;
+    if (
+      !Array.isArray(parsed.statements) ||
+      parsed.statements.length !== 4 ||
+      !Number.isInteger(parsed.correctIndex) ||
+      parsed.correctIndex < 0 ||
+      parsed.correctIndex > 3
+    ) {
+      throw new Error(
+        'Gemini trả về câu Part 1 không đúng hợp đồng bốn đáp án',
+      );
+    }
+    const statements = parsed.statements.map((statement) =>
+      String(statement).trim(),
+    );
+    if (
+      statements.some((statement) => !statement || statement.length > 300) ||
+      !String(parsed.explanation || '').trim()
+    ) {
+      throw new Error('Gemini trả về câu Part 1 thiếu nội dung');
+    }
+    return {
+      sceneSummary: String(parsed.sceneSummary || '').slice(0, 500),
+      statements,
+      correctIndex: parsed.correctIndex,
+      explanation: String(parsed.explanation).trim().slice(0, 500),
+    };
+  }
+
   async generateToeicSpeakingWritingDraft(input: {
     topic?: string;
     difficulty: 'easy' | 'medium' | 'hard';
@@ -1080,23 +1306,15 @@ Use learner-visible English only.`;
   }): Promise<{ buffer: Buffer; mimeType: string }> {
     if (!this.hasKeys()) throw new Error('Thiếu cấu hình GEMINI_API_KEY');
     const prompt = `Create one original, realistic, text-free photograph-style image for BreadTrans TOEIC Part ${input.part} practice. Scene brief: ${input.brief}. Do not include words, labels, letters, answer choices, logos, watermarks, or copyrighted characters.`;
-    const result: any = await this.executeWithRotation((model) =>
-      (model as any).generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ['IMAGE'] },
-      }),
+    const result: any = await this.executeWithRotation(
+      (model) =>
+        (model as any).generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ['IMAGE'] },
+        }),
+      this.getImageModelName(),
     );
-    const parts = result?.response?.candidates?.[0]?.content?.parts ?? [];
-    const inline = parts.find(
-      (part: any) => part?.inlineData?.data,
-    )?.inlineData;
-    if (!inline?.data || !inline?.mimeType?.startsWith('image/')) {
-      throw new Error('Nhà cung cấp không trả về ảnh hợp lệ cho đề TOEIC');
-    }
-    return {
-      buffer: Buffer.from(inline.data, 'base64'),
-      mimeType: inline.mimeType,
-    };
+    return extractGeminiImage(result);
   }
 
   async generateDictation(topic: string, count: number): Promise<any[]> {

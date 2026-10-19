@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   Req,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -131,6 +132,47 @@ export class AdminExamController {
     if (!['image', 'audio'].includes(kind))
       throw new BadRequestException('Loại media không hợp lệ');
     return this.toeicAiExamService.regenerateMedia(id, groupId, kind);
+  }
+
+  @Get(':id/ai/groups/:groupId/image-search')
+  searchPart1Images(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('groupId', ParseIntPipe) groupId: number,
+    @Query('query') query = '',
+    @Query('limit') limit?: string,
+  ) {
+    return this.toeicAiExamService.searchPart1Images(
+      id,
+      groupId,
+      query,
+      Number(limit) || 5,
+    );
+  }
+
+  @Post(':id/ai/groups/:groupId/image-search/select')
+  selectPart1Image(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('groupId', ParseIntPipe) groupId: number,
+    @Body() body: { candidateId?: string },
+  ) {
+    if (!body?.candidateId)
+      throw new BadRequestException('Cần chọn một ứng viên ảnh');
+    return this.toeicAiExamService.selectPart1Image(
+      id,
+      groupId,
+      body.candidateId,
+    );
+  }
+
+  @Post(':id/ai/groups/:groupId/image-vision')
+  generatePart1QuestionFromStoredImage(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('groupId', ParseIntPipe) groupId: number,
+  ) {
+    return this.toeicAiExamService.generatePart1QuestionFromStoredImage(
+      id,
+      groupId,
+    );
   }
 
   @Get(':id/speaking/stimuli')

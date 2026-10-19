@@ -530,6 +530,7 @@ export class ToeicService {
       return { ...current, exam: { ...current.exam, groups: [] } };
     return {
       ...current,
+      markedQuestionIds: this.safeMarkedQuestionIds(current.markedQuestionIds),
       exam: {
         ...current.exam,
         groups: current.exam.groups.map((group) => ({
@@ -560,6 +561,12 @@ export class ToeicService {
         })),
       },
     };
+  }
+
+  private safeMarkedQuestionIds(value: unknown): number[] {
+    return Array.isArray(value)
+      ? value.filter((id): id is number => Number.isInteger(id) && id > 0)
+      : [];
   }
 
   private async validateAndSaveAnswers(
@@ -610,8 +617,29 @@ export class ToeicService {
   async saveAnswers(
     attemptId: number,
     userId: number,
-    answers: Record<string, number>,
+    payload:
+      | Record<string, number>
+      | {
+          answers: Record<string, number>;
+          markedQuestionIds?: number[];
+          currentQuestionId?: number;
+        },
   ) {
+    const request: {
+      answers: Record<string, number>;
+      markedQuestionIds?: number[];
+      currentQuestionId?: number;
+    } =
+      typeof payload === 'object' &&
+      payload !== null &&
+      'answers' in payload &&
+      typeof (payload as { answers?: unknown }).answers === 'object'
+        ? (payload as {
+            answers: Record<string, number>;
+            markedQuestionIds?: number[];
+            currentQuestionId?: number;
+          })
+        : { answers: payload as Record<string, number> };
     const result = await this.prisma.$transaction(async (tx) => {
       const initial = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
@@ -643,7 +671,38 @@ export class ToeicService {
             : null,
         };
       }
-      await this.validateAndSaveAnswers(tx, attempt, userId, answers);
+      await this.validateAndSaveAnswers(tx, attempt, userId, request.answers);
+      const markedQuestionIds = request.markedQuestionIds ?? [];
+      if (markedQuestionIds.some((id) => !Number.isInteger(id) || id <= 0))
+        throw new BadRequestException('Danh sách câu đánh dấu không hợp lệ');
+      const markedQuestions = await tx.toeicQuestion.count({
+        where: {
+          id: { in: markedQuestionIds },
+          group: { examId: attempt.examId },
+        },
+      });
+      if (markedQuestions !== new Set(markedQuestionIds).size)
+        throw new BadRequestException('Câu đánh dấu không thuộc đề thi này');
+      if (
+        request.currentQuestionId !== undefined &&
+        (request.currentQuestionId <= 0 ||
+          (await tx.toeicQuestion.count({
+            where: {
+              id: request.currentQuestionId,
+              group: { examId: attempt.examId },
+            },
+          })) !== 1)
+      )
+        throw new BadRequestException('Câu hiện tại không thuộc đề thi này');
+      await tx.toeicAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          markedQuestionIds: [...new Set(markedQuestionIds)],
+          ...(request.currentQuestionId !== undefined
+            ? { currentQuestionId: request.currentQuestionId }
+            : {}),
+        },
+      });
       return { success: true, expired: false, finalizedAttempt: null };
     });
 
@@ -814,7 +873,10 @@ export class ToeicService {
 
   async getHistory(userId: number) {
     const attempts = await this.prisma.toeicAttempt.findMany({
-      where: { userId },
+      // Child attempts that belong to a unified assessment are represented by
+      // the parent history entry. Keep this endpoint for standalone L&R work
+      // so the learner does not see the same attempt twice.
+      where: { userId, assessmentComponent: null },
       include: { exam: { select: { id: true, title: true, type: true } } },
       orderBy: { createdAt: 'desc' },
     });
