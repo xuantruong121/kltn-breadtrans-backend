@@ -18,7 +18,6 @@ import {
 import { createHash, randomUUID } from 'crypto';
 import { Job, Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
-import { parseBuffer } from 'music-metadata';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { R2Service } from '../upload/r2.service';
@@ -639,6 +638,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const audio = await this.ai.generateToeicListeningAudio(transcript);
     if (!audio?.length)
       throw new BadRequestException('Không thể tạo audio TTS cho transcript');
+    // music-metadata is ESM-only. Keep it out of module bootstrap so the
+    // CommonJS Jest E2E harness can load AppModule without parsing audio.
+    const { parseBuffer } = await import('music-metadata');
     const metadata = await parseBuffer(audio, { mimeType: 'audio/mpeg' });
     if (!metadata.format.duration || metadata.format.duration <= 0)
       throw new BadRequestException('Audio TTS không có thời lượng hợp lệ');
