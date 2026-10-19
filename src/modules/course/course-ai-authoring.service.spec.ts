@@ -75,9 +75,9 @@ describe('CourseAiAuthoringService', () => {
   });
 
   it('rejects wrong candidate context, published Course, and non-Admin Apply', async () => {
-    await expect(service.applyCurriculum(72, candidate as any, admin)).rejects.toThrow(
-      'Candidate không thuộc',
-    );
+    await expect(
+      service.applyCurriculum(72, candidate as any, admin),
+    ).rejects.toThrow('Candidate không thuộc');
     prisma.course.findUnique.mockResolvedValueOnce({
       id: 71,
       status: CourseStatus.PUBLISHED,
@@ -86,7 +86,10 @@ describe('CourseAiAuthoringService', () => {
       service.applyCurriculum(71, candidate as any, admin),
     ).rejects.toBeInstanceOf(ConflictException);
     await expect(
-      service.applyCurriculum(71, candidate as any, { id: 2, role: Role.STUDENT }),
+      service.applyCurriculum(71, candidate as any, {
+        id: 2,
+        role: Role.STUDENT,
+      }),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -119,5 +122,59 @@ describe('CourseAiAuthoringService', () => {
         admin,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('keeps the Draft untouched when the provider returns malformed output or times out', async () => {
+    ai.suggestCourseCurriculum.mockRejectedValueOnce(
+      new Error('AI không thể tạo curriculum hợp lệ'),
+    );
+    await expect(service.generateCurriculum(71, {}, admin)).rejects.toThrow(
+      'AI không thể tạo curriculum hợp lệ',
+    );
+    ai.suggestCourseCurriculum.mockRejectedValueOnce(
+      new Error('Gemini timeout'),
+    );
+    await expect(service.generateCurriculum(71, {}, admin)).rejects.toThrow(
+      'Gemini timeout',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.courseLesson.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps lesson generation candidate-only and rejects a candidate for another lesson', async () => {
+    prisma.courseLesson.findFirst.mockResolvedValue({
+      id: 9,
+      title: 'Greetings',
+      summary: 'Basic greetings.',
+      learningObjectives: ['Greet someone'],
+      sections: [],
+    });
+    ai.suggestCourseLessonContent.mockResolvedValue({
+      sections: [{ type: 'THEORY', heading: 'Rule', content: 'Use hello.' }],
+      exercise: {
+        type: 'MULTIPLE_CHOICE',
+        title: 'Check',
+        prompt: 'Choose.',
+        question: {
+          prompt: 'Hello is a __.',
+          options: ['greeting', 'number'],
+          correctAnswer: 'greeting',
+          explanation: 'Hello is a greeting.',
+        },
+      },
+    });
+    const result = await service.generateLessonContent(71, 9, {}, admin);
+    expect(result).toMatchObject({
+      mode: 'CANDIDATE_ONLY',
+      candidate: { candidateCourseId: 71, candidateLessonId: 9 },
+    });
+    await expect(
+      service.applyLessonContent(
+        71,
+        10,
+        { ...(result as any).candidate },
+        admin,
+      ),
+    ).rejects.toThrow('Candidate không thuộc');
   });
 });

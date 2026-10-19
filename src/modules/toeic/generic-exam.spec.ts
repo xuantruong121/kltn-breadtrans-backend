@@ -34,4 +34,61 @@ describe('GenericExamService Writing readiness', () => {
 
     expect(service.writingReady(source)).toBe(true);
   });
+
+  it('projects 19 total questions and 80 min duration for TOEIC_SW variant', () => {
+    const exam: any = {
+      id: 22,
+      title: 'TOEIC 2 Skills: Speaking & Writing',
+      variantCode: 'TOEIC_SW',
+      familyCode: 'TOEIC',
+      templateKey: 'TOEIC_SW_V1',
+      publicationStatus: QuizPublicationStatus.PUBLISHED,
+      toeicAssessment: {
+        components: [
+          {
+            kind: 'SPEAKING',
+            speakingPracticeSet: {
+              scope: 'EXAM_INTERNAL',
+              publicationStatus: QuizPublicationStatus.PUBLISHED,
+              exercises: Array.from({ length: 11 }, (_, i) => ({
+                order: i + 1,
+                publicationStatus: QuizPublicationStatus.PUBLISHED,
+                taskType: [
+                  'READ_ALOUD',
+                  'READ_ALOUD',
+                  'DESCRIBE_PICTURE',
+                  'DESCRIBE_PICTURE',
+                  'RESPOND_QUESTIONS',
+                  'RESPOND_QUESTIONS',
+                  'RESPOND_QUESTIONS',
+                  'RESPOND_WITH_INFO',
+                  'RESPOND_WITH_INFO',
+                  'RESPOND_WITH_INFO',
+                  'EXPRESS_OPINION',
+                ][i],
+              })),
+            },
+          },
+          {
+            kind: 'WRITING',
+            writingSet: {
+              publicationStatus: QuizPublicationStatus.PUBLISHED,
+              items: Array.from({ length: 8 }, (_, i) => ({
+                writingQuiz: {
+                  publicationStatus: QuizPublicationStatus.PUBLISHED,
+                  questions: [
+                    { content: { imageUrl: i < 5 ? 'https://img.png' : null } },
+                  ],
+                },
+              })),
+            },
+          },
+        ],
+      },
+    };
+
+    const projected = service.project(exam);
+    expect(projected.totalQuestions).toBe(19);
+    expect(projected.durationSeconds).toBe(4800);
+  });
 });

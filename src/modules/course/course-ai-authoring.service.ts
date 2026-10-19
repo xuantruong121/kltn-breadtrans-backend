@@ -5,12 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  CourseLessonExerciseType,
-  CourseStatus,
-  Prisma,
-  Role,
-} from '@prisma/client';
+import { CourseStatus, Role } from '@prisma/client';
 import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -112,7 +107,7 @@ export class CourseAiAuthoringService {
             summary: lesson.summary.trim(),
             learningObjectives: lesson.objectives
               .map((value) => value.trim())
-              .filter(Boolean) as Prisma.InputJsonValue,
+              .filter(Boolean),
             difficulty: undefined,
             order: index,
           },
@@ -123,7 +118,7 @@ export class CourseAiAuthoringService {
             order: sectionIndex,
             type: section.type,
             heading: section.heading.trim(),
-            content: { text: section.content.trim() } as Prisma.InputJsonValue,
+            content: { text: section.content.trim() },
             isRequired: true,
           })),
         });
@@ -210,7 +205,7 @@ export class CourseAiAuthoringService {
             order: lesson.sections.length + index,
             type: section.type,
             heading: section.heading.trim(),
-            content: { text: section.content.trim() } as Prisma.InputJsonValue,
+            content: { text: section.content.trim() },
             isRequired: true,
           })),
         });
@@ -221,7 +216,7 @@ export class CourseAiAuthoringService {
           lessonId,
           slug: `ai-practice-${Date.now()}`,
           order: lesson.exercises.length,
-          type: exercise.type as CourseLessonExerciseType,
+          type: exercise.type,
           title: exercise.title.trim(),
           prompt: exercise.prompt.trim(),
           instructions: exercise.instructions?.trim(),
@@ -231,10 +226,8 @@ export class CourseAiAuthoringService {
             create: {
               order: 0,
               prompt: exercise.question.prompt.trim(),
-              options: exercise.question.options as
-                Prisma.InputJsonValue | undefined,
-              correctAnswer:
-                exercise.question.correctAnswer.trim() as Prisma.InputJsonValue,
+              options: exercise.question.options,
+              correctAnswer: exercise.question.correctAnswer.trim(),
               explanation: exercise.question.explanation.trim(),
             },
           },

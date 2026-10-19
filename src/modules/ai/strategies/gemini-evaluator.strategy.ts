@@ -2529,7 +2529,7 @@ Rules: create a coherent progression by level and topic; avoid duplicate existin
       }),
     );
     await this.recordUsage(result.response?.usageMetadata);
-    const parsed = JSON.parse(result.response.text().trim()) as any;
+    const parsed = JSON.parse(result.response.text().trim());
     const sections = Array.isArray(parsed?.sections)
       ? parsed.sections
           .filter(
