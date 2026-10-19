@@ -51,6 +51,14 @@ export class AdminController {
     return this.adminService.getAllUsers(role);
   }
 
+  @Get('users/:id/learning-tracking')
+  @ApiOperation({
+    summary: 'Admin xem tổng quan học tập của một học viên',
+  })
+  getLearnerLearningTracking(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.getLearnerLearningTracking(id);
+  }
+
   @Post('users')
   @ApiOperation({
     summary: 'Admin tạo tài khoản mới (Học viên hoặc Quản trị viên)',

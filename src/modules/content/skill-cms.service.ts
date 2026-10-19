@@ -21,11 +21,17 @@ import {
   ListeningQuestionDto,
   SkillQuestionDto,
   SpeakingExerciseDto,
+  SpeakingExerciseReorderDto,
   WritingQuestionDto,
 } from './skill-cms.dto';
+import { SpeakingStimulusDto } from './speaking-stimulus.dto';
 import { QuizService } from '../quiz/quiz.service';
 import { ListeningAudioAuthoringService } from '../quiz/listening-audio-authoring.service';
 import { normalizeDialogueSegments } from '../quiz/listening-dialogue.contract';
+import { SPEAKING_SET_LEVELS } from '../speaking/speaking-contract';
+import { SpeakingCategoryService } from './speaking-category.service';
+import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
+import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
 
 type Domain = 'listening' | 'reading' | 'writing' | 'speaking';
 type Admin = { id: number; role: Role };
@@ -35,6 +41,12 @@ const QUIZ_DOMAINS: Record<Exclude<Domain, 'speaking'>, QuizType> = {
   reading: QuizType.BILINGUAL_READING,
   writing: QuizType.WRITING_EMAIL,
 };
+
+const PICTURE_WRITING_TASK_TYPES = new Set([
+  'SENTENCE',
+  'PICTURE_SENTENCE',
+  'DESCRIBE_PICTURE',
+]);
 
 function asJson(value: unknown): Prisma.InputJsonValue {
   return value ?? {};
@@ -54,6 +66,8 @@ export class SkillCmsService {
     private readonly listeningAudioAuthoring?: ListeningAudioAuthoringService,
     @Optional()
     private readonly quizService?: QuizService,
+    @Optional()
+    private readonly speakingCategoryService?: SpeakingCategoryService,
   ) {}
 
   private admin(user: Admin) {
@@ -71,6 +85,24 @@ export class SkillCmsService {
     if (domain === 'speaking')
       throw new BadRequestException('Speaking uses practice sets');
     return QUIZ_DOMAINS[domain];
+  }
+
+  private assertSpeakingSetContract(dto: SkillContentDto) {
+    if (
+      dto.level &&
+      !SPEAKING_SET_LEVELS.some((level) => level === dto.level)
+    ) {
+      throw new BadRequestException(
+        `SpeakingPracticeSet.level phải là một trong: ${SPEAKING_SET_LEVELS.join(', ')}`,
+      );
+    }
+  }
+
+  private async speakingCategory(
+    code: string,
+    scope: 'practiceSet' | 'exercise',
+  ) {
+    return this.speakingCategoryService?.getByCode(code, scope);
   }
 
   private contentTypeWhere(domain: Exclude<Domain, 'speaking'>) {
@@ -116,12 +148,18 @@ export class SkillCmsService {
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
       return this.prisma.speakingPracticeSet.findMany({
+        where: { scope: 'SKILL_PRACTICE' },
         orderBy: { updatedAt: 'desc' },
         include: {
           exercises: {
-            orderBy: { id: 'asc' },
-            include: { _count: { select: { submissions: true } } },
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+            include: {
+              categoryTaxonomy: true,
+              stimulus: true,
+              _count: { select: { submissions: true } },
+            },
           },
+          categoryTaxonomy: true,
         },
       });
     }
@@ -132,15 +170,28 @@ export class SkillCmsService {
     });
   }
 
-  async get(rawDomain: string, rawId: string, user: Admin) {
+  async get(
+    rawDomain: string,
+    rawId: string,
+    user: Admin,
+    allowExamInternal = false,
+  ) {
     this.admin(user);
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
       const set = await this.prisma.speakingPracticeSet.findUnique({
         where: { id: rawId },
-        include: { exercises: { orderBy: { id: 'asc' } } },
+        include: {
+          categoryTaxonomy: true,
+          exercises: {
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+            include: { categoryTaxonomy: true, stimulus: true },
+          },
+        },
       });
       if (!set) throw new NotFoundException('Speaking practice set not found');
+      if (set.scope === 'EXAM_INTERNAL' && !allowExamInternal)
+        throw new NotFoundException('Speaking practice set not found');
       return set;
     }
     const id = this.id(rawId);
@@ -165,17 +216,26 @@ export class SkillCmsService {
     this.admin(user);
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
+      this.assertSpeakingSetContract(dto);
+      const categoryCode =
+        dto.category?.trim() ||
+        (this.speakingCategoryService
+          ? (await this.speakingCategoryService.getDefault('practiceSet')).code
+          : 'GENERAL');
+      const category = await this.speakingCategory(categoryCode, 'practiceSet');
       const title = dto.title.trim();
       const id = `speaking-${randomUUID()}`;
+      const data: any = {
+        id,
+        title,
+        description: dto.description?.trim() ?? '',
+        category: category?.code || categoryCode,
+        level: dto.level?.trim() || 'A1-B1',
+        publicationStatus: QuizPublicationStatus.DRAFT,
+      };
+      if (category) data.categoryId = category.id;
       return this.prisma.speakingPracticeSet.create({
-        data: {
-          id,
-          title,
-          description: dto.description?.trim() ?? '',
-          category: dto.category?.trim() || 'GENERAL',
-          level: dto.level?.trim() || 'BEGINNER',
-          publicationStatus: QuizPublicationStatus.DRAFT,
-        },
+        data,
       });
     }
     const type = this.quizType(domain);
@@ -214,19 +274,25 @@ export class SkillCmsService {
     this.admin(user);
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
+      this.assertSpeakingSetContract(dto);
       const set = await this.prisma.speakingPracticeSet.findUnique({
         where: { id: rawId },
       });
       if (!set) throw new NotFoundException('Speaking practice set not found');
       await this.assertNoSpeakingHistory(rawId);
+      const category = dto.category
+        ? await this.speakingCategory(dto.category.trim(), 'practiceSet')
+        : undefined;
+      const data: any = {
+        title: dto.title?.trim(),
+        description: dto.description?.trim(),
+        category: category?.code || dto.category?.trim(),
+        level: dto.level?.trim(),
+      };
+      if (category) data.categoryId = category.id;
       return this.prisma.speakingPracticeSet.update({
         where: { id: rawId },
-        data: {
-          title: dto.title?.trim(),
-          description: dto.description?.trim(),
-          category: dto.category?.trim(),
-          level: dto.level?.trim(),
-        },
+        data,
       });
     }
     const id = this.id(rawId);
@@ -303,6 +369,7 @@ export class SkillCmsService {
       },
     });
     if (!quiz) throw new NotFoundException('Writing content not found');
+    this.assertWritingTaskType(quiz.type, dto.taskType);
     await this.assertNoHistory(quizId);
     const last = await this.prisma.question.findFirst({
       where: { quizId },
@@ -394,11 +461,13 @@ export class SkillCmsService {
           type: { in: [QuizType.WRITING_EMAIL, QuizType.WRITING_PICTURE] },
         },
       },
+      include: { quiz: { select: { type: true } } },
     });
     if (!question)
       throw new NotFoundException(
         'Question does not belong to Writing content',
       );
+    this.assertWritingTaskType(question.quiz?.type, dto.taskType);
     await this.assertNoHistory(quizId);
     return this.prisma.question.update({
       where: { id: questionId },
@@ -423,19 +492,76 @@ export class SkillCmsService {
       where: { id: rawSetId },
     });
     if (!set) throw new NotFoundException('Speaking practice set not found');
-    return this.prisma.speakingExercise.create({
-      data: {
-        title: dto.title.trim(),
-        targetText: dto.targetText.trim(),
-        category: dto.category?.trim() || set.category,
-        difficulty: dto.difficulty || set.level,
-        imageUrl: dto.imageUrl,
-        audioUrl: dto.audioUrl,
-        isPremiumContent: dto.isPremiumContent ?? false,
-        practiceSetId: rawSetId,
-        publicationStatus: QuizPublicationStatus.DRAFT,
-      },
+    if (!dto.taskType) {
+      throw new BadRequestException('Câu Speaking mới phải có loại bài');
+    }
+    const stimulus = dto.stimulusId
+      ? await this.prisma.speakingStimulus.findUnique({
+          where: { id: dto.stimulusId },
+        })
+      : null;
+    if (dto.stimulusId && !stimulus) {
+      throw new NotFoundException('Không tìm thấy Speaking stimulus');
+    }
+    const semanticErrors = taskTypeValidationErrors({
+      taskType: dto.taskType as any,
+      targetText: dto.targetText,
+      imageUrl: dto.imageUrl,
+      stimulusId: dto.stimulusId,
+      stimulus,
     });
+    if (semanticErrors.length) throw new BadRequestException(semanticErrors);
+    const category = dto.category
+      ? await this.speakingCategory(dto.category.trim(), 'exercise')
+      : undefined;
+    const data: any = {
+      title: dto.title.trim(),
+      targetText: dto.targetText.trim(),
+      category: category?.code || set.category,
+      difficulty: dto.difficulty || set.level,
+      imageUrl: dto.imageUrl,
+      audioUrl: dto.audioUrl,
+      isPremiumContent: dto.isPremiumContent ?? false,
+      taskType: dto.taskType,
+      stimulusId: dto.stimulusId,
+      order: null,
+      practiceSetId: rawSetId,
+      publicationStatus: QuizPublicationStatus.DRAFT,
+    };
+    if (this.speakingCategoryService) data.categoryId = category?.id ?? null;
+    return this.prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.speakingExercise.findMany({
+          where: { practiceSetId: rawSetId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          select: { id: true, order: true },
+        });
+        const requestedOrder = dto.order ?? existing.length + 1;
+        if (requestedOrder > existing.length + 1) {
+          throw new BadRequestException(
+            `Vị trí câu phải nằm trong khoảng 1-${existing.length + 1}`,
+          );
+        }
+
+        const created = await tx.speakingExercise.create({
+          data: { ...data, order: null },
+        });
+        const orderedIds = existing.map((item) => item.id);
+        orderedIds.splice(requestedOrder - 1, 0, created.id);
+        await tx.speakingExercise.updateMany({
+          where: { practiceSetId: rawSetId },
+          data: { order: null },
+        });
+        for (const [index, id] of orderedIds.entries()) {
+          await tx.speakingExercise.update({
+            where: { id },
+            data: { order: index + 1 },
+          });
+        }
+        return created;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async updateSpeakingExercise(
@@ -451,19 +577,124 @@ export class SkillCmsService {
     const exerciseId = this.id(rawExerciseId);
     const exercise = await this.prisma.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
+      include: {
+        categoryTaxonomy: true,
+        practiceSet: { select: { category: true, categoryId: true } },
+        stimulus: true,
+      },
     });
     if (!exercise) throw new NotFoundException('Speaking exercise not found');
+    if (dto.order !== undefined) {
+      throw new BadRequestException(
+        'Dùng API reorder để thay đổi thứ tự câu trong bộ luyện',
+      );
+    }
     await this.assertNoSpeakingHistory(rawSetId);
+    const taskType = dto.taskType ?? exercise.taskType;
+    const stimulus = dto.stimulusId
+      ? await this.prisma.speakingStimulus.findUnique({
+          where: { id: dto.stimulusId },
+        })
+      : dto.stimulusId === null
+        ? null
+        : exercise.stimulus;
+    if (dto.stimulusId && !stimulus) {
+      throw new NotFoundException('Không tìm thấy Speaking stimulus');
+    }
+    const semanticErrors = taskType
+      ? taskTypeValidationErrors({
+          taskType: taskType as any,
+          targetText: dto.targetText ?? exercise.targetText,
+          imageUrl: dto.imageUrl ?? exercise.imageUrl,
+          stimulusId: dto.stimulusId ?? exercise.stimulusId,
+          stimulus,
+        })
+      : [];
+    if (semanticErrors.length) throw new BadRequestException(semanticErrors);
+    const hasCategoryInput = dto.category !== undefined;
+    const category =
+      hasCategoryInput && dto.category
+        ? await this.speakingCategory(dto.category.trim(), 'exercise')
+        : undefined;
+    const data: any = {
+      title: dto.title?.trim(),
+      targetText: dto.targetText?.trim(),
+      category:
+        category?.code || exercise.practiceSet?.category || exercise.category,
+      difficulty: dto.difficulty,
+      imageUrl: dto.imageUrl,
+      audioUrl: dto.audioUrl,
+      isPremiumContent: dto.isPremiumContent,
+      taskType,
+      stimulusId: dto.stimulusId === null ? null : stimulus?.id,
+    };
+    if (hasCategoryInput && this.speakingCategoryService) {
+      data.categoryId = category?.id ?? null;
+    }
     return this.prisma.speakingExercise.update({
       where: { id: exerciseId },
+      data,
+    });
+  }
+
+  async listSpeakingStimuli(user: Admin) {
+    this.admin(user);
+    return this.prisma.speakingStimulus.findMany({
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      include: { _count: { select: { exercises: true } } },
+    });
+  }
+
+  async createSpeakingStimulus(dto: SpeakingStimulusDto, user: Admin) {
+    this.admin(user);
+    if (!dto.kind) {
+      throw new BadRequestException('Stimulus cần có kind hợp lệ');
+    }
+    if (dto.kind === 'INFORMATION' && !dto.content?.trim()) {
+      throw new BadRequestException('INFORMATION stimulus cần nội dung');
+    }
+    if (dto.kind === 'IMAGE' && !dto.imageUrl?.trim()) {
+      throw new BadRequestException('IMAGE stimulus cần imageUrl');
+    }
+    return this.prisma.speakingStimulus.create({
       data: {
-        title: dto.title?.trim(),
-        targetText: dto.targetText?.trim(),
-        category: dto.category?.trim(),
-        difficulty: dto.difficulty,
-        imageUrl: dto.imageUrl,
-        audioUrl: dto.audioUrl,
-        isPremiumContent: dto.isPremiumContent,
+        kind: dto.kind,
+        title: dto.title?.trim() || null,
+        content: dto.content?.trim() || null,
+        imageUrl: dto.imageUrl?.trim() || null,
+      },
+    });
+  }
+
+  async updateSpeakingStimulus(
+    rawId: string,
+    dto: SpeakingStimulusDto,
+    user: Admin,
+  ) {
+    this.admin(user);
+    const id = this.id(rawId);
+    const existing = await this.prisma.speakingStimulus.findUnique({
+      where: { id },
+    });
+    if (!existing)
+      throw new NotFoundException('Không tìm thấy Speaking stimulus');
+    const kind = dto.kind ?? existing.kind;
+    const content = dto.content === undefined ? existing.content : dto.content;
+    const imageUrl =
+      dto.imageUrl === undefined ? existing.imageUrl : dto.imageUrl;
+    if (kind === 'INFORMATION' && !content?.trim()) {
+      throw new BadRequestException('INFORMATION stimulus cần nội dung');
+    }
+    if (kind === 'IMAGE' && !imageUrl?.trim()) {
+      throw new BadRequestException('IMAGE stimulus cần imageUrl');
+    }
+    return this.prisma.speakingStimulus.update({
+      where: { id },
+      data: {
+        kind,
+        title: dto.title === undefined ? existing.title : dto.title.trim(),
+        content: content?.trim() || null,
+        imageUrl: imageUrl?.trim() || null,
       },
     });
   }
@@ -483,7 +714,93 @@ export class SkillCmsService {
     });
     if (!exercise) throw new NotFoundException('Speaking exercise not found');
     await this.assertNoSpeakingHistory(rawSetId);
-    return this.prisma.speakingExercise.delete({ where: { id: exerciseId } });
+    return this.prisma.$transaction(
+      async (tx) => {
+        const deleted = await tx.speakingExercise.delete({
+          where: { id: exerciseId },
+        });
+        const remaining = await tx.speakingExercise.findMany({
+          where: { practiceSetId: rawSetId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        });
+        await tx.speakingExercise.updateMany({
+          where: { practiceSetId: rawSetId },
+          data: { order: null },
+        });
+        for (const [index, item] of remaining.entries()) {
+          await tx.speakingExercise.update({
+            where: { id: item.id },
+            data: { order: index + 1 },
+          });
+        }
+        return deleted;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  async reorderSpeakingExercises(
+    rawDomain: string,
+    rawSetId: string,
+    dto: SpeakingExerciseReorderDto,
+    user: Admin,
+  ) {
+    this.admin(user);
+    if (this.domain(rawDomain) !== 'speaking')
+      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+    const set = await this.prisma.speakingPracticeSet.findUnique({
+      where: { id: rawSetId },
+      select: { id: true, publicationStatus: true },
+    });
+    if (!set) throw new NotFoundException('Speaking practice set not found');
+    if (set.publicationStatus === QuizPublicationStatus.PUBLISHED) {
+      throw new ConflictException(
+        'Hãy chuyển bộ luyện về bản nháp trước khi sắp xếp lại câu',
+      );
+    }
+    await this.assertNoSpeakingHistory(rawSetId);
+
+    const current = await this.prisma.speakingExercise.findMany({
+      where: { practiceSetId: rawSetId },
+      orderBy: [{ order: 'asc' }, { id: 'asc' }],
+      select: { id: true },
+    });
+    const requested = dto.exerciseIds;
+    if (
+      requested.length !== current.length ||
+      new Set(requested).size !== requested.length ||
+      requested.some((id) => !current.some((item) => item.id === id))
+    ) {
+      throw new BadRequestException(
+        'Danh sách sắp xếp phải chứa đúng một lần toàn bộ câu trong bộ luyện',
+      );
+    }
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.speakingExercise.updateMany({
+          where: { practiceSetId: rawSetId },
+          data: { order: null },
+        });
+        for (const [index, id] of requested.entries()) {
+          await tx.speakingExercise.update({
+            where: { id },
+            data: { order: index + 1 },
+          });
+        }
+        return tx.speakingPracticeSet.findUnique({
+          where: { id: rawSetId },
+          include: {
+            exercises: {
+              orderBy: [{ order: 'asc' }, { id: 'asc' }],
+              include: { categoryTaxonomy: true, stimulus: true },
+            },
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async updateQuestion(
@@ -729,6 +1046,30 @@ export class SkillCmsService {
     };
   }
 
+  private assertWritingTaskType(
+    quizType: QuizType | undefined,
+    taskType?: string,
+  ) {
+    const normalizedTaskType = taskType?.trim().toUpperCase();
+    if (!normalizedTaskType) return;
+    if (
+      quizType === QuizType.WRITING_PICTURE &&
+      !PICTURE_WRITING_TASK_TYPES.has(normalizedTaskType)
+    ) {
+      throw new BadRequestException(
+        'Writing theo tranh chỉ nhận task family của dạng tranh',
+      );
+    }
+    if (
+      quizType === QuizType.WRITING_EMAIL &&
+      PICTURE_WRITING_TASK_TYPES.has(normalizedTaskType)
+    ) {
+      throw new BadRequestException(
+        'Writing Email không nhận task family của dạng tranh',
+      );
+    }
+  }
+
   private requireListeningAuthoring() {
     if (!this.listeningAudioAuthoring || !this.quizService)
       throw new ServiceUnavailableException(
@@ -836,7 +1177,7 @@ export class SkillCmsService {
   private async validateSpeaking(rawId: string) {
     const set = await this.prisma.speakingPracticeSet.findUnique({
       where: { id: rawId },
-      include: { exercises: true },
+      include: { exercises: { include: { stimulus: true } } },
     });
     if (!set) throw new NotFoundException('Speaking practice set not found');
     const errors = [
@@ -847,7 +1188,19 @@ export class SkillCmsService {
           ? `Exercise #${exercise.id}: thiếu tiêu đề hoặc prompt`
           : null,
       ),
+      ...set.exercises.flatMap((exercise) =>
+        taskTypeValidationErrors({
+          taskType: exercise.taskType,
+          targetText: exercise.targetText,
+          imageUrl: exercise.imageUrl,
+          stimulusId: exercise.stimulusId,
+          stimulus: exercise.stimulus,
+        }).map((error) => `Exercise #${exercise.id}: ${error}`),
+      ),
     ].filter((value): value is string => Boolean(value));
+    if (set.scope === 'EXAM_INTERNAL') {
+      errors.push(...toeicSpeakingContractErrors(set));
+    }
     return {
       valid: errors.length === 0,
       errors,

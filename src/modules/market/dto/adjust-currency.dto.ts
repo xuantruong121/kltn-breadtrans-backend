@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AdjustCurrencyDto {
@@ -13,7 +13,7 @@ export class AdjustCurrencyDto {
     example: 50,
     description: 'Số lượng Bánh Mì (dương là cộng, âm là trừ)',
   })
-  @IsNumber()
+  @IsInt()
   amount: number;
 
   @ApiProperty({ example: 'Thưởng học sinh xuất sắc tuần 1' })

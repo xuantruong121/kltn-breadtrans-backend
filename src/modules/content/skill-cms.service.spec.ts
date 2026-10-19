@@ -1,6 +1,11 @@
 import { ForbiddenException } from '@nestjs/common';
 import { QuizPublicationStatus, Role, QuizType } from '@prisma/client';
+import { validate } from 'class-validator';
 import { SkillCmsService } from './skill-cms.service';
+import {
+  SpeakingExerciseDto,
+  SpeakingExerciseReorderDto,
+} from './skill-cms.dto';
 
 describe('SkillCmsService', () => {
   const admin = { id: 7, role: Role.ADMIN };
@@ -89,6 +94,17 @@ describe('SkillCmsService', () => {
   });
 
   it('creates Speaking practice sets and exercises as DRAFT', async () => {
+    const tx = {
+      speakingExercise: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({
+          id: 1,
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({ id: 1 }),
+      },
+    };
     const prisma = {
       speakingPracticeSet: {
         create: jest.fn().mockResolvedValue({
@@ -101,12 +117,9 @@ describe('SkillCmsService', () => {
           level: 'BEGINNER',
         }),
       },
-      speakingExercise: {
-        create: jest.fn().mockResolvedValue({
-          id: 1,
-          publicationStatus: QuizPublicationStatus.DRAFT,
-        }),
-      },
+      $transaction: jest.fn((callback: (value: typeof tx) => unknown) =>
+        callback(tx),
+      ),
     };
     const service = new SkillCmsService(prisma as any);
 
@@ -121,7 +134,11 @@ describe('SkillCmsService', () => {
     await service.addSpeakingExercise(
       'speaking',
       'speaking-qa',
-      { title: 'Prompt', targetText: 'Good morning.' },
+      {
+        title: 'Prompt',
+        targetText: 'Good morning.',
+        taskType: 'READ_ALOUD',
+      },
       admin,
     );
 
@@ -132,7 +149,7 @@ describe('SkillCmsService', () => {
         }),
       }),
     );
-    expect(prisma.speakingExercise.create).toHaveBeenCalledWith(
+    expect(tx.speakingExercise.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           publicationStatus: QuizPublicationStatus.DRAFT,
@@ -145,7 +162,14 @@ describe('SkillCmsService', () => {
     const set = {
       id: 'speaking-ready',
       title: 'Speaking Ready',
-      exercises: [{ id: 1, title: 'Prompt', targetText: 'Hello.' }],
+      exercises: [
+        {
+          id: 1,
+          title: 'Prompt',
+          targetText: 'Hello.',
+          taskType: 'READ_ALOUD',
+        },
+      ],
     };
     const tx = {
       speakingPracticeSet: {
@@ -198,6 +222,103 @@ describe('SkillCmsService', () => {
     ).rejects.toThrow('lịch sử làm bài');
   });
 
+  it('rejects duplicate or foreign ids in Speaking reorder requests', async () => {
+    const prisma = {
+      speakingPracticeSet: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'speaking-order',
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        }),
+      },
+      speakingSubmission: { count: jest.fn().mockResolvedValue(0) },
+      speakingExercise: {
+        findMany: jest.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]),
+      },
+      $transaction: jest.fn(),
+    };
+    const service = new SkillCmsService(prisma as any);
+
+    await expect(
+      service.reorderSpeakingExercises(
+        'speaking',
+        'speaking-order',
+        { exerciseIds: [1, 1] },
+        admin,
+      ),
+    ).rejects.toThrow('đúng một lần toàn bộ câu');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('validates positive integer order DTOs', async () => {
+    const exercise = Object.assign(new SpeakingExerciseDto(), { order: 0 });
+    const reorder = Object.assign(new SpeakingExerciseReorderDto(), {
+      exerciseIds: [-1],
+    });
+
+    expect(await validate(exercise)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ property: 'order' })]),
+    );
+    expect(await validate(reorder)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ property: 'exerciseIds' }),
+      ]),
+    );
+  });
+
+  it('assigns contiguous authoritative order during Speaking reorder', async () => {
+    const tx = {
+      speakingExercise: {
+        updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      speakingPracticeSet: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'speaking-order',
+          exercises: [
+            { id: 2, order: 1 },
+            { id: 1, order: 2 },
+          ],
+        }),
+      },
+    };
+    const prisma = {
+      speakingPracticeSet: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'speaking-order',
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        }),
+      },
+      speakingSubmission: { count: jest.fn().mockResolvedValue(0) },
+      speakingExercise: {
+        findMany: jest.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]),
+      },
+      $transaction: jest.fn((callback: (value: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = new SkillCmsService(prisma as any);
+
+    await service.reorderSpeakingExercises(
+      'speaking',
+      'speaking-order',
+      { exerciseIds: [2, 1] },
+      admin,
+    );
+
+    expect(tx.speakingExercise.updateMany).toHaveBeenCalledWith({
+      where: { practiceSetId: 'speaking-order' },
+      data: { order: null },
+    });
+    expect(tx.speakingExercise.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 2 },
+      data: { order: 1 },
+    });
+    expect(tx.speakingExercise.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 1 },
+      data: { order: 2 },
+    });
+  });
+
   it('stores Writing task fields in the learner runtime content shape', async () => {
     const prisma = {
       quiz: { findFirst: jest.fn().mockResolvedValue({ id: 21 }) },
@@ -237,6 +358,65 @@ describe('SkillCmsService', () => {
         },
       }),
     });
+  });
+
+  it('rejects a Writing task family that contradicts its parent format', async () => {
+    const prisma = {
+      quiz: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 22,
+          type: QuizType.WRITING_PICTURE,
+        }),
+      },
+      submission: { count: jest.fn().mockResolvedValue(0) },
+      question: { findFirst: jest.fn() },
+    };
+    const service = new SkillCmsService(prisma as any);
+
+    await expect(
+      service.addWritingQuestion(
+        '22',
+        {
+          type: 'WRITING',
+          taskType: 'EMAIL',
+          prompt: 'Write a response.',
+        },
+        admin,
+      ),
+    ).rejects.toThrow('task family của dạng tranh');
+    expect(prisma.question.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('restores Speaking child category from the parent when an override is removed', async () => {
+    const prisma = {
+      speakingExercise: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 42,
+          category: 'BUSINESS',
+          difficulty: 'ADVANCED',
+          practiceSet: { category: 'COMMUNICATION' },
+        }),
+        update: jest.fn().mockResolvedValue({ id: 42 }),
+      },
+      speakingSubmission: { count: jest.fn().mockResolvedValue(0) },
+    };
+    const service = new SkillCmsService(prisma as any);
+
+    await service.updateSpeakingExercise(
+      'speaking',
+      'set-42',
+      '42',
+      { title: 'Updated', targetText: 'Hello again.' },
+      admin,
+    );
+
+    expect(prisma.speakingExercise.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          category: 'COMMUNICATION',
+        }),
+      }),
+    );
   });
 
   it('exposes Listening audio authoring only for a question owned by the quiz', async () => {

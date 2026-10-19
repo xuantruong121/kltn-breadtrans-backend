@@ -88,9 +88,11 @@ describe('ArenaGateway security validation', () => {
       gameBattle: { updateMany },
       userStats: {
         update: jest.fn().mockResolvedValue({ totalBanhRan: 120 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ totalBanhRan: 90 }),
       },
       pointHistory: { create: jest.fn() },
       currencyTransaction: { create: jest.fn() },
+      banhTransaction: { create: jest.fn(), createMany: jest.fn() },
     };
     const gatewayInternals = gateway as unknown as {
       prisma: { $transaction: jest.Mock };

@@ -66,7 +66,7 @@ export class MarketService {
   }
 
   async getCurrencyHistory(userId: number) {
-    return this.prisma.pointHistory.findMany({
+    return this.prisma.banhTransaction.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -589,6 +589,12 @@ export class MarketService {
   }
 
   async adjustCurrency(dto: AdjustCurrencyDto, adminName: string) {
+    if (!Number.isInteger(dto.amount) || dto.amount === 0) {
+      throw new BadRequestException(
+        'Số lượng điều chỉnh phải là số nguyên khác 0',
+      );
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: dto.userId },
       include: { profile: true },
@@ -602,52 +608,77 @@ export class MarketService {
       user.email?.split('@')[0] ||
       `Học viên #${dto.userId}`;
 
-    const updatedStats = await this.prisma.userStats.upsert({
-      where: { userId: dto.userId },
-      update: { totalBanhRan: { increment: dto.amount } },
-      create: { userId: dto.userId, totalBanhRan: Math.max(0, dto.amount) },
-    });
+    const updatedStats = await this.prisma.$transaction(async (tx) => {
+      let stats;
+      if (dto.amount > 0) {
+        stats = await tx.userStats.upsert({
+          where: { userId: dto.userId },
+          update: { totalBanhRan: { increment: dto.amount } },
+          create: { userId: dto.userId, totalBanhRan: dto.amount },
+        });
+      } else {
+        const result = await tx.userStats.updateMany({
+          where: {
+            userId: dto.userId,
+            totalBanhRan: { gte: Math.abs(dto.amount) },
+          },
+          data: { totalBanhRan: { decrement: Math.abs(dto.amount) } },
+        });
+        if (result.count !== 1) {
+          const current = await tx.userStats.findUnique({
+            where: { userId: dto.userId },
+          });
+          throw new BadRequestException(
+            `Không thể trừ ${Math.abs(dto.amount)} Bánh Mì; số dư hiện tại là ${current?.totalBanhRan ?? 0}`,
+          );
+        }
+        stats = await tx.userStats.findUniqueOrThrow({
+          where: { userId: dto.userId },
+        });
+      }
 
-    const today = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+      const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
 
-    // Write to immutable BanhTransaction ledger
-    await this.prisma.banhTransaction.create({
-      data: {
-        userId: dto.userId,
-        amount: dto.amount,
-        source: 'ADMIN_ADJUSTMENT',
-        reference: null,
-        dateKey: today,
-        isCapped: false,
-        balanceAfter: updatedStats.totalBanhRan,
-        metadata: { adminName, reason: dto.reason } as any,
-      },
-    });
+      await tx.banhTransaction.create({
+        data: {
+          userId: dto.userId,
+          amount: dto.amount,
+          source: 'ADMIN_ADJUSTMENT',
+          reference: `admin:adjust:${dto.userId}:${randomUUID()}`,
+          dateKey: today,
+          isCapped: false,
+          balanceAfter: stats.totalBanhRan,
+          metadata: { adminName, reason: dto.reason } as any,
+        },
+      });
 
-    await this.prisma.pointHistory.create({
-      data: {
-        userId: dto.userId,
-        points: dto.amount,
-        reason: `[Admin: ${adminName}] ${dto.reason}`,
-      },
-    });
+      await tx.pointHistory.create({
+        data: {
+          userId: dto.userId,
+          points: dto.amount,
+          reason: `[Admin: ${adminName}] ${dto.reason}`,
+        },
+      });
 
-    await this.prisma.currencyTransaction.create({
-      data: {
-        studentId: dto.userId,
-        studentName,
-        userId: dto.userId,
-        userName: adminName,
-        userRole: 'ADMIN',
-        amount: dto.amount,
-        reason: dto.reason,
-        type: dto.amount >= 0 ? 'add' : 'subtract',
-      },
+      await tx.currencyTransaction.create({
+        data: {
+          studentId: dto.userId,
+          studentName,
+          userId: dto.userId,
+          userName: adminName,
+          userRole: 'ADMIN',
+          amount: dto.amount,
+          reason: dto.reason,
+          type: dto.amount >= 0 ? 'add' : 'subtract',
+        },
+      });
+
+      return stats;
     });
 
     // Bắn sự kiện Real-time cập nhật số dư Bánh Mì ngay lập tức cho học sinh

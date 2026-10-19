@@ -194,6 +194,8 @@ model User {
   savedVocabulary                 UserSavedWord[]
   toeicAttempts                   ToeicAttempt[]
   toeicSpeakingWritingSubmissions ToeicSpeakingWritingSubmission[]
+  toeicAssessmentsCreated         ToeicAssessment[]                @relation("ToeicAssessmentCreator")
+  toeicAssessmentAttempts         ToeicAssessmentAttempt[]
   pet                             UserPet?
   questProgresses                 UserQuestProgress[]
   grammarAttempts                 GrammarAttempt[]
@@ -225,6 +227,7 @@ model User {
   shippingProfile                 UserShippingProfile?
   physicalRedemptions             MarketPhysicalRedemption[]
   courseLessonAttempts            CourseLessonAttempt[]
+  examsCreated                    Exam[]                           @relation("ExamCreator")
 }
 
 model AuthAccount {
@@ -898,6 +901,36 @@ enum QuizPublicationStatus {
   ARCHIVED
 }
 
+enum SpeakingPracticeScope {
+  SKILL_PRACTICE
+  EXAM_INTERNAL
+}
+
+/// Generic learner/Admin product root. Domain-specific content remains in
+/// ToeicExamSet / ToeicAssessment and is never flattened into this model.
+model Exam {
+  id                Int                   @id @default(autoincrement())
+  title             String
+  description       String?               @db.Text
+  familyCode        String
+  variantCode       String
+  templateKey       String
+  publicationStatus QuizPublicationStatus @default(DRAFT)
+  createdBy         Int?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  /// Durable provenance link for AI-authored drafts. The AI job never owns
+  /// publication; this only lets Admin review where the draft came from.
+  aiGenerationJobId String?               @unique
+
+  creator         User?            @relation("ExamCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  toeicExamSet    ToeicExamSet?
+  toeicAssessment ToeicAssessment?
+
+  @@index([familyCode, variantCode, publicationStatus])
+  @@index([templateKey])
+}
+
 enum ListeningPracticeAttemptStatus {
   IN_PROGRESS
   COMPLETED
@@ -938,6 +971,7 @@ model Quiz {
   listeningTranscriptReveals ListeningTranscriptReveal[]
   listeningAudioUsages       ListeningAudioUsage[]
   courseActivities           CourseActivity[]
+  toeicWritingSetItems       ToeicWritingSetItem[]
 }
 
 /// Immutable, quiz-level production audio with an authoritative turn timeline.
@@ -1062,7 +1096,8 @@ model Submission {
   submittedAt     DateTime @default(now())
   aiFeedback      String?  @db.Text
 
-  results Result[]
+  results         Result[]
+  assessmentLinks ToeicAssessmentWritingSubmission[]
 
   @@unique([userId, quizId, clientAttemptId])
   @@index([userId, clientAttemptId])
@@ -1120,24 +1155,77 @@ model PointHistory {
 }
 
 // Speaking Practice Models
+model SpeakingCategory {
+  id               Int      @id @default(autoincrement())
+  code             String   @unique
+  name             String
+  nameNormalized   String   @unique
+  description      String?  @db.Text
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  allowPracticeSet Boolean  @default(false)
+  allowExercise    Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  practiceSets SpeakingPracticeSet[] @relation("SpeakingPracticeSetCategory")
+  exercises    SpeakingExercise[]    @relation("SpeakingExerciseCategory")
+}
+
+enum SpeakingExerciseTaskType {
+  READ_ALOUD
+  DESCRIBE_PICTURE
+  RESPOND_TO_QUESTION
+  RESPOND_USING_INFORMATION
+  EXPRESS_OPINION
+  PRONUNCIATION_DRILL
+}
+
+enum SpeakingStimulusKind {
+  INFORMATION
+  IMAGE
+}
+
+model SpeakingStimulus {
+  id        Int                  @id @default(autoincrement())
+  kind      SpeakingStimulusKind
+  title     String?
+  content   String?              @db.Text
+  imageUrl  String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  exercises SpeakingExercise[]
+}
+
 model SpeakingExercise {
-  id                Int                   @id @default(autoincrement())
+  id                Int                       @id @default(autoincrement())
   title             String
-  targetText        String                @db.Text // Câu/đoạn văn cần đọc (hoặc script mẫu)
+  targetText        String                    @db.Text // Câu/đoạn văn cần đọc (hoặc script mẫu)
   imageUrl          String? // Dùng cho TOEIC Part 1 (Mô tả tranh)
   audioUrl          String? // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
-  isPremiumContent  Boolean               @default(false)
-  difficulty        String                @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
-  category          String                @default("TOEIC") // IELTS, TOEIC, GENERAL
+  isPremiumContent  Boolean                   @default(false)
+  difficulty        String                    @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
+  category          String                    @default("TOEIC") // IELTS, TOEIC, GENERAL
+  taskType          SpeakingExerciseTaskType?
+  categoryId        Int?
   practiceSetId     String?
-  publicationStatus QuizPublicationStatus @default(DRAFT)
-  createdAt         DateTime              @default(now())
+  order             Int?
+  stimulusId        Int?
+  publicationStatus QuizPublicationStatus     @default(DRAFT)
+  createdAt         DateTime                  @default(now())
 
-  submissions   SpeakingSubmission[]
-  uploadIntents SpeakingUploadIntent[]
-  practiceSet   SpeakingPracticeSet?   @relation(fields: [practiceSetId], references: [id], onDelete: SetNull)
+  submissions      SpeakingSubmission[]
+  uploadIntents    SpeakingUploadIntent[]
+  practiceSet      SpeakingPracticeSet?   @relation(fields: [practiceSetId], references: [id], onDelete: SetNull)
+  categoryTaxonomy SpeakingCategory?      @relation("SpeakingExerciseCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+  stimulus         SpeakingStimulus?      @relation(fields: [stimulusId], references: [id], onDelete: SetNull)
 
+  @@unique([practiceSetId, order])
   @@index([practiceSetId])
+  @@index([categoryId])
+  @@index([taskType])
+  @@index([stimulusId])
 }
 
 model SpeakingPracticeSet {
@@ -1145,13 +1233,19 @@ model SpeakingPracticeSet {
   title             String
   description       String
   category          String
+  categoryId        Int
   level             String
+  scope             SpeakingPracticeScope @default(SKILL_PRACTICE)
   publicationStatus QuizPublicationStatus @default(DRAFT)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
-  exercises        SpeakingExercise[]
-  courseActivities CourseActivity[]
+  exercises            SpeakingExercise[]
+  courseActivities     CourseActivity[]
+  assessmentComponents ToeicAssessmentComponent[] @relation("ToeicAssessmentSpeakingSource")
+  categoryTaxonomy     SpeakingCategory           @relation("SpeakingPracticeSetCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([categoryId])
 }
 
 enum SpeakingSubmissionStatus {
@@ -1215,8 +1309,9 @@ model SpeakingSubmission {
   rewardGrantedAt     DateTime?
   submittedAt         DateTime                 @default(now())
 
-  uploadIntent  SpeakingUploadIntent?
-  rewardLedgers SpeakingRewardLedger[]
+  uploadIntent    SpeakingUploadIntent?
+  rewardLedgers   SpeakingRewardLedger[]
+  assessmentLinks ToeicAssessmentSpeakingSubmission[]
 
   @@unique([userId, idempotencyKey])
   @@index([status, nextAttemptAt])
@@ -1768,11 +1863,14 @@ model ToeicExamSet {
   publicationStatus QuizPublicationStatus @default(DRAFT)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @default(now()) @updatedAt
+  examId            Int?                  @unique
 
-  groups           ToeicQuestionGroup[]
-  attempts         ToeicAttempt[]
-  toeicRewards     UserToeicReward[]
-  courseActivities CourseActivity[]
+  genericExam          Exam?                      @relation(fields: [examId], references: [id], onDelete: SetNull)
+  groups               ToeicQuestionGroup[]
+  attempts             ToeicAttempt[]
+  assessmentComponents ToeicAssessmentComponent[] @relation("ToeicAssessmentLrSource")
+  toeicRewards         UserToeicReward[]
+  courseActivities     CourseActivity[]
 }
 
 model ToeicQuestionGroup {
@@ -1784,6 +1882,14 @@ model ToeicQuestionGroup {
   audioUrl        String?
   imageUrl        String?
   passageText     String?      @db.Text
+  /// Listening transcript is the source of truth for generated audio. It is
+  /// intentionally separate from reading passageText.
+  transcriptText  String?      @db.Text
+  /// Brief used for generated Part 1 imagery; never a learner-facing answer.
+  imageBrief      String?      @db.Text
+  /// Minimal per-media provenance / hashes, e.g. AI_GENERATED and the
+  /// transcript hash used for TTS. Keeps legacy manually-authored rows valid.
+  mediaMetadata   Json?
   groupOrder      Int          @default(0)
 
   questions ToeicQuestion[]
@@ -1824,8 +1930,9 @@ model ToeicAttempt {
   readingCorrect   Int?
   totalCorrect     Int?
 
-  answers         ToeicAttemptAnswer[]
-  integrityEvents ToeicIntegrityEvent[]
+  answers             ToeicAttemptAnswer[]
+  integrityEvents     ToeicIntegrityEvent[]
+  assessmentComponent ToeicAssessmentAttemptComponent? @relation("ToeicAssessmentChildAttempt")
 }
 
 enum AttemptStatus {
@@ -1879,6 +1986,176 @@ model ToeicSpeakingWritingSubmission {
   aiTranscript  String?       @db.Text
   aiFeedback    Json? // Detailed feedback object
   gradedAt      DateTime?
+}
+
+/// A complete TOEIC Writing component composed from authoritative Writing tasks.
+/// The set owns ordering and slot semantics; task content remains in Quiz.
+model ToeicWritingSet {
+  id                Int                   @id @default(autoincrement())
+  title             String
+  description       String?               @db.Text
+  publicationStatus QuizPublicationStatus @default(DRAFT)
+  version           Int                   @default(1)
+  createdBy         Int?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  items                ToeicWritingSetItem[]
+  assessmentComponents ToeicAssessmentComponent[] @relation("ToeicAssessmentWritingSource")
+}
+
+model ToeicWritingSetItem {
+  id            Int             @id @default(autoincrement())
+  writingSetId  Int
+  writingSet    ToeicWritingSet @relation(fields: [writingSetId], references: [id], onDelete: Cascade)
+  order         Int
+  taskKind      String
+  writingQuizId Int
+  writingQuiz   Quiz            @relation(fields: [writingQuizId], references: [id], onDelete: Restrict)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([writingSetId, order])
+  @@unique([writingSetId, writingQuizId])
+  @@index([writingQuizId])
+}
+
+enum ToeicAssessmentProductFamily {
+  TOEIC_LR
+  TOEIC_SW
+  TOEIC_4_SKILLS
+}
+
+enum ToeicAssessmentComponentKind {
+  LISTENING_READING
+  SPEAKING
+  WRITING
+}
+
+enum ToeicAssessmentAttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ToeicAssessmentAttemptComponentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+/// Parent composition only. Child content remains owned by its skill runtime.
+model ToeicAssessment {
+  id                Int                          @id @default(autoincrement())
+  title             String
+  description       String?                      @db.Text
+  productFamily     ToeicAssessmentProductFamily
+  publicationStatus QuizPublicationStatus        @default(DRAFT)
+  version           Int                          @default(1)
+  createdBy         Int?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  examId            Int?                         @unique
+
+  creator     User?                      @relation("ToeicAssessmentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  genericExam Exam?                      @relation(fields: [examId], references: [id], onDelete: SetNull)
+  components  ToeicAssessmentComponent[]
+  attempts    ToeicAssessmentAttempt[]
+
+  @@index([publicationStatus, productFamily])
+}
+
+model ToeicAssessmentComponent {
+  id                    Int                          @id @default(autoincrement())
+  assessmentId          Int
+  kind                  ToeicAssessmentComponentKind
+  order                 Int
+  required              Boolean                      @default(true)
+  lrExamSetId           Int?
+  speakingPracticeSetId String?
+  writingSetId          Int?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  assessment          ToeicAssessment                   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  lrExamSet           ToeicExamSet?                     @relation("ToeicAssessmentLrSource", fields: [lrExamSetId], references: [id], onDelete: Restrict)
+  speakingPracticeSet SpeakingPracticeSet?              @relation("ToeicAssessmentSpeakingSource", fields: [speakingPracticeSetId], references: [id], onDelete: Restrict)
+  writingSet          ToeicWritingSet?                  @relation("ToeicAssessmentWritingSource", fields: [writingSetId], references: [id], onDelete: Restrict)
+  attemptComponents   ToeicAssessmentAttemptComponent[]
+
+  @@unique([assessmentId, order])
+  @@unique([assessmentId, kind])
+  @@index([lrExamSetId])
+  @@index([speakingPracticeSetId])
+  @@index([writingSetId])
+}
+
+model ToeicAssessmentAttempt {
+  id             Int                          @id @default(autoincrement())
+  assessmentId   Int
+  userId         Int
+  status         ToeicAssessmentAttemptStatus @default(IN_PROGRESS)
+  startedAt      DateTime                     @default(now())
+  submittedAt    DateTime?
+  completedAt    DateTime?
+  idempotencyKey String?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  assessment ToeicAssessment                   @relation(fields: [assessmentId], references: [id], onDelete: Restrict)
+  user       User                              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  components ToeicAssessmentAttemptComponent[]
+
+  @@unique([userId, assessmentId, idempotencyKey])
+  @@index([userId, assessmentId, status])
+}
+
+model ToeicAssessmentAttemptComponent {
+  id                    Int                                   @id @default(autoincrement())
+  assessmentAttemptId   Int
+  assessmentComponentId Int
+  status                ToeicAssessmentAttemptComponentStatus @default(NOT_STARTED)
+  startedAt             DateTime?
+  submittedAt           DateTime?
+  completedAt           DateTime?
+  toeicAttemptId        Int?
+  createdAt             DateTime                              @default(now())
+  updatedAt             DateTime                              @updatedAt
+
+  assessmentAttempt   ToeicAssessmentAttempt              @relation(fields: [assessmentAttemptId], references: [id], onDelete: Cascade)
+  assessmentComponent ToeicAssessmentComponent            @relation(fields: [assessmentComponentId], references: [id], onDelete: Restrict)
+  toeicAttempt        ToeicAttempt?                       @relation("ToeicAssessmentChildAttempt", fields: [toeicAttemptId], references: [id], onDelete: SetNull)
+  speakingSubmissions ToeicAssessmentSpeakingSubmission[]
+  writingSubmissions  ToeicAssessmentWritingSubmission[]
+
+  @@unique([assessmentAttemptId, assessmentComponentId])
+  @@unique([toeicAttemptId])
+  @@index([assessmentAttemptId, status])
+}
+
+model ToeicAssessmentSpeakingSubmission {
+  id                   Int      @id @default(autoincrement())
+  attemptComponentId   Int
+  speakingSubmissionId Int
+  createdAt            DateTime @default(now())
+
+  attemptComponent   ToeicAssessmentAttemptComponent @relation(fields: [attemptComponentId], references: [id], onDelete: Cascade)
+  speakingSubmission SpeakingSubmission              @relation(fields: [speakingSubmissionId], references: [id], onDelete: Restrict)
+
+  @@unique([attemptComponentId, speakingSubmissionId])
+  @@unique([speakingSubmissionId])
+}
+
+model ToeicAssessmentWritingSubmission {
+  id                 Int      @id @default(autoincrement())
+  attemptComponentId Int
+  submissionId       Int
+  createdAt          DateTime @default(now())
+
+  attemptComponent ToeicAssessmentAttemptComponent @relation(fields: [attemptComponentId], references: [id], onDelete: Cascade)
+  submission       Submission                      @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+
+  @@unique([attemptComponentId, submissionId])
+  @@unique([submissionId])
 }
 
 // ==========================================

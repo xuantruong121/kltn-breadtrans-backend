@@ -8,6 +8,7 @@ import { GeminiEvaluatorStrategy } from './strategies/gemini-evaluator.strategy'
 import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
 import { UploadModule } from '../upload/upload.module';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { SpeakingCategoryService } from '../content/speaking-category.service';
 
 @Module({
   imports: [UploadModule, PrismaModule],
@@ -19,6 +20,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
   providers: [
     AiService,
     AiGeneratorService,
+    SpeakingCategoryService,
     {
       provide: AI_EVALUATOR_TOKEN,
       useClass: GeminiEvaluatorStrategy,

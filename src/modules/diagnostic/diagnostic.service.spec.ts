@@ -131,7 +131,10 @@ describe('DiagnosticService', () => {
             }),
           },
           learningActivity: { create: jest.fn() },
-          userStats: { upsert: jest.fn() },
+          userStats: {
+            upsert: jest.fn().mockResolvedValue({ totalBanhRan: 50 }),
+          },
+          banhTransaction: { create: jest.fn() },
         }),
       ),
     };
@@ -202,7 +205,10 @@ describe('DiagnosticService', () => {
             create: jest.fn(),
           },
           learningActivity: { create: jest.fn() },
-          userStats: { upsert: jest.fn() },
+          userStats: {
+            upsert: jest.fn().mockResolvedValue({ totalBanhRan: 50 }),
+          },
+          banhTransaction: { create: jest.fn() },
         }),
     );
     const result = await service.submitAssessment(
@@ -324,7 +330,10 @@ describe('DiagnosticService', () => {
             }),
           },
           learningActivity: { create: jest.fn() },
-          userStats: { upsert: jest.fn() },
+          userStats: {
+            upsert: jest.fn().mockResolvedValue({ totalBanhRan: 50 }),
+          },
+          banhTransaction: { create: jest.fn() },
         }),
     );
     const result = await service.submitAssessment(

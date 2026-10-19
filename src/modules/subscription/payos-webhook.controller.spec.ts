@@ -14,10 +14,12 @@ describe('PayosWebhookController', () => {
   it('returns the exact PayOS acknowledgement after canonical fulfillment', async () => {
     const payos = {
       resolveWebhook: jest.fn().mockResolvedValue({
+        id: 91,
         type: 'PLAN',
         planPayment: { planPurchaseId: 7 },
         coursePayment: null,
       }),
+      markWebhookFulfilled: jest.fn().mockResolvedValue(undefined),
     };
     const plans = {
       confirmPurchaseFromWebhook: jest.fn().mockResolvedValue({}),
@@ -32,6 +34,7 @@ describe('PayosWebhookController', () => {
     await expect(controller.receive({})).resolves.toEqual({ success: true });
     expect(plans.confirmPurchaseFromWebhook).toHaveBeenCalledWith(7, undefined);
     expect(courses.confirmPaymentFromPayos).not.toHaveBeenCalled();
+    expect(payos.markWebhookFulfilled).toHaveBeenCalledWith(91);
   });
 
   it('acknowledges a verified PayOS probe with an unknown sample order', async () => {

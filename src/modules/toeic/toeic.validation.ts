@@ -12,6 +12,9 @@ export type ToeicValidationGroup = {
   imageUrl?: string | null;
   audioUrl?: string | null;
   passageText?: string | null;
+  transcriptText?: string | null;
+  imageBrief?: string | null;
+  mediaMetadata?: unknown;
   questions: ToeicValidationQuestion[];
 };
 
@@ -38,6 +41,9 @@ const EXPECTED_PART_COUNTS: Record<number, number> = {
   6: 16,
   7: 54,
 };
+
+const digest = (value: string) =>
+  createHash('sha256').update(value).digest('hex');
 
 export function validateToeicExam(exam: ToeicValidationExam): {
   learnerReady: boolean;
@@ -149,6 +155,31 @@ export function validateToeicExam(exam: ToeicValidationExam): {
         message: 'Listening group has no durable audio asset',
         groupId: group.id,
       });
+    const media = (group.mediaMetadata ?? {}) as {
+      audio?: { transcriptHash?: string };
+      image?: { briefHash?: string };
+    };
+    if (
+      group.part >= 1 &&
+      group.part <= 4 &&
+      media.audio?.transcriptHash &&
+      media.audio.transcriptHash !== digest(group.transcriptText ?? '')
+    )
+      issues.push({
+        code: 'STALE_AUDIO',
+        message: 'Audio đã cũ sau khi transcript được chỉnh sửa',
+        groupId: group.id,
+      });
+    if (
+      group.part === 1 &&
+      media.image?.briefHash &&
+      media.image.briefHash !== digest(group.imageBrief ?? '')
+    )
+      issues.push({
+        code: 'STALE_IMAGE',
+        message: 'Ảnh cần được rà soát lại sau khi mô tả hình thay đổi',
+        groupId: group.id,
+      });
     if ((group.part === 6 || group.part === 7) && !group.passageText?.trim())
       issues.push({
         code: 'MISSING_PASSAGE',
@@ -202,3 +233,4 @@ export function validateToeicExam(exam: ToeicValidationExam): {
     },
   };
 }
+import { createHash } from 'crypto';

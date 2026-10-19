@@ -1,4 +1,5 @@
 import { validateToeicExam } from './toeic.validation';
+import { createHash } from 'crypto';
 
 function makeExam() {
   const groups = [] as any[];
@@ -88,4 +89,22 @@ test('allows three-option Part 2 responses and rejects wrong option cardinality'
   ];
   const result = validateToeicExam(exam);
   expect(result.issues.some((issue) => issue.code === 'OPTIONS')).toBe(true);
+});
+
+test('fails closed when generated Listening audio is stale after transcript editing', () => {
+  const exam = makeExam();
+  const group = exam.groups.find((item) => item.part === 3);
+  group.transcriptText = 'Woman: The original transcript.';
+  group.mediaMetadata = {
+    audio: {
+      transcriptHash: createHash('sha256')
+        .update('Woman: A different transcript.')
+        .digest('hex'),
+    },
+  };
+  const result = validateToeicExam(exam);
+  expect(result.learnerReady).toBe(false);
+  expect(result.issues.some((issue) => issue.code === 'STALE_AUDIO')).toBe(
+    true,
+  );
 });

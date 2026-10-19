@@ -14,6 +14,7 @@ import {
   PrismaClient,
   QuizType,
   Role,
+  SpeakingExerciseTaskType,
   TopicCategory,
   User,
 } from '@prisma/client';
@@ -6394,12 +6395,56 @@ async function main() {
       category: 'TOEIC',
     },
   ];
+  const seminarStimulus = await prisma.speakingStimulus.upsert({
+    where: { id: 1 },
+    update: {
+      kind: 'INFORMATION',
+      title: 'Seminar schedule',
+      content:
+        'Registration is at 9:00. The presentation begins at 10:00. Lunch is at 12:30. The workshop begins at 2:00.',
+      imageUrl: null,
+    },
+    create: {
+      id: 1,
+      kind: 'INFORMATION',
+      title: 'Seminar schedule',
+      content:
+        'Registration is at 9:00. The presentation begins at 10:00. Lunch is at 12:30. The workshop begins at 2:00.',
+    },
+  });
+
   for (let index = 0; index < speakingExercises.length; index += 1) {
     const item = speakingExercises[index];
+    const taskType: SpeakingExerciseTaskType =
+      item.title.includes('Describe')
+        ? SpeakingExerciseTaskType.DESCRIBE_PICTURE
+        : item.title.includes('Information')
+          ? SpeakingExerciseTaskType.RESPOND_USING_INFORMATION
+          : item.title.includes('Opinion')
+            ? SpeakingExerciseTaskType.EXPRESS_OPINION
+            : item.title.includes('Question Response')
+              ? SpeakingExerciseTaskType.RESPOND_TO_QUESTION
+              : item.title.includes('Pronunciation')
+                ? SpeakingExerciseTaskType.PRONUNCIATION_DRILL
+                : SpeakingExerciseTaskType.READ_ALOUD;
+    const media =
+      item.title.includes('Describe Office')
+        ? { imageUrl: seedAssetUrl('toeic/visuals/office-meeting.png') }
+        : item.title.includes('Describe Station')
+          ? { imageUrl: seedAssetUrl('toeic/visuals/departure-board.png') }
+          : {};
+    const semanticItem = {
+      ...item,
+      taskType,
+      ...media,
+      ...(taskType === SpeakingExerciseTaskType.RESPOND_USING_INFORMATION
+        ? { stimulusId: seminarStimulus.id }
+        : {}),
+    };
     await prisma.speakingExercise.upsert({
       where: { id: index + 1 },
-      update: item,
-      create: { id: index + 1, ...item },
+      update: semanticItem,
+      create: { id: index + 1, ...semanticItem },
     });
   }
   // Remove legacy demo submissions that referenced non-existent seed audio.

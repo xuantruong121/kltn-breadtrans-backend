@@ -11,6 +11,15 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import {
+  SPEAKING_SET_LEVELS,
+  SPEAKING_TASK_TYPES,
+} from '../../speaking/speaking-contract';
+import type { SpeakingTaskType } from '../../speaking/speaking-contract';
+
+const CONTENT_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
+const GRAMMAR_LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
+const COURSE_LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
 
 export class SuggestVocabWordDto {
   @IsNotEmpty({ message: 'Từ vựng không được để trống' })
@@ -24,7 +33,7 @@ export class SuggestVocabWordDto {
   context?: string;
 
   @IsOptional()
-  @IsString({ message: 'Cấp độ phải là chuỗi ký tự' })
+  @IsIn(COURSE_LEVELS, { message: 'Cấp độ ngữ cảnh từ vựng không hợp lệ' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
 }
@@ -36,7 +45,7 @@ export class SuggestGrammarQuestionsDto {
   topicTitle: string;
 
   @IsNotEmpty({ message: 'Cấp độ ngữ pháp không được để trống' })
-  @IsString({ message: 'Cấp độ phải là chuỗi ký tự' })
+  @IsIn(GRAMMAR_LEVELS, { message: 'Cấp độ ngữ pháp không hợp lệ' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level: string;
 
@@ -65,7 +74,7 @@ export class SuggestReadingPassageDto {
   topic: string;
 
   @IsNotEmpty({ message: 'Cấp độ bài đọc không được để trống' })
-  @IsString({ message: 'Cấp độ phải là chuỗi ký tự' })
+  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level: string;
 
@@ -89,7 +98,7 @@ export class SuggestReadingQuestionsDto {
   passage: string;
 
   @IsOptional()
-  @IsString({ message: 'Cấp độ phải là chuỗi ký tự' })
+  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
 
@@ -108,7 +117,7 @@ export class SuggestToeicPart5Dto {
   topic?: string;
 
   @IsOptional()
-  @IsString({ message: 'Cấp độ phải là chuỗi ký tự' })
+  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
 
@@ -137,7 +146,7 @@ export class SuggestCourseCurriculumDto {
   courseTitle: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(COURSE_LEVELS, { message: 'Cấp độ khóa học không hợp lệ' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
 
@@ -179,7 +188,7 @@ export class SuggestListeningContentDto {
   mode: 'DIALOGUE' | 'DICTATION';
 
   @IsOptional()
-  @IsString()
+  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
   level?: string;
 
   @IsOptional()
@@ -207,7 +216,7 @@ export class SuggestListeningQuestionsDto {
   sourceText: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
   level?: string;
 
   @IsOptional()
@@ -224,7 +233,7 @@ export class SuggestWritingTaskDto {
   taskType: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
   level?: string;
 
   @IsOptional()
@@ -248,4 +257,191 @@ export class SuggestWritingTaskDto {
   @Max(1000)
   @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   wordMax?: number;
+}
+
+const SPEAKING_LEVELS = [...SPEAKING_SET_LEVELS];
+
+export class SuggestSpeakingPracticeSetDto {
+  @IsNotEmpty({ message: 'Trọng tâm bộ luyện nói không được để trống' })
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  topic: string;
+
+  @IsIn(SPEAKING_LEVELS)
+  level: string;
+
+  @IsString()
+  category: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  currentTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  currentDescription?: string;
+}
+
+export class SuggestSpeakingExercisesDto {
+  @IsNotEmpty({ message: 'Tên bộ luyện nói không được để trống' })
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  practiceSetTitle: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  practiceSetDescription?: string;
+
+  @IsIn(SPEAKING_LEVELS)
+  level: string;
+
+  @IsString()
+  category: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  currentTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  currentTargetText?: string;
+
+  @IsOptional()
+  @IsIn([...SPEAKING_TASK_TYPES])
+  taskType?: SpeakingTaskType;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  existingExerciseTitles?: string[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 3))
+  count?: number = 3;
+}
+
+export class SuggestSpeakingFullDraftDto {
+  @IsNotEmpty()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  topic: string;
+
+  @IsIn(SPEAKING_LEVELS)
+  level: string;
+
+  @IsString()
+  category: string;
+
+  @IsOptional()
+  @IsString()
+  objective?: string;
+
+  @IsOptional()
+  @IsIn([...SPEAKING_TASK_TYPES])
+  taskType?: SpeakingTaskType;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 5))
+  count?: number = 5;
+}
+
+export class SuggestListeningFullDraftDto {
+  @IsNotEmpty()
+  @IsString()
+  topic: string;
+
+  @IsOptional()
+  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  level?: string;
+
+  @IsIn(['DIALOGUE', 'DICTATION'])
+  mode: 'DIALOGUE' | 'DICTATION';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 5))
+  count?: number = 5;
+}
+
+export class SuggestReadingFullDraftDto {
+  @IsNotEmpty()
+  @IsString()
+  topic: string;
+
+  @IsNotEmpty()
+  @IsIn(CONTENT_LEVELS)
+  level: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(50)
+  @Max(1000)
+  targetLength?: number;
+
+  @IsOptional()
+  @IsString()
+  microSkill?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 5))
+  count?: number = 5;
+}
+
+export class SuggestVocabFullDraftDto {
+  @IsNotEmpty()
+  @IsString()
+  topic: string;
+
+  @IsOptional()
+  @IsIn(COURSE_LEVELS)
+  level?: string;
+
+  @IsOptional()
+  @IsString()
+  context?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 15))
+  count?: number = 15;
+}
+
+export class SuggestGrammarFullDraftDto {
+  @IsNotEmpty()
+  @IsString()
+  topicTitle: string;
+
+  @IsNotEmpty()
+  @IsIn(GRAMMAR_LEVELS)
+  level: string;
+
+  @IsOptional()
+  @IsString()
+  objective?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 10))
+  count?: number = 10;
 }

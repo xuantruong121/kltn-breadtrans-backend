@@ -226,6 +226,8 @@ export class AdminExamService {
         audioUrl: dto.audioUrl,
         imageUrl: dto.imageUrl,
         passageText: dto.passageText,
+        transcriptText: dto.transcriptText,
+        imageBrief: dto.imageBrief,
         groupOrder: dto.groupOrder ?? 0,
       },
     });
@@ -251,6 +253,21 @@ export class AdminExamService {
       );
     }
 
+    const mediaMetadata = (group.mediaMetadata as any) ?? {};
+    if (
+      dto.transcriptText !== undefined &&
+      dto.transcriptText !== group.transcriptText &&
+      mediaMetadata.audio
+    ) {
+      mediaMetadata.audio = { ...mediaMetadata.audio, stale: true };
+    }
+    if (
+      dto.imageBrief !== undefined &&
+      dto.imageBrief !== group.imageBrief &&
+      mediaMetadata.image
+    ) {
+      mediaMetadata.image = { ...mediaMetadata.image, stale: true };
+    }
     return this.prisma.toeicQuestionGroup.update({
       where: { id: groupId },
       data: {
@@ -262,6 +279,14 @@ export class AdminExamService {
         ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
         ...(dto.passageText !== undefined && {
           passageText: dto.passageText,
+        }),
+        ...(dto.transcriptText !== undefined && {
+          transcriptText: dto.transcriptText,
+        }),
+        ...(dto.imageBrief !== undefined && { imageBrief: dto.imageBrief }),
+        ...((dto.transcriptText !== undefined ||
+          dto.imageBrief !== undefined) && {
+          mediaMetadata,
         }),
         ...(dto.groupOrder !== undefined && {
           groupOrder: dto.groupOrder,

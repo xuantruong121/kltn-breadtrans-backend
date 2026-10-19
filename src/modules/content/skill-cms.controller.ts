@@ -32,8 +32,10 @@ import {
   SkillPublishDto,
   SkillQuestionDto,
   SpeakingExerciseDto,
+  SpeakingExerciseReorderDto,
   WritingQuestionDto,
 } from './skill-cms.dto';
+import { SpeakingStimulusDto } from './speaking-stimulus.dto';
 
 @ApiTags('admin-skill-cms')
 @ApiBearerAuth()
@@ -45,6 +47,25 @@ export class SkillCmsController {
 
   @Get(':domain') list(@Param('domain') domain: string, @Request() req: any) {
     return this.service.list(domain, req.user);
+  }
+
+  @Get('speaking/stimuli') listSpeakingStimuli(@Request() req: any) {
+    return this.service.listSpeakingStimuli(req.user);
+  }
+
+  @Post('speaking/stimuli') createSpeakingStimulus(
+    @Body() dto: SpeakingStimulusDto,
+    @Request() req: any,
+  ) {
+    return this.service.createSpeakingStimulus(dto, req.user);
+  }
+
+  @Patch('speaking/stimuli/:id') updateSpeakingStimulus(
+    @Param('id') id: string,
+    @Body() dto: SpeakingStimulusDto,
+    @Request() req: any,
+  ) {
+    return this.service.updateSpeakingStimulus(id, dto, req.user);
   }
   @Post(':domain') create(
     @Param('domain') domain: string,
@@ -226,6 +247,14 @@ export class SkillCmsController {
     @Request() req: any,
   ) {
     return this.service.addSpeakingExercise(domain, id, dto, req.user);
+  }
+  @Patch(':domain/:id/exercises/reorder') reorderExercises(
+    @Param('domain') domain: string,
+    @Param('id') id: string,
+    @Body() dto: SpeakingExerciseReorderDto,
+    @Request() req: any,
+  ) {
+    return this.service.reorderSpeakingExercises(domain, id, dto, req.user);
   }
   @Patch(':domain/:id/exercises/:exerciseId') updateExercise(
     @Param('domain') domain: string,

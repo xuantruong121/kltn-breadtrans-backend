@@ -164,7 +164,11 @@ export class VocabService {
       where: { id: topicId },
     });
 
-    if (!topic || topic.publicationStatus === QuizPublicationStatus.DRAFT) {
+    if (
+      !topic ||
+      (topic.publicationStatus !== undefined &&
+        topic.publicationStatus !== QuizPublicationStatus.PUBLISHED)
+    ) {
       throw new NotFoundException('Topic not found');
     }
 
@@ -242,7 +246,50 @@ export class VocabService {
     };
   }
 
+  private async assertLearnerWordAccess(
+    userId: number,
+    wordId: number,
+  ): Promise<void> {
+    const word = await this.prisma.vocabWord.findUnique({
+      where: { id: wordId },
+      select: {
+        topic: {
+          select: {
+            publicationStatus: true,
+            isPro: true,
+          },
+        },
+      },
+    });
+
+    if (
+      !word ||
+      (word.topic.publicationStatus !== undefined &&
+        word.topic.publicationStatus !== QuizPublicationStatus.PUBLISHED)
+    ) {
+      throw new NotFoundException('Vocabulary word not found');
+    }
+
+    if (word.topic.isPro) {
+      const canAccess = await this.subscriptionService?.hasFeature(
+        userId,
+        PlanFeatureKey.PREMIUM_VOCAB,
+      );
+      if (!canAccess) {
+        throw new ForbiddenException({
+          statusCode: 403,
+          message: 'Premium vocabulary entitlement is required',
+          error: {
+            code: 'FEATURE_NOT_INCLUDED',
+            featureKey: PlanFeatureKey.PREMIUM_VOCAB,
+          },
+        });
+      }
+    }
+  }
+
   async toggleStar(userId: number, wordId: number) {
+    await this.assertLearnerWordAccess(userId, wordId);
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
     });
@@ -276,6 +323,7 @@ export class VocabService {
   }
 
   async setMastered(userId: number, wordId: number, isMastered: boolean) {
+    await this.assertLearnerWordAccess(userId, wordId);
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
     });
@@ -325,6 +373,7 @@ export class VocabService {
   }
 
   async submitReview(userId: number, wordId: number, isCorrect: boolean) {
+    await this.assertLearnerWordAccess(userId, wordId);
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
     });

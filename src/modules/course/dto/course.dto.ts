@@ -13,6 +13,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CourseStatus, ClassStatus } from '@prisma/client';
 import type { PayosIntentDto } from '../../payment/payos-payment.service';
+import { COURSE_LEVELS } from '../course-level.contract';
 
 export class CreateCourseDto {
   @ApiProperty({ example: 'IELTS Mastery' })
@@ -35,6 +36,7 @@ export class CreateCourseDto {
     description: 'BEGINNER | INTERMEDIATE | ADVANCED',
   })
   @IsString()
+  @IsIn([...COURSE_LEVELS])
   @IsOptional()
   level?: string;
 
@@ -62,6 +64,7 @@ export class UpdateCourseDto {
 
   @ApiPropertyOptional({ example: 'INTERMEDIATE' })
   @IsString()
+  @IsIn([...COURSE_LEVELS])
   @IsOptional()
   level?: string;
 

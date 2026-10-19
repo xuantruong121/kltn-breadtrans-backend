@@ -1,0 +1,1025 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  Prisma,
+  QuizPublicationStatus,
+  Role,
+  ToeicAssessmentAttemptComponentStatus,
+  ToeicAssessmentAttemptStatus,
+  ToeicAssessmentComponentKind,
+  ToeicAssessmentProductFamily,
+} from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
+import {
+  CompleteToeicAssessmentComponentDto,
+  CreateToeicAssessmentDto,
+  SetToeicAssessmentComponentsDto,
+  UpdateToeicAssessmentDto,
+} from './toeic-assessment.dto';
+
+const FAMILY_KINDS: Record<
+  ToeicAssessmentProductFamily,
+  ToeicAssessmentComponentKind[]
+> = {
+  TOEIC_LR: [ToeicAssessmentComponentKind.LISTENING_READING],
+  TOEIC_SW: [
+    ToeicAssessmentComponentKind.SPEAKING,
+    ToeicAssessmentComponentKind.WRITING,
+  ],
+  TOEIC_4_SKILLS: [
+    ToeicAssessmentComponentKind.LISTENING_READING,
+    ToeicAssessmentComponentKind.SPEAKING,
+    ToeicAssessmentComponentKind.WRITING,
+  ],
+};
+
+type ComponentInput = SetToeicAssessmentComponentsDto['components'][number];
+
+@Injectable()
+export class ToeicAssessmentService {
+  constructor(
+    private readonly db: PrismaService,
+    private readonly quizAccess: QuizContentAccessService,
+  ) {}
+
+  async listAdmin() {
+    const assessments = await this.db.toeicAssessment.findMany({
+      include: this.componentInclude(),
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+    });
+    return Promise.all(
+      assessments.map((assessment) => this.projectAdmin(assessment)),
+    );
+  }
+
+  async listLearner(userId: number) {
+    const assessments = await this.db.toeicAssessment.findMany({
+      where: { publicationStatus: QuizPublicationStatus.PUBLISHED },
+      include: this.componentInclude(),
+      orderBy: { updatedAt: 'desc' },
+    });
+    const attempts = await this.db.toeicAssessmentAttempt.findMany({
+      where: {
+        userId,
+        status: {
+          in: [
+            ToeicAssessmentAttemptStatus.IN_PROGRESS,
+            ToeicAssessmentAttemptStatus.COMPLETED,
+          ],
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        assessmentId: true,
+        status: true,
+        startedAt: true,
+        completedAt: true,
+      },
+    });
+    const latest = new Map<number, (typeof attempts)[number]>();
+    for (const attempt of attempts)
+      if (!latest.has(attempt.assessmentId))
+        latest.set(attempt.assessmentId, attempt);
+    return Promise.all(
+      assessments.map(async (assessment) => ({
+        id: assessment.id,
+        title: assessment.title,
+        description: assessment.description,
+        productFamily: assessment.productFamily,
+        version: assessment.version,
+        components: await this.projectComponents(assessment.components),
+        attempt: latest.get(assessment.id) ?? null,
+      })),
+    );
+  }
+
+  async getAdmin(id: number) {
+    const assessment = await this.findAssessment(id);
+    return this.projectAdmin(assessment);
+  }
+
+  async getLearnerDetail(id: number, userId: number) {
+    const assessment = await this.db.toeicAssessment.findFirst({
+      where: { id, publicationStatus: QuizPublicationStatus.PUBLISHED },
+      include: this.componentInclude(),
+    });
+    if (!assessment)
+      throw new NotFoundException(
+        'Không tìm thấy bài đánh giá TOEIC đã xuất bản',
+      );
+    const attempt = await this.db.toeicAssessmentAttempt.findFirst({
+      where: { assessmentId: id, userId },
+      orderBy: { updatedAt: 'desc' },
+      include: this.attemptInclude(),
+    });
+    return {
+      id: assessment.id,
+      title: assessment.title,
+      description: assessment.description,
+      productFamily: assessment.productFamily,
+      version: assessment.version,
+      components: await this.projectComponents(assessment.components),
+      attempt: attempt ? this.projectAttempt(attempt) : null,
+    };
+  }
+
+  async create(dto: CreateToeicAssessmentDto, createdBy?: number) {
+    const title = dto.title?.trim();
+    if (!title)
+      throw new BadRequestException('Tên bài đánh giá không được để trống');
+    return this.db.toeicAssessment.create({
+      data: {
+        title,
+        description: dto.description?.trim() || null,
+        productFamily: dto.productFamily,
+        createdBy: createdBy ?? null,
+      },
+      include: this.componentInclude(),
+    });
+  }
+
+  async update(id: number, dto: UpdateToeicAssessmentDto) {
+    const assessment = await this.findAssessment(id);
+    this.assertDraft(assessment.publicationStatus);
+    return this.db.toeicAssessment.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
+        ...(dto.description !== undefined
+          ? { description: dto.description?.trim() || null }
+          : {}),
+        ...(dto.productFamily !== undefined
+          ? { productFamily: dto.productFamily }
+          : {}),
+      },
+      include: this.componentInclude(),
+    });
+  }
+
+  async setComponents(id: number, dto: SetToeicAssessmentComponentsDto) {
+    const assessment = await this.findAssessment(id);
+    this.assertDraft(assessment.publicationStatus);
+    await this.assertNoAttempts(id);
+    this.assertFamilyComponents(assessment.productFamily, dto.components);
+    for (const component of dto.components)
+      this.assertComponentSourceShape(component);
+    await this.assertSourcesExist(dto.components);
+
+    await this.db.$transaction(async (tx) => {
+      await tx.toeicAssessmentComponent.deleteMany({
+        where: { assessmentId: id },
+      });
+      await tx.toeicAssessmentComponent.createMany({
+        data: dto.components.map((component) => ({
+          assessmentId: id,
+          kind: component.kind,
+          order: component.order,
+          required: component.required ?? true,
+          lrExamSetId: component.lrExamSetId ?? null,
+          speakingPracticeSetId: component.speakingPracticeSetId ?? null,
+          writingSetId: component.writingSetId ?? null,
+        })),
+      });
+    });
+    return this.getAdmin(id);
+  }
+
+  async publish(id: number) {
+    const assessment = await this.findAssessment(id);
+    this.assertDraft(assessment.publicationStatus);
+    await this.assertPublishable(assessment);
+    return this.db.toeicAssessment.update({
+      where: { id },
+      data: { publicationStatus: QuizPublicationStatus.PUBLISHED },
+      include: this.componentInclude(),
+    });
+  }
+
+  async unpublish(id: number) {
+    await this.findAssessment(id);
+    if (
+      await this.db.toeicAssessmentAttempt.count({
+        where: { assessmentId: id },
+      })
+    ) {
+      throw new ConflictException(
+        'Bài đánh giá đã có lịch sử; hãy tạo phiên bản mới thay vì gỡ xuất bản',
+      );
+    }
+    return this.db.toeicAssessment.update({
+      where: { id },
+      data: { publicationStatus: QuizPublicationStatus.DRAFT },
+      include: this.componentInclude(),
+    });
+  }
+
+  async startAttempt(
+    assessmentId: number,
+    userId: number,
+    idempotencyKey?: string,
+  ) {
+    const assessment = await this.getPublishedAssessment(assessmentId);
+    await this.assertLearnerEntitlements(assessment, userId);
+    const key = idempotencyKey?.trim() || null;
+
+    const attemptId = await this.db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`toeic-assessment:${assessmentId}:${userId}`}))`;
+      if (key) {
+        const sameKey = await tx.toeicAssessmentAttempt.findFirst({
+          where: { assessmentId, userId, idempotencyKey: key },
+        });
+        if (sameKey) return sameKey.id;
+      }
+      const active = await tx.toeicAssessmentAttempt.findFirst({
+        where: {
+          assessmentId,
+          userId,
+          status: ToeicAssessmentAttemptStatus.IN_PROGRESS,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (active) return active.id;
+      const created = await tx.toeicAssessmentAttempt.create({
+        data: {
+          assessmentId,
+          userId,
+          idempotencyKey: key,
+          components: {
+            create: assessment.components.map((component) => ({
+              assessmentComponentId: component.id,
+            })),
+          },
+        },
+      });
+      return created.id;
+    });
+    return this.getAttempt(attemptId, userId);
+  }
+
+  async getAttempt(attemptId: number, userId: number) {
+    const attempt = await this.db.toeicAssessmentAttempt.findUnique({
+      where: { id: attemptId },
+      include: this.attemptInclude(),
+    });
+    if (!attempt)
+      throw new NotFoundException('Không tìm thấy lượt làm bài đánh giá');
+    if (attempt.userId !== userId)
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập lượt làm bài này',
+      );
+    return this.projectAttempt(attempt);
+  }
+
+  async startComponent(attemptId: number, componentId: number, userId: number) {
+    const attempt = await this.getOwnedAttempt(attemptId, userId);
+    const state = attempt.components.find(
+      (item) => item.assessmentComponentId === componentId,
+    );
+    if (!state)
+      throw new NotFoundException('Component không thuộc lượt làm bài này');
+    if (attempt.status === ToeicAssessmentAttemptStatus.COMPLETED)
+      return this.getAttempt(attemptId, userId);
+
+    const component = await this.db.toeicAssessmentComponent.findUnique({
+      where: { id: componentId },
+    });
+    if (!component) throw new NotFoundException('Không tìm thấy component');
+    const assessment = await this.getPublishedAssessment(attempt.assessmentId);
+    await this.assertLearnerEntitlements(assessment, userId);
+
+    await this.db.$transaction(async (tx) => {
+      const current = await tx.toeicAssessmentAttemptComponent.findUnique({
+        where: { id: state.id },
+      });
+      if (
+        !current ||
+        current.status === ToeicAssessmentAttemptComponentStatus.COMPLETED
+      )
+        return;
+      const data: Prisma.ToeicAssessmentAttemptComponentUpdateInput = {
+        status: ToeicAssessmentAttemptComponentStatus.IN_PROGRESS,
+        startedAt: current.startedAt ?? new Date(),
+      };
+      if (
+        component.kind === ToeicAssessmentComponentKind.LISTENING_READING &&
+        !current.toeicAttemptId
+      ) {
+        const source = await tx.toeicExamSet.findUnique({
+          where: { id: component.lrExamSetId! },
+        });
+        if (
+          !source ||
+          source.publicationStatus !== QuizPublicationStatus.PUBLISHED
+        )
+          throw new BadRequestException('Nguồn L&R chưa sẵn sàng');
+        const child = await tx.toeicAttempt.create({
+          data: {
+            userId,
+            examId: source.id,
+            mode: 'FULL_TEST',
+            status: 'PENDING_START',
+            durationSeconds: source.durationSeconds,
+          },
+        });
+        data.toeicAttempt = { connect: { id: child.id } };
+      }
+      await tx.toeicAssessmentAttemptComponent.update({
+        where: { id: current.id },
+        data,
+      });
+    });
+    return this.getAttempt(attemptId, userId);
+  }
+
+  async completeComponent(
+    attemptId: number,
+    componentId: number,
+    userId: number,
+    dto: CompleteToeicAssessmentComponentDto,
+  ) {
+    const attempt = await this.getOwnedAttempt(attemptId, userId);
+    const state = attempt.components.find(
+      (item) => item.assessmentComponentId === componentId,
+    );
+    if (!state)
+      throw new NotFoundException('Component không thuộc lượt làm bài này');
+    if (state.status === ToeicAssessmentAttemptComponentStatus.COMPLETED)
+      return this.getAttempt(attemptId, userId);
+    const component = await this.db.toeicAssessmentComponent.findUnique({
+      where: { id: componentId },
+    });
+    if (!component) throw new NotFoundException('Không tìm thấy component');
+
+    await this.db.$transaction(async (tx) => {
+      if (component.kind === ToeicAssessmentComponentKind.LISTENING_READING) {
+        if (!state.toeicAttemptId)
+          throw new BadRequestException('Component L&R chưa được khởi tạo');
+        const child = await tx.toeicAttempt.findUnique({
+          where: { id: state.toeicAttemptId },
+        });
+        if (!child || child.userId !== userId || child.status !== 'SUBMITTED')
+          throw new BadRequestException('Bài L&R chưa được nộp hoàn tất');
+      } else if (component.kind === ToeicAssessmentComponentKind.SPEAKING) {
+        await this.attachSpeakingSubmissions(
+          tx,
+          state.id,
+          component.speakingPracticeSetId!,
+          userId,
+          dto.speakingSubmissionIds ?? [],
+          state.startedAt ?? attempt.startedAt,
+        );
+      } else {
+        await this.attachWritingSubmissions(
+          tx,
+          state.id,
+          component.writingSetId!,
+          userId,
+          dto.writingSubmissionIds ?? [],
+          state.startedAt ?? attempt.startedAt,
+        );
+      }
+      await tx.toeicAssessmentAttemptComponent.update({
+        where: { id: state.id },
+        data: {
+          status: ToeicAssessmentAttemptComponentStatus.COMPLETED,
+          submittedAt: new Date(),
+          completedAt: new Date(),
+        },
+      });
+      await this.completeParentIfReady(tx, attemptId);
+    });
+    return this.getAttempt(attemptId, userId);
+  }
+
+  async history(userId: number) {
+    const attempts = await this.db.toeicAssessmentAttempt.findMany({
+      where: { userId },
+      orderBy: { startedAt: 'desc' },
+      include: this.attemptInclude(),
+    });
+    return attempts.map((attempt) => this.projectAttempt(attempt));
+  }
+
+  private componentInclude(): Prisma.ToeicAssessmentInclude {
+    return {
+      components: {
+        orderBy: { order: 'asc' as const },
+        include: {
+          lrExamSet: true,
+          speakingPracticeSet: {
+            include: {
+              exercises: {
+                orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                include: { stimulus: { select: { kind: true } } },
+              },
+            },
+          },
+          writingSet: {
+            include: {
+              items: {
+                include: { writingQuiz: true },
+                orderBy: { order: 'asc' as const },
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  private attemptInclude() {
+    return {
+      assessment: { include: this.componentInclude() },
+      components: {
+        orderBy: { assessmentComponent: { order: 'asc' as const } },
+        include: {
+          assessmentComponent: true,
+          toeicAttempt: true,
+          speakingSubmissions: { include: { speakingSubmission: true } },
+          writingSubmissions: {
+            include: { submission: { include: { results: true } } },
+          },
+        },
+      },
+    } as const;
+  }
+
+  private async findAssessment(id: number) {
+    const assessment = await this.db.toeicAssessment.findUnique({
+      where: { id },
+      include: this.componentInclude(),
+    });
+    if (!assessment)
+      throw new NotFoundException('Không tìm thấy bài đánh giá TOEIC');
+    return assessment;
+  }
+
+  private async getPublishedAssessment(id: number) {
+    const assessment = await this.findAssessment(id);
+    if (assessment.publicationStatus !== QuizPublicationStatus.PUBLISHED)
+      throw new NotFoundException('Bài đánh giá chưa được xuất bản');
+    await this.assertPublishable(assessment);
+    return assessment;
+  }
+
+  private async getOwnedAttempt(id: number, userId: number) {
+    const attempt = await this.db.toeicAssessmentAttempt.findUnique({
+      where: { id },
+      include: this.attemptInclude(),
+    });
+    if (!attempt)
+      throw new NotFoundException('Không tìm thấy lượt làm bài đánh giá');
+    if (attempt.userId !== userId)
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập lượt làm bài này',
+      );
+    return attempt;
+  }
+
+  private assertDraft(status: QuizPublicationStatus) {
+    if (status !== QuizPublicationStatus.DRAFT)
+      throw new ConflictException(
+        'Chỉ được chỉnh sửa composition ở trạng thái DRAFT',
+      );
+  }
+
+  private async assertNoAttempts(id: number) {
+    if (
+      await this.db.toeicAssessmentAttempt.count({
+        where: { assessmentId: id },
+      })
+    ) {
+      throw new ConflictException(
+        'Composition đã có lịch sử; không thể thay thế component',
+      );
+    }
+  }
+
+  private assertFamilyComponents(
+    family: ToeicAssessmentProductFamily,
+    components: ComponentInput[],
+  ) {
+    const expected = FAMILY_KINDS[family];
+    const actual = [...components]
+      .sort((a, b) => a.order - b.order)
+      .map((component) => component.kind);
+    if (
+      actual.length !== expected.length ||
+      actual.some((kind, index) => kind !== expected[index])
+    ) {
+      throw new BadRequestException(
+        `Product family ${family} yêu cầu đúng component: ${expected.join(', ')}`,
+      );
+    }
+    const orders = [...components]
+      .sort((a, b) => a.order - b.order)
+      .map((component) => component.order);
+    if (orders.some((order, index) => order !== index + 1))
+      throw new BadRequestException('Thứ tự component phải liên tục từ 1');
+  }
+
+  private assertComponentSourceShape(component: ComponentInput) {
+    const sources = [
+      component.lrExamSetId,
+      component.speakingPracticeSetId,
+      component.writingSetId,
+    ].filter((value) => value !== undefined && value !== null);
+    if (sources.length !== 1)
+      throw new BadRequestException(
+        'Mỗi component phải có đúng một nguồn authoritative',
+      );
+    if (
+      component.kind === ToeicAssessmentComponentKind.LISTENING_READING &&
+      component.lrExamSetId === undefined
+    )
+      throw new BadRequestException('L&R cần lrExamSetId');
+    if (
+      component.kind === ToeicAssessmentComponentKind.SPEAKING &&
+      component.speakingPracticeSetId === undefined
+    )
+      throw new BadRequestException('Speaking cần speakingPracticeSetId');
+    if (
+      component.kind === ToeicAssessmentComponentKind.WRITING &&
+      component.writingSetId === undefined
+    )
+      throw new BadRequestException('Writing cần writingSetId');
+  }
+
+  private async assertSourcesExist(components: ComponentInput[]) {
+    for (const component of components) {
+      if (
+        component.lrExamSetId &&
+        !(await this.db.toeicExamSet.findUnique({
+          where: { id: component.lrExamSetId },
+          select: { id: true },
+        }))
+      )
+        throw new BadRequestException('Không tìm thấy nguồn L&R');
+      if (
+        component.speakingPracticeSetId &&
+        !(await this.db.speakingPracticeSet.findUnique({
+          where: { id: component.speakingPracticeSetId },
+          select: { id: true },
+        }))
+      )
+        throw new BadRequestException('Không tìm thấy nguồn Speaking');
+      if (
+        component.writingSetId &&
+        !(await this.db.toeicWritingSet.findUnique({
+          where: { id: component.writingSetId },
+          select: { id: true },
+        }))
+      )
+        throw new BadRequestException('Không tìm thấy Writing Set');
+    }
+  }
+
+  private async assertPublishable(assessment: {
+    productFamily: ToeicAssessmentProductFamily;
+    components: any[];
+  }) {
+    this.assertFamilyComponents(
+      assessment.productFamily,
+      assessment.components.map((component) => ({
+        ...component,
+        required: component.required,
+      })),
+    );
+    for (const component of assessment.components) {
+      const readiness = await this.componentReadiness(component);
+      if (!readiness.ready)
+        throw new ConflictException(
+          `Component #${component.order} chưa sẵn sàng: ${readiness.reason}`,
+        );
+    }
+  }
+
+  private async componentReadiness(component: any) {
+    if (component.kind === ToeicAssessmentComponentKind.LISTENING_READING) {
+      const source = component.lrExamSet?.groups
+        ? component.lrExamSet
+        : await this.db.toeicExamSet.findUnique({
+            where: { id: component.lrExamSetId },
+            include: {
+              groups: { include: { questions: { select: { id: true } } } },
+            },
+          });
+      const questionCount =
+        source?.groups?.reduce(
+          (total: number, group: any) => total + group.questions.length,
+          0,
+        ) ?? 0;
+      return {
+        ready:
+          source?.publicationStatus === QuizPublicationStatus.PUBLISHED &&
+          questionCount > 0,
+        sourceTitle: source?.title ?? null,
+        reason: !source
+          ? 'Thiếu nguồn'
+          : source.publicationStatus !== QuizPublicationStatus.PUBLISHED
+            ? 'Nguồn chưa PUBLISHED'
+            : questionCount === 0
+              ? 'Nguồn chưa có câu hỏi'
+              : null,
+      };
+    }
+    if (component.kind === ToeicAssessmentComponentKind.SPEAKING) {
+      const source = component.speakingPracticeSet?.exercises
+        ? component.speakingPracticeSet
+        : await this.db.speakingPracticeSet.findUnique({
+            where: { id: component.speakingPracticeSetId },
+            include: {
+              exercises: {
+                select: {
+                  id: true,
+                  title: true,
+                  targetText: true,
+                  taskType: true,
+                  order: true,
+                  imageUrl: true,
+                  stimulusId: true,
+                  stimulus: { select: { kind: true } },
+                  publicationStatus: true,
+                },
+              },
+            },
+          });
+      const exercises = source?.exercises ?? [];
+      const coverage = this.speakingCoverage(exercises);
+      const allPublished =
+        exercises.length > 0 &&
+        exercises.every(
+          (exercise: any) =>
+            exercise.publicationStatus === QuizPublicationStatus.PUBLISHED,
+        );
+      const valid =
+        coverage.total === 11 &&
+        coverage.readAloud === 2 &&
+        coverage.describePicture === 2 &&
+        coverage.respondToQuestions === 3 &&
+        coverage.respondUsingInformation === 3 &&
+        coverage.expressOpinion === 1 &&
+        coverage.authoritativeOrderReady &&
+        coverage.slotTaskTypesReady &&
+        coverage.describePictureMediaReady &&
+        coverage.sharedInformationStimulusReady;
+      return {
+        ready:
+          source?.publicationStatus === QuizPublicationStatus.PUBLISHED &&
+          allPublished &&
+          valid,
+        sourceTitle: source?.title ?? null,
+        coverage,
+        reason: !source
+          ? 'Thiếu nguồn'
+          : source.publicationStatus !== QuizPublicationStatus.PUBLISHED
+            ? 'Nguồn chưa PUBLISHED'
+            : !allPublished
+              ? 'Có exercise chưa PUBLISHED'
+              : !valid
+                ? 'Thiếu coverage TOEIC Speaking 1–11'
+                : null,
+      };
+    }
+    const source =
+      component.writingSet ??
+      (await this.db.toeicWritingSet.findUnique({
+        where: { id: component.writingSetId },
+        include: {
+          items: {
+            include: {
+              writingQuiz: { select: { id: true, publicationStatus: true } },
+            },
+          },
+        },
+      }));
+    const valid =
+      source?.publicationStatus === QuizPublicationStatus.PUBLISHED &&
+      source.items.length === 8 &&
+      source.items.every(
+        (item: any) =>
+          item.writingQuiz.publicationStatus ===
+          QuizPublicationStatus.PUBLISHED,
+      );
+    return {
+      ready: valid,
+      sourceTitle: source?.title ?? null,
+      reason: !source
+        ? 'Thiếu Writing Set'
+        : source.publicationStatus !== QuizPublicationStatus.PUBLISHED
+          ? 'Writing Set chưa PUBLISHED'
+          : source.items.length !== 8
+            ? 'Writing Set cần đúng 8 task'
+            : !valid
+              ? 'Có writing source chưa PUBLISHED'
+              : null,
+    };
+  }
+
+  private speakingCoverage(
+    exercises: Array<{
+      order?: number | null;
+      taskType?: string | null;
+      targetText: string;
+      imageUrl?: string | null;
+      stimulusId?: number | null;
+      stimulus?: { kind: string } | null;
+    }>,
+  ) {
+    const expectedTaskTypes = [
+      'READ_ALOUD',
+      'READ_ALOUD',
+      'DESCRIBE_PICTURE',
+      'DESCRIBE_PICTURE',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_USING_INFORMATION',
+      'RESPOND_USING_INFORMATION',
+      'RESPOND_USING_INFORMATION',
+      'EXPRESS_OPINION',
+    ];
+    const ordered = exercises
+      .slice()
+      .sort(
+        (a, b) =>
+          (a.order ?? Number.MAX_SAFE_INTEGER) -
+          (b.order ?? Number.MAX_SAFE_INTEGER),
+      );
+    const authoritativeOrderReady =
+      exercises.length === expectedTaskTypes.length &&
+      ordered.every((exercise, index) => exercise.order === index + 1);
+    const count = (taskType: string) =>
+      exercises.filter((exercise) => exercise.taskType === taskType).length;
+    const informationExercises = exercises.filter(
+      (exercise) => exercise.taskType === 'RESPOND_USING_INFORMATION',
+    );
+    const informationStimulusIds = [
+      ...new Set(informationExercises.map((exercise) => exercise.stimulusId)),
+    ];
+    return {
+      total: exercises.length,
+      readAloud: count('READ_ALOUD'),
+      describePicture: count('DESCRIBE_PICTURE'),
+      respondToQuestions: count('RESPOND_TO_QUESTION'),
+      respondUsingInformation: count('RESPOND_USING_INFORMATION'),
+      expressOpinion: count('EXPRESS_OPINION'),
+      authoritativeOrderReady,
+      slotTaskTypesReady:
+        authoritativeOrderReady &&
+        ordered.every(
+          (exercise, index) => exercise.taskType === expectedTaskTypes[index],
+        ),
+      describePictureMediaReady: exercises
+        .filter((exercise) => exercise.taskType === 'DESCRIBE_PICTURE')
+        .every((exercise) => Boolean(exercise.imageUrl?.trim())),
+      sharedInformationStimulusReady:
+        informationExercises.length === 3 &&
+        informationStimulusIds.length === 1 &&
+        informationStimulusIds[0] != null &&
+        informationExercises.every(
+          (exercise) => exercise.stimulus?.kind === 'INFORMATION',
+        ),
+    };
+  }
+
+  private async projectAdmin(assessment: any) {
+    return {
+      id: assessment.id,
+      title: assessment.title,
+      description: assessment.description,
+      productFamily: assessment.productFamily,
+      publicationStatus: assessment.publicationStatus,
+      version: assessment.version,
+      components: await this.projectComponents(assessment.components),
+      readiness: await Promise.all(
+        assessment.components.map((component: any) =>
+          this.componentReadiness(component),
+        ),
+      ),
+    };
+  }
+
+  private async projectComponents(components: any[]) {
+    return Promise.all(
+      components.map(async (component) => {
+        const readiness = await this.componentReadiness(component);
+        return {
+          id: component.id,
+          kind: component.kind,
+          order: component.order,
+          required: component.required,
+          sourceId:
+            component.lrExamSetId ??
+            component.speakingPracticeSetId ??
+            component.writingSetId,
+          sourceTitle: readiness.sourceTitle ?? null,
+          readiness,
+        };
+      }),
+    );
+  }
+
+  private projectAttempt(attempt: any) {
+    const components = attempt.components.map((component: any) => ({
+      id: component.id,
+      assessmentComponentId: component.assessmentComponentId,
+      kind: component.assessmentComponent.kind,
+      order: component.assessmentComponent.order,
+      status: component.status,
+      childAttemptId: component.toeicAttemptId ?? null,
+      linkedSpeakingSubmissionIds:
+        component.speakingSubmissions?.map(
+          (link: any) => link.speakingSubmissionId,
+        ) ?? [],
+      linkedWritingSubmissionIds:
+        component.writingSubmissions?.map((link: any) => link.submissionId) ??
+        [],
+    }));
+    return {
+      id: attempt.id,
+      assessmentId: attempt.assessmentId,
+      assessment: {
+        id: attempt.assessment.id,
+        title: attempt.assessment.title,
+        productFamily: attempt.assessment.productFamily,
+      },
+      status: attempt.status,
+      startedAt: attempt.startedAt,
+      submittedAt: attempt.submittedAt,
+      completedAt: attempt.completedAt,
+      components,
+      currentComponent:
+        components.find(
+          (component: any) =>
+            component.status !==
+            ToeicAssessmentAttemptComponentStatus.COMPLETED,
+        ) ?? null,
+      nextComponent:
+        components.find(
+          (component: any) =>
+            component.status !==
+            ToeicAssessmentAttemptComponentStatus.COMPLETED,
+        ) ?? null,
+      result: {
+        components: components.map((component: any) => ({
+          kind: component.kind,
+          status: component.status,
+          childAttemptId: component.childAttemptId,
+          linkedSpeakingSubmissionCount:
+            component.linkedSpeakingSubmissionIds.length,
+          linkedWritingSubmissionCount:
+            component.linkedWritingSubmissionIds.length,
+        })),
+      },
+    };
+  }
+
+  private async assertLearnerEntitlements(assessment: any, userId: number) {
+    for (const component of assessment.components) {
+      if (component.kind !== ToeicAssessmentComponentKind.WRITING) continue;
+      const writingSet =
+        component.writingSet ??
+        (await this.db.toeicWritingSet.findUnique({
+          where: { id: component.writingSetId },
+          include: { items: { include: { writingQuiz: true } } },
+        }));
+      for (const item of writingSet?.items ?? [])
+        await this.quizAccess.assertAccess(
+          item.writingQuiz,
+          userId,
+          Role.STUDENT,
+        );
+    }
+  }
+
+  private async attachSpeakingSubmissions(
+    tx: Prisma.TransactionClient,
+    attemptComponentId: number,
+    practiceSetId: string,
+    userId: number,
+    submissionIds: number[],
+    startedAt: Date,
+  ) {
+    const uniqueIds = [...new Set(submissionIds)];
+    const [exercises, submissions] = await Promise.all([
+      tx.speakingExercise.findMany({
+        where: {
+          practiceSetId,
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
+        },
+        select: { id: true },
+      }),
+      tx.speakingSubmission.findMany({
+        where: {
+          id: { in: uniqueIds },
+          userId,
+          status: 'COMPLETED',
+          submittedAt: { gte: startedAt },
+        },
+        select: { id: true, exerciseId: true },
+      }),
+    ]);
+    if (
+      exercises.length === 0 ||
+      submissions.length !== uniqueIds.length ||
+      new Set(submissions.map((submission) => submission.exerciseId)).size !==
+        exercises.length ||
+      !exercises.every((exercise) =>
+        submissions.some((submission) => submission.exerciseId === exercise.id),
+      )
+    )
+      throw new BadRequestException(
+        'Speaking component chưa có đủ submission hoàn tất',
+      );
+    await tx.toeicAssessmentSpeakingSubmission.createMany({
+      data: submissions.map((submission) => ({
+        attemptComponentId,
+        speakingSubmissionId: submission.id,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  private async attachWritingSubmissions(
+    tx: Prisma.TransactionClient,
+    attemptComponentId: number,
+    writingSetId: number,
+    userId: number,
+    submissionIds: number[],
+    startedAt: Date,
+  ) {
+    const uniqueIds = [...new Set(submissionIds)];
+    const set = await tx.toeicWritingSet.findUnique({
+      where: { id: writingSetId },
+      include: { items: { select: { writingQuizId: true } } },
+    });
+    const submissions = await tx.submission.findMany({
+      where: { id: { in: uniqueIds }, userId, submittedAt: { gte: startedAt } },
+      include: { results: true },
+    });
+    const byQuiz = new Map(
+      submissions.map((submission) => [submission.quizId, submission]),
+    );
+    const valid = Boolean(
+      set &&
+      set.items.length === 8 &&
+      uniqueIds.length === 8 &&
+      set.items.every((item) => {
+        const submission = byQuiz.get(item.writingQuizId);
+        return (
+          submission &&
+          (submission.score !== null ||
+            submission.results.some((result) => result.score !== null))
+        );
+      }),
+    );
+    if (!valid)
+      throw new BadRequestException(
+        'Writing component cần đủ 8 submission/result hoàn tất theo Set #2',
+      );
+    await tx.toeicAssessmentWritingSubmission.createMany({
+      data: submissions.map((submission) => ({
+        attemptComponentId,
+        submissionId: submission.id,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  private async completeParentIfReady(
+    tx: Prisma.TransactionClient,
+    attemptId: number,
+  ) {
+    const required = await tx.toeicAssessmentAttemptComponent.findMany({
+      where: { assessmentAttemptId: attemptId },
+      include: { assessmentComponent: true },
+    });
+    if (
+      required.length > 0 &&
+      required
+        .filter((component) => component.assessmentComponent.required)
+        .every(
+          (component) =>
+            component.status ===
+            ToeicAssessmentAttemptComponentStatus.COMPLETED,
+        )
+    ) {
+      await tx.toeicAssessmentAttempt.update({
+        where: { id: attemptId },
+        data: {
+          status: ToeicAssessmentAttemptStatus.COMPLETED,
+          submittedAt: new Date(),
+          completedAt: new Date(),
+        },
+      });
+    }
+  }
+}

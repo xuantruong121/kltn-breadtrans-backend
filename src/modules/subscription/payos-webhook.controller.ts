@@ -48,6 +48,7 @@ export class PayosWebhookController {
         intent.coursePayment.amountVnd,
       );
     }
+    await this.payos.markWebhookFulfilled(intent.id);
     return { success: true };
   }
 }

@@ -486,6 +486,36 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
             throw new Error('P2_INSUFFICIENT');
           }
 
+          const [p1Stats, p2Stats] = await Promise.all([
+            tx.userStats.findUniqueOrThrow({ where: { userId: p1.userId } }),
+            tx.userStats.findUniqueOrThrow({ where: { userId: p2.userId } }),
+          ]);
+
+          await tx.banhTransaction.createMany({
+            data: [
+              {
+                userId: p1.userId,
+                amount: -stake,
+                source: 'ARENA_STAKE',
+                reference: `arena:match:${matchId}:stake:${p1.userId}`,
+                dateKey: this.getVietnamDateKey(),
+                isCapped: false,
+                balanceAfter: p1Stats.totalBanhRan,
+                metadata: { matchId, stake } as any,
+              },
+              {
+                userId: p2.userId,
+                amount: -stake,
+                source: 'ARENA_STAKE',
+                reference: `arena:match:${matchId}:stake:${p2.userId}`,
+                dateKey: this.getVietnamDateKey(),
+                isCapped: false,
+                balanceAfter: p2Stats.totalBanhRan,
+                metadata: { matchId, stake } as any,
+              },
+            ],
+          });
+
           // Log escrow currency transactions
           await tx.currencyTransaction.createMany({
             data: [
@@ -1114,6 +1144,19 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
             },
           });
 
+          await tx.banhTransaction.create({
+            data: {
+              userId: winner.userId,
+              amount: totalReward,
+              source: 'ARENA_WIN',
+              reference: `arena:match:${match.matchId}:reward:${winner.userId}`,
+              dateKey: this.getVietnamDateKey(),
+              isCapped: false,
+              balanceAfter: stats.totalBanhRan,
+              metadata: { matchId: match.matchId, totalReward } as any,
+            },
+          });
+
           return { updatedStats: stats };
         });
 
@@ -1176,6 +1219,37 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
               ],
             });
 
+            await tx.banhTransaction.createMany({
+              data: [
+                {
+                  userId: match.p1.userId,
+                  amount: match.stake,
+                  source: 'ARENA_REFUND',
+                  reference: `arena:match:${match.matchId}:refund:${match.p1.userId}`,
+                  dateKey: this.getVietnamDateKey(),
+                  isCapped: false,
+                  balanceAfter: s1.totalBanhRan,
+                  metadata: {
+                    matchId: match.matchId,
+                    stake: match.stake,
+                  } as any,
+                },
+                {
+                  userId: match.p2.userId,
+                  amount: match.stake,
+                  source: 'ARENA_REFUND',
+                  reference: `arena:match:${match.matchId}:refund:${match.p2.userId}`,
+                  dateKey: this.getVietnamDateKey(),
+                  isCapped: false,
+                  balanceAfter: s2.totalBanhRan,
+                  metadata: {
+                    matchId: match.matchId,
+                    stake: match.stake,
+                  } as any,
+                },
+              ],
+            });
+
             return { p1Stats: s1, p2Stats: s2 };
           },
         );
@@ -1234,6 +1308,15 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
         'if redis.call(get, KEYS[1]) == ARGV[1] then return redis.call(del, KEYS[1]) else return 0 end';
       await this.redis.eval(unlockScript, 1, lockKey, lockOwner);
     }
+  }
+
+  private getVietnamDateKey() {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
   }
 
   // ==========================================

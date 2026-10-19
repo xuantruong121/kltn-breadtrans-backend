@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import type { SpeakingTaskType } from '../speaking/speaking-contract';
 import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
 import type {
   IAIEvaluator,
@@ -22,6 +23,16 @@ import type {
   ContextualListeningContentSuggestion,
   ContextualListeningQuestionsSuggestion,
   ContextualWritingTaskSuggestion,
+  ContextualSpeakingPracticeSetSuggestion,
+  ContextualSpeakingExercisesSuggestion,
+  ContextualSpeakingFullDraftSuggestion,
+  ContextualListeningFullDraftSuggestion,
+  ContextualReadingFullDraftSuggestion,
+  ContextualVocabFullDraftSuggestion,
+  ContextualGrammarFullDraftSuggestion,
+  ToeicExamBatch,
+  ToeicExamBatchRequest,
+  ToeicSpeakingWritingDraft,
 } from './strategies/ai-evaluator.interface';
 
 /**
@@ -124,6 +135,46 @@ export class AiService {
     return this.aiEvaluator.generateToeicQuestions(topic, part, count);
   }
 
+  async generateToeicExamBatch(
+    input: ToeicExamBatchRequest,
+  ): Promise<ToeicExamBatch> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.generateToeicExamBatch) {
+      throw new BadRequestException(
+        'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo batch đề TOEIC',
+      );
+    }
+    return this.aiEvaluator.generateToeicExamBatch(input);
+  }
+
+  async generateToeicExamImage(input: {
+    brief: string;
+    part: number;
+  }): Promise<{ buffer: Buffer; mimeType: string }> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.generateToeicExamImage) {
+      throw new BadRequestException(
+        'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo ảnh đề TOEIC',
+      );
+    }
+    return this.aiEvaluator.generateToeicExamImage(input);
+  }
+
+  async generateToeicSpeakingWritingDraft(input: {
+    topic?: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    includeSpeaking: boolean;
+    includeWriting: boolean;
+  }): Promise<ToeicSpeakingWritingDraft> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.generateToeicSpeakingWritingDraft) {
+      throw new BadRequestException(
+        'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo đề TOEIC Speaking/Writing',
+      );
+    }
+    return this.aiEvaluator.generateToeicSpeakingWritingDraft(input);
+  }
+
   async generateDictation(topic: string, count: number): Promise<any[]> {
     return this.aiEvaluator.generateDictation(topic, count);
   }
@@ -164,6 +215,71 @@ export class AiService {
       return Buffer.from(arrayBuffer);
     } catch (e) {
       this.logger.error('Error in Azure TTS:', e);
+      return null;
+    }
+  }
+
+  /** Authoring-only TOEIC Listening TTS. The stored transcript remains the
+   * source of truth; speaker labels are mapped deterministically to voices so
+   * a Part 3 conversation is not flattened into one random voice. */
+  async generateToeicListeningAudio(
+    transcript: string,
+  ): Promise<Buffer | null> {
+    const azureKey = process.env.AZURE_SPEECH_KEY;
+    const azureRegion = process.env.AZURE_SPEECH_REGION;
+    if (!azureKey || !azureRegion) return null;
+    const escapeXml = (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    const turns = transcript
+      .split(/\r?\n/)
+      .map((line) => {
+        const match = /^\s*([^:]{1,40}):\s*(.+)$/.exec(line);
+        return match
+          ? { speaker: match[1].trim(), text: match[2].trim() }
+          : { speaker: 'Narrator', text: line.trim() };
+      })
+      .filter((turn) => turn.text);
+    if (!turns.length) return null;
+    const voicePool = [
+      'en-US-JennyNeural',
+      'en-US-GuyNeural',
+      'en-US-AriaNeural',
+      'en-US-DavisNeural',
+    ];
+    const voiceBySpeaker = new Map<string, string>();
+    const body = turns
+      .map((turn) => {
+        if (!voiceBySpeaker.has(turn.speaker))
+          voiceBySpeaker.set(
+            turn.speaker,
+            voicePool[voiceBySpeaker.size % voicePool.length],
+          );
+        return `<voice name="${voiceBySpeaker.get(turn.speaker)}"><prosody rate="0%">${escapeXml(turn.text)}</prosody></voice><break time="250ms"/>`;
+      })
+      .join('');
+    try {
+      const response = await fetch(
+        `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,
+        {
+          method: 'POST',
+          headers: {
+            'Ocp-Apim-Subscription-Key': azureKey,
+            'Content-Type': 'application/ssml+xml',
+            'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+            'User-Agent': 'BreadTransToeicAuthoring',
+          },
+          body: `<speak version="1.0" xml:lang="en-US">${body}</speak>`,
+        },
+      );
+      if (!response.ok) return null;
+      return Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      this.logger.error('Không thể tạo TOEIC Listening audio', error);
       return null;
     }
   }
@@ -416,5 +532,122 @@ export class AiService {
       );
     }
     return this.aiEvaluator.suggestWritingTask(input);
+  }
+
+  async suggestSpeakingPracticeSet(input: {
+    topic: string;
+    level: string;
+    category: string;
+    categoryContext?: import('./strategies/ai-evaluator.interface').SpeakingCategoryAiContext;
+    currentTitle?: string;
+    currentDescription?: string;
+  }): Promise<ContextualSpeakingPracticeSetSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestSpeakingPracticeSet) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý bộ luyện nói',
+      );
+    }
+    return this.aiEvaluator.suggestSpeakingPracticeSet(input);
+  }
+
+  async suggestSpeakingExercises(input: {
+    practiceSetTitle: string;
+    practiceSetDescription?: string;
+    level: string;
+    category: string;
+    categoryContext?: import('./strategies/ai-evaluator.interface').SpeakingCategoryAiContext;
+    currentTitle?: string;
+    currentTargetText?: string;
+    taskType?: SpeakingTaskType;
+    existingExerciseTitles?: string[];
+    count: number;
+  }): Promise<ContextualSpeakingExercisesSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestSpeakingExercises) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ gợi ý câu luyện nói',
+      );
+    }
+    return this.aiEvaluator.suggestSpeakingExercises(input);
+  }
+
+  async suggestSpeakingFullDraft(input: {
+    topic: string;
+    level: string;
+    category: string;
+    categoryContext?: import('./strategies/ai-evaluator.interface').SpeakingCategoryAiContext;
+    objective?: string;
+    taskType?: SpeakingTaskType;
+    count: number;
+  }): Promise<ContextualSpeakingFullDraftSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestSpeakingFullDraft) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ soạn bộ luyện nói',
+      );
+    }
+    return this.aiEvaluator.suggestSpeakingFullDraft(input);
+  }
+
+  async suggestListeningFullDraft(input: {
+    topic: string;
+    level?: string;
+    mode: 'DIALOGUE' | 'DICTATION';
+    count: number;
+  }): Promise<ContextualListeningFullDraftSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestListeningFullDraft) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ soạn bài nghe',
+      );
+    }
+    return this.aiEvaluator.suggestListeningFullDraft(input);
+  }
+
+  async suggestReadingFullDraft(input: {
+    topic: string;
+    level: string;
+    targetLength?: number;
+    microSkill?: string;
+    count: number;
+  }): Promise<ContextualReadingFullDraftSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestReadingFullDraft) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ soạn bài đọc',
+      );
+    }
+    return this.aiEvaluator.suggestReadingFullDraft(input);
+  }
+
+  async suggestVocabFullDraft(input: {
+    topic: string;
+    level?: string;
+    context?: string;
+    count: number;
+  }): Promise<ContextualVocabFullDraftSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestVocabFullDraft) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ soạn chủ đề từ vựng',
+      );
+    }
+    return this.aiEvaluator.suggestVocabFullDraft(input);
+  }
+
+  async suggestGrammarFullDraft(input: {
+    topicTitle: string;
+    level: string;
+    objective?: string;
+    count: number;
+  }): Promise<ContextualGrammarFullDraftSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestGrammarFullDraft) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ soạn bài ngữ pháp',
+      );
+    }
+    return this.aiEvaluator.suggestGrammarFullDraft(input);
   }
 }

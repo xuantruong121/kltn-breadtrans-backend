@@ -1,3 +1,5 @@
+import type { SpeakingTaskType } from '../../speaking/speaking-contract';
+
 export const AI_EVALUATOR_TOKEN = 'AI_EVALUATOR_STRATEGY';
 
 export interface WordAssessment {
@@ -124,6 +126,19 @@ export interface IAIEvaluator {
     part: number,
     count: number,
   ): Promise<any[]>;
+
+  /** Phase 8.9B: bounded TOEIC practice batch. The TOEIC domain validates this
+   * untrusted candidate before it can become a Draft row. */
+  generateToeicExamBatch?(
+    input: ToeicExamBatchRequest,
+  ): Promise<ToeicExamBatch>;
+
+  /** Optional image capability. Returning bytes (not a URL) prevents a
+   * provider from inventing remote media references. */
+  generateToeicExamImage?(input: {
+    brief: string;
+    part: number;
+  }): Promise<{ buffer: Buffer; mimeType: string }>;
 
   /**
    * Tự động sinh danh sách câu hỏi Luyện nghe (Chép chính tả)
@@ -279,7 +294,101 @@ export interface IAIEvaluator {
     wordMin?: number;
     wordMax?: number;
   }): Promise<ContextualWritingTaskSuggestion>;
+
+  /** Phase 8.8: Speaking practice-set draft only; no persistence or media. */
+  suggestSpeakingPracticeSet?(input: {
+    topic: string;
+    level: string;
+    category: string;
+    categoryContext?: SpeakingCategoryAiContext;
+    currentTitle?: string;
+    currentDescription?: string;
+  }): Promise<ContextualSpeakingPracticeSetSuggestion>;
+
+  /** Phase 8.8: Speaking exercise drafts only; parent context stays explicit. */
+  suggestSpeakingExercises?(input: {
+    practiceSetTitle: string;
+    practiceSetDescription?: string;
+    level: string;
+    category: string;
+    categoryContext?: SpeakingCategoryAiContext;
+    currentTitle?: string;
+    currentTargetText?: string;
+    taskType?: SpeakingTaskType;
+    existingExerciseTitles?: string[];
+    count: number;
+  }): Promise<ContextualSpeakingExercisesSuggestion>;
+
+  suggestSpeakingFullDraft?(input: {
+    topic: string;
+    level: string;
+    category: string;
+    categoryContext?: SpeakingCategoryAiContext;
+    objective?: string;
+    taskType?: SpeakingTaskType;
+    count: number;
+  }): Promise<ContextualSpeakingFullDraftSuggestion>;
+
+  /** Structured TOEIC S&W draft only. Persistence and publishing stay in the exam domain. */
+  generateToeicSpeakingWritingDraft?(input: {
+    topic?: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    includeSpeaking: boolean;
+    includeWriting: boolean;
+  }): Promise<ToeicSpeakingWritingDraft>;
+
+  suggestListeningFullDraft?(input: {
+    topic: string;
+    level?: string;
+    mode: 'DIALOGUE' | 'DICTATION';
+    count: number;
+  }): Promise<ContextualListeningFullDraftSuggestion>;
+
+  suggestReadingFullDraft?(input: {
+    topic: string;
+    level: string;
+    targetLength?: number;
+    microSkill?: string;
+    count: number;
+  }): Promise<ContextualReadingFullDraftSuggestion>;
+
+  suggestVocabFullDraft?(input: {
+    topic: string;
+    level?: string;
+    context?: string;
+    count: number;
+  }): Promise<ContextualVocabFullDraftSuggestion>;
+
+  suggestGrammarFullDraft?(input: {
+    topicTitle: string;
+    level: string;
+    objective?: string;
+    count: number;
+  }): Promise<ContextualGrammarFullDraftSuggestion>;
 }
+
+export type ToeicExamBatchQuestion = {
+  text?: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+};
+
+export type ToeicExamBatchGroup = {
+  transcript?: string;
+  passageText?: string;
+  imageBrief?: string;
+  questions: ToeicExamBatchQuestion[];
+};
+
+export type ToeicExamBatchRequest = {
+  part: number;
+  topic?: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  groups: Array<{ questionCount: number; kind?: 'SINGLE' | 'MULTIPLE' }>;
+};
+
+export type ToeicExamBatch = { groups: ToeicExamBatchGroup[] };
 
 export interface ContextualVocabSuggestion {
   word: string;
@@ -373,4 +482,88 @@ export interface ContextualWritingTaskSuggestion {
   wordRange?: [number, number];
   keywords?: string[];
   sampleSentences?: string[];
+}
+
+export interface ContextualSpeakingPracticeSetSuggestion {
+  title: string;
+  description: string;
+  category: string;
+  level: string;
+}
+
+export interface SpeakingCategoryAiContext {
+  code: string;
+  displayLabel: string;
+  allowPracticeSet: boolean;
+  allowExercise: boolean;
+}
+
+export interface ContextualSpeakingExerciseCandidate {
+  title: string;
+  targetText: string;
+  difficulty: string;
+  taskType: SpeakingTaskType;
+}
+
+export interface ContextualSpeakingExercisesSuggestion {
+  candidates: ContextualSpeakingExerciseCandidate[];
+}
+
+export interface ContextualSpeakingFullDraftSuggestion {
+  practiceSet: ContextualSpeakingPracticeSetSuggestion;
+  exercises: ContextualSpeakingExerciseCandidate[];
+}
+
+export interface ToeicSpeakingDraftExercise {
+  title: string;
+  targetText: string;
+  taskType: SpeakingTaskType;
+  imageBrief?: string;
+  informationStimulus?: string;
+}
+
+export interface ToeicWritingDraftTask {
+  title: string;
+  taskKind: 'PICTURE_SENTENCE' | 'WRITTEN_REQUEST' | 'OPINION_ESSAY';
+  prompt: string;
+  imageBrief?: string;
+  keywords?: string[];
+  wordRange?: [number, number];
+}
+
+export interface ToeicSpeakingWritingDraft {
+  speaking: ToeicSpeakingDraftExercise[];
+  writing: ToeicWritingDraftTask[];
+}
+
+export interface ContextualListeningFullDraftSuggestion {
+  title: string;
+  description: string;
+  level?: string;
+  mode: 'DIALOGUE' | 'DICTATION';
+  text?: string;
+  turns?: ContextualListeningTurn[];
+  questions: ContextualListeningQuestionCandidate[];
+}
+
+export interface ContextualReadingFullDraftSuggestion {
+  title: string;
+  description: string;
+  level: string;
+  passage: string;
+  questions: ContextualReadingCandidate[];
+}
+
+export interface ContextualVocabFullDraftSuggestion {
+  title: string;
+  categoryName: string;
+  words: ContextualVocabSuggestion[];
+}
+
+export interface ContextualGrammarFullDraftSuggestion {
+  title: string;
+  description: string;
+  level: string;
+  keyFormula: string;
+  questions: ContextualGrammarCandidate[];
 }

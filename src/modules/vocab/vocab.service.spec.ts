@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PlanFeatureKey } from '@prisma/client';
 import { VocabService } from './vocab.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -29,7 +33,12 @@ describe('VocabService', () => {
         findUnique: jest.fn().mockResolvedValue(premiumTopic),
         findMany: jest.fn().mockResolvedValue([]),
       },
-      vocabWord: { findMany: jest.fn().mockResolvedValue([]) },
+      vocabWord: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue({
+          topic: { publicationStatus: undefined, isPro: false },
+        }),
+      },
       userVocabWordProgress: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const subscriptionService = {
@@ -60,6 +69,11 @@ describe('VocabService', () => {
     }).compile();
 
     service = module.get<VocabService>(VocabService);
+    (service as any).prisma.vocabWord = {
+      findUnique: jest.fn().mockResolvedValue({
+        topic: { publicationStatus: undefined, isPro: false },
+      }),
+    };
   });
 
   it('should be defined', () => {
@@ -176,6 +190,24 @@ describe('VocabService', () => {
   });
 
   describe('setMastered', () => {
+    it('blocks progress writes for a vocabulary topic that is not published', async () => {
+      const prisma = (service as any).prisma;
+      prisma.vocabWord.findUnique.mockResolvedValue({
+        topic: { publicationStatus: 'DRAFT', isPro: false },
+      });
+      prisma.userVocabWordProgress = {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        create: jest.fn(),
+      };
+
+      await expect(service.setMastered(1, 10, true)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.userVocabWordProgress.create).not.toHaveBeenCalled();
+      expect(prisma.userVocabWordProgress.update).not.toHaveBeenCalled();
+    });
+
     it('sets 10 minutes nextReviewAt when isMastered is false', async () => {
       const prisma = (service as any).prisma;
       prisma.userVocabWordProgress = {

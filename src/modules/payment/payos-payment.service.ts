@@ -115,12 +115,28 @@ export class PayosPaymentService {
   async synchronize(orderCode: number): Promise<PayosIntentDto> {
     const intent = await this.findByOrderCode(orderCode);
     const remote = await this.provider.getPayment(orderCode);
-    const status = this.mapStatus(remote.status);
+    const providerStatus = remote.status;
+    const mappedStatus = this.mapStatus(providerStatus);
+    const status =
+      intent.status === PayOSPaymentIntentStatus.PAID &&
+      mappedStatus !== PayOSPaymentIntentStatus.PAID
+        ? PayOSPaymentIntentStatus.PAID
+        : mappedStatus;
+    if (
+      mappedStatus === PayOSPaymentIntentStatus.PAID &&
+      intent.status !== PayOSPaymentIntentStatus.PAID
+    ) {
+      await this.fulfill({
+        ...intent,
+        status: PayOSPaymentIntentStatus.PAID,
+        paidAt: intent.paidAt ?? new Date(),
+      });
+    }
     const updated = await this.prisma.payOSPaymentIntent.update({
       where: { id: intent.id },
       data: {
         status,
-        providerStatus: remote.status,
+        providerStatus,
         lastSyncedAt: new Date(),
         paidAt:
           status === PayOSPaymentIntentStatus.PAID
@@ -129,9 +145,6 @@ export class PayosPaymentService {
       },
       include: { planPayment: true, coursePayment: true },
     });
-    if (status === PayOSPaymentIntentStatus.PAID) {
-      await this.fulfill(updated);
-    }
     return this.toDto(updated);
   }
 
@@ -180,17 +193,30 @@ export class PayosPaymentService {
         'PayOS webhook is not a successful payment',
       );
     }
+    const paymentLinkId = data.paymentLinkId || intent.paymentLinkId;
     await this.prisma.payOSPaymentIntent.update({
       where: { id: intent.id },
       data: {
-        status: PayOSPaymentIntentStatus.PAID,
-        providerStatus: data.code,
-        paymentLinkId: data.paymentLinkId || intent.paymentLinkId,
-        paidAt: intent.paidAt ?? new Date(),
+        paymentLinkId,
         lastSyncedAt: new Date(),
       },
     });
-    return { ...intent, status: PayOSPaymentIntentStatus.PAID };
+    return { ...intent, paymentLinkId };
+  }
+
+  async markWebhookFulfilled(intentId: number): Promise<void> {
+    await this.prisma.payOSPaymentIntent.updateMany({
+      where: {
+        id: intentId,
+        status: { not: PayOSPaymentIntentStatus.PAID },
+      },
+      data: {
+        status: PayOSPaymentIntentStatus.PAID,
+        providerStatus: '00',
+        paidAt: new Date(),
+        lastSyncedAt: new Date(),
+      },
+    });
   }
 
   async findByOrderCode(orderCode: number): Promise<IntentWithTarget> {
@@ -273,7 +299,7 @@ export class PayosPaymentService {
       /\/$/,
       '',
     );
-    return `${base}/payment/return?intent=${intent.id}`;
+    return `${base}/hub?tab=account-plan&intent=${intent.id}`;
   }
 
   private cancelUrl(intent: IntentWithTarget): string {
@@ -281,7 +307,7 @@ export class PayosPaymentService {
       /\/$/,
       '',
     );
-    return `${base}/payment/return?intent=${intent.id}&cancelled=1`;
+    return `${base}/hub?tab=account-plan&intent=${intent.id}&cancelled=1`;
   }
 
   private mapStatus(status: string): PayOSPaymentIntentStatus {
