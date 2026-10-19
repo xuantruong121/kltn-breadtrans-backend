@@ -14,6 +14,12 @@ The backend is CI-only. It has no deployment job or production deployment target
 
 The workflow installs with `npm ci`, generates and validates Prisma, applies migrations only to the ephemeral PostgreSQL service, runs lint without auto-fix, typecheck, build, the full Jest suite, and E2E tests. PostgreSQL 15 and Redis 7 are disposable GitHub Actions services.
 
+## Four-week delivery policy
+
+- Tier 1 (local/frequent development): lint, typecheck, and targeted/unit tests.
+- Tier 2 (PR merge gate): the existing Backend CI quality job, including ephemeral migration validation and blocking E2E coverage.
+- Tier 3 (main/phase closure): the same required CI plus explicit full-regression/manual evidence when needed. Backend has no automatic deployment path.
+
 The Entry Diagnostic tests use repository-owned fixtures under `test/fixtures/diagnostic/`. CI never runs the database-mutating materializer.
 
 ## Secrets
