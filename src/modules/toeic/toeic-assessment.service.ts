@@ -373,6 +373,7 @@ export class ToeicAssessmentService {
           component.speakingPracticeSetId!,
           userId,
           dto.speakingSubmissionIds ?? [],
+          state.startedAt ?? attempt.startedAt,
         );
       } else {
         await this.attachWritingSubmissions(
@@ -381,6 +382,7 @@ export class ToeicAssessmentService {
           component.writingSetId!,
           userId,
           dto.writingSubmissionIds ?? [],
+          state.startedAt ?? attempt.startedAt,
         );
       }
       await tx.toeicAssessmentAttemptComponent.update({
@@ -405,7 +407,7 @@ export class ToeicAssessmentService {
     return attempts.map((attempt) => this.projectAttempt(attempt));
   }
 
-  private componentInclude() {
+  private componentInclude(): Prisma.ToeicAssessmentInclude {
     return {
       components: {
         orderBy: { order: 'asc' as const },
@@ -414,6 +416,7 @@ export class ToeicAssessmentService {
           speakingPracticeSet: {
             include: {
               exercises: {
+                orderBy: [{ order: 'asc' }, { id: 'asc' }],
                 include: { stimulus: { select: { kind: true } } },
               },
             },
@@ -428,7 +431,7 @@ export class ToeicAssessmentService {
           },
         },
       },
-    } as const;
+    };
   }
 
   private attemptInclude() {
@@ -639,6 +642,7 @@ export class ToeicAssessmentService {
                   title: true,
                   targetText: true,
                   taskType: true,
+                  order: true,
                   imageUrl: true,
                   stimulusId: true,
                   stimulus: { select: { kind: true } },
@@ -662,6 +666,8 @@ export class ToeicAssessmentService {
         coverage.respondToQuestions === 3 &&
         coverage.respondUsingInformation === 3 &&
         coverage.expressOpinion === 1 &&
+        coverage.authoritativeOrderReady &&
+        coverage.slotTaskTypesReady &&
         coverage.describePictureMediaReady &&
         coverage.sharedInformationStimulusReady;
       return {
@@ -719,6 +725,7 @@ export class ToeicAssessmentService {
 
   private speakingCoverage(
     exercises: Array<{
+      order?: number | null;
       taskType?: string | null;
       targetText: string;
       imageUrl?: string | null;
@@ -726,6 +733,29 @@ export class ToeicAssessmentService {
       stimulus?: { kind: string } | null;
     }>,
   ) {
+    const expectedTaskTypes = [
+      'READ_ALOUD',
+      'READ_ALOUD',
+      'DESCRIBE_PICTURE',
+      'DESCRIBE_PICTURE',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_USING_INFORMATION',
+      'RESPOND_USING_INFORMATION',
+      'RESPOND_USING_INFORMATION',
+      'EXPRESS_OPINION',
+    ];
+    const ordered = exercises
+      .slice()
+      .sort(
+        (a, b) =>
+          (a.order ?? Number.MAX_SAFE_INTEGER) -
+          (b.order ?? Number.MAX_SAFE_INTEGER),
+      );
+    const authoritativeOrderReady =
+      exercises.length === expectedTaskTypes.length &&
+      ordered.every((exercise, index) => exercise.order === index + 1);
     const count = (taskType: string) =>
       exercises.filter((exercise) => exercise.taskType === taskType).length;
     const informationExercises = exercises.filter(
@@ -741,6 +771,12 @@ export class ToeicAssessmentService {
       respondToQuestions: count('RESPOND_TO_QUESTION'),
       respondUsingInformation: count('RESPOND_USING_INFORMATION'),
       expressOpinion: count('EXPRESS_OPINION'),
+      authoritativeOrderReady,
+      slotTaskTypesReady:
+        authoritativeOrderReady &&
+        ordered.every(
+          (exercise, index) => exercise.taskType === expectedTaskTypes[index],
+        ),
       describePictureMediaReady: exercises
         .filter((exercise) => exercise.taskType === 'DESCRIBE_PICTURE')
         .every((exercise) => Boolean(exercise.imageUrl?.trim())),
@@ -870,6 +906,7 @@ export class ToeicAssessmentService {
     practiceSetId: string,
     userId: number,
     submissionIds: number[],
+    startedAt: Date,
   ) {
     const uniqueIds = [...new Set(submissionIds)];
     const [exercises, submissions] = await Promise.all([
@@ -881,7 +918,12 @@ export class ToeicAssessmentService {
         select: { id: true },
       }),
       tx.speakingSubmission.findMany({
-        where: { id: { in: uniqueIds }, userId, status: 'COMPLETED' },
+        where: {
+          id: { in: uniqueIds },
+          userId,
+          status: 'COMPLETED',
+          submittedAt: { gte: startedAt },
+        },
         select: { id: true, exerciseId: true },
       }),
     ]);
@@ -912,6 +954,7 @@ export class ToeicAssessmentService {
     writingSetId: number,
     userId: number,
     submissionIds: number[],
+    startedAt: Date,
   ) {
     const uniqueIds = [...new Set(submissionIds)];
     const set = await tx.toeicWritingSet.findUnique({
@@ -919,7 +962,7 @@ export class ToeicAssessmentService {
       include: { items: { select: { writingQuizId: true } } },
     });
     const submissions = await tx.submission.findMany({
-      where: { id: { in: uniqueIds }, userId },
+      where: { id: { in: uniqueIds }, userId, submittedAt: { gte: startedAt } },
       include: { results: true },
     });
     const byQuiz = new Map(

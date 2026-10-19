@@ -21,6 +21,7 @@ import {
   ListeningQuestionDto,
   SkillQuestionDto,
   SpeakingExerciseDto,
+  SpeakingExerciseReorderDto,
   WritingQuestionDto,
 } from './skill-cms.dto';
 import { SpeakingStimulusDto } from './speaking-stimulus.dto';
@@ -30,6 +31,7 @@ import { normalizeDialogueSegments } from '../quiz/listening-dialogue.contract';
 import { SPEAKING_SET_LEVELS } from '../speaking/speaking-contract';
 import { SpeakingCategoryService } from './speaking-category.service';
 import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
+import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
 
 type Domain = 'listening' | 'reading' | 'writing' | 'speaking';
 type Admin = { id: number; role: Role };
@@ -146,10 +148,11 @@ export class SkillCmsService {
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
       return this.prisma.speakingPracticeSet.findMany({
+        where: { scope: 'SKILL_PRACTICE' },
         orderBy: { updatedAt: 'desc' },
         include: {
           exercises: {
-            orderBy: { id: 'asc' },
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
             include: {
               categoryTaxonomy: true,
               stimulus: true,
@@ -167,7 +170,12 @@ export class SkillCmsService {
     });
   }
 
-  async get(rawDomain: string, rawId: string, user: Admin) {
+  async get(
+    rawDomain: string,
+    rawId: string,
+    user: Admin,
+    allowExamInternal = false,
+  ) {
     this.admin(user);
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
@@ -176,12 +184,14 @@ export class SkillCmsService {
         include: {
           categoryTaxonomy: true,
           exercises: {
-            orderBy: { id: 'asc' },
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
             include: { categoryTaxonomy: true, stimulus: true },
           },
         },
       });
       if (!set) throw new NotFoundException('Speaking practice set not found');
+      if (set.scope === 'EXAM_INTERNAL' && !allowExamInternal)
+        throw new NotFoundException('Speaking practice set not found');
       return set;
     }
     const id = this.id(rawId);
@@ -514,13 +524,44 @@ export class SkillCmsService {
       isPremiumContent: dto.isPremiumContent ?? false,
       taskType: dto.taskType,
       stimulusId: dto.stimulusId,
+      order: null,
       practiceSetId: rawSetId,
       publicationStatus: QuizPublicationStatus.DRAFT,
     };
     if (this.speakingCategoryService) data.categoryId = category?.id ?? null;
-    return this.prisma.speakingExercise.create({
-      data,
-    });
+    return this.prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.speakingExercise.findMany({
+          where: { practiceSetId: rawSetId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          select: { id: true, order: true },
+        });
+        const requestedOrder = dto.order ?? existing.length + 1;
+        if (requestedOrder > existing.length + 1) {
+          throw new BadRequestException(
+            `Vị trí câu phải nằm trong khoảng 1-${existing.length + 1}`,
+          );
+        }
+
+        const created = await tx.speakingExercise.create({
+          data: { ...data, order: null },
+        });
+        const orderedIds = existing.map((item) => item.id);
+        orderedIds.splice(requestedOrder - 1, 0, created.id);
+        await tx.speakingExercise.updateMany({
+          where: { practiceSetId: rawSetId },
+          data: { order: null },
+        });
+        for (const [index, id] of orderedIds.entries()) {
+          await tx.speakingExercise.update({
+            where: { id },
+            data: { order: index + 1 },
+          });
+        }
+        return created;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async updateSpeakingExercise(
@@ -543,6 +584,11 @@ export class SkillCmsService {
       },
     });
     if (!exercise) throw new NotFoundException('Speaking exercise not found');
+    if (dto.order !== undefined) {
+      throw new BadRequestException(
+        'Dùng API reorder để thay đổi thứ tự câu trong bộ luyện',
+      );
+    }
     await this.assertNoSpeakingHistory(rawSetId);
     const taskType = dto.taskType ?? exercise.taskType;
     const stimulus = dto.stimulusId
@@ -668,7 +714,93 @@ export class SkillCmsService {
     });
     if (!exercise) throw new NotFoundException('Speaking exercise not found');
     await this.assertNoSpeakingHistory(rawSetId);
-    return this.prisma.speakingExercise.delete({ where: { id: exerciseId } });
+    return this.prisma.$transaction(
+      async (tx) => {
+        const deleted = await tx.speakingExercise.delete({
+          where: { id: exerciseId },
+        });
+        const remaining = await tx.speakingExercise.findMany({
+          where: { practiceSetId: rawSetId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        });
+        await tx.speakingExercise.updateMany({
+          where: { practiceSetId: rawSetId },
+          data: { order: null },
+        });
+        for (const [index, item] of remaining.entries()) {
+          await tx.speakingExercise.update({
+            where: { id: item.id },
+            data: { order: index + 1 },
+          });
+        }
+        return deleted;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  async reorderSpeakingExercises(
+    rawDomain: string,
+    rawSetId: string,
+    dto: SpeakingExerciseReorderDto,
+    user: Admin,
+  ) {
+    this.admin(user);
+    if (this.domain(rawDomain) !== 'speaking')
+      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+    const set = await this.prisma.speakingPracticeSet.findUnique({
+      where: { id: rawSetId },
+      select: { id: true, publicationStatus: true },
+    });
+    if (!set) throw new NotFoundException('Speaking practice set not found');
+    if (set.publicationStatus === QuizPublicationStatus.PUBLISHED) {
+      throw new ConflictException(
+        'Hãy chuyển bộ luyện về bản nháp trước khi sắp xếp lại câu',
+      );
+    }
+    await this.assertNoSpeakingHistory(rawSetId);
+
+    const current = await this.prisma.speakingExercise.findMany({
+      where: { practiceSetId: rawSetId },
+      orderBy: [{ order: 'asc' }, { id: 'asc' }],
+      select: { id: true },
+    });
+    const requested = dto.exerciseIds;
+    if (
+      requested.length !== current.length ||
+      new Set(requested).size !== requested.length ||
+      requested.some((id) => !current.some((item) => item.id === id))
+    ) {
+      throw new BadRequestException(
+        'Danh sách sắp xếp phải chứa đúng một lần toàn bộ câu trong bộ luyện',
+      );
+    }
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.speakingExercise.updateMany({
+          where: { practiceSetId: rawSetId },
+          data: { order: null },
+        });
+        for (const [index, id] of requested.entries()) {
+          await tx.speakingExercise.update({
+            where: { id },
+            data: { order: index + 1 },
+          });
+        }
+        return tx.speakingPracticeSet.findUnique({
+          where: { id: rawSetId },
+          include: {
+            exercises: {
+              orderBy: [{ order: 'asc' }, { id: 'asc' }],
+              include: { categoryTaxonomy: true, stimulus: true },
+            },
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async updateQuestion(
@@ -1066,6 +1198,9 @@ export class SkillCmsService {
         }).map((error) => `Exercise #${exercise.id}: ${error}`),
       ),
     ].filter((value): value is string => Boolean(value));
+    if (set.scope === 'EXAM_INTERNAL') {
+      errors.push(...toeicSpeakingContractErrors(set));
+    }
     return {
       valid: errors.length === 0,
       errors,

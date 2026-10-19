@@ -28,6 +28,18 @@ export class CreateExamGroupDto {
   @IsOptional()
   passageText?: string;
 
+  @ApiPropertyOptional({ example: 'Woman: Good morning.\nMan: Good morning.' })
+  @IsString()
+  @IsOptional()
+  transcriptText?: string;
+
+  @ApiPropertyOptional({
+    example: 'A text-free photo of colleagues in a meeting room.',
+  })
+  @IsString()
+  @IsOptional()
+  imageBrief?: string;
+
   @ApiPropertyOptional({ example: 0 })
   @IsInt()
   @IsOptional()

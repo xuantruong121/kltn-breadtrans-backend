@@ -127,6 +127,19 @@ export interface IAIEvaluator {
     count: number,
   ): Promise<any[]>;
 
+  /** Phase 8.9B: bounded TOEIC practice batch. The TOEIC domain validates this
+   * untrusted candidate before it can become a Draft row. */
+  generateToeicExamBatch?(
+    input: ToeicExamBatchRequest,
+  ): Promise<ToeicExamBatch>;
+
+  /** Optional image capability. Returning bytes (not a URL) prevents a
+   * provider from inventing remote media references. */
+  generateToeicExamImage?(input: {
+    brief: string;
+    part: number;
+  }): Promise<{ buffer: Buffer; mimeType: string }>;
+
   /**
    * Tự động sinh danh sách câu hỏi Luyện nghe (Chép chính tả)
    * @param topic Chủ đề
@@ -316,6 +329,14 @@ export interface IAIEvaluator {
     count: number;
   }): Promise<ContextualSpeakingFullDraftSuggestion>;
 
+  /** Structured TOEIC S&W draft only. Persistence and publishing stay in the exam domain. */
+  generateToeicSpeakingWritingDraft?(input: {
+    topic?: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    includeSpeaking: boolean;
+    includeWriting: boolean;
+  }): Promise<ToeicSpeakingWritingDraft>;
+
   suggestListeningFullDraft?(input: {
     topic: string;
     level?: string;
@@ -345,6 +366,29 @@ export interface IAIEvaluator {
     count: number;
   }): Promise<ContextualGrammarFullDraftSuggestion>;
 }
+
+export type ToeicExamBatchQuestion = {
+  text?: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+};
+
+export type ToeicExamBatchGroup = {
+  transcript?: string;
+  passageText?: string;
+  imageBrief?: string;
+  questions: ToeicExamBatchQuestion[];
+};
+
+export type ToeicExamBatchRequest = {
+  part: number;
+  topic?: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  groups: Array<{ questionCount: number; kind?: 'SINGLE' | 'MULTIPLE' }>;
+};
+
+export type ToeicExamBatch = { groups: ToeicExamBatchGroup[] };
 
 export interface ContextualVocabSuggestion {
   word: string;
@@ -468,6 +512,28 @@ export interface ContextualSpeakingExercisesSuggestion {
 export interface ContextualSpeakingFullDraftSuggestion {
   practiceSet: ContextualSpeakingPracticeSetSuggestion;
   exercises: ContextualSpeakingExerciseCandidate[];
+}
+
+export interface ToeicSpeakingDraftExercise {
+  title: string;
+  targetText: string;
+  taskType: SpeakingTaskType;
+  imageBrief?: string;
+  informationStimulus?: string;
+}
+
+export interface ToeicWritingDraftTask {
+  title: string;
+  taskKind: 'PICTURE_SENTENCE' | 'WRITTEN_REQUEST' | 'OPINION_ESSAY';
+  prompt: string;
+  imageBrief?: string;
+  keywords?: string[];
+  wordRange?: [number, number];
+}
+
+export interface ToeicSpeakingWritingDraft {
+  speaking: ToeicSpeakingDraftExercise[];
+  writing: ToeicWritingDraftTask[];
 }
 
 export interface ContextualListeningFullDraftSuggestion {

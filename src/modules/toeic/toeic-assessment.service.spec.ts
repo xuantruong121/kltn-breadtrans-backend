@@ -124,7 +124,7 @@ describe('ToeicAssessmentService', () => {
         targetText: 'opinion',
         taskType: 'EXPRESS_OPINION',
       },
-    ];
+    ].map((exercise, index) => ({ ...exercise, order: index + 1 }));
 
     expect(instance.speakingCoverage(exercises)).toMatchObject({
       total: 11,
@@ -133,8 +133,98 @@ describe('ToeicAssessmentService', () => {
       respondToQuestions: 3,
       respondUsingInformation: 3,
       expressOpinion: 1,
+      authoritativeOrderReady: true,
+      slotTaskTypesReady: true,
       describePictureMediaReady: true,
       sharedInformationStimulusReady: true,
+    });
+  });
+
+  it('rejects gaps or duplicates in the authoritative Speaking order', () => {
+    const instance = service() as any;
+    const exercises = Array.from({ length: 11 }, (_, index) => ({
+      order: index + 1,
+      taskType: 'READ_ALOUD',
+    }));
+    exercises[10].order = 10;
+
+    expect(instance.speakingCoverage(exercises)).toMatchObject({
+      authoritativeOrderReady: false,
+      slotTaskTypesReady: false,
+    });
+  });
+
+  it('rejects a non-11-task source and wrong task types at ordered slots', () => {
+    const instance = service() as any;
+    const tooMany = Array.from({ length: 12 }, (_, index) => ({
+      order: index + 1,
+      taskType: 'READ_ALOUD',
+    }));
+    expect(instance.speakingCoverage(tooMany)).toMatchObject({
+      authoritativeOrderReady: false,
+      slotTaskTypesReady: false,
+    });
+
+    const taskTypes = [
+      'READ_ALOUD',
+      'READ_ALOUD',
+      'DESCRIBE_PICTURE',
+      'DESCRIBE_PICTURE',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_USING_INFORMATION',
+      'RESPOND_USING_INFORMATION',
+      'RESPOND_USING_INFORMATION',
+      'EXPRESS_OPINION',
+    ];
+    [taskTypes[0], taskTypes[10]] = [taskTypes[10], taskTypes[0]];
+    const wrongSlots = taskTypes.map((taskType, index) => ({
+      order: index + 1,
+      taskType,
+    }));
+    expect(instance.speakingCoverage(wrongSlots)).toMatchObject({
+      authoritativeOrderReady: true,
+      slotTaskTypesReady: false,
+    });
+  });
+
+  it('keeps Speaking slot semantics independent from titles and categories', () => {
+    const instance = service() as any;
+    const taskTypes = [
+      'READ_ALOUD',
+      'READ_ALOUD',
+      'DESCRIBE_PICTURE',
+      'DESCRIBE_PICTURE',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_TO_QUESTION',
+      'RESPOND_USING_INFORMATION',
+      'RESPOND_USING_INFORMATION',
+      'RESPOND_USING_INFORMATION',
+      'EXPRESS_OPINION',
+    ];
+    const coverage = instance.speakingCoverage(
+      taskTypes.map((taskType, index) => ({
+        order: index + 1,
+        taskType,
+        title: `unrelated title ${index}`,
+        category: 'UNRELATED_CATEGORY',
+        ...(taskType === 'DESCRIBE_PICTURE'
+          ? { imageUrl: `https://cdn.example/${index}.png` }
+          : {}),
+        ...(taskType === 'RESPOND_USING_INFORMATION'
+          ? {
+              stimulusId: 7,
+              stimulus: { kind: 'INFORMATION' },
+            }
+          : {}),
+      })),
+    );
+
+    expect(coverage).toMatchObject({
+      authoritativeOrderReady: true,
+      slotTaskTypesReady: true,
     });
   });
 

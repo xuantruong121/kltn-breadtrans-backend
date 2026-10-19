@@ -22,7 +22,12 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
 import { getSpeakingPipelineMode } from './speaking.constants';
-import { Prisma, QuizPublicationStatus, Role } from '@prisma/client';
+import {
+  Prisma,
+  QuizPublicationStatus,
+  Role,
+  SpeakingPracticeScope,
+} from '@prisma/client';
 import type { SpeakingSubmission } from '@prisma/client';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
 import { resolveSpeakingPracticeSet } from './speaking-practice-set';
@@ -60,6 +65,7 @@ type SpeakingExerciseProjectionInput = {
   audioUrl: string | null;
   isPremiumContent: boolean;
   taskType?: string | null;
+  order?: number | null;
   stimulusId?: number | null;
   stimulus?: {
     id: number;
@@ -233,6 +239,9 @@ export class SpeakingService {
       ((exercise.publicationStatus !== undefined &&
         exercise.publicationStatus !== QuizPublicationStatus.PUBLISHED) ||
         (exercise.practiceSet &&
+          exercise.practiceSet.scope !==
+            SpeakingPracticeScope.SKILL_PRACTICE) ||
+        (exercise.practiceSet &&
           exercise.practiceSet.publicationStatus !== undefined &&
           exercise.practiceSet.publicationStatus !==
             QuizPublicationStatus.PUBLISHED))
@@ -261,6 +270,7 @@ export class SpeakingService {
       id: exercise.id,
       title: exercise.title,
       difficulty: exercise.difficulty,
+      order: exercise.order,
       taskType: exercise.taskType,
       category: effectiveCategory,
       categoryLabel: effectiveCategoryLabel,
@@ -320,13 +330,20 @@ export class SpeakingService {
           ],
         }
       : {};
+    const skillScopeFilter: Prisma.SpeakingExerciseWhereInput = {
+      OR: [
+        { practiceSetId: null },
+        { practiceSet: { scope: SpeakingPracticeScope.SKILL_PRACTICE } },
+      ],
+    };
     const exercises = await this.prisma.speakingExercise.findMany({
       where:
         role === Role.ADMIN
-          ? categoryFilter
+          ? { AND: [categoryFilter, skillScopeFilter] }
           : {
               AND: [
                 categoryFilter,
+                skillScopeFilter,
                 { publicationStatus: QuizPublicationStatus.PUBLISHED },
                 {
                   OR: [
@@ -340,7 +357,7 @@ export class SpeakingService {
                 },
               ],
             },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ practiceSetId: 'asc' }, { order: 'asc' }, { id: 'asc' }],
       include: {
         categoryTaxonomy: true,
         stimulus: true,
@@ -422,7 +439,14 @@ export class SpeakingService {
         completedCount: items.filter((item) =>
           completedExerciseIds.has(item.id),
         ).length,
-        exerciseIds: items.map((item) => item.id),
+        exerciseIds: items
+          .slice()
+          .sort(
+            (a, b) =>
+              (a.order ?? Number.MAX_SAFE_INTEGER) -
+                (b.order ?? Number.MAX_SAFE_INTEGER) || a.id - b.id,
+          )
+          .map((item) => item.id),
         difficultyLabel: difficultyLabel(items.map((item) => item.difficulty)),
       });
     }
@@ -432,8 +456,9 @@ export class SpeakingService {
       exercises.map(async (exercise) => {
         const set = setSummaries.get(setFor(exercise).key)!;
         const setKey = set.key;
-        const position = (positions.get(setKey) ?? 0) + 1;
-        positions.set(setKey, position);
+        const fallbackPosition = (positions.get(setKey) ?? 0) + 1;
+        positions.set(setKey, fallbackPosition);
+        const position = exercise.order ?? fallbackPosition;
         const projected = await this.projectExercise(
           exercise,
           accessByExercise.get(exercise.id) ?? {

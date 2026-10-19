@@ -32,6 +32,7 @@ import {
   SkillPublishDto,
   SkillQuestionDto,
   SpeakingExerciseDto,
+  SpeakingExerciseReorderDto,
   WritingQuestionDto,
 } from './skill-cms.dto';
 import { SpeakingStimulusDto } from './speaking-stimulus.dto';
@@ -246,6 +247,14 @@ export class SkillCmsController {
     @Request() req: any,
   ) {
     return this.service.addSpeakingExercise(domain, id, dto, req.user);
+  }
+  @Patch(':domain/:id/exercises/reorder') reorderExercises(
+    @Param('domain') domain: string,
+    @Param('id') id: string,
+    @Body() dto: SpeakingExerciseReorderDto,
+    @Request() req: any,
+  ) {
+    return this.service.reorderSpeakingExercises(domain, id, dto, req.user);
   }
   @Patch(':domain/:id/exercises/:exerciseId') updateExercise(
     @Param('domain') domain: string,

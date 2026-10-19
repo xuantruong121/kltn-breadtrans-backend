@@ -272,4 +272,17 @@ export class SpeakingExerciseDto {
   @IsInt()
   @Min(1)
   stimulusId?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  order?: number;
+}
+
+export class SpeakingExerciseReorderDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  exerciseIds!: number[];
 }
