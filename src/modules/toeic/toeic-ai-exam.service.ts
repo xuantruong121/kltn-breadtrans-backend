@@ -344,12 +344,28 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       where: { aiGenerationJobId: jobId },
       select: { id: true, title: true, publicationStatus: true },
     });
+    const candidate = (job.draftSnapshot as any) ?? null;
     return {
       id: job.id,
       status: job.status,
       stage: (job.resultSnapshot as any)?.stage ?? 'QUEUED',
       progress: (job.resultSnapshot as any)?.parts ?? {},
       error: job.errorSummary ?? undefined,
+      candidate: candidate
+        ? {
+            available: job.status === AiGenerationJobStatus.GENERATED,
+            partial: candidate.partial === true,
+            lrBatchCount: Array.isArray(candidate.lrBatches)
+              ? candidate.lrBatches.length
+              : 0,
+            speakingCount: Array.isArray(candidate.speakingWriting?.speaking)
+              ? candidate.speakingWriting.speaking.length
+              : 0,
+            writingCount: Array.isArray(candidate.speakingWriting?.writing)
+              ? candidate.speakingWriting.writing.length
+              : 0,
+          }
+        : undefined,
       exam,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
@@ -364,12 +380,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Không tìm thấy job tạo đề TOEIC AI');
     if (job.status !== AiGenerationJobStatus.FAILED)
       throw new ConflictException('Chỉ job lỗi mới có thể thử lại');
+    const resumableCandidate = (job.draftSnapshot as any)?.partial === true;
     await this.prisma.aiGenerationJob.update({
       where: { id: jobId },
       data: {
         status: AiGenerationJobStatus.QUEUED,
         errorSummary: null,
         completedAt: null,
+        ...(resumableCandidate ? {} : { draftSnapshot: Prisma.JsonNull }),
         attempt: { increment: 1 },
         resultSnapshot: {
           ...(job.resultSnapshot as object),
@@ -411,6 +429,90 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
     const queued = await this.queue.getJob(jobId);
     if (queued) await queued.remove();
+    return this.status(jobId);
+  }
+
+  async apply(jobId: string, adminId: number) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job || job.createdByAdminId !== adminId)
+      throw new NotFoundException('Không tìm thấy candidate tạo đề TOEIC AI');
+    if (job.status !== AiGenerationJobStatus.GENERATED)
+      throw new ConflictException('Chỉ candidate đã hoàn tất mới có thể Apply');
+    const candidate = (job.draftSnapshot as any) ?? null;
+    if (!candidate || candidate.version !== 1)
+      throw new ConflictException('Candidate AI không còn hợp lệ để Apply');
+    const exam = await this.prisma.exam.findUnique({
+      where: { aiGenerationJobId: jobId },
+      include: {
+        toeicExamSet: true,
+        toeicAssessment: { include: { components: true } },
+      },
+    });
+    if (!exam)
+      throw new NotFoundException('Không tìm thấy Draft đích của job AI');
+    if (exam.publicationStatus !== QuizPublicationStatus.DRAFT)
+      throw new ConflictException('Chỉ có thể Apply candidate vào Draft');
+
+    const lrBatches = Array.isArray(candidate.lrBatches)
+      ? candidate.lrBatches
+      : [];
+    if (exam.toeicExamSet) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.toeicQuestionGroup.deleteMany({
+          where: { examId: exam.toeicExamSet!.id },
+        });
+        for (const batch of lrBatches) {
+          await this.writeBatch(
+            tx,
+            exam.toeicExamSet!.id,
+            Number(batch.part),
+            Number(batch.groupOrder),
+            Number(batch.questionNumber),
+            batch.candidate,
+          );
+        }
+      });
+      await this.materializeMedia(jobId, exam.toeicExamSet.id);
+    }
+    if (candidate.speakingWriting) {
+      await this.materializeSpeakingWriting(
+        jobId,
+        exam,
+        job.requestSnapshot as RequestSnapshot,
+        candidate.speakingWriting,
+      );
+    }
+
+    let validation: any = { learnerReady: true, issues: [] };
+    if (exam.toeicExamSet) {
+      const complete = await this.prisma.toeicExamSet.findUniqueOrThrow({
+        where: { id: exam.toeicExamSet.id },
+        include: {
+          groups: {
+            include: { questions: true },
+            orderBy: { groupOrder: 'asc' },
+          },
+        },
+      });
+      validation = validateToeicExam(complete);
+    }
+    const snapshot = (job.resultSnapshot as any) ?? {};
+    await this.prisma.aiGenerationJob.update({
+      where: { id: jobId },
+      data: {
+        status: AiGenerationJobStatus.APPROVED,
+        reviewedByAdminId: adminId,
+        reviewedAt: new Date(),
+        approvedSnapshot: { appliedAt: new Date().toISOString() },
+        resultSnapshot: {
+          ...snapshot,
+          stage: 'APPLIED_TO_DRAFT',
+          validation,
+        } as Prisma.InputJsonValue,
+      },
+    });
     return this.status(jobId);
   }
 
@@ -799,7 +901,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           mediaMetadata: {
             ...current,
             image: imageMetadata,
-          } as Prisma.InputJsonValue,
+          },
         },
       });
       this.imageCandidates.delete(candidateId);
@@ -993,7 +1095,30 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  private assertNoDuplicateBatches(
+    batches: Array<{ candidate: { groups?: any[] } }>,
+  ) {
+    const seen = new Set<string>();
+    for (const batch of batches) {
+      for (const group of batch.candidate?.groups ?? []) {
+        for (const question of group.questions ?? []) {
+          const fingerprint =
+            `${String(question.text ?? '')} ${(question.options ?? []).join('|')}`
+              .replace(/\s+/g, ' ')
+              .trim()
+              .toLowerCase();
+          if (seen.has(fingerprint))
+            throw new BadRequestException(
+              'AI trả về câu hỏi trùng lặp giữa các batch',
+            );
+          seen.add(fingerprint);
+        }
+      }
+    }
+  }
+
   private async writeBatch(
+    db: PrismaService | Prisma.TransactionClient,
     examSetId: number,
     part: number,
     firstGroupOrder: number,
@@ -1003,7 +1128,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     let questionNumber = firstQuestionNumber;
     for (let index = 0; index < candidate.groups.length; index += 1) {
       const group = candidate.groups[index];
-      await this.prisma.toeicQuestionGroup.create({
+      await db.toeicQuestionGroup.create({
         data: {
           examId: examSetId,
           part,
@@ -1253,31 +1378,41 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async generatedImageUrl(scope: string, brief: string, part: number) {
-    const image = await this.ai.generateToeicExamImage({ brief, part });
-    this.assertImage(image.buffer, image.mimeType);
-    const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
-    const uploaded = await this.r2.putObjectAtKey(
-      `ai/toeic-exams/${scope}.${extension}`,
-      image.buffer,
-      image.mimeType,
-    );
-    if (!(await this.r2.objectExists(uploaded.key)))
-      throw new BadRequestException('R2 chưa xác nhận ảnh AI vừa tải lên');
-    return {
-      url: uploaded.url,
-      metadata: {
-        source: 'AI_GENERATED',
-        r2Key: uploaded.key,
-        generatedAt: new Date().toISOString(),
-        briefHash: sha256(brief),
-      },
-    };
+    try {
+      const image = await this.ai.generateToeicExamImage({ brief, part });
+      this.assertImage(image.buffer, image.mimeType);
+      const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
+      const uploaded = await this.r2.putObjectAtKey(
+        `ai/toeic-exams/${scope}.${extension}`,
+        image.buffer,
+        image.mimeType,
+      );
+      if (!(await this.r2.objectExists(uploaded.key)))
+        throw new BadRequestException('R2 chưa xác nhận ảnh AI vừa tải lên');
+      return {
+        url: uploaded.url,
+        metadata: {
+          source: 'AI_GENERATED',
+          r2Key: uploaded.key,
+          generatedAt: new Date().toISOString(),
+          briefHash: sha256(brief),
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`AI image unavailable for ${scope}: ${message}`);
+      return {
+        url: null,
+        metadata: withMediaFailure({}, 'image', error, sha256(brief)),
+      };
+    }
   }
 
   private async materializeSpeakingWriting(
     jobId: string,
     exam: any,
     request: RequestSnapshot,
+    draft: any,
   ) {
     if (!['TOEIC_SW', 'TOEIC_4_SKILLS'].includes(request.variantCode)) return;
     const components = exam.toeicAssessment?.components ?? [];
@@ -1289,13 +1424,6 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     )?.writingSetId;
     if (!speakingSetId || !writingSetId)
       throw new NotFoundException('Draft thiếu source TOEIC Speaking/Writing');
-    await this.checkpoint(jobId, 'GENERATING_TEXT');
-    const draft = await this.ai.generateToeicSpeakingWritingDraft({
-      topic: request.topic,
-      difficulty: request.difficulty,
-      includeSpeaking: true,
-      includeWriting: true,
-    });
     this.assertSpeakingWritingDraft(draft, request);
     await this.prisma.$transaction(async (tx) => {
       const oldItems = await tx.toeicWritingSetItem.findMany({
@@ -1332,7 +1460,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           targetText: exercise.targetText.trim(),
           category: 'TOEIC',
           difficulty: 'INTERMEDIATE',
-          taskType: exercise.taskType as any,
+          taskType: exercise.taskType,
           imageUrl: image?.url,
           stimulusId: index >= 7 && index <= 9 ? sharedInformation.id : null,
           practiceSetId: speakingSetId,
@@ -1356,7 +1484,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             ? 'PICTURE_SENTENCE'
             : task.taskKind,
         imageUrl: image?.url,
-        keywords: task.keywords?.map((value) => value.trim()).filter(Boolean),
+        keywords: task.keywords
+          ?.map((value: unknown) => String(value).trim())
+          .filter(Boolean),
         wordRange: task.wordRange,
         aiMedia: image?.metadata,
       };
@@ -1406,6 +1536,10 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
     if (!exam)
       throw new NotFoundException('Không tìm thấy Draft TOEIC đích của job AI');
+    let activeScope:
+      | { kind: 'batch'; part: number; offset: number }
+      | { kind: 'speaking-writing' }
+      | undefined;
     try {
       await this.prisma.aiGenerationJob.update({
         where: { id: jobId },
@@ -1426,14 +1560,39 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         throw new ConflictException(
           'Không thể tạo lại Draft AI đã có lịch sử làm bài',
         );
-      if (exam.toeicExamSet) {
-        await this.prisma.toeicQuestionGroup.deleteMany({
-          where: { examId: exam.toeicExamSet.id },
-        });
-      }
       let groupOrder = 1;
       let questionNumber = 1;
       const lrExamSet = exam.toeicExamSet;
+      const persistedCandidate = (job.draftSnapshot as any) ?? null;
+      const generatedBatches: Array<{
+        batchKey?: string;
+        part: number;
+        groupOrder: number;
+        questionNumber: number;
+        candidate: any;
+      }> = Array.isArray(persistedCandidate?.lrBatches)
+        ? persistedCandidate.lrBatches.filter(
+            (batch: any) =>
+              typeof batch?.batchKey === 'string' &&
+              Number.isInteger(batch?.part) &&
+              batch?.candidate,
+          )
+        : [];
+      let speakingWritingDraft: any =
+        persistedCandidate?.speakingWriting ?? null;
+      const persistPartialCandidate = async () => {
+        await this.prisma.aiGenerationJob.update({
+          where: { id: jobId },
+          data: {
+            draftSnapshot: {
+              version: 1,
+              partial: true,
+              lrBatches: generatedBatches,
+              speakingWriting: speakingWritingDraft,
+            },
+          },
+        });
+      };
       if (Object.keys(request.plan).length && !lrExamSet) {
         throw new NotFoundException(
           'Draft thiếu source TOEIC Listening/Reading',
@@ -1448,6 +1607,23 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         });
         for (let offset = 0; offset < plan.length; offset += 3) {
           const slice = plan.slice(offset, offset + 3);
+          const batchKey = `${part}:${offset}`;
+          const firstGroupOrder = groupOrder;
+          const firstQuestionNumber = questionNumber;
+          groupOrder += slice.length;
+          questionNumber += slice.reduce(
+            (total, item) => total + item.questionCount,
+            0,
+          );
+          if (generatedBatches.some((batch) => batch.batchKey === batchKey)) {
+            await this.checkpoint(jobId, 'GENERATING_TEXT', part, {
+              completedGroups: Math.min(offset + slice.length, plan.length),
+              totalGroups: plan.length,
+              stage: 'GENERATING_TEXT',
+            });
+            continue;
+          }
+          activeScope = { kind: 'batch', part, offset };
           const candidate = await this.ai.generateToeicExamBatch({
             part,
             topic: request.topic,
@@ -1455,18 +1631,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             groups: slice,
           });
           this.assertBatch(part, slice, candidate);
-          await this.writeBatch(
-            lrExamSet!.id,
+          generatedBatches.push({
+            batchKey,
             part,
-            groupOrder,
-            questionNumber,
+            groupOrder: firstGroupOrder,
+            questionNumber: firstQuestionNumber,
             candidate,
-          );
-          groupOrder += slice.length;
-          questionNumber += slice.reduce(
-            (total, item) => total + item.questionCount,
-            0,
-          );
+          });
+          this.assertNoDuplicateBatches(generatedBatches);
+          await persistPartialCandidate();
           await this.checkpoint(jobId, 'GENERATING_TEXT', part, {
             completedGroups: Math.min(offset + slice.length, plan.length),
             totalGroups: plan.length,
@@ -1474,22 +1647,22 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           });
         }
       }
-      await this.checkpoint(jobId, 'VALIDATING_TEXT');
-      let validation: any = { learnerReady: true, issues: [] };
-      if (exam.toeicExamSet) {
-        await this.materializeMedia(jobId, exam.toeicExamSet.id);
-        const complete = await this.prisma.toeicExamSet.findUniqueOrThrow({
-          where: { id: exam.toeicExamSet.id },
-          include: {
-            groups: {
-              include: { questions: true },
-              orderBy: { groupOrder: 'asc' },
-            },
-          },
-        });
-        validation = validateToeicExam(complete);
+      if (['TOEIC_SW', 'TOEIC_4_SKILLS'].includes(request.variantCode)) {
+        if (!speakingWritingDraft) {
+          activeScope = { kind: 'speaking-writing' };
+          await this.checkpoint(jobId, 'GENERATING_TEXT');
+          speakingWritingDraft =
+            await this.ai.generateToeicSpeakingWritingDraft({
+              topic: request.topic,
+              difficulty: request.difficulty,
+              includeSpeaking: true,
+              includeWriting: true,
+            });
+          this.assertSpeakingWritingDraft(speakingWritingDraft, request);
+          await persistPartialCandidate();
+        }
       }
-      await this.materializeSpeakingWriting(jobId, exam, request);
+      await this.checkpoint(jobId, 'VALIDATING_TEXT');
       const currentJob = await this.prisma.aiGenerationJob.findUniqueOrThrow({
         where: { id: jobId },
         select: { resultSnapshot: true },
@@ -1499,10 +1672,20 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         data: {
           status: AiGenerationJobStatus.GENERATED,
           completedAt: new Date(),
+          draftSnapshot: {
+            version: 1,
+            partial: false,
+            lrBatches: generatedBatches,
+            speakingWriting: speakingWritingDraft ?? null,
+          },
           resultSnapshot: {
             ...((currentJob.resultSnapshot as object) ?? {}),
             stage: 'READY_FOR_REVIEW',
-            validation,
+            candidate: {
+              lrBatchCount: generatedBatches.length,
+              speakingCount: speakingWritingDraft?.speaking?.length ?? 0,
+              writingCount: speakingWritingDraft?.writing?.length ?? 0,
+            },
           },
         },
       });
@@ -1514,6 +1697,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           status: AiGenerationJobStatus.FAILED,
           completedAt: new Date(),
           errorSummary: message.slice(0, 1000),
+          resultSnapshot: {
+            ...((job.resultSnapshot as object) ?? {}),
+            stage: 'FAILED',
+            failedScope: activeScope,
+          },
           failureHistory: [
             { at: new Date().toISOString(), message: message.slice(0, 1000) },
           ] as Prisma.InputJsonValue,

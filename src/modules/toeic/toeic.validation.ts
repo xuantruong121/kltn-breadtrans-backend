@@ -60,7 +60,13 @@ export function validateToeicExam(exam: ToeicValidationExam): {
     partCounts[group.part] =
       (partCounts[group.part] ?? 0) + group.questions.length;
 
-  if (exam.type === 'FULL_TEST') {
+  if (exam.type !== 'FULL_TEST') {
+    issues.push({
+      code: 'INCOMPLETE_TEMPLATE',
+      message:
+        'Draft hiện chưa phải đề TOEIC Full Test 200 câu; cần hoàn thiện đúng template trước khi xuất bản.',
+    });
+  } else {
     const expectedTotal = Object.values(EXPECTED_PART_COUNTS).reduce(
       (sum, count) => sum + count,
       0,

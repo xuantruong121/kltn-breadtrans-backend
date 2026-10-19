@@ -48,7 +48,7 @@ import { SkillCmsModule } from './modules/content/skill-cms.module';
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 100,
+        limit: Number(process.env.THROTTLER_LIMIT ?? 100),
       },
     ]),
     AuthModule,

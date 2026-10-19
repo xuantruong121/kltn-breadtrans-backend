@@ -10,6 +10,41 @@ import * as winston from 'winston';
 import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
+
+function startPhase812RuntimeMetrics() {
+  if (process.env.PHASE812_RUNTIME_METRICS !== 'true') return;
+
+  const eventLoop = monitorEventLoopDelay({ resolution: 20 });
+  eventLoop.enable();
+  let previousCpu = process.cpuUsage();
+  let previousAt = process.hrtime.bigint();
+
+  const timer = setInterval(() => {
+    const now = process.hrtime.bigint();
+    const elapsedMicros = Number(now - previousAt) / 1_000;
+    const cpu = process.cpuUsage(previousCpu);
+    previousCpu = process.cpuUsage();
+    previousAt = now;
+    const cpuMicros = cpu.user + cpu.system;
+    const memory = process.memoryUsage();
+
+    console.log(
+      `[PHASE812_RUNTIME] ${JSON.stringify({
+        pid: process.pid,
+        cpuPercent: Number(((cpuMicros / elapsedMicros) * 100).toFixed(2)),
+        rssBytes: memory.rss,
+        heapUsedBytes: memory.heapUsed,
+        heapTotalBytes: memory.heapTotal,
+        eventLoopP50Ms: Number((eventLoop.percentile(50) / 1e6).toFixed(3)),
+        eventLoopP95Ms: Number((eventLoop.percentile(95) / 1e6).toFixed(3)),
+        eventLoopMaxMs: Number((eventLoop.max / 1e6).toFixed(3)),
+      })}`,
+    );
+    eventLoop.reset();
+  }, 5000);
+  timer.unref();
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -77,6 +112,8 @@ async function bootstrap() {
       allowedHeaders: ['Content-Type', 'Authorization'],
     });
   }
+
+  startPhase812RuntimeMetrics();
 
   // Lắng nghe trên 0.0.0.0 — cần thiết để Cloudflare Tunnel / Docker kết nối được
   await app.listen(process.env.PORT ?? 3001, '0.0.0.0');

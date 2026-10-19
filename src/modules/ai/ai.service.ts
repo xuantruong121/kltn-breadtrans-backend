@@ -20,6 +20,7 @@ import type {
   ContextualReadingQuestionsSuggestion,
   ContextualToeicPart5Suggestion,
   ContextualCourseCurriculumSuggestion,
+  ContextualCourseLessonContentSuggestion,
   ContextualListeningContentSuggestion,
   ContextualListeningQuestionsSuggestion,
   ContextualWritingTaskSuggestion,
@@ -541,6 +542,24 @@ export class AiService {
       );
     }
     return this.aiEvaluator.suggestCourseCurriculum(input);
+  }
+
+  async suggestCourseLessonContent(input: {
+    courseTitle: string;
+    courseDescription?: string;
+    courseLevel?: string;
+    lessonTitle: string;
+    lessonSummary: string;
+    objectives: string[];
+    existingSectionHeadings?: string[];
+  }): Promise<ContextualCourseLessonContentSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestCourseLessonContent) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ soạn nội dung bài học',
+      );
+    }
+    return this.aiEvaluator.suggestCourseLessonContent(input);
   }
 
   async suggestListeningContent(input: {

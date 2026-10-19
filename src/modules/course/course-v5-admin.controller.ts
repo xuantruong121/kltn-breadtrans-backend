@@ -30,6 +30,13 @@ import {
   UpdateV5QuestionDto,
   UpdateV5SectionDto,
 } from './course-v5-admin.dto';
+import {
+  ApplyCourseCurriculumDto,
+  ApplyCourseLessonContentDto,
+  GenerateCourseCurriculumDto,
+  GenerateCourseLessonContentDto,
+} from './course-ai-authoring.dto';
+import { CourseAiAuthoringService } from './course-ai-authoring.service';
 
 @ApiTags('admin-course-studio-v5')
 @ApiBearerAuth()
@@ -37,7 +44,49 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class CourseV5AdminController {
-  constructor(private readonly studio: CourseV5AdminService) {}
+  constructor(
+    private readonly studio: CourseV5AdminService,
+    private readonly aiAuthoring: CourseAiAuthoringService,
+  ) {}
+  @Post(':courseId/studio/ai/curriculum/generate')
+  generateCurriculum(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Body() dto: GenerateCourseCurriculumDto,
+    @Request() r: any,
+  ) {
+    return this.aiAuthoring.generateCurriculum(courseId, dto, r.user);
+  }
+  @Post(':courseId/studio/ai/curriculum/apply')
+  applyCurriculum(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Body() dto: ApplyCourseCurriculumDto,
+    @Request() r: any,
+  ) {
+    return this.aiAuthoring.applyCurriculum(courseId, dto, r.user);
+  }
+  @Post(':courseId/studio/lessons/:lessonId/ai/content/generate')
+  generateLessonContent(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('lessonId', ParseIntPipe) lessonId: number,
+    @Body() dto: GenerateCourseLessonContentDto,
+    @Request() r: any,
+  ) {
+    return this.aiAuthoring.generateLessonContent(
+      courseId,
+      lessonId,
+      dto,
+      r.user,
+    );
+  }
+  @Post(':courseId/studio/lessons/:lessonId/ai/content/apply')
+  applyLessonContent(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('lessonId', ParseIntPipe) lessonId: number,
+    @Body() dto: ApplyCourseLessonContentDto,
+    @Request() r: any,
+  ) {
+    return this.aiAuthoring.applyLessonContent(courseId, lessonId, dto, r.user);
+  }
   @Get(':courseId/studio') get(
     @Param('courseId', ParseIntPipe) id: number,
     @Request() r: any,

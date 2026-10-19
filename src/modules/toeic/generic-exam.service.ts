@@ -80,7 +80,11 @@ export class GenericExamService {
               include: { exercises: { include: { stimulus: true } } },
             },
             writingSet: {
-              include: { items: { include: { writingQuiz: true } } },
+              include: {
+                items: {
+                  include: { writingQuiz: { include: { questions: true } } },
+                },
+              },
             },
           },
         },
@@ -149,16 +153,21 @@ export class GenericExamService {
   }
 
   private writingReady(source: any) {
-    return Boolean(
-      source &&
-      source.publicationStatus === QuizPublicationStatus.PUBLISHED &&
-      source.items?.length === 8 &&
-      source.items.every(
-        (item: any) =>
-          item.writingQuiz?.publicationStatus ===
-          QuizPublicationStatus.PUBLISHED,
-      ),
-    );
+    if (
+      !source ||
+      source.publicationStatus !== QuizPublicationStatus.PUBLISHED ||
+      source.items?.length !== 8
+    )
+      return false;
+    return source.items.every((item: any) => {
+      const quiz = item.writingQuiz;
+      if (quiz?.publicationStatus !== QuizPublicationStatus.PUBLISHED)
+        return false;
+      if (item.taskKind !== 'PICTURE_SENTENCE') return true;
+      const content = quiz.questions?.[0]?.content as
+        { imageUrl?: unknown } | undefined;
+      return typeof content?.imageUrl === 'string' && content.imageUrl.trim();
+    });
   }
 
   private lrSource(exam: ProductRecord) {
@@ -226,6 +235,15 @@ export class GenericExamService {
     const readiness = this.productReadiness(exam);
     const child = this.lrSource(exam);
     const assessment = exam.toeicAssessment;
+    const lrQuestions =
+      child?.groups?.reduce(
+        (total: number, group: any) => total + (group.questions?.length ?? 0),
+        0,
+      ) ?? 0;
+    const taskQuestions =
+      (readiness.speakingCount ?? 0) + (readiness.writingCount ?? 0);
+    const totalQuestions =
+      exam.variantCode === 'TOEIC_SW' ? taskQuestions : lrQuestions;
     return {
       id: exam.id,
       title: exam.title,
@@ -242,19 +260,13 @@ export class GenericExamService {
       runtimeId: child?.id ?? assessment?.id ?? null,
       type: child?.type,
       difficulty: child?.difficulty,
-      durationSeconds: child?.durationSeconds,
+      durationSeconds:
+        child?.durationSeconds ??
+        (exam.variantCode === 'TOEIC_SW' ? 4800 : undefined),
       groups: child?.groups ?? [],
       totalGroups: child?.groups?.length ?? 0,
-      totalQuestions:
-        child?.groups?.reduce(
-          (total: number, group: any) => total + (group.questions?.length ?? 0),
-          0,
-        ) ?? 0,
-      questionsCount:
-        child?.groups?.reduce(
-          (total: number, group: any) => total + (group.questions?.length ?? 0),
-          0,
-        ) ?? 0,
+      totalQuestions,
+      questionsCount: totalQuestions,
       bilingualContent: {
         examFormat: exam.variantCode,
         examSetId: child?.id ?? null,
