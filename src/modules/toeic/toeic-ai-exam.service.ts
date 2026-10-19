@@ -6,6 +6,7 @@ import {
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   AiGenerationJobStatus,
@@ -24,12 +25,26 @@ import { R2Service } from '../upload/r2.service';
 import { GenericExamService } from './generic-exam.service';
 import { CreateToeicAiExamDto } from './toeic-ai-exam.dto';
 import { validateToeicExam } from './toeic.validation';
+import {
+  mediaRetryMessage,
+  toeicMediaHash,
+  withMediaFailure,
+} from './toeic-media';
 import { TOEIC_SPEAKING_TASK_SEQUENCE } from '../speaking/toeic-speaking-contract';
 import { TOEIC_WRITING_SLOT_CONTRACT } from '../writing/toeic-writing-set.contract';
+import { ImageSearchCandidate } from './pixabay-image-search.provider';
+import { ImageSearchProviderChain } from './image-search.provider-chain';
+import type {
+  ToeicPart1CandidateAnalysis,
+  ToeicPart1QuestionCandidate,
+} from '../ai/strategies/ai-evaluator.interface';
 
 const TOEIC_AI_QUEUE = 'breadtrans-toeic-ai-exam';
 const PRACTICE_DISCLAIMER =
   'Lưu ý: Đây là đề luyện tập tham khảo được xây dựng nhằm mô phỏng cấu trúc TOEIC. Nội dung không phải đề thi chính thức do ETS phát hành và không thay thế bài thi TOEIC chính thức.';
+const ADMIN_SELECT_IMAGE_TIMEOUT_MS = 20_000;
+const ADMIN_SELECT_R2_TIMEOUT_MS = 30_000;
+const ADMIN_SELECT_VISION_TIMEOUT_MS = 45_000;
 
 type PlannedGroup = { questionCount: number; kind?: 'SINGLE' | 'MULTIPLE' };
 type JobPayload = { version: 1; jobId: string };
@@ -137,12 +152,62 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     },
   );
   private worker?: Worker<JobPayload, unknown, 'generate'>;
+  private readonly imageCandidates = new Map<
+    string,
+    { candidate: ImageSearchCandidate; expiresAt: number; query: string }
+  >();
+
+  private async runBoundedStage<T>(
+    requestId: string,
+    stage: string,
+    timeoutMs: number,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const startedAt = Date.now();
+    this.logger.log(
+      `toeic_admin_select_stage_started requestId=${requestId} stage=${stage}`,
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const error = new Error(`${stage} timed out after ${timeoutMs}ms`);
+        (error as Error & { code?: string }).code =
+          `${stage.toUpperCase()}_TIMEOUT`;
+        reject(error);
+      }, timeoutMs);
+    });
+    try {
+      const result = await Promise.race([
+        Promise.resolve().then(operation),
+        timeout,
+      ]);
+      this.logger.log(
+        `toeic_admin_select_stage_completed requestId=${requestId} stage=${stage} elapsedMs=${Date.now() - startedAt}`,
+      );
+      return result;
+    } catch (error) {
+      this.logger.warn(
+        `toeic_admin_select_stage_failed requestId=${requestId} stage=${stage} elapsedMs=${Date.now() - startedAt} code=${(error as { code?: string })?.code ?? 'ERROR'}`,
+      );
+      if (
+        (error as { code?: string })?.code === `${stage.toUpperCase()}_TIMEOUT`
+      ) {
+        throw new ServiceUnavailableException(
+          `Bước ${stage} quá thời gian xử lý. Vui lòng thử lại sau.`,
+        );
+      }
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly genericExam: GenericExamService,
     private readonly ai: AiService,
     private readonly r2: R2Service,
+    private readonly imageSearch: ImageSearchProviderChain,
   ) {}
 
   onModuleInit() {
@@ -455,57 +520,389 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException(
           'Chỉ Part 1 có thể tạo lại ảnh từ mô tả hiện tại',
         );
-      const image = await this.ai.generateToeicExamImage({
-        brief: group.imageBrief,
-        part: 1,
-      });
-      this.assertImage(image.buffer, image.mimeType);
-      const uploaded = await this.r2.putObjectAtKey(
-        `ai/toeic-exams/exam-${exam.toeicExamSet!.id}/groups/${group.id}/image-regenerated.${image.mimeType === 'image/png' ? 'png' : 'jpg'}`,
-        image.buffer,
-        image.mimeType,
-      );
-      if (!(await this.r2.objectExists(uploaded.key)))
-        throw new BadRequestException('R2 chưa xác nhận ảnh tạo lại');
-      metadata.image = {
-        source: 'AI_GENERATED',
-        r2Key: uploaded.key,
-        generatedAt: new Date().toISOString(),
-        briefHash: sha256(group.imageBrief),
-      };
-      return this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          imageUrl: uploaded.url,
-          mediaMetadata: metadata as Prisma.InputJsonValue,
-        },
-      });
+      let image: Awaited<ReturnType<AiService['generateToeicExamImage']>>;
+      try {
+        image = await this.ai.generateToeicExamImage({
+          brief: group.imageBrief,
+          part: 1,
+        });
+        this.assertImage(image.buffer, image.mimeType);
+        const uploaded = await this.r2.putObjectAtKey(
+          `ai/toeic-exams/exam-${exam.toeicExamSet!.id}/groups/${group.id}/image-regenerated.${image.mimeType === 'image/png' ? 'png' : 'jpg'}`,
+          image.buffer,
+          image.mimeType,
+        );
+        if (!(await this.r2.objectExists(uploaded.key)))
+          throw new BadRequestException('R2 chưa xác nhận ảnh tạo lại');
+        metadata.image = {
+          source: 'AI_GENERATED',
+          status: 'READY',
+          r2Key: uploaded.key,
+          generatedAt: new Date().toISOString(),
+          briefHash: toeicMediaHash(group.imageBrief),
+        };
+        return this.prisma.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            imageUrl: uploaded.url,
+            mediaMetadata: metadata as Prisma.InputJsonValue,
+          },
+        });
+      } catch {
+        throw new BadRequestException(mediaRetryMessage('image'));
+      }
     }
     if (group.part > 4 || !group.transcriptText?.trim())
       throw new BadRequestException(
         'Nhóm này không có transcript Listening để tạo lại audio',
       );
-    const audio = await this.makeAudio(group.transcriptText);
-    const uploaded = await this.r2.putObjectAtKey(
-      `ai/toeic-exams/exam-${exam.toeicExamSet!.id}/groups/${group.id}/audio-regenerated.mp3`,
-      audio,
-      'audio/mpeg',
+    try {
+      const audio = await this.makeAudio(group.transcriptText);
+      const uploaded = await this.r2.putObjectAtKey(
+        `ai/toeic-exams/exam-${exam.toeicExamSet!.id}/groups/${group.id}/audio-regenerated.mp3`,
+        audio,
+        'audio/mpeg',
+      );
+      if (!(await this.r2.objectExists(uploaded.key)))
+        throw new BadRequestException('R2 chưa xác nhận audio tạo lại');
+      metadata.audio = {
+        source: 'AI_GENERATED',
+        status: 'READY',
+        r2Key: uploaded.key,
+        generatedAt: new Date().toISOString(),
+        transcriptHash: toeicMediaHash(group.transcriptText),
+      };
+      return this.prisma.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          audioUrl: uploaded.url,
+          mediaMetadata: metadata as Prisma.InputJsonValue,
+        },
+      });
+    } catch {
+      throw new BadRequestException(mediaRetryMessage('audio'));
+    }
+  }
+
+  async searchPart1Images(
+    examId: number,
+    groupId: number,
+    query: string,
+    limit = 5,
+  ) {
+    const exam = await this.editableDraft(examId);
+    const group = await this.prisma.toeicQuestionGroup.findFirst({
+      where: { id: groupId, examId: exam.toeicExamSet!.id },
+    });
+    if (!group || group.part !== 1)
+      throw new NotFoundException('Không tìm thấy nhóm Part 1 trong Draft');
+    const candidates = await this.imageSearch.search(
+      query || group.imageBrief || 'workers meeting office',
+      { limit },
     );
-    if (!(await this.r2.objectExists(uploaded.key)))
-      throw new BadRequestException('R2 chưa xác nhận audio tạo lại');
-    metadata.audio = {
-      source: 'AI_GENERATED',
-      r2Key: uploaded.key,
-      generatedAt: new Date().toISOString(),
-      transcriptHash: sha256(group.transcriptText),
-    };
-    return this.prisma.toeicQuestionGroup.update({
+    const ids = candidates.map(
+      (candidate) => `${candidate.provider.toLowerCase()}:${randomUUID()}`,
+    );
+    candidates.forEach((candidate, index) =>
+      this.imageCandidates.set(ids[index], {
+        candidate,
+        query: query.trim(),
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      }),
+    );
+    const previews = await Promise.all(
+      candidates.map(async (candidate, index) => {
+        try {
+          const visionImage = await this.imageSearch.download(candidate);
+          return {
+            candidateId: ids[index],
+            imageBuffer: visionImage.buffer,
+            mimeType: visionImage.mimeType,
+          };
+        } catch (error) {
+          this.logger.warn(
+            `Image preview skipped provider=${candidate.provider}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return null;
+        }
+      }),
+    );
+    let analyses: ToeicPart1CandidateAnalysis[] = [];
+    let analysisFailure: string | undefined;
+    try {
+      analyses = await this.runBoundedStage(
+        randomUUID(),
+        'vision_analysis',
+        ADMIN_SELECT_VISION_TIMEOUT_MS,
+        () =>
+          this.ai.analyzeToeicPart1Candidates({
+            candidates: previews.filter(
+              (preview): preview is NonNullable<typeof preview> =>
+                Boolean(preview),
+            ),
+          }),
+      );
+    } catch (error) {
+      analysisFailure = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Image candidate analysis failed: ${analysisFailure}`);
+    }
+    const results = candidates.map((candidate, index) => ({
+      id: ids[index],
+      ...candidate,
+      analysis:
+        analyses.find((analysis) => analysis.candidateId === ids[index]) ??
+        (analysisFailure
+          ? {
+              candidateId: ids[index],
+              status: 'ANALYSIS_FAILED' as const,
+              suitable: false,
+              score: 0,
+              sceneSummary: '',
+              visibleFacts: [],
+              unsafeInferences: [],
+              rejectionReasons: ['Không thể hoàn tất phân tích AI.'],
+            }
+          : undefined),
+    }));
+    return { query, provider: 'CHAIN', candidates: results };
+  }
+
+  async selectPart1Image(examId: number, groupId: number, candidateId: string) {
+    const requestId = randomUUID();
+    const exam = await this.editableDraft(examId);
+    const group = await this.prisma.toeicQuestionGroup.findFirst({
+      where: { id: groupId, examId: exam.toeicExamSet!.id },
+      include: { questions: { orderBy: { questionNumber: 'asc' } } },
+    });
+    if (!group || group.part !== 1)
+      throw new NotFoundException('Không tìm thấy nhóm Part 1 trong Draft');
+    const stored = this.imageCandidates.get(candidateId);
+    if (!stored || stored.expiresAt < Date.now()) {
+      this.imageCandidates.delete(candidateId);
+      throw new BadRequestException(
+        'Ứng viên ảnh đã hết hạn. Hãy tìm lại ảnh.',
+      );
+    }
+    let uploadedKey: string | undefined;
+    const image = await this.runBoundedStage(
+      requestId,
+      'image_download',
+      ADMIN_SELECT_IMAGE_TIMEOUT_MS,
+      () => this.imageSearch.download(stored.candidate),
+    );
+    const imageHash = sha256(image.buffer);
+    try {
+      const uploaded = await this.runBoundedStage(
+        requestId,
+        'r2_upload',
+        ADMIN_SELECT_R2_TIMEOUT_MS,
+        () =>
+          this.r2.putObjectAtKey(
+            `ai/toeic-exams/exam-${exam.toeicExamSet!.id}/groups/${group.id}/image-${stored.candidate.provider.toLowerCase()}-${imageHash.slice(0, 16)}.${image.mimeType === 'image/png' ? 'png' : image.mimeType === 'image/webp' ? 'webp' : 'jpg'}`,
+            image.buffer,
+            image.mimeType,
+          ),
+      );
+      uploadedKey = uploaded.key;
+      const exists = await this.runBoundedStage(
+        requestId,
+        'r2_verify',
+        ADMIN_SELECT_R2_TIMEOUT_MS,
+        () => this.r2.objectExists(uploaded.key),
+      );
+      if (!exists)
+        throw new BadRequestException('R2 chưa xác nhận ảnh vừa tải lên');
+      const current = (group.mediaMetadata as any) ?? {};
+      const imageMetadata = {
+        ...(current.image ?? {}),
+        source: stored.candidate.provider,
+        provenance: 'EXTERNAL_LIBRARY',
+        provider: stored.candidate.provider,
+        providerAssetId: stored.candidate.providerAssetId,
+        sourcePageUrl: stored.candidate.sourcePageUrl,
+        author: stored.candidate.author,
+        authorUrl: stored.candidate.authorUrl,
+        upstreamSource: stored.candidate.source,
+        originalTags: stored.candidate.tags,
+        license: stored.candidate.license,
+        licenseVersion: stored.candidate.licenseVersion,
+        licenseUrl: stored.candidate.licenseUrl,
+        attribution: stored.candidate.attribution,
+        providerMetadata: stored.candidate.metadata,
+        r2Key: uploaded.key,
+        imageHash,
+        retrievedAt: new Date().toISOString(),
+        status: 'READY',
+        questionStatus: 'STALE',
+      };
+      const mediaMetadata = { ...current, image: imageMetadata };
+      await this.prisma.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          imageUrl: uploaded.url,
+          imageBrief: stored.query || group.imageBrief,
+          mediaMetadata: mediaMetadata as Prisma.InputJsonValue,
+        },
+      });
+      let vision: ToeicPart1QuestionCandidate | undefined;
+      let visionError: string | undefined;
+      try {
+        vision = await this.runBoundedStage(
+          requestId,
+          'question_generation',
+          ADMIN_SELECT_VISION_TIMEOUT_MS,
+          () =>
+            this.ai.generateToeicPart1FromImage({
+              imageBuffer: image.buffer,
+              mimeType: image.mimeType,
+            }),
+        );
+        this.assertPart1QuestionCandidate(vision);
+      } catch {
+        visionError =
+          'Không thể phân tích ảnh lúc này. Bạn có thể sửa câu hỏi thủ công hoặc thử lại.';
+      }
+      if (vision) {
+        const question = group.questions[0];
+        if (question) {
+          await this.prisma.toeicQuestion.update({
+            where: { id: question.id },
+            data: {
+              text: null,
+              options: vision.statements,
+              correctIndex: vision.correctIndex,
+              explanation: vision.explanation,
+            },
+          });
+        } else {
+          await this.prisma.toeicQuestion.create({
+            data: {
+              groupId: group.id,
+              questionNumber: 1,
+              text: null,
+              options: vision.statements,
+              correctIndex: vision.correctIndex,
+              explanation: vision.explanation,
+            },
+          });
+        }
+        imageMetadata.questionStatus = 'READY_FOR_REVIEW';
+        imageMetadata.questionImageHash = imageHash;
+        imageMetadata.sceneSummary = vision.sceneSummary;
+      } else {
+        imageMetadata.questionStatus = 'FAILED';
+        imageMetadata.visionError = visionError;
+      }
+      await this.prisma.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          mediaMetadata: {
+            ...current,
+            image: imageMetadata,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      this.imageCandidates.delete(candidateId);
+      return {
+        imageUrl: uploaded.url,
+        imageMetadata,
+        question: vision ?? null,
+        error: visionError,
+      };
+    } catch (error) {
+      if (uploadedKey)
+        await this.r2.deleteFile(uploadedKey).catch(() => undefined);
+      this.imageCandidates.delete(candidateId);
+      throw error;
+    }
+  }
+
+  async generatePart1QuestionFromStoredImage(examId: number, groupId: number) {
+    const exam = await this.editableDraft(examId);
+    const group = await this.prisma.toeicQuestionGroup.findFirst({
+      where: { id: groupId, examId: exam.toeicExamSet!.id },
+      include: { questions: { orderBy: { questionNumber: 'asc' } } },
+    });
+    if (!group?.imageUrl || group.part !== 1)
+      throw new BadRequestException('Nhóm Part 1 chưa có ảnh để phân tích');
+    const publicStorageUrl = this.r2.getPublicUrl();
+    if (
+      !publicStorageUrl ||
+      !group.imageUrl.startsWith(`${publicStorageUrl.replace(/\/$/, '')}/`)
+    ) {
+      throw new BadRequestException(
+        'Chỉ ảnh đã lưu trong R2 của BreadTrans mới được phân tích',
+      );
+    }
+    const response = await fetch(group.imageUrl, {
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok)
+      throw new BadRequestException('Không thể đọc ảnh đã tải lên');
+    const image = this.imageSearch.validateBuffer(
+      Buffer.from(await response.arrayBuffer()),
+      response.headers.get('content-type'),
+    );
+    const vision = await this.ai.generateToeicPart1FromImage({
+      imageBuffer: image.buffer,
+      mimeType: image.mimeType,
+    });
+    this.assertPart1QuestionCandidate(vision);
+    const current = (group.mediaMetadata as any) ?? {};
+    const imageHash = sha256(image.buffer);
+    const question = group.questions[0];
+    if (question)
+      await this.prisma.toeicQuestion.update({
+        where: { id: question.id },
+        data: {
+          text: null,
+          options: vision.statements,
+          correctIndex: vision.correctIndex,
+          explanation: vision.explanation,
+        },
+      });
+    else
+      await this.prisma.toeicQuestion.create({
+        data: {
+          groupId: group.id,
+          questionNumber: 1,
+          text: null,
+          options: vision.statements,
+          correctIndex: vision.correctIndex,
+          explanation: vision.explanation,
+        },
+      });
+    await this.prisma.toeicQuestionGroup.update({
       where: { id: group.id },
       data: {
-        audioUrl: uploaded.url,
-        mediaMetadata: metadata as Prisma.InputJsonValue,
+        mediaMetadata: {
+          ...current,
+          image: {
+            ...(current.image ?? {}),
+            status: 'READY',
+            questionStatus: 'READY_FOR_REVIEW',
+            questionImageHash: imageHash,
+            sceneSummary: vision.sceneSummary,
+          },
+        } as Prisma.InputJsonValue,
       },
     });
+    return { question: vision };
+  }
+
+  private assertPart1QuestionCandidate(candidate: ToeicPart1QuestionCandidate) {
+    if (
+      !candidate ||
+      !Array.isArray(candidate.statements) ||
+      candidate.statements.length !== 4 ||
+      !Number.isInteger(candidate.correctIndex) ||
+      candidate.correctIndex < 0 ||
+      candidate.correctIndex > 3 ||
+      candidate.statements.some((statement) => !String(statement).trim()) ||
+      !String(candidate.explanation || '').trim()
+    ) {
+      throw new BadRequestException('Câu hỏi Part 1 từ ảnh không hợp lệ');
+    }
   }
 
   private async checkpoint(
@@ -671,58 +1068,130 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     for (const group of groups) {
       const metadata = (group.mediaMetadata as any) ?? {};
       if (group.part === 1) {
-        const image = await this.ai.generateToeicExamImage({
-          brief: group.imageBrief || 'natural workplace scene',
-          part: 1,
+        let imageResult:
+          { url: string; key: string; mimeType: string } | undefined;
+        try {
+          const image = await this.ai.generateToeicExamImage({
+            brief: group.imageBrief || 'natural workplace scene',
+            part: 1,
+          });
+          this.assertImage(image.buffer, image.mimeType);
+          const uploaded = await this.r2.putObjectAtKey(
+            `ai/toeic-exams/exam-${examSetId}/groups/${group.id}/image.${image.mimeType === 'image/png' ? 'png' : 'jpg'}`,
+            image.buffer,
+            image.mimeType,
+          );
+          if (!(await this.r2.objectExists(uploaded.key)))
+            throw new BadRequestException(
+              'R2 chưa xác nhận ảnh AI vừa tải lên',
+            );
+          imageResult = { ...uploaded, mimeType: image.mimeType };
+        } catch (error) {
+          const failedMetadata = withMediaFailure(
+            metadata,
+            'image',
+            error,
+            toeicMediaHash(group.imageBrief),
+          );
+          Object.assign(metadata, failedMetadata);
+          await this.prisma.toeicQuestionGroup.update({
+            where: { id: group.id },
+            data: {
+              imageUrl: null,
+              mediaMetadata: failedMetadata,
+            },
+          });
+          this.logger.warn(
+            `TOEIC image soft failure for group ${group.id}: ${
+              failedMetadata.image.errorCode
+            }`,
+          );
+        }
+        if (imageResult) {
+          metadata.image = {
+            source: 'AI_GENERATED',
+            status: 'READY',
+            r2Key: imageResult.key,
+            generatedAt: new Date().toISOString(),
+            briefHash: toeicMediaHash(group.imageBrief),
+          };
+          await this.prisma.toeicQuestionGroup.update({
+            where: { id: group.id },
+            data: {
+              imageUrl: imageResult.url,
+              mediaMetadata: metadata as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
+      const transcript = group.transcriptText?.trim();
+      if (!transcript) {
+        const failedMetadata = withMediaFailure(
+          metadata,
+          'audio',
+          new BadRequestException('missing transcript'),
+          toeicMediaHash(''),
+        );
+        Object.assign(metadata, failedMetadata);
+        await this.prisma.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            audioUrl: null,
+            mediaMetadata: failedMetadata,
+          },
         });
-        this.assertImage(image.buffer, image.mimeType);
+        continue;
+      }
+      let audioResult: { url: string; key: string } | undefined;
+      try {
+        const audio = await this.makeAudio(transcript);
         const uploaded = await this.r2.putObjectAtKey(
-          `ai/toeic-exams/exam-${examSetId}/groups/${group.id}/image.${image.mimeType === 'image/png' ? 'png' : 'jpg'}`,
-          image.buffer,
-          image.mimeType,
+          `ai/toeic-exams/exam-${examSetId}/groups/${group.id}/audio.mp3`,
+          audio,
+          'audio/mpeg',
         );
         if (!(await this.r2.objectExists(uploaded.key)))
-          throw new BadRequestException('R2 chưa xác nhận ảnh AI vừa tải lên');
-        metadata.image = {
+          throw new BadRequestException(
+            'R2 chưa xác nhận audio AI vừa tải lên',
+          );
+        audioResult = uploaded;
+      } catch (error) {
+        const failedMetadata = withMediaFailure(
+          metadata,
+          'audio',
+          error,
+          toeicMediaHash(transcript),
+        );
+        Object.assign(metadata, failedMetadata);
+        await this.prisma.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            audioUrl: null,
+            mediaMetadata: failedMetadata,
+          },
+        });
+        this.logger.warn(
+          `TOEIC audio soft failure for group ${group.id}: ${
+            failedMetadata.audio.errorCode
+          }`,
+        );
+      }
+      if (audioResult) {
+        metadata.audio = {
           source: 'AI_GENERATED',
-          r2Key: uploaded.key,
+          status: 'READY',
+          r2Key: audioResult.key,
           generatedAt: new Date().toISOString(),
-          briefHash: sha256(group.imageBrief || ''),
+          transcriptHash: toeicMediaHash(transcript),
         };
         await this.prisma.toeicQuestionGroup.update({
           where: { id: group.id },
           data: {
-            imageUrl: uploaded.url,
+            audioUrl: audioResult.url,
             mediaMetadata: metadata as Prisma.InputJsonValue,
           },
         });
       }
-      const transcript = group.transcriptText?.trim();
-      if (!transcript)
-        throw new BadRequestException(
-          `Nhóm Listening #${group.id} thiếu transcript`,
-        );
-      const audio = await this.makeAudio(transcript);
-      const uploaded = await this.r2.putObjectAtKey(
-        `ai/toeic-exams/exam-${examSetId}/groups/${group.id}/audio.mp3`,
-        audio,
-        'audio/mpeg',
-      );
-      if (!(await this.r2.objectExists(uploaded.key)))
-        throw new BadRequestException('R2 chưa xác nhận audio AI vừa tải lên');
-      metadata.audio = {
-        source: 'AI_GENERATED',
-        r2Key: uploaded.key,
-        generatedAt: new Date().toISOString(),
-        transcriptHash: sha256(transcript),
-      };
-      await this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          audioUrl: uploaded.url,
-          mediaMetadata: metadata as Prisma.InputJsonValue,
-        },
-      });
     }
     await this.checkpoint(jobId, 'VALIDATING_MEDIA');
   }
@@ -1019,12 +1488,6 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           },
         });
         validation = validateToeicExam(complete);
-        if (!validation.learnerReady)
-          throw new BadRequestException(
-            validation.issues
-              .map((issue: { message: string }) => issue.message)
-              .join('; '),
-          );
       }
       await this.materializeSpeakingWriting(jobId, exam, request);
       const currentJob = await this.prisma.aiGenerationJob.findUniqueOrThrow({

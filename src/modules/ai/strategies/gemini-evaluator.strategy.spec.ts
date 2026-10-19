@@ -1,4 +1,85 @@
-import { GeminiEvaluatorStrategy } from './gemini-evaluator.strategy';
+import {
+  extractGeminiImage,
+  GeminiEvaluatorStrategy,
+  parseGeminiApiKeys,
+} from './gemini-evaluator.strategy';
+
+describe('Gemini API key pool configuration', () => {
+  it('parses, trims, and de-duplicates comma/newline separated keys', () => {
+    expect(parseGeminiApiKeys(' key-a, key-b\nkey-a ', 'fallback')).toEqual([
+      'key-a',
+      'key-b',
+    ]);
+  });
+
+  it('uses the legacy single-key variable only when the pool is empty', () => {
+    expect(parseGeminiApiKeys('', 'legacy-key')).toEqual(['legacy-key']);
+  });
+});
+
+describe('Gemini image provider normalization', () => {
+  it('extracts non-empty inline image bytes and MIME', () => {
+    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    expect(
+      extractGeminiImage({
+        response: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    inlineData: {
+                      data: bytes.toString('base64'),
+                      mimeType: 'image/png',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      }),
+    ).toEqual({ buffer: bytes, mimeType: 'image/png' });
+  });
+
+  it('fails closed for text-only and empty image responses', () => {
+    expect(() =>
+      extractGeminiImage({
+        response: {
+          candidates: [{ content: { parts: [{ text: 'text only' }] } }],
+        },
+      }),
+    ).toThrow('không trả về ảnh hợp lệ');
+    expect(() =>
+      extractGeminiImage({
+        response: {
+          candidates: [
+            {
+              content: {
+                parts: [{ inlineData: { data: '', mimeType: 'image/png' } }],
+              },
+            },
+          ],
+        },
+      }),
+    ).toThrow('không trả về ảnh hợp lệ');
+  });
+
+  it('propagates provider failures instead of creating fake media', async () => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.executeWithRotation = jest
+      .fn()
+      .mockRejectedValue(new Error('provider unavailable'));
+
+    await expect(
+      strategy.generateToeicExamImage({
+        part: 1,
+        brief: 'an original workplace meeting room',
+      }),
+    ).rejects.toThrow('provider unavailable');
+  });
+});
 
 describe('GeminiEvaluatorStrategy Writing image MIME detection', () => {
   const detect = (buffer: Buffer) =>
@@ -16,6 +97,90 @@ describe('GeminiEvaluatorStrategy Writing image MIME detection', () => {
 
   it('detects WebP bytes as image/webp', () => {
     expect(detect(Buffer.from('RIFF0000WEBP', 'ascii'))).toBe('image/webp');
+  });
+});
+
+describe('GeminiEvaluatorStrategy Part 1 vision contracts', () => {
+  const createStrategy = (response: unknown) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.executeWithRotation = jest.fn().mockResolvedValue({
+      response: { text: () => JSON.stringify(response), usageMetadata: {} },
+    });
+    strategy.recordUsage = jest.fn().mockResolvedValue(undefined);
+    return strategy;
+  };
+
+  it('accepts structured candidate suitability analysis', async () => {
+    const strategy = createStrategy([
+      {
+        candidateId: 'pixabay:1',
+        suitable: true,
+        score: 0.91,
+        sceneSummary: 'A person arranges papers on a desk.',
+        visibleFacts: ['papers', 'desk'],
+        unsafeInferences: [],
+        rejectionReasons: [],
+      },
+    ]);
+    await expect(
+      strategy.analyzeToeicPart1Candidates({
+        candidates: [
+          {
+            candidateId: 'pixabay:1',
+            imageBuffer: Buffer.from('image'),
+            mimeType: 'image/jpeg',
+          },
+        ],
+      }),
+    ).resolves.toMatchObject([
+      {
+        candidateId: 'pixabay:1',
+        status: 'SUITABLE',
+        suitable: true,
+        score: 0.91,
+      },
+    ]);
+  });
+
+  it('classifies a missing suitability field as an analysis contract failure', async () => {
+    const strategy = createStrategy([
+      {
+        candidateId: 'pixabay:1',
+        score: 0.2,
+        sceneSummary: 'A desk.',
+        visibleFacts: ['desk'],
+        unsafeInferences: [],
+        rejectionReasons: ['unclear'],
+      },
+    ]);
+
+    await expect(
+      strategy.analyzeToeicPart1Candidates({
+        candidates: [
+          {
+            candidateId: 'pixabay:1',
+            imageBuffer: Buffer.from('image'),
+            mimeType: 'image/jpeg',
+          },
+        ],
+      }),
+    ).rejects.toThrow('thiếu trường suitable');
+  });
+
+  it('rejects a vision question response that is not exactly four statements', async () => {
+    const strategy = createStrategy({
+      sceneSummary: 'A desk.',
+      statements: ['Only one statement'],
+      correctIndex: 0,
+      explanation: 'The desk is visible.',
+    });
+    await expect(
+      strategy.generateToeicPart1FromImage({
+        imageBuffer: Buffer.from('image'),
+        mimeType: 'image/jpeg',
+      }),
+    ).rejects.toThrow('bốn đáp án');
   });
 });
 

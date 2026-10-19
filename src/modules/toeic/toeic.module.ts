@@ -16,6 +16,10 @@ import { SkillCmsModule } from '../content/skill-cms.module';
 import { AiModule } from '../ai/ai.module';
 import { UploadModule } from '../upload/upload.module';
 import { ToeicAiExamService } from './toeic-ai-exam.service';
+import { PixabayImageSearchProvider } from './pixabay-image-search.provider';
+import { OpenverseImageSearchProvider } from './openverse-image-search.provider';
+import { ImageSearchProviderChain } from './image-search.provider-chain';
+import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-search.provider';
 
 @Module({
   imports: [SpeakingModule, QuizModule, SkillCmsModule, AiModule, UploadModule],
@@ -32,6 +36,10 @@ import { ToeicAiExamService } from './toeic-ai-exam.service';
     ToeicAssessmentService,
     GenericExamService,
     ToeicAiExamService,
+    PixabayImageSearchProvider,
+    OpenverseImageSearchProvider,
+    WikimediaCommonsImageSearchProvider,
+    ImageSearchProviderChain,
   ],
   exports: [
     ToeicService,

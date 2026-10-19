@@ -5517,9 +5517,9 @@ async function main() {
   const toeicSpeakingWritingQuiz = await prisma.quiz.upsert({
     where: { id: 20 },
     update: {
-      title: 'TOEIC Speaking & Writing — Đề thi chuẩn 01',
+      title: 'TOEIC 2 Skills: Speaking & Writing — Đề luyện tập 01',
       description:
-        'Bộ nhiệm vụ nguyên bản theo cấu trúc TOEIC Speaking (11 câu) và Writing (8 câu).',
+        'Đề luyện tập TOEIC 2 Skills: Speaking & Writing gồm 11 task Speaking và 8 task Writing. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
       courseId: courses[4].id,
       timeLimit: 80,
@@ -5548,9 +5548,9 @@ async function main() {
     },
     create: {
       id: 20,
-      title: 'TOEIC Speaking & Writing — Đề thi chuẩn 01',
+      title: 'TOEIC 2 Skills: Speaking & Writing — Đề luyện tập 01',
       description:
-        'Bộ nhiệm vụ nguyên bản theo cấu trúc TOEIC Speaking (11 câu) và Writing (8 câu).',
+        'Đề luyện tập TOEIC 2 Skills: Speaking & Writing gồm 11 task Speaking và 8 task Writing. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
       courseId: courses[4].id,
       timeLimit: 80,
@@ -8193,18 +8193,18 @@ async function main() {
   const toeicExam = await prisma.toeicExamSet.upsert({
     where: { id: 1 },
     update: {
-      title: 'TOEIC Listening & Reading — Đề thi chuẩn 01',
+      title: 'TOEIC 2 Skills: Listening & Reading — Đề luyện tập 01',
       description:
-        'Đề thi thử nguyên bản theo cấu trúc TOEIC Listening & Reading hiện hành: 100 câu Listening (45 phút) + 100 câu Reading (75 phút), Part 1–7. Nội dung do BreadTrans biên soạn, không phải câu hỏi chính thức của ETS.',
+        'Đề luyện tập TOEIC 2 Skills: Listening & Reading gồm 100 câu Listening và 100 câu Reading, bao quát Part 1–7. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: ExamType.FULL_TEST,
       difficulty: 'medium',
       createdBy: admin.id,
     },
     create: {
       id: 1,
-      title: 'TOEIC Listening & Reading — Đề thi chuẩn 01',
+      title: 'TOEIC 2 Skills: Listening & Reading — Đề luyện tập 01',
       description:
-        'Đề thi thử nguyên bản theo cấu trúc TOEIC Listening & Reading hiện hành: 100 câu Listening (45 phút) + 100 câu Reading (75 phút), Part 1–7. Nội dung do BreadTrans biên soạn, không phải câu hỏi chính thức của ETS.',
+        'Đề luyện tập TOEIC 2 Skills: Listening & Reading gồm 100 câu Listening và 100 câu Reading, bao quát Part 1–7. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: ExamType.FULL_TEST,
       difficulty: 'medium',
       createdBy: admin.id,
@@ -11500,9 +11500,9 @@ async function main() {
   await prisma.quiz.upsert({
     where: { id: 21 },
     update: {
-      title: 'TOEIC L&R — Đề thi chuẩn Listening & Reading 01',
+      title: 'TOEIC 2 Skills: Listening & Reading — Đề luyện tập 01',
       description:
-        'Đề thi thử TOEIC Listening & Reading gồm 100 câu Listening (45 phút) và 100 câu Reading (75 phút), tổng 200 câu.',
+        'Đề luyện tập TOEIC 2 Skills: Listening & Reading gồm 100 câu Listening và 100 câu Reading, bao quát Part 1–7. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
       courseId: courses[2].id,
       timeLimit: 120,
@@ -11517,14 +11517,14 @@ async function main() {
         readingQuestions: 100,
         totalQuestions: 200,
         sections: ['LISTENING', 'READING'],
-        note: 'Đề thi chuẩn TOEIC Listening & Reading 200 câu từ ToeicExamSet 01.',
+        note: 'Đề luyện tập TOEIC Listening & Reading 200 câu từ ToeicExamSet 01.',
       },
     },
     create: {
       id: 21,
-      title: 'TOEIC L&R — Đề thi chuẩn Listening & Reading 01',
+      title: 'TOEIC 2 Skills: Listening & Reading — Đề luyện tập 01',
       description:
-        'Đề thi thử TOEIC Listening & Reading gồm 100 câu Listening (45 phút) và 100 câu Reading (75 phút), tổng 200 câu.',
+        'Đề luyện tập TOEIC 2 Skills: Listening & Reading gồm 100 câu Listening và 100 câu Reading, bao quát Part 1–7. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
       courseId: courses[2].id,
       timeLimit: 120,
@@ -11539,7 +11539,7 @@ async function main() {
         readingQuestions: 100,
         totalQuestions: 200,
         sections: ['LISTENING', 'READING'],
-        note: 'Đề thi chuẩn TOEIC Listening & Reading 200 câu từ ToeicExamSet 01.',
+        note: 'Đề luyện tập TOEIC Listening & Reading 200 câu từ ToeicExamSet 01.',
       },
     },
   });
@@ -11547,9 +11547,9 @@ async function main() {
   await prisma.quiz.upsert({
     where: { id: 22 },
     update: {
-      title: 'TOEIC 4 kỹ năng — Full Skills Comprehensive Bundle 01',
+      title: 'TOEIC 4 Skills — Đề luyện tập 01',
       description:
-        'Gói đề thi tổng hợp TOEIC 4 kỹ năng: Listening & Reading (200 câu) kết hợp Speaking (11 câu) & Writing (8 câu).',
+        'Đề luyện tập TOEIC 4 Skills kết hợp Listening, Reading, Speaking và Writing trong một sản phẩm luyện tập. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC_FOUR_SKILL,
       courseId: courses[5].id,
       timeLimit: 200,
@@ -11571,9 +11571,9 @@ async function main() {
     },
     create: {
       id: 22,
-      title: 'TOEIC 4 kỹ năng — Full Skills Comprehensive Bundle 01',
+      title: 'TOEIC 4 Skills — Đề luyện tập 01',
       description:
-        'Gói đề thi tổng hợp TOEIC 4 kỹ năng: Listening & Reading (200 câu) kết hợp Speaking (11 câu) & Writing (8 câu).',
+        'Đề luyện tập TOEIC 4 Skills kết hợp Listening, Reading, Speaking và Writing trong một sản phẩm luyện tập. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC_FOUR_SKILL,
       courseId: courses[5].id,
       timeLimit: 200,

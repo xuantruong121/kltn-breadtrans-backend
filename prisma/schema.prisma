@@ -1922,6 +1922,8 @@ model ToeicAttempt {
   deadline         DateTime?
   durationSeconds  Int
   submittedAt      DateTime?
+  currentQuestionId Int?
+  markedQuestionIds Json          @default("[]")
   timeRemaining    Int? // In seconds
   listeningScore   Int?
   readingScore     Int?

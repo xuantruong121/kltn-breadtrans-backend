@@ -222,7 +222,15 @@ export class SpeakingService {
     return this.r2Service ?? this.uploadService;
   }
 
-  private async findExerciseRecordById(id: number, role?: Role) {
+  private async findExerciseRecordById(
+    id: number,
+    role?: Role,
+    internalContext?: {
+      userId: number;
+      attemptId: number;
+      componentId: number;
+    },
+  ) {
     const exercise = await this.prisma.speakingExercise.findUnique({
       where: { id },
       include: {
@@ -236,11 +244,39 @@ export class SpeakingService {
     }
     if (
       role !== Role.ADMIN &&
+      exercise.practiceSet?.scope === SpeakingPracticeScope.EXAM_INTERNAL
+    ) {
+      if (!internalContext)
+        throw new NotFoundException(`Speaking exercise #${id} not found`);
+      const parentComponent =
+        await this.prisma.toeicAssessmentAttemptComponent.findFirst({
+          where: {
+            assessmentAttemptId: internalContext.attemptId,
+            assessmentComponentId: internalContext.componentId,
+            status: 'IN_PROGRESS',
+            assessmentAttempt: { userId: internalContext.userId },
+            assessmentComponent: {
+              speakingPracticeSetId: exercise.practiceSetId,
+            },
+          },
+          select: { id: true },
+        });
+      if (!parentComponent) {
+        throw new ForbiddenException(
+          'Cần mở Speaking từ lượt làm bài TOEIC hợp lệ',
+        );
+      }
+    }
+    if (
+      role !== Role.ADMIN &&
       ((exercise.publicationStatus !== undefined &&
         exercise.publicationStatus !== QuizPublicationStatus.PUBLISHED) ||
         (exercise.practiceSet &&
-          exercise.practiceSet.scope !==
-            SpeakingPracticeScope.SKILL_PRACTICE) ||
+          exercise.practiceSet.scope !== SpeakingPracticeScope.SKILL_PRACTICE &&
+          !(
+            exercise.practiceSet.scope ===
+              SpeakingPracticeScope.EXAM_INTERNAL && internalContext
+          )) ||
         (exercise.practiceSet &&
           exercise.practiceSet.publicationStatus !== undefined &&
           exercise.practiceSet.publicationStatus !==
@@ -479,8 +515,17 @@ export class SpeakingService {
     );
   }
 
-  async findExerciseById(id: number, userId?: number, role?: Role) {
-    const exercise = await this.findExerciseRecordById(id, role);
+  async findExerciseById(
+    id: number,
+    userId?: number,
+    role?: Role,
+    internalContext?: { attemptId: number; componentId: number },
+  ) {
+    const exercise = await this.findExerciseRecordById(
+      id,
+      role,
+      userId && internalContext ? { userId, ...internalContext } : undefined,
+    );
     await this.assertSpeakingContentAccess(exercise, userId, role);
     const access = this.speakingContentAccess
       ? await this.speakingContentAccess.resolve(exercise, userId, role)
@@ -509,6 +554,7 @@ export class SpeakingService {
     idempotencyKey?: string,
     traceIdHeader?: string,
     role?: Role,
+    internalContext?: { attemptId: number; componentId: number },
   ): Promise<SubmitSpeakingResponse> {
     const traceId = traceIdHeader?.trim() || crypto.randomUUID();
 
@@ -548,7 +594,11 @@ export class SpeakingService {
     }
 
     // 3. Verify exercise exists
-    const exercise = await this.findExerciseRecordById(exerciseId, role);
+    const exercise = await this.findExerciseRecordById(
+      exerciseId,
+      role,
+      internalContext ? { userId, ...internalContext } : undefined,
+    );
     await this.assertSpeakingContentAccess(exercise, userId, role);
 
     // 4. Byte-level audio validation
@@ -690,13 +740,18 @@ export class SpeakingService {
     dto: CreateUploadIntentDto,
     traceIdHeader?: string,
     role?: Role,
+    internalContext?: { attemptId: number; componentId: number },
   ) {
     const traceId =
       traceIdHeader ||
       `trace-intent-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 
     // 1. Verify exercise exists
-    const exercise = await this.findExerciseRecordById(exerciseId, role);
+    const exercise = await this.findExerciseRecordById(
+      exerciseId,
+      role,
+      internalContext ? { userId, ...internalContext } : undefined,
+    );
     await this.assertSpeakingContentAccess(exercise, userId, role);
 
     // 2. Validate declared MIME type, size, duration
@@ -920,7 +975,10 @@ export class SpeakingService {
       );
     }
 
-    const exercise = await this.findExerciseRecordById(intent.exerciseId, role);
+    const exercise = await this.findExerciseRecordById(
+      intent.exerciseId,
+      Role.ADMIN,
+    );
 
     // 3. Idempotent return if already finalized
     if (intent.status === 'FINALIZED' && intent.submissionId) {

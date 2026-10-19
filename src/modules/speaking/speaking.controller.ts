@@ -75,11 +75,22 @@ export class SpeakingController {
 
   @Get('exercises/:id')
   @ApiOperation({ summary: 'Lấy thông tin chi tiết một bài tập' })
-  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @Query('parentAttemptId') parentAttemptId?: string,
+    @Query('parentComponentId') parentComponentId?: string,
+  ) {
     return this.speakingService.findExerciseById(
       id,
       req.user.id,
       req.user.role,
+      parentAttemptId && parentComponentId
+        ? {
+            attemptId: Number(parentAttemptId),
+            componentId: Number(parentComponentId),
+          }
+        : undefined,
     );
   }
 
@@ -109,6 +120,8 @@ export class SpeakingController {
     @Request() req: any,
     @Body() dto: CreateUploadIntentDto,
     @Headers('x-trace-id') traceIdHeader?: string,
+    @Query('parentAttemptId') parentAttemptId?: string,
+    @Query('parentComponentId') parentComponentId?: string,
   ) {
     return this.speakingService.createUploadIntent(
       exerciseId,
@@ -116,6 +129,12 @@ export class SpeakingController {
       dto,
       traceIdHeader,
       req.user.role,
+      parentAttemptId && parentComponentId
+        ? {
+            attemptId: Number(parentAttemptId),
+            componentId: Number(parentComponentId),
+          }
+        : undefined,
     );
   }
 
@@ -200,6 +219,8 @@ export class SpeakingController {
       }),
     )
     audio: Express.Multer.File,
+    @Query('parentAttemptId') parentAttemptId?: string,
+    @Query('parentComponentId') parentComponentId?: string,
   ) {
     return this.speakingService.submitAudio(
       exerciseId,
@@ -208,6 +229,12 @@ export class SpeakingController {
       idempotencyKey,
       traceIdHeader,
       req.user.role,
+      parentAttemptId && parentComponentId
+        ? {
+            attemptId: Number(parentAttemptId),
+            componentId: Number(parentComponentId),
+          }
+        : undefined,
     );
   }
 

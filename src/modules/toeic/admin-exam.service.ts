@@ -15,6 +15,7 @@ import {
   CreateExamQuestionDto,
   UpdateExamQuestionDto,
 } from './dto';
+import { toeicMediaHash, withManualMedia } from './toeic-media';
 
 @Injectable()
 export class AdminExamService {
@@ -218,6 +219,20 @@ export class AdminExamService {
       );
     }
 
+    const mediaMetadata: Record<string, any> = {};
+    if (dto.imageUrl) {
+      Object.assign(
+        mediaMetadata,
+        withManualMedia({}, 'image', toeicMediaHash(dto.imageBrief)),
+      );
+    }
+    if (dto.audioUrl) {
+      Object.assign(
+        mediaMetadata,
+        withManualMedia({}, 'audio', toeicMediaHash(dto.transcriptText)),
+      );
+    }
+
     return this.prisma.toeicQuestionGroup.create({
       data: {
         examId,
@@ -228,6 +243,7 @@ export class AdminExamService {
         passageText: dto.passageText,
         transcriptText: dto.transcriptText,
         imageBrief: dto.imageBrief,
+        mediaMetadata,
         groupOrder: dto.groupOrder ?? 0,
       },
     });
@@ -266,7 +282,56 @@ export class AdminExamService {
       dto.imageBrief !== group.imageBrief &&
       mediaMetadata.image
     ) {
-      mediaMetadata.image = { ...mediaMetadata.image, stale: true };
+      mediaMetadata.image = {
+        ...mediaMetadata.image,
+        stale: true,
+        ...(mediaMetadata.image.questionImageHash
+          ? { questionStatus: 'STALE' }
+          : {}),
+      };
+    }
+    if (dto.imageUrl !== undefined && dto.imageUrl !== group.imageUrl) {
+      if (dto.imageUrl.trim()) {
+        const previousImage = mediaMetadata.image ?? {};
+        mediaMetadata.image = {
+          ...withManualMedia(
+            mediaMetadata,
+            'image',
+            toeicMediaHash(
+              dto.imageBrief !== undefined ? dto.imageBrief : group.imageBrief,
+            ),
+          ).image,
+          ...(previousImage.questionImageHash
+            ? { questionStatus: 'STALE', stale: true }
+            : {}),
+        };
+      } else {
+        mediaMetadata.image = {
+          ...(mediaMetadata.image ?? {}),
+          status: 'MISSING',
+        };
+      }
+    }
+    if (dto.audioUrl !== undefined && dto.audioUrl !== group.audioUrl) {
+      if (dto.audioUrl.trim()) {
+        Object.assign(
+          mediaMetadata,
+          withManualMedia(
+            mediaMetadata,
+            'audio',
+            toeicMediaHash(
+              dto.transcriptText !== undefined
+                ? dto.transcriptText
+                : group.transcriptText,
+            ),
+          ),
+        );
+      } else {
+        mediaMetadata.audio = {
+          ...(mediaMetadata.audio ?? {}),
+          status: 'MISSING',
+        };
+      }
     }
     return this.prisma.toeicQuestionGroup.update({
       where: { id: groupId },
@@ -285,7 +350,9 @@ export class AdminExamService {
         }),
         ...(dto.imageBrief !== undefined && { imageBrief: dto.imageBrief }),
         ...((dto.transcriptText !== undefined ||
-          dto.imageBrief !== undefined) && {
+          dto.imageBrief !== undefined ||
+          dto.audioUrl !== undefined ||
+          dto.imageUrl !== undefined) && {
           mediaMetadata,
         }),
         ...(dto.groupOrder !== undefined && {
