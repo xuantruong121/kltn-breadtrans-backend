@@ -76,6 +76,16 @@ test('validates the standard 200-question structure and grouping', () => {
   });
 });
 
+test('explains why a single-Part Draft cannot be published as a TOEIC template', () => {
+  const exam = makeExam();
+  exam.type = 'PRACTICE_BY_PART';
+  const result = validateToeicExam(exam);
+  expect(result.learnerReady).toBe(false);
+  expect(result.issues).toContainEqual(
+    expect.objectContaining({ code: 'INCOMPLETE_TEMPLATE' }),
+  );
+});
+
 test('rejects missing durable listening media without weakening count checks', () => {
   const exam = makeExam();
   exam.groups.find((group) => group.part === 3).audioUrl = null;

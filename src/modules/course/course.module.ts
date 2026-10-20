@@ -9,10 +9,23 @@ import { CourseLearningV5Service } from './course-v5.service';
 import { CourseV5AdminController } from './course-v5-admin.controller';
 import { CourseV5AdminService } from './course-v5-admin.service';
 import { UploadModule } from '../upload/upload.module';
+import { AiModule } from '../ai/ai.module';
+import { CourseAiAuthoringService } from './course-ai-authoring.service';
 
 @Module({
-  imports: [EventsModule, PaymentModule, SubscriptionModule, UploadModule],
-  providers: [CourseService, CourseLearningV5Service, CourseV5AdminService],
+  imports: [
+    EventsModule,
+    PaymentModule,
+    SubscriptionModule,
+    UploadModule,
+    AiModule,
+  ],
+  providers: [
+    CourseService,
+    CourseLearningV5Service,
+    CourseV5AdminService,
+    CourseAiAuthoringService,
+  ],
   controllers: [
     CoursePublicController,
     CourseController,

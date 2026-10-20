@@ -86,6 +86,14 @@ export class AdminExamController {
     return this.toeicAiExamService.cancel(jobId, req.user.id);
   }
 
+  @Post('ai/jobs/:jobId/apply')
+  @ApiOperation({
+    summary: 'Admin: áp dụng candidate TOEIC AI đã review vào Draft',
+  })
+  applyAiGeneration(@Param('jobId') jobId: string, @Req() req: any) {
+    return this.toeicAiExamService.apply(jobId, req.user.id);
+  }
+
   @Post(':id/ai/groups/:groupId/questions/:questionId/regenerate')
   regenerateAiQuestion(
     @Param('id', ParseIntPipe) id: number,

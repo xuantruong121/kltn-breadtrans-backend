@@ -276,6 +276,17 @@ export interface IAIEvaluator {
     existingLessonTitles?: string[];
   }): Promise<ContextualCourseCurriculumSuggestion>;
 
+  /** Phase 8.15: bounded candidate for one selected Course V5 lesson only. */
+  suggestCourseLessonContent?(input: {
+    courseTitle: string;
+    courseDescription?: string;
+    courseLevel?: string;
+    lessonTitle: string;
+    lessonSummary: string;
+    objectives: string[];
+    existingSectionHeadings?: string[];
+  }): Promise<ContextualCourseLessonContentSuggestion>;
+
   /** Phase 5B: Listening transcript/turn candidates only. */
   suggestListeningContent?(input: {
     mode: 'DIALOGUE' | 'DICTATION';
@@ -475,9 +486,30 @@ export interface ContextualCourseLessonCandidate {
   title: string;
   summary: string;
   objectives: string[];
+  sections?: Array<{
+    type: string;
+    heading: string;
+    content: string;
+  }>;
 }
 export interface ContextualCourseCurriculumSuggestion {
   candidates: ContextualCourseLessonCandidate[];
+}
+
+export interface ContextualCourseLessonContentSuggestion {
+  sections: Array<{ type: string; heading: string; content: string }>;
+  exercise: {
+    type: string;
+    title: string;
+    prompt: string;
+    instructions?: string;
+    question: {
+      prompt: string;
+      options?: string[];
+      correctAnswer: string;
+      explanation: string;
+    };
+  };
 }
 
 export interface ContextualListeningTurn {

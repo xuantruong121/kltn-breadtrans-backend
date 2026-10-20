@@ -1,5 +1,14 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { PayOS, type Webhook, type WebhookData } from '@payos/node';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import {
+  PayOS,
+  type CreatePaymentLinkResponse,
+  type Webhook,
+  type WebhookData,
+} from '@payos/node';
 
 export type PayosCreatePaymentInput = {
   orderCode: number;
@@ -26,6 +35,7 @@ export type PayosPaymentResult = {
 /** The only application boundary allowed to call the PayOS merchant API. */
 @Injectable()
 export class PayosProvider {
+  private readonly logger = new Logger(PayosProvider.name);
   private client: PayOS | null = null;
 
   isConfigured(): boolean {
@@ -56,15 +66,30 @@ export class PayosProvider {
   async createPayment(
     input: PayosCreatePaymentInput,
   ): Promise<PayosPaymentResult> {
-    const result = await this.getClient().paymentRequests.create({
-      orderCode: input.orderCode,
-      amount: input.amount,
-      description: input.description,
-      items: [{ name: input.itemName, quantity: 1, price: input.amount }],
-      returnUrl: input.returnUrl,
-      cancelUrl: input.cancelUrl,
-      ...(input.expiredAt ? { expiredAt: input.expiredAt } : {}),
-    });
+    let result: CreatePaymentLinkResponse;
+    try {
+      result = await this.getClient().paymentRequests.create({
+        orderCode: input.orderCode,
+        amount: input.amount,
+        description: input.description,
+        items: [{ name: input.itemName, quantity: 1, price: input.amount }],
+        returnUrl: input.returnUrl,
+        cancelUrl: input.cancelUrl,
+        ...(input.expiredAt ? { expiredAt: input.expiredAt } : {}),
+      });
+    } catch (error) {
+      const providerError = error as {
+        constructor?: { name?: string };
+        status?: number;
+        code?: string | number;
+      };
+      this.logger.error(
+        `PayOS payment-link creation failed class=${providerError.constructor?.name ?? 'Unknown'} status=${providerError.status ?? 'unknown'} code=${providerError.code ?? 'unknown'}`,
+      );
+      throw new ServiceUnavailableException(
+        'Cổng thanh toán PayOS hiện chưa thể tạo liên kết. Vui lòng thử lại sau.',
+      );
+    }
     return {
       orderCode: result.orderCode,
       paymentLinkId: result.paymentLinkId,

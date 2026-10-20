@@ -153,9 +153,34 @@ export class ToeicService {
       where: isStaff
         ? {}
         : { publicationStatus: QuizPublicationStatus.PUBLISHED },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        type: true,
+        difficulty: true,
+        durationSeconds: true,
+        publicationStatus: true,
         groups: {
-          include: { questions: true },
+          select: {
+            id: true,
+            part: true,
+            groupOrder: true,
+            imageUrl: true,
+            audioUrl: true,
+            passageText: true,
+            transcriptText: true,
+            imageBrief: true,
+            mediaMetadata: true,
+            questions: {
+              select: {
+                id: true,
+                questionNumber: true,
+                options: true,
+                correctIndex: true,
+              },
+            },
+          },
           orderBy: { groupOrder: 'asc' },
         },
       },
@@ -513,16 +538,53 @@ export class ToeicService {
       await this.finalizeExpired(attemptId, attempt.userId);
     const current = await this.prisma.toeicAttempt.findUnique({
       where: { id: attemptId },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        examId: true,
+        mode: true,
+        status: true,
+        createdAt: true,
+        startedAt: true,
+        deadline: true,
+        durationSeconds: true,
+        submittedAt: true,
+        currentQuestionId: true,
+        markedQuestionIds: true,
         exam: {
-          include: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            type: true,
+            difficulty: true,
+            durationSeconds: true,
             groups: {
-              include: { questions: { orderBy: { questionNumber: 'asc' } } },
+              select: {
+                id: true,
+                examId: true,
+                part: true,
+                canonicalAccent: true,
+                audioUrl: true,
+                imageUrl: true,
+                passageText: true,
+                groupOrder: true,
+                questions: {
+                  select: {
+                    id: true,
+                    groupId: true,
+                    questionNumber: true,
+                    text: true,
+                    options: true,
+                  },
+                  orderBy: { questionNumber: 'asc' },
+                },
+              },
               orderBy: { groupOrder: 'asc' },
             },
           },
         },
-        answers: true,
+        answers: { select: { questionId: true, selectedIndex: true } },
       },
     });
     if (!current) throw new NotFoundException('Attempt not found');
@@ -537,26 +599,19 @@ export class ToeicService {
           ...group,
           passageText: group.part <= 4 ? null : group.passageText,
           questions: group.questions.map((question) => {
-            const {
-              correctIndex: _correctIndex,
-              explanation: _explanation,
-              ...safeQuestion
-            } = question;
-            void _correctIndex;
-            void _explanation;
             // In a full-test attempt Part 1 and Part 2 prompts/options are
             // audio-only. Keep option cardinality for the answer UI, but do
             // not send the answer text to the browser before submission.
             if (current.mode === AttemptMode.FULL_TEST && group.part <= 2) {
               return {
-                ...safeQuestion,
+                ...question,
                 text: null,
                 options: Array.isArray(question.options)
                   ? question.options.map(() => '')
                   : [],
               };
             }
-            return safeQuestion;
+            return question;
           }),
         })),
       },
@@ -597,21 +652,18 @@ export class ToeicService {
       )
         throw new BadRequestException('Đáp án được chọn không hợp lệ');
     }
-    await Promise.all(
-      ids.map((questionId) =>
-        tx.toeicAttemptAnswer.upsert({
-          where: {
-            attemptId_questionId: { attemptId: attempt.id, questionId },
-          },
-          update: { selectedIndex: answers[String(questionId)] },
-          create: {
-            attemptId: attempt.id,
-            questionId,
-            selectedIndex: answers[String(questionId)],
-          },
-        }),
-      ),
-    );
+    if (ids.length > 0) {
+      const rows = ids.map(
+        (questionId) =>
+          Prisma.sql`(${attempt.id}, ${questionId}, ${answers[String(questionId)]})`,
+      );
+      await tx.$executeRaw`
+        INSERT INTO "ToeicAttemptAnswer" ("attemptId", "questionId", "selectedIndex")
+        VALUES ${Prisma.join(rows)}
+        ON CONFLICT ("attemptId", "questionId")
+        DO UPDATE SET "selectedIndex" = EXCLUDED."selectedIndex"
+      `;
+    }
   }
 
   async saveAnswers(

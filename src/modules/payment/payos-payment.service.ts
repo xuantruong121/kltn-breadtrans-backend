@@ -245,7 +245,11 @@ export class PayosPaymentService {
     const id = Number(idRow[0]?.id);
     if (!Number.isSafeInteger(id))
       throw new ConflictException('Could not allocate PayOS orderCode');
-    const orderCode = 900_000_000_000 + id;
+    // PayOS order codes are merchant-global, not local database identifiers.
+    // A fixed prefix based on the local sequence can collide with orders that
+    // already exist in the merchant account. Keep the local id as a small
+    // suffix while deriving the main part from the current epoch second.
+    const orderCode = Math.floor(Date.now() / 1000) * 1000 + (id % 1000);
     return this.prisma.payOSPaymentIntent.create({
       data: {
         id,
