@@ -35,6 +35,12 @@ export class SupportController {
     return this.supportService.getOrCreateStudentConversation(req.user.id);
   }
 
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Đếm tin nhắn quản trị chưa đọc của học viên' })
+  getUnreadCount(@Request() req: { user: { id: number } }) {
+    return this.supportService.getStudentUnreadCount(req.user.id);
+  }
+
   @Get('conversations/:id/messages')
   @ApiOperation({ summary: 'Lấy danh sách tin nhắn phân trang của học viên' })
   getMessages(

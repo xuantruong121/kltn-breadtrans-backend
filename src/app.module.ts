@@ -36,6 +36,7 @@ import { IssueReportModule } from './modules/issue-report/issue-report.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { LocationModule } from './modules/location/location.module';
 import { SkillCmsModule } from './modules/content/skill-cms.module';
+import { SuggestionModule } from './modules/suggestion/suggestion.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { SkillCmsModule } from './modules/content/skill-cms.module';
     SubscriptionModule,
     LocationModule,
     SkillCmsModule,
+    SuggestionModule,
   ],
 
   controllers: [AppController],

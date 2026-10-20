@@ -256,6 +256,13 @@ export class NotificationsService implements OnModuleInit {
     return { success: true, count: res.count };
   }
 
+  async markMessageNotificationsRead(userId: number, url: string) {
+    return this.prisma.notification.updateMany({
+      where: { userId, type: 'NEW_MESSAGE', url, isRead: false },
+      data: { isRead: true },
+    });
+  }
+
   async deleteNotification(userId: number, id: number) {
     const result = await this.prisma.notification.deleteMany({
       where: { id, userId },

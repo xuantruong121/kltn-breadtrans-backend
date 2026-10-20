@@ -3,6 +3,7 @@ import { SupportService } from './support.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ForbiddenException } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('SupportService', () => {
   let service: SupportService;
@@ -51,21 +52,29 @@ describe('SupportService', () => {
     },
     user: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
   };
 
   const mockEventEmitter = {
     emit: jest.fn(),
   };
+  const mockNotifications = {
+    createNotification: jest.fn(),
+    markMessageNotificationsRead: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.user.findMany.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SupportService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: NotificationsService, useValue: mockNotifications },
       ],
     }).compile();
 

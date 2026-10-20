@@ -6,8 +6,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Role } from '@prisma/client';
 import { CreateSupportMessageDto } from './dto/create-support-message.dto';
 import { SupportQueryDto } from './dto/support-query.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SupportService {
@@ -16,11 +18,34 @@ export class SupportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // Helper access to support models typed via PrismaService
   private get db(): PrismaService {
     return this.prisma;
+  }
+
+  private async notifyAdminsAboutStudentMessage(
+    conversationId: number,
+    studentName: string,
+    preview: string,
+  ) {
+    const admins = await this.db.user.findMany({
+      where: { role: Role.ADMIN },
+      select: { id: true },
+    });
+    await Promise.all(
+      admins.map((admin) =>
+        this.notificationsService.createNotification({
+          userId: admin.id,
+          type: 'NEW_MESSAGE',
+          title: 'Tin nhắn mới từ học viên',
+          body: `${studentName}: ${preview}`,
+          url: `/admin/messages?conversation=${conversationId}`,
+        }),
+      ),
+    );
   }
 
   // 1. Get or create single active support conversation for a student
@@ -158,6 +183,10 @@ export class SupportService {
       },
       data: { isRead: true },
     });
+    await this.notificationsService.markMessageNotificationsRead(
+      studentId,
+      `/messages`,
+    );
 
     return {
       data: messages,
@@ -168,6 +197,17 @@ export class SupportService {
       mode: conversation.mode,
       hasMore,
     };
+  }
+
+  async getStudentUnreadCount(studentId: number) {
+    const count = await this.db.supportMessage.count({
+      where: {
+        senderRole: 'ADMIN',
+        isRead: false,
+        conversation: { studentId },
+      },
+    });
+    return { count };
   }
 
   // 3. Send message from student
@@ -259,6 +299,12 @@ export class SupportService {
       },
     });
 
+    await this.notifyAdminsAboutStudentMessage(
+      conversationId,
+      studentName,
+      message.content.slice(0, 140),
+    );
+
     return message;
   }
 
@@ -349,9 +395,35 @@ export class SupportService {
     const limit = Math.min(100, Math.max(1, query.limit || 50));
     const skip = (page - 1) * limit;
 
+    const search = query.search?.trim();
+    const where: any = {
+      ...(search
+        ? {
+            student: {
+              OR: [
+                { email: { contains: search, mode: 'insensitive' } },
+                {
+                  profile: {
+                    fullName: { contains: search, mode: 'insensitive' },
+                  },
+                },
+              ],
+            },
+          }
+        : {}),
+      ...(query.unreadOnly
+        ? {
+            messages: {
+              some: { senderRole: 'STUDENT', isRead: false },
+            },
+          }
+        : {}),
+    };
+
     const [total, conversations] = await Promise.all([
-      this.db.supportConversation.count(),
+      this.db.supportConversation.count({ where }),
       this.db.supportConversation.findMany({
+        where,
         orderBy: { lastMessageAt: 'desc' },
         skip,
         take: limit,
@@ -422,6 +494,59 @@ export class SupportService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async getAdminUnreadCount() {
+    const count = await this.db.supportMessage.count({
+      where: { senderRole: 'STUDENT', isRead: false },
+    });
+    return { count };
+  }
+
+  async searchLearners(search?: string) {
+    const keyword = search?.trim();
+    if (!keyword || keyword.length < 2) return { data: [] };
+
+    const learners = await this.db.user.findMany({
+      where: {
+        role: Role.STUDENT,
+        OR: [
+          { email: { contains: keyword, mode: 'insensitive' } },
+          {
+            profile: {
+              fullName: { contains: keyword, mode: 'insensitive' },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        email: true,
+        profile: { select: { fullName: true, avatar: true } },
+        supportConversation: { select: { id: true } },
+      },
+      take: 12,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      data: learners.map((learner) => ({
+        id: learner.id,
+        name: learner.profile?.fullName || learner.email,
+        email: learner.email,
+        avatar: learner.profile?.avatar || null,
+        conversationId: learner.supportConversation?.id || null,
+      })),
+    };
+  }
+
+  async startAdminConversation(studentId: number) {
+    const learner = await this.db.user.findFirst({
+      where: { id: studentId, role: Role.STUDENT },
+      select: { id: true },
+    });
+    if (!learner) throw new NotFoundException('Không tìm thấy học viên.');
+    return this.getOrCreateStudentConversation(learner.id);
   }
 
   // 6. Admin: Get single conversation
@@ -605,7 +730,7 @@ export class SupportService {
         senderName: `${adminName} (Quản Trị Viên)`,
         content: dto.content.trim(),
         clientMessageId: dto.clientMessageId || null,
-        isRead: true,
+        isRead: false,
       },
     });
 
@@ -637,6 +762,14 @@ export class SupportService {
         email: conversation.student.email,
         avatar: conversation.student.profile?.avatar,
       },
+    });
+
+    await this.notificationsService.createNotification({
+      userId: conversation.studentId,
+      type: 'NEW_MESSAGE',
+      title: 'Quản trị viên đã gửi tin nhắn',
+      body: message.content.slice(0, 160),
+      url: '/messages',
     });
 
     return message;

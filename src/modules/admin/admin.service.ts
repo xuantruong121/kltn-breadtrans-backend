@@ -13,6 +13,8 @@ import {
   CourseLessonStatus,
   EnrollmentStatus,
   PaymentStatus,
+  SuggestionStatus,
+  IssueReportStatus,
   TopicCategory,
   QuizPublicationStatus,
   QuizType,
@@ -64,6 +66,9 @@ export class AdminService {
       approvedOrdersCount,
       pendingOrdersCount,
       breadsAggregate,
+      unreadSupportMessages,
+      pendingSuggestions,
+      openIssueReports,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: Role.STUDENT } }),
       this.prisma.user.count({
@@ -150,6 +155,15 @@ export class AdminService {
         where: { user: { role: Role.STUDENT } },
         _sum: { totalBanhRan: true },
       }),
+      this.prisma.supportMessage.count({
+        where: { senderRole: 'STUDENT', isRead: false },
+      }),
+      this.prisma.suggestion.count({
+        where: { status: { in: [SuggestionStatus.PENDING, SuggestionStatus.REVIEWING] } },
+      }),
+      this.prisma.issueReport.count({
+        where: { status: { in: [IssueReportStatus.NEW, IssueReportStatus.IN_REVIEW] } },
+      }),
     ]);
 
     const recentActivity = recentEnrollments.map((e) => ({
@@ -219,6 +233,9 @@ export class AdminService {
         totalEnrollments,
         activeEnrollments,
         pendingPayments,
+        unreadSupportMessages,
+        pendingSuggestions,
+        openIssueReports,
       },
       monthlyTrends,
       contentBreakdown,
