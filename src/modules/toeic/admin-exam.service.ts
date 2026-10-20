@@ -161,10 +161,17 @@ export class AdminExamService {
       });
     }
 
-    if (validation.issues.length > 0) {
+    const blockingIssues =
+      exam.type === 'FULL_TEST'
+        ? validation.issues
+        : validation.issues.filter(
+            (issue) => issue.code !== 'INCOMPLETE_TEMPLATE',
+          );
+
+    if (blockingIssues.length > 0) {
       throw new BadRequestException({
         message: 'Đề thi chưa đủ điều kiện xuất bản cho học viên',
-        issues: validation.issues,
+        issues: blockingIssues,
       });
     }
 

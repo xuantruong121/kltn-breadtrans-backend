@@ -72,11 +72,15 @@ describe('PayosPaymentService', () => {
     );
   });
 
-  it('creates a provider order from the stored payment amount and sequence id', async () => {
+  it('creates a provider order with a merchant-global time-based code', async () => {
     const intent = makeIntent(PayOSPaymentIntentStatus.PENDING);
+    const now = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    const expectedOrderCode =
+      Math.floor(Date.now() / 1000) * 1000 + (17 % 1000);
     const createdIntent = {
       ...intent,
-      orderCode: BigInt(900000000017),
+      orderCode: BigInt(expectedOrderCode),
     };
     const prisma = {
       planPayment: {
@@ -125,17 +129,18 @@ describe('PayosPaymentService', () => {
           userId: 7,
           planPaymentId: 21,
           amountVnd: 99000,
-          orderCode: BigInt(900000000017),
+          orderCode: BigInt(expectedOrderCode),
         }),
       }),
     );
     expect(provider.createPayment).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderCode: 900000000017,
+        orderCode: expectedOrderCode,
         amount: 99000,
       }),
     );
     expect(result.checkoutUrl).toBe('https://payos.test/checkout');
+    jest.restoreAllMocks();
   });
 
   it('returns PayOS users to the existing account plan route', () => {
