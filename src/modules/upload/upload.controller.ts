@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
+import { assertValidContentImageUpload } from './content-image-validation';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -61,13 +62,16 @@ export class UploadController {
           new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 }), // 50MB
           new FileTypeValidator({
             fileType:
-              /^(image\/(jpeg|png|webp|gif|svg\+xml)|audio\/(mpeg|mp3|mp4|ogg|wav|webm|aac|x-m4a)|video\/(mp4|webm|ogg|quicktime)|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-powerpoint|vnd\.openxmlformats-officedocument\.presentationml\.presentation|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|zip|x-zip-compressed)|text\/plain)$/,
+              /^(image\/(jpeg|png|webp)|audio\/(mpeg|mp3|mp4|ogg|wav|webm|aac|x-m4a)|video\/(mp4|webm|ogg|quicktime)|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-powerpoint|vnd\.openxmlformats-officedocument\.presentationml\.presentation|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|zip|x-zip-compressed)|text\/plain)$/,
           }),
         ],
       }),
     )
     file: Express.Multer.File,
   ) {
+    if (file.mimetype.toLowerCase().startsWith('image/')) {
+      assertValidContentImageUpload(file);
+    }
     const result = await this.uploadService.uploadFile(file);
     return {
       message: 'Upload file thành công',

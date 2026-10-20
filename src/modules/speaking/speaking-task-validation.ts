@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { SpeakingStimulusKind } from '@prisma/client';
+import { isAcceptedContentImageReference } from '../upload/content-image-validation';
 import { SPEAKING_TASK_TYPES, SpeakingTaskType } from './speaking-contract';
 
 export function isSpeakingTaskType(value: unknown): value is SpeakingTaskType {
@@ -27,8 +28,11 @@ export function taskTypeValidationErrors(input: {
   const errors: string[] = [];
   if (!input.taskType) return ['Thiếu loại bài Speaking'];
   if (!input.targetText?.trim()) errors.push('Thiếu nội dung/prompt Speaking');
-  if (input.taskType === 'DESCRIBE_PICTURE' && !input.imageUrl?.trim()) {
-    errors.push('DESCRIBE_PICTURE cần imageUrl learner-visible');
+  if (
+    input.taskType === 'DESCRIBE_PICTURE' &&
+    !isAcceptedContentImageReference(input.imageUrl)
+  ) {
+    errors.push('DESCRIBE_PICTURE cần ảnh raster đã xác thực cho learner');
   }
   if (input.taskType === 'RESPOND_USING_INFORMATION') {
     if (!input.stimulusId)

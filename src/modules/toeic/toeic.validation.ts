@@ -1,3 +1,5 @@
+import { isAcceptedContentImageReference } from '../upload/content-image-validation';
+
 export type ToeicValidationQuestion = {
   id: number;
   questionNumber: number;
@@ -149,7 +151,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
         message: `Invalid Part ${group.part}`,
         groupId: group.id,
       });
-    if (group.part === 1 && !group.imageUrl)
+    if (group.part === 1 && !isAcceptedContentImageReference(group.imageUrl))
       issues.push({
         code: 'MISSING_IMAGE',
         message: 'Part 1 group has no image stimulus',

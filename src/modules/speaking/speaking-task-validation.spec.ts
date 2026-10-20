@@ -9,15 +9,24 @@ describe('Speaking task semantic validation', () => {
         targetText: 'Describe the office scene.',
         imageUrl: null,
       }),
-    ).toContain('DESCRIBE_PICTURE cần imageUrl learner-visible');
+    ).toContain('DESCRIBE_PICTURE cần ảnh raster đã xác thực cho learner');
 
     expect(
       taskTypeValidationErrors({
         taskType: 'DESCRIBE_PICTURE',
         targetText: 'Describe the office scene.',
-        imageUrl: 'https://cdn.example/office.png',
+        imageUrl:
+          'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/office.png',
       }),
     ).toEqual([]);
+
+    expect(
+      taskTypeValidationErrors({
+        taskType: 'DESCRIBE_PICTURE',
+        targetText: 'Describe the office scene.',
+        imageUrl: 'data:image/svg+xml,<svg/>',
+      }),
+    ).toContain('DESCRIBE_PICTURE cần ảnh raster đã xác thực cho learner');
   });
 
   it('requires one reusable INFORMATION stimulus for Respond Using Information', () => {

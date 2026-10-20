@@ -23,7 +23,8 @@ const sourceFor = (taskKind: string, id: number) => ({
               ? 'EMAIL'
               : 'OPINION',
         ...(taskKind === 'PICTURE_SENTENCE' && {
-          imageUrl: 'https://example.test/picture.png',
+          imageUrl:
+            'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/picture.png',
         }),
       },
     },

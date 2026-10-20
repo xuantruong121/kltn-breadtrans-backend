@@ -25,6 +25,7 @@ import {
   WritingQuestionDto,
 } from './skill-cms.dto';
 import { SpeakingStimulusDto } from './speaking-stimulus.dto';
+import { isAcceptedContentImageReference } from '../upload/content-image-validation';
 import { QuizService } from '../quiz/quiz.service';
 import { ListeningAudioAuthoringService } from '../quiz/listening-audio-authoring.service';
 import { normalizeDialogueSegments } from '../quiz/listening-dialogue.contract';
@@ -915,7 +916,7 @@ export class SkillCmsService {
         ['PICTURE', 'PICTURE_SENTENCE', 'DESCRIBE_PICTURE'].includes(
           content.taskType.trim().toUpperCase(),
         ) &&
-        (typeof content.imageUrl !== 'string' || !content.imageUrl.trim())
+        !isAcceptedContentImageReference(content.imageUrl)
       )
         errors.push(`Câu ${index + 1}: Picture task cần imageUrl`);
       if (domain === 'writing' && content.wordRange !== undefined) {

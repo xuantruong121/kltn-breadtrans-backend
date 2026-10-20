@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QuizPublicationStatus, QuizType } from '@prisma/client';
+import { isAcceptedContentImageReference } from '../upload/content-image-validation';
 import {
   isToeicWritingTaskKind,
   validateToeicWritingStructure,
@@ -387,7 +388,7 @@ export class ToeicWritingSetService {
     const compatible =
       taskKind === 'PICTURE_SENTENCE'
         ? source.type === QuizType.WRITING_PICTURE &&
-          Boolean(content.imageUrl) &&
+          isAcceptedContentImageReference(content.imageUrl) &&
           PICTURE_TASK_TYPES.has(sourceTaskType)
         : taskKind === 'WRITTEN_REQUEST'
           ? source.type === QuizType.WRITING_EMAIL &&
