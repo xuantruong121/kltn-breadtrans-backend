@@ -3,6 +3,8 @@ import { GenericExamService } from './generic-exam.service';
 
 describe('GenericExamService Writing readiness', () => {
   const service: any = Object.create(GenericExamService.prototype);
+  const trustedPictureUrl =
+    'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/content/picture.jpg';
 
   const publishedWritingSource = (imageUrl: string | null) => ({
     publicationStatus: QuizPublicationStatus.PUBLISHED,
@@ -15,7 +17,7 @@ describe('GenericExamService Writing readiness', () => {
       items: Array.from({ length: 8 }, (_, index) => ({
         taskKind: index < 5 ? 'PICTURE_SENTENCE' : 'WRITTEN_REQUEST',
         writingQuiz: publishedWritingSource(
-          index === 0 ? null : 'https://r2/image.jpg',
+          index === 0 ? null : trustedPictureUrl,
         ),
       })),
     };
@@ -28,7 +30,7 @@ describe('GenericExamService Writing readiness', () => {
       publicationStatus: QuizPublicationStatus.PUBLISHED,
       items: Array.from({ length: 8 }, (_, index) => ({
         taskKind: index < 5 ? 'PICTURE_SENTENCE' : 'WRITTEN_REQUEST',
-        writingQuiz: publishedWritingSource('https://r2/image.jpg'),
+        writingQuiz: publishedWritingSource(trustedPictureUrl),
       })),
     };
 
