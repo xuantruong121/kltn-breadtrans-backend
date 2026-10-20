@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { validateToeicExam } from './toeic.validation';
+import { isAcceptedContentImageReference } from '../upload/content-image-validation';
 import {
   EXAM_TEMPLATES,
   ExamTemplate,
@@ -166,7 +167,7 @@ export class GenericExamService {
       if (item.taskKind !== 'PICTURE_SENTENCE') return true;
       const content = quiz.questions?.[0]?.content as
         { imageUrl?: unknown } | undefined;
-      return typeof content?.imageUrl === 'string' && content.imageUrl.trim();
+      return isAcceptedContentImageReference(content?.imageUrl);
     });
   }
 

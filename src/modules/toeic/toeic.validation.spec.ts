@@ -56,7 +56,10 @@ function makeExam() {
         id: groups.length + 1,
         part,
         groupOrder: groups.length + 1,
-        imageUrl: part === 1 ? 'image' : null,
+        imageUrl:
+          part === 1
+            ? 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/test/image.png'
+            : null,
         audioUrl: part <= 4 ? 'audio' : null,
         passageText: part >= 6 ? 'passage' : null,
         questions,
@@ -122,6 +125,19 @@ test('keeps a complete 200-question Draft reviewable when Part 1 image is unavai
     status: 'FAILED',
     errorCode: 'PROVIDER_UNAVAILABLE',
   });
+});
+
+test('rejects SVG and arbitrary remote URLs as a Part 1 publish stimulus', () => {
+  const exam = makeExam();
+  const group = exam.groups.find((candidate) => candidate.part === 1);
+  group.imageUrl = 'data:image/svg+xml,<svg/>';
+  expect(validateToeicExam(exam).issues).toContainEqual(
+    expect.objectContaining({ code: 'MISSING_IMAGE', groupId: group.id }),
+  );
+  group.imageUrl = 'https://example.com/picture.svg';
+  expect(validateToeicExam(exam).issues).toContainEqual(
+    expect.objectContaining({ code: 'MISSING_IMAGE', groupId: group.id }),
+  );
 });
 
 test('keeps Listening transcript when audio materialization fails', () => {
