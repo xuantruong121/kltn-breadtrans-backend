@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import {
   classifyGeminiError,
   GeminiCredentialManager,
@@ -64,6 +65,40 @@ describe('GeminiCredentialManager', () => {
         Object.assign(new Error('timed out'), { name: 'AbortError' }),
       ),
     ).toBe('TIMEOUT');
+  });
+
+  it('rotates to a different, not-cooling-down credential on 503 and respects MAX_ATTEMPTS — never retries the same credential twice', async () => {
+    process.env.GEMINI_API_KEYS = 'key-a,key-b,key-c';
+    const cache = redis();
+    const manager = new GeminiCredentialManager(
+      new GeminiModelRouter(),
+      cache as any,
+    );
+    const seenFingerprints: string[] = [];
+    const warnSpy = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    await expect(
+      manager.execute({
+        taskType: AiTaskType.IMAGE_SEMANTIC_VALIDATION,
+        operation: () =>
+          Promise.reject(
+            Object.assign(new Error('high demand'), { status: 503 }),
+          ),
+      }),
+    ).rejects.toThrow();
+    // every warn call logs a fingerprint; none of them may equal another —
+    // same credential must never be attempted twice within one call.
+    for (const call of warnSpy.mock.calls) {
+      const match = /key=([a-f0-9]{12})/.exec(String(call[0]));
+      if (match) seenFingerprints.push(match[1]);
+    }
+    expect(seenFingerprints.length).toBe(3); // MAX_ATTEMPTS
+    expect(new Set(seenFingerprints).size).toBe(3); // all distinct
+    for (const call of warnSpy.mock.calls)
+      for (const key of ['key-a', 'key-b', 'key-c'])
+        expect(String(call[0])).not.toContain(key);
+    warnSpy.mockRestore();
   });
 
   it('redacts keys and authorization values before logging', () => {

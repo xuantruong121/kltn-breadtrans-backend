@@ -35,8 +35,8 @@ export class AdminController {
 
   @Get('dashboard-stats')
   @ApiOperation({ summary: 'Lay thong ke tong quan cho Admin Dashboard' })
-  getDashboardStats() {
-    return this.adminService.getDashboardStats();
+  getDashboardStats(@Query('range') range?: string) {
+    return this.adminService.getDashboardStats(range);
   }
 
   @Get('listening-analytics')

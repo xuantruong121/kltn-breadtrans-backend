@@ -36,6 +36,7 @@ export class CreateV5LessonDto {
   @IsOptional() @IsString() difficulty?: string;
   @IsOptional() @IsUrl() coverImage?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) order?: number;
+  @IsOptional() @IsBoolean() requiresFinalCheck?: boolean;
 }
 
 export class UpdateV5LessonDto extends PartialType(CreateV5LessonDto) {

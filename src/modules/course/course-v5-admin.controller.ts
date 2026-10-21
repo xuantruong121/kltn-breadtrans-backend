@@ -35,8 +35,15 @@ import {
   ApplyCourseLessonContentDto,
   GenerateCourseCurriculumDto,
   GenerateCourseLessonContentDto,
+  RefineCourseLessonSectionDto,
 } from './course-ai-authoring.dto';
 import { CourseAiAuthoringService } from './course-ai-authoring.service';
+import { CourseMediaSearchService } from './course-media-search.service';
+import {
+  AcceptCourseMediaDto,
+  AcceptGeneratedMediaDto,
+  SearchCourseMediaDto,
+} from './course-media.dto';
 
 @ApiTags('admin-course-studio-v5')
 @ApiBearerAuth()
@@ -47,6 +54,7 @@ export class CourseV5AdminController {
   constructor(
     private readonly studio: CourseV5AdminService,
     private readonly aiAuthoring: CourseAiAuthoringService,
+    private readonly mediaSearch: CourseMediaSearchService,
   ) {}
   @Post(':courseId/studio/ai/curriculum/generate')
   generateCurriculum(
@@ -86,6 +94,22 @@ export class CourseV5AdminController {
     @Request() r: any,
   ) {
     return this.aiAuthoring.applyLessonContent(courseId, lessonId, dto, r.user);
+  }
+  @Post(':courseId/studio/lessons/:lessonId/ai/sections/:sectionId/refine')
+  refineLessonSection(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('lessonId', ParseIntPipe) lessonId: number,
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @Body() dto: RefineCourseLessonSectionDto,
+    @Request() r: any,
+  ) {
+    return this.aiAuthoring.refineLessonSection(
+      courseId,
+      lessonId,
+      sectionId,
+      dto,
+      r.user,
+    );
   }
   @Get(':courseId/studio') get(
     @Param('courseId', ParseIntPipe) id: number,
@@ -128,6 +152,13 @@ export class CourseV5AdminController {
     @Request() r: any,
   ) {
     return this.studio.deleteLesson(c, l, r.user);
+  }
+  @Get(':courseId/studio/lessons/:lessonId/validate') validateLesson(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Param('lessonId', ParseIntPipe) l: number,
+    @Request() r: any,
+  ) {
+    return this.studio.validateLesson(c, l, r.user);
   }
   @Post(':courseId/studio/lessons/:lessonId/publish') publishLesson(
     @Param('courseId', ParseIntPipe) c: number,
@@ -194,6 +225,66 @@ export class CourseV5AdminController {
     @Request() r: any,
   ) {
     return this.studio.unlinkMedia(c, l, m, r.user);
+  }
+  @Post(':courseId/studio/media/search') searchCourseCover(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Body() dto: SearchCourseMediaDto,
+    @Request() r: any,
+  ) {
+    return this.mediaSearch.searchCourseCover(c, dto, r.user);
+  }
+  @Post(':courseId/studio/media/accept') acceptCourseCover(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Body() dto: AcceptCourseMediaDto,
+    @Request() r: any,
+  ) {
+    return this.mediaSearch.acceptCourseCover(c, dto, r.user);
+  }
+  @Post(':courseId/studio/lessons/:lessonId/media/search') searchLessonMedia(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Param('lessonId', ParseIntPipe) l: number,
+    @Body() dto: SearchCourseMediaDto,
+    @Request() r: any,
+  ) {
+    return this.mediaSearch.searchLessonMedia(c, l, dto, r.user);
+  }
+  @Post(':courseId/studio/lessons/:lessonId/media/accept') acceptLessonMedia(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Param('lessonId', ParseIntPipe) l: number,
+    @Body() dto: AcceptCourseMediaDto,
+    @Request() r: any,
+  ) {
+    return this.mediaSearch.acceptLessonMedia(c, l, dto, r.user);
+  }
+  @Post(':courseId/studio/media/generate') generateCourseCover(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Request() r: any,
+  ) {
+    return this.mediaSearch.generateCourseCoverImage(c, r.user);
+  }
+  @Post(':courseId/studio/media/generate/accept') acceptGeneratedCourseCover(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Body() dto: AcceptGeneratedMediaDto,
+    @Request() r: any,
+  ) {
+    return this.mediaSearch.acceptGeneratedCourseCover(c, dto, r.user);
+  }
+  @Post(':courseId/studio/lessons/:lessonId/media/generate')
+  generateLessonMedia(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Param('lessonId', ParseIntPipe) l: number,
+    @Request() r: any,
+  ) {
+    return this.mediaSearch.generateLessonMediaImage(c, l, r.user);
+  }
+  @Post(':courseId/studio/lessons/:lessonId/media/generate/accept')
+  acceptGeneratedLessonMedia(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Param('lessonId', ParseIntPipe) l: number,
+    @Body() dto: AcceptGeneratedMediaDto,
+    @Request() r: any,
+  ) {
+    return this.mediaSearch.acceptGeneratedLessonMedia(c, l, dto, r.user);
   }
   @Post(':courseId/studio/lessons/:lessonId/exercises') createExercise(
     @Param('courseId', ParseIntPipe) c: number,

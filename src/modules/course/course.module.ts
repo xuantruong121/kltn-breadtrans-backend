@@ -11,6 +11,11 @@ import { CourseV5AdminService } from './course-v5-admin.service';
 import { UploadModule } from '../upload/upload.module';
 import { AiModule } from '../ai/ai.module';
 import { CourseAiAuthoringService } from './course-ai-authoring.service';
+import { CourseMediaSearchService } from './course-media-search.service';
+import { ImageSearchProviderChain } from '../toeic/image-search.provider-chain';
+import { PixabayImageSearchProvider } from '../toeic/pixabay-image-search.provider';
+import { OpenverseImageSearchProvider } from '../toeic/openverse-image-search.provider';
+import { WikimediaCommonsImageSearchProvider } from '../toeic/wikimedia-commons-image-search.provider';
 
 @Module({
   imports: [
@@ -25,6 +30,11 @@ import { CourseAiAuthoringService } from './course-ai-authoring.service';
     CourseLearningV5Service,
     CourseV5AdminService,
     CourseAiAuthoringService,
+    CourseMediaSearchService,
+    PixabayImageSearchProvider,
+    OpenverseImageSearchProvider,
+    WikimediaCommonsImageSearchProvider,
+    ImageSearchProviderChain,
   ],
   controllers: [
     CoursePublicController,

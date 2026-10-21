@@ -34,6 +34,61 @@ import {
   UpdateVocabWordDto,
 } from '../vocab/dto';
 
+export const DASHBOARD_RANGES = ['30d', '6m', '12m'] as const;
+export type DashboardRange = (typeof DASHBOARD_RANGES)[number];
+
+export function normalizeDashboardRange(value?: string): DashboardRange {
+  return DASHBOARD_RANGES.includes(value as DashboardRange)
+    ? (value as DashboardRange)
+    : '6m';
+}
+
+export function buildDashboardBuckets(range: DashboardRange, now = new Date()) {
+  if (range === '30d') {
+    return Array.from({ length: 30 }, (_, index) => {
+      const start = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - (29 - index),
+        0,
+        0,
+        0,
+        0,
+      );
+      const end = new Date(
+        start.getFullYear(),
+        start.getMonth(),
+        start.getDate(),
+        23,
+        59,
+        59,
+        999,
+      );
+      return {
+        label: `${start.getDate()}/${start.getMonth() + 1}`,
+        start,
+        end,
+      };
+    });
+  }
+
+  const monthCount = range === '12m' ? 12 : 6;
+  return Array.from({ length: monthCount }, (_, index) => {
+    const offset = monthCount - 1 - index;
+    const start = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const end = new Date(
+      start.getFullYear(),
+      start.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
+    return { label: `T${start.getMonth() + 1}`, start, end };
+  });
+}
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -44,9 +99,10 @@ export class AdminService {
     @Optional() @InjectRedis() private readonly redis?: Redis,
   ) {}
 
-  async getDashboardStats() {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  async getDashboardStats(requestedRange?: string) {
+    const range = normalizeDashboardRange(requestedRange);
+    const buckets = buildDashboardBuckets(range);
+    const rangeStart = buckets[0].start;
 
     const [
       totalStudents,
@@ -76,37 +132,37 @@ export class AdminService {
         where: {
           role: Role.STUDENT,
           OR: [
-            { lastLoginAt: { gte: thirtyDaysAgo } },
+            { lastLoginAt: { gte: rangeStart } },
             {
               learningActivities: {
-                some: { occurredAt: { gte: thirtyDaysAgo } },
+                some: { occurredAt: { gte: rangeStart } },
               },
             },
-            { submissions: { some: { submittedAt: { gte: thirtyDaysAgo } } } },
+            { submissions: { some: { submittedAt: { gte: rangeStart } } } },
             {
               speakingSubmissions: {
-                some: { submittedAt: { gte: thirtyDaysAgo } },
+                some: { submittedAt: { gte: rangeStart } },
               },
             },
             {
               assignmentSubmissions: {
-                some: { submittedAt: { gte: thirtyDaysAgo } },
+                some: { submittedAt: { gte: rangeStart } },
               },
             },
             {
               diagnosticAttempts: {
-                some: { submittedAt: { gte: thirtyDaysAgo } },
+                some: { submittedAt: { gte: rangeStart } },
               },
             },
             {
               contentAttempts: {
-                some: { submittedAt: { gte: thirtyDaysAgo } },
+                some: { submittedAt: { gte: rangeStart } },
               },
             },
             {
-              grammarAttempts: { some: { createdAt: { gte: thirtyDaysAgo } } },
+              grammarAttempts: { some: { createdAt: { gte: rangeStart } } },
             },
-            { toeicAttempts: { some: { createdAt: { gte: thirtyDaysAgo } } } },
+            { toeicAttempts: { some: { createdAt: { gte: rangeStart } } } },
           ],
         },
       }),
@@ -124,7 +180,8 @@ export class AdminService {
         },
       }),
       this.prisma.enrollment.findMany({
-        take: 10,
+        take: 8,
+        where: { joinedAt: { gte: rangeStart } },
         orderBy: { joinedAt: 'desc' },
         include: {
           user: {
@@ -181,20 +238,8 @@ export class AdminService {
       createdAt: e.joinedAt,
     }));
 
-    // Generate accurate monthly trends for the last 6 calendar months
-    const now = new Date();
-    const monthWindows: { label: string; start: Date; end: Date }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const year = now.getFullYear();
-      const month = now.getMonth() - i;
-      const start = new Date(year, month, 1, 0, 0, 0, 0);
-      const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
-      const label = `T${start.getMonth() + 1}`;
-      monthWindows.push({ label, start, end });
-    }
-
     const monthlyTrends = await Promise.all(
-      monthWindows.map(async ({ label, start, end }) => {
+      buckets.map(async ({ label, start, end }) => {
         const [enrollmentCount, submissionCount, speakingCount] =
           await Promise.all([
             this.prisma.enrollment.count({
@@ -232,6 +277,7 @@ export class AdminService {
     };
 
     return {
+      range,
       stats: {
         totalStudents,
         activeStudents,
