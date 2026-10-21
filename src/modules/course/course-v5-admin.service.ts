@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  CourseStatus,
   CourseLessonExerciseType,
   CourseLessonStatus,
   Prisma,
@@ -54,6 +55,33 @@ export class CourseV5AdminService {
     return course;
   }
 
+  private assertCourseEditable(course: { status: CourseStatus }) {
+    if (course.status === CourseStatus.PUBLISHED)
+      throw new ConflictException(
+        'Khóa học đã được xuất bản. Hãy chuyển khóa học về bản nháp trước khi chỉnh sửa.',
+      );
+  }
+
+  private assertLessonEditable(
+    course: { status: CourseStatus },
+    lesson: { status: CourseLessonStatus },
+  ) {
+    this.assertCourseEditable(course);
+    if (lesson.status === CourseLessonStatus.PUBLISHED)
+      throw new ConflictException(
+        'Bài học đã được xuất bản. Hãy chuyển bài học về bản nháp trước khi chỉnh sửa.',
+      );
+  }
+
+  private async editableLesson(courseId: number, lessonId: number) {
+    const [course, lesson] = await Promise.all([
+      this.course(courseId),
+      this.lesson(courseId, lessonId),
+    ]);
+    this.assertLessonEditable(course, lesson);
+    return lesson;
+  }
+
   async getStudio(courseId: number, user: Admin) {
     this.admin(user);
     const course = await this.course(courseId);
@@ -75,7 +103,7 @@ export class CourseV5AdminService {
 
   async updateCourse(courseId: number, dto: UpdateV5CourseDto, user: Admin) {
     this.admin(user);
-    await this.course(courseId);
+    this.assertCourseEditable(await this.course(courseId));
     return this.prisma.course.update({
       where: { id: courseId },
       data: {
@@ -89,7 +117,7 @@ export class CourseV5AdminService {
 
   async createLesson(courseId: number, dto: CreateV5LessonDto, user: Admin) {
     this.admin(user);
-    await this.course(courseId);
+    this.assertCourseEditable(await this.course(courseId));
     const duplicate = await this.prisma.courseLesson.findFirst({
       where: { courseId, slug: dto.slug.trim() },
     });
@@ -122,7 +150,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    const lesson = await this.lesson(courseId, lessonId);
+    const lesson = await this.editableLesson(courseId, lessonId);
     const attempts = await this.prisma.courseLessonAttempt.count({
       where: { lessonId },
     });
@@ -159,7 +187,7 @@ export class CourseV5AdminService {
 
   async deleteLesson(courseId: number, lessonId: number, user: Admin) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     const attempts = await this.prisma.courseLessonAttempt.count({
       where: { lessonId },
     });
@@ -170,6 +198,7 @@ export class CourseV5AdminService {
 
   async reorderLessons(courseId: number, dto: ReorderV5Dto, user: Admin) {
     this.admin(user);
+    this.assertCourseEditable(await this.course(courseId));
     const rows = await this.prisma.courseLesson.findMany({
       where: { courseId },
       select: { id: true },
@@ -196,7 +225,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     this.validateSection(dto);
     const last = await this.prisma.courseLessonSection.findFirst({
       where: { lessonId },
@@ -232,7 +261,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     const section = await this.prisma.courseLessonSection.findFirst({
       where: { id: sectionId, lessonId },
     });
@@ -258,7 +287,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     const section = await this.prisma.courseLessonSection.findFirst({
       where: { id: sectionId, lessonId },
     });
@@ -273,7 +302,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     const rows = await this.prisma.courseLessonSection.findMany({
       where: { lessonId },
       select: { id: true },
@@ -303,7 +332,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     if (!['image', 'audio', 'video', 'document'].includes(dto.type))
       throw new BadRequestException('Loại media không được hỗ trợ');
     return this.prisma.courseLessonMedia.create({
@@ -324,7 +353,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     const media = await this.prisma.courseLessonMedia.findFirst({
       where: { id: mediaId, lessonId },
     });
@@ -340,7 +369,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     if (
       !/^(image|audio|video|application\/pdf)\//.test(mimeType) &&
       mimeType !== 'application/pdf'
@@ -359,7 +388,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     const last = await this.prisma.courseLessonExercise.findFirst({
       where: { lessonId },
       orderBy: { order: 'desc' },
@@ -390,6 +419,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
+    await this.editableLesson(courseId, lessonId);
     await this.exercise(courseId, lessonId, exerciseId);
     const attempts = await this.prisma.courseLessonAttempt.count({
       where: { exerciseId },
@@ -425,6 +455,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
+    await this.editableLesson(courseId, lessonId);
     await this.exercise(courseId, lessonId, exerciseId);
     if (await this.prisma.courseLessonAttempt.count({ where: { exerciseId } }))
       throw new ConflictException('Không thể xóa bài tập đã có lịch sử');
@@ -440,7 +471,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.lesson(courseId, lessonId);
+    await this.editableLesson(courseId, lessonId);
     const rows = await this.prisma.courseLessonExercise.findMany({
       where: { lessonId },
       select: { id: true },
@@ -471,6 +502,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
+    await this.editableLesson(courseId, lessonId);
     const exercise = await this.exercise(courseId, lessonId, exerciseId);
     this.validateQuestion(exercise.type, dto);
     const last = await this.prisma.courseLessonQuestion.findFirst({
@@ -499,6 +531,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
+    await this.editableLesson(courseId, lessonId);
     const exercise = await this.exercise(courseId, lessonId, exerciseId);
     const question = await this.prisma.courseLessonQuestion.findFirst({
       where: { id: questionId, exerciseId },
@@ -546,6 +579,7 @@ export class CourseV5AdminService {
     user: Admin,
   ) {
     this.admin(user);
+    await this.editableLesson(courseId, lessonId);
     await this.exercise(courseId, lessonId, exerciseId);
     if (
       !(await this.prisma.courseLessonQuestion.findFirst({
@@ -566,7 +600,7 @@ export class CourseV5AdminService {
 
   async validateCourse(courseId: number, user: Admin) {
     this.admin(user);
-    await this.course(courseId);
+    const course = await this.course(courseId);
     const lessons = await this.prisma.courseLesson.findMany({
       where: { courseId },
       include: { sections: true, exercises: { include: { questions: true } } },
@@ -574,39 +608,64 @@ export class CourseV5AdminService {
     });
     const errors: string[] = [];
     for (const lesson of lessons) {
-      if (!lesson.title.trim())
-        errors.push(`Bài học #${lesson.id}: thiếu tiêu đề`);
-      if (!lesson.summary.trim())
-        errors.push(`Bài học #${lesson.id}: thiếu tóm tắt`);
+      const lessonErrors: string[] = [];
+      const lessonTitle = lesson.title.trim() || 'Bài học chưa đặt tên';
+      if (!lesson.title.trim()) lessonErrors.push('Thiếu tiêu đề.');
+      if (!lesson.summary.trim()) lessonErrors.push('Thiếu tóm tắt.');
       if (
         !Array.isArray(lesson.learningObjectives) ||
         lesson.learningObjectives.length === 0
       )
-        errors.push(`Bài học #${lesson.id}: thiếu mục tiêu`);
+        lessonErrors.push('Thiếu mục tiêu học tập.');
       if (!lesson.sections.some((section) => section.isRequired))
-        errors.push(`Bài học #${lesson.id}: thiếu section bắt buộc`);
+        lessonErrors.push('Thiếu phần nội dung bắt buộc.');
+      for (const section of lesson.sections) {
+        const content = section.content as Record<string, unknown> | null;
+        const meaningful =
+          content &&
+          typeof content === 'object' &&
+          Object.values(content).some((value) =>
+            typeof value === 'string'
+              ? Boolean(value.trim())
+              : Array.isArray(value)
+                ? value.length > 0
+                : false,
+          );
+        if (section.isRequired && !meaningful)
+          lessonErrors.push(`Phần “${section.heading}” chưa có nội dung.`);
+      }
       const finalCheck = lesson.exercises.find(
         (exercise) => exercise.slug === 'final-check',
       );
       if (!finalCheck) {
         if (lesson.requiresFinalCheck)
-          errors.push(`Bài học #${lesson.id}: thiếu Kiểm tra cuối bài`);
+          lessonErrors.push('Chưa có Kiểm tra cuối bài.');
       } else if (!finalCheck.questions.length)
-        errors.push(`Bài học #${lesson.id}: Kiểm tra cuối bài chưa có câu hỏi`);
+        lessonErrors.push('Kiểm tra cuối bài chưa có câu hỏi.');
       for (const exercise of lesson.exercises)
         if (exercise.required && exercise.questions.length === 0)
-          errors.push(`Bài tập “${exercise.title}” chưa có câu hỏi`);
+          lessonErrors.push(
+            `Bài luyện tập “${exercise.title}” chưa có câu hỏi.`,
+          );
+      if (lesson.status !== CourseLessonStatus.PUBLISHED)
+        lessonErrors.push('Bài học chưa được xuất bản.');
+      if (lessonErrors.length)
+        errors.push(
+          `Bài học “${lessonTitle}”:\n${lessonErrors.map((item) => `• ${item}`).join('\n')}`,
+        );
     }
-    if (
-      !lessons.some((lesson) => lesson.status === CourseLessonStatus.PUBLISHED)
-    )
-      errors.push('Khóa học cần ít nhất một bài học đã xuất bản');
+    if (!lessons.length)
+      errors.push(`Khóa học “${course.title}” chưa có bài học để xuất bản.`);
     return { valid: errors.length === 0, errors, courseId };
   }
 
   async publishLesson(courseId: number, lessonId: number, user: Admin) {
     this.admin(user);
+    const course = await this.course(courseId);
+    this.assertCourseEditable(course);
     const lesson = await this.lesson(courseId, lessonId);
+    if (lesson.status === CourseLessonStatus.PUBLISHED)
+      throw new ConflictException('Bài học đã được xuất bản.');
     const validation = await this.collectLessonValidation(lesson.id);
     if (validation.length) throw new BadRequestException(validation.join('; '));
     return this.prisma.courseLesson.update({
@@ -627,6 +686,22 @@ export class CourseV5AdminService {
     const result = await this.validateCourse(courseId, user);
     if (!result.valid) throw new BadRequestException(result.errors.join('; '));
     return this.courseService.reviewCourse(courseId, 'APPROVE', user);
+  }
+
+  async revertLessonToDraft(courseId: number, lessonId: number, user: Admin) {
+    this.admin(user);
+    const course = await this.course(courseId);
+    if (course.status === CourseStatus.PUBLISHED)
+      throw new ConflictException(
+        'Khóa học đang được xuất bản. Hãy chuyển khóa học về bản nháp trước khi chỉnh sửa bài học.',
+      );
+    const lesson = await this.lesson(courseId, lessonId);
+    if (lesson.status !== CourseLessonStatus.PUBLISHED)
+      throw new ConflictException('Bài học hiện đang ở trạng thái bản nháp.');
+    return this.prisma.courseLesson.update({
+      where: { id: lessonId },
+      data: { status: CourseLessonStatus.DRAFT },
+    });
   }
 
   async preview(courseId: number, lessonId: number, user: Admin) {

@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CourseStatus, Role } from '@prisma/client';
+import { CourseLessonStatus, CourseStatus, Role } from '@prisma/client';
 import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -32,12 +32,20 @@ type SectionContentInput = {
 
 /** Single canonical write format for Course Section content, so AI Apply and
  * the Admin editor store the same shape. */
-const sectionContentJson = (section: SectionContentInput) => {
+const sectionContentJson = (
+  section: SectionContentInput,
+  original?: unknown,
+) => {
   const text = section.content.trim();
   const paragraphs = (section.paragraphs ?? [])
     .map((value) => value.trim())
     .filter(Boolean);
+  const extensions =
+    original && typeof original === 'object' && !Array.isArray(original)
+      ? { ...(original as Record<string, unknown>) }
+      : {};
   return {
+    ...extensions,
     text,
     paragraphs: paragraphs.length ? paragraphs : text ? [text] : [],
     bullets: (section.bullets ?? [])
@@ -124,6 +132,13 @@ export class CourseAiAuthoringService {
         'Chỉ Course Draft mới có thể áp dụng nội dung AI',
       );
     return course;
+  }
+
+  private assertLessonDraft(lesson: { status: CourseLessonStatus }) {
+    if (lesson.status === CourseLessonStatus.PUBLISHED)
+      throw new ConflictException(
+        'Bài học đã được xuất bản. Hãy chuyển bài học về bản nháp trước khi dùng AI.',
+      );
   }
 
   private slug(value: string, index: number) {
@@ -232,6 +247,7 @@ export class CourseAiAuthoringService {
       },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
+    this.assertLessonDraft(lesson);
     const objectives = this.objectives(lesson.learningObjectives);
     const scope = dto.scope ?? 'FULL';
     const siblings = await this.prisma.courseLesson.findMany({
@@ -355,6 +371,7 @@ export class CourseAiAuthoringService {
       include: { lesson: true },
     });
     if (!section) throw new NotFoundException('Section not found');
+    this.assertLessonDraft(section.lesson);
     const suggestion = await this.ai.suggestCourseSectionRefinement({
       action: dto.action,
       courseTitle: course.title,
@@ -403,6 +420,7 @@ export class CourseAiAuthoringService {
         include: { sections: true, exercises: true },
       });
       if (!lesson) throw new NotFoundException('Lesson not found');
+      this.assertLessonDraft(lesson);
       const existingIds = new Set(lesson.sections.map((section) => section.id));
       const existingHeadings = new Set(
         lesson.sections.map((section) => section.heading.trim().toLowerCase()),
@@ -418,7 +436,11 @@ export class CourseAiAuthoringService {
           data: {
             type: section.type,
             heading: section.heading.trim(),
-            content: sectionContentJson(section),
+            content: sectionContentJson(
+              section,
+              lesson.sections.find((item) => item.id === section.sectionId)
+                ?.content,
+            ),
           },
         });
       }

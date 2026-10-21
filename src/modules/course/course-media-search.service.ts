@@ -1,10 +1,11 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { CourseLessonStatus, CourseStatus, Role } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
@@ -136,6 +137,32 @@ export class CourseMediaSearchService {
       where: { id: lessonId, courseId },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
+    return lesson;
+  }
+
+  private assertCourseEditable(course: { status: CourseStatus }) {
+    if (course.status === CourseStatus.PUBLISHED)
+      throw new ConflictException(
+        'Khóa học đã được xuất bản. Hãy chuyển khóa học về bản nháp trước khi thay đổi ảnh.',
+      );
+  }
+
+  private async editableCourse(courseId: number) {
+    const course = await this.course(courseId);
+    this.assertCourseEditable(course);
+    return course;
+  }
+
+  private async editableLesson(courseId: number, lessonId: number) {
+    const [course, lesson] = await Promise.all([
+      this.course(courseId),
+      this.lesson(courseId, lessonId),
+    ]);
+    this.assertCourseEditable(course);
+    if (lesson.status === CourseLessonStatus.PUBLISHED)
+      throw new ConflictException(
+        'Bài học đã được xuất bản. Hãy chuyển bài học về bản nháp trước khi thay đổi ảnh.',
+      );
     return lesson;
   }
 
@@ -474,7 +501,7 @@ export class CourseMediaSearchService {
     user: Admin,
   ) {
     this.admin(user);
-    const course = await this.course(courseId);
+    const course = await this.editableCourse(courseId);
     const firstLesson = await this.prisma.courseLesson.findFirst({
       where: { courseId },
       orderBy: { order: 'asc' },
@@ -493,7 +520,7 @@ export class CourseMediaSearchService {
     user: Admin,
   ) {
     this.admin(user);
-    const lesson = await this.lesson(courseId, lessonId);
+    const lesson = await this.editableLesson(courseId, lessonId);
     const brief = dto.brief?.trim() || this.deriveLessonMediaBrief(lesson);
     return this.runSearch(
       brief,
@@ -511,7 +538,7 @@ export class CourseMediaSearchService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.course(courseId);
+    await this.editableCourse(courseId);
     const downloaded = await this.imageSearch.download(dto.candidate);
     const key = `courses/${courseId}/cover-${Date.now()}.${this.extensionFor(downloaded.mimeType)}`;
     const uploaded = await this.upload.putObjectAtKey(
@@ -533,7 +560,7 @@ export class CourseMediaSearchService {
     user: Admin,
   ) {
     this.admin(user);
-    const lesson = await this.lesson(courseId, lessonId);
+    const lesson = await this.editableLesson(courseId, lessonId);
     const downloaded = await this.imageSearch.download(dto.candidate);
     const key = `courses/${courseId}/lessons/${lessonId}/media-${Date.now()}.${this.extensionFor(downloaded.mimeType)}`;
     const uploaded = await this.upload.putObjectAtKey(
@@ -558,7 +585,7 @@ export class CourseMediaSearchService {
    * exactly ONE candidate per call (Admin may explicitly ask again). */
   async generateCourseCoverImage(courseId: number, user: Admin) {
     this.admin(user);
-    const course = await this.course(courseId);
+    const course = await this.editableCourse(courseId);
     const firstLesson = await this.prisma.courseLesson.findFirst({
       where: { courseId },
       orderBy: { order: 'asc' },
@@ -580,7 +607,7 @@ export class CourseMediaSearchService {
     user: Admin,
   ) {
     this.admin(user);
-    const lesson = await this.lesson(courseId, lessonId);
+    const lesson = await this.editableLesson(courseId, lessonId);
     const prompt = this.deriveLessonMediaGenerationPrompt(lesson);
     return this.runGeneration(
       prompt,
@@ -618,7 +645,7 @@ export class CourseMediaSearchService {
     user: Admin,
   ) {
     this.admin(user);
-    await this.course(courseId);
+    await this.editableCourse(courseId);
     const meta = await this.resolveGenerationMetadata(
       dto.token,
       'COURSE_COVER',
@@ -653,7 +680,7 @@ export class CourseMediaSearchService {
     user: Admin,
   ) {
     this.admin(user);
-    const lesson = await this.lesson(courseId, lessonId);
+    const lesson = await this.editableLesson(courseId, lessonId);
     const meta = await this.resolveGenerationMetadata(
       dto.token,
       'LESSON_IMAGE',

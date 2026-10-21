@@ -12,6 +12,7 @@ import { UploadModule } from '../upload/upload.module';
 import { AiModule } from '../ai/ai.module';
 import { CourseAiAuthoringService } from './course-ai-authoring.service';
 import { CourseMediaSearchService } from './course-media-search.service';
+import { CourseAiWorkspaceService } from './course-ai-workspace.service';
 import { ImageSearchProviderChain } from '../toeic/image-search.provider-chain';
 import { PixabayImageSearchProvider } from '../toeic/pixabay-image-search.provider';
 import { OpenverseImageSearchProvider } from '../toeic/openverse-image-search.provider';
@@ -30,6 +31,7 @@ import { WikimediaCommonsImageSearchProvider } from '../toeic/wikimedia-commons-
     CourseLearningV5Service,
     CourseV5AdminService,
     CourseAiAuthoringService,
+    CourseAiWorkspaceService,
     CourseMediaSearchService,
     PixabayImageSearchProvider,
     OpenverseImageSearchProvider,

@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CourseMediaSearchService } from './course-media-search.service';
 import { ImageSearchCandidateDto } from './course-media.dto';
@@ -83,6 +87,19 @@ describe('CourseMediaSearchService', () => {
     await expect(
       service.searchCourseCover(17, {}, student),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('blocks media Accept before any download when the Course is published', async () => {
+    prisma.course.findUnique.mockResolvedValue({
+      id: 17,
+      title: 'Published course',
+      status: 'PUBLISHED',
+    });
+    await expect(
+      service.acceptCourseCover(17, { candidate: candidate() }, admin),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(imageSearch.download).not.toHaveBeenCalled();
+    expect(prisma.course.update).not.toHaveBeenCalled();
   });
 
   it('returns PASS on the first candidate without trying further ones', async () => {

@@ -38,6 +38,8 @@ import {
   RefineCourseLessonSectionDto,
 } from './course-ai-authoring.dto';
 import { CourseAiAuthoringService } from './course-ai-authoring.service';
+import { CourseAiWorkspaceService } from './course-ai-workspace.service';
+import { RunCourseAiWorkspaceDto } from './course-ai-workspace.dto';
 import { CourseMediaSearchService } from './course-media-search.service';
 import {
   AcceptCourseMediaDto,
@@ -54,8 +56,58 @@ export class CourseV5AdminController {
   constructor(
     private readonly studio: CourseV5AdminService,
     private readonly aiAuthoring: CourseAiAuthoringService,
+    private readonly aiWorkspace: CourseAiWorkspaceService,
     private readonly mediaSearch: CourseMediaSearchService,
   ) {}
+  @Post(':courseId/studio/ai-workspace/audit')
+  auditAiWorkspace(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Request() r: any,
+  ) {
+    return this.aiWorkspace.audit(courseId, r.user);
+  }
+  @Post(':courseId/studio/ai-workspace')
+  createAiWorkspace(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Request() r: any,
+  ) {
+    return this.aiWorkspace.create(courseId, r.user);
+  }
+  @Get(':courseId/studio/ai-workspace/:workspaceId')
+  getAiWorkspace(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('workspaceId') workspaceId: string,
+    @Request() r: any,
+  ) {
+    return this.aiWorkspace.get(courseId, workspaceId, r.user);
+  }
+  @Post(':courseId/studio/ai-workspace/:workspaceId/run')
+  runAiWorkspace(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('workspaceId') workspaceId: string,
+    @Body() dto: RunCourseAiWorkspaceDto,
+    @Request() r: any,
+  ) {
+    return this.aiWorkspace.run(courseId, workspaceId, dto.taskIds, r.user);
+  }
+  @Post(':courseId/studio/ai-workspace/:workspaceId/tasks/:taskId/retry')
+  retryAiWorkspaceTask(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('workspaceId') workspaceId: string,
+    @Param('taskId') taskId: string,
+    @Request() r: any,
+  ) {
+    return this.aiWorkspace.retry(courseId, workspaceId, taskId, r.user);
+  }
+  @Post(':courseId/studio/ai-workspace/:workspaceId/tasks/:taskId/apply')
+  applyAiWorkspaceTask(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('workspaceId') workspaceId: string,
+    @Param('taskId') taskId: string,
+    @Request() r: any,
+  ) {
+    return this.aiWorkspace.apply(courseId, workspaceId, taskId, r.user);
+  }
   @Post(':courseId/studio/ai/curriculum/generate')
   generateCurriculum(
     @Param('courseId', ParseIntPipe) courseId: number,
@@ -166,6 +218,14 @@ export class CourseV5AdminController {
     @Request() r: any,
   ) {
     return this.studio.publishLesson(c, l, r.user);
+  }
+  @Post(':courseId/studio/lessons/:lessonId/revert-to-draft')
+  revertLessonToDraft(
+    @Param('courseId', ParseIntPipe) c: number,
+    @Param('lessonId', ParseIntPipe) l: number,
+    @Request() r: any,
+  ) {
+    return this.studio.revertLessonToDraft(c, l, r.user);
   }
   @Post(':courseId/studio/lessons/:lessonId/sections') createSection(
     @Param('courseId', ParseIntPipe) c: number,

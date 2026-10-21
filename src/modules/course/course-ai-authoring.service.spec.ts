@@ -339,6 +339,61 @@ describe('CourseAiAuthoringService', () => {
     expect(result).toMatchObject({ sectionsAdded: 0 });
   });
 
+  it('preserves unmanaged legacy section extensions when an AI improvement updates it in place', async () => {
+    tx.courseLesson.findFirst = jest.fn().mockResolvedValue({
+      id: 9,
+      sections: [
+        {
+          id: 501,
+          heading: 'Present simple',
+          type: 'THEORY',
+          content: {
+            text: 'Old text.',
+            formulas: ['subject + verb'],
+            items: [{ label: 'legacy' }],
+            audioExamples: [
+              { term: 'works', audioUrl: 'https://audio.example/works.mp3' },
+            ],
+            legacyExtension: { keep: true },
+          },
+        },
+      ],
+      exercises: [],
+    });
+    await service.applyLessonContent(
+      71,
+      9,
+      {
+        candidateCourseId: 71,
+        candidateLessonId: 9,
+        sections: [
+          {
+            type: 'THEORY',
+            heading: 'Present simple',
+            content: 'Updated text.',
+            sectionId: 501,
+          },
+        ],
+      },
+      admin,
+    );
+    expect(tx.courseLessonSection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          content: expect.objectContaining({
+            text: 'Updated text.',
+            formulas: ['subject + verb'],
+            items: [{ label: 'legacy' }],
+            audioExamples: [
+              { term: 'works', audioUrl: 'https://audio.example/works.mp3' },
+            ],
+            legacyExtension: { keep: true },
+          }),
+        }),
+      }),
+    );
+  });
+
   it('generates a section-level refinement candidate without touching the Draft', async () => {
     prisma.courseLessonSection.findFirst.mockResolvedValue({
       id: 501,

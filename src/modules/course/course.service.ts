@@ -735,6 +735,20 @@ export class CourseService {
     this.requireAdmin(user.role);
     const course = await this.prisma.course.findUnique({ where: { id } });
     if (!course) throw new NotFoundException('Course not found');
+    if (
+      course.status === CourseStatus.PUBLISHED &&
+      [
+        dto.title,
+        dto.description,
+        dto.thumbnail,
+        dto.level,
+        dto.curriculumType,
+      ].some((value) => value !== undefined)
+    ) {
+      throw new ConflictException(
+        'Khóa học đã được xuất bản. Hãy chuyển khóa học về bản nháp trước khi chỉnh sửa.',
+      );
+    }
     if (dto.status === CourseStatus.PUBLISHED) {
       await this.assertCoursePublishable(id);
     }

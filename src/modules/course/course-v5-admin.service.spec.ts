@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CourseV5AdminService } from './course-v5-admin.service';
 
@@ -12,7 +12,14 @@ const baseLesson = (overrides: Partial<Record<string, unknown>> = {}) => ({
   learningObjectives: ['Describe daily routines'],
   requiresFinalCheck: true,
   status: 'DRAFT',
-  sections: [{ id: 1, isRequired: true }],
+  sections: [
+    {
+      id: 1,
+      isRequired: true,
+      heading: 'Nội dung chính',
+      content: { text: 'Nội dung bài học' },
+    },
+  ],
   exercises: [] as Array<{
     id: number;
     slug: string;
@@ -105,6 +112,54 @@ describe('CourseV5AdminService', () => {
     );
   });
 
+  it('blocks every Course Studio metadata mutation while the Course is published', async () => {
+    prisma.course.findUnique.mockResolvedValue({
+      id: 9,
+      status: 'PUBLISHED',
+    });
+    await expect(
+      service.updateCourse(9, { title: 'Không được sửa' } as any, admin),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.course.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks Lesson mutation while a Draft Course contains a published Lesson', async () => {
+    prisma.course.findUnique.mockResolvedValue({ id: 9, status: 'DRAFT' });
+    prisma.courseLesson.findFirst.mockResolvedValue(
+      baseLesson({ status: 'PUBLISHED' }),
+    );
+    await expect(
+      service.updateLesson(9, 10, { title: 'Không được sửa' } as any, admin),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.courseLesson.update).not.toHaveBeenCalled();
+  });
+
+  it('returns a published Lesson to Draft only while its Course is Draft', async () => {
+    prisma.course.findUnique.mockResolvedValue({ id: 9, status: 'DRAFT' });
+    prisma.courseLesson.findFirst.mockResolvedValue(
+      baseLesson({ status: 'PUBLISHED' }),
+    );
+    prisma.courseLesson.update.mockResolvedValue({ id: 10, status: 'DRAFT' });
+    await expect(service.revertLessonToDraft(9, 10, admin)).resolves.toEqual({
+      id: 10,
+      status: 'DRAFT',
+    });
+    expect(prisma.courseLesson.update).toHaveBeenCalledWith({
+      where: { id: 10 },
+      data: { status: 'DRAFT' },
+    });
+  });
+
+  it('does not allow a published Course to return one child Lesson to Draft', async () => {
+    prisma.course.findUnique.mockResolvedValue({
+      id: 9,
+      status: 'PUBLISHED',
+    });
+    await expect(service.revertLessonToDraft(9, 10, admin)).rejects.toThrow(
+      'Khóa học đang được xuất bản',
+    );
+  });
+
   describe('Final Check requirement — requiresFinalCheck', () => {
     it('requires Final Check for a lesson with requiresFinalCheck: true (default) and none exists', async () => {
       const lesson = baseLesson();
@@ -146,6 +201,7 @@ describe('CourseV5AdminService', () => {
 
     it('lets publishLesson succeed for a requiresFinalCheck: false lesson with no Final Check', async () => {
       const lesson = baseLesson({ requiresFinalCheck: false });
+      prisma.course.findUnique.mockResolvedValue({ id: 9, status: 'DRAFT' });
       prisma.courseLesson.findFirst.mockResolvedValue(lesson);
       prisma.courseLesson.findUnique.mockResolvedValue(lesson);
       prisma.courseLesson.update.mockResolvedValue({
@@ -176,7 +232,8 @@ describe('CourseV5AdminService', () => {
         }),
       ]);
       const result = await service.validateCourse(9, admin);
-      expect(result.valid).toBe(true);
+      expect(result.valid).toBe(false);
+      expect(result.errors.join('\n')).toContain('Bài học chưa được xuất bản.');
     });
 
     it('validateCourse still reports a missing Final Check for a lesson that requires one', async () => {
@@ -186,7 +243,7 @@ describe('CourseV5AdminService', () => {
       ]);
       const result = await service.validateCourse(9, admin);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Bài học #10: thiếu Kiểm tra cuối bài');
+      expect(result.errors.join('\n')).toContain('Chưa có Kiểm tra cuối bài.');
     });
   });
 });
