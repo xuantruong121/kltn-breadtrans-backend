@@ -26,6 +26,7 @@ import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
 import { CourseService } from '../course/course.service';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
+import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
 import {
   CreateVocabTopicDto,
   UpdateVocabTopicDto,
@@ -159,10 +160,16 @@ export class AdminService {
         where: { senderRole: 'STUDENT', isRead: false },
       }),
       this.prisma.suggestion.count({
-        where: { status: { in: [SuggestionStatus.PENDING, SuggestionStatus.REVIEWING] } },
+        where: {
+          status: {
+            in: [SuggestionStatus.PENDING, SuggestionStatus.REVIEWING],
+          },
+        },
       }),
       this.prisma.issueReport.count({
-        where: { status: { in: [IssueReportStatus.NEW, IssueReportStatus.IN_REVIEW] } },
+        where: {
+          status: { in: [IssueReportStatus.NEW, IssueReportStatus.IN_REVIEW] },
+        },
       }),
     ]);
 
@@ -1574,7 +1581,7 @@ export class AdminService {
       services: {
         gemini: {
           name: 'Google Gemini Generative AI',
-          model: process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite',
+          model: process.env.GEMINI_MODEL_NAME || DEFAULT_GEMINI_TEXT_MODEL,
           totalRequests: geminiTotalRequests,
           cachedEntries: cachedGeminiCount,
           cacheHitCount: 0,

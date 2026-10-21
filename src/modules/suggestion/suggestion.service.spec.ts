@@ -18,7 +18,10 @@ describe('SuggestionService', () => {
     },
   };
   const notificationsService = { createNotification: jest.fn() };
-  const service = new SuggestionService(prisma as never, notificationsService as never);
+  const service = new SuggestionService(
+    prisma as never,
+    notificationsService as never,
+  );
 
   beforeEach(() => jest.clearAllMocks());
 

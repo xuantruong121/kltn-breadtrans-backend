@@ -15,6 +15,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { AiService } from './ai.service';
+import { DEFAULT_GEMINI_TEXT_MODEL } from './gemini/gemini-model-router';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SmartGeneratedContent } from './strategies/ai-evaluator.interface';
 import * as crypto from 'crypto';
@@ -111,7 +112,7 @@ export class AiGeneratorService {
       remaining,
       percentage,
       isNearLimit: used >= 400,
-      modelName: process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite',
+      modelName: process.env.GEMINI_MODEL_NAME || DEFAULT_GEMINI_TEXT_MODEL,
     };
   }
 
@@ -313,7 +314,7 @@ export class AiGeneratorService {
             options: options ?? {},
           },
           provider: 'gemini',
-          model: process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite',
+          model: process.env.GEMINI_MODEL_NAME || DEFAULT_GEMINI_TEXT_MODEL,
           generatorVersion: 'phase5-smart-generator-v1',
           promptVersion: 'smart-content-v1',
         },

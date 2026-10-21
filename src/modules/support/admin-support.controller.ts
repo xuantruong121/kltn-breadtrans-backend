@@ -49,7 +49,9 @@ export class AdminSupportController {
   }
 
   @Post('conversations/start/:studentId')
-  @ApiOperation({ summary: 'Admin mở hoặc lấy cuộc trò chuyện hỗ trợ của học viên' })
+  @ApiOperation({
+    summary: 'Admin mở hoặc lấy cuộc trò chuyện hỗ trợ của học viên',
+  })
   startConversation(@Param('studentId', ParseIntPipe) studentId: number) {
     return this.supportService.startAdminConversation(studentId);
   }

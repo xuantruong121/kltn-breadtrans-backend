@@ -64,6 +64,9 @@ export interface DictionaryEnrichment {
 }
 
 export interface IAIEvaluator {
+  validateImageSemantic?(
+    input: AiImageSemanticValidationInput,
+  ): Promise<AiImageSemanticValidationResult>;
   analyzeToeicPart1Candidates?(input: {
     candidates: Array<{
       candidateId: string;
@@ -400,6 +403,23 @@ export interface ToeicPart1CandidateAnalysis {
   unsafeInferences: string[];
   rejectionReasons: string[];
 }
+
+export type AiImageSemanticValidationInput = {
+  taskType: 'TOEIC_PART1' | 'SPEAKING_DESCRIBE_PICTURE' | 'WRITING_PICTURE';
+  imageBuffer: Buffer;
+  mimeType: string;
+  imageBrief: string;
+  context?: string;
+};
+
+export type AiImageSemanticValidationResult = {
+  status: 'PASS' | 'FAIL' | 'LOW_CONFIDENCE' | 'UNAVAILABLE';
+  confidence: number;
+  description: string;
+  visibleFacts: string[];
+  issues: string[];
+  rejectionReasons: string[];
+};
 
 export interface ToeicPart1QuestionCandidate {
   sceneSummary: string;

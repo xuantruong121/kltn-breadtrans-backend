@@ -36,6 +36,8 @@ import type {
   ToeicSpeakingWritingDraft,
   ToeicPart1CandidateAnalysis,
   ToeicPart1QuestionCandidate,
+  AiImageSemanticValidationInput,
+  AiImageSemanticValidationResult,
 } from './strategies/ai-evaluator.interface';
 
 export async function normalizeAzureSpeechResponse(response: {
@@ -242,6 +244,23 @@ export class AiService {
       );
     }
     return this.aiEvaluator.analyzeToeicPart1Candidates(input);
+  }
+
+  async validateImageSemantic(
+    input: AiImageSemanticValidationInput,
+  ): Promise<AiImageSemanticValidationResult> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.validateImageSemantic) {
+      return {
+        status: 'UNAVAILABLE',
+        confidence: 0,
+        description: 'Nhà cung cấp AI chưa hỗ trợ kiểm tra ngữ nghĩa ảnh.',
+        visibleFacts: [],
+        issues: [],
+        rejectionReasons: [],
+      };
+    }
+    return this.aiEvaluator.validateImageSemantic(input);
   }
 
   async generateToeicPart1FromImage(input: {

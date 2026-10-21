@@ -3,6 +3,7 @@ import {
   GeminiEvaluatorStrategy,
   parseGeminiApiKeys,
 } from './gemini-evaluator.strategy';
+import { AiTaskType } from '../gemini/gemini-model-router';
 
 describe('Gemini API key pool configuration', () => {
   it('parses, trims, and de-duplicates comma/newline separated keys', () => {
@@ -100,6 +101,37 @@ describe('GeminiEvaluatorStrategy Writing image MIME detection', () => {
   });
 });
 
+describe('GeminiEvaluatorStrategy Writing Part 1 routing', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('routes picture evaluation through the common vision task policy', async () => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.executeWithRotation = jest.fn().mockResolvedValue({
+      response: { text: () => JSON.stringify({ score: 3, feedback: 'Tốt' }) },
+    });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () =>
+        Promise.resolve(new Uint8Array([0xff, 0xd8, 0xff]).buffer),
+    }) as any;
+
+    await strategy.evaluateWritingPart1(
+      'https://example.test/image.jpg',
+      ['desk'],
+      'A desk is clean.',
+    );
+    expect(strategy.executeWithRotation).toHaveBeenCalledWith(
+      expect.any(Function),
+      AiTaskType.WRITING_PICTURE_EVALUATION,
+    );
+  });
+});
+
 describe('GeminiEvaluatorStrategy Part 1 vision contracts', () => {
   const createStrategy = (response: unknown) => {
     const strategy = new GeminiEvaluatorStrategy() as any;
@@ -181,6 +213,40 @@ describe('GeminiEvaluatorStrategy Part 1 vision contracts', () => {
         mimeType: 'image/jpeg',
       }),
     ).rejects.toThrow('bốn đáp án');
+  });
+});
+
+describe('GeminiEvaluatorStrategy generic image semantic validation', () => {
+  it('uses structured Vision output and degrades safely when the provider is unavailable', async () => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.executeWithRotation = jest.fn().mockResolvedValue({
+      response: {
+        text: () =>
+          JSON.stringify({
+            status: 'PASS',
+            confidence: 0.9,
+            description: 'A person is reading.',
+            visibleFacts: ['person', 'book'],
+            issues: [],
+            rejectionReasons: [],
+          }),
+        usageMetadata: {},
+      },
+    });
+    strategy.recordUsage = jest.fn();
+    await expect(
+      strategy.validateImageSemantic({
+        taskType: 'SPEAKING_DESCRIBE_PICTURE',
+        imageBuffer: Buffer.from('img'),
+        mimeType: 'image/jpeg',
+        imageBrief: 'A person reading a book',
+      }),
+    ).resolves.toMatchObject({ status: 'PASS', confidence: 0.9 });
+    expect(strategy.executeWithRotation).toHaveBeenCalledWith(
+      expect.any(Function),
+      AiTaskType.IMAGE_SEMANTIC_VALIDATION,
+    );
   });
 });
 
