@@ -1,6 +1,7 @@
 import {
   extractGeminiImage,
   GeminiEvaluatorStrategy,
+  normalizeSuggestedSection,
   parseGeminiApiKeys,
 } from './gemini-evaluator.strategy';
 import { AiTaskType } from '../gemini/gemini-model-router';
@@ -343,5 +344,369 @@ describe('GeminiEvaluatorStrategy Speaking contextual authoring', () => {
         },
       ],
     });
+  });
+});
+
+describe('normalizeSuggestedSection', () => {
+  it('keeps paragraphs, bullets and examples (with translation/explanation) structured', () => {
+    const section = normalizeSuggestedSection({
+      type: 'THEORY',
+      heading: ' Present simple ',
+      content: 'Use the base verb form for habits.',
+      paragraphs: [
+        'Use the base verb form for habits.',
+        'Add -s for he/she/it.',
+      ],
+      bullets: ['Subject + verb', 'Add -s for third person'],
+      examples: [
+        {
+          text: 'She works every day.',
+          translation: 'Cô ấy làm việc mỗi ngày.',
+          explanation: 'Third-person -s.',
+        },
+      ],
+    });
+    expect(section).toEqual({
+      type: 'THEORY',
+      heading: 'Present simple',
+      content: 'Use the base verb form for habits.',
+      paragraphs: [
+        'Use the base verb form for habits.',
+        'Add -s for he/she/it.',
+      ],
+      bullets: ['Subject + verb', 'Add -s for third person'],
+      examples: [
+        {
+          text: 'She works every day.',
+          translation: 'Cô ấy làm việc mỗi ngày.',
+          explanation: 'Third-person -s.',
+        },
+      ],
+    });
+  });
+
+  it('derives content from the first paragraph when content is missing', () => {
+    const section = normalizeSuggestedSection({
+      type: 'INTRO',
+      heading: 'Goal',
+      paragraphs: ['Today you will describe daily routines.'],
+    });
+    expect(section.content).toBe('Today you will describe daily routines.');
+  });
+
+  it('derives paragraphs from content when paragraphs are missing', () => {
+    const section = normalizeSuggestedSection({
+      type: 'INTRO',
+      heading: 'Goal',
+      content: 'Today you will describe daily routines.',
+    });
+    expect(section.paragraphs).toEqual([
+      'Today you will describe daily routines.',
+    ]);
+  });
+
+  it('drops malformed examples instead of keeping empty-text entries', () => {
+    const section = normalizeSuggestedSection({
+      type: 'EXAMPLE',
+      heading: 'Model',
+      content: 'Intro text.',
+      examples: [
+        { text: '   ' },
+        { translation: 'no text' },
+        { text: 'Kept.' },
+      ],
+    });
+    expect(section.examples).toEqual([{ text: 'Kept.' }]);
+  });
+
+  it('bounds list lengths (5 paragraphs, 8 bullets, 6 examples)', () => {
+    const section = normalizeSuggestedSection({
+      type: 'THEORY',
+      heading: 'Rule',
+      content: 'x',
+      paragraphs: Array.from({ length: 9 }, (_, i) => `p${i}`),
+      bullets: Array.from({ length: 12 }, (_, i) => `b${i}`),
+      examples: Array.from({ length: 9 }, (_, i) => ({ text: `e${i}` })),
+    });
+    expect(section.paragraphs).toHaveLength(5);
+    expect(section.bullets).toHaveLength(8);
+    expect(section.examples).toHaveLength(6);
+  });
+});
+
+describe('GeminiEvaluatorStrategy suggestCourseLessonContent', () => {
+  const richResponse = {
+    pedagogyPlan: {
+      keyConcepts: ['Present simple for habits'],
+      realWorldContexts: ['Describing a daily routine to a coworker'],
+      commonMistakes: ['Forgetting -s for he/she/it'],
+      practiceCoverage: ['Guided practice drills -s agreement'],
+    },
+    sections: [
+      {
+        type: 'INTRO',
+        heading: 'Goal',
+        content: 'Daily routines come up in small talk every day.',
+        paragraphs: ['Daily routines come up in small talk every day.'],
+        bullets: [],
+        examples: [],
+      },
+      {
+        type: 'THEORY',
+        heading: 'Present simple',
+        content: 'Use the base verb form for habits.',
+        paragraphs: ['Use the base verb form for habits.'],
+        bullets: ['Subject + verb', 'Add -s for he/she/it'],
+        examples: [{ text: 'She works every day.' }],
+      },
+      {
+        type: 'EXAMPLE',
+        heading: 'Everyday routines',
+        content: 'Here are some routines.',
+        paragraphs: ['Here are some routines.'],
+        bullets: [],
+        examples: [
+          { text: 'He wakes up at six.' },
+          { text: 'They commute by bus.' },
+        ],
+      },
+    ],
+    guidedPractice: {
+      type: 'MULTIPLE_CHOICE',
+      title: 'Guided practice',
+      prompt: 'Choose the correct verb form.',
+      questions: [
+        {
+          prompt: 'She __ at a bank.',
+          options: ['work', 'works'],
+          correctAnswer: 'works',
+          explanation: 'Third-person -s.',
+        },
+        {
+          prompt: 'He __ up at six.',
+          options: ['wake', 'wakes'],
+          correctAnswer: 'wakes',
+          explanation: 'Third-person -s.',
+        },
+        {
+          prompt: 'They __ by bus.',
+          options: ['commute', 'commutes'],
+          correctAnswer: 'commute',
+          explanation: 'Plural subject.',
+        },
+      ],
+    },
+    finalCheck: {
+      type: 'MULTIPLE_CHOICE',
+      title: 'Final check',
+      prompt: 'Choose the correct verb form.',
+      questions: [
+        {
+          prompt: 'My sister __ in a hospital.',
+          options: ['work', 'works'],
+          correctAnswer: 'works',
+          explanation: 'Third-person -s.',
+        },
+        {
+          prompt: 'We __ coffee every morning.',
+          options: ['drink', 'drinks'],
+          correctAnswer: 'drink',
+          explanation: 'Plural subject.',
+        },
+        {
+          prompt: 'The train __ at seven.',
+          options: ['leave', 'leaves'],
+          correctAnswer: 'leaves',
+          explanation: 'Third-person -s.',
+        },
+      ],
+    },
+  };
+
+  const createStrategy = (response: unknown) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    const generateContent = jest.fn().mockResolvedValue({
+      response: { text: () => JSON.stringify(response), usageMetadata: {} },
+    });
+    strategy.executeWithRotation = jest.fn((callback: any) =>
+      callback({ generateContent }),
+    );
+    strategy.recordUsage = jest.fn().mockResolvedValue(undefined);
+    return { strategy, generateContent };
+  };
+
+  it('returns sections with structured fields intact and a bounded pedagogy plan', async () => {
+    const { strategy } = createStrategy(richResponse);
+    const result = await strategy.suggestCourseLessonContent({
+      courseTitle: 'English for the workplace',
+      lessonTitle: 'Daily routines',
+      lessonSummary: 'Describe daily habits.',
+      objectives: ['Describe daily routines'],
+    });
+    expect(result.sections).toHaveLength(3);
+    expect(result.sections[1]).toMatchObject({
+      type: 'THEORY',
+      bullets: ['Subject + verb', 'Add -s for he/she/it'],
+      examples: [{ text: 'She works every day.' }],
+    });
+    expect(result.sections[2].examples).toHaveLength(2);
+    expect(result.pedagogyPlan).toEqual({
+      keyConcepts: ['Present simple for habits'],
+      realWorldContexts: ['Describing a daily routine to a coworker'],
+      commonMistakes: ['Forgetting -s for he/she/it'],
+      practiceCoverage: ['Guided practice drills -s agreement'],
+    });
+  });
+
+  it('embeds beginner level guidance, previous-lesson context, and anti-filler rules in a single prompt (no second call)', async () => {
+    const { strategy, generateContent } = createStrategy(richResponse);
+    await strategy.suggestCourseLessonContent({
+      courseTitle: 'English for the workplace',
+      courseLevel: 'BEGINNER',
+      lessonTitle: 'Daily routines',
+      lessonSummary: 'Describe daily habits.',
+      objectives: ['Describe daily routines'],
+      previousLessons: [
+        { title: 'Greetings at work', summary: 'Say hello to a coworker.' },
+      ],
+      nextLessonTitle: 'Talking about the weekend',
+    });
+    expect(generateContent).toHaveBeenCalledTimes(1);
+    const prompt = generateContent.mock.calls[0][0].contents[0].parts[0].text;
+    expect(prompt).toContain('beginner (CEFR A1-A2)');
+    expect(prompt).toContain('Never use B2/C1 explanation language');
+    expect(prompt).toContain('Greetings at work');
+    expect(prompt).toContain('Talking about the weekend');
+    expect(prompt).toContain('PLAN FIRST');
+    expect(prompt).toContain('NEVER produce');
+    expect(prompt).toContain('In this lesson');
+  });
+
+  it('instructs the model to reuse existing headings and preserve correct wording in IMPROVE mode', async () => {
+    const { strategy, generateContent } = createStrategy(richResponse);
+    await strategy.suggestCourseLessonContent({
+      courseTitle: 'English for the workplace',
+      lessonTitle: 'Daily routines',
+      lessonSummary: 'Describe daily habits.',
+      objectives: ['Describe daily routines'],
+      existingSections: [
+        {
+          type: 'THEORY',
+          heading: 'Present simple',
+          text: 'Use the base verb form.',
+        },
+      ],
+      mode: 'IMPROVE',
+    });
+    const prompt = generateContent.mock.calls[0][0].contents[0].parts[0].text;
+    expect(prompt).toContain('improve the lesson');
+    expect(prompt).toContain('Reuse each existing section');
+    expect(prompt).toContain('Present simple');
+  });
+
+  it('rejects a candidate whose exercises have fewer than three valid questions', async () => {
+    const { strategy } = createStrategy({
+      ...richResponse,
+      guidedPractice: {
+        ...richResponse.guidedPractice,
+        questions: richResponse.guidedPractice.questions.slice(0, 2),
+      },
+    });
+    await expect(
+      strategy.suggestCourseLessonContent({
+        courseTitle: 'English for the workplace',
+        lessonTitle: 'Daily routines',
+        lessonSummary: 'Describe daily habits.',
+        objectives: ['Describe daily routines'],
+      }),
+    ).rejects.toThrow('AI không thể tạo nội dung bài học hợp lệ');
+  });
+});
+
+describe('GeminiEvaluatorStrategy suggestCourseSectionRefinement', () => {
+  const createStrategy = (response: unknown) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    const generateContent = jest.fn().mockResolvedValue({
+      response: { text: () => JSON.stringify(response), usageMetadata: {} },
+    });
+    strategy.executeWithRotation = jest.fn((callback: any) =>
+      callback({ generateContent }),
+    );
+    strategy.recordUsage = jest.fn().mockResolvedValue(undefined);
+    return { strategy, generateContent };
+  };
+
+  it('returns a revised section carrying the original section type', async () => {
+    const { strategy } = createStrategy({
+      heading: 'Present simple',
+      content: 'Use the base verb form for habits, and add -s for he/she/it.',
+      paragraphs: [
+        'Use the base verb form for habits, and add -s for he/she/it.',
+      ],
+      bullets: ['Subject + verb', 'Add -s for third person'],
+      examples: [],
+    });
+    const result = await strategy.suggestCourseSectionRefinement({
+      action: 'EXPAND',
+      courseTitle: 'English for the workplace',
+      lessonTitle: 'Daily routines',
+      objectives: ['Describe daily routines'],
+      section: {
+        type: 'THEORY',
+        heading: 'Present simple',
+        text: 'Use the base verb form.',
+      },
+    });
+    expect(result).toMatchObject({
+      type: 'THEORY',
+      heading: 'Present simple',
+      bullets: ['Subject + verb', 'Add -s for third person'],
+    });
+  });
+
+  it('sends the action-specific guidance for each refinement action', async () => {
+    const expectations: Record<string, string> = {
+      EXPAND: 'more useful detail',
+      SIMPLIFY: 'simpler and shorter',
+      ADD_EXAMPLES: 'add 1-3 natural everyday examples',
+      KEY_POINTS: 'propose 3-6 concrete key points',
+    };
+    for (const [action, fragment] of Object.entries(expectations)) {
+      const { strategy, generateContent } = createStrategy({
+        heading: 'Present simple',
+        content: 'Revised content.',
+        paragraphs: ['Revised content.'],
+        bullets: [],
+        examples: [],
+      });
+      await strategy.suggestCourseSectionRefinement({
+        action,
+        courseTitle: 'English for the workplace',
+        lessonTitle: 'Daily routines',
+        objectives: ['Describe daily routines'],
+        section: {
+          type: 'THEORY',
+          heading: 'Present simple',
+          text: 'Use the base verb form.',
+        },
+      });
+      const prompt = generateContent.mock.calls[0][0].contents[0].parts[0].text;
+      expect(prompt).toContain(fragment);
+    }
+  });
+
+  it('throws when the model returns an empty heading or content', async () => {
+    const { strategy } = createStrategy({ heading: '', content: '' });
+    await expect(
+      strategy.suggestCourseSectionRefinement({
+        action: 'EXPAND',
+        courseTitle: 'English for the workplace',
+        lessonTitle: 'Daily routines',
+        objectives: [],
+        section: { type: 'THEORY', heading: 'Present simple', text: 'x' },
+      }),
+    ).rejects.toThrow('AI không thể tạo nội dung mục hợp lệ');
   });
 });

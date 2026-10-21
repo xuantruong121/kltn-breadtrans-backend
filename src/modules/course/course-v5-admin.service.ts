@@ -110,6 +110,7 @@ export class CourseV5AdminService {
         difficulty: dto.difficulty,
         coverImage: dto.coverImage,
         order: dto.order ?? (last?.order ?? -1) + 1,
+        requiresFinalCheck: dto.requiresFinalCheck ?? true,
       },
     });
   }
@@ -151,6 +152,7 @@ export class CourseV5AdminService {
         coverImage: dto.coverImage,
         order: dto.order,
         status: dto.status,
+        requiresFinalCheck: dto.requiresFinalCheck,
       },
     });
   }
@@ -201,15 +203,24 @@ export class CourseV5AdminService {
       orderBy: { order: 'desc' },
       select: { order: true },
     });
-    return this.prisma.courseLessonSection.create({
-      data: {
-        lessonId,
-        type: dto.type,
-        heading: dto.heading.trim(),
-        content: this.json(dto.content),
-        isRequired: dto.isRequired ?? true,
-        order: dto.order ?? (last?.order ?? -1) + 1,
-      },
+    const order = dto.order ?? (last?.order ?? -1) + 1;
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.order !== undefined) {
+        await tx.courseLessonSection.updateMany({
+          where: { lessonId, order: { gte: order } },
+          data: { order: { increment: 1 } },
+        });
+      }
+      return tx.courseLessonSection.create({
+        data: {
+          lessonId,
+          type: dto.type,
+          heading: dto.heading.trim(),
+          content: this.json(dto.content),
+          isRequired: dto.isRequired ?? true,
+          order,
+        },
+      });
     });
   }
 
@@ -574,6 +585,14 @@ export class CourseV5AdminService {
         errors.push(`Bài học #${lesson.id}: thiếu mục tiêu`);
       if (!lesson.sections.some((section) => section.isRequired))
         errors.push(`Bài học #${lesson.id}: thiếu section bắt buộc`);
+      const finalCheck = lesson.exercises.find(
+        (exercise) => exercise.slug === 'final-check',
+      );
+      if (!finalCheck) {
+        if (lesson.requiresFinalCheck)
+          errors.push(`Bài học #${lesson.id}: thiếu Kiểm tra cuối bài`);
+      } else if (!finalCheck.questions.length)
+        errors.push(`Bài học #${lesson.id}: Kiểm tra cuối bài chưa có câu hỏi`);
       for (const exercise of lesson.exercises)
         if (exercise.required && exercise.questions.length === 0)
           errors.push(`Bài tập “${exercise.title}” chưa có câu hỏi`);
@@ -588,12 +607,19 @@ export class CourseV5AdminService {
   async publishLesson(courseId: number, lessonId: number, user: Admin) {
     this.admin(user);
     const lesson = await this.lesson(courseId, lessonId);
-    const validation = await this.validateLesson(lesson.id);
+    const validation = await this.collectLessonValidation(lesson.id);
     if (validation.length) throw new BadRequestException(validation.join('; '));
     return this.prisma.courseLesson.update({
       where: { id: lesson.id },
       data: { status: CourseLessonStatus.PUBLISHED },
     });
+  }
+
+  async validateLesson(courseId: number, lessonId: number, user: Admin) {
+    this.admin(user);
+    await this.lesson(courseId, lessonId);
+    const errors = await this.collectLessonValidation(lessonId);
+    return { valid: errors.length === 0, errors, lessonId };
   }
 
   async publishCourse(courseId: number, user: Admin) {
@@ -618,7 +644,7 @@ export class CourseV5AdminService {
     });
   }
 
-  private async validateLesson(lessonId: number) {
+  private async collectLessonValidation(lessonId: number) {
     const lesson = await this.prisma.courseLesson.findUnique({
       where: { id: lessonId },
       include: { sections: true, exercises: { include: { questions: true } } },
@@ -634,6 +660,13 @@ export class CourseV5AdminService {
       errors.push('Thiếu mục tiêu học tập');
     if (!lesson.sections.some((section) => section.isRequired))
       errors.push('Thiếu section bắt buộc');
+    const finalCheck = lesson.exercises.find(
+      (exercise) => exercise.slug === 'final-check',
+    );
+    if (!finalCheck) {
+      if (lesson.requiresFinalCheck) errors.push('Thiếu Kiểm tra cuối bài');
+    } else if (!finalCheck.questions.length)
+      errors.push('Kiểm tra cuối bài chưa có câu hỏi');
     for (const exercise of lesson.exercises)
       if (exercise.required && !exercise.questions.length)
         errors.push(`Bài tập “${exercise.title}” chưa có câu hỏi`);

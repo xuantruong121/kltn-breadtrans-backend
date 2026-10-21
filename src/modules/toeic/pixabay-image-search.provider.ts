@@ -7,9 +7,16 @@ import {
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { createHash } from 'crypto';
+import {
+  classifySearchHttpFailure,
+  withImageSearchErrorCode,
+} from './image-search-error';
 
 export type ImageSearchCandidate = {
-  provider: 'PIXABAY' | 'OPENVERSE' | 'WIKIMEDIA_COMMONS';
+  /** PEXELS is a known candidate type (its adapter stays dormant/unwired in
+   * ImageSearchProviderChain — see that file's doc comment) and never
+   * reaches this chain in practice today. */
+  provider: 'PEXELS' | 'PIXABAY' | 'OPENVERSE' | 'WIKIMEDIA_COMMONS';
   providerAssetId: string;
   previewUrl: string;
   downloadUrl: string;
@@ -152,8 +159,11 @@ export class PixabayImageSearchProvider implements ImageSearchProvider {
     if (!normalizedQuery)
       throw new BadRequestException('Từ khóa tìm ảnh không được để trống');
     if (!this.isConfigured())
-      throw new ServiceUnavailableException(
-        'Tìm ảnh Pixabay chưa được cấu hình. Bạn có thể tải ảnh lên thủ công.',
+      throw withImageSearchErrorCode(
+        new ServiceUnavailableException(
+          'Tìm ảnh Pixabay chưa được cấu hình. Bạn có thể tải ảnh lên thủ công.',
+        ),
+        'PROVIDER_NOT_CONFIGURED',
       );
     const limit = Math.min(Math.max(options?.limit ?? 5, 1), MAX_RESULTS);
     const cacheKey = `pixabay:search:${createHash('sha256').update(`${normalizedQuery.toLowerCase()}:${limit}`).digest('hex')}`;
@@ -246,14 +256,33 @@ export class PixabayImageSearchProvider implements ImageSearchProvider {
     url.searchParams.set('orientation', 'horizontal');
     url.searchParams.set('safesearch', 'true');
     url.searchParams.set('per_page', String(limit));
-    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-    if (!response.ok) {
-      const retryable = response.status === 429 || response.status >= 500;
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    } catch (error) {
       this.logger.warn(
-        `pixabay_unavailable provider=PIXABAY status=${response.status} queryHash=${createHash('sha256').update(query.toLowerCase()).digest('hex').slice(0, 12)} retryable=${retryable}`,
+        `pixabay_unavailable provider=PIXABAY queryHash=${createHash('sha256').update(query.toLowerCase()).digest('hex').slice(0, 12)} error=${error instanceof Error ? error.name : 'unknown'}`,
       );
-      throw new ServiceUnavailableException(
-        `Pixabay không khả dụng (HTTP ${response.status})`,
+      throw withImageSearchErrorCode(
+        new ServiceUnavailableException('Pixabay hiện không khả dụng'),
+        error instanceof Error && error.name === 'AbortError'
+          ? 'PROVIDER_TIMEOUT'
+          : 'PROVIDER_TRANSIENT',
+      );
+    }
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => '');
+      const code = classifySearchHttpFailure(response.status, bodyText);
+      this.logger.warn(
+        `pixabay_unavailable provider=PIXABAY status=${response.status} code=${code} queryHash=${createHash('sha256').update(query.toLowerCase()).digest('hex').slice(0, 12)}`,
+      );
+      throw withImageSearchErrorCode(
+        new ServiceUnavailableException(
+          code === 'PROVIDER_BLOCKED'
+            ? 'Pixabay đang chặn truy vấn tự động (Cloudflare)'
+            : `Pixabay không khả dụng (HTTP ${response.status})`,
+        ),
+        code,
       );
     }
     const body = (await response.json()) as { hits?: any[] };

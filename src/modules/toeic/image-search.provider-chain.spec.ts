@@ -1,6 +1,7 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { ImageSearchProviderChain } from './image-search.provider-chain';
 import { ImageSearchCandidate } from './pixabay-image-search.provider';
+import { withImageSearchErrorCode } from './image-search-error';
 
 const candidate = (provider: ImageSearchCandidate['provider']) => ({
   provider,
@@ -126,5 +127,172 @@ describe('ImageSearchProviderChain', () => {
       'Pixabay hiện đang giới hạn tải ảnh',
     );
     expect(pixabay.download).not.toHaveBeenCalled();
+  });
+
+  describe('searchWithDiagnostics — order: Openverse → Wikimedia → Pixabay', () => {
+    it('stops at Openverse when it returns results — Wikimedia/Pixabay are never called', async () => {
+      const pixabay = { search: jest.fn() };
+      const openverse = {
+        search: jest.fn().mockResolvedValue([candidate('OPENVERSE')]),
+      };
+      const wikimedia = { search: jest.fn() };
+      const chain = new ImageSearchProviderChain(
+        pixabay as any,
+        openverse as any,
+        wikimedia as any,
+      );
+      const result = await chain.searchWithDiagnostics('people greeting');
+      expect(result.candidates).toEqual([candidate('OPENVERSE')]);
+      expect(result.attempted).toEqual([
+        { provider: 'OPENVERSE', outcome: 'OK' },
+      ]);
+      expect(wikimedia.search).not.toHaveBeenCalled();
+      expect(pixabay.search).not.toHaveBeenCalled();
+    });
+
+    it('Openverse empty falls through to Wikimedia', async () => {
+      const openverse = { search: jest.fn().mockResolvedValue([]) };
+      const pixabay = { search: jest.fn() };
+      const wikimedia = {
+        search: jest.fn().mockResolvedValue([candidate('WIKIMEDIA_COMMONS')]),
+      };
+      const chain = new ImageSearchProviderChain(
+        pixabay as any,
+        openverse as any,
+        wikimedia as any,
+      );
+      const result = await chain.searchWithDiagnostics('people greeting');
+      expect(result.candidates).toEqual([candidate('WIKIMEDIA_COMMONS')]);
+      expect(pixabay.search).not.toHaveBeenCalled();
+    });
+
+    it('Openverse unavailable falls through to Wikimedia', async () => {
+      const openverse = {
+        search: jest
+          .fn()
+          .mockRejectedValue(
+            withImageSearchErrorCode(
+              new ServiceUnavailableException('x'),
+              'PROVIDER_TIMEOUT',
+            ),
+          ),
+      };
+      const pixabay = { search: jest.fn() };
+      const wikimedia = {
+        search: jest.fn().mockResolvedValue([candidate('WIKIMEDIA_COMMONS')]),
+      };
+      const chain = new ImageSearchProviderChain(
+        pixabay as any,
+        openverse as any,
+        wikimedia as any,
+      );
+      const result = await chain.searchWithDiagnostics('people greeting');
+      expect(result.candidates).toEqual([candidate('WIKIMEDIA_COMMONS')]);
+      expect(pixabay.search).not.toHaveBeenCalled();
+    });
+
+    it('Pixabay is tried last and only when healthy — a PROVIDER_BLOCKED classification skips it on the very next search (generic cooldown, not just the legacy Pixabay-only flag)', async () => {
+      const openverse = {
+        search: jest
+          .fn()
+          .mockRejectedValue(
+            withImageSearchErrorCode(
+              new ServiceUnavailableException('x'),
+              'PROVIDER_TRANSIENT',
+            ),
+          ),
+      };
+      const pixabay = {
+        search: jest
+          .fn()
+          .mockRejectedValue(
+            withImageSearchErrorCode(
+              new ServiceUnavailableException('blocked'),
+              'PROVIDER_BLOCKED',
+            ),
+          ),
+      };
+      const chain = new ImageSearchProviderChain(
+        pixabay as any,
+        openverse as any,
+      );
+      const first = await chain.searchWithDiagnostics('people greeting');
+      expect(first.attempted).toContainEqual({
+        provider: 'PIXABAY',
+        outcome: 'PROVIDER_BLOCKED',
+      });
+      expect(pixabay.search).toHaveBeenCalledTimes(1);
+
+      // second search: Pixabay must be skipped outright (cooling down),
+      // never re-attempted just because Admin clicked search again.
+      const second = await chain.searchWithDiagnostics('people greeting');
+      expect(pixabay.search).toHaveBeenCalledTimes(1); // still 1 — not called again
+      expect(second.attempted).toContainEqual({
+        provider: 'PIXABAY',
+        outcome: 'PROVIDER_BLOCKED',
+      });
+    });
+
+    it('never throws — when every configured provider errors, returns empty candidates with every failure classified, in Openverse→Wikimedia→Pixabay order', async () => {
+      const openverse = {
+        search: jest
+          .fn()
+          .mockRejectedValue(
+            withImageSearchErrorCode(
+              new ServiceUnavailableException('x'),
+              'PROVIDER_TIMEOUT',
+            ),
+          ),
+      };
+      const pixabay = {
+        search: jest
+          .fn()
+          .mockRejectedValue(
+            withImageSearchErrorCode(
+              new ServiceUnavailableException('x'),
+              'PROVIDER_TRANSIENT',
+            ),
+          ),
+      };
+      const chain = new ImageSearchProviderChain(
+        pixabay as any,
+        openverse as any,
+      );
+      const result = await chain.searchWithDiagnostics('people greeting');
+      expect(result.candidates).toEqual([]);
+      expect(result.attempted).toEqual([
+        { provider: 'OPENVERSE', outcome: 'PROVIDER_TIMEOUT' },
+        { provider: 'PIXABAY', outcome: 'PROVIDER_TRANSIENT' },
+      ]);
+    });
+
+    it('distinguishes OK_EMPTY (provider responded, zero matches) from an error — both end with empty candidates but different attempted outcomes', async () => {
+      const pixabay = { search: jest.fn().mockResolvedValue([]) };
+      const openverse = { search: jest.fn().mockResolvedValue([]) };
+      const chain = new ImageSearchProviderChain(
+        pixabay as any,
+        openverse as any,
+      );
+      const result = await chain.searchWithDiagnostics('people greeting');
+      expect(result.candidates).toEqual([]);
+      expect(result.attempted).toEqual([
+        { provider: 'OPENVERSE', outcome: 'OK_EMPTY' },
+        { provider: 'PIXABAY', outcome: 'OK_EMPTY' },
+      ]);
+    });
+
+    it('deduplicates candidates by providerAssetId before returning', async () => {
+      const dupe = candidate('PIXABAY');
+      const pixabay = {
+        search: jest.fn().mockResolvedValue([dupe, { ...dupe }, dupe]),
+      };
+      const openverse = { search: jest.fn().mockResolvedValue([]) };
+      const chain = new ImageSearchProviderChain(
+        pixabay as any,
+        openverse as any,
+      );
+      const result = await chain.searchWithDiagnostics('people greeting');
+      expect(result.candidates).toHaveLength(1);
+    });
   });
 });

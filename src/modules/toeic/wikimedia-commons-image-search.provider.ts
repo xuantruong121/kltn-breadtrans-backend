@@ -8,6 +8,10 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { createHash } from 'crypto';
 import {
+  classifySearchHttpFailure,
+  withImageSearchErrorCode,
+} from './image-search-error';
+import {
   DownloadedImage,
   ImageSearchCandidate,
   ImageSearchProvider,
@@ -190,14 +194,28 @@ export class WikimediaCommonsImageSearchProvider implements ImageSearchProvider 
       this.logger.warn(
         `wikimedia_unavailable error=${error instanceof Error ? error.name : 'unknown'}`,
       );
-      throw new ServiceUnavailableException(
-        'Wikimedia Commons hiện không khả dụng',
+      throw withImageSearchErrorCode(
+        new ServiceUnavailableException(
+          'Wikimedia Commons hiện không khả dụng',
+        ),
+        error instanceof Error && error.name === 'AbortError'
+          ? 'PROVIDER_TIMEOUT'
+          : 'PROVIDER_TRANSIENT',
       );
     }
-    if (!response.ok)
-      throw new ServiceUnavailableException(
-        `Wikimedia Commons không khả dụng (HTTP ${response.status})`,
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => '');
+      const code = classifySearchHttpFailure(response.status, bodyText);
+      this.logger.warn(
+        `wikimedia_unavailable status=${response.status} code=${code}`,
       );
+      throw withImageSearchErrorCode(
+        new ServiceUnavailableException(
+          `Wikimedia Commons không khả dụng (HTTP ${response.status})`,
+        ),
+        code,
+      );
+    }
     const body = (await response.json()) as {
       query?: { pages?: WikimediaPage[] };
     };

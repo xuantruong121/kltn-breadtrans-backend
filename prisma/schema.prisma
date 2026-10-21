@@ -694,6 +694,10 @@ model CourseLesson {
   coverImage         String?
   order              Int                @default(0)
   status             CourseLessonStatus @default(DRAFT)
+  /// Whether this lesson must have a scored Final Check exercise before it
+  /// can pass validation/publish. Defaults to true to preserve existing
+  /// behavior; set false for practice-only lessons that don't need one.
+  requiresFinalCheck Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 

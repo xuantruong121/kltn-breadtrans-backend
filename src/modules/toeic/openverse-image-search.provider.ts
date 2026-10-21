@@ -8,6 +8,10 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { createHash } from 'crypto';
 import {
+  classifySearchHttpFailure,
+  withImageSearchErrorCode,
+} from './image-search-error';
+import {
   DownloadedImage,
   ImageSearchCandidate,
   ImageSearchProvider,
@@ -148,17 +152,26 @@ export class OpenverseImageSearchProvider implements ImageSearchProvider {
       response = await fetch(url, { signal: AbortSignal.timeout(12_000) });
     } catch (error) {
       this.logger.warn(
-        `openverse_unavailable provider=OPENVERSE queryHash=${this.queryHash(query)} retryable=true error=${error instanceof Error ? error.name : 'unknown'}`,
+        `openverse_unavailable provider=OPENVERSE queryHash=${this.queryHash(query)} error=${error instanceof Error ? error.name : 'unknown'}`,
       );
-      throw new ServiceUnavailableException('Openverse hiện không khả dụng');
+      throw withImageSearchErrorCode(
+        new ServiceUnavailableException('Openverse hiện không khả dụng'),
+        error instanceof Error && error.name === 'AbortError'
+          ? 'PROVIDER_TIMEOUT'
+          : 'PROVIDER_TRANSIENT',
+      );
     }
     if (!response.ok) {
-      const retryable = response.status === 429 || response.status >= 500;
+      const bodyText = await response.text().catch(() => '');
+      const code = classifySearchHttpFailure(response.status, bodyText);
       this.logger.warn(
-        `openverse_unavailable provider=OPENVERSE status=${response.status} queryHash=${this.queryHash(query)} retryable=${retryable}`,
+        `openverse_unavailable provider=OPENVERSE status=${response.status} code=${code} queryHash=${this.queryHash(query)}`,
       );
-      throw new ServiceUnavailableException(
-        `Openverse không khả dụng (HTTP ${response.status})`,
+      throw withImageSearchErrorCode(
+        new ServiceUnavailableException(
+          `Openverse không khả dụng (HTTP ${response.status})`,
+        ),
+        code,
       );
     }
     const body = (await response.json()) as { results?: OpenverseImage[] };
