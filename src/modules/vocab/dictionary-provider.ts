@@ -1,4 +1,8 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiCredentialManager } from '../ai/gemini/gemini-credential-manager.service';
+import {
+  AiTaskType,
+  GeminiModelRouter,
+} from '../ai/gemini/gemini-model-router';
 
 export interface ProviderDictionaryEntry {
   word: string;
@@ -24,22 +28,15 @@ export interface DictionaryProvider {
  * Activates when the HTTP provider is unavailable (network timeout / blocked).
  */
 export class AiDictionaryProvider implements DictionaryProvider {
-  private readonly apiKeys: string[];
-  private currentKeyIndex = 0;
-  private readonly modelName: string;
+  private readonly credentials: GeminiCredentialManager;
 
-  constructor() {
-    const keysStr =
-      process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
-    this.apiKeys = keysStr
-      .split(',')
-      .map((k) => k.trim())
-      .filter((k) => k.length > 0);
-    this.modelName = process.env.GEMINI_MODEL_NAME || 'gemini-2.0-flash-lite';
+  constructor(credentials?: GeminiCredentialManager) {
+    this.credentials =
+      credentials || new GeminiCredentialManager(new GeminiModelRouter());
   }
 
   hasKeys(): boolean {
-    return this.apiKeys.length > 0;
+    return this.credentials.hasCredentials();
   }
 
   async lookup(word: string): Promise<ProviderDictionaryEntry[]> {
@@ -60,72 +57,57 @@ export class AiDictionaryProvider implements DictionaryProvider {
       `- If the word doesn't exist in English, return an empty array [].\n` +
       `Return raw JSON only, no markdown fences.`;
 
-    let lastError: unknown;
-    for (
-      let attempt = 0;
-      attempt < Math.max(this.apiKeys.length, 1);
-      attempt++
-    ) {
-      const key = this.apiKeys[this.currentKeyIndex];
-      try {
-        const genAI = new GoogleGenerativeAI(key);
-        const model = genAI.getGenerativeModel({ model: this.modelName });
-        const result = await model.generateContent(prompt);
-        const raw = result.response
-          .text()
-          .trim()
-          .replace(/^```json\s*/i, '')
-          .replace(/^```\s*/i, '')
-          .replace(/```$/i, '')
-          .trim();
-        const parsed: unknown = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed
-          .filter(
-            (item): item is Record<string, unknown> =>
-              !!item && typeof item === 'object',
-          )
-          .map((item) => ({
-            word: typeof item.word === 'string' ? item.word : word,
-            partOfSpeech:
-              typeof item.partOfSpeech === 'string' ? item.partOfSpeech : null,
-            ipaUs: typeof item.ipaUs === 'string' ? item.ipaUs : null,
-            ipaUk: typeof item.ipaUk === 'string' ? item.ipaUk : null,
-            definitions: Array.isArray(item.definitions)
-              ? (item.definitions as Record<string, unknown>[]).map((def) => ({
-                  definition:
-                    typeof def.definition === 'string' ? def.definition : '',
-                  example: typeof def.example === 'string' ? def.example : null,
-                  synonyms: Array.isArray(def.synonyms)
-                    ? (def.synonyms as unknown[]).filter(
-                        (s): s is string => typeof s === 'string',
-                      )
-                    : [],
-                  antonyms: Array.isArray(def.antonyms)
-                    ? (def.antonyms as unknown[]).filter(
-                        (a): a is string => typeof a === 'string',
-                      )
-                    : [],
-                }))
-              : [],
-            audioUs: null,
-            audioUk: null,
-          }))
-          .filter((entry) => entry.definitions.length > 0);
-      } catch (e) {
-        lastError = e;
-        this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
-      }
+    try {
+      const result = await this.credentials.execute({
+        taskType: AiTaskType.TEXT_AUTHORING,
+        operation: (model) => model.generateContent(prompt),
+      });
+      const raw = result.response
+        .text()
+        .trim()
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```$/i, '')
+        .trim();
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter(
+          (item): item is Record<string, unknown> =>
+            !!item && typeof item === 'object',
+        )
+        .map((item) => ({
+          word: typeof item.word === 'string' ? item.word : word,
+          partOfSpeech:
+            typeof item.partOfSpeech === 'string' ? item.partOfSpeech : null,
+          ipaUs: typeof item.ipaUs === 'string' ? item.ipaUs : null,
+          ipaUk: typeof item.ipaUk === 'string' ? item.ipaUk : null,
+          definitions: Array.isArray(item.definitions)
+            ? (item.definitions as Record<string, unknown>[]).map((def) => ({
+                definition:
+                  typeof def.definition === 'string' ? def.definition : '',
+                example: typeof def.example === 'string' ? def.example : null,
+                synonyms: Array.isArray(def.synonyms)
+                  ? (def.synonyms as unknown[]).filter(
+                      (s): s is string => typeof s === 'string',
+                    )
+                  : [],
+                antonyms: Array.isArray(def.antonyms)
+                  ? (def.antonyms as unknown[]).filter(
+                      (a): a is string => typeof a === 'string',
+                    )
+                  : [],
+              }))
+            : [],
+          audioUs: null,
+          audioUk: null,
+        }))
+        .filter((entry) => entry.definitions.length > 0);
+    } catch (error) {
+      throw error instanceof Error
+        ? error
+        : new Error(`AiDictionaryProvider error: ${String(error)}`);
     }
-
-    if (lastError instanceof Error) {
-      throw lastError;
-    }
-    throw new Error(
-      lastError
-        ? `AiDictionaryProvider error: ${String(lastError)}`
-        : 'AiDictionaryProvider: all API keys failed',
-    );
   }
 }
 

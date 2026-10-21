@@ -217,6 +217,8 @@ model User {
   rejectedPlanPayments            PlanPayment[]                    @relation("PlanPaymentRejecter")
   issueReportsSubmitted           IssueReport[]                    @relation("IssueReporter")
   issueReportsAssigned            IssueReport[]                    @relation("IssueAssignee")
+  suggestionsSubmitted            Suggestion[]                     @relation("SuggestionSubmitter")
+  suggestionsResponded            Suggestion[]                     @relation("SuggestionResponder")
   banhTransactions                BanhTransaction[]
   dailyBanhEarnings               DailyBanhEarning[]
   vocabMasteryRewards             UserVocabMasteryReward[]
@@ -2341,6 +2343,28 @@ enum IssueReportStatus {
   DUPLICATE
 }
 
+enum SuggestionCategory {
+  FEATURE
+  CONTENT
+  UI
+  BUG
+  OTHER
+}
+
+enum SuggestionStatus {
+  PENDING
+  REVIEWING
+  RESPONDED
+  RESOLVED
+  REJECTED
+}
+
+enum SuggestionAttachmentType {
+  IMAGE
+  FILE
+  LINK
+}
+
 model SupportConversation {
   id            Int         @id @default(autoincrement())
   studentId     Int         @unique
@@ -2419,6 +2443,37 @@ model IssueReport {
   @@index([status, createdAt])
   @@index([area, category])
   @@index([reporterId, createdAt])
+}
+
+model Suggestion {
+  id              Int              @id @default(autoincrement())
+  userId          Int
+  user            User             @relation("SuggestionSubmitter", fields: [userId], references: [id], onDelete: Cascade)
+  category        SuggestionCategory
+  content         String           @db.Text
+  status          SuggestionStatus @default(PENDING)
+  adminResponse   String?          @db.Text
+  respondedAt     DateTime?
+  respondedById   Int?
+  respondedBy     User?            @relation("SuggestionResponder", fields: [respondedById], references: [id], onDelete: SetNull)
+  attachments     SuggestionAttachment[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model SuggestionAttachment {
+  id           Int                      @id @default(autoincrement())
+  suggestionId Int
+  suggestion   Suggestion               @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  type         SuggestionAttachmentType
+  name         String
+  url          String                   @db.Text
+  createdAt    DateTime                 @default(now())
+
+  @@index([suggestionId])
 }
 
 // ==========================================

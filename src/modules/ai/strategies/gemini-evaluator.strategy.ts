@@ -1,12 +1,8 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import { GenerativeModel, SchemaType } from '@google/generative-ai';
 import { createHash } from 'crypto';
-import {
-  GoogleGenerativeAI,
-  GenerativeModel,
-  SchemaType,
-} from '@google/generative-ai';
 import {
   IAIEvaluator,
   PronunciationFeedback,
@@ -38,25 +34,17 @@ import {
   ToeicPart1QuestionCandidate,
 } from './ai-evaluator.interface';
 import {
+  GeminiCredentialManager,
+  redactGeminiError,
+} from '../gemini/gemini-credential-manager.service';
+import { AiTaskType, GeminiModelRouter } from '../gemini/gemini-model-router';
+import {
   SPEAKING_SET_LEVELS,
   SPEAKING_EXERCISE_DIFFICULTIES,
   SPEAKING_TASK_TYPES,
 } from '../../speaking/speaking-contract';
 
-export function parseGeminiApiKeys(
-  primaryValue?: string,
-  fallbackValue?: string,
-): string[] {
-  const rawValue = primaryValue?.trim() ? primaryValue : fallbackValue || '';
-  return Array.from(
-    new Set(
-      rawValue
-        .split(/[,\r\n]+/)
-        .map((key) => key.trim())
-        .filter(Boolean),
-    ),
-  );
-}
+export { parseGeminiApiKeys } from '../gemini/gemini-credential-manager.service';
 
 export function extractGeminiImage(result: unknown): {
   buffer: Buffer;
@@ -88,38 +76,29 @@ export function extractGeminiImage(result: unknown): {
 @Injectable()
 export class GeminiEvaluatorStrategy implements IAIEvaluator {
   private readonly logger = new Logger(GeminiEvaluatorStrategy.name);
-  private apiKeys: string[] = [];
-  private currentKeyIndex = 0;
+  private readonly credentials: GeminiCredentialManager;
 
-  constructor(@Optional() @InjectRedis() private readonly redis?: Redis) {
-    this.apiKeys = parseGeminiApiKeys(
-      process.env.GEMINI_API_KEYS,
-      process.env.GEMINI_API_KEY,
-    );
+  constructor(
+    @Optional() @InjectRedis() private readonly redis?: Redis,
+    @Optional() router?: GeminiModelRouter,
+    @Optional() credentials?: GeminiCredentialManager,
+  ) {
+    const resolvedRouter = router || new GeminiModelRouter();
+    this.credentials =
+      credentials || new GeminiCredentialManager(resolvedRouter, redis);
   }
 
   private hasKeys(): boolean {
-    return this.apiKeys.length > 0;
-  }
-
-  private getModelName(): string {
-    return process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite';
-  }
-
-  private getVisionModelName(): string {
-    return process.env.GEMINI_VISION_MODEL || this.getModelName();
-  }
-
-  private getImageModelName(): string {
-    return process.env.GEMINI_IMAGE_MODEL_NAME || 'gemini-3.1-flash-lite-image';
+    return this.credentials.hasCredentials();
   }
 
   private getCacheKey(prefix: string, ...args: any[]): string {
     const raw = args
-      .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a ?? '')))
+      .map((value) =>
+        typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''),
+      )
       .join('::');
-    const hash = createHash('md5').update(raw).digest('hex');
-    return `gemini:${prefix}:${hash}`;
+    return `gemini:${prefix}:${createHash('md5').update(raw).digest('hex')}`;
   }
 
   private async getCachedOrGenerate<T>(
@@ -162,28 +141,14 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private async recordUsage(metadata?: {
+  private recordUsage(metadata?: {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
   }): Promise<void> {
-    if (!this.redis) return;
-    try {
-      await this.redis.incr('gemini:telemetry:total_requests');
-      if (metadata?.promptTokenCount) {
-        await this.redis.incrby(
-          'gemini:telemetry:input_tokens',
-          metadata.promptTokenCount,
-        );
-      }
-      if (metadata?.candidatesTokenCount) {
-        await this.redis.incrby(
-          'gemini:telemetry:output_tokens',
-          metadata.candidatesTokenCount,
-        );
-      }
-    } catch (err) {
-      this.logger.warn(`Failed to record Gemini telemetry: ${err}`);
-    }
+    // Telemetry is recorded once by GeminiCredentialManager, which knows the
+    // selected task, model and non-secret credential fingerprint.
+    void metadata;
+    return Promise.resolve();
   }
 
   async enrichDictionaryEntry(
@@ -246,50 +211,9 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
 
   private async executeWithRotation<T>(
     operation: (model: GenerativeModel) => Promise<T>,
-    modelName = this.getModelName(),
+    taskType = AiTaskType.TEXT_AUTHORING,
   ): Promise<T> {
-    if (!this.hasKeys()) {
-      throw new Error('Thiếu GEMINI_API_KEYS');
-    }
-
-    let attempts = 0;
-    const maxAttempts = Math.max(this.apiKeys.length * 3, 3);
-    const retryDelays = [2000, 4000, 8000];
-
-    while (attempts < maxAttempts) {
-      const currentKey = this.apiKeys[this.currentKeyIndex];
-      const genAI = new GoogleGenerativeAI(currentKey);
-      const model = genAI.getGenerativeModel({ model: modelName });
-
-      try {
-        return await operation(model);
-      } catch (e: any) {
-        const errMsg = String(e?.message || '');
-        const isRateLimit =
-          e?.status === 429 ||
-          errMsg.includes('429') ||
-          errMsg.includes('Too Many Requests') ||
-          errMsg.includes('Quota') ||
-          errMsg.includes('RESOURCE_EXHAUSTED');
-
-        if (isRateLimit) {
-          const delay = retryDelays[Math.min(attempts, retryDelays.length - 1)];
-          this.logger.warn(
-            `Gemini API Key index ${this.currentKeyIndex} hit rate limit (429). Rotating key and waiting ${delay}ms before retry ${attempts + 1}/${maxAttempts}...`,
-          );
-          this.currentKeyIndex =
-            (this.currentKeyIndex + 1) % this.apiKeys.length;
-          attempts++;
-          await this.sleep(delay);
-        } else {
-          throw e;
-        }
-      }
-    }
-
-    throw new Error(
-      'Tất cả Gemini API keys đều đã hết hạn mức (429 Too Many Requests). Vui lòng thử lại sau.',
-    );
+    return this.credentials.execute({ taskType, operation });
   }
 
   async generateFeedback(
@@ -1036,6 +960,113 @@ RULES: Return exactly the specified groups and question counts. Every question h
     return parsed;
   }
 
+  async validateImageSemantic(input: {
+    taskType: 'TOEIC_PART1' | 'SPEAKING_DESCRIBE_PICTURE' | 'WRITING_PICTURE';
+    imageBuffer: Buffer;
+    mimeType: string;
+    imageBrief: string;
+    context?: string;
+  }) {
+    if (!this.hasKeys()) {
+      return {
+        status: 'UNAVAILABLE' as const,
+        confidence: 0,
+        description: 'Gemini chưa được cấu hình.',
+        visibleFacts: [],
+        issues: [],
+        rejectionReasons: [],
+      };
+    }
+    const schema: any = {
+      type: SchemaType.OBJECT,
+      properties: {
+        status: {
+          type: SchemaType.STRING,
+          enum: ['PASS', 'FAIL', 'LOW_CONFIDENCE'],
+        },
+        confidence: { type: SchemaType.NUMBER },
+        description: { type: SchemaType.STRING },
+        visibleFacts: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+        },
+        issues: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+        rejectionReasons: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+        },
+      },
+      required: [
+        'status',
+        'confidence',
+        'description',
+        'visibleFacts',
+        'issues',
+        'rejectionReasons',
+      ],
+    };
+    try {
+      const result = await this.executeWithRotation(
+        (model) =>
+          model.generateContent({
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    text: `Assess whether this image is semantically suitable for ${input.taskType}. Required image brief: ${input.imageBrief.slice(0, 1200)}. Context: ${(input.context || '').slice(0, 800)}. Use visible facts only. PASS only when the image clearly supports the brief; FAIL when it clearly conflicts, is text-heavy, unsafe, branded, abstract or ambiguous; LOW_CONFIDENCE when a human should decide. Do not infer identities, intentions, relationships or off-image facts.`,
+                  },
+                  {
+                    inlineData: {
+                      data: input.imageBuffer.toString('base64'),
+                      mimeType: input.mimeType,
+                    },
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: schema,
+              temperature: 0.1,
+            },
+          }),
+        AiTaskType.IMAGE_SEMANTIC_VALIDATION,
+      );
+      await this.recordUsage((result as any).response?.usageMetadata);
+      const parsed = JSON.parse((result as any).response.text().trim());
+      if (!['PASS', 'FAIL', 'LOW_CONFIDENCE'].includes(parsed?.status))
+        throw new Error('invalid semantic status');
+      return {
+        status: parsed.status as 'PASS' | 'FAIL' | 'LOW_CONFIDENCE',
+        confidence: Math.max(0, Math.min(1, Number(parsed.confidence) || 0)),
+        description: String(parsed.description || '').slice(0, 800),
+        visibleFacts: Array.isArray(parsed.visibleFacts)
+          ? parsed.visibleFacts.map(String).slice(0, 8)
+          : [],
+        issues: Array.isArray(parsed.issues)
+          ? parsed.issues.map(String).slice(0, 8)
+          : [],
+        rejectionReasons: Array.isArray(parsed.rejectionReasons)
+          ? parsed.rejectionReasons.map(String).slice(0, 8)
+          : [],
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Gemini semantic image validation unavailable: ${redactGeminiError((error as Error)?.message)}`,
+      );
+      return {
+        status: 'UNAVAILABLE' as const,
+        confidence: 0,
+        description:
+          'Không thể xác nhận ảnh tự động. Vui lòng kiểm tra thủ công.',
+        visibleFacts: [],
+        issues: [],
+        rejectionReasons: [],
+      };
+    }
+  }
+
   async analyzeToeicPart1Candidates(input: {
     candidates: Array<{
       candidateId: string;
@@ -1101,7 +1132,7 @@ Use only visible facts. Reject images that are blurry, abstract, text-heavy, bra
             temperature: 0.1,
           },
         }),
-      this.getVisionModelName(),
+      AiTaskType.IMAGE_SEMANTIC_VALIDATION,
     );
     await this.recordUsage(result.response?.usageMetadata);
     const parsed = JSON.parse(
@@ -1178,7 +1209,7 @@ Use only visible facts. Reject images that are blurry, abstract, text-heavy, bra
             temperature: 0.25,
           },
         }),
-      this.getVisionModelName(),
+      AiTaskType.IMAGE_TO_CONTENT,
     );
     await this.recordUsage(result.response?.usageMetadata);
     const parsed = JSON.parse(
@@ -1312,7 +1343,7 @@ Use learner-visible English only.`;
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: { responseModalities: ['IMAGE'] },
         }),
-      this.getImageModelName(),
+      AiTaskType.IMAGE_GENERATION,
     );
     return extractGeminiImage(result);
   }
@@ -1490,8 +1521,9 @@ Use learner-visible English only.`;
         },
       };
 
-      const result = await this.executeWithRotation((m) =>
-        m.generateContent([prompt, imagePart]),
+      const result = await this.executeWithRotation(
+        (m) => m.generateContent([prompt, imagePart]),
+        AiTaskType.WRITING_PICTURE_EVALUATION,
       );
       const response = result.response;
       let text = response.text().trim();
@@ -1503,7 +1535,7 @@ Use learner-visible English only.`;
       return JSON.parse(text);
     } catch (error: any) {
       this.logger.error(
-        `Error evaluating writing part 1: ${error.message}`,
+        `Error evaluating writing part 1: ${redactGeminiError(error.message)}`,
         error.stack,
       );
       throw new Error('Lỗi khi chấm điểm Writing Part 1');

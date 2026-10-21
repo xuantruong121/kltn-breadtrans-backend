@@ -34,6 +34,7 @@ import { TOEIC_SPEAKING_TASK_SEQUENCE } from '../speaking/toeic-speaking-contrac
 import { TOEIC_WRITING_SLOT_CONTRACT } from '../writing/toeic-writing-set.contract';
 import { ImageSearchCandidate } from './pixabay-image-search.provider';
 import { ImageSearchProviderChain } from './image-search.provider-chain';
+import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
 import type {
   ToeicPart1CandidateAnalysis,
   ToeicPart1QuestionCandidate,
@@ -320,7 +321,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             parts: {},
           },
           provider: 'GEMINI',
-          model: process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-lite',
+          model: process.env.GEMINI_MODEL_NAME || DEFAULT_GEMINI_TEXT_MODEL,
           generatorVersion: 'toeic-ai-exam-v1',
           promptVersion: 'toeic-practice-original-v1',
         },

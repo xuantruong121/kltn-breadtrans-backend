@@ -36,6 +36,26 @@ export class AdminSupportController {
     return this.supportService.getAdminConversations(query);
   }
 
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Đếm tin nhắn học viên chưa đọc cho quản trị viên' })
+  getUnreadCount() {
+    return this.supportService.getAdminUnreadCount();
+  }
+
+  @Get('learners')
+  @ApiOperation({ summary: 'Tìm học viên để bắt đầu cuộc trò chuyện hỗ trợ' })
+  searchLearners(@Query('search') search?: string) {
+    return this.supportService.searchLearners(search);
+  }
+
+  @Post('conversations/start/:studentId')
+  @ApiOperation({
+    summary: 'Admin mở hoặc lấy cuộc trò chuyện hỗ trợ của học viên',
+  })
+  startConversation(@Param('studentId', ParseIntPipe) studentId: number) {
+    return this.supportService.startAdminConversation(studentId);
+  }
+
   @Get('conversations/:id')
   @ApiOperation({ summary: 'Admin lấy chi tiết một cuộc hội thoại' })
   getConversation(@Param('id', ParseIntPipe) id: number) {

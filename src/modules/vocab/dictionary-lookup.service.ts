@@ -9,6 +9,7 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { GeminiCredentialManager } from '../ai/gemini/gemini-credential-manager.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
   AiDictionaryProvider,
@@ -92,7 +93,10 @@ export class DictionaryLookupService {
     @Optional() @InjectRedis() private readonly redis?: Redis,
     @Optional() private readonly aiService?: AiService,
     @Optional() private readonly subscriptionService?: SubscriptionService,
-  ) {}
+    @Optional() credentials?: GeminiCredentialManager,
+  ) {
+    this.aiProvider = new AiDictionaryProvider(credentials);
+  }
 
   private async fetchFromProviders(
     query: string,
