@@ -11,15 +11,12 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
-  Optional,
 } from '@nestjs/common';
 import { CourseService } from './course.service';
 import {
   CreateCourseDto,
   UpdateCourseDto,
   ReviewCourseDto,
-  CreateClassDto,
-  UpdateClassDto,
   CreateLessonDto,
   UpdateLessonDto,
   ReorderLessonsDto,
@@ -34,7 +31,6 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, CourseStatus } from '@prisma/client';
-import { PayosPaymentService } from '../payment/payos-payment.service';
 import { CourseLearningV5Service } from './course-v5.service';
 import { SubmitCourseLessonExerciseDto } from './course-v5.dto';
 
@@ -44,7 +40,6 @@ export class CourseController {
   constructor(
     private readonly courseService: CourseService,
     private readonly courseLearningV5Service: CourseLearningV5Service,
-    @Optional() private readonly payos?: PayosPaymentService,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -119,28 +114,6 @@ export class CourseController {
   @ApiOperation({ summary: 'Lấy danh sách khóa học hệ thống (Admin)' })
   getMyCourses(@Request() req: any) {
     return this.courseService.getAllCourses(req.user.id, req.user.role);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Get('classes')
-  @ApiOperation({ summary: 'Lấy danh sách các gói học/lớp của người dùng' })
-  getUserClasses(@Request() req: any) {
-    return this.courseService.getUserClasses(req.user.id, req.user.role);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
-  @Get(':courseId/my-enrollments')
-  @Roles(Role.STUDENT)
-  @ApiOperation({
-    summary: 'Lấy trạng thái ghi danh của học viên trong các lớp của khóa học',
-  })
-  getMyEnrollmentsInCourse(
-    @Param('courseId', ParseIntPipe) courseId: number,
-    @Request() req: any,
-  ) {
-    return this.courseService.getMyEnrollmentsInCourse(courseId, req.user.id);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -283,91 +256,6 @@ export class CourseController {
   })
   deleteCourse(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.courseService.deleteCourse(id, req.user);
-  }
-
-  // ================= CLASSES =================
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
-  @Post(':courseId/classes')
-  @Roles(Role.ADMIN)
-  @ApiOperation({
-    summary:
-      'Tạo gói học mới cho khóa học (Bắt buộc Course PUBLISHED, Admin quản lý)',
-  })
-  createClass(
-    @Param('courseId', ParseIntPipe) courseId: number,
-    @Body() dto: CreateClassDto,
-    @Request() req: any,
-  ) {
-    return this.courseService.createClass(courseId, req.user, dto);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
-  @Patch('classes/:classId')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Cập nhật thông tin gói học (Admin)' })
-  updateClass(
-    @Param('classId', ParseIntPipe) classId: number,
-    @Body() dto: UpdateClassDto,
-    @Request() req: any,
-  ) {
-    return this.courseService.updateClass(classId, req.user, dto);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
-  @Delete('classes/:classId')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Xóa gói học (Admin)' })
-  deleteClass(
-    @Param('classId', ParseIntPipe) classId: number,
-    @Request() req: any,
-  ) {
-    return this.courseService.deleteClass(classId, req.user);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
-  @Post('classes/:classId/enroll')
-  @Roles(Role.STUDENT)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Học viên ghi danh vào lớp học (Kiểm tra trạng thái & capacity)',
-  })
-  async enrollInClass(
-    @Param('classId', ParseIntPipe) classId: number,
-    @Request() req: any,
-  ) {
-    const result = await this.courseService.enrollInClass(classId, req.user.id);
-    if (this.payos && result.status === 'PENDING_PAYMENT') {
-      try {
-        const paymentIntent = await this.payos.createForCoursePayment(
-          req.user.id,
-          result.enrollmentId,
-          `Course class ${classId}`,
-        );
-        return { ...result, payos: paymentIntent };
-      } catch {
-        return result;
-      }
-    }
-    return result;
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Get('classes/:classId')
-  @ApiOperation({ summary: 'Lấy chi tiết lớp học (chứa Lessons và Materials)' })
-  getClassById(
-    @Param('classId', ParseIntPipe) classId: number,
-    @Request() req: any,
-  ) {
-    return this.courseService.getClassById(
-      classId,
-      req.user?.id,
-      req.user?.role,
-    );
   }
 
   // ================= LESSONS & MATERIALS =================

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -6,6 +7,7 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  Query,
   UseGuards,
   Request,
   Headers,
@@ -57,6 +59,11 @@ export class MarketController {
     @Body() dto: CreateMarketOrderDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
+    if (!idempotencyKey?.trim()) {
+      throw new BadRequestException(
+        'Thiếu header Idempotency-Key. Client phải sinh một UUID cho mỗi lần bấm đổi quà và gửi lại đúng UUID đó khi thử lại.',
+      );
+    }
     return this.marketService.createOrder(req.user.id, dto, idempotencyKey);
   }
 
@@ -110,5 +117,110 @@ export class MarketController {
   @ApiOperation({ summary: '[Admin] Cộng/trừ Bánh Mì thủ công cho học viên' })
   adjustCurrency(@Body() dto: AdjustCurrencyDto, @Request() req: any) {
     return this.marketService.adjustCurrency(dto, req.user.email || 'Admin');
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Patch('orders/:id/mark-fulfillment-failed')
+  @ApiOperation({
+    summary:
+      '[Admin] Đánh dấu một đơn ĐÃ DUYỆT nhưng giao/thực hiện thất bại — hoàn Bánh Mì + tồn kho',
+  })
+  markFulfillmentFailed(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('reason') reason: string,
+    @Request() req: any,
+  ) {
+    if (!reason?.trim()) {
+      throw new BadRequestException(
+        'Vui lòng nhập lý do giao/thực hiện thất bại',
+      );
+    }
+    return this.marketService.markFulfillmentFailed(
+      id,
+      reason.trim(),
+      req.user.email || 'Admin',
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Get('reconciliation')
+  @ApiOperation({
+    summary:
+      '[Admin, read-only] Đối soát UserStats.totalBanhRan so với SUM(BanhTransaction.amount) từng học viên',
+  })
+  getReconciliationReport() {
+    return this.marketService.getReconciliationReport();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Post('reconciliation/correct')
+  @ApiOperation({
+    summary:
+      '[Admin] Chạy đúng 1 lần đối soát lịch sử cho danh sách userId được chỉ định — chỉ ghi thêm 1 dòng BanhTransaction bù trừ, KHÔNG đổi UserStats.totalBanhRan. An toàn khi gọi lại (idempotent).',
+  })
+  runLegacyReconciliation(@Body('userIds') userIds: number[]) {
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      throw new BadRequestException(
+        'Vui lòng chỉ định danh sách userId cần đối soát',
+      );
+    }
+    return this.marketService.runLegacyReconciliation(userIds);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Get('ledger/summary')
+  @ApiOperation({
+    summary:
+      '[Admin] Tổng quan Sổ Bánh Mì: tổng số dư, tổng đã phát hành, tổng đã sử dụng',
+  })
+  getLedgerSummary() {
+    return this.marketService.getLedgerSummary();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Get('ledger')
+  @ApiOperation({
+    summary: '[Admin] Danh sách giao dịch Bánh Mì (BanhTransaction) có lọc',
+  })
+  listLedgerTransactions(
+    @Query('userId') userId?: string,
+    @Query('direction') direction?: 'earning' | 'spending',
+    @Query('source') source?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.marketService.listLedgerTransactions({
+      userId: userId ? Number(userId) : undefined,
+      direction,
+      source,
+      dateFrom,
+      dateTo,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Get('ledger/user/:userId')
+  @ApiOperation({
+    summary:
+      '[Admin] Lịch sử Bánh Mì đầy đủ của 1 học viên (từ BanhTransaction, không phải sổ cũ)',
+  })
+  getUserLedgerHistory(@Param('userId', ParseIntPipe) userId: number) {
+    return this.marketService.getUserLedgerHistory(userId);
   }
 }

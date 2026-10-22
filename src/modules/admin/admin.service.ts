@@ -12,7 +12,7 @@ import {
   CourseLessonAttemptStatus,
   CourseLessonStatus,
   EnrollmentStatus,
-  PaymentStatus,
+  PlanPaymentStatus,
   SuggestionStatus,
   IssueReportStatus,
   TopicCategory,
@@ -172,10 +172,10 @@ export class AdminService {
       this.prisma.enrollment.count({
         where: { status: EnrollmentStatus.ACTIVE },
       }),
-      this.prisma.payment.count({
+      this.prisma.planPayment.count({
         where: {
           status: {
-            in: [PaymentStatus.REPORTED, PaymentStatus.REVIEW_REQUIRED],
+            in: [PlanPaymentStatus.REPORTED, PlanPaymentStatus.REVIEW_REQUIRED],
           },
         },
       }),

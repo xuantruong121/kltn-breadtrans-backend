@@ -1571,7 +1571,7 @@ model MarketOrder {
   items               Json // Array of item objects
   totalK              Float
   totalBanh           Int // Integer Bánh Mì units
-  status              String                     @default("pending") // "pending" | "approved" | "rejected"
+  status              String                     @default("pending") // "pending" | "approved" | "rejected" | "completed" | "refunded" (refunded = approved/completed order whose fulfillment later failed; see MarketService.markFulfillmentFailed)
   bankSnapshot        Json?
   createdAt           DateTime                   @default(now())
   paidAtCheckout      Boolean?
@@ -2506,7 +2506,7 @@ model BanhTransaction {
   userId       Int
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   amount       Int // Positive = credit, Negative = debit
-  source       String // VOCAB_MASTERY | QUIZ_FIRST_COMPLETION | QUIZ_RETAKE | TOEIC_COMPLETION | TOEIC_PRACTICE | SPEAKING_SUBMISSION | GRAMMAR_COMPLETION | ASSIGNMENT_COMPLETION | DAILY_QUEST | PET_FEED | MARKET_PURCHASE | MARKET_REFUND | ADMIN_ADJUSTMENT | ARENA_WIN | GAME_REWARD | CONTENT_COMPLETION
+  source       String // VOCAB_MASTERY | QUIZ_FIRST_COMPLETION | QUIZ_RETAKE | TOEIC_COMPLETION | TOEIC_PRACTICE | SPEAKING_SUBMISSION | GRAMMAR_COMPLETION | ASSIGNMENT_COMPLETION | DAILY_QUEST | PET_FEED | MARKET_PURCHASE | MARKET_REFUND | ADMIN_ADJUSTMENT | ARENA_WIN | ARENA_STAKE | ARENA_REFUND | GAME_REWARD | CONTENT_COMPLETION | DIAGNOSTIC_COMPLETION | SEED_FIXTURE (dev/demo seed opening balances only — never written by runtime code) | LEGACY_RECONCILIATION (one-time compensating entry that reconciles the ledger to a pre-existing UserStats.totalBanhRan without ever changing that balance — see GamificationService.appendLegacyReconciliationEntry)
   reference    String? // Unique idempotency key (e.g. "quiz:42", "vocab:word:7", "quest:1:2026-09-15")
   dateKey      String // "YYYY-MM-DD" in Asia/Ho_Chi_Minh at time of transaction
   isCapped     Boolean  @default(true) // false = exempt from daily cap (admin, refund, system)

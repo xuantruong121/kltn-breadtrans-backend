@@ -23,6 +23,7 @@ import {
   validateQuestionBank,
 } from './diagnostic.logic';
 import { buildCourseCurriculum } from '../course/course-curriculum';
+import { GamificationService } from '../gamification/gamification.service';
 
 type AnswerMap = Record<string, unknown>;
 
@@ -31,7 +32,10 @@ const SPEAKING_FINALIZATION_POLL_MS = 250;
 
 @Injectable()
 export class DiagnosticService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gamificationService: GamificationService,
+  ) {}
 
   private assertQuestionBank(questions: DiagnosticQuestionForScoring[]) {
     const defects = validateQuestionBank(questions);
@@ -907,27 +911,21 @@ export class DiagnosticService {
         },
       });
       if (previousAttempts === 0) {
-        const updatedStats = await tx.userStats.upsert({
-          where: { userId },
-          update: { totalBanhRan: { increment: 50 } },
-          create: { userId, totalBanhRan: 50 },
-        });
-        await tx.banhTransaction.create({
-          data: {
-            userId,
-            amount: 50,
-            source: 'DIAGNOSTIC_COMPLETION',
-            reference: `diagnostic:assessment:${assessmentId}:first`,
-            dateKey: this.getVietnamDateKey(),
-            isCapped: false,
-            balanceAfter: updatedStats.totalBanhRan,
+        await this.gamificationService.awardBanh(
+          userId,
+          50,
+          'DIAGNOSTIC_COMPLETION',
+          `diagnostic:assessment:${assessmentId}:first`,
+          {
+            isCapped: true,
             metadata: {
               assessmentId,
               attemptId: created.id,
               rewardType: 'DIAGNOSTIC_FIRST_COMPLETION',
-            } as any,
+            },
           },
-        });
+          tx,
+        );
       }
       return created;
     });

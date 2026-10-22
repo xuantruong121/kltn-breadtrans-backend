@@ -357,6 +357,81 @@ export class GamificationService {
   static readonly MAX_DAILY_SPEAKING_REWARDS = 3;
 
   /**
+   * One-time, idempotent ledger-only correction for a user whose
+   * UserStats.totalBanhRan predates the ledger being complete (confirmed
+   * legacy seed behavior — never a runtime bug in awardBanh/deductBanh).
+   * Unlike awardBanh/deductBanh, this NEVER touches totalBanhRan — it only
+   * appends one BanhTransaction row so SUM(amount) catches up to the
+   * balance that is already being shown to the user. `balanceAfter` is a
+   * snapshot of the CURRENT (unchanged) balance, not a post-increment value.
+   * Safe to call repeatedly: the (userId, source, reference) pre-check makes
+   * a second call for the same user a no-op, exactly like awardBanh.
+   */
+  async appendLegacyReconciliationEntry(
+    userId: number,
+    delta: number,
+    reason: string,
+  ): Promise<{
+    applied: boolean;
+    alreadyApplied: boolean;
+    balanceAfter: number;
+  }> {
+    if (delta === 0) {
+      const stats = await this.prisma.userStats.findUnique({
+        where: { userId },
+      });
+      return {
+        applied: false,
+        alreadyApplied: false,
+        balanceAfter: stats?.totalBanhRan ?? 0,
+      };
+    }
+
+    const source = 'LEGACY_RECONCILIATION';
+    const reference = `legacy-reconciliation:${userId}:v1`;
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`legacy_reconciliation:${userId}:${reference}`}))`;
+
+      const existing = await tx.banhTransaction.findUnique({
+        where: { userId_source_reference: { userId, source, reference } },
+      });
+      const stats = await tx.userStats.findUnique({ where: { userId } });
+      if (existing) {
+        return {
+          applied: false,
+          alreadyApplied: true,
+          balanceAfter: stats?.totalBanhRan ?? 0,
+        };
+      }
+
+      await tx.banhTransaction.create({
+        data: {
+          userId,
+          amount: delta,
+          source,
+          reference,
+          dateKey: today,
+          isCapped: false,
+          balanceAfter: stats?.totalBanhRan ?? 0,
+          metadata: { reason },
+        },
+      });
+
+      this.logger.log(
+        `[appendLegacyReconciliationEntry] user=${userId} delta=${delta} balanceAfter=${stats?.totalBanhRan ?? 0} (totalBanhRan unchanged)`,
+      );
+
+      return {
+        applied: true,
+        alreadyApplied: false,
+        balanceAfter: stats?.totalBanhRan ?? 0,
+      };
+    });
+  }
+
+  /**
    * Awards Bánh Mì to a user.
    * - Checks idempotency: (userId, source, reference) must be unique in BanhTransaction.
    * - Enforces MAX_DAILY_EARNABLE_BANH cap atomically using row lock & advisory lock.
@@ -818,7 +893,13 @@ export class GamificationService {
 
   /**
    * Deducts Bánh Mì from a user's wallet atomically.
-   * Uses CAS (compare-and-swap via conditional updateMany) to prevent overdraft.
+   * - Idempotency: (userId, source, reference) must be unique in BanhTransaction —
+   *   mirrors awardBanh's pre-check-under-advisory-lock pattern, so a retried/
+   *   double-clicked deduction with the same reference is a safe no-op instead
+   *   of double-spending or throwing a raw P2002.
+   * - Uses CAS (compare-and-swap via conditional updateMany) to prevent overdraft.
+   * - Pass `externalTx` to join a caller-owned transaction (e.g. market order
+   *   checkout) instead of opening a nested one.
    */
   async deductBanh(
     userId: number,
@@ -827,10 +908,32 @@ export class GamificationService {
     source: string,
     reference: string | null = null,
     options: { metadata?: Record<string, unknown> } = {},
-  ): Promise<{ success: boolean; newBalance: number; message?: string }> {
+    externalTx?: Prisma.TransactionClient,
+  ): Promise<{
+    success: boolean;
+    newBalance: number;
+    message?: string;
+    alreadyApplied?: boolean;
+  }> {
     const today = getTodayDateKey('Asia/Ho_Chi_Minh');
 
-    return this.prisma.$transaction(async (tx) => {
+    const run = async (tx: Prisma.TransactionClient) => {
+      if (reference !== null) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`deduct_banh:${userId}:${source}:${reference}`}))`;
+
+        const existing = await tx.banhTransaction.findUnique({
+          where: { userId_source_reference: { userId, source, reference } },
+        });
+        if (existing) {
+          const stats = await tx.userStats.findUnique({ where: { userId } });
+          return {
+            success: true,
+            newBalance: stats?.totalBanhRan ?? 0,
+            alreadyApplied: true,
+          };
+        }
+      }
+
       // Atomic CAS: only deduct if balance is sufficient
       const cas = await tx.userStats.updateMany({
         where: { userId, totalBanhRan: { gte: amount } },
@@ -862,7 +965,12 @@ export class GamificationService {
       });
 
       return { success: true, newBalance: updated?.totalBanhRan ?? 0 };
-    });
+    };
+
+    if (externalTx) {
+      return run(externalTx);
+    }
+    return this.prisma.$transaction(run);
   }
 
   /**

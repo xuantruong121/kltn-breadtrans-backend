@@ -6,9 +6,10 @@ import { DiagnosticSpeakingService } from './diagnostic-speaking.service';
 import { AiModule } from '../ai/ai.module';
 import { UploadModule } from '../upload/upload.module';
 import { DiagnosticSpeakingAudioNormalizer } from './diagnostic-speaking-audio-normalizer';
+import { GamificationModule } from '../gamification/gamification.module';
 
 @Module({
-  imports: [PrismaModule, AiModule, UploadModule],
+  imports: [PrismaModule, AiModule, UploadModule, GamificationModule],
   controllers: [DiagnosticController],
   providers: [
     DiagnosticService,

@@ -4,10 +4,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { GamificationService } from '../gamification/gamification.service';
 
 @Injectable()
 export class ContentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gamificationService: GamificationService,
+  ) {}
 
   async getContentTopics(category?: string) {
     let topics = await this.prisma.contentTopic.findMany({
@@ -386,27 +390,21 @@ export class ContentService {
         },
       });
       if (rewardBanh > 0) {
-        const updatedStats = await tx.userStats.upsert({
-          where: { userId },
-          create: { userId, totalBanhRan: rewardBanh },
-          update: { totalBanhRan: { increment: rewardBanh } },
-        });
-        await tx.banhTransaction.create({
-          data: {
-            userId,
-            amount: rewardBanh,
-            source: 'CONTENT_COMPLETION',
-            reference: `content:attempt:${created.id}`,
-            dateKey: this.getVietnamDateKey(),
-            isCapped: false,
-            balanceAfter: updatedStats.totalBanhRan,
+        await this.gamificationService.awardBanh(
+          userId,
+          rewardBanh,
+          'CONTENT_COMPLETION',
+          `content:attempt:${created.id}`,
+          {
+            isCapped: true,
             metadata: {
               contentTopicId: topic.id,
               attemptId: created.id,
               score,
-            } as any,
+            },
           },
-        });
+          tx,
+        );
       }
       await tx.learningActivity.create({
         data: {

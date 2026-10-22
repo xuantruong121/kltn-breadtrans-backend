@@ -44,26 +44,13 @@ export class CourseService {
     private readonly subscriptionService?: SubscriptionService,
   ) {}
 
-  private async hasLegacyCourseOwnership(userId: number, courseId: number) {
-    const owned = await this.prisma.enrollment.findFirst({
-      where: {
-        userId,
-        class: { courseId },
-        status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
-        payment: { status: PaymentStatus.CONFIRMED },
-      },
-      select: { id: true },
-    });
-    return Boolean(owned);
-  }
-
   private async resolveCourseAccess(
-    courseId: number,
+    _courseId: number,
     userId?: number,
     role?: string,
   ): Promise<{
     canAccess: boolean;
-    accessSource: 'ADMIN' | 'PRO_SUBSCRIPTION' | 'LEGACY_PURCHASE' | null;
+    accessSource: 'ADMIN' | 'PRO_SUBSCRIPTION' | null;
     requiresPro: boolean;
   }> {
     if (role === Role.ADMIN) {
@@ -82,63 +69,7 @@ export class CourseService {
         requiresPro: false,
       };
     }
-    if (await this.hasLegacyCourseOwnership(userId, courseId)) {
-      return {
-        canAccess: true,
-        accessSource: 'LEGACY_PURCHASE',
-        requiresPro: false,
-      };
-    }
     return { canAccess: false, accessSource: null, requiresPro: true };
-  }
-
-  private async ensureSelfStudyEnrollment(courseId: number, userId: number) {
-    const existing = await this.prisma.enrollment.findFirst({
-      where: {
-        userId,
-        class: { courseId },
-        status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
-      },
-      orderBy: { joinedAt: 'asc' },
-    });
-    if (existing) return existing;
-
-    return this.prisma.$transaction(async (tx) => {
-      const course = await tx.course.findUnique({
-        where: { id: courseId },
-        select: { title: true },
-      });
-      if (!course) throw new NotFoundException('Course not found');
-      let selfStudy = await tx.class.findFirst({
-        where: {
-          courseId,
-          tuitionFeeVnd: 0,
-          status: { in: [ClassStatus.ONGOING, ClassStatus.UPCOMING] },
-          name: { startsWith: 'PRO Self Study' },
-        },
-      });
-      if (!selfStudy) {
-        selfStudy = await tx.class.create({
-          data: {
-            courseId,
-            name: `PRO Self Study — ${course.title}`,
-            tuitionFeeVnd: 0,
-            capacity: null,
-            status: ClassStatus.ONGOING,
-          },
-        });
-      }
-      return tx.enrollment.upsert({
-        where: { userId_classId: { userId, classId: selfStudy.id } },
-        create: {
-          userId,
-          classId: selfStudy.id,
-          status: EnrollmentStatus.ACTIVE,
-          progress: 0,
-        },
-        update: {},
-      });
-    });
   }
 
   private async assertCoursePublishable(courseId: number) {
@@ -324,18 +255,6 @@ export class CourseService {
     }
 
     const access = await this.resolveCourseAccess(id, userId, role);
-    const active = userId
-      ? await this.prisma.enrollment.findFirst({
-          where: {
-            userId,
-            class: { courseId: id },
-            status: {
-              in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED],
-            },
-          },
-        })
-      : null;
-
     const curriculum = buildCourseCurriculum(
       course.lessons,
       access.canAccess ? course.quizzes : [],
@@ -350,19 +269,21 @@ export class CourseService {
         return cls;
       },
     );
+    const progress =
+      access.canAccess && userId
+        ? await this.getCourseProgressFromCurriculum(id, userId, curriculum)
+        : null;
     return {
       ...courseWithoutRawActivities,
       learning: getCourseLearningProfile(id, course.title),
       classes: role === Role.ADMIN ? safeClasses : [],
       curriculum,
-      progress: active
-        ? await this.getCourseProgressFromCurriculum(id, userId!, curriculum)
-        : null,
+      progress,
       canAccess: access.canAccess,
       accessSource: access.accessSource,
       requiresPro: access.requiresPro,
-      isStarted: Boolean(active),
-      isCompleted: Boolean(active?.status === EnrollmentStatus.COMPLETED),
+      isStarted: access.canAccess,
+      isCompleted: progress?.isComplete ?? false,
       lockedReason: access.canAccess ? null : 'PRO_REQUIRED',
       lessons: course.lessons.map((lesson) => ({
         ...lesson,
@@ -450,14 +371,6 @@ export class CourseService {
     if (!access.canAccess) {
       throw new ForbiddenException('Gói PRO đang cần để truy cập lộ trình này');
     }
-    const enrollment = await this.prisma.enrollment.findFirst({
-      where: {
-        userId,
-        class: { courseId },
-        status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
-      },
-    });
-    if (!enrollment) throw new ForbiddenException('Bạn chưa ghi danh khóa học');
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
       include: {
@@ -688,7 +601,6 @@ export class CourseService {
     ) {
       throw new ConflictException('Khóa học chưa sẵn sàng cho học viên');
     }
-    const enrollment = await this.ensureSelfStudyEnrollment(courseId, user.id);
     const progress = await this.getCourseProgressFromCurriculum(
       courseId,
       user.id,
@@ -696,7 +608,6 @@ export class CourseService {
     );
     return {
       courseId,
-      enrollmentId: enrollment.id,
       accessSource: access.accessSource,
       progress,
     };

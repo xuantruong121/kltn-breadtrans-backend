@@ -85,26 +85,6 @@ export class AdminController {
     return this.adminService.deleteUser(id);
   }
 
-  @Post('enroll')
-  @ApiOperation({ summary: 'Admin cấp quyền truy cập gói học cho học viên' })
-  enrollUser(@Body() dto: { userId: number; classId: number }) {
-    return this.adminService.enrollUserInClass(dto.userId, dto.classId);
-  }
-
-  @Delete('enroll')
-  @ApiOperation({
-    summary: 'Admin thu hồi quyền truy cập gói học của học viên',
-  })
-  removeEnrollment(@Body() dto: { userId: number; classId: number }) {
-    return this.adminService.removeEnrollment(dto.userId, dto.classId);
-  }
-
-  @Get('classes/:classId/enrollments')
-  @ApiOperation({ summary: 'Lay danh sach hoc vien trong mot lop hoc' })
-  getEnrollmentsByClass(@Param('classId', ParseIntPipe) classId: number) {
-    return this.adminService.getEnrollmentsByClass(classId);
-  }
-
   // ============== COURSE MANAGEMENT ==============
 
   @Get('courses')

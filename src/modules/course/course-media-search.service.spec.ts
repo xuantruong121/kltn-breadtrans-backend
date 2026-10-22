@@ -96,7 +96,11 @@ describe('CourseMediaSearchService', () => {
       status: 'PUBLISHED',
     });
     await expect(
-      service.acceptCourseCover(17, { candidate: candidate() }, admin),
+      service.acceptCourseCover(
+        17,
+        { brief: 'published course cover', candidate: candidate() },
+        admin,
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(imageSearch.download).not.toHaveBeenCalled();
     expect(prisma.course.update).not.toHaveBeenCalled();

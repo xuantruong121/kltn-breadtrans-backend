@@ -399,7 +399,7 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
         },
       };
 
-      const service = new DiagnosticService(mockPrisma);
+      const service = new DiagnosticService(mockPrisma, {} as any);
       const res = await service.startAttempt(1, 2);
       expect(res.hasCompleted).toBe(true);
       expect(res.attemptId).toBe(99);
@@ -442,7 +442,7 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
         },
       };
 
-      const service = new DiagnosticService(mockPrisma);
+      const service = new DiagnosticService(mockPrisma, {} as any);
       const res = await service.startAttempt(1, 2);
       expect(res.hasCompleted).toBe(false);
       expect(res.attemptId).toBe(55);

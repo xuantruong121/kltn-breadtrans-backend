@@ -1,26 +1,16 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { PlanFeatureKey, QuizType, Role } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { QuizContentAccessService } from './quiz-content-access.service';
 
 describe('QuizContentAccessService', () => {
-  const prisma = {
-    enrollment: {
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-    },
-  };
   const subscriptions = { hasFeature: jest.fn() };
   let service: QuizContentAccessService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     subscriptions.hasFeature.mockResolvedValue(false);
-    prisma.enrollment.findFirst.mockResolvedValue(null);
-    prisma.enrollment.findMany.mockResolvedValue([]);
     service = new QuizContentAccessService(
-      prisma as unknown as PrismaService,
       subscriptions as unknown as SubscriptionService,
     );
   });
@@ -50,15 +40,14 @@ describe('QuizContentAccessService', () => {
     );
   });
 
-  it('allows course-linked premium Writing through enrollment without PLUS', async () => {
-    prisma.enrollment.findFirst.mockResolvedValue({ id: 1 });
+  it('does not allow course-linked premium Writing without its entitlement', async () => {
     await expect(
       service.assertAccess(writingQuiz({ courseId: 9 }), 7),
-    ).resolves.toBeUndefined();
-    expect(subscriptions.hasFeature).toHaveBeenCalledWith(
-      7,
-      PlanFeatureKey.PREMIUM_WRITING_CONTENT,
-    );
+    ).rejects.toMatchObject({
+      response: {
+        error: { featureKey: PlanFeatureKey.PREMIUM_WRITING_CONTENT },
+      },
+    });
   });
 
   it('does not let the existing vocabulary entitlement unlock Writing', async () => {
@@ -99,15 +88,12 @@ describe('QuizContentAccessService', () => {
     );
   });
 
-  it('allows enrolled users without a commercial entitlement', async () => {
-    prisma.enrollment.findFirst.mockResolvedValue({ id: 1 });
+  it('does not allow an enrollment record to bypass premium Reading entitlement', async () => {
     await expect(
       service.assertAccess(readingQuiz({ courseId: 3 }), 7),
-    ).resolves.toBeUndefined();
-    expect(subscriptions.hasFeature).toHaveBeenCalledWith(
-      7,
-      PlanFeatureKey.PREMIUM_READING,
-    );
+    ).rejects.toMatchObject({
+      response: { error: { featureKey: PlanFeatureKey.PREMIUM_READING } },
+    });
   });
 
   it('does not lock free content or require a subscription', async () => {
