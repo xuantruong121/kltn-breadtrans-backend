@@ -3,15 +3,33 @@ import {
   BadRequestException,
   NotFoundException,
   UnprocessableEntityException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
 import { AdjustCurrencyDto } from './dto/adjust-currency.dto';
 import { MarketProductDto } from './dto/market-product.dto';
+import {
+  CreateMarketProductDto,
+  UpdateMarketProductDto,
+  AdminMarketProductQueryDto,
+} from './dto/admin-market-product.dto';
 import { isValidVietnamPhone } from '../../common/utils/vietnam-phone.util';
 import { randomUUID } from 'crypto';
 import { GamificationService } from '../gamification/gamification.service';
+
+function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
 
 @Injectable()
 export class MarketService {
@@ -434,8 +452,23 @@ export class MarketService {
   }
 
   // Admin APIs
-  async getAllOrders() {
-    return this.prisma.marketOrder.findMany({
+  async getAllOrders(filter?: { status?: string; search?: string }) {
+    const where: any = {};
+    if (filter?.status && filter.status !== 'all') {
+      where.status = filter.status;
+    }
+    if (filter?.search?.trim()) {
+      const term = filter.search.trim();
+      const maybeId = parseInt(term, 10);
+      where.OR = [
+        { studentName: { contains: term, mode: 'insensitive' } },
+        { user: { email: { contains: term, mode: 'insensitive' } } },
+        ...(isNaN(maybeId) ? [] : [{ id: maybeId }]),
+      ];
+    }
+
+    const orders = await this.prisma.marketOrder.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         user: {
@@ -448,9 +481,19 @@ export class MarketService {
         physicalRedemptions: true,
       },
     });
+
+    return orders.map((ord) => ({
+      ...ord,
+      reason: (ord.bankSnapshot as any)?.reason || null,
+    }));
   }
 
-  async reviewOrder(orderId: number, status: string, reviewerName: string) {
+  async reviewOrder(
+    orderId: number,
+    status: string,
+    reviewerName: string,
+    reason?: string,
+  ) {
     const order = await this.prisma.marketOrder.findUnique({
       where: { id: orderId },
     });
@@ -458,11 +501,16 @@ export class MarketService {
       throw new NotFoundException(`Order ${orderId} not found`);
     }
 
+    if (status === 'rejected' && !reason?.trim()) {
+      throw new BadRequestException('Vui lòng nhập lý do từ chối đơn hàng');
+    }
+
     let updatedOrder = order;
 
     // Nếu Admin Từ Chối -> Hoàn lại Bánh Mì và Tồn kho Stock trong cùng 1 transaction nguyên tử
     if (status === 'rejected' && order.status === 'pending') {
-      await this.prisma.$transaction(async (tx) => {
+      updatedOrder = await this.prisma.$transaction(async (tx) => {
+        const rejectionReason = reason?.trim() || 'Admin từ chối đơn đổi quà';
         // Atomic CAS đổi trạng thái đơn hàng
         const casResult = await tx.marketOrder.updateMany({
           where: { id: orderId, status: 'pending' },
@@ -470,6 +518,11 @@ export class MarketService {
             status: 'rejected',
             reviewedBy: reviewerName,
             reviewedAt: new Date(),
+            bankSnapshot: {
+              reason: rejectionReason,
+              action: 'rejected',
+              reviewerName,
+            },
           },
         });
 
@@ -487,7 +540,10 @@ export class MarketService {
           order.totalBanh,
           'MARKET_REFUND',
           `refund:order:${orderId}`,
-          { isCapped: false, metadata: { orderId, reviewerName } },
+          {
+            isCapped: false,
+            metadata: { orderId, reviewerName, reason: rejectionReason },
+          },
           tx,
         );
         const updatedStats = { totalBanhRan: refundResult.newBalance };
@@ -518,14 +574,12 @@ export class MarketService {
         this.eventsGateway.sendCurrencyUpdate(order.userId, {
           amount: order.totalBanh,
           newBalance: updatedStats.totalBanhRan,
-          reason: `Hoàn tiền đơn đổi quà #${orderId}`,
+          reason: `Hoàn tiền đơn đổi quà #${orderId}: ${rejectionReason}`,
           studentName: order.studentName,
         });
-      });
 
-      updatedOrder = (await this.prisma.marketOrder.findUnique({
-        where: { id: orderId },
-      }))!;
+        return (await tx.marketOrder.findUnique({ where: { id: orderId } }))!;
+      });
     } else {
       updatedOrder = await this.prisma.marketOrder.update({
         where: { id: orderId },
@@ -533,6 +587,9 @@ export class MarketService {
           status,
           reviewedBy: reviewerName,
           reviewedAt: new Date(),
+          bankSnapshot: reason?.trim()
+            ? { reason: reason.trim(), action: status, reviewerName }
+            : undefined,
         },
       });
 
@@ -552,7 +609,10 @@ export class MarketService {
       reviewerName,
     });
 
-    return updatedOrder;
+    return {
+      ...updatedOrder,
+      reason: (updatedOrder.bankSnapshot as any)?.reason || null,
+    };
   }
 
   /**
@@ -588,6 +648,11 @@ export class MarketService {
           status: 'refunded',
           reviewedBy: adminName,
           reviewedAt: new Date(),
+          bankSnapshot: {
+            reason: reason.trim(),
+            action: 'fulfillment-failed',
+            adminName,
+          },
         },
       });
       if (casResult.count === 0) {
@@ -650,7 +715,232 @@ export class MarketService {
       reviewerName: adminName,
     });
 
-    return updatedOrder;
+    return {
+      ...updatedOrder!,
+      reason: (updatedOrder?.bankSnapshot as any)?.reason || reason,
+    };
+  }
+
+  // --- Admin Catalog Management ---
+
+  async adminGetProducts(query: AdminMarketProductQueryDto) {
+    const where: any = {};
+
+    if (query.search?.trim()) {
+      const term = query.search.trim();
+      where.OR = [
+        { name: { contains: term, mode: 'insensitive' } },
+        { slug: { contains: term, mode: 'insensitive' } },
+        { description: { contains: term, mode: 'insensitive' } },
+      ];
+    }
+
+    if (query.isActive !== undefined && query.isActive !== 'all') {
+      where.isActive = query.isActive === 'true';
+    }
+
+    if (query.category?.trim() && query.category !== 'all') {
+      where.category = query.category.trim();
+    }
+
+    if (query.fulfillmentType) {
+      where.fulfillmentType = query.fulfillmentType;
+    }
+
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
+    const skip = (page - 1) * limit;
+
+    const [total, products] = await Promise.all([
+      this.prisma.marketProduct.count({ where }),
+      this.prisma.marketProduct.findMany({
+        where,
+        orderBy: [{ order: 'asc' }, { id: 'desc' }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: products.map((product) => ({
+        ...product,
+        available: product.stock > 0 && product.isActive,
+      })),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async adminGetProductById(id: number) {
+    const product = await this.prisma.marketProduct.findUnique({
+      where: { id },
+    });
+    if (!product) {
+      throw new NotFoundException(`Không tìm thấy quà tặng với mã #${id}`);
+    }
+
+    const physicalRedemptionCount =
+      await this.prisma.marketPhysicalRedemption.count({
+        where: { productId: id },
+      });
+
+    return {
+      ...product,
+      hasHistory: product.purchaseCount > 0 || physicalRedemptionCount > 0,
+      redemptionCount: Math.max(product.purchaseCount, physicalRedemptionCount),
+    };
+  }
+
+  async adminCreateProduct(dto: CreateMarketProductDto) {
+    if (dto.price <= 0) {
+      throw new BadRequestException('Giá Bánh Mì phải lớn hơn 0');
+    }
+    if (dto.stock < 0) {
+      throw new BadRequestException('Số lượng tồn kho không được âm');
+    }
+
+    let finalSlug = dto.slug?.trim()
+      ? slugify(dto.slug.trim())
+      : slugify(dto.name);
+    if (!finalSlug) {
+      finalSlug = `product-${Date.now()}`;
+    }
+
+    const existingSlug = await this.prisma.marketProduct.findUnique({
+      where: { slug: finalSlug },
+    });
+    if (existingSlug) {
+      if (dto.slug?.trim()) {
+        throw new ConflictException(
+          `Mã slug "${finalSlug}" đã được sử dụng bởi vật phẩm khác`,
+        );
+      }
+      finalSlug = `${finalSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    return this.prisma.marketProduct.create({
+      data: {
+        name: dto.name.trim(),
+        slug: finalSlug,
+        description: dto.description?.trim() || null,
+        category: dto.category?.trim() || 'GENERAL',
+        rarity: dto.rarity?.trim() || 'COMMON',
+        price: dto.price,
+        stock: dto.stock,
+        imageUrl: dto.imageUrl?.trim() || null,
+        order: dto.order ?? 0,
+        isActive: dto.isActive ?? true,
+        fulfillmentType: dto.fulfillmentType ?? 'DIGITAL',
+      },
+    });
+  }
+
+  async adminUpdateProduct(id: number, dto: UpdateMarketProductDto) {
+    const existing = await this.prisma.marketProduct.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Không tìm thấy quà tặng với mã #${id}`);
+    }
+
+    if (dto.price !== undefined && dto.price <= 0) {
+      throw new BadRequestException('Giá Bánh Mì phải lớn hơn 0');
+    }
+    if (dto.stock !== undefined && dto.stock < 0) {
+      throw new BadRequestException('Số lượng tồn kho không được âm');
+    }
+
+    let updateSlug = existing.slug;
+    if (dto.slug?.trim()) {
+      const cleanSlug = slugify(dto.slug.trim());
+      if (cleanSlug !== existing.slug) {
+        const slugConflict = await this.prisma.marketProduct.findUnique({
+          where: { slug: cleanSlug },
+        });
+        if (slugConflict && slugConflict.id !== id) {
+          throw new ConflictException(
+            `Mã slug "${cleanSlug}" đã được sử dụng bởi vật phẩm khác`,
+          );
+        }
+        updateSlug = cleanSlug;
+      }
+    }
+
+    return this.prisma.marketProduct.update({
+      where: { id },
+      data: {
+        name: dto.name !== undefined ? dto.name.trim() : undefined,
+        slug: updateSlug,
+        description:
+          dto.description !== undefined
+            ? dto.description?.trim() || null
+            : undefined,
+        category: dto.category !== undefined ? dto.category.trim() : undefined,
+        rarity: dto.rarity !== undefined ? dto.rarity.trim() : undefined,
+        price: dto.price !== undefined ? dto.price : undefined,
+        stock: dto.stock !== undefined ? dto.stock : undefined,
+        imageUrl:
+          dto.imageUrl !== undefined ? dto.imageUrl?.trim() || null : undefined,
+        order: dto.order !== undefined ? dto.order : undefined,
+        isActive: dto.isActive !== undefined ? dto.isActive : undefined,
+        fulfillmentType:
+          dto.fulfillmentType !== undefined ? dto.fulfillmentType : undefined,
+      },
+    });
+  }
+
+  async adminToggleProductActive(id: number, isActive?: boolean) {
+    const existing = await this.prisma.marketProduct.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Không tìm thấy quà tặng với mã #${id}`);
+    }
+
+    const nextState =
+      typeof isActive === 'boolean' ? isActive : !existing.isActive;
+
+    return this.prisma.marketProduct.update({
+      where: { id },
+      data: { isActive: nextState },
+    });
+  }
+
+  async adminDeleteProduct(id: number) {
+    const existing = await this.prisma.marketProduct.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Không tìm thấy quà tặng với mã #${id}`);
+    }
+
+    // Kiểm tra lịch sử đổi quà: nếu đã có lượt đổi thì cấm tuyệt đối xóa vĩnh viễn
+    const physicalCount = await this.prisma.marketPhysicalRedemption.count({
+      where: { productId: id },
+    });
+
+    if (existing.purchaseCount > 0 || physicalCount > 0) {
+      throw new BadRequestException(
+        'Không thể xóa vĩnh viễn quà tặng đã có lịch sử đổi quà. Vui lòng sử dụng tính năng "Ngừng hiển thị" (ẩn khỏi cửa hàng).',
+      );
+    }
+
+    // Tuân thủ REWARD_CATALOG_HARD_DELETE_ALLOWED=false: Deactivate thay vì xóa cứng
+    await this.prisma.marketProduct.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    return {
+      success: true,
+      message: 'Đã ngừng hiển thị quà tặng (vật phẩm được lưu trữ an toàn)',
+      productId: id,
+      isActive: false,
+    };
   }
 
   /**

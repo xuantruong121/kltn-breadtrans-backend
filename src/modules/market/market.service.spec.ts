@@ -8,6 +8,10 @@ import { UnprocessableEntityException } from '@nestjs/common';
 const mockPrismaService = {
   marketProduct: {
     findMany: jest.fn(),
+    findUnique: jest.fn(),
+    count: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
     updateMany: jest.fn(),
   },
   userShippingProfile: {
@@ -41,6 +45,7 @@ const mockPrismaService = {
   marketPhysicalRedemption: {
     create: jest.fn(),
     updateMany: jest.fn(),
+    count: jest.fn(),
   },
   banhTransaction: {
     create: jest.fn(),
@@ -776,6 +781,253 @@ describe('MarketService', () => {
       expect(
         mockPrismaService.currencyTransaction.create,
       ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Admin Catalog Management', () => {
+    describe('adminGetProducts', () => {
+      it('returns paginated products with search and category filters', async () => {
+        mockPrismaService.marketProduct.count.mockResolvedValue(1);
+        mockPrismaService.marketProduct.findMany.mockResolvedValue([
+          {
+            id: 1,
+            name: 'Gấu bông Bánh Mì',
+            slug: 'gau-bong-banh-mi',
+            price: 500,
+            stock: 10,
+            isActive: true,
+          },
+        ]);
+
+        const result = await service.adminGetProducts({
+          search: 'gấu',
+          isActive: 'true',
+          page: 1,
+          limit: 10,
+        });
+
+        expect(result.data).toHaveLength(1);
+        expect(result.data[0].available).toBe(true);
+        expect(result.meta.total).toBe(1);
+      });
+    });
+
+    describe('adminGetProductById', () => {
+      it('returns product with history check', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          name: 'Gấu bông',
+          purchaseCount: 3,
+        });
+        mockPrismaService.marketPhysicalRedemption.count.mockResolvedValue(3);
+
+        const result = await service.adminGetProductById(1);
+
+        expect(result.id).toBe(1);
+        expect(result.hasHistory).toBe(true);
+        expect(result.redemptionCount).toBe(3);
+      });
+
+      it('throws NotFoundException if product does not exist', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue(null);
+
+        await expect(service.adminGetProductById(999)).rejects.toThrow(
+          'Không tìm thấy quà tặng với mã #999',
+        );
+      });
+    });
+
+    describe('adminCreateProduct', () => {
+      it('creates product with auto-generated slug', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue(null);
+        mockPrismaService.marketProduct.create.mockImplementation(
+          ({ data }: any) => Promise.resolve({ id: 10, ...data }),
+        );
+
+        const result = await service.adminCreateProduct({
+          name: 'Bình nước BreadTrans',
+          price: 250,
+          stock: 20,
+        });
+
+        expect(result.slug).toBe('binh-nuoc-breadtrans');
+        expect(result.price).toBe(250);
+        expect(result.stock).toBe(20);
+      });
+
+      it('rejects invalid price <= 0', async () => {
+        await expect(
+          service.adminCreateProduct({
+            name: 'Vật phẩm lỗi',
+            price: 0,
+            stock: 10,
+          }),
+        ).rejects.toThrow('Giá Bánh Mì phải lớn hơn 0');
+      });
+
+      it('rejects negative stock < 0', async () => {
+        await expect(
+          service.adminCreateProduct({
+            name: 'Vật phẩm lỗi',
+            price: 100,
+            stock: -5,
+          }),
+        ).rejects.toThrow('Số lượng tồn kho không được âm');
+      });
+
+      it('rejects colliding custom slug with ConflictException', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          slug: 'custom-slug',
+        });
+
+        await expect(
+          service.adminCreateProduct({
+            name: 'Vật phẩm trùng',
+            slug: 'custom-slug',
+            price: 100,
+            stock: 10,
+          }),
+        ).rejects.toThrow('đã được sử dụng bởi vật phẩm khác');
+      });
+    });
+
+    describe('adminUpdateProduct', () => {
+      it('updates product and validates price', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          slug: 'cu-slug',
+        });
+        mockPrismaService.marketProduct.update.mockImplementation(
+          ({ data }: any) => Promise.resolve({ id: 1, ...data }),
+        );
+
+        const result = await service.adminUpdateProduct(1, {
+          price: 600,
+          stock: 15,
+        });
+
+        expect(result.price).toBe(600);
+        expect(result.stock).toBe(15);
+      });
+
+      it('rejects update with price <= 0', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({ id: 1 });
+
+        await expect(
+          service.adminUpdateProduct(1, { price: -10 }),
+        ).rejects.toThrow('Giá Bánh Mì phải lớn hơn 0');
+      });
+    });
+
+    describe('adminToggleProductActive', () => {
+      it('toggles product active state', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          isActive: true,
+        });
+        mockPrismaService.marketProduct.update.mockResolvedValue({
+          id: 1,
+          isActive: false,
+        });
+
+        const result = await service.adminToggleProductActive(1);
+        expect(result.isActive).toBe(false);
+      });
+    });
+
+    describe('adminDeleteProduct — Safe deactivation policy', () => {
+      it('blocks hard deletion if product has redemption history', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          purchaseCount: 5,
+        });
+        mockPrismaService.marketPhysicalRedemption.count.mockResolvedValue(5);
+
+        await expect(service.adminDeleteProduct(1)).rejects.toThrow(
+          'Không thể xóa vĩnh viễn quà tặng đã có lịch sử đổi quà. Vui lòng sử dụng tính năng "Ngừng hiển thị"',
+        );
+      });
+
+      it('deactivates product rather than hard-deleting when zero history exists', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 2,
+          purchaseCount: 0,
+        });
+        mockPrismaService.marketPhysicalRedemption.count.mockResolvedValue(0);
+        mockPrismaService.marketProduct.update.mockResolvedValue({
+          id: 2,
+          isActive: false,
+        });
+
+        const result = await service.adminDeleteProduct(2);
+        expect(result.success).toBe(true);
+        expect(result.isActive).toBe(false);
+      });
+    });
+
+    describe('reviewOrder — Rejection requires reason and audits metadata', () => {
+      it('requires reason when rejecting order', async () => {
+        mockPrismaService.marketOrder.findUnique.mockResolvedValue({
+          id: 10,
+          status: 'pending',
+        });
+
+        await expect(
+          service.reviewOrder(10, 'rejected', 'Admin', ''),
+        ).rejects.toThrow('Vui lòng nhập lý do từ chối đơn hàng');
+      });
+
+      it('refunds Bread and stock, and persists bankSnapshot reason on rejection', async () => {
+        const order = {
+          id: 10,
+          userId: 1,
+          totalBanh: 500,
+          status: 'pending',
+          studentName: 'Học viên A',
+          items: [{ productId: 2, quantity: 1 }],
+        };
+        mockPrismaService.marketOrder.findUnique.mockResolvedValue(order);
+        mockPrismaService.$transaction.mockImplementation((cb: any) =>
+          cb({
+            marketOrder: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              findUnique: jest.fn().mockResolvedValue({
+                ...order,
+                status: 'rejected',
+                bankSnapshot: { reason: 'Hết hàng nhà cung cấp' },
+              }),
+            },
+            marketProduct: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+            marketPhysicalRedemption: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          }),
+        );
+
+        const result = await service.reviewOrder(
+          10,
+          'rejected',
+          'Admin Quản Trị',
+          'Hết hàng nhà cung cấp',
+        );
+
+        expect(result.reason).toBe('Hết hàng nhà cung cấp');
+        expect(mockGamificationService.awardBanh).toHaveBeenCalledWith(
+          1,
+          500,
+          'MARKET_REFUND',
+          'refund:order:10',
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              reason: 'Hết hàng nhà cung cấp',
+            }),
+          }),
+          expect.anything(),
+        );
+      });
     });
   });
 });

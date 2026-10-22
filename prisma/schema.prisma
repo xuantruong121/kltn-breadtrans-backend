@@ -91,6 +91,13 @@ enum SubscriptionStatus {
   REVOKED
 }
 
+enum SubscriptionEventType {
+  PAYMENT_ACTIVATED
+  ADMIN_GRANTED
+  ADMIN_EXTENDED
+  ADMIN_REVOKED
+}
+
 enum PlanPurchaseStatus {
   PENDING_PAYMENT
   COMPLETED
@@ -211,6 +218,7 @@ model User {
   supportMessages                 SupportMessage[]
   notifications                   Notification[]
   subscriptions                   Subscription[]
+  subscriptionEventsActed         SubscriptionEvent[]              @relation("SubscriptionEventActor")
   planPurchases                   PlanPurchase[]
   payosPaymentIntents             PayOSPaymentIntent[]
   confirmedPlanPayments           PlanPayment[]                    @relation("PlanPaymentConfirmer")
@@ -374,8 +382,28 @@ model Subscription {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
+  events         SubscriptionEvent[]
+
   @@index([userId, status, startsAt, endsAt])
   @@index([planVersionId])
+}
+
+model SubscriptionEvent {
+  id             Int                   @id @default(autoincrement())
+  subscriptionId Int
+  subscription   Subscription          @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  type           SubscriptionEventType
+  actorUserId    Int?
+  actor          User?                 @relation("SubscriptionEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  reason         String?
+  previousEndsAt DateTime?
+  newEndsAt      DateTime?
+  idempotencyKey String?               @unique
+  metadata       Json?
+  createdAt      DateTime              @default(now())
+
+  @@index([subscriptionId, createdAt])
+  @@index([actorUserId])
 }
 
 model PlanPurchase {

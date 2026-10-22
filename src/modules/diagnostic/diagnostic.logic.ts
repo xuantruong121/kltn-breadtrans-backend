@@ -254,6 +254,9 @@ export function validateQuestionBank(
     orders.add(question.order);
     if (!question.question?.trim()) defects.push(`empty prompt ${question.id}`);
     const meta = getQuestionMeta(question);
+    if (meta.section === 'LISTENING' && !meta.audioUrl?.trim()) {
+      defects.push(`missing listening audio ${question.id}`);
+    }
     if (meta.questionType === 'OPEN_TEXT') {
       if (
         !meta.stableKey ||

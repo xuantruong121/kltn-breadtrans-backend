@@ -13,6 +13,7 @@ import {
   PlanStatus,
   PlanVersionStatus,
   Prisma,
+  SubscriptionEventType,
   SubscriptionStatus,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -550,7 +551,7 @@ export class PlanPurchaseService {
       );
     }
 
-    await tx.subscription.create({
+    const subscription = await tx.subscription.create({
       data: {
         userId: current.userId,
         planVersionId: current.planVersionId,
@@ -560,6 +561,26 @@ export class PlanPurchaseService {
         endsAt,
       },
     });
+    if (tx.subscriptionEvent?.create) {
+      await tx.subscriptionEvent.create({
+        data: {
+          subscriptionId: subscription.id,
+          type: SubscriptionEventType.PAYMENT_ACTIVATED,
+          actorUserId: options.actorId ?? null,
+          reason:
+            options.source === 'ADMIN'
+              ? 'Xác nhận thanh toán thủ công bởi Quản trị viên'
+              : 'Kích hoạt tự động qua cổng thanh toán',
+          previousEndsAt: null,
+          newEndsAt: endsAt,
+          metadata: {
+            planPurchaseId: current.id,
+            paymentId: current.payment.id,
+            source: options.source,
+          },
+        },
+      });
+    }
     await tx.planPayment.update({
       where: { id: current.payment.id },
       data: {

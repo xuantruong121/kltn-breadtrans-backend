@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -24,6 +25,10 @@ import {
 } from './diagnostic.logic';
 import { buildCourseCurriculum } from '../course/course-curriculum';
 import { GamificationService } from '../gamification/gamification.service';
+import {
+  DiagnosticWritingFeedback,
+  DiagnosticWritingService,
+} from './diagnostic-writing.service';
 
 type AnswerMap = Record<string, unknown>;
 
@@ -35,6 +40,7 @@ export class DiagnosticService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
+    @Optional() private readonly writingService?: DiagnosticWritingService,
   ) {}
 
   private assertQuestionBank(questions: DiagnosticQuestionForScoring[]) {
@@ -277,24 +283,10 @@ export class DiagnosticService {
       answers,
       attempt.id,
     );
-    const speakingWeight =
-      gradedSpeaking.length >= 2
-        ? 0.12
-        : gradedSpeaking.length === 1
-          ? 0.08
-          : 0;
-    const finalEvidenceScore =
-      speakingScore === null
-        ? objectiveCoreScore
-        : Math.round(
-            (objectiveCoreScore * (1 - speakingWeight) +
-              speakingScore * speakingWeight) *
-              10,
-          ) / 10;
-    const finalLevel =
-      speakingScore === null
-        ? attempt.level
-        : this.boundedLevel(attempt.level, finalEvidenceScore);
+    // Speaking/Writing are formative feedback only. The reference band is
+    // calculated from the reviewed 48-item objective core and never controls
+    // access to learning content.
+    const referenceLevel = attempt.level;
     const profileWithSpeaking: DiagnosticSkillProfile[] =
       speakingScore === null
         ? profiles
@@ -364,8 +356,9 @@ export class DiagnosticService {
       return qr ? qr.isCorrect === false : false;
     });
 
+    const writingFeedback = this.readWritingFeedback(answers);
     const practiceRecommendations = buildPracticeRecommendations(
-      finalLevel,
+      referenceLevel,
       weaknesses,
       wrongQuestions,
     );
@@ -378,15 +371,23 @@ export class DiagnosticService {
       objectiveTotalCount: objectiveQuestions.length,
       productiveTaskCount,
       productiveUnavailable: productiveTaskCount > 0 && speakingScore === null,
+      productivePending:
+        speakingRows.some((row) =>
+          ['QUEUED', 'GRADING'].includes(row.status),
+        ) ||
+        writingFeedback.some((item) =>
+          ['QUEUED', 'GRADING'].includes(item.status),
+        ),
       percentage:
         objectiveQuestions.length === 0
           ? 0
           : Math.round(
               (totalObjectiveCorrect / objectiveQuestions.length) * 100,
             ),
-      level: finalLevel,
+      // Keep `level` for legacy consumers while presenting it as a reference.
+      level: referenceLevel,
+      referenceLevel,
       objectiveCoreScore,
-      objectivePlacementBand: attempt.level,
       speakingEvidenceCount: gradedSpeaking.length,
       speakingScore,
       speakingEvidenceConfidence:
@@ -395,8 +396,7 @@ export class DiagnosticService {
           : gradedSpeaking.length === 1
             ? 'PARTIAL'
             : 'UNAVAILABLE',
-      finalEvidenceScore,
-      finalEstimatedBand: finalLevel,
+      writingFeedback,
       speakingResponses: speakingRows.map((row) => ({
         id: row.id,
         questionId: row.questionId,
@@ -412,7 +412,7 @@ export class DiagnosticService {
       strengths,
       weaknesses,
       practiceRecommendations,
-      recommendations: await this.recommendations(attempt.level, weaknesses),
+      recommendations: await this.recommendations(referenceLevel, weaknesses),
       questionsResult,
     };
   }
@@ -432,6 +432,14 @@ export class DiagnosticService {
   private readAnswerMap(value: unknown): AnswerMap {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     return value as AnswerMap;
+  }
+
+  private readWritingFeedback(answers: AnswerMap): DiagnosticWritingFeedback[] {
+    const value = answers.__writingFeedback;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    return Object.values(value as Record<string, DiagnosticWritingFeedback>)
+      .filter((item) => item && typeof item.questionId === 'number')
+      .sort((left, right) => left.questionId - right.questionId);
   }
 
   private async awaitSpeakingFinalization(
@@ -714,18 +722,15 @@ export class DiagnosticService {
       ) {
         throw new BadRequestException('Phiên kiểm tra không hợp lệ');
       }
-      speakingResponses = await this.awaitSpeakingFinalization(
-        attemptId,
-        speakingQuestions.map((question) => question.id),
+      speakingResponses = await this.prisma.diagnosticSpeakingResponse.findMany(
+        {
+          where: { attemptId },
+        },
       );
-      const terminal = new Set(['GRADED', 'SKIPPED', 'GRADING_FAILED']);
       if (
         speakingQuestions.some(
           (question) =>
-            !terminal.has(
-              speakingResponses.find((row) => row.questionId === question.id)
-                ?.status ?? '',
-            ),
+            !speakingResponses.some((row) => row.questionId === question.id),
         )
       ) {
         throw new BadRequestException(
@@ -930,7 +935,33 @@ export class DiagnosticService {
       return created;
     });
 
-    return this.toResult(attempt, formQuestions);
+    const completedAnswers = this.readAnswerMap(attempt.answers);
+    const existingWritingFeedback = new Set(
+      this.readWritingFeedback(completedAnswers).map((item) => item.questionId),
+    );
+    const writingTasks = formQuestions
+      .filter(
+        (question) =>
+          isOpenDiagnosticQuestion(question) &&
+          getQuestionMeta(question).section === 'WRITING' &&
+          !existingWritingFeedback.has(question.id),
+      )
+      .map((question) => ({
+        questionId: question.id,
+        prompt: question.question,
+        answer: String(completedAnswers[String(question.id)] ?? '').trim(),
+      }))
+      .filter((task) => task.answer.length >= 2);
+    let resultAttempt = attempt;
+    if (writingTasks.length && this.writingService) {
+      await this.writingService.enqueueMany(attempt.id, writingTasks);
+      resultAttempt =
+        (await this.prisma.diagnosticAttempt.findUnique({
+          where: { id: attempt.id },
+        })) ?? attempt;
+    }
+
+    return this.toResult(resultAttempt, formQuestions);
   }
 
   private getVietnamDateKey() {

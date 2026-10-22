@@ -4,6 +4,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   ParseIntPipe,
@@ -15,6 +16,12 @@ import {
 import { MarketService } from './market.service';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
 import { AdjustCurrencyDto } from './dto/adjust-currency.dto';
+import {
+  CreateMarketProductDto,
+  UpdateMarketProductDto,
+  AdminMarketProductQueryDto,
+  AdminReviewOrderDto,
+} from './dto/admin-market-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -83,14 +90,82 @@ export class MarketController {
     return this.marketService.getInventory(req.user.id);
   }
 
-  // Admin APIs
+  // Admin APIs - Catalog Management
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Get('admin/products')
+  @ApiOperation({
+    summary: '[Admin] Lấy danh sách quà tặng quản trị (có phân trang và lọc)',
+  })
+  adminGetProducts(@Query() query: AdminMarketProductQueryDto) {
+    return this.marketService.adminGetProducts(query);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Post('admin/products')
+  @ApiOperation({ summary: '[Admin] Tạo mới quà tặng trong Cửa Hàng Bánh Mì' })
+  adminCreateProduct(@Body() dto: CreateMarketProductDto) {
+    return this.marketService.adminCreateProduct(dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Get('admin/products/:id')
+  @ApiOperation({ summary: '[Admin] Lấy chi tiết quà tặng' })
+  adminGetProductById(@Param('id', ParseIntPipe) id: number) {
+    return this.marketService.adminGetProductById(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Patch('admin/products/:id')
+  @ApiOperation({ summary: '[Admin] Chỉnh sửa thông tin quà tặng' })
+  adminUpdateProduct(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateMarketProductDto,
+  ) {
+    return this.marketService.adminUpdateProduct(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Patch('admin/products/:id/toggle-active')
+  @ApiOperation({ summary: '[Admin] Kích hoạt hoặc ngừng hiển thị quà tặng' })
+  adminToggleProductActive(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('isActive') isActive?: boolean,
+  ) {
+    return this.marketService.adminToggleProductActive(id, isActive);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Delete('admin/products/:id')
+  @ApiOperation({
+    summary: '[Admin] Chính sách xóa / ngừng hiển thị quà tặng an toàn',
+  })
+  adminDeleteProduct(@Param('id', ParseIntPipe) id: number) {
+    return this.marketService.adminDeleteProduct(id);
+  }
+
+  // Admin APIs - Order Management
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Get('orders')
   @ApiOperation({ summary: '[Admin] Lấy toàn bộ danh sách đơn hàng đổi quà' })
-  getAllOrders() {
-    return this.marketService.getAllOrders();
+  getAllOrders(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.marketService.getAllOrders({ status, search });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -100,13 +175,14 @@ export class MarketController {
   @ApiOperation({ summary: '[Admin] Phê duyệt hoặc từ chối đơn hàng' })
   reviewOrder(
     @Param('id', ParseIntPipe) id: number,
-    @Body('status') status: 'approved' | 'rejected',
+    @Body() dto: AdminReviewOrderDto,
     @Request() req: any,
   ) {
     return this.marketService.reviewOrder(
       id,
-      status,
+      dto.status,
       req.user.email || 'Admin',
+      dto.reason,
     );
   }
 

@@ -6,6 +6,7 @@ import { DiagnosticSpeakingService } from './diagnostic-speaking.service';
 import { AiModule } from '../ai/ai.module';
 import { UploadModule } from '../upload/upload.module';
 import { DiagnosticSpeakingAudioNormalizer } from './diagnostic-speaking-audio-normalizer';
+import { DiagnosticWritingService } from './diagnostic-writing.service';
 import { GamificationModule } from '../gamification/gamification.module';
 
 @Module({
@@ -14,6 +15,7 @@ import { GamificationModule } from '../gamification/gamification.module';
   providers: [
     DiagnosticService,
     DiagnosticSpeakingService,
+    DiagnosticWritingService,
     DiagnosticSpeakingAudioNormalizer,
   ],
   exports: [DiagnosticSpeakingService],

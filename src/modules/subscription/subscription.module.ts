@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { SubscriptionController } from './subscription.controller';
 import { SubscriptionService } from './subscription.service';
+import { SubscriptionAdminController } from './subscription-admin.controller';
+import { SubscriptionAdminService } from './subscription-admin.service';
 import { PlanCatalogAdminController } from './plan-catalog-admin.controller';
 import { PlanCatalogAdminService } from './plan-catalog-admin.service';
 import { PlanPurchaseController } from './plan-purchase.controller';
@@ -20,6 +22,7 @@ import { PayosWebhookController } from './payos-webhook.controller';
   imports: [PrismaModule, PaymentModule],
   controllers: [
     SubscriptionController,
+    SubscriptionAdminController,
     PlanCatalogAdminController,
     PlanPurchaseController,
     PlanPurchaseAdminController,
@@ -29,6 +32,7 @@ import { PayosWebhookController } from './payos-webhook.controller';
   ],
   providers: [
     SubscriptionService,
+    SubscriptionAdminService,
     PlanCatalogAdminService,
     PlanPurchaseService,
     PlanCatalogPublicService,
@@ -37,6 +41,6 @@ import { PayosWebhookController } from './payos-webhook.controller';
     PaymentReconciliationScheduler,
     { provide: 'PlanPurchaseService', useExisting: PlanPurchaseService },
   ],
-  exports: [SubscriptionService],
+  exports: [SubscriptionService, SubscriptionAdminService],
 })
 export class SubscriptionModule {}

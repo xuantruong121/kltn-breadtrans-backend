@@ -109,6 +109,26 @@ describe('diagnostic logic', () => {
     ).toContain('invalid correct index 1');
   });
 
+  it('rejects an active Listening item without a playable audio URL', () => {
+    expect(
+      validateQuestionBank([
+        {
+          ...questions[0],
+          skill: 'Listening',
+          options: {
+            values: ['one', 'two'],
+            stableKey: 'listen-a1-01',
+            section: 'LISTENING',
+            construct: 'short-dialogue',
+            intendedLevel: 'A1',
+            questionType: 'MCQ',
+            audioUrl: null,
+          },
+        },
+      ]),
+    ).toContain('missing listening audio 1');
+  });
+
   it('does not recommend a published course whose four-skill roadmap is incomplete', () => {
     const result = rankCourseRecommendations(
       [
