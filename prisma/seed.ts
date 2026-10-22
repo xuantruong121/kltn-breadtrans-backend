@@ -27,6 +27,17 @@ import {
 
 const prisma = new PrismaClient();
 const PASSWORD = 'Password123!';
+
+/** Mirrors GamificationService.getTodayDateKey — seed.ts runs standalone,
+ * outside Nest DI, so it can't import the service directly. */
+function getTodayDateKeyForSeed(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
 const SEED_ASSET_BASE_URL =
   process.env.SEED_ASSET_BASE_URL ?? process.env.R2_PUBLIC_URL ?? '';
 const seedAssetUrl = (key: string): string | null => {
@@ -100,17 +111,23 @@ type DialogueSeedTuple = [
   'female-01' | 'male-01',
 ];
 
-const toDialogueTurns = (turns: DialogueSeedTuple[]): CoherentDictationTurn[] => {
+const toDialogueTurns = (
+  turns: DialogueSeedTuple[],
+): CoherentDictationTurn[] => {
   let previousSpeakerId = '';
   let speakerTurnNumber = 0;
   return turns.map(([speakerId, speaker, text, translation, voiceKey]) => {
     const trimmed = text.trim();
-    const thoughtful = /^(Let me think|I need to check|I'm not sure|I am not sure)/i.test(trimmed);
+    const thoughtful =
+      /^(Let me think|I need to check|I'm not sure|I am not sure)/i.test(
+        trimmed,
+      );
     const friendly =
       /^(Great|Nice|Perfect|Sounds good|Yeah|Sure|Right|Okay)/i.test(trimmed);
     const polite = /\?|Could you|Please/i.test(trimmed);
     const hasQuestion = /\?/.test(trimmed);
-    const hasFollowUp = /\b(I(?:'ll| will| can)|we(?:'ll| will| can)|let's)\b/i.test(trimmed);
+    const hasFollowUp =
+      /\b(I(?:'ll| will| can)|we(?:'ll| will| can)|let's)\b/i.test(trimmed);
     const dialogueAct: CoherentDictationTurn['dialogueAct'] =
       /^(Hey|Hi|Good morning|Morning|Hello)\b/i.test(trimmed)
         ? 'GREETING'
@@ -120,7 +137,9 @@ const toDialogueTurns = (turns: DialogueSeedTuple[]): CoherentDictationTurn[] =>
             ? 'THINKING'
             : /^(Sorry|I am sorry|I'm sorry)\b/i.test(trimmed)
               ? 'CONCERN'
-              : /^(Actually|I mean|Could you clarify|What do you mean)\b/i.test(trimmed)
+              : /^(Actually|I mean|Could you clarify|What do you mean)\b/i.test(
+                    trimmed,
+                  )
                 ? 'CLARIFY'
                 : hasQuestion && hasFollowUp
                   ? 'ANSWER_AND_FOLLOW_UP'
@@ -136,9 +155,13 @@ const toDialogueTurns = (turns: DialogueSeedTuple[]): CoherentDictationTurn[] =>
                             ? 'AGREE_AND_PLAN'
                             : /^(Yes|Yeah|Right|Okay|Sure)\b/i.test(trimmed)
                               ? 'CONFIRM'
-                              : /^(No|Not yet|I can't|I cannot)\b/i.test(trimmed)
+                              : /^(No|Not yet|I can't|I cannot)\b/i.test(
+                                    trimmed,
+                                  )
                                 ? 'NEGATIVE_REACTION'
-                                : /^(You can|You should|We can)\b/i.test(trimmed)
+                                : /^(You can|You should|We can)\b/i.test(
+                                      trimmed,
+                                    )
                                   ? 'SUGGEST'
                                   : 'ANSWER';
     const delivery: CoherentDictationTurn['delivery'] =
@@ -196,13 +219,7 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
       'Này Leo, chúng ta vẫn gặp nhau ở thư viện vào sáng thứ Bảy chứ?',
       'female-01',
     ],
-    [
-      'leo',
-      'Leo',
-      "Yeah, that's the plan.",
-      'Ừ, đúng kế hoạch đó.',
-      'male-01',
-    ],
+    ['leo', 'Leo', "Yeah, that's the plan.", 'Ừ, đúng kế hoạch đó.', 'male-01'],
     [
       'leo',
       'Leo',
@@ -331,26 +348,140 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
     ],
   ]),
   24: toDialogueTurns([
-    ['maya', 'Maya', 'Hey, Ben. Are we still taking the morning train to the city museum?', 'Này Ben, chúng ta vẫn đi chuyến tàu sáng đến bảo tàng thành phố chứ?', 'female-01'],
+    [
+      'maya',
+      'Maya',
+      'Hey, Ben. Are we still taking the morning train to the city museum?',
+      'Này Ben, chúng ta vẫn đi chuyến tàu sáng đến bảo tàng thành phố chứ?',
+      'female-01',
+    ],
     ['ben', 'Ben', "Yeah, that's the plan.", 'Ừ, đúng kế hoạch.', 'male-01'],
-    ['ben', 'Ben', 'It leaves from platform three at eight fifteen.', 'Tàu rời sân ga số ba lúc tám giờ mười lăm.', 'male-01'],
-    ['maya', 'Maya', 'Great. I bought our tickets online last night.', 'Tuyệt. Tối qua mình đã mua vé trực tuyến cho cả hai rồi.', 'female-01'],
-    ['ben', 'Ben', 'Nice. Keep the QR code ready at the station gate.', 'Hay đấy. Nhớ chuẩn bị mã QR ở cổng ga nhé.', 'male-01'],
-    ['ben', 'Ben', 'The gate staff may ask for both tickets.', 'Nhân viên ở cổng có thể sẽ yêu cầu cả hai vé.', 'male-01'],
-    ['maya', 'Maya', 'Okay. How long is the walk from the station to the museum?', 'Được. Từ ga đến bảo tàng đi bộ mất bao lâu?', 'female-01'],
-    ['ben', 'Ben', 'Well, let me think. It\'s about a ten-minute walk.', 'Để mình nghĩ xem. Khoảng mười phút đi bộ.', 'male-01'],
-    ['maya', 'Maya', "Only ten minutes? That's easy enough.", 'Chỉ mười phút thôi à? Vậy thì dễ rồi.', 'female-01'],
-    ['maya', 'Maya', 'Should we enter through the north door, or is there another entrance?', 'Chúng ta vào bằng cửa phía bắc hay còn lối vào khác?', 'female-01'],
-    ['ben', 'Ben', 'The north door is best. It is across from the information desk.', 'Cửa phía bắc là tiện nhất. Nó đối diện quầy thông tin.', 'male-01'],
-    ['maya', 'Maya', 'Oh, good. I really want to see the space exhibition first.', 'Ồ, tốt quá. Mình thật sự muốn xem triển lãm vũ trụ trước.', 'female-01'],
-    ['ben', 'Ben', "Sure. It opens at nine, so we'll have enough time.", 'Được thôi. Triển lãm mở cửa lúc chín giờ nên mình sẽ có đủ thời gian.', 'male-01'],
-    ['ben', 'Ben', 'The guided tour starts at two and ends at three.', 'Chuyến tham quan có hướng dẫn bắt đầu lúc hai giờ và kết thúc lúc ba giờ.', 'male-01'],
-    ['maya', 'Maya', "Then let's eat at the cafe near the west entrance.", 'Vậy mình ăn ở quán gần cửa phía tây nhé.', 'female-01'],
-    ['ben', 'Ben', 'That sounds good. It accepts cards, but it closes at four thirty.', 'Nghe được đấy. Quán nhận thẻ nhưng đóng cửa lúc bốn giờ rưỡi.', 'male-01'],
-    ['maya', 'Maya', 'Right. We should get a map before the tour begins.', 'Đúng rồi. Mình nên lấy bản đồ trước khi chuyến tham quan bắt đầu.', 'female-01'],
-    ['maya', 'Maya', "Let's meet by the museum clock at five for the train home.", 'Mình gặp nhau ở đồng hồ bảo tàng lúc năm giờ để về ga nhé.', 'female-01'],
-    ['ben', 'Ben', "I'll ask the information desk for a map.", 'Mình sẽ hỏi xin một tấm bản đồ ở quầy thông tin.', 'male-01'],
-    ['ben', 'Ben', "Sounds good. I'll carry the tickets. See you there.", 'Được đấy. Mình sẽ giữ vé. Hẹn gặp bạn ở đó.', 'male-01'],
+    [
+      'ben',
+      'Ben',
+      'It leaves from platform three at eight fifteen.',
+      'Tàu rời sân ga số ba lúc tám giờ mười lăm.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Great. I bought our tickets online last night.',
+      'Tuyệt. Tối qua mình đã mua vé trực tuyến cho cả hai rồi.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      'Nice. Keep the QR code ready at the station gate.',
+      'Hay đấy. Nhớ chuẩn bị mã QR ở cổng ga nhé.',
+      'male-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      'The gate staff may ask for both tickets.',
+      'Nhân viên ở cổng có thể sẽ yêu cầu cả hai vé.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Okay. How long is the walk from the station to the museum?',
+      'Được. Từ ga đến bảo tàng đi bộ mất bao lâu?',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "Well, let me think. It's about a ten-minute walk.",
+      'Để mình nghĩ xem. Khoảng mười phút đi bộ.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      "Only ten minutes? That's easy enough.",
+      'Chỉ mười phút thôi à? Vậy thì dễ rồi.',
+      'female-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Should we enter through the north door, or is there another entrance?',
+      'Chúng ta vào bằng cửa phía bắc hay còn lối vào khác?',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      'The north door is best. It is across from the information desk.',
+      'Cửa phía bắc là tiện nhất. Nó đối diện quầy thông tin.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Oh, good. I really want to see the space exhibition first.',
+      'Ồ, tốt quá. Mình thật sự muốn xem triển lãm vũ trụ trước.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "Sure. It opens at nine, so we'll have enough time.",
+      'Được thôi. Triển lãm mở cửa lúc chín giờ nên mình sẽ có đủ thời gian.',
+      'male-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      'The guided tour starts at two and ends at three.',
+      'Chuyến tham quan có hướng dẫn bắt đầu lúc hai giờ và kết thúc lúc ba giờ.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      "Then let's eat at the cafe near the west entrance.",
+      'Vậy mình ăn ở quán gần cửa phía tây nhé.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      'That sounds good. It accepts cards, but it closes at four thirty.',
+      'Nghe được đấy. Quán nhận thẻ nhưng đóng cửa lúc bốn giờ rưỡi.',
+      'male-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      'Right. We should get a map before the tour begins.',
+      'Đúng rồi. Mình nên lấy bản đồ trước khi chuyến tham quan bắt đầu.',
+      'female-01',
+    ],
+    [
+      'maya',
+      'Maya',
+      "Let's meet by the museum clock at five for the train home.",
+      'Mình gặp nhau ở đồng hồ bảo tàng lúc năm giờ để về ga nhé.',
+      'female-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "I'll ask the information desk for a map.",
+      'Mình sẽ hỏi xin một tấm bản đồ ở quầy thông tin.',
+      'male-01',
+    ],
+    [
+      'ben',
+      'Ben',
+      "Sounds good. I'll carry the tickets. See you there.",
+      'Được đấy. Mình sẽ giữ vé. Hẹn gặp bạn ở đó.',
+      'male-01',
+    ],
   ]),
   25: toDialogueTurns([
     [
@@ -360,13 +491,7 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
       'Chào buổi sáng Dan. Bạn có một phút để xem lại dự án khách hàng không?',
       'female-01',
     ],
-    [
-      'dan',
-      'Dan',
-      "Sure, what's up?",
-      'Được, có chuyện gì vậy?',
-      'male-01',
-    ],
+    ['dan', 'Dan', "Sure, what's up?", 'Được, có chuyện gì vậy?', 'male-01'],
     [
       'dan',
       'Dan',
@@ -381,13 +506,7 @@ const COHERENT_DICTATION_DIALOGUES: Record<number, CoherentDictationTurn[]> = {
       'Hôm qua nhóm thiết kế đã hoàn thành nguyên mẫu đầu tiên.',
       'female-01',
     ],
-    [
-      'dan',
-      'Dan',
-      'I saw it.',
-      'Mình đã xem.',
-      'male-01',
-    ],
+    ['dan', 'Dan', 'I saw it.', 'Mình đã xem.', 'male-01'],
     [
       'dan',
       'Dan',
@@ -1008,6 +1127,31 @@ async function main() {
         speakingAccuracy: 5 + index / 2,
       },
     });
+    // Keep the ledger consistent with the opening balance above — a seeded
+    // balance with no matching BanhTransaction is exactly the drift bug this
+    // fixture must not reintroduce.
+    if (index * 35 > 0) {
+      await prisma.banhTransaction.upsert({
+        where: {
+          userId_source_reference: {
+            userId: student.id,
+            source: 'SEED_FIXTURE',
+            reference: `seed:opening-balance:${student.id}`,
+          },
+        },
+        update: { amount: index * 35, balanceAfter: index * 35 },
+        create: {
+          userId: student.id,
+          amount: index * 35,
+          source: 'SEED_FIXTURE',
+          reference: `seed:opening-balance:${student.id}`,
+          dateKey: getTodayDateKeyForSeed(),
+          isCapped: false,
+          balanceAfter: index * 35,
+          metadata: { reason: 'Seed demo opening balance' },
+        },
+      });
+    }
     await prisma.userPet.upsert({
       where: { userId: student.id },
       update: {
@@ -6415,24 +6559,22 @@ async function main() {
 
   for (let index = 0; index < speakingExercises.length; index += 1) {
     const item = speakingExercises[index];
-    const taskType: SpeakingExerciseTaskType =
-      item.title.includes('Describe')
-        ? SpeakingExerciseTaskType.DESCRIBE_PICTURE
-        : item.title.includes('Information')
-          ? SpeakingExerciseTaskType.RESPOND_USING_INFORMATION
-          : item.title.includes('Opinion')
-            ? SpeakingExerciseTaskType.EXPRESS_OPINION
-            : item.title.includes('Question Response')
-              ? SpeakingExerciseTaskType.RESPOND_TO_QUESTION
-              : item.title.includes('Pronunciation')
-                ? SpeakingExerciseTaskType.PRONUNCIATION_DRILL
-                : SpeakingExerciseTaskType.READ_ALOUD;
-    const media =
-      item.title.includes('Describe Office')
-        ? { imageUrl: seedAssetUrl('toeic/visuals/office-meeting.png') }
-        : item.title.includes('Describe Station')
-          ? { imageUrl: seedAssetUrl('toeic/visuals/departure-board.png') }
-          : {};
+    const taskType: SpeakingExerciseTaskType = item.title.includes('Describe')
+      ? SpeakingExerciseTaskType.DESCRIBE_PICTURE
+      : item.title.includes('Information')
+        ? SpeakingExerciseTaskType.RESPOND_USING_INFORMATION
+        : item.title.includes('Opinion')
+          ? SpeakingExerciseTaskType.EXPRESS_OPINION
+          : item.title.includes('Question Response')
+            ? SpeakingExerciseTaskType.RESPOND_TO_QUESTION
+            : item.title.includes('Pronunciation')
+              ? SpeakingExerciseTaskType.PRONUNCIATION_DRILL
+              : SpeakingExerciseTaskType.READ_ALOUD;
+    const media = item.title.includes('Describe Office')
+      ? { imageUrl: seedAssetUrl('toeic/visuals/office-meeting.png') }
+      : item.title.includes('Describe Station')
+        ? { imageUrl: seedAssetUrl('toeic/visuals/departure-board.png') }
+        : {};
     const semanticItem = {
       ...item,
       taskType,
@@ -11849,7 +11991,11 @@ async function main() {
         stock: product.stock,
         order: product.order,
         isActive: true,
-        fulfillmentType: ['gift-notebook', 'gift-bottle', 'gift-plush'].includes(product.slug)
+        fulfillmentType: [
+          'gift-notebook',
+          'gift-bottle',
+          'gift-plush',
+        ].includes(product.slug)
           ? 'PHYSICAL'
           : 'DIGITAL',
       },
@@ -11865,7 +12011,11 @@ async function main() {
         stock: product.stock,
         order: product.order,
         isActive: true,
-        fulfillmentType: ['gift-notebook', 'gift-bottle', 'gift-plush'].includes(product.slug)
+        fulfillmentType: [
+          'gift-notebook',
+          'gift-bottle',
+          'gift-plush',
+        ].includes(product.slug)
           ? 'PHYSICAL'
           : 'DIGITAL',
       },
@@ -11895,6 +12045,7 @@ async function main() {
       type: 'add',
     },
   });
+  const seedOrder601CheckoutKey = 'seed:fixture:order:601';
   await prisma.marketOrder.upsert({
     where: { id: 601 },
     update: {
@@ -11917,6 +12068,34 @@ async function main() {
       currencyTxId: 600,
       paidAtCheckout: true,
       balanceAtCheckout: 125,
+      // Without this, the fixture is indistinguishable from an order created
+      // by bypassing MarketService.createOrder entirely (no real checkout
+      // ever happened) — a prior real-data audit found exactly this gap.
+      idempotencyKey: seedOrder601CheckoutKey,
+    },
+  });
+  // Mirror the Bread debit this fixture order implies — using the exact same
+  // reference convention MarketService.createOrder uses for a real checkout,
+  // so this fixture is ledger-consistent instead of reproducing the drift
+  // bug a live reconciliation found for this exact seeded order.
+  await prisma.banhTransaction.upsert({
+    where: {
+      userId_source_reference: {
+        userId: students[0].id,
+        source: 'MARKET_PURCHASE',
+        reference: `market:order:checkout:${seedOrder601CheckoutKey}`,
+      },
+    },
+    update: {},
+    create: {
+      userId: students[0].id,
+      amount: -100,
+      source: 'MARKET_PURCHASE',
+      reference: `market:order:checkout:${seedOrder601CheckoutKey}`,
+      dateKey: getTodayDateKeyForSeed(),
+      isCapped: false,
+      balanceAfter: 125,
+      metadata: { orderId: 601, seedFixture: true },
     },
   });
   await prisma.gameBattle.upsert({

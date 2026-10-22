@@ -33,10 +33,14 @@ describe('AdminGrammarCMS (Phase 4)', () => {
       $transaction: jest.fn((cb) => cb(prisma)),
     };
 
-    grammarService = new GrammarService(prisma, {
-      emit: jest.fn(),
-      emitAsync: jest.fn().mockResolvedValue([]),
-    } as any);
+    grammarService = new GrammarService(
+      prisma,
+      {
+        emit: jest.fn(),
+        emitAsync: jest.fn().mockResolvedValue([]),
+      } as any,
+      {} as any,
+    );
   });
 
   describe('Grammar Topic Lifecycle & Draft Safety', () => {

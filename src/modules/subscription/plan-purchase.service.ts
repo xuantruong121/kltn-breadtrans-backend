@@ -13,6 +13,7 @@ import {
   PlanStatus,
   PlanVersionStatus,
   Prisma,
+  SubscriptionEventType,
   SubscriptionStatus,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -550,7 +551,7 @@ export class PlanPurchaseService {
       );
     }
 
-    await tx.subscription.create({
+    const subscription = await tx.subscription.create({
       data: {
         userId: current.userId,
         planVersionId: current.planVersionId,
@@ -560,6 +561,26 @@ export class PlanPurchaseService {
         endsAt,
       },
     });
+    if (tx.subscriptionEvent?.create) {
+      await tx.subscriptionEvent.create({
+        data: {
+          subscriptionId: subscription.id,
+          type: SubscriptionEventType.PAYMENT_ACTIVATED,
+          actorUserId: options.actorId ?? null,
+          reason:
+            options.source === 'ADMIN'
+              ? 'Xác nhận thanh toán thủ công bởi Quản trị viên'
+              : 'Kích hoạt tự động qua cổng thanh toán',
+          previousEndsAt: null,
+          newEndsAt: endsAt,
+          metadata: {
+            planPurchaseId: current.id,
+            paymentId: current.payment.id,
+            source: options.source,
+          },
+        },
+      });
+    }
     await tx.planPayment.update({
       where: { id: current.payment.id },
       data: {
@@ -884,11 +905,26 @@ export class PlanPurchaseService {
 
   private toBankInstructions(
     payment: PurchaseWithDetails['payment'],
-  ): PlanBankInstructionsDto {
+  ): PlanBankInstructionsDto | null {
     if (!payment) {
       throw new UnprocessableEntityException('PlanPayment is missing');
     }
-    const bank = getPaymentBankConfig();
+    let bank: ReturnType<typeof getPaymentBankConfig>;
+    try {
+      bank = getPaymentBankConfig();
+    } catch (error) {
+      // A completed or manually-created payment must remain readable even when
+      // this runtime does not offer the legacy bank-transfer channel (for
+      // example in PayOS-only deployments and CI). Creation still validates
+      // this configuration before issuing a manual-transfer payment.
+      if (
+        error instanceof Error &&
+        error.message.startsWith('[Payment Config] Missing required')
+      ) {
+        return null;
+      }
+      throw error;
+    }
     return {
       bin: bank.bin,
       bankName: bank.bankName,

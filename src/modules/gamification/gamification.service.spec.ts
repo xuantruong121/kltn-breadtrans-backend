@@ -254,6 +254,286 @@ describe('GamificationService weekly cron hardening', () => {
     });
   });
 
+  describe('appendLegacyReconciliationEntry — ledger-only correction, never touches totalBanhRan', () => {
+    it('appends one compensating BanhTransaction row, leaving UserStats untouched', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        banhTransaction: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({ id: 1 }),
+        },
+        userStats: {
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 101 }),
+          update: jest.fn(),
+          upsert: jest.fn(),
+        },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(prisma, {} as any, {} as any);
+
+      const res = await service.appendLegacyReconciliationEntry(
+        2,
+        35,
+        'Đối soát dữ liệu Bánh Mì từ dữ liệu khởi tạo cũ',
+      );
+
+      expect(res.applied).toBe(true);
+      expect(res.balanceAfter).toBe(101);
+      expect(tx.banhTransaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 2,
+            amount: 35,
+            source: 'LEGACY_RECONCILIATION',
+            reference: 'legacy-reconciliation:2:v1',
+            balanceAfter: 101,
+          }),
+        }),
+      );
+      // The whole point of this primitive: totalBanhRan is never written.
+      expect(tx.userStats.update).not.toHaveBeenCalled();
+      expect(tx.userStats.upsert).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent — a second call for the same user is a no-op, not a duplicate entry', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        banhTransaction: {
+          findUnique: jest.fn().mockResolvedValue({ id: 99, amount: 35 }),
+          create: jest.fn(),
+        },
+        userStats: {
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 101 }),
+        },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(prisma, {} as any, {} as any);
+
+      const res = await service.appendLegacyReconciliationEntry(
+        2,
+        35,
+        'reason',
+      );
+
+      expect(res.applied).toBe(false);
+      expect(res.alreadyApplied).toBe(true);
+      expect(tx.banhTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('no-ops without touching the DB when delta is 0', async () => {
+      const prisma: any = {
+        userStats: {
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 50 }),
+        },
+        $transaction: jest.fn(),
+      };
+      const service = new GamificationService(prisma, {} as any, {} as any);
+
+      const res = await service.appendLegacyReconciliationEntry(2, 0, 'reason');
+
+      expect(res.applied).toBe(false);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deductBanh — CAS overdraft guard & idempotency', () => {
+    it('blocks the deduction when balance is insufficient (CAS returns 0 rows)', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        banhTransaction: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn(),
+        },
+        userStats: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 10 }),
+        },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      const res = await service.deductBanh(
+        1,
+        50,
+        'Đổi quà',
+        'MARKET_PURCHASE',
+        'market:order:checkout:abc',
+      );
+
+      expect(res.success).toBe(false);
+      expect(res.newBalance).toBe(10);
+      expect(tx.banhTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('deducts atomically and writes a negative ledger entry on success', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        banhTransaction: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({ id: 1 }),
+        },
+        userStats: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 50 }),
+        },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      const res = await service.deductBanh(
+        1,
+        50,
+        'Đổi quà',
+        'MARKET_PURCHASE',
+        'market:order:checkout:xyz',
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.newBalance).toBe(50);
+      expect(tx.banhTransaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ amount: -50, isCapped: false }),
+        }),
+      );
+    });
+
+    it('is idempotent — replaying the same (userId, source, reference) never deducts twice', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        banhTransaction: {
+          findUnique: jest.fn().mockResolvedValue({ id: 5, amount: -50 }),
+          create: jest.fn(),
+        },
+        userStats: {
+          updateMany: jest.fn(),
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 50 }),
+        },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      const res = await service.deductBanh(
+        1,
+        50,
+        'Đổi quà',
+        'MARKET_PURCHASE',
+        'market:order:checkout:replay',
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.alreadyApplied).toBe(true);
+      expect(res.newBalance).toBe(50);
+      // The CAS update and a second ledger write must never run on replay.
+      expect(tx.userStats.updateMany).not.toHaveBeenCalled();
+      expect(tx.banhTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('joins a caller-supplied externalTx instead of opening a nested transaction', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        banhTransaction: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({ id: 1 }),
+        },
+        userStats: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 30 }),
+        },
+      };
+      const prisma: any = { $transaction: jest.fn() };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      const res = await service.deductBanh(
+        1,
+        20,
+        'Đổi quà',
+        'MARKET_PURCHASE',
+        'market:order:checkout:ext',
+        {},
+        tx,
+      );
+
+      expect(res.success).toBe(true);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GRAMMAR_COMPLETION / CONTENT_COMPLETION / DIAGNOSTIC_COMPLETION now share the daily cap pool', () => {
+    it.each([
+      'GRAMMAR_COMPLETION',
+      'CONTENT_COMPLETION',
+      'DIAGNOSTIC_COMPLETION',
+    ])(
+      '%s is capped by the same MAX_DAILY_EARNABLE_BANH as other capped sources when routed through awardBanh',
+      async (source) => {
+        const tx: any = {
+          $executeRaw: jest.fn().mockResolvedValue(1),
+          $queryRaw: jest
+            .fn()
+            .mockResolvedValueOnce([]) // INSERT DailyBanhEarning
+            .mockResolvedValueOnce([{ id: 1, earnedBanh: 140 }]), // already earned 140/150 today
+          banhTransaction: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({ id: 1 }),
+          },
+          userStats: {
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({ totalBanhRan: 140, doubleBanhUntil: null }),
+            upsert: jest.fn().mockResolvedValue({ totalBanhRan: 150 }),
+          },
+          dailyBanhEarning: { update: jest.fn().mockResolvedValue({}) },
+        };
+        const prisma: any = {
+          $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+        };
+        const service = new GamificationService(
+          prisma,
+          { emit: jest.fn() } as any,
+          {} as any,
+        );
+
+        // Each of these sources previously bypassed awardBanh entirely and
+        // wrote totalBanhRan/BanhTransaction directly with isCapped:false —
+        // this proves the daily-cap fix routes them through the shared,
+        // capped primitive instead.
+        const res = await service.awardBanh(1, 50, source, `${source}:ref`, {
+          isCapped: true,
+        });
+
+        expect(res.granted).toBe(10); // only 150-140=10 left in the shared pool
+        expect(res.rejected).toBe(40);
+        expect(res.remainingDaily).toBe(0);
+      },
+    );
+  });
+
   describe('advanceDailyQuestAndGrantRewardsTx', () => {
     it('locks progress row, clamps progress and grants rewards on completion', async () => {
       const tx: any = {

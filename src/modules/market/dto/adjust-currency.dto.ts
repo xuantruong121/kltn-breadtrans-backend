@@ -20,4 +20,15 @@ export class AdjustCurrencyDto {
   @IsString()
   @IsNotEmpty()
   reason: string;
+
+  @ApiProperty({
+    example: 'a3f1c9e2-...-uuid',
+    description:
+      'UUID do client sinh ra cho MỖI thao tác điều chỉnh (một lần bấm nút = một UUID). ' +
+      'Gửi lại đúng UUID này khi retry/double-click để không bị áp dụng 2 lần. ' +
+      'Hai điều chỉnh hợp lệ khác nhau phải dùng UUID khác nhau dù amount/reason trùng.',
+  })
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey: string;
 }

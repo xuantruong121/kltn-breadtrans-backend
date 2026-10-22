@@ -138,7 +138,12 @@ describe('DiagnosticService', () => {
         }),
       ),
     };
-    service = new DiagnosticService(prisma);
+    const gamificationService = {
+      awardBanh: jest
+        .fn()
+        .mockResolvedValue({ granted: 50, newBalance: 50, isCapped: true }),
+    } as any;
+    service = new DiagnosticService(prisma, gamificationService);
   });
 
   it('rejects missing, unknown and out-of-range answers before transaction', async () => {

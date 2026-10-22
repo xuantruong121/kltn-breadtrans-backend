@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { QuizPublicationStatus } from '@prisma/client';
+import { GamificationService } from '../gamification/gamification.service';
 import {
   CreateGrammarTopicDto,
   UpdateGrammarTopicDto,
@@ -19,6 +20,7 @@ export class GrammarService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly gamificationService: GamificationService,
   ) {}
 
   async getTopics(userId?: number, isStaff = false) {
@@ -182,24 +184,18 @@ export class GrammarService {
         rewardBanh = Math.max(5, Math.floor(score / 10));
         rewardXP = score;
 
-        const updatedStats = await tx.userStats.upsert({
-          where: { userId },
-          update: { totalBanhRan: { increment: rewardBanh } },
-          create: { userId, totalBanhRan: rewardBanh },
-        });
-
-        await tx.banhTransaction.create({
-          data: {
-            userId,
-            amount: rewardBanh,
-            source: 'GRAMMAR_COMPLETION',
-            reference: `grammar:topic:${topicId}`,
-            dateKey: this.getVietnamDateKey(),
-            isCapped: false,
-            balanceAfter: updatedStats.totalBanhRan,
-            metadata: { topicId, attemptId: created.id, score } as any,
+        const awardResult = await this.gamificationService.awardBanh(
+          userId,
+          rewardBanh,
+          'GRAMMAR_COMPLETION',
+          `grammar:topic:${topicId}`,
+          {
+            isCapped: true,
+            metadata: { topicId, attemptId: created.id, score },
           },
-        });
+          tx,
+        );
+        rewardBanh = awardResult.granted;
 
         await tx.pointHistory.create({
           data: {

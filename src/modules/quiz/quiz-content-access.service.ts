@@ -3,13 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import {
-  EnrollmentStatus,
-  PlanFeatureKey,
-  QuizType,
-  Role,
-} from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PlanFeatureKey, QuizType, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 
 export type QuizContentAccessSubject = {
@@ -27,15 +21,11 @@ export type QuizContentAccess = {
 
 /**
  * Single policy boundary for commercial access to Quiz-backed skill content.
- * Course enrollment is checked before commercial entitlement so purchased
- * course access survives PLUS expiry.
+ * Premium Quiz content is governed only by the user's active plan entitlement.
  */
 @Injectable()
 export class QuizContentAccessService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly subscriptionService: SubscriptionService,
-  ) {}
+  constructor(private readonly subscriptionService: SubscriptionService) {}
 
   featureForQuizType(type: QuizType): PlanFeatureKey | null {
     if (type === QuizType.BILINGUAL_READING) {
@@ -68,14 +58,14 @@ export class QuizContentAccessService {
       return { isPremiumContent: true, isLocked: true, featureKey };
     }
 
-    const [courseAccess, entitled] = await Promise.all([
-      this.hasCourseAccess(userId, quiz.courseId),
-      this.subscriptionService.hasFeature(userId, featureKey),
-    ]);
+    const entitled = await this.subscriptionService.hasFeature(
+      userId,
+      featureKey,
+    );
 
     return {
       isPremiumContent: true,
-      isLocked: !(courseAccess || entitled),
+      isLocked: !entitled,
       featureKey,
     };
   }
@@ -121,18 +111,6 @@ export class QuizContentAccessService {
       }
     }
 
-    const courseIds = [
-      ...new Set(
-        eligible
-          .map((quiz) => quiz.courseId)
-          .filter((courseId): courseId is number => courseId !== null),
-      ),
-    ];
-    const enrolledCourseIds = await this.getEnrolledCourseIds(
-      userId,
-      courseIds,
-    );
-
     for (const quiz of quizzes) {
       const featureKey = this.featureForQuizType(quiz.type);
       if (!quiz.isPremiumContent || !featureKey || role === Role.ADMIN) {
@@ -143,11 +121,9 @@ export class QuizContentAccessService {
         });
         continue;
       }
-      const isCourseAuthorized =
-        quiz.courseId !== null && enrolledCourseIds.has(quiz.courseId);
       result.set(quiz.id, {
         isPremiumContent: true,
-        isLocked: !(isCourseAuthorized || entitledFeatures.has(featureKey)),
+        isLocked: !entitledFeatures.has(featureKey),
         featureKey,
       });
     }
@@ -173,37 +149,5 @@ export class QuizContentAccessService {
         featureKey: access.featureKey,
       },
     });
-  }
-
-  private async hasCourseAccess(
-    userId: number,
-    courseId: number | null,
-  ): Promise<boolean> {
-    if (courseId === null) return false;
-    const enrolled = await this.prisma.enrollment.findFirst({
-      where: {
-        userId,
-        status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
-        class: { courseId },
-      },
-      select: { id: true },
-    });
-    return Boolean(enrolled);
-  }
-
-  private async getEnrolledCourseIds(
-    userId: number,
-    courseIds: number[],
-  ): Promise<Set<number>> {
-    if (courseIds.length === 0) return new Set();
-    const enrollments = await this.prisma.enrollment.findMany({
-      where: {
-        userId,
-        status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
-        class: { courseId: { in: courseIds } },
-      },
-      select: { class: { select: { courseId: true } } },
-    });
-    return new Set(enrollments.map((enrollment) => enrollment.class.courseId));
   }
 }

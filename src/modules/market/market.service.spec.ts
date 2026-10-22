@@ -2,11 +2,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MarketService } from './market.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
+import { GamificationService } from '../gamification/gamification.service';
 import { UnprocessableEntityException } from '@nestjs/common';
 
 const mockPrismaService = {
   marketProduct: {
     findMany: jest.fn(),
+    findUnique: jest.fn(),
+    count: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
     updateMany: jest.fn(),
   },
   userShippingProfile: {
@@ -17,15 +22,18 @@ const mockPrismaService = {
   },
   userStats: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     updateMany: jest.fn(),
     update: jest.fn(),
     upsert: jest.fn(),
+    aggregate: jest.fn(),
   },
   leaderboard: {
     findUnique: jest.fn(),
   },
   pointHistory: {
     findMany: jest.fn(),
+    create: jest.fn(),
   },
   marketOrder: {
     findUnique: jest.fn(),
@@ -37,8 +45,20 @@ const mockPrismaService = {
   marketPhysicalRedemption: {
     create: jest.fn(),
     updateMany: jest.fn(),
+    count: jest.fn(),
   },
   banhTransaction: {
+    create: jest.fn(),
+    groupBy: jest.fn(),
+    aggregate: jest.fn(),
+    findMany: jest.fn(),
+    count: jest.fn(),
+  },
+  user: {
+    findUnique: jest.fn(),
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  currencyTransaction: {
     create: jest.fn(),
   },
   $transaction: jest.fn(),
@@ -47,6 +67,25 @@ const mockPrismaService = {
 const mockEventsGateway = {
   sendCurrencyUpdate: jest.fn(),
   sendOrderReviewUpdate: jest.fn(),
+};
+
+const mockGamificationService = {
+  deductBanh: jest
+    .fn()
+    .mockResolvedValue({ success: true, newBalance: 0, alreadyApplied: false }),
+  awardBanh: jest.fn().mockResolvedValue({
+    requested: 0,
+    granted: 0,
+    rejected: 0,
+    remainingDaily: 0,
+    newBalance: 0,
+    isCapped: false,
+  }),
+  appendLegacyReconciliationEntry: jest.fn().mockResolvedValue({
+    applied: false,
+    alreadyApplied: false,
+    balanceAfter: 0,
+  }),
 };
 
 describe('MarketService', () => {
@@ -65,6 +104,10 @@ describe('MarketService', () => {
         {
           provide: EventsGateway,
           useValue: mockEventsGateway,
+        },
+        {
+          provide: GamificationService,
+          useValue: mockGamificationService,
         },
       ],
     }).compile();
@@ -337,6 +380,654 @@ describe('MarketService', () => {
         '12 Nguyễn Văn Bảo, Phường 1, Thành phố Hồ Chí Minh, Việt Nam',
       );
       expect(redemption.status).toBe('PENDING');
+    });
+  });
+
+  describe('markFulfillmentFailed — approved-order refund, double-apply blocked', () => {
+    const approvedOrder = {
+      id: 42,
+      userId: 7,
+      status: 'approved',
+      totalBanh: 80,
+      items: [{ productId: 1, quantity: 1 }],
+      studentName: 'Học viên',
+    };
+
+    it('rejects an order that is still pending (wrong state for this action)', async () => {
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue({
+        ...approvedOrder,
+        status: 'pending',
+      });
+
+      await expect(
+        service.markFulfillmentFailed(42, 'Hàng bị thất lạc', 'admin@x.com'),
+      ).rejects.toThrow();
+    });
+
+    it('refunds Bread via awardBanh, restores stock, cancels physical redemption, and is CAS-guarded against double apply', async () => {
+      mockPrismaService.marketOrder.findUnique
+        .mockResolvedValueOnce(approvedOrder) // initial state check
+        .mockResolvedValueOnce({ ...approvedOrder, status: 'refunded' }); // post-tx re-read
+
+      mockGamificationService.awardBanh.mockResolvedValueOnce({
+        requested: 80,
+        granted: 80,
+        rejected: 0,
+        remainingDaily: 150,
+        newBalance: 180,
+        isCapped: false,
+      });
+
+      const tx: any = {
+        marketOrder: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ ...approvedOrder, status: 'refunded' }),
+        },
+        marketProduct: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        marketPhysicalRedemption: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+      mockPrismaService.$transaction.mockImplementation((cb: any) => cb(tx));
+
+      const result = await service.markFulfillmentFailed(
+        42,
+        'Hàng bị thất lạc',
+        'admin@x.com',
+      );
+
+      expect(mockGamificationService.awardBanh).toHaveBeenCalledWith(
+        7,
+        80,
+        'MARKET_REFUND',
+        'market:order:42:fulfillment-failed',
+        expect.objectContaining({ isCapped: false }),
+        tx,
+      );
+      expect(tx.marketOrder.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 42, status: 'approved' },
+          data: expect.objectContaining({ status: 'refunded' }),
+        }),
+      );
+      expect(result?.status).toBe('refunded');
+    });
+
+    it('refund is idempotent — a second call after the status has already moved is rejected by the CAS, never double-refunding', async () => {
+      // After the first successful call the order is 'refunded', so a retry's
+      // initial state check already fails the 'approved'/'completed' guard.
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue({
+        ...approvedOrder,
+        status: 'refunded',
+      });
+
+      await expect(
+        service.markFulfillmentFailed(42, 'Hàng bị thất lạc', 'admin@x.com'),
+      ).rejects.toThrow();
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('adjustCurrency — idempotent Admin adjustment', () => {
+    const dto = {
+      userId: 9,
+      amount: 100,
+      reason: 'Thưởng học viên xuất sắc',
+      idempotencyKey: 'op-123',
+    };
+    let adjustTx: {
+      userStats: { findUnique: jest.Mock };
+      pointHistory: { create: jest.Mock };
+      currencyTransaction: { create: jest.Mock };
+    };
+
+    beforeEach(() => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 9,
+        email: 'u9@x.com',
+        profile: { fullName: 'Học viên 9' },
+      });
+      adjustTx = {
+        userStats: {
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 100 }),
+        },
+        pointHistory: { create: jest.fn() },
+        currencyTransaction: { create: jest.fn() },
+      };
+      mockPrismaService.$transaction.mockImplementation((cb: any) =>
+        cb(adjustTx),
+      );
+    });
+
+    it('applies once, using a reference derived from the client idempotencyKey', async () => {
+      mockGamificationService.awardBanh.mockResolvedValueOnce({
+        requested: 100,
+        granted: 100,
+        rejected: 0,
+        remainingDaily: 150,
+        newBalance: 100,
+        isCapped: false,
+      });
+
+      const result = await service.adjustCurrency(dto, 'admin@x.com');
+
+      expect(mockGamificationService.awardBanh).toHaveBeenCalledWith(
+        9,
+        100,
+        'ADMIN_ADJUSTMENT',
+        'admin:adjust:op-123',
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(result.success).toBe(true);
+      expect(result.alreadyApplied).toBe(false);
+      expect(adjustTx.pointHistory.create).toHaveBeenCalled();
+      expect(adjustTx.currencyTransaction.create).toHaveBeenCalled();
+    });
+
+    it('a retry with the SAME idempotencyKey changes the balance only once (no duplicate ledger/legacy writes)', async () => {
+      // granted: 0 signals the (userId, source, reference) pre-check in
+      // awardBanh already found this exact operation applied.
+      mockGamificationService.awardBanh.mockResolvedValueOnce({
+        requested: 100,
+        granted: 0,
+        rejected: 100,
+        remainingDaily: 150,
+        newBalance: 100,
+        isCapped: false,
+      });
+
+      const result = await service.adjustCurrency(dto, 'admin@x.com');
+
+      expect(result.alreadyApplied).toBe(true);
+      expect(adjustTx.pointHistory.create).not.toHaveBeenCalled();
+      expect(adjustTx.currencyTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('a DIFFERENT idempotencyKey for an otherwise-identical adjustment is applied as a new, legitimate operation', async () => {
+      mockGamificationService.awardBanh.mockResolvedValueOnce({
+        requested: 100,
+        granted: 100,
+        rejected: 0,
+        remainingDaily: 150,
+        newBalance: 200,
+        isCapped: false,
+      });
+
+      const result = await service.adjustCurrency(
+        { ...dto, idempotencyKey: 'op-456' },
+        'admin@x.com',
+      );
+
+      expect(mockGamificationService.awardBanh).toHaveBeenCalledWith(
+        9,
+        100,
+        'ADMIN_ADJUSTMENT',
+        'admin:adjust:op-456',
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(result.alreadyApplied).toBe(false);
+    });
+  });
+
+  describe('getReconciliationReport — read-only drift detection', () => {
+    it('classifies CONSISTENT / DRIFT_POSITIVE / DRIFT_NEGATIVE without mutating anything', async () => {
+      mockPrismaService.userStats.findMany.mockResolvedValue([
+        { userId: 1, totalBanhRan: 100 }, // consistent
+        { userId: 2, totalBanhRan: 150 }, // stored > ledger (seed-style drift)
+        { userId: 3, totalBanhRan: 10 }, // stored < ledger
+      ]);
+      mockPrismaService.banhTransaction.groupBy.mockImplementation(
+        ({ _sum }: any) => {
+          if (_sum) {
+            return Promise.resolve([
+              { userId: 1, _sum: { amount: 100 } },
+              { userId: 2, _sum: { amount: 40 } },
+              { userId: 3, _sum: { amount: 60 } },
+            ]);
+          }
+          return Promise.resolve([]); // _max createdAt — not asserted here
+        },
+      );
+
+      const report = await service.getReconciliationReport();
+
+      expect(report.totalUsers).toBe(3);
+      expect(report.driftCount).toBe(2);
+      expect(report.rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            userId: 1,
+            delta: 0,
+            status: 'CONSISTENT',
+          }),
+          expect.objectContaining({
+            userId: 2,
+            delta: 110,
+            status: 'DRIFT_POSITIVE',
+          }),
+          expect.objectContaining({
+            userId: 3,
+            delta: -50,
+            status: 'DRIFT_NEGATIVE',
+          }),
+        ]),
+      );
+      // Read-only: no write methods on prisma were touched by this call.
+      expect(mockPrismaService.userStats.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.userStats.upsert).not.toHaveBeenCalled();
+      expect(mockPrismaService.banhTransaction.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('runLegacyReconciliation — explicitly-scoped, idempotent one-time correction', () => {
+    beforeEach(() => {
+      mockPrismaService.userStats.findMany.mockResolvedValue([
+        { userId: 2, totalBanhRan: 101 },
+        { userId: 9, totalBanhRan: 50 }, // consistent — no correction expected
+      ]);
+      mockPrismaService.banhTransaction.groupBy.mockImplementation(
+        ({ _sum }: any) =>
+          _sum
+            ? Promise.resolve([
+                { userId: 2, _sum: { amount: 66 } }, // delta +35
+                { userId: 9, _sum: { amount: 50 } }, // delta 0
+              ])
+            : Promise.resolve([]),
+      );
+      mockPrismaService.user.findMany.mockResolvedValue([]);
+    });
+
+    it('only corrects the userIds explicitly passed in, never "all current drift"', async () => {
+      mockGamificationService.appendLegacyReconciliationEntry = jest
+        .fn()
+        .mockResolvedValue({
+          applied: true,
+          alreadyApplied: false,
+          balanceAfter: 101,
+        });
+
+      const result = await service.runLegacyReconciliation([2]);
+
+      expect(
+        mockGamificationService.appendLegacyReconciliationEntry,
+      ).toHaveBeenCalledWith(2, 35, expect.any(String));
+      expect(result.results).toEqual([
+        expect.objectContaining({ userId: 2, delta: 35, applied: true }),
+      ]);
+    });
+
+    it('skips a userId with zero delta instead of forcing a no-op correction', async () => {
+      mockGamificationService.appendLegacyReconciliationEntry = jest.fn();
+
+      const result = await service.runLegacyReconciliation([9]);
+
+      expect(
+        mockGamificationService.appendLegacyReconciliationEntry,
+      ).not.toHaveBeenCalled();
+      expect(result.results[0]).toEqual(
+        expect.objectContaining({ userId: 9, delta: 0, applied: false }),
+      );
+    });
+
+    it('a second run for the same userId is idempotent (delegates to appendLegacyReconciliationEntry, which guards it)', async () => {
+      mockGamificationService.appendLegacyReconciliationEntry = jest
+        .fn()
+        .mockResolvedValue({
+          applied: false,
+          alreadyApplied: true,
+          balanceAfter: 101,
+        });
+
+      const result = await service.runLegacyReconciliation([2]);
+
+      expect(result.results[0]).toEqual(
+        expect.objectContaining({
+          userId: 2,
+          applied: false,
+          alreadyApplied: true,
+        }),
+      );
+    });
+  });
+
+  describe('getLedgerSummary — truthful ledger-derived totals', () => {
+    it('sums current balances, issued (positive) and spent (|negative|) separately', async () => {
+      mockPrismaService.userStats.aggregate.mockResolvedValue({
+        _sum: { totalBanhRan: 500 },
+      });
+      mockPrismaService.banhTransaction.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: 800 } }) // issued
+        .mockResolvedValueOnce({ _sum: { amount: -300 } }); // spent
+
+      const summary = await service.getLedgerSummary();
+
+      expect(summary).toEqual({
+        totalCurrentBalance: 500,
+        totalIssued: 800,
+        totalSpent: 300,
+      });
+    });
+  });
+
+  describe('listLedgerTransactions — filtered ledger list', () => {
+    it('applies direction/source/date filters and paginates', async () => {
+      mockPrismaService.banhTransaction.findMany.mockResolvedValue([
+        { id: 1, userId: 2, amount: -50, source: 'MARKET_PURCHASE' },
+      ]);
+      mockPrismaService.banhTransaction.count.mockResolvedValue(1);
+
+      const result = await service.listLedgerTransactions({
+        userId: 2,
+        direction: 'spending',
+        source: 'MARKET_PURCHASE',
+        dateFrom: '2026-09-01',
+        dateTo: '2026-09-30',
+        page: 1,
+        limit: 10,
+      });
+
+      expect(mockPrismaService.banhTransaction.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: 2,
+            source: 'MARKET_PURCHASE',
+            amount: { lt: 0 },
+            dateKey: { gte: '2026-09-01', lte: '2026-09-30' },
+          }),
+        }),
+      );
+      expect(result.total).toBe(1);
+      expect(result.data).toHaveLength(1);
+    });
+  });
+
+  describe('getUserLedgerHistory — per-learner ledger, never CurrencyTransaction', () => {
+    it('returns current balance, reconciliation status and BanhTransaction history', async () => {
+      mockPrismaService.userStats.findUnique.mockResolvedValue({
+        totalBanhRan: 101,
+      });
+      mockPrismaService.banhTransaction.findMany.mockResolvedValue([
+        { id: 1, userId: 2, amount: 20, source: 'VOCAB_MASTERY' },
+      ]);
+      mockPrismaService.userStats.findMany.mockResolvedValue([
+        { userId: 2, totalBanhRan: 101 },
+      ]);
+      mockPrismaService.banhTransaction.groupBy.mockImplementation(
+        ({ _sum }: any) =>
+          _sum
+            ? Promise.resolve([{ userId: 2, _sum: { amount: 66 } }])
+            : Promise.resolve([]),
+      );
+      mockPrismaService.user.findMany.mockResolvedValue([]);
+
+      const history = await service.getUserLedgerHistory(2);
+
+      expect(history.currentBalance).toBe(101);
+      expect(history.reconciliation).toEqual(
+        expect.objectContaining({
+          userId: 2,
+          delta: 35,
+          status: 'DRIFT_POSITIVE',
+        }),
+      );
+      expect(history.transactions).toHaveLength(1);
+      // Must never read the legacy CurrencyTransaction table.
+      expect(
+        mockPrismaService.currencyTransaction.create,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Admin Catalog Management', () => {
+    describe('adminGetProducts', () => {
+      it('returns paginated products with search and category filters', async () => {
+        mockPrismaService.marketProduct.count.mockResolvedValue(1);
+        mockPrismaService.marketProduct.findMany.mockResolvedValue([
+          {
+            id: 1,
+            name: 'Gấu bông Bánh Mì',
+            slug: 'gau-bong-banh-mi',
+            price: 500,
+            stock: 10,
+            isActive: true,
+          },
+        ]);
+
+        const result = await service.adminGetProducts({
+          search: 'gấu',
+          isActive: 'true',
+          page: 1,
+          limit: 10,
+        });
+
+        expect(result.data).toHaveLength(1);
+        expect(result.data[0].available).toBe(true);
+        expect(result.meta.total).toBe(1);
+      });
+    });
+
+    describe('adminGetProductById', () => {
+      it('returns product with history check', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          name: 'Gấu bông',
+          purchaseCount: 3,
+        });
+        mockPrismaService.marketPhysicalRedemption.count.mockResolvedValue(3);
+
+        const result = await service.adminGetProductById(1);
+
+        expect(result.id).toBe(1);
+        expect(result.hasHistory).toBe(true);
+        expect(result.redemptionCount).toBe(3);
+      });
+
+      it('throws NotFoundException if product does not exist', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue(null);
+
+        await expect(service.adminGetProductById(999)).rejects.toThrow(
+          'Không tìm thấy quà tặng với mã #999',
+        );
+      });
+    });
+
+    describe('adminCreateProduct', () => {
+      it('creates product with auto-generated slug', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue(null);
+        mockPrismaService.marketProduct.create.mockImplementation(
+          ({ data }: any) => Promise.resolve({ id: 10, ...data }),
+        );
+
+        const result = await service.adminCreateProduct({
+          name: 'Bình nước BreadTrans',
+          price: 250,
+          stock: 20,
+        });
+
+        expect(result.slug).toBe('binh-nuoc-breadtrans');
+        expect(result.price).toBe(250);
+        expect(result.stock).toBe(20);
+      });
+
+      it('rejects invalid price <= 0', async () => {
+        await expect(
+          service.adminCreateProduct({
+            name: 'Vật phẩm lỗi',
+            price: 0,
+            stock: 10,
+          }),
+        ).rejects.toThrow('Giá Bánh Mì phải lớn hơn 0');
+      });
+
+      it('rejects negative stock < 0', async () => {
+        await expect(
+          service.adminCreateProduct({
+            name: 'Vật phẩm lỗi',
+            price: 100,
+            stock: -5,
+          }),
+        ).rejects.toThrow('Số lượng tồn kho không được âm');
+      });
+
+      it('rejects colliding custom slug with ConflictException', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          slug: 'custom-slug',
+        });
+
+        await expect(
+          service.adminCreateProduct({
+            name: 'Vật phẩm trùng',
+            slug: 'custom-slug',
+            price: 100,
+            stock: 10,
+          }),
+        ).rejects.toThrow('đã được sử dụng bởi vật phẩm khác');
+      });
+    });
+
+    describe('adminUpdateProduct', () => {
+      it('updates product and validates price', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          slug: 'cu-slug',
+        });
+        mockPrismaService.marketProduct.update.mockImplementation(
+          ({ data }: any) => Promise.resolve({ id: 1, ...data }),
+        );
+
+        const result = await service.adminUpdateProduct(1, {
+          price: 600,
+          stock: 15,
+        });
+
+        expect(result.price).toBe(600);
+        expect(result.stock).toBe(15);
+      });
+
+      it('rejects update with price <= 0', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({ id: 1 });
+
+        await expect(
+          service.adminUpdateProduct(1, { price: -10 }),
+        ).rejects.toThrow('Giá Bánh Mì phải lớn hơn 0');
+      });
+    });
+
+    describe('adminToggleProductActive', () => {
+      it('toggles product active state', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          isActive: true,
+        });
+        mockPrismaService.marketProduct.update.mockResolvedValue({
+          id: 1,
+          isActive: false,
+        });
+
+        const result = await service.adminToggleProductActive(1);
+        expect(result.isActive).toBe(false);
+      });
+    });
+
+    describe('adminDeleteProduct — Safe deactivation policy', () => {
+      it('blocks hard deletion if product has redemption history', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          purchaseCount: 5,
+        });
+        mockPrismaService.marketPhysicalRedemption.count.mockResolvedValue(5);
+
+        await expect(service.adminDeleteProduct(1)).rejects.toThrow(
+          'Không thể xóa vĩnh viễn quà tặng đã có lịch sử đổi quà. Vui lòng sử dụng tính năng "Ngừng hiển thị"',
+        );
+      });
+
+      it('deactivates product rather than hard-deleting when zero history exists', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 2,
+          purchaseCount: 0,
+        });
+        mockPrismaService.marketPhysicalRedemption.count.mockResolvedValue(0);
+        mockPrismaService.marketProduct.update.mockResolvedValue({
+          id: 2,
+          isActive: false,
+        });
+
+        const result = await service.adminDeleteProduct(2);
+        expect(result.success).toBe(true);
+        expect(result.isActive).toBe(false);
+      });
+    });
+
+    describe('reviewOrder — Rejection requires reason and audits metadata', () => {
+      it('requires reason when rejecting order', async () => {
+        mockPrismaService.marketOrder.findUnique.mockResolvedValue({
+          id: 10,
+          status: 'pending',
+        });
+
+        await expect(
+          service.reviewOrder(10, 'rejected', 'Admin', ''),
+        ).rejects.toThrow('Vui lòng nhập lý do từ chối đơn hàng');
+      });
+
+      it('refunds Bread and stock, and persists bankSnapshot reason on rejection', async () => {
+        const order = {
+          id: 10,
+          userId: 1,
+          totalBanh: 500,
+          status: 'pending',
+          studentName: 'Học viên A',
+          items: [{ productId: 2, quantity: 1 }],
+        };
+        mockPrismaService.marketOrder.findUnique.mockResolvedValue(order);
+        mockPrismaService.$transaction.mockImplementation((cb: any) =>
+          cb({
+            marketOrder: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              findUnique: jest.fn().mockResolvedValue({
+                ...order,
+                status: 'rejected',
+                bankSnapshot: { reason: 'Hết hàng nhà cung cấp' },
+              }),
+            },
+            marketProduct: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+            marketPhysicalRedemption: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          }),
+        );
+
+        const result = await service.reviewOrder(
+          10,
+          'rejected',
+          'Admin Quản Trị',
+          'Hết hàng nhà cung cấp',
+        );
+
+        expect(result.reason).toBe('Hết hàng nhà cung cấp');
+        expect(mockGamificationService.awardBanh).toHaveBeenCalledWith(
+          1,
+          500,
+          'MARKET_REFUND',
+          'refund:order:10',
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              reason: 'Hết hàng nhà cung cấp',
+            }),
+          }),
+          expect.anything(),
+        );
+      });
     });
   });
 });

@@ -4,7 +4,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 
 /**
  * Idempotent Entry Diagnostic v2 authoring.  The v1 assessment is retained as
- * historical data; only its active flag is changed.  Metadata is kept beside
+ * historical data; it is kept inactive. Metadata is kept beside
  * the option values in the existing Json column so this first rebuild remains
  * additive and does not require a destructive schema migration.
  */
@@ -1206,24 +1206,23 @@ async function main() {
     ],
   });
   await writeJson('entry-diagnostic-question-audit-before.json', before);
-  if (old)
-    await prisma.diagnosticAssessment.update({
-      where: { id: 1 },
-      data: { isActive: false },
-    });
+  await prisma.diagnosticAssessment.updateMany({
+    where: { id: { not: 2 }, isActive: true },
+    data: { isActive: false },
+  });
   const assessment = await prisma.diagnosticAssessment.upsert({
     where: { id: 2 },
     update: {
-      title: 'Entry Diagnostic v2',
+      title: 'Kiểm tra đầu vào',
       description:
-        'Bài đánh giá nội bộ ước tính trình độ A1–B2 qua Language Use, Reading và Listening; Speaking/Writing cung cấp bằng chứng bổ trợ. Thời lượng dự kiến 35–50 phút. Không phải chứng chỉ CEFR hay bài thi TOEIC chính thức.',
+        'Bài đánh giá năng lực tham khảo qua Language Use, Reading và Listening; Speaking/Writing cung cấp nhận xét bổ trợ. Thời lượng dự kiến 35–50 phút. Không phải chứng chỉ CEFR hay bài thi TOEIC chính thức.',
       isActive: true,
     },
     create: {
       id: 2,
-      title: 'Entry Diagnostic v2',
+      title: 'Kiểm tra đầu vào',
       description:
-        'Bài đánh giá nội bộ ước tính trình độ A1–B2 qua Language Use, Reading và Listening; Speaking/Writing cung cấp bằng chứng bổ trợ. Thời lượng dự kiến 35–50 phút. Không phải chứng chỉ CEFR hay bài thi TOEIC chính thức.',
+        'Bài đánh giá năng lực tham khảo qua Language Use, Reading và Listening; Speaking/Writing cung cấp nhận xét bổ trợ. Thời lượng dự kiến 35–50 phút. Không phải chứng chỉ CEFR hay bài thi TOEIC chính thức.',
       isActive: true,
     },
   });

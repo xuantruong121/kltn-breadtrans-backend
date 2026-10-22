@@ -3,20 +3,40 @@ import {
   BadRequestException,
   NotFoundException,
   UnprocessableEntityException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
 import { AdjustCurrencyDto } from './dto/adjust-currency.dto';
 import { MarketProductDto } from './dto/market-product.dto';
+import {
+  CreateMarketProductDto,
+  UpdateMarketProductDto,
+  AdminMarketProductQueryDto,
+} from './dto/admin-market-product.dto';
 import { isValidVietnamPhone } from '../../common/utils/vietnam-phone.util';
 import { randomUUID } from 'crypto';
+import { GamificationService } from '../gamification/gamification.service';
+
+function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
 
 @Injectable()
 export class MarketService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventsGateway: EventsGateway,
+    private readonly gamificationService: GamificationService,
   ) {}
 
   async getProducts(): Promise<MarketProductDto[]> {
@@ -236,35 +256,27 @@ export class MarketService {
         }
       }
 
-      // 2b. Trừ số dư Bánh Mì của học sinh theo CAS nguyên tử
-      const walletResult = await tx.userStats.updateMany({
-        where: {
-          userId,
-          totalBanhRan: { gte: calculatedTotalBanh },
-        },
-        data: {
-          totalBanhRan: { decrement: calculatedTotalBanh },
-        },
-      });
+      // 2b. Trừ số dư Bánh Mì qua primitive dùng chung (CAS + ghi ledger
+      // MARKET_PURCHASE trong cùng transaction). Reference gắn với checkoutKey
+      // (biết trước khi MarketOrder tồn tại) nên cũng là lớp idempotency thứ 2
+      // độc lập với unique constraint của MarketOrder.idempotencyKey.
+      const deductResult = await this.gamificationService.deductBanh(
+        userId,
+        calculatedTotalBanh,
+        'Đổi quà trong Cửa hàng Bánh Mì',
+        'MARKET_PURCHASE',
+        `market:order:checkout:${checkoutKey}`,
+        { metadata: { itemNames, checkoutKey } },
+        tx,
+      );
 
-      if (walletResult.count === 0) {
-        const currentStats = await tx.userStats.findUnique({
-          where: { userId },
-        });
+      if (!deductResult.success) {
         throw new BadRequestException(
-          `Bạn không đủ Bánh Mì để đổi thưởng (Cần ${calculatedTotalBanh} Bánh Mì, hiện có ${currentStats?.totalBanhRan || 0})`,
+          `Bạn không đủ Bánh Mì để đổi thưởng (Cần ${calculatedTotalBanh} Bánh Mì, hiện có ${deductResult.newBalance})`,
         );
       }
 
-      // 2c. Write to immutable BanhTransaction ledger
-      const today = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date());
-
-      const updatedStats = await tx.userStats.findUnique({ where: { userId } });
+      const updatedStats = { totalBanhRan: deductResult.newBalance };
 
       // 2d. Kích hoạt hiệu ứng vật phẩm nếu là vật phẩm tức thì (Ví dụ Khiên chuỗi)
       for (const { product, quantity } of resolvedItems) {
@@ -372,19 +384,6 @@ export class MarketService {
         }
       }
 
-      await tx.banhTransaction.create({
-        data: {
-          userId,
-          amount: -calculatedTotalBanh,
-          source: 'MARKET_PURCHASE',
-          reference: `market:order:${order.id}`,
-          dateKey: today,
-          isCapped: false,
-          balanceAfter: updatedStats?.totalBanhRan ?? 0,
-          metadata: { itemNames, orderId: order.id } as any,
-        },
-      });
-
       return {
         order,
         remainingBanh: updatedStats?.totalBanhRan ?? 0,
@@ -453,8 +452,23 @@ export class MarketService {
   }
 
   // Admin APIs
-  async getAllOrders() {
-    return this.prisma.marketOrder.findMany({
+  async getAllOrders(filter?: { status?: string; search?: string }) {
+    const where: any = {};
+    if (filter?.status && filter.status !== 'all') {
+      where.status = filter.status;
+    }
+    if (filter?.search?.trim()) {
+      const term = filter.search.trim();
+      const maybeId = parseInt(term, 10);
+      where.OR = [
+        { studentName: { contains: term, mode: 'insensitive' } },
+        { user: { email: { contains: term, mode: 'insensitive' } } },
+        ...(isNaN(maybeId) ? [] : [{ id: maybeId }]),
+      ];
+    }
+
+    const orders = await this.prisma.marketOrder.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         user: {
@@ -467,9 +481,19 @@ export class MarketService {
         physicalRedemptions: true,
       },
     });
+
+    return orders.map((ord) => ({
+      ...ord,
+      reason: (ord.bankSnapshot as any)?.reason || null,
+    }));
   }
 
-  async reviewOrder(orderId: number, status: string, reviewerName: string) {
+  async reviewOrder(
+    orderId: number,
+    status: string,
+    reviewerName: string,
+    reason?: string,
+  ) {
     const order = await this.prisma.marketOrder.findUnique({
       where: { id: orderId },
     });
@@ -477,11 +501,16 @@ export class MarketService {
       throw new NotFoundException(`Order ${orderId} not found`);
     }
 
+    if (status === 'rejected' && !reason?.trim()) {
+      throw new BadRequestException('Vui lòng nhập lý do từ chối đơn hàng');
+    }
+
     let updatedOrder = order;
 
     // Nếu Admin Từ Chối -> Hoàn lại Bánh Mì và Tồn kho Stock trong cùng 1 transaction nguyên tử
     if (status === 'rejected' && order.status === 'pending') {
-      await this.prisma.$transaction(async (tx) => {
+      updatedOrder = await this.prisma.$transaction(async (tx) => {
+        const rejectionReason = reason?.trim() || 'Admin từ chối đơn đổi quà';
         // Atomic CAS đổi trạng thái đơn hàng
         const casResult = await tx.marketOrder.updateMany({
           where: { id: orderId, status: 'pending' },
@@ -489,6 +518,11 @@ export class MarketService {
             status: 'rejected',
             reviewedBy: reviewerName,
             reviewedAt: new Date(),
+            bankSnapshot: {
+              reason: rejectionReason,
+              action: 'rejected',
+              reviewerName,
+            },
           },
         });
 
@@ -498,32 +532,21 @@ export class MarketService {
           );
         }
 
-        // Hoàn lại Bánh Mì cho học sinh
-        const updatedStats = await tx.userStats.upsert({
-          where: { userId: order.userId },
-          update: { totalBanhRan: { increment: order.totalBanh } },
-          create: { userId: order.userId, totalBanhRan: order.totalBanh },
-        });
-
-        const today = new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'Asia/Ho_Chi_Minh',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }).format(new Date());
-
-        await tx.banhTransaction.create({
-          data: {
-            userId: order.userId,
-            amount: order.totalBanh,
-            source: 'MARKET_REFUND',
-            reference: `refund:order:${orderId}`,
-            dateKey: today,
+        // Hoàn lại Bánh Mì cho học sinh qua primitive dùng chung — reference cố
+        // định theo orderId nên refund không thể áp dụng 2 lần (idempotent),
+        // độc lập với CAS status ở trên.
+        const refundResult = await this.gamificationService.awardBanh(
+          order.userId,
+          order.totalBanh,
+          'MARKET_REFUND',
+          `refund:order:${orderId}`,
+          {
             isCapped: false,
-            balanceAfter: updatedStats.totalBanhRan,
-            metadata: { orderId, reviewerName } as any,
+            metadata: { orderId, reviewerName, reason: rejectionReason },
           },
-        });
+          tx,
+        );
+        const updatedStats = { totalBanhRan: refundResult.newBalance };
 
         // Hoàn lại tồn kho stock cho các sản phẩm trong đơn hàng
         const orderItems = (order.items as any[]) || [];
@@ -551,14 +574,12 @@ export class MarketService {
         this.eventsGateway.sendCurrencyUpdate(order.userId, {
           amount: order.totalBanh,
           newBalance: updatedStats.totalBanhRan,
-          reason: `Hoàn tiền đơn đổi quà #${orderId}`,
+          reason: `Hoàn tiền đơn đổi quà #${orderId}: ${rejectionReason}`,
           studentName: order.studentName,
         });
-      });
 
-      updatedOrder = (await this.prisma.marketOrder.findUnique({
-        where: { id: orderId },
-      }))!;
+        return (await tx.marketOrder.findUnique({ where: { id: orderId } }))!;
+      });
     } else {
       updatedOrder = await this.prisma.marketOrder.update({
         where: { id: orderId },
@@ -566,6 +587,9 @@ export class MarketService {
           status,
           reviewedBy: reviewerName,
           reviewedAt: new Date(),
+          bankSnapshot: reason?.trim()
+            ? { reason: reason.trim(), action: status, reviewerName }
+            : undefined,
         },
       });
 
@@ -585,7 +609,558 @@ export class MarketService {
       reviewerName,
     });
 
-    return updatedOrder;
+    return {
+      ...updatedOrder,
+      reason: (updatedOrder.bankSnapshot as any)?.reason || null,
+    };
+  }
+
+  /**
+   * Compensating action for a redemption that already moved past 'pending'
+   * (approved/completed) but whose real-world fulfillment later failed
+   * (lost/damaged shipment, discontinued item, etc). Distinct from
+   * `reviewOrder`'s pending→rejected path because the semantics differ: this
+   * is a post-approval correction, not an initial review decision. CAS-guards
+   * the status transition and the Bread refund is idempotent via a stable
+   * per-order reference, so retrying this action never double-refunds.
+   */
+  async markFulfillmentFailed(
+    orderId: number,
+    reason: string,
+    adminName: string,
+  ) {
+    const order = await this.prisma.marketOrder.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found`);
+    }
+    if (order.status !== 'approved' && order.status !== 'completed') {
+      throw new BadRequestException(
+        `Chỉ có thể đánh dấu thất bại cho đơn đã duyệt/hoàn tất (trạng thái hiện tại: ${order.status})`,
+      );
+    }
+
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      const casResult = await tx.marketOrder.updateMany({
+        where: { id: orderId, status: order.status },
+        data: {
+          status: 'refunded',
+          reviewedBy: adminName,
+          reviewedAt: new Date(),
+          bankSnapshot: {
+            reason: reason.trim(),
+            action: 'fulfillment-failed',
+            adminName,
+          },
+        },
+      });
+      if (casResult.count === 0) {
+        throw new BadRequestException(
+          'Đơn hàng đã được xử lý bởi người khác, vui lòng tải lại',
+        );
+      }
+
+      const refundResult = await this.gamificationService.awardBanh(
+        order.userId,
+        order.totalBanh,
+        'MARKET_REFUND',
+        `market:order:${orderId}:fulfillment-failed`,
+        {
+          isCapped: false,
+          metadata: {
+            orderId,
+            adminName,
+            reason,
+            reasonType: 'FULFILLMENT_FAILED',
+          },
+        },
+        tx,
+      );
+
+      const orderItems = (order.items as any[]) || [];
+      for (const item of orderItems) {
+        const qty = Number(item.quantity) || 1;
+        const targetId = Number(item.productId || item.id);
+        if (Number.isInteger(targetId)) {
+          await tx.marketProduct.updateMany({
+            where: { id: targetId },
+            data: {
+              stock: { increment: qty },
+              purchaseCount: { decrement: qty },
+            },
+          });
+        }
+      }
+
+      await tx.marketPhysicalRedemption.updateMany({
+        where: { orderId },
+        data: { status: 'CANCELLED' },
+      });
+
+      this.eventsGateway.sendCurrencyUpdate(order.userId, {
+        amount: order.totalBanh,
+        newBalance: refundResult.newBalance,
+        reason: `Hoàn tiền do giao/thực hiện thất bại — đơn #${orderId}: ${reason}`,
+        studentName: order.studentName,
+      });
+
+      return tx.marketOrder.findUnique({ where: { id: orderId } });
+    });
+
+    this.eventsGateway.sendOrderReviewUpdate(order.userId, {
+      orderId: order.id,
+      status: 'refunded',
+      totalBanh: order.totalBanh,
+      reviewerName: adminName,
+    });
+
+    return {
+      ...updatedOrder!,
+      reason: (updatedOrder?.bankSnapshot as any)?.reason || reason,
+    };
+  }
+
+  // --- Admin Catalog Management ---
+
+  async adminGetProducts(query: AdminMarketProductQueryDto) {
+    const where: any = {};
+
+    if (query.search?.trim()) {
+      const term = query.search.trim();
+      where.OR = [
+        { name: { contains: term, mode: 'insensitive' } },
+        { slug: { contains: term, mode: 'insensitive' } },
+        { description: { contains: term, mode: 'insensitive' } },
+      ];
+    }
+
+    if (query.isActive !== undefined && query.isActive !== 'all') {
+      where.isActive = query.isActive === 'true';
+    }
+
+    if (query.category?.trim() && query.category !== 'all') {
+      where.category = query.category.trim();
+    }
+
+    if (query.fulfillmentType) {
+      where.fulfillmentType = query.fulfillmentType;
+    }
+
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
+    const skip = (page - 1) * limit;
+
+    const [total, products] = await Promise.all([
+      this.prisma.marketProduct.count({ where }),
+      this.prisma.marketProduct.findMany({
+        where,
+        orderBy: [{ order: 'asc' }, { id: 'desc' }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: products.map((product) => ({
+        ...product,
+        available: product.stock > 0 && product.isActive,
+      })),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async adminGetProductById(id: number) {
+    const product = await this.prisma.marketProduct.findUnique({
+      where: { id },
+    });
+    if (!product) {
+      throw new NotFoundException(`Không tìm thấy quà tặng với mã #${id}`);
+    }
+
+    const physicalRedemptionCount =
+      await this.prisma.marketPhysicalRedemption.count({
+        where: { productId: id },
+      });
+
+    return {
+      ...product,
+      hasHistory: product.purchaseCount > 0 || physicalRedemptionCount > 0,
+      redemptionCount: Math.max(product.purchaseCount, physicalRedemptionCount),
+    };
+  }
+
+  async adminCreateProduct(dto: CreateMarketProductDto) {
+    if (dto.price <= 0) {
+      throw new BadRequestException('Giá Bánh Mì phải lớn hơn 0');
+    }
+    if (dto.stock < 0) {
+      throw new BadRequestException('Số lượng tồn kho không được âm');
+    }
+
+    let finalSlug = dto.slug?.trim()
+      ? slugify(dto.slug.trim())
+      : slugify(dto.name);
+    if (!finalSlug) {
+      finalSlug = `product-${Date.now()}`;
+    }
+
+    const existingSlug = await this.prisma.marketProduct.findUnique({
+      where: { slug: finalSlug },
+    });
+    if (existingSlug) {
+      if (dto.slug?.trim()) {
+        throw new ConflictException(
+          `Mã slug "${finalSlug}" đã được sử dụng bởi vật phẩm khác`,
+        );
+      }
+      finalSlug = `${finalSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    return this.prisma.marketProduct.create({
+      data: {
+        name: dto.name.trim(),
+        slug: finalSlug,
+        description: dto.description?.trim() || null,
+        category: dto.category?.trim() || 'GENERAL',
+        rarity: dto.rarity?.trim() || 'COMMON',
+        price: dto.price,
+        stock: dto.stock,
+        imageUrl: dto.imageUrl?.trim() || null,
+        order: dto.order ?? 0,
+        isActive: dto.isActive ?? true,
+        fulfillmentType: dto.fulfillmentType ?? 'DIGITAL',
+      },
+    });
+  }
+
+  async adminUpdateProduct(id: number, dto: UpdateMarketProductDto) {
+    const existing = await this.prisma.marketProduct.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Không tìm thấy quà tặng với mã #${id}`);
+    }
+
+    if (dto.price !== undefined && dto.price <= 0) {
+      throw new BadRequestException('Giá Bánh Mì phải lớn hơn 0');
+    }
+    if (dto.stock !== undefined && dto.stock < 0) {
+      throw new BadRequestException('Số lượng tồn kho không được âm');
+    }
+
+    let updateSlug = existing.slug;
+    if (dto.slug?.trim()) {
+      const cleanSlug = slugify(dto.slug.trim());
+      if (cleanSlug !== existing.slug) {
+        const slugConflict = await this.prisma.marketProduct.findUnique({
+          where: { slug: cleanSlug },
+        });
+        if (slugConflict && slugConflict.id !== id) {
+          throw new ConflictException(
+            `Mã slug "${cleanSlug}" đã được sử dụng bởi vật phẩm khác`,
+          );
+        }
+        updateSlug = cleanSlug;
+      }
+    }
+
+    return this.prisma.marketProduct.update({
+      where: { id },
+      data: {
+        name: dto.name !== undefined ? dto.name.trim() : undefined,
+        slug: updateSlug,
+        description:
+          dto.description !== undefined
+            ? dto.description?.trim() || null
+            : undefined,
+        category: dto.category !== undefined ? dto.category.trim() : undefined,
+        rarity: dto.rarity !== undefined ? dto.rarity.trim() : undefined,
+        price: dto.price !== undefined ? dto.price : undefined,
+        stock: dto.stock !== undefined ? dto.stock : undefined,
+        imageUrl:
+          dto.imageUrl !== undefined ? dto.imageUrl?.trim() || null : undefined,
+        order: dto.order !== undefined ? dto.order : undefined,
+        isActive: dto.isActive !== undefined ? dto.isActive : undefined,
+        fulfillmentType:
+          dto.fulfillmentType !== undefined ? dto.fulfillmentType : undefined,
+      },
+    });
+  }
+
+  async adminToggleProductActive(id: number, isActive?: boolean) {
+    const existing = await this.prisma.marketProduct.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Không tìm thấy quà tặng với mã #${id}`);
+    }
+
+    const nextState =
+      typeof isActive === 'boolean' ? isActive : !existing.isActive;
+
+    return this.prisma.marketProduct.update({
+      where: { id },
+      data: { isActive: nextState },
+    });
+  }
+
+  async adminDeleteProduct(id: number) {
+    const existing = await this.prisma.marketProduct.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Không tìm thấy quà tặng với mã #${id}`);
+    }
+
+    // Kiểm tra lịch sử đổi quà: nếu đã có lượt đổi thì cấm tuyệt đối xóa vĩnh viễn
+    const physicalCount = await this.prisma.marketPhysicalRedemption.count({
+      where: { productId: id },
+    });
+
+    if (existing.purchaseCount > 0 || physicalCount > 0) {
+      throw new BadRequestException(
+        'Không thể xóa vĩnh viễn quà tặng đã có lịch sử đổi quà. Vui lòng sử dụng tính năng "Ngừng hiển thị" (ẩn khỏi cửa hàng).',
+      );
+    }
+
+    // Tuân thủ REWARD_CATALOG_HARD_DELETE_ALLOWED=false: Deactivate thay vì xóa cứng
+    await this.prisma.marketProduct.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    return {
+      success: true,
+      message: 'Đã ngừng hiển thị quà tặng (vật phẩm được lưu trữ an toàn)',
+      productId: id,
+      isActive: false,
+    };
+  }
+
+  /**
+   * Read-only reconciliation: compares the runtime balance
+   * (UserStats.totalBanhRan) against the append-only ledger's sum
+   * (SUM(BanhTransaction.amount)) for every user that has either. Never
+   * mutates anything — detecting drift is a prerequisite for deciding any
+   * remediation, not a repair action.
+   */
+  async getReconciliationReport() {
+    const [allStats, ledgerSums, lastTx, users] = await Promise.all([
+      this.prisma.userStats.findMany({
+        select: { userId: true, totalBanhRan: true },
+      }),
+      this.prisma.banhTransaction.groupBy({
+        by: ['userId'],
+        _sum: { amount: true },
+      }),
+      this.prisma.banhTransaction.groupBy({
+        by: ['userId'],
+        _max: { createdAt: true },
+      }),
+      this.prisma.user.findMany({
+        select: { id: true, profile: { select: { fullName: true } } },
+      }),
+    ]);
+
+    const ledgerByUser = new Map(
+      ledgerSums.map((row) => [row.userId, row._sum.amount ?? 0]),
+    );
+    const lastTxByUser = new Map(
+      lastTx.map((row) => [row.userId, row._max.createdAt]),
+    );
+    const nameByUser = new Map(
+      users.map((u) => [u.id, u.profile?.fullName ?? `Học viên #${u.id}`]),
+    );
+    const userIds = new Set<number>([
+      ...allStats.map((s) => s.userId),
+      ...ledgerByUser.keys(),
+    ]);
+
+    const rows = Array.from(userIds).map((userId) => {
+      const storedBalance =
+        allStats.find((s) => s.userId === userId)?.totalBanhRan ?? 0;
+      const ledgerBalance = ledgerByUser.get(userId) ?? 0;
+      const delta = storedBalance - ledgerBalance;
+      const status =
+        delta === 0
+          ? 'CONSISTENT'
+          : delta > 0
+            ? 'DRIFT_POSITIVE'
+            : 'DRIFT_NEGATIVE';
+      return {
+        userId,
+        displayName: nameByUser.get(userId) ?? `Học viên #${userId}`,
+        storedBalance,
+        ledgerBalance,
+        delta,
+        status,
+        lastTransactionAt: lastTxByUser.get(userId) ?? null,
+      };
+    });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      totalUsers: rows.length,
+      driftCount: rows.filter((r) => r.status !== 'CONSISTENT').length,
+      rows,
+    };
+  }
+
+  /**
+   * One-time, explicitly-scoped correction — never applied to "every drifted
+   * user" blindly (rule: only reconcile CONFIRMED legacy drift). The caller
+   * (Admin, via a reviewed list) passes exactly which userIds to correct.
+   * Never touches UserStats.totalBanhRan — only appends the compensating
+   * ledger row via GamificationService.appendLegacyReconciliationEntry.
+   */
+  async runLegacyReconciliation(userIds: number[]) {
+    const report = await this.getReconciliationReport();
+    const byUserId = new Map(report.rows.map((r) => [r.userId, r]));
+
+    const results = [] as Array<{
+      userId: number;
+      delta: number;
+      applied: boolean;
+      alreadyApplied: boolean;
+      skippedReason?: string;
+    }>;
+
+    for (const userId of userIds) {
+      const row = byUserId.get(userId);
+      if (!row || row.delta === 0) {
+        results.push({
+          userId,
+          delta: 0,
+          applied: false,
+          alreadyApplied: false,
+          skippedReason: 'Không có chênh lệch tại thời điểm chạy',
+        });
+        continue;
+      }
+      const outcome =
+        await this.gamificationService.appendLegacyReconciliationEntry(
+          userId,
+          row.delta,
+          'Đối soát dữ liệu Bánh Mì từ dữ liệu khởi tạo cũ',
+        );
+      results.push({
+        userId,
+        delta: row.delta,
+        applied: outcome.applied,
+        alreadyApplied: outcome.alreadyApplied,
+      });
+    }
+
+    return { results };
+  }
+
+  /**
+   * Tổng quan cho "Sổ Bánh Mì" — chỉ các con số suy ra thẳng từ ngữ nghĩa
+   * ledger (không bịa "doanh thu"): tổng số dư đang lưu hành (UserStats),
+   * tổng đã phát hành (tổng các dòng dương), tổng đã sử dụng (trị tuyệt đối
+   * tổng các dòng âm).
+   */
+  async getLedgerSummary() {
+    const [balanceSum, issuedSum, spentSum] = await Promise.all([
+      this.prisma.userStats.aggregate({ _sum: { totalBanhRan: true } }),
+      this.prisma.banhTransaction.aggregate({
+        where: { amount: { gt: 0 } },
+        _sum: { amount: true },
+      }),
+      this.prisma.banhTransaction.aggregate({
+        where: { amount: { lt: 0 } },
+        _sum: { amount: true },
+      }),
+    ]);
+    return {
+      totalCurrentBalance: balanceSum._sum.totalBanhRan ?? 0,
+      totalIssued: issuedSum._sum.amount ?? 0,
+      totalSpent: Math.abs(spentSum._sum.amount ?? 0),
+    };
+  }
+
+  /**
+   * Danh sách giao dịch Bánh Mì thật (BanhTransaction) có filter — nguồn dữ
+   * liệu duy nhất cho "Sổ Bánh Mì", không phải CurrencyTransaction (sổ cũ).
+   */
+  async listLedgerTransactions(filters: {
+    userId?: number;
+    direction?: 'earning' | 'spending';
+    source?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 20));
+
+    const where: any = {};
+    if (filters.userId) where.userId = filters.userId;
+    if (filters.source) where.source = filters.source;
+    if (filters.direction === 'earning') where.amount = { gt: 0 };
+    if (filters.direction === 'spending') where.amount = { lt: 0 };
+    if (filters.dateFrom || filters.dateTo) {
+      where.dateKey = {
+        ...(filters.dateFrom ? { gte: filters.dateFrom } : {}),
+        ...(filters.dateTo ? { lte: filters.dateTo } : {}),
+      };
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.banhTransaction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          user: {
+            select: { id: true, profile: { select: { fullName: true } } },
+          },
+        },
+      }),
+      this.prisma.banhTransaction.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  /**
+   * Lịch sử Bánh Mì đầy đủ của 1 học viên — luôn đọc từ BanhTransaction
+   * (sổ thật), không bao giờ tính từ CurrencyTransaction (sổ cũ).
+   */
+  async getUserLedgerHistory(userId: number) {
+    const [stats, transactions, report] = await Promise.all([
+      this.prisma.userStats.findUnique({
+        where: { userId },
+        select: { totalBanhRan: true },
+      }),
+      this.prisma.banhTransaction.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+      this.getReconciliationReport(),
+    ]);
+    const reconciliation = report.rows.find((r) => r.userId === userId) ?? {
+      storedBalance: stats?.totalBanhRan ?? 0,
+      ledgerBalance: 0,
+      delta: 0,
+      status: 'CONSISTENT',
+    };
+
+    return {
+      userId,
+      currentBalance: stats?.totalBanhRan ?? 0,
+      reconciliation,
+      transactions,
+    };
   }
 
   async adjustCurrency(dto: AdjustCurrencyDto, adminName: string) {
@@ -608,55 +1183,70 @@ export class MarketService {
       user.email?.split('@')[0] ||
       `Học viên #${dto.userId}`;
 
-    const updatedStats = await this.prisma.$transaction(async (tx) => {
-      let stats;
-      if (dto.amount > 0) {
-        stats = await tx.userStats.upsert({
-          where: { userId: dto.userId },
-          update: { totalBanhRan: { increment: dto.amount } },
-          create: { userId: dto.userId, totalBanhRan: dto.amount },
-        });
-      } else {
-        const result = await tx.userStats.updateMany({
-          where: {
-            userId: dto.userId,
-            totalBanhRan: { gte: Math.abs(dto.amount) },
-          },
-          data: { totalBanhRan: { decrement: Math.abs(dto.amount) } },
-        });
-        if (result.count !== 1) {
-          const current = await tx.userStats.findUnique({
-            where: { userId: dto.userId },
-          });
+    // Reference cố định theo idempotencyKey do client sinh — một thao tác
+    // Admin (một lần bấm) chỉ áp dụng đúng 1 lần dù bị double-click/retry.
+    // Hai điều chỉnh hợp lệ khác nhau (kể cả cùng amount/reason) phải dùng
+    // idempotencyKey khác nhau nên không bao giờ bị gộp nhầm.
+    const reference = `admin:adjust:${dto.idempotencyKey}`;
+
+    const { newBalance, alreadyApplied } = await this.prisma.$transaction(
+      async (tx) => {
+        if (dto.amount > 0) {
+          const result = await this.gamificationService.awardBanh(
+            dto.userId,
+            dto.amount,
+            'ADMIN_ADJUSTMENT',
+            reference,
+            { isCapped: false, metadata: { adminName, reason: dto.reason } },
+            tx,
+          );
+          if (result.granted === 0) {
+            const stats = await tx.userStats.findUnique({
+              where: { userId: dto.userId },
+            });
+            return {
+              newBalance: stats?.totalBanhRan ?? 0,
+              alreadyApplied: true,
+            };
+          }
+          return { newBalance: result.newBalance, alreadyApplied: false };
+        }
+
+        const result = await this.gamificationService.deductBanh(
+          dto.userId,
+          Math.abs(dto.amount),
+          dto.reason,
+          'ADMIN_ADJUSTMENT',
+          reference,
+          { metadata: { adminName, reason: dto.reason } },
+          tx,
+        );
+        if (!result.success) {
           throw new BadRequestException(
-            `Không thể trừ ${Math.abs(dto.amount)} Bánh Mì; số dư hiện tại là ${current?.totalBanhRan ?? 0}`,
+            `Không thể trừ ${Math.abs(dto.amount)} Bánh Mì; số dư hiện tại là ${result.newBalance}`,
           );
         }
-        stats = await tx.userStats.findUniqueOrThrow({
-          where: { userId: dto.userId },
-        });
-      }
+        if (result.alreadyApplied) {
+          return { newBalance: result.newBalance, alreadyApplied: true };
+        }
+        return { newBalance: result.newBalance, alreadyApplied: false };
+      },
+    );
 
-      const today = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date());
+    if (alreadyApplied) {
+      return {
+        success: true,
+        alreadyApplied: true,
+        message: `Thao tác điều chỉnh này đã được áp dụng trước đó, không thực hiện lại.`,
+        currentBanh: newBalance,
+        studentName,
+      };
+    }
 
-      await tx.banhTransaction.create({
-        data: {
-          userId: dto.userId,
-          amount: dto.amount,
-          source: 'ADMIN_ADJUSTMENT',
-          reference: `admin:adjust:${dto.userId}:${randomUUID()}`,
-          dateKey: today,
-          isCapped: false,
-          balanceAfter: stats.totalBanhRan,
-          metadata: { adminName, reason: dto.reason } as any,
-        },
-      });
-
+    // PointHistory + CurrencyTransaction (sổ cũ) chỉ ghi khi điều chỉnh thực
+    // sự áp dụng lần đầu — tránh double-write trên retry. Giữ nguyên 2 bảng
+    // này trong giai đoạn này (dọn CurrencyTransaction là việc tương lai).
+    await this.prisma.$transaction(async (tx) => {
       await tx.pointHistory.create({
         data: {
           userId: dto.userId,
@@ -664,7 +1254,6 @@ export class MarketService {
           reason: `[Admin: ${adminName}] ${dto.reason}`,
         },
       });
-
       await tx.currencyTransaction.create({
         data: {
           studentId: dto.userId,
@@ -677,22 +1266,21 @@ export class MarketService {
           type: dto.amount >= 0 ? 'add' : 'subtract',
         },
       });
-
-      return stats;
     });
 
     // Bắn sự kiện Real-time cập nhật số dư Bánh Mì ngay lập tức cho học sinh
     this.eventsGateway.sendCurrencyUpdate(dto.userId, {
       amount: dto.amount,
-      newBalance: updatedStats.totalBanhRan,
+      newBalance,
       reason: dto.reason,
       studentName,
     });
 
     return {
       success: true,
+      alreadyApplied: false,
       message: `Đã ${dto.amount >= 0 ? 'cộng' : 'trừ'} ${Math.abs(dto.amount)} Bánh Mì cho học viên ${studentName} thành công!`,
-      currentBanh: updatedStats.totalBanhRan,
+      currentBanh: newBalance,
       studentName,
     };
   }

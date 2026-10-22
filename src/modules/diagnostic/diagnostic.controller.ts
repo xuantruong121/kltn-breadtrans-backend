@@ -17,6 +17,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DiagnosticService } from './diagnostic.service';
 import { DiagnosticSpeakingService } from './diagnostic-speaking.service';
+import { DiagnosticWritingService } from './diagnostic-writing.service';
 
 @ApiTags('diagnostic')
 @Controller('diagnostic')
@@ -26,6 +27,7 @@ export class DiagnosticController {
   constructor(
     private readonly diagnosticService: DiagnosticService,
     private readonly speakingService: DiagnosticSpeakingService,
+    private readonly writingService: DiagnosticWritingService,
   ) {}
 
   @Get('current')
@@ -85,6 +87,22 @@ export class DiagnosticController {
     @Param('attemptId', ParseIntPipe) attemptId: number,
   ) {
     return this.speakingService.list(req.user.id, assessmentId, attemptId);
+  }
+
+  @Post(':id/attempts/:attemptId/writing/:questionId/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  retryWriting(
+    @Request() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) assessmentId: number,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+  ) {
+    return this.writingService.retry(
+      req.user.id,
+      assessmentId,
+      attemptId,
+      questionId,
+    );
   }
 
   @Get('speaking-responses/:responseId/audio')
