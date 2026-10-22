@@ -1213,14 +1213,14 @@ async function main() {
   const assessment = await prisma.diagnosticAssessment.upsert({
     where: { id: 2 },
     update: {
-      title: 'Entry Diagnostic v2',
+      title: 'Kiểm tra đầu vào',
       description:
         'Bài đánh giá năng lực tham khảo qua Language Use, Reading và Listening; Speaking/Writing cung cấp nhận xét bổ trợ. Thời lượng dự kiến 35–50 phút. Không phải chứng chỉ CEFR hay bài thi TOEIC chính thức.',
       isActive: true,
     },
     create: {
       id: 2,
-      title: 'Entry Diagnostic v2',
+      title: 'Kiểm tra đầu vào',
       description:
         'Bài đánh giá năng lực tham khảo qua Language Use, Reading và Listening; Speaking/Writing cung cấp nhận xét bổ trợ. Thời lượng dự kiến 35–50 phút. Không phải chứng chỉ CEFR hay bài thi TOEIC chính thức.',
       isActive: true,

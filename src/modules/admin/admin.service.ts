@@ -1545,6 +1545,7 @@ export class AdminService {
       archivedSpeakingAudio,
       totalMaterials,
       totalUsers,
+      audioDurationThisMonth,
     ] = await Promise.all([
       this.prisma.speakingSubmission.count(),
       this.prisma.speakingSubmission.count({
@@ -1555,7 +1556,30 @@ export class AdminService {
       }),
       this.prisma.material.count(),
       this.prisma.user.count(),
+      this.prisma.speakingSubmission.aggregate({
+        where: { submittedAt: { gte: startOfMonth } },
+        _sum: { durationMs: true },
+      }),
     ]);
+
+    // Azure AI Speech (Pronunciation Assessment) free tier: 5 audio hours /
+    // month, same figure already shown on the card header. Cloudflare R2
+    // free tier: 10 GB storage / month. These are the providers' published
+    // quota constants, not billing estimates — safe to hardcode, unlike
+    // actual cost which this deployment has no real provider billing feed
+    // for.
+    const AZURE_SPEECH_FREE_QUOTA_MINUTES = 5 * 60;
+    const R2_FREE_QUOTA_GB = 10;
+
+    const audioMinutesThisMonth = Math.round(
+      (audioDurationThisMonth._sum.durationMs ?? 0) / 60000,
+    );
+    const azureUsedPercent = Math.min(
+      100,
+      Math.round(
+        (audioMinutesThisMonth / AZURE_SPEECH_FREE_QUOTA_MINUTES) * 100,
+      ),
+    );
 
     let cachedGeminiCount = 0;
     let geminiTotalRequests = 0;
@@ -1614,14 +1638,22 @@ export class AdminService {
     );
     const measuredStorageMb = r2Usage?.totalMb ?? 0;
     const r2StorageGb = Number((measuredStorageMb / 1024).toFixed(3));
+    const r2UsedPercent = Math.min(
+      100,
+      Math.round((r2StorageGb / R2_FREE_QUOTA_GB) * 100),
+    );
 
+    // Azure/R2 overage cost is always 0 while usage stays within their free
+    // tiers (no paid tier wired up), so the only real cost component today
+    // is Gemini's token-based estimate — surface that in the headline total
+    // instead of a hardcoded 0 that contradicts the Gemini card below it.
     return {
       summary: {
-        totalCostUsd: 0,
-        totalCostVnd: 0,
+        totalCostUsd: geminiCostUsd,
+        totalCostVnd: geminiCostVnd,
         savedCostUsd: 0,
         savedCostVnd: 0,
-        status: 'UNAVAILABLE',
+        status: geminiTotalRequests > 0 ? 'PARTIAL' : 'UNAVAILABLE',
         activeUsers: totalUsers,
       },
       services: {
@@ -1646,12 +1678,12 @@ export class AdminService {
           name: 'Microsoft Azure AI Speech',
           totalSubmissions: totalSpeakingSubmissions,
           submissionsThisMonth: speakingThisMonth,
-          audioMinutesThisMonth: 0,
-          freeQuotaMinutes: 0,
-          usedPercent: 0,
+          audioMinutesThisMonth,
+          freeQuotaMinutes: AZURE_SPEECH_FREE_QUOTA_MINUTES,
+          usedPercent: azureUsedPercent,
           costUsd: 0,
           costVnd: 0,
-          withinFreeTier: false,
+          withinFreeTier: azureUsedPercent < 100,
         },
         cloudflareR2: {
           name: 'Cloudflare R2 Object Storage',
@@ -1660,12 +1692,12 @@ export class AdminService {
           totalMaterials,
           usedStorageMb: measuredStorageMb,
           usedStorageGb: r2StorageGb,
-          freeQuotaGb: 0,
-          usedPercent: 0,
+          freeQuotaGb: R2_FREE_QUOTA_GB,
+          usedPercent: r2UsedPercent,
           egressCostUsd: 0,
           costUsd: 0,
           costVnd: 0,
-          withinFreeTier: false,
+          withinFreeTier: r2UsedPercent < 100,
         },
       },
     };
