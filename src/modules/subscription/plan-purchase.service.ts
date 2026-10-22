@@ -905,11 +905,26 @@ export class PlanPurchaseService {
 
   private toBankInstructions(
     payment: PurchaseWithDetails['payment'],
-  ): PlanBankInstructionsDto {
+  ): PlanBankInstructionsDto | null {
     if (!payment) {
       throw new UnprocessableEntityException('PlanPayment is missing');
     }
-    const bank = getPaymentBankConfig();
+    let bank: ReturnType<typeof getPaymentBankConfig>;
+    try {
+      bank = getPaymentBankConfig();
+    } catch (error) {
+      // A completed or manually-created payment must remain readable even when
+      // this runtime does not offer the legacy bank-transfer channel (for
+      // example in PayOS-only deployments and CI). Creation still validates
+      // this configuration before issuing a manual-transfer payment.
+      if (
+        error instanceof Error &&
+        error.message.startsWith('[Payment Config] Missing required')
+      ) {
+        return null;
+      }
+      throw error;
+    }
     return {
       bin: bank.bin,
       bankName: bank.bankName,
