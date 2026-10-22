@@ -10,7 +10,10 @@ import {
   SpeakingPracticeScope,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { validateToeicExam } from './toeic.validation';
+import {
+  validateToeicExam,
+  humanizeToeicValidationIssues,
+} from './toeic.validation';
 import { isAcceptedContentImageReference } from '../upload/content-image-validation';
 import {
   EXAM_TEMPLATES,
@@ -116,6 +119,46 @@ export class GenericExamService {
     return exam as ProductRecord;
   }
 
+  /**
+   * True once a learner has attempted this Exam (L&R or TOEIC assessment
+   * attempts) — the single source of truth for every lifecycle guard below.
+   * An Exam with attempts must keep its historical content/structure and
+   * publication semantics; mutation goes through Duplicate instead.
+   */
+  async hasLearnerAttempts(exam: ProductRecord): Promise<boolean> {
+    const [lrAttempt, assessmentAttempt] = await Promise.all([
+      exam.toeicExamSet
+        ? this.prisma.toeicAttempt.findFirst({
+            where: { examId: exam.toeicExamSet.id },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      exam.toeicAssessment
+        ? this.prisma.toeicAssessmentAttempt.findFirst({
+            where: { assessmentId: exam.toeicAssessment.id },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
+    return Boolean(lrAttempt || assessmentAttempt);
+  }
+
+  /** Blocks any action that would change already-published, attempted content. */
+  private async assertExamCanReturnToDraft(exam: ProductRecord) {
+    if (await this.hasLearnerAttempts(exam)) {
+      // Structured, not just a string: the Admin UI uses offerNewVersion to
+      // swap the "Chuyển về bản nháp" CTA for "Tạo phiên bản mới" without
+      // string-matching the message.
+      throw new ConflictException({
+        message:
+          'Đề đã có học viên làm bài, không thể chuyển về bản nháp hoặc chỉnh sửa nội dung. Hãy dùng "Tạo phiên bản mới" để chỉnh sửa mà không ảnh hưởng lịch sử.',
+        code: 'EXAM_HAS_ATTEMPTS',
+        offerNewVersion: true,
+        examId: exam.id,
+      });
+    }
+  }
+
   async resolveToeicExamId(id: number) {
     const root = await this.prisma.exam.findUnique({
       where: { id },
@@ -191,10 +234,20 @@ export class GenericExamService {
             {
               code: 'MISSING_LR',
               message: 'Chưa có nguồn Listening & Reading',
+              humanMessage: 'Đề chưa có nguồn Listening & Reading.',
             },
           ],
           counts: { total: 0, listening: 0, reading: 0, groups: 0 },
         };
+    // Admin-facing issues always carry a human Vietnamese message + part/
+    // group/question navigation coordinates — never the raw technical code
+    // (MISSING_AUDIO, "Group ID: 128") on its own.
+    if (lr) {
+      lrValidation.issues = humanizeToeicValidationIssues(
+        lr,
+        lrValidation.issues,
+      );
+    }
     const components = exam.toeicAssessment?.components ?? [];
     const speaking = components.find(
       (component: any) => component.kind === 'SPEAKING',
@@ -230,6 +283,90 @@ export class GenericExamService {
       speakingCount: speaking?.exercises?.length ?? 0,
       writingCount: writing?.items?.length ?? 0,
     };
+  }
+
+  /**
+   * Deterministic "Kiểm tra sẵn sàng" summary — one row per section, each
+   * with a readiness state and an issue count. No AI call; pure counting
+   * over the same issues/booleans productReadiness() already computed.
+   */
+  private buildReadinessSummary(
+    exam: ProductRecord,
+    readiness: ReturnType<GenericExamService['productReadiness']>,
+  ) {
+    const issues = (readiness.lrValidation.issues ?? []) as Array<{
+      part?: number;
+    }>;
+    const listeningIssues = issues.filter(
+      (issue) => issue.part !== undefined && issue.part <= 4,
+    ).length;
+    const readingIssues = issues.filter(
+      (issue) => issue.part !== undefined && issue.part >= 5,
+    ).length;
+    const structuralIssues = issues.length - listeningIssues - readingIssues;
+
+    const rows: Array<{
+      key: string;
+      label: string;
+      state: 'READY' | 'WARNING' | 'INCOMPLETE';
+      issueCount: number;
+    }> = [
+      {
+        key: 'info',
+        label: 'Thông tin đề',
+        state: exam.title ? 'READY' : 'INCOMPLETE',
+        issueCount: 0,
+      },
+      {
+        key: 'structure',
+        label: 'Cấu trúc',
+        state: structuralIssues > 0 ? 'WARNING' : 'READY',
+        issueCount: structuralIssues,
+      },
+    ];
+    if (readiness.readiness.listeningReading !== undefined) {
+      rows.push(
+        {
+          key: 'listening',
+          label: 'Listening',
+          state:
+            listeningIssues > 0
+              ? 'WARNING'
+              : readiness.readiness.listeningReading
+                ? 'READY'
+                : 'INCOMPLETE',
+          issueCount: listeningIssues,
+        },
+        {
+          key: 'reading',
+          label: 'Reading',
+          state:
+            readingIssues > 0
+              ? 'WARNING'
+              : readiness.readiness.listeningReading
+                ? 'READY'
+                : 'INCOMPLETE',
+          issueCount: readingIssues,
+        },
+      );
+    }
+    if (readiness.readiness.speaking !== undefined) {
+      rows.push({
+        key: 'speaking',
+        label: 'Speaking',
+        state: readiness.readiness.speaking ? 'READY' : 'INCOMPLETE',
+        issueCount: readiness.readiness.speaking ? 0 : 1,
+      });
+    }
+    if (readiness.readiness.writing !== undefined) {
+      rows.push({
+        key: 'writing',
+        label: 'Writing',
+        state: readiness.readiness.writing ? 'READY' : 'INCOMPLETE',
+        issueCount: readiness.readiness.writing ? 0 : 1,
+      });
+    }
+    return rows;
   }
 
   private project(exam: ProductRecord) {
@@ -284,6 +421,10 @@ export class GenericExamService {
         writingCount: readiness.writingCount,
         writingExpected: readiness.template.variantCode === 'TOEIC_LR' ? 0 : 8,
       },
+      // Deterministic, zero-AI-call readiness summary for the Studio
+      // "Kiểm tra" tab / outline header — code, not a model, decides this.
+      readinessSummary: this.buildReadinessSummary(exam, readiness),
+      aiGenerationJobId: (exam as any).aiGenerationJobId ?? null,
       assessment: assessment
         ? {
             id: assessment.id,
@@ -325,6 +466,77 @@ export class GenericExamService {
 
   async getAdmin(id: number) {
     return this.project(await this.findExam(id));
+  }
+
+  /**
+   * Phase G — "Xem như học viên" preview DTO for Admin only. Strictly
+   * excludes answer keys, grading rubrics and AI-internal provenance.
+   * Read-only; creates no ExamAttempt/ToeicAssessmentAttempt and triggers
+   * no gamification/quest/streak side effects
+   * (EXAM_LEARNER_PREVIEW_CREATES_ATTEMPT=false).
+   */
+  async getLearnerPreview(id: number) {
+    const exam = await this.findExam(id);
+
+    const lr = exam.toeicExamSet
+      ? {
+          groups: exam.toeicExamSet.groups.map((group: any) => ({
+            part: group.part,
+            groupOrder: group.groupOrder,
+            imageUrl: group.imageUrl,
+            passageText: group.passageText,
+            hasAudio: !!group.audioUrl,
+            questions: group.questions.map((question: any) => ({
+              id: question.id,
+              questionNumber: question.questionNumber,
+              text: question.text,
+              options: question.options,
+            })),
+          })),
+        }
+      : null;
+
+    const speaking = exam.toeicAssessment?.components
+      ?.find((c: any) => c.speakingPracticeSet)
+      ?.speakingPracticeSet?.exercises?.map((exercise: any) => ({
+        id: exercise.id,
+        order: exercise.order,
+        title: exercise.title,
+        targetText: exercise.targetText,
+        imageUrl: exercise.imageUrl,
+        audioUrl: exercise.audioUrl,
+      }));
+
+    const writing = exam.toeicAssessment?.components
+      ?.find((c: any) => c.writingSet)
+      ?.writingSet?.items?.map((item: any) => {
+        const content = (item.writingQuiz?.questions?.[0]?.content ?? {}) as {
+          prompt?: string;
+          taskType?: string;
+          imageUrl?: string;
+          keywords?: string[];
+          wordRange?: unknown;
+        };
+        return {
+          id: item.id,
+          order: item.order,
+          taskKind: item.taskKind,
+          prompt: content.prompt ?? null,
+          taskType: content.taskType ?? null,
+          imageUrl: content.imageUrl ?? null,
+          keywords: content.keywords ?? [],
+          wordRange: content.wordRange ?? null,
+        };
+      });
+
+    return {
+      examId: exam.id,
+      title: exam.title,
+      preview: true,
+      lr,
+      speaking: speaking ?? null,
+      writing: writing ?? null,
+    };
   }
 
   private async speakingContext(id: number) {
@@ -637,6 +849,7 @@ export class GenericExamService {
 
   async unpublish(id: number) {
     const exam = await this.findExam(id);
+    await this.assertExamCanReturnToDraft(exam);
     await this.prisma.$transaction([
       this.prisma.exam.update({
         where: { id },
@@ -664,27 +877,10 @@ export class GenericExamService {
 
   async delete(id: number) {
     const exam = await this.findExam(id);
-    if (exam.toeicExamSet) {
-      const attempt = await this.prisma.toeicAttempt.findFirst({
-        where: { examId: exam.toeicExamSet.id },
-        select: { id: true },
-      });
-      if (attempt) {
-        throw new ConflictException(
-          'Exam đã có lịch sử làm bài, không thể xóa sản phẩm',
-        );
-      }
-    }
-    if (exam.toeicAssessment) {
-      const attempt = await this.prisma.toeicAssessmentAttempt.findFirst({
-        where: { assessmentId: exam.toeicAssessment.id },
-        select: { id: true },
-      });
-      if (attempt) {
-        throw new ConflictException(
-          'Exam đã có lịch sử làm bài, không thể xóa sản phẩm',
-        );
-      }
+    if (await this.hasLearnerAttempts(exam)) {
+      throw new ConflictException(
+        'Exam đã có lịch sử làm bài, không thể xóa sản phẩm',
+      );
     }
     await this.prisma.$transaction(async (tx) => {
       if (exam.toeicAssessment) {
@@ -698,5 +894,182 @@ export class GenericExamService {
       await tx.exam.delete({ where: { id } });
     });
     return { success: true, id };
+  }
+
+  /**
+   * "Tạo phiên bản mới" / "Nhân bản đề" — the lightweight replacement for a
+   * full revision system. Clones Exam-owned structure/content (L&R groups
+   * and questions; EXAM_INTERNAL Speaking/Writing sources and their items)
+   * into a brand-new DRAFT Exam with 0 attempts and a new identity.
+   * Never clones: ExamAttempt, answers, scores, submissions, AI job
+   * history. The original Exam is left completely unchanged.
+   */
+  async duplicate(id: number, adminId?: number) {
+    const exam = await this.findExam(id);
+    const newExamId = await this.prisma.$transaction(async (tx) => {
+      const newExam = await tx.exam.create({
+        data: {
+          title: `${exam.title} — Bản mới`,
+          description: exam.description,
+          familyCode: exam.familyCode,
+          variantCode: exam.variantCode,
+          templateKey: exam.templateKey,
+          publicationStatus: QuizPublicationStatus.DRAFT,
+          createdBy: adminId,
+        },
+      });
+
+      if (exam.toeicExamSet) {
+        const newLr = await tx.toeicExamSet.create({
+          data: {
+            title: `${exam.toeicExamSet.title} — Bản mới`,
+            description: exam.toeicExamSet.description,
+            type: exam.toeicExamSet.type,
+            difficulty: exam.toeicExamSet.difficulty,
+            durationSeconds: exam.toeicExamSet.durationSeconds,
+            createdBy: adminId,
+            examId: newExam.id,
+            publicationStatus: QuizPublicationStatus.DRAFT,
+          },
+        });
+        for (const group of exam.toeicExamSet.groups as any[]) {
+          await tx.toeicQuestionGroup.create({
+            data: {
+              examId: newLr.id,
+              part: group.part,
+              canonicalAccent: group.canonicalAccent,
+              audioUrl: group.audioUrl,
+              imageUrl: group.imageUrl,
+              passageText: group.passageText,
+              transcriptText: group.transcriptText,
+              imageBrief: group.imageBrief,
+              mediaMetadata: group.mediaMetadata ?? Prisma.JsonNull,
+              groupOrder: group.groupOrder,
+              questions: {
+                create: (group.questions as any[]).map((question) => ({
+                  questionNumber: question.questionNumber,
+                  text: question.text,
+                  options: question.options,
+                  correctIndex: question.correctIndex,
+                  explanation: question.explanation,
+                })),
+              },
+            },
+          });
+        }
+      }
+
+      if (exam.toeicAssessment) {
+        const newAssessment = await tx.toeicAssessment.create({
+          data: {
+            title: `${exam.toeicAssessment.title} — Bản mới`,
+            description: exam.toeicAssessment.description,
+            productFamily: exam.toeicAssessment.productFamily,
+            createdBy: adminId,
+            examId: newExam.id,
+            publicationStatus: QuizPublicationStatus.DRAFT,
+          },
+        });
+        for (const component of exam.toeicAssessment.components as any[]) {
+          if (component.kind === 'SPEAKING' && component.speakingPracticeSet) {
+            const source = component.speakingPracticeSet;
+            const newSpeaking = await tx.speakingPracticeSet.create({
+              data: {
+                id: `exam-${newExam.id}-speaking`,
+                title: `${source.title} — Bản mới`,
+                description: source.description,
+                category: source.category,
+                categoryId: source.categoryId,
+                level: source.level,
+                scope: source.scope,
+                publicationStatus: QuizPublicationStatus.DRAFT,
+              },
+            });
+            for (const exercise of source.exercises as any[]) {
+              await tx.speakingExercise.create({
+                data: {
+                  title: exercise.title,
+                  targetText: exercise.targetText,
+                  imageUrl: exercise.imageUrl,
+                  audioUrl: exercise.audioUrl,
+                  isPremiumContent: exercise.isPremiumContent,
+                  difficulty: exercise.difficulty,
+                  category: exercise.category,
+                  taskType: exercise.taskType,
+                  categoryId: exercise.categoryId,
+                  practiceSetId: newSpeaking.id,
+                  order: exercise.order,
+                  stimulusId: exercise.stimulusId,
+                  publicationStatus: QuizPublicationStatus.DRAFT,
+                },
+              });
+            }
+            await tx.toeicAssessmentComponent.create({
+              data: {
+                assessmentId: newAssessment.id,
+                kind: 'SPEAKING',
+                order: component.order,
+                required: component.required,
+                speakingPracticeSetId: newSpeaking.id,
+              },
+            });
+          }
+          if (component.kind === 'WRITING' && component.writingSet) {
+            const source = component.writingSet;
+            const newWriting = await tx.toeicWritingSet.create({
+              data: {
+                title: `${source.title} — Bản mới`,
+                description: source.description,
+                publicationStatus: QuizPublicationStatus.DRAFT,
+                createdBy: adminId,
+              },
+            });
+            for (const item of source.items as any[]) {
+              const sourceQuiz = item.writingQuiz;
+              const newQuiz = await tx.quiz.create({
+                data: {
+                  title: sourceQuiz.title,
+                  description: sourceQuiz.description,
+                  theoryContent: sourceQuiz.theoryContent,
+                  bilingualContent:
+                    sourceQuiz.bilingualContent ?? Prisma.JsonNull,
+                  type: sourceQuiz.type,
+                  isPremiumContent: sourceQuiz.isPremiumContent,
+                  publicationStatus: QuizPublicationStatus.DRAFT,
+                  timeLimit: sourceQuiz.timeLimit,
+                  questions: {
+                    create: (sourceQuiz.questions as any[]).map((q) => ({
+                      type: q.type,
+                      content: q.content ?? Prisma.JsonNull,
+                      order: q.order,
+                    })),
+                  },
+                },
+              });
+              await tx.toeicWritingSetItem.create({
+                data: {
+                  writingSetId: newWriting.id,
+                  order: item.order,
+                  taskKind: item.taskKind,
+                  writingQuizId: newQuiz.id,
+                },
+              });
+            }
+            await tx.toeicAssessmentComponent.create({
+              data: {
+                assessmentId: newAssessment.id,
+                kind: 'WRITING',
+                order: component.order,
+                required: component.required,
+                writingSetId: newWriting.id,
+              },
+            });
+          }
+        }
+      }
+
+      return newExam.id;
+    });
+    return this.getAdmin(newExamId);
   }
 }

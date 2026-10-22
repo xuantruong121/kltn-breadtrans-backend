@@ -74,6 +74,15 @@ export class AdminExamController {
     return this.toeicAiExamService.status(jobId);
   }
 
+  @Get('ai/jobs/:jobId/candidate')
+  @ApiOperation({
+    summary:
+      'Admin: xem nội dung candidate AI đã soạn (câu hỏi/tình huống thật, kèm cờ cần kiểm tra) trước khi Apply',
+  })
+  getAiCandidateContent(@Param('jobId') jobId: string, @Req() req: any) {
+    return this.toeicAiExamService.getCandidate(jobId, req.user.id);
+  }
+
   @Post('ai/jobs/:jobId/retry')
   @ApiOperation({ summary: 'Admin: thử lại job tạo đề TOEIC AI lỗi' })
   retryAiGeneration(@Param('jobId') jobId: string, @Req() req: any) {
@@ -88,10 +97,37 @@ export class AdminExamController {
 
   @Post('ai/jobs/:jobId/apply')
   @ApiOperation({
-    summary: 'Admin: áp dụng candidate TOEIC AI đã review vào Draft',
+    summary:
+      'Admin: áp dụng candidate TOEIC AI đã review vào Draft (toàn bộ hoặc theo lựa chọn)',
   })
-  applyAiGeneration(@Param('jobId') jobId: string, @Req() req: any) {
-    return this.toeicAiExamService.apply(jobId, req.user.id);
+  applyAiGeneration(
+    @Param('jobId') jobId: string,
+    @Req() req: any,
+    @Body() body?: { selectedCandidateKeys?: string[] },
+  ) {
+    return this.toeicAiExamService.apply(
+      jobId,
+      req.user.id,
+      body?.selectedCandidateKeys,
+    );
+  }
+
+  @Patch('ai/jobs/:jobId/candidate')
+  @ApiOperation({
+    summary:
+      'Admin: chỉnh sửa nội dung candidate TRƯỚC Apply (chỉ ghi vào draftSnapshot, không đụng Draft thật)',
+  })
+  updateAiCandidate(
+    @Param('jobId') jobId: string,
+    @Req() req: any,
+    @Body() body: { candidateKey: string; patch: Record<string, unknown> },
+  ) {
+    return this.toeicAiExamService.updateCandidate(
+      jobId,
+      req.user.id,
+      body.candidateKey,
+      body.patch,
+    );
   }
 
   @Post(':id/ai/groups/:groupId/questions/:questionId/regenerate')
@@ -268,6 +304,15 @@ export class AdminExamController {
     return this.genericExamService.getAdmin(id);
   }
 
+  @Get(':id/learner-preview')
+  @ApiOperation({
+    summary:
+      'Admin: Xem như học viên (preview read-only, không tạo lượt làm bài)',
+  })
+  getLearnerPreview(@Param('id', ParseIntPipe) id: number) {
+    return this.genericExamService.getLearnerPreview(id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Admin: Cập nhật thông tin cơ bản bộ đề thi' })
   updateExam(
@@ -293,6 +338,15 @@ export class AdminExamController {
   @ApiOperation({ summary: 'Admin: Xóa đề thi (bảo vệ lịch sử thi)' })
   deleteExam(@Param('id', ParseIntPipe) id: number) {
     return this.genericExamService.delete(id);
+  }
+
+  @Post(':id/duplicate')
+  @ApiOperation({
+    summary:
+      'Admin: Tạo phiên bản mới / Nhân bản đề — clone cấu trúc & nội dung vào một Draft mới, không sao chép lượt làm bài',
+  })
+  duplicateExam(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.genericExamService.duplicate(id, req.user?.id);
   }
 
   // ============== GROUP ENDPOINTS ==============
