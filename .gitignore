@@ -5,6 +5,10 @@ dist
 .env
 .env.production
 .env.local
+# Any local copy/backup of a real .env still holds live secrets.
+.env.bak*
+.env.*.bak
+.env.backup*
 
 /generated/prisma
 
