@@ -92,13 +92,21 @@ async function main() {
         // a diagnostic clip, or an inline url on the question content.
         if (listening) {
           const inline = content.audioUrl ?? content.audio;
-          const assetUrls = [
+          // Premium audio lives in the private bucket, so its asset row
+          // deliberately carries a storage key and a null public url: it is
+          // streamed through the authorized per-question endpoint instead.
+          // Presence of the asset is what makes the item complete; only the
+          // public urls can be probed over HTTP.
+          const hasAsset = question.audioAssets.some(
+            (a) => nonEmpty(a.url) || nonEmpty(a.key),
+          );
+          const publicUrls = [
             ...question.audioAssets.map((a) => a.url),
             ...question.diagnosticClips.map((c) => c.url),
             ...(nonEmpty(inline) ? [inline as string] : []),
           ].filter((u): u is string => nonEmpty(u));
-          if (!assetUrls.length) missing.push(`${label}.audio`);
-          urls.push(...assetUrls);
+          if (!hasAsset && !publicUrls.length) missing.push(`${label}.audio`);
+          urls.push(...publicUrls);
         }
 
         // Writing tasks need a prompt. An image is only required when the task

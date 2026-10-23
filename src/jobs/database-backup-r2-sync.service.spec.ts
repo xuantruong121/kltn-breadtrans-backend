@@ -22,7 +22,8 @@ describe('DatabaseBackupR2SyncService', () => {
     it('returns null and rejects if backup bucket equals public media bucket', () => {
       process.env.R2_BACKUP_BUCKET_NAME = 'same-bucket';
       process.env.R2_BUCKET_NAME = 'same-bucket';
-      process.env.R2_BACKUP_ENDPOINT = 'https://account.r2.cloudflarestorage.com';
+      process.env.R2_BACKUP_ENDPOINT =
+        'https://account.r2.cloudflarestorage.com';
       process.env.R2_BACKUP_ACCESS_KEY_ID = 'key';
       process.env.R2_BACKUP_SECRET_ACCESS_KEY = 'secret';
 
@@ -32,7 +33,8 @@ describe('DatabaseBackupR2SyncService', () => {
     it('returns null if R2_BACKUP_ENDPOINT contains a bucket pathname', () => {
       process.env.R2_BACKUP_BUCKET_NAME = 'backup-bucket';
       process.env.R2_BUCKET_NAME = 'media-bucket';
-      process.env.R2_BACKUP_ENDPOINT = 'https://account.r2.cloudflarestorage.com/backup-bucket';
+      process.env.R2_BACKUP_ENDPOINT =
+        'https://account.r2.cloudflarestorage.com/backup-bucket';
       process.env.R2_BACKUP_ACCESS_KEY_ID = 'key';
       process.env.R2_BACKUP_SECRET_ACCESS_KEY = 'secret';
 
@@ -42,7 +44,8 @@ describe('DatabaseBackupR2SyncService', () => {
     it('instantiates S3Client when configuration is valid root endpoint', () => {
       process.env.R2_BACKUP_BUCKET_NAME = 'backup-bucket';
       process.env.R2_BUCKET_NAME = 'media-bucket';
-      process.env.R2_BACKUP_ENDPOINT = 'https://account.r2.cloudflarestorage.com';
+      process.env.R2_BACKUP_ENDPOINT =
+        'https://account.r2.cloudflarestorage.com';
       process.env.R2_BACKUP_ACCESS_KEY_ID = 'key';
       process.env.R2_BACKUP_SECRET_ACCESS_KEY = 'secret';
 
@@ -53,7 +56,9 @@ describe('DatabaseBackupR2SyncService', () => {
 
   describe('classifyDump', () => {
     it('classifies normal timestamped dump as AUTOMATIC', () => {
-      const { backupClass, checkpoint, isProtected } = service.classifyDump('kltn_db_20261023_133044.dump');
+      const { backupClass, checkpoint, isProtected } = service.classifyDump(
+        'kltn_db_20261023_133044.dump',
+      );
       expect(backupClass).toBe('AUTOMATIC');
       expect(checkpoint).toBe('scheduled');
       expect(isProtected).toBe(false);
@@ -90,8 +95,15 @@ describe('DatabaseBackupR2SyncService', () => {
   describe('computeRemoteKey', () => {
     it('creates automatic path with YYYY/MM/DD prefix', () => {
       const date = new Date(Date.UTC(2026, 9, 23, 12, 0, 0)); // Oct 23, 2026
-      const key = service.computeRemoteKey('kltn_db_20261023_133044.dump', 'AUTOMATIC', 'scheduled', date);
-      expect(key).toBe('database-backups/automatic/2026/10/23/kltn_db_20261023_133044.dump');
+      const key = service.computeRemoteKey(
+        'kltn_db_20261023_133044.dump',
+        'AUTOMATIC',
+        'scheduled',
+        date,
+      );
+      expect(key).toBe(
+        'database-backups/automatic/2026/10/23/kltn_db_20261023_133044.dump',
+      );
     });
 
     it('creates protected baseline path', () => {
@@ -100,7 +112,9 @@ describe('DatabaseBackupR2SyncService', () => {
         'PROTECTED_BASELINE',
         'baseline',
       );
-      expect(key).toBe('database-backups/protected/baseline/baseline/breadtrans_db_protected_learner-baseline_20261023.dump');
+      expect(key).toBe(
+        'database-backups/protected/baseline/baseline/breadtrans_db_protected_learner-baseline_20261023.dump',
+      );
     });
 
     it('creates protected handoff path', () => {
@@ -109,7 +123,9 @@ describe('DatabaseBackupR2SyncService', () => {
         'PROTECTED_HANDOFF',
         'handoff-session',
       );
-      expect(key).toBe('database-backups/protected/handoff/handoff-session/breadtrans_db_protected_handoff_20261023.dump');
+      expect(key).toBe(
+        'database-backups/protected/handoff/handoff-session/breadtrans_db_protected_handoff_20261023.dump',
+      );
     });
   });
 
@@ -117,9 +133,12 @@ describe('DatabaseBackupR2SyncService', () => {
     it('deletes expired automatic backups while preserving PROTECTED files', async () => {
       const deletedKeys: string[] = [];
       const mockClient = {
-        send: jest.fn().mockImplementation(async (command: any) => {
+        // Not an async function: the body only returns values, so `async`
+        // tripped require-await. The SDK contract is still honoured by
+        // returning promises explicitly.
+        send: jest.fn().mockImplementation((command: any) => {
           if (command.constructor.name === 'ListObjectsV2Command') {
-            return {
+            return Promise.resolve({
               Contents: [
                 {
                   Key: 'database-backups/automatic/2026/09/01/old_auto.dump',
@@ -134,20 +153,28 @@ describe('DatabaseBackupR2SyncService', () => {
                   LastModified: new Date(Date.now() - 30 * 24 * 3600 * 1000), // 30 days old but PROTECTED
                 },
               ],
-            };
+            });
           }
           if (command.constructor.name === 'DeleteObjectCommand') {
             deletedKeys.push(command.input.Key);
-            return {};
+            return Promise.resolve({});
           }
-          return {};
+          return Promise.resolve({});
         }),
       } as any;
 
-      const pruned = await service.pruneRemoteAutomaticBackups(mockClient, 'test-bucket', 14);
+      const pruned = await service.pruneRemoteAutomaticBackups(
+        mockClient,
+        'test-bucket',
+        14,
+      );
 
-      expect(pruned).toEqual(['database-backups/automatic/2026/09/01/old_auto.dump']);
-      expect(deletedKeys).toEqual(['database-backups/automatic/2026/09/01/old_auto.dump']);
+      expect(pruned).toEqual([
+        'database-backups/automatic/2026/09/01/old_auto.dump',
+      ]);
+      expect(deletedKeys).toEqual([
+        'database-backups/automatic/2026/09/01/old_auto.dump',
+      ]);
     });
   });
 });
