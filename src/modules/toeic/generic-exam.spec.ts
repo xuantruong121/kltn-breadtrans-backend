@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { QuizPublicationStatus } from '@prisma/client';
 import { GenericExamService } from './generic-exam.service';
 
@@ -92,5 +93,47 @@ describe('GenericExamService Writing readiness', () => {
     const projected = service.project(exam);
     expect(projected.totalQuestions).toBe(19);
     expect(projected.durationSeconds).toBe(4800);
+  });
+});
+
+describe('GenericExamService publish readiness guard', () => {
+  it('rejects a DRAFT exam when learner readiness is false before any publish write', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    const exam = {
+      id: 69,
+      templateKey: 'TOEIC_LR_V1',
+      variantCode: 'TOEIC_LR',
+      publicationStatus: QuizPublicationStatus.DRAFT,
+      toeicAssessment: null,
+      toeicExamSet: {
+        id: 169,
+        type: 'FULL_TEST',
+        publicationStatus: QuizPublicationStatus.DRAFT,
+        groups: [
+          {
+            id: 1671,
+            part: 1,
+            groupOrder: 1,
+            imageUrl: null,
+            audioUrl: 'https://cdn.example.r2.dev/audio.mp3',
+            questions: [
+              {
+                id: 1,
+                questionNumber: 1,
+                options: ['A', 'B', 'C', 'D'],
+                correctIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+    };
+    service.findExam = jest.fn().mockResolvedValue(exam);
+    service.prisma = { $transaction: jest.fn() };
+
+    await expect(service.publish(69)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(service.prisma.$transaction).not.toHaveBeenCalled();
   });
 });

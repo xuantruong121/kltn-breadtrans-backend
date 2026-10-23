@@ -92,6 +92,15 @@ export function buildToeicListeningSsml(transcript: string): string {
     'en-US-AriaNeural',
     'en-US-DavisNeural',
   ];
+  // A TOEIC Part 1/2 line is a plain "A. <content>" option label — speak the
+  // leading letter as a letter name (SSML say-as), never leaving it to the
+  // voice's own guess, without narrating a "Statement/Option/Response" word.
+  const renderSpeech = (text: string) => {
+    const match = /^([A-D])\.\s(.*)$/s.exec(text);
+    if (!match) return escapeXml(text);
+    const [, letter, rest] = match;
+    return `<say-as interpret-as="characters">${letter}</say-as>. ${escapeXml(rest)}`;
+  };
   const voiceBySpeaker = new Map<string, string>();
   const body = turns
     .map((turn) => {
@@ -100,7 +109,7 @@ export function buildToeicListeningSsml(transcript: string): string {
           turn.speaker,
           voicePool[voiceBySpeaker.size % voicePool.length],
         );
-      return `<voice name="${voiceBySpeaker.get(turn.speaker)}">${escapeXml(turn.text)}</voice>`;
+      return `<voice name="${voiceBySpeaker.get(turn.speaker)}">${renderSpeech(turn.text)}</voice>`;
     })
     .join('');
   return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">${body}</speak>`;

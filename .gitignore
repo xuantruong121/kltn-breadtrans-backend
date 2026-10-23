@@ -16,3 +16,12 @@ cloudflared.exe
 # Test environment — local only, never commit secrets
 .env.test
 .env.test.local
+
+# Database backups and disaster-recovery artifacts (may contain real data;
+# can be hundreds of MB). Never commit these.
+*.dump
+*.sql.gz
+*.tgz
+db-backups/
+.local-backups/
+recovery-inspect.sql

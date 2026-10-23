@@ -14,14 +14,18 @@ import {
   IntegrityEventType,
   Prisma,
   QuizPublicationStatus,
+  ToeicAttemptSection,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SpeakingService } from '../speaking/speaking.service';
 import { validateToeicExam } from './toeic.validation';
+import { buildToeicListeningAudioScript } from './toeic-listening-audio';
 
 const MIN_DURATION = 60;
 const MAX_DURATION = 21600;
 const PENDING_TTL_MS = 2 * 60 * 60 * 1000;
+/** Official TOEIC Reading section timing; server-authoritative, never a client value. */
+const READING_SECTION_SECONDS = 75 * 60;
 
 type AnswerRow = {
   selectedIndex: number | null;
@@ -362,13 +366,24 @@ export class ToeicService {
         canonicalAccent: true,
         audioUrl: true,
         passageText: true,
-        questions: { select: { options: true }, take: 1 },
+        transcriptText: true,
+        questions: {
+          select: { options: true, correctIndex: true },
+          orderBy: { questionNumber: 'asc' },
+        },
       },
     });
     if (!group) throw new NotFoundException('TOEIC question group not found');
     const attempt = await this.prisma.toeicAttempt.findUnique({
       where: { id: attemptId },
-      select: { userId: true, examId: true, mode: true, status: true },
+      select: {
+        userId: true,
+        examId: true,
+        mode: true,
+        status: true,
+        section: true,
+        listeningPosition: true,
+      },
     });
     if (
       !attempt ||
@@ -382,6 +397,20 @@ export class ToeicService {
     if (attempt.status !== AttemptStatus.IN_PROGRESS) {
       throw new BadRequestException('Lượt thi không còn ở trạng thái làm bài');
     }
+    if (
+      attempt.mode === AttemptMode.FULL_TEST &&
+      attempt.section === ToeicAttemptSection.LISTENING &&
+      group.part <= 4
+    ) {
+      // One-pass enforcement at the API layer: the only group whose audio
+      // can be fetched is the one at the attempt's current manifest
+      // position — never a past (replay) or future (skip-ahead) segment.
+      const groupIds = await this.getListeningManifestGroupIds(attempt.examId);
+      if (groupIds[attempt.listeningPosition] !== groupId)
+        throw new ForbiddenException(
+          'Không thể nghe lại hoặc nghe trước nhóm câu hỏi này trong Full Test nghiêm ngặt',
+        );
+    }
     if (group.audioUrl) {
       const response = await fetch(group.audioUrl);
       if (response.ok) return Buffer.from(await response.arrayBuffer());
@@ -390,24 +419,12 @@ export class ToeicService {
     // mode keeps its legacy pedagogical fallback for groups that are not yet
     // materialized; authoring is handled by the bounded maintenance script.
     if (attempt.mode !== AttemptMode.FULL_TEST) {
-      let text = group.passageText;
-      if (group.part === 1) {
-        const options = group.questions[0]?.options;
-        if (
-          !Array.isArray(options) ||
-          !options.every((item) => typeof item === 'string')
-        ) {
-          throw new ServiceUnavailableException(
-            'Câu Part 1 chưa có nội dung audio',
-          );
-        }
-        text = options.join(' ');
-      }
-      if (group.part === 2 && text) {
-        text = text.replace(/^\s*AUDIO\s+PROMPT\s*:\s*/i, '');
-      }
-      if (!text)
+      let text: string;
+      try {
+        text = buildToeicListeningAudioScript(group);
+      } catch {
         throw new ServiceUnavailableException('Nhóm câu hỏi này chưa có audio');
+      }
       return this.speakingService.generateTts(
         text,
         group.canonicalAccent === 'UK' ? 'UK' : 'US',
@@ -518,7 +535,116 @@ export class ToeicService {
       );
       return tx.toeicAttempt.update({
         where: { id: attemptId },
-        data: { status: AttemptStatus.IN_PROGRESS, startedAt, deadline },
+        data: {
+          status: AttemptStatus.IN_PROGRESS,
+          startedAt,
+          deadline,
+          // Strict Full Test starts in the Listening section at manifest
+          // position 0; Practice never gets a section (stays null).
+          ...(attempt.mode === AttemptMode.FULL_TEST
+            ? { section: ToeicAttemptSection.LISTENING, listeningPosition: 0 }
+            : {}),
+        },
+      });
+    });
+  }
+
+  /** Deterministic server-authoritative Listening order: Part 1→4, group order within each Part. */
+  private async getListeningManifestGroupIds(examId: number) {
+    const groups = await this.prisma.toeicQuestionGroup.findMany({
+      where: { examId, part: { lte: 4 } },
+      select: { id: true, part: true, groupOrder: true },
+      orderBy: [{ part: 'asc' }, { groupOrder: 'asc' }],
+    });
+    return groups.map((g) => g.id);
+  }
+
+  /**
+   * Strict Full Test one-pass Listening manifest. Only the segment at the
+   * attempt's current `listeningPosition` carries a fetchable `audioUrl` —
+   * past segments (already consumed) and future segments (not yet reached)
+   * both come back with `audioUrl: null`, so replay and skip-ahead are
+   * blocked at the API layer, not merely hidden by the UI.
+   */
+  async getListeningManifest(attemptId: number, userId: number) {
+    const attempt = await this.prisma.toeicAttempt.findUnique({
+      where: { id: attemptId },
+    });
+    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (attempt.userId !== userId)
+      throw new ForbiddenException('Bạn không có quyền truy cập bài thi này');
+    if (attempt.mode !== AttemptMode.FULL_TEST)
+      throw new BadRequestException(
+        'Chỉ Full Test mới có Listening manifest nghiêm ngặt',
+      );
+    const groups = await this.prisma.toeicQuestionGroup.findMany({
+      where: { examId: attempt.examId, part: { lte: 4 } },
+      select: { id: true, part: true, groupOrder: true, audioUrl: true },
+      orderBy: [{ part: 'asc' }, { groupOrder: 'asc' }],
+    });
+    return {
+      section: attempt.section,
+      listeningPosition: attempt.listeningPosition,
+      totalSegments: groups.length,
+      segments: groups.map((group, index) => ({
+        groupId: group.id,
+        part: group.part,
+        groupOrder: group.groupOrder,
+        audioUrl: index === attempt.listeningPosition ? group.audioUrl : null,
+      })),
+    };
+  }
+
+  /**
+   * Advances the one-pass Listening cursor by exactly one segment. The
+   * cursor only ever moves forward — there is no endpoint that decrements
+   * or resets it — and once it reaches the end of the manifest the attempt
+   * transitions to Reading automatically and the transition is one-way.
+   */
+  async advanceListening(attemptId: number, userId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const initial = await tx.toeicAttempt.findUnique({
+        where: { id: attemptId },
+      });
+      if (!initial) throw new NotFoundException('Attempt not found');
+      await this.lockAttemptRow(tx, attemptId);
+      const attempt = await tx.toeicAttempt.findUnique({
+        where: { id: attemptId },
+      });
+      if (!attempt) throw new NotFoundException('Attempt not found');
+      if (attempt.userId !== userId)
+        throw new ForbiddenException(
+          'Bạn không có quyền điều khiển lượt thi này',
+        );
+      if (attempt.status !== AttemptStatus.IN_PROGRESS)
+        throw new BadRequestException('Lượt thi chưa bắt đầu hoặc đã kết thúc');
+      if (
+        attempt.mode !== AttemptMode.FULL_TEST ||
+        attempt.section !== ToeicAttemptSection.LISTENING
+      )
+        throw new BadRequestException(
+          'Phần Listening đã kết thúc hoặc chưa bắt đầu',
+        );
+      const groupIds = await this.getListeningManifestGroupIds(attempt.examId);
+      const nextPosition = attempt.listeningPosition + 1;
+      if (nextPosition >= groupIds.length) {
+        const readingStartedAt = new Date();
+        const readingDeadline = new Date(
+          readingStartedAt.getTime() + READING_SECTION_SECONDS * 1000,
+        );
+        return tx.toeicAttempt.update({
+          where: { id: attemptId },
+          data: {
+            listeningPosition: groupIds.length,
+            section: ToeicAttemptSection.READING,
+            readingStartedAt,
+            readingDeadline,
+          },
+        });
+      }
+      return tx.toeicAttempt.update({
+        where: { id: attemptId },
+        data: { listeningPosition: nextPosition },
       });
     });
   }
@@ -532,8 +658,10 @@ export class ToeicService {
       throw new ForbiddenException('Bạn không có quyền truy cập bài thi này');
     if (
       attempt.status === AttemptStatus.IN_PROGRESS &&
-      attempt.deadline &&
-      attempt.deadline <= new Date()
+      ((attempt.deadline && attempt.deadline <= new Date()) ||
+        (attempt.section === ToeicAttemptSection.READING &&
+          attempt.readingDeadline &&
+          attempt.readingDeadline <= new Date()))
     )
       await this.finalizeExpired(attemptId, attempt.userId);
     const current = await this.prisma.toeicAttempt.findUnique({
@@ -551,6 +679,10 @@ export class ToeicService {
         submittedAt: true,
         currentQuestionId: true,
         markedQuestionIds: true,
+        section: true,
+        listeningPosition: true,
+        readingStartedAt: true,
+        readingDeadline: true,
         exam: {
           select: {
             id: true,
@@ -626,7 +758,12 @@ export class ToeicService {
 
   private async validateAndSaveAnswers(
     tx: Prisma.TransactionClient,
-    attempt: { id: number; examId: number },
+    attempt: {
+      id: number;
+      examId: number;
+      mode: AttemptMode;
+      section: ToeicAttemptSection | null;
+    },
     userId: number,
     answers: Record<string, number>,
   ) {
@@ -638,10 +775,21 @@ export class ToeicService {
       throw new BadRequestException('Danh sách câu trả lời không hợp lệ');
     const questions = await tx.toeicQuestion.findMany({
       where: { id: { in: ids }, group: { examId: attempt.examId } },
-      select: { id: true, options: true },
+      select: { id: true, options: true, group: { select: { part: true } } },
     });
     if (questions.length !== ids.length)
       throw new BadRequestException('Câu hỏi không thuộc đề thi này');
+    if (attempt.mode === AttemptMode.FULL_TEST && attempt.section) {
+      for (const question of questions) {
+        const isListening = question.group.part <= 4;
+        if (isListening && attempt.section !== ToeicAttemptSection.LISTENING)
+          throw new BadRequestException(
+            'Phần Listening đã kết thúc, không thể sửa đáp án',
+          );
+        if (!isListening && attempt.section !== ToeicAttemptSection.READING)
+          throw new BadRequestException('Phần Reading chưa bắt đầu');
+      }
+    }
     for (const question of questions) {
       const options = Array.isArray(question.options) ? question.options : [];
       const selected = answers[String(question.id)];
@@ -709,7 +857,14 @@ export class ToeicService {
         );
       if (attempt.status !== AttemptStatus.IN_PROGRESS)
         throw new BadRequestException('Lượt thi chưa bắt đầu hoặc đã kết thúc');
-      if (attempt.deadline && attempt.deadline <= new Date()) {
+      const readingExpired =
+        attempt.section === ToeicAttemptSection.READING &&
+        attempt.readingDeadline &&
+        attempt.readingDeadline <= new Date();
+      if (
+        (attempt.deadline && attempt.deadline <= new Date()) ||
+        readingExpired
+      ) {
         const finalization = await this.finalizeExpiredTx(
           tx,
           attemptId,
@@ -1101,14 +1256,34 @@ export class ToeicService {
     if (!attempt) throw new NotFoundException('Attempt not found');
     if (role !== 'ADMIN' && attempt.userId !== userId)
       throw new ForbiddenException('Bạn không có quyền truy cập bài thi này');
-    return {
-      remaining:
-        attempt.deadline && attempt.status === AttemptStatus.IN_PROGRESS
+    if (attempt.status !== AttemptStatus.IN_PROGRESS)
+      return { remaining: 0, section: attempt.section };
+    // Strict Full Test: Listening is paced by the audio manifest, not a
+    // countdown — the client should not show a Reading-style timer there.
+    // Reading has its own server-authoritative 75-minute deadline.
+    if (attempt.mode === AttemptMode.FULL_TEST && attempt.section) {
+      if (attempt.section === ToeicAttemptSection.LISTENING)
+        return { remaining: null, section: ToeicAttemptSection.LISTENING };
+      return {
+        remaining: attempt.readingDeadline
           ? Math.max(
               0,
-              Math.floor((attempt.deadline.getTime() - Date.now()) / 1000),
+              Math.floor(
+                (attempt.readingDeadline.getTime() - Date.now()) / 1000,
+              ),
             )
           : 0,
+        section: ToeicAttemptSection.READING,
+      };
+    }
+    return {
+      remaining: attempt.deadline
+        ? Math.max(
+            0,
+            Math.floor((attempt.deadline.getTime() - Date.now()) / 1000),
+          )
+        : 0,
+      section: attempt.section,
     };
   }
 
@@ -1122,8 +1297,12 @@ export class ToeicService {
         'Bạn không có quyền xem kết quả bài thi này',
       );
     if (attempt.status !== AttemptStatus.SUBMITTED) {
-      if (attempt.deadline && attempt.deadline <= new Date())
-        await this.finalizeExpired(attemptId, attempt.userId);
+      const expired =
+        (attempt.deadline && attempt.deadline <= new Date()) ||
+        (attempt.section === ToeicAttemptSection.READING &&
+          attempt.readingDeadline &&
+          attempt.readingDeadline <= new Date());
+      if (expired) await this.finalizeExpired(attemptId, attempt.userId);
       else throw new BadRequestException('Bài thi đang diễn ra, chưa nộp bài');
     }
     const result = await this.prisma.$transaction(async (tx) => {

@@ -47,8 +47,14 @@ describe('ToeicAiExamService partial media materialization', () => {
             id: 101,
             part: 1,
             imageBrief: 'A manager reviewing a report in an office.',
-            transcriptText: 'Woman: The meeting starts at nine.',
+            transcriptText: null,
             mediaMetadata: {},
+            questions: [
+              {
+                options: ['a', 'b', 'c', 'd'],
+                correctIndex: 0,
+              },
+            ],
           },
           {
             id: 102,
@@ -56,6 +62,12 @@ describe('ToeicAiExamService partial media materialization', () => {
             imageBrief: null,
             transcriptText: 'Man: Could you send the report?',
             mediaMetadata: {},
+            questions: [
+              {
+                options: ['Yes, I can.', 'At noon.', 'On the desk.'],
+                correctIndex: 0,
+              },
+            ],
           },
         ]),
         update: jest.fn().mockImplementation((args) => {

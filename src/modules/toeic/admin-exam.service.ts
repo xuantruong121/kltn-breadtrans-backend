@@ -16,6 +16,10 @@ import {
   UpdateExamQuestionDto,
 } from './dto';
 import { toeicMediaHash, withManualMedia } from './toeic-media';
+import {
+  TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
+  toeicListeningAudioFingerprint,
+} from './toeic-listening-audio';
 
 @Injectable()
 export class AdminExamService {
@@ -259,6 +263,7 @@ export class AdminExamService {
   async updateGroup(examId: number, groupId: number, dto: UpdateExamGroupDto) {
     const group = await this.prisma.toeicQuestionGroup.findUnique({
       where: { id: groupId },
+      include: { questions: { orderBy: { questionNumber: 'asc' } } },
     });
     if (!group || group.examId !== examId) {
       throw new NotFoundException(
@@ -278,8 +283,12 @@ export class AdminExamService {
 
     const mediaMetadata = (group.mediaMetadata as any) ?? {};
     if (
-      dto.transcriptText !== undefined &&
-      dto.transcriptText !== group.transcriptText &&
+      ['transcriptText', 'passageText', 'part', 'canonicalAccent'].some(
+        (field) =>
+          (dto as Record<string, unknown>)[field] !== undefined &&
+          (dto as Record<string, unknown>)[field] !==
+            (group as Record<string, unknown>)[field],
+      ) &&
       mediaMetadata.audio
     ) {
       mediaMetadata.audio = { ...mediaMetadata.audio, stale: true };
@@ -321,6 +330,20 @@ export class AdminExamService {
     }
     if (dto.audioUrl !== undefined && dto.audioUrl !== group.audioUrl) {
       if (dto.audioUrl.trim()) {
+        const audioGroup = {
+          ...group,
+          part: dto.part ?? group.part,
+          canonicalAccent: dto.canonicalAccent ?? group.canonicalAccent,
+          transcriptText: dto.transcriptText ?? group.transcriptText,
+          passageText: dto.passageText ?? group.passageText,
+        };
+        let sourceHash: string | undefined;
+        try {
+          sourceHash = toeicListeningAudioFingerprint(audioGroup);
+        } catch {
+          // The admin can attach audio before completing content; readiness
+          // remains fail-closed until a valid semantic script can be built.
+        }
         Object.assign(
           mediaMetadata,
           withManualMedia(
@@ -333,6 +356,13 @@ export class AdminExamService {
             ),
           ),
         );
+        if (sourceHash) {
+          mediaMetadata.audio = {
+            ...mediaMetadata.audio,
+            sourceHash,
+            scriptVersion: TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
+          };
+        }
       } else {
         mediaMetadata.audio = {
           ...(mediaMetadata.audio ?? {}),
@@ -357,6 +387,9 @@ export class AdminExamService {
         }),
         ...(dto.imageBrief !== undefined && { imageBrief: dto.imageBrief }),
         ...((dto.transcriptText !== undefined ||
+          dto.passageText !== undefined ||
+          dto.part !== undefined ||
+          dto.canonicalAccent !== undefined ||
           dto.imageBrief !== undefined ||
           dto.audioUrl !== undefined ||
           dto.imageUrl !== undefined) && {
@@ -458,7 +491,7 @@ export class AdminExamService {
       );
     }
 
-    return this.prisma.toeicQuestion.create({
+    const created = await this.prisma.toeicQuestion.create({
       data: {
         groupId,
         questionNumber: dto.questionNumber,
@@ -468,6 +501,21 @@ export class AdminExamService {
         explanation: dto.explanation,
       },
     });
+    if (group.part <= 2 && group.mediaMetadata) {
+      await this.prisma.toeicQuestionGroup.update({
+        where: { id: groupId },
+        data: {
+          mediaMetadata: {
+            ...((group.mediaMetadata as any) ?? {}),
+            audio: {
+              ...(((group.mediaMetadata as any) ?? {}).audio ?? {}),
+              stale: true,
+            },
+          },
+        },
+      });
+    }
+    return created;
   }
 
   async updateQuestion(
@@ -512,7 +560,7 @@ export class AdminExamService {
       );
     }
 
-    return this.prisma.toeicQuestion.update({
+    const updated = await this.prisma.toeicQuestion.update({
       where: { id: questionId },
       data: {
         ...(dto.questionNumber !== undefined && {
@@ -528,6 +576,22 @@ export class AdminExamService {
         }),
       },
     });
+    if (
+      question.group.part <= 2 &&
+      (dto.options !== undefined || dto.correctIndex !== undefined)
+    ) {
+      const current = (question.group.mediaMetadata as any) ?? {};
+      await this.prisma.toeicQuestionGroup.update({
+        where: { id: groupId },
+        data: {
+          mediaMetadata: {
+            ...current,
+            audio: { ...(current.audio ?? {}), stale: true },
+          },
+        },
+      });
+    }
+    return updated;
   }
 
   async deleteQuestion(examId: number, groupId: number, questionId: number) {
@@ -556,6 +620,21 @@ export class AdminExamService {
       );
     }
 
-    return this.prisma.toeicQuestion.delete({ where: { id: questionId } });
+    const deleted = await this.prisma.toeicQuestion.delete({
+      where: { id: questionId },
+    });
+    if (question.group.part <= 2 && question.group.mediaMetadata) {
+      const current = (question.group.mediaMetadata as any) ?? {};
+      await this.prisma.toeicQuestionGroup.update({
+        where: { id: groupId },
+        data: {
+          mediaMetadata: {
+            ...current,
+            audio: { ...(current.audio ?? {}), stale: true },
+          },
+        },
+      });
+    }
+    return deleted;
   }
 }

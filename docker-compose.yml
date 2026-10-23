@@ -1,6 +1,7 @@
-version: '3.8'
-
 services:
+  # Real local development database. Its volume holds the only live data —
+  # never point a disposable tool (such as Prisma's --shadow-database-url)
+  # at this service. See docs/database-safety.md.
   postgres:
     image: postgres:15-alpine
     container_name: kltn-postgres
@@ -12,6 +13,53 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d kltn_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Disposable database Prisma may reset/replay freely when generating
+  # migrations. Separate container, separate volume, separate port — so a
+  # shadow reset can never reach development data.
+  postgres-shadow:
+    image: postgres:15-alpine
+    container_name: kltn-postgres-shadow
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: kltn_shadow
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_shadow_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d kltn_shadow']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Scheduled logical backups (pg_dump -Fc) of the development database,
+  # written to a host directory outside the Postgres data volume.
+  postgres-backup:
+    image: postgres:15-alpine
+    container_name: kltn-postgres-backup
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: password
+      PGDATABASE: kltn_db
+      BACKUP_INTERVAL_SECONDS: '21600' # every 6 hours
+      BACKUP_RETENTION_DAYS: '14'
+    volumes:
+      - ./docker/postgres-backup/backup.sh:/usr/local/bin/backup.sh:ro
+      - ${POSTGRES_BACKUP_DIR:-./db-backups}:/backups
+    entrypoint: ['/bin/sh', '/usr/local/bin/backup.sh']
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -24,4 +72,5 @@ services:
 
 volumes:
   postgres_data:
+  postgres_shadow_data:
   redis_data:

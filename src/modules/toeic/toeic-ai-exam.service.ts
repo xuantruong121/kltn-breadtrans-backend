@@ -30,6 +30,11 @@ import {
   toeicMediaHash,
   withMediaFailure,
 } from './toeic-media';
+import {
+  buildToeicListeningAudioScript,
+  TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
+  toeicListeningAudioFingerprint,
+} from './toeic-listening-audio';
 import { TOEIC_SPEAKING_TASK_SEQUENCE } from '../speaking/toeic-speaking-contract';
 import { TOEIC_WRITING_SLOT_CONTRACT } from '../writing/toeic-writing-set.contract';
 import { ImageSearchCandidate } from './pixabay-image-search.provider';
@@ -57,6 +62,32 @@ type RequestSnapshot = {
   topic?: string;
   difficulty: 'easy' | 'medium' | 'hard';
   plan: Record<number, PlannedGroup[]>;
+};
+
+type FailedLrBatch = {
+  batchKey: string;
+  part: number;
+  offset: number;
+  groupOrder: number;
+  questionNumber: number;
+  groups: PlannedGroup[];
+  code: 'CONTENT_CONTRACT_FAILURE';
+  message: string;
+  attempts: number;
+};
+
+type ToeicAiDraftSnapshot = {
+  version: 1;
+  partial: boolean;
+  lrBatches: Array<{
+    batchKey?: string;
+    part: number;
+    groupOrder: number;
+    questionNumber: number;
+    candidate: any;
+  }>;
+  failedUnits?: FailedLrBatch[];
+  speakingWriting?: any;
 };
 
 const sha256 = (value: string | Buffer) =>
@@ -335,6 +366,51 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     return this.status(jobId);
   }
 
+  private batchCoordinates(
+    request: RequestSnapshot,
+    targetPart: number,
+    targetOffset: number,
+  ) {
+    let groupOrder = 1;
+    let questionNumber = 1;
+    for (const [rawPart, plan] of Object.entries(request.plan)) {
+      const part = Number(rawPart);
+      for (let offset = 0; offset < plan.length; offset += 3) {
+        const groups = plan.slice(offset, offset + 3);
+        if (part === targetPart && offset === targetOffset) {
+          return { groupOrder, questionNumber, groups };
+        }
+        groupOrder += groups.length;
+        questionNumber += groups.reduce(
+          (total, group) => total + group.questionCount,
+          0,
+        );
+      }
+    }
+    throw new BadRequestException('Không tìm thấy batch TOEIC cần tạo lại');
+  }
+
+  private failedBatch(
+    request: RequestSnapshot,
+    part: number,
+    offset: number,
+    message: string,
+    previous?: FailedLrBatch,
+  ): FailedLrBatch {
+    const coordinates = this.batchCoordinates(request, part, offset);
+    return {
+      batchKey: `${part}:${offset}`,
+      part,
+      offset,
+      groupOrder: coordinates.groupOrder,
+      questionNumber: coordinates.questionNumber,
+      groups: coordinates.groups,
+      code: 'CONTENT_CONTRACT_FAILURE',
+      message: message.slice(0, 1000),
+      attempts: (previous?.attempts ?? 0) + 1,
+    };
+  }
+
   /**
    * Phase E — Candidate Workspace content for human review BEFORE Apply.
    * Returns actual generated question/task content (not just counts), each
@@ -353,6 +429,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         lrGroups: [],
         speaking: [],
         writing: [],
+        failedUnits: [],
         flaggedCount: 0,
         appliedCandidateKeys: [],
       };
@@ -362,7 +439,10 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       ? (job.approvedSnapshot as any).appliedCandidateKeys
       : [];
 
-    let flaggedCount = 0;
+    const failedUnits: FailedLrBatch[] = Array.isArray(candidate.failedUnits)
+      ? candidate.failedUnits
+      : [];
+    let flaggedCount = failedUnits.length;
     const lrGroups = (
       Array.isArray(candidate.lrBatches) ? candidate.lrBatches : []
     ).flatMap((batch: any) => {
@@ -473,6 +553,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       lrGroups: lrGroupsWithApplied,
       speaking,
       writing,
+      failedUnits: failedUnits.map((unit) => ({
+        batchKey: unit.batchKey,
+        part: unit.part,
+        offset: unit.offset,
+        groupOrder: unit.groupOrder,
+        code: unit.code,
+        message: unit.message,
+        attempts: unit.attempts,
+      })),
       flaggedCount,
       appliedCandidateKeys,
     };
@@ -712,8 +801,13 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       error: job.errorSummary ?? undefined,
       candidate: candidate
         ? {
-            available: job.status === AiGenerationJobStatus.GENERATED,
+            available:
+              job.status === AiGenerationJobStatus.GENERATED ||
+              Array.isArray(candidate.failedUnits),
             partial: candidate.partial === true,
+            failedUnitCount: Array.isArray(candidate.failedUnits)
+              ? candidate.failedUnits.length
+              : 0,
             lrBatchCount: Array.isArray(candidate.lrBatches)
               ? candidate.lrBatches.length
               : 0,
@@ -737,16 +831,44 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
     if (!job || job.createdByAdminId !== adminId)
       throw new NotFoundException('Không tìm thấy job tạo đề TOEIC AI');
-    if (job.status !== AiGenerationJobStatus.FAILED)
+    const request = job.requestSnapshot as RequestSnapshot;
+    const existingCandidate =
+      (job.draftSnapshot as ToeicAiDraftSnapshot | null) ?? null;
+    const existingFailedUnits = Array.isArray(existingCandidate?.failedUnits)
+      ? existingCandidate.failedUnits
+      : [];
+    const legacyFailedScope = (job.resultSnapshot as any)?.failedScope;
+    const recoveredLegacyFailure =
+      existingFailedUnits.length === 0 &&
+      job.status === AiGenerationJobStatus.FAILED &&
+      legacyFailedScope?.kind === 'batch' &&
+      Number.isInteger(legacyFailedScope.part) &&
+      Number.isInteger(legacyFailedScope.offset)
+        ? this.failedBatch(
+            request,
+            legacyFailedScope.part,
+            legacyFailedScope.offset,
+            job.errorSummary || 'Batch AI chưa hoàn tất',
+          )
+        : null;
+    const failedUnits = recoveredLegacyFailure
+      ? [recoveredLegacyFailure]
+      : existingFailedUnits;
+    if (!failedUnits.length)
       throw new ConflictException('Chỉ job lỗi mới có thể thử lại');
-    const resumableCandidate = (job.draftSnapshot as any)?.partial === true;
     await this.prisma.aiGenerationJob.update({
       where: { id: jobId },
       data: {
         status: AiGenerationJobStatus.QUEUED,
         errorSummary: null,
         completedAt: null,
-        ...(resumableCandidate ? {} : { draftSnapshot: Prisma.JsonNull }),
+        draftSnapshot: {
+          version: 1,
+          partial: true,
+          lrBatches: existingCandidate?.lrBatches ?? [],
+          failedUnits,
+          speakingWriting: existingCandidate?.speakingWriting ?? null,
+        },
         attempt: { increment: 1 },
         resultSnapshot: {
           ...(job.resultSnapshot as object),
@@ -898,9 +1020,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const appliedCandidateKeys = Array.from(
       new Set([...previouslyApplied, ...toApply]),
     );
-    const fullyApplied = availableKeys.every((k) =>
-      appliedCandidateKeys.includes(k),
-    );
+    const fullyApplied =
+      availableKeys.every((k) => appliedCandidateKeys.includes(k)) &&
+      !(candidate.failedUnits ?? []).length;
     const snapshot = (job.resultSnapshot as any) ?? {};
     await this.prisma.aiGenerationJob.update({
       where: { id: jobId },
@@ -1022,6 +1144,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const exam = await this.editableDraft(examId);
     const group = await this.prisma.toeicQuestionGroup.findFirst({
       where: { id: groupId, examId: exam.toeicExamSet!.id },
+      include: { questions: { orderBy: { questionNumber: 'asc' } } },
     });
     if (!group) throw new NotFoundException('Không tìm thấy nhóm trong Draft');
     const metadata = (group.mediaMetadata as any) ?? {};
@@ -1062,12 +1185,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException(mediaRetryMessage('image'));
       }
     }
-    if (group.part > 4 || !group.transcriptText?.trim())
+    if (group.part > 4)
       throw new BadRequestException(
-        'Nhóm này không có transcript Listening để tạo lại audio',
+        'Nhóm này không phải nội dung Listening để tạo lại audio',
       );
     try {
-      const audio = await this.makeAudio(group.transcriptText);
+      const script = buildToeicListeningAudioScript(group);
+      const sourceHash = toeicListeningAudioFingerprint(group);
+      const audio = await this.makeAudio(script);
       const uploaded = await this.r2.putObjectAtKey(
         `ai/toeic-exams/exam-${exam.toeicExamSet!.id}/groups/${group.id}/audio-regenerated.mp3`,
         audio,
@@ -1080,7 +1205,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         status: 'READY',
         r2Key: uploaded.key,
         generatedAt: new Date().toISOString(),
-        transcriptHash: toeicMediaHash(group.transcriptText),
+        sourceHash,
+        scriptVersion: TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
       };
       return this.prisma.toeicQuestionGroup.update({
         where: { id: group.id },
@@ -1455,9 +1581,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         group.questions.length !== expected[index].questionCount
       )
         throw new BadRequestException(`Nhóm ${index + 1} có sai số câu hỏi`);
-      if ([1, 2, 3, 4].includes(part) && !String(group.transcript ?? '').trim())
+      if ([2, 3, 4].includes(part) && !String(group.transcript ?? '').trim())
         throw new BadRequestException(
-          `Nhóm Listening ${index + 1} thiếu transcript`,
+          `Nhóm Listening ${index + 1} thiếu nội dung cần nghe`,
         );
       if ([6, 7].includes(part) && !String(group.passageText ?? '').trim())
         throw new BadRequestException(
@@ -1489,6 +1615,13 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           throw new BadRequestException(
             'AI trả về giải thích không đủ chất lượng',
           );
+        // Part 3/4 question prompts are spoken after the conversation/talk
+        // (toeic-listening-audio.ts); without this text the audio script
+        // cannot be composed at all.
+        if ([3, 4].includes(part) && !String(question.text ?? '').trim())
+          throw new BadRequestException(
+            'AI trả về câu hỏi Part 3/4 thiếu nội dung câu hỏi để đọc trong audio',
+          );
         const fingerprint =
           `${String(question.text ?? '')} ${options.join('|')}`
             .replace(/\s+/g, ' ')
@@ -1500,6 +1633,20 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           );
         seen.add(fingerprint);
       });
+      if (part >= 1 && part <= 4) {
+        try {
+          buildToeicListeningAudioScript({
+            part,
+            transcriptText: group.transcript,
+            passageText: group.passageText,
+            questions: group.questions,
+          });
+        } catch (error) {
+          throw new BadRequestException(
+            `Nhóm Listening ${index + 1} không đủ cấu trúc audio: ${(error as Error).message}`,
+          );
+        }
+      }
     });
   }
 
@@ -1635,8 +1782,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     return keys;
   }
 
-  private async makeAudio(transcript: string) {
-    const audio = await this.ai.generateToeicListeningAudio(transcript);
+  private async makeAudio(audioScript: string) {
+    const audio = await this.ai.generateToeicListeningAudio(audioScript);
     if (!audio?.length)
       throw new BadRequestException('Không thể tạo audio TTS cho transcript');
     // music-metadata is ESM-only. Keep it out of module bootstrap so the
@@ -1667,6 +1814,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     await this.checkpoint(jobId, 'GENERATING_MEDIA');
     const groups = await this.prisma.toeicQuestionGroup.findMany({
       where: { examId: examSetId, part: { lte: 4 } },
+      include: { questions: { orderBy: { questionNumber: 'asc' } } },
       orderBy: { groupOrder: 'asc' },
     });
     for (const group of groups) {
@@ -1728,12 +1876,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           });
         }
       }
-      const transcript = group.transcriptText?.trim();
-      if (!transcript) {
+      let script: string;
+      let sourceHash: string;
+      try {
+        script = buildToeicListeningAudioScript(group);
+        sourceHash = toeicListeningAudioFingerprint(group);
+      } catch (error) {
         const failedMetadata = withMediaFailure(
           metadata,
           'audio',
-          new BadRequestException('missing transcript'),
+          error,
           toeicMediaHash(''),
         );
         Object.assign(metadata, failedMetadata);
@@ -1748,7 +1900,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       }
       let audioResult: { url: string; key: string } | undefined;
       try {
-        const audio = await this.makeAudio(transcript);
+        const audio = await this.makeAudio(script);
         const uploaded = await this.r2.putObjectAtKey(
           `ai/toeic-exams/exam-${examSetId}/groups/${group.id}/audio.mp3`,
           audio,
@@ -1764,7 +1916,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           metadata,
           'audio',
           error,
-          toeicMediaHash(transcript),
+          sourceHash,
         );
         Object.assign(metadata, failedMetadata);
         await this.prisma.toeicQuestionGroup.update({
@@ -1786,7 +1938,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           status: 'READY',
           r2Key: audioResult.key,
           generatedAt: new Date().toISOString(),
-          transcriptHash: toeicMediaHash(transcript),
+          sourceHash,
+          scriptVersion: TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
         };
         await this.prisma.toeicQuestionGroup.update({
           where: { id: group.id },
@@ -2042,7 +2195,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       let groupOrder = 1;
       let questionNumber = 1;
       const lrExamSet = exam.toeicExamSet;
-      const persistedCandidate = (job.draftSnapshot as any) ?? null;
+      const persistedCandidate =
+        (job.draftSnapshot as ToeicAiDraftSnapshot | null) ?? null;
       const generatedBatches: Array<{
         batchKey?: string;
         part: number;
@@ -2059,6 +2213,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         : [];
       let speakingWritingDraft: any =
         persistedCandidate?.speakingWriting ?? null;
+      let failedUnits: FailedLrBatch[] = Array.isArray(
+        persistedCandidate?.failedUnits,
+      )
+        ? (persistedCandidate?.failedUnits ?? [])
+        : [];
       const persistPartialCandidate = async () => {
         await this.prisma.aiGenerationJob.update({
           where: { id: jobId },
@@ -2067,6 +2226,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
               version: 1,
               partial: true,
               lrBatches: generatedBatches,
+              failedUnits,
               speakingWriting: speakingWritingDraft,
             },
           },
@@ -2109,15 +2269,50 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             difficulty: request.difficulty,
             groups: slice,
           });
-          this.assertBatch(part, slice, candidate);
-          generatedBatches.push({
+          const generatedBatch = {
             batchKey,
             part,
             groupOrder: firstGroupOrder,
             questionNumber: firstQuestionNumber,
             candidate,
-          });
-          this.assertNoDuplicateBatches(generatedBatches);
+          };
+          try {
+            this.assertBatch(part, slice, candidate);
+            this.assertNoDuplicateBatches([
+              ...generatedBatches,
+              generatedBatch,
+            ]);
+          } catch (error) {
+            // A malformed candidate is untrusted provider content, not an
+            // infrastructure failure. Preserve its stable batch identity so
+            // independent units can continue and this exact unit can retry.
+            if (!(error instanceof BadRequestException)) throw error;
+            const message = error.message || 'Candidate AI không hợp lệ';
+            const previous = failedUnits.find(
+              (unit) => unit.batchKey === batchKey,
+            );
+            failedUnits = [
+              ...failedUnits.filter((unit) => unit.batchKey !== batchKey),
+              this.failedBatch(request, part, offset, message, previous),
+            ];
+            await persistPartialCandidate();
+            await this.checkpoint(jobId, 'GENERATING_TEXT', part, {
+              completedGroups: Math.min(offset + slice.length, plan.length),
+              totalGroups: plan.length,
+              stage: 'PARTIAL',
+              failedBatches: failedUnits
+                .filter((unit) => unit.part === part)
+                .map((unit) => ({
+                  batchKey: unit.batchKey,
+                  message: unit.message,
+                })),
+            });
+            continue;
+          }
+          generatedBatches.push(generatedBatch);
+          failedUnits = failedUnits.filter(
+            (unit) => unit.batchKey !== batchKey,
+          );
           await persistPartialCandidate();
           await this.checkpoint(jobId, 'GENERATING_TEXT', part, {
             completedGroups: Math.min(offset + slice.length, plan.length),
@@ -2153,15 +2348,20 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           completedAt: new Date(),
           draftSnapshot: {
             version: 1,
-            partial: false,
+            partial: failedUnits.length > 0,
             lrBatches: generatedBatches,
+            failedUnits,
             speakingWriting: speakingWritingDraft ?? null,
           },
           resultSnapshot: {
             ...((currentJob.resultSnapshot as object) ?? {}),
-            stage: 'READY_FOR_REVIEW',
+            stage:
+              failedUnits.length > 0
+                ? 'READY_FOR_REVIEW_WITH_ERRORS'
+                : 'READY_FOR_REVIEW',
             candidate: {
               lrBatchCount: generatedBatches.length,
+              failedUnitCount: failedUnits.length,
               speakingCount: speakingWritingDraft?.speaking?.length ?? 0,
               writingCount: speakingWritingDraft?.writing?.length ?? 0,
             },
@@ -2182,6 +2382,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             failedScope: activeScope,
           },
           failureHistory: [
+            ...(Array.isArray(job.failureHistory) ? job.failureHistory : []),
             { at: new Date().toISOString(), message: message.slice(0, 1000) },
           ] as Prisma.InputJsonValue,
         },

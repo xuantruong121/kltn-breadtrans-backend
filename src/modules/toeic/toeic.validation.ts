@@ -1,4 +1,9 @@
+import { createHash } from 'crypto';
 import { isAcceptedContentImageReference } from '../upload/content-image-validation';
+import {
+  buildToeicListeningAudioScript,
+  toeicListeningAudioFingerprint,
+} from './toeic-listening-audio';
 
 export type ToeicValidationQuestion = {
   id: number;
@@ -11,6 +16,7 @@ export type ToeicValidationGroup = {
   id: number;
   part: number;
   groupOrder: number;
+  canonicalAccent?: string | null;
   imageUrl?: string | null;
   audioUrl?: string | null;
   passageText?: string | null;
@@ -112,6 +118,21 @@ export function validateToeicExam(exam: ToeicValidationExam): {
     const groupsFor = (part: number) =>
       groups.filter((group) => group.part === part);
     for (const [part, expectedGroups] of [
+      [1, 6],
+      [2, 25],
+    ] as const) {
+      const partGroups = groupsFor(part);
+      if (
+        partGroups.length !== expectedGroups ||
+        partGroups.some((group) => group.questions.length !== 1)
+      ) {
+        issues.push({
+          code: 'LISTENING_GROUP_STRUCTURE',
+          message: `Part ${part} must contain ${expectedGroups} one-question audio groups`,
+        });
+      }
+    }
+    for (const [part, expectedGroups] of [
       [3, 13],
       [4, 10],
     ] as const) {
@@ -164,20 +185,72 @@ export function validateToeicExam(exam: ToeicValidationExam): {
         groupId: group.id,
       });
     const media = (group.mediaMetadata ?? {}) as {
-      audio?: { transcriptHash?: string };
+      audio?: {
+        transcriptHash?: string;
+        sourceHash?: string;
+        source?: string;
+        status?: string;
+        stale?: boolean;
+      };
       image?: { briefHash?: string };
     };
-    if (
-      group.part >= 1 &&
-      group.part <= 4 &&
-      media.audio?.transcriptHash &&
-      media.audio.transcriptHash !== digest(group.transcriptText ?? '')
-    )
-      issues.push({
-        code: 'STALE_AUDIO',
-        message: 'Audio đã cũ sau khi transcript được chỉnh sửa',
-        groupId: group.id,
-      });
+    if (group.part >= 1 && group.part <= 4) {
+      try {
+        buildToeicListeningAudioScript(group);
+        const sourceHash = toeicListeningAudioFingerprint(group);
+        if (
+          media.audio?.source === 'AI_GENERATED' &&
+          media.audio.sourceHash !== sourceHash
+        ) {
+          issues.push({
+            code: 'STALE_AUDIO',
+            message: 'Generated audio does not match the current spoken script',
+            groupId: group.id,
+          });
+        }
+        if (media.audio?.stale) {
+          issues.push({
+            code: 'STALE_AUDIO',
+            message: 'Audio was marked stale after spoken content changed',
+            groupId: group.id,
+          });
+        }
+        if (
+          media.audio?.source !== 'AI_GENERATED' &&
+          media.audio?.sourceHash &&
+          media.audio.sourceHash !== sourceHash
+        ) {
+          issues.push({
+            code: 'STALE_AUDIO',
+            message: 'Audio does not match the current spoken script',
+            groupId: group.id,
+          });
+        }
+        // Legacy authored assets have no generated provenance and remain
+        // compatible. Legacy AI assets without sourceHash fail closed above.
+        if (
+          !media.audio?.sourceHash &&
+          media.audio?.transcriptHash &&
+          media.audio.source !== 'AI_GENERATED' &&
+          media.audio.transcriptHash !== digest(group.transcriptText ?? '')
+        ) {
+          issues.push({
+            code: 'STALE_AUDIO',
+            message: 'Legacy audio does not match its stored script',
+            groupId: group.id,
+          });
+        }
+      } catch (error) {
+        issues.push({
+          code: 'INVALID_LISTENING_SCRIPT',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Listening audio script is invalid',
+          groupId: group.id,
+        });
+      }
+    }
     if (
       group.part === 1 &&
       media.image?.briefHash &&
@@ -251,8 +324,6 @@ export function validateToeicExam(exam: ToeicValidationExam): {
     },
   };
 }
-import { createHash } from 'crypto';
-
 /**
  * Human-readable, Admin-facing view of a ToeicValidationIssue.
  * `code`/`groupId`/`questionId` stay for internal navigation (outline jump
@@ -345,7 +416,14 @@ export function humanizeToeicValidationIssues(
           : humanMessage;
         break;
       case 'STALE_AUDIO':
-        humanMessage = `${partLabel} · ${groupLabel}: audio cũ, cần tạo lại sau khi sửa transcript.`;
+        humanMessage = `${partLabel} · ${groupLabel}: audio chưa khớp với nội dung cần nghe, hãy tạo lại audio.`;
+        break;
+      case 'INVALID_LISTENING_SCRIPT':
+        humanMessage = `${partLabel} · ${groupLabel}: nội dung nghe chưa đủ cấu trúc để tạo audio.`;
+        break;
+      case 'LISTENING_GROUP_STRUCTURE':
+        humanMessage =
+          'Cấu trúc nhóm Listening Part 1 hoặc Part 2 chưa đúng số câu cần có.';
         break;
       case 'STALE_IMAGE':
       case 'STALE_IMAGE_QUESTION':

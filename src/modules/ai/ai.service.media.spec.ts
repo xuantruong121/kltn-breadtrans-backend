@@ -13,6 +13,22 @@ describe('Azure Speech SSML authoring', () => {
     expect(ssml).toContain('Read &lt;this&gt; &amp; say &quot;hello&quot;.');
     expect(ssml).not.toContain('<break');
   });
+
+  it('speaks a TOEIC option letter as a character name, never a narrated label word', () => {
+    const ssml = buildToeicListeningSsml(
+      'Where will the meeting be held?\n\nA. In the main hall.\n\nB. Near the lobby.',
+    );
+
+    expect(ssml).toContain(
+      '<say-as interpret-as="characters">A</say-as>. In the main hall.',
+    );
+    expect(ssml).toContain(
+      '<say-as interpret-as="characters">B</say-as>. Near the lobby.',
+    );
+    expect(ssml).not.toContain('Statement');
+    expect(ssml).not.toContain('Response');
+    expect(ssml).not.toContain('Option');
+  });
 });
 
 describe('Azure Speech media normalization', () => {

@@ -148,7 +148,7 @@ function fixture(
     getJob: jest.fn().mockResolvedValue(null),
     add: jest.fn().mockResolvedValue(undefined),
   };
-  return { service, ai, prisma, runtimeJob, updates };
+  return { service, ai, prisma, runtimeJob, updates, queue: service.queue };
 }
 
 const requestFor = (
@@ -242,15 +242,24 @@ describe('ToeicAiExamService controlled template pipeline', () => {
     expect(harness.prisma.toeicQuestionGroup.create).not.toHaveBeenCalled();
   });
 
-  it('fails malformed provider output safely without writing a Draft', async () => {
+  it('isolates malformed provider output as a failed candidate unit without writing a Draft', async () => {
     const harness = fixture(
       requestFor('TOEIC_LR', { 5: [{ questionCount: 1 }] }),
       { malformed: true },
     );
-    await expect(
-      harness.service.process({ data: { jobId: 'qa-job' } }),
-    ).rejects.toThrow('AI trả về phương án không hợp lệ');
-    expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.FAILED);
+    await harness.service.process({ data: { jobId: 'qa-job' } });
+    expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.GENERATED);
+    expect(harness.runtimeJob.draftSnapshot).toMatchObject({
+      partial: true,
+      lrBatches: [],
+      failedUnits: [
+        expect.objectContaining({
+          batchKey: '5:0',
+          code: 'CONTENT_CONTRACT_FAILURE',
+          message: 'AI trả về phương án không hợp lệ',
+        }),
+      ],
+    });
     expect(harness.prisma.toeicQuestionGroup.create).not.toHaveBeenCalled();
   });
 
@@ -268,10 +277,109 @@ describe('ToeicAiExamService controlled template pipeline', () => {
       }
       return { groups: [{ questions: [first.groups[0].questions[0]] }] };
     });
-    await expect(
-      harness.service.process({ data: { jobId: 'qa-job' } }),
-    ).rejects.toThrow('AI trả về câu hỏi trùng lặp giữa các batch');
-    expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.FAILED);
+    await harness.service.process({ data: { jobId: 'qa-job' } });
+    expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.GENERATED);
+    expect(harness.runtimeJob.draftSnapshot).toMatchObject({
+      partial: true,
+      lrBatches: [expect.objectContaining({ batchKey: '5:0' })],
+      failedUnits: [
+        expect.objectContaining({
+          batchKey: '5:3',
+          code: 'CONTENT_CONTRACT_FAILURE',
+        }),
+      ],
+    });
+    expect(harness.prisma.toeicQuestionGroup.create).not.toHaveBeenCalled();
+  });
+
+  it('persists a first Listening contract failure, continues later batches, then retries only that failed unit', async () => {
+    const request = requestFor('TOEIC_LR', {
+      1: Array.from({ length: 4 }, () => ({ questionCount: 1 })),
+    });
+    const harness = fixture(request);
+    let invalidFirstUnit = true;
+    harness.ai.generateToeicExamBatch.mockImplementation((input: any) => {
+      const candidate = batchFor(input.part, input.groups);
+      if (invalidFirstUnit) {
+        invalidFirstUnit = false;
+        candidate.groups[0].questions[0].options.pop();
+      }
+      return candidate;
+    });
+
+    await harness.service.process({ data: { jobId: 'qa-job' } });
+
+    expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.GENERATED);
+    expect(harness.runtimeJob.draftSnapshot).toMatchObject({
+      partial: true,
+      lrBatches: [expect.objectContaining({ batchKey: '1:3' })],
+      failedUnits: [
+        expect.objectContaining({
+          batchKey: '1:0',
+          message: 'AI trả về phương án không hợp lệ',
+        }),
+      ],
+    });
+    expect(
+      harness.ai.generateToeicExamBatch.mock.calls.map(
+        (call: any[]) => call[0].groups.length,
+      ),
+    ).toEqual([3, 1]);
+
+    await harness.service.retry('qa-job', 1);
+    await harness.service.process({ data: { jobId: 'qa-job' } });
+
+    expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.GENERATED);
+    expect(harness.runtimeJob.draftSnapshot).toMatchObject({
+      partial: false,
+      lrBatches: expect.arrayContaining([
+        expect.objectContaining({ batchKey: '1:0' }),
+        expect.objectContaining({ batchKey: '1:3' }),
+      ]),
+      failedUnits: [],
+    });
+    expect(
+      harness.ai.generateToeicExamBatch.mock.calls.map(
+        (call: any[]) => call[0].groups.length,
+      ),
+    ).toEqual([3, 1, 3]);
+    expect(harness.prisma.toeicQuestionGroup.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps a zero-content first batch failure visible and retryable in the candidate workspace', async () => {
+    const request = requestFor('TOEIC_LR', {
+      1: [{ questionCount: 1 }],
+    });
+    const harness = fixture(request);
+    harness.ai.generateToeicExamBatch.mockImplementation((input: any) => {
+      const candidate = batchFor(input.part, input.groups);
+      candidate.groups[0].questions[0].options.pop();
+      return candidate;
+    });
+
+    await harness.service.process({ data: { jobId: 'qa-job' } });
+
+    expect(harness.runtimeJob.draftSnapshot).toMatchObject({
+      partial: true,
+      lrBatches: [],
+      failedUnits: [expect.objectContaining({ batchKey: '1:0' })],
+    });
+    const candidate = await harness.service.getCandidate('qa-job', 1);
+    expect(candidate.lrGroups).toEqual([]);
+    expect(candidate.failedUnits).toEqual([
+      expect.objectContaining({
+        batchKey: '1:0',
+        message: 'AI trả về phương án không hợp lệ',
+      }),
+    ]);
+
+    await harness.service.retry('qa-job', 1);
+    expect(harness.queue.add).toHaveBeenCalledWith(
+      'generate',
+      { version: 1, jobId: 'qa-job' },
+      { jobId: 'qa-job' },
+    );
+    expect(harness.runtimeJob.draftSnapshot.failedUnits).toHaveLength(1);
     expect(harness.prisma.toeicQuestionGroup.create).not.toHaveBeenCalled();
   });
 
