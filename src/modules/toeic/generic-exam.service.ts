@@ -424,7 +424,7 @@ export class GenericExamService {
       // Deterministic, zero-AI-call readiness summary for the Studio
       // "Kiểm tra" tab / outline header — code, not a model, decides this.
       readinessSummary: this.buildReadinessSummary(exam, readiness),
-      aiGenerationJobId: (exam as any).aiGenerationJobId ?? null,
+      aiGenerationJobId: exam.aiGenerationJobId ?? null,
       assessment: assessment
         ? {
             id: assessment.id,
