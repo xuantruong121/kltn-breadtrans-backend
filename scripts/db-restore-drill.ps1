@@ -29,7 +29,8 @@
 param(
   [string]$DumpFile = '',
   [string]$BackupDir = '',
-  [string]$ExpectCounts = ''
+  [string]$ExpectCounts = '',
+  [switch]$LearnerCatalogAssertions
 )
 
 $ErrorActionPreference = 'Continue'
@@ -167,6 +168,37 @@ if ($ExpectCounts) {
       Fail "Count mismatch for $table : restored=$($results[$table]) expected=$expected"
     }
     Write-Host "  assert $table = $expected : PASS"
+  }
+}
+
+# Optional application-level assertions for the learner recovery baseline.
+# These are deliberately separate from row counts: a database can restore
+# structurally while still losing publication or media-reference semantics.
+if ($LearnerCatalogAssertions) {
+  $assertSql = @'
+SELECT 'flashcard_published_topics=' || count(*) FROM "VocabTopic" WHERE "categoryName" <> 'SYSTEM_DICTIONARY' AND "publicationStatus" = 'PUBLISHED';
+SELECT 'course_non_beginner=' || count(*) FROM "Course" WHERE "level" <> 'BEGINNER';
+SELECT 'general_speaking_visible=' || count(*) FROM "SpeakingExercise" WHERE "practiceSetId" IS NULL AND "publicationStatus" = 'PUBLISHED';
+SELECT 'listening_q27_audio_refs=' || count(*) FROM "QuizAudioAsset" WHERE "questionId" = 27 AND "isActive" = true AND "key" = 'catalog/listening/practice/audio/quiz-9/question-27/v1.mp3';
+SELECT 'toeic_published_products=' || count(*) FROM "Exam" WHERE "variantCode" IN ('TOEIC_LR', 'TOEIC_SW', 'TOEIC_4_SKILLS') AND "publicationStatus" = 'PUBLISHED';
+'@
+  $assertFile = Join-Path $env:TEMP 'kltn-restore-learner-assertions.sql'
+  $assertSql | Out-File -FilePath $assertFile -Encoding ascii
+  docker cp "$assertFile" "$drillId`:/tmp/learner-assertions.sql" | Out-Null
+  Remove-Item $assertFile -ErrorAction SilentlyContinue
+  if ($LASTEXITCODE -ne 0) { Fail 'Could not copy learner assertion SQL into the drill container.' }
+  $assertLines = docker exec $drillId psql -U postgres -d $restoreDb -tAf /tmp/learner-assertions.sql
+  if ($LASTEXITCODE -ne 0) { Fail 'Learner catalog assertions could not run.' }
+  $expectedAssertions = @{ flashcard_published_topics = 8; course_non_beginner = 0; general_speaking_visible = 30; listening_q27_audio_refs = 1; toeic_published_products = 3 }
+  foreach ($line in $assertLines) {
+    $parts = "$line".Trim().Split('=')
+    if ($parts.Count -ne 2) { continue }
+    $name = $parts[0]
+    $value = [int]$parts[1]
+    if (-not $expectedAssertions.ContainsKey($name) -or $value -ne $expectedAssertions[$name]) {
+      Fail "Learner catalog assertion failed: $name=$value"
+    }
+    Write-Host "  assert $name = $value : PASS"
   }
 }
 

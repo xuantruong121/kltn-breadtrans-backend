@@ -1,10 +1,19 @@
 {
- "generatedAt": "2026-10-23T07:22:16.929241Z",
+ "generatedAt": "2026-10-23T07:55:35.532861+00:00",
  "purpose": "Exam 69 surviving R2 media forensics (inventory only; DB reconstruction DEFERRED)",
  "owningExam": {
-  "examId": 69,
-  "toeicExamSetId": 86,
-  "note": "mapping observed live before the incident"
+  "claim": "generic Exam.id = 69 owned ToeicExamSet.id = 86",
+  "confidence": "AMBIGUOUS",
+  "proven": false,
+  "why": "The R2 namespace number is exam.toeicExamSet.id, NOT the generic Exam.id. The Exam<->ToeicExamSet link lived only in the destroyed Exam/ToeicExamSet rows. R2 objects carry no custom metadata (putObjectAtKey sets none; HeadObject returns {}). No surviving log, report, job record or git-tracked artifact states the link. The only files asserting 69<->86 are artifacts generated in the same post-incident session from a prior live reading, which is circular and not admissible as evidence.",
+  "evidenceSearched": [
+   "R2 object custom metadata (HeadObject) - empty",
+   "R2 key naming source in toeic-ai-exam.service.ts - encodes toeicExamSetId only",
+   "git-tracked artifacts/reports - none reference exam 86 or groups 1671-1764",
+   "September logical dumps - predate Exam 69 creation (2026-10-23)",
+   "post-incident volume snapshot - data already destroyed",
+   "AiGenerationJob rows (would have linked job->exam) - destroyed with the database"
+  ]
  },
  "r2Mutated": false,
  "totals": {
@@ -14,7 +23,7 @@
   "distinctGroups": 54,
   "part1Images": 0
  },
- "part1ImageStatus": "ABSENT in R2 \u2014 consistent with the image-provider outage (0/6 generated)",
+ "part1ImageStatus": "ABSENT in R2 — consistent with the image-provider outage (0/6 generated)",
  "items": [
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1671/audio-regenerated.mp3",
@@ -27,7 +36,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1671/audio.mp3",
@@ -40,7 +50,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1672/audio-regenerated.mp3",
@@ -53,7 +64,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1672/audio.mp3",
@@ -66,7 +78,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1673/audio-regenerated.mp3",
@@ -79,7 +92,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1673/audio.mp3",
@@ -92,7 +106,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1674/audio-regenerated.mp3",
@@ -105,7 +120,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1674/audio.mp3",
@@ -118,7 +134,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1675/audio-regenerated.mp3",
@@ -131,7 +148,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1675/audio.mp3",
@@ -144,7 +162,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1676/audio-regenerated.mp3",
@@ -157,7 +176,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1676/audio.mp3",
@@ -170,7 +190,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1677/audio-regenerated.mp3",
@@ -183,7 +204,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1677/audio.mp3",
@@ -196,7 +218,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1678/audio-regenerated.mp3",
@@ -209,7 +232,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1678/audio.mp3",
@@ -222,7 +246,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1679/audio-regenerated.mp3",
@@ -235,7 +260,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1679/audio.mp3",
@@ -248,7 +274,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1680/audio-regenerated.mp3",
@@ -261,7 +288,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1680/audio.mp3",
@@ -274,7 +302,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1681/audio-regenerated.mp3",
@@ -287,7 +316,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1681/audio.mp3",
@@ -300,7 +330,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1682/audio-regenerated.mp3",
@@ -313,7 +344,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1682/audio.mp3",
@@ -326,7 +358,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1683/audio-regenerated.mp3",
@@ -339,7 +372,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1683/audio.mp3",
@@ -352,7 +386,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1684/audio-regenerated.mp3",
@@ -365,7 +400,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1684/audio.mp3",
@@ -378,7 +414,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1685/audio-regenerated.mp3",
@@ -391,7 +428,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1685/audio.mp3",
@@ -404,7 +442,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1686/audio-regenerated.mp3",
@@ -417,7 +456,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1686/audio.mp3",
@@ -430,7 +470,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1687/audio-regenerated.mp3",
@@ -443,7 +484,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1687/audio.mp3",
@@ -456,7 +498,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1688/audio-regenerated.mp3",
@@ -469,7 +512,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1688/audio.mp3",
@@ -482,7 +526,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1689/audio-regenerated.mp3",
@@ -495,7 +540,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1689/audio.mp3",
@@ -508,7 +554,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1690/audio-regenerated.mp3",
@@ -521,7 +568,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1690/audio.mp3",
@@ -534,7 +582,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1691/audio-regenerated.mp3",
@@ -547,7 +596,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1691/audio.mp3",
@@ -560,7 +610,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1692/audio-regenerated.mp3",
@@ -573,7 +624,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1692/audio.mp3",
@@ -586,7 +638,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1693/audio-regenerated.mp3",
@@ -599,7 +652,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1693/audio.mp3",
@@ -612,7 +666,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1694/audio-regenerated.mp3",
@@ -625,7 +680,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1694/audio.mp3",
@@ -638,7 +694,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1695/audio-regenerated.mp3",
@@ -651,7 +708,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1695/audio.mp3",
@@ -664,7 +722,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1696/audio-regenerated.mp3",
@@ -677,7 +736,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1696/audio.mp3",
@@ -690,7 +750,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1697/audio-regenerated.mp3",
@@ -703,7 +764,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1697/audio.mp3",
@@ -716,7 +778,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1698/audio-regenerated.mp3",
@@ -729,7 +792,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1698/audio.mp3",
@@ -742,7 +806,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1699/audio-regenerated.mp3",
@@ -755,7 +820,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1699/audio.mp3",
@@ -768,7 +834,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1700/audio-regenerated.mp3",
@@ -781,7 +848,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1700/audio.mp3",
@@ -794,7 +862,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1701/audio-regenerated.mp3",
@@ -807,7 +876,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1701/audio.mp3",
@@ -820,7 +890,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1702/audio-regenerated.mp3",
@@ -833,7 +904,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1702/audio.mp3",
@@ -846,7 +918,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1703/audio-regenerated.mp3",
@@ -859,7 +932,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1703/audio.mp3",
@@ -872,7 +946,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1704/audio-regenerated.mp3",
@@ -885,7 +960,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1704/audio.mp3",
@@ -898,7 +974,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1705/audio-regenerated.mp3",
@@ -911,7 +988,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1705/audio.mp3",
@@ -924,7 +1002,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1706/audio-regenerated.mp3",
@@ -937,7 +1016,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1706/audio.mp3",
@@ -950,7 +1030,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1707/audio-regenerated.mp3",
@@ -963,7 +1044,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1707/audio.mp3",
@@ -976,7 +1058,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1708/audio-regenerated.mp3",
@@ -989,7 +1072,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1708/audio.mp3",
@@ -1002,7 +1086,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1709/audio-regenerated.mp3",
@@ -1015,7 +1100,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1709/audio.mp3",
@@ -1028,7 +1114,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1710/audio-regenerated.mp3",
@@ -1041,7 +1128,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1710/audio.mp3",
@@ -1054,7 +1142,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1711/audio-regenerated.mp3",
@@ -1067,7 +1156,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1711/audio.mp3",
@@ -1080,7 +1170,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1712/audio-regenerated.mp3",
@@ -1093,7 +1184,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1712/audio.mp3",
@@ -1106,7 +1198,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1713/audio-regenerated.mp3",
@@ -1119,7 +1212,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1713/audio.mp3",
@@ -1132,7 +1226,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1714/audio-regenerated.mp3",
@@ -1145,7 +1240,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1714/audio.mp3",
@@ -1158,7 +1254,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1715/audio-regenerated.mp3",
@@ -1171,7 +1268,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1715/audio.mp3",
@@ -1184,7 +1282,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1716/audio-regenerated.mp3",
@@ -1197,7 +1296,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1716/audio.mp3",
@@ -1210,7 +1310,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1717/audio-regenerated.mp3",
@@ -1223,7 +1324,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1717/audio.mp3",
@@ -1236,7 +1338,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1718/audio-regenerated.mp3",
@@ -1249,7 +1352,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1718/audio.mp3",
@@ -1262,7 +1366,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1719/audio-regenerated.mp3",
@@ -1275,7 +1380,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1719/audio.mp3",
@@ -1288,7 +1394,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1720/audio-regenerated.mp3",
@@ -1301,7 +1408,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1720/audio.mp3",
@@ -1314,7 +1422,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1721/audio-regenerated.mp3",
@@ -1327,7 +1436,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1721/audio.mp3",
@@ -1340,7 +1450,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1762/audio-regenerated.mp3",
@@ -1353,7 +1464,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1762/audio.mp3",
@@ -1366,7 +1478,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1763/audio-regenerated.mp3",
@@ -1379,7 +1492,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1763/audio.mp3",
@@ -1392,7 +1506,8 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1764/audio-regenerated.mp3",
@@ -1405,7 +1520,8 @@
    "mediaType": "audio",
    "phase0Corrected": true,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   },
   {
    "objectKey": "ai/toeic-exams/exam-86/groups/1764/audio.mp3",
@@ -1418,7 +1534,17 @@
    "mediaType": "audio",
    "phase0Corrected": false,
    "confidence": "PROVEN",
-   "rationale": "object key deterministically encodes toeicExamSetId and groupId written by toeic-ai-exam.service materializeMedia/regenerateMedia"
+   "rationale": "key format ai/toeic-exams/exam-${exam.toeicExamSet.id}/groups/${group.id}/ is written only by toeic-ai-exam.service.ts (materializeMedia -> audio.mp3, regenerateMedia -> audio-regenerated.mp3)",
+   "provenClaim": "object belongs to ToeicExamSet.id=86, group id as encoded in key"
   }
- ]
+ ],
+ "provenFacts": [
+  "ToeicExamSet.id = 86 is the owning L&R content set of these 108 objects",
+  "group ids 1671-1764 (54 distinct) belong to that exam set",
+  "54 audio-regenerated.mp3 objects were written by regenerateMedia (Phase 0 corrected composer)",
+  "54 audio.mp3 objects were written by materializeMedia before the Phase 0 label/question fixes",
+  "no Part 1 image objects exist for this exam set (image provider outage)"
+ ],
+ "attachmentPolicy": "Objects may be attached to a rebuilt ToeicExamSet 86 by groupId, because that mapping is PROVEN. They must NOT be attached on the basis of the unproven Exam 69 identity.",
+ "correctionNote": "Supersedes the earlier manifest, which labelled the Exam 69 <-> namespace 86 mapping PROVEN. That label was an overstatement and is downgraded to AMBIGUOUS."
 }

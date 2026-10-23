@@ -118,7 +118,13 @@ export class DiagnosticService {
         level: true,
         status: true,
         curriculumType: true,
-        _count: { select: { lessons: true } },
+        // Lessons live in `Lesson` for GENERAL_ENGLISH courses but in
+        // `CourseLesson` for authored curricula such as
+        // PRONUNCIATION_FOUNDATION, so both relations must be counted.
+        // Counting only `lessons` reported lessonCount = 0 for the IPA course
+        // and, because rankCourseRecommendations requires lessonCount > 0,
+        // silently dropped it from every recommendation.
+        _count: { select: { lessons: true, courseLessons: true } },
         lessons: {
           orderBy: { order: 'asc' },
           select: {
@@ -170,7 +176,7 @@ export class DiagnosticService {
         description: course.description,
         level: course.level,
         status: course.status,
-        lessonCount: course._count.lessons,
+        lessonCount: course._count.lessons + course._count.courseLessons,
         curriculumReady:
           buildCourseCurriculum(
             course.lessons ?? [],

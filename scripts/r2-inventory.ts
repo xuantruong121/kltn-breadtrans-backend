@@ -12,19 +12,27 @@
 import 'dotenv/config';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import {
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  S3Client,
+} from '@aws-sdk/client-s3';
 
 type Obj = {
   key: string;
   size: number;
   lastModified: string | null;
   etag: string | null;
+  contentType: string | null;
+  metadata: Record<string, string>;
+  publicReachability: 'REACHABLE' | 'NOT_REACHABLE' | 'NOT_CONFIGURED' | 'UNKNOWN';
 };
 
 const accountId = process.env.R2_ACCOUNT_ID;
 const accessKeyId = process.env.R2_ACCESS_KEY_ID;
 const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 const bucket = process.env.R2_BUCKET_NAME;
+const publicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
 
 if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
   console.error('R2 configuration incomplete; cannot inventory.');
@@ -58,11 +66,52 @@ async function listAll(prefix?: string): Promise<Obj[]> {
           ? item.LastModified.toISOString()
           : null,
         etag: item.ETag ? item.ETag.replace(/"/g, '') : null,
+        contentType: null,
+        metadata: {},
+        publicReachability: publicUrl ? 'UNKNOWN' : 'NOT_CONFIGURED',
       });
     }
     token = response.IsTruncated ? response.NextContinuationToken : undefined;
   } while (token);
   return objects;
+}
+
+async function mapConcurrent<T>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<void>,
+): Promise<void> {
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+      while (cursor < values.length) {
+        const index = cursor++;
+        await mapper(values[index]);
+      }
+    }),
+  );
+}
+
+async function enrichObject(object: Obj): Promise<void> {
+  const head = await client.send(
+    new HeadObjectCommand({ Bucket: bucket, Key: object.key }),
+  );
+  object.contentType = head.ContentType ?? null;
+  object.metadata = head.Metadata ?? {};
+  object.size = head.ContentLength ?? object.size;
+  object.etag = head.ETag?.replace(/"/g, '') ?? object.etag;
+
+  if (!publicUrl) return;
+  try {
+    const response = await fetch(`${publicUrl}/${object.key}`, {
+      method: 'HEAD',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(10_000),
+    });
+    object.publicReachability = response.ok ? 'REACHABLE' : 'NOT_REACHABLE';
+  } catch {
+    object.publicReachability = 'NOT_REACHABLE';
+  }
 }
 
 /** Groups by the first two path segments so real layout is observed, not assumed. */
@@ -81,6 +130,8 @@ async function main() {
   );
   const objects = await listAll(prefix);
   console.log(`total objects: ${objects.length}`);
+  console.log('enriching object headers and public reachability (read-only)...');
+  await mapConcurrent(objects, 16, enrichObject);
 
   const groups = new Map<string, { count: number; bytes: number }>();
   for (const object of objects) {
@@ -110,13 +161,14 @@ async function main() {
 
   const outDir = join(__dirname, '..', 'artifacts');
   mkdirSync(outDir, { recursive: true });
-  const outFile = join(outDir, 'r2-inventory.json');
+  const outFile = join(outDir, 'r2-full-inventory.json');
   writeFileSync(
     outFile,
     JSON.stringify(
       {
         generatedAt: new Date().toISOString(),
-        mode: 'READ_ONLY',
+        mode: 'READ_ONLY_FULL',
+        bucket: '<configured-public-media-bucket>',
         totalObjects: objects.length,
         groups: [...groups.entries()].map(([k, v]) => ({ prefix: k, ...v })),
         objects,

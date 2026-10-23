@@ -6,6 +6,7 @@ export const JOB_NAMES = {
   STREAK_REMINDER: 'streak-reminder',
   VOCABULARY_REVIEW: 'vocabulary-review',
   R2_AUDIO_CLEANUP: 'r2-audio-cleanup',
+  DATABASE_BACKUP_R2_SYNC: 'database-backup-r2-sync',
 } as const;
 
 export type SystemJobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

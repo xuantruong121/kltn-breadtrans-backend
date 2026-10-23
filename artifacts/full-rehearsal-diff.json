@@ -1,0 +1,8 @@
+{
+  "equal": true,
+  "before": "D:\\Study\\KLTN\\Project\\kltn-breadtrans-backend\\artifacts\\full-rehearsal-run1.json",
+  "after": "D:\\Study\\KLTN\\Project\\kltn-breadtrans-backend\\artifacts\\full-rehearsal-run2.json",
+  "beforeBytes": 114550,
+  "afterBytes": 114550,
+  "difference": null
+}

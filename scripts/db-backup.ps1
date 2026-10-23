@@ -27,7 +27,8 @@ param(
   [string]$Database = 'kltn_db',
   [string]$User = 'postgres',
   [string]$Label = '',
-  [string]$BackupDir = ''
+  [string]$BackupDir = '',
+  [switch]$SkipOffsite = $false
 )
 
 $ErrorActionPreference = 'Continue'
@@ -162,4 +163,32 @@ Write-Host "  sha256  : $sha"
 Write-Host '  archive : pg_restore -l PASS'
 Write-Host "  meta    : $metaPath"
 if (-not $globalsOk) { Write-Host '  note    : globals dump unavailable (not required for application restore)' }
+
+if (-not $SkipOffsite) {
+  $backupBucket = $env:R2_BACKUP_BUCKET_NAME
+  if (-not $backupBucket -and (Test-Path $envFile)) {
+    $bucketLine = Select-String -Path $envFile -Pattern '^\s*R2_BACKUP_BUCKET_NAME\s*=' | Select-Object -First 1
+    if ($bucketLine) {
+      $backupBucket = ($bucketLine.Line -replace '^\s*R2_BACKUP_BUCKET_NAME\s*=', '').Trim().Trim('"').Trim("'")
+    }
+  }
+
+  if ($backupBucket) {
+    Write-Host ''
+    Write-Host '=================================================='
+    Write-Host ' AUTOMATED R2 OFFSITE SYNC'
+    Write-Host '=================================================='
+    $backupClass = if ($Label -match 'PROTECTED') { 'PROTECTED_BASELINE' } else { 'AUTOMATIC' }
+    $checkpointLabel = if ($Label) { $Label } else { 'manual' }
+    try {
+      npx ts-node "$repoRoot/scripts/db-backup-offsite.ts" --file "$hostDump" --checkpoint "$checkpointLabel" --class "$backupClass" --no-restore-drill
+    } catch {
+      Write-Host "Warning: Automated R2 sync failed: $_"
+      Write-Host 'Local backup is intact.'
+    }
+  } else {
+    Write-Host '  note    : R2 offsite sync skipped (R2_BACKUP_BUCKET_NAME not set)'
+  }
+}
+
 exit 0

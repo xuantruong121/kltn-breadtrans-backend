@@ -1,0 +1,93 @@
+{
+  "generatedAt": "2026-10-23T13:50:13.476Z",
+  "manifestAuthority": {
+    "source": "scripts/rollout-premium-content.ts",
+    "commit": "03a143c",
+    "rationale": "Committed production rollout manifest; text-only domains have no structurally possible R2-media corroboration."
+  },
+  "counts": {
+    "provenPremium": 5,
+    "canonicalManifestConfirmedPremium": 25,
+    "ambiguousPremiumWithheld": 0,
+    "totalPremium": 30,
+    "freeAssignments": 24
+  },
+  "assignments": {
+    "provenPremium": {
+      "listeningQuizIds": [
+        5,
+        10,
+        11,
+        12,
+        25
+      ]
+    },
+    "canonicalManifestConfirmed": {
+      "readingQuizIds": [
+        14,
+        15,
+        16
+      ],
+      "writingQuizIds": [
+        4,
+        7,
+        18,
+        19
+      ],
+      "speakingExerciseIds": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ]
+    },
+    "free": {
+      "readingQuizIds": [
+        2,
+        6,
+        13
+      ],
+      "listeningQuizIds": [
+        1,
+        9,
+        23,
+        24,
+        26,
+        27,
+        28
+      ],
+      "writingQuizIds": [
+        3,
+        17
+      ],
+      "speakingExerciseIds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17
+      ]
+    }
+  }
+}

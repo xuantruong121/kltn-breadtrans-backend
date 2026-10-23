@@ -34,7 +34,7 @@ describe('SystemJobsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new SystemJobsService({} as any, {} as any, {} as any);
+    service = new SystemJobsService({} as any, {} as any, {} as any, {} as any);
   });
 
   it('removes an existing failed job before re-adding with the same deterministic ID', async () => {

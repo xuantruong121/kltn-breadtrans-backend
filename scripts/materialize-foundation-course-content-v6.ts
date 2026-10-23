@@ -2653,46 +2653,92 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
   'greetings-and-introductions': [
     q(
       'You meet a new classmate in the afternoon. Which greeting fits?',
-      ['Good night.', 'Good afternoon.', 'Good bye morning.', 'I am afternoon.'],
+      [
+        'Good night.',
+        'Good afternoon.',
+        'Good bye morning.',
+        'I am afternoon.',
+      ],
       'Good afternoon.',
       'Use “Good afternoon” when meeting someone after midday.',
     ),
     q(
       'Which reply gives a place of origin?',
-      ['I am from Can Tho.', 'I am name Can Tho.', 'I work from Can Tho?', 'My from is Can Tho.'],
+      [
+        'I am from Can Tho.',
+        'I am name Can Tho.',
+        'I work from Can Tho?',
+        'My from is Can Tho.',
+      ],
       'I am from Can Tho.',
       '“I am from + place” tells someone where you come from.',
     ),
     q(
       'Choose the polite answer: “What do you do?”',
-      ['I am a designer.', 'I from a designer.', 'My do designer.', 'I doing a designer.'],
+      [
+        'I am a designer.',
+        'I from a designer.',
+        'My do designer.',
+        'I doing a designer.',
+      ],
       'I am a designer.',
       'Use “I am a/an + job” to answer a question about work.',
     ),
-    openQ('Introduce yourself to a new classmate in one sentence.', 'Hi, I am Linh. Nice to meet you.', 'A short greeting, name and polite closing complete the introduction.'),
-    openQ('Ask a new classmate where they are from.', 'Where are you from?', '“Where are you from?” is the taught question for origin.'),
+    openQ(
+      'Introduce yourself to a new classmate in one sentence.',
+      'Hi, I am Linh. Nice to meet you.',
+      'A short greeting, name and polite closing complete the introduction.',
+    ),
+    openQ(
+      'Ask a new classmate where they are from.',
+      'Where are you from?',
+      '“Where are you from?” is the taught question for origin.',
+    ),
   ],
   'family-and-personal-information': [
     q(
       'Mai is talking about her father. Which sentence is correct?',
-      ['This is my father.', 'This my father is.', 'This is father my.', 'My this father.'],
+      [
+        'This is my father.',
+        'This my father is.',
+        'This is father my.',
+        'My this father.',
+      ],
       'This is my father.',
       'Use “This is my + family member” to introduce someone.',
     ),
     q(
       'Which sentence uses the plural form correctly?',
-      ['I have two sister.', 'I have two sisters.', 'I have two sisteres.', 'I have two sister’s.'],
+      [
+        'I have two sister.',
+        'I have two sisters.',
+        'I have two sisteres.',
+        'I have two sister’s.',
+      ],
       'I have two sisters.',
       'A count of two needs the plural noun “sisters”.',
     ),
     q(
       'Choose the safe, basic personal question.',
-      ['What is your bank password?', 'Where are you from?', 'What is your ID number?', 'What is your PIN?'],
+      [
+        'What is your bank password?',
+        'Where are you from?',
+        'What is your ID number?',
+        'What is your PIN?',
+      ],
       'Where are you from?',
       'Origin is a suitable basic learning-context question; passwords and PINs are private.',
     ),
-    openQ('Say who you live with.', 'I live with my family.', '“I live with + person/group” gives a simple household answer.'),
-    openQ('Say how many brothers or sisters you have.', 'I have two brothers.', 'Use “I have + number + plural family noun.”'),
+    openQ(
+      'Say who you live with.',
+      'I live with my family.',
+      '“I live with + person/group” gives a simple household answer.',
+    ),
+    openQ(
+      'Say how many brothers or sisters you have.',
+      'I have two brothers.',
+      'Use “I have + number + plural family noun.”',
+    ),
   ],
   'daily-routines': [
     q(
@@ -2703,18 +2749,36 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Which sentence describes a regular morning action?',
-      ['I usually walk to work.', 'I am walk to work.', 'I usually walking work.', 'I walk yesterday work.'],
+      [
+        'I usually walk to work.',
+        'I am walk to work.',
+        'I usually walking work.',
+        'I walk yesterday work.',
+      ],
       'I usually walk to work.',
       '“Usually” introduces a repeated routine and is followed by the base verb with I.',
     ),
     q(
       'Choose the correct negative sentence about a routine.',
-      ['She does not cooks at night.', 'She does not cook at night.', 'She do not cook at night.', 'She not cooks at night.'],
+      [
+        'She does not cooks at night.',
+        'She does not cook at night.',
+        'She do not cook at night.',
+        'She not cooks at night.',
+      ],
       'She does not cook at night.',
       'After “does not”, the main verb returns to its base form.',
     ),
-    openQ('Write one routine you do before bed.', 'I usually read before bed.', 'Use “usually” and the base verb to describe a repeated habit.'),
-    openQ('Change “He watches TV.” to a sentence with I.', 'I watch TV.', 'With I, the main verb has no third-person -s.'),
+    openQ(
+      'Write one routine you do before bed.',
+      'I usually read before bed.',
+      'Use “usually” and the base verb to describe a repeated habit.',
+    ),
+    openQ(
+      'Change “He watches TV.” to a sentence with I.',
+      'I watch TV.',
+      'With I, the main verb has no third-person -s.',
+    ),
   ],
   'time-schedules-and-now': [
     q(
@@ -2731,12 +2795,25 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Which question asks about an activity happening today?',
-      ['What are you doing today?', 'What do you doing today?', 'What are you do today?', 'What you are today doing?'],
+      [
+        'What are you doing today?',
+        'What do you doing today?',
+        'What are you do today?',
+        'What you are today doing?',
+      ],
       'What are you doing today?',
       'Present continuous questions use am/is/are + subject + V-ing.',
     ),
-    openQ('Write a sentence about a fixed class schedule.', 'The class starts at nine.', 'A regular schedule uses present simple.'),
-    openQ('Write a sentence about what you are doing this afternoon.', 'I am studying this afternoon.', 'A temporary activity uses am/is/are + V-ing.'),
+    openQ(
+      'Write a sentence about a fixed class schedule.',
+      'The class starts at nine.',
+      'A regular schedule uses present simple.',
+    ),
+    openQ(
+      'Write a sentence about what you are doing this afternoon.',
+      'I am studying this afternoon.',
+      'A temporary activity uses am/is/are + V-ing.',
+    ),
   ],
   'home-and-places': [
     q(
@@ -2753,17 +2830,35 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Which direction is clear and complete?',
-      ['Turn left at the museum.', 'Left turn museum.', 'Turning left the.', 'You left at?'],
+      [
+        'Turn left at the museum.',
+        'Left turn museum.',
+        'Turning left the.',
+        'You left at?',
+      ],
       'Turn left at the museum.',
       'An imperative plus a landmark gives a usable direction.',
     ),
-    openQ('Describe one object next to another object.', 'The lamp is next to the sofa.', '“Next to” describes two objects that are side by side.'),
-    openQ('Give one short direction to the station.', 'Go straight to the station.', 'Use an imperative verb and name the destination.'),
+    openQ(
+      'Describe one object next to another object.',
+      'The lamp is next to the sofa.',
+      '“Next to” describes two objects that are side by side.',
+    ),
+    openQ(
+      'Give one short direction to the station.',
+      'Go straight to the station.',
+      'Use an imperative verb and name the destination.',
+    ),
   ],
   'food-and-shopping': [
     q(
       'At a café, which request is polite?',
-      ['Give me tea.', 'Could I have some tea, please?', 'Tea you now.', 'I tea have.'],
+      [
+        'Give me tea.',
+        'Could I have some tea, please?',
+        'Tea you now.',
+        'I tea have.',
+      ],
       'Could I have some tea, please?',
       '“Could I have… please?” is a polite request for an item.',
     ),
@@ -2775,34 +2870,70 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Choose the correct sentence about rice.',
-      ['We need many rice.', 'We need some rice.', 'We need a rice.', 'We need ricees.'],
+      [
+        'We need many rice.',
+        'We need some rice.',
+        'We need a rice.',
+        'We need ricees.',
+      ],
       'We need some rice.',
       'Rice is uncountable, so “some rice” is natural here.',
     ),
-    openQ('Ask the price of two sandwiches.', 'How much are these sandwiches?', 'Plural items use “How much are…?”'),
-    openQ('Ask for a receipt politely.', 'Could I have the receipt, please?', 'A polite request includes “Could I have… please?”'),
+    openQ(
+      'Ask the price of two sandwiches.',
+      'How much are these sandwiches?',
+      'Plural items use “How much are…?”',
+    ),
+    openQ(
+      'Ask for a receipt politely.',
+      'Could I have the receipt, please?',
+      'A polite request includes “Could I have… please?”',
+    ),
   ],
   'study-work-basic-communication': [
     q(
       'Which message clearly states its purpose?',
-      ['I am writing to confirm our class.', 'Class Tuesday thing.', 'Confirm now!', 'You know the class.'],
+      [
+        'I am writing to confirm our class.',
+        'Class Tuesday thing.',
+        'Confirm now!',
+        'You know the class.',
+      ],
       'I am writing to confirm our class.',
       'The opening “I am writing to…” tells the reader the purpose immediately.',
     ),
     q(
       'Choose the phrase that gives a deadline.',
-      ['until Friday at five', 'by Friday at five', 'from Friday at five', 'in Friday at five'],
+      [
+        'until Friday at five',
+        'by Friday at five',
+        'from Friday at five',
+        'in Friday at five',
+      ],
       'by Friday at five',
       '“By + time” states the latest time an action should be finished.',
     ),
     q(
       'Which request asks for clarification politely?',
-      ['Explain this now.', 'Could you clarify the meeting time?', 'Meeting time!', 'You clarify this.'],
+      [
+        'Explain this now.',
+        'Could you clarify the meeting time?',
+        'Meeting time!',
+        'You clarify this.',
+      ],
       'Could you clarify the meeting time?',
       '“Could you + base verb” softens a request for information.',
     ),
-    openQ('Write a short message confirming a meeting tomorrow.', 'I am writing to confirm our meeting tomorrow.', 'Start with the purpose and add the relevant time.'),
-    openQ('Ask a colleague to send a file by noon.', 'Could you send the file by noon, please?', 'Combine a polite request with the deadline phrase “by noon”.'),
+    openQ(
+      'Write a short message confirming a meeting tomorrow.',
+      'I am writing to confirm our meeting tomorrow.',
+      'Start with the purpose and add the relevant time.',
+    ),
+    openQ(
+      'Ask a colleague to send a file by noon.',
+      'Could you send the file by noon, please?',
+      'Combine a polite request with the deadline phrase “by noon”.',
+    ),
   ],
   'foundation-review': [
     q(
@@ -2813,7 +2944,12 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Which sentence is a polite request in a shop?',
-      ['Give me the receipt.', 'Could I have the receipt, please?', 'Receipt now.', 'You receipt me.'],
+      [
+        'Give me the receipt.',
+        'Could I have the receipt, please?',
+        'Receipt now.',
+        'You receipt me.',
+      ],
       'Could I have the receipt, please?',
       '“Could I have… please?” is the polite shopping pattern from the course.',
     ),
@@ -2823,8 +2959,16 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
       'I am from Hue.',
       'Use “I am from + place” to introduce where you come from.',
     ),
-    openQ('Write one sentence about a regular study habit.', 'I usually study English in the evening.', 'Use present simple with “usually”.'),
-    openQ('Write one polite question asking for directions.', 'Could you tell me where the station is?', 'Use “Could you tell me…?” for a polite question.'),
+    openQ(
+      'Write one sentence about a regular study habit.',
+      'I usually study English in the evening.',
+      'Use present simple with “usually”.',
+    ),
+    openQ(
+      'Write one polite question asking for directions.',
+      'Could you tell me where the station is?',
+      'Use “Could you tell me…?” for a polite question.',
+    ),
   ],
   'present-simple-and-continuous': [
     q(
@@ -2841,12 +2985,25 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Choose the corrected sentence for a weekly habit.',
-      ['He is play football every Sunday.', 'He plays football every Sunday.', 'He play football every Sunday.', 'He playing football every Sunday.'],
+      [
+        'He is play football every Sunday.',
+        'He plays football every Sunday.',
+        'He play football every Sunday.',
+        'He playing football every Sunday.',
+      ],
       'He plays football every Sunday.',
       'A weekly habit uses present simple and adds -s with he.',
     ),
-    openQ('Write one sentence about a routine and one about today.', 'I usually cook at home. I am eating out today.', 'The first sentence is a routine; the second is a temporary action.'),
-    openQ('Correct this sentence: “They is study now.”', 'They are studying now.', 'They takes “are”, followed by the V-ing form.'),
+    openQ(
+      'Write one sentence about a routine and one about today.',
+      'I usually cook at home. I am eating out today.',
+      'The first sentence is a routine; the second is a temporary action.',
+    ),
+    openQ(
+      'Correct this sentence: “They is study now.”',
+      'They are studying now.',
+      'They takes “are”, followed by the V-ing form.',
+    ),
   ],
   'nouns-articles-and-quantity': [
     q(
@@ -2867,8 +3024,16 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
       'a piece of advice',
       'Advice is uncountable; “a piece of advice” gives one unit.',
     ),
-    openQ('Ask whether there is any bread.', 'Do we have any bread?', 'Use “any” in a yes/no question about an uncountable noun.'),
-    openQ('Write one sentence with “many” and a plural noun.', 'There are many books here.', '“Many” is followed by a countable plural noun.'),
+    openQ(
+      'Ask whether there is any bread.',
+      'Do we have any bread?',
+      'Use “any” in a yes/no question about an uncountable noun.',
+    ),
+    openQ(
+      'Write one sentence with “many” and a plural noun.',
+      'There are many books here.',
+      '“Many” is followed by a countable plural noun.',
+    ),
   ],
   'past-simple': [
     q(
@@ -2879,18 +3044,36 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Which question asks about a finished trip?',
-      ['Did you visit Da Lat?', 'Do you visited Da Lat?', 'Did you visited Da Lat?', 'You did visit Da Lat?'],
+      [
+        'Did you visit Da Lat?',
+        'Do you visited Da Lat?',
+        'Did you visited Da Lat?',
+        'You did visit Da Lat?',
+      ],
       'Did you visit Da Lat?',
       'After “Did”, use the base verb “visit”.',
     ),
     q(
       'Choose the correct negative sentence.',
-      ['We didn’t watched TV.', 'We didn’t watch TV.', 'We not watched TV.', 'We don’t watched TV.'],
+      [
+        'We didn’t watched TV.',
+        'We didn’t watch TV.',
+        'We not watched TV.',
+        'We don’t watched TV.',
+      ],
       'We didn’t watch TV.',
       'After “didn’t”, the main verb stays in its base form.',
     ),
-    openQ('Write one sentence about something you did yesterday.', 'I cleaned my room yesterday.', 'Use a past verb and a finished-time expression.'),
-    openQ('Ask a friend whether they visited a museum.', 'Did you visit a museum?', 'Use Did + subject + base verb for a past question.'),
+    openQ(
+      'Write one sentence about something you did yesterday.',
+      'I cleaned my room yesterday.',
+      'Use a past verb and a finished-time expression.',
+    ),
+    openQ(
+      'Ask a friend whether they visited a museum.',
+      'Did you visit a museum?',
+      'Use Did + subject + base verb for a past question.',
+    ),
   ],
   'future-will-going-to': [
     q(
@@ -2911,8 +3094,16 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
       'is going to rain',
       'Visible evidence supports “is going to rain”.',
     ),
-    openQ('Write a plan for this weekend with “going to”.', 'I am going to visit my family this weekend.', 'Use am/is/are going to + base verb for a plan.'),
-    openQ('Make a short promise with “will”.', 'I will call you tonight.', 'Use “will + base verb” for a promise.'),
+    openQ(
+      'Write a plan for this weekend with “going to”.',
+      'I am going to visit my family this weekend.',
+      'Use am/is/are going to + base verb for a plan.',
+    ),
+    openQ(
+      'Make a short promise with “will”.',
+      'I will call you tonight.',
+      'Use “will + base verb” for a promise.',
+    ),
   ],
   'adjectives-adverbs-comparison': [
     q(
@@ -2933,13 +3124,26 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
       'shorter',
       'Use the comparative form with “than”.',
     ),
-    openQ('Write a sentence using “more useful”.', 'This map is more useful than that one.', 'Use “more + adjective + than” for a longer adjective.'),
-    openQ('Write a sentence with an adverb describing careful work.', 'She works carefully.', 'The adverb “carefully” describes how she works.'),
+    openQ(
+      'Write a sentence using “more useful”.',
+      'This map is more useful than that one.',
+      'Use “more + adjective + than” for a longer adjective.',
+    ),
+    openQ(
+      'Write a sentence with an adverb describing careful work.',
+      'She works carefully.',
+      'The adverb “carefully” describes how she works.',
+    ),
   ],
   'basic-modal-verbs': [
     q(
       'Which sentence expresses ability?',
-      ['I can speak English.', 'I can speaks English.', 'I can to speak English.', 'I cans speak English.'],
+      [
+        'I can speak English.',
+        'I can speaks English.',
+        'I can to speak English.',
+        'I cans speak English.',
+      ],
       'I can speak English.',
       'After “can”, use the base verb without to or -s.',
     ),
@@ -2951,12 +3155,25 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Which sentence states a workplace rule?',
-      ['You must wear a badge.', 'You must to wear a badge.', 'You must wears a badge.', 'You must wearing a badge.'],
+      [
+        'You must wear a badge.',
+        'You must to wear a badge.',
+        'You must wears a badge.',
+        'You must wearing a badge.',
+      ],
       'You must wear a badge.',
       '“Must + base verb” expresses an obligation.',
     ),
-    openQ('Give a learner advice about reviewing words.', 'You should review the words every day.', 'Use should followed by the base verb.'),
-    openQ('Ask whether visitors have to sign in.', 'Do visitors have to sign in?', 'Use do + subject + have to for this obligation question.'),
+    openQ(
+      'Give a learner advice about reviewing words.',
+      'You should review the words every day.',
+      'Use should followed by the base verb.',
+    ),
+    openQ(
+      'Ask whether visitors have to sign in.',
+      'Do visitors have to sign in?',
+      'Use do + subject + have to for this obligation question.',
+    ),
   ],
   'prepositions-and-common-phrases': [
     q(
@@ -2967,7 +3184,12 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Which phrase means skilled in a subject?',
-      ['good in English', 'good at English', 'good on English', 'good to English'],
+      [
+        'good in English',
+        'good at English',
+        'good on English',
+        'good to English',
+      ],
       'good at English',
       'The fixed phrase is “good at + subject”.',
     ),
@@ -2977,30 +3199,61 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
       'in',
       'Use “in” with a month.',
     ),
-    openQ('Write a sentence with “interested in”.', 'I am interested in reading.', '“Interested in” is followed by a noun or V-ing form.'),
-    openQ('Write a sentence with “on time”.', 'She arrived on time.', '“On time” means at the scheduled time.'),
+    openQ(
+      'Write a sentence with “interested in”.',
+      'I am interested in reading.',
+      '“Interested in” is followed by a noun or V-ing form.',
+    ),
+    openQ(
+      'Write a sentence with “on time”.',
+      'She arrived on time.',
+      '“On time” means at the scheduled time.',
+    ),
   ],
   'grammar-vocabulary-review': [
     q(
       'Every morning Hoa ___ tea, but right now she ___.',
-      ['drinks / is reading', 'drink / reads', 'drank / read', 'is drink / reading'],
+      [
+        'drinks / is reading',
+        'drink / reads',
+        'drank / read',
+        'is drink / reading',
+      ],
       'drinks / is reading',
       'The routine uses present simple; the action now uses present continuous.',
     ),
     q(
       'Which sentence describes a planned visit?',
-      ['I am going to visit my aunt.', 'I going visit my aunt.', 'I am go visit my aunt.', 'I will to visit my aunt.'],
+      [
+        'I am going to visit my aunt.',
+        'I going visit my aunt.',
+        'I am go visit my aunt.',
+        'I will to visit my aunt.',
+      ],
       'I am going to visit my aunt.',
       'A plan uses am/is/are going to + base verb.',
     ),
     q(
       'Choose the correct collocation.',
-      ['She is good in cooking.', 'She is good at cooking.', 'She good at cooks.', 'She is good on cooking.'],
+      [
+        'She is good in cooking.',
+        'She is good at cooking.',
+        'She good at cooks.',
+        'She is good on cooking.',
+      ],
       'She is good at cooking.',
       'The taught collocation is “good at + noun/V-ing”.',
     ),
-    openQ('Write a past-simple sentence with “last night”.', 'I watched a film last night.', 'Use a past verb with a finished-time marker.'),
-    openQ('Give a short recommendation with “should”.', 'You should review your notes.', 'Use should followed by the base verb.'),
+    openQ(
+      'Write a past-simple sentence with “last night”.',
+      'I watched a film last night.',
+      'Use a past verb with a finished-time marker.',
+    ),
+    openQ(
+      'Give a short recommendation with “should”.',
+      'You should review your notes.',
+      'Use should followed by the base verb.',
+    ),
   ],
   'ipa-and-pronunciation-basics': [
     q(
@@ -3011,7 +3264,12 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'In /ˈpɜːrsən/, what does ˈ mark?',
-      ['The silent letter', 'The primary stress', 'The plural ending', 'The final sound'],
+      [
+        'The silent letter',
+        'The primary stress',
+        'The plural ending',
+        'The final sound',
+      ],
       'The primary stress',
       'The mark before a syllable shows primary stress.',
     ),
@@ -3021,8 +3279,16 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
       'book',
       'Book ends with the /k/ sound shown in the lesson examples.',
     ),
-    openQ('Write the IPA for “teacher” from the lesson.', '/ˈtiːtʃə/', 'The stress mark comes before the first stressed syllable.'),
-    openQ('State the first step before repeating a new word.', 'Listen to the model first.', 'Listening first gives a reliable sound target.'),
+    openQ(
+      'Write the IPA for “teacher” from the lesson.',
+      '/ˈtiːtʃə/',
+      'The stress mark comes before the first stressed syllable.',
+    ),
+    openQ(
+      'State the first step before repeating a new word.',
+      'Listen to the model first.',
+      'Listening first gives a reliable sound target.',
+    ),
   ],
   'important-short-and-long-vowels': [
     q(
@@ -3039,12 +3305,25 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Which description fits /iː/?',
-      ['Longer and tense', 'Always silent', 'Only a consonant', 'A two-syllable sound'],
+      [
+        'Longer and tense',
+        'Always silent',
+        'Only a consonant',
+        'A two-syllable sound',
+      ],
       'Longer and tense',
       '/iː/ is a long vowel with a tenser tongue position than /ɪ/.',
     ),
-    openQ('Write a word from the lesson with /uː/.', 'food', 'Food is the taught example with the long /uː/ vowel.'),
-    openQ('Explain one way to compare a minimal pair.', 'Listen and compare the vowel length and quality.', 'Both duration and vowel quality matter.'),
+    openQ(
+      'Write a word from the lesson with /uː/.',
+      'food',
+      'Food is the taught example with the long /uː/ vowel.',
+    ),
+    openQ(
+      'Explain one way to compare a minimal pair.',
+      'Listen and compare the vowel length and quality.',
+      'Both duration and vowel quality matter.',
+    ),
   ],
   'common-diphthongs': [
     q(
@@ -3055,7 +3334,12 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'What happens inside one diphthong?',
-      ['The mouth moves smoothly between two vowel positions.', 'The speaker stops between two sounds.', 'Only the first sound is spoken.', 'A consonant is added.'],
+      [
+        'The mouth moves smoothly between two vowel positions.',
+        'The speaker stops between two sounds.',
+        'Only the first sound is spoken.',
+        'A consonant is added.',
+      ],
       'The mouth moves smoothly between two vowel positions.',
       'A diphthong is one smooth movement within one syllable.',
     ),
@@ -3066,7 +3350,11 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
       'Go is the lesson example for /əʊ/.',
     ),
     openQ('Write IPA for “now”.', '/naʊ/', 'Now uses the /aʊ/ diphthong.'),
-    openQ('Describe how to practise a diphthong in a short sentence.', 'Keep the movement smooth in one syllable.', 'The sound should not be split into two separate syllables.'),
+    openQ(
+      'Describe how to practise a diphthong in a short sentence.',
+      'Keep the movement smooth in one syllable.',
+      'The sound should not be split into two separate syllables.',
+    ),
   ],
   'consonants-vietnamese-learners-confuse': [
     q(
@@ -3083,12 +3371,25 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'Which action helps check whether /ð/ is voiced?',
-      ['Touch your throat for vibration.', 'Close both ears.', 'Hold your breath.', 'Whisper every word.'],
+      [
+        'Touch your throat for vibration.',
+        'Close both ears.',
+        'Hold your breath.',
+        'Whisper every word.',
+      ],
       'Touch your throat for vibration.',
       'Voiced sounds create a vibration that can be felt at the throat.',
     ),
-    openQ('Write a word beginning with the voiceless /θ/.', 'three', 'Three is a familiar /θ/ example from the lesson.'),
-    openQ('Say how /ʃ/ and /tʃ/ differ.', 'The /tʃ/ sound has a stop before the fricative.', 'The initial stop is the key contrast in the lesson.'),
+    openQ(
+      'Write a word beginning with the voiceless /θ/.',
+      'three',
+      'Three is a familiar /θ/ example from the lesson.',
+    ),
+    openQ(
+      'Say how /ʃ/ and /tʃ/ differ.',
+      'The /tʃ/ sound has a stop before the fricative.',
+      'The initial stop is the key contrast in the lesson.',
+    ),
   ],
   'final-sounds': [
     q(
@@ -3109,8 +3410,16 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
       'worked',
       'Worked has a clearly pronounced final /t/ in the lesson practice.',
     ),
-    openQ('Write the plural of “bag”.', 'bags', 'Keep the final plural sound clear when adding -s.'),
-    openQ('Write the past form of “watch”.', 'watched', 'The -ed ending is part of the word’s final sound practice.'),
+    openQ(
+      'Write the plural of “bag”.',
+      'bags',
+      'Keep the final plural sound clear when adding -s.',
+    ),
+    openQ(
+      'Write the past form of “watch”.',
+      'watched',
+      'The -ed ending is part of the word’s final sound practice.',
+    ),
   ],
   'word-stress': [
     q(
@@ -3127,17 +3436,35 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
     ),
     q(
       'What should be stronger in a stressed syllable?',
-      ['Its beat and clarity', 'Only the spelling', 'The silent letters', 'Every syllable equally'],
+      [
+        'Its beat and clarity',
+        'Only the spelling',
+        'The silent letters',
+        'Every syllable equally',
+      ],
       'Its beat and clarity',
       'Stress makes the main syllable clearer and more prominent.',
     ),
-    openQ('Write IPA with stress for “relax”.', '/rɪˈlæks/', 'The stress mark appears before the second syllable.'),
-    openQ('Name one physical way to practise word stress.', 'Tap the stressed syllable.', 'Tapping makes the main beat easier to feel.'),
+    openQ(
+      'Write IPA with stress for “relax”.',
+      '/rɪˈlæks/',
+      'The stress mark appears before the second syllable.',
+    ),
+    openQ(
+      'Name one physical way to practise word stress.',
+      'Tap the stressed syllable.',
+      'Tapping makes the main beat easier to feel.',
+    ),
   ],
   'schwa-and-sentence-rhythm': [
     q(
       'Where is schwa most likely to appear?',
-      ['In an unstressed syllable', 'In every stressed vowel', 'Only in a question', 'Only in the letter a'],
+      [
+        'In an unstressed syllable',
+        'In every stressed vowel',
+        'Only in a question',
+        'Only in the letter a',
+      ],
       'In an unstressed syllable',
       'Schwa is the relaxed vowel commonly heard in unstressed syllables.',
     ),
@@ -3153,34 +3480,69 @@ export const finalQuestionsBySlug: Record<string, Question[]> = {
       'about',
       'The first syllable of about is the schwa /ə/.',
     ),
-    openQ('Write IPA for “about”.', '/əˈbaʊt/', 'The first syllable is unstressed and uses schwa.'),
-    openQ('Name the two main stressed words in “I can meet you at five”.', 'meet and five', 'Meet and five carry the key information.'),
+    openQ(
+      'Write IPA for “about”.',
+      '/əˈbaʊt/',
+      'The first syllable is unstressed and uses schwa.',
+    ),
+    openQ(
+      'Name the two main stressed words in “I can meet you at five”.',
+      'meet and five',
+      'Meet and five carry the key information.',
+    ),
   ],
   'linking-and-integrated-practice': [
     q(
       'In “Turn it off”, which sounds may link naturally?',
-      ['/n/ in turn with it', '/t/ with turn', '/f/ with off', '/ɪ/ with please'],
+      [
+        '/n/ in turn with it',
+        '/t/ with turn',
+        '/f/ with off',
+        '/ɪ/ with please',
+      ],
       '/n/ in turn with it',
       'A final consonant can link smoothly to the next word’s vowel.',
     ),
     q(
       'Which sentence keeps linking natural but clear?',
-      ['Please send it today.', 'Sendit as fast as possible.', 'Erase every final sound.', 'Stress every word equally.'],
+      [
+        'Please send it today.',
+        'Sendit as fast as possible.',
+        'Erase every final sound.',
+        'Stress every word equally.',
+      ],
       'Please send it today.',
       'Linking supports smooth speech without hiding word boundaries or meaning.',
     ),
     q(
       'What should never be lost during connected speech?',
-      ['Clear meaning and key final sounds', 'Every pause', 'All consonants twice', 'The sentence stress everywhere'],
+      [
+        'Clear meaning and key final sounds',
+        'Every pause',
+        'All consonants twice',
+        'The sentence stress everywhere',
+      ],
       'Clear meaning and key final sounds',
       'Natural linking is useful only while the message stays understandable.',
     ),
-    openQ('Write a short sentence containing “send it”.', 'Please send it by Friday.', 'The final consonant can connect smoothly to “it”.'),
-    openQ('Write a sentence containing “pick it up”.', 'Please pick it up.', 'Keep the phrase connected but pronounce each word clearly.'),
+    openQ(
+      'Write a short sentence containing “send it”.',
+      'Please send it by Friday.',
+      'The final consonant can connect smoothly to “it”.',
+    ),
+    openQ(
+      'Write a sentence containing “pick it up”.',
+      'Please pick it up.',
+      'Keep the phrase connected but pronounce each word clearly.',
+    ),
   ],
 };
 
-for (const lesson of [...foundationLessons, ...pronunciationLessons, ...grammarLessons]) {
+for (const lesson of [
+  ...foundationLessons,
+  ...pronunciationLessons,
+  ...grammarLessons,
+]) {
   if (!finalQuestionsBySlug[lesson.slug]) {
     throw new Error(`Missing authored final questions for ${lesson.slug}`);
   }
@@ -3189,7 +3551,7 @@ for (const lesson of [...foundationLessons, ...pronunciationLessons, ...grammarL
 const courseSpecs: CourseSpec[] = [
   {
     existingId: 1,
-    title: 'Tiếng Anh Nền Tảng A1–A2',
+    title: 'English Foundations A1–A2',
     description:
       'Lộ trình nền tảng dành cho người Việt mới học: giao tiếp hằng ngày, nghe, nói, đọc, viết, ngữ pháp, từ vựng và phát âm trong ngữ cảnh thực tế.',
     level: 'A1-A2',
@@ -3200,7 +3562,7 @@ const courseSpecs: CourseSpec[] = [
   },
   {
     existingId: 8,
-    title: 'Ngữ pháp & Từ vựng Cơ bản',
+    title: 'Grammar & Vocabulary Builder',
     description:
       'Giải thích bằng tiếng Việt các cấu trúc ngữ pháp và cụm từ thiết yếu A1–A2, kèm ví dụ song ngữ, lỗi thường gặp và bài tập có phản hồi.',
     level: 'A1-A2',
@@ -3210,6 +3572,7 @@ const courseSpecs: CourseSpec[] = [
     lessons: grammarLessons,
   },
   {
+    existingId: 12,
     title: 'Phát âm Tiếng Anh với IPA',
     description:
       'Khóa học phát âm nhập môn cho người Việt: hiểu IPA, luyện nguyên âm, phụ âm, âm cuối, trọng âm, schwa, nối âm và tự nghe lại giọng nói.',
@@ -3261,6 +3624,61 @@ const course8LessonMedia: Record<string, { url: string; altText: string }> = {
     url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-8/lessons/lesson-64/media/v1-5481b364440919f4.svg',
     altText:
       'Bản đồ khái niệm liên kết ngữ cảnh, dạng động từ, số lượng và cụm giới từ.',
+  },
+};
+
+/**
+ * Provenance was audited when these assets were first imported and the exact
+ * R2 objects are retained in active-course-content-research.json.  Keep the
+ * course-12 links here so a DB-only recovery never substitutes unrelated
+ * imagery or depends on an external host at learner runtime.
+ */
+const course12LessonMedia: Record<
+  string,
+  { url: string; altText: string; provenance: string }
+> = {
+  'ipa-and-pronunciation-basics': {
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-656/media/v2-2409783a63bbdf8a.svg',
+    altText: 'Bảng ký hiệu ngữ âm quốc tế IPA',
+    provenance:
+      'International Phonetic Association, CC BY-SA 3.0; preserved in BreadTrans R2',
+  },
+  'important-short-and-long-vowels': {
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-657/media/v2-6159fc095a65a264.png',
+    altText: 'Sơ đồ vị trí nguyên âm tiếng Anh',
+    provenance: 'Tharthan, public domain; preserved in BreadTrans R2',
+  },
+  'common-diphthongs': {
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-658/media/v2-df9615c74382c571.svg',
+    altText: 'Sơ đồ nguyên âm đôi tiếng Anh',
+    provenance: 'Pauline Hennings, CC BY-SA 3.0; preserved in BreadTrans R2',
+  },
+  'consonants-vietnamese-learners-confuse': {
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-659/media/v2-fe47c3cbbc71da57.png',
+    altText: 'Minh họa vị trí cấu âm phụ âm tiếng Anh',
+    provenance: 'Daniel Jones, public domain; preserved in BreadTrans R2',
+  },
+  'final-sounds': {
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-660/media/v2-b14d12b5a7b10d16.png',
+    altText: 'Bảng phụ âm IPA cho phần luyện âm cuối',
+    provenance:
+      'International Phonetic Association, CC BY-SA 3.0; preserved in BreadTrans R2',
+  },
+  'word-stress': {
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-661/media/v2-7c3b9fe614178296.png',
+    altText: 'Minh họa nhịp điệu và trọng âm từ',
+    provenance: 'Nina Paley, CC BY-SA 3.0; preserved in BreadTrans R2',
+  },
+  'schwa-and-sentence-rhythm': {
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-662/media/v2-e5948bbb30933e8b.svg',
+    altText: 'Ký hiệu schwa trong bảng IPA',
+    provenance: 'Holly Cheng, public domain; preserved in BreadTrans R2',
+  },
+  'linking-and-integrated-practice': {
+    url: 'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/courses/course-12/lessons/lesson-663/media/v2-3c2cbd5433327f5e.jpg',
+    altText: 'Minh họa ghép âm để nhận diện âm trong từ',
+    provenance:
+      'U.S. Department of Education, CC BY-SA 4.0; preserved in BreadTrans R2',
   },
 };
 
@@ -3397,18 +3815,24 @@ async function resolveOrCreateCourse(
   spec: CourseSpec,
 ): Promise<{ id: number; created: boolean }> {
   if (spec.existingId) {
-    await prisma.course.update({
+    const data = {
+      title: spec.title,
+      description: spec.description,
+      level: spec.level,
+      curriculumType: spec.curriculumType,
+      thumbnail: spec.thumbnail,
+      status: CourseStatus.PUBLISHED,
+    };
+    const existing = await prisma.course.findUnique({
       where: { id: spec.existingId },
-      data: {
-        title: spec.title,
-        description: spec.description,
-        level: spec.level,
-        curriculumType: spec.curriculumType,
-        thumbnail: spec.thumbnail,
-        status: CourseStatus.PUBLISHED,
-      },
+      select: { id: true },
     });
-    return { id: spec.existingId, created: false };
+    if (existing) {
+      await prisma.course.update({ where: { id: existing.id }, data });
+      return { id: spec.existingId, created: false };
+    }
+    await prisma.course.create({ data: { id: spec.existingId, ...data } });
+    return { id: spec.existingId, created: true };
   }
   const existing = await prisma.course.findFirst({
     where: { title: spec.title },
@@ -3585,7 +4009,8 @@ async function materializeLesson(
       const changed =
         !desired ||
         current.prompt !== desired.prompt ||
-        JSON.stringify(current.options) !== JSON.stringify(desired.options ?? null) ||
+        JSON.stringify(current.options) !==
+          JSON.stringify(desired.options ?? null) ||
         current.correctAnswer !== desired.correctAnswer ||
         current.explanation !== desired.explanation;
       if (current.answers.length > 0 && changed) {
@@ -3594,7 +4019,10 @@ async function materializeLesson(
         );
       }
     }
-    if (currentQuestions.some((question) => question.answers.length > 0) && currentQuestions.length !== seed.questions.length) {
+    if (
+      currentQuestions.some((question) => question.answers.length > 0) &&
+      currentQuestions.length !== seed.questions.length
+    ) {
       throw new Error(
         `Refusing to change answered final-check question count for exercise ${exercise.id}.`,
       );
@@ -3629,9 +4057,18 @@ async function materializeLesson(
   await prisma.courseLessonReference.deleteMany({
     where: { lessonId: row.id },
   });
-  if (courseId === 8) {
-    const media = course8LessonMedia[lesson.slug];
+  if (courseId === 8 || courseId === 12) {
+    const media =
+      courseId === 8
+        ? course8LessonMedia[lesson.slug]
+        : course12LessonMedia[lesson.slug];
     if (media) {
+      const provenance =
+        courseId === 12
+          ? (media as (typeof course12LessonMedia)[string]).provenance
+          : media.url.includes('wikimedia')
+            ? 'Wikimedia Commons CC0 local asset'
+            : 'BreadTrans original instructional SVG';
       await prisma.courseLessonMedia.upsert({
         where: { id: courseId * 1000 + order },
         update: {
@@ -3639,9 +4076,7 @@ async function materializeLesson(
           type: 'IMAGE',
           url: media.url,
           altText: media.altText,
-          provenance: media.url.includes('wikimedia')
-            ? 'Wikimedia Commons CC0 local asset'
-            : 'BreadTrans original instructional SVG',
+          provenance,
           renderStatus: 'READY',
         },
         create: {
@@ -3650,9 +4085,7 @@ async function materializeLesson(
           type: 'IMAGE',
           url: media.url,
           altText: media.altText,
-          provenance: media.url.includes('wikimedia')
-            ? 'Wikimedia Commons CC0 local asset'
-            : 'BreadTrans original instructional SVG',
+          provenance,
           renderStatus: 'READY',
         },
       });
@@ -4012,15 +4445,13 @@ async function writeReport(courseIds: number[]) {
 
 export async function materializeFoundationCourses() {
   await mkdir(artifactDir, { recursive: true });
-  const managedLessonCount = await prisma.courseLesson.count();
-  if (
-    managedLessonCount > 0 &&
-    process.env.MATERIALIZER_ALLOW_OVERWRITE !== 'true'
-  ) {
-    throw new Error(
-      'V5 CourseLesson content already exists. Set MATERIALIZER_ALLOW_OVERWRITE=true only for an explicit maintenance rewrite.',
-    );
-  }
+  // The overwrite guard is per course, not global. A global count made the
+  // whole command refuse as soon as any one course had authored content, so a
+  // course whose content was lost could not be rebuilt without also rewriting
+  // the courses that were still intact. Each target course is now judged on
+  // its own: an empty course is rebuilt, a populated one is preserved unless
+  // an explicit maintenance rewrite is requested.
+  const allowOverwrite = process.env.MATERIALIZER_ALLOW_OVERWRITE === 'true';
   const existing = await prisma.course.findMany({
     orderBy: { id: 'asc' },
     select: {
@@ -4046,15 +4477,24 @@ export async function materializeFoundationCourses() {
     results.push(result);
     targetIds.push(result.id);
   }
+  const rebuiltCourseIds: number[] = [];
+  const preservedCourseIds: number[] = [];
   for (const [index, spec] of courseSpecs.entries()) {
     const courseId = targetIds[index];
+    const existingLessons = await prisma.courseLesson.count({
+      where: { courseId },
+    });
+    if (existingLessons > 0 && !allowOverwrite) {
+      preservedCourseIds.push(courseId);
+      continue;
+    }
     for (const [lessonIndex, lesson] of spec.lessons.entries())
       await materializeLesson(courseId, lesson, lessonIndex + 1);
+    rebuiltCourseIds.push(courseId);
   }
-  await prisma.course.updateMany({
-    where: { status: CourseStatus.PUBLISHED, id: { notIn: targetIds } },
-    data: { status: CourseStatus.DRAFT },
-  });
+  // Recovery must never change the publication state of unrelated courses.
+  // Legacy cleanup is an explicitly scoped operation, not a side effect of
+  // restoring authored V5 lessons for the three canonical foundation courses.
   const after = await snapshotCourses(targetIds);
   await writeAudits(before, after, targetIds);
   await writeReport(targetIds);
@@ -4063,13 +4503,59 @@ export async function materializeFoundationCourses() {
       {
         existingCourseIds: existingIds,
         targetIds,
+        rebuiltCourseIds,
+        preservedCourseIds,
         results,
         publishedBasicCourseCount: courseSpecs.length,
-        advancedUnpublished: existingIds.filter((id) => !targetIds.includes(id))
-          .length,
+        untouchedCourseIds: existingIds.filter((id) => !targetIds.includes(id)),
       },
       null,
       2,
     ),
   );
+}
+
+/** Recover only the verified IPA course.  Unlike the historical full
+ * materializer this deliberately leaves every other course's publication
+ * state untouched. */
+export async function materializePronunciationCourse() {
+  const spec = courseSpecs.find((course) => course.existingId === 12);
+  if (!spec) throw new Error('Canonical IPA course specification is missing');
+
+  const result = await resolveOrCreateCourse(spec);
+  for (const [lessonIndex, lesson] of spec.lessons.entries()) {
+    await materializeLesson(result.id, lesson, lessonIndex + 1);
+  }
+  const course = await prisma.course.findUniqueOrThrow({
+    where: { id: result.id },
+    include: {
+      courseLessons: {
+        orderBy: { order: 'asc' },
+        include: { media: true, sections: true, exercises: true },
+      },
+    },
+  });
+  return {
+    courseId: course.id,
+    created: result.created,
+    title: course.title,
+    status: course.status,
+    lessonCount: course.courseLessons.length,
+    sectionCount: course.courseLessons.reduce(
+      (total, lesson) => total + lesson.sections.length,
+      0,
+    ),
+    exerciseCount: course.courseLessons.reduce(
+      (total, lesson) => total + lesson.exercises.length,
+      0,
+    ),
+    mediaCount: course.courseLessons.reduce(
+      (total, lesson) => total + lesson.media.length,
+      0,
+    ),
+  };
+}
+
+export async function disconnectFoundationCourseMaterializer() {
+  await prisma.$disconnect();
 }

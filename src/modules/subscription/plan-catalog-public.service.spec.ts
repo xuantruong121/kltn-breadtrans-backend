@@ -154,6 +154,58 @@ describe('PlanCatalogPublicService', () => {
     );
   });
 
+  // Regression: PLUS was ACTIVE/PUBLISHED/isCurrent with correct commercial
+  // terms, but the canonical catalog materializer gave every CONTENT_ACCESS
+  // entitlement a LIFETIME period. validatePlanEntitlementInput rejects that,
+  // so the catalog failed closed and the UI showed "Chưa mở bán" for a plan
+  // whose own fields were all valid.
+  it('fails closed when a CONTENT_ACCESS entitlement carries a period', async () => {
+    const { prisma, service } = makeService();
+    const plus = plan('PLUS');
+    const broken = version('PLUS', { id: 21 });
+    broken.entitlements = [
+      {
+        enabled: true,
+        limitValue: null,
+        unit: 'CONTENT_ACCESS',
+        period: 'LIFETIME',
+        scope: null,
+      },
+    ] as never;
+    plus.versions = [broken];
+    prisma.plan.findMany.mockResolvedValue([plus]);
+
+    const result = await service.getCatalog();
+
+    expect(result.plans[0]).toEqual(
+      expect.objectContaining({ purchasable: false, currentVersion: null }),
+    );
+  });
+
+  it('stays purchasable for the corrected CONTENT_ACCESS entitlement shape', async () => {
+    const { prisma, service } = makeService();
+    const plus = plan('PLUS');
+    const fixed = version('PLUS', { id: 21 });
+    fixed.entitlements = [
+      {
+        enabled: true,
+        limitValue: null,
+        unit: 'CONTENT_ACCESS',
+        period: null,
+        scope: null,
+      },
+    ] as never;
+    plus.versions = [fixed];
+    prisma.plan.findMany.mockResolvedValue([plus]);
+
+    const result = await service.getCatalog();
+
+    expect(result.plans[0].purchasable).toBe(true);
+    expect(result.plans[0].currentVersion).toEqual(
+      expect.objectContaining({ id: 21, priceVnd: 69000, durationDays: 30 }),
+    );
+  });
+
   it('does not choose arbitrarily when multiple current versions exist', async () => {
     const { prisma, service } = makeService();
     const plus = plan('PLUS');

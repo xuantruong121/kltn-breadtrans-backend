@@ -22,6 +22,7 @@ import 'dotenv/config';
 import { execSync } from 'child_process';
 import { PrismaClient } from '@prisma/client';
 import { assertDatabaseSafety } from './db-safety-guard';
+import { resyncSequences } from './db-resync-sequences';
 
 /** Offering names the seed owns; anything else would be deleted by it. */
 const SEEDED_OFFERING_NAMES = ['Grammar & Vocabulary — Open Practice'];
@@ -86,6 +87,13 @@ async function main() {
     // 3. Run the canonical seed unchanged.
     console.log('\nRunning canonical seed (prisma db seed) ...');
     execSync('npx prisma db seed', { stdio: 'inherit' });
+
+    // 4. The seed writes explicit primary keys (stable TOEIC group ids keep
+    //    media object keys valid), which leaves identity sequences behind
+    //    max(id). Without this step the next create() fails on a duplicate id.
+    console.log('\nRe-synchronising identity sequences ...');
+    await resyncSequences(prisma);
+
     console.log('\nSEED OK');
   } finally {
     await prisma.$disconnect();
