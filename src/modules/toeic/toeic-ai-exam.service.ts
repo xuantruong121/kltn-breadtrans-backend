@@ -335,6 +335,364 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     return this.status(jobId);
   }
 
+  /**
+   * Phase E — Candidate Workspace content for human review BEFORE Apply.
+   * Returns actual generated question/task content (not just counts), each
+   * item flagged by deterministic checks only (no AI confidence, no extra
+   * provider call). Read-only — never mutates draftSnapshot or Draft.
+   */
+  async getCandidate(jobId: string, adminId: number) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job || job.createdByAdminId !== adminId)
+      throw new NotFoundException('Không tìm thấy candidate tạo đề TOEIC AI');
+    const candidate = (job.draftSnapshot as any) ?? null;
+    if (!candidate)
+      return {
+        lrGroups: [],
+        speaking: [],
+        writing: [],
+        flaggedCount: 0,
+        appliedCandidateKeys: [],
+      };
+    const appliedCandidateKeys: string[] = Array.isArray(
+      (job.approvedSnapshot as any)?.appliedCandidateKeys,
+    )
+      ? (job.approvedSnapshot as any).appliedCandidateKeys
+      : [];
+
+    let flaggedCount = 0;
+    const lrGroups = (
+      Array.isArray(candidate.lrBatches) ? candidate.lrBatches : []
+    ).flatMap((batch: any) => {
+      let questionNumber = batch.questionNumber;
+      return (batch.candidate?.groups ?? []).map(
+        (group: any, index: number) => {
+          const expectedOptions = batch.part === 2 ? 3 : 4;
+          const questions = (group.questions ?? []).map((question: any) => {
+            const options = Array.isArray(question.options)
+              ? question.options.map((option: unknown) => String(option).trim())
+              : [];
+            const issues: string[] = [];
+            if (
+              options.length !== expectedOptions ||
+              options.some((o: string) => !o)
+            )
+              issues.push('Thiếu đáp án lựa chọn');
+            if (
+              new Set(options.map((o: string) => o.toLowerCase())).size !==
+              options.length
+            )
+              issues.push('Có đáp án trùng lặp');
+            if (
+              !Number.isInteger(question.correctIndex) ||
+              question.correctIndex < 0 ||
+              question.correctIndex >= options.length
+            )
+              issues.push('Chưa có đáp án đúng hợp lệ');
+            if (!question.explanation?.trim())
+              issues.push('Chưa có giải thích đáp án');
+            if (issues.length) flaggedCount += 1;
+            return {
+              questionNumber: questionNumber++,
+              text: question.text ?? null,
+              options,
+              correctIndex: question.correctIndex,
+              explanation: question.explanation ?? null,
+              issues,
+            };
+          });
+          const groupIssues: string[] = [];
+          if (batch.part >= 1 && batch.part <= 4 && !group.transcript?.trim())
+            groupIssues.push('Chưa có transcript/audio');
+          if (
+            (batch.part === 6 || batch.part === 7) &&
+            !group.passageText?.trim()
+          )
+            groupIssues.push('Chưa có đoạn văn');
+          if (batch.part === 1 && !group.imageBrief?.trim())
+            groupIssues.push('Chưa có mô tả hình ảnh');
+          if (groupIssues.length) flaggedCount += 1;
+          const groupOrder = batch.groupOrder + index;
+          return {
+            candidateKey: `LR:P${batch.part}:G${groupOrder}`,
+            part: batch.part,
+            groupOrder,
+            transcript: group.transcript ?? null,
+            passageText: group.passageText ?? null,
+            imageBrief: group.imageBrief ?? null,
+            issues: groupIssues,
+            questions,
+          };
+        },
+      );
+    });
+
+    const speaking = (candidate.speakingWriting?.speaking ?? []).map(
+      (task: any, index: number) => {
+        const issues: string[] = [];
+        if (!task.title?.trim()) issues.push('Chưa có tiêu đề');
+        if (!task.targetText?.trim())
+          issues.push('Chưa có nội dung tình huống');
+        if (issues.length) flaggedCount += 1;
+        return {
+          candidateKey: `SPEAKING:TASK${index + 1}`,
+          taskNumber: index + 1,
+          title: task.title ?? null,
+          targetText: task.targetText ?? null,
+          issues,
+          applied: appliedCandidateKeys.includes('SPEAKING'),
+        };
+      },
+    );
+    const writing = (candidate.speakingWriting?.writing ?? []).map(
+      (task: any, index: number) => {
+        const issues: string[] = [];
+        if (!task.prompt?.trim()) issues.push('Chưa có đề bài');
+        if (task.taskKind === 'PICTURE_SENTENCE' && !task.imageBrief?.trim())
+          issues.push('Chưa có hình ảnh');
+        if (issues.length) flaggedCount += 1;
+        return {
+          candidateKey: `WRITING:TASK${index + 1}`,
+          taskNumber: index + 1,
+          title: task.title ?? null,
+          prompt: task.prompt ?? null,
+          issues,
+          applied: appliedCandidateKeys.includes('WRITING'),
+        };
+      },
+    );
+
+    const lrGroupsWithApplied = lrGroups.map((g: any) => ({
+      ...g,
+      applied: appliedCandidateKeys.includes(g.candidateKey),
+    }));
+
+    return {
+      lrGroups: lrGroupsWithApplied,
+      speaking,
+      writing,
+      flaggedCount,
+      appliedCandidateKeys,
+    };
+  }
+
+  /**
+   * Phase E — edit candidate content BEFORE Apply. Persists only into the
+   * job's draftSnapshot JSON; never touches real Exam/ToeicQuestionGroup
+   * tables (EXAM_AI_CANDIDATE_EDIT_MUTATES_DRAFT=false).
+   */
+  async updateCandidate(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+    patch: Record<string, unknown>,
+  ) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job || job.createdByAdminId !== adminId)
+      throw new NotFoundException('Không tìm thấy candidate tạo đề TOEIC AI');
+    const candidate = (job.draftSnapshot as any) ?? null;
+    if (!candidate)
+      throw new ConflictException('Candidate AI chưa sẵn sàng để chỉnh sửa');
+
+    const lrMatch = /^LR:P(\d+):G(\d+)$/.exec(candidateKey);
+    const taskMatch = /^(SPEAKING|WRITING):TASK(\d+)$/.exec(candidateKey);
+
+    if (lrMatch) {
+      const part = Number(lrMatch[1]);
+      const groupOrder = Number(lrMatch[2]);
+      const lrBatches = Array.isArray(candidate.lrBatches)
+        ? candidate.lrBatches
+        : [];
+      let found = false;
+      for (const batch of lrBatches) {
+        if (Number(batch.part) !== part) continue;
+        const groups = batch.candidate?.groups ?? [];
+        let questionNumberStart = Number(batch.questionNumber);
+        for (let index = 0; index < groups.length; index += 1) {
+          const group = groups[index];
+          if (Number(batch.groupOrder) + index !== groupOrder) {
+            questionNumberStart += group.questions?.length ?? 0;
+            continue;
+          }
+          found = true;
+          if (typeof patch.transcript === 'string')
+            group.transcript = patch.transcript;
+          if (typeof patch.passageText === 'string')
+            group.passageText = patch.passageText;
+          if (typeof patch.imageBrief === 'string')
+            group.imageBrief = patch.imageBrief;
+          if (Array.isArray(patch.questions)) {
+            for (const qPatch of patch.questions) {
+              const question = (group.questions ?? []).find(
+                (q: any, qi: number) =>
+                  qi === qPatch.questionIndex ||
+                  questionNumberStart + qi === qPatch.questionNumber,
+              );
+              if (!question) continue;
+              if (typeof qPatch.text === 'string') question.text = qPatch.text;
+              if (Array.isArray(qPatch.options))
+                question.options = qPatch.options.map((o: unknown) =>
+                  String(o),
+                );
+              if (Number.isInteger(qPatch.correctIndex))
+                question.correctIndex = qPatch.correctIndex;
+              if (typeof qPatch.explanation === 'string')
+                question.explanation = qPatch.explanation;
+            }
+          }
+        }
+      }
+      if (!found)
+        throw new NotFoundException('Không tìm thấy candidate item này');
+    } else if (taskMatch) {
+      const skill = taskMatch[1];
+      const taskIndex = Number(taskMatch[2]) - 1;
+      const list =
+        skill === 'SPEAKING'
+          ? candidate.speakingWriting?.speaking
+          : candidate.speakingWriting?.writing;
+      const task = Array.isArray(list) ? list[taskIndex] : undefined;
+      if (!task)
+        throw new NotFoundException('Không tìm thấy candidate item này');
+      if (typeof patch.title === 'string') task.title = patch.title;
+      if (typeof patch.targetText === 'string')
+        task.targetText = patch.targetText;
+      if (typeof patch.prompt === 'string') task.prompt = patch.prompt;
+      if (typeof patch.imageBrief === 'string')
+        task.imageBrief = patch.imageBrief;
+    } else {
+      throw new NotFoundException('candidateKey không hợp lệ');
+    }
+
+    await this.prisma.aiGenerationJob.update({
+      where: { id: jobId },
+      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
+    });
+    return this.getCandidate(jobId, adminId);
+  }
+
+  /**
+   * Targeted "Tạo lại nhóm" — regenerates ONE L&R group's candidate content
+   * BEFORE Apply, reusing the same bounded AI batch call Phase D already
+   * uses. Never touches real Draft tables; never regenerates a key that has
+   * already been applied (that content belongs to "Tạo phiên bản mới"
+   * territory, not a silent candidate swap under an applied item).
+   */
+  async regenerateCandidateGroup(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+  ) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job || job.createdByAdminId !== adminId)
+      throw new NotFoundException('Không tìm thấy candidate tạo đề TOEIC AI');
+    const candidate = (job.draftSnapshot as any) ?? null;
+    if (!candidate)
+      throw new ConflictException('Candidate AI chưa sẵn sàng để tạo lại');
+    const appliedCandidateKeys: string[] = Array.isArray(
+      (job.approvedSnapshot as any)?.appliedCandidateKeys,
+    )
+      ? (job.approvedSnapshot as any).appliedCandidateKeys
+      : [];
+    if (appliedCandidateKeys.includes(candidateKey))
+      throw new ConflictException(
+        'Nội dung này đã được Apply vào Draft; không thể tạo lại candidate. Dùng "Tạo phiên bản mới" để thay đổi nội dung đã xuất bản/áp dụng.',
+      );
+    const lrMatch = /^LR:P(\d+):G(\d+)$/.exec(candidateKey);
+    if (!lrMatch)
+      throw new NotFoundException(
+        'Chỉ có thể tạo lại theo nhóm cho nội dung Listening/Reading',
+      );
+    const part = Number(lrMatch[1]);
+    const groupOrder = Number(lrMatch[2]);
+    const request = job.requestSnapshot as unknown as RequestSnapshot;
+
+    const lrBatches = Array.isArray(candidate.lrBatches)
+      ? candidate.lrBatches
+      : [];
+    let found = false;
+    for (const batch of lrBatches) {
+      if (Number(batch.part) !== part) continue;
+      const groups = batch.candidate?.groups ?? [];
+      for (let index = 0; index < groups.length; index += 1) {
+        if (Number(batch.groupOrder) + index !== groupOrder) continue;
+        found = true;
+        const questionCount = groups[index].questions?.length ?? 1;
+        const regenerated = await this.ai.generateToeicExamBatch({
+          part,
+          topic: request.topic,
+          difficulty: request.difficulty,
+          groups: [{ questionCount }],
+        });
+        this.assertBatch(part, [{ questionCount }], regenerated);
+        groups[index] = regenerated.groups[0];
+      }
+    }
+    if (!found)
+      throw new NotFoundException('Không tìm thấy candidate item này');
+
+    await this.prisma.aiGenerationJob.update({
+      where: { id: jobId },
+      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
+    });
+    return this.getCandidate(jobId, adminId);
+  }
+
+  /**
+   * Targeted "Tạo lại Part" — regenerates every NOT-YET-APPLIED L&R group of
+   * one Part. Already-applied groups in the same Part are left untouched.
+   * Bounded to this Part's groups only — never re-runs the whole Exam.
+   */
+  async regenerateCandidatePart(jobId: string, adminId: number, part: number) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job || job.createdByAdminId !== adminId)
+      throw new NotFoundException('Không tìm thấy candidate tạo đề TOEIC AI');
+    const candidate = (job.draftSnapshot as any) ?? null;
+    if (!candidate)
+      throw new ConflictException('Candidate AI chưa sẵn sàng để tạo lại');
+    const appliedCandidateKeys: string[] = Array.isArray(
+      (job.approvedSnapshot as any)?.appliedCandidateKeys,
+    )
+      ? (job.approvedSnapshot as any).appliedCandidateKeys
+      : [];
+    const request = job.requestSnapshot as unknown as RequestSnapshot;
+    const lrBatches = Array.isArray(candidate.lrBatches)
+      ? candidate.lrBatches
+      : [];
+    for (const batch of lrBatches) {
+      if (Number(batch.part) !== part) continue;
+      const groups = batch.candidate?.groups ?? [];
+      for (let index = 0; index < groups.length; index += 1) {
+        const groupOrder = Number(batch.groupOrder) + index;
+        const candidateKey = `LR:P${part}:G${groupOrder}`;
+        if (appliedCandidateKeys.includes(candidateKey)) continue;
+        const questionCount = groups[index].questions?.length ?? 1;
+        const regenerated = await this.ai.generateToeicExamBatch({
+          part,
+          topic: request.topic,
+          difficulty: request.difficulty,
+          groups: [{ questionCount }],
+        });
+        this.assertBatch(part, [{ questionCount }], regenerated);
+        groups[index] = regenerated.groups[0];
+      }
+    }
+
+    await this.prisma.aiGenerationJob.update({
+      where: { id: jobId },
+      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
+    });
+    return this.getCandidate(jobId, adminId);
+  }
+
   async status(jobId: string) {
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
@@ -433,7 +791,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     return this.status(jobId);
   }
 
-  async apply(jobId: string, adminId: number) {
+  async apply(
+    jobId: string,
+    adminId: number,
+    selectedCandidateKeys?: string[],
+  ) {
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
     });
@@ -455,29 +817,63 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Không tìm thấy Draft đích của job AI');
     if (exam.publicationStatus !== QuizPublicationStatus.DRAFT)
       throw new ConflictException('Chỉ có thể Apply candidate vào Draft');
+    // Defence in depth: even if an Exam somehow sits in DRAFT with existing
+    // learner attempts (e.g. a legacy/bugged unpublish), AI Apply must never
+    // rewrite historically-attempted content.
+    if (await this.genericExam.hasLearnerAttempts(exam as any))
+      throw new ConflictException(
+        'Đề đã có lịch sử làm bài; không thể Apply candidate AI đè lên nội dung lịch sử. Hãy dùng "Tạo phiên bản mới".',
+      );
 
-    const lrBatches = Array.isArray(candidate.lrBatches)
-      ? candidate.lrBatches
+    const previouslyApplied: string[] = Array.isArray(
+      (job.approvedSnapshot as any)?.appliedCandidateKeys,
+    )
+      ? (job.approvedSnapshot as any).appliedCandidateKeys
       : [];
-    if (exam.toeicExamSet) {
+    const availableKeys = this.availableCandidateKeys(candidate);
+    const isSelective = Array.isArray(selectedCandidateKeys);
+    // Keys actually eligible to be (re)written this call: requested, known
+    // to exist in the candidate, and not already applied (idempotent no-op
+    // on repeat — re-applying an applied key must never duplicate content).
+    const toApply = isSelective
+      ? selectedCandidateKeys.filter(
+          (k) => availableKeys.includes(k) && !previouslyApplied.includes(k),
+        )
+      : // Full apply-all (no selection given) always rewrites everything —
+        // deleteMany below wipes the whole L&R set, so every available key
+        // must be rewritten, not just the ones never applied before.
+        availableKeys;
+
+    const lrGroups = this.flattenLrCandidateGroups(candidate);
+    if (exam.toeicExamSet && (!isSelective || toApply.length)) {
+      const groupsToWrite = lrGroups.filter((g) =>
+        toApply.includes(g.candidateKey),
+      );
       await this.prisma.$transaction(async (tx) => {
-        await tx.toeicQuestionGroup.deleteMany({
-          where: { examId: exam.toeicExamSet!.id },
-        });
-        for (const batch of lrBatches) {
-          await this.writeBatch(
+        if (!isSelective) {
+          // Full apply-all (default, backward-compatible): replace the
+          // entire L&R content set in one shot, as before.
+          await tx.toeicQuestionGroup.deleteMany({
+            where: { examId: exam.toeicExamSet!.id },
+          });
+        }
+        for (const g of groupsToWrite) {
+          await this.writeGroup(
             tx,
             exam.toeicExamSet!.id,
-            Number(batch.part),
-            Number(batch.groupOrder),
-            Number(batch.questionNumber),
-            batch.candidate,
+            g.part,
+            g.groupOrder,
+            g.questionNumberStart,
+            g.group,
           );
         }
       });
       await this.materializeMedia(jobId, exam.toeicExamSet.id);
     }
-    if (candidate.speakingWriting) {
+    if (
+      candidate.speakingWriting &&
+      (toApply.includes('SPEAKING') || toApply.includes('WRITING'))
+    ) {
       await this.materializeSpeakingWriting(
         jobId,
         exam,
@@ -499,17 +895,28 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       });
       validation = validateToeicExam(complete);
     }
+    const appliedCandidateKeys = Array.from(
+      new Set([...previouslyApplied, ...toApply]),
+    );
+    const fullyApplied = availableKeys.every((k) =>
+      appliedCandidateKeys.includes(k),
+    );
     const snapshot = (job.resultSnapshot as any) ?? {};
     await this.prisma.aiGenerationJob.update({
       where: { id: jobId },
       data: {
-        status: AiGenerationJobStatus.APPROVED,
+        status: fullyApplied
+          ? AiGenerationJobStatus.APPROVED
+          : AiGenerationJobStatus.GENERATED,
         reviewedByAdminId: adminId,
         reviewedAt: new Date(),
-        approvedSnapshot: { appliedAt: new Date().toISOString() },
+        approvedSnapshot: {
+          appliedAt: new Date().toISOString(),
+          appliedCandidateKeys,
+        },
         resultSnapshot: {
           ...snapshot,
-          stage: 'APPLIED_TO_DRAFT',
+          stage: fullyApplied ? 'APPLIED_TO_DRAFT' : 'PARTIALLY_APPLIED',
           validation,
         } as Prisma.InputJsonValue,
       },
@@ -1129,32 +1536,103 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     let questionNumber = firstQuestionNumber;
     for (let index = 0; index < candidate.groups.length; index += 1) {
       const group = candidate.groups[index];
-      await db.toeicQuestionGroup.create({
-        data: {
-          examId: examSetId,
-          part,
-          groupOrder: firstGroupOrder + index,
-          transcriptText: group.transcript?.trim() || null,
-          passageText: group.passageText?.trim() || null,
-          imageBrief: group.imageBrief?.trim() || null,
-          mediaMetadata: {
-            source: 'AI_GENERATED',
-            generatedAt: new Date().toISOString(),
-          },
-          questions: {
-            create: group.questions.map((question: any) => ({
-              questionNumber: questionNumber++,
-              text: question.text?.trim() || null,
-              options: question.options.map((option: unknown) =>
-                String(option).trim(),
-              ),
-              correctIndex: question.correctIndex,
-              explanation: question.explanation.trim(),
-            })),
-          },
-        },
-      });
+      await this.writeGroup(
+        db,
+        examSetId,
+        part,
+        firstGroupOrder + index,
+        questionNumber,
+        group,
+      );
+      questionNumber += group.questions.length;
     }
+  }
+
+  private async writeGroup(
+    db: PrismaService | Prisma.TransactionClient,
+    examSetId: number,
+    part: number,
+    groupOrder: number,
+    firstQuestionNumber: number,
+    group: any,
+  ) {
+    let questionNumber = firstQuestionNumber;
+    await db.toeicQuestionGroup.create({
+      data: {
+        examId: examSetId,
+        part,
+        groupOrder,
+        transcriptText: group.transcript?.trim() || null,
+        passageText: group.passageText?.trim() || null,
+        imageBrief: group.imageBrief?.trim() || null,
+        mediaMetadata: {
+          source: 'AI_GENERATED',
+          generatedAt: new Date().toISOString(),
+        },
+        questions: {
+          create: group.questions.map((question: any) => ({
+            questionNumber: questionNumber++,
+            text: question.text?.trim() || null,
+            options: question.options.map((option: unknown) =>
+              String(option).trim(),
+            ),
+            correctIndex: question.correctIndex,
+            explanation: question.explanation.trim(),
+          })),
+        },
+      },
+    });
+  }
+
+  /**
+   * Derives the stable, in-memory-only candidateKey identity for every
+   * selectable logical unit in a draft candidate — no new DB column/table.
+   * Group-level for L&R (the atomic Prisma write unit); whole-block for
+   * Speaking/Writing (their materialization is all-or-nothing today).
+   */
+  private flattenLrCandidateGroups(candidate: any): Array<{
+    candidateKey: string;
+    part: number;
+    groupOrder: number;
+    questionNumberStart: number;
+    group: any;
+  }> {
+    const lrBatches = Array.isArray(candidate?.lrBatches)
+      ? candidate.lrBatches
+      : [];
+    const flattened: Array<{
+      candidateKey: string;
+      part: number;
+      groupOrder: number;
+      questionNumberStart: number;
+      group: any;
+    }> = [];
+    for (const batch of lrBatches) {
+      let questionNumber = Number(batch.questionNumber);
+      const groups = batch.candidate?.groups ?? [];
+      for (let index = 0; index < groups.length; index += 1) {
+        const group = groups[index];
+        const groupOrder = Number(batch.groupOrder) + index;
+        flattened.push({
+          candidateKey: `LR:P${batch.part}:G${groupOrder}`,
+          part: Number(batch.part),
+          groupOrder,
+          questionNumberStart: questionNumber,
+          group,
+        });
+        questionNumber += group.questions?.length ?? 0;
+      }
+    }
+    return flattened;
+  }
+
+  private availableCandidateKeys(candidate: any): string[] {
+    const keys = this.flattenLrCandidateGroups(candidate).map(
+      (g) => g.candidateKey,
+    );
+    if (candidate?.speakingWriting?.speaking?.length) keys.push('SPEAKING');
+    if (candidate?.speakingWriting?.writing?.length) keys.push('WRITING');
+    return keys;
   }
 
   private async makeAudio(transcript: string) {

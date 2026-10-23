@@ -9,6 +9,7 @@ import {
   Prisma,
   QuizPublicationStatus,
   Role,
+  SpeakingPracticeScope,
   ToeicAssessmentAttemptComponentStatus,
   ToeicAssessmentAttemptStatus,
   ToeicAssessmentComponentKind,
@@ -562,14 +563,22 @@ export class ToeicAssessmentService {
         }))
       )
         throw new BadRequestException('Không tìm thấy nguồn L&R');
-      if (
-        component.speakingPracticeSetId &&
-        !(await this.db.speakingPracticeSet.findUnique({
+      if (component.speakingPracticeSetId) {
+        const speakingSource = await this.db.speakingPracticeSet.findUnique({
           where: { id: component.speakingPracticeSetId },
-          select: { id: true },
-        }))
-      )
-        throw new BadRequestException('Không tìm thấy nguồn Speaking');
+          select: { id: true, scope: true },
+        });
+        if (!speakingSource)
+          throw new BadRequestException('Không tìm thấy nguồn Speaking');
+        // Standalone Skill Practice content (SKILL_PRACTICE) is open for
+        // free learner practice and must never become the authoritative,
+        // scored component of a TOEIC assessment — only EXAM_INTERNAL sets
+        // are reserved/ring-fenced for exam composition.
+        if (speakingSource.scope !== SpeakingPracticeScope.EXAM_INTERNAL)
+          throw new BadRequestException(
+            'Nguồn Speaking phải là nội dung dành riêng cho đề thi (EXAM_INTERNAL), không được dùng bộ luyện tập kỹ năng độc lập.',
+          );
+      }
       if (
         component.writingSetId &&
         !(await this.db.toeicWritingSet.findUnique({
@@ -798,6 +807,7 @@ export class ToeicAssessmentService {
       productFamily: assessment.productFamily,
       publicationStatus: assessment.publicationStatus,
       version: assessment.version,
+      examId: assessment.examId ?? null,
       components: await this.projectComponents(assessment.components),
       readiness: await Promise.all(
         assessment.components.map((component: any) =>

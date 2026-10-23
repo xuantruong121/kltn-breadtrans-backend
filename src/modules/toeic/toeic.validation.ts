@@ -252,3 +252,118 @@ export function validateToeicExam(exam: ToeicValidationExam): {
   };
 }
 import { createHash } from 'crypto';
+
+/**
+ * Human-readable, Admin-facing view of a ToeicValidationIssue.
+ * `code`/`groupId`/`questionId` stay for internal navigation (outline jump
+ * targets); `humanMessage` is the only thing meant to be shown in the UI —
+ * never raw codes like MISSING_AUDIO or a bare "Group ID: 128".
+ */
+export type HumanReadableToeicIssue = ToeicValidationIssue & {
+  part?: number;
+  groupOrder?: number;
+  questionNumber?: number;
+  humanMessage: string;
+};
+
+const PART_LABEL: Record<number, string> = {
+  1: 'Listening · Part 1',
+  2: 'Listening · Part 2',
+  3: 'Listening · Part 3',
+  4: 'Listening · Part 4',
+  5: 'Reading · Part 5',
+  6: 'Reading · Part 6',
+  7: 'Reading · Part 7',
+};
+
+const GROUP_NOUN: Record<number, string> = {
+  1: 'Bức ảnh',
+  2: 'Câu hỏi',
+  3: 'Nhóm hội thoại',
+  4: 'Nhóm bài nói',
+  5: 'Câu hỏi',
+  6: 'Đoạn văn',
+  7: 'Đoạn văn',
+};
+
+/**
+ * Attaches a human-readable Vietnamese message + navigation coordinates
+ * (part/groupOrder/questionNumber) to each raw validation issue. Never
+ * mutates `validateToeicExam`'s own output — call this only where issues
+ * are about to be shown to an Admin.
+ */
+export function humanizeToeicValidationIssues(
+  exam: ToeicValidationExam,
+  issues: ToeicValidationIssue[],
+): HumanReadableToeicIssue[] {
+  const groupsById = new Map(
+    (exam.groups ?? []).map((group) => [group.id, group]),
+  );
+  const questionIndex = new Map<
+    number,
+    { group: ToeicValidationGroup; question: ToeicValidationQuestion }
+  >();
+  for (const group of exam.groups ?? []) {
+    for (const question of group.questions ?? []) {
+      questionIndex.set(question.id, { group, question });
+    }
+  }
+
+  return issues.map((issue) => {
+    const group = issue.groupId ? groupsById.get(issue.groupId) : undefined;
+    const fromQuestion = issue.questionId
+      ? questionIndex.get(issue.questionId)
+      : undefined;
+    const part = group?.part ?? fromQuestion?.group.part;
+    const groupOrder = group?.groupOrder ?? fromQuestion?.group.groupOrder;
+    const questionNumber = fromQuestion?.question.questionNumber;
+    const partLabel = part ? PART_LABEL[part] : undefined;
+    const groupLabel =
+      part && groupOrder
+        ? `${GROUP_NOUN[part] ?? 'Nhóm'} ${groupOrder}`
+        : undefined;
+
+    let humanMessage = issue.message;
+    switch (issue.code) {
+      case 'MISSING_AUDIO':
+        humanMessage = `${partLabel} · ${groupLabel} chưa có audio.`;
+        break;
+      case 'MISSING_IMAGE':
+        humanMessage = `${partLabel} · ${groupLabel} chưa có hình ảnh.`;
+        break;
+      case 'MISSING_PASSAGE':
+        humanMessage = `${partLabel} · ${groupLabel} chưa có đoạn văn.`;
+        break;
+      case 'OPTIONS':
+        humanMessage = questionNumber
+          ? `${partLabel} · Câu ${questionNumber} chưa đủ đáp án lựa chọn.`
+          : humanMessage;
+        break;
+      case 'ANSWER_KEY':
+        humanMessage = questionNumber
+          ? `${partLabel} · Câu ${questionNumber} chưa có đáp án đúng.`
+          : humanMessage;
+        break;
+      case 'STALE_AUDIO':
+        humanMessage = `${partLabel} · ${groupLabel}: audio cũ, cần tạo lại sau khi sửa transcript.`;
+        break;
+      case 'STALE_IMAGE':
+      case 'STALE_IMAGE_QUESTION':
+        humanMessage = `${partLabel} · ${groupLabel}: hình ảnh cần rà soát lại.`;
+        break;
+      case 'TOTAL_COUNT':
+      case 'PART_COUNT':
+      case 'GROUP_STRUCTURE':
+      case 'PART7_STRUCTURE':
+      case 'QUESTION_ORDER':
+      case 'INCOMPLETE_TEMPLATE':
+        humanMessage =
+          'Cấu trúc đề chưa đúng chuẩn TOEIC Full Test — cần AI soạn lại hoặc bổ sung thủ công.';
+        break;
+      default:
+        break;
+    }
+
+    return { ...issue, part, groupOrder, questionNumber, humanMessage };
+  });
+}

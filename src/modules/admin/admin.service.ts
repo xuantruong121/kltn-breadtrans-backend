@@ -13,6 +13,8 @@ import {
   CourseLessonStatus,
   EnrollmentStatus,
   PlanPaymentStatus,
+  PlanPurchaseStatus,
+  SubscriptionStatus,
   SuggestionStatus,
   IssueReportStatus,
   TopicCategory,
@@ -126,6 +128,8 @@ export class AdminService {
       unreadSupportMessages,
       pendingSuggestions,
       openIssueReports,
+      completedRevenueAgg,
+      activeSubscriptionsCount,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: Role.STUDENT } }),
       this.prisma.user.count({
@@ -228,6 +232,14 @@ export class AdminService {
           status: { in: [IssueReportStatus.NEW, IssueReportStatus.IN_REVIEW] },
         },
       }),
+      this.prisma.planPurchase.aggregate({
+        where: { status: PlanPurchaseStatus.COMPLETED },
+        _sum: { amountVnd: true },
+        _count: { id: true },
+      }),
+      this.prisma.subscription.count({
+        where: { status: SubscriptionStatus.ACTIVE },
+      }),
     ]);
 
     const recentActivity = recentEnrollments.map((e) => ({
@@ -240,7 +252,7 @@ export class AdminService {
 
     const monthlyTrends = await Promise.all(
       buckets.map(async ({ label, start, end }) => {
-        const [enrollmentCount, submissionCount, speakingCount] =
+        const [enrollmentCount, submissionCount, speakingCount, revenueAgg] =
           await Promise.all([
             this.prisma.enrollment.count({
               where: { joinedAt: { gte: start, lte: end } },
@@ -251,12 +263,20 @@ export class AdminService {
             this.prisma.speakingSubmission.count({
               where: { submittedAt: { gte: start, lte: end } },
             }),
+            this.prisma.planPurchase.aggregate({
+              where: {
+                status: PlanPurchaseStatus.COMPLETED,
+                completedAt: { gte: start, lte: end },
+              },
+              _sum: { amountVnd: true },
+            }),
           ]);
 
         return {
           month: label,
           enrollments: enrollmentCount,
           activityCount: submissionCount + speakingCount,
+          revenueVnd: revenueAgg._sum.amountVnd ?? 0,
         };
       }),
     );
@@ -276,6 +296,12 @@ export class AdminService {
       pendingOrders: pendingOrdersCount,
     };
 
+    const finance = {
+      totalRevenueVnd: completedRevenueAgg?._sum?.amountVnd ?? 0,
+      completedPurchasesCount: completedRevenueAgg?._count?.id ?? 0,
+      activeSubscriptionsCount: activeSubscriptionsCount ?? 0,
+    };
+
     return {
       range,
       stats: {
@@ -290,6 +316,7 @@ export class AdminService {
         pendingSuggestions,
         openIssueReports,
       },
+      finance,
       monthlyTrends,
       contentBreakdown,
       gamification,
