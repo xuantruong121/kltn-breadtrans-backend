@@ -112,6 +112,40 @@ export class AdminExamController {
     );
   }
 
+  @Post('ai/jobs/:jobId/candidate/:candidateKey/regenerate')
+  @ApiOperation({
+    summary:
+      'Admin: Tạo lại candidate theo nhóm TRƯỚC Apply (bounded, không đụng Draft)',
+  })
+  regenerateCandidateGroup(
+    @Param('jobId') jobId: string,
+    @Param('candidateKey') candidateKey: string,
+    @Req() req: any,
+  ) {
+    return this.toeicAiExamService.regenerateCandidateGroup(
+      jobId,
+      req.user.id,
+      candidateKey,
+    );
+  }
+
+  @Post('ai/jobs/:jobId/candidate/parts/:part/regenerate')
+  @ApiOperation({
+    summary:
+      'Admin: Tạo lại candidate theo Part TRƯỚC Apply (bỏ qua nội dung đã Apply)',
+  })
+  regenerateCandidatePart(
+    @Param('jobId') jobId: string,
+    @Param('part', ParseIntPipe) part: number,
+    @Req() req: any,
+  ) {
+    return this.toeicAiExamService.regenerateCandidatePart(
+      jobId,
+      req.user.id,
+      part,
+    );
+  }
+
   @Patch('ai/jobs/:jobId/candidate')
   @ApiOperation({
     summary:

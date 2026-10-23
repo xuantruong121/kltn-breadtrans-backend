@@ -575,6 +575,124 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     return this.getCandidate(jobId, adminId);
   }
 
+  /**
+   * Targeted "Tạo lại nhóm" — regenerates ONE L&R group's candidate content
+   * BEFORE Apply, reusing the same bounded AI batch call Phase D already
+   * uses. Never touches real Draft tables; never regenerates a key that has
+   * already been applied (that content belongs to "Tạo phiên bản mới"
+   * territory, not a silent candidate swap under an applied item).
+   */
+  async regenerateCandidateGroup(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+  ) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job || job.createdByAdminId !== adminId)
+      throw new NotFoundException('Không tìm thấy candidate tạo đề TOEIC AI');
+    const candidate = (job.draftSnapshot as any) ?? null;
+    if (!candidate)
+      throw new ConflictException('Candidate AI chưa sẵn sàng để tạo lại');
+    const appliedCandidateKeys: string[] = Array.isArray(
+      (job.approvedSnapshot as any)?.appliedCandidateKeys,
+    )
+      ? (job.approvedSnapshot as any).appliedCandidateKeys
+      : [];
+    if (appliedCandidateKeys.includes(candidateKey))
+      throw new ConflictException(
+        'Nội dung này đã được Apply vào Draft; không thể tạo lại candidate. Dùng "Tạo phiên bản mới" để thay đổi nội dung đã xuất bản/áp dụng.',
+      );
+    const lrMatch = /^LR:P(\d+):G(\d+)$/.exec(candidateKey);
+    if (!lrMatch)
+      throw new NotFoundException(
+        'Chỉ có thể tạo lại theo nhóm cho nội dung Listening/Reading',
+      );
+    const part = Number(lrMatch[1]);
+    const groupOrder = Number(lrMatch[2]);
+    const request = job.requestSnapshot as unknown as RequestSnapshot;
+
+    const lrBatches = Array.isArray(candidate.lrBatches)
+      ? candidate.lrBatches
+      : [];
+    let found = false;
+    for (const batch of lrBatches) {
+      if (Number(batch.part) !== part) continue;
+      const groups = batch.candidate?.groups ?? [];
+      for (let index = 0; index < groups.length; index += 1) {
+        if (Number(batch.groupOrder) + index !== groupOrder) continue;
+        found = true;
+        const questionCount = groups[index].questions?.length ?? 1;
+        const regenerated = await this.ai.generateToeicExamBatch({
+          part,
+          topic: request.topic,
+          difficulty: request.difficulty,
+          groups: [{ questionCount }],
+        });
+        this.assertBatch(part, [{ questionCount }], regenerated);
+        groups[index] = regenerated.groups[0];
+      }
+    }
+    if (!found)
+      throw new NotFoundException('Không tìm thấy candidate item này');
+
+    await this.prisma.aiGenerationJob.update({
+      where: { id: jobId },
+      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
+    });
+    return this.getCandidate(jobId, adminId);
+  }
+
+  /**
+   * Targeted "Tạo lại Part" — regenerates every NOT-YET-APPLIED L&R group of
+   * one Part. Already-applied groups in the same Part are left untouched.
+   * Bounded to this Part's groups only — never re-runs the whole Exam.
+   */
+  async regenerateCandidatePart(jobId: string, adminId: number, part: number) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job || job.createdByAdminId !== adminId)
+      throw new NotFoundException('Không tìm thấy candidate tạo đề TOEIC AI');
+    const candidate = (job.draftSnapshot as any) ?? null;
+    if (!candidate)
+      throw new ConflictException('Candidate AI chưa sẵn sàng để tạo lại');
+    const appliedCandidateKeys: string[] = Array.isArray(
+      (job.approvedSnapshot as any)?.appliedCandidateKeys,
+    )
+      ? (job.approvedSnapshot as any).appliedCandidateKeys
+      : [];
+    const request = job.requestSnapshot as unknown as RequestSnapshot;
+    const lrBatches = Array.isArray(candidate.lrBatches)
+      ? candidate.lrBatches
+      : [];
+    for (const batch of lrBatches) {
+      if (Number(batch.part) !== part) continue;
+      const groups = batch.candidate?.groups ?? [];
+      for (let index = 0; index < groups.length; index += 1) {
+        const groupOrder = Number(batch.groupOrder) + index;
+        const candidateKey = `LR:P${part}:G${groupOrder}`;
+        if (appliedCandidateKeys.includes(candidateKey)) continue;
+        const questionCount = groups[index].questions?.length ?? 1;
+        const regenerated = await this.ai.generateToeicExamBatch({
+          part,
+          topic: request.topic,
+          difficulty: request.difficulty,
+          groups: [{ questionCount }],
+        });
+        this.assertBatch(part, [{ questionCount }], regenerated);
+        groups[index] = regenerated.groups[0];
+      }
+    }
+
+    await this.prisma.aiGenerationJob.update({
+      where: { id: jobId },
+      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
+    });
+    return this.getCandidate(jobId, adminId);
+  }
+
   async status(jobId: string) {
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },

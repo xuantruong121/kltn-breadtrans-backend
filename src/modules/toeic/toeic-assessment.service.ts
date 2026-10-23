@@ -807,6 +807,7 @@ export class ToeicAssessmentService {
       productFamily: assessment.productFamily,
       publicationStatus: assessment.publicationStatus,
       version: assessment.version,
+      examId: assessment.examId ?? null,
       components: await this.projectComponents(assessment.components),
       readiness: await Promise.all(
         assessment.components.map((component: any) =>
