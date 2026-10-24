@@ -132,8 +132,11 @@ export function resolveListeningVoice(
       /male|man|agent|manager|guy|ethan|leo|ben|dan|customer-2|nhân viên|nhan vien|hỗ trợ|ho tro|support|assistant|staff|mark/.test(
         normalizedSpeaker,
       );
+    // Named speakers used by authored listening content are listed
+    // explicitly. Relying on the female default for an unlisted name is how a
+    // speaker can silently take the wrong voice.
     const isFemale =
-      /female|woman|lady|maya|nora|jenny|khách hàng|khach hang|customer-1|customer|caller|client|buyer|guest/.test(
+      /female|woman|lady|maya|nora|mia|linh|jenny|khách hàng|khach hang|customer-1|customer|caller|client|buyer|guest/.test(
         normalizedSpeaker,
       );
     if (isMale && !isFemale) {
@@ -987,6 +990,163 @@ export class ListeningAudioAuthoringService {
       buffer: isPremium
         ? await this.uploadService.downloadPrivateFileBuffer(artifact.r2Key)
         : await this.uploadService.downloadFileBuffer(artifact.r2Key),
+    };
+  }
+
+  /**
+   * Rebuild the published whole-quiz artifact row from audio that is still in
+   * object storage.
+   *
+   * The incident destroyed every ListeningAudioArtifact row while the rendered
+   * `full.mp3` objects survived, so the learner "play the whole script" control
+   * had no artifact to resolve and answered 503. The audio itself never needs
+   * to be re-synthesized: this relinks the newest surviving object for the quiz
+   * and republishes it.
+   *
+   * Hashes are recomputed from the current canonical script through the same
+   * helpers `generatePreview` uses, so a later content edit still marks the
+   * artifact stale exactly as it would have before.
+   *
+   * Idempotent: a second call finds the artifact already published against the
+   * same key and reports `relinked: false`.
+   */
+  async relinkPublishedArtifactFromStorage(
+    quizId: number,
+    options: { maxVersionProbe?: number } = {},
+  ): Promise<{
+    quizId: number;
+    status:
+      | 'RELINKED'
+      | 'ALREADY_PUBLISHED'
+      | 'NO_SURVIVING_OBJECT'
+      | 'NOT_A_LISTENING_QUIZ';
+    r2Key?: string;
+    version?: number;
+    bytes?: number;
+    relinked: boolean;
+  }> {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, type: true },
+    });
+    if (!quiz || quiz.type !== QuizType.LISTENING_PRACTICE) {
+      return { quizId, status: 'NOT_A_LISTENING_QUIZ', relinked: false };
+    }
+
+    const payload = await this.loadCanonical(quizId);
+    const synthesisHash = sha256(stableJson(payload));
+    const contentHash = sha256(
+      stableJson(
+        payload.turns.map(({ turnId, speakerId, text, translation }) => ({
+          turnId,
+          speakerId,
+          text,
+          translation,
+        })),
+      ),
+    );
+    const isPremium = await this.isPremiumListeningQuiz(quizId);
+
+    // Newest version first. Premium quizzes may sit at the key the premium
+    // rollout moved them to, so both private layouts are probed.
+    const maxProbe = options.maxVersionProbe ?? 12;
+    const candidates: Array<{ key: string; version: number }> = [];
+    for (let version = maxProbe; version >= 1; version--) {
+      if (isPremium) {
+        candidates.push({
+          key: `${PRIVATE_LISTENING_MEDIA_PREFIX}quiz-${quizId}/artifact-v${version}/full.mp3`,
+          version,
+        });
+        candidates.push({
+          key: `${PRIVATE_LISTENING_MEDIA_PREFIX}quiz-${quizId}/audio/v${version}/full.mp3`,
+          version,
+        });
+      } else {
+        candidates.push({
+          key: `${PRODUCTION_PREFIX}/quiz-${quizId}/audio/v${version}/full.mp3`,
+          version,
+        });
+      }
+    }
+
+    let found: { key: string; version: number } | null = null;
+    for (const candidate of candidates) {
+      const exists = isPremium
+        ? await this.uploadService.privateObjectExists(candidate.key)
+        : await this.uploadService.objectExists(candidate.key);
+      if (exists) {
+        found = candidate;
+        break;
+      }
+    }
+    if (!found) {
+      return { quizId, status: 'NO_SURVIVING_OBJECT', relinked: false };
+    }
+
+    const buffer = isPremium
+      ? await this.uploadService.downloadPrivateFileBuffer(found.key)
+      : await this.uploadService.downloadFileBuffer(found.key);
+    if (!buffer?.length) {
+      return { quizId, status: 'NO_SURVIVING_OBJECT', relinked: false };
+    }
+    const checksumSha256 = sha256(buffer);
+    // A private object must never carry a public URL.
+    const r2Url = isPremium
+      ? null
+      : this.uploadService.getPublicAssetUrl(found.key);
+    this.assertPremiumArtifactStorage(isPremium, found.key, r2Url);
+
+    const existing = await this.prisma.listeningAudioArtifact.findUnique({
+      where: { quizId_synthesisHash: { quizId, synthesisHash } },
+    });
+    if (
+      existing &&
+      existing.status === 'PUBLISHED' &&
+      existing.r2Key === found.key
+    ) {
+      return {
+        quizId,
+        status: 'ALREADY_PUBLISHED',
+        r2Key: found.key,
+        version: existing.version,
+        bytes: buffer.length,
+        relinked: false,
+      };
+    }
+
+    const now = new Date();
+    const data = {
+      status: 'PUBLISHED' as const,
+      provider: 'AZURE_SPEECH_SDK',
+      locale: payload.locale,
+      accent: payload.accent,
+      voiceRegistryVersion: payload.voiceRegistryVersion,
+      outputFormat: payload.outputFormat,
+      contentHash,
+      r2Key: found.key,
+      r2Url,
+      checksumSha256,
+      error: null,
+      publishedAt: now,
+      approvedAt: now,
+    };
+    if (existing) {
+      await this.prisma.listeningAudioArtifact.update({
+        where: { id: existing.id },
+        data,
+      });
+    } else {
+      await this.prisma.listeningAudioArtifact.create({
+        data: { quizId, version: found.version, synthesisHash, ...data },
+      });
+    }
+    return {
+      quizId,
+      status: 'RELINKED',
+      r2Key: found.key,
+      version: found.version,
+      bytes: buffer.length,
+      relinked: true,
     };
   }
 }

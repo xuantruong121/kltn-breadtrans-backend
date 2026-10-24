@@ -76,6 +76,47 @@ describe('ListeningAudioAuthoring primitives', () => {
     ).toThrow();
   });
 
+  // Regression: the recovery materializer chose voices by the order speakers
+  // were encountered inside one synthesis call. Dictation questions hold a
+  // single turn, so every speaker landed in slot 0 - the male voice - and Mia,
+  // Maya and Nora were all rendered male (measured 119-156 Hz median F0 against
+  // 185-196 Hz after the repair). Voice must depend on the speaker alone, never
+  // on position, so a lone first turn by a female speaker stays female.
+  it.each([
+    ['mia', 'UK', 'en-gb-female-01'],
+    ['leo', 'UK', 'en-gb-male-01'],
+    ['maya', 'US', 'en-us-female-01'],
+    ['ben', 'US', 'en-us-male-01'],
+    ['nora', 'US', 'en-us-female-01'],
+    ['dan', 'US', 'en-us-male-01'],
+  ])(
+    'resolves %s (%s) by speaker identity even as the only turn',
+    (speaker, accent, expectedVoiceKey) => {
+      // No fallback slot: this is the single-turn dictation shape.
+      expect(
+        resolveListeningVoice(speaker, accent as 'US' | 'UK').voiceKey,
+      ).toBe(expectedVoiceKey);
+      // A named speaker must be recognised outright, not fall through to the
+      // positional tie-breaker, which is reserved for unnamed turns.
+      expect(
+        resolveListeningVoice(speaker.toUpperCase(), accent as 'US' | 'UK')
+          .voiceKey,
+      ).toBe(expectedVoiceKey);
+    },
+  );
+
+  it('keeps the two dictation speakers of a quiz acoustically distinct', () => {
+    for (const [a, b, accent] of [
+      ['mia', 'leo', 'UK'],
+      ['maya', 'ben', 'US'],
+      ['nora', 'dan', 'US'],
+    ] as Array<[string, string, 'US' | 'UK']>) {
+      expect(resolveListeningVoice(a, accent).providerVoice).not.toBe(
+        resolveListeningVoice(b, accent).providerVoice,
+      );
+    }
+  });
+
   it('maps explicit participant roles to distinct provider voices', () => {
     expect(resolveListeningVoice('maya', 'US', 'female-01')).toEqual({
       voiceKey: 'en-us-female-01',

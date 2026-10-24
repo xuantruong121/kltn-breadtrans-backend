@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaClient, QuizType } from '@prisma/client';
 import { buildNaturalListeningAudioText } from '../src/modules/quiz/quiz.service';
+import { resolveListeningVoice } from '../src/modules/quiz/listening-audio-authoring.service';
 import {
   HeadObjectCommand,
   PutObjectCommand,
@@ -38,42 +39,42 @@ function escapeSsml(text: string): string {
     .replace(/'/g, '&apos;');
 }
 
+/**
+ * Resolve the TTS voice for one dialogue turn.
+ *
+ * This used to assign voices by the order speakers were encountered inside a
+ * single synthesis call: the first speaker got slot 0 (male) and the second
+ * slot 1 (female). Dictation questions hold exactly one turn each, so every
+ * question started a fresh map, every speaker landed in slot 0, and all of
+ * them were voiced male - Mia, Maya and Nora included. Voice now follows the
+ * speaker's identity through the canonical registry, and the encounter index
+ * is only used as a tie-breaker for turns with no speaker name.
+ */
 function dialogueVoice(
   speaker: string,
   index: number,
   accent: 'US' | 'UK',
-  speakerSlots: Map<string, number>,
 ): string {
-  const normalized = speaker.toLocaleLowerCase('vi-VN');
-  const isAgent =
-    normalized.includes('agent') ||
-    normalized.includes('support') ||
-    normalized.includes('nhân viên') ||
-    normalized.includes('assistant') ||
-    normalized.includes('staff');
-  const isCustomer =
-    normalized.includes('customer') ||
-    normalized.includes('caller') ||
-    normalized.includes('client') ||
-    normalized.includes('buyer') ||
-    normalized.includes('guest');
-  let slot = speakerSlots.get(normalized);
-  if (slot === undefined) {
-    slot = isAgent ? 1 : isCustomer ? 0 : speakerSlots.size % 2;
-    speakerSlots.set(normalized, slot);
-  }
-  if (accent === 'UK') {
-    return slot === 1 || (!normalized && index % 2 === 1)
-      ? 'en-GB-SoniaNeural'
-      : 'en-GB-RyanNeural';
-  }
-  return slot === 1 || (!normalized && index % 2 === 1)
-    ? 'en-US-JennyNeural'
-    : 'en-US-GuyNeural';
+  const named = speaker.trim();
+  return resolveListeningVoice(
+    named,
+    accent,
+    undefined,
+    named ? undefined : index,
+  ).providerVoice;
 }
 
-async function synthesize(text: string, accent: 'US' | 'UK'): Promise<Buffer> {
-  const voice = accent === 'UK' ? 'en-GB-SoniaNeural' : 'en-US-JennyNeural';
+async function synthesize(
+  text: string,
+  accent: 'US' | 'UK',
+  speaker?: string,
+): Promise<Buffer> {
+  // A named speaker decides the voice; without one, keep the previous default.
+  const voice = speaker?.trim()
+    ? resolveListeningVoice(speaker.trim(), accent).providerVoice
+    : accent === 'UK'
+      ? 'en-GB-SoniaNeural'
+      : 'en-US-JennyNeural';
   const lang = accent === 'UK' ? 'en-GB' : 'en-US';
   const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'><voice name='${voice}'><prosody rate='1.0'>${escapeSsml(text)}</prosody></voice></speak>`;
   const response = await fetch(
@@ -100,11 +101,10 @@ async function synthesizeDialogue(
   accent: 'US' | 'UK',
 ): Promise<Buffer> {
   const lang = accent === 'UK' ? 'en-GB' : 'en-US';
-  const speakerSlots = new Map<string, number>();
   const body = segments
     .map(
       (segment, index) =>
-        `<voice name='${dialogueVoice(segment.speaker, index, accent, speakerSlots)}'><prosody rate='1.0'>${escapeSsml(segment.text)}</prosody></voice>`,
+        `<voice name='${dialogueVoice(segment.speaker, index, accent)}'><prosody rate='1.0'>${escapeSsml(segment.text)}</prosody></voice>`,
     )
     .join('');
   const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>${body}</speak>`;
@@ -200,7 +200,15 @@ async function main(): Promise<void> {
           }));
         buffer = await synthesizeDialogue(segments, accent);
       } else {
-        buffer = await synthesize(text, accent);
+        buffer = await synthesize(
+          text,
+          accent,
+          typeof content.speakerId === 'string'
+            ? content.speakerId
+            : typeof content.speaker === 'string'
+              ? content.speaker
+              : undefined,
+        );
       }
       await s3.send(
         new PutObjectCommand({
