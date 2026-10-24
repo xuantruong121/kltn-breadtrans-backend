@@ -22,6 +22,7 @@ export class SystemJobsScheduler implements OnModuleInit {
       if (getBusinessWeekday() === 0) {
         await this.jobs.enqueueWeekly(getBusinessWeekKey());
       }
+      await this.jobs.enqueueDatabaseBackupR2Sync();
     } catch (error) {
       this.logger.warn(
         `system_job_startup_recovery_unavailable: ${(error as Error).message}`,
@@ -52,5 +53,10 @@ export class SystemJobsScheduler implements OnModuleInit {
   @Cron('0 0 * * 0', { timeZone: BUSINESS_TIMEZONE })
   async enqueueR2Cleanup(): Promise<void> {
     await this.jobs.enqueueR2Cleanup(getBusinessWeekKey());
+  }
+
+  @Cron('15 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  async enqueueDatabaseBackupR2Sync(): Promise<void> {
+    await this.jobs.enqueueDatabaseBackupR2Sync();
   }
 }

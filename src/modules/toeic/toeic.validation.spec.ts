@@ -4,6 +4,7 @@ import {
   withManualMedia,
   withMediaFailure,
 } from './toeic-media';
+import { toeicListeningAudioFingerprint } from './toeic-listening-audio';
 import { createHash } from 'crypto';
 
 function makeExam() {
@@ -47,6 +48,10 @@ function makeExam() {
         () => ({
           id: number,
           questionNumber: number++,
+          text:
+            part === 3 || part === 4
+              ? `What does the speaker say about item ${number}?`
+              : null,
           options: part === 2 ? ['a', 'b', 'c'] : ['a', 'b', 'c', 'd'],
           correctIndex: 0,
         }),
@@ -62,6 +67,14 @@ function makeExam() {
             : null,
         audioUrl: part <= 4 ? 'audio' : null,
         passageText: part >= 6 ? 'passage' : null,
+        transcriptText:
+          part === 2
+            ? 'Could you send the report this afternoon?'
+            : part === 3
+              ? 'Woman: The client meeting starts at ten.\nMan: I will prepare the room.'
+              : part === 4
+                ? 'Good morning. The training session begins after a short break.'
+                : null,
         questions,
       });
     }
@@ -207,5 +220,42 @@ test('fails closed when generated Listening audio is stale after transcript edit
   expect(result.learnerReady).toBe(false);
   expect(result.issues.some((issue) => issue.code === 'STALE_AUDIO')).toBe(
     true,
+  );
+});
+
+test('fails closed when generated Part 2 audio has no semantic source fingerprint', () => {
+  const exam = makeExam();
+  const group = exam.groups.find((item) => item.part === 2);
+  group.mediaMetadata = {
+    audio: {
+      source: 'AI_GENERATED',
+      transcriptHash: toeicMediaHash(group.transcriptText),
+    },
+  };
+
+  const result = validateToeicExam(exam);
+
+  expect(result.learnerReady).toBe(false);
+  expect(result.issues).toContainEqual(
+    expect.objectContaining({ code: 'STALE_AUDIO', groupId: group.id }),
+  );
+});
+
+test('accepts generated Listening media only when every current semantic fingerprint matches', () => {
+  const exam = makeExam();
+  for (const group of exam.groups.filter((item) => item.part <= 4)) {
+    group.mediaMetadata = {
+      audio: {
+        source: 'AI_GENERATED',
+        sourceHash: toeicListeningAudioFingerprint(group),
+      },
+    };
+  }
+
+  const result = validateToeicExam(exam);
+
+  expect(result.learnerReady).toBe(true);
+  expect(result.issues).not.toContainEqual(
+    expect.objectContaining({ code: 'STALE_AUDIO' }),
   );
 });

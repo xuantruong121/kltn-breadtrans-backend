@@ -1,0 +1,23 @@
+{
+ "generatedAt": "2026-10-23T15:48:05.731Z",
+ "localFile": "D:\\Study\\KLTN\\.local-backups\\breadtrans-auto\\kltn_db_AUTO_R2_VERIFY_20261023_154754.dump",
+ "checkpoint": "AUTO_R2_VERIFY",
+ "class": "AUTOMATIC",
+ "bucketIsMediaBucket": false,
+ "localBytes": 651945,
+ "localSha256": "c4631240c134b5db454738b2afa6bbd5c42035531ffa1d531108f1e81a7af64d",
+ "localArchiveVerified": true,
+ "remoteKey": "database-backups/automatic/2026/10/23/kltn_db_AUTO_R2_VERIFY_20261023_154754.dump",
+ "remoteBytes": 651945,
+ "remoteSizeMatch": true,
+ "downloadedBytes": 651945,
+ "downloadedSha256": "c4631240c134b5db454738b2afa6bbd5c42035531ffa1d531108f1e81a7af64d",
+ "sha256Match": true,
+ "publicProbe": {
+  "url": "<public-base>/database-backups/automatic/2026/10/23/kltn_db_AUTO_R2_VERIFY_20261023_154754.dump",
+  "status": 404
+ },
+ "backupBucketPrivate": true,
+ "remoteValid": false,
+ "remoteRestoreSkipped": true
+}

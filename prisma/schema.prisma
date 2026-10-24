@@ -6,6 +6,11 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  /// Disposable database Prisma resets/replays when generating migrations.
+  /// It MUST be a different database from DATABASE_URL (separate container
+  /// and volume here: kltn-postgres-shadow on port 5433). Pointing this at
+  /// DATABASE_URL destroys development data — see docs/database-safety.md.
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 enum Role {
@@ -1966,6 +1971,17 @@ model ToeicAttempt {
   readingCorrect   Int?
   totalCorrect     Int?
 
+  /// Strict Full Test section state only. Always null for PRACTICE attempts
+  /// and for FULL_TEST attempts that predate this field (legacy-compatible —
+  /// the server treats a null section the same as unrestricted/legacy).
+  section           ToeicAttemptSection?
+  /// Server-authoritative one-pass cursor into the deterministic Listening
+  /// manifest (ordered Part 1-4 groups for this exam). Monotonically
+  /// increasing; never decremented by any client action.
+  listeningPosition Int                  @default(0)
+  readingStartedAt  DateTime?
+  readingDeadline   DateTime?
+
   answers             ToeicAttemptAnswer[]
   integrityEvents     ToeicIntegrityEvent[]
   assessmentComponent ToeicAssessmentAttemptComponent? @relation("ToeicAssessmentChildAttempt")
@@ -1975,6 +1991,11 @@ enum AttemptStatus {
   PENDING_START
   IN_PROGRESS
   SUBMITTED
+}
+
+enum ToeicAttemptSection {
+  LISTENING
+  READING
 }
 
 enum IntegrityEventType {

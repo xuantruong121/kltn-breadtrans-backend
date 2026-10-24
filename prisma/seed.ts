@@ -12,6 +12,7 @@ import {
   PaymentStatus,
   Prisma,
   PrismaClient,
+  QuizPublicationStatus,
   QuizType,
   Role,
   SpeakingExerciseTaskType,
@@ -19,6 +20,7 @@ import {
   User,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { ensureCanonicalPlanCatalog } from '../src/modules/subscription/canonical-plan-catalog';
 import {
   SPEAKING_DICTIONARY_ENTRIES,
   SPEAKING_DICTIONARY_METADATA,
@@ -52,6 +54,11 @@ const seedAssetUrl = (key: string): string | null => {
 const listeningPracticeAssetUrl = (filename: string): string | null => {
   const base = SEED_ASSET_BASE_URL.replace(/\/$/, '');
   return base ? `${base}/catalog/listening/practice/images/${filename}` : null;
+};
+
+const listeningPracticeAudioUrl = (key: string): string | null => {
+  const base = SEED_ASSET_BASE_URL.replace(/\/$/, '');
+  return base ? `${base}/${key}` : null;
 };
 
 type DictationSeedSentence = {
@@ -1069,6 +1076,7 @@ const VOCAB_COLLOCATIONS: Record<string, SeedCollocation[]> = {
 };
 
 async function main() {
+  await ensureCanonicalPlanCatalog(prisma);
   const password = await bcrypt.hash(PASSWORD, 12);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@breadtrans.com' },
@@ -1223,60 +1231,6 @@ async function main() {
       thumbnail: null,
     },
     {
-      id: 2,
-      title: 'English Four Skills B1',
-      level: 'INTERMEDIATE',
-      status: 'PUBLISHED',
-      description:
-        'Phát triển đồng đều Listening, Speaking, Reading và Writing ở mức B1 qua tình huống đời sống, học tập và công việc.',
-      thumbnail: null,
-    },
-    {
-      id: 3,
-      title: 'TOEIC Listening & Reading 450–650',
-      level: 'INTERMEDIATE',
-      status: 'PUBLISHED',
-      description:
-        'Lộ trình TOEIC L&R tập trung đủ Part 1–7, từ vựng công sở và chiến thuật làm bài cho mục tiêu 450–650.',
-      thumbnail: null,
-    },
-    {
-      id: 4,
-      title: 'TOEIC Listening & Reading 650–850+',
-      level: 'ADVANCED',
-      status: 'PUBLISHED',
-      description:
-        'Luyện TOEIC Listening & Reading nâng cao với hội thoại dài, suy luận, Part 6–7 đa văn bản và quản lý thời gian.',
-      thumbnail: null,
-    },
-    {
-      id: 5,
-      title: 'TOEIC Speaking & Writing',
-      level: 'INTERMEDIATE',
-      status: 'PUBLISHED',
-      description:
-        'Luyện đúng các dạng nhiệm vụ TOEIC Speaking và Writing: đọc thành tiếng, mô tả, phản hồi, email và bài luận ý kiến.',
-      thumbnail: null,
-    },
-    {
-      id: 6,
-      title: 'TOEIC 4 Skills Mastery',
-      level: 'INTERMEDIATE',
-      status: 'PUBLISHED',
-      description:
-        'Lộ trình 4 kỹ năng kết hợp TOEIC Listening & Reading với TOEIC Speaking & Writing, phù hợp cho học viên cần đánh giá toàn diện.',
-      thumbnail: null,
-    },
-    {
-      id: 7,
-      title: 'Business English B1–B2',
-      level: 'INTERMEDIATE',
-      status: 'PUBLISHED',
-      description:
-        'Tiếng Anh công sở thực tế: họp, email, điện thoại, chăm sóc khách hàng, báo cáo, thuyết trình và giải quyết vấn đề.',
-      thumbnail: null,
-    },
-    {
       id: 8,
       title: 'Grammar & Vocabulary Builder',
       level: 'BEGINNER',
@@ -1302,92 +1256,15 @@ async function main() {
     );
   }
 
-  const offeringDefinitions = [
-    {
-      courseIndex: 0,
-      name: 'English Foundations — Free Access',
-      capacity: null,
-      tuitionFeeVnd: 0,
-      status: 'ONGOING',
-    },
-    {
-      courseIndex: 2,
-      name: 'TOEIC 450–650 — Standard Access',
-      capacity: null,
-      tuitionFeeVnd: 1490000,
-      status: 'ONGOING',
-    },
-    {
-      courseIndex: 1,
-      name: 'Four Skills B1 — Free Practice',
-      capacity: null,
-      tuitionFeeVnd: 0,
-      status: 'ONGOING',
-    },
-    {
-      courseIndex: 5,
-      name: 'TOEIC 4 Skills — Complete Access',
-      capacity: null,
-      tuitionFeeVnd: 2490000,
-      status: 'ONGOING',
-    },
-    {
-      courseIndex: 3,
-      name: 'TOEIC 650–850+ — Intensive Access',
-      capacity: null,
-      tuitionFeeVnd: 1990000,
-      status: 'ONGOING',
-    },
-    {
-      courseIndex: 4,
-      name: 'TOEIC Speaking & Writing — Practice Access',
-      capacity: null,
-      tuitionFeeVnd: 1290000,
-      status: 'ONGOING',
-    },
-    {
-      courseIndex: 6,
-      name: 'Business English — Self Study',
-      capacity: null,
-      tuitionFeeVnd: 990000,
-      status: 'ONGOING',
-    },
-    {
-      courseIndex: 7,
-      name: 'Grammar & Vocabulary — Open Practice',
-      capacity: null,
-      tuitionFeeVnd: 0,
-      status: 'ONGOING',
-    },
-  ].map((item) => ({
-    courseId: courses[item.courseIndex].id,
-    name: item.name,
-    capacity: item.capacity,
-    tuitionFeeVnd: item.tuitionFeeVnd,
-    status: ClassStatus[item.status as keyof typeof ClassStatus],
-  }));
-  // Scoped cleanup of obsolete prototype offerings from early development seeds
-  const seededOfferingNames = offeringDefinitions.map((o) => o.name);
-  const oldSeedClasses = await prisma.class.findMany({
-    where: { name: { notIn: seededOfferingNames } },
-    select: { id: true },
-  });
-  if (oldSeedClasses.length > 0) {
-    const oldClassIds = oldSeedClasses.map((c) => c.id);
-    const oldEnrollments = await prisma.enrollment.findMany({
-      where: { classId: { in: oldClassIds } },
-      select: { id: true },
-    });
-    if (oldEnrollments.length > 0) {
-      await prisma.payment.deleteMany({
-        where: { enrollmentId: { in: oldEnrollments.map((e) => e.id) } },
-      });
-    }
-    await prisma.class.deleteMany({
-      where: { id: { in: oldClassIds } },
-    });
-  }
-
+  // Courses are self-paced and unlocked by plan entitlement. Legacy classes,
+  // tuition and enrollment records are intentionally not seeded any more.
+  const offeringDefinitions: Array<{
+    courseId: number;
+    name: string;
+    capacity: number | null;
+    tuitionFeeVnd: number;
+    status: ClassStatus;
+  }> = [];
   const offerings: Class[] = [];
   for (const definition of offeringDefinitions) {
     const offeringData = {
@@ -2212,7 +2089,8 @@ async function main() {
     });
   }
 
-  for (let index = 1; index <= 3; index += 1) {
+  if (offerings.length > 0) {
+    for (let index = 1; index <= 3; index += 1) {
     await prisma.assignmentSubmission.upsert({
       where: {
         assignmentId_userId: { assignmentId: index, userId: students[0].id },
@@ -2242,10 +2120,12 @@ async function main() {
         isPointsAwarded: true,
       },
     });
+    }
   }
 
-  let enrollmentIndex = 1;
-  for (const [studentIndex, student] of students.entries()) {
+  if (offerings.length >= 4) {
+    let enrollmentIndex = 1;
+    for (const [studentIndex, student] of students.entries()) {
     const freeOffering = offerings[studentIndex % 2 === 0 ? 0 : 2];
     await prisma.enrollment.upsert({
       where: {
@@ -2323,6 +2203,7 @@ async function main() {
         },
       });
       enrollmentIndex += 1;
+    }
     }
   }
 
@@ -3181,7 +3062,8 @@ async function main() {
       description:
         'Bài mini test nguyên bản mô phỏng dạng câu hỏi TOEIC Listening & Reading.',
       timeLimit: 25,
-      courseId: 3,
+      // TOEIC practice is an independent product, not a Course enrollment.
+      courseId: null,
       questions: [
         {
           type: 'MULTIPLE_CHOICE',
@@ -5658,6 +5540,38 @@ async function main() {
     }
   }
 
+  // General listening audio is materialized once in R2 and is deliberately
+  // relinked during every canonical seed. The seed never invokes TTS: that
+  // would make reconstruction non-deterministic and consume a provider quota.
+  const seededListeningQuestions = await prisma.question.findMany({
+    where: { quiz: { type: QuizType.LISTENING_PRACTICE } },
+    select: { id: true, quizId: true, content: true },
+  });
+  for (const question of seededListeningQuestions) {
+    const content = question.content as Record<string, unknown>;
+    if (typeof content.audioText !== 'string' || !content.audioText.trim()) {
+      continue;
+    }
+    const isDialogue = Array.isArray(content.transcriptSegments);
+    const key = isDialogue
+      ? `catalog/listening/practice/audio/quiz-${question.quizId}/question-${question.id}/dialogue-v3.mp3`
+      : `catalog/listening/practice/audio/quiz-${question.quizId}/question-${question.id}/v1.mp3`;
+    const url = listeningPracticeAudioUrl(key);
+    if (!url) continue;
+    await prisma.quizAudioAsset.upsert({
+      where: { questionId_version: { questionId: question.id, version: 1 } },
+      update: { key, url, mimeType: 'audio/mpeg', isActive: true },
+      create: {
+        questionId: question.id,
+        version: 1,
+        key,
+        url,
+        mimeType: 'audio/mpeg',
+        isActive: true,
+      },
+    });
+  }
+
   const toeicSpeakingWritingQuiz = await prisma.quiz.upsert({
     where: { id: 20 },
     update: {
@@ -5665,7 +5579,7 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 2 Skills: Speaking & Writing gồm 11 task Speaking và 8 task Writing. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
-      courseId: courses[4].id,
+      courseId: null,
       timeLimit: 80,
       bilingualContent: {
         examFormat: 'TOEIC_SW',
@@ -5696,7 +5610,7 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 2 Skills: Speaking & Writing gồm 11 task Speaking và 8 task Writing. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
-      courseId: courses[4].id,
+      courseId: null,
       timeLimit: 80,
       bilingualContent: {
         examFormat: 'TOEIC_SW',
@@ -6578,6 +6492,7 @@ async function main() {
     const semanticItem = {
       ...item,
       taskType,
+      publicationStatus: QuizPublicationStatus.PUBLISHED,
       ...media,
       ...(taskType === SpeakingExerciseTaskType.RESPOND_USING_INFORMATION
         ? { stimulusId: seminarStimulus.id }
@@ -7392,6 +7307,7 @@ async function main() {
         categoryName: definition.categoryName,
         totalWords: definition.words.length,
         isPro: definition.isPro,
+        publicationStatus: QuizPublicationStatus.PUBLISHED,
       },
       create: {
         id: topicIndex + 1,
@@ -7399,6 +7315,7 @@ async function main() {
         categoryName: definition.categoryName,
         totalWords: definition.words.length,
         isPro: definition.isPro,
+        publicationStatus: QuizPublicationStatus.PUBLISHED,
       },
     });
     for (
@@ -11646,7 +11563,7 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 2 Skills: Listening & Reading gồm 100 câu Listening và 100 câu Reading, bao quát Part 1–7. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
-      courseId: courses[2].id,
+      courseId: null,
       timeLimit: 120,
       bilingualContent: {
         examFormat: 'TOEIC_LR',
@@ -11668,7 +11585,7 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 2 Skills: Listening & Reading gồm 100 câu Listening và 100 câu Reading, bao quát Part 1–7. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
-      courseId: courses[2].id,
+      courseId: null,
       timeLimit: 120,
       bilingualContent: {
         examFormat: 'TOEIC_LR',
@@ -11693,7 +11610,7 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 4 Skills kết hợp Listening, Reading, Speaking và Writing trong một sản phẩm luyện tập. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC_FOUR_SKILL,
-      courseId: courses[5].id,
+      courseId: null,
       timeLimit: 200,
       bilingualContent: {
         examFormat: 'TOEIC_4_SKILLS',
@@ -11717,7 +11634,7 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 4 Skills kết hợp Listening, Reading, Speaking và Writing trong một sản phẩm luyện tập. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC_FOUR_SKILL,
-      courseId: courses[5].id,
+      courseId: null,
       timeLimit: 200,
       bilingualContent: {
         examFormat: 'TOEIC_4_SKILLS',

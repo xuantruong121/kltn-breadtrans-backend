@@ -1,0 +1,1205 @@
+{
+  "generatedAt": "2026-10-23T14:21:55.965Z",
+  "source": "Frontend App Router page files and imported API service modules",
+  "routeCount": 47,
+  "routes": [
+    {
+      "route": "/arena",
+      "component": "src/app/(student)/arena/page.tsx",
+      "apiEndpoints": [
+        "/arena",
+        "/gamification/arena/snippet",
+        "/gamification/badges/me",
+        "/gamification/dashboard/today",
+        "/gamification/leaderboard",
+        "/gamification/pet",
+        "/gamification/pet/change-type",
+        "/gamification/pet/feed",
+        "/gamification/quests",
+        "/login?redirect=/arena",
+        "/register?redirect=/arena",
+        "/users/me/daily-practice",
+        "/users/me/skill-progress",
+        "/users/profile",
+        "/users/shipping-profile",
+        "/users/skills-summary",
+        "/users/stats"
+      ],
+      "apiServices": [
+        "user.service",
+        "gamification.service"
+      ],
+      "dbModels": [
+        "User",
+        "Profile",
+        "UserStats",
+        "LearningActivity",
+        "PointHistory",
+        "MarketOrder",
+        "UserBadge"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/classes",
+      "component": "src/app/(student)/classes/page.tsx",
+      "apiEndpoints": [
+        "/courses"
+      ],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/classes/[classId]",
+      "component": "src/app/(student)/classes/[classId]/page.tsx",
+      "apiEndpoints": [
+        "/classes/${classId}",
+        "/courses",
+        "/courses/assignments/${selectedAssignment.id}/submit",
+        "/upload/file",
+        "/uploads/"
+      ],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/courses",
+      "component": "src/app/(public)/courses/page.tsx",
+      "apiEndpoints": [
+        "/classes",
+        "/courses",
+        "/courses/${course.id}",
+        "/courses/${courseId}/activities/${activityId}/access",
+        "/courses/${courseId}/learning",
+        "/courses/${courseId}/learning/lessons/${lessonId}",
+        "/courses/${courseId}/learning/lessons/${lessonId}/exercises/${exerciseId}/submit",
+        "/courses/${courseId}/lessons/${lessonId}",
+        "/courses/${courseId}/my-enrollments",
+        "/courses/${id}",
+        "/courses/${id}/progress",
+        "/courses/${id}/start",
+        "/courses/classes/${classId}",
+        "/courses/classes/${classId}/enroll",
+        "/public/courses",
+        "/public/courses/${id}"
+      ],
+      "apiServices": [
+        "course.service"
+      ],
+      "dbModels": [
+        "Course",
+        "CourseLesson",
+        "CourseLessonExercise",
+        "CourseLessonAttempt"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "COURSE_LIBRARY_ACCESS (Pro) to open V5 learner content; metadata remains visible",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/courses/[id]",
+      "component": "src/app/(public)/courses/[id]/page.tsx",
+      "apiEndpoints": [
+        "/classes",
+        "/courses",
+        "/courses/${courseId}/activities/${activityId}/access",
+        "/courses/${courseId}/learning",
+        "/courses/${courseId}/learning/lessons/${lessonId}",
+        "/courses/${courseId}/learning/lessons/${lessonId}/exercises/${exerciseId}/submit",
+        "/courses/${courseId}/lessons/${lessonId}",
+        "/courses/${courseId}/my-enrollments",
+        "/courses/${id}",
+        "/courses/${id}/progress",
+        "/courses/${id}/start",
+        "/courses/classes/${classId}",
+        "/courses/classes/${classId}/enroll",
+        "/my-courses/${id}",
+        "/plans?highlight=pro",
+        "/public/courses",
+        "/public/courses/${id}"
+      ],
+      "apiServices": [
+        "course.service"
+      ],
+      "dbModels": [
+        "Course",
+        "CourseLesson",
+        "CourseLessonExercise",
+        "CourseLessonAttempt"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "COURSE_LIBRARY_ACCESS (Pro) to open V5 learner content; metadata remains visible",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/dashboard",
+      "component": "src/app/(student)/dashboard/page.tsx",
+      "apiEndpoints": [
+        "/exams",
+        "/flashcard",
+        "/gamification/arena/snippet",
+        "/gamification/badges/me",
+        "/gamification/dashboard/today",
+        "/gamification/leaderboard",
+        "/gamification/pet",
+        "/gamification/pet/change-type",
+        "/gamification/pet/feed",
+        "/gamification/quests",
+        "/hub?tab=account-plan",
+        "/hub?tab=account-profile",
+        "/listening",
+        "/payments/payos/${intentId}/sync",
+        "/plan-purchases",
+        "/plan-purchases/${id}",
+        "/plan-purchases/${id}/replace-payment",
+        "/plan-purchases/${id}/report-transfer",
+        "/plan-purchases/me",
+        "/plans",
+        "/plans/catalog",
+        "/reading",
+        "/speaking",
+        "/subscriptions/me",
+        "/users/me/daily-practice",
+        "/users/me/skill-progress",
+        "/users/profile",
+        "/users/shipping-profile",
+        "/users/skills-summary",
+        "/users/stats",
+        "/writing"
+      ],
+      "apiServices": [
+        "gamification.service",
+        "user.service",
+        "plan.service"
+      ],
+      "dbModels": [
+        "UserStats",
+        "PointHistory",
+        "MarketOrder",
+        "UserBadge",
+        "User",
+        "Profile",
+        "LearningActivity",
+        "Plan",
+        "PlanVersion",
+        "PlanEntitlement",
+        "Subscription",
+        "PlanPurchase"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/diagnostic",
+      "component": "src/app/(student)/diagnostic/page.tsx",
+      "apiEndpoints": [
+        "/dashboard",
+        "/diagnostic/${assessmentId}/attempts",
+        "/diagnostic/${assessmentId}/attempts/${attemptId}/speaking/${questionId}/confirm",
+        "/diagnostic/${assessmentId}/attempts/${attemptId}/speaking/${questionId}/skip",
+        "/diagnostic/${assessmentId}/attempts/${attemptId}/writing/${questionId}/retry",
+        "/diagnostic/${assessmentId}/attempts/start",
+        "/diagnostic/current",
+        "/diagnostic/results/latest",
+        "/hub?tab=diagnostic-result"
+      ],
+      "apiServices": [
+        "diagnostic.service"
+      ],
+      "dbModels": [
+        "DiagnosticAssessment",
+        "DiagnosticAttempt",
+        "DiagnosticQuestion"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/exams",
+      "component": "src/app/(student)/exams/page.tsx",
+      "apiEndpoints": [
+        "/dashboard",
+        "/exams",
+        "/exams/${id}",
+        "/exams/${quiz.id}",
+        "/login",
+        "/register"
+      ],
+      "apiServices": [
+        "exam.service"
+      ],
+      "dbModels": [
+        "GenericExam",
+        "ExamQuestion",
+        "ExamAttempt"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/exams/[id]",
+      "component": "src/app/(student)/exams/[id]/page.tsx",
+      "apiEndpoints": [
+        "/exams",
+        "/exams/${id}",
+        "/toeic/${data.runtimeId}",
+        "/toeic/assessments/${data.assessment.id}"
+      ],
+      "apiServices": [
+        "exam.service"
+      ],
+      "dbModels": [
+        "GenericExam",
+        "ExamQuestion",
+        "ExamAttempt"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/exams/submissions/[id]",
+      "component": "src/app/(student)/exams/submissions/[id]/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/flashcard",
+      "component": "src/app/(student)/flashcard/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/flashcard/[id]",
+      "component": "src/app/(student)/flashcard/[id]/page.tsx",
+      "apiEndpoints": [
+        "/flashcard",
+        "/flashcard/${topicId}",
+        "/payments/payos/${intentId}/sync",
+        "/plan-purchases",
+        "/plan-purchases/${id}",
+        "/plan-purchases/${id}/replace-payment",
+        "/plan-purchases/${id}/report-transfer",
+        "/plan-purchases/me",
+        "/plans/catalog",
+        "/plans?highlight=plus",
+        "/subscriptions/me",
+        "/vocab/lookup",
+        "/vocab/lookup/details",
+        "/vocab/saved",
+        "/vocab/saved/${id}",
+        "/vocab/topics",
+        "/vocab/topics/${id}",
+        "/vocab/words/${id}/master",
+        "/vocab/words/${id}/review",
+        "/vocab/words/${id}/star"
+      ],
+      "apiServices": [
+        "vocab.service",
+        "plan.service"
+      ],
+      "dbModels": [
+        "VocabTopic",
+        "VocabWord",
+        "UserVocabWordProgress",
+        "Plan",
+        "PlanVersion",
+        "PlanEntitlement",
+        "Subscription",
+        "PlanPurchase"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "PREMIUM_VOCAB only for premium topics",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/grammar",
+      "component": "src/app/(student)/grammar/page.tsx",
+      "apiEndpoints": [
+        "/reading?category=grammar"
+      ],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/hub",
+      "component": "src/app/(student)/hub/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/learn",
+      "component": "src/app/(student)/learn/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/listening",
+      "component": "src/app/(student)/listening/page.tsx",
+      "apiEndpoints": [
+        "/listening",
+        "/listening/${authGate.quiz.id}",
+        "/listening/${launchingQuiz.id}",
+        "/login",
+        "/quizzes/${id}",
+        "/quizzes/${id}/submit",
+        "/quizzes/${quizId}/listening-attempts",
+        "/quizzes/${quizId}/listening-attempts/${attemptId}",
+        "/quizzes/${quizId}/listening-attempts/${attemptId}/cancel",
+        "/quizzes/${quizId}/questions/${questionId}/check",
+        "/quizzes/${quizId}/transcript",
+        "/quizzes/${quizId}/transcript/audio${query}",
+        "/quizzes/${quizId}/transcript/reveal",
+        "/quizzes/listening-practice",
+        "/quizzes/submissions/${submissionId}/analytics",
+        "/quizzes/toeic-papers",
+        "/register"
+      ],
+      "apiServices": [
+        "quiz.service"
+      ],
+      "dbModels": [
+        "Quiz",
+        "Question",
+        "QuizAttempt",
+        "QuizAudioAsset"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "PREMIUM_LISTENING / PREMIUM_READING by item",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/listening/[id]",
+      "component": "src/app/(student)/listening/[id]/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/listening/submissions/[id]",
+      "component": "src/app/(student)/listening/submissions/[id]/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/market",
+      "component": "src/app/(student)/market/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/messages",
+      "component": "src/app/(student)/messages/page.tsx",
+      "apiEndpoints": [
+        "/admin/support/conversations",
+        "/admin/support/conversations/${conversationId}",
+        "/admin/support/conversations/${conversationId}/messages",
+        "/admin/support/conversations/${conversationId}/mode",
+        "/admin/support/conversations/start/${studentId}",
+        "/admin/support/learners",
+        "/admin/support/unread-count",
+        "/support/conversations/${conversationId}/ai-messages",
+        "/support/conversations/${conversationId}/messages",
+        "/support/conversations/${conversationId}/mode",
+        "/support/conversations/me",
+        "/support/unread-count"
+      ],
+      "apiServices": [
+        "support.service"
+      ],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/my-courses",
+      "component": "src/app/(student)/my-courses/page.tsx",
+      "apiEndpoints": [
+        "/courses"
+      ],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/my-courses/[courseId]",
+      "component": "src/app/(student)/my-courses/[courseId]/page.tsx",
+      "apiEndpoints": [
+        "/classes",
+        "/courses",
+        "/courses/${courseId}/activities/${activityId}/access",
+        "/courses/${courseId}/learning",
+        "/courses/${courseId}/learning/lessons/${lessonId}",
+        "/courses/${courseId}/learning/lessons/${lessonId}/exercises/${exerciseId}/submit",
+        "/courses/${courseId}/lessons/${lessonId}",
+        "/courses/${courseId}/my-enrollments",
+        "/courses/${id}",
+        "/courses/${id}/progress",
+        "/courses/${id}/start",
+        "/courses/classes/${classId}",
+        "/courses/classes/${classId}/enroll",
+        "/public/courses",
+        "/public/courses/${id}"
+      ],
+      "apiServices": [
+        "course.service"
+      ],
+      "dbModels": [
+        "Course",
+        "CourseLesson",
+        "CourseLessonExercise",
+        "CourseLessonAttempt"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "COURSE_LIBRARY_ACCESS (Pro) to open V5 learner content; metadata remains visible",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/my-courses/[courseId]/lessons/[lessonId]",
+      "component": "src/app/(student)/my-courses/[courseId]/lessons/[lessonId]/page.tsx",
+      "apiEndpoints": [
+        "/classes",
+        "/courses",
+        "/courses/${courseId}/activities/${activityId}/access",
+        "/courses/${courseId}/learning",
+        "/courses/${courseId}/learning/lessons/${lessonId}",
+        "/courses/${courseId}/learning/lessons/${lessonId}/exercises/${exerciseId}/submit",
+        "/courses/${courseId}/lessons/${lessonId}",
+        "/courses/${courseId}/my-enrollments",
+        "/courses/${id}",
+        "/courses/${id}/progress",
+        "/courses/${id}/start",
+        "/courses/classes/${classId}",
+        "/courses/classes/${classId}/enroll",
+        "/my-courses/${courseId}",
+        "/public/courses",
+        "/public/courses/${id}"
+      ],
+      "apiServices": [
+        "course.service"
+      ],
+      "dbModels": [
+        "Course",
+        "CourseLesson",
+        "CourseLessonExercise",
+        "CourseLessonAttempt"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "COURSE_LIBRARY_ACCESS (Pro) to open V5 learner content; metadata remains visible",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/notifications",
+      "component": "src/app/(student)/notifications/page.tsx",
+      "apiEndpoints": [
+        "/notifications/inbox",
+        "/notifications/inbox/${id}",
+        "/notifications/inbox/${id}/read",
+        "/notifications/inbox/read-all",
+        "/notifications/inbox/unread-count"
+      ],
+      "apiServices": [
+        "notification.service"
+      ],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/pet",
+      "component": "src/app/(student)/pet/page.tsx",
+      "apiEndpoints": [
+        "/dashboard",
+        "/gamification/arena/snippet",
+        "/gamification/badges/me",
+        "/gamification/dashboard/today",
+        "/gamification/leaderboard",
+        "/gamification/pet",
+        "/gamification/pet/change-type",
+        "/gamification/pet/feed",
+        "/gamification/quests",
+        "/market",
+        "/market/currency/balance"
+      ],
+      "apiServices": [
+        "gamification.service"
+      ],
+      "dbModels": [
+        "UserStats",
+        "PointHistory",
+        "MarketOrder",
+        "UserBadge"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/plans",
+      "component": "src/app/(student)/plans/page.tsx",
+      "apiEndpoints": [
+        "/payments/payos/${intentId}/sync",
+        "/plan-purchases",
+        "/plan-purchases/${id}",
+        "/plan-purchases/${id}/replace-payment",
+        "/plan-purchases/${id}/report-transfer",
+        "/plan-purchases/me",
+        "/plans/catalog",
+        "/subscriptions/me"
+      ],
+      "apiServices": [
+        "plan.service"
+      ],
+      "dbModels": [
+        "Plan",
+        "PlanVersion",
+        "PlanEntitlement",
+        "Subscription",
+        "PlanPurchase"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "Public catalog; purchase requires authenticated learner",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/reading",
+      "component": "src/app/(student)/reading/page.tsx",
+      "apiEndpoints": [
+        "/grammar/topics",
+        "/grammar/topics/${id}",
+        "/grammar/topics/${id}/attempt",
+        "/login",
+        "/reading",
+        "/reading/${authGate.quizId}",
+        "/reading/exercises",
+        "/reading/quizzes/${quizId}/theory",
+        "/reading/tracking",
+        "/reading?${qs}",
+        "/reading?${queryString}",
+        "/register"
+      ],
+      "apiServices": [
+        "reading.service",
+        "grammar.service"
+      ],
+      "dbModels": [
+        "GrammarTopic",
+        "GrammarAttempt"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/reading/[id]",
+      "component": "src/app/(student)/reading/[id]/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/reading/mistakes",
+      "component": "src/app/(student)/reading/mistakes/page.tsx",
+      "apiEndpoints": [
+        "/hub?tab=learning-progress",
+        "/reading/${mistake.quizId}",
+        "/reading/exercises",
+        "/reading/quizzes/${quizId}/theory",
+        "/reading/tracking"
+      ],
+      "apiServices": [
+        "reading.service"
+      ],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/reading/submissions/[id]",
+      "component": "src/app/(student)/reading/submissions/[id]/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/speaking",
+      "component": "src/app/(student)/speaking/page.tsx",
+      "apiEndpoints": [
+        "/login",
+        "/register",
+        "/speaking",
+        "/speaking/${launchingExerciseId}${query}",
+        "/speaking/capabilities",
+        "/speaking/exercises",
+        "/speaking/exercises/${exerciseId}/upload-intents",
+        "/speaking/exercises/${id}",
+        "/speaking/exercises/${id}/submit",
+        "/speaking/submissions/${submissionId}",
+        "/speaking/submissions/${submissionId}/audio",
+        "/speaking/submissions/my",
+        "/speaking/tts",
+        "/speaking/upload-intents/${uploadIntentId}/finalize",
+        "/users/me/daily-practice",
+        "/users/me/skill-progress",
+        "/users/profile",
+        "/users/shipping-profile",
+        "/users/skills-summary",
+        "/users/stats"
+      ],
+      "apiServices": [
+        "speaking.service",
+        "user.service"
+      ],
+      "dbModels": [
+        "SpeakingPracticeSet",
+        "SpeakingExercise",
+        "SpeakingSubmission",
+        "User",
+        "Profile",
+        "UserStats",
+        "LearningActivity"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT only for premium exercises",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/speaking/[id]",
+      "component": "src/app/(student)/speaking/[id]/page.tsx",
+      "apiEndpoints": [
+        "/plans?highlight=plus",
+        "/speaking",
+        "/speaking/${nextId}${query}",
+        "/speaking/capabilities",
+        "/speaking/exercises",
+        "/speaking/exercises/${exerciseId}/upload-intents",
+        "/speaking/exercises/${id}",
+        "/speaking/exercises/${id}/submit",
+        "/speaking/submissions/${submissionId}",
+        "/speaking/submissions/${submissionId}/audio",
+        "/speaking/submissions/my",
+        "/speaking/tts",
+        "/speaking/upload-intents/${uploadIntentId}/finalize",
+        "/toeic/assessments/attempts/${parentAttemptId}/components/${parentComponentId}/complete",
+        "/worklets/breadtrans-recorder-processor.js"
+      ],
+      "apiServices": [
+        "speaking.service"
+      ],
+      "dbModels": [
+        "SpeakingPracticeSet",
+        "SpeakingExercise",
+        "SpeakingSubmission"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT only for premium exercises",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/student-home",
+      "component": "src/app/(student)/student-home/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/toeic/[examId]",
+      "component": "src/app/(student)/toeic/[examId]/page.tsx",
+      "apiEndpoints": [
+        "/login",
+        "/register",
+        "/toeic/${examId}",
+        "/toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "/toeic/assessments/history",
+        "/toeic/attempts/${attemptId}",
+        "/toeic/attempts/${attemptId}/answers",
+        "/toeic/attempts/${attemptId}/begin",
+        "/toeic/attempts/${attemptId}/cancel",
+        "/toeic/attempts/${attemptId}/integrity-events",
+        "/toeic/attempts/${attemptId}/listening/advance",
+        "/toeic/attempts/${attemptId}/remaining-time",
+        "/toeic/attempts/${attemptId}/result",
+        "/toeic/attempts/${attemptId}/review",
+        "/toeic/attempts/${attemptId}/submit",
+        "/toeic/bundles/${quizId}",
+        "/toeic/exams/${examId}",
+        "/toeic/exams/${examId}/attempts",
+        "/toeic/exams/${examId}/briefing",
+        "/toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "/toeic/history"
+      ],
+      "apiServices": [
+        "toeic.service"
+      ],
+      "dbModels": [
+        "ToeicExam",
+        "ToeicAttempt",
+        "ToeicAssessment",
+        "ToeicAssessmentAttempt"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/toeic/assessments",
+      "component": "src/app/(student)/toeic/assessments/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/toeic/assessments/[id]",
+      "component": "src/app/(student)/toeic/assessments/[id]/page.tsx",
+      "apiEndpoints": [
+        "/toeic/assessments",
+        "/toeic/assessments/${id}",
+        "/toeic/assessments/${id}/attempts",
+        "/toeic/assessments/${id}/attempts/${attempt.id}"
+      ],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/toeic/assessments/[id]/attempts/[attemptId]",
+      "component": "src/app/(student)/toeic/assessments/[id]/attempts/[attemptId]/page.tsx",
+      "apiEndpoints": [
+        "/toeic/assessments/${id}",
+        "/toeic/assessments/attempts/${attemptId}",
+        "/toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "/toeic/assessments/attempts/${attemptId}/components/${componentId}/start",
+        "/toeic/assessments/history",
+        "/toeic/attempts/${attemptId}",
+        "/toeic/attempts/${attemptId}/answers",
+        "/toeic/attempts/${attemptId}/begin",
+        "/toeic/attempts/${attemptId}/cancel",
+        "/toeic/attempts/${attemptId}/integrity-events",
+        "/toeic/attempts/${attemptId}/listening/advance",
+        "/toeic/attempts/${attemptId}/remaining-time",
+        "/toeic/attempts/${attemptId}/result",
+        "/toeic/attempts/${attemptId}/review",
+        "/toeic/attempts/${attemptId}/submit",
+        "/toeic/attempts/${component.childAttemptId}?parentAssessmentId=${id}&parentAttemptId=${attemptId}&parentComponentId=${componentId}",
+        "/toeic/bundles/${quizId}",
+        "/toeic/exams/${examId}",
+        "/toeic/exams/${examId}/attempts",
+        "/toeic/exams/${examId}/briefing",
+        "/toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "/toeic/history",
+        "/writing/${component.writingQuizIds[0]}?parentAssessmentId=${id}&parentAttemptId=${attemptId}&parentComponentId=${componentId}",
+        "/writing/${quizId}?parentAssessmentId=${id}&parentAttemptId=${attemptId}&parentComponentId=${component.assessmentComponentId}"
+      ],
+      "apiServices": [
+        "toeic.service"
+      ],
+      "dbModels": [
+        "ToeicExam",
+        "ToeicAttempt",
+        "ToeicAssessment",
+        "ToeicAssessmentAttempt"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/toeic/attempts/[attemptId]",
+      "component": "src/app/(student)/toeic/attempts/[attemptId]/page.tsx",
+      "apiEndpoints": [
+        "/exams",
+        "/toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "/toeic/assessments/history",
+        "/toeic/attempts/${attemptId}",
+        "/toeic/attempts/${attemptId}/answers",
+        "/toeic/attempts/${attemptId}/begin",
+        "/toeic/attempts/${attemptId}/cancel",
+        "/toeic/attempts/${attemptId}/integrity-events",
+        "/toeic/attempts/${attemptId}/listening/advance",
+        "/toeic/attempts/${attemptId}/remaining-time",
+        "/toeic/attempts/${attemptId}/result",
+        "/toeic/attempts/${attemptId}/review",
+        "/toeic/attempts/${attemptId}/submit",
+        "/toeic/bundles/${quizId}",
+        "/toeic/exams/${examId}",
+        "/toeic/exams/${examId}/attempts",
+        "/toeic/exams/${examId}/briefing",
+        "/toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "/toeic/history"
+      ],
+      "apiServices": [
+        "toeic.service"
+      ],
+      "dbModels": [
+        "ToeicExam",
+        "ToeicAttempt",
+        "ToeicAssessment",
+        "ToeicAssessmentAttempt"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/toeic/bundle/[quizId]",
+      "component": "src/app/(student)/toeic/bundle/[quizId]/page.tsx",
+      "apiEndpoints": [
+        "/login",
+        "/register",
+        "/speaking",
+        "/toeic/${bundle.listeningReading.id}",
+        "/toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "/toeic/assessments/history",
+        "/toeic/attempts/${attemptId}",
+        "/toeic/attempts/${attemptId}/answers",
+        "/toeic/attempts/${attemptId}/begin",
+        "/toeic/attempts/${attemptId}/cancel",
+        "/toeic/attempts/${attemptId}/integrity-events",
+        "/toeic/attempts/${attemptId}/listening/advance",
+        "/toeic/attempts/${attemptId}/remaining-time",
+        "/toeic/attempts/${attemptId}/result",
+        "/toeic/attempts/${attemptId}/review",
+        "/toeic/attempts/${attemptId}/submit",
+        "/toeic/bundle/${quizId}",
+        "/toeic/bundles/${quizId}",
+        "/toeic/exams/${examId}",
+        "/toeic/exams/${examId}/attempts",
+        "/toeic/exams/${examId}/briefing",
+        "/toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "/toeic/history",
+        "/writing"
+      ],
+      "apiServices": [
+        "toeic.service"
+      ],
+      "dbModels": [
+        "ToeicExam",
+        "ToeicAttempt",
+        "ToeicAssessment",
+        "ToeicAssessmentAttempt"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/toeic/history",
+      "component": "src/app/(student)/toeic/history/page.tsx",
+      "apiEndpoints": [
+        "/toeic/assessments/${item.assessment.id}/attempts/${item.id}",
+        "/toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "/toeic/assessments/history",
+        "/toeic/attempts/${attemptId}",
+        "/toeic/attempts/${attemptId}/answers",
+        "/toeic/attempts/${attemptId}/begin",
+        "/toeic/attempts/${attemptId}/cancel",
+        "/toeic/attempts/${attemptId}/integrity-events",
+        "/toeic/attempts/${attemptId}/listening/advance",
+        "/toeic/attempts/${attemptId}/remaining-time",
+        "/toeic/attempts/${attemptId}/result",
+        "/toeic/attempts/${attemptId}/review",
+        "/toeic/attempts/${attemptId}/submit",
+        "/toeic/attempts/${item.id}",
+        "/toeic/bundles/${quizId}",
+        "/toeic/exams/${examId}",
+        "/toeic/exams/${examId}/attempts",
+        "/toeic/exams/${examId}/briefing",
+        "/toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "/toeic/history",
+        "/toeic/results/${item.id}"
+      ],
+      "apiServices": [
+        "toeic.service"
+      ],
+      "dbModels": [
+        "ToeicExam",
+        "ToeicAttempt",
+        "ToeicAssessment",
+        "ToeicAssessmentAttempt"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/toeic/results/[attemptId]",
+      "component": "src/app/(student)/toeic/results/[attemptId]/page.tsx",
+      "apiEndpoints": [
+        "/exams",
+        "/toeic/assessments/${parentAssessmentId}/attempts/${parentAttemptId}",
+        "/toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "/toeic/assessments/history",
+        "/toeic/attempts/${attemptId}",
+        "/toeic/attempts/${attemptId}/answers",
+        "/toeic/attempts/${attemptId}/begin",
+        "/toeic/attempts/${attemptId}/cancel",
+        "/toeic/attempts/${attemptId}/integrity-events",
+        "/toeic/attempts/${attemptId}/listening/advance",
+        "/toeic/attempts/${attemptId}/remaining-time",
+        "/toeic/attempts/${attemptId}/result",
+        "/toeic/attempts/${attemptId}/review",
+        "/toeic/attempts/${attemptId}/submit",
+        "/toeic/bundles/${quizId}",
+        "/toeic/exams/${examId}",
+        "/toeic/exams/${examId}/attempts",
+        "/toeic/exams/${examId}/briefing",
+        "/toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "/toeic/history",
+        "/toeic/review/${attemptId}"
+      ],
+      "apiServices": [
+        "toeic.service"
+      ],
+      "dbModels": [
+        "ToeicExam",
+        "ToeicAttempt",
+        "ToeicAssessment",
+        "ToeicAssessmentAttempt"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/toeic/review/[attemptId]",
+      "component": "src/app/(student)/toeic/review/[attemptId]/page.tsx",
+      "apiEndpoints": [
+        "/toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "/toeic/assessments/history",
+        "/toeic/attempts/${attemptId}",
+        "/toeic/attempts/${attemptId}/answers",
+        "/toeic/attempts/${attemptId}/begin",
+        "/toeic/attempts/${attemptId}/cancel",
+        "/toeic/attempts/${attemptId}/integrity-events",
+        "/toeic/attempts/${attemptId}/listening/advance",
+        "/toeic/attempts/${attemptId}/remaining-time",
+        "/toeic/attempts/${attemptId}/result",
+        "/toeic/attempts/${attemptId}/review",
+        "/toeic/attempts/${attemptId}/submit",
+        "/toeic/bundles/${quizId}",
+        "/toeic/exams/${examId}",
+        "/toeic/exams/${examId}/attempts",
+        "/toeic/exams/${examId}/briefing",
+        "/toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "/toeic/history",
+        "/toeic/results/${attemptId}"
+      ],
+      "apiServices": [
+        "toeic.service"
+      ],
+      "dbModels": [
+        "ToeicExam",
+        "ToeicAttempt",
+        "ToeicAssessment",
+        "ToeicAssessmentAttempt"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/vocabulary/saved",
+      "component": "src/app/(student)/vocabulary/saved/page.tsx",
+      "apiEndpoints": [
+        "/flashcard",
+        "/vocab/lookup",
+        "/vocab/lookup/details",
+        "/vocab/saved",
+        "/vocab/saved/${id}",
+        "/vocab/topics",
+        "/vocab/topics/${id}",
+        "/vocab/words/${id}/master",
+        "/vocab/words/${id}/review",
+        "/vocab/words/${id}/star"
+      ],
+      "apiServices": [
+        "vocab.service"
+      ],
+      "dbModels": [
+        "VocabTopic",
+        "VocabWord",
+        "UserVocabWordProgress"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "PREMIUM_VOCAB only for premium topics",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/vocabulary/study",
+      "component": "src/app/(student)/vocabulary/study/page.tsx",
+      "apiEndpoints": [
+        "/flashcard",
+        "/payments/payos/${intentId}/sync",
+        "/plan-purchases",
+        "/plan-purchases/${id}",
+        "/plan-purchases/${id}/replace-payment",
+        "/plan-purchases/${id}/report-transfer",
+        "/plan-purchases/me",
+        "/plans/catalog",
+        "/plans?highlight=plus",
+        "/subscriptions/me",
+        "/vocab/lookup",
+        "/vocab/lookup/details",
+        "/vocab/saved",
+        "/vocab/saved/${id}",
+        "/vocab/topics",
+        "/vocab/topics/${id}",
+        "/vocab/words/${id}/master",
+        "/vocab/words/${id}/review",
+        "/vocab/words/${id}/star"
+      ],
+      "apiServices": [
+        "vocab.service",
+        "plan.service"
+      ],
+      "dbModels": [
+        "VocabTopic",
+        "VocabWord",
+        "UserVocabWordProgress",
+        "Plan",
+        "PlanVersion",
+        "PlanEntitlement",
+        "Subscription",
+        "PlanPurchase"
+      ],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "PREMIUM_VOCAB only for premium topics",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/writing",
+      "component": "src/app/(student)/writing/page.tsx",
+      "apiEndpoints": [
+        "/login",
+        "/register",
+        "/users/me/daily-practice",
+        "/users/me/skill-progress",
+        "/users/profile",
+        "/users/shipping-profile",
+        "/users/skills-summary",
+        "/users/stats",
+        "/writing",
+        "/writing/${authGate.topicId}",
+        "/writing/${launchingTopicId}",
+        "/writing/part2/submit",
+        "/writing/part3/submit",
+        "/writing/quizzes/${id}",
+        "/writing/quizzes/${id}/submit",
+        "/writing/submissions/${activity.sourceId}",
+        "/writing/topics"
+      ],
+      "apiServices": [
+        "writing.service",
+        "user.service"
+      ],
+      "dbModels": [
+        "Quiz",
+        "Question",
+        "WritingSubmission",
+        "User",
+        "Profile",
+        "UserStats",
+        "LearningActivity"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "PREMIUM_WRITING_CONTENT only for premium topics",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/writing/[id]",
+      "component": "src/app/(student)/writing/[id]/page.tsx",
+      "apiEndpoints": [
+        "/plans?highlight=plus",
+        "/toeic/assessments/attempts/${parentAttemptId}/components/${parentComponentId}/complete",
+        "/writing",
+        "/writing/part2/submit",
+        "/writing/part3/submit",
+        "/writing/quizzes/${id}",
+        "/writing/quizzes/${id}/submit",
+        "/writing/submissions/${result.submissionId}",
+        "/writing/topics"
+      ],
+      "apiServices": [
+        "writing.service"
+      ],
+      "dbModels": [
+        "Quiz",
+        "Question",
+        "WritingSubmission"
+      ],
+      "r2MediaDependency": "R2-backed media where authored content requires audio/image; verify URL at runtime",
+      "requiredEntitlement": "PREMIUM_WRITING_CONTENT only for premium topics",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    },
+    {
+      "route": "/writing/submissions/[id]",
+      "component": "src/app/(student)/writing/submissions/[id]/page.tsx",
+      "apiEndpoints": [],
+      "apiServices": [],
+      "dbModels": [],
+      "r2MediaDependency": "No mandatory R2 media inferred from this route component",
+      "requiredEntitlement": "Authenticated learner where endpoint requires it",
+      "expectedLearnerVisibleData": "Route component data derived from its imported API services; empty or null primary lists require runtime review."
+    }
+  ]
+}

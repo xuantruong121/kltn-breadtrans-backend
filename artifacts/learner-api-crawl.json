@@ -1,0 +1,1089 @@
+{
+  "generatedAt": "2026-10-23T14:21:44.306Z",
+  "staticReadEndpointCount": 60,
+  "requestCount": 180,
+  "serverErrorCount": 0,
+  "results": [
+    {
+      "tier": "FREE",
+      "path": "/courses",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/courses/my-courses",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/diagnostic/current",
+      "status": 200,
+      "shape": "object:canonicalBlueprint,description,hasCompleted,id,inProgressAttempt,latestAttempt,questions,title"
+    },
+    {
+      "tier": "FREE",
+      "path": "/diagnostic/results/latest",
+      "status": 200,
+      "shape": "null"
+    },
+    {
+      "tier": "FREE",
+      "path": "/exams",
+      "status": 200,
+      "shape": "array:3"
+    },
+    {
+      "tier": "FREE",
+      "path": "/exams/templates",
+      "status": 200,
+      "shape": "array:5"
+    },
+    {
+      "tier": "FREE",
+      "path": "/gamification/arena/snippet",
+      "status": 200,
+      "shape": "object:message,rank,tier"
+    },
+    {
+      "tier": "FREE",
+      "path": "/gamification/badges/me",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/gamification/dashboard/today",
+      "status": 200,
+      "shape": "object:activities,dateKey,quests,summary,timezone"
+    },
+    {
+      "tier": "FREE",
+      "path": "/gamification/leaderboard",
+      "status": 200,
+      "shape": "object:currentUserRank,entries,scope,tier"
+    },
+    {
+      "tier": "FREE",
+      "path": "/gamification/pet",
+      "status": 200,
+      "shape": "object:canFeed,createdAt,dailyFeedCount,dailyRewardLimit,dailyRewardedFeedCount,exp,feedCost,feedExpReward,happiness,health,id,lastFedAt,level,name,nextFeedAt,roster,satiety,satietyState,stateUpdatedAt,updatedAt,userId"
+    },
+    {
+      "tier": "FREE",
+      "path": "/gamification/quests",
+      "status": 200,
+      "shape": "array:4"
+    },
+    {
+      "tier": "FREE",
+      "path": "/grammar/my-attempts",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/grammar/topics",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/admin/products",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/currency/balance",
+      "status": 200,
+      "shape": "object:streakCount,streakFreezes,tier,totalBanh,totalPoints,weeklyExp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/currency/history",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/inventory",
+      "status": 200,
+      "shape": "object:orders,ownedItemNames,ownedProductIds,ownedSlugs"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/ledger",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/ledger/summary",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/orders",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/orders/mine",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/orders/my",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/products",
+      "status": 200,
+      "shape": "array:12"
+    },
+    {
+      "tier": "FREE",
+      "path": "/market/reconciliation",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/notifications/inbox",
+      "status": 200,
+      "shape": "object:items,nextCursor"
+    },
+    {
+      "tier": "FREE",
+      "path": "/notifications/inbox/unread-count",
+      "status": 200,
+      "shape": "object:count"
+    },
+    {
+      "tier": "FREE",
+      "path": "/notifications/public-key",
+      "status": 200,
+      "shape": "object:publicKey"
+    },
+    {
+      "tier": "FREE",
+      "path": "/plans/catalog",
+      "status": 200,
+      "shape": "object:plans"
+    },
+    {
+      "tier": "FREE",
+      "path": "/public/courses",
+      "status": 200,
+      "shape": "array:3"
+    },
+    {
+      "tier": "FREE",
+      "path": "/quizzes",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/quizzes/listening-practice",
+      "status": 200,
+      "shape": "array:12"
+    },
+    {
+      "tier": "FREE",
+      "path": "/quizzes/toeic-papers",
+      "status": 200,
+      "shape": "array:3"
+    },
+    {
+      "tier": "FREE",
+      "path": "/reading/bilingual-progress",
+      "status": 200,
+      "shape": "object:accuracy,completedArticles,completedArticlesList,questionsAnswered,sentencesRead"
+    },
+    {
+      "tier": "FREE",
+      "path": "/reading/exercises",
+      "status": 200,
+      "shape": "array:6"
+    },
+    {
+      "tier": "FREE",
+      "path": "/reading/topics",
+      "status": 200,
+      "shape": "array:9"
+    },
+    {
+      "tier": "FREE",
+      "path": "/reading/tracking",
+      "status": 200,
+      "shape": "object:mistakes,progress,recentAttempts,recentTrend,recommendation,sampleSize,subskills"
+    },
+    {
+      "tier": "FREE",
+      "path": "/speaking/capabilities",
+      "status": 200,
+      "shape": "object:allowedContentTypes,maxDurationMs,maxSizeBytes,minDurationMs,uploadMode,uploadTtlSeconds"
+    },
+    {
+      "tier": "FREE",
+      "path": "/speaking/exercises",
+      "status": 200,
+      "shape": "array:30"
+    },
+    {
+      "tier": "FREE",
+      "path": "/speaking/my-submissions",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/speaking/submissions/my",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/subscriptions/me",
+      "status": 200,
+      "shape": "object:entitlements,isPaid,plan,planVersion,subscription"
+    },
+    {
+      "tier": "FREE",
+      "path": "/support/conversations/me",
+      "status": 200,
+      "shape": "object:createdAt,id,lastMessageAt,mode,status,student,studentId,unreadCount,updatedAt"
+    },
+    {
+      "tier": "FREE",
+      "path": "/support/unread-count",
+      "status": 200,
+      "shape": "object:count"
+    },
+    {
+      "tier": "FREE",
+      "path": "/toeic/assessments",
+      "status": 200,
+      "shape": "array:2"
+    },
+    {
+      "tier": "FREE",
+      "path": "/toeic/assessments/history",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/toeic/exams",
+      "status": 200,
+      "shape": "array:1"
+    },
+    {
+      "tier": "FREE",
+      "path": "/toeic/history",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/users/learning-history",
+      "status": 200,
+      "shape": "object:activities,summary"
+    },
+    {
+      "tier": "FREE",
+      "path": "/users/me/daily-practice",
+      "status": 200,
+      "shape": "object:completedCount,dateKey,estimatedMinutes,generatedAt,items,reasonSummary,targetActivities"
+    },
+    {
+      "tier": "FREE",
+      "path": "/users/me/skill-progress",
+      "status": 200,
+      "shape": "object:overall,skills"
+    },
+    {
+      "tier": "FREE",
+      "path": "/users/profile",
+      "status": 200,
+      "shape": "object:billing,createdAt,email,emailVerifiedAt,id,lastDeviceType,lastLoginAt,leaderboard,loginCount,mustChangePassword,pet,profile,role,sessionToken,shippingProfile,shippingProfileComplete,stats,updatedAt"
+    },
+    {
+      "tier": "FREE",
+      "path": "/users/shipping-profile",
+      "status": 200,
+      "shape": "object:addressLine,countryCode,formattedAddress,phone,phoneDisplay,provinceCode,provinceName,recipientName,shippingProfileComplete,wardCode,wardName"
+    },
+    {
+      "tier": "FREE",
+      "path": "/users/skills-summary",
+      "status": 200,
+      "shape": "object:overall,skills"
+    },
+    {
+      "tier": "FREE",
+      "path": "/users/stats",
+      "status": 200,
+      "shape": "object:hasCompletedPlacementTest,latestDiagnostic,masteredVocabCount,pet,quizAccuracy,speakingAccuracy,streakCount,streakFreezes,tier,totalBanhRan,totalPoints,totalQuizzesDone,totalToeicTestsDone,weeklyExp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/vocab/lookup",
+      "status": 400,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/vocab/lookup/details",
+      "status": 400,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "FREE",
+      "path": "/vocab/saved",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "FREE",
+      "path": "/vocab/topics",
+      "status": 200,
+      "shape": "object:categories,topics"
+    },
+    {
+      "tier": "FREE",
+      "path": "/writing/topics",
+      "status": 200,
+      "shape": "object:categories,quizzes"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/courses",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/courses/my-courses",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/diagnostic/current",
+      "status": 200,
+      "shape": "object:canonicalBlueprint,description,hasCompleted,id,inProgressAttempt,latestAttempt,questions,title"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/diagnostic/results/latest",
+      "status": 200,
+      "shape": "null"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/exams",
+      "status": 200,
+      "shape": "array:3"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/exams/templates",
+      "status": 200,
+      "shape": "array:5"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/gamification/arena/snippet",
+      "status": 200,
+      "shape": "object:message,rank,tier"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/gamification/badges/me",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/gamification/dashboard/today",
+      "status": 200,
+      "shape": "object:activities,dateKey,quests,summary,timezone"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/gamification/leaderboard",
+      "status": 200,
+      "shape": "object:currentUserRank,entries,scope,tier"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/gamification/pet",
+      "status": 200,
+      "shape": "object:canFeed,createdAt,dailyFeedCount,dailyRewardLimit,dailyRewardedFeedCount,exp,feedCost,feedExpReward,happiness,health,id,lastFedAt,level,name,nextFeedAt,roster,satiety,satietyState,stateUpdatedAt,updatedAt,userId"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/gamification/quests",
+      "status": 200,
+      "shape": "array:4"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/grammar/my-attempts",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/grammar/topics",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/admin/products",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/currency/balance",
+      "status": 200,
+      "shape": "object:streakCount,streakFreezes,tier,totalBanh,totalPoints,weeklyExp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/currency/history",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/inventory",
+      "status": 200,
+      "shape": "object:orders,ownedItemNames,ownedProductIds,ownedSlugs"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/ledger",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/ledger/summary",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/orders",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/orders/mine",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/orders/my",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/products",
+      "status": 200,
+      "shape": "array:12"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/market/reconciliation",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/notifications/inbox",
+      "status": 200,
+      "shape": "object:items,nextCursor"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/notifications/inbox/unread-count",
+      "status": 200,
+      "shape": "object:count"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/notifications/public-key",
+      "status": 200,
+      "shape": "object:publicKey"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/plans/catalog",
+      "status": 200,
+      "shape": "object:plans"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/public/courses",
+      "status": 200,
+      "shape": "array:3"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/quizzes",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/quizzes/listening-practice",
+      "status": 200,
+      "shape": "array:12"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/quizzes/toeic-papers",
+      "status": 200,
+      "shape": "array:3"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/reading/bilingual-progress",
+      "status": 200,
+      "shape": "object:accuracy,completedArticles,completedArticlesList,questionsAnswered,sentencesRead"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/reading/exercises",
+      "status": 200,
+      "shape": "array:6"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/reading/topics",
+      "status": 200,
+      "shape": "array:9"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/reading/tracking",
+      "status": 200,
+      "shape": "object:mistakes,progress,recentAttempts,recentTrend,recommendation,sampleSize,subskills"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/speaking/capabilities",
+      "status": 200,
+      "shape": "object:allowedContentTypes,maxDurationMs,maxSizeBytes,minDurationMs,uploadMode,uploadTtlSeconds"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/speaking/exercises",
+      "status": 200,
+      "shape": "array:30"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/speaking/my-submissions",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/speaking/submissions/my",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/subscriptions/me",
+      "status": 200,
+      "shape": "object:entitlements,isPaid,plan,planVersion,subscription"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/support/conversations/me",
+      "status": 200,
+      "shape": "object:createdAt,id,lastMessageAt,mode,status,student,studentId,unreadCount,updatedAt"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/support/unread-count",
+      "status": 200,
+      "shape": "object:count"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/toeic/assessments",
+      "status": 200,
+      "shape": "array:2"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/toeic/assessments/history",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/toeic/exams",
+      "status": 200,
+      "shape": "array:1"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/toeic/history",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/users/learning-history",
+      "status": 200,
+      "shape": "object:activities,summary"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/users/me/daily-practice",
+      "status": 200,
+      "shape": "object:completedCount,dateKey,estimatedMinutes,generatedAt,items,reasonSummary,targetActivities"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/users/me/skill-progress",
+      "status": 200,
+      "shape": "object:overall,skills"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/users/profile",
+      "status": 200,
+      "shape": "object:billing,createdAt,email,emailVerifiedAt,id,lastDeviceType,lastLoginAt,leaderboard,loginCount,mustChangePassword,pet,profile,role,sessionToken,shippingProfile,shippingProfileComplete,stats,updatedAt"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/users/shipping-profile",
+      "status": 200,
+      "shape": "object:addressLine,countryCode,formattedAddress,phone,phoneDisplay,provinceCode,provinceName,recipientName,shippingProfileComplete,wardCode,wardName"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/users/skills-summary",
+      "status": 200,
+      "shape": "object:overall,skills"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/users/stats",
+      "status": 200,
+      "shape": "object:hasCompletedPlacementTest,latestDiagnostic,masteredVocabCount,pet,quizAccuracy,speakingAccuracy,streakCount,streakFreezes,tier,totalBanhRan,totalPoints,totalQuizzesDone,totalToeicTestsDone,weeklyExp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/vocab/lookup",
+      "status": 400,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/vocab/lookup/details",
+      "status": 400,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/vocab/saved",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/vocab/topics",
+      "status": 200,
+      "shape": "object:categories,topics"
+    },
+    {
+      "tier": "PLUS",
+      "path": "/writing/topics",
+      "status": 200,
+      "shape": "object:categories,quizzes"
+    },
+    {
+      "tier": "PRO",
+      "path": "/courses",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/courses/my-courses",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/diagnostic/current",
+      "status": 200,
+      "shape": "object:canonicalBlueprint,description,hasCompleted,id,inProgressAttempt,latestAttempt,questions,title"
+    },
+    {
+      "tier": "PRO",
+      "path": "/diagnostic/results/latest",
+      "status": 200,
+      "shape": "null"
+    },
+    {
+      "tier": "PRO",
+      "path": "/exams",
+      "status": 200,
+      "shape": "array:3"
+    },
+    {
+      "tier": "PRO",
+      "path": "/exams/templates",
+      "status": 200,
+      "shape": "array:5"
+    },
+    {
+      "tier": "PRO",
+      "path": "/gamification/arena/snippet",
+      "status": 200,
+      "shape": "object:message,rank,tier"
+    },
+    {
+      "tier": "PRO",
+      "path": "/gamification/badges/me",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/gamification/dashboard/today",
+      "status": 200,
+      "shape": "object:activities,dateKey,quests,summary,timezone"
+    },
+    {
+      "tier": "PRO",
+      "path": "/gamification/leaderboard",
+      "status": 200,
+      "shape": "object:currentUserRank,entries,scope,tier"
+    },
+    {
+      "tier": "PRO",
+      "path": "/gamification/pet",
+      "status": 200,
+      "shape": "object:canFeed,createdAt,dailyFeedCount,dailyRewardLimit,dailyRewardedFeedCount,exp,feedCost,feedExpReward,happiness,health,id,lastFedAt,level,name,nextFeedAt,roster,satiety,satietyState,stateUpdatedAt,updatedAt,userId"
+    },
+    {
+      "tier": "PRO",
+      "path": "/gamification/quests",
+      "status": 200,
+      "shape": "array:4"
+    },
+    {
+      "tier": "PRO",
+      "path": "/grammar/my-attempts",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/grammar/topics",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/admin/products",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/currency/balance",
+      "status": 200,
+      "shape": "object:streakCount,streakFreezes,tier,totalBanh,totalPoints,weeklyExp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/currency/history",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/inventory",
+      "status": 200,
+      "shape": "object:orders,ownedItemNames,ownedProductIds,ownedSlugs"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/ledger",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/ledger/summary",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/orders",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/orders/mine",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/orders/my",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/products",
+      "status": 200,
+      "shape": "array:12"
+    },
+    {
+      "tier": "PRO",
+      "path": "/market/reconciliation",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/notifications/inbox",
+      "status": 200,
+      "shape": "object:items,nextCursor"
+    },
+    {
+      "tier": "PRO",
+      "path": "/notifications/inbox/unread-count",
+      "status": 200,
+      "shape": "object:count"
+    },
+    {
+      "tier": "PRO",
+      "path": "/notifications/public-key",
+      "status": 200,
+      "shape": "object:publicKey"
+    },
+    {
+      "tier": "PRO",
+      "path": "/plans/catalog",
+      "status": 200,
+      "shape": "object:plans"
+    },
+    {
+      "tier": "PRO",
+      "path": "/public/courses",
+      "status": 200,
+      "shape": "array:3"
+    },
+    {
+      "tier": "PRO",
+      "path": "/quizzes",
+      "status": 403,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/quizzes/listening-practice",
+      "status": 200,
+      "shape": "array:12"
+    },
+    {
+      "tier": "PRO",
+      "path": "/quizzes/toeic-papers",
+      "status": 200,
+      "shape": "array:3"
+    },
+    {
+      "tier": "PRO",
+      "path": "/reading/bilingual-progress",
+      "status": 200,
+      "shape": "object:accuracy,completedArticles,completedArticlesList,questionsAnswered,sentencesRead"
+    },
+    {
+      "tier": "PRO",
+      "path": "/reading/exercises",
+      "status": 200,
+      "shape": "array:6"
+    },
+    {
+      "tier": "PRO",
+      "path": "/reading/topics",
+      "status": 200,
+      "shape": "array:9"
+    },
+    {
+      "tier": "PRO",
+      "path": "/reading/tracking",
+      "status": 200,
+      "shape": "object:mistakes,progress,recentAttempts,recentTrend,recommendation,sampleSize,subskills"
+    },
+    {
+      "tier": "PRO",
+      "path": "/speaking/capabilities",
+      "status": 200,
+      "shape": "object:allowedContentTypes,maxDurationMs,maxSizeBytes,minDurationMs,uploadMode,uploadTtlSeconds"
+    },
+    {
+      "tier": "PRO",
+      "path": "/speaking/exercises",
+      "status": 200,
+      "shape": "array:30"
+    },
+    {
+      "tier": "PRO",
+      "path": "/speaking/my-submissions",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/speaking/submissions/my",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/subscriptions/me",
+      "status": 200,
+      "shape": "object:entitlements,isPaid,plan,planVersion,subscription"
+    },
+    {
+      "tier": "PRO",
+      "path": "/support/conversations/me",
+      "status": 200,
+      "shape": "object:createdAt,id,lastMessageAt,mode,status,student,studentId,unreadCount,updatedAt"
+    },
+    {
+      "tier": "PRO",
+      "path": "/support/unread-count",
+      "status": 200,
+      "shape": "object:count"
+    },
+    {
+      "tier": "PRO",
+      "path": "/toeic/assessments",
+      "status": 200,
+      "shape": "array:2"
+    },
+    {
+      "tier": "PRO",
+      "path": "/toeic/assessments/history",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/toeic/exams",
+      "status": 200,
+      "shape": "array:1"
+    },
+    {
+      "tier": "PRO",
+      "path": "/toeic/history",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/users/learning-history",
+      "status": 200,
+      "shape": "object:activities,summary"
+    },
+    {
+      "tier": "PRO",
+      "path": "/users/me/daily-practice",
+      "status": 200,
+      "shape": "object:completedCount,dateKey,estimatedMinutes,generatedAt,items,reasonSummary,targetActivities"
+    },
+    {
+      "tier": "PRO",
+      "path": "/users/me/skill-progress",
+      "status": 200,
+      "shape": "object:overall,skills"
+    },
+    {
+      "tier": "PRO",
+      "path": "/users/profile",
+      "status": 200,
+      "shape": "object:billing,createdAt,email,emailVerifiedAt,id,lastDeviceType,lastLoginAt,leaderboard,loginCount,mustChangePassword,pet,profile,role,sessionToken,shippingProfile,shippingProfileComplete,stats,updatedAt"
+    },
+    {
+      "tier": "PRO",
+      "path": "/users/shipping-profile",
+      "status": 200,
+      "shape": "object:addressLine,countryCode,formattedAddress,phone,phoneDisplay,provinceCode,provinceName,recipientName,shippingProfileComplete,wardCode,wardName"
+    },
+    {
+      "tier": "PRO",
+      "path": "/users/skills-summary",
+      "status": 200,
+      "shape": "object:overall,skills"
+    },
+    {
+      "tier": "PRO",
+      "path": "/users/stats",
+      "status": 200,
+      "shape": "object:hasCompletedPlacementTest,latestDiagnostic,masteredVocabCount,pet,quizAccuracy,speakingAccuracy,streakCount,streakFreezes,tier,totalBanhRan,totalPoints,totalQuizzesDone,totalToeicTestsDone,weeklyExp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/vocab/lookup",
+      "status": 400,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/vocab/lookup/details",
+      "status": 400,
+      "shape": "object:error,message,path,requestId,statusCode,timestamp"
+    },
+    {
+      "tier": "PRO",
+      "path": "/vocab/saved",
+      "status": 200,
+      "shape": "array:0"
+    },
+    {
+      "tier": "PRO",
+      "path": "/vocab/topics",
+      "status": 200,
+      "shape": "object:categories,topics"
+    },
+    {
+      "tier": "PRO",
+      "path": "/writing/topics",
+      "status": 200,
+      "shape": "object:categories,quizzes"
+    }
+  ],
+  "note": "Only documented GET endpoints without path parameters were crawled; parameterized learner flows are verified separately by domain runtime harnesses."
+}

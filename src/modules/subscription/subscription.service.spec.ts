@@ -233,6 +233,26 @@ describe('SubscriptionService', () => {
         period: EntitlementPeriod.LIFETIME,
       }),
     ).toThrow('CONTENT_ACCESS');
+    // Regression: the canonical catalog materializer used to emit exactly this
+    // shape (no limit, but a LIFETIME period) for every PLUS feature, which
+    // made the whole PlanVersion unpurchasable and surfaced as "Chưa mở bán".
+    expect(() =>
+      service.validatePlanEntitlementInput({
+        enabled: true,
+        limitValue: null,
+        unit: EntitlementUnit.CONTENT_ACCESS,
+        period: EntitlementPeriod.LIFETIME,
+      }),
+    ).toThrow('CONTENT_ACCESS');
+    // ...and the corrected shape must stay valid.
+    expect(() =>
+      service.validatePlanEntitlementInput({
+        enabled: true,
+        limitValue: null,
+        unit: EntitlementUnit.CONTENT_ACCESS,
+        period: null,
+      }),
+    ).not.toThrow();
     expect(() =>
       service.validatePlanEntitlementInput({
         enabled: true,

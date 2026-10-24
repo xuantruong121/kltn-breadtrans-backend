@@ -43,6 +43,47 @@ describe('AdminExamService (Phase 4)', () => {
   });
 
   describe('Exam Lifecycle & Draft Safety', () => {
+    const buildFullTest = (missingFirstImage = false) => {
+      let questionId = 1;
+      let questionNumber = 1;
+      let groupId = 1;
+      const makeQuestions = (count: number, optionCount = 4) =>
+        Array.from({ length: count }, () => ({
+          id: questionId++,
+          questionNumber: questionNumber++,
+          options: Array.from({ length: optionCount }, (_, index) =>
+            String.fromCharCode(65 + index),
+          ),
+          correctIndex: 0,
+        }));
+      const group = (part: number, count: number, order: number) => ({
+        id: groupId++,
+        part,
+        groupOrder: order,
+        audioUrl: part <= 4 ? 'https://cdn.example.r2.dev/audio.mp3' : null,
+        imageUrl:
+          part === 1 && missingFirstImage && groupId === 2
+            ? null
+            : part === 1
+              ? 'https://cdn.example.r2.dev/image.jpg'
+              : null,
+        passageText: part >= 6 ? 'A valid reading passage.' : null,
+        questions: makeQuestions(count, part === 2 ? 3 : 4),
+      });
+      const groups = [
+        ...Array.from({ length: 6 }, (_, index) => group(1, 1, index + 1)),
+        group(2, 25, 7),
+        ...Array.from({ length: 13 }, (_, index) => group(3, 3, index + 8)),
+        ...Array.from({ length: 10 }, (_, index) => group(4, 3, index + 21)),
+        group(5, 30, 31),
+        group(6, 16, 32),
+        ...Array.from({ length: 9 }, (_, index) => group(7, 3, index + 33)),
+        group(7, 2, 42),
+        ...Array.from({ length: 5 }, (_, index) => group(7, 5, index + 43)),
+      ];
+      return { id: 301, title: 'Full Test', type: 'FULL_TEST', groups };
+    };
+
     it('creates an exam set with DRAFT status by default', async () => {
       prisma.toeicExamSet.create.mockResolvedValue({
         id: 301,
@@ -111,6 +152,15 @@ describe('AdminExamService (Phase 4)', () => {
       await expect(adminExamService.publishExam(301)).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    it('rejects publishing a structurally complete FULL_TEST when learner readiness fails', async () => {
+      prisma.toeicExamSet.findUnique.mockResolvedValue(buildFullTest(true));
+
+      await expect(adminExamService.publishExam(301)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.toeicExamSet.update).not.toHaveBeenCalled();
     });
 
     it('rejects publishing if a group is missing required media (e.g. Part 1 missing image)', async () => {

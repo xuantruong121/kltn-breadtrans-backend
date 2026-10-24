@@ -1,0 +1,983 @@
+{
+  "generatedAt": "2026-10-23T13:44:32.941Z",
+  "mode": "READ_ONLY",
+  "publishedPlanVersions": [
+    {
+      "planCode": "FREE",
+      "planDisplayName": "BreadTrans Free",
+      "version": 1,
+      "durationDays": null,
+      "priceVnd": 0,
+      "entitlements": []
+    },
+    {
+      "planCode": "PLUS",
+      "planDisplayName": "BreadTrans Plus",
+      "version": 1,
+      "durationDays": 30,
+      "priceVnd": 69000,
+      "entitlements": [
+        "PREMIUM_VOCAB",
+        "PREMIUM_READING",
+        "PREMIUM_LISTENING",
+        "PREMIUM_SPEAKING_CONTENT",
+        "PREMIUM_WRITING_CONTENT"
+      ]
+    },
+    {
+      "planCode": "PRO",
+      "planDisplayName": "BreadTrans Pro",
+      "version": 1,
+      "durationDays": 30,
+      "priceVnd": 149000,
+      "entitlements": [
+        "COURSE_LIBRARY_ACCESS",
+        "PREMIUM_VOCAB",
+        "PREMIUM_READING",
+        "PREMIUM_LISTENING",
+        "PREMIUM_SPEAKING_CONTENT",
+        "PREMIUM_WRITING_CONTENT"
+      ]
+    }
+  ],
+  "allPlanVersions": [
+    {
+      "code": "FREE",
+      "status": "ACTIVE",
+      "versions": [
+        {
+          "id": 20,
+          "version": 1,
+          "status": "PUBLISHED",
+          "isCurrent": true,
+          "durationDays": null,
+          "priceVnd": 0,
+          "entitlements": []
+        }
+      ]
+    },
+    {
+      "code": "PLUS",
+      "status": "ACTIVE",
+      "versions": [
+        {
+          "id": 21,
+          "version": 1,
+          "status": "PUBLISHED",
+          "isCurrent": true,
+          "durationDays": 30,
+          "priceVnd": 69000,
+          "entitlements": [
+            "PREMIUM_VOCAB",
+            "PREMIUM_READING",
+            "PREMIUM_LISTENING",
+            "PREMIUM_SPEAKING_CONTENT",
+            "PREMIUM_WRITING_CONTENT"
+          ]
+        }
+      ]
+    },
+    {
+      "code": "PRO",
+      "status": "ACTIVE",
+      "versions": [
+        {
+          "id": 1,
+          "version": 1,
+          "status": "PUBLISHED",
+          "isCurrent": true,
+          "durationDays": 30,
+          "priceVnd": 149000,
+          "entitlements": [
+            "COURSE_LIBRARY_ACCESS",
+            "PREMIUM_VOCAB",
+            "PREMIUM_READING",
+            "PREMIUM_LISTENING",
+            "PREMIUM_SPEAKING_CONTENT",
+            "PREMIUM_WRITING_CONTENT"
+          ]
+        }
+      ]
+    }
+  ],
+  "content": [
+    {
+      "domain": "COURSE",
+      "canonicalId": 1,
+      "title": "English Foundations A1–A2",
+      "requiredEntitlement": "COURSE_LIBRARY_ACCESS",
+      "free": false,
+      "plus": false,
+      "pro": true,
+      "evidence": "CourseService.resolveCourseAccess"
+    },
+    {
+      "domain": "COURSE",
+      "canonicalId": 8,
+      "title": "Grammar & Vocabulary Builder",
+      "requiredEntitlement": "COURSE_LIBRARY_ACCESS",
+      "free": false,
+      "plus": false,
+      "pro": true,
+      "evidence": "CourseService.resolveCourseAccess"
+    },
+    {
+      "domain": "COURSE",
+      "canonicalId": 12,
+      "title": "Phát âm Tiếng Anh với IPA",
+      "requiredEntitlement": "COURSE_LIBRARY_ACCESS",
+      "free": false,
+      "plus": false,
+      "pro": true,
+      "evidence": "CourseService.resolveCourseAccess"
+    },
+    {
+      "domain": "QUIZ_TOEIC",
+      "canonicalId": 8,
+      "title": "TOEIC L&R Mini Mixed Practice",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_BILINGUAL_READING",
+      "canonicalId": 14,
+      "title": "Reading B1 — Practical English",
+      "requiredEntitlement": "PREMIUM_READING",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_BILINGUAL_READING",
+      "canonicalId": 15,
+      "title": "Reading B2 — Workplace & Reports",
+      "requiredEntitlement": "PREMIUM_READING",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_BILINGUAL_READING",
+      "canonicalId": 16,
+      "title": "Reading C1 — Analysis & Inference",
+      "requiredEntitlement": "PREMIUM_READING",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_BILINGUAL_READING",
+      "canonicalId": 2,
+      "title": "Reading A2 — Notices & Messages",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 29,
+      "title": "Viết câu theo tranh — Tủ tài liệu",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 30,
+      "title": "Viết câu theo tranh — Giao hàng",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 31,
+      "title": "Viết câu theo tranh — Quầy thu ngân",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 32,
+      "title": "Viết câu theo tranh — Bảng giờ khởi hành",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 33,
+      "title": "Viết câu theo tranh — Bãi để xe đạp",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 34,
+      "title": "Thư phản hồi — Dời lịch họp",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 35,
+      "title": "Thư phản hồi — Khiếu nại đơn hàng",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 36,
+      "title": "Bài luận ý kiến — Học trực tuyến",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 37,
+      "title": "Viết câu theo tranh — Tủ tài liệu",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 38,
+      "title": "Viết câu theo tranh — Giao hàng",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 25,
+      "title": "Nghe chép B1 — Cập nhật công việc",
+      "requiredEntitlement": "PREMIUM_LISTENING",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 24,
+      "title": "Nghe chép A2 — Du lịch và chỉ đường",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 26,
+      "title": "Hội thoại A2 — Gọi món tại quán cà phê",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 27,
+      "title": "Hội thoại B1 — Lên kế hoạch dự án",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_TOEIC",
+      "canonicalId": 20,
+      "title": "TOEIC 2 Skills: Speaking & Writing — Đề luyện tập 01",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_TOEIC",
+      "canonicalId": 21,
+      "title": "TOEIC 2 Skills: Listening & Reading — Đề luyện tập 01",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_TOEIC_FOUR_SKILL",
+      "canonicalId": 22,
+      "title": "TOEIC 4 Skills — Đề luyện tập 01",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 39,
+      "title": "Viết câu theo tranh — Quầy thu ngân",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 40,
+      "title": "Viết câu theo tranh — Bảng giờ khởi hành",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 41,
+      "title": "Viết câu theo tranh — Bãi để xe đạp",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 42,
+      "title": "Thư phản hồi — Dời lịch họp",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 43,
+      "title": "Thư phản hồi — Khiếu nại đơn hàng",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 44,
+      "title": "Bài luận ý kiến — Học trực tuyến",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_BILINGUAL_READING",
+      "canonicalId": 6,
+      "title": "Reading B1 — Workplace Documents",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_BILINGUAL_READING",
+      "canonicalId": 13,
+      "title": "Reading A1–A2 — Everyday Texts",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 5,
+      "title": "Listening B1 — Workplace Conversations",
+      "requiredEntitlement": "PREMIUM_LISTENING",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 10,
+      "title": "Listening A2 — Travel & Services",
+      "requiredEntitlement": "PREMIUM_LISTENING",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 11,
+      "title": "Listening B1 — Work & Meetings",
+      "requiredEntitlement": "PREMIUM_LISTENING",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 12,
+      "title": "Listening B2 — Inference & Intent",
+      "requiredEntitlement": "PREMIUM_LISTENING",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 1,
+      "title": "Listening A2 — Everyday Communication",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 9,
+      "title": "Listening A1 — Essential Everyday English",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 23,
+      "title": "Nghe chép A1 — Tin nhắn hằng ngày",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_LISTENING_PRACTICE",
+      "canonicalId": 28,
+      "title": "Hội thoại B2 — Hỗ trợ khách hàng",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 4,
+      "title": "Writing B1 — Professional Email",
+      "requiredEntitlement": "PREMIUM_WRITING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 7,
+      "title": "Writing B2 — Problem & Solution Email",
+      "requiredEntitlement": "PREMIUM_WRITING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 18,
+      "title": "Writing B1 — Professional Communication",
+      "requiredEntitlement": "PREMIUM_WRITING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 19,
+      "title": "Writing B2–C1 — Argument & Problem Solving",
+      "requiredEntitlement": "PREMIUM_WRITING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_PICTURE",
+      "canonicalId": 3,
+      "title": "Writing A2–B1 — Sentence Builder",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "QUIZ_WRITING_EMAIL",
+      "canonicalId": 17,
+      "title": "Writing A2 — Messages & Simple Emails",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "QuizContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 1,
+      "title": "Read Aloud A1 — Daily Schedule",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 6,
+      "title": "Read Aloud B1 — Office Announcement",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 7,
+      "title": "Read Aloud B1 — Hotel Service",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 8,
+      "title": "Read Aloud B1 — Delivery",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 9,
+      "title": "Read Aloud B2 — Training",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 10,
+      "title": "Read Aloud B2 — Customer Policy",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 18,
+      "title": "Question Response B1 — Study Habit",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 19,
+      "title": "Question Response B1 — Meeting Preparation",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 20,
+      "title": "Question Response B2 — Customer Service",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 21,
+      "title": "Opinion B1 — Online Learning",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 22,
+      "title": "Opinion B1 — Public Transport",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 23,
+      "title": "Opinion B2 — Remote Work",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 24,
+      "title": "Opinion B2 — Training",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 25,
+      "title": "TOEIC Speaking — Read Aloud 1",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 26,
+      "title": "TOEIC Speaking — Read Aloud 2",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 27,
+      "title": "TOEIC Speaking — Describe Office Scene",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 28,
+      "title": "TOEIC Speaking — Describe Station Scene",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 29,
+      "title": "TOEIC Speaking — Information Response",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 30,
+      "title": "TOEIC Speaking — Express Opinion",
+      "requiredEntitlement": "PREMIUM_SPEAKING_CONTENT",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 2,
+      "title": "Read Aloud A1 — Weather",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 3,
+      "title": "Read Aloud A2 — Appointment",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 4,
+      "title": "Read Aloud A2 — Travel",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 5,
+      "title": "Read Aloud A2 — Store Notice",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 11,
+      "title": "Pronunciation — Final Consonants",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 12,
+      "title": "Pronunciation — -ed Endings",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 13,
+      "title": "Pronunciation — Word Stress",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 14,
+      "title": "Pronunciation — Numbers & Dates",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 15,
+      "title": "Pronunciation — Linking",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 16,
+      "title": "Question Response A2 — Weekend",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "SPEAKING",
+      "canonicalId": 17,
+      "title": "Question Response A2 — Transport",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "SpeakingContentAccessService"
+    },
+    {
+      "domain": "VOCAB",
+      "canonicalId": 2,
+      "title": "Travel & Transportation",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "VocabService.assertTopicAccess"
+    },
+    {
+      "domain": "VOCAB",
+      "canonicalId": 3,
+      "title": "Office & Meetings",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "VocabService.assertTopicAccess"
+    },
+    {
+      "domain": "VOCAB",
+      "canonicalId": 4,
+      "title": "Customer Service & Retail",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "VocabService.assertTopicAccess"
+    },
+    {
+      "domain": "VOCAB",
+      "canonicalId": 5,
+      "title": "Finance & Business",
+      "requiredEntitlement": "PREMIUM_VOCAB",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "VocabService.assertTopicAccess"
+    },
+    {
+      "domain": "VOCAB",
+      "canonicalId": 6,
+      "title": "Technology & Projects",
+      "requiredEntitlement": "PREMIUM_VOCAB",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "VocabService.assertTopicAccess"
+    },
+    {
+      "domain": "VOCAB",
+      "canonicalId": 7,
+      "title": "Marketing & Sales",
+      "requiredEntitlement": "PREMIUM_VOCAB",
+      "free": false,
+      "plus": true,
+      "pro": true,
+      "evidence": "VocabService.assertTopicAccess"
+    },
+    {
+      "domain": "VOCAB",
+      "canonicalId": 8,
+      "title": "Health, Learning & Well-being",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "VocabService.assertTopicAccess"
+    },
+    {
+      "domain": "VOCAB",
+      "canonicalId": 1,
+      "title": "Daily Routines & Time",
+      "requiredEntitlement": null,
+      "free": true,
+      "plus": null,
+      "pro": null,
+      "evidence": "VocabService.assertTopicAccess"
+    },
+    {
+      "domain": "TOEIC_TOEIC_SW",
+      "canonicalId": 1,
+      "title": "TOEIC 2 Skills: Speaking & Writing — Đề luyện tập 01",
+      "requiredEntitlement": "COMPONENT_GOVERNED",
+      "free": null,
+      "plus": null,
+      "pro": null,
+      "evidence": "ToeicAssessmentService.assertLearnerEntitlements"
+    },
+    {
+      "domain": "TOEIC_TOEIC_4_SKILLS",
+      "canonicalId": 2,
+      "title": "TOEIC 4 Skills — Đề luyện tập 01",
+      "requiredEntitlement": "COMPONENT_GOVERNED",
+      "free": null,
+      "plus": null,
+      "pro": null,
+      "evidence": "ToeicAssessmentService.assertLearnerEntitlements"
+    }
+  ],
+  "summary": {
+    "freeRows": 49,
+    "premiumRows": 36,
+    "unmappedPremiumRows": 0,
+    "currentFree": true,
+    "currentPlus": true,
+    "currentPro": true
+  }
+}

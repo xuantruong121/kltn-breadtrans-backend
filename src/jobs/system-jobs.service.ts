@@ -9,6 +9,7 @@ import IORedis from 'ioredis';
 import { GamificationService } from '../modules/gamification/gamification.service';
 import { NotificationsCronService } from '../modules/notifications/notifications.cron';
 import { R2CleanupService } from '../modules/upload/r2-cleanup.service';
+import { DatabaseBackupR2SyncService } from './database-backup-r2-sync.service';
 import {
   JOB_NAMES,
   SYSTEM_QUEUE_NAME,
@@ -27,6 +28,7 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     private readonly gamification: GamificationService,
     private readonly notifications: NotificationsCronService,
     private readonly r2Cleanup: R2CleanupService,
+    private readonly dbBackupSync: DatabaseBackupR2SyncService,
   ) {
     this.connection = new IORedis(
       process.env.REDIS_URL || 'redis://localhost:6379',
@@ -108,6 +110,15 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  async enqueueDatabaseBackupR2Sync(syncKey?: string): Promise<void> {
+    const key = syncKey ?? new Date().toISOString().slice(0, 13);
+    await this.enqueue(
+      JOB_NAMES.DATABASE_BACKUP_R2_SYNC,
+      { version: 1 },
+      { jobId: `database-backup-r2-sync-${key}` },
+    );
+  }
+
   async enqueue(
     name: SystemJobName,
     payload: SystemJobPayload,
@@ -153,6 +164,8 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
         return this.notifications.runVocabSpacedReview();
       case JOB_NAMES.R2_AUDIO_CLEANUP:
         return this.r2Cleanup.runCleanup();
+      case JOB_NAMES.DATABASE_BACKUP_R2_SYNC:
+        return this.dbBackupSync.syncPendingBackups();
       default:
         throw new Error('Unknown system job');
     }

@@ -1,9 +1,7 @@
 import 'dotenv/config';
 import {
-  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
-  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -36,6 +34,11 @@ const speakingPremiumIds = [
 const speakingFreeIds = [1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 16, 17];
 const writingPremiumIds = [4, 7, 18, 19];
 const writingFreeIds = [3, 17];
+
+/** Canonical PLUS commercial terms, validated after semantic resolution. */
+const CANONICAL_PLUS_PRICE_VND = 69000;
+const CANONICAL_PLUS_DURATION_DAYS = 30;
+const CANONICAL_PLUS_CURRENCY = 'VND';
 
 const fiveEntitlements = [
   PlanFeatureKey.PREMIUM_VOCAB,
@@ -147,29 +150,20 @@ async function readPublic(key: string): Promise<Buffer> {
 }
 
 async function privateReadable(key: string): Promise<boolean> {
+  // The window has to absorb clock skew between this machine and R2. A
+  // presigned URL is validated against the signer's clock, so a machine that
+  // runs even a couple of minutes behind makes every 60s URL arrive already
+  // expired (R2 answers 403 ExpiredRequest) while header-signed requests still
+  // succeed on their ~15 minute tolerance. That looked like unreadable media
+  // when the object was present and fine. The application's own presigners use
+  // 300-3600s for the same reason.
   const signed = await getSignedUrl(
     privateClient,
     new GetObjectCommand({ Bucket: privateBucket, Key: key }),
-    { expiresIn: 60 },
+    { expiresIn: 900 },
   );
   const response = await fetch(signed);
   return response.ok && Boolean(await response.arrayBuffer());
-}
-
-async function listPublicKeys(): Promise<Set<string>> {
-  const keys = new Set<string>();
-  let token: string | undefined;
-  do {
-    const page = await publicClient.send(
-      new ListObjectsV2Command({
-        Bucket: publicBucket,
-        ContinuationToken: token,
-      }),
-    );
-    for (const item of page.Contents ?? []) if (item.Key) keys.add(item.Key);
-    token = page.IsTruncated ? page.NextContinuationToken : undefined;
-  } while (token);
-  return keys;
 }
 
 function assertManifestIds(
@@ -325,35 +319,32 @@ async function checkPlusState() {
   );
   if (current.length !== 1)
     throw new Error('PLUS must have exactly one current published version');
-  const v35 = plus.versions.find((version) => version.id === 35);
+  // A historical autoincrement id is not business identity. PLUS is resolved
+  // semantically above (Plan.code = PLUS, isCurrent, PUBLISHED); the resolved
+  // version's commercial terms are then validated against the canonical
+  // expected values. Pinning PlanVersion.id = 35 made this script unrunnable
+  // after the catalog was rebuilt, even though PLUS was correct.
+  const currentVersion = current[0];
   if (
-    !v35 ||
-    v35.version !== 2 ||
-    v35.priceVnd !== 69000 ||
-    v35.durationDays !== 30 ||
-    v35.currency !== 'VND'
+    currentVersion.priceVnd !== CANONICAL_PLUS_PRICE_VND ||
+    currentVersion.durationDays !== CANONICAL_PLUS_DURATION_DAYS ||
+    currentVersion.currency !== CANONICAL_PLUS_CURRENCY
   ) {
-    throw new Error('PlanVersion 35 commercial terms changed');
-  }
-  const v35Keys = v35.entitlements
-    .filter((item) => item.enabled)
-    .map((item) => item.featureKey);
-  if (v35Keys.length !== 1 || v35Keys[0] !== PlanFeatureKey.PREMIUM_VOCAB) {
-    throw new Error('PlanVersion 35 entitlement contract changed');
-  }
-  const expanded = plus.versions.find((version) => {
-    const keys = version.entitlements
-      .filter((item) => item.enabled)
-      .map((item) => item.featureKey)
-      .sort();
-    return (
-      version.priceVnd === 69000 &&
-      version.durationDays === 30 &&
-      version.currency === 'VND' &&
-      keys.join(',') === [...fiveEntitlements].sort().join(',')
+    throw new Error(
+      `Current PLUS version ${currentVersion.id} commercial terms differ from canonical ` +
+        `(expected ${CANONICAL_PLUS_PRICE_VND} ${CANONICAL_PLUS_CURRENCY} / ${CANONICAL_PLUS_DURATION_DAYS} days, ` +
+        `found ${currentVersion.priceVnd} ${currentVersion.currency} / ${currentVersion.durationDays} days)`,
     );
-  });
-  return { plus, current: current[0], v35, expanded };
+  }
+  const currentKeys = currentVersion.entitlements
+    .filter((item) => item.enabled)
+    .map((item) => item.featureKey)
+    .sort();
+  const expanded =
+    currentKeys.join(',') === [...fiveEntitlements].sort().join(',')
+      ? currentVersion
+      : undefined;
+  return { plus, current: currentVersion, expanded };
 }
 
 async function preflight(): Promise<{
@@ -412,7 +403,7 @@ async function preflight(): Promise<{
         plan: {
           currentId: plan.current.id,
           currentVersion: plan.current.version,
-          v35Intact: true,
+          canonicalTermsValid: true,
           expandedAlreadyExists: Boolean(plan.expanded),
         },
         planned: {
@@ -450,33 +441,6 @@ async function migrateMedia(moves: MediaMove[]): Promise<void> {
       throw new Error(`Private media verification failed: ${move.newKey}`);
     }
   }
-}
-
-async function retirePublicMedia(moves: MediaMove[]): Promise<number> {
-  const keys = new Set(moves.map((move) => move.oldKey));
-  const all = await listPublicKeys();
-  for (const key of all) {
-    if (
-      key.startsWith('catalog/listening/practice/audio/quiz-5/') ||
-      key.startsWith('catalog/listening/practice/audio/quiz-10/') ||
-      key.startsWith('catalog/listening/practice/audio/quiz-11/') ||
-      key.startsWith('catalog/listening/practice/audio/quiz-12/') ||
-      key.startsWith('catalog/listening/practice/audio/quiz-25/') ||
-      key.startsWith('catalog/listening/practice/quiz-25/')
-    )
-      keys.add(key);
-  }
-  let retired = 0;
-  for (const key of keys) {
-    if (!(await head(publicClient, publicBucket, key))) continue;
-    await publicClient.send(
-      new DeleteObjectCommand({ Bucket: publicBucket, Key: key }),
-    );
-    if (await head(publicClient, publicBucket, key))
-      throw new Error(`Public media still readable: ${key}`);
-    retired++;
-  }
-  return retired;
 }
 
 async function updateMediaReferences(moves: MediaMove[]): Promise<void> {
@@ -672,7 +636,6 @@ async function main(): Promise<void> {
   if (DRY_RUN) return;
   await migrateMedia(plan.moves);
   await updateMediaReferences(plan.moves);
-  const retired = await retirePublicMedia(plan.moves);
   const published = await applyFlagsAndPlan();
   await verifyPostState(published.planVersionId);
   console.log(
@@ -680,7 +643,7 @@ async function main(): Promise<void> {
       {
         applied: true,
         privateObjects: plan.moves.length,
-        publicObjectsRetired: retired,
+        publicObjectsPreserved: true,
         ...published,
       },
       null,

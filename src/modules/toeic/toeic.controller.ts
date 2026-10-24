@@ -125,6 +125,18 @@ export class ToeicController {
     return this.toeicService.getRemainingTime(+id, req.user.id, req.user.role);
   }
 
+  @Get('attempts/:id/listening/manifest')
+  @UseGuards(JwtAuthGuard)
+  getListeningManifest(@Param('id') id: string, @Req() req: any) {
+    return this.toeicService.getListeningManifest(+id, req.user.id);
+  }
+
+  @Post('attempts/:id/listening/advance')
+  @UseGuards(JwtAuthGuard)
+  advanceListening(@Param('id') id: string, @Req() req: any) {
+    return this.toeicService.advanceListening(+id, req.user.id);
+  }
+
   @Patch('attempts/:id/answers')
   @UseGuards(JwtAuthGuard)
   saveAnswers(

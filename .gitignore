@@ -5,6 +5,10 @@ dist
 .env
 .env.production
 .env.local
+# Any local copy/backup of a real .env still holds live secrets.
+.env.bak*
+.env.*.bak
+.env.backup*
 
 /generated/prisma
 
@@ -16,3 +20,12 @@ cloudflared.exe
 # Test environment — local only, never commit secrets
 .env.test
 .env.test.local
+
+# Database backups and disaster-recovery artifacts (may contain real data;
+# can be hundreds of MB). Never commit these.
+*.dump
+*.sql.gz
+*.tgz
+db-backups/
+.local-backups/
+recovery-inspect.sql
