@@ -348,18 +348,30 @@ describe('QuizService', () => {
           order: 1,
           content: {
             transcriptSegments: [
-              { speaker: 'Customer', text: 'I need help.', translation: 'Tôi cần hỗ trợ.' },
-              { speaker: 'Agent', text: 'I can help.', translation: 'Tôi có thể hỗ trợ.' },
+              {
+                speaker: 'Customer',
+                text: 'I need help.',
+                translation: 'Tôi cần hỗ trợ.',
+              },
+              {
+                speaker: 'Agent',
+                text: 'I can help.',
+                translation: 'Tôi có thể hỗ trợ.',
+              },
             ],
           },
         },
       ]);
-      mockPrismaService.listeningTranscriptReveal.findUnique.mockResolvedValue(null);
+      mockPrismaService.listeningTranscriptReveal.findUnique.mockResolvedValue(
+        null,
+      );
 
       await expect(service.getListeningTranscript(7, 28)).rejects.toThrow(
         ForbiddenException,
       );
-      expect(mockPrismaService.listeningTranscriptReveal.findUnique).toHaveBeenCalledWith({
+      expect(
+        mockPrismaService.listeningTranscriptReveal.findUnique,
+      ).toHaveBeenCalledWith({
         where: { userId_quizId: { userId: 7, quizId: 28 } },
         select: { id: true },
       });
@@ -380,13 +392,23 @@ describe('QuizService', () => {
           order: 1,
           content: {
             transcriptSegments: [
-              { speaker: 'Customer', text: 'I need help.', translation: 'Tôi cần hỗ trợ.' },
-              { speaker: 'Agent', text: 'I can help.', translation: 'Tôi có thể hỗ trợ.' },
+              {
+                speaker: 'Customer',
+                text: 'I need help.',
+                translation: 'Tôi cần hỗ trợ.',
+              },
+              {
+                speaker: 'Agent',
+                text: 'I can help.',
+                translation: 'Tôi có thể hỗ trợ.',
+              },
             ],
           },
         },
       ]);
-      mockPrismaService.listeningTranscriptReveal.findUnique.mockResolvedValue({ id: 1 });
+      mockPrismaService.listeningTranscriptReveal.findUnique.mockResolvedValue({
+        id: 1,
+      });
 
       const result = await service.getListeningTranscript(7, 28);
       expect(result.items).toHaveLength(2);

@@ -20,14 +20,19 @@ describe('ToeicService learner publication boundary', () => {
 
     await service.getExamBriefing(302, 7);
 
-    const select = prisma.toeicExamSet.findUnique.mock.calls[0][0].include.groups.select;
-    expect(select).toEqual(expect.objectContaining({
-      canonicalAccent: true,
-      transcriptText: true,
-      imageBrief: true,
-      mediaMetadata: true,
-    }));
-    expect(select.questions.select).toEqual(expect.objectContaining({ text: true }));
+    const select =
+      prisma.toeicExamSet.findUnique.mock.calls[0][0].include.groups.select;
+    expect(select).toEqual(
+      expect.objectContaining({
+        canonicalAccent: true,
+        transcriptText: true,
+        imageBrief: true,
+        mediaMetadata: true,
+      }),
+    );
+    expect(select.questions.select).toEqual(
+      expect.objectContaining({ text: true }),
+    );
   });
 
   it('does not create a new attempt for an unpublished exam', async () => {

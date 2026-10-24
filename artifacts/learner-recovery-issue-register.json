@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-24",
+  "pass": "GLOBAL LEARNER FUNCTIONAL + ACTIVE MEDIA SEMANTIC AUDIT",
+  "auditOnly": true,
+  "productFixesApplied": 0,
+  "issues": [
+    {
+      "id": "GA-001",
+      "priority": "P1",
+      "domain": "Grammar",
+      "title": "Grammar is entirely invisible to learners",
+      "evidence": "GET /grammar/topics returns 0 items for FREE, PLUS and PRO. DB holds 12 topics and 60 questions, every topic publicationStatus=DRAFT (allDraft=true).",
+      "classification": "PRODUCT_PUBLICATION_BACKLOG",
+      "notRecoveryLoss": "Content exists and is intact; only publication state withholds it.",
+      "remediation": "Content-owner decision to publish, not a code fix."
+    },
+    {
+      "id": "GA-002",
+      "priority": "P2",
+      "domain": "Vocabulary 1v1 Arena",
+      "title": "Arena never reads the learner's currency balance before queueing",
+      "evidence": "src/app/(student)/arena/page.tsx has no reference to totalBanh/balance; stake buttons are disabled only while isSearching. Live socket test with totalBanh=0 returned arena:error 'Bạn khong du 10 Banh Mi de tham gia muc cuoc nay!' only after join_queue.",
+      "classification": "UX_DEFECT",
+      "securityImpact": "none - the server enforces the stake correctly",
+      "remediation": "Read the balance on the Arena page and disable or explain unaffordable stakes before the learner commits."
+    },
+    {
+      "id": "GA-003",
+      "priority": "P3",
+      "domain": "Vocabulary 1v1 Arena",
+      "title": "UI stake ladder omits the lowest server-allowed stake",
+      "evidence": "arena.gateway.ts allowedStakes=[10,20,50,100]; arena/page.tsx STAKES=[20,50,100].",
+      "classification": "UX_DEFECT",
+      "remediation": "Offer 10, or document the omission deliberately."
+    },
+    {
+      "id": "GA-004",
+      "priority": "P3",
+      "domain": "Repo hygiene",
+      "title": "Backend formatting check fails",
+      "evidence": "npm run lint:check exits 1 with 16 prettier errors in course.service.ts, quiz.service.spec.ts, toeic.service.lifecycle.spec.ts.",
+      "classification": "HYGIENE",
+      "remediation": "Run prettier on those three files only; another session may hold them open."
+    }
+  ],
+  "baselineDeltasExplained": [
+    {
+      "metric": "speaking.examInternal",
+      "observed": 22,
+      "statedBaseline": 2,
+      "verdict": "NOT_DRIFT",
+      "explanation": "22 EXAM_INTERNAL speaking exercises = 2 assessments x 11 TOEIC speaking tasks. The baseline figure counted exam-internal SETS, not exercises. standalonePublished=30 matches baseline exactly."
+    },
+    {
+      "metric": "flashcards.topics",
+      "observed": 9,
+      "statedBaseline": 8,
+      "verdict": "NOT_DRIFT",
+      "explanation": "publishedTopics=8 matches baseline and words=353 matches exactly with countDrift=0. The 9th topic is unpublished and adds no learner-visible deck."
+    },
+    {
+      "metric": "toeic.part1WithImage",
+      "observed": 7,
+      "statedBaseline": 6,
+      "verdict": "NOT_DRIFT",
+      "explanation": "There are 2 ToeicExamSets and 225 questions in total; Exam 1 contributes 6 Part-1 groups and the extra group belongs to the second set."
+    }
+  ]
+}

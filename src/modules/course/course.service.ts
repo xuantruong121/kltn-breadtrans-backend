@@ -78,7 +78,11 @@ export class CourseService {
       order: number;
       title: string;
       summary: string;
-      exercises?: Array<{ id: number; title?: string | null; required?: boolean }>;
+      exercises?: Array<{
+        id: number;
+        title?: string | null;
+        required?: boolean;
+      }>;
     }>,
   ): CourseCurriculum {
     const lessons = courseLessons.map((cl) => ({

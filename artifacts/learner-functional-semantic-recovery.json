@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-24",
+  "backendBaseUrl": "http://localhost:3001",
+  "identities": { "FREE": "student1", "PLUS": "student3", "PRO": "student2" },
+  "sideEffects": {
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "R2_MEDIA_OBJECTS_DELETED": 0,
+    "R2_MEDIA_OBJECTS_CREATED": 0,
+    "CANONICAL_RECOVERY_DATA_MUTATED": false,
+    "QA_ORPHAN_RECORDS_AFTER_CLEANUP": 0,
+    "note": "Every probe in this pass was a GET or a socket queue/cancel. No learner write was committed; the one socket join_queue was refused by the server's own balance guard, so no currency moved."
+  },
+  "entitlement": {
+    "ENTITLEMENT_MATRIX_PASS": true,
+    "PREMIUM_CONTENT_LEAK_TO_FREE": 0,
+    "FREE_CONTENT_WRONGLY_PAYWALLED": 0,
+    "premiumItemsObservedOnFreeIdentity": 30,
+    "vacuous": false,
+    "listGating": [
+      { "surface": "/quizzes/listening-practice", "items": 12, "premium": 5, "freeLocked": "5/5", "plusLocked": "0/5", "proLocked": "0/5" },
+      { "surface": "/reading/exercises", "items": 6, "premium": 3, "freeLocked": "3/3", "plusLocked": "0/3", "proLocked": "0/3" },
+      { "surface": "/writing/topics", "items": 6, "premium": 4, "freeLocked": "4/4", "plusLocked": "0/4", "proLocked": "0/4" },
+      { "surface": "/speaking/exercises", "items": 30, "premium": 18, "freeLocked": "18/18", "plusLocked": "0/18", "proLocked": "0/18" }
+    ],
+    "serverSideEnforcement": {
+      "method": "direct GET of premium detail and transcript endpoints as the FREE identity, bypassing the UI entirely",
+      "probes": 15,
+      "freeStatus": "403 on all 15",
+      "proStatus": "200 on all 15",
+      "bodyContentLeaks": 0,
+      "UI_HIDING_ONLY": false
+    }
+  },
+  "privacy": {
+    "PRE_REVEAL_PRIVACY_PASS": true,
+    "evidence": "GET /quizzes/{24,26,27,28}/transcript returns 403 'Hay xac nhan xem transcript truoc khi tai noi dung' for an entitled PRO identity that has not revealed. Quizzes 23 and 9 return 200 only because that identity already revealed them. No unrevealed payload carried transcript prose."
+  },
+  "idor": {
+    "IDOR_PASS": null,
+    "status": "UNVERIFIED",
+    "reason": "The QA identities own no cross-checkable submission objects (GET /users/learning-history returned no sourceIds for student2), and manufacturing one would create learner state this audit-only pass is not allowed to commit. Socket-layer authorisation was verified instead: an unauthenticated /arena connection is rejected with 'Authentication token required for Arena'."
+  },
+  "mediaSemantics": {
+    "ARTIFACT_TIMELINE_INTEGRITY_PASS": true,
+    "publishedArtifacts": 4,
+    "perArtifact": [
+      { "quizId": 23, "artifactId": 5, "version": 7, "entries": 20, "withOffsets": 20, "distinctWindows": 20, "monotonic": true, "inRange": true, "durationMs": 75528, "speakers": ["Mia", "Leo"], "SEEK_PASS": true },
+      { "quizId": 24, "artifactId": 6, "version": 7, "entries": 20, "withOffsets": 20, "distinctWindows": 20, "monotonic": true, "inRange": true, "durationMs": 90432, "SEEK_PASS": true },
+      { "quizId": 25, "artifactId": 7, "version": 7, "entries": 20, "withOffsets": 20, "distinctWindows": 20, "monotonic": true, "inRange": true, "durationMs": 82728, "speakers": ["Nora", "Dan"], "SEEK_PASS": true },
+      { "quizId": 28, "artifactId": 8, "version": 2, "entries": 4, "withOffsets": 4, "distinctWindows": 4, "monotonic": true, "inRange": true, "durationMs": 21528, "SEEK_PASS": true }
+    ],
+    "retractedEarlierFinding": {
+      "claim": "transcriptSegments[].startMs populated for 0 of 120 segments, so per-question seeking is impossible",
+      "verdict": "WAS_A_CHECKER_ARTIFACT",
+      "explanation": "The delivered payload carries startMs/endMs on each transcript ITEM, not on a nested segments array. The earlier checker looked only at the nested shape and therefore read zero. Re-measured against the real shape, 23 and 25 expose 20 of 20 offsets over the live API and all 4 published artifacts validate."
+    },
+    "notAuthored": [
+      { "quizId": 26, "reason": "CANONICAL_NOT_AUTHORED" },
+      { "quizId": 27, "reason": "CANONICAL_NOT_AUTHORED" }
+    ]
+  },
+  "endpointSweep": {
+    "BROKEN_ENDPOINTS": 0,
+    "domainsProbed": ["Dashboard", "Plans", "Courses", "Flashcards", "Listening", "Reading", "Writing", "Speaking", "Grammar", "Diagnostic", "TOEIC", "Market", "Notifications", "Arena"],
+    "falsePositivesRetracted": "An earlier sweep reported 12 404s across /toeic/exam-sets, /market/items and two arena status paths. All four were paths this audit invented; the real routes are /toeic/exams, /market/products and the /arena socket namespace, and each returns 200 or its proper socket event. /courses/my-enrollments returned 400 for the same reason: the real route is /courses/:courseId/my-enrollments."
+  },
+  "arena": {
+    "ARENA_GLOBAL_STATUS": "IMPLEMENTED_PARTIALLY_VERIFIED",
+    "transport": "socket.io namespace /arena (not REST)",
+    "handlersMatched": ["join_queue", "cancel_queue", "submit_answer", "reconnect_match"],
+    "verified": { "UNAUTH_REJECTED": true, "AUTH_CONNECT": true, "STAKE_VALIDATION": true, "QUEUE_CANCELLED": true },
+    "unverified": { "MATCH_COMPLETION": "blocked - both QA identities hold totalBanh=0 and granting currency would mutate canonical user state" }
+  },
+  "coverage": {
+    "CURRENT_LEARNER_ROUTE_COUNT": 48,
+    "apiLevelDomainsCovered": 14,
+    "browserPhasesRun": 0,
+    "RESPONSIVE_SMOKE_PASS": null,
+    "GLOBAL_SCROLL_REGRESSION_PASS": null,
+    "ERROR_EMPTY_STATE_PASS": null
+  }
+}
