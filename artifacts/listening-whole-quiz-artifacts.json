@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-24T02:55:45.790Z",
+  "generatedAt": "2026-10-24T08:14:19.283Z",
   "entries": [
     {
       "quiz": {
@@ -21,6 +21,18 @@
         "locale": "en-GB",
         "accent": "UK",
         "voiceRegistryVersion": "2026-09-21.v1",
+        "voiceConfiguration": [
+          {
+            "speakerId": "mia",
+            "voiceKey": "en-gb-female-01",
+            "providerVoice": "en-GB-SoniaNeural"
+          },
+          {
+            "speakerId": "leo",
+            "voiceKey": "en-gb-male-01",
+            "providerVoice": "en-GB-RyanNeural"
+          }
+        ],
         "outputFormat": "audio-16khz-128kbitrate-mono-mp3",
         "synthesisHash": "753cc8b2a1d4449e507c4d3952045f5bc09c8ce3eea43b254df13933d372a43b",
         "contentHash": "b32ec9e1adb418ab43abf991463286bd338a14847139266acd51d17f496a5b04"
@@ -128,7 +140,345 @@
         }
       ],
       "provenance": {
-        "recoveredAt": "2026-10-24T02:55:45.790Z",
+        "recoveredAt": "2026-10-24T08:14:18.128Z",
+        "method": "canonical authoring pipeline (Azure Speech SDK) re-render",
+        "note": "The pre-incident audio survived in object storage but the authoritative per-turn timeline did not. This entry preserves the timeline so a future rebuild can relink instead of paying for another render."
+      }
+    },
+    {
+      "quiz": {
+        "id": 24,
+        "title": "Nghe chép A2 — Du lịch và chỉ đường",
+        "type": "LISTENING_PRACTICE",
+        "isPremiumContent": false
+      },
+      "artifact": {
+        "version": 7,
+        "r2Key": "catalog/listening/practice/quiz-24/audio/v7/full.mp3",
+        "r2Url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/listening/practice/quiz-24/audio/v7/full.mp3",
+        "checksumSha256": "6d0614c4b0992259533908b8acd3eb8d4ca2914c9da1cb485460067bae29b463",
+        "bytes": 1446912,
+        "contentType": "audio/mpeg",
+        "durationMs": 90432,
+        "provider": "AZURE_SPEECH_SDK",
+        "locale": "en-US",
+        "accent": "US",
+        "voiceRegistryVersion": "2026-09-21.v1",
+        "voiceConfiguration": [
+          {
+            "speakerId": "maya",
+            "voiceKey": "en-us-female-01",
+            "providerVoice": "en-US-JennyNeural"
+          },
+          {
+            "speakerId": "ben",
+            "voiceKey": "en-us-male-01",
+            "providerVoice": "en-US-GuyNeural"
+          }
+        ],
+        "outputFormat": "audio-16khz-128kbitrate-mono-mp3",
+        "synthesisHash": "afd6dee66d800a0005bd2fc4a19173b19f666a472e82ba436082af69919ee87e",
+        "contentHash": "4eed60213f925c4021b87d7aa59542470345636ff986f0d83f123ae39eaa680c"
+      },
+      "timeline": [
+        {
+          "endMs": 4936,
+          "turnId": "turn-001",
+          "startMs": 0
+        },
+        {
+          "endMs": 7518,
+          "turnId": "turn-002",
+          "startMs": 6059
+        },
+        {
+          "endMs": 10886,
+          "turnId": "turn-003",
+          "startMs": 8549
+        },
+        {
+          "endMs": 15403,
+          "turnId": "turn-004",
+          "startMs": 11972
+        },
+        {
+          "endMs": 20217,
+          "turnId": "turn-005",
+          "startMs": 16406
+        },
+        {
+          "endMs": 23461,
+          "turnId": "turn-006",
+          "startMs": 21236
+        },
+        {
+          "endMs": 28430,
+          "turnId": "turn-007",
+          "startMs": 24521
+        },
+        {
+          "endMs": 33306,
+          "turnId": "turn-008",
+          "startMs": 29506
+        },
+        {
+          "endMs": 37761,
+          "turnId": "turn-009",
+          "startMs": 34381
+        },
+        {
+          "endMs": 42339,
+          "turnId": "turn-010",
+          "startMs": 38870
+        },
+        {
+          "endMs": 47967,
+          "turnId": "turn-011",
+          "startMs": 43454
+        },
+        {
+          "endMs": 53429,
+          "turnId": "turn-012",
+          "startMs": 49042
+        },
+        {
+          "endMs": 58462,
+          "turnId": "turn-013",
+          "startMs": 54492
+        },
+        {
+          "endMs": 61881,
+          "turnId": "turn-014",
+          "startMs": 59494
+        },
+        {
+          "endMs": 65616,
+          "turnId": "turn-015",
+          "startMs": 62966
+        },
+        {
+          "endMs": 71354,
+          "turnId": "turn-016",
+          "startMs": 66679
+        },
+        {
+          "endMs": 76265,
+          "turnId": "turn-017",
+          "startMs": 72429
+        },
+        {
+          "endMs": 80321,
+          "turnId": "turn-018",
+          "startMs": 77271
+        },
+        {
+          "endMs": 83607,
+          "turnId": "turn-019",
+          "startMs": 81382
+        },
+        {
+          "endMs": 89560,
+          "turnId": "turn-020",
+          "startMs": 84695
+        }
+      ],
+      "provenance": {
+        "recoveredAt": "2026-10-24T08:14:18.418Z",
+        "method": "canonical authoring pipeline (Azure Speech SDK) re-render",
+        "note": "The pre-incident audio survived in object storage but the authoritative per-turn timeline did not. This entry preserves the timeline so a future rebuild can relink instead of paying for another render."
+      }
+    },
+    {
+      "quiz": {
+        "id": 25,
+        "title": "Nghe chép B1 — Cập nhật công việc",
+        "type": "LISTENING_PRACTICE",
+        "isPremiumContent": true
+      },
+      "artifact": {
+        "version": 7,
+        "r2Key": "premium/listening/quiz-25/audio/v7/full.mp3",
+        "r2Url": null,
+        "checksumSha256": "44005ffbe6c30314aa01f54df10e68df5960f5e0857261e57caf2d1c1d4c1c02",
+        "bytes": 1323648,
+        "contentType": "audio/mpeg",
+        "durationMs": 82728,
+        "provider": "AZURE_SPEECH_SDK",
+        "locale": "en-GB",
+        "accent": "UK",
+        "voiceRegistryVersion": "2026-09-21.v1",
+        "voiceConfiguration": [
+          {
+            "speakerId": "nora",
+            "voiceKey": "en-gb-female-01",
+            "providerVoice": "en-GB-SoniaNeural"
+          },
+          {
+            "speakerId": "dan",
+            "voiceKey": "en-gb-male-01",
+            "providerVoice": "en-GB-RyanNeural"
+          }
+        ],
+        "outputFormat": "audio-16khz-128kbitrate-mono-mp3",
+        "synthesisHash": "d3ca7a903c8d050f4435623219504d1389d01b718817284b3461099b392ca489",
+        "contentHash": "9d5c7cc620486042f77e66e6827b70fba9c1b912dfce649118dcdaa2d9378d68"
+      },
+      "timeline": [
+        {
+          "endMs": 4566,
+          "turnId": "turn-001",
+          "startMs": 25
+        },
+        {
+          "endMs": 6265,
+          "turnId": "turn-002",
+          "startMs": 5223
+        },
+        {
+          "endMs": 9440,
+          "turnId": "turn-003",
+          "startMs": 7390
+        },
+        {
+          "endMs": 13889,
+          "turnId": "turn-004",
+          "startMs": 10502
+        },
+        {
+          "endMs": 15177,
+          "turnId": "turn-005",
+          "startMs": 14502
+        },
+        {
+          "endMs": 19064,
+          "turnId": "turn-006",
+          "startMs": 16289
+        },
+        {
+          "endMs": 23362,
+          "turnId": "turn-007",
+          "startMs": 20127
+        },
+        {
+          "endMs": 27228,
+          "turnId": "turn-008",
+          "startMs": 23362
+        },
+        {
+          "endMs": 31949,
+          "turnId": "turn-009",
+          "startMs": 27228
+        },
+        {
+          "endMs": 37189,
+          "turnId": "turn-010",
+          "startMs": 32601
+        },
+        {
+          "endMs": 41885,
+          "turnId": "turn-011",
+          "startMs": 38251
+        },
+        {
+          "endMs": 46334,
+          "turnId": "turn-012",
+          "startMs": 42509
+        },
+        {
+          "endMs": 51071,
+          "turnId": "turn-013",
+          "startMs": 47396
+        },
+        {
+          "endMs": 54496,
+          "turnId": "turn-014",
+          "startMs": 51684
+        },
+        {
+          "endMs": 58786,
+          "turnId": "turn-015",
+          "startMs": 55596
+        },
+        {
+          "endMs": 62848,
+          "turnId": "turn-016",
+          "startMs": 59454
+        },
+        {
+          "endMs": 66747,
+          "turnId": "turn-017",
+          "startMs": 63890
+        },
+        {
+          "endMs": 70122,
+          "turnId": "turn-018",
+          "startMs": 67397
+        },
+        {
+          "endMs": 75260,
+          "turnId": "turn-019",
+          "startMs": 71222
+        },
+        {
+          "endMs": 81822,
+          "turnId": "turn-020",
+          "startMs": 75872
+        }
+      ],
+      "provenance": {
+        "recoveredAt": "2026-10-24T08:14:19.056Z",
+        "method": "canonical authoring pipeline (Azure Speech SDK) re-render",
+        "note": "The pre-incident audio survived in object storage but the authoritative per-turn timeline did not. This entry preserves the timeline so a future rebuild can relink instead of paying for another render."
+      }
+    },
+    {
+      "quiz": {
+        "id": 28,
+        "title": "Hội thoại B2 — Hỗ trợ khách hàng",
+        "type": "LISTENING_PRACTICE",
+        "isPremiumContent": false
+      },
+      "artifact": {
+        "version": 2,
+        "r2Key": "catalog/listening/practice/quiz-28/audio/v2/full.mp3",
+        "r2Url": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/listening/practice/quiz-28/audio/v2/full.mp3",
+        "checksumSha256": "123f74e0f1c1f865446c42c813fb610b5b351ef0a34e93699115f096a634807d",
+        "bytes": 344448,
+        "contentType": "audio/mpeg",
+        "durationMs": 21528,
+        "provider": "AZURE_SPEECH_SDK",
+        "locale": "en-US",
+        "accent": "US",
+        "voiceRegistryVersion": "2026-09-21.v1",
+        "voiceConfiguration": [],
+        "outputFormat": "audio-16khz-128kbitrate-mono-mp3",
+        "synthesisHash": "565edbda09541dfe04581a08647eb5c261aaa63c8fe286d3034530b211f22042",
+        "contentHash": "9a418e18aea8ea1d1c132e11e449454608fed97c2fc26579db616b65b35db006"
+      },
+      "timeline": [
+        {
+          "endMs": 4488,
+          "turnId": "turn-001",
+          "startMs": 0
+        },
+        {
+          "endMs": 11123,
+          "turnId": "turn-002",
+          "startMs": 5560
+        },
+        {
+          "endMs": 13408,
+          "turnId": "turn-003",
+          "startMs": 12220
+        },
+        {
+          "endMs": 20618,
+          "turnId": "turn-004",
+          "startMs": 14480
+        }
+      ],
+      "provenance": {
+        "recoveredAt": "2026-10-24T08:14:19.283Z",
         "method": "canonical authoring pipeline (Azure Speech SDK) re-render",
         "note": "The pre-incident audio survived in object storage but the authoritative per-turn timeline did not. This entry preserves the timeline so a future rebuild can relink instead of paying for another render."
       }

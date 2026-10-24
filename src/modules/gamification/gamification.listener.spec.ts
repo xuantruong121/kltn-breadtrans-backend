@@ -10,6 +10,8 @@ describe('GamificationListener', () => {
     userStats: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock };
     pointHistory: { findFirst: jest.Mock };
     dailyBanhEarning: { findUnique: jest.Mock; upsert: jest.Mock };
+    speakingRewardLedger: { createMany: jest.Mock };
+    $transaction: jest.Mock;
   };
   let gamificationServiceMock: {
     awardXp: jest.Mock;
@@ -55,6 +57,10 @@ describe('GamificationListener', () => {
         findUnique: jest.fn().mockResolvedValue(null),
         upsert: jest.fn().mockResolvedValue({}),
       },
+      speakingRewardLedger: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      $transaction: jest.fn((callback) => callback(prismaMock)),
     };
 
     gamificationServiceMock = {
@@ -287,6 +293,34 @@ describe('GamificationListener', () => {
         1,
         expect.any(String),
         expect.anything(),
+      );
+    });
+
+    it('treats a repeated speaking settlement as a ledger NOOP without duplicate side effects', async () => {
+      prismaMock.dailyQuest.findMany.mockResolvedValue([]);
+      prismaMock.speakingRewardLedger.createMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      const payload = {
+        userId: 15,
+        submissionId: 101,
+        exerciseId: 1,
+        overallScore: 85,
+        isSilentOrNoSpeech: false,
+      };
+
+      await listener.handleSpeakingSubmittedEvent(payload);
+      await listener.handleSpeakingSubmittedEvent(payload);
+
+      expect(prismaMock.speakingRewardLedger.createMany).toHaveBeenCalledTimes(
+        4,
+      );
+      expect(gamificationServiceMock.awardXp).toHaveBeenCalledTimes(1);
+      expect(gamificationServiceMock.awardSpeakingReward).toHaveBeenCalledTimes(
+        1,
       );
     });
   });

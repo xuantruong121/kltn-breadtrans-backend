@@ -36,7 +36,10 @@ import {
   isPrivateListeningMediaKey,
 } from '../src/modules/upload/r2.service';
 import { UploadService } from '../src/modules/upload/upload.service';
-import { sha256 } from '../src/modules/quiz/listening-audio-authoring.service';
+import {
+  resolveListeningVoice,
+  sha256,
+} from '../src/modules/quiz/listening-audio-authoring.service';
 
 const MANIFEST = join(
   process.cwd(),
@@ -47,9 +50,9 @@ const MANIFEST = join(
 const doExport = process.argv.includes('--export');
 const doRestore = process.argv.includes('--restore');
 /**
- * Publication is opt-in. Publishing makes DICTATION questions artifact-backed,
- * and the dictation UI seeks using question content offsets that no canonical
- * pipeline currently populates, so a restored artifact stays parked by default.
+ * Publication is opt-in. A published artifact is served to Dictation only
+ * through the timing-only learner contract; the manifest restore itself stays
+ * non-activating so a recovered row is never made learner-visible by accident.
  */
 const activate = process.argv.includes('--activate');
 
@@ -69,6 +72,11 @@ type ManifestEntry = {
     locale: string;
     accent: string;
     voiceRegistryVersion: string;
+    voiceConfiguration: Array<{
+      speakerId: string;
+      voiceKey: string;
+      providerVoice: string;
+    }>;
     outputFormat: string;
     synthesisHash: string;
     contentHash: string;
@@ -148,6 +156,21 @@ async function runExport(prisma: PrismaClient, upload: UploadService) {
       continue;
     }
     seen.add(artifact.quizId);
+    const questions = await prisma.question.findMany({
+      where: { quizId: artifact.quizId },
+      orderBy: { order: 'asc' },
+      select: { content: true },
+    });
+    const speakers = new Map<string, string | undefined>();
+    for (const question of questions) {
+      const content = question.content as Record<string, unknown>;
+      const speakerId = typeof content.speakerId === 'string' ? content.speakerId : null;
+      if (!speakerId || speakers.has(speakerId)) continue;
+      speakers.set(
+        speakerId,
+        typeof content.voiceKey === 'string' ? content.voiceKey : undefined,
+      );
+    }
     entries.push({
       quiz: artifact.quiz,
       artifact: {
@@ -162,6 +185,10 @@ async function runExport(prisma: PrismaClient, upload: UploadService) {
         locale: artifact.locale,
         accent: artifact.accent,
         voiceRegistryVersion: artifact.voiceRegistryVersion,
+        voiceConfiguration: [...speakers.entries()].map(([speakerId, voiceKey], fallbackSlot) => ({
+          speakerId,
+          ...resolveListeningVoice(speakerId, artifact.accent, voiceKey, fallbackSlot),
+        })),
         outputFormat: artifact.outputFormat,
         synthesisHash: artifact.synthesisHash,
         contentHash: artifact.contentHash,
@@ -261,6 +288,32 @@ async function runRestore(prisma: PrismaClient, upload: UploadService) {
         JSON.stringify(timelineOf(existing.timeline)) ===
         JSON.stringify(entry.timeline);
       if (existing.r2Key === entry.artifact.r2Key && sameTimeline) {
+        if (activate && existing.status !== 'PUBLISHED') {
+          // The manifest's checksum and exact timeline have already passed
+          // verification above. Activation only promotes this recovered,
+          // identity-equivalent artifact; it never calls Azure or uploads R2.
+          await prisma.$transaction(async (tx) => {
+            await tx.listeningAudioArtifact.updateMany({
+              where: {
+                quizId: entry.quiz.id,
+                status: 'PUBLISHED',
+                id: { not: existing.id },
+              },
+              data: { status: 'STALE' },
+            });
+            await tx.listeningAudioArtifact.update({
+              where: { id: existing.id },
+              data: {
+                status: 'PUBLISHED',
+                approvedAt: existing.approvedAt ?? new Date(),
+                publishedAt: new Date(),
+              },
+            });
+          });
+          summary.restored++;
+          console.log(`  ${label}: ACTIVATED_EXISTING (no audio synthesized)`);
+          continue;
+        }
         summary.alreadyValid++;
         console.log(`  ${label}: ALREADY_VALID (${existing.status})`);
         continue;

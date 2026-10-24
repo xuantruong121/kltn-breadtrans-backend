@@ -151,39 +151,54 @@ export class GamificationListener {
     const runWithTx = async (tx: Prisma.TransactionClient) => {
       const txWithLedger = tx as unknown as {
         speakingRewardLedger?: {
-          create: (args: {
+          createMany: (args: {
             data: {
               submissionId: number;
               userId: number;
               rewardType: string;
               reference: string;
-            };
-          }) => Promise<unknown>;
+            }[];
+            skipDuplicates: boolean;
+          }) => Promise<{ count: number }>;
         };
       };
       if (
         txWithLedger.speakingRewardLedger &&
-        typeof txWithLedger.speakingRewardLedger.create === 'function'
+        typeof txWithLedger.speakingRewardLedger.createMany === 'function'
       ) {
-        await txWithLedger.speakingRewardLedger.create({
-          data: {
-            submissionId,
-            userId,
-            rewardType,
-            reference,
-          },
+        // Reserve the effect before mutating XP/Bánh Mì. `createMany` maps to
+        // INSERT ... ON CONFLICT DO NOTHING in PostgreSQL, so a retry becomes a
+        // clean NOOP instead of deliberately producing a duplicate-key error.
+        const reservation = await txWithLedger.speakingRewardLedger.createMany({
+          data: [
+            {
+              submissionId,
+              userId,
+              rewardType,
+              reference,
+            },
+          ],
+          skipDuplicates: true,
         });
+        if (reservation.count === 0) {
+          this.logger.log(
+            `Reward effect ${rewardType} already processed for submission #${submissionId} (${reference}). Skipping.`,
+          );
+          return false;
+        }
       }
       await effectFn(tx);
+      return true;
     };
 
     try {
+      let applied: boolean;
       if (typeof this.prisma.$transaction === 'function') {
-        await this.prisma.$transaction(runWithTx);
+        applied = await this.prisma.$transaction(runWithTx);
       } else {
-        await runWithTx(this.prisma);
+        applied = await runWithTx(this.prisma);
       }
-      return true;
+      return applied;
     } catch (err: unknown) {
       if (this.isUniqueConstraint(err)) {
         this.logger.log(

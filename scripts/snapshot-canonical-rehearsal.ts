@@ -30,6 +30,7 @@ async function main() {
     toeicExamSets,
     toeicAssessments,
     writingSets,
+    wholeQuizArtifacts,
     sequenceState,
   ] = await Promise.all([
     prisma.plan.findMany({
@@ -62,6 +63,21 @@ async function main() {
     }),
     prisma.toeicAssessment.findMany({ orderBy: { id: 'asc' }, include: { genericExam: true, components: { orderBy: { order: 'asc' } } } }),
     prisma.toeicWritingSet.findMany({ orderBy: { id: 'asc' }, include: { items: { orderBy: { order: 'asc' }, select: { id: true, order: true, taskKind: true, writingQuizId: true } } } }),
+    prisma.listeningAudioArtifact.findMany({
+      where: { quizId: { in: [23, 24, 25, 28] } },
+      orderBy: [{ quizId: 'asc' }, { version: 'asc' }],
+      include: {
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            isPremiumContent: true,
+            questions: { orderBy: { order: 'asc' }, select: { content: true } },
+          },
+        },
+      },
+    }),
     resyncSequences(prisma, true),
   ]);
 
@@ -136,6 +152,39 @@ async function main() {
         assessments: toeicAssessments.map((assessment) => ({ id: assessment.id, examId: assessment.examId, title: assessment.title, productFamily: assessment.productFamily, publicationStatus: assessment.publicationStatus, componentIds: assessment.components.map((component) => ({ id: component.id, kind: component.kind, order: component.order, lrExamSetId: component.lrExamSetId, speakingPracticeSetId: component.speakingPracticeSetId, writingSetId: component.writingSetId })) })),
         writingSets: writingSets.map((set) => ({ id: set.id, title: set.title, publicationStatus: set.publicationStatus, version: set.version, items: set.items })),
       },
+      wholeQuizArtifacts: wholeQuizArtifacts.map((artifact) => {
+        const speakers = new Map<string, string | undefined>();
+        for (const question of artifact.quiz.questions) {
+          const content = question.content as Record<string, unknown>;
+          const speakerId = typeof content.speakerId === 'string' ? content.speakerId : null;
+          if (!speakerId || speakers.has(speakerId)) continue;
+          speakers.set(speakerId, typeof content.voiceKey === 'string' ? content.voiceKey : undefined);
+        }
+        return {
+          quiz: {
+            id: artifact.quiz.id,
+            title: artifact.quiz.title,
+            type: artifact.quiz.type,
+            isPremiumContent: artifact.quiz.isPremiumContent,
+          },
+          artifact: {
+            version: artifact.version,
+            status: artifact.status,
+            r2Key: artifact.r2Key,
+            checksumSha256: artifact.checksumSha256,
+            durationMs: artifact.durationMs,
+            synthesisHash: artifact.synthesisHash,
+            contentHash: artifact.contentHash,
+            provider: artifact.provider,
+            locale: artifact.locale,
+            accent: artifact.accent,
+            voiceRegistryVersion: artifact.voiceRegistryVersion,
+            outputFormat: artifact.outputFormat,
+          },
+          timeline: json(artifact.timeline),
+          voiceConfiguration: [...speakers.entries()],
+        };
+      }),
       sequenceState,
     },
   };

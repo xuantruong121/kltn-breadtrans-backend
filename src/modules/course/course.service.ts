@@ -28,7 +28,7 @@ import {
   PlanFeatureKey,
   Role,
 } from '@prisma/client';
-import { buildCourseCurriculum } from './course-curriculum';
+import { buildCourseCurriculum, CourseCurriculum } from './course-curriculum';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
   getCourseLearningProfile,
@@ -70,6 +70,66 @@ export class CourseService {
       };
     }
     return { canAccess: false, accessSource: null, requiresPro: true };
+  }
+
+  private buildV5FallbackCurriculum(
+    courseLessons: Array<{
+      id: number;
+      order: number;
+      title: string;
+      summary: string;
+      exercises?: Array<{ id: number; title?: string | null; required?: boolean }>;
+    }>,
+  ): CourseCurriculum {
+    const lessons = courseLessons.map((cl) => ({
+      id: cl.id,
+      order: cl.order,
+      title: cl.title,
+      description: cl.summary,
+      materials: [],
+      activities: (cl.exercises || []).map((ex) => ({
+        id: `v5-ex-${ex.id}`,
+        sourceId: ex.id,
+        kind: 'LESSON' as const,
+        skill: null,
+        title: ex.title || 'Bài tập thực hành',
+        description: null,
+        route: null,
+        required: Boolean(ex.required),
+        published: true,
+        hasQuestions: true,
+        isPremiumContent: false,
+        completed: false,
+        unlocked: true,
+        lockedReason: null,
+      })),
+    }));
+
+    const requiredActivityCount = courseLessons.reduce(
+      (sum, cl) =>
+        sum + (cl.exercises || []).filter((ex) => ex.required).length,
+      0,
+    );
+    const optionalActivityCount = courseLessons.reduce(
+      (sum, cl) =>
+        sum + (cl.exercises || []).filter((ex) => !ex.required).length,
+      0,
+    );
+
+    return {
+      version: 2,
+      lessons,
+      requiredActivityCount,
+      optionalActivityCount,
+      skillCoverage: {
+        LISTENING: 0,
+        SPEAKING: 0,
+        READING: 0,
+        WRITING: 0,
+      },
+      readiness: courseLessons.length > 0 ? 'READY' : 'EMPTY',
+      readinessReasons: [],
+    };
   }
 
   private async assertCoursePublishable(courseId: number) {
@@ -219,6 +279,15 @@ export class CourseService {
           },
         },
         lessons: { include: { materials: true }, orderBy: { order: 'asc' } },
+        courseLessons: {
+          where: { status: CourseLessonStatus.PUBLISHED },
+          orderBy: { order: 'asc' },
+          include: {
+            exercises: {
+              select: { id: true, title: true, type: true, required: true },
+            },
+          },
+        },
         quizzes: {
           include: { _count: { select: { questions: true } } },
           orderBy: { id: 'asc' },
@@ -239,14 +308,19 @@ export class CourseService {
     if (!course) throw new NotFoundException('Course not found');
 
     if (role === Role.ADMIN) {
+      const isV5Admin =
+        (course.lessons?.length ?? 0) === 0 &&
+        Boolean(course.courseLessons && course.courseLessons.length > 0);
       return {
         ...course,
-        curriculum: buildCourseCurriculum(
-          course.lessons,
-          course.quizzes,
-          course.activities,
-          course.curriculumType,
-        ),
+        curriculum: isV5Admin
+          ? this.buildV5FallbackCurriculum(course.courseLessons)
+          : buildCourseCurriculum(
+              course.lessons || [],
+              course.quizzes || [],
+              course.activities || [],
+              course.curriculumType,
+            ),
       };
     }
 
@@ -254,13 +328,19 @@ export class CourseService {
       throw new NotFoundException('Course not found');
     }
 
+    const isV5Only =
+      (course.lessons?.length ?? 0) === 0 &&
+      Boolean(course.courseLessons && course.courseLessons.length > 0);
+
     const access = await this.resolveCourseAccess(id, userId, role);
-    const curriculum = buildCourseCurriculum(
-      course.lessons,
-      access.canAccess ? course.quizzes : [],
-      access.canAccess ? course.activities : [],
-      course.curriculumType,
-    );
+    const curriculum = isV5Only
+      ? this.buildV5FallbackCurriculum(course.courseLessons)
+      : buildCourseCurriculum(
+          course.lessons || [],
+          access.canAccess ? course.quizzes || [] : [],
+          access.canAccess ? course.activities || [] : [],
+          course.curriculumType,
+        );
     const { activities: _activities, ...courseWithoutRawActivities } = course;
     void _activities;
     const safeClasses = course.classes.map(
@@ -285,14 +365,16 @@ export class CourseService {
       isStarted: access.canAccess,
       isCompleted: progress?.isComplete ?? false,
       lockedReason: access.canAccess ? null : 'PRO_REQUIRED',
-      lessons: course.lessons.map((lesson) => ({
-        ...lesson,
-        videoUrl: access.canAccess ? lesson.videoUrl : null,
-        materials: lesson.materials.map((material) => ({
-          ...material,
-          fileUrl: access.canAccess ? material.fileUrl : null,
-        })),
-      })),
+      lessons: isV5Only
+        ? curriculum.lessons
+        : course.lessons.map((lesson) => ({
+            ...lesson,
+            videoUrl: access.canAccess ? lesson.videoUrl : null,
+            materials: lesson.materials.map((material) => ({
+              ...material,
+              fileUrl: access.canAccess ? material.fileUrl : null,
+            })),
+          })),
       quizzes: access.canAccess ? course.quizzes : [],
     };
   }
@@ -1193,6 +1275,15 @@ export class CourseService {
         status: true,
         createdAt: true,
         lessons: { include: { materials: true }, orderBy: { order: 'asc' } },
+        courseLessons: {
+          where: { status: CourseLessonStatus.PUBLISHED },
+          orderBy: { order: 'asc' },
+          include: {
+            exercises: {
+              select: { id: true, title: true, type: true, required: true },
+            },
+          },
+        },
         quizzes: { include: { _count: { select: { questions: true } } } },
         activities: {
           include: {
@@ -1220,12 +1311,18 @@ export class CourseService {
     });
     const visible = [];
     for (const course of courses) {
-      const curriculum = buildCourseCurriculum(
-        course.lessons,
-        course.quizzes,
-        course.activities,
-        course.curriculumType,
-      );
+      const isV5Only =
+        course.lessons.length === 0 &&
+        course.courseLessons &&
+        course.courseLessons.length > 0;
+      const curriculum = isV5Only
+        ? this.buildV5FallbackCurriculum(course.courseLessons)
+        : buildCourseCurriculum(
+            course.lessons,
+            course.quizzes,
+            course.activities,
+            course.curriculumType,
+          );
       const access = await this.resolveCourseAccess(course.id, userId, role);
       visible.push({
         id: course.id,
@@ -1271,6 +1368,15 @@ export class CourseService {
         status: true,
         createdAt: true,
         lessons: { include: { materials: true }, orderBy: { order: 'asc' } },
+        courseLessons: {
+          where: { status: CourseLessonStatus.PUBLISHED },
+          orderBy: { order: 'asc' },
+          include: {
+            exercises: {
+              select: { id: true, title: true, type: true, required: true },
+            },
+          },
+        },
         quizzes: { include: { _count: { select: { questions: true } } } },
         activities: {
           include: {
@@ -1308,12 +1414,19 @@ export class CourseService {
       );
     }
     const access = await this.resolveCourseAccess(id, userId, role);
-    const curriculum = buildCourseCurriculum(
-      course.lessons,
-      access.canAccess ? course.quizzes : [],
-      access.canAccess ? course.activities : [],
-      course.curriculumType,
-    );
+    const isV5Only =
+      course.lessons.length === 0 &&
+      course.courseLessons &&
+      course.courseLessons.length > 0;
+
+    const curriculum = isV5Only
+      ? this.buildV5FallbackCurriculum(course.courseLessons)
+      : buildCourseCurriculum(
+          course.lessons,
+          access.canAccess ? course.quizzes : [],
+          access.canAccess ? course.activities : [],
+          course.curriculumType,
+        );
     if (course.status !== CourseStatus.PUBLISHED && !access.canAccess) {
       throw new NotFoundException(
         'Khóa học không tồn tại hoặc chưa được công khai',
@@ -1329,15 +1442,17 @@ export class CourseService {
       learning: getCourseLearningProfile(id, course.title),
       status: course.status,
       createdAt: course.createdAt,
-      lessons: course.lessons.map((lesson) => ({
-        id: lesson.id,
-        title: lesson.title,
-        description: lesson.description,
-        order: lesson.order,
-        activities:
-          curriculum.lessons.find((item) => item.id === lesson.id)
-            ?.activities ?? [],
-      })),
+      lessons: isV5Only
+        ? curriculum.lessons
+        : course.lessons.map((lesson) => ({
+            id: lesson.id,
+            title: lesson.title,
+            description: lesson.description,
+            order: lesson.order,
+            activities:
+              curriculum.lessons.find((item) => item.id === lesson.id)
+                ?.activities ?? [],
+          })),
       curriculum,
       classes: (course.classes || []).map(({ enrollments, ...cls }) => {
         const current = enrollments?.length ?? 0;

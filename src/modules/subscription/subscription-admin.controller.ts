@@ -48,7 +48,7 @@ export class SubscriptionAdminController {
 
   @Get()
   @ApiOperation({
-    summary: 'Danh sách quyền học viên (Pro Entitlement list) kèm bộ lọc',
+    summary: 'Danh sách quyền học viên kèm bộ lọc',
   })
   @ApiResponse({ status: HttpStatus.OK, type: PaginatedAdminSubscriptionsDto })
   list(
@@ -58,14 +58,14 @@ export class SubscriptionAdminController {
   }
 
   @Get('plans')
-  @ApiOperation({ summary: 'Danh sách các gói Pro đang mở để Admin tặng' })
+  @ApiOperation({ summary: 'Danh sách các gói nâng cấp đang mở để Admin tặng' })
   @ApiResponse({ status: HttpStatus.OK, type: [AdminActivePlanDto] })
   getActivePlans(): Promise<AdminActivePlanDto[]> {
     return this.subscriptionAdminService.getActivePlans();
   }
 
   @Get('learners')
-  @ApiOperation({ summary: 'Tra cứu học viên cho modal tặng gói Pro' })
+  @ApiOperation({ summary: 'Tra cứu học viên cho modal tặng gói' })
   @ApiResponse({ status: HttpStatus.OK, type: [AdminLearnerLookupDto] })
   searchLearners(@Query('q') query?: string): Promise<AdminLearnerLookupDto[]> {
     return this.subscriptionAdminService.searchLearners(query);
@@ -74,7 +74,8 @@ export class SubscriptionAdminController {
   @Post('grant')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Admin tặng gói Pro cho học viên (không sinh bản ghi thanh toán)',
+    summary:
+      'Admin tặng gói nâng cấp cho học viên (không sinh bản ghi thanh toán)',
   })
   @ApiResponse({ status: HttpStatus.OK, type: AdminSubscriptionItemDto })
   grant(
@@ -90,7 +91,8 @@ export class SubscriptionAdminController {
   @Post(':id/extend')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Admin gia hạn gói Pro đang hoạt động (bảo toàn ngày còn lại)',
+    summary:
+      'Admin gia hạn gói nâng cấp đang hoạt động (bảo toàn ngày còn lại)',
   })
   @ApiResponse({ status: HttpStatus.OK, type: AdminSubscriptionItemDto })
   extend(
@@ -108,7 +110,7 @@ export class SubscriptionAdminController {
   @Post(':id/revoke')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Admin thu hồi quyền Pro của học viên (không xóa bản ghi)',
+    summary: 'Admin thu hồi quyền gói của học viên (không xóa bản ghi)',
   })
   @ApiResponse({ status: HttpStatus.OK, type: AdminSubscriptionItemDto })
   revoke(
@@ -125,7 +127,7 @@ export class SubscriptionAdminController {
 
   @Get(':id/history')
   @ApiOperation({
-    summary: 'Lịch sử kiểm toán của một quyền Pro (audit history timeline)',
+    summary: 'Lịch sử kiểm toán của một gói học viên (audit history timeline)',
   })
   @ApiResponse({ status: HttpStatus.OK, type: [AdminSubscriptionEventDto] })
   getHistory(
@@ -136,7 +138,7 @@ export class SubscriptionAdminController {
 
   @Get('user/:userId/history')
   @ApiOperation({
-    summary: 'Toàn bộ lịch sử quyền Pro của một học viên',
+    summary: 'Toàn bộ lịch sử gói nâng cấp của một học viên',
   })
   @ApiResponse({ status: HttpStatus.OK, type: [AdminSubscriptionEventDto] })
   getLearnerHistory(

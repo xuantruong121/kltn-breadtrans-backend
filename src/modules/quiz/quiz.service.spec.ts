@@ -42,6 +42,11 @@ const mockPrismaService = {
   question: {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
+    findMany: jest.fn(),
+  },
+  listeningTranscriptReveal: {
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
   },
   listeningPracticeAttempt: {
     findFirst: jest.fn(),
@@ -285,6 +290,112 @@ describe('QuizService', () => {
 
       const result = await service.getQuizById(9, false, 7);
       expect(result.questions[0].content).toEqual({ options: ['A', 'B'] });
+    });
+
+    it('delivers artifact timing without leaking a listening transcript before reveal', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 23,
+        type: 'LISTENING_PRACTICE',
+        publicationStatus: 'PUBLISHED',
+        questions: [
+          {
+            id: 115,
+            type: 'DICTATION',
+            content: {
+              targetTurnId: 'turn-001',
+              correctAnswer: 'Hidden answer.',
+              audioText: 'Hidden answer.',
+              translation: 'Bản dịch chỉ được xem sau khi reveal.',
+              transcriptSegments: [
+                { text: 'Hidden answer.', translation: 'Đáp án ẩn' },
+              ],
+            },
+          },
+        ],
+      });
+      mockListeningAudioAuthoringService.getCurrentPublishedArtifact.mockResolvedValue(
+        {
+          id: 7,
+          version: 7,
+          checksumSha256: 'checksum',
+          durationMs: 75528,
+          timeline: [{ turnId: 'turn-001', startMs: 1200, endMs: 3400 }],
+        },
+      );
+
+      const result = await service.getQuizById(23, false, 7);
+
+      expect(result.questions[0].content).toEqual({ targetTurnId: 'turn-001' });
+      expect((result.questions[0] as any).listeningSegment).toEqual({
+        turnId: 'turn-001',
+        startMs: 1200,
+        endMs: 3400,
+      });
+    });
+
+    it('requires a learner-owned reveal before serving dialogue transcripts', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 28,
+        type: 'LISTENING_PRACTICE',
+        isPremiumContent: false,
+        courseId: null,
+        publicationStatus: 'PUBLISHED',
+      });
+      mockPrismaService.question.findMany.mockResolvedValue([
+        {
+          id: 179,
+          type: 'DIALOGUE',
+          order: 1,
+          content: {
+            transcriptSegments: [
+              { speaker: 'Customer', text: 'I need help.', translation: 'Tôi cần hỗ trợ.' },
+              { speaker: 'Agent', text: 'I can help.', translation: 'Tôi có thể hỗ trợ.' },
+            ],
+          },
+        },
+      ]);
+      mockPrismaService.listeningTranscriptReveal.findUnique.mockResolvedValue(null);
+
+      await expect(service.getListeningTranscript(7, 28)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(mockPrismaService.listeningTranscriptReveal.findUnique).toHaveBeenCalledWith({
+        where: { userId_quizId: { userId: 7, quizId: 28 } },
+        select: { id: true },
+      });
+    });
+
+    it('serves dialogue transcript only after that learner has a reveal record', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 28,
+        type: 'LISTENING_PRACTICE',
+        isPremiumContent: false,
+        courseId: null,
+        publicationStatus: 'PUBLISHED',
+      });
+      mockPrismaService.question.findMany.mockResolvedValue([
+        {
+          id: 179,
+          type: 'DIALOGUE',
+          order: 1,
+          content: {
+            transcriptSegments: [
+              { speaker: 'Customer', text: 'I need help.', translation: 'Tôi cần hỗ trợ.' },
+              { speaker: 'Agent', text: 'I can help.', translation: 'Tôi có thể hỗ trợ.' },
+            ],
+          },
+        },
+      ]);
+      mockPrismaService.listeningTranscriptReveal.findUnique.mockResolvedValue({ id: 1 });
+
+      const result = await service.getListeningTranscript(7, 28);
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0]).toMatchObject({
+        questionId: 179,
+        turnId: 'turn-001',
+        speaker: 'Customer',
+        transcript: 'I need help.',
+      });
     });
 
     it('keeps Reading answer keys out of the pre-submission payload', async () => {
@@ -1406,6 +1517,7 @@ describe('QuizService', () => {
         version: 5,
         checksumSha256: 'checksum-v5',
         durationMs: 94627,
+        timeline: [{ turnId: 'turn-001', startMs: 0, endMs: 2500 }],
       };
       mockPrismaService.question.findUnique.mockResolvedValue({
         id: 120,
@@ -1441,6 +1553,33 @@ describe('QuizService', () => {
         checksumSha256: 'checksum-v5',
       });
       expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when an artifact-backed question has no valid timeline turn', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 120,
+        quizId: 24,
+        type: 'DICTATION',
+        quiz: { id: 24, type: 'LISTENING_PRACTICE' },
+        audioAssets: [],
+        content: { targetTurnId: 'turn-002' },
+      });
+      mockListeningAudioAuthoringService.getCurrentPublishedArtifact.mockResolvedValue(
+        {
+          id: 15,
+          version: 5,
+          checksumSha256: 'checksum-v5',
+          durationMs: 94627,
+          timeline: [{ turnId: 'turn-001', startMs: 0, endMs: 2500 }],
+        },
+      );
+
+      await expect(service.streamQuestionAudio(24, 120)).rejects.toThrow(
+        'Audio toàn bài chưa có mốc thời gian hợp lệ cho câu này',
+      );
+      expect(
+        mockListeningAudioAuthoringService.getPublishedAudio,
+      ).not.toHaveBeenCalled();
     });
 
     it('does not downgrade an identity-bound request to a legacy clip', async () => {

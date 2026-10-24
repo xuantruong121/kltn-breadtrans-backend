@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "phases": [
+    {
+      "name": "Q25 whole-audio recovery",
+      "timestamp": "2026-10-24T12:00:00.000Z",
+      "route": "/listening/25",
+      "entitlement": "PLUS",
+      "result": "PASS",
+      "measured": {
+        "questionsVerified": "20/20",
+        "perQuestionSeek": true,
+        "segmentStop": true,
+        "navigationAudio": true,
+        "semanticSpeaker": true,
+        "fullScriptPlayback": true,
+        "fullScriptDurationSeconds": 82.728,
+        "preRevealTranscriptStatus": 403,
+        "postRevealTranscriptStatus": 200
+      },
+      "failureDetails": null
+    }
+  ]
+}
