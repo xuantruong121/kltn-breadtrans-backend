@@ -46,23 +46,31 @@ describe('provenance guard', () => {
     'revision-register',
   ];
 
-  it.each(awkward)('detects the awkward variant %p in a string value', (token) => {
-    const fixture = clone(draft()) as Record<string, unknown>;
-    (fixture.listening as { items: Record<string, unknown>[] }).items[0].prompt =
-      `What are the speakers mainly discussing? ${token}`;
-    const hits = findProvenanceViolations(fixture);
-    expect(hits.length).toBeGreaterThan(0);
-  });
+  it.each(awkward)(
+    'detects the awkward variant %p in a string value',
+    (token) => {
+      const fixture = clone(draft()) as Record<string, unknown>;
+      (
+        fixture.listening as { items: Record<string, unknown>[] }
+      ).items[0].prompt = `What are the speakers mainly discussing? ${token}`;
+      const hits = findProvenanceViolations(fixture);
+      expect(hits.length).toBeGreaterThan(0);
+    },
+  );
 
-  it.each(awkward)('detects the awkward variant %p in an object KEY', (token) => {
-    const fixture = clone(draft()) as Record<string, unknown>;
-    (fixture as Record<string, unknown>)[`note_${token}`] = 'anything';
-    expect(findProvenanceViolations(fixture).length).toBeGreaterThan(0);
-  });
+  it.each(awkward)(
+    'detects the awkward variant %p in an object KEY',
+    (token) => {
+      const fixture = clone(draft()) as Record<string, unknown>;
+      fixture[`note_${token}`] = 'anything';
+      expect(findProvenanceViolations(fixture).length).toBeGreaterThan(0);
+    },
+  );
 
   it('detects a token nested deep inside arrays and objects', () => {
     const fixture = clone(draft()) as Record<string, unknown>;
-    const items = (fixture.listening as { items: Record<string, unknown>[] }).items;
+    const items = (fixture.listening as { items: Record<string, unknown>[] })
+      .items;
     items[4].distractorRationales = [
       'CORRECT',
       'fine',
@@ -78,7 +86,8 @@ describe('provenance guard', () => {
     const fixture = clone(rubrics()) as {
       rubrics: { criteria: { anchors: { anchor: string }[] }[] }[];
     };
-    fixture.rubrics[0].criteria[0].anchors[0].anchor = 'No response. See IR-017.';
+    fixture.rubrics[0].criteria[0].anchors[0].anchor =
+      'No response. See IR-017.';
     expect(findProvenanceViolations(fixture).length).toBeGreaterThan(0);
   });
 
@@ -123,7 +132,8 @@ describe('active CEFR guard', () => {
 
   it('detects a CEFR code used as an item level in the content draft', () => {
     const fixture = clone(draft()) as Record<string, unknown>;
-    const items = (fixture.listening as { items: Record<string, unknown>[] }).items;
+    const items = (fixture.listening as { items: Record<string, unknown>[] })
+      .items;
     items[0].intendedLevel = 'A2';
     expect(findActiveCefrViolations(fixture).length).toBeGreaterThan(0);
   });
@@ -162,7 +172,8 @@ describe('database-id guard', () => {
 
   it('detects a nested numeric id on an item', () => {
     const fixture = clone(draft()) as Record<string, unknown>;
-    const items = (fixture.listening as { items: Record<string, unknown>[] }).items;
+    const items = (fixture.listening as { items: Record<string, unknown>[] })
+      .items;
     items[2].id = 417;
     items[2].assessmentId = 2;
     const hits = findDatabaseIds(fixture);

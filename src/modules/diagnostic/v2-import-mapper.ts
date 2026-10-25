@@ -138,7 +138,9 @@ export function assertNoAuthoringFields(
 ): void {
   for (const key of Object.keys(payload)) {
     if ((AUTHORING_ONLY_FIELDS as readonly string[]).includes(key)) {
-      throw new Error(`${label}: authoring-only field "${key}" must not be persisted`);
+      throw new Error(
+        `${label}: authoring-only field "${key}" must not be persisted`,
+      );
     }
     if (!QUESTION_COLUMNS.has(key)) {
       throw new Error(`${label}: "${key}" is not a DiagnosticQuestion column`);
@@ -175,7 +177,8 @@ export function mapObjectiveQuestion(
     throw new Error(`${item.draftKey}: correctAnswer is not unique in options`);
   }
   const skillCode = SKILL_CODES[item.skill];
-  if (!skillCode) throw new Error(`${item.draftKey}: unknown skill "${item.skill}"`);
+  if (!skillCode)
+    throw new Error(`${item.draftKey}: unknown skill "${item.skill}"`);
 
   let passageId: number | null = null;
   if (item.passageDraftKey) {
@@ -222,7 +225,8 @@ export function mapProductiveTask(
   ctx: MappingContext,
 ): QuestionCreatePayload {
   const skillCode = SKILL_CODES[item.skill];
-  if (!skillCode) throw new Error(`${item.draftKey}: unknown skill "${item.skill}"`);
+  if (!skillCode)
+    throw new Error(`${item.draftKey}: unknown skill "${item.skill}"`);
   let rubricId: number | null = null;
   if (item.rubricVersion) {
     const resolved = ctx.rubricIds?.[item.rubricVersion];
@@ -281,7 +285,9 @@ export function authoredIndexFromDisplayed(
 ): number {
   const authored = permutation[displayedIndex];
   if (authored === undefined) {
-    throw new Error(`displayed index ${displayedIndex} is outside the permutation`);
+    throw new Error(
+      `displayed index ${displayedIndex} is outside the permutation`,
+    );
   }
   return authored;
 }
@@ -293,7 +299,9 @@ export function displayedIndexFromAuthored(
 ): number {
   const displayed = permutation.indexOf(authoredIndex);
   if (displayed < 0) {
-    throw new Error(`authored index ${authoredIndex} is not in the permutation`);
+    throw new Error(
+      `authored index ${authoredIndex} is not in the permutation`,
+    );
   }
   return displayed;
 }
@@ -303,7 +311,10 @@ export function displayedIndexFromAuthored(
  * through the authored index, never by position and never by text.
  */
 export function rationaleForDisplayedOption(
-  item: Pick<ObjectiveDraftItem, 'options' | 'correctAnswer' | 'distractorRationales'>,
+  item: Pick<
+    ObjectiveDraftItem,
+    'options' | 'correctAnswer' | 'distractorRationales'
+  >,
   permutation: readonly number[],
   displayedIndex: number,
 ): { optionText: string; rationale: string; isCorrect: boolean } {

@@ -44,11 +44,15 @@ export function walkStrings(value: unknown, visit: Visitor, path = ''): void {
     return;
   }
   if (Array.isArray(value)) {
-    value.forEach((entry, index) => walkStrings(entry, visit, `${path}[${index}]`));
+    value.forEach((entry, index) =>
+      walkStrings(entry, visit, `${path}[${index}]`),
+    );
     return;
   }
   if (value && typeof value === 'object') {
-    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    for (const [key, entry] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
       const childPath = path ? `${path}.${key}` : key;
       // The key itself is content as far as these guards are concerned.
       visit(childPath, key, key);
@@ -92,7 +96,8 @@ export function findProvenanceViolations(document: unknown): GuardViolation[] {
   return found;
 }
 
-const CEFR_TOKEN = /(?:^|[^A-Za-z])(?:Pre-A1|A1|A2|B1|B2|C1|C2|CEFR)(?:[^A-Za-z]|$)/i;
+const CEFR_TOKEN =
+  /(?:^|[^A-Za-z])(?:Pre-A1|A1|A2|B1|B2|C1|C2|CEFR)(?:[^A-Za-z]|$)/i;
 /** A value that is nothing but a CEFR code is acting as a level, not prose. */
 const CEFR_EXACT = /^\s*(?:Pre-A1|A1|A2|B1|B2|C1|C2)\s*$/i;
 /** Field names that make a CEFR token semantically ACTIVE. */
@@ -168,7 +173,9 @@ export function findDatabaseIds(document: unknown): GuardViolation[] {
       return;
     }
     if (!value || typeof value !== 'object') return;
-    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    for (const [key, entry] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
       const childPath = path ? `${path}.${key}` : key;
       if (/^(?:id|[A-Za-z0-9]*Id)$/.test(key) && typeof entry === 'number') {
         found.push({

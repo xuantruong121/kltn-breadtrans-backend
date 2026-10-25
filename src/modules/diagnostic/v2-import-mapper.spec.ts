@@ -45,7 +45,10 @@ function permutationsOf4(): number[][] {
       return;
     }
     rest.forEach((value, index) => {
-      recurse([...rest.slice(0, index), ...rest.slice(index + 1)], [...acc, value]);
+      recurse(
+        [...rest.slice(0, index), ...rest.slice(index + 1)],
+        [...acc, value],
+      );
     });
   };
   recurse(base, []);
@@ -84,7 +87,9 @@ describe('v2 import mapper — allowlist discipline', () => {
         string,
         unknown
       >;
-      expect(() => assertNoAuthoringFields(payload, item.draftKey)).not.toThrow();
+      expect(() =>
+        assertNoAuthoringFields(payload, item.draftKey),
+      ).not.toThrow();
       expect(payload.draftKey).toBeUndefined();
       expect(payload.distractorRationales).toBeUndefined();
       expect(payload.answerRationale).toBeUndefined();
@@ -93,19 +98,24 @@ describe('v2 import mapper — allowlist discipline', () => {
 
   it('rejects a payload carrying an authoring field (negative fixture)', () => {
     expect(() =>
-      assertNoAuthoringFields({ question: 'x', distractorRationales: [] }, 'fixture'),
+      assertNoAuthoringFields(
+        { question: 'x', distractorRationales: [] },
+        'fixture',
+      ),
     ).toThrow(/distractorRationales/);
   });
 
   it('rejects a payload carrying a key the schema does not have', () => {
-    expect(() => assertNoAuthoringFields({ question: 'x', madeUp: 1 }, 'fixture')).toThrow(
-      /not a DiagnosticQuestion column/,
-    );
+    expect(() =>
+      assertNoAuthoringFields({ question: 'x', madeUp: 1 }, 'fixture'),
+    ).toThrow(/not a DiagnosticQuestion column/);
   });
 
   it('refuses an item whose correctAnswer is absent from options', () => {
     const broken = { ...objectiveItems[0], correctAnswer: 'not an option' };
-    expect(() => mapObjectiveQuestion(broken, ctx)).toThrow(/not one of options/);
+    expect(() => mapObjectiveQuestion(broken, ctx)).toThrow(
+      /not one of options/,
+    );
   });
 
   it('refuses an unresolved passage reference rather than writing null', () => {
@@ -161,7 +171,9 @@ describe('option identity under shuffle', () => {
           expect(resolved.optionText).toBe(displayedOptions[displayed]);
           // the rationale is the authored rationale for THAT option
           const authored = perm[displayed];
-          expect(resolved.rationale).toBe(item.distractorRationales?.[authored]);
+          expect(resolved.rationale).toBe(
+            item.distractorRationales?.[authored],
+          );
           // CORRECT marker and correctness agree, wherever the key landed
           if (resolved.isCorrect) {
             correctSeen += 1;
