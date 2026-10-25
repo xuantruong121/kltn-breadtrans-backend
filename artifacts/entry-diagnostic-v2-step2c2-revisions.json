@@ -1,0 +1,441 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_V2_STEP_2C2_TARGETED_FINAL_CONTENT_REVISIONS",
+  "appliedAt": "2026-10-25",
+  "blueprintVersion": "V2_2026_01",
+  "contentVersionBefore": 2,
+  "contentVersionAfter": 3,
+  "sourceOfTruth": [
+    "artifacts/entry-diagnostic-v2-step2d-review.json",
+    "artifacts/entry-diagnostic-v2-step2d-review.md",
+    "artifacts/entry-diagnostic-v2-content-revision-register.json",
+    "artifacts/entry-diagnostic-v2-step2c-revisions.json"
+  ],
+  "historicalArtifactsMutated": false,
+  "ENTRY_DIAGNOSTIC_V2_CONTENT_REVIEW_PASS": "REQUIRES_STEP2D2",
+  "selfApproval": "withheld deliberately; next phase is STEP_2D2_COLD_TARGETED_RE_REVIEW",
+
+  "step2dClosureCountCorrection": {
+    "whatStep2dProseSaid": "REV_REQUIRED_CLOSED=6",
+    "whatStep2dTableListed": ["REV-002", "REV-003", "REV-004", "REV-005", "REV-007", "REV-009", "REV-012"],
+    "correctedAuthoritativeSummary": {
+      "REV_REQUIRED_TOTAL": 10,
+      "REV_REQUIRED_CLOSED": 7,
+      "REV_REQUIRED_PARTIAL": 2,
+      "REV_REQUIRED_OPEN": 1
+    },
+    "partial": ["REV-001", "REV-006"],
+    "open": ["REV-008"],
+    "whoseError": "mine, in the Step 2D artifact: the per-revision table listed 7 CLOSED while the summary field said 6",
+    "resolution": "Recorded here only. The Step 2D artifacts were not edited - history is not rewritten.",
+    "impact": "none on outcome; every PARTIAL and OPEN entry was addressed in this pass regardless of the summary number"
+  },
+
+  "revisionsNowClosed": {
+    "REV_001_CLOSED": true,
+    "REV_006_CLOSED": true,
+    "REV_008_CLOSED": true,
+    "note": "These three were the PARTIAL/OPEN entries carried out of Step 2D. Each was closed against its own written acceptance criteria, with the criteria actually executed rather than proxied."
+  },
+
+  "issues": [
+    {
+      "issueId": "IR-001",
+      "severity": "MAJOR",
+      "object": "LU_Q_002",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "Replaced the option 'by' with 'to' and restored targetFeature to preposition_of_clock_time. Options are now on / in / at / to, key 'at' unchanged at index 2.",
+      "whyThisOptionAndNotStemContext": "The register's option (a) - which Step 2C wrongly rejected - is the right fix. Adding stem context to license 'by' would have kept a second licit preposition in play and made the construct depend on the learner noticing a clause. Removing 'by' makes every distractor wrong on the same grounds. 'to' was chosen because it is a genuine time-telling preposition ('ten to nine'), so it is a plausible learner error, and because 'starts to half past nine' has no licit reading at all. 'before' and 'around' were rejected for exactly the reason 'by' was: both remain semantically defensible.",
+      "acceptanceCriteria": [
+        "LU_Q_002_EXACTLY_ONE_DEFENSIBLE_ANSWER=true",
+        "LU_Q_002_TARGET_FEATURE_COHERENT=true",
+        "LU_Q_002_FALSE_GRAMMAR_RULE_REMOVED=true"
+      ],
+      "validationResult": "PASS. Each option tested in the frame: 'on half past nine', 'in half past nine' and 'to half past nine' have no licit reading; 'at half past nine' is correct. All three distractors now fail on slot selection, so the declared construct matches the option set."
+    },
+    {
+      "issueId": "IR-002",
+      "severity": "MINOR",
+      "object": "LU_Q_002",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "answerRationale is now 'A clock time takes \"at\": \"at half past nine\".' The claim that 'a start event does not take [a limit]' is gone. The new 'to' rationale explains only that 'to' belongs to telling the time relative to the next hour, which is true and not overgeneralised.",
+      "acceptanceCriteria": ["LU_Q_002_RATIONALE_FACTUALLY_CORRECT=true", "no rationale states a rule untrue of English"],
+      "validationResult": "PASS. English does allow 'starts by', 'begins by' in upper-bound readings; no rationale in the item now denies that, because the item no longer contains 'by'."
+    },
+    {
+      "issueId": "IR-003",
+      "severity": "MINOR",
+      "object": "LST_CLIP_02, LST_Q_005",
+      "disposition": "MUST_FIX_BEFORE_TTS",
+      "status": "FIXED",
+      "change": "'bring your student card' is gone from the script. The script now says 'your ID card alone won't start the machines', and LST_Q_005's options use 'student ID card'.",
+      "acceptanceCriteria": ["script and option use general American usage", "script hash regenerated"],
+      "validationResult": "PASS. Script hash regenerated. Fixed together with IR-009 and IR-012 in one script rewrite so LST_CLIP_02 is edited once, not three times."
+    },
+    {
+      "issueId": "IR-004",
+      "severity": "MINOR",
+      "object": "LU_Q_004",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "'favour' -> 'favor' in the learner-facing stem and in the rationale.",
+      "classification": "TRUE_US_VARIANT_MISMATCH",
+      "acceptanceCriteria": ["'favor' throughout the learner-facing text of this item"],
+      "validationResult": "PASS. No occurrence of 'favour' remains anywhere in the item."
+    },
+    {
+      "issueId": "IR-005",
+      "severity": "MINOR",
+      "object": "RDG_PASSAGE_01, RDG_Q_002, RDG_Q_003",
+      "disposition": "PARTIALLY_FIXED_BY_JUDGEMENT",
+      "status": "FIXED_IN_PART_BY_DESIGN",
+      "change": "Three flagged forms, judged separately rather than replaced as a batch.",
+      "perItem": [
+        {
+          "form": "Only at weekends (RDG_Q_003 option)",
+          "classification": "TRUE_US_VARIANT_MISMATCH",
+          "action": "changed to 'Only on weekends'",
+          "reason": "'at weekends' is strongly British; American English uses 'on weekends'. The option set now also reads consistently against the key 'On weekday mornings'."
+        },
+        {
+          "form": "From 1 March (RDG_PASSAGE_01)",
+          "classification": "STYLE_PREFERENCE_ONLY",
+          "action": "changed to 'From March 1'",
+          "reason": "Not an error - '1 March' is unambiguous and no item depends on the date. Applied anyway because the change is free, carries zero validity risk and aligns learner-facing reading content with the product's declared American input variety. Recorded as style, not as a defect, so the count of true mismatches is not inflated."
+        },
+        {
+          "form": "campus store (RDG_PASSAGE_01, RDG_Q_002 key)",
+          "classification": "DIALECT_NEUTRAL",
+          "action": "NOT CHANGED",
+          "reason": "Ordinary American English; the Step 2D flag was a false positive and the instruction for this pass was explicit that it must not be changed merely because a checker flagged it. Item validity is unaffected either way: the key is the exact passage phrase, so it remains matchable.",
+          "residualNoteForNextPass": "In American English 'store' most readily means a shop, so a reader may picture the campus shop rather than a storage facility. Comprehension of the item does not depend on resolving that, but it is worth revisiting when the passage is next touched. Recorded, not acted on."
+        },
+        {
+          "form": "revising them (RDG_Q_004 option)",
+          "classification": "TRUE_US_VARIANT_MISMATCH",
+          "action": "changed to 'reviewing them'",
+          "reason": "Stale residue from REV-001, which changed the passage's 'revision' to 'studying' but missed this option because my scan matched 'revision' and not 'revising'. It is also a genuine dialect mismatch: in American English 'revising' means editing, so an American-input learner would read the distractor as being about editing notes rather than reviewing them. Judged stale residue, not an intentional paraphrase."
+        }
+      ],
+      "acceptanceCriteria": ["EN_US_REVIEW_MANUAL=true", "RDG_Q_004_WORDING_CONSISTENCY_PASS=true"],
+      "validationResult": "PASS. EN_US_TRUE_MISMATCH_COUNT=4 (student card, favour, at weekends, revising), EN_US_DIALECT_NEUTRAL_FALSE_POSITIVE_COUNT=1 (campus store), STYLE_PREFERENCE_ONLY=1 (date form, applied)."
+    },
+    {
+      "issueId": "IR-006",
+      "severity": "MINOR",
+      "object": "LST_Q_001",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "All four options are now gerund phrases of comparable length (33-39 characters): Returning a book one of them borrowed / Working on their project together / Checking the library's opening hours / Catching up on a class they both missed. Rationales rewritten to match.",
+      "acceptanceCriteria": ["all four options share one grammatical shape", "no option is formally distinguishable from the others"],
+      "validationResult": "PASS. The key was previously the only gerund among three indefinite-article noun phrases, which is the odd-one-out heuristic. It is no longer formally distinguishable; it is now the shortest option by 3 characters, which is not a recognised key cue."
+    },
+    {
+      "issueId": "IR-007",
+      "severity": "MINOR",
+      "object": "LST_Q_003",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "'The printing service' replaced with 'The print room'. All four options now denote areas, and all four are named in the rewritten clip.",
+      "acceptanceCriteria": ["all four options denote areas", "or the stem is reworded"],
+      "validationResult": "PASS. The stem's word 'area' no longer eliminates any option a priori. The print room is deliberately mentioned in the script as open, so the distractor is traceable rather than invented."
+    },
+    {
+      "issueId": "IR-008",
+      "severity": "MINOR",
+      "object": "LST_Q_004",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "'No reservation is needed' replaced with 'By email'. Options are now At the desk / Online / By phone / By email, all method-level and all short.",
+      "acceptanceCriteria": ["replaced with a method-level distractor consistent with the stem"],
+      "validationResult": "PASS. No option now denies the stem's own presupposition, so none reads as a non-answer. All four are 6-11 characters, so no length cue."
+    },
+    {
+      "issueId": "IR-009",
+      "severity": "MINOR",
+      "object": "LST_Q_005",
+      "disposition": "MUST_FIX_BEFORE_TTS",
+      "status": "FIXED",
+      "change": "The required object is now clip-specific: the script issues a weekly print release code, and the answer a learner would supply from general experience - the student ID - is present as an explicitly wrong option, because the script states an ID card alone will not start the machines. Stem is now 'What do students need in order to print?'; options are A booking confirmation from the desk / Cash for the printing fee / This week's release code / Only their student ID card.",
+      "acceptanceCriteria": ["the required object is not world-predictable", "a reviewer shown only stem and options cannot name the key"],
+      "validationResult": "PASS, with one residual cue recorded honestly. World knowledge now points at a wrong option rather than at the key, so the bypass route is punished instead of rewarded. During the semantic test I found that my first version of this item had the stem say 'this week' while the key said \"This week's\" - a stem/option lexical echo, which is itself a surface cue - and removed 'this week' from the stem. Residual: option 4 contains the absolute 'Only', which test-wise learners tend to avoid; that steers them away from a wrong option, so it does not leak the key among the remaining three. Not claimed as perfect."
+    },
+    {
+      "issueId": "IR-010",
+      "severity": "MINOR",
+      "object": "LST_Q_007 (with LST_Q_006)",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "Options rewritten to comparable length (36/35/38/39 characters), all four stating a plausible voicemail purpose, key at index 2 unchanged: To confirm that the form is complete / To arrange a meeting about the form / To request one more thing for the form / To explain that the request was refused.",
+      "acceptanceCriteria": ["four options of comparable length, all plausible voicemail purposes", "the key no longer contains the content LST_Q_006 asks for"],
+      "validationResult": "PASS, after a second fix the semantic test forced. The key was 58 characters against 28-48, so the longest-option heuristic pointed straight at it; it is now 38 and not the longest. The key no longer names a document or a signature, so it does not answer LST_Q_006. My first rewrite used 'To ask for one more step before Friday' - and LST_Q_008's stem says 'the Friday deadline', so Q008's stem pointed at Q007's key. That is the same local-dependence class IR-010 raised, running in the opposite direction, and I had introduced it myself. The date was removed from the key."
+    },
+    {
+      "issueId": "IR-011",
+      "severity": "MINOR",
+      "object": "LST_Q_008",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "closesAlso": "REV-006",
+      "change": "All four options are now propositions about the deadline: Meeting it would avoid a month's delay / It applies only to new applications / It can be extended on request / It was set by the landlord, not the office. Key at index 0 unchanged.",
+      "acceptanceCriteria": ["all four options are propositions about the deadline", "none is defeated by the stem alone", "REV-006: a reviewer given only stem and options cannot eliminate more than one option a priori"],
+      "validationResult": "PASS, and the REV-006 criterion was executed rather than proxied. Running the elimination test on stem and options only: option 1 is plausible because deadlines commonly gate a processing cycle; option 2 is plausible because deadlines commonly scope to a category of application; option 3 is plausible because extensions are commonly available; option 4 is plausible because a third party could have set the date. A-priori eliminable count = 0, against a permitted maximum of 1. The previous set failed this test with 2 eliminable: 'It has already passed' was defeated by the stem's own framing of Friday as the deadline, and 'The landlord must send the page directly' was not about the deadline at all."
+    },
+    {
+      "issueId": "IR-012",
+      "severity": "MINOR",
+      "object": "LST_CLIP_02",
+      "disposition": "MUST_FIX_BEFORE_TTS",
+      "status": "FIXED",
+      "change": "The cause is now sufficient on its own: 'The second-floor power supply is being rewired, so the computer room up there stays closed until Thursday.' The north-side element survives as a separate, self-consistent fact - 'The north-side elevators are out of service too - please use the main entrance' - which keeps LST_Q_003's mis-attribution distractor traceable without asking the learner to believe that elevator maintenance closes a room reachable by stairs.",
+      "acceptanceCriteria": ["the cause is sufficient, or the access limitation is explicit", "the script reads as something a real staff announcer would say"],
+      "validationResult": "PASS. 87 words, estimatedDurationSeconds raised 40 -> 45. All three dependent items remain supported: LST_Q_003 (computer room closed, group study rooms open, print room open, elevators not entrance), LST_Q_004 (book online rather than at the desk), LST_Q_005 (release code from the front desk, ID card alone insufficient)."
+    },
+    {
+      "issueId": "IR-013",
+      "severity": "MINOR",
+      "object": "RDG_Q_004, blueprint matrix[4]",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "RDG_Q_004 retiered D1 -> D3, and the blueprint's 'main idea' matrix row relaxed from difficultyTier 'D1' to 'D1-D3' with a note explaining that a main-idea item is as hard as the passage it sits on. Both halves of IR-013's acceptance criteria were applied, not just one.",
+      "acceptanceCriteria": ["no D1 reading item is more demanding than any D2 reading item", "the item and the blueprint agree"],
+      "validationResult": "PASS. Objective tier distribution moved from D1=6 D2=9 D3=6 D4=4 to D1=5 D2=9 D3=7 D4=4. This is an intended change, not drift. The validator does not bind item tiers to matrix rows, so BLUEPRINT_COUNT_CONFORMANCE_PASS is unaffected; the range form 'D1-D3' was already used by matrix[13], so no new pattern was invented."
+    },
+    {
+      "issueId": "IR-014",
+      "severity": "MINOR",
+      "object": "LST_Q_009",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "Removed the trailing clause 'now stated as specifically as the correct option' from the first distractor rationale. It described a revision, not the stimulus. The rationale now reads 'The applause remark read literally - the key literal-interpretation trap.'",
+      "acceptanceCriteria": ["every distractorRationale is a statement about the stimulus and the option only, with no reference to authoring or revision history"],
+      "validationResult": "PASS. This residue was written by my own Step 2C fix for REV-004."
+    },
+    {
+      "issueId": "IR-015",
+      "severity": "MINOR",
+      "object": "SPK_RUBRIC_V2 -> SPK_RUBRIC_V3",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "Both double-penalisations removed. (a) 'Beyond the prompt' is now scored in task_fulfilment only: language_use anchors 2 and 4 no longer reference the prompt's wording, and its description states explicitly that going beyond the prompt's content is judged under task_fulfilment. (b) 'Pace' is assigned to fluency only: intelligibility's description now reads 'including pronunciation and stress. Pace and pausing are judged under fluency, not here.'",
+      "acceptanceCriteria": ["language_use anchors restated without reference to the prompt's wording", "'pace' assigned to exactly one criterion", "no separate pronunciation or coherence criterion added"],
+      "validationResult": "PASS. A learner who leans on the prompt now loses points once, not twice, and a slow halting speaker is marked down under fluency only. No fifth criterion was added - the blind reviewer explicitly endorsed folding pronunciation into intelligibility and omitting coherence at this turn length, and that structure is unchanged."
+    },
+    {
+      "issueId": "IR-016",
+      "severity": "MINOR",
+      "object": "WRT_RUBRIC_V2 -> WRT_RUBRIC_V3",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "change": "task_achievement anchor 2's undefined 'length falls well below the stated range' is replaced with an explicit threshold - 'shorter than two thirds of the stated minimum word count' - and the anchor now states that a response covering every required element and only slightly under the minimum is not capped there. normalisationIntent.wordCountHandling was updated to match.",
+      "acceptanceCriteria": ["'well below' replaced by an explicit proportion of wordMin", "short but complete is distinguished from incomplete"],
+      "validationResult": "PASS. A complete 52-word response to WRT_TASK_01 (two thirds of 60 is 40) is no longer capped at 2 alongside a response that omits a required function, and an AI grader now has a bounded rule instead of a judgement call."
+    },
+    {
+      "issueId": "IR-017",
+      "severity": "MINOR",
+      "object": "DIAG_V2_ASSESSMENT and all item instructions",
+      "disposition": "SAFE_TO_DEFER",
+      "status": "NOT_FIXED_DEFERRED",
+      "reason": "This is a product decision, not an authoring defect, and Step 2D itself judged it a decision to close before activation rather than before persistence. I have no mandate to decide whether procedural instructions should be Vietnamese, English or bilingual. I am also not the right party to decide it: the argument - that English timing and length instructions make task comprehension part of the measurement for exactly the weakest learners - is a product and fairness tradeoff for the owner.",
+      "acceptanceCriteria": ["a recorded product decision on instruction language", "if English is retained, Vietnamese glosses for at least the timing, length and response-mode instructions"],
+      "validationResult": "OPEN. Carried forward. Blocks activation, not draft persistence."
+    },
+    {
+      "issueId": "IR-018",
+      "severity": "NOTE",
+      "object": "contentOriginalityDeclaration",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "whyFixedDespiteBeingANote": "The finding is that a declaration in the artifact claims more than the evidence supports. That is an accuracy problem in a claim, not a style note, and it costs nothing to correct. Leaving an overclaim in place because it was filed as a NOTE would be the wrong call.",
+      "change": "The declaration's scope is narrowed from 'copied or adapted' to wording only, with scopeOfClaim='WORDING_ONLY' and an explicit taskStructureNote recording that task structures, response formats and prep/response timings follow published task-type conventions, are not claimed as novel, and that the short personal-response speaking task uses a conventional 15s prep / 45s response configuration.",
+      "acceptanceCriteria": ["the declaration claims only what the evidence supports"],
+      "validationResult": "PASS. No content was changed to achieve this - only the claim about the content."
+    },
+    {
+      "issueId": "IR-019",
+      "severity": "NOTE",
+      "object": "whole form",
+      "disposition": "NOTE_ONLY",
+      "status": "NOT_FIXED_RECORDED",
+      "reason": "Topical monotony: 10 of 11 source objects sit in campus study life. Not a fairness defect and no item requires specialist knowledge. Diversifying would mean rewriting source objects wholesale, which is out of scope for a targeted pass and would discard content the blind review judged sound. Recorded as a diversification candidate for the next content pass, where it also interacts with the abandonment metric already first on the blueprint's validation watch list."
+    },
+    {
+      "issueId": "IR-020",
+      "severity": "NOTE",
+      "object": "RDG_Q_009",
+      "disposition": "NOTE_ONLY",
+      "status": "NOT_FIXED_RECORDED",
+      "reason": "Step 2D explicitly recorded this as softer than IR-013 and excluded it from the tier change count, with acceptance criteria 'none required'. Retiering it on a NOTE would be acting beyond the finding. Recorded for consideration at the next pass."
+    },
+    {
+      "issueId": "IR-021",
+      "severity": "NOTE",
+      "object": "content draft, revisionProvenance",
+      "disposition": "MUST_FIX_BEFORE_DRAFT_PERSISTENCE",
+      "status": "FIXED",
+      "whyFixedDespiteBeingANote": "Filed as a NOTE because it was a disclosure, but the underlying problem is architectural: the canonical content artifact carried revision identifiers, pass names and review filenames, and that artifact is the input to persistence. It is also what leaked into the blind review.",
+      "change": "The revisionProvenance block was removed from the content draft entirely and preserved in this evidence artifact (see movedRevisionProvenance below). The draft now carries authoringOnlyFields instead, declaring that the listed fields are authoring and audit metadata that must never be written to a learner-facing table, returned by a learner-facing endpoint, or exposed as content, and naming 13 such fields explicitly.",
+      "acceptanceCriteria": ["CANONICAL_CONTENT_REVISION_PROVENANCE_LEAK=false", "no REV or IR identifier, pass name or review filename anywhere in the content draft or rubrics"],
+      "validationResult": "PASS, after catching my own repeat of the same mistake. My first version of the replacement field said revision history lives in 'Step 2B, 2C, 2D and 2C2 evidence artifacts' - which put pass names straight back into the canonical artifact, the exact class of leak I was fixing. Reworded to a generic pointer. A scan of the draft and rubrics for REV-nnn, IR-nnn, pass names and review filenames now returns zero rows."
+    },
+    {
+      "issueId": "IR-022",
+      "severity": "NOTE",
+      "object": "LST_Q_010",
+      "disposition": "MUST_FIX_BEFORE_TTS",
+      "status": "FIXED",
+      "change": "'a section he was unsure about' -> 'a section they were unsure about'.",
+      "acceptanceCriteria": ["the rationale uses neutral language or an identity the script establishes", "voice casting for LST_CLIP_04 is decided explicitly rather than inherited"],
+      "validationResult": "PASS on the wording. LST_CLIP_04 establishes no gender for that speaker and declares only 'two distinct voices', so the rationale no longer asserts one. The second half - an explicit voice-casting decision for LST_CLIP_04 - is a Step 3 decision and is carried to the pre-TTS gate alongside DEF-003."
+    },
+    {
+      "issueId": "IR-023",
+      "severity": "NOTE",
+      "object": "cross-task Writing comparability",
+      "disposition": "NOTE_ONLY",
+      "status": "NOT_FIXED_RECORDED",
+      "reason": "Step 2D's own acceptance criteria were 'none now', because designing a scoring formula is out of scope. WRT_TASK_02 is substantively more demanding than WRT_TASK_01 at the same 0-4 ceiling, so an equally weighted mean combines two unequated raw scales. Neither task is capped by genre, so this is not a fairness defect and WRITING_RUBRIC_TASK_COMPATIBILITY_PASS still holds. WRITING_RUBRIC_CROSS_TASK_COMPARABILITY_READY remains false and should stay false until the pilot inspects per-task score distributions."
+    },
+    {
+      "issueId": "IR-024",
+      "severity": "NOTE",
+      "object": "LU_Q_003",
+      "disposition": "NOTE_ONLY",
+      "status": "NOT_FIXED_RECORDED",
+      "reason": "'have studied ... since September' is fully acceptable and is the only grammatical option offered, so the item is sound; the more idiomatic 'have been studying' is simply absent. Step 2D's acceptance criteria were 'none required'. Adding the continuous form would create a second defensible answer - precisely the IR-001 failure mode - so it must not be added."
+    }
+  ],
+
+  "minorDisposition": {
+    "STEP2D_MINOR_TOTAL": 16,
+    "STEP2D_MINOR_FIXED": 15,
+    "STEP2D_MINOR_DEFERRED": 1,
+    "STEP2D_MINOR_NOTE_ONLY": 0,
+    "deferred": ["IR-017 - product decision on instruction language; blocks activation, not persistence"],
+    "noteTotal": 7,
+    "noteFixed": 3,
+    "noteFixedIds": ["IR-018", "IR-021", "IR-022"],
+    "noteRecordedOnly": ["IR-019", "IR-020", "IR-023", "IR-024"],
+    "noteFixRationale": "Three NOTEs were acted on because each was a real defect filed under a soft label: an inaccurate originality claim, revision metadata inside the canonical content artifact, and an unsupported gendered pronoun that would have pre-bound TTS casting. The other four are genuine observations whose own acceptance criteria said no change was required, and two of them (IR-020, IR-024) would have done harm if acted on."
+  },
+
+  "defectsIFoundInMyOwnStep2c2Work": [
+    "The first version of LST_Q_005 had the stem say 'this week' while the key said \"This week's\" - a stem/option lexical echo, which is the kind of surface cue IR-009 exists to remove. Caught by running the semantic test instead of assuming the fix worked; stem corrected.",
+    "The first version of LST_Q_007's key read 'To ask for one more step before Friday', and LST_Q_008's stem says 'the Friday deadline' - so one item's stem pointed at another item's key. That is the same local-dependence defect IR-010 raised, in the opposite direction, newly introduced by me. Date removed from the key.",
+    "My replacement for the leaked revisionProvenance field itself named 'Step 2B, 2C, 2D and 2C2' inside the canonical content artifact - the same class of leak I was fixing. Reworded to a generic pointer."
+  ],
+
+  "noRegressionOfConfirmedSuccesses": {
+    "all25AnswerKeysValid": "PASS - all 25 keys resolve and CORRECT sits at the key's index in all 25 rationale arrays",
+    "RDG_Q_006": "PASS - untouched by this pass; the mechanical guard REV002_KEY_SHARES_NO_STEM_TERM still passes",
+    "speakingFluencyLengthIndependent": "PASS - the fluency criterion was not edited; the guards REV003_NO_TIME_PROPORTION_ANCHOR and REV003_EVERY_ANCHOR_NAMES_FLOW still pass. IR-015 touched intelligibility and language_use only.",
+    "writingFullRange": "PASS - the organisation criterion was not edited; REV009_NO_SINGLE_TASK_ANCHOR still passes. IR-016 touched task_achievement only, and raising the floor for short-but-complete responses can only widen task 1's accessible range.",
+    "accentNotPenalised": "PASS - 'Accent itself is not assessed' retained in intelligibility's description; no anchor references nativeness or accentedness",
+    "CEFR_CONTENT_LEAK_COUNT": 0,
+    "ITEM_TIER_TO_RESULT_BAND_MAPPING_DEFINED": false,
+    "originalityClean": "PASS - rechecked on the one materially rewritten object"
+  },
+
+  "mechanicalRevalidation": {
+    "TOTAL_ITEMS": 29,
+    "LISTENING_ITEMS": 10,
+    "READING_ITEMS": 10,
+    "SPEAKING_TASKS": 2,
+    "WRITING_TASKS": 2,
+    "LANGUAGE_USE_ITEMS": 5,
+    "LISTENING_CLIPS": 4,
+    "READING_PASSAGES": 3,
+    "DRAFT_KEY_UNIQUENESS_PASS": true,
+    "OBJECTIVE_KEY_STRUCTURE_PASS": true,
+    "UNRESOLVED_DRAFT_REFERENCES": 0,
+    "RUBRIC_STRUCTURAL_VALIDATION_PASS": true,
+    "BLUEPRINT_COUNT_CONFORMANCE_PASS": true,
+    "DUPLICATE_EXACT_CONTENT_COUNT": 0,
+    "MECHANICAL_VALIDATION_PASS": true,
+    "CORRECT_OPTION_DISTRIBUTION": { "A": 5, "B": 7, "C": 7, "D": 6 },
+    "CORRECT_OPTION_DISTRIBUTION_CHANGED": false,
+    "distributionNote": "Every rewritten option set deliberately kept its key at the original index, so the distribution is untouched despite six items being re-optioned.",
+    "OBJECTIVE_TIER_DISTRIBUTION": { "D1": 5, "D2": 9, "D3": 7, "D4": 4 },
+    "tierDistributionNote": "Changed by IR-013 on purpose (D1 6->5, D3 6->7). Not drift.",
+    "PASSAGE_WORD_COUNTS": { "RDG_PASSAGE_01": 97, "RDG_PASSAGE_02": 151, "RDG_PASSAGE_03": 159 },
+    "LST_CLIP_02_WORDS": 87,
+    "LST_CLIP_02_ESTIMATED_SECONDS": 45
+  },
+
+  "hashIntegrity": {
+    "HASH_MANIFEST_REGENERATED_ONCE": true,
+    "HASH_CHECK_1_PASS": true,
+    "HASH_CHECK_2_PASS": true,
+    "HASH_CHECK_MODE_MUTATED_FILES": false,
+    "manifestMd5AfterWrite": "25a535c650bef6526de2376a1840fa0c",
+    "manifestMd5AfterCheck1": "25a535c650bef6526de2376a1840fa0c",
+    "manifestMd5AfterCheck2": "25a535c650bef6526de2376a1840fa0c",
+    "HASH_MISMATCH_COUNT": 0
+  },
+
+  "listeningReadiness": {
+    "LISTENING_SCRIPT_CONTENT_READY_FOR_TTS": true,
+    "LST_CLIP_02_READY_FOR_TTS": true,
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 0,
+    "LISTENING_AUDIO_REQUIRED_ITEM_COUNT": 10,
+    "LISTENING_EN_US_CONSISTENCY_PASS": true,
+    "caveat": "Content-ready is not the same as approved. These flags are my own judgement on content I also revised, and they are exactly the kind of claim Step 2D showed can be wrong. LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT=0 here is a reasoned per-item judgement on learner-visible text with the script hidden, not the mechanical proxy I wrongly reported under this flag name in Step 2C. It still needs the cold re-review before any audio is generated.",
+    "DEF_003_STATUS": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+    "additionalPreTtsGateItem": "Voice casting for LST_CLIP_04's two speakers must be decided explicitly at the Step 3 gate (from IR-022), not inherited from any rationale wording."
+  },
+
+  "originality": {
+    "ORIGINALITY_RECHECK_OBJECT_COUNT": 1,
+    "recheckedObject": "LST_CLIP_02 - the only materially rewritten source object. RDG_PASSAGE_01's change was a single date token and RDG_Q_003/004's were single words, none of which constitutes material rewriting.",
+    "ORIGINALITY_QUERIES_RUN": 1,
+    "ORIGINALITY_MEANINGFUL_MATCH_COUNT": 0,
+    "ORIGINALITY_UNRESOLVED_OBJECT_COUNT": 0,
+    "incidentalFinding": "The search returned campus print-release help pages describing passcode-based release as an alternative to ID-card release. No wording match, and it confirms the IR-009 fix describes a real-world mechanism rather than a contrived one."
+  },
+
+  "safety": {
+    "DB_MUTATED": false,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "dbAccessThisPass": "none - no SELECT was needed, since no claim in this pass depends on row counts",
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0,
+    "FRONTEND_FILES_CHANGED": 0,
+    "historicalArtifactsMutated": false,
+    "filesChangedThisPass": [
+      "artifacts/entry-diagnostic-v2-content-draft.json",
+      "artifacts/entry-diagnostic-v2-rubrics-draft.json",
+      "artifacts/entry-diagnostic-v2-blueprint.json (matrix[4] tier range only)",
+      "artifacts/entry-diagnostic-v2-content-draft.sha256 (regenerated once)",
+      "artifacts/entry-diagnostic-v2-step2c2-revisions.json (new)"
+    ]
+  },
+
+  "movedRevisionProvenance": {
+    "note": "Preserved here verbatim after removal from the canonical content draft under IR-021.",
+    "appliedPass": "STEP_2C_APPLY_CONTENT_REVIEW_REVISIONS",
+    "sourceRegister": "artifacts/entry-diagnostic-v2-content-revision-register.json",
+    "appliedRevisions": ["REV-001", "REV-002", "REV-003", "REV-004", "REV-005", "REV-006", "REV-007", "REV-008", "REV-009", "REV-012"],
+    "notAppliedRevisions": {
+      "REV-010": "NOTE - register requiredChange is \"None.\"; retain as authored",
+      "REV-011": "NOTE - register requires no change; subskill retained as authored",
+      "REV-013": "NOTE - open product decision on instruction language; no content change until decided"
+    },
+    "evidence": "artifacts/entry-diagnostic-v2-step2c-revisions.json"
+  },
+
+  "whatThisPassDoesNotEstablish": [
+    "Approval. ENTRY_DIAGNOSTIC_V2_CONTENT_REVIEW_PASS is REQUIRES_STEP2D2 and is deliberately not set true. I revised this content and cannot clear it.",
+    "That the six re-optioned items are now cue-free. Each was tested by reasoning over learner-visible text, which is the right test, but it is the same kind of judgement that produced three wrong flags in Step 2C and missed a MAJOR across two passes.",
+    "Any psychometric property. D1-D4 remains DESIGN_HYPOTHESIS_NOT_CALIBRATED, and IR-013's retier is a qualitative ordering fix, not a calibration.",
+    "Rubric validity. Three anchor edits in two passes have not been trialled against real responses.",
+    "That LU_Q_002 is now sound. I judged 'to' has no licit reading in the frame; that is the same form of judgement that wrongly cleared 'by' twice, so this specific item deserves the closest attention in the cold re-review."
+  ],
+
+  "ENTRY_DIAGNOSTIC_V2_STEP2C2_COMPLETE": true,
+  "nextStep": "STEP_2D2_COLD_TARGETED_RE_REVIEW"
+}

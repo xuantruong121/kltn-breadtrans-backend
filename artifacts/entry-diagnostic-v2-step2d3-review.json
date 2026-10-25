@@ -1,0 +1,221 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_V2_STEP_2D3_FINAL_COLD_TARGETED_CONTENT_GATE",
+  "reviewedAt": "2026-10-25",
+  "contentVersionReviewed": 4,
+
+  "STEP2D3_REVIEW_COMPLETE": true,
+  "STEP2D3_VERDICT": "REVISIONS_REQUIRED",
+  "ENTRY_DIAGNOSTIC_V2_CONTENT_REVIEW_PASS": false,
+
+  "verdictBasis": {
+    "summary": "Zero BLOCKER, zero MAJOR, and the cold reviewer's own recommendation was APPROVE_FOR_DRAFT_PERSISTENCE. I am returning REVISIONS_REQUIRED because two of section 17's explicit numeric approval criteria are not met by the gate's own figures.",
+    "unmetCriteria": [
+      {
+        "criterion": "LISTENING_CROSS_ITEM_LEAK_COUNT=0",
+        "actual": 1,
+        "detail": "CLIP_03_CROSS_ITEM_LEAK_COUNT=1, and the cold reviewer graded its severity MATERIAL (D3-001). Section 17 lists this count at zero as an approval condition. It is one."
+      },
+      {
+        "criterion": "PERSISTENCE_MAPPING_AUTHORING_METADATA_GUARD_PASS",
+        "actual": false,
+        "detail": "D3-009. My Step 2C3 set this true on the ground that removing the authoringOnlyFields declaration proved there was nothing to map. That was an over-claim: eight authoring-only field families still exist in the draft, and nothing executable excludes them. Section 17 requires canonical provenance safe; provenance is safe, mapping enforcement is not established."
+      }
+    ],
+    "whereIDisagreeWithTheColdReviewer": "Only on the arithmetic of the gate, not on the content. The reviewer judged the CLIP_03 leak deferrable to activation because no learner is scored off a DRAFT and the script stays byte-unchanged, which is reasonable product reasoning. But section 17 states the criterion as a number, and self-approving against an explicit unmet number is the failure mode this whole gate sequence exists to prevent. Relaxing that criterion is the product owner's call to make explicitly, not mine to make silently.",
+    "substantiveAssessment": "The content package is sound. It is internally consistent, structurally conformant, byte-stable, free of CEFR and process-provenance leakage in canonical content, and contains no item the cold reviewer could answer without its audio or passage. If the owner decides to accept the documented MINOR list and persist inactive DRAFT rows now, that is a defensible decision; it is not one I will record as a passed gate."
+  },
+
+  "independence": {
+    "INDEPENDENCE_MODE": "COLD_CONTEXT_PROXY",
+    "STAGE_A_FINDINGS_FROZEN_BEFORE_RECONCILIATION": true,
+    "disclosure": "The agent writing this artifact authored the content and every revision pass including Step 2C3. It is not the reviewer. Stage A was performed by an agent started with no session context and barred from all eleven prior review and evidence artifacts; it was deliberately not told any expected version values, so its reading of the actuals is independent of both the brief and me.",
+    "notClaimed": "Human assessment-specialist independence and psychometric validation. Neither is established by anything here.",
+    "coldPassTrackRecord": "Three cold passes have now each found real defects the author had cleared: Step 2D found a MAJOR dismissed by two author passes, Step 2D2 found four over-claimed closures, and this pass found two more over-claims plus eleven defects never previously examined."
+  },
+
+  "counts": {
+    "BLOCKER_COUNT": 0,
+    "MAJOR_COUNT": 0,
+    "PERSISTENCE_BLOCKING_MINOR_COUNT": 0,
+    "PRE_TTS_CONTENT_BLOCKING_ISSUE_COUNT": 0,
+    "NONBLOCKING_MINOR_COUNT": 13,
+    "NOTE_COUNT": 6,
+    "totalNewFindings": 19,
+    "classificationNote": "The two unmet criteria are a reporting correction (D3-009) and a deferred-to-activation content defect (D3-001). Neither is a BLOCKER or MAJOR, which is why the verdict is revisions-required rather than a rejection."
+  },
+
+  "flags": {
+    "TOTAL_ITEMS": 29,
+    "LISTENING_ITEMS": 10,
+    "LISTENING_CLIPS": 4,
+    "READING_ITEMS": 10,
+    "READING_PASSAGES": 3,
+    "SPEAKING_TASKS": 2,
+    "WRITING_TASKS": 2,
+    "LANGUAGE_USE_ITEMS": 5,
+    "OBJECTIVE_ITEMS": 25,
+    "OBJECTIVE_KEYS_VALID": "25/25",
+    "OBJECTIVE_STRUCTURE_PROBLEM_ITEMS": "0/25",
+    "DRAFT_KEYS": "36 unique of 36",
+    "UNRESOLVED_DRAFT_REFERENCES": 0,
+    "V2_SCORER_FAILS_CLOSED": true,
+
+    "HASH_MISMATCH_COUNT": 0,
+    "VALIDATOR_CHECK_MODE_READ_ONLY_PASS": true,
+    "CONTENT_TARGET_STABLE_DURING_REVIEW": true,
+    "CONTENT_FILES_MUTATED": false,
+
+    "actualVersionValues": {
+      "contentDraft": { "blueprintVersion": "V2_2026_01", "scoringVersion": "FOUR_SKILL_PLACEMENT_V2", "contentVersion": 4 },
+      "blueprint": { "blueprintVersion": "V2_2026_01", "scoringVersion": "FOUR_SKILL_PLACEMENT_V2", "contentVersion": "ABSENT" },
+      "rubrics": { "blueprintVersion": "V2_2026_01", "scoringVersion": "ABSENT", "contentVersion": "ABSENT" },
+      "agreement": "The three files agree on every dimension they share.",
+      "briefDiscrepancy": "The Step 2D3 brief's section 3 expects contentVersion=3. The actual value is 4, because Step 2C3 bumped it. The brief's expectation is stale; the content is not wrong. Reported rather than matched to either side."
+    },
+
+    "LU_Q_002_VALID": true,
+    "LU_Q_002_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LU_Q_002_TARGET_FEATURE_COHERENT": true,
+    "LU_Q_002_RATIONALE_VALID": true,
+    "LU_Q_002_RATIONALE_FACTUALLY_CORRECT": true,
+    "LU_Q_002_FEEDBACK_OVERGENERALIZATION_PRESENT": false,
+    "LU_Q_002_residual": "One DISTRACTOR rationale retains a minor near-universal: 'Used with days and dates, not with clock times' - but 'on the half hour' is a licit clock-time use of 'on'. NOTE D3-015.",
+
+    "LISTENING_AUDIO_REQUIRED_ITEM_COUNT": 10,
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 0,
+    "LISTENING_CROSS_ITEM_LEAK_COUNT": 1,
+    "CLIP_01_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_02_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_03_CROSS_ITEM_LEAK_COUNT": 1,
+    "CLIP_04_CROSS_ITEM_LEAK_COUNT": 0,
+    "definitionsUsedByTheReviewer": {
+      "bypassable": "the key can be named with confidence from learner-visible text alone - none can",
+      "leak": "a sibling stem or option eliminates an option or materially privileges exactly one option - one instance"
+    },
+
+    "LST_CLIP_02_SEMANTIC_REGRESSION_PASS": true,
+    "LST_Q_004_AUDIO_REQUIRED": true,
+    "LST_Q_004_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LST_Q_005_AUDIO_REQUIRED": true,
+    "LST_Q_005_CROSS_ITEM_LEAK_FOUND": false,
+
+    "LST_Q_006_TO_Q007_RESIDUAL_CUE_PRESENT": true,
+    "LST_Q_006_TO_Q007_CUE_SEVERITY": "MATERIAL",
+    "LST_Q_007_AUDIO_REQUIRED": true,
+    "cueSeverityNote": "My Step 2C3 recorded this as a residual that neither eliminates an option nor names the key, and counted it as zero leaks. The cold reviewer independently judged it MATERIAL: exactly one of the four options realises the presupposition that Q006's stem asserts, the other three are off-dimension, and the option's wording mirrors the stem closely. It also observes the pair is largely redundant even with the audio. I accept its judgement over mine - mine was the self-serving reading.",
+
+    "LST_Q_009_AUDIO_REQUIRED": true,
+    "LST_Q_009_INFERENCE_VALID": true,
+    "LST_Q_010_OPTIONS_DO_NOT_LEAK_Q009": true,
+    "LST_Q_010_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LST_CLIP_04_INFERENCE_VALIDITY_PASS": true,
+
+    "LST_CLIP_03_UNSUPPORTED_GENDER_ASSUMPTION_COUNT": 0,
+    "LST_Q_008_UNSUPPORTED_PRONOUN_PRESENT": false,
+    "LST_CLIP_03_PRONOUN_INTEGRITY_PASS": true,
+
+    "LEARNER_FACING_EN_US_RESIDUE_COUNT": 1,
+    "en_us_detail": "'Overgeneralises' in RDG_Q_010.distractorRationales[1]. Strictly learner-visible fields - prompt, options, instructions, script, passage text - are at 0. My Step 2C3 reported LEARNER_FACING_EN_US_RESIDUE_COUNT=0, which was wrong.",
+    "LISTENING_EN_US_CONSISTENCY_PASS": true,
+
+    "CANONICAL_PROVENANCE_GUARD_PASS": true,
+    "CANONICAL_CONTENT_REVISION_PROVENANCE_LEAK": false,
+    "PERSISTENCE_MAPPING_AUTHORING_METADATA_GUARD_PASS": false,
+    "BLUEPRINT_VERSION_CONSISTENCY_GUARD_PASS": true,
+    "CEFR_CANONICAL_CONTENT_GUARD_PASS": true,
+    "CEFR_CONTENT_LEAK_COUNT": 0,
+    "ITEM_TIER_TO_RESULT_BAND_MAPPING_DEFINED": false,
+
+    "SPEAKING_RUBRIC_REGRESSION_PASS": true,
+    "WRITING_RUBRIC_REGRESSION_PASS": true,
+    "D2_011_SAFE_TO_RETAIN": true,
+
+    "ORIGINALITY_RECHECK_OBJECT_COUNT": 11,
+    "ORIGINALITY_MEANINGFUL_MATCH_COUNT": 0,
+    "ORIGINALITY_UNRESOLVED_OBJECT_COUNT": 0,
+    "originalityNote": "The reviewer rechecked all 11 source objects rather than the 1 my Step 2C3 judged materially rewritten. Broader coverage, same result.",
+
+    "DB_MUTATED": false,
+    "LEGACY_ASSESSMENT_COUNT": 1,
+    "LEGACY_QUESTION_COUNT": 20,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "v2TablesVerifiedEmpty": ["DiagnosticReadingPassage", "DiagnosticListeningClip", "DiagnosticRubric", "DiagnosticWritingResponse", "DiagnosticSkillResult"],
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0
+  },
+
+  "guardFixtureTestEvidence": {
+    "method": "The reviewer copied the canonical draft and rubrics into its own temp directory, injected forbidden values, and exercised the guards end to end. Nothing was injected into any canonical file.",
+    "provenanceGuard": {
+      "ordinaryTokens": "fires on 6 of 6, end to end through the real validator",
+      "awkwardVariantsSilentOn": ["REV_014", "REV-7", "REVISION-012", "IR017", "IR_017", "Pass 2C", "Phase 2C", "REQUIRES STEP", "REQUIRES-STEP", "STEP 2 D 2", "any REV-nnn preceded by an underscore, e.g. STATUS=CLOSED_BY_REV-014", "D3-nnn and DEF-nnn prefixes"],
+      "rootCause": "The \\b anchor does not fire between an underscore and a letter, and the issue-prefix alternation hardcodes only IR and D2. The token shape most likely in this project is a SCREAMING_SNAKE status value - the one shape \\b defeats.",
+      "myVerification": "Confirmed by reading the patterns I wrote. CANONICAL_PROVENANCE_GUARD_PASS=true proves less than its name implies. D3-008."
+    },
+    "versionGuard": {
+      "firesOn": ["rubrics blueprintVersion != draft", "a scoring value planted in blueprint.blueprintVersion", "draft != blueprint scoringVersion"],
+      "silentOn": ["a wrong rubrics.scoringVersion", "any contentVersion disagreement"],
+      "myVerification": "Confirmed by grep: the validator compares scoringVersion only between draft and blueprint, and never compares contentVersion. Nothing is wrong today because the rubrics carry neither field. D3-014."
+    },
+    "cefrGuard": {
+      "gap": "The blueprint is not scanned at all. Fixture-proved that levelSystem.bands[3].band='B2' (a placement result band) and difficultyScale.tiers[0].cefrEquivalent='A1' (an item difficulty) both pass while the flag still reads true.",
+      "myVerification": "Confirmed: scanForCefr is called on items, clips, passages, productive tasks and rubrics - not the blueprint. Today's blueprint CEFR strings are all legitimate rationale, so CEFR_CONTENT_LEAK_COUNT=0 is correct, but the guard cannot see the one file where a CEFR token could reach a band field. D3-010."
+    },
+    "deadCheck": "NO_DB_IDS applies /\\bid\\b\"\\s*:\\s*\\d/ to allKeys, an array of draft-key strings, so it can never fire. Confirmed at line 149. A guard that cannot fail. D3-016."
+  },
+
+  "newFindings": {
+    "note": "19 findings, ids D3-001..D3-019. Full text in the accompanying markdown. Classification summary only here.",
+    "PERSISTENCE_BLOCKING": [],
+    "PRE_TTS_CONTENT_BLOCKING": [],
+    "mustResolveBeforeV2Scorer": ["D3-004", "D3-012", "D3-003"],
+    "preMappingRequirement": ["D3-011", "D3-019"],
+    "safeToDeferActivation": ["D3-001", "D3-005"],
+    "reportingCorrections": ["D3-009", "D3-006"],
+    "guardScopeDefects": ["D3-008", "D3-010", "D3-014", "D3-016"],
+    "contentMinor": ["D3-002", "D3-007", "D3-013"],
+    "notes": ["D3-013", "D3-014", "D3-015", "D3-016", "D3-017", "D3-018", "D3-019"],
+    "mostConsequential": {
+      "D3-004": "The blueprint's overallWeightRationale opens with 'Not equal-by-default' and argues from 'Speaking carries 2 rubric-graded tasks and Writing 1' to a 'Receptive 60 / productive 40' conclusion - while overallWeights is 25/25/25/25, overallFormula is (L+R+S+W)/4, counts.writingProductiveTasks is 2, and weightingRationale says the opposite. knownWeakness still reads 'With a single Writing task...'. Verified directly. The blueprint is the specification the V2 scorer will be written from, and one of its two weighting paragraphs argues for the wrong weights. This is the single most dangerous finding in the pass and I never checked it across four revision passes.",
+      "D3-012": "DEF-004 is understated. The blueprint declares Starter 0-44 / Foundation 45-64 / Intermediate 65-79 / Upper 80-100, while resolveEstimatedLevel returns Intermediate at >=75. A learner at 70% is Intermediate by the blueprint and Foundation by the code - a mid-scale boundary conflict that survives even if the fourth band is added. Verified directly.",
+      "D3-003": "counts.objectiveItemsByDifficultyTier declares {D1:4, D2:7, D3:5, D4:4, ...}; the items actually give D1:5 D2:9 D3:7 D4:4 across all 25. No grouping reproduces the declared figures, and the validator prints the real distribution but never compares it to the claim. Verified directly."
+    }
+  },
+
+  "step2d2ClosureVerdict": {
+    "method": "The reviewer re-derived each of D2-001..D2-013 from its own Stage A evidence rather than accepting the Step 2C3 PASS labels.",
+    "closed": ["D2-002", "D2-003 (content, partially - see D3-008 on the guard)", "D2-004", "D2-005", "D2-007", "D2-008", "D2-009", "D2-010", "D2-012", "D2-013"],
+    "notFullyClosed": {
+      "D2-001": "Closed for LU_Q_004 'favour', but the underlying scanning gap it was diagnostic of is still open - 'Overgeneralises' survives (D3-006), and the validator's fixed stem list structurally cannot see 'generalis'.",
+      "D2-006": "Closed on three clips. CLIP_03 is not closed: the Q006 -> Q007 cue my pass recorded as a non-counting residual is graded MATERIAL (D3-001).",
+      "D2-011": "Correctly retained. The reviewer agrees the inaccurate pace pointer is safer than adding a speech-rate requirement that would penalise a slow-but-smooth speaker."
+    }
+  },
+
+  "deferredDecisionRegister": {
+    "IR_017_INSTRUCTION_LANGUAGE": { "status": "SAFE_TO_DEFER_ACTIVATION", "blocksPersistence": false, "blocksTts": false, "blocksActivation": true },
+    "DEF_003_TTS_VOICE": { "status": "DEFERRED_TO_STEP3_PRE_TTS_GATE", "blocksPersistence": false, "blocksTts": true, "note": "Unresolved deliberately; resolving it means a paid call." },
+    "LST_CLIP_03_VOICE_CASTING_STATUS": { "status": "DEFERRED_TO_STEP3_PRE_TTS_GATE", "note": "The script names a person and uses no pronoun. Casting must be an explicit decision; no gender is inferred anywhere in the content and none should be." },
+    "LST_CLIP_04_VOICE_CASTING_STATUS": { "status": "DEFERRED_TO_STEP3_PRE_TTS_GATE", "note": "Two distinct voices declared, not cast." },
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": {
+      "status": "OPEN_AND_WIDENED_BY_D3-012",
+      "blocksDraftPersistence": false,
+      "blocksV2ScorerImplementation": true,
+      "contentCouplingVerified": "Zero occurrences of Starter, Foundation, Intermediate or Upper in the content draft or rubrics, so the bands are scorer output and not content. Absence of coupling independently confirmed.",
+      "constraint": "Resolve the band count AND the Intermediate lower boundary in one product decision. Do not invent a fourth cutoff by inference."
+    }
+  },
+
+  "whatThisGateDoesNotEstablish": [
+    "Human or psychometric independence. A cold-context proxy is resistance to prior-issue priming, nothing more.",
+    "Any psychometric property of any item. D1-D4 remains DESIGN_HYPOTHESIS_NOT_CALIBRATED.",
+    "Rubric validity. Five anchor edits across four passes, never trialled against a real response.",
+    "That a future importer is safe. D3-009 and D3-011: the mapping is undefined, nothing executable enforces an authoring-field exclusion, and the obvious mapping for answerRationale is into a column the service returns to the learner.",
+    "That the finding list is complete. Three cold passes have each found defects the author cleared, and this one found eleven that no previous pass examined at all."
+  ],
+
+  "nextStep": "Close D3-001 and correct D3-009, or obtain an explicit product decision to relax the LISTENING_CROSS_ITEM_LEAK_COUNT criterion. The blueprint findings D3-004, D3-003 and D3-012 must be resolved before the V2 scorer is implemented, and D3-011's field mapping must be recorded before any row is written."
+}

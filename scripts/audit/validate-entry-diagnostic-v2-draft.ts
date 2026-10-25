@@ -4,6 +4,22 @@
  * This is NOT a content review. It checks counts, keys, structure and
  * references only; it cannot judge whether an item is a good item.
  *
+ * What this tool CAN prove mechanically:
+ *   counts, draft-key uniqueness, reference resolution, answer-key structure,
+ *   content hashes, forbidden process metadata, CEFR tokens, version
+ *   consistency, and a fixed list of known British spellings.
+ *
+ * What it CANNOT prove, and must never be read as proving:
+ *   that the audio is semantically required to answer a Listening item;
+ *   that distractors are fair or plausible; that an inference is warranted;
+ *   that a rubric measures its construct. Those are review assertions and
+ *   belong to a human or to an independent reviewer, not to this file.
+ *
+ * Every flag below names the scope it inspected. A flag that would claim more
+ * than it checked is a defect in this tool: three times in this project a
+ * narrow check was reported under a broad flag name, and each time the gap
+ * was found later by someone re-deriving the claim.
+ *
  * Two explicit modes, because an audit tool that rewrites its own evidence is
  * not an audit tool. An earlier revision regenerated the hash manifest on every
  * run, which meant a read-only review pass still mutated the file it was
@@ -22,6 +38,13 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+
+import {
+  findActiveCefrViolations,
+  findDatabaseIds,
+  findProvenanceViolations,
+  GUARD_SCOPE,
+} from '../../src/modules/diagnostic/content-guards';
 import { join } from 'node:path';
 
 const ART = join(process.cwd(), 'artifacts');
@@ -162,18 +185,151 @@ for (const item of allItems) {
   }
 }
 
-// ------------------------------------------------------- no CEFR codes anywhere
-const cefr = /\b(Pre-A1|A1|A2|B1|B2|C1|C2)\b/;
-const scanForCefr = (label: string, value: unknown) => {
-  const text = JSON.stringify(value ?? '');
-  const hit = text.match(cefr);
-  if (hit) fail('NO_CEFR_IN_CONTENT', `${label}: contains "${hit[0]}"`);
+// --------------------------------------------- CEFR, provenance, database ids
+// These three were previously inline regexes in this file, and all three passed
+// inputs they should have rejected. They now live in
+// src/modules/diagnostic/content-guards.ts with fixture tests that genuinely
+// fail (content-guards.spec.ts), and traverse the parsed structure rather than
+// its serialisation.
+for (const violation of findActiveCefrViolations(draft)) {
+  fail('NO_CEFR_IN_CONTENT', `contentDraft.${violation.path}: ${violation.kind} "${violation.token}"`);
+}
+for (const violation of findActiveCefrViolations(rubrics)) {
+  fail('NO_CEFR_IN_CONTENT', `rubrics.${violation.path}: ${violation.kind} "${violation.token}"`);
+}
+// The blueprint is scanned too. It legitimately discusses CEFR in its design
+// rationale, so the guard flags only tokens acting as a level - a bare code as
+// a value, or a token in a level-bearing field outside the declared history
+// fields. Step 2D3 fixture-proved that a result band or an item difficulty
+// could previously be set to a CEFR code here with the flag still reading true.
+for (const violation of findActiveCefrViolations(blueprint)) {
+  fail('CEFR_BLUEPRINT_SEMANTIC', `blueprint.${violation.path}: ${violation.kind} "${violation.token}"`);
+}
+
+for (const violation of findProvenanceViolations(draft)) {
+  fail('CANONICAL_PROVENANCE', `contentDraft.${violation.path}: ${violation.kind} "${violation.token}"`);
+}
+for (const violation of findProvenanceViolations(rubrics)) {
+  fail('CANONICAL_PROVENANCE', `rubrics.${violation.path}: ${violation.kind} "${violation.token}"`);
+}
+
+for (const violation of findDatabaseIds(draft)) {
+  fail('NO_DB_IDS', `contentDraft.${violation.path}: ${violation.kind} ${violation.token}`);
+}
+for (const violation of findDatabaseIds(rubrics)) {
+  fail('NO_DB_IDS', `rubrics.${violation.path}: ${violation.kind} ${violation.token}`);
+}
+
+// ------------------------------------------------- blueprint version agreement
+if (blueprint.blueprintVersion !== draft.blueprintVersion) {
+  fail(
+    'BLUEPRINT_VERSION_CONSISTENCY',
+    `blueprint says blueprintVersion="${blueprint.blueprintVersion}" but the ` +
+      `content draft says "${draft.blueprintVersion}"`,
+  );
+}
+if (rubrics.blueprintVersion !== draft.blueprintVersion) {
+  fail(
+    'BLUEPRINT_VERSION_CONSISTENCY',
+    `rubrics say blueprintVersion="${rubrics.blueprintVersion}" but the ` +
+      `content draft says "${draft.blueprintVersion}"`,
+  );
+}
+if (draft.scoringVersion !== blueprint.scoringVersion) {
+  fail(
+    'BLUEPRINT_VERSION_CONSISTENCY',
+    `scoringVersion disagrees: draft "${draft.scoringVersion}" vs blueprint ` +
+      `"${blueprint.scoringVersion}"`,
+  );
+}
+if (
+  rubrics.scoringVersion !== undefined &&
+  rubrics.scoringVersion !== draft.scoringVersion
+) {
+  fail(
+    'BLUEPRINT_VERSION_CONSISTENCY',
+    `rubrics scoringVersion "${rubrics.scoringVersion}" disagrees with the ` +
+      `draft "${draft.scoringVersion}"`,
+  );
+}
+
+// -------------------------------- blueprint difficulty distribution conformance
+// The blueprint's declared tier spread is now compared with the items. It was
+// wrong by one in two cells and no mechanical run could see it.
+{
+  const declared = (blueprint.counts?.objectiveItemsByDifficultyTier ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const counted = new Map<string, number>();
+  for (const item of objective) {
+    const tier = item.difficultyTier ?? 'UNSET';
+    counted.set(tier, (counted.get(tier) ?? 0) + 1);
+  }
+  for (const tier of ['D1', 'D2', 'D3', 'D4']) {
+    const want = declared[tier];
+    const have = counted.get(tier) ?? 0;
+    if (typeof want === 'number' && want !== have) {
+      fail(
+        'BLUEPRINT_TIER_DISTRIBUTION_CONFORMANCE',
+        `blueprint declares ${tier}=${want} but the items give ${tier}=${have}`,
+      );
+    }
+  }
+}
+
+// --------------------------------------- known British spellings, scope-declared
+// A FIXED list, deliberately not presented as proof of locale consistency.
+// Absence of a hit means only that these forms are absent. Judging whether the
+// English reads as general American is a review assertion, not a regex result.
+const BRITISH_FORMS: ReadonlyArray<readonly [string, RegExp]> = [
+  ['favour', /\bfavours?\b/i],
+  ['centre', /\bcentres?\b/i],
+  ['lift (elevator)', /\blifts\b/i],
+  ['practise', /\bpractis(?:e|ed|ing)\b/i],
+  ['-ise spelling', /\b(?:organis|recognis|apologis|realis|analys)(?:e|ed|es|ing|ation|able)\b/i],
+  ['queue', /\bqueue[sd]?\b/i],
+  ['revision (studying)', /\brevis(?:ion|ing)\b/i],
+  ['zip (fastener)', /\bzip\b/i],
+  ['at weekends', /\bat weekends\b/i],
+  ['student card', /\bstudent cards?\b/i],
+  ['-lled spelling', /\b(?:cancelled|travelled|labelled|dialled)\b/i],
+  ['colour', /\bcolou?rs?\b/i],
+  ['programme', /\bprogramme\b/i],
+];
+// The fields a learner or a grader can actually read.
+const LEARNER_FIELDS = [
+  'prompt',
+  'instructions',
+  'script',
+  'text',
+  'options',
+  'answerRationale',
+  'distractorRationales',
+] as const;
+const EN_US_FIELDS_CHECKED = LEARNER_FIELDS.join(', ');
+const scanForBritish = (label: string, obj: Record<string, unknown>) => {
+  for (const field of LEARNER_FIELDS) {
+    const value = obj[field];
+    if (value === undefined) continue;
+    const text = Array.isArray(value) ? value.join(' \u0000 ') : String(value);
+    for (const [kind, pattern] of BRITISH_FORMS) {
+      const hit = text.match(pattern);
+      if (hit) {
+        fail(
+          'KNOWN_BRITISH_FORM',
+          `${label}.${field}: "${hit[0]}" (${kind})`,
+        );
+      }
+    }
+  }
 };
-for (const item of allItems) scanForCefr(item.draftKey, item);
-for (const clip of clips) scanForCefr(clip.draftKey as string, clip);
+for (const item of allItems) scanForBritish(item.draftKey, item as never);
+for (const clip of clips) scanForBritish(clip.draftKey as string, clip as never);
 for (const passage of passages)
-  scanForCefr(passage.draftKey as string, passage);
-scanForCefr('rubrics', rubrics);
+  scanForBritish(passage.draftKey as string, passage as never);
+for (const task of productive)
+  scanForBritish(task.draftKey as string, task as never);
 
 // ------------------------------------------------- objective answer-key structure
 for (const item of objective) {
@@ -588,8 +744,42 @@ console.log(
 console.log(
   `RUBRIC_STRUCTURAL_VALIDATION_PASS=${!failures.some((f) => f.check.startsWith('RUBRIC'))}`,
 );
+const cefrPass = !failures.some((f) => f.check === 'NO_CEFR_IN_CONTENT');
 console.log(
-  `NO_CEFR_IN_CONTENT_PASS=${!failures.some((f) => f.check === 'NO_CEFR_IN_CONTENT')}`,
+  `CEFR_BLUEPRINT_SEMANTIC_GUARD_PASS=${!failures.some((f) => f.check === 'CEFR_BLUEPRINT_SEMANTIC')}`,
+);
+console.log(
+  `CEFR_ACTIVE_SEMANTIC_LEAK_COUNT=${failures.filter((f) => f.check === 'NO_CEFR_IN_CONTENT' || f.check === 'CEFR_BLUEPRINT_SEMANTIC').length}`,
+);
+console.log(`  ACTIVE_CEFR_GUARD_SCOPE=${GUARD_SCOPE.activeCefr}`);
+console.log(
+  `NO_DB_IDS_GUARD_PASS=${!failures.some((f) => f.check === 'NO_DB_IDS')}`,
+);
+console.log(`  NO_DB_IDS_GUARD_SCOPE=${GUARD_SCOPE.databaseIds}`);
+console.log(
+  `BLUEPRINT_TIER_DISTRIBUTION_CONFORMANCE_PASS=${!failures.some((f) => f.check === 'BLUEPRINT_TIER_DISTRIBUTION_CONFORMANCE')}`,
+);
+console.log(
+  '  GUARDS_TESTED_IN=src/modules/diagnostic/content-guards.spec.ts (negative fixtures)',
+);
+console.log(`NO_CEFR_IN_CONTENT_PASS=${cefrPass}`);
+console.log(`CEFR_CANONICAL_CONTENT_GUARD_PASS=${cefrPass}`);
+console.log(
+  `CANONICAL_PROVENANCE_GUARD_PASS=${!failures.some((f) => f.check === 'CANONICAL_PROVENANCE')}`,
+);
+console.log(`  PROVENANCE_GUARD_SCOPE=${GUARD_SCOPE.provenance}`);
+console.log(
+  `BLUEPRINT_VERSION_CONSISTENCY_GUARD_PASS=${!failures.some((f) => f.check === 'BLUEPRINT_VERSION_CONSISTENCY')}`,
+);
+console.log(
+  `  BLUEPRINT_VERSION=${draft.blueprintVersion} (draft, blueprint and rubrics compared)`,
+);
+console.log(
+  `KNOWN_BRITISH_FORM_COUNT=${failures.filter((f) => f.check === 'KNOWN_BRITISH_FORM').length}`,
+);
+console.log(`  EN_US_FIELDS_CHECKED=${EN_US_FIELDS_CHECKED}`);
+console.log(
+  '  EN_US_GUARD_CAVEAT=fixed word list; absence proves only these forms are absent, NOT locale consistency',
 );
 console.log(`VALIDATOR_MODE=${MODE}`);
 console.log(`MANIFEST_WRITTEN=${manifestWritten}`);

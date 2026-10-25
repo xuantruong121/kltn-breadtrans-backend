@@ -1,0 +1,268 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_V2_STEP_2C3_FINAL_TARGETED_CONTENT_AND_VALIDATOR_CLEANUP",
+  "appliedAt": "2026-10-25",
+  "blueprintVersion": "V2_2026_01",
+  "contentVersionBefore": 3,
+  "contentVersionAfter": 4,
+  "ENTRY_DIAGNOSTIC_V2_STEP2C3_COMPLETE": true,
+  "ENTRY_DIAGNOSTIC_V2_CONTENT_REVIEW_PASS": "REQUIRES_STEP2D3",
+  "selfApproval": "withheld deliberately. I revised this content and cannot clear it.",
+  "sourceOfTruth": [
+    "artifacts/entry-diagnostic-v2-step2d2-review.json",
+    "artifacts/entry-diagnostic-v2-step2d2-review.md",
+    "artifacts/entry-diagnostic-v2-step2c2-revisions.json"
+  ],
+  "historicalArtifactsMutated": false,
+
+  "disposition": {
+    "STEP2D2_MINOR_TOTAL": 10,
+    "STEP2D2_MINOR_FIXED": 10,
+    "STEP2D2_MINOR_DEFERRED": 0,
+    "STEP2D2_NOTE_TOTAL": 3,
+    "STEP2D2_NOTE_FIXED": 2,
+    "STEP2D2_NOTE_RETAINED": 1,
+    "noIssueUnaccountedFor": true,
+    "table": [
+      { "issueId": "D2-001", "severity": "MINOR", "object": "LU_Q_004", "classification": "FIXED_BEFORE_PERSISTENCE", "action": "answerRationale favour -> favor", "status": "CLOSED", "evidence": "every string field on the item re-checked by assertion, not only the fields edited; validator KNOWN_BRITISH_FORM_COUNT=0" },
+      { "issueId": "D2-002", "severity": "MINOR", "object": "RDG_PASSAGE_03", "classification": "FIXED_BEFORE_PERSISTENCE", "action": "'a failed zip' -> 'a failed zipper'", "status": "CLOSED", "evidence": "learner-facing; word count unchanged at 159; passage hash regenerated" },
+      { "issueId": "D2-003", "severity": "MINOR", "object": "content draft + rubrics", "classification": "FIXED_BEFORE_PERSISTENCE", "action": "authoringOnlyFields block removed entirely; all 5 draft reviewStatus values and both rubric status fields made pass-agnostic; three 'Step 4' references replaced with SCORER_IMPLEMENTATION_PHASE", "status": "CLOSED", "evidence": "CANONICAL_PROVENANCE_GUARD_PASS=true, and the guard is proven to fire on the pre-2C3 files" },
+      { "issueId": "D2-004", "severity": "MINOR", "object": "LST_Q_009, LST_Q_010", "classification": "FIXED_BEFORE_PERSISTENCE", "action": "removed the option whose definite noun phrase presupposed the projector failure, and the Q009 option that Q010's stem eliminated", "status": "CLOSED", "evidence": "CLIP_04 cross-item test; see perClipCrossItemTest" },
+      { "issueId": "D2-005", "severity": "MINOR", "object": "LST_Q_004, LST_CLIP_02", "classification": "FIXED_BEFORE_TTS", "action": "booking channel inverted in the script so the world-knowledge default 'Online' is now a wrong option and the key requires hearing the outage", "status": "CLOSED", "evidence": "same pattern IR-009 established on this clip; key stayed at index 1 so the distribution is unchanged" },
+      { "issueId": "D2-006", "severity": "MINOR", "object": "LST_Q_001, LST_Q_003, LST_Q_005, LST_Q_007, LST_Q_008", "classification": "FIXED_BEFORE_PERSISTENCE", "action": "option sets reworked on all four clips so no sibling stem or option eliminates an option or names a key", "status": "CLOSED", "evidence": "per-clip semantic test run and recorded; all four counts 0" },
+      { "issueId": "D2-007", "severity": "MINOR", "object": "LU_Q_002", "classification": "FIXED_BEFORE_PERSISTENCE", "action": "answerRationale scoped to the authored sentence and the 'other prepositions are possible in other frames' qualification added", "status": "CLOSED", "evidence": "no longer states a universal, and no longer contradicts the item's own 'ten to nine' distractor rationale" },
+      { "issueId": "D2-008", "severity": "MINOR", "object": "LST_CLIP_02", "classification": "FIXED_BEFORE_TTS", "action": "'elevators out of service ... use the main entrance' -> '... use the south-side ones'", "status": "CLOSED", "evidence": "the remedy now matches the fault; LST_Q_003's mis-attribution distractor was re-based on the south-side elevators, which the script states cleanly" },
+      { "issueId": "D2-009", "severity": "MINOR", "object": "LST_CLIP_03, LST_Q_008", "classification": "FIXED_BEFORE_TTS", "action": "'says she would rather not' -> 'says they would rather not'; 'her accommodating tone' -> 'the accommodating tone'", "status": "CLOSED", "evidence": "assertion over every string field on the item for ' she ', ' her ', ' he ', ' his '; LST_CLIP_03 verified to contain zero gendered pronouns on a word-boundary search" },
+      { "issueId": "D2-010", "severity": "MINOR", "object": "WRT_RUBRIC_V3.task_achievement", "classification": "FIXED_BEFORE_PERSISTENCE", "action": "'within the stated length' dropped from anchor 3", "status": "CLOSED", "evidence": "length now lives only in the single defined under-length condition on anchor 2, matching wordCountHandling; a complete over-length response no longer falls between anchors" },
+      { "issueId": "D2-011", "severity": "NOTE", "object": "SPK_RUBRIC_V3", "classification": "NOTE_ONLY", "action": "none", "status": "RETAINED", "evidence": "The cold reviewer reasoned deliberately that fixing the inaccurate 'pace' pointer by adding speech rate to fluency would risk penalising a slow-but-smooth speaker, which is worse than the pointer. IR-015's actual double-scoring defect is closed. I agree and did not touch it. Recorded as a pilot watch item along with the language_use content/lexis split." },
+      { "issueId": "D2-012", "severity": "NOTE", "object": "blueprint", "classification": "FIXED_BEFORE_PERSISTENCE", "action": "blueprintVersion FOUR_SKILL_PLACEMENT_V2 -> V2_2026_01, plus a mechanical consistency guard", "status": "CLOSED", "evidence": "the scoring version had been copy-pasted into the blueprint version field; scoringVersion keeps its own value. BLUEPRINT_VERSION_CONSISTENCY_GUARD_PASS=true, and the guard is proven to fire on the pre-2C3 blueprint. Fixed despite being a NOTE because it is a version-contract defect and the project forbids inferring versions from anything implicit." },
+      { "issueId": "D2-013", "severity": "NOTE", "object": "validator", "classification": "FIXED_BEFORE_PERSISTENCE", "action": "literal token CEFR added to the guard alternation, with the scope declared in the output", "status": "CLOSED", "evidence": "CEFR_GUARD_TOKENS now lists Pre-A1 A1 A2 B1 B2 C1 C2 CEFR; scope covers every item, clip, passage, productive task and the whole rubrics document. Fixed despite being a NOTE because the guard was narrower than its own flag name." }
+    ]
+  },
+
+  "perClipCrossItemTest": {
+    "method": "For each clip, all of that clip's stems and option sets were read together with the script hidden. For every item the question was: does a sibling stem or option ELIMINATE an option, or NAME the key? This replaces the per-item test that could not see the defect class.",
+    "CLIP_01_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_01_REASONING": "LST_Q_002's options presuppose a meeting, which previously eliminated LST_Q_001's 'Checking the library's opening hours' and weakened 'Returning a book'. All four LST_Q_001 options are now things two students could meet about, so nothing is eliminated. Neither item names the other's key; no time appears in LST_Q_001 and no topic in LST_Q_002.",
+    "CLIP_02_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_02_REASONING": "LST_Q_004's stem presupposes the group study rooms are reservable and LST_Q_005's presupposes printing is possible. LST_Q_003's options no longer contain either, so neither presupposition eliminates anything. One further cross-link was found during this test and fixed: LST_Q_005's first option read 'A booking confirmation from the desk', and 'the desk' is now LST_Q_004's key, so it weakly supported that key. It is now 'Their own paper for the printer', and LST_Q_005's learner-visible text is asserted free of desk, online and book.",
+    "CLIP_03_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_03_REASONING": "LST_Q_007's 'To confirm that the form is complete' is gone; LST_Q_006's stem presupposes something IS missing and eliminated it outright. All four LST_Q_007 options are now compatible with a missing item. LST_Q_008's 'It was set by the landlord, not the office' is gone; it put 'the landlord' into the learner-visible set and cued LST_Q_006's key.",
+    "CLIP_03_RESIDUAL_RECORDED": "LST_Q_006's stem still raises the prior probability of LST_Q_007's key, because 'something is missing' is most consonant with 'request one more thing'. It neither eliminates an option nor names the key - the key does not say what the thing is, and the other three options remain live - so it is not counted as a leak. Recorded rather than hidden. Resolving it fully would require moving LST_Q_007's construct onto the processing deadline, which would collide with LST_Q_008.",
+    "CLIP_04_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_04_REASONING": "LST_Q_010 no longer mentions the projector at all, so nothing presupposes the technical failure that is LST_Q_009's key. LST_Q_009's 'It was called off before it could begin' is gone, since LST_Q_010's stem presupposes the presentation happened and ran short. The replacement, 'The slides were the strongest part', is compatible with that stem and is a trap for a learner who missed the equipment failure. Neither item's options mention cutting or length, so LST_Q_010's key is not cued either.",
+    "LISTENING_CROSS_ITEM_LEAK_COUNT": 0,
+    "costRecordedHonestly": "LST_CLIP_04 no longer offers a projector-based wrong cause for LST_Q_010, which was pedagogically useful. The leak mattered more, but the loss is real and is not being papered over."
+  },
+
+  "validatorChanges": {
+    "intent": "Convert the claims that kept being asserted in prose into mechanical guards, and make every flag state the scope it inspected.",
+    "guardsAdded": [
+      {
+        "flag": "CANONICAL_PROVENANCE_GUARD_PASS",
+        "scope": "whole content draft document + whole rubrics document",
+        "patterns": "REV-nn, (IR|D2)-nn, STEP 2A-2E with optional digit, 'Step <n>', REQUIRES_STEP, and review filenames",
+        "whyWholeDocument": "The previous miss happened because the token sat in a field nobody thought to include in a field list. Scanning selected fields is how that failure works."
+      },
+      {
+        "flag": "CEFR_CANONICAL_CONTENT_GUARD_PASS",
+        "scope": "every objective item (all fields), every clip, every passage, every productive task, the whole rubrics document",
+        "change": "added the literal token CEFR to the alternation and made the match case-insensitive; extended the scan to productive tasks, which were previously not covered"
+      },
+      {
+        "flag": "BLUEPRINT_VERSION_CONSISTENCY_GUARD_PASS",
+        "scope": "draft vs blueprint vs rubrics blueprintVersion, plus draft vs blueprint scoringVersion",
+        "change": "new; nothing compared these before"
+      },
+      {
+        "flag": "KNOWN_BRITISH_FORM_COUNT",
+        "scope": "prompt, instructions, script, text, options, answerRationale, distractorRationales - on every item, clip, passage and productive task",
+        "deliberateNaming": "Named for what it is: a count of hits from a FIXED word list. It is NOT named EN_US_CONSISTENCY_PASS, and its output carries the caveat 'absence proves only these forms are absent, NOT locale consistency'. Judging whether the English reads as general American is a review assertion."
+      }
+    ],
+    "guardsProvenToFire": {
+      "method": "The same patterns were run against the pre-2C3 backups of the three files.",
+      "results": [
+        "pre-2C3 content draft: provenance guard fires on REQUIRES_STEP and STEP2D",
+        "pre-2C3 rubrics: fires on 'Step 4', REQUIRES_STEP and STEP2D",
+        "pre-2C3 blueprint: version consistency guard fires (FOUR_SKILL_PLACEMENT_V2 vs V2_2026_01)",
+        "pre-2C3 draft: favour guard fires; zip guard fires"
+      ],
+      "whyThisMatters": "A guard that only ever passes is worthless as evidence. Each new guard was shown to fail on the data that motivated it."
+    },
+    "headerDocumentationAdded": "The validator header now states explicitly what it can prove mechanically (counts, keys, references, hashes, forbidden metadata, CEFR tokens, version consistency, a fixed spelling list) and what it must never be read as proving (that audio is semantically required, that distractors are fair, that an inference is warranted, that a rubric measures its construct). Those remain review assertions.",
+    "defectsInMyOwnGuardWorkCaughtAndFixed": [
+      "The British-form pattern /\\bfavou?rs?\\b/ matched the CORRECT American spelling 'favor', so the guard flagged three clean fields on LU_Q_004. Tightened to require the u.",
+      "The new flags were passed as additional arguments to a single console.log, which space-joins them, so eleven flags printed on one line. Split into individual calls."
+    ]
+  },
+
+  "flags": {
+    "LU_Q_002_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LU_Q_002_RATIONALE_FACTUALLY_CORRECT": true,
+    "LU_Q_002_FEEDBACK_OVERGENERALIZATION_PRESENT": false,
+    "LU_Q_002_OPTIONS_UNCHANGED": true,
+
+    "LEARNER_FACING_EN_US_RESIDUE_COUNT": 0,
+    "LEARNER_FACING_EN_US_FIELD_SCAN_SCOPE": "prompt, instructions, script, text, options, answerRationale, distractorRationales",
+    "LISTENING_EN_US_CONSISTENCY_PASS": true,
+
+    "LST_Q_004_AUDIO_REQUIRED": true,
+    "LST_Q_004_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LST_Q_009_AUDIO_REQUIRED": true,
+    "LST_Q_009_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LST_Q_010_OPTIONS_DO_NOT_LEAK_LST_Q_009": true,
+    "LST_Q_010_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LST_Q_008_UNSUPPORTED_PRONOUN_PRESENT": false,
+    "LST_CLIP_03_GENDER_EVIDENCE_PRESENT": false,
+    "LST_CLIP_03_GENDER_NOTE": "The script names Mai and contains no gendered pronoun. A name is not evidence of anyone's pronouns, so no gender was inferred and none was written into the metadata either. The casting decision is carried to the pre-TTS gate instead of being invented here.",
+
+    "LISTENING_AUDIO_REQUIRED_ITEM_COUNT": 10,
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 0,
+    "LISTENING_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_01_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_02_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_03_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_04_CROSS_ITEM_LEAK_COUNT": 0,
+
+    "CANONICAL_CONTENT_REVISION_PROVENANCE_LEAK": false,
+    "CANONICAL_PROVENANCE_GUARD_PASS": true,
+    "PERSISTENCE_MAPPING_AUTHORING_METADATA_GUARD_PASS": true,
+    "persistenceMappingNote": "Passes by the second route the brief allows: proving there is nothing to map. The authoringOnlyFields block was removed rather than kept as an unenforced promise, so the content draft no longer claims any persistence exclusion. The genuine requirement - that answerRationale, distractorRationales, constructRationale, wordGuidanceRationale, diagnosticUse, internalLabel, targetSubskills and targetEvidence are authoring fields and must not be written to a learner-facing table or returned by a learner-facing endpoint - is recorded HERE, as a requirement on the persistence step, not as a sentence inside the content artifact.",
+
+    "CEFR_CONTENT_LEAK_COUNT": 0,
+    "CEFR_CANONICAL_CONTENT_GUARD_PASS": true,
+    "BLUEPRINT_VERSION_CONSISTENCY_GUARD_PASS": true,
+    "ITEM_TIER_TO_RESULT_BAND_MAPPING_DEFINED": false,
+    "ITEM_LEVEL_STATUS": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
+    "DIFFICULTY_TIER_REVIEW_STATUS": "QUALITATIVE_ONLY",
+
+    "SPK_RUBRIC_VERSION": "SPK_RUBRIC_V3",
+    "WRT_RUBRIC_VERSION": "WRT_RUBRIC_V3",
+    "rubricVersionNote": "Deliberately NOT bumped. SPK_RUBRIC_V3 is byte-unchanged. WRT_RUBRIC_V3 lost four words from one anchor without changing what any score point means, so a new id would imply a change that did not happen.",
+    "SPEAKING_FLUENCY_LENGTH_DEPENDENCY_ABSENT": true,
+    "WRITING_TASK1_CAN_ACCESS_FULL_SCORE_RANGE": true,
+    "WRITING_TASK2_CAN_ACCESS_FULL_SCORE_RANGE": true,
+    "rubricRegressionEvidence": "The fluency criterion was not touched; the mechanical guards REV003_NO_TIME_PROPORTION_ANCHOR and REV003_EVERY_ANCHOR_NAMES_FLOW still pass. The organisation criterion was not touched; REV009_NO_SINGLE_TASK_ANCHOR still passes. The one edit removed a length condition from task_achievement, which can only widen the accessible range for a short-but-complete response.",
+
+    "ORIGINALITY_RECHECK_OBJECT_COUNT": 1,
+    "ORIGINALITY_RECHECK_OBJECT": "LST_CLIP_02 - the only materially rewritten source object. RDG_PASSAGE_03 changed one word (zip -> zipper), which is not material rewriting; all other edits were to options, rationales and metadata, which the brief excludes from originality re-checking.",
+    "ORIGINALITY_QUERIES_RUN": 1,
+    "ORIGINALITY_MEANINGFUL_MATCH_COUNT": 0,
+    "ORIGINALITY_UNRESOLVED_OBJECT_COUNT": 0,
+    "originalityIncidentalFinding": "The search returned library and university notices redirecting room bookings to a service desk during an online-system outage. No wording match, and it confirms the D2-005 fix describes a real-world situation rather than a contrived one.",
+
+    "HASH_MANIFEST_REGENERATED_ONCE": true,
+    "HASH_CHECK_1_PASS": true,
+    "HASH_CHECK_2_PASS": true,
+    "HASH_CHECK_MODE_MUTATED_FILES": false,
+    "manifestMd5AcrossAllThreeRuns": "7bd42329c4959baa35441aa0fda5137e",
+    "HASH_MISMATCH_COUNT": 0,
+
+    "TOTAL_ITEMS": 29,
+    "LISTENING_ITEMS": 10,
+    "LISTENING_CLIPS": 4,
+    "READING_ITEMS": 10,
+    "READING_PASSAGES": 3,
+    "SPEAKING_TASKS": 2,
+    "WRITING_TASKS": 2,
+    "LANGUAGE_USE_ITEMS": 5,
+    "OBJECTIVE_ITEMS": 25,
+    "DRAFT_KEY_UNIQUENESS_PASS": true,
+    "OBJECTIVE_KEY_STRUCTURE_PASS": true,
+    "UNRESOLVED_DRAFT_REFERENCES": 0,
+    "RUBRIC_STRUCTURAL_VALIDATION_PASS": true,
+    "BLUEPRINT_COUNT_CONFORMANCE_PASS": true,
+    "DUPLICATE_EXACT_CONTENT_COUNT": 0,
+    "MECHANICAL_VALIDATION_PASS": true,
+    "CORRECT_OPTION_DISTRIBUTION": { "A": 5, "B": 7, "C": 7, "D": 6 },
+    "CORRECT_OPTION_DISTRIBUTION_CHANGED": false,
+    "distributionNote": "Six option sets were rewritten and every one kept its key at the original index, so the distribution and the key-letter sequence are untouched.",
+    "OBJECTIVE_TIER_DISTRIBUTION": { "D1": 5, "D2": 9, "D3": 7, "D4": 4 },
+    "LST_CLIP_02_WORDS": 97,
+    "LST_CLIP_02_ESTIMATED_SECONDS": 48,
+
+    "LISTENING_SCRIPT_CONTENT_READY_FOR_TTS": true,
+    "LST_CLIP_02_CONTENT_READY_FOR_TTS": true,
+    "LST_CLIP_03_CONTENT_READY_FOR_TTS": true,
+    "LST_CLIP_04_CONTENT_READY_FOR_TTS": true,
+    "LST_CLIP_03_PRONOUN_CASTING_ASSUMPTION_REMOVED": true,
+    "ttsReadinessCaveat": "Content-ready is not approved. These are my own judgements on content I revised, and Step 2D and Step 2D2 both showed such judgements can be wrong. The pre-TTS technical gate still has three open items below.",
+
+    "BACKEND_TYPECHECK_PASS": true,
+    "DIAGNOSTIC_TESTS_PASS": "75/75 across 6 suites",
+    "CI_LINT_CHECK_PASS": true,
+    "GIT_DIFF_CHECK_PASS": true,
+    "FRONTEND_FILES_CHANGED_BY_STEP2C3": 0,
+    "frontendNote": "No write to any frontend path was performed in this pass. The 8 modified frontend files in the working tree are from this session's earlier TOEIC-routing and DIAG-007 passes.",
+
+    "DB_MUTATED": false,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "dbAccessThisPass": "none; no claim in this pass depends on row counts",
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0
+  },
+
+  "openGates": {
+    "DEF_003": {
+      "status": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+      "requirement": "Confirm an appropriate en-US voice exists in the TTS voice set before any canonical generation. Not resolved here: resolving it would mean a paid call."
+    },
+    "LST_CLIP_04_VOICE_CASTING": {
+      "status": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+      "requirement": "Two distinct voices are declared but not cast. Decide explicitly rather than inheriting from any rationale wording."
+    },
+    "LST_CLIP_03_VOICE_CASTING": {
+      "status": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+      "requirement": "The script names a person (Mai) and the rationales are now pronoun-neutral. Casting must be an explicit decision; nothing in the content infers a gender, and nothing should."
+    },
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": {
+      "status": "OPEN",
+      "problem": "The handoff and the blueprint's difficultyScale.notResultBands text both name four internal result bands (Starter, Foundation, Intermediate, Upper). The implementation emits three: resolveEstimatedLevel in src/modules/diagnostic/diagnostic.logic.ts returns Intermediate at >=75, Foundation at >=45, otherwise Starter. No Upper exists in the backend, the diagnostic specs, or the frontend's formatPlacementLevel.",
+      "DEF_004_BLOCKS_DRAFT_PERSISTENCE": false,
+      "whyNotBlocking": "Verified absence of persisted-content coupling: the content draft and rubrics contain zero occurrences of Starter, Foundation, Intermediate or Upper. The bands are a scorer output, not content.",
+      "DEF_004_BLOCKS_V2_SCORER_IMPLEMENTATION": true,
+      "mustResolveBefore": ["FOUR_SKILL_PLACEMENT_V2 scorer implementation", "activation"],
+      "constraint": "Do not invent an Upper cutoff. The current cut points are 45 and 75 and no empirical basis exists for a fourth. Recorded, not fixed - Step 2C3 has no mandate over result-band logic."
+    },
+    "D2_011_PILOT_WATCH_ITEMS": [
+      "SPK_RUBRIC_V3 intelligibility points 'pace' at fluency, which never names it. Deliberately left: adding speech rate to fluency would risk penalising a slow-but-smooth speaker.",
+      "SPK_RUBRIC_V3 language_use disclaims content beyond the prompt while its anchor 3 scores vocabulary beyond the prompt. The content/lexis split holds on a careful read but is thin for an AI grader."
+    ],
+    "IR_017_INSTRUCTION_LANGUAGE": {
+      "status": "SAFE_TO_DEFER_TO_ACTIVATION",
+      "requirement": "Product decision on whether procedural instructions are Vietnamese, English or bilingual. Confirmed by two cold reviews as not blocking persistence or TTS."
+    }
+  },
+
+  "persistenceStepRequirements": {
+    "note": "Carried here because the content artifact no longer makes this claim about itself.",
+    "authoringOnlyFieldsThatMustNotBePersistedAsLearnerContent": [
+      "answerRationale",
+      "distractorRationales",
+      "constructRationale",
+      "wordGuidanceRationale",
+      "diagnosticUse",
+      "internalLabel",
+      "targetSubskills",
+      "targetEvidence",
+      "reviewStatus",
+      "contentOriginalityDeclaration",
+      "difficultyScale",
+      "itemLevelStatus"
+    ],
+    "requirement": "The persistence mapping must be explicit about which fields it writes, and a test should assert that none of the above reaches a learner-facing table or endpoint. The validator cannot prove this; only the persistence code can."
+  },
+
+  "whatThisPassDoesNotEstablish": [
+    "Approval. ENTRY_DIAGNOSTIC_V2_CONTENT_REVIEW_PASS is REQUIRES_STEP2D3 and is deliberately not true.",
+    "That the per-clip cross-item test is exhaustive. It is a reasoned semantic test at the right scope, which the previous per-item test was not, but it is still my judgement on content I rewrote.",
+    "Any psychometric property. The six rewritten option sets have no item statistics; their plausibility and parallelism are authored claims.",
+    "Rubric validity. Five anchor edits across four passes, never trialled against a real response.",
+    "That the defect list is now empty. Two cold passes each found real defects I had cleared, and this pass itself found three new ones in my own work while testing it - the favour pattern matching 'favor', the eleven flags on one line, and the LST_Q_005 desk cross-link."
+  ],
+
+  "nextStep": "STEP_2D3_COLD_FINAL_TARGETED_GATE"
+}

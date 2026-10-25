@@ -1,20 +1,22 @@
 {
   "blueprintVersion": "V2_2026_01",
   "scoringVersion": "FOUR_SKILL_PLACEMENT_V2",
-  "contentVersion": 2,
+  "contentVersion": 5,
   "draftedAt": "2026-10-25",
   "difficultyScale": "BREADTRANS_AUTHORING_DIFFICULTY_D1_D4",
   "itemLevelStatus": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
   "contentOriginalityDeclaration": {
     "original": true,
-    "statement": "Every script, passage, prompt, option and rubric anchor below was written for BreadTrans in this authoring pass. No question wording, passage, script, answer set or prompt was copied or adapted from IELTS, TOEIC, Cambridge examinations, Aptis, the Duolingo English Test, or any commercial practice material. Published assessment research informed task structure, construct and rubric dimensions only."
+    "statement": "Every script, passage, prompt, option and rubric anchor in this file was written for BreadTrans in this authoring pass. No wording - no question stem, passage, script, answer set or prompt - was copied from IELTS, TOEIC, Cambridge examinations, Aptis, the Duolingo English Test, or any commercial practice material.",
+    "scopeOfClaim": "WORDING_ONLY",
+    "taskStructureNote": "Task structures, response formats and prep/response timings follow published task-type conventions that are common across the assessment literature, and are not claimed as novel. In particular the short personal-response speaking task uses a conventional 15s prep / 45s response configuration. Published assessment research informed task structure, construct and rubric dimensions only."
   },
   "reviewStatus": {
-    "contentReviewPass": "REQUIRES_STEP2D_REVIEW",
-    "itemValidityPass": "REQUIRES_STEP2D_REVIEW",
-    "distractorQualityPass": "REQUIRES_STEP2D_REVIEW",
-    "levelAppropriatenessPass": "REQUIRES_STEP2D_REVIEW",
-    "rubricValidityPass": "REQUIRES_STEP2D_REVIEW"
+    "contentReviewPass": "REQUIRES_INDEPENDENT_COLD_REVIEW",
+    "itemValidityPass": "REQUIRES_INDEPENDENT_COLD_REVIEW",
+    "distractorQualityPass": "REQUIRES_INDEPENDENT_COLD_REVIEW",
+    "levelAppropriatenessPass": "REQUIRES_INDEPENDENT_COLD_REVIEW",
+    "rubricValidityPass": "REQUIRES_INDEPENDENT_COLD_REVIEW"
   },
   "assessment": {
     "draftKey": "DIAG_V2_ASSESSMENT",
@@ -53,12 +55,12 @@
         ],
         "localeIntent": "en-US",
         "accentIntent": "general American, clear announcement register",
-        "estimatedDurationSeconds": 40,
+        "estimatedDurationSeconds": 48,
         "targetSubskills": [
           "specific detail"
         ],
         "difficultyTier": "D2",
-        "script": "Good morning, everyone. A quick note about the study center this week. Because the elevators on the north side are being serviced, the second-floor computer room will stay closed until Thursday. The group study rooms on the ground floor are open as usual, but you'll need to book them online this week rather than at the desk. And if you're coming in for printing, bring your student card — we can't release print jobs without it."
+        "script": "Good morning. A quick note about the study center this week. The second-floor power supply is being rewired, so the computer room up there stays closed until Thursday. The north-side elevators are out of service too, so if you need an elevator, use the south-side ones. The ground-floor group study rooms and the language lab are open as usual, but our online booking system is down, so reserve a room at the desk this week instead. And to print, pick up this week's release code from the front desk; your ID card alone won't start the machines."
       },
       {
         "draftKey": "LST_CLIP_03",
@@ -109,18 +111,18 @@
         "mediaDraftKey": "LST_CLIP_01",
         "prompt": "What are the speakers mainly discussing?",
         "options": [
-          "A class they both missed",
+          "Returning some books to the library together",
           "Working on their project together",
-          "A change to the library's opening hours",
-          "A book one of them has to return"
+          "Finding a quieter place to study",
+          "Catching up on a class they both missed"
         ],
         "correctAnswer": "Working on their project together",
-        "answerRationale": "Both speakers have the same task outstanding and agree to do it jointly; this is the thread of the whole exchange rather than any single detail.",
+        "answerRationale": "Both speakers raise unfinished work on the same group task and agree to do it together; that is the thread of the exchange rather than any single detail.",
         "distractorRationales": [
-          "No class is mentioned; plausible only if the listener assumes a generic student topic.",
+          "A laptop and printouts are mentioned, but no books and no returning.",
           "CORRECT",
-          "Opening hours are never discussed; the listener may confuse this with the remark about the room getting busy after four.",
-          "Printouts are mentioned, which a listener may mishear as library borrowing."
+          "The reading room filling up after four is mentioned as a reason to go earlier, not as a plan to move elsewhere - the closest competing detail.",
+          "A plausible reason two students would meet, but no missed class is mentioned."
         ],
         "estimatedSeconds": 20
       },
@@ -159,17 +161,17 @@
         "mediaDraftKey": "LST_CLIP_02",
         "prompt": "Which area is closed at the start of this week?",
         "options": [
-          "The ground-floor group study rooms",
-          "The printing service",
-          "The north-side entrance",
+          "The language lab",
+          "The south-side elevators",
+          "The main entrance",
           "The second-floor computer room"
         ],
         "correctAnswer": "The second-floor computer room",
-        "answerRationale": "Stated directly: it stays closed until Thursday because of the elevator servicing.",
+        "answerRationale": "Stated directly: the computer room upstairs stays closed until Thursday while the second-floor power supply is rewired.",
         "distractorRationales": [
-          "Mentioned in the same breath but described as open as usual.",
-          "Mentioned with a condition, not a closure.",
-          "The north-side elevators are being serviced, not the entrance - a plausible mis-attribution.",
+          "Named in the same sentence as the group study rooms and described as open as usual.",
+          "The north-side elevators are out of service; the announcement sends people to the south-side ones - the strongest mis-attribution.",
+          "Not mentioned as closed; a plausible guess for a building with access problems.",
           "CORRECT"
         ],
         "estimatedSeconds": 20
@@ -184,18 +186,18 @@
         "mediaDraftKey": "LST_CLIP_02",
         "prompt": "How should students reserve a group study room this week?",
         "options": [
-          "At the desk",
           "Online",
+          "At the desk",
           "By phone",
-          "No reservation is needed"
+          "By email"
         ],
-        "correctAnswer": "Online",
-        "answerRationale": "The announcement contrasts this week's online booking with the usual desk booking.",
+        "correctAnswer": "At the desk",
+        "answerRationale": "Stated directly: the online booking system is down this week, so rooms are reserved at the desk instead.",
         "distractorRationales": [
-          "Explicitly the method NOT to use this week; the strongest distractor for a listener who misses \"rather than\".",
+          "The default method a learner would assume, and the one the announcement explicitly rules out this week - this option exists to catch a learner answering from habit rather than from the audio.",
           "CORRECT",
-          "Never mentioned; a generic alternative.",
-          "Contradicts the instruction, but plausible if the listener only hears \"open as usual\"."
+          "A plausible alternative channel the announcement does not offer.",
+          "A plausible alternative channel the announcement does not offer."
         ],
         "estimatedSeconds": 20
       },
@@ -207,20 +209,20 @@
         "difficultyTier": "D2",
         "order": 5,
         "mediaDraftKey": "LST_CLIP_02",
-        "prompt": "What must students bring in order to print?",
+        "prompt": "What do students need in order to print?",
         "options": [
-          "A booking confirmation",
+          "Their own paper for the printer",
           "Cash for the printing fee",
-          "Their student card",
-          "A printed receipt"
+          "This week's release code",
+          "Only their student ID card"
         ],
-        "correctAnswer": "Their student card",
-        "answerRationale": "Stated as a requirement: print jobs cannot be released without it.",
+        "correctAnswer": "This week's release code",
+        "answerRationale": "Stated directly: pick up this week's release code from the front desk. The announcement also rules out the answer a learner would assume from general experience, saying an ID card alone will not start the machines.",
         "distractorRationales": [
-          "Booking is mentioned, but for study rooms, not printing - a cross-detail trap.",
+          "Not mentioned; a plausible requirement in a self-service print room.",
           "No fee is mentioned.",
           "CORRECT",
-          "Plausible-sounding but absent from the announcement."
+          "The answer general world knowledge supplies, and the one the announcement explicitly excludes - this option exists to catch a learner who answers without listening."
         ],
         "estimatedSeconds": 20
       },
@@ -232,19 +234,19 @@
         "difficultyTier": "D2",
         "order": 6,
         "mediaDraftKey": "LST_CLIP_03",
-        "prompt": "What is missing from the form?",
+        "prompt": "What does the speaker say about the form?",
         "options": [
-          "The applicant's own signature",
-          "The date it was submitted",
-          "A copy of an identity document",
-          "The landlord's signature"
+          "It was submitted after the deadline",
+          "Everything on it was filled in incorrectly",
+          "It needs to be filled in again from the start",
+          "One page came through blank"
         ],
-        "correctAnswer": "The landlord's signature",
-        "answerRationale": "The caller states the page needing the current landlord's signature came through blank.",
+        "correctAnswer": "One page came through blank",
+        "answerRationale": "Stated directly: the speaker says the landlord's signature is needed as well and that \"that page came through blank\".",
         "distractorRationales": [
-          "The caller explicitly says what the applicant filled in is fine; the strongest distractor if \"signature\" is heard without whose.",
-          "Monday is mentioned as the drop-off day, which may be mistaken for a missing date.",
-          "Never mentioned.",
+          "The form was dropped off on Monday and the cut-off is Friday, so it is not late - a plausible worry for an administrative call.",
+          "Contradicted outright: \"Everything you filled in is fine - that's not the problem.\" The strongest distractor for a learner who hears \"problem\" and stops.",
+          "Only the one blank page is needed, not a fresh form.",
           "CORRECT"
         ],
         "estimatedSeconds": 20
@@ -259,18 +261,18 @@
         "mediaDraftKey": "LST_CLIP_03",
         "prompt": "Why is the speaker calling?",
         "options": [
-          "To confirm that the form is complete",
-          "To reschedule an appointment",
-          "To request a missing document so the form can be processed",
-          "To explain that the application has been refused"
+          "To arrange a meeting about the form",
+          "To ask for a payment before Friday",
+          "To request one more thing for the form",
+          "To explain that the request was refused"
         ],
-        "correctAnswer": "To request a missing document so the form can be processed",
-        "answerRationale": "The call's function is a request for the outstanding signature, framed by what it unblocks.",
+        "correctAnswer": "To request one more thing for the form",
+        "answerRationale": "The speaker says what was filled in is fine, names one thing still needed, and ties it to a Friday cut-off. The purpose is to obtain that one remaining item in time.",
         "distractorRationales": [
-          "Inverts the message; plausible for a listener who latches onto \"everything you filled in is fine\".",
-          "No appointment exists in the message.",
+          "No meeting is proposed anywhere in the message.",
+          "No payment is mentioned; plausible for an administrative call.",
           "CORRECT",
-          "Nothing is refused; \"that's not the problem\" may be misread as a rejection."
+          "Nothing is refused; the speaker is trying to avoid a delay."
         ],
         "estimatedSeconds": 25
       },
@@ -285,17 +287,17 @@
         "prompt": "What does the speaker suggest about the Friday deadline?",
         "options": [
           "Meeting it would avoid a month's delay",
-          "It has already passed",
+          "It applies only to new applications",
           "It can be extended on request",
-          "The landlord must send the page directly"
+          "It was set to suit the student's schedule"
         ],
         "correctAnswer": "Meeting it would avoid a month's delay",
-        "answerRationale": "The speaker contrasts processing this month with rolling into the next cycle, and signals she would rather avoid that - the intention is to convey consequence, not just a date.",
+        "answerRationale": "The speaker contrasts processing this month with rolling into the next cycle and says they would rather not do that - the intention is to convey the consequence, not just the date.",
         "distractorRationales": [
           "CORRECT",
-          "The deadline is upcoming, not past.",
-          "The speaker offers no extension; her tone is accommodating, which may imply flexibility.",
-          "Traceable to \"we need your current landlord's signature\" and \"that page came through blank\", but the speaker asks the student to get it to the office - a plausible mishearing of who delivers it."
+          "Plausible if \"this month\" and \"the next cycle\" are heard as rules about application types; the message makes no such distinction.",
+          "The speaker offers no extension, though the accommodating tone may imply flexibility.",
+          "Plausible given the helpful tone, but the date comes from the office's processing cycle, not from the student."
         ],
         "estimatedSeconds": 25
       },
@@ -311,15 +313,15 @@
         "options": [
           "The applause showed that it went well",
           "A technical problem spoiled their plan",
-          "It was called off before it could begin",
+          "The slides were the strongest part",
           "The audience left before it had finished"
         ],
         "correctAnswer": "A technical problem spoiled their plan",
-        "answerRationale": "Nothing negative is stated. The deflection to the applause, the projector failure, the fallback to speaking from memory and the twelve minutes instead of fifteen must be combined before the implication is available; no single line says the plan went wrong.",
+        "answerRationale": "No negative verdict is stated. The deflection to the applause, the projector failing to read the file, the fallback to speaking from memory and the twelve minutes instead of fifteen must be combined before the implication is available.",
         "distractorRationales": [
-          "The applause remark read literally - the key literal-interpretation trap, now stated as specifically as the correct option.",
+          "The applause remark read literally - the key literal-interpretation trap.",
           "CORRECT",
-          "The presentation clearly happened; the speaker reports how long it ran.",
+          "The speaker never showed slides at all, having spoken from memory - a trap for a learner who missed the equipment failure.",
           "The audience clapped at the end, so they stayed."
         ],
         "estimatedSeconds": 25
@@ -335,7 +337,7 @@
         "prompt": "Why was the presentation shorter than planned?",
         "options": [
           "The speaker was asked to stop early",
-          "The projector trouble delayed the start",
+          "They were given less time than planned",
           "The speaker left out a section",
           "The speaker ran out of time"
         ],
@@ -343,9 +345,9 @@
         "answerRationale": "\"Twelve, in the end. I cut the part I was least sure about\" - the listener must connect the shorter duration to the deliberate cut rather than to the equipment problem.",
         "distractorRationales": [
           "Nobody intervenes.",
-          "The projector did fail to read the file, but the speaker went ahead from memory and never mentions a late start - the most available wrong cause.",
+          "A plausible competing cause the conversation never raises.",
           "CORRECT",
-          "The speaker attributes the shorter length to cutting a section he was unsure about, not to being stopped by the clock."
+          "The speaker attributes the shorter length to cutting a section they were unsure about, not to being stopped by the clock."
         ],
         "estimatedSeconds": 25
       }
@@ -364,7 +366,7 @@
         ],
         "wordCount": 97,
         "estimatedReadingSeconds": 60,
-        "text": "From 1 March, the bicycle racks behind Building C will be removed while the courtyard is repaved. Riders should use the covered racks beside the sports hall instead; these are monitored by camera and hold about ninety bicycles. The arrangement is expected to last eight weeks. During this period, bicycles left against railings or in doorways will be tagged, and if they are not moved within three days they will be taken to the campus store. Anyone collecting a tagged bicycle should bring proof of ownership to the facilities desk, which is open on weekday mornings only."
+        "text": "From March 1, the bicycle racks behind Building C will be removed while the courtyard is repaved. Riders should use the covered racks beside the sports hall instead; these are monitored by camera and hold about ninety bicycles. The arrangement is expected to last eight weeks. During this period, bicycles left against railings or in doorways will be tagged, and if they are not moved within three days they will be taken to the campus store. Anyone collecting a tagged bicycle should bring proof of ownership to the facilities desk, which is open on weekday mornings only."
       },
       {
         "draftKey": "RDG_PASSAGE_02",
@@ -392,7 +394,7 @@
         ],
         "wordCount": 159,
         "estimatedReadingSeconds": 90,
-        "text": "On the first Saturday of each month, a community hall in the city becomes a repair cafe. People bring broken things - a lamp, a kettle, a jacket with a failed zip - and sit with a volunteer who helps them fix it. Nobody hands the item over; the owner does the work, guided.\n\nThe organizers are deliberate about this. A free repair service would be useful, but it would also leave the owner no better placed the next time something broke. Teaching the repair is slower and messier, and on a busy morning the line grows long. The volunteers accept that trade-off on purpose.\n\nNot everything can be saved. Some appliances are sealed in ways that make opening them impractical, and the cafe keeps a note of which products these are. Over three years that list has grown long enough that the organizers now pass it to a consumer group, which draws on it in its own campaigns."
+        "text": "On the first Saturday of each month, a community hall in the city becomes a repair cafe. People bring broken things - a lamp, a kettle, a jacket with a failed zipper - and sit with a volunteer who helps them fix it. Nobody hands the item over; the owner does the work, guided.\n\nThe organizers are deliberate about this. A free repair service would be useful, but it would also leave the owner no better placed the next time something broke. Teaching the repair is slower and messier, and on a busy morning the line grows long. The volunteers accept that trade-off on purpose.\n\nNot everything can be saved. Some appliances are sealed in ways that make opening them impractical, and the cafe keeps a note of which products these are. Over three years that list has grown long enough that the organizers now pass it to a consumer group, which draws on it in its own campaigns."
       }
     ],
     "items": [
@@ -457,7 +459,7 @@
         "prompt": "When can a tagged bicycle be collected?",
         "options": [
           "At any time",
-          "Only at weekends",
+          "Only on weekends",
           "On weekday mornings",
           "Within three days only"
         ],
@@ -476,7 +478,7 @@
         "skill": "READING",
         "taskType": "MCQ",
         "subskill": "main idea",
-        "difficultyTier": "D1",
+        "difficultyTier": "D3",
         "order": 14,
         "passageDraftKey": "RDG_PASSAGE_02",
         "prompt": "What is the writer's main point?",
@@ -484,7 +486,7 @@
           "Students should never reread their notes",
           "Rereading feels effective but recalling from memory works better",
           "Exams mainly reward familiarity with material",
-          "Taking good notes matters more than revising them"
+          "Taking good notes matters more than reviewing them"
         ],
         "correctAnswer": "Rereading feels effective but recalling from memory works better",
         "answerRationale": "The whole passage contrasts the feeling of fluency with the effectiveness of retrieval, and the final paragraph refuses the absolute position.",
@@ -640,7 +642,7 @@
         "answerRationale": "The list is now shared with a consumer group that uses it in campaigns, so its value has extended outside; this is implied by the handover rather than stated as significance.",
         "distractorRationales": [
           "CORRECT",
-          "Overgeneralises from \"some appliances\" - the main quantifier trap.",
+          "Overgeneralizes from \"some appliances\" - the main quantifier trap.",
           "Nothing suggests refusing customers.",
           "The repair work continues; the list is a by-product."
         ],
@@ -672,7 +674,7 @@
         ],
         "constructRationale": "A familiar, concrete topic every learner in the target population can attempt, so the task elicits speech rather than testing topic knowledge. Three sub-questions give a weaker speaker a structure to follow while leaving a stronger speaker room to elaborate, which is what makes the same prompt informative across the D1-D2 span.",
         "imageRequired": false,
-        "rubricVersion": "SPK_RUBRIC_V2",
+        "rubricVersion": "SPK_RUBRIC_V3",
         "estimatedSeconds": 120
       },
       {
@@ -697,7 +699,7 @@
         ],
         "constructRationale": "Deliberately different evidence from task 1: this one requires taking a position and supporting it, so it can show organisation and connected speech rather than description. The topic needs no specialist knowledge, and both positions are equally defensible so no learner is penalised for their view.",
         "imageRequired": false,
-        "rubricVersion": "SPK_RUBRIC_V2",
+        "rubricVersion": "SPK_RUBRIC_V3",
         "estimatedSeconds": 180
       }
     ]
@@ -724,7 +726,7 @@
           "appropriate informal register",
           "basic sentence control"
         ],
-        "rubricVersion": "WRT_RUBRIC_V2",
+        "rubricVersion": "WRT_RUBRIC_V3",
         "estimatedSeconds": 420
       },
       {
@@ -748,7 +750,7 @@
           "paragraph-level organisation",
           "range beyond the prompt's own wording"
         ],
-        "rubricVersion": "WRT_RUBRIC_V2",
+        "rubricVersion": "WRT_RUBRIC_V3",
         "estimatedSeconds": 540
       }
     ]
@@ -787,7 +789,7 @@
         "skill": "LANGUAGE_USE",
         "taskType": "MCQ",
         "subskill": "grammar",
-        "targetFeature": "preposition_of_time_point_versus_deadline",
+        "targetFeature": "preposition_of_clock_time",
         "difficultyTier": "D1",
         "order": 26,
         "prompt": "The session starts ____ half past nine.",
@@ -795,17 +797,17 @@
           "on",
           "in",
           "at",
-          "by"
+          "to"
         ],
         "correctAnswer": "at",
-        "answerRationale": "A point on the clock takes \"at\". The item also separates a point in time from a deadline: \"by\" is grammatical English but states a limit, which a start event does not take.",
+        "answerRationale": "For the exact start time in this sentence, use \"at\": \"The session starts at half past nine.\" Other prepositions are possible with a clock time in other frames - \"by half past nine\", \"from half past nine\" - so the rule is about this slot, not about clock times in general.",
         "distractorRationales": [
-          "Used with days and dates.",
-          "Used with months, years and longer periods.",
+          "Used with days and dates; it does not mark a named clock time.",
+          "Used with months, years and other longer periods.",
           "CORRECT",
-          "Means \"no later than\", so it reads the slot as a deadline rather than a point in time - wrong for the construct, not merely ungrammatical, and the most informative distractor."
+          "Belongs to telling the time relative to the next hour, as in \"ten to nine\"; it cannot fill this slot."
         ],
-        "diagnosticUse": "Weakness here points to prepositions of time as an early vocabulary-grammar target; choosing \"by\" specifically points to point-in-time versus deadline rather than to slot confusion.",
+        "diagnosticUse": "Weakness here points to prepositions of time as an early vocabulary-grammar target.",
         "estimatedSeconds": 25
       },
       {
@@ -842,7 +844,7 @@
         "targetFeature": "verb_noun_collocation",
         "difficultyTier": "D2",
         "order": 28,
-        "prompt": "Could you ____ me a favour and check the room number?",
+        "prompt": "Could you ____ me a favor and check the room number?",
         "options": [
           "make",
           "do",
@@ -850,12 +852,12 @@
           "take"
         ],
         "correctAnswer": "do",
-        "answerRationale": "\"Do someone a favour\" is the fixed collocation.",
+        "answerRationale": "\"Do someone a favor\" is the fixed collocation.",
         "distractorRationales": [
           "The classic make/do confusion for this noun.",
           "CORRECT",
           "Grammatical but not the established collocation.",
-          "Collocates with other nouns, not \"favour\"."
+          "Collocates with other nouns, not \"favor\"."
         ],
         "diagnosticUse": "Weakness here points to collocation work rather than more grammar rules.",
         "estimatedSeconds": 30
@@ -888,27 +890,5 @@
       }
     ]
   },
-  "revisedAt": "2026-10-25",
-  "revisionProvenance": {
-    "appliedPass": "STEP_2C_APPLY_CONTENT_REVIEW_REVISIONS",
-    "sourceRegister": "artifacts/entry-diagnostic-v2-content-revision-register.json",
-    "appliedRevisions": [
-      "REV-001",
-      "REV-002",
-      "REV-003",
-      "REV-004",
-      "REV-005",
-      "REV-006",
-      "REV-007",
-      "REV-008",
-      "REV-009",
-      "REV-012"
-    ],
-    "notAppliedRevisions": {
-      "REV-010": "NOTE - register requiredChange is \"None.\"; retain as authored",
-      "REV-011": "NOTE - register requires no change; subskill retained as authored",
-      "REV-013": "NOTE - open product decision on instruction language; no content change until decided"
-    },
-    "evidence": "artifacts/entry-diagnostic-v2-step2c-revisions.json"
-  }
+  "revisedAt": "2026-10-25"
 }

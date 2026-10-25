@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "blueprintVersion": "FOUR_SKILL_PLACEMENT_V2",
+  "blueprintVersion": "V2_2026_01",
   "scoringVersion": "FOUR_SKILL_PLACEMENT_V2",
   "authoredAt": "2026-10-25",
   "researchBasis": "artifacts/entry-diagnostic-v2-research.md",
@@ -81,7 +81,8 @@
       "weightWithinSkill": "equal",
       "mediaRequirement": "NONE",
       "previousDraftDifficultyNote": "previous draft recorded \"A2-B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
-      "difficultyTier": "D1"
+      "difficultyTier": "D1-D3",
+      "tierNote": "A range, not a single tier: a main-idea item is as hard as the passage it sits on. The main-idea item on the 97-word notice is D1; the one on the three-paragraph argument passage is D3."
     },
     {
       "skill": "Reading",
@@ -231,13 +232,14 @@
     "productiveTasks": 4,
     "expectedCompletionMinutesDerivedFromMatrix": 46,
     "objectiveItemsByDifficultyTier": {
-      "D1": 4,
-      "D2": 7,
-      "D3": 5,
+      "D1": 5,
+      "D2": 9,
+      "D3": 7,
       "D4": 4,
-      "range:D1-D2": 2,
-      "range:D2-D4": 2,
-      "D1-D3": 5
+      "total": 25,
+      "countedOver": "all 25 objective items: 10 Listening, 10 Reading, 5 LanguageUse, each carrying a single difficultyTier",
+      "status": "DESCRIPTIVE_COUNT_OF_AUTHORED_CONTENT",
+      "note": "Counted from the content draft, not a target. Items are not retiered to match this block; this block is corrected to match the items. An earlier revision of this field declared {D1:4, D2:7, D3:5, D4:4} plus range and D1-D3 groupings that no grouping of the 25 items reproduced."
     }
   },
   "expectedCompletionMinutes": 46,
@@ -259,7 +261,7 @@
       "Writing": 0.25,
       "LanguageUse": 0
     },
-    "overallWeightRationale": "Not equal-by-default. Two reasons, both evidential. (1) Reliability of evidence: each receptive skill carries 10 objectively keyed items, while Speaking carries 2 rubric-graded tasks and Writing 1. Giving a single AI-graded writing task the same influence as ten keyed reading items would let the noisiest measurement move placement as much as the most reliable one. (2) Construct coverage still matters: the legacy form had zero productive evidence, so productive skills retain a combined 40% - enough that a learner who cannot produce language is not placed as though they can. Receptive 60 / productive 40 is the deliberate compromise between measurement reliability and construct validity.",
+    "overallWeightRationale": "Equal weighting, and it is a PRODUCT-DESIGN HYPOTHESIS rather than an empirically derived weighting. The primary result of this instrument is the four-skill profile; the secondary overall figure exists only as a routing indicator and is computed as round((L + R + S + W) / 4) once all four required skills are complete. Each of Listening, Reading, Speaking and Writing therefore carries 0.25, and LanguageUse carries 0. No claim is made that these weights are reliability-optimal: no item calibration, no reliability study and no standard setting has been run, so there is no evidence on which to base an unequal split. An earlier draft of this field argued for a receptive 60 / productive 40 compromise from the premise that Writing carried a single task; that premise is false in V2 (Writing carries 2 tasks, Speaking 2) and the conclusion contradicted the declared overallWeights, so it has been removed rather than reconciled. Revisiting the weights is a psychometric-validation task, listed in psychometricValidationBacklog.",
     "overallFormula": "round((L + R + S + W) / 4), computed ONLY when Listening, Reading, Speaking and Writing are all COMPLETE. While any required skill is incomplete the overall figure is null - it is never computed over the subset that happens to be finished, and never represented as 0.",
     "compensatory": true,
     "compensatoryBasis": "Cambridge English socio-cognitive framework reports skills separately while treating overall ability as compensatory. This supports the compensatory form of the secondary figure, not any particular cross-skill split.",
@@ -279,12 +281,15 @@
     "weightingEmpiricalValidationStatus": "NOT_YET_VALIDATED",
     "weightingRationale": "Three options were compared (equal 25/25/25/25; 30/30/20/20; skill-profile-first with a separate overall) against construct validity, observations per skill, rubric and AI grading uncertainty, learner interpretation, receptive-masking risk and productive-task variance. 30/30/20/20 was REJECTED: its only argument was that more objective items implies more reliability implies more weight, but item count is not reliability without discrimination and distribution evidence, and it downweights exactly the two skills the legacy form could not measure. Skill-profile-first was chosen: the four bands are the primary result, which confines rubric noise to the affected skill and makes a weak productive skill visible instead of masked. The secondary overall figure uses EQUAL weighting because, absent reliability evidence, equal weights assert the least - any unequal split would claim we know which skill our instrument measures better. No external source decides this split; Cambridge supports a compensatory overall and Aptis supports equal weighting within a paper, neither prescribes a cross-skill split.",
     "weightingNotDerivedFrom": "Not derived from Cambridge or Aptis. Those sources support compensatory overall scoring and equal item weighting within a paper only. Cambridge products use a range of weighting arrangements including equal skill weighting.",
-    "knownWeakness": "With a single Writing task the Writing band is the least stable of the four. Adding a second Writing task is the first change to evaluate once pilot data exists.",
+    "knownWeakness": "Equal weighting is unvalidated: it is a design hypothesis, not a measured optimum, and the two productive skills are graded by rubric against 10 objectively keyed items per receptive skill. Whether a 45-60 second Speaking sample and a 60-130 word Writing sample support the same influence on the overall indicator as ten keyed items is exactly what pilot data must test. Until it does, the four-skill profile - not the overall figure - is what the product should act on.",
     "secondaryOverallPartialCalculation": false
   },
   "levelSystem": {
-    "type": "INTERNAL_BANDS",
-    "bands": [
+    "status": "UNRESOLVED_DO_NOT_IMPLEMENT",
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": "OPEN",
+    "DEF_004_BLOCKS_V2_SCORER_IMPLEMENTATION": true,
+    "problem": "Two independent disagreements between this document and the implementation. (1) Band count: this blueprint named four bands (Starter, Foundation, Intermediate, Upper); resolveEstimatedLevel in src/modules/diagnostic/diagnostic.logic.ts emits three - no Upper exists in the backend, the diagnostic specs or the frontend. (2) Cutoffs: this blueprint declared Intermediate as 65-79 while the code returns Intermediate at >= 75, so a learner at 70 percent is Intermediate here and Foundation there. The cutoff conflict survives even if a fourth band is added.",
+    "previouslyDeclaredBandsRemoved": [
       {
         "band": "Starter",
         "min": 0,
@@ -306,21 +311,10 @@
         "max": 100
       }
     ],
-    "boundaryRationale": "The legacy two-boundary scale (45 / 75) is retained at its lower edge for continuity with existing learner history, and one additional upper band is added because V2 measures a wider ability range than a 20-item MCQ screen could. Boundaries are routing thresholds for content difficulty, not proficiency claims.",
-    "cefrClaim": false,
-    "cefrEstimateClaim": false,
-    "cefrClaimBasis": "BreadTrans V2 does not yet have sufficient empirical and standard-setting evidence to make a defensible CEFR-linked placement claim. The Council of Europe Manual (2009) does provide for relating examinations to the CEFR, through familiarisation, specification, standardisation/benchmarking, standard setting and validation. BreadTrans has run none of the evidence-side procedures (no standard-setting panel, no item calibration, no candidate sample, no reliability study, no external validation), so no CEFR wording ships with V2.",
-    "learnerFacingWording": "Describe the output as a placement indication used to route learning content. Never as a certified or CEFR level.",
-    "futureCefrAlignmentPossible": true,
-    "futureCefrAlignmentRequiresEmpiricalValidation": true,
-    "futureCefrAlignmentProcedures": [
-      "familiarisation",
-      "specification",
-      "standardisation / benchmarking",
-      "standard setting",
-      "validation"
-    ],
-    "boundaryStatus": "DESIGN_HYPOTHESIS_NOT_VALIDATED"
+    "whyRemovedRatherThanCorrected": "These cutoffs were presented as an approved V2 contract. They are not: no empirical basis exists for any of the four boundaries, and the only implemented cutoffs are V1 behaviour, which is evidence of existing behaviour rather than approval for V2. Leaving them in place would let the V2 scorer be implemented against unvalidated numbers that disagree with the running code.",
+    "requiredResolution": "One product decision settling the band COUNT and the Intermediate lower boundary together. Do not add Upper by inference and do not adopt either existing threshold automatically. V1 scoring must not change.",
+    "v1BehaviourForReference": "resolveEstimatedLevel: >= 75 Intermediate, >= 45 Foundation, else Starter. Recorded as observed behaviour only.",
+    "contentCoupling": "None. Zero occurrences of Starter, Foundation, Intermediate or Upper in the content draft or the rubrics, so result bands are scorer output and not content. This is why DEF-004 does not block DRAFT persistence."
   },
   "mediaPolicy": {
     "listeningAudio": "Authored for V2 via the project's existing Azure Speech pipeline. Versioned storage keys under a V2-specific prefix. Script hash and audio hash recorded per item so the audio-to-script binding is provable rather than inferred from a filename.",
@@ -333,7 +327,7 @@
       "every Listening item has a verified audio asset (bytes > 0, decodes, duration plausible, script hash matches)",
       "every productive task has a rubric with a rubricVersion",
       "scoringVersion and blueprintVersion present on the assessment",
-      "no invalid answer key (correctIndex within range)",
+      "no invalid answer key: the authored draft keys items by correctAnswer (a string that must appear exactly once in options), and the persisted row keys them by correctIndex (which must be a valid index into the persisted options array). Both representations must hold, and the import mapping between them is specified in artifacts/entry-diagnostic-v2-persistence-contract.md",
       "no duplicate item prompt and no duplicate audio asset",
       "no Listening item left SEMANTIC_AMBIGUOUS or SEMANTIC_MISMATCH"
     ]
