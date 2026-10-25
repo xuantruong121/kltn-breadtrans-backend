@@ -1,0 +1,2535 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-25T03:30:27.476Z",
+  "readOnly": true,
+  "scope": "Every media reference held by active (published, learner-reachable) content, across all learner domains. Superseded artifact versions are excluded and listed separately.",
+  "method": "Technical existence is never semantic proof. PROVEN requires data tying the media to its meaning (a validated per-question timeline window). HIGH_CONFIDENCE requires the canonical pipeline to have recorded the mapping (speaker+voice, or a transcript the audio was composed from). Anything else stays AMBIGUOUS; a missing but required reference is MISMATCH.",
+  "counts": {
+    "total": 249,
+    "SEMANTIC_PROVEN": 64,
+    "SEMANTIC_HIGH_CONFIDENCE": 54,
+    "SEMANTIC_AMBIGUOUS": 28,
+    "SEMANTIC_MISMATCH": 0,
+    "NOT_REQUIRED": 103
+  },
+  "byDomain": {
+    "Listening": {
+      "NOT_REQUIRED": 47,
+      "SEMANTIC_PROVEN": 64
+    },
+    "Speaking": {
+      "NOT_REQUIRED": 52,
+      "SEMANTIC_AMBIGUOUS": 6
+    },
+    "TOEIC": {
+      "SEMANTIC_HIGH_CONFIDENCE": 54,
+      "SEMANTIC_AMBIGUOUS": 6
+    },
+    "Courses": {
+      "SEMANTIC_AMBIGUOUS": 16
+    },
+    "Flashcards / Vocabulary": {
+      "NOT_REQUIRED": 2
+    },
+    "Diagnostic": {
+      "NOT_REQUIRED": 2
+    }
+  },
+  "supersededVersionsExcluded": [
+    "24:v6",
+    "25:v6",
+    "28:v1"
+  ],
+  "items": [
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 1,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 2,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 3,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 4,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 5,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 6,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 17,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 18,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 19,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 27,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 28,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 29,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 30,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 31,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 32,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 33,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 34,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 35,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 36,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 37,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 38,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 39,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 40,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 41,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 42,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 43,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 44,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 45,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 46,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 47,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 48,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 49,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 50,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 51,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 52,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 53,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 54,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 55,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 56,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 57,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 58,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "ListeningAudioArtifact",
+      "entityId": "quiz-23:v7",
+      "mediaRole": "whole-quiz dialogue track",
+      "expectedSemanticRole": "one continuous recording whose timeline lets each question seek to its own turn",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "published v7; 20 windows, all offsets present, strictly ordered, distinct, inside durationMs=75528"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 115,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-115/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 116,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-116/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 117,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-117/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 118,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-118/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 119,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-119/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 120,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-120/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 121,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-121/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 122,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-122/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 123,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-123/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 124,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-124/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 125,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-125/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 126,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-126/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 127,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-127/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 128,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-128/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 129,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-129/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 130,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-130/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 131,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-131/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 132,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-132/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 133,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-133/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 134,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-23/question-134/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "ListeningAudioArtifact",
+      "entityId": "quiz-24:v7",
+      "mediaRole": "whole-quiz dialogue track",
+      "expectedSemanticRole": "one continuous recording whose timeline lets each question seek to its own turn",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "published v7; 20 windows, all offsets present, strictly ordered, distinct, inside durationMs=90432"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 135,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-135/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 136,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-136/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 137,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-137/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 138,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-138/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 139,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-139/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 140,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-140/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 141,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-141/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 142,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-142/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 143,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-143/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 144,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-144/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 145,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-145/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 146,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-146/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 147,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-147/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 148,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-148/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 149,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-149/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 150,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-150/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 151,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-151/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 152,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-152/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 153,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-153/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 154,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset catalog/listening/practice/audio/quiz-24/question-154/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "ListeningAudioArtifact",
+      "entityId": "quiz-25:v7",
+      "mediaRole": "whole-quiz dialogue track",
+      "expectedSemanticRole": "one continuous recording whose timeline lets each question seek to its own turn",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "published v7; 20 windows, all offsets present, strictly ordered, distinct, inside durationMs=82728"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 155,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-155/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 156,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-156/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 157,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-157/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 158,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-158/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 159,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-159/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 160,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-160/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 161,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-161/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 162,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-162/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 163,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-163/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 164,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-164/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 165,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-165/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 166,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-166/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 167,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-167/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 168,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-168/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 169,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-169/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 170,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-170/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 171,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-171/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 172,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-172/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 173,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-173/dialogue-v4.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 174,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "audio of this turn, in that turn speaker voice",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "asset premium/listening/quiz-25/question-174/dialogue-v3.mp3 carried forward from the acoustic (F0) verification recorded in the prior manifest"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 175,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 176,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 177,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 178,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "ListeningAudioArtifact",
+      "entityId": "quiz-28:v2",
+      "mediaRole": "whole-quiz dialogue track",
+      "expectedSemanticRole": "one continuous recording whose timeline lets each question seek to its own turn",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_PROVEN",
+      "evidence": "published v2; 4 windows, all offsets present, strictly ordered, distinct, inside durationMs=21528"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 179,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Listening",
+      "entityType": "Question",
+      "entityId": 180,
+      "mediaRole": "per-question audio",
+      "expectedSemanticRole": "none - comprehension item is served from the shared track",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "question type MULTIPLE_CHOICE does not require its own turn audio"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 1,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 2,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 3,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 4,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 5,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 6,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 7,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 8,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 9,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 10,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 11,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 12,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 13,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 14,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 15,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 16,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 17,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 18,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 19,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 20,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 21,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 22,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 23,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 24,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 25,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 26,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 27,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 27,
+      "mediaRole": "describe-picture stimulus",
+      "expectedSemanticRole": "the picture the learner is asked to describe, matching the prompt",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between the image content and the prompt text"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 28,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 28,
+      "mediaRole": "describe-picture stimulus",
+      "expectedSemanticRole": "the picture the learner is asked to describe, matching the prompt",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between the image content and the prompt text"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 29,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 30,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 32,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 33,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 34,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 34,
+      "mediaRole": "describe-picture stimulus",
+      "expectedSemanticRole": "the picture the learner is asked to describe, matching the prompt",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between the image content and the prompt text"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 35,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 35,
+      "mediaRole": "describe-picture stimulus",
+      "expectedSemanticRole": "the picture the learner is asked to describe, matching the prompt",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between the image content and the prompt text"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 36,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 37,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 38,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 39,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 40,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 41,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 42,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 43,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 44,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 45,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 45,
+      "mediaRole": "describe-picture stimulus",
+      "expectedSemanticRole": "the picture the learner is asked to describe, matching the prompt",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between the image content and the prompt text"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 46,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 46,
+      "mediaRole": "describe-picture stimulus",
+      "expectedSemanticRole": "the picture the learner is asked to describe, matching the prompt",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between the image content and the prompt text"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 47,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 48,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 49,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 50,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 51,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 52,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "Speaking",
+      "entityType": "SpeakingExercise",
+      "entityId": 53,
+      "mediaRole": "reference/model audio",
+      "expectedSemanticRole": "a model reading of this exercise's own target text",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "no reference audio; task is learner-spoken (exam-internal)"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 1,
+      "mediaRole": "Part 1 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 1,
+      "mediaRole": "Part 1 photograph",
+      "expectedSemanticRole": "the photograph the four statements describe",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between image content and the statements"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 2,
+      "mediaRole": "Part 1 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 2,
+      "mediaRole": "Part 1 photograph",
+      "expectedSemanticRole": "the photograph the four statements describe",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between image content and the statements"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 3,
+      "mediaRole": "Part 1 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 3,
+      "mediaRole": "Part 1 photograph",
+      "expectedSemanticRole": "the photograph the four statements describe",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between image content and the statements"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 4,
+      "mediaRole": "Part 1 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 4,
+      "mediaRole": "Part 1 photograph",
+      "expectedSemanticRole": "the photograph the four statements describe",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between image content and the statements"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 5,
+      "mediaRole": "Part 1 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 5,
+      "mediaRole": "Part 1 photograph",
+      "expectedSemanticRole": "the photograph the four statements describe",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between image content and the statements"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 6,
+      "mediaRole": "Part 1 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 6,
+      "mediaRole": "Part 1 photograph",
+      "expectedSemanticRole": "the photograph the four statements describe",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "image present; no stored link between image content and the statements"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 7,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 8,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 9,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 10,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 11,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 12,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 13,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 14,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 15,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 16,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 17,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 18,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 19,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 20,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 21,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 22,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 23,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 24,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 25,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 26,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 27,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 28,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 29,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 30,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 31,
+      "mediaRole": "Part 2 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 32,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 33,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 34,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 35,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 36,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 37,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 38,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 39,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 40,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 41,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 42,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 43,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 44,
+      "mediaRole": "Part 3 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 45,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 46,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 47,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 48,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 49,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 50,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 51,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 52,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 53,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "TOEIC",
+      "entityType": "ToeicQuestionGroup",
+      "entityId": 54,
+      "mediaRole": "Part 4 audio",
+      "expectedSemanticRole": "spoken rendering of this group's transcript",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_HIGH_CONFIDENCE",
+      "evidence": "audio present and the group carries the transcript it was composed from"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 8001,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 17 altText=\"Sơ đồ so sánh hiện tại đơn cho thói quen với hiện tại tiếp diễn cho hành động đang xảy ra.\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 8002,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 18 altText=\"Sơ đồ phân biệt danh từ đếm được, không đếm được và các từ chỉ lượng.\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 8003,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 19 altText=\"Dòng thời gian minh họa thì quá khứ đơn và các mốc thời gian đã hoàn thành.\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 8004,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 20 altText=\"Sơ đồ phân biệt will cho quyết định ngay lúc nói với be going to cho kế hoạch hoặc bằng chứng.\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 8005,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 21 altText=\"Biểu đồ minh họa tính từ, trạng từ và các dạng so sánh hơn, so sánh nhất.\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 8006,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 22 altText=\"Thang ý nghĩa minh họa can cho khả năng, should cho lời khuyên và must cho nghĩa vụ.\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 8007,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 23 altText=\"Minh họa vị trí của đồ vật trong, trên, dưới, cạnh và phía trước hoặc phía sau để học giới từ.\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 8008,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 24 altText=\"Bản đồ khái niệm liên kết ngữ cảnh, dạng động từ, số lượng và cụm giới từ.\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 12001,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 1 altText=\"Bảng ký hiệu ngữ âm quốc tế IPA\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 12002,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 2 altText=\"Sơ đồ vị trí nguyên âm tiếng Anh\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 12003,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 3 altText=\"Sơ đồ nguyên âm đôi tiếng Anh\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 12004,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 4 altText=\"Minh họa vị trí cấu âm phụ âm tiếng Anh\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 12005,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 5 altText=\"Bảng phụ âm IPA cho phần luyện âm cuối\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 12006,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 6 altText=\"Minh họa nhịp điệu và trọng âm từ\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 12007,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 7 altText=\"Ký hiệu schwa trong bảng IPA\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Courses",
+      "entityType": "CourseLessonMedia",
+      "entityId": 12008,
+      "mediaRole": "lesson image",
+      "expectedSemanticRole": "media illustrating this lesson's own content",
+      "technicalStatus": "PRESENT",
+      "semanticStatus": "SEMANTIC_AMBIGUOUS",
+      "evidence": "media attached to lesson 8 altText=\"Minh họa ghép âm để nhận diện âm trong từ\"; lesson association and alt text are the only links, not verified content"
+    },
+    {
+      "domain": "Flashcards / Vocabulary",
+      "entityType": "VocabWord (rolled up)",
+      "entityId": "90 published words",
+      "mediaRole": "pronunciation audio",
+      "expectedSemanticRole": "spoken form of this word",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "none of the 90 published words carry audio; the UI uses the browser speech synthesis path instead of stored media"
+    },
+    {
+      "domain": "Flashcards / Vocabulary",
+      "entityType": "VocabWord (rolled up)",
+      "entityId": "90 published words",
+      "mediaRole": "illustration image",
+      "expectedSemanticRole": "picture illustrating this word",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "VocabWord carries no image column in the current schema, so no image reference can exist to audit"
+    },
+    {
+      "domain": "Diagnostic",
+      "entityType": "DiagnosticAssessment",
+      "entityId": 1,
+      "mediaRole": "listening audio for the entry test",
+      "expectedSemanticRole": "audio matching each diagnostic listening item, if the form used audio items",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "active form is 20 multiple-choice items; 0 carry any media reference; ListeningDiagnosticClip holds 0 rows and is empty in every backup including pre-reseed. Listening prompts print the script inline, so no audio object is required to answer them."
+    },
+    {
+      "domain": "Diagnostic",
+      "entityType": "DiagnosticAssessment",
+      "entityId": 1,
+      "mediaRole": "speaking task stimulus / recording",
+      "expectedSemanticRole": "prompt media for a productive speaking task, if the form had one",
+      "technicalStatus": "ABSENT",
+      "semanticStatus": "NOT_REQUIRED",
+      "evidence": "the two Speaking items are multiple-choice (questionType MCQ, no section metadata), so the recorder gate section===\"SPEAKING\" && questionType===\"OPEN_TEXT\" never opens and no recording media exists; DiagnosticSpeakingResponse is empty in the live database and in every backup."
+    }
+  ]
+}

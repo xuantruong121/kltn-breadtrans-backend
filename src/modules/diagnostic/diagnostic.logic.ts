@@ -783,3 +783,202 @@ export function rankCourseRecommendations(
       reason: item.reason,
     }));
 }
+
+/**
+ * Which scoring algorithm an assessment is eligible for.
+ *
+ * This is deliberately derived from the structural metadata the algorithms
+ * actually need, never from presentation data. An earlier implementation chose
+ * the algorithm with `assessment.id === 2 || title.includes('v2')`, which meant
+ * renaming an assessment silently changed every learner's score, and which
+ * could select the section/band algorithm for items that carry no section
+ * metadata at all - scoring every learner Pre-A1 regardless of their answers.
+ */
+export type DiagnosticScoringVersion =
+  'OBJECTIVE_POOLED_V1' | 'SECTION_BAND_V2';
+
+/** The metadata SECTION_BAND_V2 cannot work without. */
+export type DiagnosticScoringCapability = {
+  version: DiagnosticScoringVersion;
+  /** Objective items carrying BOTH a section and an intended CEFR band. */
+  itemsWithBandMetadata: number;
+  objectiveItems: number;
+  reason: string;
+};
+
+/**
+ * Resolve the scoring version from item structure.
+ *
+ * SECTION_BAND_V2 is only offered when every objective item carries the
+ * section and intendedLevel metadata its formulas read. Partial coverage falls
+ * back to the pooled scorer rather than silently scoring the uncovered
+ * sections as zero.
+ */
+export function resolveDiagnosticScoringVersion(
+  questions: DiagnosticQuestionForScoring[],
+): DiagnosticScoringCapability {
+  const objective = questions.filter(
+    (question) => !isOpenDiagnosticQuestion(question),
+  );
+  const withBandMetadata = objective.filter((question) => {
+    const meta = getQuestionMeta(question);
+    return Boolean(meta.section) && Boolean(meta.intendedLevel);
+  });
+  if (objective.length > 0 && withBandMetadata.length === objective.length) {
+    return {
+      version: 'SECTION_BAND_V2',
+      itemsWithBandMetadata: withBandMetadata.length,
+      objectiveItems: objective.length,
+      reason:
+        'every objective item carries section and intendedLevel metadata, so section and band percentages are computable',
+    };
+  }
+  return {
+    version: 'OBJECTIVE_POOLED_V1',
+    itemsWithBandMetadata: withBandMetadata.length,
+    objectiveItems: objective.length,
+    reason:
+      objective.length === 0
+        ? 'no objective items to score'
+        : `${withBandMetadata.length}/${objective.length} objective items carry section+intendedLevel metadata, which is insufficient for section/band scoring`,
+  };
+}
+
+/**
+ * Fail closed before running SECTION_BAND_V2. Its formulas return 0 for any
+ * section with no matching items, so running it against items that lack the
+ * metadata would produce a confident but meaningless placement.
+ */
+export function assertSectionBandV2Scorable(
+  questions: DiagnosticQuestionForScoring[],
+): void {
+  const capability = resolveDiagnosticScoringVersion(questions);
+  if (capability.version !== 'SECTION_BAND_V2') {
+    throw new Error(
+      `DIAGNOSTIC_SCORER_UNSUPPORTED: section/band scoring requires section+intendedLevel on every objective item (${capability.reason})`,
+    );
+  }
+  // The catastrophic case is a form where none of the weighted sections match
+  // any item: every section percentage would be 0, weightedCore would be 0 and
+  // every learner would be placed at the bottom band with full confidence.
+  // A form that covers only some weighted sections still produces meaningful
+  // non-zero scores for the sections it has, so that is left to content
+  // authoring rather than refused here.
+  const weightedSections = ['LANGUAGE_USE', 'READING', 'LISTENING'];
+  const covered = weightedSections.filter((section) =>
+    questions.some(
+      (question) =>
+        getQuestionMeta(question).section === section &&
+        !isOpenDiagnosticQuestion(question),
+    ),
+  );
+  if (!covered.length) {
+    throw new Error(
+      `DIAGNOSTIC_SCORER_UNSUPPORTED: section/band scoring requires objective items in at least one of ${weightedSections.join(', ')}`,
+    );
+  }
+}
+
+/**
+ * Describe the form that was actually administered, from its own items.
+ *
+ * CANONICAL_DIAGNOSTIC_BLUEPRINT describes a 52-item form that exists in no
+ * backup and in no live database; presenting it to a learner as "canonical"
+ * alongside a 20-item result overstated what was administered.
+ */
+export function describeAdministeredForm(
+  questions: DiagnosticQuestionForScoring[],
+) {
+  const objective = questions.filter(
+    (question) => !isOpenDiagnosticQuestion(question),
+  );
+  const bySkill: Record<string, number> = {};
+  for (const question of questions) {
+    bySkill[question.skill] = (bySkill[question.skill] ?? 0) + 1;
+  }
+  return {
+    totalItems: questions.length,
+    objectiveCount: objective.length,
+    productiveCount: questions.length - objective.length,
+    itemsBySkill: bySkill,
+  };
+}
+
+/**
+ * The scorer production runs for the Entry Diagnostic, stated explicitly.
+ *
+ * Earlier revisions inferred this twice over: first from the assessment's id
+ * and title (so a rename changed every learner's score), then from the items'
+ * own metadata (so enriching content with `section`/`intendedLevel` would have
+ * silently switched algorithm). Scoring semantics must not move because
+ * content metadata got richer, so the production scorer is now a constant.
+ *
+ * SECTION_BAND_V2 stays in the source because it is tested and may be used
+ * once a 52-item form is actually authored - it exists in no canonical backup
+ * today. It is reachable only by naming it explicitly, and
+ * `assertSectionBandV2Scorable` still refuses to run it against a form that
+ * lacks the structure its formulas read.
+ *
+ * When that content is authored, replace this constant with a persisted
+ * `scoringVersion` on the assessment; do not reintroduce inference.
+ */
+export const CURRENT_AUTHORED_FORM_SCORER: DiagnosticScoringVersion =
+  'OBJECTIVE_POOLED_V1';
+
+/**
+ * Scoring versions this build knows how to run.
+ *
+ * `CURRENT_AUTHORED_FORM_SCORER` above was the transitional application-level
+ * constant used before the version was persisted. Now that every assessment
+ * carries `scoringVersion`, production resolves the scorer from that stored
+ * value, and this set is what makes an unknown or unimplemented version fail
+ * closed instead of silently falling back to whatever the code last defaulted
+ * to.
+ */
+export const SUPPORTED_DIAGNOSTIC_SCORING_VERSIONS = [
+  'OBJECTIVE_POOLED_V1',
+] as const satisfies readonly DiagnosticScoringVersion[];
+
+/**
+ * Scoring versions that are defined but not yet runnable in production.
+ * FOUR_SKILL_PLACEMENT_V2 is authored content-side first (Step 2); until its
+ * scorer is implemented, an assessment claiming it must be refused rather than
+ * scored by the V1 algorithm.
+ */
+export const KNOWN_UNIMPLEMENTED_SCORING_VERSIONS = [
+  'FOUR_SKILL_PLACEMENT_V2',
+  'SECTION_BAND_V2',
+] as const;
+
+/**
+ * Resolve the scorer for an assessment from its PERSISTED version.
+ *
+ * Deliberately takes only the stored version string: no id, title, question
+ * count, skill label or item metadata is in scope, so none of them can change
+ * which algorithm runs (DIAG-002 and DIAG-008).
+ */
+export function resolvePersistedScoringVersion(
+  persisted: string | null | undefined,
+): DiagnosticScoringVersion {
+  const value = (persisted ?? '').trim();
+  if (!value) {
+    throw new Error(
+      'DIAGNOSTIC_SCORER_UNSUPPORTED: assessment has no persisted scoringVersion',
+    );
+  }
+  if (
+    (SUPPORTED_DIAGNOSTIC_SCORING_VERSIONS as readonly string[]).includes(value)
+  ) {
+    return value as DiagnosticScoringVersion;
+  }
+  if (
+    (KNOWN_UNIMPLEMENTED_SCORING_VERSIONS as readonly string[]).includes(value)
+  ) {
+    throw new Error(
+      `DIAGNOSTIC_SCORER_UNSUPPORTED: scoringVersion "${value}" is known but its scorer is not implemented in this build`,
+    );
+  }
+  throw new Error(
+    `DIAGNOSTIC_SCORER_UNSUPPORTED: unknown scoringVersion "${value}"`,
+  );
+}

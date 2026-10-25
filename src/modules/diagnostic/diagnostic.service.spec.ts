@@ -39,6 +39,12 @@ describe('DiagnosticService', () => {
     title: 'Entry',
     description: 'General English',
     isActive: true,
+    // Persisted scoring identity. Production resolves the scorer from this
+    // field, so every assessment fixture must state it.
+    scoringVersion: 'OBJECTIVE_POOLED_V1',
+    blueprintVersion: 'V1_LEGACY_20_ITEM',
+    contentVersion: 1,
+    status: 'ACTIVE',
     questions,
   };
   let prisma: any;
@@ -287,6 +293,7 @@ describe('DiagnosticService', () => {
       ...assessment,
       id: 2,
       title: 'Entry Diagnostic v2',
+      scoringVersion: 'OBJECTIVE_POOLED_V1',
       questions: v2Questions,
     });
     prisma.diagnosticAttempt.findUnique = jest.fn().mockResolvedValue({

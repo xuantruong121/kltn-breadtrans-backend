@@ -11,6 +11,9 @@ import {
   buildSkillProfiles,
   buildStrengthsAndWeaknesses,
   CANONICAL_DIAGNOSTIC_BLUEPRINT,
+  resolvePersistedScoringVersion,
+  assertSectionBandV2Scorable,
+  describeAdministeredForm,
   DiagnosticSkillProfile,
   DiagnosticQuestionForScoring,
   getAttemptQuestionPermutation,
@@ -264,9 +267,16 @@ export class DiagnosticService {
       answers,
       permutations,
     );
-    const totalObjectiveCorrect = profiles
-      .filter((p) => p.skill !== 'Speaking')
-      .reduce((sum, p) => sum + p.correctCount, 0);
+    // Every objective item counts, whatever skill it is labelled with. The
+    // objective/productive split is already made by `objectiveQuestions` via
+    // the item's questionType, so filtering again by skill name here dropped
+    // the Speaking-labelled MCQs from the numerator while the denominator
+    // (objectiveQuestions.length) still counted them - a learner who answered
+    // all 20 correctly was shown 18/20 and 90%.
+    const totalObjectiveCorrect = profiles.reduce(
+      (sum, p) => sum + p.correctCount,
+      0,
+    );
 
     const speakingRows = this.prisma.diagnosticSpeakingResponse
       ? await this.prisma.diagnosticSpeakingResponse.findMany({
@@ -370,7 +380,17 @@ export class DiagnosticService {
     );
     return {
       attemptId: attempt.id,
-      canonicalBlueprint: CANONICAL_DIAGNOSTIC_BLUEPRINT,
+      // The form actually administered, derived from its own items. The
+      // 52-item CANONICAL_DIAGNOSTIC_BLUEPRINT exists in no backup and in no
+      // live database, so it is no longer returned as `canonicalBlueprint`
+      // next to a 20-item result; it is offered as an explicitly unauthored
+      // plan instead.
+      administeredForm: describeAdministeredForm(questions),
+      plannedBlueprint: {
+        ...CANONICAL_DIAGNOSTIC_BLUEPRINT,
+        status: 'NOT_AUTHORED',
+        note: 'Planned structure only. It is not what this attempt administered; see administeredForm.',
+      },
       correctCount: totalObjectiveCorrect,
       totalCount: objectiveQuestions.length,
       totalTaskCount: questions.length,
@@ -530,7 +550,16 @@ export class DiagnosticService {
       id: assessment.id,
       title: assessment.title,
       description: assessment.description,
-      canonicalBlueprint: CANONICAL_DIAGNOSTIC_BLUEPRINT,
+      // The form actually being served, derived from its own items. The
+      // 52-item CANONICAL_DIAGNOSTIC_BLUEPRINT exists in no backup and in no
+      // live database, so it is no longer returned as `canonicalBlueprint`
+      // beside a 20-item form; it is offered as an explicitly unauthored plan.
+      administeredForm: describeAdministeredForm(formQuestions),
+      plannedBlueprint: {
+        ...CANONICAL_DIAGNOSTIC_BLUEPRINT,
+        status: 'NOT_AUTHORED',
+        note: 'Planned structure only. It is not the form being administered; see administeredForm.',
+      },
       hasCompleted: !!latestAttempt,
       questions: formQuestions.map((question) =>
         this.sanitizeQuestion(question, activeAttemptId),
@@ -826,9 +855,24 @@ export class DiagnosticService {
     const totalCount = objectiveQuestions.length;
     const percentage =
       totalCount === 0 ? 0 : Math.round((correctCount / totalCount) * 100);
-    const v2 =
-      assessment.id === 2 || assessment.title.toLowerCase().includes('v2');
-    const level = v2
+    // The algorithm is chosen from the items' own structure, never from the
+    // assessment's id or title: renaming an assessment must not change any
+    // learner's score, and the section/band scorer must not run against items
+    // that carry no section metadata (it would score every learner Pre-A1).
+    // The scorer comes from the assessment's PERSISTED scoringVersion.
+    // Nothing else about the assessment - id, title, question count, skills,
+    // order, or section/intendedLevel metadata on its items - is in scope, so
+    // none of them can change which algorithm runs (DIAG-002, DIAG-008). An
+    // unknown or not-yet-implemented version throws rather than falling back.
+    const scoringVersion = resolvePersistedScoringVersion(
+      assessment.scoringVersion,
+    );
+    const useSectionBandV2 = scoringVersion === 'SECTION_BAND_V2';
+    if (useSectionBandV2) {
+      // Fails closed rather than quietly computing zeros for a missing section.
+      assertSectionBandV2Scorable(formQuestions);
+    }
+    const level = useSectionBandV2
       ? resolvePlacementLevel(
           {
             LANGUAGE_USE: this.sectionPercentage(

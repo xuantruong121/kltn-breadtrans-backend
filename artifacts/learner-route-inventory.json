@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-24T15:52:34.993Z",
+  "generatedAt": "2026-10-25T02:03:03.878Z",
   "source": {
     "frontendRoot": "kltn-breadtrans-frontend-junior",
     "appDir": "src/app",
@@ -32,9 +32,9 @@
     },
     "byPriority": {
       "P0": 10,
-      "P1": 10,
+      "P1": 8,
       "P3": 17,
-      "P2": 11
+      "P2": 13
     }
   },
   "excluded": [
@@ -467,9 +467,7 @@
         "GET /exams/${id}"
       ],
       "mediaTypes": [],
-      "criticalInteractions": [
-        "navigation"
-      ],
+      "criticalInteractions": [],
       "auditPriority": "P2"
     },
     {
@@ -983,32 +981,10 @@
       "group": "(student)",
       "authRequired": true,
       "dynamic": true,
-      "apis": [
-        "GET /toeic/assessments/history",
-        "GET /toeic/attempts/${attemptId}",
-        "GET /toeic/attempts/${attemptId}/remaining-time",
-        "GET /toeic/attempts/${attemptId}/result",
-        "GET /toeic/attempts/${attemptId}/review",
-        "GET /toeic/bundles/${quizId}",
-        "GET /toeic/exams/${examId}",
-        "GET /toeic/exams/${examId}/briefing",
-        "GET /toeic/groups/${groupId}/audio?attemptId=${attemptId}",
-        "GET /toeic/history",
-        "PATCH /toeic/attempts/${attemptId}/answers",
-        "POST /toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
-        "POST /toeic/attempts/${attemptId}/begin",
-        "POST /toeic/attempts/${attemptId}/cancel",
-        "POST /toeic/attempts/${attemptId}/integrity-events",
-        "POST /toeic/attempts/${attemptId}/listening/advance",
-        "POST /toeic/attempts/${attemptId}/submit",
-        "POST /toeic/exams/${examId}/attempts"
-      ],
+      "apis": [],
       "mediaTypes": [],
-      "criticalInteractions": [
-        "write/submit",
-        "navigation"
-      ],
-      "auditPriority": "P1"
+      "criticalInteractions": [],
+      "auditPriority": "P2"
     },
     {
       "routeId": "toeic-assessments-id-attempts-attemptId",
@@ -1055,16 +1031,10 @@
       "group": "(student)",
       "authRequired": true,
       "dynamic": true,
-      "apis": [
-        "GET /toeic/assessments/${id}",
-        "POST /toeic/assessments/${id}/attempts"
-      ],
+      "apis": [],
       "mediaTypes": [],
-      "criticalInteractions": [
-        "write/submit",
-        "navigation"
-      ],
-      "auditPriority": "P1"
+      "criticalInteractions": [],
+      "auditPriority": "P2"
     },
     {
       "routeId": "toeic-assessments",

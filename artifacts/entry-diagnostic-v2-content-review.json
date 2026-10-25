@@ -1,0 +1,224 @@
+{
+  "reviewPhase": "STEP_2B_INDEPENDENT_CONTENT_REVIEW",
+  "reviewedAt": "2026-10-25",
+  "blueprintVersion": "V2_2026_01",
+  "contentVersion": 1,
+
+  "independenceCaveat": "The reviewer is the same agent that authored the package in Step 2A. True reviewer independence was therefore not achievable. The procedure compensated as far as possible: every item was re-read from the artifact and attacked adversarially BEFORE the author's uncertainty list was consulted, and the reconciliation in authorUncertaintyReconciliation was written afterwards. Seven issues were found that the author had not raised, which is the only objective evidence available that the pass was not circular. A human or separate-session review is still recommended before persistence.",
+
+  "integrity": {
+    "hashManifestEntryCount": 13,
+    "recomputedCount": 13,
+    "hashMismatchCount": 0,
+    "contentDraftHashIntegrityPass": true,
+    "step2bMechanicalBaselinePass": true
+  },
+
+  "coverage": {
+    "itemsReviewed": "29/29",
+    "listeningScriptsReviewed": "4/4",
+    "readingPassagesReviewed": "3/3",
+    "rubricsReviewed": "2/2"
+  },
+
+  "verdict": "APPROVE_WITH_REQUIRED_REVISIONS",
+  "contentReviewPass": false,
+  "revisionRequired": true,
+
+  "issueCounts": {
+    "blocker": 0,
+    "major": 4,
+    "minor": 6,
+    "note": 3,
+    "newReviewerIssueCount": 7
+  },
+
+  "objectiveItemSummary": {
+    "ambiguousObjectiveItems": 0,
+    "invalidAnswerKeys": 0,
+    "multipleDefensibleAnswerItems": 0,
+    "weakDistractorCount": 2,
+    "weakDistractorKeys": ["LST_Q_008", "LST_Q_010"],
+    "unfairDistractorCount": 0,
+    "nonParallelDistractorCount": 2,
+    "nonParallelDistractorKeys": ["LST_Q_009", "LU_Q_002"],
+    "distractorRationaleDefectCount": 1,
+    "distractorRationaleDefectKeys": ["LST_Q_010"],
+    "optionReorderRegressionPass": true,
+    "optionReorderItemsChecked": ["LST_Q_003", "LST_Q_006", "RDG_Q_006", "RDG_Q_008"]
+  },
+
+  "listeningSummary": {
+    "audioRequiredItemCount": 10,
+    "audioBypassableItemCount": 0,
+    "audioBypassableCaveat": "No item is answerable with certainty from the learner-visible stem and options alone. Two items have reduced audio dependency through option design rather than content: LST_Q_009 (one hedged option among three specific ones) and LST_Q_008 (two options are a priori implausible from the stem). LST_Q_009 is raised as MAJOR; LST_Q_008 as MINOR.",
+    "scriptNaturalnessPass": false,
+    "scriptNaturalnessBlocker": "All four scripts use British lexis and spelling while declaring en-US / general American voices (REV-001).",
+    "questionSemanticPass": true
+  },
+
+  "items": [
+    { "draftKey": "LST_Q_001", "skill": "LISTENING", "tier": "D1", "subskill": "gist", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "LST_Q_002", "skill": "LISTENING", "tier": "D1", "subskill": "gist", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [], "reviewerNote": "The exchange also contains the agreement tested by LST_Q_001. Checked for overlap: Q_002's option set contains only one defensible answer, so the two items do not collide." },
+    { "draftKey": "LST_Q_003", "skill": "LISTENING", "tier": "D2", "subskill": "specific detail", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": false, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "MINOR", "issues": ["REV-005"] },
+    { "draftKey": "LST_Q_004", "skill": "LISTENING", "tier": "D2", "subskill": "specific detail", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "LST_Q_005", "skill": "LISTENING", "tier": "D2", "subskill": "specific detail", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "LST_Q_006", "skill": "LISTENING", "tier": "D2", "subskill": "specific detail", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [], "reviewerNote": "Reorder verified: correct option now at D, its rationale is CORRECT at index 3, and the applicant-signature distractor retained its own rationale." },
+    { "draftKey": "LST_Q_007", "skill": "LISTENING", "tier": "D3", "subskill": "purpose", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "LST_Q_008", "skill": "LISTENING", "tier": "D3", "subskill": "speaker intention", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": false, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "MINOR", "issues": ["REV-006"] },
+    { "draftKey": "LST_Q_009", "skill": "LISTENING", "tier": "D4", "subskill": "inference", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "MAJOR", "issues": ["REV-004"] },
+    { "draftKey": "LST_Q_010", "skill": "LISTENING", "tier": "D4", "subskill": "inference", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": false, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "MINOR", "issues": ["REV-007"] },
+
+    { "draftKey": "RDG_Q_001", "skill": "READING", "tier": "D1", "subskill": "main idea", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "RDG_Q_002", "skill": "READING", "tier": "D2", "subskill": "specific detail", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "RDG_Q_003", "skill": "READING", "tier": "D2", "subskill": "specific detail", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "NOTE", "issues": ["REV-011"] },
+    { "draftKey": "RDG_Q_004", "skill": "READING", "tier": "D1", "subskill": "main idea", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "RDG_Q_005", "skill": "READING", "tier": "D2", "subskill": "specific detail", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "RDG_Q_006", "skill": "READING", "tier": "D3", "subskill": "meaning in context", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "MAJOR", "issues": ["REV-002"] },
+    { "draftKey": "RDG_Q_007", "skill": "READING", "tier": "D3", "subskill": "reference", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "RDG_Q_008", "skill": "READING", "tier": "D3", "subskill": "meaning in context", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [], "reviewerNote": "Reorder verified: correct option at D with CORRECT rationale at index 3; genuinely requires the preceding sentences, unlike RDG_Q_006." },
+    { "draftKey": "RDG_Q_009", "skill": "READING", "tier": "D4", "subskill": "inference", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "NOTE", "issues": ["REV-010"] },
+    { "draftKey": "RDG_Q_010", "skill": "READING", "tier": "D4", "subskill": "inference", "answerableFromAuthoredStimulus": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsMutuallyDistinct": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "externalKnowledgeRequired": false, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+
+    { "draftKey": "LU_Q_001", "skill": "LANGUAGE_USE", "tier": "D1", "subskill": "grammar", "targetFeatureAccurate": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "difficultyTierPlausible": true, "status": "PASS", "issues": [], "reviewerNote": "Adversarial check: \"have tried\" could be argued in a complaint reading, but \"I've been trying\" would be the natural perfect form and is absent, so \"am trying\" remains the only defensible option." },
+    { "draftKey": "LU_Q_002", "skill": "LANGUAGE_USE", "tier": "D1", "subskill": "grammar", "targetFeatureAccurate": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "difficultyTierPlausible": true, "status": "MINOR", "issues": ["REV-008"] },
+    { "draftKey": "LU_Q_003", "skill": "LANGUAGE_USE", "tier": "D2", "subskill": "grammar", "targetFeatureAccurate": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "difficultyTierPlausible": true, "status": "PASS", "issues": [], "reviewerNote": "Adversarial check: the natural alternative \"have been studying\" is not offered, so no second defensible option exists." },
+    { "draftKey": "LU_Q_004", "skill": "LANGUAGE_USE", "tier": "D2", "subskill": "vocabulary", "targetFeatureAccurate": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "difficultyTierPlausible": true, "status": "PASS", "issues": [] },
+    { "draftKey": "LU_Q_005", "skill": "LANGUAGE_USE", "tier": "D3", "subskill": "vocabulary", "targetFeatureAccurate": true, "exactlyOneDefensibleAnswer": true, "keyCorrect": true, "distractorsPlausible": true, "distractorsFair": true, "rationaleCorrect": true, "wordingNatural": true, "difficultyTierPlausible": true, "status": "PASS", "issues": [], "reviewerNote": "\"contributor\" is a real noun in the same family, which makes it the sharpest distractor without being unfair." },
+
+    { "draftKey": "SPK_TASK_01", "skill": "SPEAKING", "range": ["D1", "D2"], "constructPass": true, "elicitsSufficientSpeech": true, "accessibleAcrossRange": true, "specialistKnowledgeRequired": false, "prepTimeAppropriate": true, "responseTimeAppropriate": true, "rubricObservableFromTask": false, "status": "MAJOR", "issues": ["REV-003"] },
+    { "draftKey": "SPK_TASK_02", "skill": "SPEAKING", "range": ["D2", "D4"], "constructPass": true, "elicitsSufficientSpeech": true, "accessibleAcrossRange": true, "specialistKnowledgeRequired": false, "prepTimeAppropriate": true, "responseTimeAppropriate": true, "rubricObservableFromTask": true, "status": "PASS", "issues": [] },
+    { "draftKey": "WRT_TASK_01", "skill": "WRITING", "range": ["D1", "D2"], "constructPass": true, "elicitsGenuineProduction": true, "sufficientTextForScoring": true, "clearAudienceAndPurpose": true, "overRewardsFormula": false, "lengthAppropriate": true, "rubricObservableFromTask": false, "status": "MAJOR", "issues": ["REV-009"] },
+    { "draftKey": "WRT_TASK_02", "skill": "WRITING", "range": ["D2", "D4"], "constructPass": true, "elicitsGenuineProduction": true, "sufficientTextForScoring": true, "permitsOrganisation": true, "permitsDevelopment": true, "specialistKnowledgeRequired": false, "lengthAppropriate": true, "rubricObservableFromTask": true, "status": "PASS", "issues": [] }
+  ],
+
+  "scripts": [
+    { "draftKey": "LST_CLIP_01", "tier": "D1", "scriptNaturalness": "GOOD", "speakerConsistency": "GOOD", "questionEvidenceSufficient": true, "turnTakingNatural": true, "status": "MAJOR", "issues": ["REV-001"], "reviewerNote": "Contractions and ellipsis are natural (\"That's the plan\", \"Deal\"). No speaker states information purely to expose an answer. British lexis only via \"group thing\"/register, but see REV-001 for the package-wide locale problem." },
+    { "draftKey": "LST_CLIP_02", "tier": "D2", "scriptNaturalness": "GOOD", "speakerConsistency": "GOOD", "questionEvidenceSufficient": true, "turnTakingNatural": true, "status": "MAJOR", "issues": ["REV-001"], "reviewerNote": "Announcement register is plausible. Contains \"lifts\" and \"study centre\" - clearly British - against a declared general American voice." },
+    { "draftKey": "LST_CLIP_03", "tier": "D3", "scriptNaturalness": "GOOD", "speakerConsistency": "GOOD", "questionEvidenceSufficient": true, "turnTakingNatural": true, "status": "MAJOR", "issues": ["REV-001"], "reviewerNote": "\"I'd rather not do that to you\" carries the speaker-intention evidence LST_Q_008 needs, audibly and without relying on punctuation." },
+    { "draftKey": "LST_CLIP_04", "tier": "D4", "scriptNaturalness": "GOOD", "speakerConsistency": "GOOD", "questionEvidenceSufficient": true, "turnTakingNatural": true, "status": "MAJOR", "issues": ["REV-001"], "reviewerNote": "Inference load reviewed in both directions (§15): not too obvious, because no negative statement appears; not too speculative, because three independent cues converge - the hedge \"Well.\", the interlocutor's challenge, and the reported equipment failure plus the cut section. Contains \"practised\" (British spelling)." }
+  ],
+
+  "passages": [
+    { "draftKey": "RDG_PASSAGE_01", "tier": "D1", "status": "PASS", "naturalEnglish": true, "coherent": true, "internallyConsistent": true, "genrePlausible": true, "ageSuitable": true, "generalEnglishAccessible": true, "specialistKnowledgeIndependent": true, "issues": [] },
+    { "draftKey": "RDG_PASSAGE_02", "tier": "D3", "status": "MINOR", "naturalEnglish": true, "coherent": true, "internallyConsistent": true, "genrePlausible": true, "ageSuitable": true, "generalEnglishAccessible": true, "specialistKnowledgeIndependent": true, "issues": ["REV-012"] },
+    { "draftKey": "RDG_PASSAGE_03", "tier": "D4", "status": "PASS", "naturalEnglish": true, "coherent": true, "internallyConsistent": true, "genrePlausible": true, "ageSuitable": true, "generalEnglishAccessible": true, "specialistKnowledgeIndependent": true, "issues": [], "reviewerNote": "Repair cafes are a real, widespread phenomenon; the passage describes the concept in original wording without tracking any particular organisation's text. British spellings (\"organisers\", \"recognisably\") are internally consistent here because Reading declares no locale." }
+  ],
+
+  "rubrics": [
+    {
+      "rubricVersion": "SPK_RUBRIC_V1",
+      "criteriaDistinctPass": true,
+      "observablePass": false,
+      "anchorsPass": false,
+      "aiGradingReadyPass": false,
+      "status": "MAJOR",
+      "issues": ["REV-003"],
+      "criterionFindings": {
+        "task_fulfilment": "Distinct and well anchored. Anchors 1 and 2 adapt per task explicitly, which is good design and the reason this criterion does NOT mismatch across the two tasks. Checked for double-counting with coherence: it absorbs content coverage but not organisation, so no double-count.",
+        "intelligibility": "Captures understandability without penalising accent; the description states accent is not assessed and no anchor references nativeness. Distinct from fluency because its anchors are about listener effort, not flow.",
+        "fluency": "DEFECT. Anchors 1-4 are defined by proportion of available time filled. A learner who answers the prompt completely and concisely in 30 seconds of a 45-second task scores low, independently of ability. This conflicts with task_fulfilment, which can simultaneously award 4.",
+        "language_use": "Combining grammar and vocabulary is defensible for a 45-60 second turn and the anchors stay stable because each names both strands (\"errors ... vocabulary\"). Not flagged."
+      },
+      "omissionReview": {
+        "coherence": "Omission DEFENSIBLE. In a 45-60 second turn, organisation is only observable as part of addressing the prompt; a separate score would largely restate task_fulfilment.",
+        "pronunciation": "Folding into intelligibility DEFENSIBLE and preferable, since the placement construct is being understood rather than accent."
+      }
+    },
+    {
+      "rubricVersion": "WRT_RUBRIC_V1",
+      "criteriaDistinctPass": true,
+      "observablePass": false,
+      "anchorsPass": false,
+      "singleRubricTwoTasksPass": false,
+      "aiGradingReadyPass": false,
+      "status": "MAJOR",
+      "issues": ["REV-009"],
+      "criterionFindings": {
+        "task_achievement": "Distinct and per-task anchored. Overlap with organisation checked: task_achievement covers WHICH elements appear, organisation covers their ARRANGEMENT, so the same error is not penalised twice.",
+        "organisation": "DEFECT. Anchor 3 explicitly names task 2 (\"task 2 separates its reasons recognisably\") and anchor 4 requires deliberate grouping and signposting. Neither is available in a 60-90 word three-function message, so WRT_TASK_01 is effectively capped below the top of the scale for reasons of genre, not ability.",
+        "vocabulary": "Distinct from grammar; anchors are about range and precision rather than accuracy. No double-count found.",
+        "grammar": "Distinct from vocabulary; anchors judge accuracy by effect on the reader. No double-count found."
+      }
+    }
+  ],
+
+  "difficultyTierReview": {
+    "status": "QUALITATIVE_ONLY",
+    "itemLevelStatus": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
+    "itemTierToResultBandMappingDefined": false,
+    "tierChangeRecommendationCount": 0,
+    "observations": [
+      "Listening progression D1 gist -> D2 detail -> D3 purpose/intention -> D4 inference is internally coherent; no gross anomaly.",
+      "Reading progression D1 main idea -> D2 detail -> D3 meaning/reference -> D4 inference is internally coherent.",
+      "LST_Q_009 was examined for the author's D3-vs-D4 concern. The tier is defensible: the inference requires combining three cues and no negative statement is available. The real weakness is option parallelism (REV-004), not the tier, so no tier change is recommended.",
+      "RDG_Q_003 sits slightly above a pure detail lookup because collection time must be linked to the facilities desk, but remains plausible at D2.",
+      "No recommendation is made on relative difficulty beyond these qualitative observations; inspection cannot calibrate."
+    ]
+  },
+
+  "cefrLeakCheck": {
+    "cefrContentLeakCount": 0,
+    "scope": "item intendedDifficulty, learner-facing prompts, options, answers, result bands, rubric anchors",
+    "allowedOccurrences": "previousDraftDifficultyNote in the blueprint matrix only (authoring traceability, permitted by the blueprint)",
+    "itemTierToResultBandMappingDefined": false
+  },
+
+  "fairnessReview": {
+    "culturalFairnessConcerns": 0,
+    "ageSuitabilityConcerns": 0,
+    "notes": [
+      "Contexts are campus, housing, study habits, community repair, lecture recording - all plausible for 16-24 students without wealth, nationality or specialist assumptions.",
+      "No gender stereotyping found. The only named character is Mai, a housing officer, in a neutral professional role.",
+      "No violence, sexual content, political or religious persuasion, or traumatic scenario."
+    ]
+  },
+
+  "originalityCheck": {
+    "originalitySpotCheckPass": "NOT_COMPLETED",
+    "reason": "The web-search tool returned a transient classifier error on every attempt during this pass, so the §35 bounded external spot-check could not be performed. This is a tool failure, not a finding.",
+    "originalityConcernCount": 0,
+    "internalAssessment": "No internal indicator of copied text was found: all passages and scripts are plain contemporary prose with BreadTrans-specific details (Building C, the study centre notice, the housing office voicemail). One attribution concern was found independently of any external check and is raised as REV-012.",
+    "requiredBeforeApproval": "Re-run the bounded external spot-check on the three passages, four scripts and four productive prompts."
+  },
+
+  "authorUncertaintyReconciliation": [
+    { "authorUncertaintyId": "AU-1", "concern": "LST_Q_009 may behave as D3 rather than D4 because the applause cue is strong.", "reviewerClassification": "PARTIALLY_CONFIRMED", "reviewerReason": "The tier is defensible - no negative statement exists and three cues must be combined. But a related, different weakness is real: one option is hedged while three are specific, so strategic guessing partially substitutes for inference.", "requiredAction": "REV-004 (option parallelism). No tier change." },
+    { "authorUncertaintyId": "AU-2", "concern": "LST_Q_008 requires combining the Friday deadline with \"rolls into the next cycle\"; confirm the audio makes that link audible.", "reviewerClassification": "PARTIALLY_CONFIRMED", "reviewerReason": "The link is carried by \"we can still process everything this month\" followed by \"Otherwise it rolls into the next cycle\", which is audible and does not depend on punctuation. However one distractor is implausible, which narrows the item more than intended.", "requiredAction": "REV-006 (weak distractor)." },
+    { "authorUncertaintyId": "AU-3", "concern": "RDG_Q_009 distractor C (\"the cafe cannot accept responsibility\") may also be defensible from the text.", "reviewerClassification": "REJECTED", "reviewerReason": "The passage supplies an explicit competing reason - a free service would leave the owner no better placed next time. Liability is never raised, so C is outside knowledge rather than a second supported reading. It functions as the strong distractor it was designed to be.", "requiredAction": "None (REV-010 recorded as NOTE)." },
+    { "authorUncertaintyId": "AU-4", "concern": "LU_Q_002 distractor \"by\" changes meaning rather than being ungrammatical, which may be unfair at D1.", "reviewerClassification": "PARTIALLY_CONFIRMED", "reviewerReason": "Only one option is defensible, since \"starts by half past nine\" is semantically incoherent for a start event, so the item is not ambiguous. But \"by\" is a semantic-shift distractor sitting among three purely grammatical-slot distractors, which makes the set non-parallel.", "requiredAction": "REV-008 (non-parallel distractor)." },
+    { "authorUncertaintyId": "AU-5", "concern": "Clip durations are estimates from word counts, not measured.", "reviewerClassification": "CONFIRMED", "reviewerReason": "Unavoidable before TTS. Word counts (65-77) are consistent with the 32-40 second estimates at a normal speaking rate, so the estimates are reasonable, but they remain estimates.", "requiredAction": "None now. Step 3 must write measured durations back and the readiness guard must compare them against these estimates." },
+    { "authorUncertaintyId": "AU-6", "concern": "The Speaking rubric has no separate coherence criterion; a reviewer may disagree.", "reviewerClassification": "REJECTED", "reviewerReason": "The omission is defensible for a 45-60 second turn, and task_fulfilment already captures content coverage without absorbing organisation. Independently, however, a different Speaking rubric defect was found in the fluency criterion.", "requiredAction": "None for coherence. REV-003 for fluency." },
+    { "authorUncertaintyId": "AU-7", "concern": "RDG_PASSAGE_02 names \"the fluency trap\" and RDG_Q_006 then asks about it; check the item is not answerable from the term's wording alone.", "reviewerClassification": "CONFIRMED", "reviewerReason": "It is answerable without the passage. The correct option, \"mistaking ease of reading for real understanding\", glosses \"fluency\" as \"ease of reading\" and \"trap\" as \"mistaking\". A learner who knows the word fluency can select it from the stem and options alone, so the item does not measure its declared meaning-in-context subskill.", "requiredAction": "REV-002 (reading context leak)." },
+    { "authorUncertaintyId": "AU-8", "concern": "Vietnamese assessment title with English item content; confirm instruction language expectations.", "reviewerClassification": "CONFIRMED", "reviewerReason": "The mix is consistent with the existing product, where learner-facing chrome is Vietnamese and target-language content is English. It is nonetheless an unconfirmed product decision, and the per-task instructions (\"Write 60-90 words\") are in English while the assessment description is Vietnamese.", "requiredAction": "REV-013 - product decision on instruction language, not a content defect." }
+  ],
+
+  "approvalGate": {
+    "blockerCount": 0,
+    "majorCount": 4,
+    "ambiguousObjectiveItems": 0,
+    "invalidAnswerKeys": 0,
+    "multipleDefensibleAnswerItems": 0,
+    "listeningAudioBypassableItemCount": 0,
+    "productiveTasksElicitSufficientEvidence": true,
+    "rubricsUsableForIntendedTasks": false,
+    "unresolvedOriginalityConcern": true,
+    "contentReviewPass": false,
+    "reason": "Four MAJOR issues and an incomplete originality spot-check. No blocker, no invalid key, no ambiguous item."
+  },
+
+  "safety": {
+    "contentDraftMutated": false,
+    "rubricDraftMutated": false,
+    "hashManifestMutated": false,
+    "dbMutated": false,
+    "legacyAssessmentCount": 1,
+    "legacyQuestionCount": 20,
+    "v2CanonicalContentRowsCreated": 0,
+    "azureCallCount": 0,
+    "ttsCallCount": 0,
+    "geminiCallCount": 0,
+    "r2DiagnosticMediaCreated": 0,
+    "r2UnrelatedMediaMutated": 0
+  }
+}

@@ -1,0 +1,358 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-25",
+  "pass": "ENTRY DIAGNOSTIC DEEP RECOVERY + FUNCTIONAL + SCORING CORRECTNESS AUDIT",
+  "auditOnly": true,
+  "productFixesApplied": 0,
+
+  "architectureMap": {
+    "learnerRoute": "/diagnostic",
+    "frontendPage": "src/app/(student)/diagnostic/page.tsx (1128 lines, holds a MediaRecorder-based speaking recorder)",
+    "frontendComponents": [
+      "src/components/diagnostic/ClozePrompt.tsx",
+      "src/components/diagnostic/DiagnosticQuestionNavigator.tsx",
+      "src/components/dashboard/PlacementTestBanner.tsx"
+    ],
+    "backendController": "src/modules/diagnostic/diagnostic.controller.ts (@Controller('diagnostic'))",
+    "backendServices": [
+      "diagnostic.service.ts (form assembly, submission, scoring, placement)",
+      "diagnostic.logic.ts (blueprint, answer predicate, placement, recommendations)",
+      "diagnostic-speaking.service.ts (productive speaking lifecycle)",
+      "diagnostic-speaking-audio-normalizer.ts",
+      "diagnostic-writing.service.ts"
+    ],
+    "dbModels": [
+      "DiagnosticAssessment",
+      "DiagnosticQuestion (skill, question, options, correctIndex, explanation, order - NO audio or image column)",
+      "DiagnosticAttempt (answers, correctCount, totalCount, percentage, level, status, submissionToken)",
+      "DiagnosticSpeakingResponse (audioKey, durationMs, transcript, score, provider, gradingAttempts)",
+      "ListeningDiagnosticClip (separate table, currently empty)"
+    ],
+    "endpoints": [
+      "GET /diagnostic/current",
+      "POST /diagnostic/:id/attempts/start",
+      "POST /diagnostic/:id/attempts (submit + score)",
+      "GET /diagnostic/results/latest",
+      "POST /diagnostic/:id/attempts/:attemptId/speaking/:questionId/confirm",
+      "POST /diagnostic/:id/attempts/:attemptId/speaking/:questionId/skip",
+      "GET /diagnostic/:id/attempts/:attemptId/speaking",
+      "GET /diagnostic/speaking-responses/:responseId/audio",
+      "POST /diagnostic/:id/attempts/:attemptId/writing/:questionId/retry"
+    ],
+    "distinctFromStandaloneSpeaking": "Entry Diagnostic speaking uses DiagnosticSpeakingResponse and the /diagnostic/* endpoints above, not the standalone /speaking/* SpeakingExercise pipeline. They were kept separate throughout this audit."
+  },
+
+  "canonicalStructure": {
+    "activeAssessment": {
+      "id": 1,
+      "title": "Kiểm tra trình độ đầu vào",
+      "isActive": true,
+      "selfDescription": "Bài sàng lọc 20 câu",
+      "itemCount": 20,
+      "allItemsMultipleChoice": true
+    },
+    "matrix": [
+      { "skill": "Listening", "section": "(none in data)", "items": 4, "types": ["MCQ"], "media": 0, "scoring": "pooled objective count", "weight": "1 item = 1 point", "required": true },
+      { "skill": "Reading", "section": "(none in data)", "items": 4, "types": ["MCQ"], "media": 0, "scoring": "pooled objective count", "weight": "1 item = 1 point", "required": true },
+      { "skill": "Grammar", "section": "(none in data)", "items": 4, "types": ["MCQ"], "media": 0, "scoring": "pooled objective count", "weight": "1 item = 1 point", "required": true },
+      { "skill": "Vocabulary", "section": "(none in data)", "items": 4, "types": ["MCQ"], "media": 0, "scoring": "pooled objective count", "weight": "1 item = 1 point", "required": true },
+      { "skill": "Speaking", "section": "(none in data)", "items": 2, "types": ["MCQ"], "media": 0, "scoring": "EXCLUDED from the reported numerator but counted in the denominator - see DIAG-001", "weight": "0 in numerator / 1 in denominator", "required": true },
+      { "skill": "Writing", "section": "(none in data)", "items": 2, "types": ["MCQ"], "media": 0, "scoring": "pooled objective count", "weight": "1 item = 1 point", "required": true }
+    ],
+    "orderIntegrity": "orders 1..20 contiguous, no duplicates, no gaps",
+    "timers": "none in the data model or the active form",
+    "blueprintDeclaredInCode": {
+      "constant": "CANONICAL_DIAGNOSTIC_BLUEPRINT in diagnostic.logic.ts",
+      "version": "2.0",
+      "totalItems": 52,
+      "objectiveCount": 48,
+      "productiveCount": 4,
+      "sections": {
+        "LANGUAGE_USE": 16,
+        "READING": 16,
+        "LISTENING": 16,
+        "SPEAKING": "2 productive",
+        "WRITING": "2 productive"
+      },
+      "mismatchWithDatabase": "The blueprint expects 52 items with 16 Listening and 4 productive tasks. The database holds 20 items with 4 Listening and 0 productive tasks. The blueprint is returned to the learner in every result payload as canonicalBlueprint."
+    }
+  },
+
+  "dataCompleteness": {
+    "ENTRY_DIAGNOSTIC_TOTAL_ITEMS": 20,
+    "ENTRY_DIAGNOSTIC_INCOMPLETE_ITEM_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_ORPHAN_ITEM_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_DUPLICATE_ITEM_COUNT": 0,
+    "checks": "empty prompts, option arrays, blank/non-string options, correctIndex range, duplicate option text, duplicate prompts, duplicate order indices, empty skill, orphan questions, orphan speaking responses",
+    "result": "PASS - every one of the 20 items is structurally complete and the answer key is in range"
+  },
+
+  "recoveryComparison": {
+    "method": "pg_restore -a -f - against every available backup, read-only, no database was created or restored",
+    "evidence": [
+      { "dump": "PRE_RESEED_PROTECTED_20261023_071552", "assessments": 0, "questions": 0, "listeningClips": 0, "speakingResponses": 0 },
+      { "dump": "CANONICAL_BASELINE_PROTECTED_20261023_080526", "assessments": 1, "questions": 20, "listeningClips": 0, "speakingResponses": 0 },
+      { "dump": "20261023_073044", "assessments": 1, "questions": 20, "listeningClips": 0, "speakingResponses": 0 },
+      { "dump": "20261023_133044", "assessments": 1, "questions": 20, "listeningClips": 0, "speakingResponses": 0 },
+      { "dump": "20261024_030419", "assessments": 1, "questions": 20, "listeningClips": 0, "speakingResponses": 0 },
+      { "dump": "20261024_090419", "assessments": 1, "questions": 20, "listeningClips": 0, "speakingResponses": 0 },
+      { "dump": "20261025_011937", "assessments": 1, "questions": 20, "listeningClips": 0, "speakingResponses": 0 },
+      { "live": "current kltn_db", "assessments": 1, "questions": 20, "listeningClips": 0, "speakingResponses": 0 }
+    ],
+    "ENTRY_DIAGNOSTIC_RECOVERY_DATA_STATUS": "NO_RECOVERY_GAP_FOR_THE_ACTIVE_FORM",
+    "reasoning": "The 20-item form is identical in the live database and in every backup taken after the reseed, and the pre-reseed dump contains no diagnostic rows at all. Nothing was lost between backups. The richer 52-item blueprint was never present in any dump, so it is CANONICAL_NOT_AUTHORED in the database rather than recovery loss."
+  },
+
+  "listening": {
+    "ENTRY_DIAGNOSTIC_LISTENING_ITEM_COUNT": 4,
+    "ENTRY_DIAGNOSTIC_LISTENING_AUDIO_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_LISTENING_TECHNICAL_PASS": true,
+    "ENTRY_DIAGNOSTIC_LISTENING_SEMANTIC_PASS": true,
+    "design": "The four Listening items are text-based by construction: each prompt prints the script, e.g. 'You hear: \"The museum tour begins at eleven near the main entrance.\" Where should visitors meet?'. No audio object is needed to answer them, and the dedicated ListeningDiagnosticClip table is empty in the live database and in every backup.",
+    "semanticVerdict": "NOT_REQUIRED for all four items - there is no audio reference that could be mismatched, so there is nothing to disprove. This is a product-design limitation (a listening test that is read rather than heard), not a media defect.",
+    "audioSemanticCounts": {
+      "proven": 0,
+      "highConfidence": 0,
+      "ambiguous": 0,
+      "mismatch": 0,
+      "notRequired": 4
+    }
+  },
+
+  "images": {
+    "ENTRY_DIAGNOSTIC_IMAGE_REFERENCE_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_IMAGE_SEMANTIC_PROVEN_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_IMAGE_SEMANTIC_AMBIGUOUS_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_IMAGE_SEMANTIC_MISMATCH_COUNT": 0,
+    "note": "DiagnosticQuestion has no image column and no prompt or options blob contains an image reference. The single Diagnostic item previously deferred as SEMANTIC_AMBIGUOUS in the global manifest is now resolved to NOT_REQUIRED on this evidence."
+  },
+
+  "speaking": {
+    "ENTRY_DIAGNOSTIC_SPEAKING_TASK_COUNT_PRODUCTIVE": 0,
+    "ENTRY_DIAGNOSTIC_SPEAKING_TASK_COUNT_MCQ": 2,
+    "ENTRY_DIAGNOSTIC_SPEAKING_DATA_PASS": true,
+    "reachability": "UNREACHABLE_WITH_CURRENT_DATA",
+    "gate": "src/app/(student)/diagnostic/page.tsx:444 - const isSpeaking = current.section === 'SPEAKING' && current.questionType === 'OPEN_TEXT'",
+    "whyUnreachable": "Current questions store options as a plain string array, so getQuestionMeta returns questionType 'MCQ' and section undefined. The gate never opens, so the recorder is never rendered and no recording, upload or grading can occur.",
+    "subsystemExists": "Yes and it is substantial: a MediaRecorder in the page, DiagnosticSpeakingResponse model, confirm/skip/audio endpoints, an audio normalizer and a grading service. None of it is reachable by the current canonical form.",
+    "historicalUsage": "DiagnosticSpeakingResponse holds 0 rows in the live database and in every backup, so this pipeline has never produced a single learner recording in the recoverable history.",
+    "recordingGates": {
+      "ENTRY_DIAGNOSTIC_MIC_PERMISSION_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_RECORD_START_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_RECORD_STOP_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_RECORDED_BLOB_NONEMPTY_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_RECORDED_DURATION_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_RECORD_PLAYBACK_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_RERECORD_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_STALE_RECORDING_REGRESSION_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_RECORDING_ASYNC_OWNERSHIP_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_SPEAKING_UPLOAD_PASS": "NOT_APPLICABLE",
+      "ENTRY_DIAGNOSTIC_SPEAKING_STORED_AUDIO_PASS": "NOT_APPLICABLE",
+      "reason": "All of these describe a flow the current product cannot enter. They are reported NOT_APPLICABLE rather than PASS (nothing was proven to work) or FAIL (nothing is broken); the honest finding is that the task type does not exist in the data."
+    },
+    "ENTRY_DIAGNOSTIC_SPEAKING_GRADING_PIPELINE": "diagnostic-speaking.service.ts with its own provider/graderVersion/gradingAttempts columns, separate from the standalone Speaking pipeline. Not exercised: there is no reachable task to grade.",
+    "ENTRY_DIAGNOSTIC_LIVE_SPEAKING_GRADING_STATUS": "NOT_INVOKED_NO_REACHABLE_TASK",
+    "ENTRY_DIAGNOSTIC_SPEAKING_GRADING_CONTRACT_PASS": "NOT_APPLICABLE",
+    "ENTRY_DIAGNOSTIC_SPEAKING_GRADING_IDEMPOTENCY_PASS": "NOT_APPLICABLE"
+  },
+
+  "writing": {
+    "ENTRY_DIAGNOSTIC_WRITING_TASK_COUNT_PRODUCTIVE": 0,
+    "ENTRY_DIAGNOSTIC_WRITING_TASK_COUNT_MCQ": 2,
+    "ENTRY_DIAGNOSTIC_WRITING_DATA_PASS": true,
+    "ENTRY_DIAGNOSTIC_WRITING_GRADING_CONTRACT_PASS": "NOT_APPLICABLE",
+    "ENTRY_DIAGNOSTIC_WRITING_LIVE_GRADING_STATUS": "NOT_INVOKED",
+    "note": "Both Writing items are multiple-choice ('Choose the best opening for a professional email'), so diagnostic-writing.service.ts has no productive task to grade either."
+  },
+
+  "scoringContract": {
+    "pathSelection": "diagnostic.service.ts: const v2 = assessment.id === 2 || assessment.title.toLowerCase().includes('v2'). The active assessment is id 1 titled 'Kiểm tra trình độ đầu vào', so v2 is false and the simple path runs.",
+    "LISTENING_SCORE_FORMULA": "no separate skill score on the active path; Listening contributes 4 items to the pooled objective count. The per-skill profile reports round(correct/total*100) with evidence SUFFICIENT when total >= MIN_DOMAIN_EVIDENCE (3).",
+    "READING_SCORE_FORMULA": "same pooled treatment, 4 items.",
+    "SPEAKING_SCORE_FORMULA": "2 MCQ items are scored as objective items for the per-skill profile, but excluded from the reported numerator (see DIAG-001). Profile percentage is null because totalCount 2 < MIN_DOMAIN_EVIDENCE 3, so evidence is INSUFFICIENT.",
+    "WRITING_SCORE_FORMULA": "2 MCQ items, included in the numerator; profile percentage null for the same evidence-threshold reason.",
+    "FINAL_SCORE_FORMULA_AS_STORED": "percentage = round(correctCount / objectiveQuestions.length * 100) where correctCount counts every correct objective item. Verified: 20/20 stored as 100.",
+    "FINAL_SCORE_FORMULA_AS_REPORTED": "percentage = round(totalObjectiveCorrect / objectiveQuestions.length * 100) where totalObjectiveCorrect = sum of per-skill correctCount EXCLUDING Speaking. This is the defect: the numerator drops Speaking, the denominator keeps it.",
+    "ROUNDING_RULE": "Math.round on the percentage, applied once.",
+    "PLACEMENT_BOUNDARIES_ACTIVE_PATH": "resolveEstimatedLevel(percentage): >= 75 Intermediate, >= 45 Foundation, otherwise Starter.",
+    "PLACEMENT_BOUNDARIES_V2_PATH_UNREACHABLE": "resolvePlacementLevel requires band evidence (A1/A2/B1/B2 >= 70 with lower-band evidence >= 60) and a CORE weighted score = LANGUAGE_USE*0.4 + READING*0.3 + LISTENING*0.3, falling back to >= 65 / >= 55 / >= 40 thresholds and 'Pre-A1 – Cần củng cố nền tảng'.",
+    "MISSING_SKILL_RULE": "Submission is rejected entirely: HTTP 400 'Cần trả lời đúng 20 câu hỏi hiện tại' unless all 20 answers are present. There is no partial-result path, so a misleading partial placement cannot be produced.",
+    "FAILED_GRADING_RULE": "productiveUnavailable / productivePending flags exist in the payload for QUEUED/GRADING speaking and writing rows; with no productive tasks they are never set.",
+    "ENTRY_DIAGNOSTIC_PER_SKILL_SCORING_CONTRACT_PASS": true,
+    "ENTRY_DIAGNOSTIC_FINAL_SCORE_FORMULA_DISCOVERED": true
+  },
+
+  "testVectors": {
+    "method": "Each vector is a separate QA learner submitting through POST /diagnostic/1/attempts, with expected values computed independently from the database answer key (never by calling the service).",
+    "note": "Vectors below 17 correct pass because the Speaking items sit at order 17-18, so the faulty exclusion removes nothing from the numerator.",
+    "rows": [
+      { "CASE": "all-min correct=0/20", "L": 4, "R": 4, "S": 2, "W": 2, "EXPECTED_FINAL": 0, "ACTUAL_FINAL": 0, "DELTA": 0, "EXPECTED_LEVEL": "Starter", "ACTUAL_LEVEL": "Starter", "PASS": true },
+      { "CASE": "boundary-low correct=8/20", "EXPECTED_FINAL": 40, "ACTUAL_FINAL": 40, "DELTA": 0, "EXPECTED_LEVEL": "Starter", "ACTUAL_LEVEL": "Starter", "PASS": true },
+      { "CASE": "boundary correct=9/20", "EXPECTED_FINAL": 45, "ACTUAL_FINAL": 45, "DELTA": 0, "EXPECTED_LEVEL": "Foundation", "ACTUAL_LEVEL": "Foundation", "PASS": true },
+      { "CASE": "mixed correct=10/20", "EXPECTED_FINAL": 50, "ACTUAL_FINAL": 50, "DELTA": 0, "EXPECTED_LEVEL": "Foundation", "ACTUAL_LEVEL": "Foundation", "PASS": true },
+      { "CASE": "boundary correct=14/20", "EXPECTED_FINAL": 70, "ACTUAL_FINAL": 70, "DELTA": 0, "EXPECTED_LEVEL": "Foundation", "ACTUAL_LEVEL": "Foundation", "PASS": true },
+      { "CASE": "boundary correct=15/20", "EXPECTED_FINAL": 75, "ACTUAL_FINAL": 75, "DELTA": 0, "EXPECTED_LEVEL": "Intermediate", "ACTUAL_LEVEL": "Intermediate", "PASS": true },
+      { "CASE": "all-max correct=20/20", "EXPECTED_FINAL": 100, "ACTUAL_FINAL": 90, "DELTA": -10, "EXPECTED_LEVEL": "Intermediate", "ACTUAL_LEVEL": "Intermediate", "PASS": false, "defect": "DIAG-001" },
+      { "CASE": "empty answers", "EXPECTED_FINAL": "HTTP 400", "ACTUAL_FINAL": "HTTP 400 Cần trả lời đúng 20 câu hỏi hiện tại", "PASS": true },
+      { "CASE": "listening+reading only", "EXPECTED_FINAL": "HTTP 400", "ACTUAL_FINAL": "HTTP 400 Cần trả lời đúng 20 câu hỏi hiện tại", "PASS": true },
+      { "CASE": "duplicate submit with same submissionToken", "EXPECTED_FINAL": "one COMPLETED attempt", "ACTUAL_FINAL": "one COMPLETED attempt on every vector", "PASS": true }
+    ],
+    "ENTRY_DIAGNOSTIC_FINAL_SCORE_RECOMPUTE_PASS": false,
+    "ENTRY_DIAGNOSTIC_PLACEMENT_BOUNDARY_PASS": true,
+    "boundaryNote": "Every placement boundary (45 and 75) is correct in both directions. The single failure is the all-correct vector, which is a reporting defect rather than a boundary defect: the stored level stayed Intermediate."
+  },
+
+  "levelMapping": {
+    "ENTRY_DIAGNOSTIC_LEVEL_MAPPING_IMPLEMENTATION_PASS": true,
+    "claimedScale": "Starter / Foundation / Intermediate on the active path - an internal three-band scale, NOT CEFR.",
+    "cefrClaimedAnywhere": "Only on the unreachable v2 path, which returns strings such as 'B1 – Trung cấp' and 'Pre-A1 – Cần củng cố nền tảng'.",
+    "ENTRY_DIAGNOSTIC_LEVEL_MAPPING_EXTERNAL_VALIDITY": "NOT_CLAIMED",
+    "reasoning": "The active Entry Diagnostic does not claim CEFR, so there is no CEFR validity question to answer for what learners actually receive. External validity was therefore not researched: it would only apply if the v2 path became reachable, and judging a 52-item placement test against Council of Europe / Cambridge guidance is a separate exercise that should not be bundled into this audit."
+  },
+
+  "runtimeGates": {
+    "ENTRY_DIAGNOSTIC_SUBMIT_IDEMPOTENCY_PASS": true,
+    "ENTRY_DIAGNOSTIC_FINALIZATION_IDEMPOTENCY_PASS": true,
+    "idempotencyEvidence": "submitAssessment takes a pg_advisory_xact_lock on diagnostic:userId:assessmentId:submissionToken and returns the existing COMPLETED attempt when the token matches. Each of the 7 vectors submitted twice with the same token and ended with exactly one COMPLETED attempt row.",
+    "ENTRY_DIAGNOSTIC_TIMER_CONTRACT_PASS": "NOT_APPLICABLE",
+    "timerNote": "No timer exists in the diagnostic data model or the active form.",
+    "ENTRY_DIAGNOSTIC_RESUME_PASS": "NOT_VERIFIED_IN_BROWSER",
+    "resumeNote": "A start endpoint and an IN_PROGRESS status exist, but submission requires all 20 answers in one request, so there is no server-side partial-answer state to restore. Browser resume was not driven end-to-end in this pass.",
+    "ENTRY_DIAGNOSTIC_RESULT_UI_DATA_CONSISTENCY_PASS": false,
+    "resultConsistencyEvidence": {
+      "stored": { "correctCount": 20, "totalCount": 20, "percentage": 100, "level": "Intermediate" },
+      "submitResponse": { "correctCount": 18, "percentage": 90, "level": "Intermediate" },
+      "resultsLatestEndpoint": { "correctCount": 18, "percentage": 90 },
+      "verdict": "Both learner-facing endpoints under-report by exactly the 2 Speaking items while the stored row is correct."
+    },
+    "ENTRY_DIAGNOSTIC_RECOMMENDATION_LINKAGE_PASS": true,
+    "recommendationEvidence": {
+      "courseRecommendations": "none returned for this learner profile (rankCourseRecommendations filters to PUBLISHED, lessonCount > 0, curriculumReady, non-TOEIC)",
+      "practiceRecommendations": [
+        { "id": "rec-gram-default", "route": "/reading?category=grammar&topicId=1", "resolved": "query-param route, not id-addressable; the checker matched topicId=1 against VocabTopic 1 (PUBLISHED), so this one is only partially proven" },
+        { "id": "rec-vocab-default", "route": "/vocabulary/study?topicId=1", "resolved": "VocabTopic 1 PUBLISHED" },
+        { "id": "rec-read-default", "route": "/reading/13", "resolved": "Quiz 13 BILINGUAL_READING PUBLISHED" }
+      ],
+      "brokenLinks": 0
+    },
+    "ENTRY_DIAGNOSTIC_IDOR_PASS": true,
+    "idorEvidence": [
+      { "path": "/diagnostic/1/attempts/:attemptId/speaking", "owner": 200, "otherLearner": 403, "anonymous": 401 },
+      { "path": "/diagnostic/results/latest", "owner": 200, "otherLearner": 200, "anonymous": 401, "note": "per-learner scoped; learner B who never submitted receives no attempt id and no score belonging to A" }
+    ],
+    "ENTRY_DIAGNOSTIC_PRE_RESULT_PRIVACY_PASS": true,
+    "privacyEvidence": "GET /diagnostic/current was inspected before every submission on 7 separate learners: no correctIndex, no populated explanation, no percentage+level pair was present in any payload."
+  },
+
+  "issues": [
+    {
+      "id": "DIAG-001",
+      "priority": "P1",
+      "classification": "PRODUCT_LOGIC_DEFECT",
+      "domain": "Entry Diagnostic scoring",
+      "title": "Reported score drops the Speaking items from the numerator but keeps them in the denominator",
+      "location": "src/modules/diagnostic/diagnostic.service.ts - totalObjectiveCorrect = profiles.filter(p => p.skill !== 'Speaking').reduce(...), then percentage = round(totalObjectiveCorrect / objectiveQuestions.length * 100)",
+      "evidence": "A submission answering all 20 items correctly is stored as correctCount 20 / percentage 100 / level Intermediate, but POST /diagnostic/1/attempts returns correctCount 18 / percentage 90, and GET /diagnostic/results/latest also returns 18 / 90. Independent recomputation from the database answer key gives 20/20, with and without the per-attempt option permutation.",
+      "impact": "Every learner who answers either Speaking MCQ correctly is shown a score up to 10 points below the truth, the maximum achievable displayed score is 90 percent, and the stored row disagrees with what the learner is told. The placement level itself is unaffected because it is derived from the stored percentage.",
+      "notPlacementAffecting": "Confirmed: all 7 boundary vectors produced the correct level, and the all-correct vector still reported level Intermediate.",
+      "risk": "Learner-visible incorrect score and an internal data/display inconsistency in the product's first assessment.",
+      "suspectedCause": "The exclusion and its comment ('Speaking/Writing are formative feedback only... reviewed 48-item objective core') were written for the 52-item v2 blueprint where Speaking is a productive task. With the active 20-item form, where Speaking items are ordinary MCQs, the exclusion is both wrong and asymmetric - Writing is not excluded.",
+      "recommendedNextPhase": "Remediation phase: make the numerator and denominator agree, keyed on whether the item is actually productive rather than on the skill name."
+    },
+    {
+      "id": "DIAG-002",
+      "priority": "P1",
+      "classification": "PRODUCT_LOGIC_DEFECT",
+      "domain": "Entry Diagnostic scoring path selection",
+      "title": "The scoring algorithm is selected by a substring of the assessment title",
+      "location": "src/modules/diagnostic/diagnostic.service.ts - const v2 = assessment.id === 2 || assessment.title.toLowerCase().includes('v2')",
+      "evidence": "The CEFR placement path is chosen when the assessment id is 2 or its title contains 'v2'. The active assessment is id 1 titled 'Kiểm tra trình độ đầu vào', so the simple three-band path runs. Renaming an assessment for presentation reasons would silently change which scoring algorithm runs.",
+      "latentSeverity": "If the active assessment were renamed to contain 'v2', the v2 path would run against legacy-shaped data: sectionPercentage returns 0 when no question carries section metadata (if (!items.length) return 0) and bandPercentages returns 0 for every band, so weightedCore would be 0 and every learner would be placed 'Pre-A1 – Cần củng cố nền tảng' regardless of their answers.",
+      "risk": "A content-editorial action (renaming a title) can silently invalidate every placement result.",
+      "recommendedNextPhase": "Remediation phase: select the algorithm from an explicit version/shape field on the assessment, not from its display title."
+    },
+    {
+      "id": "DIAG-003",
+      "priority": "P2",
+      "classification": "CANONICAL_NOT_AUTHORED",
+      "domain": "Entry Diagnostic structure",
+      "title": "Production code declares a 52-item blueprint that the database has never contained",
+      "evidence": "CANONICAL_DIAGNOSTIC_BLUEPRINT declares version 2.0 with 52 items (16 Listening, 16 Reading, 16 Language Use, 2 productive Speaking, 2 productive Writing). The database holds 20 items (4 Listening) in the live runtime and in every backup including the protected canonical baseline; the pre-reseed dump holds none. scripts/materialize-entry-diagnostic-v2.ts defines the richer form (ids 2001-2056, passageText, audioGroup, activeInForm) but was never applied in the recoverable window.",
+      "blueprintIsLearnerVisible": "The result payload returns canonicalBlueprint to the client, so the product advertises a 52-item structure while administering 20 items.",
+      "classificationReasoning": "This is NOT recovery loss: no backup ever held the richer form, so nothing was lost. It is unauthored canonical content plus a stale constant in code.",
+      "recommendedNextPhase": "Product decision: either materialize the v2 form (which would also require authoring 16 Listening audio items and enabling the productive tasks) or correct the blueprint constant to describe what is actually administered."
+    },
+    {
+      "id": "DIAG-004",
+      "priority": "P2",
+      "classification": "CANONICAL_NOT_AUTHORED",
+      "domain": "Entry Diagnostic Speaking / Writing",
+      "title": "The productive Speaking and Writing pipelines are unreachable",
+      "evidence": "The recorder gate is section === 'SPEAKING' && questionType === 'OPEN_TEXT'. Current items store options as a plain array, so questionType is MCQ and section is undefined, and the gate never opens. DiagnosticSpeakingResponse holds 0 rows live and in every backup, so no learner recording has ever existed in recoverable history. The subsystem itself is substantial: a MediaRecorder in the page, confirm/skip/audio endpoints, an audio normalizer, and dedicated speaking and writing grading services.",
+      "impact": "The Entry Diagnostic measures Speaking and Writing with two multiple-choice questions each. It does not record or grade any learner speech or writing, so those two 'skills' are not productively assessed at all.",
+      "risk": "A placement test that reports Speaking and Writing without ever hearing or reading the learner's own production.",
+      "recommendedNextPhase": "Product decision alongside DIAG-003."
+    },
+    {
+      "id": "DIAG-005",
+      "priority": "P3",
+      "classification": "PRODUCT_LOGIC_DEFECT",
+      "domain": "Entry Diagnostic per-skill reporting",
+      "title": "Speaking and Writing never report a per-skill percentage",
+      "evidence": "MIN_DOMAIN_EVIDENCE is 3 and both skills have exactly 2 items, so buildSkillProfiles returns percentage null and evidence INSUFFICIENT for them on every submission. Confirmed in a live payload: Listening/Reading/Grammar/Vocabulary report 100, Speaking and Writing report null.",
+      "impact": "Two of the six advertised skills can never show a score, by construction of the item counts.",
+      "risk": "Low in isolation; it is a symptom of DIAG-003/DIAG-004 rather than an independent fault.",
+      "recommendedNextPhase": "Resolve with the structure decision."
+    },
+    {
+      "id": "DIAG-006",
+      "priority": "INFO",
+      "classification": "INTENTIONAL_PRODUCT_BEHAVIOR",
+      "domain": "Entry Diagnostic Listening",
+      "title": "Listening is assessed by reading the script rather than by audio",
+      "evidence": "All four Listening prompts print the script inline, e.g. 'You hear: \"The 8:10 train has been delayed by twenty minutes.\" What is the new departure time?'. ListeningDiagnosticClip is empty everywhere.",
+      "classificationReasoning": "Recorded as INFO, not a media gap: there is no broken or mismatched audio reference, and no backup ever held diagnostic audio. Whether a read-aloud script is an acceptable way to measure listening is a product/assessment-design question, not a recovery one.",
+      "recommendedNextPhase": "Product decision alongside DIAG-003."
+    }
+  ],
+
+  "gapCounts": {
+    "RECOVERY_DATA_GAP_COUNT": 0,
+    "RECOVERY_MEDIA_GAP_COUNT": 0,
+    "RECOVERY_LINKAGE_GAP_COUNT": 0,
+    "PRODUCT_LOGIC_DEFECT_COUNT": 3,
+    "FRONTEND_RUNTIME_DEFECT_COUNT": 0,
+    "BACKEND_RUNTIME_DEFECT_COUNT": 0,
+    "AUTHORIZATION_DEFECT_COUNT": 0,
+    "CONCURRENCY_IDEMPOTENCY_DEFECT_COUNT": 0,
+    "MEDIA_SEMANTIC_MISMATCH_COUNT": 0,
+    "CANONICAL_NOT_AUTHORED_COUNT": 2,
+    "EXTERNAL_PROVIDER_BLOCKER_COUNT": 0,
+    "QA_HARNESS_LIMITATION_COUNT": 1,
+    "UNKNOWN_COUNT": 0,
+    "harnessLimitationNote": "Browser-level resume was not driven end-to-end, and one practice-recommendation route is a query-param route that cannot be resolved to a numeric entity."
+  },
+
+  "mediaReport": {
+    "ENTRY_DIAGNOSTIC_ACTIVE_MEDIA_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_MEDIA_TECHNICAL_PASS_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_MEDIA_TECHNICAL_FAIL_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_MEDIA_SEMANTIC_PROVEN_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_MEDIA_SEMANTIC_HIGH_CONFIDENCE_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_MEDIA_SEMANTIC_AMBIGUOUS_COUNT": 0,
+    "ENTRY_DIAGNOSTIC_MEDIA_SEMANTIC_MISMATCH_COUNT": 0,
+    "ambiguousOrMismatchItems": [],
+    "globalManifestEffect": "The previously deferred Diagnostic item is resolved to NOT_REQUIRED, taking the global ambiguous count from 29 to 28; all 28 remaining are images in Courses, TOEIC Part 1 and Speaking."
+  },
+
+  "safety": {
+    "DATABASE_MUTATED_CANONICAL": false,
+    "TTS_CALL_COUNT": 0,
+    "AZURE_CALL_COUNT": 0,
+    "R2_CANONICAL_MEDIA_CREATED": 0,
+    "R2_CANONICAL_MEDIA_DELETED": 0,
+    "EXTERNAL_GRADING_CALLS": 0,
+    "ENTRY_DIAGNOSTIC_QA_ORPHAN_RECORDS": 0,
+    "qaStateCreated": "QA learners and their own diagnostic attempts only, all deleted in finally blocks; no database was created or restored to read the backups."
+  }
+}

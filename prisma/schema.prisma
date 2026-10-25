@@ -218,6 +218,7 @@ model User {
   learningActivities              LearningActivity[]
   diagnosticAttempts              DiagnosticAttempt[]
   diagnosticSpeakingResponses     DiagnosticSpeakingResponse[]
+  diagnosticWritingResponses      DiagnosticWritingResponse[]
   contentAttempts                 ContentAttempt[]
   supportConversation             SupportConversation?
   supportMessages                 SupportMessage[]
@@ -1481,32 +1482,131 @@ model LearningActivity {
   @@index([userId, type, occurredAt])
 }
 
+/// Explicit lifecycle for a Diagnostic assessment. Replaces "highest id wins":
+/// the learner-current form is the one with status ACTIVE, enforced by a
+/// partial unique index so two forms can never both be current.
+enum DiagnosticAssessmentStatus {
+  DRAFT
+  READY
+  ACTIVE
+  ARCHIVED
+}
+
+/// What kind of response an item expects. This is the authoritative
+/// objective-vs-productive discriminator; scoring must never infer it from the
+/// skill label (the DIAG-001 defect) or from option metadata (DIAG-008).
+enum DiagnosticTaskType {
+  MCQ
+  OPEN_TEXT
+  SPEAKING_RESPONSE
+  WRITING_RESPONSE
+}
+
+/// Skills a Diagnostic item can measure. LANGUAGE_USE is auxiliary: it is
+/// reported in the profile and carries weight 0 in the overall figure.
+enum DiagnosticSkill {
+  LISTENING
+  READING
+  SPEAKING
+  WRITING
+  LANGUAGE_USE
+}
+
+/// Grading lifecycle for a productive submission. A null score alone must never
+/// be used to mean "not graded", "queued" and "failed" at the same time.
+enum DiagnosticGradingStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  QUEUED
+  GRADING
+  GRADED
+  GRADING_FAILED
+}
+
+/// Completion state, used both for an attempt as a whole and per skill. An
+/// overall figure may only be computed once every required skill is COMPLETE.
+enum DiagnosticCompletionState {
+  NOT_STARTED
+  IN_PROGRESS
+  PENDING_GRADING
+  COMPLETE
+  GRADING_FAILED
+}
+
 model DiagnosticAssessment {
-  id                Int                          @id @default(autoincrement())
-  title             String
-  description       String?
-  isActive          Boolean                      @default(true)
+  id          Int     @id @default(autoincrement())
+  title       String
+  description String?
+  /// Deprecated in favour of `status`, kept so V1 code paths keep working
+  /// during the transition. `status` is authoritative for learner-current.
+  isActive    Boolean @default(true)
+
+  /// Which scoring algorithm this form is scored by. Persisted so the scorer is
+  /// never inferred from id, title, question count or item metadata.
+  scoringVersion   String                     @default("OBJECTIVE_POOLED_V1")
+  /// Which content blueprint this form implements. Separate from
+  /// scoringVersion because one scorer may later serve several forms.
+  blueprintVersion String?
+  /// Bumped when the authored content or media of this form is revised without
+  /// changing its scoring semantics.
+  contentVersion   Int                        @default(1)
+  status           DiagnosticAssessmentStatus @default(ACTIVE)
+
   questions         DiagnosticQuestion[]
   attempts          DiagnosticAttempt[]
   speakingResponses DiagnosticSpeakingResponse[]
+  writingResponses  DiagnosticWritingResponse[]
+  readingPassages   DiagnosticReadingPassage[]
   createdAt         DateTime                     @default(now())
   updatedAt         DateTime                     @updatedAt
+
+  @@index([status])
 }
 
 model DiagnosticQuestion {
   id           Int                  @id @default(autoincrement())
   assessmentId Int
   assessment   DiagnosticAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  /// Legacy free-text skill label used by V1 ("Listening", "Grammar", ...).
+  /// V2 authors `skillCode`; both are kept so V1 rows stay untouched.
   skill        String
   question     String               @db.Text
   options      Json
+  /// -1 for productive tasks, which have no key. `taskType` is the
+  /// discriminator; correctIndex must not be used to infer item kind.
   correctIndex Int
   explanation  String?              @db.Text
   order        Int                  @default(0)
 
+  /// V2 authored structure. All optional so existing V1 rows are valid.
+  taskType      DiagnosticTaskType @default(MCQ)
+  skillCode     DiagnosticSkill?
+  /// Constrained free string rather than an enum: the authored subskill set
+  /// will grow with content and a rigid enum would force a migration per term.
+  subskill      String?
+  /// Content metadata only. Must never select a scoring algorithm (DIAG-008).
+  intendedLevel String?
+  difficulty    String?
+  instructions  String?            @db.Text
+
+  /// Productive task delivery parameters.
+  prepSeconds     Int?
+  responseSeconds Int?
+  wordMin         Int?
+  wordMax         Int?
+
+  passageId Int?
+  passage   DiagnosticReadingPassage? @relation(fields: [passageId], references: [id], onDelete: SetNull)
+  rubricId  Int?
+  rubric    DiagnosticRubric?         @relation(fields: [rubricId], references: [id], onDelete: SetNull)
+
   speakingResponses DiagnosticSpeakingResponse[]
+  writingResponses  DiagnosticWritingResponse[]
+  listeningClips    DiagnosticListeningClip[]
 
   @@index([assessmentId, order])
+  @@index([assessmentId, skillCode])
+  @@index([passageId])
 }
 
 model DiagnosticAttempt {
@@ -1525,7 +1625,19 @@ model DiagnosticAttempt {
   completedAt     DateTime?
   submissionToken String?
 
+  /// Version pinning. An attempt keeps the versions it was taken under, so a
+  /// later form or scorer can never reinterpret a historical result.
+  scoringVersion   String?
+  blueprintVersion String?
+  contentVersion   Int?
+  /// V2 finalization state. `overallScore` stays null - never 0 - while any
+  /// required skill is incomplete.
+  resultState      DiagnosticCompletionState @default(IN_PROGRESS)
+  overallScore     Float?
+
   speakingResponses DiagnosticSpeakingResponse[]
+  writingResponses  DiagnosticWritingResponse[]
+  skillResults      DiagnosticSkillResult[]
 
   @@index([userId, submittedAt])
   @@index([userId, assessmentId, status])
@@ -1558,10 +1670,164 @@ model DiagnosticSpeakingResponse {
   confirmedAt     DateTime?
   gradedAt        DateTime?
 
+  /// Which rubric graded this response, so a historical score stays
+  /// interpretable after the rubric changes.
+  rubricId        Int?
+  rubric          DiagnosticRubric? @relation(fields: [rubricId], references: [id], onDelete: SetNull)
+  rubricVersion   String?
+  providerVersion String?
+
   @@unique([attemptId, questionId])
   @@index([userId, assessmentId, status])
   @@index([attemptId, status])
 }
+
+/// A Reading passage shared by several Diagnostic items, so passage text is
+/// stored once rather than duplicated into every question.
+model DiagnosticReadingPassage {
+  id           Int                  @id @default(autoincrement())
+  assessmentId Int
+  assessment   DiagnosticAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  title        String?
+  text         String               @db.Text
+  order        Int                  @default(0)
+  createdAt    DateTime             @default(now())
+
+  questions DiagnosticQuestion[]
+
+  @@index([assessmentId, order])
+}
+
+/// Canonical audio for a Diagnostic Listening item.
+///
+/// Each media-bearing subsystem in this schema owns its own asset table
+/// (QuizAudioAsset, CourseLessonMedia, ListeningAudioArtifact); there is no
+/// generic media model to reuse, and the similarly named
+/// ListeningDiagnosticClip belongs to the quiz `Question` model, not here.
+///
+/// `script` is the authoritative transcript and is deliberately stored on the
+/// asset rather than in the learner-facing question payload, so a service
+/// projection can withhold it until the item has been answered.
+model DiagnosticListeningClip {
+  id         Int                @id @default(autoincrement())
+  questionId Int
+  question   DiagnosticQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  version    Int                @default(1)
+  isActive   Boolean            @default(false)
+
+  storageKey String
+  url        String
+  mimeType   String
+  durationMs Int?
+  byteSize   Int?
+
+  /// Binds the audio to the words it was generated from: both hashes are
+  /// recorded so the audio-to-script relationship is provable rather than
+  /// inferred from a filename.
+  script       String  @db.Text
+  scriptSha256 String
+  audioSha256  String?
+
+  voice            String?
+  locale           String?
+  accent           String?
+  generationSource String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([questionId, version])
+  @@index([questionId, isActive])
+}
+
+/// Versioned rubric for a productive task. Stored as a snapshot so the
+/// question "which rubric graded this historical response?" stays answerable
+/// after the rubric is revised.
+model DiagnosticRubric {
+  id            Int             @id @default(autoincrement())
+  skill         DiagnosticSkill
+  rubricVersion String
+  /// Dimension definitions and their ranges, snapshotted at publication.
+  criteria      Json
+  maxScore      Float           @default(100)
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+
+  questions          DiagnosticQuestion[]
+  speakingResponses  DiagnosticSpeakingResponse[]
+  writingResponses   DiagnosticWritingResponse[]
+
+  @@unique([skill, rubricVersion])
+}
+
+/// A learner's written response to a productive Writing task.
+///
+/// V1 kept writing feedback inside `DiagnosticAttempt.answers.__writingFeedback`.
+/// V2 stores it relationally so grading state, rubric identity and provider
+/// identity are queryable and historically pinned.
+model DiagnosticWritingResponse {
+  id           Int                  @id @default(autoincrement())
+  userId       Int
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessmentId Int
+  assessment   DiagnosticAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  attemptId    Int
+  attempt      DiagnosticAttempt    @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId   Int
+  question     DiagnosticQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  taskKey      String
+
+  status       DiagnosticGradingStatus @default(NOT_SUBMITTED)
+  responseText String?                 @db.Text
+  wordCount    Int?
+
+  score         Float?
+  /// Validated, structured dimension scores. Never the raw provider payload.
+  scoreMetadata Json?
+
+  rubricId      Int?
+  rubric        DiagnosticRubric? @relation(fields: [rubricId], references: [id], onDelete: SetNull)
+  rubricVersion String?
+
+  provider        String?
+  providerVersion String?
+  graderVersion   String?
+  gradingAttempts Int     @default(0)
+  failureReason   String? @db.Text
+  /// Optional audit copy of the provider response. Secondary to scoreMetadata
+  /// and never the only structured state.
+  rawProviderPayload Json?
+
+  createdAt   DateTime  @default(now())
+  submittedAt DateTime?
+  gradedAt    DateTime?
+
+  @@unique([attemptId, questionId])
+  @@index([userId, assessmentId, status])
+  @@index([attemptId, status])
+}
+
+/// Per-skill result for an attempt. V2's primary output is the skill profile,
+/// so each skill carries its own score, band and completion state rather than
+/// being derived from an opaque JSON blob.
+model DiagnosticSkillResult {
+  id        Int                       @id @default(autoincrement())
+  attemptId Int
+  attempt   DiagnosticAttempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  skill     DiagnosticSkill
+  status    DiagnosticCompletionState @default(NOT_STARTED)
+  /// Null while the skill is not COMPLETE. Never 0 to mean "unknown".
+  score     Float?
+  /// Internal band key only (Starter/Foundation/Intermediate/Upper). No CEFR
+  /// code is stored or derived here.
+  band      String?
+  itemsScored Int?
+  itemsTotal  Int?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([attemptId, skill])
+  @@index([attemptId, status])
+}
+
 
 model ContentAttempt {
   id             Int          @id @default(autoincrement())

@@ -1,0 +1,314 @@
+{
+  "blueprintVersion": "V2_2026_01",
+  "draftedAt": "2026-10-25",
+  "status": "DRAFT_REVISED_REQUIRES_STEP2D_REVIEW",
+  "reviewStatus": {
+    "rubricValidityPass": "REQUIRES_STEP2D_REVIEW"
+  },
+  "scoringImplementationNote": "No grading formula is implemented here. Each rubric records its criteria, ranges and anchors, plus the INTENT for normalisation. Step 4 implements the scorer.",
+  "rubrics": [
+    {
+      "rubricVersion": "SPK_RUBRIC_V2",
+      "skill": "SPEAKING",
+      "appliesToTasks": [
+        "SPK_TASK_01",
+        "SPK_TASK_02"
+      ],
+      "criterionCount": 4,
+      "criterionSelectionRationale": "Four criteria, not six. Task fulfilment, intelligibility, fluency and language use are each independently observable in a 45-60 second recording. Coherence was deliberately NOT separated: in a turn this short, discourse organisation is only visible as part of whether the speaker addressed the prompt, so a separate coherence score would largely restate task fulfilment and add noise to an AI-graded total. Pronunciation is folded into intelligibility because the construct of interest for placement is whether the speaker can be understood, not accent.",
+      "maxPerCriterion": 4,
+      "minPerCriterion": 0,
+      "criteria": [
+        {
+          "criterionKey": "task_fulfilment",
+          "description": "How far the response addresses what the prompt asked for.",
+          "scoreMin": 0,
+          "scoreMax": 4,
+          "anchors": [
+            {
+              "score": 0,
+              "anchor": "No response, or speech unrelated to the prompt."
+            },
+            {
+              "score": 1,
+              "anchor": "Touches the topic but leaves most of the prompt unaddressed; for task 1 names the place only, or for task 2 states a preference with no reason."
+            },
+            {
+              "score": 2,
+              "anchor": "Addresses some required parts; for task 1 covers two of the three sub-questions, or for task 2 gives an opinion with one undeveloped reason."
+            },
+            {
+              "score": 3,
+              "anchor": "Addresses all required parts, with at least one part developed beyond a single clause."
+            },
+            {
+              "score": 4,
+              "anchor": "Addresses all required parts and develops them, including a relevant example or a concrete detail the prompt did not supply."
+            }
+          ]
+        },
+        {
+          "criterionKey": "intelligibility",
+          "description": "How easily a listener can understand the speech, including pronunciation, stress and pace. Accent itself is not assessed.",
+          "scoreMin": 0,
+          "scoreMax": 4,
+          "anchors": [
+            {
+              "score": 0,
+              "anchor": "Largely unintelligible, or no usable audio."
+            },
+            {
+              "score": 1,
+              "anchor": "Individual words are recognisable but the listener must reconstruct most utterances."
+            },
+            {
+              "score": 2,
+              "anchor": "Generally understandable; the listener has to re-listen to some stretches."
+            },
+            {
+              "score": 3,
+              "anchor": "Understandable throughout with occasional unclear words that do not block meaning."
+            },
+            {
+              "score": 4,
+              "anchor": "Consistently clear; the listener never has to work to follow it."
+            }
+          ]
+        },
+        {
+          "criterionKey": "fluency",
+          "description": "Flow of speech: length and placement of pauses, restarts and self-repair, and whether hesitation is natural or spent searching for basic words. Response length is NOT judged here - it is judged under task_fulfilment and against minimumUsefulResponseSeconds.",
+          "scoreMin": 0,
+          "scoreMax": 4,
+          "anchors": [
+            {
+              "score": 0,
+              "anchor": "Almost no connected speech produced."
+            },
+            {
+              "score": 1,
+              "anchor": "Pauses are frequent and long enough to break the utterance, often mid-phrase; the same clause is restarted repeatedly while searching for basic words."
+            },
+            {
+              "score": 2,
+              "anchor": "Keeps going, but with noticeable mid-clause hesitation, several restarts or self-repairs, and audible word-searching that interrupts the flow."
+            },
+            {
+              "score": 3,
+              "anchor": "Mostly connected speech; pauses fall mainly at clause boundaries, with occasional self-repair that does not break the flow."
+            },
+            {
+              "score": 4,
+              "anchor": "Smooth throughout: pauses fall at natural boundaries and read as thinking rather than word-searching, with no restarts that cost the listener anything. A complete, smooth response scores 4 however much of the available time it uses."
+            }
+          ]
+        },
+        {
+          "criterionKey": "language_use",
+          "description": "Grammatical control and vocabulary range in combination, judged by whether errors impede meaning.",
+          "scoreMin": 0,
+          "scoreMax": 4,
+          "anchors": [
+            {
+              "score": 0,
+              "anchor": "No assessable language."
+            },
+            {
+              "score": 1,
+              "anchor": "Isolated words and memorised phrases; errors frequently obscure meaning."
+            },
+            {
+              "score": 2,
+              "anchor": "Simple sentences with recurring basic errors; vocabulary mostly repeats the prompt's own words."
+            },
+            {
+              "score": 3,
+              "anchor": "Simple and some complex sentences; errors occur but meaning stays clear; some vocabulary beyond the prompt."
+            },
+            {
+              "score": 4,
+              "anchor": "Varied structures used accurately enough that errors do not distract; vocabulary chosen rather than borrowed from the prompt."
+            }
+          ]
+        }
+      ],
+      "normalisationIntent": {
+        "perTask": "Mean of the four criterion scores, expressed as a percentage of the 0-4 range.",
+        "perSkill": "Mean across the two Speaking tasks, both weighted equally.",
+        "roundingIntent": "Round once at the skill level, not per criterion.",
+        "missingTask": "If either task is not GRADED the Speaking skill reports no score and the attempt stays PENDING_GRADING. A failed grading is never treated as 0.",
+        "implementedIn": "Step 4"
+      },
+      "aiGradingRequirements": {
+        "structuredOutputRequired": true,
+        "requiredFields": [
+          "task_fulfilment",
+          "intelligibility",
+          "fluency",
+          "language_use"
+        ],
+        "rangeValidation": "each 0-4 integer; reject and retry on out-of-range or missing field",
+        "rejectIf": [
+          "any criterion absent",
+          "non-numeric score",
+          "score outside 0-4",
+          "feedback referencing a different submission"
+        ],
+        "note": "Raw provider output is never written directly to the skill score; it is validated into scoreMetadata first."
+      }
+    },
+    {
+      "rubricVersion": "WRT_RUBRIC_V2",
+      "skill": "WRITING",
+      "appliesToTasks": [
+        "WRT_TASK_01",
+        "WRT_TASK_02"
+      ],
+      "criterionCount": 4,
+      "criterionSelectionRationale": "Task achievement, organisation, vocabulary and grammar. Unlike Speaking, organisation IS separated here, but it is anchored per task rather than once for both. WRT_TASK_01 is a 60-90 word three-function message, where organisation is observable as sentence-level sequencing and cohesion, not as paragraphing; WRT_TASK_02 at 90-130 words asks for two developed reasons, where grouping and signposting are observable. Anchoring both tasks against paragraphing would have capped task 1 near the middle of the scale by genre rather than by ability, and because the skill score is the equally weighted mean of the two tasks that would have depressed every learner's Writing score. Vocabulary and grammar are kept apart because written production makes them independently visible, which Speaking at 45 seconds does not.",
+      "maxPerCriterion": 4,
+      "minPerCriterion": 0,
+      "criteria": [
+        {
+          "criterionKey": "task_achievement",
+          "description": "Whether the response does what the prompt required, including every required element.",
+          "scoreMin": 0,
+          "scoreMax": 4,
+          "anchors": [
+            {
+              "score": 0,
+              "anchor": "Blank, off-topic, or copied from the prompt."
+            },
+            {
+              "score": 1,
+              "anchor": "Addresses one required element; for task 1 explains the absence only, or for task 2 states an opinion with no reason."
+            },
+            {
+              "score": 2,
+              "anchor": "Addresses most required elements but one is missing or reduced to a fragment; or length falls well below the stated range."
+            },
+            {
+              "score": 3,
+              "anchor": "Addresses all required elements within the stated length."
+            },
+            {
+              "score": 4,
+              "anchor": "Addresses all required elements and develops them with specific, relevant content of the writer's own."
+            }
+          ]
+        },
+        {
+          "criterionKey": "organisation",
+          "description": "Ordering of ideas and use of linking, judged at the scale the task allows: sentence-level sequencing and cohesion for the short functional message, grouping and signposting for the extended response.",
+          "scoreMin": 0,
+          "scoreMax": 4,
+          "anchors": [
+            {
+              "score": 0,
+              "anchor": "No discernible order."
+            },
+            {
+              "score": 1,
+              "anchor": "Sentences in near-random order; no linking beyond \"and\" or \"but\"."
+            },
+            {
+              "score": 2,
+              "anchor": "Recognisable sequence; linking is repetitive or occasionally misused."
+            },
+            {
+              "score": 3,
+              "anchor": "Clear sequence with appropriate linking; for task 1 the three functions are handled in separate, ordered sentences, or for task 2 the reasons are separated recognisably."
+            },
+            {
+              "score": 4,
+              "anchor": "For task 1, the message reads as one deliberately ordered whole in which each function is signalled and the reader never has to re-read to find it; for task 2, ideas are grouped deliberately into paragraphs or signposted blocks to the same effect."
+            }
+          ]
+        },
+        {
+          "criterionKey": "vocabulary",
+          "description": "Range and precision of word choice relative to the task.",
+          "scoreMin": 0,
+          "scoreMax": 4,
+          "anchors": [
+            {
+              "score": 0,
+              "anchor": "No assessable vocabulary."
+            },
+            {
+              "score": 1,
+              "anchor": "Very limited; relies on prompt wording and a few high-frequency words."
+            },
+            {
+              "score": 2,
+              "anchor": "Sufficient for the basic message; repetition is noticeable and some word choices are wrong."
+            },
+            {
+              "score": 3,
+              "anchor": "Adequate range with some less common words used appropriately; occasional imprecision."
+            },
+            {
+              "score": 4,
+              "anchor": "Varied and generally precise, including collocations the prompt did not provide."
+            }
+          ]
+        },
+        {
+          "criterionKey": "grammar",
+          "description": "Range of structures and accuracy, judged by effect on the reader.",
+          "scoreMin": 0,
+          "scoreMax": 4,
+          "anchors": [
+            {
+              "score": 0,
+              "anchor": "No assessable sentences."
+            },
+            {
+              "score": 1,
+              "anchor": "Mostly fragments or single-clause sentences; errors often obscure meaning."
+            },
+            {
+              "score": 2,
+              "anchor": "Simple sentences largely controlled; frequent errors in tense, agreement or articles that occasionally obscure meaning."
+            },
+            {
+              "score": 3,
+              "anchor": "Mix of simple and complex sentences; errors are present but do not obscure meaning."
+            },
+            {
+              "score": 4,
+              "anchor": "Varied structures with errors rare enough not to distract the reader."
+            }
+          ]
+        }
+      ],
+      "normalisationIntent": {
+        "perTask": "Mean of the four criterion scores, expressed as a percentage of the 0-4 range.",
+        "perSkill": "Mean across the two Writing tasks, both weighted equally.",
+        "roundingIntent": "Round once at the skill level, not per criterion.",
+        "missingTask": "If either task is not GRADED the Writing skill reports no score and the attempt stays PENDING_GRADING. A failed grading is never treated as 0.",
+        "wordCountHandling": "Length below the stated minimum is reflected in task_achievement, not applied as a separate automatic penalty.",
+        "implementedIn": "Step 4"
+      },
+      "aiGradingRequirements": {
+        "structuredOutputRequired": true,
+        "requiredFields": [
+          "task_achievement",
+          "organisation",
+          "vocabulary",
+          "grammar"
+        ],
+        "rangeValidation": "each 0-4 integer; reject and retry on out-of-range or missing field",
+        "rejectIf": [
+          "any criterion absent",
+          "non-numeric score",
+          "score outside 0-4",
+          "feedback referencing a different submission",
+          "malformed JSON"
+        ],
+        "note": "Raw provider output is never written directly to the skill score; it is validated into scoreMetadata first."
+      }
+    }
+  ],
+  "revisedAt": "2026-10-25"
+}

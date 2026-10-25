@@ -1,0 +1,914 @@
+{
+  "blueprintVersion": "V2_2026_01",
+  "scoringVersion": "FOUR_SKILL_PLACEMENT_V2",
+  "contentVersion": 2,
+  "draftedAt": "2026-10-25",
+  "difficultyScale": "BREADTRANS_AUTHORING_DIFFICULTY_D1_D4",
+  "itemLevelStatus": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
+  "contentOriginalityDeclaration": {
+    "original": true,
+    "statement": "Every script, passage, prompt, option and rubric anchor below was written for BreadTrans in this authoring pass. No question wording, passage, script, answer set or prompt was copied or adapted from IELTS, TOEIC, Cambridge examinations, Aptis, the Duolingo English Test, or any commercial practice material. Published assessment research informed task structure, construct and rubric dimensions only."
+  },
+  "reviewStatus": {
+    "contentReviewPass": "REQUIRES_STEP2D_REVIEW",
+    "itemValidityPass": "REQUIRES_STEP2D_REVIEW",
+    "distractorQualityPass": "REQUIRES_STEP2D_REVIEW",
+    "levelAppropriatenessPass": "REQUIRES_STEP2D_REVIEW",
+    "rubricValidityPass": "REQUIRES_STEP2D_REVIEW"
+  },
+  "assessment": {
+    "draftKey": "DIAG_V2_ASSESSMENT",
+    "title": "Kiểm tra đầu vào bốn kỹ năng",
+    "description": "Bài kiểm tra đầu vào đánh giá Nghe, Đọc, Nói và Viết để xếp lộ trình học phù hợp.",
+    "statusOnCreate": "DRAFT",
+    "learnerFacingNote": "Kết quả là chỉ dẫn xếp lộ trình học, không phải chứng chỉ trình độ."
+  },
+  "listening": {
+    "clips": [
+      {
+        "draftKey": "LST_CLIP_01",
+        "internalLabel": "Two students deciding to work together",
+        "contextType": "short everyday exchange",
+        "speakerCount": 2,
+        "speakerLabels": [
+          "Student A",
+          "Student B"
+        ],
+        "localeIntent": "en-US",
+        "accentIntent": "general American, two distinct voices",
+        "estimatedDurationSeconds": 32,
+        "targetSubskills": [
+          "gist"
+        ],
+        "difficultyTier": "D1",
+        "script": "A: Hey, are you heading to the library later?\nB: That's the plan. I've still got the slides to finish for our group thing.\nA: Same. Should we just do it together? It'd be faster than messaging back and forth.\nB: Honestly, yeah. The reading room gets packed after four, though.\nA: Then let's aim for three. I'll grab the corner table if I get there first.\nB: Deal. I'll bring my laptop and the printouts."
+      },
+      {
+        "draftKey": "LST_CLIP_02",
+        "internalLabel": "Study center announcement",
+        "contextType": "announcement / instructions",
+        "speakerCount": 1,
+        "speakerLabels": [
+          "Staff announcer"
+        ],
+        "localeIntent": "en-US",
+        "accentIntent": "general American, clear announcement register",
+        "estimatedDurationSeconds": 40,
+        "targetSubskills": [
+          "specific detail"
+        ],
+        "difficultyTier": "D2",
+        "script": "Good morning, everyone. A quick note about the study center this week. Because the elevators on the north side are being serviced, the second-floor computer room will stay closed until Thursday. The group study rooms on the ground floor are open as usual, but you'll need to book them online this week rather than at the desk. And if you're coming in for printing, bring your student card — we can't release print jobs without it."
+      },
+      {
+        "draftKey": "LST_CLIP_03",
+        "internalLabel": "Housing office voicemail about a missing signature",
+        "contextType": "voicemail / short informational message",
+        "speakerCount": 1,
+        "speakerLabels": [
+          "Housing office staff"
+        ],
+        "localeIntent": "en-US",
+        "accentIntent": "general American, friendly professional",
+        "estimatedDurationSeconds": 38,
+        "targetSubskills": [
+          "specific detail",
+          "purpose",
+          "speaker intention"
+        ],
+        "difficultyTier": "D3",
+        "script": "Hi, this is Mai from the student housing office. I'm calling about the form you dropped off on Monday. Everything you filled in is fine — that's not the problem. It's that we need your current landlord's signature as well, and that page came through blank. If you can get it to us by Friday, we can still process everything this month. Otherwise it rolls into the next cycle, and I'd rather not do that to you."
+      },
+      {
+        "draftKey": "LST_CLIP_04",
+        "internalLabel": "Presentation that did not go to plan",
+        "contextType": "short conversation requiring inference",
+        "speakerCount": 2,
+        "speakerLabels": [
+          "Friend A",
+          "Friend B"
+        ],
+        "localeIntent": "en-US",
+        "accentIntent": "general American, two distinct voices, conversational",
+        "estimatedDurationSeconds": 34,
+        "targetSubskills": [
+          "inference"
+        ],
+        "difficultyTier": "D4",
+        "script": "A: So, how was the presentation?\nB: Well. Everyone clapped at the end.\nA: That's not really an answer.\nB: I know. I'd practiced the whole thing twice, and then the projector wouldn't read my file, so I just talked through it from memory.\nA: Oh no. For all fifteen minutes?\nB: Twelve, in the end. I cut the part I was least sure about."
+      }
+    ],
+    "items": [
+      {
+        "draftKey": "LST_Q_001",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "gist",
+        "difficultyTier": "D1",
+        "order": 1,
+        "mediaDraftKey": "LST_CLIP_01",
+        "prompt": "What are the speakers mainly discussing?",
+        "options": [
+          "A class they both missed",
+          "Working on their project together",
+          "A change to the library's opening hours",
+          "A book one of them has to return"
+        ],
+        "correctAnswer": "Working on their project together",
+        "answerRationale": "Both speakers have the same task outstanding and agree to do it jointly; this is the thread of the whole exchange rather than any single detail.",
+        "distractorRationales": [
+          "No class is mentioned; plausible only if the listener assumes a generic student topic.",
+          "CORRECT",
+          "Opening hours are never discussed; the listener may confuse this with the remark about the room getting busy after four.",
+          "Printouts are mentioned, which a listener may mishear as library borrowing."
+        ],
+        "estimatedSeconds": 20
+      },
+      {
+        "draftKey": "LST_Q_002",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "gist",
+        "difficultyTier": "D1",
+        "order": 2,
+        "mediaDraftKey": "LST_CLIP_01",
+        "prompt": "What do the speakers agree to do?",
+        "options": [
+          "Meet at three o'clock",
+          "Work separately and compare later",
+          "Meet after four o'clock",
+          "Reserve a room in advance"
+        ],
+        "correctAnswer": "Meet at three o'clock",
+        "answerRationale": "One speaker proposes three and the other accepts with \"Deal\".",
+        "distractorRationales": [
+          "CORRECT",
+          "The opposite of what is agreed; plausible for a listener who catches the messaging remark but not the agreement.",
+          "Four is mentioned, but as the time to avoid - a nearby-detail trap.",
+          "Nothing is reserved; the corner table remark may suggest booking."
+        ],
+        "estimatedSeconds": 20
+      },
+      {
+        "draftKey": "LST_Q_003",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "specific detail",
+        "difficultyTier": "D2",
+        "order": 3,
+        "mediaDraftKey": "LST_CLIP_02",
+        "prompt": "Which area is closed at the start of this week?",
+        "options": [
+          "The ground-floor group study rooms",
+          "The printing service",
+          "The north-side entrance",
+          "The second-floor computer room"
+        ],
+        "correctAnswer": "The second-floor computer room",
+        "answerRationale": "Stated directly: it stays closed until Thursday because of the elevator servicing.",
+        "distractorRationales": [
+          "Mentioned in the same breath but described as open as usual.",
+          "Mentioned with a condition, not a closure.",
+          "The north-side elevators are being serviced, not the entrance - a plausible mis-attribution.",
+          "CORRECT"
+        ],
+        "estimatedSeconds": 20
+      },
+      {
+        "draftKey": "LST_Q_004",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "specific detail",
+        "difficultyTier": "D2",
+        "order": 4,
+        "mediaDraftKey": "LST_CLIP_02",
+        "prompt": "How should students reserve a group study room this week?",
+        "options": [
+          "At the desk",
+          "Online",
+          "By phone",
+          "No reservation is needed"
+        ],
+        "correctAnswer": "Online",
+        "answerRationale": "The announcement contrasts this week's online booking with the usual desk booking.",
+        "distractorRationales": [
+          "Explicitly the method NOT to use this week; the strongest distractor for a listener who misses \"rather than\".",
+          "CORRECT",
+          "Never mentioned; a generic alternative.",
+          "Contradicts the instruction, but plausible if the listener only hears \"open as usual\"."
+        ],
+        "estimatedSeconds": 20
+      },
+      {
+        "draftKey": "LST_Q_005",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "specific detail",
+        "difficultyTier": "D2",
+        "order": 5,
+        "mediaDraftKey": "LST_CLIP_02",
+        "prompt": "What must students bring in order to print?",
+        "options": [
+          "A booking confirmation",
+          "Cash for the printing fee",
+          "Their student card",
+          "A printed receipt"
+        ],
+        "correctAnswer": "Their student card",
+        "answerRationale": "Stated as a requirement: print jobs cannot be released without it.",
+        "distractorRationales": [
+          "Booking is mentioned, but for study rooms, not printing - a cross-detail trap.",
+          "No fee is mentioned.",
+          "CORRECT",
+          "Plausible-sounding but absent from the announcement."
+        ],
+        "estimatedSeconds": 20
+      },
+      {
+        "draftKey": "LST_Q_006",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "specific detail",
+        "difficultyTier": "D2",
+        "order": 6,
+        "mediaDraftKey": "LST_CLIP_03",
+        "prompt": "What is missing from the form?",
+        "options": [
+          "The applicant's own signature",
+          "The date it was submitted",
+          "A copy of an identity document",
+          "The landlord's signature"
+        ],
+        "correctAnswer": "The landlord's signature",
+        "answerRationale": "The caller states the page needing the current landlord's signature came through blank.",
+        "distractorRationales": [
+          "The caller explicitly says what the applicant filled in is fine; the strongest distractor if \"signature\" is heard without whose.",
+          "Monday is mentioned as the drop-off day, which may be mistaken for a missing date.",
+          "Never mentioned.",
+          "CORRECT"
+        ],
+        "estimatedSeconds": 20
+      },
+      {
+        "draftKey": "LST_Q_007",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "purpose",
+        "difficultyTier": "D3",
+        "order": 7,
+        "mediaDraftKey": "LST_CLIP_03",
+        "prompt": "Why is the speaker calling?",
+        "options": [
+          "To confirm that the form is complete",
+          "To reschedule an appointment",
+          "To request a missing document so the form can be processed",
+          "To explain that the application has been refused"
+        ],
+        "correctAnswer": "To request a missing document so the form can be processed",
+        "answerRationale": "The call's function is a request for the outstanding signature, framed by what it unblocks.",
+        "distractorRationales": [
+          "Inverts the message; plausible for a listener who latches onto \"everything you filled in is fine\".",
+          "No appointment exists in the message.",
+          "CORRECT",
+          "Nothing is refused; \"that's not the problem\" may be misread as a rejection."
+        ],
+        "estimatedSeconds": 25
+      },
+      {
+        "draftKey": "LST_Q_008",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "speaker intention",
+        "difficultyTier": "D3",
+        "order": 8,
+        "mediaDraftKey": "LST_CLIP_03",
+        "prompt": "What does the speaker suggest about the Friday deadline?",
+        "options": [
+          "Meeting it would avoid a month's delay",
+          "It has already passed",
+          "It can be extended on request",
+          "The landlord must send the page directly"
+        ],
+        "correctAnswer": "Meeting it would avoid a month's delay",
+        "answerRationale": "The speaker contrasts processing this month with rolling into the next cycle, and signals she would rather avoid that - the intention is to convey consequence, not just a date.",
+        "distractorRationales": [
+          "CORRECT",
+          "The deadline is upcoming, not past.",
+          "The speaker offers no extension; her tone is accommodating, which may imply flexibility.",
+          "Traceable to \"we need your current landlord's signature\" and \"that page came through blank\", but the speaker asks the student to get it to the office - a plausible mishearing of who delivers it."
+        ],
+        "estimatedSeconds": 25
+      },
+      {
+        "draftKey": "LST_Q_009",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "inference",
+        "difficultyTier": "D4",
+        "order": 9,
+        "mediaDraftKey": "LST_CLIP_04",
+        "prompt": "What does the second speaker imply about the presentation?",
+        "options": [
+          "The applause showed that it went well",
+          "A technical problem spoiled their plan",
+          "It was called off before it could begin",
+          "The audience left before it had finished"
+        ],
+        "correctAnswer": "A technical problem spoiled their plan",
+        "answerRationale": "Nothing negative is stated. The deflection to the applause, the projector failure, the fallback to speaking from memory and the twelve minutes instead of fifteen must be combined before the implication is available; no single line says the plan went wrong.",
+        "distractorRationales": [
+          "The applause remark read literally - the key literal-interpretation trap, now stated as specifically as the correct option.",
+          "CORRECT",
+          "The presentation clearly happened; the speaker reports how long it ran.",
+          "The audience clapped at the end, so they stayed."
+        ],
+        "estimatedSeconds": 25
+      },
+      {
+        "draftKey": "LST_Q_010",
+        "skill": "LISTENING",
+        "taskType": "MCQ",
+        "subskill": "inference",
+        "difficultyTier": "D4",
+        "order": 10,
+        "mediaDraftKey": "LST_CLIP_04",
+        "prompt": "Why was the presentation shorter than planned?",
+        "options": [
+          "The speaker was asked to stop early",
+          "The projector trouble delayed the start",
+          "The speaker left out a section",
+          "The speaker ran out of time"
+        ],
+        "correctAnswer": "The speaker left out a section",
+        "answerRationale": "\"Twelve, in the end. I cut the part I was least sure about\" - the listener must connect the shorter duration to the deliberate cut rather than to the equipment problem.",
+        "distractorRationales": [
+          "Nobody intervenes.",
+          "The projector did fail to read the file, but the speaker went ahead from memory and never mentions a late start - the most available wrong cause.",
+          "CORRECT",
+          "The speaker attributes the shorter length to cutting a section he was unsure about, not to being stopped by the clock."
+        ],
+        "estimatedSeconds": 25
+      }
+    ]
+  },
+  "reading": {
+    "passages": [
+      {
+        "draftKey": "RDG_PASSAGE_01",
+        "internalLabel": "Bicycle parking changes",
+        "contextType": "everyday functional notice",
+        "difficultyTier": "D1",
+        "targetSubskills": [
+          "main idea",
+          "specific detail"
+        ],
+        "wordCount": 97,
+        "estimatedReadingSeconds": 60,
+        "text": "From 1 March, the bicycle racks behind Building C will be removed while the courtyard is repaved. Riders should use the covered racks beside the sports hall instead; these are monitored by camera and hold about ninety bicycles. The arrangement is expected to last eight weeks. During this period, bicycles left against railings or in doorways will be tagged, and if they are not moved within three days they will be taken to the campus store. Anyone collecting a tagged bicycle should bring proof of ownership to the facilities desk, which is open on weekday mornings only."
+      },
+      {
+        "draftKey": "RDG_PASSAGE_02",
+        "internalLabel": "Why rereading notes feels better than it works",
+        "contextType": "short explanatory article",
+        "difficultyTier": "D3",
+        "targetSubskills": [
+          "main idea",
+          "specific detail",
+          "meaning in context",
+          "reference"
+        ],
+        "wordCount": 151,
+        "estimatedReadingSeconds": 85,
+        "text": "Many students prepare for exams by reading their notes over and over. It feels productive: the material becomes familiar, and familiarity is easily mistaken for knowledge. Researchers who study learning call this the illusion of fluency. Because the words flow smoothly on the fourth reading, the student concludes the content is secure - yet asked to explain it with the page closed, they often cannot.\n\nA more uncomfortable method works better. Putting the notes away and trying to write down what you remember forces the brain to retrieve rather than recognize. Retrieval is slower, and it feels worse, which is exactly why many learners abandon it. Those who persist tend to remember more a week later.\n\nNone of this makes rereading useless. It is a reasonable first pass, a way of mapping what is there. The mistake is treating it as the whole of studying rather than the beginning of it."
+      },
+      {
+        "draftKey": "RDG_PASSAGE_03",
+        "internalLabel": "The repair cafe",
+        "contextType": "community / explanatory",
+        "difficultyTier": "D4",
+        "targetSubskills": [
+          "meaning in context",
+          "inference"
+        ],
+        "wordCount": 159,
+        "estimatedReadingSeconds": 90,
+        "text": "On the first Saturday of each month, a community hall in the city becomes a repair cafe. People bring broken things - a lamp, a kettle, a jacket with a failed zip - and sit with a volunteer who helps them fix it. Nobody hands the item over; the owner does the work, guided.\n\nThe organizers are deliberate about this. A free repair service would be useful, but it would also leave the owner no better placed the next time something broke. Teaching the repair is slower and messier, and on a busy morning the line grows long. The volunteers accept that trade-off on purpose.\n\nNot everything can be saved. Some appliances are sealed in ways that make opening them impractical, and the cafe keeps a note of which products these are. Over three years that list has grown long enough that the organizers now pass it to a consumer group, which draws on it in its own campaigns."
+      }
+    ],
+    "items": [
+      {
+        "draftKey": "RDG_Q_001",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "main idea",
+        "difficultyTier": "D1",
+        "order": 11,
+        "passageDraftKey": "RDG_PASSAGE_01",
+        "prompt": "What is the main purpose of the notice?",
+        "options": [
+          "To introduce a charge for bicycle parking",
+          "To ask riders to register their bicycles",
+          "To report a rise in bicycle theft",
+          "To explain where to park bicycles during building work"
+        ],
+        "correctAnswer": "To explain where to park bicycles during building work",
+        "answerRationale": "Every paragraph serves the temporary relocation and its rules; this is the notice's function.",
+        "distractorRationales": [
+          "No charge appears anywhere.",
+          "Proof of ownership is mentioned, which may suggest registration.",
+          "Camera monitoring may suggest a theft motive.",
+          "CORRECT"
+        ],
+        "estimatedSeconds": 45
+      },
+      {
+        "draftKey": "RDG_Q_002",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "specific detail",
+        "difficultyTier": "D2",
+        "order": 12,
+        "passageDraftKey": "RDG_PASSAGE_01",
+        "prompt": "What happens to a bicycle left in a doorway if it is not moved?",
+        "options": [
+          "It is taken to the campus store",
+          "It is removed immediately",
+          "Its owner is charged a fine",
+          "It is moved to the sports hall racks"
+        ],
+        "correctAnswer": "It is taken to the campus store",
+        "answerRationale": "Stated: tagged, then removed to the campus store if not moved within three days.",
+        "distractorRationales": [
+          "CORRECT",
+          "Contradicts the three-day window - the key detail to notice.",
+          "No fine is mentioned.",
+          "The sports hall is where riders should park voluntarily, not where tagged bicycles go."
+        ],
+        "estimatedSeconds": 40
+      },
+      {
+        "draftKey": "RDG_Q_003",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "specific detail",
+        "difficultyTier": "D2",
+        "order": 13,
+        "passageDraftKey": "RDG_PASSAGE_01",
+        "prompt": "When can a tagged bicycle be collected?",
+        "options": [
+          "At any time",
+          "Only at weekends",
+          "On weekday mornings",
+          "Within three days only"
+        ],
+        "correctAnswer": "On weekday mornings",
+        "answerRationale": "The facilities desk is open on weekday mornings only.",
+        "distractorRationales": [
+          "Contradicted by \"only\".",
+          "Inverts the stated opening pattern.",
+          "CORRECT",
+          "Three days is the tagging window, not the collection window - a nearby-number trap."
+        ],
+        "estimatedSeconds": 40
+      },
+      {
+        "draftKey": "RDG_Q_004",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "main idea",
+        "difficultyTier": "D1",
+        "order": 14,
+        "passageDraftKey": "RDG_PASSAGE_02",
+        "prompt": "What is the writer's main point?",
+        "options": [
+          "Students should never reread their notes",
+          "Rereading feels effective but recalling from memory works better",
+          "Exams mainly reward familiarity with material",
+          "Taking good notes matters more than revising them"
+        ],
+        "correctAnswer": "Rereading feels effective but recalling from memory works better",
+        "answerRationale": "The whole passage contrasts the feeling of fluency with the effectiveness of retrieval, and the final paragraph refuses the absolute position.",
+        "distractorRationales": [
+          "Overstates; the last paragraph explicitly rejects this - the strongest distractor.",
+          "CORRECT",
+          "The passage argues familiarity misleads, not that exams reward it.",
+          "Note-taking quality is never compared with reviewing notes."
+        ],
+        "estimatedSeconds": 55
+      },
+      {
+        "draftKey": "RDG_Q_005",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "specific detail",
+        "difficultyTier": "D2",
+        "order": 15,
+        "passageDraftKey": "RDG_PASSAGE_02",
+        "prompt": "According to the passage, what happens to learners who keep using retrieval?",
+        "options": [
+          "They read more quickly",
+          "They feel less anxious before exams",
+          "They need shorter study sessions",
+          "They remember more a week later"
+        ],
+        "correctAnswer": "They remember more a week later",
+        "answerRationale": "Stated directly of those who persist.",
+        "distractorRationales": [
+          "Reading speed is not claimed.",
+          "The passage says retrieval feels worse, not calmer.",
+          "Session length is never discussed.",
+          "CORRECT"
+        ],
+        "estimatedSeconds": 40
+      },
+      {
+        "draftKey": "RDG_Q_006",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "meaning in context",
+        "difficultyTier": "D3",
+        "order": 16,
+        "passageDraftKey": "RDG_PASSAGE_02",
+        "prompt": "In the passage, \"the illusion of fluency\" refers to",
+        "options": [
+          "the sense that one is reading faster than one really is",
+          "the impression that one speaks more smoothly than one actually does",
+          "the belief that a short text must be an easy text",
+          "the feeling that familiar material has already been learned"
+        ],
+        "correctAnswer": "the feeling that familiar material has already been learned",
+        "answerRationale": "The meaning comes from the surrounding sentences, not from the term: familiarity is easily mistaken for knowledge, and smooth words on a fourth reading lead the student to conclude the content is secure. All four options are readings the phrase permits on its own, so the passage is required to choose between them.",
+        "distractorRationales": [
+          "A reading-speed interpretation the term allows in isolation; the passage never claims the student misjudges how fast they read.",
+          "Transfers the term to spoken fluency; the passage is about reading and recall only.",
+          "A text-difficulty interpretation; the passage never mentions length.",
+          "CORRECT"
+        ],
+        "estimatedSeconds": 50
+      },
+      {
+        "draftKey": "RDG_Q_007",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "reference",
+        "difficultyTier": "D3",
+        "order": 17,
+        "passageDraftKey": "RDG_PASSAGE_02",
+        "prompt": "In the second paragraph, \"it\" in \"it feels worse\" refers to",
+        "options": [
+          "rereading the notes",
+          "the exam itself",
+          "retrieving information from memory",
+          "abandoning studying altogether"
+        ],
+        "correctAnswer": "retrieving information from memory",
+        "answerRationale": "The pronoun continues the subject of the preceding clause, retrieval, which is described as slower.",
+        "distractorRationales": [
+          "The method being contrasted, and the nearest competing noun phrase.",
+          "Not the subject of the sentence.",
+          "CORRECT",
+          "Appears later in the same sentence as the consequence, not the referent."
+        ],
+        "estimatedSeconds": 45
+      },
+      {
+        "draftKey": "RDG_Q_008",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "meaning in context",
+        "difficultyTier": "D3",
+        "order": 18,
+        "passageDraftKey": "RDG_PASSAGE_03",
+        "prompt": "In the passage, \"that trade-off\" means accepting",
+        "options": [
+          "fewer volunteers in return for lower running costs",
+          "longer opening hours in return for shorter lines",
+          "repairing fewer kinds of item in return for better quality",
+          "slower, messier service in return for teaching owners to repair"
+        ],
+        "correctAnswer": "slower, messier service in return for teaching owners to repair",
+        "answerRationale": "The phrase points back to the explicit comparison: teaching is slower and messier, and lines grow, but the owner gains the skill.",
+        "distractorRationales": [
+          "Costs are never discussed.",
+          "Reverses the direction - lines get longer, not shorter.",
+          "Range of items is discussed only in the final paragraph, on a different point.",
+          "CORRECT"
+        ],
+        "estimatedSeconds": 55
+      },
+      {
+        "draftKey": "RDG_Q_009",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "inference",
+        "difficultyTier": "D4",
+        "order": 19,
+        "passageDraftKey": "RDG_PASSAGE_03",
+        "prompt": "What can be inferred about why owners do the repair work themselves?",
+        "options": [
+          "The volunteers lack the skills to do it for them",
+          "So that they can handle similar problems without help later",
+          "The cafe cannot accept responsibility for damage",
+          "It is quicker than waiting to be served"
+        ],
+        "correctAnswer": "So that they can handle similar problems without help later",
+        "answerRationale": "Not stated. It follows from the organizers' reason for rejecting a free service: otherwise the owner is no better placed next time.",
+        "distractorRationales": [
+          "Contradicted - volunteers guide the repair.",
+          "CORRECT",
+          "A realistic institutional motive the passage never raises; the most tempting outside-knowledge answer.",
+          "Contradicted - the guided method is slower."
+        ],
+        "estimatedSeconds": 60
+      },
+      {
+        "draftKey": "RDG_Q_010",
+        "skill": "READING",
+        "taskType": "MCQ",
+        "subskill": "inference",
+        "difficultyTier": "D4",
+        "order": 20,
+        "passageDraftKey": "RDG_PASSAGE_03",
+        "prompt": "What does the final paragraph suggest about the cafe's list of sealed products?",
+        "options": [
+          "It has become useful beyond the cafe itself",
+          "It proves most appliances cannot be repaired",
+          "It is used to turn certain customers away",
+          "It has replaced the cafe's repair work"
+        ],
+        "correctAnswer": "It has become useful beyond the cafe itself",
+        "answerRationale": "The list is now shared with a consumer group that uses it in campaigns, so its value has extended outside; this is implied by the handover rather than stated as significance.",
+        "distractorRationales": [
+          "CORRECT",
+          "Overgeneralises from \"some appliances\" - the main quantifier trap.",
+          "Nothing suggests refusing customers.",
+          "The repair work continues; the list is a by-product."
+        ],
+        "estimatedSeconds": 60
+      }
+    ]
+  },
+  "speaking": {
+    "tasks": [
+      {
+        "draftKey": "SPK_TASK_01",
+        "skill": "SPEAKING",
+        "taskType": "SPEAKING_RESPONSE",
+        "subskill": "short personal response",
+        "difficultyRange": [
+          "D1",
+          "D2"
+        ],
+        "order": 21,
+        "prompt": "Talk about a place where you usually study or work. Say where it is, when you normally go there, and why it suits you.",
+        "instructions": "You will have 15 seconds to think, then 45 seconds to speak. Speak for as long as you can within the time.",
+        "prepSeconds": 15,
+        "responseSeconds": 45,
+        "minimumUsefulResponseSeconds": 15,
+        "targetSubskills": [
+          "describing a familiar place",
+          "giving reasons",
+          "sustaining a short turn"
+        ],
+        "constructRationale": "A familiar, concrete topic every learner in the target population can attempt, so the task elicits speech rather than testing topic knowledge. Three sub-questions give a weaker speaker a structure to follow while leaving a stronger speaker room to elaborate, which is what makes the same prompt informative across the D1-D2 span.",
+        "imageRequired": false,
+        "rubricVersion": "SPK_RUBRIC_V2",
+        "estimatedSeconds": 120
+      },
+      {
+        "draftKey": "SPK_TASK_02",
+        "skill": "SPEAKING",
+        "taskType": "SPEAKING_RESPONSE",
+        "subskill": "extended opinion / situation response",
+        "difficultyRange": [
+          "D2",
+          "D4"
+        ],
+        "order": 22,
+        "prompt": "Some people prefer to study with other people; others prefer to study alone. Which do you think works better, and why? Give at least one reason and one example from your own experience.",
+        "instructions": "You will have 30 seconds to think, then 60 seconds to speak. Try to give reasons, not only your preference.",
+        "prepSeconds": 30,
+        "responseSeconds": 60,
+        "minimumUsefulResponseSeconds": 25,
+        "targetSubskills": [
+          "stating and supporting an opinion",
+          "comparing two options",
+          "organising an extended turn"
+        ],
+        "constructRationale": "Deliberately different evidence from task 1: this one requires taking a position and supporting it, so it can show organisation and connected speech rather than description. The topic needs no specialist knowledge, and both positions are equally defensible so no learner is penalised for their view.",
+        "imageRequired": false,
+        "rubricVersion": "SPK_RUBRIC_V2",
+        "estimatedSeconds": 180
+      }
+    ]
+  },
+  "writing": {
+    "tasks": [
+      {
+        "draftKey": "WRT_TASK_01",
+        "skill": "WRITING",
+        "taskType": "WRITING_RESPONSE",
+        "subskill": "short functional response (message / email)",
+        "difficultyRange": [
+          "D1",
+          "D2"
+        ],
+        "order": 23,
+        "prompt": "You agreed to meet a classmate tomorrow to work on a shared assignment, but you can no longer come. Write a short message to your classmate. In your message: explain why you cannot come, suggest another time, and ask them to send you one thing you need for the assignment.",
+        "instructions": "Write 60-90 words. You have about 7 minutes.",
+        "wordMin": 60,
+        "wordMax": 90,
+        "wordGuidanceRationale": "Three required functions need roughly 15-25 words each to realise. 60 words is the floor at which all three can appear; above about 90 the task stops producing new evidence and starts consuming time that the second writing task uses better. Derived from the 46-minute design target and this task's grading needs, not from any published exam's limits.",
+        "targetEvidence": [
+          "covering all three required points",
+          "appropriate informal register",
+          "basic sentence control"
+        ],
+        "rubricVersion": "WRT_RUBRIC_V2",
+        "estimatedSeconds": 420
+      },
+      {
+        "draftKey": "WRT_TASK_02",
+        "skill": "WRITING",
+        "taskType": "WRITING_RESPONSE",
+        "subskill": "short opinion / extended response",
+        "difficultyRange": [
+          "D2",
+          "D4"
+        ],
+        "order": 24,
+        "prompt": "Your university is considering making one lecture each week available as a recording instead of teaching it in person. Do you think this is a good idea? Write your opinion and give at least two reasons for it.",
+        "instructions": "Write 90-130 words. You have about 9 minutes.",
+        "wordMin": 90,
+        "wordMax": 130,
+        "wordGuidanceRationale": "An opinion plus two developed reasons needs roughly 90 words before organisation becomes observable at all. The 130-word ceiling keeps the task inside its 9-minute slot and keeps responses short enough to grade consistently. Chosen for this placement purpose, not copied from an external exam.",
+        "targetEvidence": [
+          "taking a clear position",
+          "developing more than one reason",
+          "paragraph-level organisation",
+          "range beyond the prompt's own wording"
+        ],
+        "rubricVersion": "WRT_RUBRIC_V2",
+        "estimatedSeconds": 540
+      }
+    ]
+  },
+  "languageUse": {
+    "note": "Auxiliary diagnostic dimension. overallWeight = 0. These items never substitute for a skill measurement; they exist to sharpen later recommendations.",
+    "items": [
+      {
+        "draftKey": "LU_Q_001",
+        "skill": "LANGUAGE_USE",
+        "taskType": "MCQ",
+        "subskill": "grammar",
+        "targetFeature": "present_continuous_for_current_action",
+        "difficultyTier": "D1",
+        "order": 25,
+        "prompt": "Quiet, please - I ____ to hear the instructions.",
+        "options": [
+          "try",
+          "am trying",
+          "tried",
+          "have tried"
+        ],
+        "correctAnswer": "am trying",
+        "answerRationale": "An action in progress at the moment of speaking requires the present continuous.",
+        "distractorRationales": [
+          "Present simple; the habitual reading is the common error here.",
+          "CORRECT",
+          "Past simple, inconsistent with \"please\" in the same breath.",
+          "Present perfect, which implies a completed attempt."
+        ],
+        "diagnosticUse": "Weakness here suggests starting with basic tense-aspect contrasts.",
+        "estimatedSeconds": 30
+      },
+      {
+        "draftKey": "LU_Q_002",
+        "skill": "LANGUAGE_USE",
+        "taskType": "MCQ",
+        "subskill": "grammar",
+        "targetFeature": "preposition_of_time_point_versus_deadline",
+        "difficultyTier": "D1",
+        "order": 26,
+        "prompt": "The session starts ____ half past nine.",
+        "options": [
+          "on",
+          "in",
+          "at",
+          "by"
+        ],
+        "correctAnswer": "at",
+        "answerRationale": "A point on the clock takes \"at\". The item also separates a point in time from a deadline: \"by\" is grammatical English but states a limit, which a start event does not take.",
+        "distractorRationales": [
+          "Used with days and dates.",
+          "Used with months, years and longer periods.",
+          "CORRECT",
+          "Means \"no later than\", so it reads the slot as a deadline rather than a point in time - wrong for the construct, not merely ungrammatical, and the most informative distractor."
+        ],
+        "diagnosticUse": "Weakness here points to prepositions of time as an early vocabulary-grammar target; choosing \"by\" specifically points to point-in-time versus deadline rather than to slot confusion.",
+        "estimatedSeconds": 25
+      },
+      {
+        "draftKey": "LU_Q_003",
+        "skill": "LANGUAGE_USE",
+        "taskType": "MCQ",
+        "subskill": "grammar",
+        "targetFeature": "present_perfect_with_since",
+        "difficultyTier": "D2",
+        "order": 27,
+        "prompt": "We ____ in this building since September.",
+        "options": [
+          "have studied",
+          "studied",
+          "study",
+          "are studying"
+        ],
+        "correctAnswer": "have studied",
+        "answerRationale": "\"Since\" with a period continuing to now requires the present perfect.",
+        "distractorRationales": [
+          "CORRECT",
+          "Past simple, incompatible with \"since\" plus a continuing period - the central contrast being tested.",
+          "Present simple, which cannot carry \"since\".",
+          "Present continuous; tempting because the situation is ongoing, but it does not license \"since\" here."
+        ],
+        "diagnosticUse": "Weakness here suggests work on perfect aspect and time expressions.",
+        "estimatedSeconds": 35
+      },
+      {
+        "draftKey": "LU_Q_004",
+        "skill": "LANGUAGE_USE",
+        "taskType": "MCQ",
+        "subskill": "vocabulary",
+        "targetFeature": "verb_noun_collocation",
+        "difficultyTier": "D2",
+        "order": 28,
+        "prompt": "Could you ____ me a favour and check the room number?",
+        "options": [
+          "make",
+          "do",
+          "give",
+          "take"
+        ],
+        "correctAnswer": "do",
+        "answerRationale": "\"Do someone a favour\" is the fixed collocation.",
+        "distractorRationales": [
+          "The classic make/do confusion for this noun.",
+          "CORRECT",
+          "Grammatical but not the established collocation.",
+          "Collocates with other nouns, not \"favour\"."
+        ],
+        "diagnosticUse": "Weakness here points to collocation work rather than more grammar rules.",
+        "estimatedSeconds": 30
+      },
+      {
+        "draftKey": "LU_Q_005",
+        "skill": "LANGUAGE_USE",
+        "taskType": "MCQ",
+        "subskill": "vocabulary",
+        "targetFeature": "word_formation_noun",
+        "difficultyTier": "D3",
+        "order": 29,
+        "prompt": "Her main ____ to the group project was the data analysis.",
+        "options": [
+          "contribute",
+          "contributing",
+          "contribution",
+          "contributor"
+        ],
+        "correctAnswer": "contribution",
+        "answerRationale": "The slot after a possessive and adjective needs an abstract noun naming the thing contributed.",
+        "distractorRationales": [
+          "Base verb in a noun slot.",
+          "Gerund; grammatically possible in other frames but not after \"Her main\" with this meaning.",
+          "CORRECT",
+          "A person noun, so it names the wrong referent - the sharpest distractor because it is a real noun."
+        ],
+        "diagnosticUse": "Weakness here suggests word-family and suffix work for academic vocabulary.",
+        "estimatedSeconds": 40
+      }
+    ]
+  },
+  "revisedAt": "2026-10-25",
+  "revisionProvenance": {
+    "appliedPass": "STEP_2C_APPLY_CONTENT_REVIEW_REVISIONS",
+    "sourceRegister": "artifacts/entry-diagnostic-v2-content-revision-register.json",
+    "appliedRevisions": [
+      "REV-001",
+      "REV-002",
+      "REV-003",
+      "REV-004",
+      "REV-005",
+      "REV-006",
+      "REV-007",
+      "REV-008",
+      "REV-009",
+      "REV-012"
+    ],
+    "notAppliedRevisions": {
+      "REV-010": "NOTE - register requiredChange is \"None.\"; retain as authored",
+      "REV-011": "NOTE - register requires no change; subskill retained as authored",
+      "REV-013": "NOTE - open product decision on instruction language; no content change until decided"
+    },
+    "evidence": "artifacts/entry-diagnostic-v2-step2c-revisions.json"
+  }
+}

@@ -1,70 +1,111 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-10-24",
-  "pass": "GLOBAL LEARNER FUNCTIONAL + ACTIVE MEDIA SEMANTIC AUDIT",
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-25",
+  "pass": "GLOBAL LEARNER BROWSER + SECURITY AUDIT",
   "auditOnly": true,
   "productFixesApplied": 0,
   "issues": [
+    {
+      "id": "GA-005",
+      "priority": "P2",
+      "domain": "Global (learner catalogs)",
+      "title": "In-place filter and tab interactions reset document scroll to the top",
+      "evidence": "Measured in Chromium at 1440x860. Clicking a filter with no URL change moved scrollY from 700 to 0 on /speaking, /market, /exams and from 604/700 to 0 on /reading, /listening; Arena stake selection moved 500 to 0. Browser clamping was ruled out: on /speaking, /market and /exams the document height was unchanged (1746->1746, 2369->2369, 1942->1942) and maxScroll was unchanged, and on /reading, /listening a clamp would have landed at 364/406 rather than 0.",
+      "notTheCause": "Not the shared student layout's scroll-to-top effect, which is keyed on [pathname] and cannot fire without a route change; and not a scrollTo call in any of the catalog pages (grep found none).",
+      "classification": "UX_DEFECT_GLOBAL",
+      "risk": "A learner filtering a long catalog is thrown back to the top on every click, so the results they filtered for are off screen.",
+      "surfacesAffected": ["/reading", "/listening", "/speaking", "/market", "/exams", "/arena"],
+      "recommendedNextPhase": "UI/UX remediation phase; root-cause the remount that discards scroll position."
+    },
+    {
+      "id": "GA-006",
+      "priority": "P2",
+      "domain": "Listening",
+      "title": "Listening exercise page pushes repeated history entries, trapping Back",
+      "evidence": "Navigating /listening -> /listening/1 added 5 history entries and emitted 13 main-frame navigation events all to /listening/1. Two consecutive Back presses both stayed on /listening/1 and never returned to /listening.",
+      "classification": "NAVIGATION_DEFECT",
+      "risk": "Browser Back does not leave the exercise; the learner must press Back repeatedly to escape.",
+      "recommendedNextPhase": "UI/UX remediation phase; replace repeated pushes with replace-state for in-exercise state sync."
+    },
+    {
+      "id": "GA-007",
+      "priority": "P3",
+      "domain": "Global (list -> detail -> Back)",
+      "title": "Back restores list scroll position inconsistently",
+      "evidence": "Back from a detail page returned to the correct list on /courses, /exams and /flashcard, but only /courses restored the scroll offset (left at 420, returned at 420). /exams and /flashcard returned at scrollY 0 after leaving at 800 and 605.",
+      "classification": "UX_INCONSISTENCY",
+      "risk": "Learners lose their place in long catalogs on some surfaces but not others.",
+      "recommendedNextPhase": "UI/UX remediation phase; make the Back restoration policy uniform."
+    },
     {
       "id": "GA-001",
       "priority": "P1",
       "domain": "Grammar",
       "title": "Grammar is entirely invisible to learners",
-      "evidence": "GET /grammar/topics returns 0 items for FREE, PLUS and PRO. DB holds 12 topics and 60 questions, every topic publicationStatus=DRAFT (allDraft=true).",
+      "evidence": "GET /grammar/topics returns 0 items for FREE, PLUS and PRO. DB holds 12 topics and 60 questions, every topic publicationStatus=DRAFT. Browser: /grammar renders a correct zero-content state with a human-readable message and no error.",
       "classification": "PRODUCT_PUBLICATION_BACKLOG",
       "notRecoveryLoss": "Content exists and is intact; only publication state withholds it.",
-      "remediation": "Content-owner decision to publish, not a code fix."
+      "risk": "A whole advertised skill has no learner content.",
+      "recommendedNextPhase": "Content-owner decision to publish; not a code fix."
     },
     {
       "id": "GA-002",
       "priority": "P2",
       "domain": "Vocabulary 1v1 Arena",
       "title": "Arena never reads the learner's currency balance before queueing",
-      "evidence": "src/app/(student)/arena/page.tsx has no reference to totalBanh/balance; stake buttons are disabled only while isSearching. Live socket test with totalBanh=0 returned arena:error 'Bạn khong du 10 Banh Mi de tham gia muc cuoc nay!' only after join_queue.",
+      "evidence": "src/app/(student)/arena/page.tsx has no reference to totalBanh/balance; stake buttons are disabled only while isSearching. A QA learner with 0 Banh Mi can select a stake and press 'Tim doi thu ngay', and only then is refused.",
       "classification": "UX_DEFECT",
+      "mitigation": "The refusal itself is well handled: 'Ban khong du 50 Banh Mi de tham gia muc cuoc nay!' with no raw JSON, no stack trace, no stuck spinner, and the CTA stays usable.",
       "securityImpact": "none - the server enforces the stake correctly",
-      "remediation": "Read the balance on the Arena page and disable or explain unaffordable stakes before the learner commits."
+      "status": "OPEN",
+      "recommendedNextPhase": "Arena deep audit / UI-UX phase."
     },
     {
       "id": "GA-003",
       "priority": "P3",
       "domain": "Vocabulary 1v1 Arena",
       "title": "UI stake ladder omits the lowest server-allowed stake",
-      "evidence": "arena.gateway.ts allowedStakes=[10,20,50,100]; arena/page.tsx STAKES=[20,50,100].",
+      "evidence": "arena.gateway.ts allowedStakes=[10,20,50,100]; arena/page.tsx STAKES=[20,50,100]. Browser confirms 3 stake buttons.",
       "classification": "UX_DEFECT",
-      "remediation": "Offer 10, or document the omission deliberately."
+      "status": "OPEN",
+      "recommendedNextPhase": "Arena deep audit."
     },
     {
       "id": "GA-004",
       "priority": "P3",
       "domain": "Repo hygiene",
-      "title": "Backend formatting check fails",
-      "evidence": "npm run lint:check exits 1 with 16 prettier errors in course.service.ts, quiz.service.spec.ts, toeic.service.lifecycle.spec.ts.",
+      "title": "Backend formatting debt",
+      "evidence": "Resolved during the backup phase: npm run lint:check now exits 0. Kept for traceability.",
       "classification": "HYGIENE",
-      "remediation": "Run prettier on those three files only; another session may hold them open."
+      "status": "RESOLVED"
     }
   ],
-  "baselineDeltasExplained": [
-    {
-      "metric": "speaking.examInternal",
-      "observed": 22,
-      "statedBaseline": 2,
-      "verdict": "NOT_DRIFT",
-      "explanation": "22 EXAM_INTERNAL speaking exercises = 2 assessments x 11 TOEIC speaking tasks. The baseline figure counted exam-internal SETS, not exercises. standalonePublished=30 matches baseline exactly."
+  "mediaClassificationSummary": {
+    "activeMediaReferenceCount": 248,
+    "semanticProven": 64,
+    "semanticHighConfidence": 54,
+    "semanticAmbiguous": 29,
+    "semanticMismatch": 0,
+    "notRequired": 101,
+    "ambiguousAreAllImages": true,
+    "ambiguousBreakdown": {
+      "Courses lesson image": 16,
+      "TOEIC Part 1 photograph": 6,
+      "Speaking describe-picture stimulus": 6,
+      "Diagnostic (deferred to its dedicated audit)": 1
     },
-    {
-      "metric": "flashcards.topics",
-      "observed": 9,
-      "statedBaseline": 8,
-      "verdict": "NOT_DRIFT",
-      "explanation": "publishedTopics=8 matches baseline and words=353 matches exactly with countDrift=0. The 9th topic is unpublished and adds no learner-visible deck."
-    },
-    {
-      "metric": "toeic.part1WithImage",
-      "observed": 7,
-      "statedBaseline": 6,
-      "verdict": "NOT_DRIFT",
-      "explanation": "There are 2 ToeicExamSets and 225 questions in total; Exam 1 contributes 6 Part-1 groups and the extra group belongs to the second set."
-    }
-  ]
+    "whyAmbiguous": "Every remaining ambiguous reference is an image whose visual content cannot be tied to its prompt from database evidence alone. This is a limit of a read-only audit, not a recovery gap: zero required media is missing (SEMANTIC_MISMATCH=0). Closing them needs visual inspection of each image against its prompt.",
+    "mismatchNote": "SEMANTIC_MISMATCH=0 means every published TOEIC Part 1 group has a photograph, every published listening group has audio, and every DESCRIBE_PICTURE speaking task has an image."
+  },
+  "carriedClassifications": {
+    "GRAMMAR_CLASSIFICATION": "PRODUCT_PUBLICATION_BACKLOG",
+    "ARENA_BALANCE_PRECHECK_UX_DEFECT": "OPEN",
+    "ARENA_CLIENT_SERVER_STAKE_MISMATCH": "OPEN",
+    "RECONSTRUCTION_TOEIC_LEARNER_READINESS_CONTRACT_PASS": "BLOCKED",
+    "RECONSTRUCTION_TOEIC_LEARNER_READINESS_BLOCKER": "kltn_semantic_rehearsal absent from current PostgreSQL runtime"
+  },
+  "deferredDeepAudits": {
+    "ENTRY_DIAGNOSTIC_DEEP_AUDIT_REQUIRED": true,
+    "VOCABULARY_1V1_DEEP_AUDIT_REQUIRED": true
+  }
 }

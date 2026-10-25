@@ -1,8 +1,12 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-10-24",
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-25",
   "backendBaseUrl": "http://localhost:3001",
-  "identities": { "FREE": "student1", "PLUS": "student3", "PRO": "student2" },
+  "identities": {
+    "FREE": "student1",
+    "PLUS": "student3",
+    "PRO": "student2"
+  },
   "sideEffects": {
     "AZURE_CALL_COUNT": 0,
     "TTS_CALL_COUNT": 0,
@@ -19,10 +23,38 @@
     "premiumItemsObservedOnFreeIdentity": 30,
     "vacuous": false,
     "listGating": [
-      { "surface": "/quizzes/listening-practice", "items": 12, "premium": 5, "freeLocked": "5/5", "plusLocked": "0/5", "proLocked": "0/5" },
-      { "surface": "/reading/exercises", "items": 6, "premium": 3, "freeLocked": "3/3", "plusLocked": "0/3", "proLocked": "0/3" },
-      { "surface": "/writing/topics", "items": 6, "premium": 4, "freeLocked": "4/4", "plusLocked": "0/4", "proLocked": "0/4" },
-      { "surface": "/speaking/exercises", "items": 30, "premium": 18, "freeLocked": "18/18", "plusLocked": "0/18", "proLocked": "0/18" }
+      {
+        "surface": "/quizzes/listening-practice",
+        "items": 12,
+        "premium": 5,
+        "freeLocked": "5/5",
+        "plusLocked": "0/5",
+        "proLocked": "0/5"
+      },
+      {
+        "surface": "/reading/exercises",
+        "items": 6,
+        "premium": 3,
+        "freeLocked": "3/3",
+        "plusLocked": "0/3",
+        "proLocked": "0/3"
+      },
+      {
+        "surface": "/writing/topics",
+        "items": 6,
+        "premium": 4,
+        "freeLocked": "4/4",
+        "plusLocked": "0/4",
+        "proLocked": "0/4"
+      },
+      {
+        "surface": "/speaking/exercises",
+        "items": 30,
+        "premium": 18,
+        "freeLocked": "18/18",
+        "plusLocked": "0/18",
+        "proLocked": "0/18"
+      }
     ],
     "serverSideEnforcement": {
       "method": "direct GET of premium detail and transcript endpoints as the FREE identity, bypassing the UI entirely",
@@ -37,19 +69,94 @@
     "PRE_REVEAL_PRIVACY_PASS": true,
     "evidence": "GET /quizzes/{24,26,27,28}/transcript returns 403 'Hay xac nhan xem transcript truoc khi tai noi dung' for an entitled PRO identity that has not revealed. Quizzes 23 and 9 return 200 only because that identity already revealed them. No unrevealed payload carried transcript prose."
   },
-  "idor": {
-    "IDOR_PASS": null,
-    "status": "UNVERIFIED",
-    "reason": "The QA identities own no cross-checkable submission objects (GET /users/learning-history returned no sourceIds for student2), and manufacturing one would create learner state this audit-only pass is not allowed to commit. Socket-layer authorisation was verified instead: an unauthenticated /arena connection is rejected with 'Authentication token required for Arena'."
-  },
+  "idor": [
+    {
+      "resourceType": "ToeicAssessmentAttempt",
+      "owner": 200,
+      "other": 403,
+      "anonymous": 401
+    },
+    {
+      "resourceType": "ListeningAttempt",
+      "owner": 200,
+      "other": 404,
+      "anonymous": null
+    },
+    {
+      "resourceType": "PerLearnerCollection (/users/learning-history)",
+      "owner": 200,
+      "other": 200,
+      "anonymous": 401,
+      "note": "per-learner scoped, not addressable by id"
+    },
+    {
+      "resourceType": "PerLearnerCollection (/users/me/skill-progress)",
+      "owner": 200,
+      "other": 200,
+      "anonymous": 401,
+      "note": "per-learner scoped, not addressable by id"
+    }
+  ],
   "mediaSemantics": {
     "ARTIFACT_TIMELINE_INTEGRITY_PASS": true,
     "publishedArtifacts": 4,
     "perArtifact": [
-      { "quizId": 23, "artifactId": 5, "version": 7, "entries": 20, "withOffsets": 20, "distinctWindows": 20, "monotonic": true, "inRange": true, "durationMs": 75528, "speakers": ["Mia", "Leo"], "SEEK_PASS": true },
-      { "quizId": 24, "artifactId": 6, "version": 7, "entries": 20, "withOffsets": 20, "distinctWindows": 20, "monotonic": true, "inRange": true, "durationMs": 90432, "SEEK_PASS": true },
-      { "quizId": 25, "artifactId": 7, "version": 7, "entries": 20, "withOffsets": 20, "distinctWindows": 20, "monotonic": true, "inRange": true, "durationMs": 82728, "speakers": ["Nora", "Dan"], "SEEK_PASS": true },
-      { "quizId": 28, "artifactId": 8, "version": 2, "entries": 4, "withOffsets": 4, "distinctWindows": 4, "monotonic": true, "inRange": true, "durationMs": 21528, "SEEK_PASS": true }
+      {
+        "quizId": 23,
+        "artifactId": 5,
+        "version": 7,
+        "entries": 20,
+        "withOffsets": 20,
+        "distinctWindows": 20,
+        "monotonic": true,
+        "inRange": true,
+        "durationMs": 75528,
+        "speakers": [
+          "Mia",
+          "Leo"
+        ],
+        "SEEK_PASS": true
+      },
+      {
+        "quizId": 24,
+        "artifactId": 6,
+        "version": 7,
+        "entries": 20,
+        "withOffsets": 20,
+        "distinctWindows": 20,
+        "monotonic": true,
+        "inRange": true,
+        "durationMs": 90432,
+        "SEEK_PASS": true
+      },
+      {
+        "quizId": 25,
+        "artifactId": 7,
+        "version": 7,
+        "entries": 20,
+        "withOffsets": 20,
+        "distinctWindows": 20,
+        "monotonic": true,
+        "inRange": true,
+        "durationMs": 82728,
+        "speakers": [
+          "Nora",
+          "Dan"
+        ],
+        "SEEK_PASS": true
+      },
+      {
+        "quizId": 28,
+        "artifactId": 8,
+        "version": 2,
+        "entries": 4,
+        "withOffsets": 4,
+        "distinctWindows": 4,
+        "monotonic": true,
+        "inRange": true,
+        "durationMs": 21528,
+        "SEEK_PASS": true
+      }
     ],
     "retractedEarlierFinding": {
       "claim": "transcriptSegments[].startMs populated for 0 of 120 segments, so per-question seeking is impossible",
@@ -57,28 +164,127 @@
       "explanation": "The delivered payload carries startMs/endMs on each transcript ITEM, not on a nested segments array. The earlier checker looked only at the nested shape and therefore read zero. Re-measured against the real shape, 23 and 25 expose 20 of 20 offsets over the live API and all 4 published artifacts validate."
     },
     "notAuthored": [
-      { "quizId": 26, "reason": "CANONICAL_NOT_AUTHORED" },
-      { "quizId": 27, "reason": "CANONICAL_NOT_AUTHORED" }
+      {
+        "quizId": 26,
+        "reason": "CANONICAL_NOT_AUTHORED"
+      },
+      {
+        "quizId": 27,
+        "reason": "CANONICAL_NOT_AUTHORED"
+      }
     ]
   },
   "endpointSweep": {
     "BROKEN_ENDPOINTS": 0,
-    "domainsProbed": ["Dashboard", "Plans", "Courses", "Flashcards", "Listening", "Reading", "Writing", "Speaking", "Grammar", "Diagnostic", "TOEIC", "Market", "Notifications", "Arena"],
+    "domainsProbed": [
+      "Dashboard",
+      "Plans",
+      "Courses",
+      "Flashcards",
+      "Listening",
+      "Reading",
+      "Writing",
+      "Speaking",
+      "Grammar",
+      "Diagnostic",
+      "TOEIC",
+      "Market",
+      "Notifications",
+      "Arena"
+    ],
     "falsePositivesRetracted": "An earlier sweep reported 12 404s across /toeic/exam-sets, /market/items and two arena status paths. All four were paths this audit invented; the real routes are /toeic/exams, /market/products and the /arena socket namespace, and each returns 200 or its proper socket event. /courses/my-enrollments returned 400 for the same reason: the real route is /courses/:courseId/my-enrollments."
   },
   "arena": {
     "ARENA_GLOBAL_STATUS": "IMPLEMENTED_PARTIALLY_VERIFIED",
     "transport": "socket.io namespace /arena (not REST)",
-    "handlersMatched": ["join_queue", "cancel_queue", "submit_answer", "reconnect_match"],
-    "verified": { "UNAUTH_REJECTED": true, "AUTH_CONNECT": true, "STAKE_VALIDATION": true, "QUEUE_CANCELLED": true },
-    "unverified": { "MATCH_COMPLETION": "blocked - both QA identities hold totalBanh=0 and granting currency would mutate canonical user state" }
+    "handlersMatched": [
+      "join_queue",
+      "cancel_queue",
+      "submit_answer",
+      "reconnect_match"
+    ],
+    "verified": {
+      "UNAUTH_REJECTED": true,
+      "AUTH_CONNECT": true,
+      "STAKE_VALIDATION": true,
+      "QUEUE_CANCELLED": true
+    },
+    "unverified": {
+      "MATCH_COMPLETION": "blocked - both QA identities hold totalBanh=0 and granting currency would mutate canonical user state"
+    }
   },
   "coverage": {
     "CURRENT_LEARNER_ROUTE_COUNT": 48,
     "apiLevelDomainsCovered": 14,
-    "browserPhasesRun": 0,
-    "RESPONSIVE_SMOKE_PASS": null,
-    "GLOBAL_SCROLL_REGRESSION_PASS": null,
-    "ERROR_EMPTY_STATE_PASS": null
+    "browserPhasesRun": 8,
+    "RESPONSIVE_SMOKE_PASS": true,
+    "GLOBAL_SCROLL_REGRESSION_PASS": false,
+    "ERROR_EMPTY_STATE_PASS": true
+  },
+  "browserAudit": {
+    "CURRENT_LEARNER_ROUTE_COUNT": 48,
+    "BROWSER_ROUTES_PLANNED": 34,
+    "BROWSER_ROUTES_AUDITED": 34,
+    "BROWSER_PASS_COUNT": 34,
+    "BROWSER_FAIL_COUNT": 0,
+    "BROWSER_BLOCKED_COUNT": 0,
+    "phases": {
+      "A": 7,
+      "B": 4,
+      "C": 4,
+      "D": 9,
+      "E": 2,
+      "F": 2,
+      "G": 1,
+      "H": 5
+    },
+    "dynamicRouteCompression": "One representative id per dynamic family, chosen from live published data, because each family is one page component with one contract, one authorization model and one interaction model. Families compressed: /courses/:id, /flashcard/:id, /listening/:id, /speaking/:id, /reading/:id, /writing/:id, /exams/:id (all three TOEIC products audited individually since their adapters differ).",
+    "notBrowserAudited": "Runtime/attempt and submission-detail routes (/toeic/attempts/:id, /toeic/results/:id, /toeic/review/:id, /*/submissions/:id, /my-courses/:courseId/lessons/:lessonId, /classes/:classId, /diagnostic deep flow) were not driven end-to-end in this pass: they need committed learner submissions or paid external grading, which the audit-only rule excludes. TOEIC attempt creation and the assessment runtime were exercised in the preceding routing phase."
+  },
+  "gates": {
+    "LEARNER_IDOR_REGRESSION_PASS": true,
+    "IDOR_RESOURCE_TYPES_TESTED": [
+      "ToeicAssessmentAttempt",
+      "ListeningAttempt",
+      "PerLearnerCollection"
+    ],
+    "GLOBAL_LEARNER_RESPONSIVE_SMOKE_PASS": true,
+    "GLOBAL_FORWARD_SCROLL_REGRESSION_PASS": true,
+    "GLOBAL_SAME_PAGE_SCROLL_STABILITY_PASS": false,
+    "BACK_NAVIGATION_SCROLL_RESTORE_PASS": false,
+    "LEARNER_ERROR_EMPTY_STATE_PASS": true,
+    "ENTITLEMENT_BROWSER_SMOKE_PASS": true
+  },
+  "responsive": {
+    "viewports": [
+      "desktop 1440",
+      "tablet 834",
+      "mobile 390"
+    ],
+    "screens": 18,
+    "horizontalOverflowFailures": 0,
+    "falsePositivesInvestigated": "7 controls were first flagged as offscreen on /exams, /market, /arena, /listening/1. Each was shown to sit inside a horizontally-scrollable strip (certificate carousel, category strip, tier strip), so they are reachable by swiping and are not unreachable CTAs."
+  },
+  "samePageScroll": {
+    "tested": 6,
+    "inPlaceResets": 5,
+    "urlChangingFilters": 1,
+    "clampRuledOut": true,
+    "detail": "/speaking, /market, /exams reset with document height unchanged; /reading, /listening reset below their remaining maxScroll; /reading?category= is a genuine navigation governed by the global scroll-to-top policy."
+  },
+  "errorEmptyStates": {
+    "tested": 8,
+    "pass": 8,
+    "states": [
+      "empty learning history",
+      "no saved words",
+      "zero published grammar",
+      "empty notifications",
+      "empty toeic history",
+      "invalid course id",
+      "invalid exam id",
+      "invalid listening id"
+    ],
+    "criteria": "no raw JSON, no stack trace, no infinite spinner, human-readable message present"
   }
 }

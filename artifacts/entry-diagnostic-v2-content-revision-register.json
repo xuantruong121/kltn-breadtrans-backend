@@ -1,0 +1,200 @@
+{
+  "registerFor": "ENTRY_DIAGNOSTIC_V2_STEP_2C_APPLY_REVIEW_REVISIONS",
+  "createdAt": "2026-10-25",
+  "blueprintVersion": "V2_2026_01",
+  "contentVersion": 1,
+  "sourceReview": "artifacts/entry-diagnostic-v2-content-review.json",
+  "note": "No content was modified in Step 2B. Each entry below states the problem and precise acceptance criteria for Step 2C.",
+
+  "counts": { "blocker": 0, "major": 4, "minor": 6, "note": 3, "total": 13 },
+
+  "revisions": [
+    {
+      "revisionId": "REV-001",
+      "severity": "MAJOR",
+      "draftKey": ["LST_CLIP_01", "LST_CLIP_02", "LST_CLIP_03", "LST_CLIP_04"],
+      "issueType": "SCRIPT_NATURALNESS_DEFECT",
+      "currentProblem": "All four clips declare localeIntent \"en-US\" and accentIntent \"general American\", but the scripts use British lexis and spelling: \"lifts\" and \"study centre\" in LST_CLIP_02, \"practised\" in LST_CLIP_04, and generally British register. An American voice reading \"the lifts on the north side are being serviced\" is a dialect mismatch, and \"lifts\" may be unfamiliar to learners whose input is American English. Because Step 3 generates canonical audio from these exact scripts under the declared locale, the mismatch would be baked into published media and be expensive to correct afterwards.",
+      "requiredChange": "Make lexis, spelling and declared locale consistent. Either (a) keep en-US and Americanise: \"lifts\" to \"elevators\", \"study centre\" to \"study center\", \"practised\" to \"practiced\", and review each script for remaining British register; or (b) change localeIntent/accentIntent to en-GB on all four clips and keep the current lexis, confirming that an en-GB voice is available in the TTS pipeline.",
+      "acceptanceCriteria": [
+        "every clip's localeIntent and accentIntent match the lexis and spelling actually used in its script",
+        "no clip mixes British and American variants of the same word class",
+        "if option (a) is taken, LST_Q_003's answer and distractors still work with the replacement word for \"lifts\"",
+        "scriptSha256 recomputed for every changed script and the hash manifest regenerated",
+        "chosen locale is confirmed available in the Step 3 TTS voice set before audio generation"
+      ]
+    },
+    {
+      "revisionId": "REV-002",
+      "severity": "MAJOR",
+      "draftKey": "RDG_Q_006",
+      "issueType": "READING_CONTEXT_LEAK",
+      "currentProblem": "The item asks what \"the fluency trap\" refers to and the correct option is \"mistaking ease of reading for real understanding\". That option glosses \"fluency\" as \"ease of reading\" and \"trap\" as \"mistaking\", so a learner who knows the word fluency can select it from the stem and options alone without reading the passage. The item therefore does not measure its declared meaning-in-context subskill. Confirms author uncertainty AU-7.",
+      "requiredChange": "Make the answer depend on the passage rather than on the term's own wording. Either (a) re-target the item at a phrase whose passage meaning is not recoverable from its parts - for example what \"a more uncomfortable method\" refers to, or what \"the whole of revision\" contrasts with; or (b) keep the term but rewrite the options so the correct one does not paraphrase the term's components and at least two distractors are also consistent with the term read in isolation.",
+      "acceptanceCriteria": [
+        "a reviewer given only the stem and the four options, without the passage, cannot identify the correct answer above chance by paraphrase matching",
+        "the correct answer remains derivable from RDG_PASSAGE_02 without outside knowledge",
+        "exactly one defensible answer",
+        "subskill stays \"meaning in context\" or is explicitly re-declared",
+        "difficultyTier stays D3 unless explicitly re-declared"
+      ]
+    },
+    {
+      "revisionId": "REV-003",
+      "severity": "MAJOR",
+      "draftKey": "SPK_RUBRIC_V1",
+      "issueType": "RUBRIC_CRITERION_UNOBSERVABLE",
+      "currentProblem": "The fluency criterion's anchors are defined by how much of the available time is filled: 1 is \"well under half the available time\", 2 is \"half to two thirds\", 3 is \"fill most of the time\", 4 is \"continuously for the available time\". A learner who answers SPK_TASK_01 completely and concisely in 30 seconds of the 45 available is scored 2 on fluency regardless of how smooth the speech was, while task_fulfilment may simultaneously award 4. The criterion therefore measures response length rather than flow, and it penalises concision.",
+      "requiredChange": "Re-anchor fluency on observable flow features rather than elapsed time. Use pause length and placement, frequency of restarts and self-repair, and whether hesitation is natural or word-searching. Any residual length expectation must live in task_fulfilment or in minimumUsefulResponseSeconds, not in fluency.",
+      "acceptanceCriteria": [
+        "no fluency anchor references a proportion of the available time",
+        "each fluency anchor names at least one observable flow feature (pause length or placement, restarts, self-repair, word-searching)",
+        "a complete, smooth 30-second response to SPK_TASK_01 can score 4 on fluency",
+        "a response that fills the full time with long searching pauses cannot score above 2",
+        "fluency remains distinct from intelligibility, whose anchors stay about listener effort"
+      ]
+    },
+    {
+      "revisionId": "REV-004",
+      "severity": "MAJOR",
+      "draftKey": "LST_Q_009",
+      "issueType": "DISTRACTOR_NOT_PARALLEL",
+      "currentProblem": "Three options make specific, strong claims (\"went better than expected\", \"was cancelled before it began\", \"the audience left before the end\") while the correct option is hedged and general (\"It did not go the way they had planned\"). A test-wise learner can prefer the hedged option as a strategy, which partially substitutes for the inference the item exists to measure. This matters more here than elsewhere because this is a D4 inference item. Related to but distinct from author uncertainty AU-1, which was about the tier.",
+      "requiredChange": "Make the options parallel in specificity so no option is identifiable as the answer by its form. Either raise the correct option's specificity, for example \"Technical problems forced a change of plan\", or lower the distractors' specificity so all four are comparably hedged.",
+      "acceptanceCriteria": [
+        "all four options are comparable in length and specificity, with no single hedged option among specific ones",
+        "the correct answer still requires combining at least two cues from LST_CLIP_04",
+        "exactly one defensible answer",
+        "distractorRationales updated to match any reordered or rewritten options, with CORRECT at the correct index",
+        "difficultyTier stays D4"
+      ]
+    },
+    {
+      "revisionId": "REV-005",
+      "severity": "MINOR",
+      "draftKey": "LST_Q_003",
+      "issueType": "QUESTION_WORDING_DEFECT",
+      "currentProblem": "The stem asks which area is \"closed this week\", but the script says the computer room \"will stay closed until Thursday\", so it is not closed for the whole week. A precise learner may hesitate. No other option is closed at all, so the key is unaffected.",
+      "requiredChange": "Align the stem with the script, for example \"Which area is closed at the start of this week?\" or \"Which area is closed until Thursday?\".",
+      "acceptanceCriteria": [
+        "the stem does not assert a duration the script contradicts",
+        "the correct answer is unchanged",
+        "no distractor becomes defensible as a result of the rewording"
+      ]
+    },
+    {
+      "revisionId": "REV-006",
+      "severity": "MINOR",
+      "draftKey": "LST_Q_008",
+      "issueType": "WEAK_DISTRACTOR",
+      "currentProblem": "The distractor \"Missing it would be faster overall\" is implausible: no learner reasoning from the clip would conclude that missing a deadline is faster. It narrows the item to effectively three options and reduces audio dependency, since the stem alone makes two options unlikely.",
+      "requiredChange": "Replace with a distractor that reflects a real mishearing of the clip, for example \"The form will be processed next month either way\" or \"The landlord must send the page directly\".",
+      "acceptanceCriteria": [
+        "the replacement is wrong but traceable to something audible in LST_CLIP_03",
+        "exactly one defensible answer",
+        "distractorRationales updated with CORRECT at the correct index",
+        "a reviewer given only the stem and options cannot eliminate more than one option a priori"
+      ]
+    },
+    {
+      "revisionId": "REV-007",
+      "severity": "MINOR",
+      "draftKey": "LST_Q_010",
+      "issueType": "DISTRACTOR_RATIONALE_DEFECT",
+      "currentProblem": "Two defects in the rationale text, not in the key. The rationale for \"The speaker ran out of time\" says it \"would make it longer, not shorter\", which is incorrect reasoning - running out of time would plausibly shorten a talk, and the real reason it is wrong is that the speaker states a deliberate cut. Separately, \"The projector ended the session\" is only weakly plausible, since projectors do not end sessions.",
+      "requiredChange": "Correct the rationale for the running-out-of-time distractor to state the actual ground (the speaker attributes the shorter length to cutting a section, not to being stopped). Consider replacing the projector distractor with a more plausible misattribution, for example \"The file would not open at all\".",
+      "acceptanceCriteria": [
+        "every distractorRationale states a reason that is actually true of the clip",
+        "no rationale contains a factual or logical error",
+        "if the projector distractor is replaced, it remains traceable to the clip and the rationale array stays aligned with CORRECT at the correct index"
+      ]
+    },
+    {
+      "revisionId": "REV-008",
+      "severity": "MINOR",
+      "draftKey": "LU_Q_002",
+      "issueType": "DISTRACTOR_NOT_PARALLEL",
+      "currentProblem": "The item tests preposition of clock time. Three distractors are wrong because the preposition does not fit the slot (\"on\", \"in\"), but \"by\" is wrong for a different reason - it is a semantic shift to a deadline reading rather than a slot error. The set is therefore not parallel in what makes each option wrong, which is the pattern the author flagged in AU-4. The item still has exactly one defensible answer, since \"starts by half past nine\" is semantically incoherent for a start event, so this is not ambiguity.",
+      "requiredChange": "Either (a) replace \"by\" with a fourth slot-level distractor such as \"for\" or \"from\", keeping all three distractors wrong for the same kind of reason; or (b) keep \"by\" and re-declare the targetFeature to cover preposition choice including deadline-versus-point-in-time, so the construct matches the option set.",
+      "acceptanceCriteria": [
+        "all distractors are wrong for reasons consistent with the declared targetFeature, or the targetFeature is re-declared to cover them",
+        "exactly one defensible answer",
+        "all options remain natural English",
+        "difficultyTier stays D1 unless explicitly re-declared"
+      ]
+    },
+    {
+      "revisionId": "REV-009",
+      "severity": "MAJOR",
+      "draftKey": "WRT_RUBRIC_V1",
+      "issueType": "RUBRIC_TASK_MISMATCH",
+      "currentProblem": "One rubric is applied to a 60-90 word three-function message and a 90-130 word opinion response, but the organisation criterion is not observable at the same scale in both. Anchor 3 explicitly names only task 2 (\"task 2 separates its reasons recognisably\") and anchor 4 requires ideas \"grouped deliberately and signposted\", which a short message cannot exhibit. WRT_TASK_01 is therefore capped near the middle of the organisation scale by genre rather than by ability. Because the skill score is the equally weighted mean of both tasks, this depresses every learner's Writing score systematically. The authoring rationale's claim that \"both writing tasks are long enough for paragraphing\" does not hold for a 60-90 word message.",
+      "requiredChange": "Choose one of three. (a) Give organisation per-task anchors, as task_achievement already does, so task 1 is judged on sentence-level sequencing and cohesion rather than paragraphing. (b) Apply organisation to WRT_TASK_02 only and define the Writing skill score as the mean of the criteria actually scored per task. (c) Split into two rubric versions, WRT_RUBRIC_V1_FUNCTIONAL and WRT_RUBRIC_V1_EXTENDED, each with its own criterion set.",
+      "acceptanceCriteria": [
+        "no criterion anchor names one task while being applied to both",
+        "a perfectly organised 60-90 word message can reach the top of every criterion it is scored on",
+        "if a criterion is not scored for a task, the normalisation intent states how the task percentage is computed from the remaining criteria",
+        "task_achievement and organisation remain distinct, with no error penalised under both",
+        "rubricVersion is incremented or split, and the affected tasks' rubricVersion references are updated",
+        "rubrics:json hash regenerated"
+      ]
+    },
+    {
+      "revisionId": "REV-010",
+      "severity": "NOTE",
+      "draftKey": "RDG_Q_009",
+      "issueType": "OTHER",
+      "currentProblem": "No change required. The author flagged distractor C (\"the cafe cannot accept responsibility for damage\") as possibly defensible. The review rejects that: the passage supplies an explicit competing reason, so C is outside knowledge and functions as the intended strong distractor.",
+      "requiredChange": "None.",
+      "acceptanceCriteria": ["retain as authored"]
+    },
+    {
+      "revisionId": "REV-011",
+      "severity": "NOTE",
+      "draftKey": "RDG_Q_003",
+      "issueType": "OTHER",
+      "currentProblem": "The item is declared \"specific detail\" but requires linking collection of a tagged bicycle to the facilities desk's opening hours, which is a small inference. Still plausible at D2 and the key is unambiguous.",
+      "requiredChange": "None required. Optionally re-declare the subskill if the reviewer wants strict subskill purity.",
+      "acceptanceCriteria": ["retain as authored, or re-declare subskill explicitly"]
+    },
+    {
+      "revisionId": "REV-012",
+      "severity": "MINOR",
+      "draftKey": "RDG_PASSAGE_02",
+      "issueType": "PASSAGE_QUALITY_DEFECT",
+      "currentProblem": "The passage asserts \"Researchers who study learning call this the fluency trap\". The established term in the learning-science literature is the illusion of fluency, or fluency illusion; \"the fluency trap\" is not the standard label. Attributing a non-standard term to researchers is a factual-accuracy weakness in a test passage, and it is also the term RDG_Q_006 depends on. The external check that would settle the exact prevailing term could not be run in this pass (see originalityCheck).",
+      "requiredChange": "Either use the established term, or drop the attribution. For example \"Researchers call this the illusion of fluency\", or \"This is sometimes called a fluency trap\" without attributing it to researchers.",
+      "acceptanceCriteria": [
+        "any term attributed to researchers is the term actually used in the literature, verified against a citable source",
+        "or the attribution to researchers is removed",
+        "the passage still supports whatever RDG_Q_006 becomes under REV-002",
+        "passage word count and passageSha256 recomputed if the text changes"
+      ]
+    },
+    {
+      "revisionId": "REV-013",
+      "severity": "NOTE",
+      "draftKey": "DIAG_V2_ASSESSMENT",
+      "issueType": "OTHER",
+      "currentProblem": "The assessment title, description and learner note are Vietnamese while all item content and per-task instructions (\"Write 60-90 words. You have about 9 minutes.\") are English. This matches the existing product's pattern of Vietnamese chrome with English target-language content, but it is an unconfirmed product decision rather than a content defect. Confirms author uncertainty AU-8.",
+      "requiredChange": "Product decision: confirm whether task instructions should be Vietnamese, English, or both. No content change until decided.",
+      "acceptanceCriteria": [
+        "instruction language policy stated explicitly for V2",
+        "if instructions become bilingual, the word-count and timing figures remain identical in both languages"
+      ]
+    }
+  ],
+
+  "deferredToLaterSteps": [
+    {
+      "id": "DEF-001",
+      "origin": "AU-5",
+      "note": "Clip durations are word-count estimates (32-40s for 65-77 words), reasonable but unmeasured. Step 3 must write measured durations back onto DiagnosticListeningClip.durationMs, and the readiness guard should compare measured against estimated and flag large divergence."
+    },
+    {
+      "id": "DEF-002",
+      "origin": "STEP_2B_TOOL_FAILURE",
+      "note": "The bounded external originality spot-check on 3 passages, 4 scripts and 4 productive prompts could not be run because the web-search tool returned a classifier error throughout this pass. It must be completed before persistence."
+    }
+  ]
+}
