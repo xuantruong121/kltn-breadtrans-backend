@@ -1,7 +1,7 @@
 {
   "blueprintVersion": "V2_2026_01",
   "scoringVersion": "FOUR_SKILL_PLACEMENT_V2",
-  "contentVersion": 5,
+  "contentVersion": 6,
   "draftedAt": "2026-10-25",
   "difficultyScale": "BREADTRANS_AUTHORING_DIFFICULTY_D1_D4",
   "itemLevelStatus": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
@@ -334,7 +334,7 @@
         "difficultyTier": "D4",
         "order": 10,
         "mediaDraftKey": "LST_CLIP_04",
-        "prompt": "Why was the presentation shorter than planned?",
+        "prompt": "What reason does the speaker give for how long the presentation ran?",
         "options": [
           "The speaker was asked to stop early",
           "They were given less time than planned",
@@ -342,7 +342,7 @@
           "The speaker ran out of time"
         ],
         "correctAnswer": "The speaker left out a section",
-        "answerRationale": "\"Twelve, in the end. I cut the part I was least sure about\" - the listener must connect the shorter duration to the deliberate cut rather than to the equipment problem.",
+        "answerRationale": "\"Twelve, in the end. I cut the part I was least sure about\" - the listener must connect the length the speaker reports to the deliberate cut rather than to the equipment problem.",
         "distractorRationales": [
           "Nobody intervenes.",
           "A plausible competing cause the conversation never raises.",

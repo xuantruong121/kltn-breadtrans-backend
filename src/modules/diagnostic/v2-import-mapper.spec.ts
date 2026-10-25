@@ -62,14 +62,18 @@ describe('v2 import mapper — allowlist discipline', () => {
       const payload = mapObjectiveQuestion(item, ctx);
       expect(payload.assessmentId).toBe(999);
       expect(payload.question).toBe(item.prompt);
-      expect(payload.options).toEqual(item.options);
+      expect(payload.options.values).toEqual(item.options);
+      expect(payload.options.stableKey).toBe(item.draftKey);
+      expect(payload.sourceKey).toBe(item.draftKey);
     }
   });
 
   it('derives correctIndex from correctAnswer for every objective item', () => {
     for (const item of objectiveItems) {
       const payload = mapObjectiveQuestion(item, ctx);
-      expect(payload.options[payload.correctIndex]).toBe(item.correctAnswer);
+      expect(payload.options.values[payload.correctIndex]).toBe(
+        item.correctAnswer,
+      );
     }
   });
 
@@ -90,6 +94,7 @@ describe('v2 import mapper — allowlist discipline', () => {
       expect(() =>
         assertNoAuthoringFields(payload, item.draftKey),
       ).not.toThrow();
+      // draftKey is now a real column (sourceKey); the raw field must still not ride through
       expect(payload.draftKey).toBeUndefined();
       expect(payload.distractorRationales).toBeUndefined();
       expect(payload.answerRationale).toBeUndefined();
@@ -132,7 +137,8 @@ describe('v2 import mapper — allowlist discipline', () => {
     for (const task of tasks) {
       const payload = mapProductiveTask(task as never, ctx);
       expect(payload.correctIndex).toBe(-1);
-      expect(payload.options).toEqual([]);
+      expect(payload.options.values).toEqual([]);
+      expect(payload.options.questionType).toBe('OPEN_TEXT');
       expect(payload.explanation).toBeNull();
       expect([21, 22]).toContain(payload.rubricId);
     }

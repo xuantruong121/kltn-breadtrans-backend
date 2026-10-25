@@ -1,0 +1,312 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_PHASE_B0_DATABASE_AND_RUNTIME_PREFLIGHT",
+  "preparedAt": "2026-10-25",
+  "PHASE_B0_COMPLETE": true,
+  "phaseType": "PLANNING_ONLY",
+  "report": "artifacts/entry-diagnostic-phase-b0-preflight.md",
+
+  "baseline": {
+    "CONTENT_REVIEW_PASS": true,
+    "CONTENT_PACKAGE_VERSION": 6,
+    "CONTENT_FILES_MUTATED": false,
+    "contentTreatedAsFrozen": true,
+    "contentReviewReopened": false
+  },
+
+  "headlineFinding": {
+    "id": "B0-001",
+    "title": "DiagnosticListeningClip is 1:1 with a question; the authored content is 1:N",
+    "evidence": "model DiagnosticListeningClip has a REQUIRED questionId FK and @@unique([questionId, version]). The authored content maps LST_CLIP_01 to 2 questions, LST_CLIP_02 to 3, LST_CLIP_03 to 3, LST_CLIP_04 to 2.",
+    "decidingSecondFact": "The clip table is NOT the delivery source. sanitizeQuestion reads audioUrl from the options JSON, never from this relation. The clip table is a media registry: script, scriptSha256, audioSha256, storageKey, url, voice, locale, durationMs, byteSize.",
+    "decision": "ONE_CLIP_ROW_PER_LISTENING_QUESTION",
+    "rowCount": "10 clip rows, not 4",
+    "sharing": "Questions on the same authored clip share storageKey, url, script, scriptSha256 and audioSha256. Only one audio file is uploaded and stored.",
+    "whyThisShape": "The blueprint's own readiness guard is phrased per item - 'every Listening item has a verified audio asset (bytes > 0, decodes, duration plausible, script hash matches)' - which is naturally expressed as one row per Listening question. The schema appears designed for per-question audio assets.",
+    "migrationNeeded": false,
+    "idempotency": "already provided by the existing @@unique([questionId, version])",
+    "costStatedHonestly": "A script change must update 10 rows rather than 4. scriptSha256 makes drift detectable and the import is idempotent on (questionId, version), so a re-run corrects it.",
+    "rejectedAlternative": "Making questionId nullable and adding assessmentId to the clip. Semantically tidier but changes a required relation on an existing table for no delivery benefit, since the delivery path does not read the relation."
+  },
+
+  "MINIMAL_SCHEMA_CHANGE_DESIGNED": true,
+  "STABLE_SOURCE_IDENTITY_DESIGNED": true,
+  "identityAudit": {
+    "method": "Checked every @unique and @@unique on all nine diagnostic models against the live schema.",
+    "alreadySufficient": {
+      "DiagnosticRubric": "@@unique([skill, rubricVersion])",
+      "DiagnosticListeningClip": "@@unique([questionId, version]) - derived from the question's identity",
+      "DiagnosticSpeakingResponse": "@@unique([attemptId, questionId]) - runtime data, not imported",
+      "DiagnosticWritingResponse": "@@unique([attemptId, questionId]) - runtime data, not imported",
+      "DiagnosticSkillResult": "@@unique([attemptId, skill]) - runtime data, not imported"
+    },
+    "needsSourceKey": ["DiagnosticAssessment", "DiagnosticQuestion", "DiagnosticReadingPassage"],
+    "correctionToEarlierPlan": "The earlier plan proposed sourceKey on five tables. Only three need it. Rubrics and clips are already covered by existing constraints, so two of the five proposed additions would have been redundant identity fields - which the brief explicitly warns against."
+  },
+  "proposedMigration": {
+    "statements": [
+      "DiagnosticAssessment:     sourceKey String?  @unique",
+      "DiagnosticQuestion:       sourceKey String?  @@unique([assessmentId, sourceKey])",
+      "DiagnosticReadingPassage: sourceKey String?  @@unique([assessmentId, sourceKey])"
+    ],
+    "type": "String",
+    "nullable": true,
+    "uniquenessScope": "per assessment for questions and passages; global for the assessment",
+    "existingRowCompatibility": "V1's 1 assessment and 20 questions keep NULL. Postgres treats each NULL as distinct in a unique index, so no collision and no backfill is required.",
+    "indexRequirements": "created by the unique constraints; no separate index needed",
+    "migrationRisk": "LOW - three ADD COLUMN plus three unique indexes. All additive. No column dropped, no type changed, no data rewritten.",
+    "rollbackStrategy": "Drop the three unique indexes and the three columns. Nothing references them until the importer exists, so rollback is clean.",
+    "populatedFrom": "the authored draftKey (LST_Q_001, RDG_PASSAGE_02, DIAG_V2_ASSESSMENT), already proven unique at 37 keys with 0 duplicates",
+    "executedInB0": false
+  },
+
+  "IDEMPOTENT_IMPORT_CONTRACT_READY": true,
+  "importerStates": {
+    "PURE_MAPPING_VALID": true,
+    "IMPORTER_IMPLEMENTED": false,
+    "ISOLATED_IMPORT_TESTED": false,
+    "LIVE_IMPORT_APPROVED": false,
+    "note": "Four distinct states; only the first is true. The mapper has no consumer outside its own spec, so no importer exists."
+  },
+  "importContract": {
+    "transactionOrder": [
+      "assessment - upsert on sourceKey, forced to DRAFT",
+      "reading passages - upsert on (assessmentId, sourceKey)",
+      "rubrics - upsert on (skill, rubricVersion)",
+      "questions - upsert on (assessmentId, sourceKey), resolving passageId and rubricId",
+      "listening clips - upsert on (questionId, version), one row per listening question",
+      "post-assertions inside the same transaction"
+    ],
+    "matching": "upsert by identity only",
+    "forbidden": ["delete", "truncate", "replace-all", "delete-where-assessmentId-then-reinsert"],
+    "forbiddenReason": "a delete-then-reinsert would destroy attempt references",
+    "ownershipScope": "every write is constrained to the assessment identified by its sourceKey; a row whose sourceKey is NULL (every V1 row) can never be matched, so legacy content is structurally untouchable by the importer",
+    "postImportAssertions": [
+      "29 questions, 3 passages, 4 distinct scripts across 10 clip rows, 2 rubrics",
+      "every question resolves its passage, rubric and clip reference",
+      "assessment.isActive = false AND status = DRAFT",
+      "the V1 assessment row and its 20 questions are byte-unchanged",
+      "0 attempts touched",
+      "a second run changes 0 rows"
+    ],
+    "failureBehaviour": "any assertion failure rolls the whole transaction back, so a failure cannot leave a partially imported assessment available to learners"
+  },
+
+  "DRAFT_LIFECYCLE_CONTRACT_READY": true,
+  "draftLifecycle": {
+    "verifiedAgainstSource": "isActive Boolean @default(true); status DiagnosticAssessmentStatus @default(ACTIVE); the schema comment calls status authoritative but grep for a read path filtering on status returns 0, while four read paths filter isActive: true (diagnostic.service.ts:527, 599, 616, 706) and getCurrentAssessment orders by id desc.",
+    "failureMode": "OMITTING the field, not setting it wrong - the defaults make a new row current immediately",
+    "contract": {
+      "DRAFT": "isActive=false, status=DRAFT, not selectable by getCurrentAssessment, no attempt can be started against it",
+      "ACTIVE": "only by an explicit activation operation gated on readiness"
+    },
+    "rules": [
+      "the importer sets BOTH fields explicitly in the creating statement; never rely on a default",
+      "read paths move to status = ACTIVE as the authority, keeping isActive in sync during the transition rather than dropping it",
+      "assertQuestionBank is scoped to the assessment being served, so a DRAFT that fails validation can never break the live one - today it runs before getCurrentAssessment returns, which is why a bad import would 500 the endpoint for every learner"
+    ],
+    "tests": [
+      "insert a DRAFT V2 assessment with a HIGHER id than V1, assert getCurrentAssessment still returns V1",
+      "assert starting an attempt against the DRAFT id is refused",
+      "assert GET /diagnostic/current does not throw"
+    ],
+    "implementedInB0": false
+  },
+
+  "D4_012_TASK_TYPE_VALIDATION_PLAN_READY": true,
+  "taskTypeValidation": {
+    "verifiedDefect": "validateQuestionBank branches on meta.questionType. OPEN_TEXT requires stableKey && section && construct && intendedLevel, and getQuestionMeta populates intendedLevel ONLY for ['A1','A2','B1','B2'] (diagnostic.logic.ts:157). Everything else requires values.length >= 2 and correctIndex in range. So a productive task can validate only by persisting a CEFR code, which the product forbids.",
+    "design": "ONE task-type-aware validator, discriminating on the taskType COLUMN - never on correctIndex and never on option count.",
+    "rules": {
+      "MCQ": "4 unique options, exactly one key in range, references resolve",
+      "MCQ_LISTENING": "plus a clip row present for this question and a deliverable audioUrl",
+      "MCQ_READING": "plus a resolving passage reference",
+      "SPEAKING_RESPONSE": "prompt, prepSeconds, responseSeconds, resolving rubric",
+      "WRITING_RESPONSE": "prompt, wordMin, wordMax, resolving rubric"
+    },
+    "intendedLevelRequirement": "dropped outright - it is a CEFR field this product does not claim",
+    "forbidden": ["fake MCQ options", "correctIndex -1 posing as an MCQ", "fake correct answer", "CEFR code to satisfy an obsolete validator"],
+    "noSeparateV1V2Validators": true,
+    "implementedInB0": false
+  },
+
+  "D4_013_DELIVERY_CONTRACT_READY": true,
+  "deliveryContract": {
+    "routeVerified": "DB options(Json) -> getQuestionMeta -> sanitizeQuestion -> API -> frontend",
+    "objectBranchImplemented": "getQuestionMeta reads values, stableKey, section, construct, intendedLevel, questionType, passageText, audioGroup, audioUrl, activeInForm. sanitizeQuestion derives audioUrl for LISTENING and passageTitle/passageBody/passageText for READING, returning a 12-field allowlist.",
+    "v1StoresFlatArray": "A read-only query returns [\"At noon\", \"At the train station\", ...] and jsonb_object_keys errors with 'cannot call jsonb_object_keys on an array'. So the object branch is live code that nothing currently feeds, and V1 has no audio or passage delivery either.",
+    "decision": "the importer MUST write the object form into options",
+    "whyItMatters": "The previous pure mapper writes string[], which would reproduce V1's limitation exactly. That is the real content of D4-013 and it is a defect in the mapper, not in the runtime.",
+    "frontendConsumptionConfirmed": "diagnostic/page.tsx (1128 lines) contains getUserMedia, MediaRecorder, audioUrl, passageBody, textarea and 20 timer references, plus diagnosticSpeakingRecorderLogic.ts with its own tests.",
+    "metadataHelpersAreNotProof": "The existence of getQuestionMeta and sanitizeQuestion does not prove runtime delivery works; only a contract test against imported rows does.",
+    "requiredContractTests": [
+      "a mapped Listening row yields a non-empty audioUrl",
+      "a mapped Reading row yields its passage body",
+      "a Speaking task yields prompt plus prepSeconds and responseSeconds",
+      "a Writing task yields prompt plus wordMin and wordMax",
+      "none of the four payloads contains an answer key, a rationale or a clip script"
+    ]
+  },
+
+  "D5_001_IMPORT_METADATA_EXCLUSION_VERIFIED": true,
+  "D5_001_DELIVERY_LEAK_TEST_PLAN_READY": true,
+  "authoringMetadataConfidentiality": {
+    "importSideVerified": "internalLabel is on AUTHORING_ONLY_FIELDS (v2-import-mapper.ts:27) alongside answerRationale, distractorRationales, constructRationale and diagnosticUse. assertNoAuthoringFields throws on any of them and on any key that is not a real DiagnosticQuestion column. 37 mapper tests cover it, including negative fixtures.",
+    "DIRECT_ARTIFACT_DELIVERY_ROUTE_EXISTS": false,
+    "directRouteEvidence": "grep across runtime src/ for the content-artifact paths returns exactly one hit - a comment inside the mapper itself. Nothing in the running application reads entry-diagnostic-v2-content-draft.json. Reported as a fact rather than invented.",
+    "residualRisk": "a future delivery path, not a present one. The only way authoring metadata can reach a learner today is if the importer writes it into a served column, and the mapper's allowlist is what prevents that.",
+    "labelsAreGenuinelyAnswerBearing": [
+      "LST_CLIP_04.internalLabel 'Presentation that did not go to plan' vs LST_Q_009 key 'A technical problem spoiled their plan'",
+      "RDG_PASSAGE_02.internalLabel 'Why rereading notes feels better than it works' vs RDG_Q_004 key 'Rereading feels effective but recalling from memory works better'",
+      "LST_CLIP_01.internalLabel 'Two students deciding to work together' vs LST_Q_001 key 'Working on their project together'"
+    ],
+    "notRenaming": "The labels are not renamed. The correct protection is the data boundary, not obscuring the text.",
+    "requiredDeliveryTest": "For every learner-facing Diagnostic payload produced from imported rows - question delivery, attempt start, submit, result - assert that no internalLabel value, no answerRationale, no distractorRationales entry and no clip script appears in the serialised response before an authorised review state. A passing mapper unit test alone does not prove this."
+  },
+
+  "D5_002_DECISION": "KEEP_AS_APPROVED",
+  "d5_002Reasoning": {
+    "disagreesWithColdReviewer": true,
+    "script": "'The second-floor power supply is being rewired, so the computer room up there stays closed' and 'The ground-floor group study rooms and the language lab are open as usual.'",
+    "linguisticFact": "'Ground floor' is standard American English. What differs between the varieties is the floor ABOVE it: American usage treats ground floor and first floor as the same level, with the next level up called the second floor. So ground floor plus second floor is coherent AmE - level 1 and level 2, with no missing floor. The British reading makes it level 1 and level 3, still unambiguous, merely different.",
+    "decisive": "No item depends on the relationship between the two floors. LST_Q_003 asks which area is closed; the learner distinguishes rooms, not floor arithmetic. Its distractors - language lab, south-side elevators, main entrance - contain no floor computation either.",
+    "conclusion": "Editing an approved, hash-frozen script to chase a non-issue carries more risk than the non-issue. No edit before TTS.",
+    "editPerformedInB0": false,
+    "audioRegenerated": "none - no audio has been generated for this V2 package"
+  },
+
+  "D5_003_IDENTIFIERS_UNCHANGED": true,
+  "d5_003": {
+    "decision": "KEEP_EXISTING_RUBRIC_IDENTIFIERS",
+    "consistentWith": "the decision already recorded in Step 2C4 as D3-007",
+    "reason": "criterionKey 'organisation' and 'task_fulfilment' are the field names the AI grader must emit, cross-referenced consistently with each rubric's aiGradingRequirements.requiredFields.",
+    "mappingPreservation": "the importer writes the rubric's criteria as the authored Json snapshot, so identifier and learner-facing anchor wording travel together and neither is rewritten",
+    "learnerFacingWordingTreatedSeparately": true,
+    "silentRenameBeforeImport": false
+  },
+
+  "PERMUTATION_RUNTIME_FIX_PLAN_READY": true,
+  "permutation": {
+    "newlyVerifiedFact": "attemptId is CLIENT-SUPPLIED and OPTIONAL. Controller: @Post(':id/attempts') body: { answers?: unknown; submissionToken?: string; attemptId?: number }.",
+    "callSites": "five in production: diagnostic.logic.ts:305 and diagnostic.service.ts:343, 823, 1048, 1096",
+    "failureMode": "At :1048 and :1096 the permutation is `attemptId && !isOpen ? getAttemptQuestionPermutation(...) : undefined`. When the client omits attemptId, the function falls through to `answer === question.correctIndex`, comparing a DISPLAY index against an AUTHORED index. It fails open and mis-grades silently.",
+    "permutationStorage": "NOT stored - derived deterministically from (attemptId, questionId, optionCount). That is fine because it is reproducible, but it means the attempt id is the entire authority and it currently arrives from the client.",
+    "classification": "CURRENT_RUNTIME_DEFECT, independent of import readiness",
+    "minimumCorrectChange": [
+      "resolve the attempt server-side from the authenticated user and the assessment, verify ownership, and use that attempt's id",
+      "for an MCQ with more than one option, a missing or invalid permutation becomes an ERROR, not a fallback - return a discriminated cannot-grade rather than a boolean"
+    ],
+    "testPlan": ["correct submission", "incorrect submission", "all 24 permutations of a four-option item", "missing permutation", "invalid permutation", "missing attempt", "attempt ownership mismatch", "duplicate submit"],
+    "testsMustCallRealFunction": "My own Step 2C4 suite asserts perm[displayed] === correctIndex, which is a tautology about the array and never invokes the grader. It must be replaced, not extended.",
+    "implementedInB0": false
+  },
+
+  "EXISTING_SPEAKING_WRITING_REUSE_PLAN_READY": true,
+  "reuse": {
+    "reuseAsIs": [
+      "DiagnosticSpeakingService - confirmRecording, skip, list, audio; ownership-scoped",
+      "DiagnosticSpeakingAudioNormalizer - webm/opus to 16k mono wav",
+      "DiagnosticWritingService - enqueueMany, retry; async",
+      "DiagnosticAttempt - resultState, overallScore null-never-zero, version pinning",
+      "frontend diagnostic/page.tsx and diagnosticSpeakingRecorderLogic.ts",
+      "R2 storage, BullMQ/Redis, the Gemini client and the Azure Speech path"
+    ],
+    "targetedAdjustmentsOnly": "wire the productive services to V2 content and to DiagnosticSkillResult",
+    "noFrontendRedesignInB0": true,
+    "laterUiPhase": "must inspect what is already installed before implementing"
+  },
+
+  "ISOLATED_POSTGRES15_REHEARSAL_PLAN_READY": true,
+  "DATABASE_MIGRATION_RISK_ASSESSED": true,
+  "B1_REHEARSAL_READY": true,
+  "b1Plan": {
+    "target": "a throwaway PostgreSQL 15 container on a third port, created for the rehearsal and destroyed afterwards",
+    "forbiddenTargets": ["kltn_db (5432) - the real development database", "kltn_shadow (5433) - Prisma's shadow database"],
+    "whyShadowIsExcludedToo": "The original destructive incident came from confusing the real and shadow databases, so the shadow is excluded as a test target on principle, not only the real one.",
+    "preflightAssertion": "before any command, print the resolved DATABASE_URL and SHADOW_DATABASE_URL, assert the rehearsal URL matches neither, and assert the target port is the rehearsal port",
+    "steps": [
+      "B1-1 bring up an isolated PG15 and apply the current migration history",
+      "B1-2 seed a V1-shaped FIXTURE (1 assessment, 20 questions, some attempts) - never a dump of kltn_db",
+      "B1-3 apply the additive migration; assert 3 columns and 3 unique indexes added, 0 dropped, 0 type changes, fixture rows byte-unchanged",
+      "B1-4 review the generated SQL for destructive statements; fail on any",
+      "B1-5 run the importer; assert the full post-import assertion set",
+      "B1-6 run the importer AGAIN; assert 0 rows changed and 0 duplicates",
+      "B1-7 force a mid-transaction failure; assert full rollback and that no partially imported assessment is selectable",
+      "B1-8 assert DRAFT is not served: getCurrentAssessment still returns the fixture, and starting an attempt on the DRAFT id is refused",
+      "B1-9 reference integrity: every question resolves passage, rubric and clip",
+      "B1-10 roll the migration back; assert the fixture still loads and serves"
+    ],
+    "acceptance": "B1-3 through B1-10 all pass; B1-6 and B1-7 are the two that actually decide whether a live import may ever be proposed",
+    "createdInB0": false
+  },
+
+  "liveChangeGate": {
+    "allOpen": true,
+    "requirements": [
+      "B0 preflight PASS - this document",
+      "B1 isolated rehearsal PASS - not started",
+      "migration SQL reviewed for destructive statements",
+      "connection target verified by printed URL, not by variable name",
+      "protected checkpoint verified to exist and to restore",
+      "rollback and recovery strategy documented and exercised in B1",
+      "explicit user authorisation for the live phase"
+    ],
+    "preference": "a minimal additive migration and a single transactional import",
+    "neverResetOrRecreate": true
+  },
+
+  "remainingBlockers": {
+    "GAP_1_SCHEMA_IDENTITY": "designed here, not applied",
+    "IMPORTER_IMPLEMENTED": "false - no importer exists at all",
+    "D4_011_LIFECYCLE": "designed, not implemented",
+    "D4_012_VALIDATION": "designed, not implemented",
+    "D4_013_OBJECT_FORM_OPTIONS": "designed, not implemented",
+    "PERMUTATION_FAIL_OPEN": "CURRENT RUNTIME DEFECT, independent of import",
+    "DEF_004_RESULT_BANDS": "OPEN - the blueprint declares levelSystem UNRESOLVED_DO_NOT_IMPLEMENT",
+    "DEF_003_TTS_VOICE": "unconfirmed - blocks Phase E",
+    "LST_CLIP_03_AND_04_VOICE_CASTING": "undecided - blocks Phase E",
+    "IR_017_INSTRUCTION_LANGUAGE": "blocks activation only"
+  },
+
+  "safety": {
+    "DB_MUTATED": false,
+    "DATABASE_RESET": false,
+    "DATABASE_RESTORED": false,
+    "DATABASE_TABLES_DROPPED": 0,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "dbAccessThisPhase": "read-only inspection only. No migration, no seed, no QA row, no cleanup. The one earlier read-only query establishing the V1 options shape is cited as evidence; no new write of any kind.",
+    "rehearsalEnvironmentCreated": false,
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0,
+    "STEP2E_LIVE_PERSISTENCE_ALLOWED": false,
+    "filesCreatedByThisPhase": [
+      "artifacts/entry-diagnostic-phase-b0-preflight.md",
+      "artifacts/entry-diagnostic-phase-b0-contract.json"
+    ],
+    "historicalArtifactsModified": false,
+    "applicationCodeModified": false,
+    "contentModified": false
+  },
+
+  "b0Decision": {
+    "verdict": "B0_ACCEPTED_AS_PLANNING_PHASE",
+    "rationale": "The schema proposal is minimal and additive; the identity design is narrower than previously thought because two tables already carry sufficient constraints; the clip cardinality question resolves without a migration; and the one genuinely new discovery - that attemptId is client-supplied - is a present runtime defect rather than an import blocker.",
+    "correctionsToEarlierPlans": [
+      "sourceKey is needed on three tables, not five - rubrics and clips are already covered, and adding identity fields there would have duplicated an existing reliable identity",
+      "the clip cardinality mismatch is resolvable with zero migration by importing one clip row per Listening question",
+      "attemptId being client-supplied was not previously established; it is the root cause of the permutation fail-open"
+    ]
+  },
+
+  "whatThisPhaseDoesNotEstablish": [
+    "That any migration works. Nothing was applied anywhere, including an isolated database.",
+    "That the importer works. It does not exist.",
+    "That delivery works. The object-form decision is a design; only a contract test against imported rows would prove it.",
+    "That the content is persistable. STEP2E_LIVE_PERSISTENCE_ALLOWED stays false and all six live-change gates are open.",
+    "Any psychometric property of the assessment."
+  ],
+
+  "nextPhase": "PHASE_B1_ISOLATED_IMPLEMENTATION_AND_REHEARSAL on a throwaway PostgreSQL 15, not a live database migration."
+}

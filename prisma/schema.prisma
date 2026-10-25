@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
   /// Disposable database Prisma resets/replays when generating migrations.
   /// It MUST be a different database from DATABASE_URL (separate container
   /// and volume here: kltn-postgres-shadow on port 5433). Pointing this at
@@ -388,7 +388,7 @@ model Subscription {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  events         SubscriptionEvent[]
+  events SubscriptionEvent[]
 
   @@index([userId, status, startsAt, endsAt])
   @@index([planVersionId])
@@ -1560,6 +1560,10 @@ model DiagnosticAssessment {
   createdAt         DateTime                     @default(now())
   updatedAt         DateTime                     @updatedAt
 
+  /// Stable authored identity for the canonical importer. NULL on every
+  /// legacy row; Postgres treats each NULL as distinct, so no collision.
+  sourceKey String? @unique
+
   @@index([status])
 }
 
@@ -1604,6 +1608,10 @@ model DiagnosticQuestion {
   writingResponses  DiagnosticWritingResponse[]
   listeningClips    DiagnosticListeningClip[]
 
+  /// Stable authored identity, unique within its assessment.
+  sourceKey String?
+
+  @@unique([assessmentId, sourceKey])
   @@index([assessmentId, order])
   @@index([assessmentId, skillCode])
   @@index([passageId])
@@ -1695,6 +1703,10 @@ model DiagnosticReadingPassage {
 
   questions DiagnosticQuestion[]
 
+  /// Stable authored identity, unique within its assessment.
+  sourceKey String?
+
+  @@unique([assessmentId, sourceKey])
   @@index([assessmentId, order])
 }
 
@@ -1752,9 +1764,9 @@ model DiagnosticRubric {
   isActive      Boolean         @default(true)
   createdAt     DateTime        @default(now())
 
-  questions          DiagnosticQuestion[]
-  speakingResponses  DiagnosticSpeakingResponse[]
-  writingResponses   DiagnosticWritingResponse[]
+  questions         DiagnosticQuestion[]
+  speakingResponses DiagnosticSpeakingResponse[]
+  writingResponses  DiagnosticWritingResponse[]
 
   @@unique([skill, rubricVersion])
 }
@@ -1788,11 +1800,11 @@ model DiagnosticWritingResponse {
   rubric        DiagnosticRubric? @relation(fields: [rubricId], references: [id], onDelete: SetNull)
   rubricVersion String?
 
-  provider        String?
-  providerVersion String?
-  graderVersion   String?
-  gradingAttempts Int     @default(0)
-  failureReason   String? @db.Text
+  provider           String?
+  providerVersion    String?
+  graderVersion      String?
+  gradingAttempts    Int     @default(0)
+  failureReason      String? @db.Text
   /// Optional audit copy of the provider response. Secondary to scoreMetadata
   /// and never the only structured state.
   rawProviderPayload Json?
@@ -1810,24 +1822,23 @@ model DiagnosticWritingResponse {
 /// so each skill carries its own score, band and completion state rather than
 /// being derived from an opaque JSON blob.
 model DiagnosticSkillResult {
-  id        Int                       @id @default(autoincrement())
-  attemptId Int
-  attempt   DiagnosticAttempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  skill     DiagnosticSkill
-  status    DiagnosticCompletionState @default(NOT_STARTED)
+  id          Int                       @id @default(autoincrement())
+  attemptId   Int
+  attempt     DiagnosticAttempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  skill       DiagnosticSkill
+  status      DiagnosticCompletionState @default(NOT_STARTED)
   /// Null while the skill is not COMPLETE. Never 0 to mean "unknown".
-  score     Float?
+  score       Float?
   /// Internal band key only (Starter/Foundation/Intermediate/Upper). No CEFR
   /// code is stored or derived here.
-  band      String?
+  band        String?
   itemsScored Int?
   itemsTotal  Int?
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime                  @updatedAt
 
   @@unique([attemptId, skill])
   @@index([attemptId, status])
 }
-
 
 model ContentAttempt {
   id             Int          @id @default(autoincrement())
@@ -2215,27 +2226,27 @@ model ToeicQuestion {
 }
 
 model ToeicAttempt {
-  id               Int           @id @default(autoincrement())
-  userId           Int
-  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  examId           Int
-  exam             ToeicExamSet  @relation(fields: [examId], references: [id], onDelete: Cascade)
-  mode             AttemptMode   @default(PRACTICE)
-  status           AttemptStatus @default(PENDING_START)
-  createdAt        DateTime      @default(now())
-  startedAt        DateTime?
-  deadline         DateTime?
-  durationSeconds  Int
-  submittedAt      DateTime?
+  id                Int           @id @default(autoincrement())
+  userId            Int
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId            Int
+  exam              ToeicExamSet  @relation(fields: [examId], references: [id], onDelete: Cascade)
+  mode              AttemptMode   @default(PRACTICE)
+  status            AttemptStatus @default(PENDING_START)
+  createdAt         DateTime      @default(now())
+  startedAt         DateTime?
+  deadline          DateTime?
+  durationSeconds   Int
+  submittedAt       DateTime?
   currentQuestionId Int?
   markedQuestionIds Json          @default("[]")
-  timeRemaining    Int? // In seconds
-  listeningScore   Int?
-  readingScore     Int?
-  totalScore       Int?
-  listeningCorrect Int?
-  readingCorrect   Int?
-  totalCorrect     Int?
+  timeRemaining     Int? // In seconds
+  listeningScore    Int?
+  readingScore      Int?
+  totalScore        Int?
+  listeningCorrect  Int?
+  readingCorrect    Int?
+  totalCorrect      Int?
 
   /// Strict Full Test section state only. Always null for PRACTICE attempts
   /// and for FULL_TEST attempts that predate this field (legacy-compatible —
@@ -2765,19 +2776,19 @@ model IssueReport {
 }
 
 model Suggestion {
-  id              Int              @id @default(autoincrement())
-  userId          Int
-  user            User             @relation("SuggestionSubmitter", fields: [userId], references: [id], onDelete: Cascade)
-  category        SuggestionCategory
-  content         String           @db.Text
-  status          SuggestionStatus @default(PENDING)
-  adminResponse   String?          @db.Text
-  respondedAt     DateTime?
-  respondedById   Int?
-  respondedBy     User?            @relation("SuggestionResponder", fields: [respondedById], references: [id], onDelete: SetNull)
-  attachments     SuggestionAttachment[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id            Int                    @id @default(autoincrement())
+  userId        Int
+  user          User                   @relation("SuggestionSubmitter", fields: [userId], references: [id], onDelete: Cascade)
+  category      SuggestionCategory
+  content       String                 @db.Text
+  status        SuggestionStatus       @default(PENDING)
+  adminResponse String?                @db.Text
+  respondedAt   DateTime?
+  respondedById Int?
+  respondedBy   User?                  @relation("SuggestionResponder", fields: [respondedById], references: [id], onDelete: SetNull)
+  attachments   SuggestionAttachment[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
 
   @@index([userId, createdAt])
   @@index([status, createdAt])

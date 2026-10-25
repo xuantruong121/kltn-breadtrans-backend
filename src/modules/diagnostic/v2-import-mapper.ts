@@ -28,7 +28,6 @@ export const AUTHORING_ONLY_FIELDS = [
   'targetSubskills',
   'targetEvidence',
   'difficultyRange',
-  'draftKey',
   'mediaDraftKey',
   'passageDraftKey',
   'estimatedSeconds',
@@ -46,6 +45,7 @@ export const AUTHORING_ONLY_FIELDS = [
 /** Columns `DiagnosticQuestion` actually has, per prisma/schema.prisma. */
 const QUESTION_COLUMNS = new Set([
   'assessmentId',
+  'sourceKey',
   'skill',
   'question',
   'options',
@@ -103,13 +103,46 @@ export type MappingContext = {
   passageIds?: Readonly<Record<string, number>>;
   /** rubricVersion -> persisted rubric id. */
   rubricIds?: Readonly<Record<string, number>>;
+  /** passage draftKey -> passage body, inlined so READING delivery works. */
+  passageTexts?: Readonly<Record<string, string>>;
+};
+
+/**
+ * The shape `getQuestionMeta` parses out of the `options` Json column.
+ *
+ * B1 correction: the earlier mapper wrote a plain `string[]`, which is what V1
+ * stores and is exactly why V1 has no audio and no passage delivery - the
+ * array branch of `getQuestionMeta` returns only `{values, questionType}`, so
+ * `sanitizeQuestion` has no `section` and therefore emits neither `audioUrl`
+ * nor passage text. Writing the object form reuses delivery code that already
+ * exists rather than changing the runtime.
+ */
+export type QuestionOptionsPayload = {
+  values: string[];
+  questionType: 'MCQ' | 'OPEN_TEXT';
+  /** Drives delivery: sanitizeQuestion keys audio and passage off this. */
+  section: 'LISTENING' | 'READING' | 'SPEAKING' | 'WRITING' | 'LANGUAGE_USE';
+  construct: string;
+  /** Authored identity, also required by validateQuestionBank for OPEN_TEXT. */
+  stableKey: string;
+  /** Reading only: the passage body the learner reads. */
+  passageText?: string;
+  /** Listening only: which authored clip this question belongs to. */
+  audioGroup?: string;
+  /**
+   * Listening only. Null until Phase E generates audio - the contract is
+   * written now, the asset is not invented.
+   */
+  audioUrl?: string | null;
+  activeInForm: boolean;
 };
 
 export type QuestionCreatePayload = {
   assessmentId: number;
+  sourceKey: string;
   skill: string;
   question: string;
-  options: string[];
+  options: QuestionOptionsPayload;
   correctIndex: number;
   explanation: string | null;
   order: number;
@@ -147,6 +180,40 @@ export function assertNoAuthoringFields(
     }
   }
 }
+
+/** The generic heading `sanitizeQuestion` already shows for untitled passages. */
+export const GENERIC_PASSAGE_TITLE = 'Đoạn đọc';
+
+/**
+ * `sanitizeQuestion` reads line 1 of `passageText` as the passage TITLE and
+ * serves only the remaining lines as the body - a V1 convention where passages
+ * were stored as a title line followed by the body. An authored
+ * multi-paragraph passage has no
+ * title line, so without this its opening paragraph is hoisted into a heading
+ * and vanishes from the text the learner reads. Measured in B1: 7 of 10 Reading
+ * items lost 405 characters.
+ *
+ * The title line used is the exact generic label the serializer itself already
+ * falls back to for single-line passages, so no new learner-facing content is
+ * introduced and no runtime change is needed. The authored body is unchanged
+ * and remains complete after the split.
+ */
+export function titledPassage(text: string): string {
+  const body = text.replace(/^\s+/, '');
+  const [firstLine] = body.split('\n');
+  if (firstLine.trim() === GENERIC_PASSAGE_TITLE) return body;
+  return `${GENERIC_PASSAGE_TITLE}\n${body}`;
+}
+
+/** Section drives delivery in sanitizeQuestion; it is not the legacy label. */
+const SECTION_OF: Readonly<Record<string, QuestionOptionsPayload['section']>> =
+  {
+    LISTENING: 'LISTENING',
+    READING: 'READING',
+    SPEAKING: 'SPEAKING',
+    WRITING: 'WRITING',
+    LANGUAGE_USE: 'LANGUAGE_USE',
+  };
 
 const SKILL_CODES: Readonly<Record<string, string>> = {
   LISTENING: 'LISTENING',
@@ -191,11 +258,31 @@ export function mapObjectiveQuestion(
     passageId = resolved;
   }
 
+  const section = SECTION_OF[item.skill];
   const payload: QuestionCreatePayload = {
     assessmentId: ctx.assessmentId,
+    sourceKey: item.draftKey,
     skill: LEGACY_SKILL_LABEL[item.skill] ?? item.skill,
     question: item.prompt,
-    options: [...item.options],
+    options: {
+      values: [...item.options],
+      questionType: 'MCQ',
+      section,
+      construct: item.subskill ?? 'objective',
+      stableKey: item.draftKey,
+      ...(section === 'READING' &&
+      ctx.passageTexts?.[item.passageDraftKey ?? '']
+        ? {
+            passageText: titledPassage(
+              ctx.passageTexts[item.passageDraftKey ?? ''],
+            ),
+          }
+        : {}),
+      ...(section === 'LISTENING'
+        ? { audioGroup: item.mediaDraftKey, audioUrl: null }
+        : {}),
+      activeInForm: true,
+    },
     correctIndex,
     // Result-time only. Verified: sanitizeQuestion does not return it, and the
     // two sites that do are toResult and submitAssessment.
@@ -239,9 +326,17 @@ export function mapProductiveTask(
   }
   const payload: QuestionCreatePayload = {
     assessmentId: ctx.assessmentId,
+    sourceKey: item.draftKey,
     skill: LEGACY_SKILL_LABEL[item.skill] ?? item.skill,
     question: item.prompt,
-    options: [],
+    options: {
+      values: [],
+      questionType: 'OPEN_TEXT',
+      section: SECTION_OF[item.skill],
+      construct: item.subskill ?? 'productive',
+      stableKey: item.draftKey,
+      activeInForm: true,
+    },
     // -1 is the schema's documented sentinel for "no key". taskType is the
     // discriminator; correctIndex must not be used to infer item kind.
     correctIndex: -1,
@@ -338,7 +433,9 @@ export const MAPPING_GAPS = [
       'Without one an import cannot be made idempotent: a re-run has nothing to ' +
       'match on except (assessmentId, order) or the question text, both of which ' +
       'change when content is revised.',
-    blocksLivePersistence: true,
+    blocksLivePersistence: false,
+    resolvedInPhase:
+      'B1 - sourceKey columns plus unique indexes on assessment, question and passage; rubrics and clips were already covered by their existing constraints.',
   },
   {
     id: 'GAP-2',

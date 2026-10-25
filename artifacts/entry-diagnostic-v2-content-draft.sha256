@@ -1,6 +1,6 @@
 # Entry Diagnostic V2 content draft - SHA-256 manifest
 # Binds reviewed content to what a later persistence or TTS step consumes.
-# generated 2026-10-25T12:10:38.326Z
+# generated 2026-10-25T16:15:29.633Z
 
 8ecdf1c5b274d5074ce0cf50e8866141e51652b5e4130e155e94b86a758ef83b  script:LST_CLIP_01
 2a3817edebbf148111a0ee17da81b92fd55feee4a8d19368a900efa65933f3b6  script:LST_CLIP_02
@@ -14,4 +14,4 @@ c2ce00a6b408aee7eaed0a1cae81cdd7b400fb311dc660bce975123164fb0420  prompt:SPK_TAS
 2f4af35b322205eb66cef7aa45ebc644d5414bbfcfa5b78f6b96ff5132395195  prompt:WRT_TASK_01
 116ac95be7531190c33a6e7aa93af64dec27441a138c5cb7d4760fbb1c4706c5  prompt:WRT_TASK_02
 cd041bac126bdbd1459ec3ed69e552c59bd61113d58392d4ba56cb4ae8a113cb  rubrics:json
-310582dece7688577de1ba26c4dade59f0038670c0bbe0bfbfdb949d61655a40  contentDraft:json
+85490d0aa61cd59785dfb585c6c57655333b5b6c0da5edc260d5129e8f499171  contentDraft:json

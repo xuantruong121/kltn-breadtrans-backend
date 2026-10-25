@@ -1,0 +1,195 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_STEP_2D5_FINAL_TARGETED_CONTENT_APPROVAL",
+  "reviewedAt": "2026-10-25",
+  "contentVersionReviewed": 6,
+
+  "STEP2D5_REVIEW_COMPLETE": true,
+  "STEP2D5_VERDICT": "CONTENT_APPROVED",
+  "ENTRY_DIAGNOSTIC_CONTENT_REVIEW_PASS": true,
+  "STEP2E_LIVE_PERSISTENCE_ALLOWED": false,
+  "approvalScope": "AUTHORED CONTENT ONLY. This does not approve database migration, canonical import, runtime integration, audio generation, AI grading, final scoring or activation. Content approval never authorises a database mutation.",
+
+  "independence": {
+    "INDEPENDENCE_MODE": "COLD_CONTEXT_PROXY",
+    "STAGE_A_FINDINGS_FROZEN_BEFORE_RECONCILIATION": true,
+    "disclosure": "The agent writing this artifact made the Step 2C5 stem change under review and authored the content. It is not the reviewer. Stage A was run by an agent started with no session context, barred from all 22 prior review and evidence artifacts, and deliberately not told what the stem had been changed to.",
+    "reviewerSelfDisclosure": "The reviewer reports reading none of the forbidden artifacts and inspecting no git diff or history. The only git command it ran was `git status --porcelain artifacts/`, to confirm it had mutated nothing; that returned filenames and modification status only, no content. Accepted.",
+    "notClaimed": "Human assessment-specialist independence and psychometric validation.",
+    "significance": "This is the first cold pass in the sequence to approve. The four before it each found real defects the author had cleared: a MAJOR dismissed twice, four over-claimed closures, two more over-claims plus eleven unexamined defects, and a MAJOR of a class the author had just fixed next door."
+  },
+
+  "counts": {
+    "CONTENT_BLOCKER_COUNT": 0,
+    "CONTENT_MAJOR_COUNT": 0,
+    "CONTENT_PERSISTENCE_BLOCKING_MINOR_COUNT": 0,
+    "NONBLOCKING_MINOR_COUNT": 3,
+    "NOTE_COUNT": 2
+  },
+
+  "primaryFocus_LST_CLIP_04": {
+    "D4_001_CLOSED": true,
+    "LST_Q_009_AUDIO_REQUIRED": true,
+    "LST_Q_010_AUDIO_REQUIRED": true,
+    "LST_Q_010_STEM_NATURALNESS_PASS": true,
+    "LST_Q_009_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LST_Q_010_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "CLIP_04_CROSS_ITEM_LEAK_COUNT": 0,
+    "reviewerReasoning": {
+      "presupposition": "The new stem asserts no technical failure and no departure from plan. 'how long the presentation ran' is direction-neutral - it does not say shorter, longer, over-running or cut short. The only residual presupposition is that the length was commented on and a reason given, which is intrinsic to the item's own construct and is not an imported fact about a sibling.",
+      "privileging": "Decisive test: LST_Q_010's option set contains no technical, equipment or malfunction content at all. Nothing in it realises LST_Q_009's key proposition. The weaker effect that does exist - the shared frame nudging away from Q009's two positive options toward its two non-positive ones - eliminates no option and singles out no option, leaving a live two-way field. Classified WEAK_CONTEXTUAL_PRIOR, not counted.",
+      "reverseDirection": "HARMLESS_SHARED_CONTEXT. LST_Q_010's key shares no lexical or semantic material with any LST_Q_009 option. If anything the pressure runs the wrong way for a learner: Q009's key plausibly suggests Q010's DISTRACTOR 'The speaker ran out of time', since a projector failure is exactly what eats a slot.",
+      "constructPreserved": "Both remain inference at D4. The script never says 'I ran twelve minutes BECAUSE I cut a section'; the learner must bind an elliptical answer ('Twelve, in the end.') to the next sentence and reject two salient external causes, one of which - the projector failure - is explicitly present as a competing explanation.",
+      "postScript": "Each item has exactly one defensible answer, every distractor independently defeated by the script, both answerRationale values factually accurate, CORRECT at index 1 for Q009 and index 2 for Q010 matching each key."
+    }
+  },
+
+  "listeningRegression": {
+    "LISTENING_AUDIO_REQUIRED_ITEM_COUNT": 10,
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 0,
+    "LISTENING_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_01_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_02_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_03_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_04_CROSS_ITEM_LEAK_COUNT": 0,
+    "classificationRule": "A count increments only for MATERIAL_CROSS_ITEM_LEAK or DIRECT_ANSWER_LEAK. HARMLESS_SHARED_CONTEXT and WEAK_CONTEXTUAL_PRIOR are reported per item but not counted.",
+    "weakPriorsReported": [
+      "CLIP_02: LST_Q_004's necessary 'this week' marks a temporary arrangement, weakly discounting the Online option - which the author anticipates in that option's own rationale, and which leaves a 1-in-3 guess, not an answer.",
+      "CLIP_03: LST_Q_007's 'To request one more thing for the form' is semantically aligned with LST_Q_006's key 'One page came through blank' (both encode a partial deficiency). Not counted: it is an option among four, Q007's other three posit wholly different scenarios, and Q006's 'submitted after the deadline' survives as a bounded plausible alternative."
+    ],
+    "designPraise": "Several distractors are built to catch the answer world knowledge supplies, with the audio explicitly closing them off - 'your ID card alone won't start the machines' against LST_Q_005[3], 'our online booking system is down' against LST_Q_004[0]. The right instinct for a placement instrument where guessing-from-plausibility is the main threat to validity."
+  },
+
+  "packageIntegrity": {
+    "TOTAL_ITEMS": 29,
+    "OBJECTIVE_ITEMS": 25,
+    "OBJECTIVE_KEYS_VALID": true,
+    "objectiveDefects": "0 on 25/25",
+    "ACTUAL_CONTENT_VERSION": 6,
+    "versionAgreement": "blueprintVersion V2_2026_01 identical across all three files; scoringVersion FOUR_SKILL_PLACEMENT_V2 identical in content and blueprint.",
+    "draftKeys": "37 unique, 0 duplicates (1 assessment + 4 clips + 3 passages + 25 objective + 4 productive)",
+    "unresolvedReferences": 0,
+    "orderValues": "clean 1-29, no duplication or gap",
+    "BLUEPRINT_CONFORMANCE_PASS": true,
+    "tierDistribution": "objectiveItemsByDifficultyTier {D1:5, D2:9, D3:7, D4:4} matches the reviewer's independent count of the 25 items exactly",
+    "rubricLinkage": "resolves in both directions; both rubrics structurally complete with 4 criteria, 5 anchors each at distinct scores 0-4, and aiGradingRequirements.requiredFields matching their own criterionKey lists",
+    "blueprintScoringHandChecked": "The reviewer hand-checked blueprint.scoring, which the validator does not cover (D4-010), and found it self-consistent: overallWeights sum to 1.00 with LanguageUse 0; perSkillFormulas denominators /10 /10 /5 match actual item counts; 'mean across the 2 graded tasks' matches 2 Speaking and 2 Writing and both rubrics' normalisationIntent.",
+    "cefr": "0 CEFR strings in the content draft, 0 in rubrics. 15 in the blueprint, every one inside a previousDraftDifficultyNote provenance field that states the code is deliberately not persisted as an item level, plus one explicit notCefr disclaimer. itemLevelStatus correctly DESIGN_HYPOTHESIS_NOT_CALIBRATED.",
+    "collateralChangeCheck": {
+      "result": "PASS - no evidence of an edit that went further than one stem",
+      "evidence": "All three passage wordCount declarations match recomputed counts exactly (97/97, 151/151, 159/159). Every key still matches its own answerRationale and CORRECT index; every answerRationale still matches its stem's question type; every stem still matches its declared subskill. The two LST_CLIP_04 rationales are coherent with the NEW stem, with no trace of the removed 'shorter than planned' framing - which is precisely the inconsistency an incomplete edit would have left. Option-position distribution unperturbed at A5 B7 C7 D6 with no run of three."
+    },
+    "HASH_MISMATCH_COUNT": 0,
+    "VALIDATOR_CHECK_MODE_READ_ONLY_PASS": true,
+    "CONTENT_TARGET_STABLE_DURING_REVIEW": true,
+    "CONTENT_FILES_MUTATED": false,
+    "stabilityEvidence": "All four artifacts hashed at the start and end of the review, byte-identical, and re-verified independently by the author after the report landed."
+  },
+
+  "findings": [
+    {
+      "id": "D5-001",
+      "severity": "MINOR",
+      "title": "internalLabel fields are answer-bearing and must never reach a learner",
+      "affected": ["LST_CLIP_01", "LST_CLIP_03", "LST_CLIP_04", "RDG_PASSAGE_01", "RDG_PASSAGE_02"],
+      "verifiedByAuthor": true,
+      "evidence": [
+        "LST_CLIP_04.internalLabel = 'Presentation that did not go to plan'  vs  LST_Q_009 key = 'A technical problem spoiled their plan'",
+        "LST_CLIP_01.internalLabel = 'Two students deciding to work together'  vs  LST_Q_001 key = 'Working on their project together'",
+        "RDG_PASSAGE_02.internalLabel = 'Why rereading notes feels better than it works'  vs  RDG_Q_004 key = 'Rereading feels effective but recalling from memory works better'",
+        "LST_CLIP_03.internalLabel = 'Housing office voicemail about a missing signature' privileges both LST_Q_006 and LST_Q_007"
+      ],
+      "whyItMatters": "The exact proposition D4-001 was raised to remove from LST_Q_010's stem still exists, near-verbatim, in LST_CLIP_04's own metadata. The field is correctly named internalLabel and nothing in the package suggests it is learner-facing, so the content as authored is not defective - hence MINOR. But if any import or delivery step ever mapped internalLabel to a title, caption, heading, alt text, filename or audio-player label, D4-001 would reopen as a DIRECT_ANSWER_LEAK on three of four Listening clips and one Reading passage at once, in a field no content review would be looking at.",
+      "authorAddendum": "Partially mitigated already, which the reviewer could not have weighed because it lies outside the content package it was given. `internalLabel` is on AUTHORING_ONLY_FIELDS in src/modules/diagnostic/v2-import-mapper.ts (line 27) and in the persistence contract's exclusion list, and assertNoAuthoringFields throws on it - covered by 37 passing mapper tests. So the mapper cannot carry it through. What is still missing is exactly what the reviewer asks for: an executable test proving no internalLabel string appears in any learner-facing response payload. The mapper guard protects the import path; it does not protect a future delivery path that reads the artifact directly.",
+      "acceptanceCriteria": [
+        "the persistence contract states explicitly that internalLabel is authoring metadata, never persisted to nor derived into any learner-visible column or API field",
+        "sanitizeQuestion's allowlist is asserted not to expose it",
+        "an executable test proves no internalLabel string appears in any learner-facing response payload"
+      ],
+      "blocksContentApproval": false,
+      "blocksPersistence": false
+    },
+    {
+      "id": "D5-002",
+      "severity": "MINOR",
+      "title": "LST_CLIP_02 mixes British 'ground-floor' with American 'second-floor' in en-US audio",
+      "carriedFrom": "D4-007, re-severitised from NOTE",
+      "verifiedByAuthor": true,
+      "evidence": "The script contains both 'The second-floor power supply is being rewired' and 'The ground-floor group study rooms and the language lab are open as usual'. A building with a ground floor and a second floor and no first floor is a BrE/AmE hybrid; American English would say first floor. The clip declares localeIntent en-US and accentIntent general American.",
+      "whyItMatters": "Zero construct impact - no item depends on the ground-floor clause and LST_Q_003's key is unaffected - which is why it is not MAJOR. Raised from NOTE on cost asymmetry alone: a two-word script edit today versus a TTS regeneration plus a manifest-hash change after audio is cut. The validator cannot catch it: it reports KNOWN_BRITISH_FORM_COUNT=0 and its own output carries the caveat that the list is fixed and absence proves only that those forms are absent.",
+      "acceptanceCriteria": [
+        "either 'ground-floor' becomes 'first-floor' with LST_CLIP_02's script hash regenerated once and no other field touched, or the hybrid is accepted in writing with a stated rationale",
+        "decided BEFORE TTS generation either way"
+      ],
+      "blocksContentApproval": false,
+      "blocksTts": "should be decided before, not blocking in itself"
+    },
+    {
+      "id": "D5-003",
+      "severity": "MINOR",
+      "title": "British-spelled rubric identifiers in an en-US package",
+      "affected": ["WRT_RUBRIC_V3.criteria[1].criterionKey", "WRT_RUBRIC_V3.aiGradingRequirements.requiredFields[1]", "SPK_RUBRIC_V3.criteria[0].criterionKey", "rubrics.scoringImplementationNote"],
+      "evidence": "criterionKey 'organisation' and 'task_fulfilment' are British spellings in machine-readable identifiers (US: organization, fulfillment); 'normalisation' appears in prose. The same forms also sit in five internal metadata fields of the content draft.",
+      "whyItMatters": "No learner-facing field is affected - the reviewer swept every prompt, instructions, script, text and options value and found all learner-facing English correctly American, so the en-US commitment to learners holds. The defect is forward-looking: 'organisation' is an identifier the AI-grading structured output, the validator and scoreMetadata must all match character-for-character. Renaming after grading contracts and stored metadata depend on it is breaking; renaming now costs nothing.",
+      "authorNote": "This is the same issue recorded as D3-007 in Step 2C4, where the decision taken was to KEEP the British identifiers precisely because they are the field names the AI grader must emit, with the condition that any rename must happen before the first rubric row is persisted (DiagnosticRubric.criteria is a Json snapshot column). The reviewer reached the same fork independently. The decision stands; it is recorded here again so it is not silently re-litigated.",
+      "acceptanceCriteria": [
+        "either the criterion keys are normalised to US spelling with every cross-reference updated in the same change, or the BrE identifier spelling is accepted in writing as the frozen contract",
+        "decided before the grading contract is implemented"
+      ],
+      "blocksContentApproval": false
+    },
+    {
+      "id": "D5-004",
+      "severity": "NOTE",
+      "title": "LST_Q_010 says 'the speaker' where LST_Q_009 says 'the second speaker'",
+      "detail": "In a declared two-speaker dialogue both denote the same person (B, who presented and gave the reason), but the inconsistent referring expression invites a learner to wonder whether a different participant is meant. Answerability is unaffected - only B presents and only B gives a reason - which is why the naturalness flag still passes. Not worth a stem edit on its own: any edit to a closed-defect stem carries more risk than the ambiguity does."
+    },
+    {
+      "id": "D5-005",
+      "severity": "NOTE",
+      "title": "LST_Q_006 and LST_Q_007 draw on the same script clause",
+      "detail": "Both key off 'we need your current landlord's signature as well, and that page came through blank' - Q006 for the detail, Q007 for the purpose. Local dependency, not a leak, and substantially mitigated: Q007 requires integrating the 'everything you filled in is fine' framing and the Friday cut-off, so it is not a restatement. Recorded for the eventual calibration backlog, where item intercorrelation would show up empirically. Not actionable on authored content."
+    }
+  ],
+
+  "reviewerDisagreements": {
+    "againstTheAuthor": [
+      "The Step 2C5 CLIP_04_reasoning says a learner has 'no basis to prefer' Q009's key over the other options. The reviewer judges that slightly too strong: the shared frame does shift probability away from Q009's two positive options toward its two non-positive ones. 'No material basis' is the accurate claim, and that is what was certified. Right conclusion, overstated reasoning.",
+      "The Step 2C5 record includes assertedGuards: 'The new stem is asserted free of the tokens plan, shorter, short, problem and technical.' The token claim is true, but token-absence is not leak-absence, and a lexical guard reported inside a leak-closure record is the same shape of over-claim earlier passes were faulted for. The closure survives because the independent SEMANTIC check also passes; the token list is not what closes it."
+    ],
+    "inTheAuthorsFavour": [
+      "Step 2D4's D4-002 ('LST_Q_006 distractors B and C are categorical absolutes, leaving the key as the only bounded option') is judged overstated. Option [0] 'It was submitted after the deadline' is bounded, specific and highly plausible for an administrative call, so the key is NOT the only bounded option and the format cue leaves a two-way field. The underlying observation is real but rates NOTE, not MINOR.",
+      "Step 2D4's count of 37 unique draft keys over the earlier artifact's 36 is upheld; the reviewer's own enumeration is 37."
+    ],
+    "upheldIndependently": ["D4-007 (confirmed and raised to MINOR as D5-002)", "CLIP_01/02/03 leak counts of 0", "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT=0", "TOTAL_ITEMS=29", "OBJECTIVE_ITEMS=25", "objective keys 25/25", "HASH_MISMATCH_COUNT=0"],
+    "authorAcceptsBoth": "Both criticisms are accepted without qualification. The 'no basis' phrasing was mine and it was too strong. The assertedGuards line is the recurring failure mode of this project appearing inside the fix for it, and the reviewer is right that the semantic check is what closes D4-001, not the token list."
+  },
+
+  "outOfScopeButWorthKnowing": {
+    "levelSystem": "blueprint.levelSystem.status is UNRESOLVED_DO_NOT_IMPLEMENT with DEF_004_RESULT_BAND_MODEL_MISMATCH OPEN and DEF_004_BLOCKS_V2_SCORER_IMPLEMENTATION true. The reviewer explicitly did not fail the content for it, but notes the blueprint itself declares the level system unimplementable, so content approval must not be read as clearing a path to scoring.",
+    "originality": "contentOriginalityDeclaration is appropriately scoped - scopeOfClaim WORDING_ONLY, with task structures and the 15s/45s timing explicitly not claimed as novel. Having read all four scripts, three passages, four prompts and 25 option sets, the reviewer found nothing that read as lifted, and judged the material pitched correctly for 16-24 year olds with no specialist knowledge and no culturally narrow content.",
+    "notEvaluated": "The reviewer did not evaluate the Part B architecture audit, the persistence designs, or any Gate B / runtime / guard-scope finding. All out of scope here, and it accessed no database."
+  },
+
+  "safety": {
+    "CONTENT_FILES_MUTATED": false,
+    "DB_MUTATED": false,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0,
+    "filesCreatedByThisPass": ["artifacts/entry-diagnostic-v2-step2d5-review.json", "artifacts/entry-diagnostic-v2-step2d5-review.md"],
+    "noHistoricalArtifactModified": true
+  },
+
+  "whatThisApprovalDoesNotMean": [
+    "It does not authorise a database write. STEP2E_LIVE_PERSISTENCE_ALLOWED stays false: GAP-1 is unresolved, no importer exists, and D4-011 means a careless import would take the diagnostic down for every learner.",
+    "It does not mean the runtime can deliver this content. D4-012 and D4-013 are designs, not implementations.",
+    "It does not establish any psychometric property. D1-D4 remains uncalibrated, equal weighting is a declared design hypothesis, and neither rubric has been trialled against a real response.",
+    "It does not clear a path to scoring. The blueprint declares its own level system UNRESOLVED_DO_NOT_IMPLEMENT.",
+    "It is a cold-context proxy for independence, not human assessment-specialist validation."
+  ],
+
+  "nextStep": "Phase B - persistence foundation. It is the only phase that writes to the database and must be separately authorised. D5-002 should be decided before Phase E (TTS), and D5-003 before the grading contract is implemented."
+}
