@@ -127,10 +127,20 @@ Backend diagnostic 418/418; FE `test:ci` 638/638; FE and backend tsc clean; lint
 files. Browser E2E on the disposable harness (clone DB, Redis 6392, fake S3, mock grader): main 44/44,
 skip/resume 14/14. Cross-account: another learner cannot read the result or retry its grading.
 
-## H. Remaining Entry Diagnostic work
+## H. Demo status: DEMO_READY
 
-1. Restart the backend (`npm run dev:backend`) so it reads `DIAGNOSTIC_GRADER_MODE=real`.
-2. Owner's own full run of the assessment (real voice, real grading) — the evidence a synthetic voice
-   cannot give.
-3. Known, not fixed: a long-session client-side jump from the result page into a practice room could stay
-   on its loading screen; advice links use full navigation instead. Root cause unknown.
+Verified after the owner restarted `npm run dev:backend` (17:58, after the .env change at 17:47): one
+consumer per queue on Redis 6379, no standalone worker (legacy mode). Advice links re-checked: the two
+exam-internal Writing quizzes were replaced; all 18 cited routes open for a FREE learner.
+
+Honest limitations:
+- Real grading was smoke-tested with a synthetic voice and a synthetic text; accuracy on a real
+  learner's speech is shown only by a human run.
+- Writing feedback is generic in places (does not quote the learner's sentence).
+- A long-session client-side jump from the result page could stay on the loading screen; advice links
+  use full navigation. Root cause unknown.
+
+Owner trial (one run, real voice): log in as a test learner, open /diagnostic, do all 29 tasks
+(Listening clips should play), record both Speaking tasks, write both Writing tasks, submit, wait for
+grading (about a minute), then check: no "bộ chấm thử nghiệm" notice (that would mean mock grading),
+four skill scores and the overall, per-criterion feedback, priorities with links, reload keeps the result.
