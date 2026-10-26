@@ -64,6 +64,13 @@ const SPEAKING_FINALIZATION_POLL_MS = 250;
  */
 export const FOUR_SKILL_PROFILE_LEVEL = 'FOUR_SKILL_PROFILE';
 
+/** Label lines that precede a passage but are not its title. */
+const GENERIC_PASSAGE_LABELS = new Set([
+  'đoạn đọc',
+  'passage',
+  'reading passage',
+]);
+
 @Injectable()
 export class DiagnosticService {
   constructor(
@@ -134,12 +141,16 @@ export class DiagnosticService {
     const taskKind = classifyDiagnosticTask(question);
     const productive = taskKind === 'SPEAKING' || taskKind === 'WRITING';
     const passageLines = meta.passageText ? meta.passageText.split('\n') : [];
+    // The imported V2 passages start with the generic label line
+    // "Đoạn đọc". It is not a title: the page already labels the passage,
+    // so showing it again only repeated the label. Authored titles stay.
+    const firstLine = passageLines[0]?.trim() ?? '';
     const passageTitle =
-      meta.section === 'READING' && passageLines.length > 1
-        ? passageLines[0].trim()
-        : meta.section === 'READING' && meta.passageText
-          ? 'Đoạn đọc'
-          : null;
+      meta.section === 'READING' &&
+      passageLines.length > 1 &&
+      !GENERIC_PASSAGE_LABELS.has(firstLine.toLowerCase())
+        ? firstLine
+        : null;
     const passageBody =
       meta.section === 'READING' && passageLines.length > 1
         ? passageLines.slice(1).join('\n').trim()
@@ -774,6 +785,25 @@ export class DiagnosticService {
       orderBy: { submittedAt: 'desc' },
     });
     return attempt ? this.toResult(attempt, formQuestions) : null;
+  }
+
+  /**
+   * Leave an unfinished attempt so the next start creates a fresh one. Only
+   * the owner's IN_PROGRESS attempt changes; nothing is deleted, and speaking
+   * jobs still queued for it stop at their IN_PROGRESS check.
+   */
+  async abandonAttempt(
+    userId: number,
+    assessmentId: number,
+    attemptId: number,
+  ) {
+    const result = await this.prisma.diagnosticAttempt.updateMany({
+      where: { id: attemptId, userId, assessmentId, status: 'IN_PROGRESS' },
+      data: { status: 'ABANDONED', level: 'ABANDONED' },
+    });
+    if (result.count !== 1)
+      throw new NotFoundException('Không có lượt làm bài đang dở để làm lại.');
+    return { attemptId, status: 'ABANDONED' };
   }
 
   async startAttempt(userId: number, assessmentId: number) {

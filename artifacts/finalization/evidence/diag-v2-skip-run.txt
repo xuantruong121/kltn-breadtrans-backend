@@ -1,8 +1,10 @@
 
 == Entry Diagnostic V2 id 5: skip / incomplete / resume (browser)
-PASS  resume keeps the answers given before pausing  (A
+PASS  resume keeps the answers given before pausing  (B
 Working on their project together)
-PASS  skipping a Writing task says it will not be graded
+PASS  Speaking skip at 21 moves straight to 22
+PASS  Speaking skip at 22 moves straight to 23
+PASS  Writing skip at 24 moves straight to 25
 PASS  the pre-submit confirmation names the skipped tasks and the consequence  (Nộp bài khi còn phần bỏ qua? Bạn đã bỏ qua 2 bài Nói và 1 bài Viết. Phần bỏ qua không được chấm và không bị tính là 0 điểm, nhưng kỹ năng đó sẽ không có điểm và)
 PASS  Listening and Reading are scored  (L 100, R 100)
 PASS  Speaking: both tasks skipped, no score, not 0  ({"skill":"SPEAKING","state":"NOT_STARTED","score":null,"weight":0.25,"itemsScored":0,"itemsTotal":2,"tasksGraded":0,"tasksPending":0,"tasksFailed":0,"tasksSkipped":2})

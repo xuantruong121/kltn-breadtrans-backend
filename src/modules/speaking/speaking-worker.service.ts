@@ -8,13 +8,26 @@ import { MockSpeakingEvaluator } from './mock-speaking-evaluator';
 import { UploadService } from '../upload/upload.service';
 import { validateSpeakingAudio } from './speaking-audio-validator';
 import {
+  assessPracticeSpeech,
+  mockPracticeSpeech,
+} from './speaking-assessment-mode';
+import {
   isMissingStorageError,
   SPEAKING_FAILED_EVENT,
   SPEAKING_COMPLETED_EVENT,
   getSpeakingPipelineMode,
+  getLeaseTimeoutMs,
+  getSpeakingWorkerConfig,
 } from './speaking.constants';
 import { SpeakingQueueService } from './speaking-queue.service';
 import { SpeakingEventPublisherService } from './speaking-event-publisher.service';
+import { SpeakingPostProcessingService } from './speaking-post-processing.service';
+
+const POST_PROCESSING_MAX_ATTEMPTS = 4;
+/** A legacy feedback/reward failure is retried for this long, then FAILED. */
+const POST_PROCESSING_RETRY_WINDOW_MS = 2 * 60_000;
+/** Minimum gap between two legacy feedback/reward attempts on one row. */
+const POST_PROCESSING_RETRY_BACKOFF_MS = 30_000;
 
 /**
  * The legacy poller mocks only when MOCK_AZURE_SPEECH=true is set explicitly
@@ -57,6 +70,8 @@ export class SpeakingWorkerService implements OnModuleInit {
     @Optional() private readonly queueService?: SpeakingQueueService,
     @Optional()
     private readonly eventPublisher?: SpeakingEventPublisherService,
+    @Optional()
+    private readonly postProcessing?: SpeakingPostProcessingService,
   ) {}
 
   /**
@@ -76,6 +91,7 @@ export class SpeakingWorkerService implements OnModuleInit {
     try {
       await this.recoverStuckLeases();
       await this.processNextBatch();
+      await this.sweepPostProcessing();
     } catch (err: any) {
       this.logger.error(
         `Error in SpeakingWorker polling loop: ${err.message}`,
@@ -83,6 +99,74 @@ export class SpeakingWorkerService implements OnModuleInit {
       );
     } finally {
       this.isProcessing = false;
+    }
+  }
+
+  /**
+   * Legacy-mode consumer for feedback and reward. Claims are atomic in
+   * SpeakingPostProcessingService (status + lease + worker token), and the
+   * reward is idempotent per submission, so a restart or an overlapping tick
+   * cannot grant twice. A failure leaves the row PENDING for the next tick;
+   * after POST_PROCESSING_RETRY_WINDOW_MS the attempt is terminal (FAILED).
+   */
+  private async sweepPostProcessing(): Promise<void> {
+    if (!this.postProcessing) return;
+    const lease = new Date(
+      Date.now() - getLeaseTimeoutMs(getSpeakingWorkerConfig().jobTimeoutMs),
+    );
+    // A row that failed less than RETRY_BACKOFF_MS ago waits, so a failing
+    // provider is not called on every 3 s tick.
+    const backoff = new Date(Date.now() - POST_PROCESSING_RETRY_BACKOFF_MS);
+    const due = (field: 'rewardStatus' | 'feedbackStatus') => {
+      const startedAt =
+        field === 'rewardStatus' ? 'rewardStartedAt' : 'feedbackStartedAt';
+      return this.prisma.speakingSubmission.findMany({
+        where: {
+          status: 'COMPLETED',
+          OR: [
+            { [field]: 'PENDING', [startedAt]: null },
+            { [field]: 'PENDING', [startedAt]: { lte: backoff } },
+            { [field]: 'PROCESSING', [startedAt]: { lte: lease } },
+          ],
+        },
+        select: { id: true, processedAt: true },
+        orderBy: { id: 'asc' },
+        take: 5,
+      });
+    };
+    const attemptFor = (processedAt: Date | null) =>
+      processedAt &&
+      Date.now() - processedAt.getTime() > POST_PROCESSING_RETRY_WINDOW_MS
+        ? POST_PROCESSING_MAX_ATTEMPTS
+        : 1;
+    // Rewards first: they are fast and do not depend on an AI provider.
+    for (const row of await due('rewardStatus')) {
+      try {
+        await this.postProcessing.processReward(
+          row.id,
+          `legacy-reward-${row.id}`,
+          attemptFor(row.processedAt),
+          POST_PROCESSING_MAX_ATTEMPTS,
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `Reward for #${row.id} will be retried: ${err.message}`,
+        );
+      }
+    }
+    for (const row of await due('feedbackStatus')) {
+      try {
+        await this.postProcessing.processFeedback(
+          row.id,
+          `legacy-feedback-${row.id}`,
+          attemptFor(row.processedAt),
+          POST_PROCESSING_MAX_ATTEMPTS,
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `Feedback for #${row.id} will be retried: ${err.message}`,
+        );
+      }
     }
   }
 
@@ -314,12 +398,10 @@ export class SpeakingWorkerService implements OnModuleInit {
     let assessmentResult: any;
     try {
       assessmentResult = legacyMockEnabled()
-        ? await MockSpeakingEvaluator.evaluate(
-            submission.exercise.targetText,
-            audioBuffer,
-          )
-        : await this.aiService.assessPronunciation(
-            submission.exercise.targetText,
+        ? await mockPracticeSpeech(submission.exercise, audioBuffer)
+        : await assessPracticeSpeech(
+            this.aiService,
+            submission.exercise,
             audioBuffer,
           );
     } catch (providerErr: any) {
@@ -394,15 +476,20 @@ export class SpeakingWorkerService implements OnModuleInit {
               : 'NOT_REQUESTED',
         },
       });
-      try {
-        await this.queueService.enqueueFeedback(submissionId, traceId);
-        if (!isSilent && overallScore !== null && overallScore > 0) {
-          await this.queueService.enqueueReward(submissionId, traceId);
+      // This poller runs only in legacy mode, where the standalone worker
+      // that consumes BullMQ jobs refuses to start: enqueued jobs would never
+      // run (no feedback, no XP). The PENDING rows are picked up by
+      // sweepPostProcessing on the next tick instead.
+      if (!this.postProcessing) {
+        try {
+          await this.queueService.enqueueFeedback(submissionId, traceId);
+          if (!isSilent && overallScore !== null && overallScore > 0)
+            await this.queueService.enqueueReward(submissionId, traceId);
+        } catch (queueErr: any) {
+          this.logger.error(
+            `Failed to enqueue speaking post-processing #${submissionId}: ${queueErr.message}`,
+          );
         }
-      } catch (queueErr: any) {
-        this.logger.error(
-          `Failed to enqueue speaking post-processing #${submissionId}: ${queueErr.message}`,
-        );
       }
       return;
     }

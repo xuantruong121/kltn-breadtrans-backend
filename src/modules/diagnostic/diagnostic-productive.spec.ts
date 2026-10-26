@@ -57,6 +57,22 @@ describe('speaking duration policy', () => {
       ).toThrow(/SPEAKING_TASK_MISCONFIGURED/);
   });
 
+  it('owner bug (attempt 58, q86): a stopwatch longer than the audio is refused; the recording length is accepted', () => {
+    // The page used to report wall time from start() to onstop. With a real
+    // microphone the first samples arrive late, so the stopwatch ran ~1.8 s
+    // past the decoded audio and the confirm answered 400. The page now
+    // reports the decoded length of the Blob itself.
+    const p = speakingDurationPolicy({ id: 86, responseSeconds: 45 });
+    const decoded = 12_000;
+    expect(checkRecordingDuration(p, decoded, decoded + 1_800)).toMatchObject({
+      ok: false,
+      code: 'CLIENT_DURATION_MISMATCH',
+    });
+    expect(checkRecordingDuration(p, decoded, decoded + 30).ok).toBe(true);
+    // No client figure: the server's own measurement decides.
+    expect(checkRecordingDuration(p, decoded).ok).toBe(true);
+  });
+
   it('judges the measured duration and cross-checks the client one', () => {
     const p = speakingDurationPolicy({ id: 1, responseSeconds: 45 });
     expect(checkRecordingDuration(p, 45_000, 45_000).ok).toBe(true);

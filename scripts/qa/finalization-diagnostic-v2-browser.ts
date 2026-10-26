@@ -66,6 +66,7 @@ const words = (n: number) =>
 
 type Item = {
   id: number;
+  prompt: string;
   section: string;
   taskType: string;
   options: string[];
@@ -109,6 +110,7 @@ async function main() {
         norm(q),
         {
           id: Number(id),
+          prompt: q,
           section: raw?.section ?? '?',
           taskType: t,
           options: optionsOf(raw),
@@ -141,8 +143,28 @@ async function main() {
       !/52 nhiệm vụ|48 trắc nghiệm/.test(intro),
     `(${intro.match(/\d+ nhiệm vụ[^)]*\)/)?.[0]})`,
   );
+  // Client-reported vs server-decoded recording length (the owner's 400).
+  await page.evaluate(() => {
+    const w = window as unknown as { __durations?: number[] };
+    w.__durations = [];
+    const original = FormData.prototype.append;
+    FormData.prototype.append = function (this: FormData, name: string, value: string | Blob, ...rest: [string?]) {
+      if (name === 'durationMs') w.__durations!.push(Number(value));
+      return (original as (...args: unknown[]) => void).call(this, name, value, ...rest);
+    } as typeof FormData.prototype.append;
+  });
+  const reportedDurations = () =>
+    page.evaluate(() => (window as unknown as { __durations?: number[] }).__durations ?? []);
   await page.getByRole('button', { name: /Bắt đầu làm bài/ }).click();
   await page.waitForTimeout(3000);
+  const sidebar = (await page.locator('aside[aria-label="Danh sách câu hỏi"]').innerText()).replace(/\s+/g, ' ');
+  const order = ['Nghe · câu 1–10', 'Đọc · câu 11–20', 'Nói · câu 21–22', 'Viết · câu 23–24', 'Ngữ pháp & Từ vựng · câu 25–29'];
+  const positions = order.map((label) => sidebar.indexOf(label));
+  check(
+    'desktop sidebar lists the sections in the assessment order',
+    positions.every((pos, i) => pos >= 0 && (i === 0 || pos > positions[i - 1])),
+    `(${positions.join(',')})`,
+  );
 
   const correct: Record<string, number> = {};
   let speakingSeen = 0;
@@ -166,52 +188,55 @@ async function main() {
       speakingSeen += 1;
       const text = (await body()).replace(/\s+/g, ' ');
       check(
-        `speaking ${speakingSeen}: the stated limits are the task's own (prep ${item.prep}s, ${item.response}s)`,
-        text.includes(
-          item.prep
-            ? `Chuẩn bị ${item.prep} giây, sau đó nói tối đa ${item.response} giây`
-            : `Thời lượng tối đa ${item.response} giây`,
-        ),
+        `speaking ${speakingSeen}: no preparation step, no confirm button`,
+        !/Bắt đầu chuẩn bị|Ghi âm ngay|Xác nhận & tiếp tục/.test(text) &&
+          (await page.getByRole('button', { name: /^Ghi âm$/ }).isVisible()),
       );
+      const record = async (holdMs: number | null) => {
+        await page.getByRole('button', { name: /^(Ghi âm|Ghi lại)$/ }).click();
+        await page.getByText(/Đang ghi âm/).waitFor({ timeout: 15_000 });
+        if (holdMs !== null) {
+          await page.waitForTimeout(holdMs);
+          await page.getByRole('button', { name: /Dừng ghi âm/ }).click();
+        }
+        await page
+          .getByText(/Đã nhận bản ghi/)
+          .waitFor({ timeout: ((item.response ?? 90) + 30) * 1000 });
+      };
       if (speakingSeen === 1) {
-        // Preparation countdown, then recording starts by itself.
-        await page.getByRole('button', { name: /Bắt đầu chuẩn bị/ }).click();
+        await record(3000);
+        check('speaking 1: stopping uploads and confirms by itself', true);
         check(
-          'speaking 1: the preparation countdown is shown',
-          await page.getByText(/Thời gian chuẩn bị còn \d+s/).isVisible(),
+          'speaking 1: the page stays on the task (no auto-advance)',
+          (await page.locator('h2').allInnerTexts()).map(norm).includes(norm(item.prompt)),
         );
-        await page
-          .getByText(/Đang ghi âm/)
-          .waitFor({ timeout: ((item.prep ?? 0) + 10) * 1000 });
-        check('speaking 1: recording started when preparation ended', true);
-        await page.waitForTimeout(3000);
-        await page.getByRole('button', { name: /Dừng ghi âm/ }).click();
-        await page.getByLabel('Nghe lại bài nói').waitFor({ timeout: 10_000 });
+        const firstRow = harnessQuery(
+          `select r.id, r."audioKey" from "DiagnosticSpeakingResponse" r join "DiagnosticAttempt" a on a.id = r."attemptId" join "User" u on u.id = a."userId" where u.email = '${account.email}' and r."questionId" = ${item.id}`,
+        );
+        await record(2000);
+        const secondRow = harnessQuery(
+          `select r.id, r."audioKey" from "DiagnosticSpeakingResponse" r join "DiagnosticAttempt" a on a.id = r."attemptId" join "User" u on u.id = a."userId" where u.email = '${account.email}' and r."questionId" = ${item.id}`,
+        );
+        const [row] = harnessQuery(
+          `select r."durationMs" from "DiagnosticSpeakingResponse" r join "DiagnosticAttempt" a on a.id = r."attemptId" join "User" u on u.id = a."userId" where u.email = '${account.email}' and r."questionId" = ${item.id}`,
+        );
+        const client = (await reportedDurations()).at(-1);
         check(
-          'speaking 1: the take can be played back before confirming',
-          true,
+          'speaking 1: the length the page reports is the recording itself (within 50 ms of the server-decoded length)',
+          client !== undefined && Math.abs(client - Number(row?.[0])) <= 50,
+          `(client ${client} ms, server ${row?.[0]} ms)`,
         );
-        // Re-record, then confirm the second take.
-        await page.getByRole('button', { name: /Ghi âm lại/ }).click();
-        await page.getByRole('button', { name: /Ghi âm ngay/ }).click();
-        await page.waitForTimeout(4000);
-        await page.getByRole('button', { name: /Dừng ghi âm/ }).click();
+        check(
+          'speaking 1: "Ghi lại" replaces the take (one row, new audio)',
+          firstRow.length === 1 && secondRow.length === 1 && firstRow[0][1] !== secondRow[0][1],
+          `(${firstRow.length}/${secondRow.length})`,
+        );
       } else {
-        // Recording stops itself at the task's responseSeconds.
-        await page
-          .getByRole('button', { name: /Ghi âm ngay|Bắt đầu ghi âm/ })
-          .click();
-        await page
-          .getByLabel('Nghe lại bài nói')
-          .waitFor({ timeout: ((item.response ?? 90) + 15) * 1000 });
-        check(
-          `speaking 2: recording stopped by itself at ${item.response}s`,
-          !(await page.getByText(/Đang ghi âm/).isVisible()),
-        );
+        await record(null);
+        check(`speaking 2: recording stopped by itself at ${item.response}s and was sent`, true);
       }
-      await page.getByLabel('Nghe lại bài nói').waitFor({ timeout: 10_000 });
-      await page.getByRole('button', { name: /Xác nhận & tiếp tục/ }).click();
-      await page.waitForTimeout(3000);
+      await page.getByRole('button', { name: /^Câu tiếp/ }).click();
+      await page.waitForTimeout(800);
       answered += 1;
       continue;
     }
@@ -252,6 +277,19 @@ async function main() {
         !!src,
         `(${src?.slice(-40)})`,
       );
+    }
+    if (item.section === 'READING') {
+      const article = page.locator('article[aria-label="Đoạn đọc"]');
+      const articleText = (await article.innerText()).replace(/\s+/g, ' ');
+      const strong = await article.locator('strong').allInnerTexts();
+      const expected: Record<string, string> = { 16: 'the illusion of fluency', 17: 'it', 18: 'that trade-off' };
+      const order = i + 1;
+      if (order === 11)
+        check('reading: the passage label appears once (no duplicated heading)', (articleText.match(/Đoạn đọc/g) ?? []).length === 1);
+      if (expected[order])
+        check(`reading ${order}: "${expected[order]}" is bolded, and only it`, strong.length === 1 && strong[0] === expected[order], `(${strong.join('|')})`);
+      else if (order === 12 || order === 19)
+        check(`reading ${order}: nothing is bolded without a quoted reference`, strong.length === 0, `(${strong.join('|')})`);
     }
     const keyText = item.options[item.key];
     const choice =

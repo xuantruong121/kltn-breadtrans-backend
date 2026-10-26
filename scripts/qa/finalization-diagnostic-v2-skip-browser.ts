@@ -119,26 +119,35 @@ async function main() {
       check(`task ${i + 1} identified`, false);
       break;
     }
+    const position = async () =>
+      Number(
+        /Câu (\d+)\/29/.exec(
+          await page.locator('aside[aria-label="Danh sách câu hỏi"]').innerText(),
+        )?.[1],
+      );
     if (item.taskType === 'SPEAKING_RESPONSE') {
-      await page.getByRole('button', { name: /Bỏ qua phần này/ }).click();
-      await page.waitForTimeout(1500);
+      const before = await position();
+      await page.getByRole('button', { name: /^Bỏ qua$/ }).click();
+      await page.waitForFunction(
+        (n) => document.querySelector('aside[aria-label="Danh sách câu hỏi"]')?.textContent?.includes(`Câu ${n}/29`),
+        before + 1,
+        { timeout: 10_000 },
+      );
+      check(`Speaking skip at ${before} moves straight to ${before + 1}`, (await position()) === before + 1);
       continue;
     }
     if (item.taskType === 'WRITING_RESPONSE') {
       writingSeen += 1;
       if (writingSeen === 1) {
-        await page
-          .getByLabel('Câu trả lời tự luận')
-          .fill(essay(item.wordMin + 5));
+        await page.getByLabel('Câu trả lời tự luận').fill(essay(item.wordMin + 5));
+        await page.getByRole('button', { name: /^Câu tiếp/ }).click();
+        await page.waitForTimeout(500);
       } else {
-        await page.getByRole('button', { name: /Bỏ qua bài viết này/ }).click();
-        check(
-          'skipping a Writing task says it will not be graded',
-          await page.getByText(/Bạn đã chọn bỏ qua bài viết này/).isVisible(),
-        );
+        const before = await position();
+        await page.getByRole('button', { name: /^Bỏ qua$/ }).click();
+        await page.waitForTimeout(500);
+        check(`Writing skip at ${before} moves straight to ${before + 1}`, (await position()) === before + 1);
       }
-      await page.getByRole('button', { name: /^Câu tiếp/ }).click();
-      await page.waitForTimeout(500);
       continue;
     }
     const pressed = await page.locator('button[aria-pressed="true"]').count();

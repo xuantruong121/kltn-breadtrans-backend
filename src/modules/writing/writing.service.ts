@@ -1,4 +1,10 @@
 import {
+  buildPracticeWritingRequest,
+  practiceWritingTask,
+  validatePracticeWritingResult,
+  type PracticeWritingResult,
+} from './practice-writing-grading';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -25,6 +31,8 @@ const GENERAL_WRITING_TYPES: QuizType[] = [
  * requiring one made every exam Writing task answer "not found"; access to
  * them is still restricted by assertExamInternalWritingAccess.
  */
+const PRACTICE_GRADE_ATTEMPTS = 2;
+
 function isWritingQuiz(quiz: {
   type: QuizType;
   practiceTopic?: { category: TopicCategory } | null;
@@ -150,6 +158,11 @@ export class WritingService {
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
+      // Practice results store their own scale and detail.
+      if (parsed.rubricVersion && Number.isInteger(parsed.maxScore)) {
+        const base = this.validateEvaluation(parsed, parsed.maxScore as number);
+        return { ...base, detail: parsed as unknown as PracticeWritingResult };
+      }
       return this.validateEvaluation(parsed, maxScore);
     } catch {
       return null;
@@ -180,8 +193,10 @@ export class WritingService {
     clientAttemptId: string;
     evaluation: { score: number; feedback: string; suggestions: string[] };
     maxScore: number;
+    detail?: PracticeWritingResult;
   }) {
     const feedback = JSON.stringify({
+      ...(input.detail ?? {}),
       feedback: input.evaluation.feedback,
       suggestions: input.evaluation.suggestions,
       maxScore: input.maxScore,
@@ -263,18 +278,36 @@ export class WritingService {
 
   private formatAssessmentResponse(
     submission: { id: number },
-    evaluation: { score: number; feedback: string; suggestions: string[] },
+    evaluation: {
+      score: number;
+      feedback: string;
+      suggestions: string[];
+      detail?: PracticeWritingResult;
+    },
     maxScore: number,
     taskType?: unknown,
   ) {
+    const detail = evaluation.detail;
     return {
       submissionId: submission.id,
       status: 'COMPLETED',
       score: evaluation.score,
-      maxScore,
+      maxScore: detail?.maxScore ?? maxScore,
       feedback: evaluation.feedback,
       suggestions: evaluation.suggestions,
       taskType: taskType ? String(taskType) : null,
+      // Practice tasks: per-criterion scores and grounded corrections.
+      ...(detail
+        ? {
+            rubricVersion: detail.rubricVersion,
+            criteria: detail.criteria,
+            strengths: detail.strengths,
+            corrections: detail.corrections,
+            wordCount: detail.wordCount,
+            wordRange: detail.wordRange,
+            keywords: detail.keywords,
+          }
+        : {}),
     };
   }
 
@@ -642,9 +675,53 @@ export class WritingService {
       feedback: string;
       suggestions: string[];
     };
+    // Catalog practice tasks are graded with their own authored rubric; TOEIC
+    // exam writing tasks (no practice topic) keep their exam graders.
+    const practiceTask = quiz.practiceTopic
+      ? practiceWritingTask(content ?? {}, quiz.title)
+      : null;
+    let detail: PracticeWritingResult | undefined;
 
     try {
-      if (quiz.type === QuizType.WRITING_PICTURE) {
+      if (practiceTask) {
+        const request = buildPracticeWritingRequest(practiceTask, answer);
+        let reason = 'NO_ATTEMPT';
+        for (
+          let attempt = 1;
+          attempt <= PRACTICE_GRADE_ATTEMPTS && !detail;
+          attempt += 1
+        ) {
+          const out = await this.aiService.generateStructuredJson({
+            systemInstruction: request.systemInstruction,
+            prompt: request.prompt,
+            responseSchema: request.responseSchema,
+            temperature: 0.2,
+          });
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(out.text);
+          } catch {
+            reason = 'INVALID_JSON';
+            continue;
+          }
+          const verdict = validatePracticeWritingResult(
+            parsed,
+            practiceTask,
+            answer,
+            request.facts,
+          );
+          if (verdict.ok) detail = verdict.value;
+          else reason = verdict.reason;
+        }
+        if (!detail)
+          throw new Error(`PRACTICE_WRITING_GRADE_INVALID: ${reason}`);
+        evaluation = {
+          score: detail.score,
+          maxScore: detail.maxScore,
+          feedback: detail.feedback,
+          suggestions: detail.suggestions,
+        };
+      } else if (quiz.type === QuizType.WRITING_PICTURE) {
         const result = content.imageUrl
           ? await this.aiService.evaluateWritingPart1(
               content.imageUrl,
@@ -697,6 +774,7 @@ export class WritingService {
       evaluation.maxScore,
     );
     const submission = await this.persistAssessment({
+      detail,
       quizId,
       quizTitle: quiz.title,
       quizType: quiz.type,
@@ -709,7 +787,7 @@ export class WritingService {
     });
     return this.formatAssessmentResponse(
       submission,
-      validatedEvaluation,
+      { ...validatedEvaluation, detail },
       evaluation.maxScore,
       content.taskType,
     );
