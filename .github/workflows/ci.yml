@@ -29,8 +29,10 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: kltn_test_db
+        # Host ports differ from the local protected ones (5432/5433, Redis
+        # 6379), which the P0 test-target guard refuses by design.
         ports:
-          - 5432:5432
+          - 55432:5432
         options: >-
           --health-cmd "pg_isready -U postgres -d kltn_test_db"
           --health-interval 10s
@@ -39,7 +41,7 @@ jobs:
       redis:
         image: redis:7-alpine
         ports:
-          - 6379:6379
+          - 6380:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -51,8 +53,8 @@ jobs:
       CI_DATABASE_IS_EPHEMERAL: 'true'
       PRODUCTION_DATABASE_NOT_USED: 'true'
       LOCAL_OWNER_DATABASE_NOT_USED: 'true'
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kltn_test_db?schema=public
-      REDIS_URL: redis://localhost:6379
+      DATABASE_URL: postgresql://postgres:postgres@localhost:55432/kltn_test_db?schema=public
+      REDIS_URL: redis://localhost:6380
       JWT_SECRET: ci-only-jwt-secret
       JWT_REFRESH_SECRET: ci-only-refresh-secret
       OTP_SECRET: ci-only-otp-secret
@@ -96,6 +98,10 @@ jobs:
         run: npm test -- --ci --runInBand
 
       - name: E2E tests
+        # E2E boots the whole app and requires verified disposable targets.
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:55432/kltn_test_db?schema=public
+          TEST_REDIS_URL: redis://localhost:6380
         run: npm run test:e2e
 
       - name: Upload Jest diagnostics on failure
