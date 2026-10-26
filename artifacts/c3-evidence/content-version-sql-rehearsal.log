@@ -1,0 +1,76 @@
+# C3 rehearsal of entry-diagnostic-phase-c3-content-version-fix.sql on DISPOSABLE clone only
+# target sysid: 7700826478806171683 db=c3_clone port=5450
+## setup: the fixed importer wrote 6; simulate live pre-fix state (contentVersion=1) in the clone
+5|1
+UPDATE 1
+## run 1 (expect 1 row, COMMIT)
+BEGIN
+SELECT 1
+ id | contentVersion 
+----+----------------
+  5 |              6
+(1 row)
+
+DO
+COMMIT
+exit=0
+1|1|ACTIVE|t
+5|6|DRAFT|f
+## run 2 (idempotence: expect 0 rows, abort, nothing changed)
+BEGIN
+SELECT 0
+ id | contentVersion 
+----+----------------
+(0 rows)
+
+ERROR:  C3_CONTENT_VERSION_FIX_ABORTED: expected exactly 1 row, got 0
+CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
+exit=3
+5|6
+## run 3 (guard: row ACTIVE with version 1 -> expect abort, unchanged)
+DETAIL:  Failing row contains (5, Kiểm tra đầu vào bốn kỹ năng, Bài kiểm tra đầu vào đánh giá Nghe, Đọc, Nói và V..., t, 2026-10-26 04:20:24.803, 2026-10-26 04:20:55.294, V2_2026_01, 1, FOUR_SKILL_PLACEMENT_V2, DRAFT, DIAG_V2_ASSESSMENT).
+5|1|f
+BEGIN
+SELECT 1
+ id | contentVersion 
+----+----------------
+  5 |              6
+(1 row)
+
+DO
+COMMIT
+exit=0
+5|6|f
+## restore clone row to inactive DRAFT v6
+5|6|f
+UPDATE 1
+## NOTE: run 3 above did NOT test the isActive guard: the clone's check constraint refused isActive=true on a DRAFT row, so the row stayed inactive at version 1 and the fix correctly applied to it.
+## run 4 (guard: status ARCHIVED with version 1 -> expect abort, unchanged)
+5|1|ARCHIVED
+UPDATE 1
+BEGIN
+SELECT 0
+ id | contentVersion 
+----+----------------
+(0 rows)
+
+ERROR:  C3_CONTENT_VERSION_FIX_ABORTED: expected exactly 1 row, got 0
+CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
+exit=3
+5|1|ARCHIVED
+## run 5 (guard: wrong sourceKey -> expect abort, unchanged)
+5|OTHER|DRAFT
+UPDATE 1
+BEGIN
+SELECT 0
+ id | contentVersion 
+----+----------------
+(0 rows)
+
+ERROR:  C3_CONTENT_VERSION_FIX_ABORTED: expected exactly 1 row, got 0
+CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
+exit=3
+5|1|OTHER
+## restore clone row: DRAFT, inactive, DIAG_V2_ASSESSMENT, v6
+5|6|DRAFT|f|DIAG_V2_ASSESSMENT
+UPDATE 1

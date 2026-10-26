@@ -674,6 +674,23 @@ export class CourseService {
     if (!course || course.status !== CourseStatus.PUBLISHED) {
       throw new NotFoundException('Course is not learner-ready');
     }
+    // Course Learning 5.0 is the learner path: publishing already requires a
+    // complete V5 lesson, and /learning serves exactly the published V5
+    // lessons. Gating start on the legacy curriculum refused published courses
+    // whose legacy lessons have no activities (PARTIAL) or which have none
+    // at all (EMPTY), although /learning served them. The legacy readiness
+    // check now applies only to courses without V5 lessons.
+    const publishedV5Lessons = await this.prisma.courseLesson.count({
+      where: { courseId, status: CourseLessonStatus.PUBLISHED },
+    });
+    if (publishedV5Lessons > 0) {
+      return {
+        courseId,
+        accessSource: access.accessSource,
+        learningPath: 'COURSE_LEARNING_V5' as const,
+        progress: null,
+      };
+    }
     const curriculum = buildCourseCurriculum(
       course.lessons,
       course.quizzes,

@@ -1,0 +1,31 @@
+target localhost:5437/b2b_rehearsal sysid=7700793221349826600 pg=15.19 read_only=on mode=rehearsal
+PASS  imported assessment exists
+PASS  assessment status=DRAFT, isActive=false  (id=5 status=DRAFT isActive=false)
+PASS  assessment scoring/blueprint versions match the package  (FOUR_SKILL_PLACEMENT_V2 / V2_2026_01)
+PASS  29 question rows  (29)
+PASS  question sourceKeys are exactly the 29 authored draftKeys
+PASS  section counts L10 R10 S2 W2 LU5  (10/10/2/2/5)
+PASS  3 passage rows  (3)
+PASS  passage RDG_PASSAGE_01: text equals the authored body and the manifest hash
+PASS  passage RDG_PASSAGE_01: title deliberately NULL
+PASS  passage RDG_PASSAGE_02: text equals the authored body and the manifest hash
+PASS  passage RDG_PASSAGE_02: title deliberately NULL
+PASS  passage RDG_PASSAGE_03: text equals the authored body and the manifest hash
+PASS  passage RDG_PASSAGE_03: title deliberately NULL
+PASS  2 rubric rows  (2)
+PASS  rubric SPEAKING/SPK_RUBRIC_V3: criteria equal the approved document
+PASS  rubric WRITING/WRT_RUBRIC_V3: criteria equal the approved document
+PASS  every stored column equals the mapper output for its authored item  (29 rows)
+PASS  25 objective rows: prompt, options and answer key equal the raw draft  (errors=0)
+PASS  4 productive rows carry correctIndex -1 and no options
+PASS  reading questions resolve the passage their item names
+PASS  productive tasks resolve the rubric their item names
+PASS  no CEFR level persisted
+PASS  10 clip registrations  (10)
+PASS  clip scripts hash to exactly 4 authored clips
+PASS  each Listening question owns one pending clip whose script matches its authored clip and manifest  (errors=0)
+PASS  no audio URL invented
+PASS  no authoring-only field name in any options blob
+PASS  no authored internalLabel text in stored options or passages  (labels checked=3)
+
+B2B_VERIFY_FAILURES=0

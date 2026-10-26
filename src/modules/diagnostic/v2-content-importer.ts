@@ -209,7 +209,13 @@ export async function importApprovedContent(
 
   return prisma.$transaction(async (tx: ImporterTx) => {
     // ---------------------------------------------------------- assessment
-    // isActive and status are ALWAYS written, never defaulted.
+    // isActive and status are ALWAYS written, never defaulted. contentVersion
+    // is the approved draft's: omitting it left the column at its schema
+    // default of 1 while the imported content was version 6 (C2-FIND-001).
+    if (!Number.isInteger(draft.contentVersion) || draft.contentVersion < 1)
+      throw new Error(
+        `CONTENT_VERSION_INVALID: approved draft has contentVersion ${String(draft.contentVersion)}`,
+      );
     const assessmentFields = {
       title: String(draft.assessment?.title ?? 'Kiểm tra đầu vào'),
       description: String(draft.assessment?.description ?? ''),
@@ -217,6 +223,7 @@ export async function importApprovedContent(
       status: 'DRAFT',
       scoringVersion: draft.scoringVersion,
       blueprintVersion: draft.blueprintVersion,
+      contentVersion: draft.contentVersion,
     };
     const existingAssessment = await tx.diagnosticAssessment.findUnique({
       where: { sourceKey: ASSESSMENT_SOURCE_KEY },

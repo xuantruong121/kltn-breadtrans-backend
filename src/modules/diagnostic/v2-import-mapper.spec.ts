@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getAttemptQuestionPermutation } from './diagnostic.logic';
+import {
+  getAttemptQuestionPermutation,
+  isDiagnosticAnswerCorrect,
+} from './diagnostic.logic';
 import {
   assertNoAuthoringFields,
   authoredIndexFromDisplayed,
@@ -194,19 +197,31 @@ describe('option identity under shuffle', () => {
     },
   );
 
-  it('grading stays correct under every permutation (authored key is canonical)', () => {
+  // Phase C1 replaced a test here that only asserted `perm[perm.indexOf(k)]
+  // === k`, which holds for every permutation and never touched the grader.
+  // This version maps each approved item exactly as the importer persists it
+  // and grades every click under every ordering with the REAL grader.
+  it('the real grader scores every approved item correctly under all 24 orderings', () => {
+    const ctx = {
+      assessmentId: 1,
+      passageIds: { RDG_PASSAGE_01: 1, RDG_PASSAGE_02: 2, RDG_PASSAGE_03: 3 },
+      passageTexts: {},
+    };
+    let graded = 0;
     for (const item of objectiveItems) {
-      const correctIndex = item.options.indexOf(item.correctAnswer);
+      const row: any = mapObjectiveQuestion(item, ctx);
+      const question = { id: 1, order: 1, ...row };
+      const key = question.correctIndex;
       for (const perm of permutationsOf4()) {
-        // the learner clicks the position where the key is displayed
-        const displayed = perm.indexOf(correctIndex);
-        expect(perm[displayed]).toBe(correctIndex);
-        // and every other position must NOT grade as correct
-        for (let other = 0; other < 4; other += 1) {
-          if (other === displayed) continue;
-          expect(perm[other]).not.toBe(correctIndex);
+        const displayedKey = perm.indexOf(key);
+        for (let clicked = 0; clicked < 4; clicked += 1) {
+          expect(isDiagnosticAnswerCorrect(question, clicked, perm)).toBe(
+            clicked === displayedKey,
+          );
+          graded += 1;
         }
       }
     }
+    expect(graded).toBe(objectiveItems.length * 24 * 4);
   });
 });

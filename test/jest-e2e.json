@@ -1,5 +1,9 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
@@ -9,6 +13,6 @@
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/../src/$1"
   },
-  "globalSetup": "<rootDir>/setup-env.js",
+  "globalSetup": "<rootDir>/safety/e2e-global-setup.ts",
   "maxWorkers": 1
 }

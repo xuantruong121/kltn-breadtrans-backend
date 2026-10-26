@@ -20,7 +20,12 @@ export interface MockPronunciationResult {
 export class MockSpeakingEvaluator {
   private static readonly logger = new Logger(MockSpeakingEvaluator.name);
 
+  /**
+   * Mock scores are invented; they must never reach a production learner,
+   * whatever MOCK_AZURE_SPEECH says.
+   */
   static isMockEnabled(): boolean {
+    if (process.env.NODE_ENV === 'production') return false;
     return (
       process.env.MOCK_AZURE_SPEECH === 'true' ||
       process.env.NODE_ENV === 'test'

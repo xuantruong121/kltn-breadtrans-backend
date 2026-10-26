@@ -1,0 +1,37 @@
+target 5438/c1_isolated sysid=7700804571409465384
+PASS  getCurrentAssessment selects the ACTIVE assessment id=1, not the DRAFT id=5  (served=1)
+PASS  startAttempt creates an IN_PROGRESS attempt  (attempt=58)
+PASS  ROOT DEFECT CLOSED: the option order is identical before and after start
+PASS  the served order really is permuted (not authored order)  (19/20 items reordered)
+PASS  submit with no attempt id is refused
+PASS  submit with another learner's attempt is refused
+PASS  submit against the DRAFT assessment is refused
+PASS  submit with an out-of-range option index is refused
+PASS  submit with a non-existent attempt is refused
+PASS  refused submissions wrote nothing  (attempts 1->2: +1 is the other learner's start)
+PASS  persisted grade equals the options the learner actually clicked: 13/20  (stored 13/20 COMPLETED)
+PASS  persisted answers record the permutation scheme
+PASS  every per-question verdict matches the intended answer  (mismatches=0)
+PASS  selectedText shows the option the learner clicked
+PASS  getLatestResult reproduces the stored grade  (13)
+PASS  a replayed all-correct submission does not change the grade  (13)
+PASS  the replay rewrote nothing (attempt xmin unchanged, no new activity)
+PASS  startAttempt after completion returns the completed attempt, no retake
+PASS  two concurrent submits of one attempt complete it exactly once  (outcomes=fulfilled/fulfilled, activities +1)
+PASS  the first-completion reward was granted at most once  (+1)
+PASS  startAttempt on the DRAFT is refused
+PASS  submitAssessment on the DRAFT is refused
+PASS  no attempt exists on the DRAFT
+PASS  the ACTIVE assessment is still the one served after all of the above
+PASS  lifecycle unchanged: id=1 ACTIVE, id=5 DRAFT inactive
+DRAFT readiness {"content":{"valid":true,"defects":[]},"runtime":{"ready":false,"defects":10},"activation":{"ready":false,"blockers":["runtime: 10 defect(s)","DIAGNOSTIC_SCORER_UNSUPPORTED: scoringVersion \"FOUR_SKILL_PLACEMENT_V2\" is known but its scorer is not implemented in this build"]}}
+PASS  DRAFT content is structurally valid under task-type rules
+PASS  DRAFT runtime is NOT ready: exactly the 10 Listening items lack audio
+PASS  DRAFT activation is blocked by runtime AND by the unimplemented scorer
+PASS  the ACTIVE legacy assessment passes all three layers
+PASS  Speaking tasks deliver prompt, recording limits, no options
+PASS  Writing tasks deliver prompt and word bounds, no options
+PASS  Listening items state NOT_READY with a null audioUrl
+PASS  Reading items deliver their complete authored passage
+PASS  no confidential field in any DRAFT payload
+C1_ISOLATED_FAILURES=0  (34 checks)

@@ -16,17 +16,34 @@ import {
   describeAdministeredForm,
   DiagnosticSkillProfile,
   DiagnosticQuestionForScoring,
+  classifyDiagnosticTask,
   getAttemptQuestionPermutation,
+  getLearnerQuestionPermutation,
   getQuestionMeta,
   getQuestionOptions,
   isDiagnosticAnswerCorrect,
   isOpenDiagnosticQuestion,
+  LEARNER_PERMUTATION_SCHEME,
+  resolveAuthoredOptionIndex,
   rankCourseRecommendations,
   resolvePlacementLevel,
   resolveEstimatedLevel,
   validateQuestionBank,
 } from './diagnostic.logic';
 import { buildCourseCurriculum } from '../course/course-curriculum';
+import {
+  FOUR_SKILL_SCORING_VERSION,
+  scoreFourSkillPlacementV2,
+} from './diagnostic-four-skill';
+import {
+  refreshFourSkillResult,
+  writeObjectiveSkillRows,
+} from './diagnostic-four-skill.store';
+import {
+  WRITING_MAX_CHARACTERS,
+  summarizeProductiveSkill,
+  WRITING_MIN_CHARACTERS,
+} from './diagnostic-productive';
 import { GamificationService } from '../gamification/gamification.service';
 import {
   DiagnosticWritingFeedback,
@@ -37,6 +54,12 @@ type AnswerMap = Record<string, unknown>;
 
 const SPEAKING_FINALIZATION_TIMEOUT_MS = 10_000;
 const SPEAKING_FINALIZATION_POLL_MS = 250;
+
+/**
+ * `DiagnosticAttempt.level` for FOUR_SKILL_PLACEMENT_V2. Not a band: V2 bands
+ * are withheld until DEF-004 is decided, and the column is non-nullable.
+ */
+export const FOUR_SKILL_PROFILE_LEVEL = 'FOUR_SKILL_PROFILE';
 
 @Injectable()
 export class DiagnosticService {
@@ -61,25 +84,51 @@ export class DiagnosticService {
     );
   }
 
+  /**
+   * The one display permutation for this learner, assessment and question.
+   * Used to serve options AND to grade them, so the two cannot disagree.
+   */
+  private displayPermutation(
+    userId: number,
+    assessmentId: number,
+    question: DiagnosticQuestionForScoring,
+  ): number[] | undefined {
+    if (isOpenDiagnosticQuestion(question)) return undefined;
+    const count = getQuestionOptions(question).length;
+    return count > 0
+      ? getLearnerQuestionPermutation(userId, assessmentId, question.id, count)
+      : undefined;
+  }
+
+  private permutationsFor(
+    userId: number,
+    assessmentId: number,
+    questions: DiagnosticQuestionForScoring[],
+  ): Record<number, number[]> {
+    const permutations: Record<number, number[]> = {};
+    for (const question of questions) {
+      const permutation = this.displayPermutation(
+        userId,
+        assessmentId,
+        question,
+      );
+      if (permutation) permutations[question.id] = permutation;
+    }
+    return permutations;
+  }
+
   private sanitizeQuestion(
     question: DiagnosticQuestionForScoring,
-    attemptId?: number,
+    permutation?: number[],
   ) {
     const meta = getQuestionMeta(question);
     const originalOptions = getQuestionOptions(question);
-    let options = originalOptions;
-    if (
-      attemptId &&
-      meta.questionType === 'MCQ' &&
-      originalOptions.length > 1
-    ) {
-      const permutation = getAttemptQuestionPermutation(
-        attemptId,
-        question.id,
-        originalOptions.length,
-      );
-      options = permutation.map((idx) => originalOptions[idx]);
-    }
+    const options =
+      permutation && permutation.length === originalOptions.length
+        ? permutation.map((idx) => originalOptions[idx])
+        : originalOptions;
+    const taskKind = classifyDiagnosticTask(question);
+    const productive = taskKind === 'SPEAKING' || taskKind === 'WRITING';
     const passageLines = meta.passageText ? meta.passageText.split('\n') : [];
     const passageTitle =
       meta.section === 'READING' && passageLines.length > 1
@@ -107,6 +156,23 @@ export class DiagnosticService {
       passageText:
         meta.section === 'READING' ? (meta.passageText ?? null) : null,
       audioUrl: meta.section === 'LISTENING' ? (meta.audioUrl ?? null) : null,
+      // A null audioUrl is an explicit NOT_READY state, never playable audio.
+      mediaStatus:
+        meta.section === 'LISTENING'
+          ? meta.audioUrl?.trim()
+            ? ('READY' as const)
+            : ('NOT_READY' as const)
+          : null,
+      taskType: question.taskType ?? 'MCQ',
+      instructions: question.instructions ?? null,
+      // Learner-facing task constraints. None of these is answer-bearing.
+      prepSeconds:
+        taskKind === 'SPEAKING' ? (question.prepSeconds ?? null) : null,
+      responseSeconds:
+        taskKind === 'SPEAKING' ? (question.responseSeconds ?? null) : null,
+      wordMin: taskKind === 'WRITING' ? (question.wordMin ?? null) : null,
+      wordMax: taskKind === 'WRITING' ? (question.wordMax ?? null) : null,
+      productive,
       order: question.order,
     };
   }
@@ -226,39 +292,53 @@ export class DiagnosticService {
   private async toResult(
     attempt: {
       id: number;
+      userId: number;
+      assessmentId: number;
       answers: unknown;
       correctCount: number;
       totalCount: number;
       percentage: number;
       level: string;
       submittedAt: Date;
+      scoringVersion?: string | null;
     },
     questions: DiagnosticQuestionForScoring[],
   ) {
+    const fourSkill =
+      attempt.scoringVersion === FOUR_SKILL_SCORING_VERSION
+        ? await refreshFourSkillResult(this.prisma, attempt.id)
+        : null;
     const answers = this.readAnswerMap(attempt.answers);
     const objectiveQuestions = questions.filter(
       (question) => !isOpenDiagnosticQuestion(question),
     );
     const productiveTaskCount = questions.length - objectiveQuestions.length;
 
-    const permAttemptId =
-      typeof (answers as any).__permAttemptId === 'number'
-        ? (answers as any).__permAttemptId
-        : attempt.id >= 50
-          ? attempt.id
-          : undefined;
-
+    // Re-derive the display permutation from the scheme recorded at
+    // submission. The former fallback - "attempt id >= 50 means permuted" -
+    // guessed, and disagreed with how the same attempt had been graded when it
+    // was created without an attempt id. An attempt whose scheme is unknown
+    // gets no permutation, so its index answers resolve to "unresolvable"
+    // rather than to a comparison of incompatible indexes.
     const permutations: Record<number, number[]> = {};
-    if (permAttemptId) {
+    if (answers.__permScheme === LEARNER_PERMUTATION_SCHEME) {
+      Object.assign(
+        permutations,
+        this.permutationsFor(
+          attempt.userId,
+          attempt.assessmentId,
+          objectiveQuestions,
+        ),
+      );
+    } else if (typeof answers.__permAttemptId === 'number') {
       for (const question of objectiveQuestions) {
         const options = getQuestionOptions(question);
-        if (options.length > 1) {
+        if (options.length > 0)
           permutations[question.id] = getAttemptQuestionPermutation(
-            permAttemptId,
+            answers.__permAttemptId,
             question.id,
             options.length,
           );
-        }
       }
     }
 
@@ -287,17 +367,19 @@ export class DiagnosticService {
     const gradedSpeaking = speakingRows.filter(
       (row) => row.status === 'GRADED' && typeof row.score === 'number',
     );
-    const speakingScore = gradedSpeaking.length
-      ? Math.round(
-          (gradedSpeaking.reduce((sum, row) => sum + Number(row.score), 0) /
-            gradedSpeaking.length) *
-            10,
-        ) / 10
-      : null;
+    // A skill is scored only when every one of its tasks is GRADED; one
+    // graded task out of two is reported as pending or failed, not averaged.
+    const speakingSkill = summarizeProductiveSkill(
+      questions
+        .filter((question) => classifyDiagnosticTask(question) === 'SPEAKING')
+        .map((question) => question.id),
+      speakingRows,
+    );
+    const speakingScore = speakingSkill.score;
     const objectiveCoreScore = this.weightedCore(
       questions,
       answers,
-      attempt.id,
+      permutations,
     );
     // Speaking/Writing are formative feedback only. The reference band is
     // calculated from the reviewed 48-item objective core and never controls
@@ -346,14 +428,11 @@ export class DiagnosticService {
         selectedText =
           speakingRows.find((row) => row.questionId === question.id)?.status ??
           (typeof rawAnswer === 'string' ? rawAnswer : undefined);
-      } else if (typeof rawAnswer === 'string') {
-        selectedText = rawAnswer;
-      } else if (typeof rawAnswer === 'number') {
-        if (perm && perm[rawAnswer] !== undefined) {
-          selectedText = options[perm[rawAnswer]];
-        } else if (options[rawAnswer] !== undefined) {
-          selectedText = options[rawAnswer];
-        }
+      } else {
+        // Shown as what the learner actually picked, resolved through the
+        // same permutation that graded it - never re-read at the raw index.
+        const authored = resolveAuthoredOptionIndex(question, rawAnswer, perm);
+        selectedText = authored === null ? undefined : options[authored];
       }
       return {
         questionId: question.id,
@@ -372,7 +451,18 @@ export class DiagnosticService {
       return qr ? qr.isCorrect === false : false;
     });
 
-    const writingFeedback = this.readWritingFeedback(answers);
+    const writingRows = this.writingService
+      ? await this.writingService.listFeedback(attempt.id)
+      : [];
+    const writingFeedback = writingRows.length
+      ? writingRows
+      : this.readWritingFeedback(answers);
+    const writingSkill = summarizeProductiveSkill(
+      questions
+        .filter((question) => classifyDiagnosticTask(question) === 'WRITING')
+        .map((question) => question.id),
+      writingFeedback,
+    );
     const practiceRecommendations = buildPracticeRecommendations(
       referenceLevel,
       weaknesses,
@@ -423,14 +513,34 @@ export class DiagnosticService {
             ? 'PARTIAL'
             : 'UNAVAILABLE',
       writingFeedback,
-      speakingResponses: speakingRows.map((row) => ({
-        id: row.id,
-        questionId: row.questionId,
-        status: row.status,
-        score: row.score,
-        durationMs: row.durationMs,
-        failureReason: row.failureReason,
-      })),
+      productiveSkills: { speaking: speakingSkill, writing: writingSkill },
+      // FOUR_SKILL_PLACEMENT_V2 attempts only: the per-skill profile (primary
+      // result) and the secondary overall, null until all four are complete.
+      fourSkill,
+      speakingResponses: speakingRows.map((row) => {
+        const graded = row.status === 'GRADED';
+        const meta =
+          graded && row.scoreMetadata && typeof row.scoreMetadata === 'object'
+            ? (row.scoreMetadata as Record<string, unknown>)
+            : {};
+        return {
+          id: row.id,
+          questionId: row.questionId,
+          status: row.status,
+          // Task rubric percentage (0-100); null unless GRADED.
+          score: graded ? row.score : null,
+          scoreScale: 'PERCENT_0_100' as const,
+          durationMs: row.durationMs,
+          failureReason: row.failureReason,
+          rubricVersion: graded ? (row.rubricVersion ?? null) : null,
+          criteria: graded ? (meta.criteria ?? null) : null,
+          criterionFeedback: graded ? (meta.criterionFeedback ?? null) : null,
+          feedback: graded ? (meta.feedback ?? null) : null,
+          suggestions:
+            graded && Array.isArray(meta.suggestions) ? meta.suggestions : [],
+          transcript: graded ? (row.transcript ?? null) : null,
+        };
+      }),
       submittedAt: attempt.submittedAt,
       completedAt:
         (attempt as { completedAt?: Date }).completedAt ?? attempt.submittedAt,
@@ -543,8 +653,6 @@ export class DiagnosticService {
       include: { speakingResponses: true },
       orderBy: { submittedAt: 'desc' },
     });
-    const activeAttemptId =
-      inProgressAttempt?.id ?? (latestAttempt ? latestAttempt.id : undefined);
 
     return {
       id: assessment.id,
@@ -561,8 +669,12 @@ export class DiagnosticService {
         note: 'Planned structure only. It is not the form being administered; see administeredForm.',
       },
       hasCompleted: !!latestAttempt,
+      // Same order before "start", after it, on resume and on review.
       questions: formQuestions.map((question) =>
-        this.sanitizeQuestion(question, activeAttemptId),
+        this.sanitizeQuestion(
+          question,
+          this.displayPermutation(userId, assessment.id, question),
+        ),
       ),
       latestAttempt: latestAttempt
         ? {
@@ -683,6 +795,11 @@ export class DiagnosticService {
           level: 'IN_PROGRESS',
           status: 'IN_PROGRESS',
           submissionToken,
+          // Pinned so the attempt is always scored by the version it was
+          // taken under, whatever later happens to the assessment.
+          scoringVersion: assessment.scoringVersion,
+          blueprintVersion: assessment.blueprintVersion,
+          contentVersion: assessment.contentVersion,
         },
       });
     });
@@ -717,13 +834,41 @@ export class DiagnosticService {
       throw new BadRequestException('Câu trả lời không hợp lệ');
     }
 
+    // Grading needs an authoritative attempt: the learner's own, on this
+    // assessment. Submitting without one used to create a fresh COMPLETED
+    // attempt graded with no display permutation - wrong answers marked right
+    // and vice versa - and it also bypassed the no-retake rule.
+    if (!Number.isInteger(attemptId) || (attemptId as number) <= 0) {
+      throw new BadRequestException('Phiên kiểm tra không hợp lệ');
+    }
+    const ownedAttempt = await this.prisma.diagnosticAttempt.findUnique({
+      where: { id: attemptId },
+    });
+    if (
+      !ownedAttempt ||
+      ownedAttempt.userId !== userId ||
+      ownedAttempt.assessmentId !== assessmentId
+    ) {
+      throw new BadRequestException('Phiên kiểm tra không hợp lệ');
+    }
+    // A replay of a finished attempt returns the result already recorded. It
+    // is never graded again, so a second submission cannot change the score.
+    if (ownedAttempt.status === 'COMPLETED') {
+      return this.toResult(ownedAttempt, formQuestions);
+    }
+    if (ownedAttempt.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('Phiên kiểm tra không hợp lệ');
+    }
+    const permutations = this.permutationsFor(
+      userId,
+      assessmentId,
+      formQuestions,
+    );
+
     const answerMap = answers as AnswerMap;
     const speakingQuestions = formQuestions.filter(
       (question) => getQuestionMeta(question).section === 'SPEAKING',
     );
-    if (speakingQuestions.length > 0 && !attemptId) {
-      throw new BadRequestException('Phiên kiểm tra Speaking không hợp lệ');
-    }
     const expectedIds = new Set(
       formQuestions
         .filter((question) => getQuestionMeta(question).section !== 'SPEAKING')
@@ -745,18 +890,7 @@ export class DiagnosticService {
       status: string;
       score: number | null;
     }> = [];
-    if (attemptId) {
-      const attempt = await this.prisma.diagnosticAttempt.findUnique({
-        where: { id: attemptId },
-        include: { speakingResponses: true },
-      });
-      if (
-        !attempt ||
-        attempt.userId !== userId ||
-        attempt.assessmentId !== assessmentId
-      ) {
-        throw new BadRequestException('Phiên kiểm tra không hợp lệ');
-      }
+    if (speakingQuestions.length > 0) {
       speakingResponses = await this.prisma.diagnosticSpeakingResponse.findMany(
         {
           where: { attemptId },
@@ -776,30 +910,25 @@ export class DiagnosticService {
     for (const question of formQuestions) {
       const selectedOption = answerMap[String(question.id)];
       if (isOpenDiagnosticQuestion(question)) {
-        if (getQuestionMeta(question).section === 'SPEAKING' && attemptId)
-          continue;
+        if (getQuestionMeta(question).section === 'SPEAKING') continue;
         if (
           typeof selectedOption !== 'string' ||
-          selectedOption.trim().length < 2 ||
-          selectedOption.length > 2000
+          selectedOption.trim().length < WRITING_MIN_CHARACTERS ||
+          selectedOption.length > WRITING_MAX_CHARACTERS
         )
           throw new BadRequestException('Câu trả lời tự luận không hợp lệ');
-      } else {
-        const options = getQuestionOptions(question);
-        const isStringValid =
-          typeof selectedOption === 'string' &&
-          options.some((opt) => opt.trim() === selectedOption.trim());
-        const isIndexValid =
-          Number.isInteger(selectedOption) &&
-          (selectedOption as number) >= 0 &&
-          (selectedOption as number) < options.length;
-        const isObjectValid =
-          typeof selectedOption === 'object' && selectedOption !== null;
-        if (!isStringValid && !isIndexValid && !isObjectValid) {
-          throw new BadRequestException(
-            'Có câu trả lời không thuộc lựa chọn hiện tại',
-          );
-        }
+      } else if (
+        // Every objective answer must resolve to exactly one authored option
+        // through the server's own permutation, before anything is written.
+        resolveAuthoredOptionIndex(
+          question,
+          selectedOption,
+          permutations[question.id],
+        ) === null
+      ) {
+        throw new BadRequestException(
+          'Có câu trả lời không thuộc lựa chọn hiện tại',
+        );
       }
     }
 
@@ -810,31 +939,19 @@ export class DiagnosticService {
         (row) => row.questionId === question.id,
       );
       const options = getQuestionOptions(question);
-      const perm =
-        attemptId && !open && options.length > 1
-          ? getAttemptQuestionPermutation(
-              attemptId,
-              question.id,
-              options.length,
-            )
-          : undefined;
+      const perm = permutations[question.id];
       const isCorrect = open
         ? null
         : isDiagnosticAnswerCorrect(question, rawAnswer, perm);
       let selectedText: string | undefined;
       if (open) {
         selectedText =
-          getQuestionMeta(question).section === 'SPEAKING' && attemptId
+          getQuestionMeta(question).section === 'SPEAKING'
             ? (speakingResponse?.status ?? 'SKIPPED')
             : String(rawAnswer ?? '');
-      } else if (typeof rawAnswer === 'string') {
-        selectedText = rawAnswer;
-      } else if (typeof rawAnswer === 'number') {
-        if (perm && perm[rawAnswer] !== undefined) {
-          selectedText = options[perm[rawAnswer]];
-        } else if (options[rawAnswer] !== undefined) {
-          selectedText = options[rawAnswer];
-        }
+      } else {
+        const authored = resolveAuthoredOptionIndex(question, rawAnswer, perm);
+        selectedText = authored === null ? undefined : options[authored];
       }
       return {
         questionId: question.id,
@@ -868,6 +985,25 @@ export class DiagnosticService {
       assessment.scoringVersion,
     );
     const useSectionBandV2 = scoringVersion === 'SECTION_BAND_V2';
+    const useFourSkillV2 = scoringVersion === 'FOUR_SKILL_PLACEMENT_V2';
+    // V2: Listening/Reading/Language Use are final now; Speaking/Writing are
+    // filled in as grading completes (refreshFourSkillResult).
+    const objectiveFourSkill = useFourSkillV2
+      ? scoreFourSkillPlacementV2({
+          objective: formQuestions
+            .filter((question) => !isOpenDiagnosticQuestion(question))
+            .map((question) => ({
+              section: getQuestionMeta(question).section,
+              isCorrect:
+                questionsResult.find((r) => r.questionId === question.id)
+                  ?.isCorrect === true,
+            })),
+          speakingQuestionIds: [],
+          speaking: [],
+          writingQuestionIds: [],
+          writing: [],
+        })
+      : null;
     if (useSectionBandV2) {
       // Fails closed rather than quietly computing zeros for a missing section.
       assertSectionBandV2Scorable(formQuestions);
@@ -879,25 +1015,28 @@ export class DiagnosticService {
               formQuestions,
               answerMap,
               'LANGUAGE_USE',
-              attemptId,
+              permutations,
             ),
             READING: this.sectionPercentage(
               formQuestions,
               answerMap,
               'READING',
-              attemptId,
+              permutations,
             ),
             LISTENING: this.sectionPercentage(
               formQuestions,
               answerMap,
               'LISTENING',
-              attemptId,
+              permutations,
             ),
-            CORE: this.weightedCore(formQuestions, answerMap, attemptId),
+            CORE: this.weightedCore(formQuestions, answerMap, permutations),
           },
-          this.bandPercentages(formQuestions, answerMap, attemptId),
+          this.bandPercentages(formQuestions, answerMap, permutations),
         )
-      : resolveEstimatedLevel(percentage);
+      : useFourSkillV2
+        ? // No band: the V2 band model is undecided (DEF-004).
+          FOUR_SKILL_PROFILE_LEVEL
+        : resolveEstimatedLevel(percentage);
     const attempt = await this.prisma.$transaction(async (tx) => {
       if (submissionToken) {
         // Serialize retries for the same learner/assessment/token without a
@@ -911,12 +1050,16 @@ export class DiagnosticService {
         if (recent && recentAnswers.__submissionToken === submissionToken)
           return recent;
       }
-      if (attemptId) {
-        const currentAttempt = await tx.diagnosticAttempt.findUnique({
-          where: { id: attemptId },
-        });
-        if (currentAttempt?.status === 'COMPLETED') return currentAttempt;
-      }
+      // Two submissions for the same attempt are serialized here, and the
+      // status is re-read under the lock: the second one returns the attempt
+      // the first completed instead of grading and rewarding it again.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`diagnostic:submit:${attemptId}`}, 0))`;
+      const currentAttempt = await tx.diagnosticAttempt.findUnique({
+        where: { id: attemptId },
+      });
+      if (currentAttempt?.status === 'COMPLETED') return currentAttempt;
+      if (currentAttempt?.status !== 'IN_PROGRESS')
+        throw new BadRequestException('Phiên kiểm tra không hợp lệ');
       // The first-completion reward is a read-then-write decision. Serialize
       // it per learner/assessment so concurrent submissions cannot both earn it.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`diagnostic:reward:${userId}:${assessmentId}`}, 0))`;
@@ -926,40 +1069,35 @@ export class DiagnosticService {
       const storedAnswers = {
         ...answerMap,
         ...(submissionToken ? { __submissionToken: submissionToken } : {}),
-        ...(attemptId ? { __permAttemptId: attemptId } : {}),
+        // Names how the options were displayed, so the result screen
+        // re-derives exactly the permutation this grade was computed with.
+        __permScheme: LEARNER_PERMUTATION_SCHEME,
       };
-      const created = attemptId
-        ? await tx.diagnosticAttempt.update({
-            where: { id: attemptId },
-            data: {
-              answers: storedAnswers,
-              correctCount,
-              totalCount,
-              percentage,
-              level,
-              status: 'COMPLETED',
-              completedAt: new Date(),
-            },
-          })
-        : await tx.diagnosticAttempt.create({
-            data: {
-              userId,
-              assessmentId,
-              answers: storedAnswers,
-              correctCount,
-              totalCount,
-              percentage,
-              level,
-              status: 'COMPLETED',
-              completedAt: new Date(),
-            },
-          });
+      const created = await tx.diagnosticAttempt.update({
+        where: { id: attemptId },
+        data: {
+          answers: storedAnswers,
+          correctCount,
+          totalCount,
+          percentage,
+          level,
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          ...(useFourSkillV2
+            ? { resultState: 'PENDING_GRADING' as const }
+            : {}),
+        },
+      });
+      if (objectiveFourSkill)
+        await writeObjectiveSkillRows(tx, created.id, objectiveFourSkill);
       await tx.learningActivity.create({
         data: {
           userId,
           type: 'DIAGNOSTIC',
           title: assessment.title,
-          detail: `${correctCount}/${totalCount} câu đúng • ${level}`,
+          detail: useFourSkillV2
+            ? `${correctCount}/${totalCount} câu trắc nghiệm đúng • Nói/Viết đang được chấm`
+            : `${correctCount}/${totalCount} câu đúng • ${level}`,
           score: percentage,
           sourceType: 'DiagnosticAttempt',
           sourceId: String(created.id),
@@ -985,33 +1123,14 @@ export class DiagnosticService {
       return created;
     });
 
-    const completedAnswers = this.readAnswerMap(attempt.answers);
-    const existingWritingFeedback = new Set(
-      this.readWritingFeedback(completedAnswers).map((item) => item.questionId),
-    );
-    const writingTasks = formQuestions
-      .filter(
-        (question) =>
-          isOpenDiagnosticQuestion(question) &&
-          getQuestionMeta(question).section === 'WRITING' &&
-          !existingWritingFeedback.has(question.id),
-      )
-      .map((question) => ({
-        questionId: question.id,
-        prompt: question.question,
-        answer: String(completedAnswers[String(question.id)] ?? '').trim(),
-      }))
-      .filter((task) => task.answer.length >= 2);
-    let resultAttempt = attempt;
-    if (writingTasks.length && this.writingService) {
-      await this.writingService.enqueueMany(attempt.id, writingTasks);
-      resultAttempt =
-        (await this.prisma.diagnosticAttempt.findUnique({
-          where: { id: attempt.id },
-        })) ?? attempt;
+    // Writing grading starts only once the attempt is complete, because the
+    // text is final from that point. Each task is queued at most once.
+    if (this.writingService) {
+      await this.writingService.enqueueForAttempt(attempt, formQuestions);
     }
+    if (useFourSkillV2) await refreshFourSkillResult(this.prisma, attempt.id);
 
-    return this.toResult(resultAttempt, formQuestions);
+    return this.toResult(attempt, formQuestions);
   }
 
   private getVietnamDateKey() {
@@ -1027,7 +1146,7 @@ export class DiagnosticService {
     questions: DiagnosticQuestionForScoring[],
     answers: AnswerMap,
     section: string,
-    attemptId?: number,
+    permutations: Record<number, number[]>,
   ) {
     const items = questions.filter(
       (question) =>
@@ -1036,21 +1155,13 @@ export class DiagnosticService {
     );
     if (!items.length) return 0;
     return Math.round(
-      (items.filter((question) => {
-        const perm =
-          attemptId && !isOpenDiagnosticQuestion(question)
-            ? getAttemptQuestionPermutation(
-                attemptId,
-                question.id,
-                getQuestionOptions(question).length,
-              )
-            : undefined;
-        return isDiagnosticAnswerCorrect(
+      (items.filter((question) =>
+        isDiagnosticAnswerCorrect(
           question,
           answers[String(question.id)],
-          perm,
-        );
-      }).length /
+          permutations[question.id],
+        ),
+      ).length /
         items.length) *
         100,
     );
@@ -1059,13 +1170,14 @@ export class DiagnosticService {
   private weightedCore(
     questions: DiagnosticQuestionForScoring[],
     answers: AnswerMap,
-    attemptId?: number,
+    permutations: Record<number, number[]>,
   ) {
     return Math.round(
-      this.sectionPercentage(questions, answers, 'LANGUAGE_USE', attemptId) *
+      this.sectionPercentage(questions, answers, 'LANGUAGE_USE', permutations) *
         0.4 +
-        this.sectionPercentage(questions, answers, 'READING', attemptId) * 0.3 +
-        this.sectionPercentage(questions, answers, 'LISTENING', attemptId) *
+        this.sectionPercentage(questions, answers, 'READING', permutations) *
+          0.3 +
+        this.sectionPercentage(questions, answers, 'LISTENING', permutations) *
           0.3,
     );
   }
@@ -1073,7 +1185,7 @@ export class DiagnosticService {
   private bandPercentages(
     questions: DiagnosticQuestionForScoring[],
     answers: AnswerMap,
-    attemptId?: number,
+    permutations: Record<number, number[]>,
   ) {
     const result: Record<string, number> = {};
     for (const band of ['A1', 'A2', 'B1', 'B2']) {
@@ -1084,21 +1196,13 @@ export class DiagnosticService {
       );
       result[band] = items.length
         ? Math.round(
-            (items.filter((question) => {
-              const perm =
-                attemptId && !isOpenDiagnosticQuestion(question)
-                  ? getAttemptQuestionPermutation(
-                      attemptId,
-                      question.id,
-                      getQuestionOptions(question).length,
-                    )
-                  : undefined;
-              return isDiagnosticAnswerCorrect(
+            (items.filter((question) =>
+              isDiagnosticAnswerCorrect(
                 question,
                 answers[String(question.id)],
-                perm,
-              );
-            }).length /
+                permutations[question.id],
+              ),
+            ).length /
               items.length) *
               100,
           )

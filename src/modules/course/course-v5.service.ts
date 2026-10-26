@@ -273,9 +273,34 @@ export class CourseLearningV5Service {
         }
       }
     }
+    // Free-text items ("Viết một câu giới thiệu nơi bạn đến") have many valid
+    // answers but store a single model answer. Grading them by exact match
+    // marked "I am from Can Tho." wrong against "I am from Hanoi.", and since a
+    // required exercise needs 100%, lessons could not be completed honestly.
+    // They must be answered, are returned with the model answer for
+    // self-review, and do not count toward the score.
+    for (const question of exercise.questions) {
+      if (this.isOpenQuestion(question)) {
+        const answer = answerById.get(question.id);
+        if (typeof answer !== 'string' || answer.trim().length === 0) {
+          throw new BadRequestException(
+            `Hãy viết câu trả lời cho câu hỏi ${question.order}`,
+          );
+        }
+      }
+    }
     const graded = exercise.questions.map((question) => {
       const rawAnswer = answerById.get(question.id);
       const answer = rawAnswer === undefined ? null : rawAnswer;
+      if (this.isOpenQuestion(question)) {
+        return {
+          questionId: question.id,
+          answer,
+          isCorrect: null,
+          score: null,
+          explanation: question.explanation,
+        };
+      }
       const isCorrect = this.answersEqual(answer, question.correctAnswer);
       return {
         questionId: question.id,
@@ -285,8 +310,10 @@ export class CourseLearningV5Service {
         explanation: question.explanation,
       };
     });
-    const score = graded.reduce((sum, answer) => sum + answer.score, 0);
-    const maxScore = exercise.questions.length;
+    const score = graded.reduce((sum, answer) => sum + (answer.score ?? 0), 0);
+    const maxScore = exercise.questions.filter(
+      (question) => !this.isOpenQuestion(question),
+    ).length;
     const attempt = await this.prisma.$transaction(async (tx) => {
       if (typeof tx.$executeRaw === 'function') {
         const lockKey = BigInt(user.id) * 1_000_003n + BigInt(exerciseId);
@@ -371,12 +398,19 @@ export class CourseLearningV5Service {
     );
   }
 
+  /** A question without options is answered in the learner's own words. */
+  private isOpenQuestion(question: { options: Prisma.JsonValue | null }) {
+    return !Array.isArray(question.options) || question.options.length === 0;
+  }
+
   private isSuccessful(
     score: number | null,
     maxScore: number | null,
     minimumScore?: number | null,
   ) {
-    if (score === null || maxScore === null || maxScore <= 0) return false;
+    if (score === null || maxScore === null || maxScore < 0) return false;
+    // Every item was free text: a submitted attempt (all answered) completes it.
+    if (maxScore === 0) return score === 0;
     return minimumScore !== null && minimumScore !== undefined
       ? (score / maxScore) * 100 >= minimumScore
       : score === maxScore;

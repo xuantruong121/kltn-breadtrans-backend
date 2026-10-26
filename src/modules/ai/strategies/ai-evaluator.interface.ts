@@ -99,6 +99,20 @@ export interface IAIEvaluator {
   chat(prompt: string): Promise<string>;
 
   /**
+   * Schema-constrained JSON generation for machine consumers such as rubric
+   * grading. Unlike `chat`, it adds no persona, never substitutes a friendly
+   * fallback string, and THROWS on every failure (missing credentials
+   * included), so callers can tell a provider outage from malformed output.
+   * The returned text is unvalidated; callers must validate it.
+   */
+  generateStructuredJson?(input: {
+    systemInstruction: string;
+    prompt: string;
+    responseSchema: unknown;
+    temperature?: number;
+  }): Promise<{ text: string; model: string }>;
+
+  /**
    * Chấm điểm phát âm từ file audio
    * @param targetText Đoạn văn mẫu học viên cần đọc
    * @param audioBuffer File audio dưới dạng binary buffer (chuẩn WAV 16kHz)

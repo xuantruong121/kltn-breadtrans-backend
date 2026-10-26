@@ -2171,6 +2171,20 @@ export class QuizService {
   async submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto) {
     const quiz = await this.getQuizById(quizId, true, userId);
 
+    // This endpoint grades only Listening and Reading practice, whose answers
+    // are validated below (complete, each question once). TOEIC and Writing
+    // quizzes have their own submit flows; reaching them here scored
+    // `dto.answers` as sent, so one question repeated N times earned N points
+    // and N x 10 XP on the leaderboard.
+    if (
+      quiz.type !== QuizType.LISTENING_PRACTICE &&
+      quiz.type !== QuizType.BILINGUAL_READING
+    ) {
+      throw new BadRequestException(
+        'Bài này không được nộp qua luyện Nghe/Đọc',
+      );
+    }
+
     if (quiz.type === QuizType.LISTENING_PRACTICE) {
       this.assertCompleteListeningSubmission(quiz.questions, dto.answers);
     } else if (quiz.type === QuizType.BILINGUAL_READING) {

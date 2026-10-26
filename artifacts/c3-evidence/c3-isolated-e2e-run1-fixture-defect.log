@@ -1,0 +1,65 @@
+targets: db=c3_clone sysid=7700826478806171683  redis port=6391 keys=0
+prisma:info Starting a postgresql pool with 9 connections.
+synthetic assessment 6: speaking 45s/60s, writing 60-90/90-130
+PASS  the grader under test is the real-mode provider grader
+PASS  HTTP: unauthenticated request is refused
+PASS  HTTP: current assessment is the synthetic runnable form  (status=200 id=6)
+PASS  delivery: Speaking tasks carry their own response limits
+PASS  delivery: Writing tasks carry their word guidance
+PASS  start creates an IN_PROGRESS attempt  (attempt=58)
+PASS  a real 50 s recording is refused on the 45 s task  (Bản ghi dài hơn thời gian cho phép của nhiệm vụ)
+PASS  a real 50 s recording claiming 44 s is still refused
+PASS  a real 44.5 s recording is accepted on the 45 s task  (measured=44500 ms)
+PASS  the decoded duration is what was stored
+PASS  another learner cannot upload into this attempt
+PASS  malformed media is refused  (Không đọc được nội dung bản ghi âm)
+PASS  a 59 s and then a re-recorded 58 s answer are accepted on the 60 s task
+PASS  both Speaking tasks reach GRADED through the real queue and worker  (GRADED/GRADED)
+PASS  Azure sessions bounded by accepted uploads (2 or 3)  (sessions=3)
+PASS  the rejected first reply was retried with the SAME Azure evidence (model calls = sessions + 1)  (model=4 sessions=3)
+PASS  the session received canonical 16 kHz PCM of the decoded length  (first=1424000 bytes)
+PASS  the speaking prompt carries the transcript and Azure evidence, and forbids a formula
+PASS  only the latest recording object is kept  (objects=2)
+PASS  the graded task-2 response is the re-recording  (58000)
+PASS  speaking results carry rubric version, criteria, per-criterion and overall feedback
+PASS  the stored transcript is the adapter transcript, not the model-forged one  (I like to visit the lake near my village because it is calm and green.)
+FAIL  persisted speaking metadata holds validated speech evidence and grounded quotes
+PASS  at most one speaking row was graded on its second model reply  (2/1)
+PASS  no storage key in any learner payload
+PASS  another learner cannot fetch this learner's audio
+PASS  the owner gets a short-lived audio URL
+PASS  submission is accepted over HTTP  (status=201 )
+PASS  objective grade stays correct: 1 of 2  (1)
+PASS  right after submission Writing is pending, and pending is not a zero
+PASS  Speaking skill is COMPLETE only because both tasks are GRADED
+PASS  Writing skill is PENDING with no score right after submission  (PENDING)
+PASS  a provider outage leaves both Writing tasks GRADING_FAILED, not zero  (GRADING_FAILED/GRADING_FAILED)
+PASS  the failed state is not reported as pending
+PASS  a transient model outage is retried once per task, then fails as transient  (PROVIDER_TRANSIENT:MODEL_HTTP_503: fake provider failure | PROVIDER_TRANSIENT:MODEL_HTTP_503: fake provider failure)
+PASS  Writing skill is FAILED with no score, never zero
+PASS  another learner cannot retry this learner's writing
+PASS  two concurrent retries: one accepted, one refused  (409,202)
+PASS  after retry both Writing tasks are GRADED with rubric criteria
+PASS  Writing feedback carries per-criterion notes once GRADED
+PASS  Writing skill is COMPLETE with a score only after both tasks are GRADED
+PASS  word counts were computed server-side
+PASS  nothing is pending once every task is graded
+PASS  a GRADED Writing task cannot be re-queued
+PASS  exactly one Writing row per task
+PASS  writing runs: task 1 graded on run 2 despite two concurrent retries
+PASS  a replayed submission returns the recorded result and rewrites nothing
+PASS  no extra Writing rows after the replay
+PASS  a recording after submission is refused
+PASS  no recognizable speech fails closed as INSUFFICIENT_EVIDENCE, no score  (INSUFFICIENT_EVIDENCE:SPEECH_EVIDENCE_INSUFFICIENT: 0 word(s) recognized; at least 5 required)
+PASS  the model is never asked to grade a recording without speech
+PASS  another learner cannot retry this learner's speaking
+PASS  speaking retry is accepted
+PASS  the retried recording is GRADED
+PASS  Azure throttling is retried once, then GRADING_FAILED as transient  (PROVIDER_TRANSIENT:AZURE_TooManyRequests: 429; sessions=2)
+PASS  a rejected model credential fails at once as permanent, called once  (PROVIDER_PERMANENT:MODEL_HTTP_401: fake provider failure; calls=1)
+PASS  DRAFT start refused over HTTP
+PASS  DRAFT submission refused over HTTP
+PASS  no attempt exists on the DRAFT
+seam calls: azureSessions=8 modelCalls=12
+
+C3_ISOLATED_E2E_FAILURES=1

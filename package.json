@@ -147,7 +147,8 @@
     "rootDir": "src",
     "roots": [
       "<rootDir>",
-      "<rootDir>/../prisma"
+      "<rootDir>/../prisma",
+      "<rootDir>/../test/safety"
     ],
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
@@ -157,7 +158,11 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "globalSetup": "<rootDir>/../test/safety/jest-global-setup.ts",
+    "setupFiles": [
+      "<rootDir>/../test/safety/jest-setup-isolation.ts"
+    ]
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

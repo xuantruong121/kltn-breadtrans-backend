@@ -1,3 +1,4 @@
+import { extendDoubleBanhUntil } from './market-effects';
 import {
   Injectable,
   BadRequestException,
@@ -290,17 +291,26 @@ export class MarketService {
           });
         }
 
-        // Double-bread boost: activate for 7 days
+        // Double-bread boost: 24 hours per card, as the product is sold
+        // ("Thẻ nhân đôi Bánh Mì (24h Boost)"). It used to grant 7 days per
+        // card and reset a running boost.
         if (
           product.slug.includes('double-bread') ||
           product.name.toLowerCase().includes('double bread') ||
           product.name.toLowerCase().includes('bánh x2')
         ) {
-          const boostedUntil = new Date();
-          boostedUntil.setDate(boostedUntil.getDate() + 7 * quantity);
+          const stats = await tx.userStats.findUnique({
+            where: { userId },
+            select: { doubleBanhUntil: true },
+          });
           await tx.userStats.update({
             where: { userId },
-            data: { doubleBanhUntil: boostedUntil },
+            data: {
+              doubleBanhUntil: extendDoubleBanhUntil(
+                stats?.doubleBanhUntil ?? null,
+                quantity,
+              ),
+            },
           });
         }
 
@@ -333,6 +343,7 @@ export class MarketService {
       // 2e. Tạo bản ghi đơn hàng MarketOrder
       const orderItems = resolvedItems.map(({ product, quantity }) => ({
         productId: product.id,
+        slug: product.slug,
         name: product.name,
         price: product.price,
         quantity,

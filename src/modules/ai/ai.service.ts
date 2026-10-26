@@ -166,6 +166,21 @@ export class AiService {
     return this.aiEvaluator.generateFeedback(question, studentAnswer);
   }
 
+  /** See IAIEvaluator.generateStructuredJson: throws on every failure. */
+  async generateStructuredJson(input: {
+    systemInstruction: string;
+    prompt: string;
+    responseSchema: unknown;
+    temperature?: number;
+  }): Promise<{ text: string; model: string }> {
+    if (!this.aiEvaluator.generateStructuredJson) {
+      const error = new Error('Structured JSON generation is not supported');
+      (error as Error & { code?: string }).code = 'PROVIDER_NOT_CONFIGURED';
+      throw error;
+    }
+    return this.aiEvaluator.generateStructuredJson(input);
+  }
+
   async chat(prompt: string): Promise<string> {
     return this.aiEvaluator.chat(prompt);
   }

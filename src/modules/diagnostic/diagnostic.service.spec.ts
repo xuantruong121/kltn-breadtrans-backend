@@ -1,5 +1,25 @@
 import { BadRequestException } from '@nestjs/common';
+import { getLearnerQuestionPermutation } from './diagnostic.logic';
 import { DiagnosticService } from './diagnostic.service';
+
+/**
+ * The displayed index a learner clicks for an AUTHORED option. Answers are
+ * submitted as displayed indexes, so a test that means "the learner chose
+ * option N" must translate through the server's own display permutation.
+ */
+const shown = (
+  userId: number,
+  assessmentId: number,
+  questionId: number,
+  authoredIndex: number,
+  optionCount: number,
+) =>
+  getLearnerQuestionPermutation(
+    userId,
+    assessmentId,
+    questionId,
+    optionCount,
+  ).indexOf(authoredIndex);
 
 describe('DiagnosticService', () => {
   const questions = [
@@ -59,6 +79,14 @@ describe('DiagnosticService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn(),
+        // The learner's own in-progress attempt on this assessment.
+        findUnique: jest.fn().mockResolvedValue({
+          id: 4,
+          userId: 7,
+          assessmentId: 1,
+          status: 'IN_PROGRESS',
+          answers: {},
+        }),
       },
       course: {
         findMany: jest.fn().mockResolvedValue([
@@ -126,15 +154,19 @@ describe('DiagnosticService', () => {
           diagnosticAttempt: {
             findFirst: jest.fn().mockResolvedValue(null),
             count: jest.fn().mockResolvedValue(0),
-            create: jest.fn().mockResolvedValue({
-              id: 4,
-              answers: { '1': 0, '2': 1, '3': 0 },
-              correctCount: 3,
-              totalCount: 3,
-              percentage: 100,
-              level: 'Intermediate',
-              submittedAt: new Date(),
-            }),
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({ id: 4, status: 'IN_PROGRESS' }),
+            // Echo what was written, as the database would.
+            update: jest.fn((args: { data: Record<string, unknown> }) =>
+              Promise.resolve({
+                id: 4,
+                userId: 7,
+                assessmentId: 1,
+                submittedAt: new Date(),
+                ...args.data,
+              }),
+            ),
           },
           learningActivity: { create: jest.fn() },
           userStats: {
@@ -153,14 +185,22 @@ describe('DiagnosticService', () => {
   });
 
   it('rejects missing, unknown and out-of-range answers before transaction', async () => {
+    // Learner 7 on their own attempt 4, so each rejection below is caused by
+    // the answers themselves rather than by an ownership failure.
     await expect(
-      service.submitAssessment(1, 1, { '1': 0 }),
+      service.submitAssessment(7, 1, { '1': 0 }, undefined, 4),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
-      service.submitAssessment(1, 1, { '1': 0, '2': 1, '3': 0, '999': 0 }),
+      service.submitAssessment(
+        7,
+        1,
+        { '1': 0, '2': 1, '3': 0, '999': 0 },
+        undefined,
+        4,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
-      service.submitAssessment(1, 1, { '1': 8, '2': 1, '3': 0 }),
+      service.submitAssessment(7, 1, { '1': 8, '2': 1, '3': 0 }, undefined, 4),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -169,8 +209,13 @@ describe('DiagnosticService', () => {
     const result = await service.submitAssessment(
       7,
       1,
-      { '1': 0, '2': 1, '3': 0 },
+      {
+        '1': shown(7, 1, 1, 0, 2),
+        '2': shown(7, 1, 2, 1, 2),
+        '3': shown(7, 1, 3, 0, 2),
+      },
       'token-1',
+      4,
     );
     expect(result).toMatchObject({
       attemptId: 4,
@@ -198,6 +243,8 @@ describe('DiagnosticService', () => {
   it('reuses a submission with the same client token without creating another attempt', async () => {
     const existing = {
       id: 9,
+      userId: 7,
+      assessmentId: 1,
       answers: { '1': 0, '2': 1, '3': 0, __submissionToken: 'same-token' },
       correctCount: 3,
       totalCount: 3,
@@ -227,6 +274,7 @@ describe('DiagnosticService', () => {
       1,
       { '1': 0, '2': 1, '3': 0 },
       'same-token',
+      4,
     );
     expect(result.attemptId).toBe(9);
     expect(executeRaw).toHaveBeenCalledTimes(1);
@@ -322,15 +370,15 @@ describe('DiagnosticService', () => {
             findUnique: jest
               .fn()
               .mockResolvedValue({ id: 10, status: 'IN_PROGRESS' }),
-            update: jest.fn().mockResolvedValue({
-              id: 10,
-              answers: { '101': 1, '102': 1, '103': 'SKIPPED' },
-              correctCount: 1,
-              totalCount: 2,
-              percentage: 50,
-              level: 'A1',
-              submittedAt: new Date(),
-            }),
+            update: jest.fn((args: { data: Record<string, unknown> }) =>
+              Promise.resolve({
+                id: 10,
+                userId: 7,
+                assessmentId: 2,
+                submittedAt: new Date(),
+                ...args.data,
+              }),
+            ),
             create: jest.fn().mockResolvedValue({
               id: 10,
               answers: { '101': 1, '102': 1, '103': 'spoken answer' },
@@ -351,7 +399,13 @@ describe('DiagnosticService', () => {
     const result = await service.submitAssessment(
       7,
       2,
-      { '101': { originalIndex: 1 }, '102': 1, '103': 'SKIPPED' },
+      // 101 answered correctly (authored option 1), 102 wrongly (authored 1,
+      // key 0). A client-declared originalIndex is no longer accepted.
+      {
+        '101': shown(7, 2, 101, 1, 2),
+        '102': shown(7, 2, 102, 1, 2),
+        '103': 'SKIPPED',
+      },
       'token-v2',
       10,
     );

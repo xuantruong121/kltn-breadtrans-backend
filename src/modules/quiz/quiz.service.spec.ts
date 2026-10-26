@@ -762,6 +762,37 @@ describe('QuizService', () => {
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
+    it.each(['TOEIC', 'TOEIC_FOUR_SKILL', 'WRITING_PICTURE', 'WRITING_EMAIL'])(
+      'refuses a %s quiz, so repeated answers cannot inflate score or XP',
+      async (type) => {
+        mockPrismaService.quiz.findUnique.mockResolvedValue({
+          id: 30,
+          title: 'Not practice',
+          type,
+          questions: [
+            {
+              id: 301,
+              type: 'MULTIPLE_CHOICE',
+              content: { options: ['A', 'B'], correct: 'A' },
+            },
+          ],
+        });
+        mockPrismaService.$transaction.mockClear();
+        mockEventEmitter.emit.mockClear();
+
+        await expect(
+          service.submitQuiz(30, 7, {
+            answers: Array.from({ length: 50 }, () => ({
+              questionId: 301,
+              answer: 'A',
+            })),
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+        expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+      },
+    );
+
     it('keeps Listening activity creation outside the Reading transaction path', async () => {
       mockPrismaService.quiz.findUnique.mockResolvedValue({
         id: 9,

@@ -89,6 +89,25 @@ export class DiagnosticController {
     return this.speakingService.list(req.user.id, assessmentId, attemptId);
   }
 
+  @Post(':id/attempts/:attemptId/speaking/:questionId/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Chấm lại bản ghi Speaking đã chấm lỗi (giữ nguyên bản ghi)',
+  })
+  retrySpeaking(
+    @Request() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) assessmentId: number,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+  ) {
+    return this.speakingService.retry(
+      req.user.id,
+      assessmentId,
+      attemptId,
+      questionId,
+    );
+  }
+
   @Post(':id/attempts/:attemptId/writing/:questionId/retry')
   @HttpCode(HttpStatus.ACCEPTED)
   retryWriting(

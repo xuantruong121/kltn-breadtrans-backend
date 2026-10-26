@@ -8,7 +8,8 @@ import { TransformInterceptor } from '../../src/common/interceptors/transform.in
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-const mode = process.env.WRITING_QA_PROVIDER_MODE === 'failure' ? 'failure' : 'success';
+const mode =
+  process.env.WRITING_QA_PROVIDER_MODE === 'failure' ? 'failure' : 'success';
 const counterFile = process.env.WRITING_QA_COUNTER_FILE;
 let calls = 0;
 
@@ -21,7 +22,8 @@ function persistCounter() {
 function evaluate(score: number) {
   calls += 1;
   persistCounter();
-  if (mode === 'failure') throw new Error('deterministic writing provider unavailable');
+  if (mode === 'failure')
+    throw new Error('deterministic writing provider unavailable');
   return {
     score,
     feedback: 'Deterministic acceptance feedback.',

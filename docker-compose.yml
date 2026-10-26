@@ -13,6 +13,11 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # `always`, not `unless-stopped`: Docker Desktop marks containers as
+    # manually stopped when it shuts down, and `unless-stopped` then declines
+    # to start them on the next boot. The backup worker is useless without
+    # this service, so it must come back on its own.
+    restart: always
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d kltn_db']
       interval: 10s
@@ -33,6 +38,7 @@ services:
       - '5433:5432'
     volumes:
       - postgres_shadow_data:/var/lib/postgresql/data
+    restart: always
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d kltn_shadow']
       interval: 10s
@@ -66,7 +72,7 @@ services:
       - ./docker/postgres-backup/backup.sh:/usr/local/bin/backup.sh:ro
       - ${POSTGRES_BACKUP_DIR:-./db-backups}:/backups
     entrypoint: ['/bin/sh', '/usr/local/bin/backup.sh']
-    restart: unless-stopped
+    restart: always
     # The scheduler loop is PID 1, so a fatal exit already stops the container
     # and the restart policy takes over. This only catches the failure mode that
     # leaves the loop alive but unable to do its job: the host bind mount going
@@ -86,6 +92,7 @@ services:
       - '6379:6379'
     volumes:
       - redis_data:/data
+    restart: always
     command: redis-server --save 60 1 --loglevel warning
 
 volumes:

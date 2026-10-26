@@ -1,0 +1,5 @@
+target localhost:5437/b2b_rehearsal sysid=7700793221349826600 pg=15.19 read_only=off mode=rehearsal
+IMPORT_RESULT {"assessmentId":5,"created":{"assessment":1,"passage":3,"rubric":2,"question":29,"clip":10},"updated":{},"unchanged":{},"isActive":false,"status":"DRAFT"}
+PASS  importer returned an inactive DRAFT
+
+B2B_IMPORT_FAILURES=0

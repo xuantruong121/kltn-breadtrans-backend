@@ -1,0 +1,12 @@
+> temp-app@0.0.1 db:migrate:deploy
+> prisma migrate deploy
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "kltn_db", schema "public" at "localhost:5432"
+68 migrations found in prisma/migrations
+Applying migration `20261025120000_diagnostic_source_identity`
+The following migration(s) have been applied:
+migrations/
+  └─ 20261025120000_diagnostic_source_identity/
+    └─ migration.sql
+All migrations have been successfully applied.

@@ -1,0 +1,609 @@
+{
+  "takenAt": "2026-10-26T03:43:45.815Z",
+  "identity": {
+    "db": "kltn_shadow",
+    "version": "15.19",
+    "sysid": "7699757546958700579",
+    "readOnlySession": "on"
+  },
+  "migrations": [],
+  "sourceKeyColumns": [],
+  "diagnosticIndexes": [
+    {
+      "tablename": "DiagnosticAssessment",
+      "indexname": "DiagnosticAssessment_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticAssessment_pkey\" ON public.\"DiagnosticAssessment\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticAssessment",
+      "indexname": "DiagnosticAssessment_single_active_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticAssessment_single_active_key\" ON public.\"DiagnosticAssessment\" USING btree (\"isActive\") WHERE (\"isActive\" = true)"
+    },
+    {
+      "tablename": "DiagnosticAttempt",
+      "indexname": "DiagnosticAttempt_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticAttempt_pkey\" ON public.\"DiagnosticAttempt\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticAttempt",
+      "indexname": "DiagnosticAttempt_userId_assessmentId_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticAttempt_userId_assessmentId_status_idx\" ON public.\"DiagnosticAttempt\" USING btree (\"userId\", \"assessmentId\", status)"
+    },
+    {
+      "tablename": "DiagnosticAttempt",
+      "indexname": "DiagnosticAttempt_userId_submittedAt_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticAttempt_userId_submittedAt_idx\" ON public.\"DiagnosticAttempt\" USING btree (\"userId\", \"submittedAt\")"
+    },
+    {
+      "tablename": "DiagnosticQuestion",
+      "indexname": "DiagnosticQuestion_assessmentId_order_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticQuestion_assessmentId_order_idx\" ON public.\"DiagnosticQuestion\" USING btree (\"assessmentId\", \"order\")"
+    },
+    {
+      "tablename": "DiagnosticQuestion",
+      "indexname": "DiagnosticQuestion_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticQuestion_pkey\" ON public.\"DiagnosticQuestion\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticSpeakingResponse",
+      "indexname": "DiagnosticSpeakingResponse_attemptId_questionId_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticSpeakingResponse_attemptId_questionId_key\" ON public.\"DiagnosticSpeakingResponse\" USING btree (\"attemptId\", \"questionId\")"
+    },
+    {
+      "tablename": "DiagnosticSpeakingResponse",
+      "indexname": "DiagnosticSpeakingResponse_attemptId_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticSpeakingResponse_attemptId_status_idx\" ON public.\"DiagnosticSpeakingResponse\" USING btree (\"attemptId\", status)"
+    },
+    {
+      "tablename": "DiagnosticSpeakingResponse",
+      "indexname": "DiagnosticSpeakingResponse_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticSpeakingResponse_pkey\" ON public.\"DiagnosticSpeakingResponse\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticSpeakingResponse",
+      "indexname": "DiagnosticSpeakingResponse_userId_assessmentId_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticSpeakingResponse_userId_assessmentId_status_idx\" ON public.\"DiagnosticSpeakingResponse\" USING btree (\"userId\", \"assessmentId\", status)"
+    }
+  ],
+  "diagnosticConstraints": [
+    {
+      "tbl": "\"DiagnosticAssessment\"",
+      "conname": "DiagnosticAssessment_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticAttempt\"",
+      "conname": "DiagnosticAttempt_assessmentId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"assessmentId\") REFERENCES \"DiagnosticAssessment\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticAttempt\"",
+      "conname": "DiagnosticAttempt_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticAttempt\"",
+      "conname": "DiagnosticAttempt_userId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticQuestion\"",
+      "conname": "DiagnosticQuestion_assessmentId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"assessmentId\") REFERENCES \"DiagnosticAssessment\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticQuestion\"",
+      "conname": "DiagnosticQuestion_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_assessmentId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"assessmentId\") REFERENCES \"DiagnosticAssessment\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_attemptId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"attemptId\") REFERENCES \"DiagnosticAttempt\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_questionId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"questionId\") REFERENCES \"DiagnosticQuestion\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_userId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    }
+  ],
+  "tableCount": 112,
+  "tableFingerprints": {
+    "public.AiGenerationJob": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.AiUsage": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Announcement": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Assignment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.AssignmentSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.AuthAccount": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Badge": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.BanhTransaction": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.BankTransaction": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Class": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ContentAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ContentTopic": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Course": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseActivity": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLesson": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonExercise": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonExerciseAnswer": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonMedia": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonQuestion": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonReference": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonSection": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CurrencyTransaction": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DailyBanhEarning": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DailyQuest": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DiagnosticAssessment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DiagnosticAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DiagnosticQuestion": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DiagnosticSpeakingResponse": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Enrollment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Exam": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.GameBattle": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.GamePlay": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.GameSettings": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.GrammarAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.GrammarQuestion": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.GrammarTopic": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.IssueReport": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Leaderboard": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.LearningActivity": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Lesson": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ListeningAudioArtifact": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ListeningAudioUsage": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ListeningDiagnosticClip": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ListeningPracticeAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ListeningTranscriptReveal": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.MarketOrder": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.MarketPhysicalRedemption": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.MarketProduct": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Material": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Notification": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.PayOSPaymentIntent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Payment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Plan": {
+      "rows": 1,
+      "md5": "1c60c6c00069f510f0eb1f010d44d122"
+    },
+    "public.PlanEntitlement": {
+      "rows": 6,
+      "md5": "2b8900a3be29e2f8473fb614f0c4a71a"
+    },
+    "public.PlanPayment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.PlanPurchase": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.PlanVersion": {
+      "rows": 1,
+      "md5": "f397e0e0709b669b588f6da1e277b619"
+    },
+    "public.PointHistory": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.PracticeTopic": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Profile": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.PushSubscription": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Question": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Quiz": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.QuizAudioAsset": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Result": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SpeakingCategory": {
+      "rows": 5,
+      "md5": "af5db674d9011d1711f8551a5c619914"
+    },
+    "public.SpeakingExercise": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SpeakingPracticeSet": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SpeakingRewardLedger": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SpeakingStimulus": {
+      "rows": 1,
+      "md5": "1b0bbb72cd956ecae67794cad0d992ea"
+    },
+    "public.SpeakingSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SpeakingUploadIntent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Submission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Subscription": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SubscriptionEvent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Suggestion": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SuggestionAttachment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SupportConversation": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SupportMessage": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessmentAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessmentAttemptComponent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessmentComponent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessmentSpeakingSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessmentWritingSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAttemptAnswer": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicExamSet": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicIntegrityEvent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicQuestion": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicQuestionGroup": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicSpeakingWritingSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicWritingSet": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicWritingSetItem": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.User": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserBadge": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserBilling": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserBookProgress": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserGrammarReward": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserPet": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserQuestProgress": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserQuizReward": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserSavedWord": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserShippingProfile": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserStats": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserToeicReward": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserVocabMasteryReward": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserVocabWordProgress": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.VocabTopic": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.VocabWord": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.WatchTracking": {
+      "rows": 0,
+      "md5": "empty"
+    }
+  },
+  "legacyXmin": {
+    "assessment": [],
+    "questions": []
+  },
+  "sequences": [
+    {
+      "name": "DiagnosticAssessment_id_seq",
+      "last_value": null
+    },
+    {
+      "name": "DiagnosticAttempt_id_seq",
+      "last_value": null
+    },
+    {
+      "name": "DiagnosticQuestion_id_seq",
+      "last_value": null
+    },
+    {
+      "name": "DiagnosticSpeakingResponse_id_seq",
+      "last_value": null
+    }
+  ]
+}

@@ -35,7 +35,7 @@ describe('CourseService self-paced business rules', () => {
       create: jest.fn(),
     },
     payment: { count: jest.fn(), create: jest.fn() },
-    courseLesson: { findMany: jest.fn() },
+    courseLesson: { findMany: jest.fn(), count: jest.fn() },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   } as any;
@@ -75,6 +75,57 @@ describe('CourseService self-paced business rules', () => {
       service.updateCourseStatus(1, CourseStatus.PUBLISHED),
     ).rejects.toThrow('chưa có bài học V5');
     expect(prisma.course.update).not.toHaveBeenCalled();
+  });
+
+  describe('startCourse', () => {
+    const pro = { hasFeature: jest.fn().mockResolvedValue(true) } as any;
+    const published = (lessons: unknown[]) => ({
+      id: 1,
+      status: CourseStatus.PUBLISHED,
+      curriculumType: 'FOUR_SKILLS',
+      lessons,
+      quizzes: [],
+      activities: [],
+    });
+
+    it('starts a published course that has published V5 lessons, even with an incomplete legacy curriculum', async () => {
+      const withPro = new CourseService(prisma as PrismaService, pro);
+      prisma.course.findUnique.mockResolvedValue(
+        published([{ id: 1, order: 1, title: 'Legacy', materials: [] }]),
+      );
+      prisma.courseLesson.count.mockResolvedValue(8);
+      await expect(
+        withPro.startCourse(1, { id: 7, role: 'STUDENT' as any }),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          courseId: 1,
+          accessSource: 'PRO_SUBSCRIPTION',
+          learningPath: 'COURSE_LEARNING_V5',
+        }),
+      );
+    });
+
+    it('still refuses a legacy-only course whose curriculum is not ready', async () => {
+      const withPro = new CourseService(prisma as PrismaService, pro);
+      prisma.course.findUnique.mockResolvedValue(published([]));
+      prisma.courseLesson.count.mockResolvedValue(0);
+      await expect(
+        withPro.startCourse(1, { id: 7, role: 'STUDENT' as any }),
+      ).rejects.toThrow('chưa sẵn sàng');
+    });
+
+    it('still requires an active PRO plan', async () => {
+      const noPro = new CourseService(
+        prisma as PrismaService,
+        {
+          hasFeature: jest.fn().mockResolvedValue(false),
+        } as any,
+      );
+      await expect(
+        noPro.startCourse(1, { id: 7, role: 'STUDENT' as any }),
+      ).rejects.toThrow('PRO');
+      expect(prisma.courseLesson.count).not.toHaveBeenCalled();
+    });
   });
 
   it('does not expose draft courses to students', async () => {

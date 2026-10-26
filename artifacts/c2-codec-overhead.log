@@ -1,0 +1,18 @@
+ 0.25s webm -> measured    250 ms  drift +0 ms  (1671 bytes)
+ 0.25s ogg  -> measured    250 ms  drift +0 ms  (1231 bytes)
+ 0.25s m4a  -> measured    256 ms  drift +6 ms  (3206 bytes)
+ 0.25s wav  -> measured    250 ms  drift +0 ms  (24078 bytes)
+    1s webm -> measured   1000 ms  drift +0 ms  (5607 bytes)
+    1s ogg  -> measured   1000 ms  drift +0 ms  (5001 bytes)
+    1s m4a  -> measured   1003 ms  drift +3 ms  (9335 bytes)
+    1s wav  -> measured   1000 ms  drift +0 ms  (96078 bytes)
+   45s webm -> measured  45000 ms  drift +0 ms  (275966 bytes)
+   45s ogg  -> measured  45000 ms  drift +0 ms  (265279 bytes)
+   45s m4a  -> measured  45013 ms  drift +13 ms  (371158 bytes)
+   45s wav  -> measured  45000 ms  drift +0 ms  (4320078 bytes)
+   60s webm -> measured  60000 ms  drift +0 ms  (368766 bytes)
+   60s ogg  -> measured  60000 ms  drift +0 ms  (354644 bytes)
+   60s m4a  -> measured  60011 ms  drift +11 ms  (494581 bytes)
+   60s wav  -> measured  60000 ms  drift +0 ms  (5760078 bytes)
+
+WORST_ABSOLUTE_CODEC_DRIFT_MS=13

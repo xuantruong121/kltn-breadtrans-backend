@@ -1,0 +1,313 @@
+{
+  "phase": "B2B",
+  "title": "Controlled local database migration and DRAFT import",
+  "date": "2026-10-26",
+  "independenceMode": "AUTHOR_SELF_VERIFICATION",
+  "credentialsPolicy": "No password, token or connection string is recorded. Databases are identified by name, port and cluster system_identifier.",
+
+  "authorization": {
+    "B2B_EXPLICIT_USER_AUTHORIZATION": true,
+    "granted": "Apply exactly the reviewed migration and import the 29-item Entry Diagnostic into kltn_db as DRAFT, isActive=false, effective only after every pre-write gate passes.",
+    "choices": {
+      "checkpointOffsite": "R2 private backup bucket plus local protected copy",
+      "readOnlyMechanism": "default_transaction_read_only=on session option; no role created",
+      "httpAuthSmoke": "skipped in B2B, recorded NOT_VERIFIED"
+    },
+    "notAuthorizedAndNotDone": ["activation", "audio generation or upload", "AI grading", "role creation", "row deletion or rollback", "restore into kltn_db"]
+  },
+
+  "preWriteGates": {
+    "G1_identityAndPending": {
+      "pass": true,
+      "target": "localhost:5432 / kltn_db",
+      "system_identifier": "7674533776495505443",
+      "serverVersion": "15.19",
+      "migrationDirectories": 68,
+      "appliedBefore": 67,
+      "pending": ["20261025120000_diagnostic_source_identity"],
+      "failedOrRolledBackRows": 0
+    },
+    "G2_constraintProvenance": {
+      "pass": true,
+      "finding": "The two lifecycle constraints predate the B1 migration and were already applied to kltn_db. The B1 migration contains neither.",
+      "DiagnosticAssessment_single_active_key": { "type": "partial unique index", "createdBy": "20261022130000_enforce_single_active_diagnostic", "appliedAt": "2026-10-23T07:29:30Z" },
+      "DiagnosticAssessment_status_matches_isActive": { "type": "CHECK", "createdBy": "20261025054012_diagnostic_v2_schema_foundation", "appliedAt": "2026-10-25T05:43:35Z" },
+      "b1MigrationMentions": { "constraintNames": 0, "CHECK": 0, "WHERE": 0 },
+      "whyB1SawThem": "B1's rehearsal replayed all 67 earlier migrations before applying its own."
+    },
+    "G3_codeEqualsRehearsedRevision": {
+      "pass": true,
+      "head": "0adb882",
+      "sha256": {
+        "migration.sql": "ba333dac06c01fe33a9887abe02a8d9efac01df89e1116e66c9ca3adf8262825",
+        "v2-content-importer.ts": "9f0f90e220f3fbf76ae43c344914c9809efbeed64487084d517c6f19ee520d6f",
+        "v2-import-mapper.ts": "e6eca130393fad1521bfffc99382ce83e6121541cadd88c92f1e2e877ea51a9d",
+        "content-guards.ts": "45c0d870b87c0a9bc4dcecc1106d263ab2c2b08ea8bb50bf7e67c5f80609abb5",
+        "entry-diagnostic-v2-content-draft.json": "85490d0aa61cd59785dfb585c6c57655333b5b6c0da5edc260d5129e8f499171",
+        "entry-diagnostic-v2-content-draft.sha256": "6bf2baf2c494240c7852769fd1f89ca3db660a233f8413347c1772d671dc4c52",
+        "entry-diagnostic-v2-rubrics-draft.json": "eed58aad4e8131f26dee4722920a230f3a6e931fbaba15d228272465dedaea68"
+      },
+      "allEqualToHead": true
+    },
+    "G4_noConcurrentWriters": {
+      "pass": true,
+      "firstEvaluation": "FAIL. The backend dev server held 9 connections and runs periodic writers: speaking worker @Interval(3000), speaking reconciliation @Interval(30000), payment reconciliation */5, system jobs */5 and hourly. Phase stopped before any write.",
+      "secondEvaluation": "FAIL. After the user stopped it, an orphaned app process PID 13232 (parent 21700 exited) started at 09:01:37 local, listened on 3001 and resumed UPDATE \"SpeakingSubmission\". Phase stopped again. Cause of the relaunch: UNKNOWN.",
+      "finalEvaluation": "PASS. After the user stopped it again: 0 backend node processes, port 3001 closed and 0 kltn_db sessions, held for a 60-second watch, and re-confirmed immediately before the migration and the import.",
+      "otherClaudeSessions": 0,
+      "liveUnchangedFromCheckpointToMigration": "0 of 136 tables differed between the snapshot taken with the checkpoint and the one taken immediately before the migration."
+    },
+    "G5_noContainerOrVolumeChange": {
+      "pass": true,
+      "detail": "kltn-postgres, kltn-postgres-shadow, kltn-postgres-backup and kltn-redis were never stopped, recreated or reconfigured. Only new disposable containers were created and removed."
+    }
+  },
+
+  "checkpoint": {
+    "PROTECTED_CHECKPOINT_CREATED": true,
+    "command": "scripts/db-backup.ps1 -Label PRE_DIAGNOSTIC_V2_IMPORT_PROTECTED",
+    "file": "D:/Study/KLTN/.local-backups/breadtrans-auto/kltn_db_PRE_DIAGNOSTIC_V2_IMPORT_PROTECTED_20261026_020536.dump",
+    "bytes": 683135,
+    "sha256": "1194fb5b8aa59b6e785df1a8d3f7af783ef5e941e1e977028142fc9a1cfb8cdb",
+    "sha256Recomputed": true,
+    "format": "pg_dump -Fc",
+    "archiveReadable": "pg_restore -l PASS",
+    "globalsFile": "globals_PRE_DIAGNOSTIC_V2_IMPORT_PROTECTED_20261026_020536.sql",
+    "class": "PROTECTED_BASELINE",
+    "pruneExemption": {
+      "proven": true,
+      "method": "The real automatic_stamp_of() function from docker/postgres-backup/backup.sh was executed against the filename.",
+      "checkpointResult": "NOT_AUTO (exempt)",
+      "controlResult": "kltn_db_20261026_010617.dump -> MATCH_AUTO (prunable)",
+      "secondGuard": "filename contains PROTECTED"
+    },
+    "offsite": {
+      "remoteKey": "database-backups/protected/baseline/PRE_DIAGNOSTIC_V2_IMPORT_PROTECTED/kltn_db_PRE_DIAGNOSTIC_V2_IMPORT_PROTECTED_20261026_020536.dump",
+      "remoteBytes": 683135,
+      "downloadedSha256Match": true,
+      "publicUrlProbe": 404,
+      "backupBucketIsMediaBucket": false,
+      "remoteRestoreSkipped": "by the backup script's own --no-restore-drill flag; restore was verified locally instead"
+    },
+    "sideEffect": "artifacts/offsite-backup-verification.json was rewritten by the backup script to describe this checkpoint."
+  },
+
+  "restoreVerification": {
+    "PROTECTED_CHECKPOINT_RESTORE_VERIFIED": true,
+    "drillScript": {
+      "firstRun": {
+        "result": "FAILED",
+        "message": "Count mismatch for DiagnosticAssessment : restored= expected=1",
+        "rootCause": "Script limitation, not a restore defect. db-restore-drill.ps1 computes counts only for nine hard-coded $coreTables; a table outside that list reads as $null. Verified by reading lines 128-160 of the script.",
+        "disposableContainerCleanedUp": true
+      },
+      "secondRun": {
+        "result": "PASSED",
+        "assertions": "User=7 Course=3 Lesson=16 Exam=3 ToeicExamSet=2 ToeicQuestionGroup=81 ToeicQuestion=225 ToeicAssessment=2 ToeicAttempt=1, public tables 118, _prisma_migrations 67",
+        "disposableContainerDestroyed": true
+      }
+    },
+    "fullContentVerification": {
+      "method": "The checkpoint was restored into a separate disposable PostgreSQL 15 container and a whole-row, order-independent md5 of every base table was compared against the live snapshot taken with the checkpoint.",
+      "tablesCompared": 136,
+      "tablesWithDifferentContent": 0,
+      "migrationHistoryIdentical": true,
+      "restoreTargetSystemIdentifier": "7700793221349826600",
+      "restoreTargetWasNotProtected": true
+    },
+    "restoredIntoKltnDb": false
+  },
+
+  "rehearsalOnCheckpointCopy": {
+    "container": "kltn-b2b-rehearsal (labels breadtrans.disposable=true, breadtrans.phase=B2B_REHEARSAL), port 5437, database b2b_rehearsal",
+    "system_identifier": "7700793221349826600",
+    "migrateDeploy": "applied exactly 20261025120000_diagnostic_source_identity at localhost:5437",
+    "omitIsolation": "PENDING_MIGRATION_OMIT was not edited during rehearsal. The runner uses a plain PrismaClient with no omit, which models the application after the omit is removed, without touching the source the running application loads.",
+    "results": { "import": "1/1", "verify": "28/28", "reimport": "4/4 (66 rows, 0 rewritten)", "service": "10/10", "negative": "5/5" },
+    "total": { "pass": 48, "fail": 0 },
+    "negativeTests": [
+      "startAttempt on the DRAFT -> NotFoundException 'Bài kiểm tra không tồn tại hoặc đã ngừng hoạt động'",
+      "submitAssessment on the DRAFT -> NotFoundException",
+      "attempt rows before and after: 0 and 0",
+      "UPDATE isActive=true on the DRAFT -> SQLSTATE 23514 (status_matches_isActive)",
+      "DRAFT still DRAFT and inactive afterwards"
+    ],
+    "tablesChanged": ["DiagnosticAssessment", "DiagnosticListeningClip", "DiagnosticQuestion", "DiagnosticReadingPassage", "DiagnosticRubric", "_prisma_migrations"],
+    "teardown": "container and its anonymous volume removed with docker rm -f -v; dangling volume count returned to 26"
+  },
+
+  "liveMigration": {
+    "MIGRATION_APPLIED": true,
+    "command": "npm run db:migrate:deploy",
+    "prismaReportedTarget": "PostgreSQL database \"kltn_db\", schema \"public\" at \"localhost:5432\"",
+    "applied": ["20261025120000_diagnostic_source_identity"],
+    "exit": 0,
+    "MIGRATION_HISTORY_CONSISTENT": true,
+    "historyEvidence": {
+      "rowsAfter": 68,
+      "newRowFinished": true,
+      "newRowRolledBack": false,
+      "newRowChecksumPrefix": "ba333dac06c01fe3",
+      "checksumEqualsFileSha256": true,
+      "earlier67RowsUnchanged": true
+    },
+    "schemaAfter": {
+      "sourceKeyColumns": [
+        { "table": "DiagnosticAssessment", "type": "text", "nullable": true, "default": null },
+        { "table": "DiagnosticQuestion", "type": "text", "nullable": true, "default": null },
+        { "table": "DiagnosticReadingPassage", "type": "text", "nullable": true, "default": null }
+      ],
+      "indexesAdded": ["DiagnosticAssessment_sourceKey_key", "DiagnosticQuestion_assessmentId_sourceKey_key", "DiagnosticReadingPassage_assessmentId_sourceKey_key"],
+      "indexesRemoved": [],
+      "constraintsAdded": [],
+      "constraintsRemoved": [],
+      "lifecycleCheckStillPresent": true
+    },
+    "legacyDataAfterMigration": {
+      "tablesWhoseFingerprintChanged": ["DiagnosticAssessment", "DiagnosticQuestion", "_prisma_migrations"],
+      "whyDiagnosticFingerprintsChanged": "Whole-row text now includes the new NULL column. The data did not change, as the two checks below prove.",
+      "legacyColumnFingerprints": { "assessment_id_1": "aa4052209c0b988e0e3b9e8d2fee33d6 (unchanged)", "legacy_20_questions": "3f78b8cc460d6808de018630af407d3a (unchanged)" },
+      "legacyXminUnchanged": true,
+      "heapRewrite": false,
+      "legacyRowsWithNonNullSourceKey": 0
+    }
+  },
+
+  "omitRemoval": {
+    "PENDING_MIGRATION_OMIT_REMOVED_SAFELY": true,
+    "removedAfter": "live migration applied and all three columns and indexes verified",
+    "removedBefore": "the live import",
+    "applicationRunningAtRemoval": false,
+    "prismaServiceNowIdenticalToHead": true,
+    "filesRemoved": [
+      { "path": "src/prisma/prisma.service.spec.ts", "reason": "tested the removed omit; created in B2A.1, never committed" },
+      { "path": "scripts/audit/b2a1-verify-omit-sql.ts", "reason": "verified the removed omit and imported its constant; created in B2A.1, never committed; its result is recorded in the B2A.1 note" }
+    ],
+    "afterRemoval": { "tsc": 0, "focusedTests": "10/10 suites, 181/181 tests (187 minus the 6 removed omit tests)" },
+    "noCompatibilityLayerLeft": true
+  },
+
+  "liveImport": {
+    "IMPORTER_FIRST_RUN_PASS": true,
+    "firstRun": {
+      "result": { "assessmentId": 5, "created": { "assessment": 1, "passage": 3, "rubric": 2, "question": 29, "clip": 10 }, "updated": {}, "unchanged": {}, "isActive": false, "status": "DRAFT" },
+      "rowsCreated": 45,
+      "hashManifestVerified": "importer default options; verifyHashes not disabled"
+    },
+    "verify": { "pass": 28, "fail": 0, "session": "read_only=on" },
+    "verifyHighlights": [
+      "29 question rows whose sourceKeys are exactly the 29 authored draftKeys",
+      "section counts Listening 10 / Reading 10 / Speaking 2 / Writing 2 / LanguageUse 5",
+      "every stored column equals the mapper output for its authored item, with ids resolved by identity (29 rows)",
+      "25 objective rows: prompt, options and answer key equal the raw draft, independent of the mapper",
+      "3 passages: text equals the authored body and the approved manifest hash; title NULL",
+      "2 rubrics: criteria equal the approved document",
+      "10 clip registrations hashing to exactly 4 authored scripts, each matching its manifest hash, url empty, PENDING_PHASE_E, inactive",
+      "no authoring-only field name in any options blob; no authored internalLabel text anywhere",
+      "no CEFR level, no audio URL"
+    ],
+    "secondRun": {
+      "IMPORTER_SECOND_RUN_ADDITIONAL_ROWS": 0,
+      "IMPORTER_SECOND_RUN_CHANGED_ROWS": 0,
+      "importerReported": { "created": {}, "updated": {}, "unchanged": { "assessment": 1, "passage": 3, "rubric": 2, "question": 29, "clip": 10 } },
+      "xminEvidence": { "rowsCompared": 66, "rowsRewritten": 0, "scope": "45 imported rows plus the legacy assessment and its 20 questions" }
+    },
+    "importerInvocations": 2,
+    "concurrentInvocations": 0
+  },
+
+  "liveServiceTests": {
+    "session": "default_transaction_read_only=on, enforced and asserted before any query",
+    "client": "plain PrismaClient, no omit",
+    "DRAFT_CURRENT_SELECTION_SERVICE_TEST_PASS": true,
+    "DIAGNOSTIC_SERVICE_SMOKE": "PASS",
+    "results": [
+      "getCurrentAssessment succeeds with the DRAFT present",
+      "getCurrentAssessment serves the legacy ACTIVE assessment id=1, not the DRAFT id=5",
+      "the served form is the 20 legacy questions; assertQuestionBank does not fail",
+      "served questions expose no correctIndex, explanation, difficulty, intendedLevel or sourceKey",
+      "getLatestResult succeeds and returns null (0 attempts)",
+      "DRAFT payload through the real sanitizeQuestion: served key set audioUrl, construct, id, options, order, passageBody, passageText, passageTitle, question, questionType, section, skill",
+      "DRAFT payload: none of the 25 stored rationale strings is served",
+      "DRAFT Reading: 10 of 10 items serve the complete authored passage",
+      "DRAFT Listening: audioUrl present and null, no transcript"
+    ],
+    "pass": 10,
+    "fail": 0,
+    "DRAFT_ATTEMPT_DENIAL_SERVICE_TEST_PASS": true,
+    "attemptDenialWhere": "rehearsal copy of the checkpoint only, as required; the runner refuses the negative suite against --live, and that refusal was observed",
+    "LEARNER_PAYLOAD_CONFIDENTIALITY_PASS": true
+  },
+
+  "postWriteInvariants": {
+    "LEGACY_DATA_PRESERVED": true,
+    "tablesCompared": 136,
+    "tablesChanged": 6,
+    "changed": {
+      "public.DiagnosticAssessment": "1 -> 2",
+      "public.DiagnosticListeningClip": "0 -> 10",
+      "public.DiagnosticQuestion": "20 -> 49",
+      "public.DiagnosticReadingPassage": "0 -> 3",
+      "public.DiagnosticRubric": "0 -> 2",
+      "public._prisma_migrations": "67 -> 68"
+    },
+    "unexpectedTablesChanged": [],
+    "tablesUnchanged": 130,
+    "userTableUnchanged": true,
+    "diagnosticAttemptRows": 0,
+    "legacyAssessmentFingerprint": "aa4052209c0b988e0e3b9e8d2fee33d6 (unchanged)",
+    "legacyQuestionsFingerprint": "3f78b8cc460d6808de018630af407d3a (unchanged)",
+    "legacyXminUnchanged": true,
+    "activeAssessments": ["1:ACTIVE"],
+    "v2Assessment": { "id": 5, "status": "DRAFT", "isActive": false, "questions": 29 },
+    "sequencesAfter": { "DiagnosticAssessment_id_seq": 5, "DiagnosticQuestion_id_seq": 89, "DiagnosticReadingPassage_id_seq": 3, "DiagnosticListeningClip_id_seq": 10, "DiagnosticRubric_id_seq": 2, "DiagnosticAttempt_id_seq": 57 },
+    "sequenceNote": "DiagnosticQuestion advanced by exactly 29 and the others by exactly their created rows: the re-import consumed no identifiers.",
+    "shadow": { "SHADOW_DB_MUTATED": false, "tablesChanged": 0, "system_identifier": "7699757546958700579", "migrationRows": "0 -> 0" }
+  },
+
+  "correctionsToEarlierReports": [
+    "B2A and B2A.1 named the submit path 'submitAttempt'. The real method is DiagnosticService.submitAssessment; the cited line 706 is correct.",
+    "B2A treated db-restore-drill.ps1 as able to assert arbitrary table counts. It can only assert nine hard-coded tables; see restoreVerification.drillScript.firstRun."
+  ],
+  "selfCheckDefectsThisPhase": [
+    "A pg_stat_user_tables comparison joined on relname and produced symmetric +x/-x artifacts because schema phase3c_test duplicates 18 table names. Re-measured keyed by schema.table: 0 changes.",
+    "A PowerShell regex in a pre-live quiescence check failed to parse and printed backend_procs=0. That value was discarded and the check re-run with a literal match, which returned 0."
+  ],
+  "observations": [
+    "kltn_db contains a second schema, phase3c_test, with 18 tables and no Diagnostic tables. search_path is \"$user\", public; the migration's unqualified statements could not reach it, and its fingerprints are unchanged."
+  ],
+
+  "notVerified": {
+    "DIAGNOSTIC_HTTP_AUTH_SMOKE": "NOT_VERIFIED",
+    "reason": "User chose option (c). No JWT was created, no session forged, no login performed. The backend was stopped for the whole window."
+  },
+  "applicationState": "The backend dev server is stopped. It is safe to restart: the generated client and the database now both have sourceKey and the omit is gone.",
+
+  "flags": {
+    "B2B_EXPLICIT_USER_AUTHORIZATION": true,
+    "PROTECTED_CHECKPOINT_CREATED": true,
+    "PROTECTED_CHECKPOINT_RESTORE_VERIFIED": true,
+    "REAL_DB_IDENTITY_VERIFIED": true,
+    "MIGRATION_APPLIED": true,
+    "MIGRATION_HISTORY_CONSISTENT": true,
+    "IMPORTER_FIRST_RUN_PASS": true,
+    "IMPORTER_SECOND_RUN_ADDITIONAL_ROWS": 0,
+    "IMPORTER_SECOND_RUN_CHANGED_ROWS": 0,
+    "LEGACY_DATA_PRESERVED": true,
+    "DRAFT_CURRENT_SELECTION_SERVICE_TEST_PASS": true,
+    "DRAFT_ATTEMPT_DENIAL_SERVICE_TEST_PASS": true,
+    "LEARNER_PAYLOAD_CONFIDENTIALITY_PASS": true,
+    "PENDING_MIGRATION_OMIT_REMOVED_SAFELY": true,
+    "DIAGNOSTIC_HTTP_AUTH_SMOKE": "NOT_VERIFIED",
+    "DIAGNOSTIC_SERVICE_SMOKE": "PASS",
+    "REAL_DB_RESET": false,
+    "LEGACY_DATA_DELETED": false,
+    "SHADOW_DB_MUTATED": false,
+    "V2_ACTIVATED": false,
+    "TTS_CALL_COUNT": 0,
+    "AI_GRADING_CALL_COUNT": 0,
+    "FULL_SUITE_PASS": "NOT_RUN",
+    "PHASE_B2B_VERDICT": "CONTROLLED_DRAFT_PERSISTENCE_PASS"
+  },
+  "verdictScope": "Persistence only. The assessment is an inactive DRAFT and is not functional: Listening audio, productive runtime, the FOUR_SKILL_PLACEMENT_V2 scorer and activation remain outstanding."
+}

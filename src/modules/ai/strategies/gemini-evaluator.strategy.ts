@@ -304,6 +304,34 @@ Hãy đưa ra nhận xét chi tiết HOÀN TOÀN BẰNG TIẾNG VIỆT với gi�
     });
   }
 
+  async generateStructuredJson(input: {
+    systemInstruction: string;
+    prompt: string;
+    responseSchema: unknown;
+    temperature?: number;
+  }): Promise<{ text: string; model: string }> {
+    if (!this.hasKeys()) {
+      const error = new Error('Gemini credentials are not configured');
+      (error as Error & { code?: string }).code = 'PROVIDER_NOT_CONFIGURED';
+      throw error;
+    }
+    let modelName = 'unknown';
+    const result = await this.executeWithRotation((model) => {
+      modelName = model.model;
+      return model.generateContent({
+        systemInstruction: input.systemInstruction,
+        contents: [{ role: 'user', parts: [{ text: input.prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: input.responseSchema as never,
+          temperature: input.temperature ?? 0.2,
+        },
+      });
+    }, AiTaskType.STRUCTURED_AUTHORING);
+    await this.recordUsage(result.response?.usageMetadata);
+    return { text: result.response.text(), model: modelName };
+  }
+
   async chat(prompt: string): Promise<string> {
     try {
       if (!this.hasKeys()) {

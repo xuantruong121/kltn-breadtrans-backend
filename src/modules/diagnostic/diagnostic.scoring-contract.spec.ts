@@ -322,7 +322,13 @@ describe('Entry Diagnostic rename regression at service level (DIAG-002)', () =>
       diagnosticAttempt: {
         findFirst: jest.fn().mockResolvedValue(null),
         count: jest.fn().mockResolvedValue(0),
-        findUnique: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 1,
+          userId: 7,
+          assessmentId: 9,
+          status: 'IN_PROGRESS',
+          answers: {},
+        }),
       },
       diagnosticSpeakingResponse: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -336,17 +342,17 @@ describe('Entry Diagnostic rename regression at service level (DIAG-002)', () =>
           diagnosticAttempt: {
             findFirst: jest.fn().mockResolvedValue(null),
             count: jest.fn().mockResolvedValue(0),
-            findUnique: jest.fn().mockResolvedValue(null),
-            create: jest.fn((args: { data: Record<string, unknown> }) => {
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({ id: 1, status: 'IN_PROGRESS' }),
+            update: jest.fn((args: { data: Record<string, unknown> }) => {
               created.push(args.data);
               return Promise.resolve({
                 id: 1,
-                answers: args.data.answers,
-                correctCount: args.data.correctCount,
-                totalCount: args.data.totalCount,
-                percentage: args.data.percentage,
-                level: args.data.level,
+                userId: 7,
+                assessmentId: 9,
                 submittedAt: new Date(),
+                ...args.data,
               });
             }),
           },
@@ -365,11 +371,13 @@ describe('Entry Diagnostic rename regression at service level (DIAG-002)', () =>
 
     const service = new DiagnosticService(prisma, gamification);
 
-    await service.submitAssessment(7, 9, {
-      '1': 'right',
-      '2': 'right',
-      '3': 'right',
-    });
+    await service.submitAssessment(
+      7,
+      9,
+      { '1': 'right', '2': 'right', '3': 'right' },
+      undefined,
+      1,
+    );
 
     expect(created).toHaveLength(1);
     const stored = created[0];
@@ -507,12 +515,11 @@ describe('Entry Diagnostic persisted scoring version (Step 1)', () => {
   });
 
   it('refuses a known but unimplemented scorer instead of silently using V1', () => {
-    // FOUR_SKILL_PLACEMENT_V2 content is authored before its scorer exists;
-    // scoring such a form with the V1 algorithm would produce a confident
-    // wrong result.
-    expect(() =>
-      resolvePersistedScoringVersion('FOUR_SKILL_PLACEMENT_V2'),
-    ).toThrow(/known but its scorer is not implemented/);
+    // FOUR_SKILL_PLACEMENT_V2 now resolves to its own scorer (finalization);
+    // SECTION_BAND_V2 is still defined but not runnable.
+    expect(resolvePersistedScoringVersion('FOUR_SKILL_PLACEMENT_V2')).toBe(
+      'FOUR_SKILL_PLACEMENT_V2',
+    );
     expect(() => resolvePersistedScoringVersion('SECTION_BAND_V2')).toThrow(
       /known but its scorer is not implemented/,
     );
@@ -551,6 +558,7 @@ describe('Entry Diagnostic persisted scoring version (Step 1)', () => {
   it('lists exactly the versions this build can run', () => {
     expect([...SUPPORTED_DIAGNOSTIC_SCORING_VERSIONS]).toEqual([
       'OBJECTIVE_POOLED_V1',
+      'FOUR_SKILL_PLACEMENT_V2',
     ]);
   });
 });

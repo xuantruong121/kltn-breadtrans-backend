@@ -1,6 +1,9 @@
+import { refreshFourSkillResult } from './diagnostic-four-skill.store';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -15,13 +18,19 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { randomUUID } from 'crypto';
 import { UploadService } from '../upload/upload.service';
 import { AiService } from '../ai/ai.service';
-import { MockSpeakingEvaluator } from '../speaking/mock-speaking-evaluator';
-import { getQuestionMeta, isOpenDiagnosticQuestion } from './diagnostic.logic';
+import { classifyDiagnosticTask } from './diagnostic.logic';
 import { DiagnosticSpeakingAudioNormalizer } from './diagnostic-speaking-audio-normalizer';
+import {
+  checkRecordingDuration,
+  DIAGNOSTIC_RUBRIC_GRADER,
+  type DiagnosticRubricGrader,
+  gradeWithRubric,
+  parseRubric,
+  speakingDurationPolicy,
+} from './diagnostic-productive';
+import { selectDiagnosticRubricGrader } from './diagnostic-rubric-grader';
 
 const MAX_BYTES = 10 * 1024 * 1024;
-const MIN_DURATION_MS = 300;
-const MAX_DURATION_MS = 90_000;
 const ALLOWED_MIME = new Set([
   'audio/wav',
   'audio/x-wav',
@@ -36,8 +45,21 @@ type AudioFile = Express.Multer.File;
 
 const DIAGNOSTIC_SPEAKING_QUEUE = 'breadtrans-diagnostic-speaking';
 const DIAGNOSTIC_SPEAKING_JOB = 'diagnostic-speaking-grade';
+const GRADER_VERSION = 'diagnostic-speaking-v2-rubric';
 
+/**
+ * The audioKey is the grading-run identity: it is unique per confirmed
+ * recording, so a job for an older recording can never claim or overwrite the
+ * row once a newer recording has replaced it.
+ */
 type DiagnosticSpeakingJob = { responseId: number; audioKey: string };
+
+const DURATION_MESSAGES: Record<string, string> = {
+  TOO_SHORT: 'Bản ghi quá ngắn',
+  TOO_LONG: 'Bản ghi dài hơn thời gian cho phép của nhiệm vụ',
+  CLIENT_DURATION_MISMATCH:
+    'Thời lượng bản ghi không khớp với nội dung âm thanh',
+};
 
 @Injectable()
 export class DiagnosticSpeakingService
@@ -48,14 +70,20 @@ export class DiagnosticSpeakingService
   private worker?: Worker<DiagnosticSpeakingJob>;
   private queueConnection?: IORedis;
   private workerConnection?: IORedis;
+  private readonly grader: DiagnosticRubricGrader;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly uploadService: UploadService,
-    private readonly aiService: AiService,
+    aiService: AiService,
     @Optional()
     private readonly audioNormalizer?: DiagnosticSpeakingAudioNormalizer,
-  ) {}
+    @Optional()
+    @Inject(DIAGNOSTIC_RUBRIC_GRADER)
+    grader?: DiagnosticRubricGrader,
+  ) {
+    this.grader = grader ?? selectDiagnosticRubricGrader(aiService);
+  }
 
   onModuleInit(): void {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -80,6 +108,12 @@ export class DiagnosticSpeakingService
       async (job) => this.processGradingJob(job),
       { connection: this.workerConnection, concurrency: 2 },
     );
+    // A job that crashed or stalled must not leave its row in GRADING
+    // forever, where neither the learner nor retry can reach it.
+    this.worker.on('failed', (job, error) => {
+      if (job)
+        void this.markRunFailed(job.data, `WORKER_FAILED: ${error.message}`);
+    });
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -89,11 +123,10 @@ export class DiagnosticSpeakingService
     await this.queueConnection?.quit();
   }
 
-  private async loadContext(
+  private async loadAttempt(
     userId: number,
     assessmentId: number,
     attemptId: number,
-    questionId: number,
   ) {
     const attempt = await this.prisma.diagnosticAttempt.findUnique({
       where: { id: attemptId },
@@ -106,22 +139,48 @@ export class DiagnosticSpeakingService
     ) {
       throw new ForbiddenException('Phiên kiểm tra không thuộc tài khoản này');
     }
-    if (attempt.status !== 'IN_PROGRESS') {
-      throw new BadRequestException('Phiên kiểm tra đã hoàn tất');
-    }
+    return attempt;
+  }
+
+  private async loadSpeakingTask(assessmentId: number, questionId: number) {
     const question = await this.prisma.diagnosticQuestion.findFirst({
       where: { id: questionId, assessmentId },
     });
-    if (
-      !question ||
-      !isOpenDiagnosticQuestion(question) ||
-      getQuestionMeta(question).section !== 'SPEAKING'
-    ) {
+    if (!question || classifyDiagnosticTask(question) !== 'SPEAKING') {
       throw new NotFoundException('Nhiệm vụ Speaking không tồn tại');
     }
+    return question;
+  }
+
+  private async loadContext(
+    userId: number,
+    assessmentId: number,
+    attemptId: number,
+    questionId: number,
+  ) {
+    const attempt = await this.loadAttempt(userId, assessmentId, attemptId);
+    if (attempt.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('Phiên kiểm tra đã hoàn tất');
+    }
+    const question = await this.loadSpeakingTask(assessmentId, questionId);
     return { attempt, question };
   }
 
+  private taskKeyOf(question: { id: number; options: unknown }) {
+    const raw = question.options as { stableKey?: unknown } | null;
+    return String(
+      typeof raw?.stableKey === 'string' ? raw.stableKey : question.id,
+    );
+  }
+
+  /**
+   * Accept a recording for one Speaking task.
+   *
+   * Transition: (none | QUEUED | GRADING | GRADED | GRADING_FAILED | SKIPPED)
+   * -> QUEUED, allowed only while the attempt is IN_PROGRESS. Re-recording is
+   * the same transition: the new recording replaces the old one, and the old
+   * recording's job becomes stale because its audioKey no longer matches.
+   */
   async confirmRecording(
     userId: number,
     assessmentId: number,
@@ -130,7 +189,7 @@ export class DiagnosticSpeakingService
     file: AudioFile,
     durationMs?: number,
   ) {
-    const { attempt, question } = await this.loadContext(
+    const { question } = await this.loadContext(
       userId,
       assessmentId,
       attemptId,
@@ -147,18 +206,38 @@ export class DiagnosticSpeakingService
     ) {
       throw new BadRequestException('Định dạng bản ghi không được hỗ trợ');
     }
-    const actualDuration = Number(durationMs);
-    if (
-      !Number.isFinite(actualDuration) ||
-      actualDuration < MIN_DURATION_MS ||
-      actualDuration > MAX_DURATION_MS
-    ) {
-      throw new BadRequestException('Thời lượng bản ghi không hợp lệ');
+
+    // The limit is the task's own response time, and the duration judged is
+    // the one DECODED from the audio, not the one the client reports.
+    let policy: ReturnType<typeof speakingDurationPolicy>;
+    try {
+      policy = speakingDurationPolicy(question);
+    } catch {
+      throw new NotFoundException('Nhiệm vụ Speaking chưa được cấu hình');
+    }
+    let measuredMs: number;
+    try {
+      const decoded = await (
+        this.audioNormalizer ?? new DiagnosticSpeakingAudioNormalizer()
+      ).normalize(file.buffer, mime);
+      measuredMs = decoded.durationMs;
+    } catch {
+      throw new BadRequestException('Không đọc được nội dung bản ghi âm');
+    }
+    const clientMs =
+      durationMs === undefined || durationMs === null
+        ? undefined
+        : Number(durationMs);
+    const verdict = checkRecordingDuration(policy, measuredMs, clientMs);
+    if (!verdict.ok) {
+      throw new BadRequestException(DURATION_MESSAGES[verdict.code]);
     }
 
-    const existing = attempt.speakingResponses.find(
-      (r) => r.questionId === questionId,
-    );
+    const rubric = question.rubricId
+      ? await this.prisma.diagnosticRubric.findUnique({
+          where: { id: question.rubricId },
+        })
+      : null;
     const extension = mime.includes('wav')
       ? 'wav'
       : mime.includes('ogg')
@@ -173,54 +252,78 @@ export class DiagnosticSpeakingService
       mime || 'audio/webm',
     );
 
-    const response = await this.prisma.diagnosticSpeakingResponse.upsert({
-      where: { attemptId_questionId: { attemptId, questionId } },
-      create: {
-        userId,
-        assessmentId,
-        attemptId,
-        questionId,
-        taskKey: String(
-          (getQuestionMeta(question) as { stableKey?: string }).stableKey ??
+    let replacedKey: string | null = null;
+    let response: Awaited<
+      ReturnType<PrismaService['diagnosticSpeakingResponse']['upsert']>
+    >;
+    try {
+      response = await this.prisma.$transaction(async (tx) => {
+        // Serialize confirmations for this task, and re-check the attempt
+        // under the lock: the upload above can take long enough for the
+        // learner to submit, and a recording arriving after submission must
+        // not replace the one that was submitted.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`diagnostic:speaking:${attemptId}:${questionId}`}, 0))`;
+        const current = await tx.diagnosticAttempt.findUnique({
+          where: { id: attemptId },
+          select: { status: true },
+        });
+        if (current?.status !== 'IN_PROGRESS') {
+          throw new BadRequestException('Phiên kiểm tra đã hoàn tất');
+        }
+        const existing = await tx.diagnosticSpeakingResponse.findUnique({
+          where: { attemptId_questionId: { attemptId, questionId } },
+          select: { audioKey: true },
+        });
+        replacedKey = existing?.audioKey ?? null;
+        const fields = {
+          status: 'QUEUED',
+          audioKey,
+          audioMimeType: mime,
+          byteSize: file.size,
+          durationMs: verdict.durationMs,
+          transcript: null,
+          score: null,
+          scoreMetadata: Prisma.JsonNull,
+          provider: null,
+          providerVersion: null,
+          graderVersion: GRADER_VERSION,
+          rubricId: rubric?.id ?? null,
+          rubricVersion: rubric?.rubricVersion ?? null,
+          gradingAttempts: 0,
+          failureReason: null,
+          confirmedAt: new Date(),
+          gradedAt: null,
+        };
+        return tx.diagnosticSpeakingResponse.upsert({
+          where: { attemptId_questionId: { attemptId, questionId } },
+          create: {
+            userId,
+            assessmentId,
+            attemptId,
             questionId,
-        ),
-        status: 'QUEUED',
-        audioKey,
-        audioMimeType: mime,
-        byteSize: file.size,
-        durationMs: actualDuration,
-        transcript: null,
-        score: null,
-        scoreMetadata: Prisma.JsonNull,
-        provider: null,
-        graderVersion: 'diagnostic-speaking-v1',
-        gradingAttempts: 0,
-        failureReason: null,
-        confirmedAt: new Date(),
-        gradedAt: null,
-      },
-      update: {
-        status: 'QUEUED',
-        audioKey,
-        audioMimeType: mime,
-        byteSize: file.size,
-        durationMs: actualDuration,
-        transcript: null,
-        score: null,
-        scoreMetadata: Prisma.JsonNull,
-        provider: null,
-        graderVersion: 'diagnostic-speaking-v1',
-        gradingAttempts: 0,
-        failureReason: null,
-        confirmedAt: new Date(),
-        gradedAt: null,
-      },
-    });
-    if (existing?.audioKey && existing.audioKey !== audioKey) {
-      await this.uploadService
-        .deleteFile(existing.audioKey)
-        .catch(() => undefined);
+            taskKey: this.taskKeyOf(question),
+            ...fields,
+          },
+          update: fields,
+        });
+      });
+    } catch (error) {
+      // The recording was refused: do not leave its object behind.
+      await this.uploadService.deleteFile(audioKey).catch(() => undefined);
+      throw error;
     }
+    if (replacedKey && replacedKey !== audioKey) {
+      await this.uploadService.deleteFile(replacedKey).catch(() => undefined);
+    }
+    return this.enqueue(response, audioKey);
+  }
+
+  private async enqueue(
+    response: Parameters<DiagnosticSpeakingService['publicResponse']>[0] & {
+      id: number;
+    },
+    audioKey: string,
+  ) {
     try {
       if (!this.queue) {
         throw new Error('Diagnostic speaking grading queue is unavailable');
@@ -231,8 +334,8 @@ export class DiagnosticSpeakingService
         { jobId: `diagnostic-speaking-${response.id}-${Date.now()}` },
       );
     } catch (error) {
-      const failed = await this.prisma.diagnosticSpeakingResponse.update({
-        where: { id: response.id },
+      await this.prisma.diagnosticSpeakingResponse.updateMany({
+        where: { id: response.id, audioKey, status: 'QUEUED' },
         data: {
           status: 'GRADING_FAILED',
           failureReason:
@@ -241,7 +344,10 @@ export class DiagnosticSpeakingService
               : 'Không thể xếp hàng chấm tự động',
         },
       });
-      return this.publicResponse(failed);
+      const failed = await this.prisma.diagnosticSpeakingResponse.findUnique({
+        where: { id: response.id },
+      });
+      return this.publicResponse(failed ?? response);
     }
     return this.publicResponse(response);
   }
@@ -265,10 +371,7 @@ export class DiagnosticSpeakingService
         assessmentId,
         attemptId,
         questionId,
-        taskKey: String(
-          (getQuestionMeta(question) as { stableKey?: string }).stableKey ??
-            questionId,
-        ),
+        taskKey: this.taskKeyOf(question),
         status: 'SKIPPED',
         confirmedAt: new Date(),
       },
@@ -282,17 +385,47 @@ export class DiagnosticSpeakingService
     return this.publicResponse(response);
   }
 
-  async list(userId: number, assessmentId: number, attemptId: number) {
-    const attempt = await this.prisma.diagnosticAttempt.findUnique({
-      where: { id: attemptId },
+  /**
+   * Re-grade a recording whose grading failed, keeping the same recording.
+   *
+   * Preconditions: the attempt is the caller's on this assessment; the task's
+   * response exists, is GRADING_FAILED and still has its audio. Allowed after
+   * the attempt is COMPLETED, because the recording no longer changes then.
+   * The status flip is conditional, so two concurrent retries enqueue once.
+   */
+  async retry(
+    userId: number,
+    assessmentId: number,
+    attemptId: number,
+    questionId: number,
+  ) {
+    await this.loadAttempt(userId, assessmentId, attemptId);
+    await this.loadSpeakingTask(assessmentId, questionId);
+    const row = await this.prisma.diagnosticSpeakingResponse.findUnique({
+      where: { attemptId_questionId: { attemptId, questionId } },
     });
-    if (
-      !attempt ||
-      attempt.userId !== userId ||
-      attempt.assessmentId !== assessmentId
-    ) {
-      throw new ForbiddenException('Phiên kiểm tra không thuộc tài khoản này');
-    }
+    if (!row || row.userId !== userId)
+      throw new NotFoundException('Không có bản ghi để chấm lại');
+    if (row.status !== 'GRADING_FAILED' || !row.audioKey)
+      throw new ConflictException(
+        'Bản ghi này không ở trạng thái chấm lại được',
+      );
+    const flipped = await this.prisma.diagnosticSpeakingResponse.updateMany({
+      where: { id: row.id, audioKey: row.audioKey, status: 'GRADING_FAILED' },
+      data: { status: 'QUEUED', failureReason: null },
+    });
+    if (flipped.count === 0)
+      throw new ConflictException(
+        'Bản ghi này không ở trạng thái chấm lại được',
+      );
+    return this.enqueue(
+      { ...row, status: 'QUEUED', failureReason: null },
+      row.audioKey,
+    );
+  }
+
+  async list(userId: number, assessmentId: number, attemptId: number) {
+    await this.loadAttempt(userId, assessmentId, attemptId);
     const rows = await this.prisma.diagnosticSpeakingResponse.findMany({
       where: { attemptId },
       orderBy: { questionId: 'asc' },
@@ -316,52 +449,48 @@ export class DiagnosticSpeakingService
     };
   }
 
-  private async grade(targetText: string, buffer: Buffer) {
-    let lastError = 'Không thể chấm tự động';
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      try {
-        const result = MockSpeakingEvaluator.isMockEnabled()
-          ? await MockSpeakingEvaluator.evaluate(targetText, buffer)
-          : await this.aiService.assessPronunciation(targetText, buffer);
-        if (result.isSilentOrNoSpeech || result.errorCode === 'NO_SPEECH') {
-          return {
-            status: 'GRADING_FAILED',
-            score: null,
-            transcript: result.transcript ?? null,
-            metadata: result,
-            provider: MockSpeakingEvaluator.isMockEnabled() ? 'mock' : 'azure',
-            attempts: attempt,
-            failureReason: 'Không phát hiện giọng nói',
-          };
-        }
-        const raw = Number(result.overallScore);
-        const score = Math.max(0, Math.min(100, raw <= 10 ? raw * 10 : raw));
-        return {
-          status: 'GRADED',
-          score,
-          transcript: result.transcript ?? null,
-          metadata: result,
-          provider: MockSpeakingEvaluator.isMockEnabled() ? 'mock' : 'azure',
-          attempts: attempt,
-          failureReason: null,
-        };
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : String(error);
-        if (attempt === 2) break;
-      }
-    }
-    return {
-      status: 'GRADING_FAILED',
-      score: null,
-      transcript: null,
-      metadata: { errorCode: 'PROVIDER_UNAVAILABLE' },
-      provider: 'unavailable',
-      attempts: 2,
-      failureReason: lastError,
-    };
+  /** Leave a terminal, retryable state - only if this run still owns the row. */
+  private markRunFailed(job: DiagnosticSpeakingJob, reason: string) {
+    return this.prisma.diagnosticSpeakingResponse.updateMany({
+      where: {
+        id: job.responseId,
+        audioKey: job.audioKey,
+        status: { in: ['QUEUED', 'GRADING'] },
+      },
+      data: { status: 'GRADING_FAILED', score: null, failureReason: reason },
+    });
   }
 
-  private async processGradingJob(job: Job<DiagnosticSpeakingJob>) {
+  async processGradingJob(job: Pick<Job<DiagnosticSpeakingJob>, 'data'>) {
+    try {
+      await this.gradeDiagnosticSpeakingJob(job);
+    } finally {
+      await this.syncFourSkill(job.data.responseId);
+    }
+  }
+
+  /**
+   * FOUR_SKILL_PLACEMENT_V2 attempts keep their per-skill rows and overall
+   * in step with grading. A failure here is logged, never thrown: the
+   * result is recomputed again whenever it is read.
+   */
+  private async syncFourSkill(responseId: number) {
+    try {
+      const row = await this.prisma.diagnosticSpeakingResponse.findUnique({
+        where: { id: responseId },
+        select: { attemptId: true },
+      });
+      if (row) await refreshFourSkillResult(this.prisma, row.attemptId);
+    } catch (error) {
+      this.logger.warn(
+        `Four-skill result refresh failed for response ${responseId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async gradeDiagnosticSpeakingJob(
+    job: Pick<Job<DiagnosticSpeakingJob>, 'data'>,
+  ) {
     const claimed = await this.prisma.diagnosticSpeakingResponse.updateMany({
       where: {
         id: job.data.responseId,
@@ -370,86 +499,89 @@ export class DiagnosticSpeakingService
       },
       data: { status: 'GRADING' },
     });
+    // Stale (re-recorded, skipped) or duplicate job: nothing to do.
     if (claimed.count === 0) return;
-    const response = await this.prisma.diagnosticSpeakingResponse.findUnique({
-      where: { id: job.data.responseId },
-    });
-    if (!response || response.audioKey !== job.data.audioKey) return;
-    if (!response.audioKey) {
-      await this.prisma.diagnosticSpeakingResponse.updateMany({
+    const fail = (reason: string, extra: Record<string, unknown> = {}) =>
+      this.prisma.diagnosticSpeakingResponse.updateMany({
         where: {
-          id: response.id,
-          audioKey: job.data.audioKey,
-          status: 'GRADING',
-        },
-        data: {
-          status: 'GRADING_FAILED',
-          failureReason: 'Bản ghi không có đối tượng âm thanh lưu trữ',
-        },
-      });
-      return;
-    }
-    const question = await this.prisma.diagnosticQuestion.findUnique({
-      where: { id: response.questionId },
-      select: { question: true },
-    });
-    if (!question) {
-      await this.prisma.diagnosticSpeakingResponse.updateMany({
-        where: {
-          id: response.id,
-          audioKey: job.data.audioKey,
-          status: 'GRADING',
-        },
-        data: {
-          status: 'GRADING_FAILED',
-          failureReason: 'Nhiệm vụ Speaking không còn tồn tại',
-        },
-      });
-      return;
-    }
-    let originalBuffer: Buffer;
-    let normalized: Awaited<
-      ReturnType<DiagnosticSpeakingAudioNormalizer['normalize']>
-    >;
-    try {
-      originalBuffer = await this.uploadService.downloadPrivateFileBuffer(
-        response.audioKey,
-      );
-      normalized = await (
-        this.audioNormalizer ?? new DiagnosticSpeakingAudioNormalizer()
-      ).normalize(originalBuffer, response.audioMimeType ?? 'audio/webm');
-    } catch (error) {
-      await this.prisma.diagnosticSpeakingResponse.updateMany({
-        where: {
-          id: response.id,
+          id: job.data.responseId,
           audioKey: job.data.audioKey,
           status: 'GRADING',
         },
         data: {
           status: 'GRADING_FAILED',
           score: null,
-          scoreMetadata: { errorCode: 'AUDIO_NORMALIZATION_FAILED' },
-          provider: 'unavailable',
-          gradingAttempts: { increment: 1 },
-          failureReason:
-            error instanceof Error
-              ? error.message
-              : 'Không thể chuẩn hóa âm thanh',
+          failureReason: reason,
+          ...extra,
         },
       });
+
+    const response = await this.prisma.diagnosticSpeakingResponse.findUnique({
+      where: { id: job.data.responseId },
+    });
+    if (!response || response.audioKey !== job.data.audioKey) return;
+    const question = await this.prisma.diagnosticQuestion.findUnique({
+      where: { id: response.questionId },
+    });
+    if (!question) {
+      await fail('Nhiệm vụ Speaking không còn tồn tại');
       return;
     }
+    const rubricRow = question.rubricId
+      ? await this.prisma.diagnosticRubric.findUnique({
+          where: { id: question.rubricId },
+        })
+      : null;
+    let rubric: ReturnType<typeof parseRubric>;
     try {
-      const gradingStartedAt = Date.now();
-      const scoreState = await this.grade(question.question, normalized.buffer);
-      this.logger.log(
-        JSON.stringify({
-          event: 'diagnostic_speaking_provider_result',
-          provider: scoreState.provider,
-          providerDurationMs: Date.now() - gradingStartedAt,
-          resultStatus: scoreState.status,
-        }),
+      if (!rubricRow) throw new Error('RUBRIC_MISSING');
+      rubric = parseRubric(rubricRow);
+      if (rubric.skill !== 'SPEAKING') throw new Error('RUBRIC_SKILL_MISMATCH');
+    } catch (error) {
+      await fail(error instanceof Error ? error.message : 'RUBRIC_INVALID');
+      return;
+    }
+
+    let normalized: Awaited<
+      ReturnType<DiagnosticSpeakingAudioNormalizer['normalize']>
+    >;
+    try {
+      const original = await this.uploadService.downloadPrivateFileBuffer(
+        job.data.audioKey,
       );
+      normalized = await (
+        this.audioNormalizer ?? new DiagnosticSpeakingAudioNormalizer()
+      ).normalize(original, response.audioMimeType ?? 'audio/webm');
+    } catch (error) {
+      await fail(
+        error instanceof Error ? error.message : 'Không thể chuẩn hóa âm thanh',
+        {
+          scoreMetadata: { errorCode: 'AUDIO_NORMALIZATION_FAILED' },
+          provider: 'unavailable',
+        },
+      );
+      return;
+    }
+
+    const startedAt = Date.now();
+    const outcome = await gradeWithRubric(this.grader, {
+      skill: 'SPEAKING',
+      submissionRef: `speaking:${response.id}:${job.data.audioKey}`,
+      rubric,
+      taskPrompt: question.question,
+      taskInstructions: question.instructions ?? null,
+      audio: normalized.buffer,
+      durationMs: normalized.durationMs,
+    });
+    this.logger.log(
+      JSON.stringify({
+        event: 'diagnostic_speaking_rubric_result',
+        provider: this.grader.provider,
+        providerDurationMs: Date.now() - startedAt,
+        resultStatus: outcome.status,
+      }),
+    );
+    if (outcome.status === 'GRADED') {
       await this.prisma.diagnosticSpeakingResponse.updateMany({
         where: {
           id: response.id,
@@ -457,29 +589,36 @@ export class DiagnosticSpeakingService
           status: 'GRADING',
         },
         data: {
-          status: scoreState.status,
-          transcript: scoreState.transcript,
-          score: scoreState.score,
-          scoreMetadata: scoreState.metadata as Prisma.InputJsonObject,
-          provider: scoreState.provider,
-          gradingAttempts: scoreState.attempts,
-          failureReason: scoreState.failureReason,
-          gradedAt: scoreState.status === 'GRADED' ? new Date() : null,
+          status: 'GRADED',
+          transcript: outcome.grade.transcript,
+          score: outcome.grade.taskPercentage,
+          scoreMetadata: {
+            validated: true,
+            rubricVersion: rubric.version,
+            criteria: outcome.grade.criteria,
+            criterionFeedback: outcome.grade.criterionFeedback,
+            feedback: outcome.grade.feedback,
+            suggestions: outcome.grade.suggestions,
+            evidenceQuotes: outcome.grade.evidenceQuotes,
+            speechEvidence: (outcome.grade.speechEvidence ??
+              null) as Prisma.InputJsonValue | null,
+            measuredDurationMs: normalized.durationMs,
+          },
+          provider: this.grader.provider,
+          providerVersion: this.grader.providerVersion,
+          rubricId: rubric.id,
+          rubricVersion: rubric.version,
+          gradingAttempts: outcome.attempts,
+          failureReason: null,
+          gradedAt: new Date(),
         },
       });
-    } catch (error) {
-      await this.prisma.diagnosticSpeakingResponse.updateMany({
-        where: {
-          id: response.id,
-          audioKey: job.data.audioKey,
-          status: 'GRADING',
-        },
-        data: {
-          status: 'GRADING_FAILED',
-          gradingAttempts: { increment: 1 },
-          failureReason:
-            error instanceof Error ? error.message : 'Không thể chấm tự động',
-        },
+    } else {
+      await fail(outcome.reason, {
+        provider: this.grader.provider,
+        providerVersion: this.grader.providerVersion,
+        gradingAttempts: outcome.attempts,
+        scoreMetadata: { validated: false, rejection: outcome.reason },
       });
     }
   }
@@ -494,13 +633,21 @@ export class DiagnosticSpeakingService
     durationMs: number | null;
     transcript: string | null;
     score: number | null;
+    scoreMetadata?: unknown;
     provider: string | null;
     graderVersion: string | null;
+    rubricVersion?: string | null;
     gradingAttempts: number;
     failureReason: string | null;
     confirmedAt: Date | null;
     gradedAt: Date | null;
   }) {
+    const meta =
+      row.scoreMetadata && typeof row.scoreMetadata === 'object'
+        ? (row.scoreMetadata as Record<string, unknown>)
+        : {};
+    // The storage key is deliberately absent: audio is reached only through
+    // the ownership-checked `audio` endpoint and a short-lived signed URL.
     return {
       id: row.id,
       questionId: row.questionId,
@@ -510,9 +657,14 @@ export class DiagnosticSpeakingService
       byteSize: row.byteSize,
       durationMs: row.durationMs,
       transcript: row.transcript,
-      score: row.score,
+      score: row.status === 'GRADED' ? row.score : null,
+      criteria: row.status === 'GRADED' ? (meta.criteria ?? null) : null,
+      criterionFeedback:
+        row.status === 'GRADED' ? (meta.criterionFeedback ?? null) : null,
+      feedback: row.status === 'GRADED' ? (meta.feedback ?? null) : null,
       provider: row.provider,
       graderVersion: row.graderVersion,
+      rubricVersion: row.rubricVersion ?? null,
       gradingAttempts: row.gradingAttempts,
       failureReason: row.failureReason,
       confirmedAt: row.confirmedAt,

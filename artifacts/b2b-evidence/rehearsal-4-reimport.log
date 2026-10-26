@@ -1,0 +1,8 @@
+target localhost:5437/b2b_rehearsal sysid=7700793221349826600 pg=15.19 read_only=off mode=rehearsal
+REIMPORT_RESULT {"assessmentId":5,"created":{},"updated":{},"unchanged":{"assessment":1,"passage":3,"rubric":2,"question":29,"clip":10},"isActive":false,"status":"DRAFT"}
+PASS  ADDITIONAL_ROWS=0  (0)
+PASS  importer reports 0 created  ({})
+PASS  CHANGED_ROWS=0 (importer report)  ({})
+PASS  0 rows physically rewritten (xmin unchanged)  (rows=66 rewritten=0)
+
+B2B_REIMPORT_FAILURES=0

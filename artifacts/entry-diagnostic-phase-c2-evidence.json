@@ -1,0 +1,236 @@
+{
+  "phase": "C2",
+  "title": "Productive skill runtime completion - Speaking, Writing, asynchronous grading",
+  "date": "2026-10-26",
+  "independenceMode": "AUTHOR_SELF_VERIFICATION",
+  "credentialsPolicy": "No password, token or connection string is recorded.",
+
+  "baseline": {
+    "kltn_db": { "system_identifier": "7674533776495505443", "migrations": 68, "id1": "ACTIVE, 20 questions", "id5": "DRAFT, inactive, 29 items", "attempts": 0, "speakingResponses": 0, "writingResponses": 0 },
+    "newFinding": {
+      "id": "C2-FIND-001",
+      "summary": "Assessment id=5 is persisted with contentVersion=1, not 6.",
+      "cause": "The B1/B2B importer writes title, description, isActive, status, scoringVersion and blueprintVersion but not contentVersion, so the column took its default of 1.",
+      "disposition": "Not corrected: C2 does not authorize database writes. Requires an authorized one-row update and an importer fix in a later phase."
+    }
+  },
+
+  "inspection": {
+    "speaking": {
+      "IMPLEMENTED_AND_CORRECT": ["ownership checks (user, assessment)", "IN_PROGRESS precondition", "stale-job protection keyed on audioKey + status", "storage key never returned to learners", "owner-only signed audio URL", "skip without a score"],
+      "IMPLEMENTED_WITH_DEFECT": [
+        "duration: client-reported durationMs checked against a global 300 ms - 90 s window; never compared with the decoded audio or with the task's responseSeconds",
+        "grading construct: Azure scripted pronunciation assessment with ReferenceText = the task prompt and EnableMiscue, which scores whether the learner read the prompt aloud; the approved rubric was never used",
+        "malformed provider score: Math.max(0, Math.min(100, NaN)) = NaN persisted as GRADED",
+        "a recording uploaded slowly could land after final submission (status checked before the upload only)",
+        "a stalled or crashed job left the row in GRADING with no path out"
+      ],
+      "MISSING": ["retry after GRADING_FAILED once the attempt is completed"]
+    },
+    "writing": {
+      "IMPLEMENTED_WITH_DEFECT": [
+        "results kept as read-modify-write of attempt.answers.__writingFeedback with no lock; worker and enqueue/retry writes can lose each other's updates",
+        "no run identity: a retried task's older job could still overwrite it; retry had no status precondition, so retrying a QUEUED or GRADED task queued a duplicate",
+        "graded every task with evaluateWritingPart3 (fixed TOEIC 0-5 rubric), ignoring the persisted Diagnostic rubric",
+        "empty provider feedback replaced with a stock sentence and marked GRADED",
+        "word count never computed or stored"
+      ],
+      "MISSING": ["any dedicated test"],
+      "unusedSchema": "DiagnosticWritingResponse (status enum, responseText, wordCount, rubricId, rubricVersion, gradingAttempts, rawProviderPayload, unique(attemptId, questionId)) already existed from migration 20261025054012 and had 0 rows. No migration was needed."
+    }
+  },
+
+  "speakingDuration": {
+    "SPEAKING_PER_TASK_DURATION_ENFORCED": true,
+    "source": "the task row's responseSeconds (server-owned). prepSeconds is never added.",
+    "measurement": "decoded duration from DiagnosticSpeakingAudioNormalizer (ffmpeg-static to 16 kHz mono PCM), computed from WAV data bytes. The client value is cross-checked only.",
+    "limits": { "task1": "45 s -> max 45 550 ms", "task2": "60 s -> max 60 550 ms", "minimum": "300 ms (unchanged)" },
+    "tolerance": {
+      "codecToleranceMs": 50,
+      "codecEvidence": "Measured in C2 (artifacts/c2-codec-overhead.log): exact-length tones encoded as webm/opus, ogg/opus, m4a/aac and wav at 0.25, 1, 45 and 60 s and decoded by the real normalizer. Opus and WAV drift 0 ms; AAC at most +13 ms.",
+      "captureStopAllowanceMs": 500,
+      "captureStopStatus": "ASSUMPTION_NOT_MEASURED - MediaRecorder stop latency in a browser was not observed in C2; to be confirmed and tightened in browser E2E.",
+      "clientMismatchToleranceMs": 1500
+    },
+    "misconfiguredTask": "a speaking task with no responseSeconds is refused (404), never given a generic limit"
+  },
+
+  "writingContract": {
+    "WRITING_TASK_BOUNDS_ENFORCED": true,
+    "enforcementMeaning": "ENFORCED_AS_APPROVED_GRADING_GUIDANCE. The approved rubric WRT_RUBRIC_V3 normalisationIntent.wordCountHandling states length below the minimum is reflected in task_achievement, only below two thirds of the minimum, and that a complete response slightly under the minimum is not capped. Rejecting a 59-word answer would contradict approved content, so the range is not a submission gate. The server computes the word count, stores it, and passes wordMin, wordMax, belowMinimum, belowTwoThirdsMinimum and aboveMaximum to the grader.",
+    "wordCountConvention": "value.trim() ? value.trim().split(/\\s+/u).length : 0 - identical to the learner page's countWritingWords",
+    "hardTextLimits": "2 to 2000 characters, unchanged; text is trimmed, never truncated",
+    "persistence": "DiagnosticWritingResponse, one row per (attempt, task), created once when the attempt completes; a replayed completion queues nothing",
+    "runIdentity": "gradingAttempts is the run number; claim and final write are conditional on (id, status, run)"
+  },
+
+  "gradingContract": {
+    "rubricSelection": "each task's rubricId; the worker refuses a missing rubric or one whose skill differs from the task (RUBRIC_MISSING / RUBRIC_SKILL_MISMATCH)",
+    "persistedRubrics": [{ "id": 1, "skill": "SPEAKING", "version": "SPK_RUBRIC_V3", "criteria": ["task_fulfilment", "intelligibility", "fluency", "language_use"] }, { "id": 2, "skill": "WRITING", "version": "WRT_RUBRIC_V3", "criteria": ["task_achievement", "organisation", "vocabulary", "grammar"] }],
+    "outputValidation": "validateRubricGrade implements the approved aiGradingRequirements: every criterion present, integer within 0-4, no unknown criterion, non-empty feedback, malformed JSON rejected, and submissionRef must equal this submission (feedback referencing a different submission). Invalid output is retried once, then GRADING_FAILED.",
+    "taskScore": "mean criterion score as a percentage of the 0-4 range, stored unrounded; skill aggregation and rounding stay with the scorer phase",
+    "graderSeam": "DIAGNOSTIC_RUBRIC_GRADER token; returns RAW output and never validates itself",
+    "implementations": {
+      "mock": "MockDiagnosticRubricGrader - tests, DIAGNOSTIC_GRADER_MODE=mock, or MOCK_AZURE_SPEECH / NODE_ENV=test. Says nothing about grading quality.",
+      "modelWriting": "rubric-structured JSON prompt through AiService.chat. NOT run against the real provider in C2.",
+      "modelSpeaking": "REFUSES with SPEAKING_RUBRIC_GRADER_NOT_CONFIGURED. The rubric needs what the learner said; the only speech call in the codebase is scripted pronunciation against a reference text, which does not measure this construct. Fail-closed leaves the task GRADING_FAILED and retryable rather than storing a meaningless score."
+    },
+    "runningAppNote": "The development environment has no mock flag set, so in the running app Writing would use the unverified model prompt and Speaking would fail closed. No learner can reach V2 productive tasks today: id=5 is a DRAFT and the ACTIVE legacy form has none."
+  },
+
+  "stateMachine": {
+    "speaking": [
+      "(none|QUEUED|GRADING|GRADED|GRADING_FAILED|SKIPPED) -> QUEUED on confirm, only while the attempt is IN_PROGRESS; replaces the recording and makes older jobs stale",
+      "QUEUED -> GRADING by the job owning this audioKey (conditional)",
+      "GRADING -> GRADED | GRADING_FAILED (conditional on audioKey + GRADING)",
+      "GRADING_FAILED -> QUEUED by retry: owner only, audio present, conditional; also after completion",
+      "QUEUED|GRADING -> GRADING_FAILED when BullMQ reports the job failed or stalled, only for the same audioKey",
+      "any -> SKIPPED while IN_PROGRESS; a queued job then goes stale"
+    ],
+    "writing": [
+      "(none) -> QUEUED once per task when the attempt completes, run 1",
+      "QUEUED -> GRADING by the job owning this run (conditional)",
+      "GRADING -> GRADED | GRADING_FAILED (conditional on run + GRADING)",
+      "GRADING_FAILED -> QUEUED by retry: owner only, run incremented, conditional",
+      "QUEUED|GRADING -> GRADING_FAILED on BullMQ failure or stall, only for the same run"
+    ],
+    "results": "speakingScore is computed from GRADED rows only and is null otherwise; Writing score is null unless GRADED; productivePending is true only for QUEUED/GRADING; GRADING_FAILED is reported as such, never as 0"
+  },
+
+  "normalization": {
+    "SPEAKING_NORMALIZATION_VERIFIED": "REAL_LOCAL_TRANSCODE_PASS",
+    "NORMALIZER_UNIT_TEST_PASS": true,
+    "REAL_LOCAL_TRANSCODE_PASS": true,
+    "REAL_PROVIDER_GRADING_PASS": "NOT_RUN",
+    "evidence": "ffmpeg-static decoded real webm/opus recordings of 44.5, 50, 58 and 59 s in the isolated E2E, both at confirm time and in the worker; the codec measurement decoded 16 encodings across 4 containers."
+  },
+
+  "tests": {
+    "newSpecs": [
+      { "file": "diagnostic-productive.spec.ts", "tests": 22 },
+      { "file": "diagnostic-writing.service.spec.ts", "tests": 18, "note": "first tests for this service" },
+      { "file": "diagnostic-speaking.service.spec.ts", "tests": 34, "note": "rewritten; replaced 6 tests that asserted the scripted-pronunciation path" }
+    ],
+    "testStyle": "the service specs use an in-memory store that applies the same conditional where-clauses the services rely on, so stale, duplicate and concurrent cases test behaviour",
+    "mutationChecks": [
+      "removing the run condition from the Writing claim -> 1 of 18 fail",
+      "replacing the per-task limit with the generic 90 s -> 5 of 56 fail"
+    ],
+    "focused": { "suites": "13/13", "tests": "288/288", "scope": "src/modules/diagnostic, src/worker, src/prisma" },
+    "FULL_BACKEND_TEST_SUITE_RESULT": "146/146 suites, 1391/1391 tests",
+    "c1GraderIntegritySpec": "unchanged since C1 and passing",
+    "isolatedE2E": { "checks": 44, "pass": 44, "log": "artifacts/c2-isolated-e2e.log" },
+    "liveReadOnly": { "fail": 0, "log": "re-run of scripts/audit/c1-live-readonly.ts" },
+    "typecheck": 0,
+    "lintCheck": 0,
+    "gitDiffCheck": 0
+  },
+
+  "isolatedE2E": {
+    "environment": "disposable PostgreSQL 15 clone (checkpoint restore + migration + import, system_identifier 7700814485142634531) and disposable Redis on 6390; both removed afterwards",
+    "sharedRedisRefused": "6379 is refused: the running application's workers listen on the same queue names there",
+    "real": ["DiagnosticController over HTTP via supertest", "DiagnosticService", "DiagnosticSpeakingService", "DiagnosticWritingService", "BullMQ queues and workers", "DiagnosticSpeakingAudioNormalizer with ffmpeg-static", "Prisma on PostgreSQL"],
+    "fake": ["object storage (in memory; nothing sent to R2)", "rubric grader", "gamification", "authentication - a guard inside the testing module; no JWT created, the running app never contacted"],
+    "syntheticAssessment": "built in the clone only from the approved DRAFT Speaking and Writing rows plus two objective items; the clone's legacy form was archived so the single-active constraint admitted it",
+    "highlights": [
+      "unauthenticated request refused",
+      "Speaking tasks served with responseSeconds 45/60 and prepSeconds; Writing with word guidance",
+      "real 50 s audio refused on the 45 s task, also when it claims 44 s; real 44.5 s accepted; stored duration is the decoded one",
+      "another learner cannot upload into, retry or download from this attempt",
+      "malformed media refused",
+      "re-recording replaced the response; the persisted row is the re-recording; only current objects kept",
+      "both Speaking tasks GRADED through the real queue with rubric version, criteria and feedback; no storage key in any payload",
+      "objective grade on the same submission still correct (1 of 2)",
+      "right after submission Writing is pending and null, never 0",
+      "provider outage -> both Writing tasks GRADING_FAILED, null, not pending",
+      "two concurrent retries -> one 202, one 409; retried tasks GRADED with WRT_RUBRIC_V3 criteria; word counts 70 and 100 computed server-side; a GRADED task cannot be re-queued",
+      "replayed submission rewrote nothing (attempt xmin unchanged), no extra Writing rows; a recording after submission refused",
+      "Speaking provider outage -> GRADING_FAILED with no score; retry by the owner GRADED it",
+      "DRAFT start and submit refused over HTTP; 0 attempts on the DRAFT"
+    ],
+    "honestCorrection": "An earlier assertion expected the first task-2 recording never to be graded. It was graded - the worker finished before the re-recording arrived - which is legitimate: stale protection prevents an old job overwriting a newer recording, not an old recording being graded first. The assertion was corrected to what can be claimed; the late-stale-job case is asserted deterministically in the unit spec."
+  },
+
+  "security": {
+    "cases": ["another learner's attempt", "another learner's audio", "another learner's writing retry", "another learner's speaking retry", "wrong assessment", "wrong question", "non-Speaking / non-Writing task", "stale recording", "duplicate job delivery", "duplicate and concurrent retry", "replayed submission", "recording after submission", "malformed provider output", "output for a different submission", "unauthenticated request"],
+    "ownershipBasis": "the authenticated user id against persisted attempt and response rows; no client-supplied id is trusted on its own",
+    "storageExposure": "audioKey never in a learner payload; audio only through an owner-checked, 300-second signed URL"
+  },
+
+  "databaseEvidence": {
+    "REAL_DB_MUTATED": false,
+    "liveTablesChangedSinceB2B": 0,
+    "liveTablesCompared": 136,
+    "SHADOW_DB_MUTATED": false,
+    "shadowTablesChanged": 0,
+    "disposableContainersRemoved": true,
+    "danglingVolumes": "26 before and after"
+  },
+
+  "runningApplication": "The nest --watch dev server reloaded the C2 code (port 3001, PID 16760), still answers 401 unauthenticated, and was not used by any test.",
+
+  "corrections": [
+    "C1 reported its live read-only script as 9/9; the script has 8 checks. Result unchanged: 0 failures."
+  ],
+
+  "remainingGaps": [
+    "Speaking real grading: an unscripted speech grader producing transcript and rubric scores must be designed; until then Speaking fails closed outside mock mode",
+    "Writing real grading: the model prompt must be run against the provider and its output quality reviewed",
+    "C2-FIND-001: id=5 contentVersion=1 instead of 6; importer omits the field",
+    "Frontend shows Writing score as '/5'; it is now a 0-100 percentage with scoreScale PERCENT_0_100",
+    "MediaRecorder stop allowance (500 ms) unmeasured; confirm in browser E2E",
+    "Speaking skill aggregation: results average whatever tasks are GRADED, while the rubric requires both tasks before a skill score - scorer phase",
+    "Listening audio; FOUR_SKILL_PLACEMENT_V2 scorer; DEF-004; activation; real browser E2E"
+  ],
+
+  "frontendContractForUiPhase": {
+    "speaking": "responseSeconds and prepSeconds per task; auto-stop at responseSeconds; send durationMs; handle 400 messages for too long, too short, mismatch and unreadable audio; statuses QUEUED, GRADING, GRADED, GRADING_FAILED, SKIPPED; POST .../speaking/:questionId/retry when GRADING_FAILED; show criteria and feedback when GRADED",
+    "writing": "wordMin and wordMax as guidance, not a hard stop; wordCount is computed server-side with the same convention; score is 0-100 with scoreScale PERCENT_0_100; criteria and rubricVersion available; retry only when GRADING_FAILED",
+    "results": "productivePending for QUEUED/GRADING; GRADING_FAILED shown as failed with a retry action, never as a zero",
+    "uiPhaseRequirement": "discover the skills actually installed, read their instructions, reuse existing components, test the real interface on desktop and mobile"
+  },
+
+  "flags": {
+    "PHASE_C2_COMPLETE": true,
+    "SPEAKING_PER_TASK_DURATION_ENFORCED": true,
+    "SPEAKING_RECORDING_OWNERSHIP_PASS": true,
+    "SPEAKING_RECORDING_LIFECYCLE_PASS": true,
+    "SPEAKING_NORMALIZATION_VERIFIED": "REAL_LOCAL_TRANSCODE_PASS",
+    "WRITING_SERVICE_UNIT_TESTS_PASS": true,
+    "WRITING_TASK_BOUNDS_ENFORCED": true,
+    "WRITING_SUBMISSION_OWNERSHIP_PASS": true,
+    "SPEAKING_ASYNC_GRADING_INTEGRATION_PASS": true,
+    "WRITING_ASYNC_GRADING_INTEGRATION_PASS": true,
+    "DUPLICATE_GRADING_PREVENTED": true,
+    "STALE_GRADING_RESULT_PREVENTED": true,
+    "GRADING_FAILURE_RECOVERABLE": true,
+    "PRODUCTIVE_RESULT_PERSISTENCE_PASS": true,
+    "PENDING_GRADING_NOT_TREATED_AS_ZERO": true,
+    "FAILED_GRADING_NOT_TREATED_AS_ZERO": true,
+    "ISOLATED_SERVICE_INTEGRATION_PASS": true,
+    "ISOLATED_HTTP_E2E_PASS": true,
+    "REAL_PROVIDER_GRADING_VERIFIED": false,
+    "REAL_BROWSER_E2E_VERIFIED": false,
+    "C1_OBJECTIVE_GRADING_REGRESSION_PASS": true,
+    "DRAFT_ISOLATION_PRESERVED": true,
+    "BACKEND_TYPECHECK_PASS": true,
+    "DIAGNOSTIC_TARGETED_TESTS_PASS": true,
+    "FULL_BACKEND_TEST_SUITE_RESULT": "146/146 suites, 1391/1391 tests",
+    "CI_LINT_CHECK_PASS": true,
+    "GIT_DIFF_CHECK_PASS": true,
+    "REAL_DB_MUTATED": false,
+    "SHADOW_DB_MUTATED": false,
+    "REAL_DATABASE_RESET": false,
+    "CONTENT_VERSION": 6,
+    "PERSISTED_CONTENT_VERSION_ID5": 1,
+    "CONTENT_FILES_UNCHANGED": true,
+    "V2_ACTIVATED": false,
+    "AZURE_SPEECH_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0,
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": "OPEN",
+    "FINAL_V2_PLACEMENT_SCORER_IMPLEMENTED": false,
+    "PHASE_C2_VERDICT": "PRODUCTIVE_RUNTIME_PASS"
+  }
+}

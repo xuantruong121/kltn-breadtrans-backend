@@ -169,7 +169,7 @@ export class AuthService {
 
     // Generate signed JWT refresh token (30 days) containing userId and deviceId
     const refreshToken = this.jwtService.sign(
-      { sub: user.id, deviceId, type: 'refresh' },
+      { sub: user.id, deviceId, type: 'refresh', jti: crypto.randomUUID() },
       { expiresIn: '30d' },
     );
 
@@ -254,7 +254,14 @@ export class AuthService {
       { expiresIn: '1d' },
     );
     const new_refresh_token = this.jwtService.sign(
-      { sub: user.id, deviceId: effectiveDeviceId, type: 'refresh' },
+      {
+        sub: user.id,
+        deviceId: effectiveDeviceId,
+        type: 'refresh',
+        // Unique per issue: without it a rotation inside the same second
+        // produced a byte-identical token, so the old one stayed valid.
+        jti: crypto.randomUUID(),
+      },
       { expiresIn: '30d' },
     );
 
@@ -623,7 +630,7 @@ export class AuthService {
       { expiresIn: '1d' },
     );
     const refresh_token = this.jwtService.sign(
-      { sub: user.id, deviceId, type: 'refresh' },
+      { sub: user.id, deviceId, type: 'refresh', jti: crypto.randomUUID() },
       { expiresIn: '30d' },
     );
     await this.redis.set(
