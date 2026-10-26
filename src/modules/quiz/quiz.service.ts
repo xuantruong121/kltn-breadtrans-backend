@@ -44,6 +44,7 @@ import {
   validateReadingQuestionContent,
 } from './reading-content.validation';
 import { QuizContentAccessService } from './quiz-content-access.service';
+import { loadWritingExerciseProgress } from '../writing/writing-exercise-progress';
 
 /**
  * Compare learner dictation without penalising typography that does not change
@@ -2909,6 +2910,31 @@ export class QuizService {
       }
     }
 
+    // Catalog Writing exercises hold several tasks: say which one this is and
+    // how far the learner is through the exercise.
+    let writingExercise: Record<string, unknown> | null = null;
+    const answeredTask = submission.results[0]?.questionId;
+    if (
+      isWritingSubmission &&
+      submission.quiz.practiceTopicId &&
+      answeredTask !== undefined
+    ) {
+      const ids = submission.quiz.questions.map((q) => q.id);
+      const { summary } = await loadWritingExerciseProgress(
+        this.prisma,
+        submission.userId,
+        submission.quizId,
+        ids,
+      );
+      const task = submission.quiz.questions.find((q) => q.id === answeredTask);
+      writingExercise = {
+        questionId: answeredTask,
+        position: ids.indexOf(answeredTask) + 1,
+        prompt: (task?.content as { prompt?: string } | null)?.prompt ?? null,
+        ...summary,
+      };
+    }
+
     return {
       submissionId,
       quizId: submission.quizId,
@@ -2932,6 +2958,7 @@ export class QuizService {
           ? `Bạn nên tập trung ôn luyện lại các mảng kiến thức: ${weaknesses.join(', ')}.`
           : 'Thành tích rất tốt! Hãy tiếp tục duy trì và thử sức ở đề thi khó hơn.',
       writingFeedback,
+      writingExercise,
       submittedAnswer: isWritingSubmission
         ? (submission.results[0]?.answer ?? null)
         : null,

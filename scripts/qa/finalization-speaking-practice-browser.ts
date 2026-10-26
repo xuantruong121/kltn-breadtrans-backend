@@ -150,6 +150,11 @@ async function main() {
     '--use-fake-device-for-media-stream',
     `--use-file-for-fake-audio-capture=${wav}`,
   ]);
+  const directPuts: string[] = [];
+  rec.page.on('request', (r) => {
+    if (r.method() === 'PUT' && r.url().includes(':9460/'))
+      directPuts.push(r.url());
+  });
   await rec.page.goto(`${FE}/speaking/16`);
   await hidePet(rec.page);
   check(
@@ -172,6 +177,11 @@ async function main() {
   });
   await rec.page.getByText('Hệ thống nghe được').waitFor({ timeout: 60_000 });
   const body = await rec.page.locator('body').innerText();
+  check(
+    'proxy upload mode: no direct storage PUT from the browser',
+    directPuts.length === 0,
+    String(directPuts.length),
+  );
   check(
     'recorded answer is uploaded and graded',
     /\[mock\] I think it is a good idea/.test(body),

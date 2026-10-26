@@ -33,9 +33,9 @@ describe('SpeakingService - Durable Submissions & Security', () => {
     evaluateSpeakingPart3To5: MockFn;
   };
   let mockUploadService: {
-    uploadRawBuffer: MockFn;
+    putPrivateObjectAtKey: MockFn;
     deleteFile: MockFn;
-    getPresignedDownloadUrl: MockFn;
+    getRecordingDownloadUrl: MockFn;
   };
   let mockWorker: { triggerProcessing: MockFn };
 
@@ -65,12 +65,12 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       evaluateSpeakingPart3To5: jest.fn(),
     };
     mockUploadService = {
-      uploadRawBuffer: jest.fn().mockResolvedValue({
+      putPrivateObjectAtKey: jest.fn().mockResolvedValue({
         key: 'speaking_audio/test-123.wav',
         url: 'https://r2.example.com/speaking_audio/test-123.wav',
       }),
       deleteFile: jest.fn().mockResolvedValue(undefined),
-      getPresignedDownloadUrl: jest
+      getRecordingDownloadUrl: jest
         .fn()
         .mockResolvedValue('https://signed-r2.example.com/audio'),
     };
@@ -183,7 +183,7 @@ describe('SpeakingService - Durable Submissions & Security', () => {
         traceId: expect.any(String),
       });
       expect(mockPrisma.speakingSubmission.create).not.toHaveBeenCalled();
-      expect(mockUploadService.uploadRawBuffer).not.toHaveBeenCalled();
+      expect(mockUploadService.putPrivateObjectAtKey).not.toHaveBeenCalled();
     });
 
     it('creates PENDING submission and returns 202 Accepted on valid new submission', async () => {
@@ -218,7 +218,7 @@ describe('SpeakingService - Durable Submissions & Security', () => {
         acceptedAt: submittedAt.toISOString(),
         traceId: expect.any(String),
       });
-      expect(mockUploadService.uploadRawBuffer).toHaveBeenCalled();
+      expect(mockUploadService.putPrivateObjectAtKey).toHaveBeenCalled();
       expect(mockWorker.triggerProcessing).toHaveBeenCalled();
     });
 
@@ -333,7 +333,7 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       });
       expect(result.id).toBe(50);
       expect(result.audioUrl).toBe('https://signed-r2.example.com/audio');
-      expect(mockUploadService.getPresignedDownloadUrl).toHaveBeenCalledWith(
+      expect(mockUploadService.getRecordingDownloadUrl).toHaveBeenCalledWith(
         'speaking_audio/rec.wav',
         3600,
       );

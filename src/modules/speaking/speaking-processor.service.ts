@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
+import { maxRecordingMs, speakingTaskTiming } from './speaking-task-timing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UnrecoverableError } from 'bullmq';
 import IORedis from 'ioredis';
@@ -170,7 +171,9 @@ export class SpeakingProcessorService implements OnModuleDestroy {
     // 1. Load submission to verify existence and check idempotency
     const existing = await this.prisma.speakingSubmission.findUnique({
       where: { id: submissionId },
-      include: { exercise: true },
+      include: {
+        exercise: { include: { practiceSet: { select: { scope: true } } } },
+      },
     });
 
     if (!existing) {
@@ -261,7 +264,7 @@ export class SpeakingProcessorService implements OnModuleDestroy {
           );
         }
       } else {
-        audioBuffer = await this.uploadService.downloadFileBuffer(
+        audioBuffer = await this.uploadService.downloadRecordingBuffer(
           existing.audioKey,
         );
       }
@@ -317,6 +320,13 @@ export class SpeakingProcessorService implements OnModuleDestroy {
       const validation = validateSpeakingAudio(
         audioBuffer,
         existing.audioMimeType || undefined,
+        maxRecordingMs(
+          speakingTaskTiming({
+            taskType: existing.exercise.taskType,
+            order: existing.exercise.order,
+            examTask: existing.exercise.practiceSet?.scope === 'EXAM_INTERNAL',
+          }),
+        ),
       );
       tValidationMs = Date.now() - tValidationStart;
 

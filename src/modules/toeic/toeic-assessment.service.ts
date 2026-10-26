@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { summarizeAssessmentSkills } from './toeic-assessment-result';
 import {
   Prisma,
   QuizPublicationStatus,
@@ -902,6 +903,8 @@ export class ToeicAssessmentService {
             ToeicAssessmentAttemptComponentStatus.COMPLETED,
         ) ?? null,
       result: {
+        // Per-skill practice results from graded work; no overall score.
+        skills: summarizeAssessmentSkills(attempt.components),
         components: components.map((component: any) => ({
           kind: component.kind,
           status: component.status,

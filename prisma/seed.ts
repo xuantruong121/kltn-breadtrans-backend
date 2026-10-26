@@ -11658,9 +11658,11 @@ async function main() {
 
   const quests: Array<[string, string, string, number, number, number]> = [
     ['Học 10 từ vựng', 'Học từ mới trong Flashcard', 'LEARN_VOCAB', 10, 15, 5],
+    // COMPLETE_QUIZ advances on any completed quiz (Listening, Reading,
+    // Grammar, Writing), so the title names a practice, not only listening.
     [
-      'Làm 1 bài luyện nghe',
-      'Hoàn thành một bài nghe',
+      'Hoàn thành 1 bài luyện tập',
+      'Hoàn thành một bài luyện Nghe, Đọc, Viết hoặc Ngữ pháp',
       'COMPLETE_QUIZ',
       1,
       20,

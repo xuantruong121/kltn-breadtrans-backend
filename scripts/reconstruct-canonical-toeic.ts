@@ -146,6 +146,7 @@ const WRITING_TASKS: Array<{
   prompt: string;
   imageKey?: string;
   keywords?: string[];
+  email?: string;
 }> = [
   {
     title: 'Viết câu theo tranh — Tủ tài liệu',
@@ -181,11 +182,16 @@ const WRITING_TASKS: Array<{
     title: 'Thư phản hồi — Dời lịch họp',
     prompt:
       'Read the e-mail from a colleague who needs to move a team meeting. Reply in at least 25 words: confirm a new time, suggest a room, and ask one question.',
+    // The e-mail the prompt refers to (it was missing from the task).
+    email:
+      "From: Linh Tran\nSubject: Moving Thursday's team meeting\n\nHi, the project room is being repainted on Thursday, so I need to move our 10 a.m. team meeting. Could you tell me a time on Friday that works for you and which room we could use instead? Thanks, Linh",
   },
   {
     title: 'Thư phản hồi — Khiếu nại đơn hàng',
     prompt:
       'A customer writes that part of their order is missing. Reply in at least 25 words: apologise, explain the next step, and request one piece of information.',
+    email:
+      'From: Mark Davis\nSubject: Missing item in order #4821\n\nHello, my order arrived yesterday, but the desk lamp was not in the box. The other items were in good condition. Please let me know what you will do about the missing lamp. Regards, Mark Davis',
   },
   {
     title: 'Bài luận ý kiến — Học trực tuyến',
@@ -418,6 +424,7 @@ async function main() {
                         ? publicUrl(content.imageKey)
                         : undefined,
                       keywords: content.keywords,
+                      email: content.email,
                     },
                   },
                 },

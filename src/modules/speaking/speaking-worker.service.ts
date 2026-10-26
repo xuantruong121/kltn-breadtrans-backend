@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { maxRecordingMs, speakingTaskTiming } from './speaking-task-timing';
 import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -321,7 +322,9 @@ export class SpeakingWorkerService implements OnModuleInit {
   async processSubmission(submissionId: number): Promise<void> {
     const submission = await this.prisma.speakingSubmission.findUnique({
       where: { id: submissionId },
-      include: { exercise: true },
+      include: {
+        exercise: { include: { practiceSet: { select: { scope: true } } } },
+      },
     });
 
     if (!submission) {
@@ -349,7 +352,7 @@ export class SpeakingWorkerService implements OnModuleInit {
       if (!submission.audioKey) {
         throw new Error('MISSING_AUDIO_KEY: Submission has no audioKey stored');
       }
-      audioBuffer = await this.uploadService.downloadFileBuffer(
+      audioBuffer = await this.uploadService.downloadRecordingBuffer(
         submission.audioKey,
       );
     } catch (storageErr: any) {
@@ -392,6 +395,14 @@ export class SpeakingWorkerService implements OnModuleInit {
       const validation = validateSpeakingAudio(
         audioBuffer,
         submission.audioMimeType || undefined,
+        maxRecordingMs(
+          speakingTaskTiming({
+            taskType: submission.exercise.taskType,
+            order: submission.exercise.order,
+            examTask:
+              submission.exercise.practiceSet?.scope === 'EXAM_INTERNAL',
+          }),
+        ),
       );
       if (validation.quality.isSilent) {
         await this.prisma.speakingSubmission.update({

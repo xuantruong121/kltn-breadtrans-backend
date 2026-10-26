@@ -582,7 +582,7 @@ describeWithIsolatedDatabaseAndRedis(
     it('8. BullMQ score processor publishes one completion event after commit with minimal payload', async () => {
       const subId = await createPendingSubmission();
       const mockUploadService = {
-        downloadFileBuffer: jest
+        downloadRecordingBuffer: jest
           .fn()
           .mockResolvedValue(createWavBuffer({ durationSeconds: 1 })),
       };
@@ -636,7 +636,7 @@ describeWithIsolatedDatabaseAndRedis(
     it('9. Legacy score worker publishes one completion event after commit', async () => {
       const subId = await createPendingSubmission();
       const mockUploadService = {
-        downloadFileBuffer: jest
+        downloadRecordingBuffer: jest
           .fn()
           .mockResolvedValue(createWavBuffer({ durationSeconds: 1 })),
       };
@@ -684,7 +684,7 @@ describeWithIsolatedDatabaseAndRedis(
     it('10. Event publication failure: score remains COMPLETED and Azure assessment is not repeated', async () => {
       const subId = await createPendingSubmission();
       const mockUploadService = {
-        downloadFileBuffer: jest
+        downloadRecordingBuffer: jest
           .fn()
           .mockResolvedValue(createWavBuffer({ durationSeconds: 1 })),
       };

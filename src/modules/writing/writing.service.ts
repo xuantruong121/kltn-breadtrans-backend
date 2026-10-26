@@ -1,5 +1,8 @@
+import { hasVietnameseDiacritics } from '../diagnostic/diagnostic-productive';
+import { loadWritingExerciseProgress } from './writing-exercise-progress';
 import {
   buildPracticeWritingRequest,
+  practiceRubric,
   practiceWritingTask,
   validatePracticeWritingResult,
   type PracticeWritingResult,
@@ -194,6 +197,8 @@ export class WritingService {
     evaluation: { score: number; feedback: string; suggestions: string[] };
     maxScore: number;
     detail?: PracticeWritingResult;
+    /** Catalog exercises: every task must be graded before the exercise counts. */
+    exercise?: { questionIds: number[]; position: number };
   }) {
     const feedback = JSON.stringify({
       ...(input.detail ?? {}),
@@ -227,7 +232,9 @@ export class WritingService {
           data: {
             userId: input.userId,
             type: 'WRITING_PRACTICE_COMPLETED',
-            title: input.quizTitle,
+            title: input.exercise
+              ? `${input.quizTitle} — Câu ${input.exercise.position}/${input.exercise.questionIds.length}`
+              : input.quizTitle,
             detail: `${input.evaluation.score}/${input.maxScore} điểm`,
             score: Math.round((input.evaluation.score / input.maxScore) * 100),
             sourceType: 'WRITING_SUBMISSION',
@@ -237,6 +244,19 @@ export class WritingService {
         return created;
       });
 
+      // A multi-task exercise is rewarded once, when its last task is graded,
+      // with the exercise score; earlier tasks earn nothing on their own.
+      let score = Math.round((input.evaluation.score / input.maxScore) * 100);
+      if (input.exercise) {
+        const { summary } = await loadWritingExerciseProgress(
+          this.prisma,
+          input.userId,
+          input.quizId,
+          input.exercise.questionIds,
+        );
+        if (!summary.complete || summary.percent === null) return submission;
+        score = summary.percent;
+      }
       const rewardInsert = await this.prisma.userQuizReward.createMany({
         data: { userId: input.userId, quizId: input.quizId },
         skipDuplicates: true,
@@ -244,7 +264,7 @@ export class WritingService {
       this.eventEmitter?.emit('quiz.submitted', {
         userId: input.userId,
         quizId: input.quizId,
-        score: Math.round((input.evaluation.score / input.maxScore) * 100),
+        score,
         quizType: input.quizType,
         submissionId: submission.id,
         isFirstSubmission: rewardInsert.count === 1,
@@ -286,9 +306,11 @@ export class WritingService {
     },
     maxScore: number,
     taskType?: unknown,
+    exercise?: Record<string, unknown>,
   ) {
     const detail = evaluation.detail;
     return {
+      ...(exercise ? { exercise } : {}),
       submissionId: submission.id,
       status: 'COMPLETED',
       score: evaluation.score,
@@ -493,8 +515,7 @@ export class WritingService {
         toeicWritingSetItems: { select: { id: true }, take: 1 },
         questions: {
           select: { id: true, content: true },
-          orderBy: { order: 'asc' },
-          take: 1,
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
         },
       },
     });
@@ -522,7 +543,60 @@ export class WritingService {
       'OPINION_ESSAY',
     ].includes(content.taskType);
 
+    // Every task of a catalog exercise, with the learner's latest grade.
+    const keywordsOf = (c: any): string[] =>
+      Array.isArray(c?.keywords)
+        ? c.keywords
+        : Array.isArray(c?.requiredKeywords)
+          ? c.requiredKeywords
+          : [];
+    let exercise: Record<string, unknown> | undefined;
+    if (quiz.practiceTopic) {
+      const questionIds = quiz.questions.map((q) => q.id);
+      const progress = userId
+        ? await loadWritingExerciseProgress(
+            this.prisma,
+            userId,
+            quizId,
+            questionIds,
+          )
+        : null;
+      exercise = {
+        ...(progress?.summary ?? {
+          total: questionIds.length,
+          answered: 0,
+          complete: false,
+          percent: null,
+          nextQuestionId: questionIds[0] ?? null,
+        }),
+        questions: quiz.questions.map((q, index) => {
+          const c = q.content as any;
+          const latest = progress?.latest.get(q.id);
+          const rubric = practiceRubric(c);
+          return {
+            id: q.id,
+            position: index + 1,
+            taskType: c?.taskType ?? null,
+            prompt: c?.prompt ?? null,
+            imageUrl: c?.imageUrl ?? null,
+            keywords: keywordsOf(c),
+            requirements: Array.isArray(c?.requirements) ? c.requirements : [],
+            wordRange: Array.isArray(c?.wordRange) ? c.wordRange : null,
+            maxScore: rubric ? rubric.reduce((n, r) => n + r.max, 0) : null,
+            latest: latest
+              ? {
+                  submissionId: latest.submissionId,
+                  score: latest.score,
+                  maxScore: latest.maxScore,
+                }
+              : null,
+          };
+        }),
+      };
+    }
+
     return {
+      ...(exercise ? { exercise } : {}),
       quizId: quiz.id,
       title: quiz.title,
       description: quiz.description,
@@ -538,6 +612,7 @@ export class WritingService {
           ? content.requiredKeywords
           : [],
       sampleSentences: content.sampleSentences,
+      email: typeof content.email === 'string' ? content.email : null,
       wordRange: Array.isArray(content.wordRange) ? content.wordRange : null,
       maxScore:
         quiz.type === QuizType.WRITING_PICTURE ? 3 : isEssayTask ? 5 : 4,
@@ -600,6 +675,7 @@ export class WritingService {
     role?: import('@prisma/client').Role,
     clientAttemptId?: string,
     context?: { attemptId: number; componentId: number },
+    questionId?: number,
   ) {
     const answer = text?.trim();
     if (!answer) throw new BadRequestException('Bài viết không được để trống');
@@ -613,8 +689,7 @@ export class WritingService {
         toeicWritingSetItems: { select: { id: true }, take: 1 },
         questions: {
           select: { id: true, content: true },
-          orderBy: { order: 'asc' },
-          take: 1,
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
         },
       },
     });
@@ -631,8 +706,37 @@ export class WritingService {
     if (role !== 'ADMIN')
       await this.assertExamInternalWritingAccess(quizId, userId, context);
 
-    const question = quiz.questions[0];
+    // Catalog exercises hold several independent tasks, answered one at a
+    // time; TOEIC exam Writing quizzes keep their single task.
+    const isExercise = Boolean(quiz.practiceTopic);
+    const question =
+      questionId === undefined
+        ? quiz.questions[0]
+        : quiz.questions.find((item) => item.id === questionId);
+    if (!question || (!isExercise && question !== quiz.questions[0]))
+      throw new BadRequestException('Câu hỏi không thuộc bài luyện viết này');
     const content = question.content as any;
+    const exercise = isExercise
+      ? {
+          questionIds: quiz.questions.map((item) => item.id),
+          position: quiz.questions.indexOf(question) + 1,
+        }
+      : undefined;
+    const exerciseState = async () =>
+      exercise
+        ? {
+            questionId: question.id,
+            position: exercise.position,
+            ...(
+              await loadWritingExerciseProgress(
+                this.prisma,
+                userId,
+                quizId,
+                exercise.questionIds,
+              )
+            ).summary,
+          }
+        : undefined;
     const logicalAttemptId = clientAttemptId ?? randomUUID();
     const existing = await this.getIdempotentSubmission(
       userId,
@@ -666,6 +770,7 @@ export class WritingService {
         existingEvaluation,
         existingMaxScore,
         content.taskType,
+        await exerciseState(),
       );
     }
 
@@ -756,8 +861,14 @@ export class WritingService {
         );
         evaluation = { ...result, maxScore: 5 };
       } else {
+        // A written request is graded against the e-mail it answers.
+        const instructions = content.prompt ?? quiz.description ?? quiz.title;
         const result = await this.aiService.evaluateWritingPart2(
-          content.prompt ?? quiz.description ?? quiz.title,
+          content.email
+            ? `${content.email}
+
+Task: ${instructions}`
+            : instructions,
           answer,
         );
         evaluation = { ...result, maxScore: 4 };
@@ -769,12 +880,19 @@ export class WritingService {
       );
     }
 
+    // Unaccented Vietnamese feedback is unreadable; refuse it like any other
+    // unusable grade (the learner can submit again; nothing is stored).
+    if (!hasVietnameseDiacritics(evaluation.feedback))
+      throw new ServiceUnavailableException(
+        'Dịch vụ chấm bài trả về nhận xét không hợp lệ. Bài viết chưa được lưu điểm; vui lòng thử lại.',
+      );
     const validatedEvaluation = this.validateEvaluation(
       evaluation,
       evaluation.maxScore,
     );
     const submission = await this.persistAssessment({
       detail,
+      exercise,
       quizId,
       quizTitle: quiz.title,
       quizType: quiz.type,
@@ -790,6 +908,7 @@ export class WritingService {
       { ...validatedEvaluation, detail },
       evaluation.maxScore,
       content.taskType,
+      await exerciseState(),
     );
   }
 

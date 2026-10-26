@@ -290,14 +290,13 @@ export class R2Service {
     contentType?: string;
     etag?: string;
   } | null> {
-    if (isPrivatePremiumMediaKey(key)) {
-      throw new BadRequestException(
-        'Protected premium media requires private storage access',
-      );
-    }
+    // Metadata only: a private key is checked in the private bucket.
+    const { client, bucket } = isPrivatePremiumMediaKey(key)
+      ? this.requirePrivateStorage()
+      : { client: this.client, bucket: this.bucket };
     try {
-      const response = await this.client.send(
-        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+      const response = await client.send(
+        new HeadObjectCommand({ Bucket: bucket, Key: key }),
       );
       return {
         contentLength: response.ContentLength ?? 0,
@@ -420,6 +419,25 @@ export class R2Service {
       Key: key,
     });
     return getSignedUrl(this.client, command, { expiresIn });
+  }
+
+  /** Presigned PUT into the private bucket (learner recordings). */
+  async getPrivatePresignedUploadUrl(
+    key: string,
+    mimeType: string,
+    expiresIn = 600,
+  ): Promise<string> {
+    if (!isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected media must use the private key namespace',
+      );
+    }
+    const { client, bucket } = this.requirePrivateStorage();
+    return getSignedUrl(
+      client,
+      new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: mimeType }),
+      { expiresIn },
+    );
   }
 
   async getPrivatePresignedDownloadUrl(

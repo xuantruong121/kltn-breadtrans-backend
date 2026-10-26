@@ -73,7 +73,7 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
     };
 
     mockUploadService = {
-      getPresignedUploadUrl: jest
+      getRecordingUploadUrl: jest
         .fn()
         .mockImplementation((key) =>
           Promise.resolve(
@@ -87,7 +87,7 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       }),
       deleteFile: jest.fn().mockResolvedValue(undefined),
       getPublicUrl: jest.fn().mockReturnValue('https://r2-public.example.com'),
-      getPresignedDownloadUrl: jest
+      getRecordingDownloadUrl: jest
         .fn()
         .mockResolvedValue('https://signed-dl.example/audio'),
     };
@@ -111,10 +111,15 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
 
   describe('Capabilities', () => {
     it('returns presigned capability by default', () => {
+      // A local .env may choose proxy; the default is what is tested here.
+      const saved = process.env.SPEAKING_AUDIO_UPLOAD_MODE;
+      delete process.env.SPEAKING_AUDIO_UPLOAD_MODE;
       const caps = service.getCapabilities();
+      if (saved !== undefined) process.env.SPEAKING_AUDIO_UPLOAD_MODE = saved;
       expect(caps.uploadMode).toBe('presigned');
       expect(caps.maxSizeBytes).toBe(10 * 1024 * 1024);
-      expect(caps.maxDurationMs).toBe(45000);
+      // The longest task (an opinion, 60 s) plus the flush tolerance.
+      expect(caps.maxDurationMs).toBe(61500);
       expect(caps.allowedContentTypes).toContain('audio/wav');
     });
 
@@ -145,7 +150,7 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       expect(result.uploadUrl).toContain('https://r2.storage.example/upload/');
       expect(result.signedHeaders!['Content-Type']).toBe('audio/wav');
       expect(result.objectKey).toMatch(
-        /^speaking\/pending\/10\/[0-9a-f-]+\.wav$/,
+        /^premium\/speaking\/practice\/pending\/10\/[0-9a-f-]+\.wav$/,
       );
       expect(result.maxSizeBytes).toBe(10485760);
       expect(result.isAlreadyFinalized).toBe(false);
@@ -206,7 +211,7 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       await expect(service.createUploadIntent(1, 10, validDto)).rejects.toThrow(
         BadRequestException,
       );
-      expect(mockUploadService.getPresignedUploadUrl).not.toHaveBeenCalled();
+      expect(mockUploadService.getRecordingUploadUrl).not.toHaveBeenCalled();
     });
 
     it('returns existing intent if duplicate idempotencyKey is in flight', async () => {
