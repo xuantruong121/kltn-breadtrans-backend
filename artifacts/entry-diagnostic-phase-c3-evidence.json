@@ -1,0 +1,195 @@
+{
+  "phase": "C3",
+  "title": "Real Speaking & Writing grading integration (implementation, mocks only)",
+  "date": "2026-10-26",
+  "verdict": "PROVIDER_IMPLEMENTATION_READY_FOR_LIVE_VALIDATION",
+  "verdictScope": "Implementation only. No real provider was called; grading validity and provider behaviour are NOT_VERIFIED.",
+  "flags": {
+    "AZURE_LIVE_CALL": "NOT_RUN",
+    "GEMINI_LIVE_CALL": "NOT_RUN",
+    "REAL_AUDIO_SENT_EXTERNALLY": false,
+    "AZURE_UNSCRIPTED_CONTINUOUS_IMPLEMENTED": true,
+    "AZURE_REFERENCE_TEXT_EMPTY": "VERIFIED_WITH_SDK_MOCK",
+    "TASK_PROMPT_SENT_AS_REFERENCE_TEXT": false,
+    "AZURE_SCORE_TO_RUBRIC_FORMULA": false,
+    "SPEECH_EVIDENCE_ATTACHED_BY_ADAPTER_NOT_MODEL": true,
+    "GEMINI_STRUCTURED_OUTPUT_IMPLEMENTED": true,
+    "PERSONA_CHAT_USED_FOR_GRADING": false,
+    "LEGACY_TOEIC_WRITING_GRADER_USED": false,
+    "STRICT_OUTPUT_VALIDATION": true,
+    "EVIDENCE_QUOTE_GROUNDING": "PRESENCE_ONLY",
+    "QUOTE_RELEVANCE": "NOT_VERIFIED",
+    "ERROR_CLASSIFICATION_PERMANENT_TRANSIENT": true,
+    "C2_QUEUE_STALE_RETRY_STATE_MACHINE_PRESERVED": true,
+    "MOCK_ONLY_BY_EXPLICIT_MODE": true,
+    "MOCK_FORBIDDEN_IN_PRODUCTION": true,
+    "REAL_PROVIDERS_BLOCKED_UNDER_NODE_ENV_TEST": true,
+    "UNSET_MODE_FAILS_CLOSED": true,
+    "ACTIVATION_BLOCKED_WITHOUT_REAL_GRADER": "IN_READINESS_EVALUATOR",
+    "ACTIVATION_GATE_AT_RUNTIME": "NOT_APPLICABLE",
+    "CONTENT_VERSION_IMPORTER_FIXED": true,
+    "CONTENT_VERSION_REGRESSION_TEST_RED_WITHOUT_FIX": true,
+    "CONTENT_VERSION_LIVE_UPDATE": "PREPARED_NOT_EXECUTED",
+    "CONTENT_VERSION_SQL_REHEARSED": "DISPOSABLE_CLONE_ONLY",
+    "CONTENT_VERSION_SQL_ISACTIVE_GUARD_EXERCISED": false,
+    "SKILL_COMPLETION_REQUIRES_ALL_TASKS_GRADED": true,
+    "PENDING_OR_FAILED_COUNTED_AS_ZERO": false,
+    "PLACEMENT_THRESHOLDS_ADDED": false,
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": "OPEN",
+    "ASSESSMENT_5_ACTIVATED": false,
+    "LISTENING_TTS_GENERATED": false,
+    "FRONTEND_CHANGED": false,
+    "SCHEMA_MIGRATION": false,
+    "FEEDBACK_LANGUAGE_DECISION": "NEEDS_CONFIRMATION",
+    "TRANSCRIPT_ACCURACY": "NOT_VERIFIED",
+    "GRADING_VALIDITY": "NOT_VERIFIED",
+    "UNIT_SUITE": "PASS_1502_OF_1502_ON_DISPOSABLE_TARGETS",
+    "ISOLATED_E2E": "PASS_59_OF_59",
+    "TYPECHECK": "PASS",
+    "LINT_CHECK": "PASS",
+    "BUILD": "PASS_TSC_TO_SCRATCH_OUTDIR",
+    "NEST_BUILD_TO_DIST": "NOT_RUN",
+    "GIT_DIFF_CHECK": "PASS",
+    "KLTN_DB_CONTENT_CHANGED_TABLES": 0,
+    "KLTN_SHADOW_CONTENT_CHANGED_TABLES": 0,
+    "PROTECTED_DB_WRITE_INCIDENT": "OCCURRED_NET_ZERO_CONTENT",
+    "LIVE_REDIS_6379_USED_BY_TESTS": "OCCURRED",
+    "C2_EVIDENCE_CORRECTION": "C2 full-suite run likely wrote net-zero to kltn_db through the same specs",
+    "RUNNING_APP_PROCESS_ACTION": "NONE",
+    "DEV_APP_PRODUCTIVE_GRADING_NOW_FAILS_CLOSED": true,
+    "LIVE_SMOKE_HARNESS": "PREPARED_DRY_RUN_PASS",
+    "LIVE_SMOKE_AUTHORIZATION": "REQUESTED"
+  },
+  "providerDocsConsulted": {
+    "azurePronunciationAssessment": "Microsoft Learn, updated 2026-07-03: unscripted = no reference text; continuous mode beyond 30 s; prosody en-US SDK >= 1.35; unscripted STT model differs from standard STT, two-pass recommended for highly accurate text; content assessment retired from SDK 1.46",
+    "geminiStructuredOutput": "responseSchema supported; documentation advises validating values in the application",
+    "installedSdks": {
+      "microsoft-cognitiveservices-speech-sdk": "1.51.0",
+      "@google/generative-ai": "0.24.1 (IntegerSchema has no minimum/maximum)"
+    }
+  },
+  "filesChanged": {
+    "new": [
+      "src/modules/diagnostic/diagnostic-azure-speech.ts",
+      "src/modules/diagnostic/diagnostic-azure-speech.spec.ts",
+      "src/modules/diagnostic/diagnostic-rubric-grader.spec.ts",
+      "src/modules/diagnostic/v2-content-importer.spec.ts",
+      "src/modules/ai/strategies/gemini-structured-json.spec.ts",
+      "scripts/audit/c3-isolated-e2e.ts",
+      "scripts/audit/c3-live-smoke.ts",
+      "artifacts/entry-diagnostic-phase-c3-content-version-fix.sql",
+      "artifacts/c3-fixtures/writing-smoke-fixtures.json",
+      "artifacts/c3-fixtures/speaking-smoke-recordings.md"
+    ],
+    "modified": [
+      "src/modules/ai/strategies/ai-evaluator.interface.ts",
+      "src/modules/ai/strategies/gemini-evaluator.strategy.ts",
+      "src/modules/ai/ai.service.ts",
+      "src/modules/diagnostic/diagnostic-productive.ts",
+      "src/modules/diagnostic/diagnostic-rubric-grader.ts",
+      "src/modules/diagnostic/diagnostic-speaking.service.ts",
+      "src/modules/diagnostic/diagnostic-writing.service.ts",
+      "src/modules/diagnostic/diagnostic.service.ts",
+      "src/modules/diagnostic/diagnostic.logic.ts",
+      "src/modules/diagnostic/v2-content-importer.ts",
+      "src/modules/diagnostic/diagnostic-productive.spec.ts",
+      "src/modules/diagnostic/diagnostic-speaking.service.spec.ts",
+      "src/modules/diagnostic/diagnostic-writing.service.spec.ts",
+      "src/modules/diagnostic/diagnostic.grading-integrity.spec.ts"
+    ],
+    "notMine": ["artifacts/offsite-backup-verification.json (rewritten by the backup script, untouched in C3)"]
+  },
+  "tests": {
+    "diagnostic-productive.spec.ts": 54,
+    "diagnostic-azure-speech.spec.ts": 28,
+    "diagnostic-rubric-grader.spec.ts": 42,
+    "v2-content-importer.spec.ts": 3,
+    "gemini-structured-json.spec.ts": 5,
+    "diagnostic.grading-integrity.spec.ts": 40,
+    "diagnosticAndAiTargeted": "16 suites / 396 tests PASS",
+    "fullSuite": "150 suites / 1502 tests PASS (DATABASE_URL, SHADOW_DATABASE_URL -> disposable clone; REDIS_URL -> disposable 6391)",
+    "mutations": [
+      { "change": "reference text set to the task prompt", "result": "1 of 28 failed" },
+      { "change": "quote grounding removed", "result": "5 of 96 failed" },
+      { "change": "contentVersion removed from importer", "result": "2 of 3 failed" }
+    ]
+  },
+  "isolatedE2E": {
+    "script": "scripts/audit/c3-isolated-e2e.ts",
+    "log": "artifacts/c3-isolated-e2e.log",
+    "result": "59/59",
+    "environment": "disposable PostgreSQL 15 clone (protected checkpoint sha256 1194fb5b...cdb restored, migrate deploy, approved import) + disposable Redis 6391; final clone sysid 7700830945193414690; containers removed",
+    "fakesOnlyAt": ["Azure recognition session", "structured-JSON model gateway", "storage", "gamification", "auth guard"],
+    "runHistory": [
+      { "run": 1, "result": "58/59", "cause": "fixture defect: only one word offset shifted, so no 1 s gap after sorting", "log": "artifacts/c3-evidence/c3-isolated-e2e-run1-fixture-defect.log" },
+      { "run": 2, "result": "59/59", "note": "fixture corrected" },
+      { "run": 3, "result": "59/59", "note": "fresh clone, final code after classifier refactor" }
+    ],
+    "seamCalls": { "azureSessions": 8, "modelCalls": 12 }
+  },
+  "contentVersionSqlRehearsal": {
+    "file": "artifacts/entry-diagnostic-phase-c3-content-version-fix.sql",
+    "log": "artifacts/c3-evidence/content-version-sql-rehearsal.log",
+    "target": "disposable clone sysid 7700826478806171683 only",
+    "results": {
+      "run1_matching_row": "1 row updated 1 -> 6, COMMIT",
+      "run2_rerun": "0 rows, aborted (idempotent)",
+      "status_ARCHIVED": "0 rows, aborted",
+      "wrong_sourceKey": "0 rows, aborted",
+      "isActive_true": "NOT_EXERCISED: check constraint refuses isActive=true on a DRAFT row"
+    },
+    "liveRowAfterC3": { "id": 5, "contentVersion": 1, "status": "DRAFT", "isActive": false }
+  },
+  "protectedDatabases": {
+    "kltn_db": {
+      "systemIdentifier": "7674533776495505443",
+      "tables": 136,
+      "contentChangedBeforeVsAfterC3": 0,
+      "contentChangedSinceC2After": 0,
+      "migrations": "68, identical",
+      "snapshots": ["artifacts/c3-evidence/live-before-c3.json", "artifacts/c3-evidence/live-after-fullsuite.json", "artifacts/c3-evidence/live-after-c3.json"]
+    },
+    "kltn_shadow": {
+      "systemIdentifier": "7699757546958700579",
+      "tables": 112,
+      "contentChangedBeforeVsAfterC3": 0,
+      "snapshots": ["artifacts/c3-evidence/shadow-before-c3.json", "artifacts/c3-evidence/shadow-after-c3.json"]
+    },
+    "writeCountersIdenticalAcrossDisposableRuns": {
+      "files": [
+        "artifacts/c3-evidence/kltn-db-tablestats-before-clone-suite.txt",
+        "artifacts/c3-evidence/kltn-db-tablestats-after-clone-suite.txt",
+        "artifacts/c3-evidence/kltn-db-tablestats-before-final.txt",
+        "artifacts/c3-evidence/kltn-db-tablestats-after-final.txt"
+      ],
+      "result": "identical"
+    }
+  },
+  "incident": {
+    "id": "C3-INC-001",
+    "summary": "A bare full jest run and four isolated reruns of speaking-reward-forced-crash.integration.spec.ts wrote to kltn_db (insert then delete) and used Redis 6379.",
+    "cause": "Four pre-existing specs construct PrismaService without a URL; Prisma falls back to .env DATABASE_URL = kltn_db. Two use REDIS_URL || redis://localhost:6379.",
+    "specs": [
+      "src/modules/speaking/speaking-reward-forced-crash.integration.spec.ts",
+      "src/modules/subscription/plan-purchase.concurrency.integration.spec.ts",
+      "src/modules/subscription/subscription-admin.concurrency.integration.spec.ts",
+      "src/modules/toeic/toeic.race.integration.spec.ts",
+      "src/modules/speaking/speaking-queue.integration.spec.ts (Redis only)"
+    ],
+    "evidence": "Read-only probe: default PrismaClient connects to kltn_db:5432 sysid 7674533776495505443. pg_stat_user_tables: equal insert/delete counts on User, SpeakingSubmission, SpeakingExercise; autoanalyze 2026-10-26 04:26 UTC right after the runs. Counters are cumulative; the C3 share is not separable.",
+    "effect": "0/136 tables changed in content; ID sequences of those tables advanced (not covered by the snapshot sequence list).",
+    "remediation": "All later suite runs used explicit DATABASE_URL/SHADOW_DATABASE_URL to the disposable clone and REDIS_URL to disposable Redis; kltn_db counters identical before/after. The specs were not modified (out of scope).",
+    "recommendation": "Guard these specs to refuse unless DATABASE_URL is explicitly set and is not kltn_db."
+  },
+  "operationalNotes": [
+    "The owner's backend on :3001 reloaded itself in watch mode with C3 code (PID 23000 -> 19072); no process action was taken.",
+    ".env sets no DIAGNOSTIC_GRADER_MODE, so diagnostic productive grading in that dev instance now fails closed (GRADING_FAILED, retryable). Set DIAGNOSTIC_GRADER_MODE=mock for local development; .env was not edited."
+  ],
+  "liveSmoke": {
+    "plan": "artifacts/entry-diagnostic-phase-c3-live-smoke-plan.md",
+    "harness": "scripts/audit/c3-live-smoke.ts",
+    "dryRun": "PASS (5 Writing + 1 Speaking via fake seams), artifacts/c3-live-smoke/dry-run-*.json",
+    "liveRefusalWithoutAuthorization": "VERIFIED",
+    "caps": { "azureSessions": 6, "modelCalls": 16 }
+  }
+}

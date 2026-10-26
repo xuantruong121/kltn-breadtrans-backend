@@ -1,0 +1,420 @@
+{
+  "schemaVersion": 1,
+  "blueprintVersion": "V2_2026_01",
+  "scoringVersion": "FOUR_SKILL_PLACEMENT_V2",
+  "authoredAt": "2026-10-25",
+  "researchBasis": "artifacts/entry-diagnostic-v2-research.md",
+  "purpose": {
+    "statement": "Place a learner onto suitable BreadTrans learning content by measuring four skills with task types appropriate to each.",
+    "stakes": "LOW",
+    "decisionReversibility": "Fully reversible - a learner may move between content freely at any time.",
+    "targetPopulation": "Vietnamese students and university students, approximately 16-24, general English.",
+    "notAnExamination": "Not a certification instrument. No CEFR, ALTE or exam-equivalence claim (see research doc)."
+  },
+  "constructBoundary": {
+    "basis": "CEFR Companion Volume communicative model: reception, production, interaction and mediation, each with spoken and written modes. Listening/Reading/Speaking/Writing remain recognisable within reception and production, so the learner-facing organisation stays the four skills.",
+    "mapping": {
+      "Listening": "reception - spoken (requires audio playback; the script must not be readable before answering)",
+      "Reading": "reception - written (requires an authored passage)",
+      "Speaking": "production - spoken (requires a learner audio recording)",
+      "Writing": "production - written (requires learner-written text)"
+    },
+    "LanguageUse": "Auxiliary diagnostic dimension only. Grammar/vocabulary items are reported in the profile but carry weight 0 in the overall placement, so they can never substitute for a skill measurement.",
+    "interactionAndMediation": "Not implemented as modules. The framework contains them, but they are not required by this placement purpose. Task design should still recognise that communicative competence is broader than four isolated skill labels."
+  },
+  "matrix": [
+    {
+      "skill": "Listening",
+      "subskill": "gist",
+      "taskType": "MCQ_AFTER_AUDIO",
+      "numberOfTasks": 2,
+      "estimatedTimeMinutes": 2,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "AUDIO_REQUIRED",
+      "previousDraftDifficultyNote": "previous draft recorded \"A2\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D1"
+    },
+    {
+      "skill": "Listening",
+      "subskill": "specific detail",
+      "taskType": "MCQ_AFTER_AUDIO",
+      "numberOfTasks": 4,
+      "estimatedTimeMinutes": 4,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "AUDIO_REQUIRED",
+      "previousDraftDifficultyNote": "previous draft recorded \"A2-B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D2"
+    },
+    {
+      "skill": "Listening",
+      "subskill": "purpose / speaker intention",
+      "taskType": "MCQ_AFTER_AUDIO",
+      "numberOfTasks": 2,
+      "estimatedTimeMinutes": 2,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "AUDIO_REQUIRED",
+      "previousDraftDifficultyNote": "previous draft recorded \"B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D3"
+    },
+    {
+      "skill": "Listening",
+      "subskill": "inference",
+      "taskType": "MCQ_AFTER_AUDIO",
+      "numberOfTasks": 2,
+      "estimatedTimeMinutes": 2,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "AUDIO_REQUIRED",
+      "previousDraftDifficultyNote": "previous draft recorded \"B1-B2\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D4"
+    },
+    {
+      "skill": "Reading",
+      "subskill": "main idea",
+      "taskType": "MCQ_ON_PASSAGE",
+      "numberOfTasks": 2,
+      "estimatedTimeMinutes": 3,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "NONE",
+      "previousDraftDifficultyNote": "previous draft recorded \"A2-B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D1-D3",
+      "tierNote": "A range, not a single tier: a main-idea item is as hard as the passage it sits on. The main-idea item on the 97-word notice is D1; the one on the three-paragraph argument passage is D3."
+    },
+    {
+      "skill": "Reading",
+      "subskill": "specific detail",
+      "taskType": "MCQ_ON_PASSAGE",
+      "numberOfTasks": 3,
+      "estimatedTimeMinutes": 3,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "NONE",
+      "previousDraftDifficultyNote": "previous draft recorded \"A2-B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D2"
+    },
+    {
+      "skill": "Reading",
+      "subskill": "meaning in context",
+      "taskType": "MCQ_ON_PASSAGE",
+      "numberOfTasks": 2,
+      "estimatedTimeMinutes": 2,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "NONE",
+      "previousDraftDifficultyNote": "previous draft recorded \"B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D3"
+    },
+    {
+      "skill": "Reading",
+      "subskill": "reference",
+      "taskType": "MCQ_ON_PASSAGE",
+      "numberOfTasks": 1,
+      "estimatedTimeMinutes": 1,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "NONE",
+      "previousDraftDifficultyNote": "previous draft recorded \"B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D3"
+    },
+    {
+      "skill": "Reading",
+      "subskill": "inference",
+      "taskType": "MCQ_ON_PASSAGE",
+      "numberOfTasks": 2,
+      "estimatedTimeMinutes": 3,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "NONE",
+      "previousDraftDifficultyNote": "previous draft recorded \"B1-B2\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D4"
+    },
+    {
+      "skill": "Speaking",
+      "subskill": "short personal response",
+      "taskType": "PRODUCTIVE_SPEAKING_RECORDING",
+      "numberOfTasks": 1,
+      "estimatedTimeMinutes": 2,
+      "scoringType": "RUBRIC_GRADED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "LEARNER_AUDIO_CAPTURE",
+      "prepSeconds": 15,
+      "responseSeconds": 45,
+      "previousDraftDifficultyNote": "previous draft recorded \"A2-B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyRange": [
+        "D1",
+        "D2"
+      ]
+    },
+    {
+      "skill": "Speaking",
+      "subskill": "extended opinion / situation response",
+      "taskType": "PRODUCTIVE_SPEAKING_RECORDING",
+      "numberOfTasks": 1,
+      "estimatedTimeMinutes": 3,
+      "scoringType": "RUBRIC_GRADED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "LEARNER_AUDIO_CAPTURE",
+      "prepSeconds": 30,
+      "responseSeconds": 60,
+      "previousDraftDifficultyNote": "previous draft recorded \"B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyRange": [
+        "D2",
+        "D4"
+      ]
+    },
+    {
+      "skill": "Writing",
+      "subskill": "short functional response (message / email)",
+      "taskType": "PRODUCTIVE_WRITING_TEXT",
+      "numberOfTasks": 1,
+      "estimatedTimeMinutes": 7,
+      "scoringType": "RUBRIC_GRADED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "NONE",
+      "wordRange": {
+        "min": 60,
+        "max": 90
+      },
+      "previousDraftDifficultyNote": "previous draft recorded \"A2-B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyRange": [
+        "D1",
+        "D2"
+      ]
+    },
+    {
+      "skill": "Writing",
+      "subskill": "short opinion / extended response",
+      "taskType": "PRODUCTIVE_WRITING_TEXT",
+      "numberOfTasks": 1,
+      "estimatedTimeMinutes": 9,
+      "scoringType": "RUBRIC_GRADED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "NONE",
+      "wordRange": {
+        "min": 90,
+        "max": 130
+      },
+      "previousDraftDifficultyNote": "previous draft recorded \"B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyRange": [
+        "D2",
+        "D4"
+      ]
+    },
+    {
+      "skill": "LanguageUse",
+      "subskill": "grammar / vocabulary (auxiliary)",
+      "taskType": "MCQ",
+      "numberOfTasks": 5,
+      "estimatedTimeMinutes": 3,
+      "scoringType": "OBJECTIVE_KEYED",
+      "weightWithinSkill": "equal",
+      "mediaRequirement": "NONE",
+      "overallWeight": 0,
+      "note": "Auxiliary profile dimension. Never substitutes for a skill.",
+      "previousDraftDifficultyNote": "previous draft recorded \"A1-B1\"; retained only to show the progression this tier was derived from, and deliberately not persisted as an item level",
+      "difficultyTier": "D1-D3"
+    }
+  ],
+  "counts": {
+    "listeningItems": 10,
+    "listeningAudioClips": 4,
+    "readingItems": 10,
+    "readingPassages": 3,
+    "speakingProductiveTasks": 2,
+    "writingProductiveTasks": 2,
+    "languageUseItems": 5,
+    "totalItems": 29,
+    "objectiveItems": 25,
+    "productiveTasks": 4,
+    "expectedCompletionMinutesDerivedFromMatrix": 46,
+    "objectiveItemsByDifficultyTier": {
+      "D1": 5,
+      "D2": 9,
+      "D3": 7,
+      "D4": 4,
+      "total": 25,
+      "countedOver": "all 25 objective items: 10 Listening, 10 Reading, 5 LanguageUse, each carrying a single difficultyTier",
+      "status": "DESCRIPTIVE_COUNT_OF_AUTHORED_CONTENT",
+      "note": "Counted from the content draft, not a target. Items are not retiered to match this block; this block is corrected to match the items. An earlier revision of this field declared {D1:4, D2:7, D3:5, D4:4} plus range and D1-D3 groupings that no grouping of the 25 items reproduced."
+    }
+  },
+  "expectedCompletionMinutes": 46,
+  "formLengthRationale": "Weir's stakes-proportionality (Cambridge socio-cognitive framework): the higher the stakes the stricter the evidential demands. This is a low-stakes, fully reversible placement decision inside a learning product, so a ~40 minute form is proportionate. A certification-length instrument would add learner fatigue and grading cost without improving the routing decision it informs.",
+  "scoring": {
+    "withinSkillItemWeighting": "equal, and disclosed to the learner",
+    "withinSkillBasis": "British Council Aptis TR/2015/001 - all items in a receptive paper equally weighted, disclosed in advance. This source speaks to weighting WITHIN a paper only.",
+    "perSkillFormulas": {
+      "Listening": "round(correctListeningItems / 10 * 100)",
+      "Reading": "round(correctReadingItems / 10 * 100)",
+      "Speaking": "round(mean(perTaskRubricPercent across the 2 graded tasks))",
+      "Writing": "round(mean(perTaskRubricPercent across the 2 graded tasks))",
+      "LanguageUse": "round(correctLanguageUseItems / 5 * 100) - profile only, weight 0"
+    },
+    "overallWeights": {
+      "Listening": 0.25,
+      "Reading": 0.25,
+      "Speaking": 0.25,
+      "Writing": 0.25,
+      "LanguageUse": 0
+    },
+    "overallWeightRationale": "Equal weighting, and it is a PRODUCT-DESIGN HYPOTHESIS rather than an empirically derived weighting. The primary result of this instrument is the four-skill profile; the secondary overall figure exists only as a routing indicator and is computed as round((L + R + S + W) / 4) once all four required skills are complete. Each of Listening, Reading, Speaking and Writing therefore carries 0.25, and LanguageUse carries 0. No claim is made that these weights are reliability-optimal: no item calibration, no reliability study and no standard setting has been run, so there is no evidence on which to base an unequal split. An earlier draft of this field argued for a receptive 60 / productive 40 compromise from the premise that Writing carried a single task; that premise is false in V2 (Writing carries 2 tasks, Speaking 2) and the conclusion contradicted the declared overallWeights, so it has been removed rather than reconciled. Revisiting the weights is a psychometric-validation task, listed in psychometricValidationBacklog.",
+    "overallFormula": "round((L + R + S + W) / 4), computed ONLY when Listening, Reading, Speaking and Writing are all COMPLETE. While any required skill is incomplete the overall figure is null - it is never computed over the subset that happens to be finished, and never represented as 0.",
+    "compensatory": true,
+    "compensatoryBasis": "Cambridge English socio-cognitive framework reports skills separately while treating overall ability as compensatory. This supports the compensatory form of the secondary figure, not any particular cross-skill split.",
+    "weakSkillPolicy": "The per-skill profile is the primary output, so a weak skill is visible as its own band and drives recommendations. The secondary overall figure stays compensatory and is never presented as the sole result.",
+    "roundingRule": "Math.round, applied once per skill score and once to the overall figure. No double rounding.",
+    "minimumEvidence": {
+      "objectiveSkill": "a skill reports a percentage only when it has at least 3 scored items",
+      "productiveSkill": "a skill reports a percentage only when every one of its tasks reached GRADED"
+    },
+    "pendingSkillRule": "If any of Listening/Reading/Speaking/Writing is not COMPLETE the attempt is PENDING_GRADING: the per-skill results available so far are shown, and the overall figure and placement band are withheld (null). No partial overall is ever calculated.",
+    "failedGradingRule": "If a productive task reaches GRADING_FAILED the attempt is PARTIAL. The affected skill reports no score, the overall figure is withheld, and the learner is offered a retry. A failed grading never scores 0 and never silently finalizes a placement.",
+    "primaryResult": "PER_SKILL_PROFILE",
+    "primaryResultNote": "The four per-skill bands are the primary result. BreadTrans content is organised per skill, so four bands are directly actionable; a single number is not the product output.",
+    "overallFigureRole": "SECONDARY_ROUTING_INDICATOR",
+    "weightingStatus": "PRODUCT_DESIGN_HYPOTHESIS",
+    "weightingDecision": "SKILL_PROFILE_FIRST_EQUAL_WEIGHTED_SECONDARY_OVERALL",
+    "weightingEmpiricalValidationStatus": "NOT_YET_VALIDATED",
+    "weightingRationale": "Three options were compared (equal 25/25/25/25; 30/30/20/20; skill-profile-first with a separate overall) against construct validity, observations per skill, rubric and AI grading uncertainty, learner interpretation, receptive-masking risk and productive-task variance. 30/30/20/20 was REJECTED: its only argument was that more objective items implies more reliability implies more weight, but item count is not reliability without discrimination and distribution evidence, and it downweights exactly the two skills the legacy form could not measure. Skill-profile-first was chosen: the four bands are the primary result, which confines rubric noise to the affected skill and makes a weak productive skill visible instead of masked. The secondary overall figure uses EQUAL weighting because, absent reliability evidence, equal weights assert the least - any unequal split would claim we know which skill our instrument measures better. No external source decides this split; Cambridge supports a compensatory overall and Aptis supports equal weighting within a paper, neither prescribes a cross-skill split.",
+    "weightingNotDerivedFrom": "Not derived from Cambridge or Aptis. Those sources support compensatory overall scoring and equal item weighting within a paper only. Cambridge products use a range of weighting arrangements including equal skill weighting.",
+    "knownWeakness": "Equal weighting is unvalidated: it is a design hypothesis, not a measured optimum, and the two productive skills are graded by rubric against 10 objectively keyed items per receptive skill. Whether a 45-60 second Speaking sample and a 60-130 word Writing sample support the same influence on the overall indicator as ten keyed items is exactly what pilot data must test. Until it does, the four-skill profile - not the overall figure - is what the product should act on.",
+    "secondaryOverallPartialCalculation": false
+  },
+  "levelSystem": {
+    "status": "UNRESOLVED_DO_NOT_IMPLEMENT",
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": "OPEN",
+    "DEF_004_BLOCKS_V2_SCORER_IMPLEMENTATION": true,
+    "problem": "Two independent disagreements between this document and the implementation. (1) Band count: this blueprint named four bands (Starter, Foundation, Intermediate, Upper); resolveEstimatedLevel in src/modules/diagnostic/diagnostic.logic.ts emits three - no Upper exists in the backend, the diagnostic specs or the frontend. (2) Cutoffs: this blueprint declared Intermediate as 65-79 while the code returns Intermediate at >= 75, so a learner at 70 percent is Intermediate here and Foundation there. The cutoff conflict survives even if a fourth band is added.",
+    "previouslyDeclaredBandsRemoved": [
+      {
+        "band": "Starter",
+        "min": 0,
+        "max": 44
+      },
+      {
+        "band": "Foundation",
+        "min": 45,
+        "max": 64
+      },
+      {
+        "band": "Intermediate",
+        "min": 65,
+        "max": 79
+      },
+      {
+        "band": "Upper",
+        "min": 80,
+        "max": 100
+      }
+    ],
+    "whyRemovedRatherThanCorrected": "These cutoffs were presented as an approved V2 contract. They are not: no empirical basis exists for any of the four boundaries, and the only implemented cutoffs are V1 behaviour, which is evidence of existing behaviour rather than approval for V2. Leaving them in place would let the V2 scorer be implemented against unvalidated numbers that disagree with the running code.",
+    "requiredResolution": "One product decision settling the band COUNT and the Intermediate lower boundary together. Do not add Upper by inference and do not adopt either existing threshold automatically. V1 scoring must not change.",
+    "v1BehaviourForReference": "resolveEstimatedLevel: >= 75 Intermediate, >= 45 Foundation, else Starter. Recorded as observed behaviour only.",
+    "contentCoupling": "None. Zero occurrences of Starter, Foundation, Intermediate or Upper in the content draft or the rubrics, so result bands are scorer output and not content. This is why DEF-004 does not block DRAFT persistence."
+  },
+  "mediaPolicy": {
+    "listeningAudio": "Authored for V2 via the project's existing Azure Speech pipeline. Versioned storage keys under a V2-specific prefix. Script hash and audio hash recorded per item so the audio-to-script binding is provable rather than inferred from a filename.",
+    "transcriptPrivacy": "The authoritative script must not reach the client before the learner answers that item.",
+    "unrelatedMedia": "No existing media is altered."
+  },
+  "readinessGuard": {
+    "requiredBeforeActivation": [
+      "all four skills present with their blueprint item counts",
+      "every Listening item has a verified audio asset (bytes > 0, decodes, duration plausible, script hash matches)",
+      "every productive task has a rubric with a rubricVersion",
+      "scoringVersion and blueprintVersion present on the assessment",
+      "no invalid answer key: the authored draft keys items by correctAnswer (a string that must appear exactly once in options), and the persisted row keys them by correctIndex (which must be a valid index into the persisted options array). Both representations must hold, and the import mapping between them is specified in artifacts/entry-diagnostic-v2-persistence-contract.md",
+      "no duplicate item prompt and no duplicate audio asset",
+      "no Listening item left SEMANTIC_AMBIGUOUS or SEMANTIC_MISMATCH"
+    ]
+  },
+  "legacyPolicy": {
+    "legacyFormPreserved": "The 20-item form (assessment id 1) is not rewritten, not repurposed and not deleted.",
+    "legacyAttempts": "Historical attempts keep their own assessment and scoring version and are never rescored with the V2 scorer.",
+    "activation": "V2 becomes current only through an explicit authoritative active flag, never by being the highest id."
+  },
+  "expectedCompletionMinutesStatus": "DESIGN_ESTIMATE",
+  "expectedCompletionMinutesNote": "Recalculated from the matrix after adding the second Writing task (+16 min of Writing instead of 10) and reducing LanguageUse to 5 items. Not measured with real users. At this length, measured abandonment per section is the first validation item to watch - see the psychometric validation backlog.",
+  "validationStatus": {
+    "engineeringCompleteFlag": "ENTRY_DIAGNOSTIC_V2_ENGINEERING_COMPLETE",
+    "psychometricValidationFlag": "ENTRY_DIAGNOSTIC_V2_PSYCHOMETRIC_VALIDATION_COMPLETE",
+    "mustNotBeConflated": true,
+    "currentState": "neither complete; engineering not started beyond research + blueprint",
+    "claimsBlockedUntilValidated": [
+      "validated",
+      "calibrated",
+      "reliable",
+      "CEFR-aligned",
+      "exam-standard"
+    ]
+  },
+  "psychometricValidationBacklog": {
+    "objectiveItemAnalysis": [
+      "item difficulty (facility) per item",
+      "item discrimination (point-biserial or equivalent)",
+      "distractor performance - distractors chosen by nobody or by stronger learners",
+      "internal consistency per receptive skill where item count supports it",
+      "answer-key confirmation against live response data",
+      "score distribution per skill and overall (floor/ceiling effects)",
+      "skill-score correlations - do the four skills behave as distinguishable constructs"
+    ],
+    "productiveTaskAnalysis": [
+      "grading consistency across repeated submissions of the same response",
+      "human-vs-AI agreement on a validation sample (exact and adjacent)",
+      "score drift across provider and model versions - re-score a fixed sample on every provider/model change and alert on movement",
+      "rubric dimension behaviour - redundant or non-discriminating dimensions",
+      "rubric-version comparability when a rubric changes"
+    ],
+    "boundariesAndOperations": [
+      "boundary stability - learners sitting within a few points of a band edge",
+      "test-retest or parallel-form evidence if a second form becomes feasible",
+      "measured completion time: median, P75, P90, per-section",
+      "abandonment / dropout rate per section (fatigue)",
+      "device split (mobile vs desktop) for recording and writing tasks"
+    ],
+    "ifCefrLinkageWanted": [
+      "run the Council of Europe Manual procedures in order before any CEFR wording appears"
+    ]
+  },
+  "difficultyScale": {
+    "scaleId": "BREADTRANS_AUTHORING_DIFFICULTY_D1_D4",
+    "status": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
+    "purpose": "An authoring-side relative difficulty scale for ITEMS. It exists so content can carry a deliberate progression without borrowing a proficiency vocabulary. It is not a proficiency scale, is not calibrated against any learner data, and is never shown to a learner.",
+    "notCefr": "D1-D4 are NOT CEFR levels and are not derived from any CEFR conversion. They were assigned from the intended relative progression of the previous draft, not by translating A2/B1/B2.",
+    "notResultBands": "Deliberately separate from the result bands (Starter/Foundation/Intermediate/Upper). Result bands describe a learner OUTCOME; D1-D4 describe an ITEM. No mapping between the two exists or should be inferred.",
+    "tiers": [
+      {
+        "tier": "D1",
+        "label": "most accessible",
+        "intent": "short, high-frequency language; the answer is directly available once the text or audio is understood"
+      },
+      {
+        "tier": "D2",
+        "label": "straightforward",
+        "intent": "requires locating a specific piece of information among competing nearby details"
+      },
+      {
+        "tier": "D3",
+        "label": "demanding",
+        "intent": "requires reading or hearing past the literal wording - purpose, attitude, reference, meaning in context"
+      },
+      {
+        "tier": "D4",
+        "label": "most demanding",
+        "intent": "requires combining information or drawing an inference that is not stated"
+      }
+    ],
+    "productiveTasks": "Productive tasks carry a difficultyRange rather than a single tier, because one prompt is answered across a span of ability."
+  },
+  "itemLevelPolicy": {
+    "itemDifficultyField": "difficultyTier (D1-D4) or difficultyRange for productive tasks",
+    "itemLevelStatus": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
+    "cefrPersistedAsItemLevel": false,
+    "resultBandsAreSeparate": true,
+    "mappingBetweenTiersAndBands": "none - deliberately not defined"
+  }
+}

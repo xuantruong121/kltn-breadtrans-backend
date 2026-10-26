@@ -3,6 +3,8 @@ import { Interval } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { MockSpeakingEvaluator } from './mock-speaking-evaluator';
+
 import { UploadService } from '../upload/upload.service';
 import { validateSpeakingAudio } from './speaking-audio-validator';
 import {
@@ -13,6 +15,15 @@ import {
 } from './speaking.constants';
 import { SpeakingQueueService } from './speaking-queue.service';
 import { SpeakingEventPublisherService } from './speaking-event-publisher.service';
+
+/**
+ * The legacy poller mocks only when MOCK_AZURE_SPEECH=true is set explicitly
+ * outside unit tests (which stub AiService) and never in production.
+ */
+const legacyMockEnabled = () =>
+  process.env.MOCK_AZURE_SPEECH === 'true' &&
+  process.env.NODE_ENV !== 'test' &&
+  MockSpeakingEvaluator.isMockEnabled();
 
 const MAX_ATTEMPTS = 4;
 const RETRY_BACKOFF_MS = [
@@ -298,13 +309,19 @@ export class SpeakingWorkerService implements OnModuleInit {
       return;
     }
 
-    // 3. Call Azure Speech via AiService
+    // 3. Call Azure Speech via AiService. Same rule as the BullMQ processor:
+    // the mock evaluator only when explicitly enabled, never in production.
     let assessmentResult: any;
     try {
-      assessmentResult = await this.aiService.assessPronunciation(
-        submission.exercise.targetText,
-        audioBuffer,
-      );
+      assessmentResult = legacyMockEnabled()
+        ? await MockSpeakingEvaluator.evaluate(
+            submission.exercise.targetText,
+            audioBuffer,
+          )
+        : await this.aiService.assessPronunciation(
+            submission.exercise.targetText,
+            audioBuffer,
+          );
     } catch (providerErr: any) {
       const code = providerErr?.code || 'PROVIDER_UNAVAILABLE';
       this.logger.error(
@@ -341,7 +358,7 @@ export class SpeakingWorkerService implements OnModuleInit {
         overallScore,
         transcript,
         aiFeedback: assessmentResult,
-        provider: 'azure',
+        provider: legacyMockEnabled() ? 'mock' : 'azure',
         scoreVersion: 'v1',
         processedAt: new Date(),
         lastErrorCode,

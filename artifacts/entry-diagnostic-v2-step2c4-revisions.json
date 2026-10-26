@@ -1,0 +1,238 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_V2_STEP_2C4_FINAL_CONSISTENCY_AND_PERSISTENCE_CONTRACT",
+  "appliedAt": "2026-10-25",
+  "contentVersionBefore": 4,
+  "contentVersionAfter": 5,
+  "blueprintVersion": "V2_2026_01",
+  "scoringVersion": "FOUR_SKILL_PLACEMENT_V2",
+  "ENTRY_DIAGNOSTIC_V2_STEP2C4_COMPLETE": true,
+  "ENTRY_DIAGNOSTIC_V2_CONTENT_REVIEW_PASS": "REQUIRES_STEP2D4",
+  "STEP2E_LIVE_PERSISTENCE_ALLOWED": false,
+  "selfApproval": "withheld. I authored this content and every revision pass.",
+  "historicalArtifactsMutated": false,
+
+  "disposition": {
+    "note": "All 19 Step 2D3 findings accounted for. None dropped.",
+    "MINOR_TOTAL": 13,
+    "NOTE_TOTAL": 6,
+    "FIXED": 14,
+    "DOCUMENTED_AS_CONTRACT": 2,
+    "NOTE_ONLY_RETAINED": 1,
+    "OPEN_BY_DESIGN": 2,
+    "table": [
+      { "id": "D3-001", "severity": "MINOR", "object": "LST_Q_006 / LST_Q_007", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "LST_Q_006's stem no longer asserts that something is missing. Question-only revision; LST_CLIP_03 script byte-unchanged, so no TTS cost. Both subskills preserved, LST_Q_007 untouched, key index unchanged." },
+      { "id": "D3-002", "severity": "MINOR", "object": "LST_Q_002", "classification": "SAFE_TO_DEFER", "status": "NOT_FIXED_RECORDED", "action": "none", "reason": "The item is declared gist but keys a clock time against a competing nearby time, which is the blueprint's D2 specific-detail definition. Re-labelling it changes the declared subskill distribution the blueprint matrix states, and re-keying it changes a reviewed item that is otherwise sound. Both are content-design decisions with knock-on effects on the matrix; neither blocks persistence, TTS or the scorer. Carried to the next content pass with the blueprint matrix reconciliation." },
+      { "id": "D3-003", "severity": "MINOR", "object": "blueprint.counts.objectiveItemsByDifficultyTier", "classification": "REQUIRED_BEFORE_SCORER", "status": "FIXED", "action": "Corrected from {D1:4,D2:7,D3:5,D4:4,range:D1-D2:2,range:D2-D4:2,D1-D3:5} to the counted {D1:5,D2:9,D3:7,D4:4,total:25}, marked DESCRIPTIVE_COUNT_OF_AUTHORED_CONTENT, and a BLUEPRINT_TIER_DISTRIBUTION_CONFORMANCE check added to the validator so the claim is now machine-compared. No item was retiered to match the stale block." },
+      { "id": "D3-004", "severity": "MINOR", "object": "blueprint.scoring", "classification": "REQUIRED_BEFORE_SCORER", "status": "FIXED", "action": "overallWeightRationale rewritten and knownWeakness rebased. The old text opened 'Not equal-by-default' and argued 'Receptive 60 / productive 40' from 'Writing 1 task', contradicting overallWeights (25/25/25/25), overallFormula, counts.writingProductiveTasks (2) and weightingRationale. The replacement states equal weighting as a PRODUCT-DESIGN HYPOTHESIS and explicitly declines to claim reliability evidence." },
+      { "id": "D3-005", "severity": "MINOR", "object": "SPK_RUBRIC_V3 / WRT_RUBRIC_V3 length anchors", "classification": "SAFE_TO_DEFER", "status": "NOT_FIXED_RECORDED", "action": "none", "reason": "Two length cases are unanchored: a Speaking response below minimumUsefulResponseSeconds, and a Writing response over wordMax. Both are grading-consistency holes that matter when the grader runs, not when rows are created, and the correct disposition for an over-length response in a placement instrument is probably 'no penalty' - which is a rubric-design decision, not a typo. Deferred to the scorer/grading phase, where it can be decided with the grading prompt in front of us. Explicitly NOT fixed by adding a speech-rate requirement, per D2-011." },
+      { "id": "D3-006", "severity": "MINOR", "object": "RDG_Q_010", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "Overgeneralises -> Overgeneralizes. The validator's -ise stem list structurally could not see 'generalis'; the en-US guard keeps its honest limited name and the broader claim is no longer made from it." },
+      { "id": "D3-007", "severity": "MINOR", "object": "rubric criterionKeys and anchor prose", "classification": "SAFE_TO_DEFER", "status": "NOT_FIXED_DECISION_RECORDED", "action": "British identifiers deliberately retained", "reason": "criterionKey 'task_fulfilment' and 'organisation' are the field names the AI grader must emit, listed in aiGradingRequirements.requiredFields. Renaming them is a coordinated change across the rubric, the grading prompt and any persisted Json snapshot. The decision recorded here is to KEEP the current identifiers rather than churn them, because learner-facing text is consistently American and these are machine field names. If they are ever renamed it must happen before the first rubric row is persisted, since DiagnosticRubric.criteria is a Json snapshot column - so this is on the Step 2E checklist." },
+      { "id": "D3-008", "severity": "MINOR", "object": "validator provenance patterns", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "Guard rewritten as structural JSON traversal in src/modules/diagnostic/content-guards.ts. Left anchor changed from \\b to (?:^|[^A-Za-z]) so underscore-embedded identifiers match; REVISION, DEF and D<n> prefixes added; Pass/Phase/Step covered; keys traversed as well as values. 34 negative fixtures across 17 awkward variants, each injected in a string value AND in an object key." },
+      { "id": "D3-009", "severity": "MINOR", "object": "PERSISTENCE_MAPPING_AUTHORING_METADATA_GUARD_PASS", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "CORRECTED_AND_SUPERSEDED", "action": "The over-claimed flag is retired. It is replaced by three distinct flags that cannot be conflated: PERSISTENCE_MAPPING_CONTRACT_DOCUMENTED=true, PERSISTENCE_MAPPING_IMPLEMENTED=true, PERSISTENCE_MAPPING_GUARD_PASS=false. The exclusion is now executable: assertNoAuthoringFields throws on any authoring field or any key that is not a real column, and 87 tests cover it." },
+      { "id": "D3-010", "severity": "MINOR", "object": "CEFR guard vs the blueprint", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "The guard now scans the blueprint and distinguishes active from historical use: a bare CEFR code as a value is active anywhere outside a declared history field, and a CEFR token in a level-bearing field (band/level/tier/difficulty/cefrEquivalent/placement/cutoff/threshold) is active. Fixtures prove a result band of 'B2' and an item difficulty of 'A1' both fail, while legitimate rationale in cefrClaimBasis, notCefr and previousDraftDifficultyNote passes." },
+      { "id": "D3-011", "severity": "MINOR", "object": "persistence mapping", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "DOCUMENTED_AND_IMPLEMENTED_BUT_NOT_CLOSED", "action": "Full field-by-field contract written to artifacts/entry-diagnostic-v2-persistence-contract.md, plus a pure allowlist mapper with 37 tests. All three of the collisions D3-011 named were investigated against source and resolved or recorded. NOT closed: GAP-1 blocks it.", "D3_011_CLOSED": false },
+      { "id": "D3-012", "severity": "MINOR", "object": "blueprint.levelSystem", "classification": "REQUIRED_BEFORE_SCORER", "status": "FIXED_AS_UNRESOLVED", "action": "levelSystem replaced with an UNRESOLVED_DO_NOT_IMPLEMENT record. The four bands and their cutoffs were presented as an approved V2 contract; they are not. Both disagreements are stated (band count, and Intermediate 65-79 vs code >= 75), the removed values are preserved for the decision, V1 behaviour is recorded as observed-only, and no cutoff was chosen. Upper was not introduced." },
+      { "id": "D3-013", "severity": "NOTE", "object": "WRT_RUBRIC_V3.organisation anchor 3", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "Anchor 3 now scores the ordering of the content PRESENT: 'each function the writer includes is handled in a separate, ordered sentence'. Previously a task-1 response missing a function was capped at 2 under task_achievement AND made anchor 3 unreachable - the same deficiency charged twice. Fixed despite being a NOTE because it is a live double-penalty in a rubric about to be persisted." },
+      { "id": "D3-014", "severity": "NOTE", "object": "version comparisons", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "The validator now also compares rubrics.scoringVersion when present. contentVersion remains uncompared and that is now stated rather than implied: it is a single-document field with no counterpart in the blueprint or rubrics." },
+      { "id": "D3-015", "severity": "NOTE", "object": "LU_Q_002.distractorRationales[0]", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "'Used with days and dates, not with clock times' -> 'Used with days and dates; it does not mark a named clock time'. 'on the half hour' is a licit clock-time use of 'on', so the old wording was broader than true - in the very item whose answerRationale was rescoped for the same reason." },
+      { "id": "D3-016", "severity": "NOTE", "object": "validator NO_DB_IDS", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "The dead check is replaced. findDatabaseIds traverses the parsed structure and flags any key named 'id' or matching '*Id' whose value is a number. Fixtures prove it fires on a top-level id, a nested item id, an assessmentId and a rubricId inside a criterion, and that it does not reject order, wordMin, scores, versions, draftKey or the string scaleId. A reachability test asserts findDatabaseIds({id:1}) returns one hit - the old check could not fail at all." },
+      { "id": "D3-017", "severity": "NOTE", "object": "RDG_PASSAGE_01 'campus store'", "classification": "NOTE_ONLY", "status": "NOT_FIXED_RECORDED", "reason": "Explicitly not a dialect defect - 'campus store' is ordinary American English and an earlier checker's flag on it was a false positive, which the standing instruction confirms. The residual point is referential clarity: for a US reader 'the campus store' reads first as the shop, an odd destination for an impounded bicycle. Item validity is unaffected because RDG_Q_002's key is the verbatim passage phrase. Changing it would alter a reviewed passage and its key for a clarity nicety. Recorded for the next content pass." },
+      { "id": "D3-018", "severity": "NOTE", "object": "LST_Q_009.answerRationale", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "'Nothing negative is stated' -> 'No negative verdict is stated'. The projector failure IS stated outright and the same sentence then lists it as a clue, so the rationale was misdescribing its own script." },
+      { "id": "D3-019", "severity": "NOTE", "object": "blueprint.readinessGuard", "classification": "REQUIRED_BEFORE_PERSISTENCE", "status": "FIXED", "action": "The answer-key requirement now states both representations: the draft keys by correctAnswer (a string unique within options), the persisted row keys by correctIndex (a valid index), and it points at the persistence contract for the mapping between them." }
+    ]
+  },
+
+  "listening": {
+    "D3_QUESTION_CROSS_ITEM_LEAK_CLOSED": true,
+    "LST_Q006_TO_Q007_MATERIAL_LEAK_CLOSED": true,
+    "fixApproach": "Question-only, as the brief preferred. The leak lived in LST_Q_006's STEM, not in any key: 'What is missing from the form?' asserted before any audio that something was missing, and exactly one of LST_Q_007's options realised that assertion. The stem now asks what the speaker SAYS about the form, which asserts nothing. LST_Q_007 is untouched - re-keying it would have collided with LST_Q_008, which already owns the Friday deadline.",
+    "scriptUnchanged": true,
+    "scriptUnchangedEvidence": "script:LST_CLIP_03 hash is identical in the regenerated manifest, so no TTS cost is incurred and no re-voicing is needed.",
+    "subskillsPreserved": "LST_Q_006 stays 'specific detail', LST_Q_007 stays 'purpose'.",
+    "newQ006": {
+      "prompt": "What does the speaker say about the form?",
+      "key": "One page came through blank",
+      "keyIndex": 3,
+      "distractorGrounding": "The 'filled in incorrectly' option is now the strongest distractor because the script explicitly contradicts it ('Everything you filled in is fine - that's not the problem'), which rewards listening rather than guessing."
+    },
+    "LISTENING_AUDIO_REQUIRED_ITEM_COUNT": 10,
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 0,
+    "LISTENING_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_01_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_02_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_03_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_04_CROSS_ITEM_LEAK_COUNT": 0,
+    "honestCaveat": "These four counts are my own semantic judgement on content I revised, at the per-clip scope the defect class requires. They are not mechanical guarantees and the validator does not and cannot produce them. A cold pass has overturned my count on this exact item once already, which is why Step 2D4 exists."
+  },
+
+  "blueprint": {
+    "BLUEPRINT_WEIGHTING_CONTRADICTION_COUNT": 0,
+    "BLUEPRINT_WRITING_TASK_COUNT": 2,
+    "BLUEPRINT_SPEAKING_TASK_COUNT": 2,
+    "EQUAL_WEIGHT_POLICY_CONSISTENCY_PASS": true,
+    "weightingPolicyAsNowStated": "Primary result is the four-skill profile. Secondary overall is a routing indicator computed as round((L+R+S+W)/4) only when all four required skills are complete. Each of the four carries 0.25, LanguageUse 0. Equal weighting is a product-design hypothesis; no reliability evidence is claimed.",
+    "BLUEPRINT_DIFFICULTY_DISTRIBUTION_MATCHES_CONTENT": true,
+    "countedDistribution": { "D1": 5, "D2": 9, "D3": 7, "D4": 4, "total": 25 },
+    "noItemRetieredToMatchBlueprint": true,
+    "BLUEPRINT_UNRESOLVED_CUTOFF_PRESENTED_AS_APPROVED": false,
+    "LEGACY_V1_SCORING_UNCHANGED": true,
+    "v1Evidence": "resolveEstimatedLevel in src/modules/diagnostic/diagnostic.logic.ts was read, not modified. The diagnostic suites that assert its thresholds (>=75 Intermediate, >=45 Foundation) still pass unchanged.",
+    "ITEM_LEVEL_STATUS": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
+    "ITEM_TIER_TO_RESULT_BAND_MAPPING_DEFINED": false
+  },
+
+  "validatorGuards": {
+    "architecture": "The three weak checks were moved out of the audit script into src/modules/diagnostic/content-guards.ts as pure functions, so they can be unit-tested with fixtures that genuinely fail. The script now delegates to them. This is the structural fix for the project's recurring failure mode: a narrow check reported under a broad flag name.",
+    "PROVENANCE_GUARD_NEGATIVE_FIXTURES_PASS": true,
+    "PROVENANCE_GUARD_SCANS_REQUIRED_SCOPE": true,
+    "CANONICAL_PROVENANCE_GUARD_PASS": true,
+    "CANONICAL_CONTENT_REVISION_PROVENANCE_LEAK": false,
+    "provenanceVariantsCovered": ["REV_014", "REV-7", "REVISION-012", "IR017", "IR_017", "D3-001", "DEF-004", "REQUIRES STEP", "REQUIRES-STEP", "REQUIRES_STEP2D4_REVIEW", "STATUS=CLOSED_BY_REV-014", "Pass 2C", "Phase 2C", "Step 4", "entry-diagnostic-v2-step2c3-revisions.json", "content-review", "revision-register"],
+    "provenanceNegativeFixtureCount": 34,
+    "provenanceFalsePositiveGuard": "A benign fixture asserts the guard does NOT flag difficultyTier 'D1', the range 'D1-D3', the words review/revising/steps, or scaleId.",
+    "CEFR_BLUEPRINT_SEMANTIC_GUARD_PASS": true,
+    "CEFR_CANONICAL_CONTENT_GUARD_PASS": true,
+    "CEFR_ACTIVE_SEMANTIC_LEAK_COUNT": 0,
+    "cefrActiveVsHistorical": "Active = a bare CEFR code as a value outside a declared history field, or a CEFR token in a level-bearing field. Historical = cefrClaimBasis, notCefr, notAnExamination, previousDraftDifficultyNote, basis, researchBasis and similar. Fixtures prove both directions.",
+    "NO_DB_IDS_GUARD_REACHABLE": true,
+    "NO_DB_IDS_NEGATIVE_FIXTURES_PASS": true,
+    "BLUEPRINT_VERSION_CONSISTENCY_GUARD_PASS": true,
+    "BLUEPRINT_TIER_DISTRIBUTION_CONFORMANCE_PASS": true,
+    "KNOWN_BRITISH_FORM_COUNT": 0,
+    "en_us_flag_honesty": "KNOWN_BRITISH_FORM_COUNT keeps its limited name and its caveat that absence proves only the listed forms are absent. EN_US_MANUAL_REVIEW_COMPLETED is reported separately as a human-judgement flag, not derived from the scan.",
+    "EN_US_MANUAL_REVIEW_COMPLETED": true,
+    "whatTheseGuardsStillCannotProve": "That audio is semantically required, that a distractor is fair, that an inference is warranted, or that a rubric measures its construct. Documented in the validator header so the distinction survives the next reader."
+  },
+
+  "persistenceContract": {
+    "artifact": "artifacts/entry-diagnostic-v2-persistence-contract.md",
+    "PERSISTENCE_MAPPING_CONTRACT_DOCUMENTED": true,
+    "PERSISTENCE_MAPPING_IMPLEMENTED": true,
+    "PERSISTENCE_MAPPING_GUARD_PASS": false,
+    "D3_011_CLOSED": false,
+    "STEP2E_LIVE_PERSISTENCE_ALLOWED": false,
+    "implementation": "src/modules/diagnostic/v2-import-mapper.ts - pure functions returning plain payloads, no Prisma client, no I/O. Nothing is spread; assertNoAuthoringFields throws on any authoring field or any key that is not a real DiagnosticQuestion column.",
+    "testEvidence": "src/modules/diagnostic/v2-import-mapper.spec.ts, 37 tests: all 25 objective items and all 4 productive tasks map cleanly, correctIndex is derived from correctAnswer for every item, intendedLevel is null for every item, unresolved passage and rubric references throw rather than writing null, and negative fixtures prove the allowlist rejects both an authoring field and an invented column.",
+    "blockingGap": {
+      "id": "GAP-1",
+      "field": "draftKey",
+      "problem": "DiagnosticQuestion has no column for a stable authored source identity, so an import cannot be made idempotent. A re-run has nothing to match on but (assessmentId, order) or question text, both of which change when content is revised.",
+      "whyThisBlocks": "A non-idempotent import of 29 rows into a database with a history of expensive recovery is not a risk worth taking for convenience. The fix is one additive migration, which this phase may not perform."
+    },
+    "nonBlockingGap": {
+      "id": "GAP-2",
+      "field": "distractorRationales",
+      "decision": "Not persisted. They remain authoring and review metadata. Lossless in the safe direction: no learner sees per-distractor feedback, and nothing can attach the wrong rationale to the wrong option."
+    },
+    "ANSWER_RATIONALE_PRE_SUBMISSION_EXPOSURE": false,
+    "ANSWER_KEY_PRE_SUBMISSION_EXPOSURE": false,
+    "LISTENING_TRANSCRIPT_PRE_SUBMISSION_EXPOSURE": false,
+    "confidentialityEvidence": "sanitizeQuestion (diagnostic.service.ts:64) returns an explicit allowlist of 12 fields containing neither correctIndex nor explanation. explanation is returned at exactly two sites, both read and confirmed: toResult (line 365) and submitAssessment (line 846), both whole-assessment result time. submitAssessment requires the full expected answer set, so answering one question discloses nothing about the rest of an unfinished diagnostic.",
+    "answerRationaleDecision": "answerRationale -> explanation is PERMITTED, as a decision with evidence rather than a default, because exposure is post-submission only. Conditional on Step 2E: if toResult or sanitizeQuestion is ever changed to serve partial attempts, this decision must be revisited in the same change.",
+    "OPTION_RATIONALE_IDENTITY_STABLE_UNDER_SHUFFLE": true,
+    "ANSWER_KEY_STABLE_UNDER_SHUFFLE": true,
+    "DISTRACTOR_FEEDBACK_ALIGNMENT_PASS": true,
+    "shuffleProof": "The authored index is the canonical identity; the permutation affects display order only. getAttemptQuestionPermutation is deterministic from attemptId and questionId, so the inverse is total and lossless - no identity is inferred from display position or from option text. Proved over all 24 permutations of 4 options against all 25 objective items: the text at a display position is the option resolved for it, the rationale shown is that authored option's own rationale, the CORRECT marker lands on the key and on exactly one option, and no non-key position grades as correct.",
+    "carriedHazards": [
+      "Hazard A: isDiagnosticAnswerCorrect ends with `return answer === question.correctIndex` when no permutation is passed, so a caller that forgets it compares a display index against an authored index and silently mis-grades. Not a current bug - both live callers pass it - but it fails open. Step 2E should make the permutation required for MCQ grading or throw when absent.",
+      "Hazard B: toResult returns selectedOption (a display index) next to correctOption (an authored index). Any consumer comparing them directly is wrong; isCorrect is computed correctly and is the only safe field. Either translate correctOption into the display frame or rename both."
+    ]
+  },
+
+  "mechanicalValidation": {
+    "TOTAL_ITEMS": 29,
+    "LISTENING_ITEMS": 10,
+    "LISTENING_CLIPS": 4,
+    "READING_ITEMS": 10,
+    "READING_PASSAGES": 3,
+    "SPEAKING_TASKS": 2,
+    "WRITING_TASKS": 2,
+    "LANGUAGE_USE_ITEMS": 5,
+    "OBJECTIVE_ITEMS": 25,
+    "DRAFT_KEY_UNIQUENESS_PASS": true,
+    "OBJECTIVE_KEY_STRUCTURE_PASS": true,
+    "UNRESOLVED_DRAFT_REFERENCES": 0,
+    "RUBRIC_STRUCTURAL_VALIDATION_PASS": true,
+    "BLUEPRINT_CONFORMANCE_PASS": true,
+    "DUPLICATE_EXACT_CONTENT_COUNT": 0,
+    "MECHANICAL_VALIDATION_PASS": true,
+    "CORRECT_OPTION_DISTRIBUTION": { "A": 5, "B": 7, "C": 7, "D": 6 },
+    "CORRECT_OPTION_DISTRIBUTION_CHANGED": false,
+    "HASH_MANIFEST_REGENERATED_ONCE": true,
+    "HASH_MISMATCH_COUNT": 0,
+    "POST_REVISION_HASH_CHECK_PASS": true,
+    "CHECK_MODE_MUTATED_FILES": false,
+    "manifestMd5AcrossWriteAndBothChecks": "15187db92ed4382691ea908bdf0a949c"
+  },
+
+  "preservedConstructs": {
+    "note": "Re-verified after the Step 2C4 edits, by the mechanical guards that were built for each.",
+    "LU_Q_002_ONE_DEFENSIBLE_ANSWER": "options untouched (on/in/at/to); only the distractor rationale wording was narrowed",
+    "RDG_Q_006_CONTEXTUAL_READING": "untouched; REV002_KEY_SHARES_NO_STEM_TERM still passes",
+    "SPEAKING_FLUENCY_LENGTH_DEPENDENCY_ABSENT": "SPK_RUBRIC_V3 byte-unchanged; REV003 guards still pass",
+    "WRITING_TASK1_AND_2_FULL_SCORE_RANGE": "the one WRT edit narrowed organisation anchor 3 to score content present, which can only widen task 1's reachable range; REV009_NO_SINGLE_TASK_ANCHOR still passes",
+    "ACCENT_FAIRNESS": "intelligibility description untouched; 'Accent itself is not assessed' retained",
+    "LISTENING_AUDIO_DEPENDENCE": "re-tested per clip after the LST_Q_006 change",
+    "NO_CEFR_MAPPING_OR_UNSUPPORTED_CUTOFFS": "CEFR_ACTIVE_SEMANTIC_LEAK_COUNT=0 and the unresolved cutoffs are now recorded as unresolved rather than approved"
+  },
+
+  "testing": {
+    "BACKEND_TYPECHECK_PASS": true,
+    "DIAGNOSTIC_TESTS_PASS": "162/162 across 8 suites",
+    "NEW_GUARD_AND_MAPPER_TESTS": "87/87 across 2 new suites",
+    "CI_LINT_CHECK_PASS": true,
+    "lintNote": "The 32 prettier errors CI reported were from the pre-fix state of the four new files. eslint --fix was run on those four files ONLY, to avoid touching work that may belong to another session. lint:check now exits 0, including the one non-prettier error (no-unnecessary-type-assertion), and all 87 tests still pass after the reformat.",
+    "GIT_DIFF_CHECK_PASS": true,
+    "FULL_SUITE": "1267/1268 passing. One unrelated suite, src/modules/speaking/speaking-post-processing.service.spec.ts, fails only under the parallel full run and passes 8/8 in isolation. It is a pre-existing parallel-execution flake in the Speaking module, which Step 2C4 did not touch. Reported rather than absorbed into a green claim.",
+    "FRONTEND_FILES_CHANGED_BY_STEP2C4": 0
+  },
+
+  "safety": {
+    "DB_MUTATED": false,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "dbAccessThisPass": "none. Prisma schema and service source were read only; no SELECT was needed.",
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0,
+    "filesChanged": [
+      "artifacts/entry-diagnostic-v2-content-draft.json",
+      "artifacts/entry-diagnostic-v2-rubrics-draft.json",
+      "artifacts/entry-diagnostic-v2-blueprint.json",
+      "artifacts/entry-diagnostic-v2-content-draft.sha256 (regenerated once)",
+      "scripts/audit/validate-entry-diagnostic-v2-draft.ts",
+      "src/modules/diagnostic/content-guards.ts (new)",
+      "src/modules/diagnostic/content-guards.spec.ts (new)",
+      "src/modules/diagnostic/v2-import-mapper.ts (new)",
+      "src/modules/diagnostic/v2-import-mapper.spec.ts (new)",
+      "artifacts/entry-diagnostic-v2-step2c4-revisions.json (new)",
+      "artifacts/entry-diagnostic-v2-step2c4-report.md (new)",
+      "artifacts/entry-diagnostic-v2-persistence-contract.md (new)"
+    ]
+  },
+
+  "openRegister": {
+    "DEF_003_STATUS": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+    "LST_CLIP_03_VOICE_CASTING_STATUS": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+    "LST_CLIP_04_VOICE_CASTING_STATUS": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": "OPEN",
+    "DEF_004_BLOCKS_V2_SCORER_IMPLEMENTATION": true,
+    "DEF_004_BLOCKS_DRAFT_PERSISTENCE": false,
+    "DEF_005_PERSISTENCE_SOURCE_IDENTITY_GAP": "OPEN - GAP-1, blocks live persistence; one additive migration",
+    "IR_017_INSTRUCTION_LANGUAGE": "SAFE_TO_DEFER_ACTIVATION",
+    "D3_002_SUBSKILL_LABELLING": "OPEN - carried to the next content pass with the blueprint matrix reconciliation",
+    "D3_005_RUBRIC_LENGTH_ANCHORS": "OPEN - deferred to the grading phase",
+    "D3_007_RUBRIC_IDENTIFIER_VARIETY": "DECIDED - keep British identifiers; must not change after the first rubric row is persisted"
+  },
+
+  "whatThisPassDoesNotEstablish": [
+    "Approval. The flag is REQUIRES_STEP2D4 and is deliberately not true.",
+    "That live persistence is safe. PERSISTENCE_MAPPING_GUARD_PASS is false because of GAP-1, and that value must not be flipped merely because the content package is internally consistent.",
+    "That the four per-clip leak counts are correct. They are my semantic judgement on content I revised, and a cold pass has already overturned my count on this exact item once.",
+    "Any psychometric property. D1-D4 remains an uncalibrated design hypothesis and the equal weighting is now explicitly labelled a product-design hypothesis.",
+    "Rubric validity. Six anchor edits across five passes, still never trialled against a real response."
+  ],
+
+  "nextStep": "STEP_2D4_COLD_GATE, then the GAP-1 migration decision before any Step 2E write."
+}

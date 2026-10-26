@@ -1,0 +1,141 @@
+[test-safety] isolated database verified: p0_isolated (cluster 7700839956956897314)
+[test-safety] isolated Redis verified: redis://127.0.0.1:6391
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:33 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 140 with score 85 (submissionId: 214)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:33 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39m[31mFailed to handle speaking gamification for user 140[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:33 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39mError: FORCED_XP_MUTATION_CRASH
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\speaking\speaking-reward-forced-crash.integration.spec.ts:213:30[90m)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:33 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 140 with score 85 (submissionId: 214)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:33 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=140 source=SPEAKING_SUBMISSION requested=5 granted=5 balance=5[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:33 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32mAwarded badge "Giọng Đọc Vàng" to user 140[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:33 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=140 source=DAILY_QUEST requested=10 granted=10 balance=15[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:33 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32mUser 140 completed quest 3 and received rewards atomically.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:33 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_reward_metrics","submissionId":214,"gamificationMs":208}[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 140 with score 85 (submissionId: 215)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39m[31mFailed to handle speaking gamification for user 140[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39mError: FORCED_BANH_MUTATION_CRASH
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\speaking\speaking-reward-forced-crash.integration.spec.ts:259:30[90m)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 140 with score 85 (submissionId: 215)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mReward effect XP already processed for submission #215 (xp:speaking:215). Skipping.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=140 source=SPEAKING_SUBMISSION requested=5 granted=5 balance=20[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_reward_metrics","submissionId":215,"gamificationMs":86}[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 141 with score 85 (submissionId: 216)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=141 source=SPEAKING_SUBMISSION requested=5 granted=5 balance=5[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32mAwarded badge "Giọng Đọc Vàng" to user 141[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=141 source=DAILY_QUEST requested=10 granted=10 balance=15[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32mUser 141 completed quest 3 and received rewards atomically.[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39m[31mFailed to handle speaking gamification for user 141[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39mError: FORCED_QUEST_2_CRASH
+    at GamificationService.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\speaking\speaking-reward-forced-crash.integration.spec.ts:336:17[90m)[39m
+    at [90mD:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-mock[24m\build\index.js:305:39
+    at GamificationService.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-mock[24m\build\index.js:312:13[90m)[39m
+    at GamificationService.mockConstructor [as advanceDailyQuestAndGrantRewardsTx] [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-mock[24m\build\index.js:102:19[90m)[39m
+    at [90mD:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\gamification\gamification.listener.ts:381:44
+    at runWithTx [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\gamification\gamification.listener.ts:190:13[90m)[39m
+    at Proxy._transactionWithCallback [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4m@prisma\client[24m\runtime\library.js:130:7984[90m)[39m
+    at GamificationListener.executeRewardEffect [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\gamification\gamification.listener.ts:197:19[90m)[39m
+    at GamificationListener.handleSpeakingSubmittedEvent [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\gamification\gamification.listener.ts:375:9[90m)[39m
+    at SpeakingPostProcessingService.processReward [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\speaking\speaking-post-processing.service.ts:203:7[90m)[39m
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\speaking\speaking-reward-forced-crash.integration.spec.ts:341:5[90m)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 141 with score 85 (submissionId: 216)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mReward effect XP already processed for submission #216 (xp:speaking:216). Skipping.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mReward effect BANH already processed for submission #216 (banh:speaking:216). Skipping.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_reward_metrics","submissionId":216,"gamificationMs":52}[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 142 with score 90 (submissionId: 217)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=142 source=SPEAKING_SUBMISSION requested=5 granted=5 balance=5[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39m[31mFailed to handle speaking gamification for user 142[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39mError: FORCED_BADGE_CRASH
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\speaking\speaking-reward-forced-crash.integration.spec.ts:426:30[90m)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 142 with score 90 (submissionId: 217)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mReward effect XP already processed for submission #217 (xp:speaking:217). Skipping.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mReward effect BANH already processed for submission #217 (banh:speaking:217). Skipping.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32mAwarded badge "Giọng Đọc Vàng" to user 142[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=142 source=DAILY_QUEST requested=10 granted=10 balance=15[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32mUser 142 completed quest 3 and received rewards atomically.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_reward_metrics","submissionId":217,"gamificationMs":105}[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 140 with score 85 (submissionId: 218)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39m[31mFailed to handle speaking gamification for user 140[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39mError: CRASH_BETWEEN_REWARDS
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\speaking\speaking-reward-forced-crash.integration.spec.ts:484:30[90m)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 140 with score 85 (submissionId: 218)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mReward effect XP already processed for submission #218 (xp:speaking:218). Skipping.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=140 source=SPEAKING_SUBMISSION requested=5 granted=5 balance=25[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_reward_metrics","submissionId":218,"gamificationMs":83}[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 140 with score 85 (submissionId: 219)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_reward_metrics","submissionId":219,"gamificationMs":94}[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 140 with score 85 (submissionId: 220)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39m[31mFailed to handle speaking gamification for user 140[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:34 PM [31m  ERROR[39m [38;5;3m[GamificationListener] [39mError: TRANSIENT_FAILURE
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\speaking\speaking-reward-forced-crash.integration.spec.ts:554:30[90m)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:35 PM [32m    LOG[39m [38;5;3m[SpeakingProcessorService] [39m[32m[SpeakingProcessor] Exclusive claim acquired for submission #221 (attempt 1/4, traceId=trace-bullmq-event-8, queueWait=28ms)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:35 PM [32m    LOG[39m [38;5;3m[SpeakingProcessorService] [39m[32m[SpeakingProcessor] Successfully completed SpeakingSubmission #221 with score 8.8 (traceId=trace-bullmq-event-8, total=185ms)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:35 PM [32m    LOG[39m [38;5;3m[SpeakingProcessorService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_latency_metrics","traceId":"trace-bullmq-event-8","submissionId":221,"status":"COMPLETED","queueWaitMs":28,"r2DownloadMs":0,"validationMs":8,"azureScoringMs":153,"dbPersistMs":9,"scorePersistMs":9,"scoreEventPublishMs":1,"totalWorkerMs":185,"timestamp":"2026-10-26T05:12:35.195Z"}[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:35 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #222 (Attempt 0/4)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:35 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mSuccessfully completed SpeakingSubmission #222 with score 82[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:35 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #223 (Attempt 0/4)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:35 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mSuccessfully completed SpeakingSubmission #223 with score 75[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:35 PM [31m  ERROR[39m [38;5;3m[SpeakingEventPublisherService] [39m[31m[SpeakingEventPublisher] Failed to publish speaking.completed event to Redis for submission #223 (traceId=legacy-223-1792991555339): REDIS_PUB_UNAVAILABLE[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:35 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32m[SpeakingWorker] Submission #223 is already COMPLETED. Skipping.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:38 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling toeic.submitted event for user 126 (examId: 1, mode: FULL_TEST)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:38 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling toeic.submitted event for user 126 (examId: 1, mode: FULL_TEST)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:38 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=126 source=TOEIC_COMPLETION requested=120 granted=120 balance=120[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:38 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mIdempotent duplicate detected for user #10 with key "idemp-key-123". Returning existing submission #99. (traceId=3ea83a96-e05a-45d1-aec7-53b7abb509b8)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:38 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mUploading audio for exercise #1 by user #10 (1000ms, traceId=e5e4f75f-d2a3-46e2-b559-20caada9c26f)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:38 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mUploading audio for exercise #1 by user #10 (1000ms, traceId=78e7f670-f3d8-4fb2-bb09-dc0e5e73a88f)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:38 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mUploading audio for exercise #1 by user #10 (1000ms, traceId=e92faa9c-13f6-4a0f-a219-68545e4fb5c0)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:38 PM [31m  ERROR[39m [38;5;3m[SpeakingService] [39m[31m[SpeakingService] Failed to enqueue submission #777 to BullMQ: Redis connection timeout. Submission remains PENDING in DB for reconciliation. (traceId=e92faa9c-13f6-4a0f-a219-68545e4fb5c0)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [31m  ERROR[39m [38;5;3m[SpeakingProcessorService] [39m[31m[SpeakingProcessor] Pronunciation assessment provider error for submission #103: [TOO_MANY_REQUESTS] Too Many Requests: Azure Speech rate limit reached (traceId=trace-429)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [31m  ERROR[39m [38;5;3m[SpeakingProcessorService] [39m[31m[SpeakingProcessor] Failed to download audio for submission #107: The specified key does not exist. (traceId=trace-missing)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [31m  ERROR[39m [38;5;3m[SpeakingProcessorService] [39m[31m[SpeakingProcessor] Pronunciation assessment provider error for submission #105: [PROVIDER_UNAVAILABLE] Service Unavailable: Azure Speech 503 (traceId=trace-max)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [31m  ERROR[39m [38;5;3m[SpeakingProcessorService] [39m[31m[SpeakingProcessor] Job #106 timed out after 50ms (traceId=trace-timeout)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #10 (Attempt 1/4)[39m
+[33m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [33m   WARN[39m [38;5;3m[SpeakingWorkerService] [39m[33mAudio bytes validation failed for submission #10: Invalid audio file: incomplete WAV header[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #20 (Attempt 1/4)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [31m  ERROR[39m [38;5;3m[SpeakingWorkerService] [39m[31mPronunciation assessment provider error for submission #20: [PROVIDER_TIMEOUT] Azure timed out[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mScheduling retry for submission #20 at 2026-10-26T05:13:39.910Z (Backoff: 60s)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #30 (Attempt 4/4)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [31m  ERROR[39m [38;5;3m[SpeakingWorkerService] [39m[31mPronunciation assessment provider error for submission #30: [PROVIDER_UNAVAILABLE] Service Unavailable[39m
+[33m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [33m   WARN[39m [38;5;3m[SpeakingWorkerService] [39m[33mSubmission #30 reached max retry attempts (4). Marking as FAILED.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #45 (Attempt 1/4)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #40 (Attempt 1/4)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mSuccessfully completed SpeakingSubmission #40 with score 8.5[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #50 (Attempt 1/4)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mSuccessfully completed SpeakingSubmission #50 with score NO_SPEECH[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #60 (Attempt 1/4)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:39 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mSuccessfully completed SpeakingSubmission #60 with score 9[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:40 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mCreated upload intent 0cd0fca8-da22-4136-bce2-0a429fadbc65 for user #10, exercise #1 (objectKey=speaking/pending/10/0cd0fca8-da22-4136-bce2-0a429fadbc65.wav, traceId=trace-intent-1792991560970-132f6bb1)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:41 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mReturning active upload intent existing-intent-id for user #10 with key "idemp-intent-001" (traceId=trace-intent-1792991561008-76b24608)[39m
+[33m[Nest] 11168  - [39m10/26/2026, 12:12:41 PM [33m   WARN[39m [38;5;3m[SpeakingService] [39m[33mIDOR attempt detected: User #99 attempted to finalize intent intent-uuid-123 owned by User #10[39m
+[33m[Nest] 11168  - [39m10/26/2026, 12:12:41 PM [33m   WARN[39m [38;5;3m[SpeakingService] [39m[33mExact size mismatch for intent intent-uuid-123: expected 640000 bytes, R2 has 640001 bytes[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:41 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32m[SpeakingService] Enqueued submission #101 from intent intent-uuid-123 to BullMQ queue (traceId=trace-fin-1)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:41 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mIdempotent duplicate finalize detected for intent intent-uuid-123. Returning existing submission #101 (traceId=trace-finalize-1792991561018-f7f6a02e)[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:41 PM [31m  ERROR[39m [38;5;3m[SpeakingService] [39m[31m[SpeakingService] Failed to enqueue submission #101 to BullMQ: Redis connection failed. Submission remains PENDING in DB for reconciliation. (traceId=trace-err)[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:42 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_feedback_metrics","submissionId":1,"geminiFeedbackMs":0,"feedbackPersistMs":0}[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:42 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_feedback_metrics","submissionId":10,"geminiFeedbackMs":61,"feedbackPersistMs":0}[39m
+[31m[Nest] 11168  - [39m10/26/2026, 12:12:42 PM [31m  ERROR[39m [38;5;3m[SpeakingPostProcessingService] [39m[31m[SpeakingPostProcessing] Feedback failed permanently for #20: Gemini quota exceeded 429[39m
+[33m[Nest] 11168  - [39m10/26/2026, 12:12:42 PM [33m   WARN[39m [38;5;3m[SpeakingPostProcessingService] [39m[33m[SpeakingPostProcessing] Stale feedback worker token feedback-07dacebd-b151-44c7-91c2-79ede1f53f69 for #30. Discarding write.[39m
+[33m[Nest] 11168  - [39m10/26/2026, 12:12:42 PM [33m   WARN[39m [38;5;3m[SpeakingPostProcessingService] [39m[33m[SpeakingPostProcessing] Stale reward worker token reward-9d15096e-959c-49da-befe-27f606fe0739 for #40. Discarding write.[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:42 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_reward_metrics","submissionId":70,"gamificationMs":0}[39m
+[33m[Nest] 11168  - [39m10/26/2026, 12:12:42 PM [33m   WARN[39m [38;5;3m[PaymentReconciliationService] [39m[33mPlan payment reconciliation requires review (amount) for bank transaction #11[39m
+[33m[Nest] 11168  - [39m10/26/2026, 12:12:42 PM [33m   WARN[39m [38;5;3m[PaymentReconciliationService] [39m[33mPlan payment reconciliation requires review (receiving-account) for bank transaction #11[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:43 PM [32m    LOG[39m [38;5;3m[PlanCatalogAdminService] [39mObject(4) {
+  adminUserId: [33m7[39m,
+  action: [32m'CREATE_DRAFT'[39m,
+  versionId: [33m24[39m,
+  planCode: [32m'PLUS'[39m
+}
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:43 PM [32m    LOG[39m [38;5;3m[PlanCatalogAdminService] [39mObject(4) {
+  adminUserId: [33m7[39m,
+  action: [32m'PUBLISH'[39m,
+  versionId: [33m22[39m,
+  planCode: [32m'PLUS'[39m
+}
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:45 PM [32m    LOG[39m [38;5;3m[SpeakingQueueService] [39m[32mClosed BullMQ queue "breadtrans-speaking-assessment" connection[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:45 PM [32m    LOG[39m [38;5;3m[SpeakingQueueService] [39m[32m[SpeakingQueue] Enqueued job: jobId=speaking-assessment-42 submissionId=42 traceId=trace-abc[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:45 PM [32m    LOG[39m [38;5;3m[SpeakingQueueService] [39m[32mClosed BullMQ queue "breadtrans-speaking-assessment" connection[39m
+[32m[Nest] 11168  - [39m10/26/2026, 12:12:45 PM [32m    LOG[39m [38;5;3m[SpeakingQueueService] [39m[32mClosed BullMQ queue "breadtrans-speaking-assessment" connection[39m
+
+Test Suites: 31 passed, 31 total
+Tests:       254 passed, 254 total
+Snapshots:   0 total
+Time:        18.118 s, estimated 38 s
+Ran all test suites matching src/modules/speaking|src/modules/subscription|src/modules/toeic/toeic.race|test/safety.

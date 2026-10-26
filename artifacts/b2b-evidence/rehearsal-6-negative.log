@@ -1,0 +1,8 @@
+target localhost:5437/b2b_rehearsal sysid=7700793221349826600 pg=15.19 read_only=off mode=rehearsal
+PASS  startAttempt on the DRAFT is refused with NotFoundException  (NotFoundException: Bài kiểm tra không tồn tại hoặc đã ngừng hoạt động)
+PASS  submitAssessment on the DRAFT is refused with NotFoundException  (NotFoundException)
+PASS  no attempt row was created  (before=0)
+PASS  activating the DRAFT is blocked by the status/isActive CHECK  ->  Invalid `prisma.$executeRawUnsafe()` invocation: Raw query failed. Code: `23514
+PASS  DRAFT still DRAFT and inactive after the attempt
+
+B2B_NEGATIVE_FAILURES=0

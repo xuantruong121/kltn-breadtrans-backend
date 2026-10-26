@@ -13,6 +13,11 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # `always`, not `unless-stopped`: Docker Desktop marks containers as
+    # manually stopped when it shuts down, and `unless-stopped` then declines
+    # to start them on the next boot. The backup worker is useless without
+    # this service, so it must come back on its own.
+    restart: always
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d kltn_db']
       interval: 10s
@@ -33,6 +38,7 @@ services:
       - '5433:5432'
     volumes:
       - postgres_shadow_data:/var/lib/postgresql/data
+    restart: always
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d kltn_shadow']
       interval: 10s
@@ -55,11 +61,29 @@ services:
       PGDATABASE: kltn_db
       BACKUP_INTERVAL_SECONDS: '21600' # every 6 hours
       BACKUP_RETENTION_DAYS: '14'
+      # `depends_on` is not re-evaluated when the Docker daemon restarts this
+      # container under its restart policy, so it can start while Postgres is
+      # still recovering. The worker waits instead of losing the whole cycle.
+      POSTGRES_READY_RETRY_SECONDS: '30'
+      POSTGRES_READY_MAX_ATTEMPTS: '20'
+      # A failed cycle retries on this short window, never the full interval.
+      BACKUP_FAILURE_RETRY_SECONDS: '300'
     volumes:
       - ./docker/postgres-backup/backup.sh:/usr/local/bin/backup.sh:ro
       - ${POSTGRES_BACKUP_DIR:-./db-backups}:/backups
     entrypoint: ['/bin/sh', '/usr/local/bin/backup.sh']
-    restart: unless-stopped
+    restart: always
+    # The scheduler loop is PID 1, so a fatal exit already stops the container
+    # and the restart policy takes over. This only catches the failure mode that
+    # leaves the loop alive but unable to do its job: the host bind mount going
+    # away, which would otherwise fail silently every cycle.
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pgrep -f backup.sh >/dev/null && [ -w /backups ]']
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
@@ -68,6 +92,7 @@ services:
       - '6379:6379'
     volumes:
       - redis_data:/data
+    restart: always
     command: redis-server --save 60 1 --loglevel warning
 
 volumes:

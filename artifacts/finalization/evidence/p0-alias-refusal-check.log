@@ -1,0 +1,4 @@
+alias target: postgresql://***@172.17.112.1:5432/kltn_test_db
+static check: {"ok":true}
+identity check: {"ok":false,"reason":"connection reached protected cluster 7674533776495505443","database":"kltn_test_db"}
+redis redis://172.17.112.1:6379: {"ok":false,"reason":"port 6379 is the shared Redis of the running application"}

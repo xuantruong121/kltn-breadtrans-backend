@@ -1,11 +1,13 @@
 param(
   [ValidateSet('Init','Run1','Verify1','Run2','Verify2','Cleanup')]
   [string]$Stage,
-  [int]$HostPort = 5435
+  [int]$HostPort = 5436,
+  [string]$RehearsalName = 'kltn-semantic-rehearsal',
+  [string]$DatabaseName = 'kltn_semantic_rehearsal'
 )
 
 $ErrorActionPreference = 'Stop'
-$name = 'kltn-full-canonical-rehearsal'; $volume = "$name-data"; $db = 'kltn_full_rehearsal'
+$name = $RehearsalName; $volume = "$name-data"; $db = $DatabaseName
 $root = Split-Path -Parent $PSScriptRoot
 if ($HostPort -in 5432,5433) { throw 'Refusing a live/shadow PostgreSQL port.' }
 $url = "postgresql://postgres:rehearsal@localhost:$HostPort/$db`?schema=public"
@@ -30,6 +32,7 @@ function Invoke-Canonical([string]$run, [bool]$seed) {
   Run "$run course covers" { npx ts-node scripts/relink-course-covers.ts }
   Run "$run TOEIC runtime" { npx ts-node scripts/reconstruct-canonical-toeic.ts }
   Run "$run TOEIC L&R Phase-0 media relink" { npx ts-node scripts/materialize-exam1-listening-phase0.ts --exam=1 --reuse-existing }
+  Run "$run whole-quiz manifest restore" { npx ts-node scripts/whole-quiz-artifact-manifest.ts --restore --activate }
   Run "$run sequence check" { npx ts-node scripts/db-resync-sequences.ts --check }
   Run "$run TOEIC validator" { npx ts-node scripts/verify-canonical-baseline.ts }
 }

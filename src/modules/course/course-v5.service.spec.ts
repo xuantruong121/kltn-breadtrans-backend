@@ -284,4 +284,106 @@ describe('CourseLearningV5Service', () => {
     expect(result.attemptId).toBe(101);
     expect(create).not.toHaveBeenCalled();
   });
+
+  describe('free-text items', () => {
+    const exercise = (questions: unknown[]) => ({
+      id: 44,
+      lessonId: 12,
+      minimumScore: null,
+      questions,
+    });
+    const open = {
+      id: 90,
+      order: 2,
+      prompt: 'Viết một câu giới thiệu nơi bạn đến.',
+      options: null,
+      correctAnswer: 'I am from Hanoi.',
+      explanation: 'Dùng I am from + nơi chốn.',
+    };
+    const mc = {
+      id: 88,
+      order: 1,
+      options: ['A', 'B'],
+      correctAnswer: 'A',
+      explanation: '',
+    };
+    let created: any;
+    beforeEach(() => {
+      created = undefined;
+      prisma.$transaction.mockImplementation(
+        async (callback: (tx: any) => Promise<unknown>) =>
+          callback({
+            courseLessonAttempt: {
+              create: jest.fn().mockImplementation(({ data }) => {
+                created = data;
+                return Promise.resolve({ id: 99 });
+              }),
+            },
+          }),
+      );
+    });
+
+    it('does not mark a valid own-words answer wrong; the exercise completes on the objective items', async () => {
+      prisma.courseLessonExercise.findFirst.mockResolvedValue(
+        exercise([mc, open]),
+      );
+      const result = await service.submitExercise(1, 12, 44, user, {
+        answers: [
+          { questionId: 88, answer: 'A' },
+          { questionId: 90, answer: 'I am from Can Tho.' },
+        ],
+      });
+      expect(result).toMatchObject({ score: 1, maxScore: 1, completed: true });
+      const openFeedback = result.feedback.find((f) => f.questionId === 90);
+      expect(openFeedback).toMatchObject({
+        isCorrect: null,
+        correctAnswer: 'I am from Hanoi.',
+      });
+      expect(created.answers.create).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            questionId: 90,
+            isCorrect: null,
+            score: null,
+          }),
+        ]),
+      );
+    });
+
+    it('still requires every free-text item to be answered', async () => {
+      prisma.courseLessonExercise.findFirst.mockResolvedValue(
+        exercise([mc, open]),
+      );
+      await expect(
+        service.submitExercise(1, 12, 44, user, {
+          answers: [
+            { questionId: 88, answer: 'A' },
+            { questionId: 90, answer: '   ' },
+          ],
+        }),
+      ).rejects.toThrow('Hãy viết câu trả lời');
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('still fails the exercise on a wrong objective answer', async () => {
+      prisma.courseLessonExercise.findFirst.mockResolvedValue(
+        exercise([mc, open]),
+      );
+      const result = await service.submitExercise(1, 12, 44, user, {
+        answers: [
+          { questionId: 88, answer: 'B' },
+          { questionId: 90, answer: 'I am from Hue.' },
+        ],
+      });
+      expect(result).toMatchObject({ score: 0, maxScore: 1, completed: false });
+    });
+
+    it('completes an exercise made only of free-text items once all are answered', async () => {
+      prisma.courseLessonExercise.findFirst.mockResolvedValue(exercise([open]));
+      const result = await service.submitExercise(1, 12, 44, user, {
+        answers: [{ questionId: 90, answer: 'I come from Da Nang.' }],
+      });
+      expect(result).toMatchObject({ maxScore: 0, completed: true });
+    });
+  });
 });

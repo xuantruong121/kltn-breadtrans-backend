@@ -1,0 +1,4 @@
+
+> temp-app@0.0.1 lint:check
+> eslint "{src,apps,libs,test}/**/*.ts"
+

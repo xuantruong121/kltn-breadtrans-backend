@@ -1,0 +1,50 @@
+{
+  "quizId": 24,
+  "artifact": {
+    "id": 6,
+    "version": 7,
+    "status": "PUBLISHED",
+    "r2Key": "catalog/listening/practice/quiz-24/audio/v7/full.mp3",
+    "checksumSha256": "6d0614c4b0992259533908b8acd3eb8d4ca2914c9da1cb485460067bae29b463",
+    "durationMs": 90432,
+    "timelineEntries": 20
+  },
+  "phases": {
+    "C_segmentSeekAndStop": {
+      "questionsVerified": "20/20",
+      "perQuestionSeekPass": true,
+      "segmentStopPass": true
+    },
+    "D_navigation": {
+      "navigationAudioPass": true
+    },
+    "E_semanticSpeaker": {
+      "semanticSpeakerPass": true,
+      "speakers": ["maya", "ben"]
+    },
+    "F_fullScript": {
+      "fullScriptPlaybackPass": true,
+      "startsAtZero": true,
+      "resumeSrcStable": true,
+      "blobLifecyclePass": true
+    },
+    "G_transcriptReveal": {
+      "preRevealStatus": 403,
+      "postRevealStatus": 200,
+      "transcriptItems": 20,
+      "speakers": ["maya", "ben"]
+    }
+  },
+  "regressions": {
+    "staleAudioRequestOverwrite": true,
+    "fullScriptStartPosition": true,
+    "fullScriptResume": true,
+    "playerModeSwitch": true
+  },
+  "recovery": {
+    "azureCalls": 0,
+    "ttsCalls": 0,
+    "r2Writes": 0,
+    "manifestRestore": "ALREADY_VALID"
+  }
+}

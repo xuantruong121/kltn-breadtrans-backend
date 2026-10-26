@@ -1,0 +1,12 @@
+target 5432/kltn_db sysid=7674533776495505443 read_only=on
+PASS  getCurrentAssessment serves the ACTIVE id=1 with the new code  (served=1, questions=20)
+PASS  new delivery fields present
+PASS  no confidential field served
+PASS  served order is stable across requests
+PASS  getLatestResult returns the no-result state
+READINESS id=1 status=ACTIVE content=true runtime=true(0) activation=true blockers=[]
+PASS  id=1 passes content, runtime and activation
+READINESS id=5 status=DRAFT content=true runtime=false(10) activation=false blockers=["runtime: 10 defect(s)","DIAGNOSTIC_SCORER_UNSUPPORTED: scoringVersion \"FOUR_SKILL_PLACEMENT_V2\" is known but its scorer is not implemented in this build"]
+PASS  id=5 content valid, runtime NOT ready (10 audio), activation blocked
+PASS  the session really is read-only (a locking read is refused)
+C1_LIVE_READONLY_FAILURES=0

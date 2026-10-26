@@ -1,0 +1,49 @@
+
+== Entry Diagnostic V2 id 5 (browser, mock grader)
+PASS  the clone serves V2 id 5 as the active assessment  (5 / ACTIVE / FOUR_SKILL_PLACEMENT_V2)
+PASS  the intro counts the administered form, not the 52-task plan  (29 nhiệm vụ (25 trắc nghiệm + 4 thực hành))
+PASS  listening: the question carries playable audio (stand-in fixture)  (ening/practice/quiz-23/audio/v7/full.mp3)
+PASS  speaking 1: the stated limits are the task's own (prep 15s, 45s)
+PASS  speaking 1: the preparation countdown is shown
+PASS  speaking 1: recording started when preparation ended
+PASS  speaking 1: the take can be played back before confirming
+PASS  speaking 2: the stated limits are the task's own (prep 30s, 60s)
+PASS  speaking 2: recording stopped by itself at 60s
+PASS  writing 1: guidance states the task's range (60–90 từ)
+PASS  writing 1: a short draft is told it is below the range but still graded
+PASS  writing 1: 65 words reads as within the range
+PASS  writing 2: guidance states the task's range (90–130 từ)
+PASS  writing 2: a short draft is told it is below the range but still graded
+PASS  writing 2: 95 words reads as within the range
+PASS  all 29 tasks answered through the UI  (29)
+PASS  the four-skill result reaches COMPLETE  (COMPLETE)
+PASS  Listening and Reading equal the keyed answers  (L 50 vs 50, R 50 vs 50)
+PASS  Speaking and Writing equal the mean of their graded tasks  (S 69 [62.5,75], W 75 [75,75])
+PASS  overall is the equal-weight mean of the four skills  (61 vs 61)
+PASS  Language Use is reported with weight 0
+PASS  no placement band (DEF-004 decided as D1)
+PASS  the attempt pins its versions and stores the result  (FOUR_SKILL_PLACEMENT_V2 / V2_2026_01 / 6 / COMPLETE / 61 / 5)
+PASS  after a reload the result page shows the four-skill profile and overall
+PASS  task scores use the 0-100 scale, never /5  (undefined)
+PASS  the answer review never shows a grading status as an answer
+PASS  per-criterion feedback is shown on a 0-4 scale
+PASS  no CEFR or official-score claim  (undefined)
+PASS  the result page has no horizontal scroll at 390px  (0px)
+PASS  D1 advice is returned (V1 lists are not)
+PASS  every cited resource has a real learner route  (/listening/23 /listening/24 /reading/6 /courses/8 /speaking/16 /speaking/17 /courses/8)
+PASS  priorities are at most three and carry evidence  (LISTENING:LISTENING_DETAIL, READING:READING_CONTEXT, SPEAKING:SPEAKING_TASK)
+PASS  mock-graded productive evidence is flagged to the learner
+PASS  the result page shows the advice with its mock-grader notice
+PASS  the recommended READING_QUIZ opens (/reading/6)  (Thoát bài đọc Reading B1 — Workplace Documents Câu 1/3 ĐỌC HIỂU 1/3 Mẹo đọc hiểu ĐOẠN VĂN BÀI ĐỌC Đối chiếu nội dung để )
+PASS  back from the resource returns to the result
+PASS  another learner cannot read this result  (200)
+PASS  another learner cannot retry this attempt's grading  (403)
+PASS  a failed task withholds its skill and the overall (never 0)  (GRADING_FAILED, overall null)
+PASS  the stored attempt follows (GRADING_FAILED, no overall)  (GRADING_FAILED / )
+PASS  the page says the overall is withheld and offers a retry per failed task
+PASS  both retries regrade through the queue and the overall returns  (COMPLETE, overall 61)
+PASS  the page shows the restored overall
+PASS  no server error during the run
+issues: console: Failed to load resource: the server responded with a status of 403 () | console: [GSI_LOGGER]: The given origin is not allowed for the given client ID. | console: Failed to load resource: the server responded with a status of 403 () | console: Failed to load resource: the server responded with a status of 403 () | console: [GSI_LOGGER]: The given origin is not allowed for the given client ID. | console: Failed to load resource: the server responded with a status of 403 () | console: [GSI_LOGGER]: The given origin is not allowed for the given client ID. | console: Failed to load resource: the server responded with a status of 403 ()
+
+DIAGNOSTIC_V2_BROWSER_FAILURES=0

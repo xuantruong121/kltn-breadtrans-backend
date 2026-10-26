@@ -179,13 +179,13 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
         order: 1,
       };
 
-      // By stable originalIndex object
+      // A client-declared authored index is not accepted: the authored
+      // identity of an option is the server's to derive, not the client's.
       expect(isDiagnosticAnswerCorrect(question, { originalIndex: 0 })).toBe(
-        true,
-      );
-      expect(isDiagnosticAnswerCorrect(question, { originalIndex: 2 })).toBe(
         false,
       );
+      // Text that two options share identifies neither of them.
+      expect(isDiagnosticAnswerCorrect(question, 'At 8:00')).toBe(false);
 
       // By permutation mapped index
       const permutation = [2, 0, 1, 3]; // position 1 maps to original 0 (correct)

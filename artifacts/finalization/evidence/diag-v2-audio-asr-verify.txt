@@ -1,0 +1,5 @@
+LST_CLIP_01: 32.5 s, script words 70, recognised 70, recall 99%, not heard: four
+LST_CLIP_02: 32.8 s, script words 101, recognised 100, recall 98%, not heard: north week's
+LST_CLIP_03: 25.6 s, script words 76, recognised 76, recall 99%, not heard: mai
+LST_CLIP_04: 28.4 s, script words 59, recognised 59, recall 95%, not heard: i'd fifteen twelve
+AZURE_RECOGNITION_SESSIONS=4 AUDIO_SECONDS=119.4

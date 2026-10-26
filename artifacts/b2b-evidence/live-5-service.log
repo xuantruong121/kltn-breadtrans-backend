@@ -1,0 +1,12 @@
+target localhost:5432/kltn_db sysid=7674533776495505443 pg=15.19 read_only=on mode=live
+PASS  getCurrentAssessment succeeds with the DRAFT present
+PASS  getCurrentAssessment selects the legacy ACTIVE assessment, not the DRAFT  (served=1, draft=5)
+PASS  served form is the 20 legacy questions  (20)
+PASS  served legacy questions expose no answer or hidden field
+PASS  getLatestResult succeeds with the DRAFT present
+PASS  getLatestResult returns the legitimate no-result state  (null)
+PASS  DRAFT payload: no forbidden key served  (served keys: audioUrl,construct,id,options,order,passageBody,passageText,passageTitle,question,questionType,section,skill)
+PASS  DRAFT payload: no stored rationale text served  (rationales stored=25)
+PASS  DRAFT Reading: every item serves the complete authored passage  (10 items)
+PASS  DRAFT Listening: audioUrl field present and null, no transcript
+B2B_SERVICE_FAILURES=0

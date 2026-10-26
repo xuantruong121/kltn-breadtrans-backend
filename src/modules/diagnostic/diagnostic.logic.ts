@@ -62,6 +62,38 @@ export function getAttemptQuestionPermutation(
   return indices;
 }
 
+/**
+ * Display permutation for one learner on one assessment.
+ *
+ * Seeded by the authenticated learner and the assessment, never by an attempt
+ * id. The attempt id is not known when the form is first served - it is
+ * created by "start", after the learner has already received the questions -
+ * so seeding by attempt made the order the learner saw (unpermuted) differ
+ * from the order the grader assumed (permuted by the new attempt), and every
+ * first attempt was graded against the wrong option. This seed is identical
+ * before start, after start, on resume and on the result screen, and the
+ * server derives it from the JWT subject, so the client cannot choose it.
+ */
+export function getLearnerQuestionPermutation(
+  userId: number,
+  assessmentId: number,
+  questionId: number,
+  optionCount: number,
+): number[] {
+  return getAttemptQuestionPermutation(
+    learnerPermutationSeed(userId, assessmentId),
+    questionId,
+    optionCount,
+  );
+}
+
+function learnerPermutationSeed(userId: number, assessmentId: number): number {
+  return Math.abs(userId) * 100003 + Math.abs(assessmentId) * 7919 + 1;
+}
+
+/** Marker persisted on an attempt's answers naming how its options were displayed. */
+export const LEARNER_PERMUTATION_SCHEME = 'LEARNER_ASSESSMENT_V1';
+
 export type DiagnosticQuestionForScoring = {
   id: number;
   skill: string;
@@ -70,6 +102,14 @@ export type DiagnosticQuestionForScoring = {
   correctIndex: number;
   explanation?: string | null;
   order: number;
+  taskType?: string | null;
+  instructions?: string | null;
+  passageId?: number | null;
+  rubricId?: number | null;
+  prepSeconds?: number | null;
+  responseSeconds?: number | null;
+  wordMin?: number | null;
+  wordMax?: number | null;
 };
 
 export type DiagnosticQuestionMeta = {
@@ -85,53 +125,79 @@ export type DiagnosticQuestionMeta = {
   activeInForm?: boolean;
 };
 
+/** True when `permutation` is a complete permutation of 0..optionCount-1. */
+function isValidPermutation(
+  permutation: unknown,
+  optionCount: number,
+): permutation is number[] {
+  if (!Array.isArray(permutation) || permutation.length !== optionCount)
+    return false;
+  const seen = new Set<number>();
+  for (const value of permutation) {
+    if (!Number.isInteger(value) || value < 0 || value >= optionCount)
+      return false;
+    seen.add(value);
+  }
+  return seen.size === optionCount;
+}
+
+/**
+ * Resolve a learner's answer to the AUTHORED option index, or null when it
+ * cannot be resolved unambiguously. Never guesses.
+ *
+ * - A displayed index is translated through the server's display permutation.
+ *   Without a valid permutation it is unresolvable: comparing a displayed index
+ *   to an authored index is the defect this replaces, since it scores a wrong
+ *   answer correct whenever the permutation moved the key.
+ * - Option text identifies the option whatever order it was shown in, but only
+ *   when exactly one option carries that text.
+ * - A client-asserted `originalIndex` is not accepted: the authored identity of
+ *   an option is the server's to derive, not the client's to declare.
+ */
+export function resolveAuthoredOptionIndex(
+  question: DiagnosticQuestionForScoring,
+  answer: unknown,
+  permutation?: number[],
+): number | null {
+  if (isOpenDiagnosticQuestion(question)) return null;
+  const options = getQuestionMeta(question).values;
+  if (answer === undefined || answer === null) return null;
+
+  const byText = (text: string): number | null => {
+    const matches = options
+      .map((option, index) => (option.trim() === text.trim() ? index : -1))
+      .filter((index) => index >= 0);
+    return matches.length === 1 ? matches[0] : null;
+  };
+
+  if (typeof answer === 'string') return byText(answer);
+
+  let displayed: unknown = answer;
+  if (typeof answer === 'object') {
+    const raw = answer as Record<string, unknown>;
+    if (typeof raw.text === 'string') return byText(raw.text);
+    if (typeof raw.value === 'string') return byText(raw.value);
+    displayed = raw.index;
+  }
+
+  if (
+    typeof displayed !== 'number' ||
+    !Number.isInteger(displayed) ||
+    displayed < 0 ||
+    displayed >= options.length
+  )
+    return null;
+  if (!isValidPermutation(permutation, options.length)) return null;
+  return permutation[displayed];
+}
+
 export function isDiagnosticAnswerCorrect(
   question: DiagnosticQuestionForScoring,
   answer: unknown,
   permutation?: number[],
 ): boolean {
-  if (isOpenDiagnosticQuestion(question)) return false;
-  if (answer === undefined || answer === null) return false;
-
-  const meta = getQuestionMeta(question);
-  const options = meta.values;
-  const correctText = options[question.correctIndex];
-
-  // 1. Exact string match against original correct option text
-  if (typeof answer === 'string' && typeof correctText === 'string') {
-    if (answer.trim() === correctText.trim()) return true;
-  }
-
-  // 2. Object with text, value, or stable originalIndex
-  if (typeof answer === 'object' && answer !== null) {
-    const rawObj = answer as Record<string, unknown>;
-    if (typeof rawObj.originalIndex === 'number') {
-      return rawObj.originalIndex === question.correctIndex;
-    }
-    if (typeof rawObj.value === 'string' && typeof correctText === 'string') {
-      if (rawObj.value.trim() === correctText.trim()) return true;
-    }
-    if (typeof rawObj.text === 'string' && typeof correctText === 'string') {
-      if (rawObj.text.trim() === correctText.trim()) return true;
-    }
-    if (typeof rawObj.index === 'number') {
-      answer = rawObj.index;
-    }
-  }
-
-  // 3. Numeric index
-  if (typeof answer === 'number') {
-    if (
-      permutation &&
-      Array.isArray(permutation) &&
-      permutation[answer] !== undefined
-    ) {
-      return permutation[answer] === question.correctIndex;
-    }
-    return answer === question.correctIndex;
-  }
-
-  return false;
+  const authored = resolveAuthoredOptionIndex(question, answer, permutation);
+  return authored !== null && authored === question.correctIndex;
 }
 
 export function getQuestionMeta(
@@ -239,7 +305,42 @@ export type DiagnosticRecommendation = {
   advisoryOnly?: boolean;
 };
 
-export function validateQuestionBank(
+export type DiagnosticTaskKind = 'OBJECTIVE' | 'SPEAKING' | 'WRITING';
+
+/**
+ * Classify by the persisted `taskType` column first. Legacy rows predate the
+ * column's productive values and default to MCQ, so `options.questionType`
+ * decides only when the column says nothing more specific.
+ */
+export function classifyDiagnosticTask(
+  question: DiagnosticQuestionForScoring,
+): DiagnosticTaskKind | 'INCONSISTENT' {
+  const meta = getQuestionMeta(question);
+  const taskType = question.taskType ?? 'MCQ';
+  if (taskType === 'SPEAKING_RESPONSE')
+    return meta.questionType === 'OPEN_TEXT' ? 'SPEAKING' : 'INCONSISTENT';
+  if (taskType === 'WRITING_RESPONSE')
+    return meta.questionType === 'OPEN_TEXT' ? 'WRITING' : 'INCONSISTENT';
+  if (taskType === 'OPEN_TEXT' || meta.questionType === 'OPEN_TEXT') {
+    if (meta.section === 'SPEAKING') return 'SPEAKING';
+    if (meta.section === 'WRITING') return 'WRITING';
+    return 'INCONSISTENT';
+  }
+  return 'OBJECTIVE';
+}
+
+const positiveInt = (value: unknown) =>
+  Number.isInteger(value) && (value as number) > 0;
+
+/**
+ * Layer 1 - content structural validity: is the authored task complete and
+ * internally consistent? Independent of audio, providers or activation.
+ *
+ * Each task kind is checked by its own rules. Productive tasks are never asked
+ * for options, an answer key or a CEFR label: none of those exists for them,
+ * and demanding one forced authors to fabricate it.
+ */
+export function validateDiagnosticContent(
   questions: DiagnosticQuestionForScoring[],
 ): string[] {
   const defects: string[] = [];
@@ -253,36 +354,155 @@ export function validateQuestionBank(
       defects.push(`duplicate order ${question.order}`);
     orders.add(question.order);
     if (!question.question?.trim()) defects.push(`empty prompt ${question.id}`);
+    if (!question.skill?.trim()) defects.push(`missing skill ${question.id}`);
+
     const meta = getQuestionMeta(question);
-    if (meta.section === 'LISTENING' && !meta.audioUrl?.trim()) {
-      defects.push(`missing listening audio ${question.id}`);
+    const kind = classifyDiagnosticTask(question);
+    if (kind === 'INCONSISTENT') {
+      defects.push(`inconsistent task type ${question.id}`);
+      continue;
     }
-    if (meta.questionType === 'OPEN_TEXT') {
-      if (
-        !meta.stableKey ||
-        !meta.section ||
-        !meta.construct ||
-        !meta.intendedLevel
-      )
-        defects.push(`incomplete open task metadata ${question.id}`);
-    } else {
+
+    if (kind === 'OBJECTIVE') {
       if (meta.values.length < 2)
         defects.push(`invalid options ${question.id}`);
-      if (meta.values.some((option) => typeof option !== 'string'))
-        defects.push(`non-string option ${question.id}`);
-      if (new Set(meta.values).size !== meta.values.length)
+      if (new Set(meta.values.map((v) => v.trim())).size !== meta.values.length)
         defects.push(`duplicate option ${question.id}`);
       if (
         !Number.isInteger(question.correctIndex) ||
         question.correctIndex < 0 ||
         question.correctIndex >= meta.values.length
-      ) {
+      )
         defects.push(`invalid correct index ${question.id}`);
+      // Section-specific structure. Legacy items carry no section and are
+      // plain text MCQs; these rules apply only where a section is declared.
+      if (meta.section === 'LISTENING' && !meta.audioGroup)
+        defects.push(`listening item without clip association ${question.id}`);
+      if (meta.section === 'READING') {
+        if (!meta.passageText?.trim())
+          defects.push(`reading item without passage text ${question.id}`);
+        if (question.passageId === null)
+          defects.push(`reading item without passage reference ${question.id}`);
       }
+      continue;
     }
-    if (!question.skill?.trim()) defects.push(`missing skill ${question.id}`);
+
+    // Productive task.
+    if (meta.values.length > 0)
+      defects.push(`productive task carries options ${question.id}`);
+    if (question.rubricId === null)
+      defects.push(`productive task without rubric ${question.id}`);
+    if (kind === 'SPEAKING') {
+      if (meta.section !== 'SPEAKING')
+        defects.push(`speaking task outside SPEAKING section ${question.id}`);
+      if (
+        question.prepSeconds !== undefined &&
+        !positiveInt(question.prepSeconds)
+      )
+        defects.push(`invalid speaking prep time ${question.id}`);
+      if (
+        question.responseSeconds !== undefined &&
+        !positiveInt(question.responseSeconds)
+      )
+        defects.push(`invalid speaking response time ${question.id}`);
+    } else {
+      if (meta.section !== 'WRITING')
+        defects.push(`writing task outside WRITING section ${question.id}`);
+      if (
+        question.wordMin !== undefined &&
+        question.wordMax !== undefined &&
+        !(
+          positiveInt(question.wordMin) &&
+          positiveInt(question.wordMax) &&
+          (question.wordMin as number) < (question.wordMax as number)
+        )
+      )
+        defects.push(`invalid writing word bounds ${question.id}`);
+    }
   }
   return defects;
+}
+
+/**
+ * Layer 2 - runtime readiness: can each task actually be executed now? A DRAFT
+ * may be structurally valid while this still reports work outstanding, which
+ * is the correct state for content whose audio has not been produced.
+ */
+export function validateRuntimeReadiness(
+  questions: DiagnosticQuestionForScoring[],
+): string[] {
+  const defects: string[] = [];
+  for (const question of questions) {
+    const meta = getQuestionMeta(question);
+    if (meta.section === 'LISTENING' && !meta.audioUrl?.trim())
+      defects.push(`missing listening audio ${question.id}`);
+  }
+  return defects;
+}
+
+/**
+ * The gate the learner runtime enforces before serving, starting or scoring
+ * an assessment: content AND runtime readiness. Kept under its existing name
+ * so every call site keeps its fail-closed behaviour.
+ */
+export function validateQuestionBank(
+  questions: DiagnosticQuestionForScoring[],
+): string[] {
+  return [
+    ...validateDiagnosticContent(questions),
+    ...validateRuntimeReadiness(questions),
+  ];
+}
+
+export type DiagnosticReadinessReport = {
+  content: { valid: boolean; defects: string[] };
+  runtime: { ready: boolean; defects: string[] };
+  activation: { ready: boolean; blockers: string[] };
+};
+
+/**
+ * Layer 3 - activation readiness: may this assessment be exposed to learners?
+ * Requires valid content, a runnable runtime, a scorer this build can run AND,
+ * when it has Speaking or Writing tasks, a grader running against real
+ * providers. A mock or unavailable grader, or an unstated one, blocks
+ * activation. Passing content validation never implies READY or ACTIVE.
+ */
+export function evaluateAssessmentReadiness(
+  assessment: { scoringVersion?: string | null; status?: string | null },
+  questions: DiagnosticQuestionForScoring[],
+  options: { productiveGraderMode?: 'real' | 'mock' | 'unavailable' } = {},
+): DiagnosticReadinessReport {
+  const content = validateDiagnosticContent(questions);
+  const runtime = validateRuntimeReadiness(questions);
+  const blockers: string[] = [];
+  if (content.length) blockers.push(`content: ${content.length} defect(s)`);
+  if (runtime.length) blockers.push(`runtime: ${runtime.length} defect(s)`);
+  if (!questions.length) blockers.push('assessment has no questions');
+  const hasProductive = questions.some((question) => {
+    const kind = classifyDiagnosticTask(question);
+    return kind === 'SPEAKING' || kind === 'WRITING';
+  });
+  if (hasProductive && options.productiveGraderMode !== 'real')
+    blockers.push(
+      `productive grader mode is ${options.productiveGraderMode ?? 'not stated'}; activation needs real providers`,
+    );
+  try {
+    const version = resolvePersistedScoringVersion(assessment.scoringVersion);
+    if (
+      version === 'FOUR_SKILL_PLACEMENT_V2' &&
+      !FOUR_SKILL_PLACEMENT_BAND_DECIDED
+    )
+      blockers.push(
+        'FOUR_SKILL_PLACEMENT_V2 placement band model is undecided (DEF-004); results are scored but cannot be activated',
+      );
+  } catch (error) {
+    blockers.push(error instanceof Error ? error.message : String(error));
+  }
+  return {
+    content: { valid: content.length === 0, defects: content },
+    runtime: { ready: runtime.length === 0, defects: runtime },
+    activation: { ready: blockers.length === 0, blockers },
+  };
 }
 
 export function resolveEstimatedLevel(percentage: number): string {
@@ -782,4 +1002,212 @@ export function rankCourseRecommendations(
       relevance: item.relevance,
       reason: item.reason,
     }));
+}
+
+/**
+ * Which scoring algorithm an assessment is eligible for.
+ *
+ * This is deliberately derived from the structural metadata the algorithms
+ * actually need, never from presentation data. An earlier implementation chose
+ * the algorithm with `assessment.id === 2 || title.includes('v2')`, which meant
+ * renaming an assessment silently changed every learner's score, and which
+ * could select the section/band algorithm for items that carry no section
+ * metadata at all - scoring every learner Pre-A1 regardless of their answers.
+ */
+export type DiagnosticScoringVersion =
+  'OBJECTIVE_POOLED_V1' | 'SECTION_BAND_V2' | 'FOUR_SKILL_PLACEMENT_V2';
+
+/** The metadata SECTION_BAND_V2 cannot work without. */
+export type DiagnosticScoringCapability = {
+  version: DiagnosticScoringVersion;
+  /** Objective items carrying BOTH a section and an intended CEFR band. */
+  itemsWithBandMetadata: number;
+  objectiveItems: number;
+  reason: string;
+};
+
+/**
+ * Resolve the scoring version from item structure.
+ *
+ * SECTION_BAND_V2 is only offered when every objective item carries the
+ * section and intendedLevel metadata its formulas read. Partial coverage falls
+ * back to the pooled scorer rather than silently scoring the uncovered
+ * sections as zero.
+ */
+export function resolveDiagnosticScoringVersion(
+  questions: DiagnosticQuestionForScoring[],
+): DiagnosticScoringCapability {
+  const objective = questions.filter(
+    (question) => !isOpenDiagnosticQuestion(question),
+  );
+  const withBandMetadata = objective.filter((question) => {
+    const meta = getQuestionMeta(question);
+    return Boolean(meta.section) && Boolean(meta.intendedLevel);
+  });
+  if (objective.length > 0 && withBandMetadata.length === objective.length) {
+    return {
+      version: 'SECTION_BAND_V2',
+      itemsWithBandMetadata: withBandMetadata.length,
+      objectiveItems: objective.length,
+      reason:
+        'every objective item carries section and intendedLevel metadata, so section and band percentages are computable',
+    };
+  }
+  return {
+    version: 'OBJECTIVE_POOLED_V1',
+    itemsWithBandMetadata: withBandMetadata.length,
+    objectiveItems: objective.length,
+    reason:
+      objective.length === 0
+        ? 'no objective items to score'
+        : `${withBandMetadata.length}/${objective.length} objective items carry section+intendedLevel metadata, which is insufficient for section/band scoring`,
+  };
+}
+
+/**
+ * Fail closed before running SECTION_BAND_V2. Its formulas return 0 for any
+ * section with no matching items, so running it against items that lack the
+ * metadata would produce a confident but meaningless placement.
+ */
+export function assertSectionBandV2Scorable(
+  questions: DiagnosticQuestionForScoring[],
+): void {
+  const capability = resolveDiagnosticScoringVersion(questions);
+  if (capability.version !== 'SECTION_BAND_V2') {
+    throw new Error(
+      `DIAGNOSTIC_SCORER_UNSUPPORTED: section/band scoring requires section+intendedLevel on every objective item (${capability.reason})`,
+    );
+  }
+  // The catastrophic case is a form where none of the weighted sections match
+  // any item: every section percentage would be 0, weightedCore would be 0 and
+  // every learner would be placed at the bottom band with full confidence.
+  // A form that covers only some weighted sections still produces meaningful
+  // non-zero scores for the sections it has, so that is left to content
+  // authoring rather than refused here.
+  const weightedSections = ['LANGUAGE_USE', 'READING', 'LISTENING'];
+  const covered = weightedSections.filter((section) =>
+    questions.some(
+      (question) =>
+        getQuestionMeta(question).section === section &&
+        !isOpenDiagnosticQuestion(question),
+    ),
+  );
+  if (!covered.length) {
+    throw new Error(
+      `DIAGNOSTIC_SCORER_UNSUPPORTED: section/band scoring requires objective items in at least one of ${weightedSections.join(', ')}`,
+    );
+  }
+}
+
+/**
+ * Describe the form that was actually administered, from its own items.
+ *
+ * CANONICAL_DIAGNOSTIC_BLUEPRINT describes a 52-item form that exists in no
+ * backup and in no live database; presenting it to a learner as "canonical"
+ * alongside a 20-item result overstated what was administered.
+ */
+export function describeAdministeredForm(
+  questions: DiagnosticQuestionForScoring[],
+) {
+  const objective = questions.filter(
+    (question) => !isOpenDiagnosticQuestion(question),
+  );
+  const bySkill: Record<string, number> = {};
+  for (const question of questions) {
+    bySkill[question.skill] = (bySkill[question.skill] ?? 0) + 1;
+  }
+  return {
+    totalItems: questions.length,
+    objectiveCount: objective.length,
+    productiveCount: questions.length - objective.length,
+    itemsBySkill: bySkill,
+  };
+}
+
+/**
+ * The scorer production runs for the Entry Diagnostic, stated explicitly.
+ *
+ * Earlier revisions inferred this twice over: first from the assessment's id
+ * and title (so a rename changed every learner's score), then from the items'
+ * own metadata (so enriching content with `section`/`intendedLevel` would have
+ * silently switched algorithm). Scoring semantics must not move because
+ * content metadata got richer, so the production scorer is now a constant.
+ *
+ * SECTION_BAND_V2 stays in the source because it is tested and may be used
+ * once a 52-item form is actually authored - it exists in no canonical backup
+ * today. It is reachable only by naming it explicitly, and
+ * `assertSectionBandV2Scorable` still refuses to run it against a form that
+ * lacks the structure its formulas read.
+ *
+ * When that content is authored, replace this constant with a persisted
+ * `scoringVersion` on the assessment; do not reintroduce inference.
+ */
+export const CURRENT_AUTHORED_FORM_SCORER: DiagnosticScoringVersion =
+  'OBJECTIVE_POOLED_V1';
+
+/**
+ * Scoring versions this build knows how to run.
+ *
+ * `CURRENT_AUTHORED_FORM_SCORER` above was the transitional application-level
+ * constant used before the version was persisted. Now that every assessment
+ * carries `scoringVersion`, production resolves the scorer from that stored
+ * value, and this set is what makes an unknown or unimplemented version fail
+ * closed instead of silently falling back to whatever the code last defaulted
+ * to.
+ */
+export const SUPPORTED_DIAGNOSTIC_SCORING_VERSIONS = [
+  'OBJECTIVE_POOLED_V1',
+  'FOUR_SKILL_PLACEMENT_V2',
+] as const satisfies readonly DiagnosticScoringVersion[];
+
+/**
+ * FOUR_SKILL_PLACEMENT_V2 scores the per-skill profile and the secondary
+ * overall figure (see diagnostic-four-skill.ts). DEF-004 was decided by the
+ * owner as D1 (2026-10-26): advisory scores and evidence-based advice only,
+ * no named placement band. The band model is therefore decided, and this
+ * gate no longer blocks activation on its own.
+ */
+export const FOUR_SKILL_PLACEMENT_BAND_DECIDED = true;
+
+/**
+ * Scoring versions that are defined but not yet runnable in production.
+ * FOUR_SKILL_PLACEMENT_V2 is authored content-side first (Step 2); until its
+ * scorer is implemented, an assessment claiming it must be refused rather than
+ * scored by the V1 algorithm.
+ */
+export const KNOWN_UNIMPLEMENTED_SCORING_VERSIONS = [
+  'SECTION_BAND_V2',
+] as const;
+
+/**
+ * Resolve the scorer for an assessment from its PERSISTED version.
+ *
+ * Deliberately takes only the stored version string: no id, title, question
+ * count, skill label or item metadata is in scope, so none of them can change
+ * which algorithm runs (DIAG-002 and DIAG-008).
+ */
+export function resolvePersistedScoringVersion(
+  persisted: string | null | undefined,
+): DiagnosticScoringVersion {
+  const value = (persisted ?? '').trim();
+  if (!value) {
+    throw new Error(
+      'DIAGNOSTIC_SCORER_UNSUPPORTED: assessment has no persisted scoringVersion',
+    );
+  }
+  if (
+    (SUPPORTED_DIAGNOSTIC_SCORING_VERSIONS as readonly string[]).includes(value)
+  ) {
+    return value as DiagnosticScoringVersion;
+  }
+  if (
+    (KNOWN_UNIMPLEMENTED_SCORING_VERSIONS as readonly string[]).includes(value)
+  ) {
+    throw new Error(
+      `DIAGNOSTIC_SCORER_UNSUPPORTED: scoringVersion "${value}" is known but its scorer is not implemented in this build`,
+    );
+  }
+  throw new Error(
+    `DIAGNOSTIC_SCORER_UNSUPPORTED: unknown scoringVersion "${value}"`,
+  );
 }

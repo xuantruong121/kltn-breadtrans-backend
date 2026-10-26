@@ -1,0 +1,256 @@
+[31m[Nest] 13988  - [39m10/26/2026, 2:28:14 PM [31m  ERROR[39m [38;5;3m[SpeakingProcessorService] [39m[31m[SpeakingProcessor] Pronunciation assessment provider error for submission #103: [TOO_MANY_REQUESTS] Too Many Requests: Azure Speech rate limit reached (traceId=trace-429)[39m
+[31m[Nest] 13988  - [39m10/26/2026, 2:28:14 PM [31m  ERROR[39m [38;5;3m[SpeakingProcessorService] [39m[31m[SpeakingProcessor] Failed to download audio for submission #107: The specified key does not exist. (traceId=trace-missing)[39m
+[31m[Nest] 13988  - [39m10/26/2026, 2:28:14 PM [31m  ERROR[39m [38;5;3m[SpeakingProcessorService] [39m[31m[SpeakingProcessor] Pronunciation assessment provider error for submission #105: [PROVIDER_UNAVAILABLE] Service Unavailable: Azure Speech 503 (traceId=trace-max)[39m
+[31m[Nest] 13988  - [39m10/26/2026, 2:28:14 PM [31m  ERROR[39m [38;5;3m[SpeakingProcessorService] [39m[31m[SpeakingProcessor] Job #106 timed out after 50ms (traceId=trace-timeout)[39m
+[32m[Nest] 13988  - [39m10/26/2026, 2:28:15 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mIdempotent duplicate detected for user #10 with key "idemp-key-123". Returning existing submission #99. (traceId=9d57130c-d765-4ec4-89ae-25d0e4b0377a)[39m
+[32m[Nest] 13988  - [39m10/26/2026, 2:28:15 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mUploading audio for exercise #1 by user #10 (1000ms, traceId=b9b31e3a-4dd6-4bdc-b3fc-c44b373dacbd)[39m
+[32m[Nest] 13988  - [39m10/26/2026, 2:28:15 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mUploading audio for exercise #1 by user #10 (1000ms, traceId=e3f17bb5-d1d7-4c74-a2df-ba9044c8ec8b)[39m
+[32m[Nest] 13988  - [39m10/26/2026, 2:28:15 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mUploading audio for exercise #1 by user #10 (1000ms, traceId=d1e35e35-c823-4976-9e74-47ef076bafb3)[39m
+[31m[Nest] 13988  - [39m10/26/2026, 2:28:15 PM [31m  ERROR[39m [38;5;3m[SpeakingService] [39m[31m[SpeakingService] Failed to enqueue submission #777 to BullMQ: Redis connection timeout. Submission remains PENDING in DB for reconciliation. (traceId=d1e35e35-c823-4976-9e74-47ef076bafb3)[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #10 (Attempt 1/4)[39m
+[33m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [33m   WARN[39m [38;5;3m[SpeakingWorkerService] [39m[33mAudio bytes validation failed for submission #10: Invalid audio file: incomplete WAV header[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #20 (Attempt 1/4)[39m
+[31m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [31m  ERROR[39m [38;5;3m[SpeakingWorkerService] [39m[31mPronunciation assessment provider error for submission #20: [PROVIDER_TIMEOUT] Azure timed out[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mScheduling retry for submission #20 at 2026-10-26T07:29:16.460Z (Backoff: 60s)[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #30 (Attempt 4/4)[39m
+[31m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [31m  ERROR[39m [38;5;3m[SpeakingWorkerService] [39m[31mPronunciation assessment provider error for submission #30: [PROVIDER_UNAVAILABLE] Service Unavailable[39m
+[33m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [33m   WARN[39m [38;5;3m[SpeakingWorkerService] [39m[33mSubmission #30 reached max retry attempts (4). Marking as FAILED.[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #45 (Attempt 1/4)[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #40 (Attempt 1/4)[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mSuccessfully completed SpeakingSubmission #40 with score 8.5[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #50 (Attempt 1/4)[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mSuccessfully completed SpeakingSubmission #50 with score NO_SPEECH[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mProcessing SpeakingSubmission #60 (Attempt 1/4)[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:16 PM [32m    LOG[39m [38;5;3m[SpeakingWorkerService] [39m[32mSuccessfully completed SpeakingSubmission #60 with score 9[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:18 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mCreated upload intent 41de6958-63e3-4a6e-9ee0-e1f3078cb024 for user #10, exercise #1 (objectKey=speaking/pending/10/41de6958-63e3-4a6e-9ee0-e1f3078cb024.wav, traceId=trace-intent-1792999698769-fbe7a46e)[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:18 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mReturning active upload intent existing-intent-id for user #10 with key "idemp-intent-001" (traceId=trace-intent-1792999698850-8d5a227a)[39m
+[33m[Nest] 9020  - [39m10/26/2026, 2:28:18 PM [33m   WARN[39m [38;5;3m[SpeakingService] [39m[33mIDOR attempt detected: User #99 attempted to finalize intent intent-uuid-123 owned by User #10[39m
+[33m[Nest] 9020  - [39m10/26/2026, 2:28:18 PM [33m   WARN[39m [38;5;3m[SpeakingService] [39m[33mExact size mismatch for intent intent-uuid-123: expected 640000 bytes, R2 has 640001 bytes[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:18 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32m[SpeakingService] Enqueued submission #101 from intent intent-uuid-123 to BullMQ queue (traceId=trace-fin-1)[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:18 PM [32m    LOG[39m [38;5;3m[SpeakingService] [39m[32mIdempotent duplicate finalize detected for intent intent-uuid-123. Returning existing submission #101 (traceId=trace-finalize-1792999698874-975e9196)[39m
+[31m[Nest] 9020  - [39m10/26/2026, 2:28:18 PM [31m  ERROR[39m [38;5;3m[SpeakingService] [39m[31m[SpeakingService] Failed to enqueue submission #101 to BullMQ: Redis connection failed. Submission remains PENDING in DB for reconciliation. (traceId=trace-err)[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:19 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingAudioNormalizer] [39m[32m{"event":"diagnostic_speaking_audio_normalized","inputMime":"audio/webm;codecs=opus","inputBytes":56387,"decodedInputCodec":"opus","decodedInputSampleRate":48000,"decodedInputChannels":1,"normalizedMime":"audio/wav","normalizedCodec":"pcm_s16le","normalizedBytes":119118,"normalizedSampleRate":16000,"normalizedChannels":1,"normalizedPcmBits":16,"durationMs":3720,"normalizationDurationMs":1828}[39m
+[31m[Nest] 10716  - [39m10/26/2026, 2:28:20 PM [31m  ERROR[39m [38;5;3m[PaymentService] [39m[31m[PaymentNotification] Rejection email failed for student #15 (Payment #200):[39m
+[31m[Nest] 10716  - [39m10/26/2026, 2:28:20 PM [31m  ERROR[39m [38;5;3m[PaymentService] [39mError: SMTP connection timed out
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\payment\payment.service.spec.ts:3081:11[90m)[39m
+    at Promise.finally.completed [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1561:28[90m)[39m
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1501:10[90m)[39m
+    at _callCircusTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1011:40[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:104:5)[39m
+    at _runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:951:3[90m)[39m
+    at [90mD:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:853:7
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:866:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at run [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:765:3[90m)[39m
+    at runAndTransformResultsToJestFormat [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1993:21[90m)[39m
+    at jestAdapter [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\runner.js:111:19[90m)[39m
+    at runTestInternal [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:276:16[90m)[39m
+    at runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:344:7[90m)[39m
+    at Object.worker [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:498:12[90m)[39m
+[31m[Nest] 10716  - [39m10/26/2026, 2:28:21 PM [31m  ERROR[39m [38;5;3m[PaymentService] [39m[31m[PaymentNotification] Activation email failed for student #15 (Payment #200):[39m
+[31m[Nest] 10716  - [39m10/26/2026, 2:28:21 PM [31m  ERROR[39m [38;5;3m[PaymentService] [39mError: SMTP fatal error
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\payment\payment.service.spec.ts:3292:11[90m)[39m
+    at Promise.finally.completed [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1561:28[90m)[39m
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1501:10[90m)[39m
+    at _callCircusTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1011:40[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:104:5)[39m
+    at _runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:951:3[90m)[39m
+    at [90mD:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:853:7
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:866:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at run [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:765:3[90m)[39m
+    at runAndTransformResultsToJestFormat [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1993:21[90m)[39m
+    at jestAdapter [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\runner.js:111:19[90m)[39m
+    at runTestInternal [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:276:16[90m)[39m
+    at runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:344:7[90m)[39m
+    at Object.worker [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:498:12[90m)[39m
+[31m[Nest] 10716  - [39m10/26/2026, 2:28:21 PM [31m  ERROR[39m [38;5;3m[PaymentService] [39m[31m[PaymentNotification] Failed to execute atomic activation claim for payment #200:[39m
+[31m[Nest] 10716  - [39m10/26/2026, 2:28:21 PM [31m  ERROR[39m [38;5;3m[PaymentService] [39mError: PostgreSQL connection dropped
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\payment\payment.service.spec.ts:3342:34[90m)[39m
+    at Promise.finally.completed [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1561:28[90m)[39m
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1501:10[90m)[39m
+    at _callCircusTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1011:40[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:104:5)[39m
+    at _runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:951:3[90m)[39m
+    at [90mD:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:853:7
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:866:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at run [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:765:3[90m)[39m
+    at runAndTransformResultsToJestFormat [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1993:21[90m)[39m
+    at jestAdapter [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\runner.js:111:19[90m)[39m
+    at runTestInternal [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:276:16[90m)[39m
+    at runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:344:7[90m)[39m
+    at Object.worker [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:498:12[90m)[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Vocab Suggestion failed: 429 Too Many Requests: Quota exceeded[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI TOEIC Part 5 Suggestion failed: Gemini API connection timeout[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Vocab Suggestion failed: 429 Too Many Requests: Rate limit exceeded on Gemini endpoint[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Grammar Suggestion failed: 503 Service Unavailable: High server load on Gemini infrastructure[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Reading Passage Suggestion failed: Gemini API call timed out after 30000ms[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Reading Questions Suggestion failed: SyntaxError: Unexpected end of JSON input from AI model[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI TOEIC Part 5 Suggestion failed: ValidationError: AI response missing candidates array in schema output[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Speaking exercises failed: 429 Too Many Requests[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Speaking exercises failed: 503 Service Unavailable[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Speaking exercises failed: Gemini request timed out[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Speaking exercises failed: SyntaxError: Unexpected end of JSON input[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:21 PM [33m   WARN[39m [38;5;3m[AdminContextualAiController] [39m[33mAI Speaking exercises failed: ValidationError: targetText is missing[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":3,"resultStatus":"GRADED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":0,"resultStatus":"GRADED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":1,"resultStatus":"GRADED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":0,"resultStatus":"GRADING_FAILED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":0,"resultStatus":"GRADING_FAILED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":1,"resultStatus":"GRADED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":0,"resultStatus":"GRADING_FAILED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":1,"resultStatus":"GRADING_FAILED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":0,"resultStatus":"GRADING_FAILED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":0,"resultStatus":"GRADED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":0,"resultStatus":"GRADING_FAILED"}[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:22 PM [32m    LOG[39m [38;5;3m[DiagnosticSpeakingService] [39m[32m{"event":"diagnostic_speaking_rubric_result","provider":"fake","providerDurationMs":0,"resultStatus":"GRADING_FAILED"}[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:23 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_feedback_metrics","submissionId":1,"geminiFeedbackMs":1,"feedbackPersistMs":0}[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:23 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_feedback_metrics","submissionId":10,"geminiFeedbackMs":52,"feedbackPersistMs":0}[39m
+[31m[Nest] 10228  - [39m10/26/2026, 2:28:23 PM [31m  ERROR[39m [38;5;3m[SpeakingPostProcessingService] [39m[31m[SpeakingPostProcessing] Feedback failed permanently for #20: Gemini quota exceeded 429[39m
+[33m[Nest] 10228  - [39m10/26/2026, 2:28:23 PM [33m   WARN[39m [38;5;3m[SpeakingPostProcessingService] [39m[33m[SpeakingPostProcessing] Stale feedback worker token feedback-dc93a921-cc04-46d6-beba-651a9ef2061f for #30. Discarding write.[39m
+[33m[Nest] 10228  - [39m10/26/2026, 2:28:23 PM [33m   WARN[39m [38;5;3m[SpeakingPostProcessingService] [39m[33m[SpeakingPostProcessing] Stale reward worker token reward-a86d42dc-591c-4a89-bc66-05fc39ceaf6b for #40. Discarding write.[39m
+[32m[Nest] 10228  - [39m10/26/2026, 2:28:23 PM [32m    LOG[39m [38;5;3m[SpeakingPostProcessingService] [39m[32m[LATENCY_INSTRUMENTATION] {"tag":"speaking_reward_metrics","submissionId":70,"gamificationMs":0}[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:24 PM [33m   WARN[39m [38;5;3m[DiagnosticWritingService] [39m[33mDiagnostic Writing grading failed: INVALID_GRADER_OUTPUT:DIFFERENT_RUBRIC_VERSION[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:24 PM [33m   WARN[39m [38;5;3m[DiagnosticWritingService] [39m[33mDiagnostic Writing grading failed: INVALID_GRADER_OUTPUT:FEEDBACK_MISSING[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:24 PM [33m   WARN[39m [38;5;3m[DiagnosticWritingService] [39m[33mDiagnostic Writing grading failed: GRADER_ERROR:down[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:24 PM [33m   WARN[39m [38;5;3m[DiagnosticWritingService] [39m[33mDiagnostic Writing grading failed: GRADER_ERROR:down[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:24 PM [33m   WARN[39m [38;5;3m[DiagnosticWritingService] [39m[33mDiagnostic Writing grading failed: GRADER_ERROR:down[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:24 PM [33m   WARN[39m [38;5;3m[DiagnosticWritingService] [39m[33mDiagnostic Writing grading failed: GRADER_ERROR:down[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:24 PM [33m   WARN[39m [38;5;3m[DiagnosticWritingService] [39m[33mDiagnostic Writing grading failed: GRADER_ERROR:x[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=1 source=PRACTICE requested=80 granted=50 balance=150[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[appendLegacyReconciliationEntry] user=2 delta=35 balanceAfter=101 (totalBanhRan unchanged)[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=1 source=GRAMMAR_COMPLETION requested=50 granted=10 balance=150[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=1 source=CONTENT_COMPLETION requested=50 granted=10 balance=150[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=1 source=DIAGNOSTIC_COMPLETION requested=50 granted=10 balance=150[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=2 source=DAILY_QUEST requested=10 granted=10 balance=20[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32mUser 2 completed quest 7 and received rewards atomically.[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=3 source=VOCAB_MASTERY requested=1 granted=1 balance=11[39m
+[32m[Nest] 10716  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationService] [39m[32m[awardBanh] user=4 source=TOEIC_COMPLETION requested=120 granted=120 balance=120[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling vocab.learned event for user 11[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling vocab.learned event for user 11[39m
+[33m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [33m   WARN[39m [38;5;3m[GamificationListener] [39m[33m[vocab.learned] Missing wordId for user 11. No Bánh Mì awarded.[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling vocab.learned event for user 11[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling quiz.submitted event for user 12 with score 70 (firstSubmission: true)[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling quiz.submitted event for user 12 with score 100 (firstSubmission: false)[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling quiz.submitted event for user 12 with score 80 (firstSubmission: false)[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling quiz.submitted event for user 12 with score 100 (firstSubmission: false)[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 15 with score 85 (submissionId: 99)[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 15 with score 85 (submissionId: 101)[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling speaking.submitted event for user 15 with score 85 (submissionId: 101)[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mReward effect XP already processed for submission #101 (xp:speaking:101). Skipping.[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mReward effect BANH already processed for submission #101 (banh:speaking:101). Skipping.[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:25 PM [32m    LOG[39m [38;5;3m[GamificationListener] [39m[32mHandling toeic.submitted event for user 18 (examId: 2, mode: FULL_TEST)[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:25 PM [33m   WARN[39m [38;5;3m[PexelsImageSearchProvider] [39m[33mpexels_unavailable status=429 code=PROVIDER_BLOCKED[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:27 PM [32m    LOG[39m [38;5;3m[AiService] [39m[32mAiService initialized with Strategy Pattern[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:27 PM [32m    LOG[39m [38;5;3m[AiService] [39m[32mAiService initialized with Strategy Pattern[39m
+[31m[Nest] 9020  - [39m10/26/2026, 2:28:27 PM [31m  ERROR[39m [38;5;3m[NotificationsCronService] [39m[31m[Queue] Failed to create vocabulary reminder for user 202; claims released for retry.[39m
+[31m[Nest] 9020  - [39m10/26/2026, 2:28:27 PM [31m  ERROR[39m [38;5;3m[NotificationsCronService] [39mError: notification database unavailable
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\notifications\notifications.cron.spec.ts:113:31[90m)[39m
+    at Promise.finally.completed [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1561:28[90m)[39m
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1501:10[90m)[39m
+    at _callCircusTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1011:40[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:104:5)[39m
+    at _runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:951:3[90m)[39m
+    at [90mD:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:853:7
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:866:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at run [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:765:3[90m)[39m
+    at runAndTransformResultsToJestFormat [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1993:21[90m)[39m
+    at jestAdapter [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\runner.js:111:19[90m)[39m
+    at runTestInternal [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:276:16[90m)[39m
+    at runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:344:7[90m)[39m
+    at Object.worker [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:498:12[90m)[39m
+[31m[Nest] 9020  - [39m10/26/2026, 2:28:27 PM [31m  ERROR[39m [38;5;3m[NotificationsCronService] [39m[31m[Queue] Error in runVocabSpacedReview:[39m
+[31m[Nest] 9020  - [39m10/26/2026, 2:28:27 PM [31m  ERROR[39m [38;5;3m[NotificationsCronService] [39mError: notification database unavailable
+    at Object.<anonymous> [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39msrc\modules\notifications\notifications.cron.spec.ts:113:31[90m)[39m
+    at Promise.finally.completed [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1561:28[90m)[39m
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1501:10[90m)[39m
+    at _callCircusTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1011:40[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:104:5)[39m
+    at _runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:951:3[90m)[39m
+    at [90mD:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:853:7
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:866:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at _runTestsForDescribeBlock [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:861:11[90m)[39m
+    at run [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:765:3[90m)[39m
+    at runAndTransformResultsToJestFormat [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\jestAdapterInit.js:1993:21[90m)[39m
+    at jestAdapter [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-circus[24m\build\runner.js:111:19[90m)[39m
+    at runTestInternal [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:276:16[90m)[39m
+    at runTest [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:344:7[90m)[39m
+    at Object.worker [90m(D:\Study\KLTN\Project\kltn-breadtrans-backend\[39mnode_modules\[4mjest-runner[24m\build\testWorker.js:498:12[90m)[39m
+[33m[Nest] 9496  - [39m10/26/2026, 2:28:27 PM [33m   WARN[39m [38;5;3m[DictionaryLookupService] [39m[33mPrimary dictionary provider failed for "sustainable" (Error: timeout), falling back to AI provider[39m
+[31m[Nest] 9496  - [39m10/26/2026, 2:28:27 PM [31m  ERROR[39m [38;5;3m[DictionaryLookupService] [39m[31mAll dictionary providers failed for "sustainable": Error: timeout[39m
+[33m[Nest] 9496  - [39m10/26/2026, 2:28:27 PM [33m   WARN[39m [38;5;3m[DictionaryLookupService] [39m[33mPrimary dictionary provider failed for "sustainable" (Error: HTTP timeout), falling back to AI provider[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:27 PM [33m   WARN[39m [38;5;3m[GeminiCredentialManager] [39m[33mGemini request failed task=TEXT_AUTHORING model=gemini-3.5-flash-lite key=c8df51469c30 class=RATE_LIMIT: quota exceeded[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:27 PM [32m    LOG[39m [38;5;3m[SpeakingQueueService] [39m[32mClosed BullMQ queue "breadtrans-speaking-assessment" connection[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:27 PM [32m    LOG[39m [38;5;3m[SpeakingQueueService] [39m[32m[SpeakingQueue] Enqueued job: jobId=speaking-assessment-42 submissionId=42 traceId=trace-abc[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:27 PM [32m    LOG[39m [38;5;3m[SpeakingQueueService] [39m[32mClosed BullMQ queue "breadtrans-speaking-assessment" connection[39m
+[32m[Nest] 13192  - [39m10/26/2026, 2:28:27 PM [32m    LOG[39m [38;5;3m[SpeakingQueueService] [39m[32mClosed BullMQ queue "breadtrans-speaking-assessment" connection[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mpixabay_fallback provider=PIXABAY reason=HTTP 429[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mpixabay_fallback provider=PIXABAY reason=HTTP 429[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mopenverse_fallback_failed provider=OPENVERSE reason=HTTP 503[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mpixabay_materialization_degraded skip=PIXABAY_SEARCH[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mopenverse_fallback_failed provider=OPENVERSE reason=timeout[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mopenverse_fallback provider=OPENVERSE code=PROVIDER_TIMEOUT[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mopenverse_fallback provider=OPENVERSE code=PROVIDER_TRANSIENT[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mpixabay_fallback provider=PIXABAY code=PROVIDER_BLOCKED[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mopenverse_fallback provider=OPENVERSE code=PROVIDER_TIMEOUT[39m
+[33m[Nest] 13192  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[ImageSearchProviderChain] [39m[33mpixabay_fallback provider=PIXABAY code=PROVIDER_TRANSIENT[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[PaymentReconciliationService] [39m[33mPlan payment reconciliation requires review (amount) for bank transaction #11[39m
+[33m[Nest] 22300  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[PaymentReconciliationService] [39m[33mPlan payment reconciliation requires review (receiving-account) for bank transaction #11[39m
+[33m[Nest] 10716  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[PixabayImageSearchProvider] [39m[33mpixabay_unavailable provider=PIXABAY status=429 code=PROVIDER_BLOCKED queryHash=7ef014a71965[39m
+[33m[Nest] 10716  - [39m10/26/2026, 2:28:28 PM [33m   WARN[39m [38;5;3m[PixabayImageSearchProvider] [39m[33mpixabay_unavailable provider=PIXABAY status=429 code=PROVIDER_RATE_LIMITED queryHash=7ef014a71965[39m
+[31m[Nest] 9020  - [39m10/26/2026, 2:28:29 PM [31m  ERROR[39m [38;5;3m[DatabaseBackupR2SyncService] [39m[31mREFUSING R2 BACKUP: R2_BACKUP_BUCKET_NAME equals public R2_BUCKET_NAME. Database dumps must never go to public media bucket.[39m
+[31m[Nest] 9020  - [39m10/26/2026, 2:28:29 PM [31m  ERROR[39m [38;5;3m[DatabaseBackupR2SyncService] [39m[31mREFUSING R2 BACKUP: R2_BACKUP_ENDPOINT must be account root, got pathname "/backup-bucket".[39m
+[32m[Nest] 9496  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2CleanupService] [39m[32mOrphan intent cleanup completed: inspected=2, deleted=2, expired=1, staleToPending=0, staleToFinalized=0, failures=0[39m
+[32m[Nest] 9496  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2CleanupService] [39m[32mOrphan intent cleanup completed: inspected=1, deleted=0, expired=0, staleToPending=0, staleToFinalized=0, failures=0[39m
+[33m[Nest] 9496  - [39m10/26/2026, 2:28:29 PM [33m   WARN[39m [38;5;3m[R2CleanupService] [39m[33mIntent intent-orphan-key has objectKey speaking/pending/10/claimed.wav tied to submission #555. Skipping deletion.[39m
+[32m[Nest] 9496  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2CleanupService] [39m[32mOrphan intent cleanup completed: inspected=1, deleted=0, expired=0, staleToPending=0, staleToFinalized=0, failures=0[39m
+[32m[Nest] 9496  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2CleanupService] [39m[32mOrphan intent cleanup completed: inspected=1, deleted=0, expired=1, staleToPending=0, staleToFinalized=0, failures=0[39m
+[31m[Nest] 9496  - [39m10/26/2026, 2:28:29 PM [31m  ERROR[39m [38;5;3m[R2CleanupService] [39m[31mFailed to cleanup orphan intent intent-fail: Error: S3 500 Network error[39m
+[32m[Nest] 9496  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2CleanupService] [39m[32mOrphan intent cleanup completed: inspected=2, deleted=1, expired=2, staleToPending=0, staleToFinalized=0, failures=1[39m
+[32m[Nest] 9496  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2CleanupService] [39m[32mOrphan intent cleanup completed: inspected=2, deleted=0, expired=0, staleToPending=1, staleToFinalized=1, failures=0[39m
+[32m[Nest] 9020  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[DatabaseBackupR2SyncService] [39m[32mPruned expired automatic backup from R2: database-backups/automatic/2026/09/01/old_auto.dump[39m
+[32m[Nest] 13988  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[PlanCatalogAdminService] [39mObject(4) {
+  adminUserId: [33m7[39m,
+  action: [32m'CREATE_DRAFT'[39m,
+  versionId: [33m24[39m,
+  planCode: [32m'PLUS'[39m
+}
+[32m[Nest] 13988  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[PlanCatalogAdminService] [39mObject(4) {
+  adminUserId: [33m7[39m,
+  action: [32m'PUBLISH'[39m,
+  versionId: [33m22[39m,
+  planCode: [32m'PLUS'[39m
+}
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mStorage provider: cloudflare-r2[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mStorage endpoint host: 1a906fb7fd3b0ba97e49bbe2220d40cc.r2.cloudflarestorage.com[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mBucket: breadtrans-files[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mPresigned upload mode: disabled[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mStorage provider: cloudflare-r2[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mStorage endpoint host: 1a906fb7fd3b0ba97e49bbe2220d40cc.r2.cloudflarestorage.com[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mBucket: breadtrans-files[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mPresigned upload mode: disabled[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mStorage provider: cloudflare-r2[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mStorage endpoint host: test-account.r2.cloudflarestorage.com[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mBucket: breadtrans-files[39m
+[32m[Nest] 22300  - [39m10/26/2026, 2:28:29 PM [32m    LOG[39m [38;5;3m[R2Service] [39m[32mPresigned upload mode: disabled[39m
+
+Test Suites: 5 skipped, 149 passed, 149 of 154 total
+Tests:       29 skipped, 1527 passed, 1556 total
+Snapshots:   0 total
+Time:        19.671 s, estimated 23 s
+Ran all test suites.

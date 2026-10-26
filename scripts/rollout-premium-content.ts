@@ -288,6 +288,14 @@ async function loadManifest(): Promise<{
     }
     for (const artifact of quiz.listeningAudioArtifacts) {
       if (!artifact.r2Key) continue;
+      // Whole-quiz artifacts restored from the semantic manifest are already
+      // canonical private objects (for example .../audio/v7/full.mp3).  They
+      // must stay at that manifest key: attempting to treat them as a public
+      // source on a later rollout makes an otherwise idempotent reconstruction
+      // fail and can create a second, non-canonical private copy.
+      if (artifact.r2Key.startsWith(`premium/listening/quiz-${quiz.id}/`)) {
+        continue;
+      }
       moves.push({
         kind: 'artifact',
         id: artifact.id,

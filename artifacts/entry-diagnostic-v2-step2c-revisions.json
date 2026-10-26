@@ -1,0 +1,369 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_V2_STEP_2C_APPLY_CONTENT_REVIEW_REVISIONS",
+  "appliedAt": "2026-10-25",
+  "blueprintVersion": "V2_2026_01",
+  "contentVersionBefore": 1,
+  "contentVersionAfter": 2,
+  "sourceRegister": "artifacts/entry-diagnostic-v2-content-revision-register.json",
+  "step2bArtifactsMutated": false,
+  "step2bArtifactMtimesPrecedeStep2cEdits": true,
+  "databaseWrites": 0,
+  "ttsCalls": 0,
+  "azureCalls": 0,
+  "geminiGradingCalls": 0,
+  "v2Activated": false,
+  "frontendFilesChangedByStep2c": 0,
+  "frontendWorkingTreeNote": "8 frontend files are modified in the working tree, all from this session's earlier TOEIC-routing and DIAG-007 passes. Every one of their mtimes predates the Step 2C edits, so none was touched here.",
+
+  "registerCountCorrection": {
+    "declaredInStep2bReview": { "blocker": 0, "major": 4, "minor": 6, "note": 3, "total": 13 },
+    "actualBySeverityField": { "blocker": 0, "major": 5, "minor": 5, "note": 3, "total": 13 },
+    "discrepancy": "The Step 2B review summary declared major=4, but five register entries carry severity MAJOR: REV-001, REV-002, REV-003, REV-004 and REV-009. REV-004 was miscounted as MINOR in the summary while its own entry says MAJOR. The declared minor count was correspondingly one too high.",
+    "whoseError": "mine, in Step 2B",
+    "resolution": "All five MAJOR entries were applied. The register file itself was not edited, since Step 2C may not mutate Step 2B artifacts; the correction is recorded here instead.",
+    "note": "Step 2C applied every BLOCKER/MAJOR/MINOR entry regardless of the summary count, so the miscount changed no outcome."
+  },
+
+  "appliedRevisions": [
+    {
+      "revisionId": "REV-001",
+      "severity": "MAJOR",
+      "optionChosen": "(a) keep en-US and Americanise the lexis",
+      "whyThisOption": "All four clips declare localeIntent en-US and the product's input elsewhere is American English. Switching four clips to en-GB to match three British words would have required confirming an en-GB voice in the Step 3 TTS set and would have left the rest of the product inconsistent.",
+      "edits": [
+        "LST_CLIP_02.internalLabel: \"Study centre announcement\" -> \"Study center announcement\"",
+        "LST_CLIP_02.script: \"the study centre this week\" -> \"the study center this week\"",
+        "LST_CLIP_02.script: \"the lifts on the north side are being serviced\" -> \"the elevators on the north side are being serviced\"",
+        "LST_CLIP_04.script: \"I'd practised the whole thing twice\" -> \"I'd practiced the whole thing twice\"",
+        "LST_Q_003.answerRationale: \"because of the lift servicing\" -> \"because of the elevator servicing\"",
+        "LST_Q_003.distractorRationales[2]: \"The north-side lifts\" -> \"The north-side elevators\"",
+        "RDG_PASSAGE_02.text: \"retrieve rather than recognise\" -> \"retrieve rather than recognize\"",
+        "RDG_PASSAGE_02.text: \"the whole of revision\" -> \"the whole of studying\"",
+        "RDG_Q_004.distractorRationales[3]: \"compared with revision\" -> \"compared with reviewing notes\"",
+        "RDG_Q_007.options[3]: \"abandoning revision altogether\" -> \"abandoning studying altogether\"",
+        "RDG_PASSAGE_03.text: \"organisers\" -> \"organizers\" (both occurrences)",
+        "RDG_PASSAGE_03.text: \"the queue grows long\" -> \"the line grows long\"",
+        "RDG_Q_008.options[1]: \"shorter queues\" -> \"shorter lines\"",
+        "RDG_Q_008.answerRationale: \"and queues grow\" -> \"and lines grow\"",
+        "RDG_Q_008.distractorRationales[1]: \"queues get longer\" -> \"lines get longer\"",
+        "RDG_Q_009.answerRationale: \"the organisers' reason\" -> \"the organizers' reason\""
+      ],
+      "deliberatelyNotReplaced": [
+        {
+          "text": "\"you'll need to book them online\" in LST_CLIP_02",
+          "reason": "\"book a room\" is natural American English, and LST_Q_004's stem says \"reserve\". The script/stem mismatch IS the paraphrase the item measures. Replacing \"book\" with \"reserve\" would have handed the learner a verbatim lexical match and quietly made a D2 detail item easier. This is exactly the blind word replacement the pass was told to avoid."
+        },
+        {
+          "text": "\"I've still got the slides to finish\" in LST_CLIP_01",
+          "reason": "\"I've still got\" is ordinary informal American speech, not a British-only form. Rewriting it would have changed register without fixing a defect."
+        },
+        {
+          "text": "-ise/-ment spellings in rubric prose and identifiers: criterionKey \"organisation\", \"task_fulfilment\", \"normalisationIntent\", \"recognisable\" in anchors",
+          "reason": "These are authoring and grading metadata, never shown to a learner, and criterionKey values are part of the declared aiGradingRequirements.requiredFields contract. Americanising them would rename a machine contract to no learner benefit. Scoped out deliberately; REV-001 addresses learner-facing content."
+        },
+        {
+          "text": "\"data analysis\" in LU_Q_005",
+          "reason": "Checker false positive on my own regex. The noun \"analysis\" is identical in both dialects; only the verb differs (analyse/analyze). Content was correct; the pattern was fixed."
+        }
+      ],
+      "acceptanceCriteriaVerification": {
+        "localeMatchesLexis": "PASS - LEARNER_FACING_BRITISH_FORM_COUNT=0 across every script, passage, stem, option and instruction",
+        "noMixedVariantsOfSameWordClass": "PASS",
+        "LST_Q_003_still_works_with_elevators": "PASS - the key is \"The second-floor computer room\" (unchanged); the entrance distractor now reads \"The north-side elevators are being serviced, not the entrance\", preserving the mis-attribution",
+        "hashesRecomputed": "PASS - script:LST_CLIP_02, script:LST_CLIP_04, passage:RDG_PASSAGE_02, passage:RDG_PASSAGE_03 all changed in the manifest",
+        "localeConfirmedInTtsVoiceSet": "NOT_VERIFIED_IN_THIS_PASS - Step 2C may not call Azure. en-US voice availability must be confirmed at the start of Step 3 before audio generation. Carried as DEF-003."
+      }
+    },
+    {
+      "revisionId": "REV-002",
+      "severity": "MAJOR",
+      "draftKey": "RDG_Q_006",
+      "optionChosen": "(b) keep the term, rewrite the options",
+      "whyThisOption": "Option (a) would have re-targeted the item at \"a more uncomfortable method\" or \"the whole of revision\", but RDG_Q_007 on the same passage is already a reference item, so the two would have overlapped. Option (b) keeps a genuine meaning-in-context item.",
+      "before": {
+        "prompt": "In the passage, \"the fluency trap\" refers to",
+        "correctAnswer": "mistaking ease of reading for real understanding",
+        "defect": "The key glossed \"fluency\" as \"ease of reading\" and \"trap\" as \"mistaking\", so paraphrase matching on the stem alone identified it."
+      },
+      "after": {
+        "prompt": "In the passage, \"the illusion of fluency\" refers to",
+        "options": [
+          "the sense that one is reading faster than one really is",
+          "the impression that one speaks more smoothly than one actually does",
+          "the belief that a short text must be an easy text",
+          "the feeling that familiar material has already been learned"
+        ],
+        "correctAnswer": "the feeling that familiar material has already been learned",
+        "correctIndex": 3
+      },
+      "acceptanceCriteriaVerification": {
+        "notAnswerableByParaphraseMatching": "PASS - all four options are readings the phrase \"illusion of fluency\" permits in isolation (speed, spoken smoothness, text difficulty, familiarity). The key now shares no lexical item with the stem (REV002_KEY_SHARES_NO_STEM_TERM=PASS); nothing in the stem favours it.",
+        "derivableFromPassageOnly": "PASS - \"familiarity is easily mistaken for knowledge\" plus \"the words flow smoothly on the fourth reading, the student concludes the content is secure\" select option 4 and rule out the other three (no claim about reading speed, no spoken language, no mention of length)",
+        "exactlyOneDefensibleAnswer": "PASS",
+        "subskillUnchanged": "PASS - meaning in context",
+        "difficultyTierUnchanged": "PASS - D3",
+        "correctOptionDistributionImpact": "none - the key stayed at index 3 by design"
+      }
+    },
+    {
+      "revisionId": "REV-003",
+      "severity": "MAJOR",
+      "draftKey": "SPK_RUBRIC_V1 -> SPK_RUBRIC_V2",
+      "edits": [
+        "fluency.description rewritten to name pause length and placement, restarts, self-repair and word-searching, and to state explicitly that response length is NOT judged here",
+        "all five fluency anchors replaced; no anchor references a proportion of the available time"
+      ],
+      "acceptanceCriteriaVerification": {
+        "noAnchorReferencesProportionOfTime": "PASS - verified mechanically (REV003_NO_TIME_PROPORTION_ANCHOR)",
+        "everyAnchorNamesObservableFlowFeature": "PASS - verified mechanically (REV003_EVERY_ANCHOR_NAMES_FLOW)",
+        "smooth30sResponseToSpkTask01CanScore4": "PASS - anchor 4 reads \"A complete, smooth response scores 4 however much of the available time it uses.\" A complete, natural, smooth 30-second response to the 45-second task is explicitly eligible for the top fluency score.",
+        "fullTimeWithSearchingPausesCannotExceed2": "PASS - anchor 3 requires pauses mainly at clause boundaries and anchor 4 requires that pauses read as thinking rather than word-searching, so audible word-searching caps the score at 2 regardless of duration",
+        "remainsDistinctFromIntelligibility": "PASS - intelligibility anchors were not touched and still speak only of listener effort",
+        "residualLengthExpectationRelocated": "PASS - length now lives in task_fulfilment's coverage/development anchors and in minimumUsefulResponseSeconds (15s for SPK_TASK_01, 25s for SPK_TASK_02), both already present"
+      }
+    },
+    {
+      "revisionId": "REV-004",
+      "severity": "MAJOR",
+      "draftKey": "LST_Q_009",
+      "optionChosen": "raise the key's specificity to match the distractors",
+      "before": {
+        "options": [
+          "It went better than expected",
+          "It did not go the way they had planned",
+          "It was cancelled before it began",
+          "The audience left before the end"
+        ],
+        "defect": "the key was the only hedged option among three specific claims, so its form identified it"
+      },
+      "after": {
+        "options": [
+          "The applause showed that it went well",
+          "A technical problem spoiled their plan",
+          "It was called off before it could begin",
+          "The audience left before it had finished"
+        ],
+        "correctAnswer": "A technical problem spoiled their plan",
+        "correctIndex": 1
+      },
+      "acceptanceCriteriaVerification": {
+        "comparableLengthAndSpecificity": "PASS - 37, 38, 39 and 40 characters; all four are concrete positive claims and none is hedged",
+        "stillRequiresCombiningTwoCues": "PASS - the clip never says anything went wrong. The key requires combining the deflection to the applause, the projector failing to read the file, the fallback to speaking from memory, and twelve minutes instead of fifteen. No single line states it.",
+        "exactlyOneDefensibleAnswer": "PASS",
+        "rationalesUpdatedWithCorrectAtCorrectIndex": "PASS - CORRECT remains at index 1; all four rationales rewritten to match the new options",
+        "difficultyTierStaysD4": "PASS",
+        "incidentalBenefit": "the rewrite also removed the British spelling \"cancelled\" (now \"called off\")"
+      }
+    },
+    {
+      "revisionId": "REV-005",
+      "severity": "MINOR",
+      "draftKey": "LST_Q_003",
+      "edits": ["prompt: \"Which area is closed this week?\" -> \"Which area is closed at the start of this week?\""],
+      "whyThisWording": "The register offered \"...until Thursday?\" as an alternative, but that wording would have moved a detail from the clip into the stem. \"At the start of this week\" is consistent with a Thursday reopening without supplying the audible detail.",
+      "acceptanceCriteriaVerification": {
+        "stemDoesNotAssertContradictedDuration": "PASS",
+        "correctAnswerUnchanged": "PASS - The second-floor computer room",
+        "noDistractorBecomesDefensible": "PASS - the ground-floor rooms are open as usual, printing is conditional not closed, and the north-side item is the elevators not the entrance"
+      }
+    },
+    {
+      "revisionId": "REV-006",
+      "severity": "MINOR",
+      "draftKey": "LST_Q_008",
+      "edits": [
+        "options[3]: \"Missing it would be faster overall\" -> \"The landlord must send the page directly\"",
+        "distractorRationales[3] rewritten to trace the distractor to the audio"
+      ],
+      "acceptanceCriteriaVerification": {
+        "wrongButTraceableToClip": "PASS - traceable to \"we need your current landlord's signature\" and \"that page came through blank\"; wrong because the speaker asks the student to get it to the office by Friday",
+        "exactlyOneDefensibleAnswer": "PASS",
+        "rationalesAligned": "PASS - CORRECT stays at index 0",
+        "noMoreThanOneOptionEliminableAPriori": "PASS - only \"It has already passed\" is now implausible without the audio; the extension option and the landlord option both require the clip"
+      }
+    },
+    {
+      "revisionId": "REV-007",
+      "severity": "MINOR",
+      "draftKey": "LST_Q_010",
+      "edits": [
+        "distractorRationales[3]: the incorrect reasoning \"Running out of time would make it longer, not shorter\" replaced with \"The speaker attributes the shorter length to cutting a section he was unsure about, not to being stopped by the clock.\"",
+        "options[1]: \"The projector ended the session\" -> \"The projector trouble delayed the start\", with a matching rationale"
+      ],
+      "whyThisReplacementAndNotTheRegistersExample": "The register suggested \"The file would not open at all\". I rejected it: the clip says \"the projector wouldn't read my file\", so that option would have been a true statement about the clip and a learner could defend it as a cause, breaking the one-defensible-answer requirement for an item whose stem asks for a reason. \"The projector trouble delayed the start\" is plausible, traceable to the same audible failure, and unambiguously false - the clip never mentions a late start and gives an explicit competing reason.",
+      "acceptanceCriteriaVerification": {
+        "everyRationaleTrueOfTheClip": "PASS",
+        "noFactualOrLogicalErrorInAnyRationale": "PASS - the running-out-of-time rationale now states the actual ground instead of an invalid inference",
+        "replacementTraceableAndArrayAligned": "PASS - CORRECT stays at index 2"
+      }
+    },
+    {
+      "revisionId": "REV-008",
+      "severity": "MINOR",
+      "draftKey": "LU_Q_002",
+      "optionChosen": "(b) keep \"by\" and re-declare the targetFeature",
+      "whyThisOption": "Option (a) required a fourth slot-level distractor such as \"for\" or \"from\". \"The session starts for half past nine\" and \"...starts from half past nine\" are both unnatural in a way that teaches nothing, and the review itself called \"by\" the most informative distractor. Re-declaring the construct keeps the diagnostic value and makes the option set match what is being measured.",
+      "edits": [
+        "targetFeature: \"preposition_of_clock_time\" -> \"preposition_of_time_point_versus_deadline\"",
+        "answerRationale extended to state that the item separates a point in time from a deadline",
+        "distractorRationales[3] rewritten to say \"by\" is wrong for the construct rather than ungrammatical",
+        "diagnosticUse extended so choosing \"by\" specifically points to point-in-time versus deadline"
+      ],
+      "acceptanceCriteriaVerification": {
+        "distractorsConsistentWithDeclaredTargetFeature": "PASS via re-declaration, which the register permits explicitly",
+        "exactlyOneDefensibleAnswer": "PASS - \"starts by half past nine\" is semantically incoherent for a start event",
+        "optionsRemainNaturalEnglish": "PASS - all four are ordinary prepositions",
+        "difficultyTierStaysD1": "PASS"
+      }
+    },
+    {
+      "revisionId": "REV-009",
+      "severity": "MAJOR",
+      "draftKey": "WRT_RUBRIC_V1 -> WRT_RUBRIC_V2",
+      "optionChosen": "(a) per-task anchors for organisation",
+      "whyThisOption": "Option (b) would have made the Writing per-task percentage computed from different criterion counts per task, which complicates the Step 4 scorer for no gain. Option (c) would have created two rubric ids for a four-criterion rubric that differs in one criterion's anchors. Option (a) mirrors what task_achievement already does and keeps one grading contract.",
+      "edits": [
+        "organisation.description now states the scale explicitly: sentence-level sequencing and cohesion for the short functional message, grouping and signposting for the extended response",
+        "organisation anchor 3 rewritten to name BOTH tasks, where it previously named only task 2",
+        "organisation anchor 4 rewritten to give task 1 a reachable top descriptor (one deliberately ordered whole with each function signalled) alongside task 2's paragraph grouping",
+        "criterionSelectionRationale corrected: the false claim \"both writing tasks are long enough for paragraphing\" was removed and replaced with the per-task reasoning, including why anchoring both tasks to paragraphing would have depressed every learner's Writing score"
+      ],
+      "acceptanceCriteriaVerification": {
+        "noCriterionAnchorNamesOneTaskWhileAppliedToBoth": "PASS - verified mechanically across both rubrics (REV009_NO_SINGLE_TASK_ANCHOR); every anchor that names a task names both",
+        "perfectly_organised_60_90_word_message_can_reach_top_of_every_criterion": "PASS - anchor 4 for task 1 no longer requires paragraphing",
+        "normalisationIntentForUnscoredCriteria": "N/A - option (a) scores all four criteria for both tasks, so no criterion is unscored and perTask stays the mean of four",
+        "taskAchievementAndOrganisationRemainDistinct": "PASS - task_achievement covers whether the required elements are present and developed; organisation covers their ordering and linking. No error is penalised under both.",
+        "rubricVersionIncremented": "PASS - WRT_RUBRIC_V1 -> WRT_RUBRIC_V2, with WRT_TASK_01 and WRT_TASK_02 references updated",
+        "rubricsHashRegenerated": "PASS - rubrics:json hash changed in the manifest"
+      }
+    },
+    {
+      "revisionId": "REV-012",
+      "severity": "MINOR",
+      "draftKey": "RDG_PASSAGE_02",
+      "edits": [
+        "text: \"Researchers who study learning call this the fluency trap.\" -> \"Researchers who study learning call this the illusion of fluency.\"",
+        "wordCount: 150 -> 151"
+      ],
+      "externalEvidence": {
+        "status": "VERIFIED",
+        "finding": "The established term in the learning-science literature is the illusion of fluency, also written as the fluency illusion, associated with Robert Bjork's work on desirable difficulties and with Benjamin, Bjork & Schwartz (1998) on retrieval fluency misleading metamnemonic judgements. \"The fluency trap\" is not the standard label.",
+        "note": "This was the external check Step 2B could not run because the web-search tool was returning a classifier error. It was run in Step 2C and confirmed the review's suspicion."
+      },
+      "acceptanceCriteriaVerification": {
+        "attributedTermIsTheLiteratureTerm": "PASS - the attribution to researchers is now accurate, so it was kept rather than dropped",
+        "passageStillSupportsRdgQ006": "PASS - RDG_Q_006's stem now quotes the same phrase the passage uses, and the key is still derived from the two surrounding sentences",
+        "wordCountAndHashRecomputed": "PASS - wordCount 151 verified against the text; passage:RDG_PASSAGE_02 hash changed"
+      }
+    }
+  ],
+
+  "notApplied": [
+    {
+      "revisionId": "REV-010",
+      "severity": "NOTE",
+      "draftKey": "RDG_Q_009",
+      "whySkipped": "The register's requiredChange is literally \"None.\" and its acceptance criterion is \"retain as authored\". The entry exists to record that the review rejected the author's uncertainty about distractor C, not to request a change. Nothing to apply."
+    },
+    {
+      "revisionId": "REV-011",
+      "severity": "NOTE",
+      "draftKey": "RDG_Q_003",
+      "whySkipped": "The register states no change is required and offers re-declaring the subskill only as an option for strict subskill purity. The item's declared subskill \"specific detail\" was retained: collecting a tagged bicycle at the facilities desk's stated hours is a one-step link within the passage, not an inference beyond it, and D2 already carries that demand. Re-declaring it would have made the reading subskill distribution less even without improving the item."
+    },
+    {
+      "revisionId": "REV-013",
+      "severity": "NOTE",
+      "draftKey": "DIAG_V2_ASSESSMENT",
+      "whySkipped": "The register classes this as an open product decision - whether task instructions should be Vietnamese, English or bilingual - and states \"No content change until decided.\" Step 2C has no mandate to decide product language policy. Carried to Step 2D/Step 3 as an open decision; the current state (Vietnamese chrome, English target-language content and per-task instructions) matches the existing product's pattern and was left as authored."
+    }
+  ],
+
+  "deferredCarriedForward": [
+    { "id": "DEF-001", "status": "STILL_OPEN", "note": "Clip durations remain word-count estimates. Step 3 must write measured durationMs and flag divergence." },
+    { "id": "DEF-002", "status": "CLOSED_IN_STEP_2C", "note": "The bounded external originality spot-check that the Step 2B tool failure blocked was completed in this pass. See originalitySpotCheck." },
+    { "id": "DEF-003", "status": "NEW", "note": "en-US voice availability in the Step 3 TTS voice set has not been confirmed, because Step 2C may not call Azure. It must be confirmed before any audio is generated from these scripts." }
+  ],
+
+  "originalitySpotCheck": {
+    "status": "PASS",
+    "coverage": "complete, not sampled: 3 reading passages, 4 listening scripts, 2 speaking prompts, 2 writing prompts",
+    "method": "bounded external web search on distinctive verbatim spans from each object, 7 searches",
+    "verbatimMatchesFound": 0,
+    "probes": [
+      { "span": "the owner does the work, guided", "object": "RDG_PASSAGE_03", "result": "no verbatim match; the owner-led repair-cafe model is independently documented, so the passage is factually accurate as well as original" },
+      { "span": "illusion of fluency", "object": "RDG_PASSAGE_02", "result": "term is standard in the literature; no verbatim match on the passage's own sentences. This probe also supplied the evidence for REV-012." },
+      { "span": "familiarity is easily mistaken for knowledge", "object": "RDG_PASSAGE_02", "result": "no verbatim match" },
+      { "span": "bicycles left against railings", "object": "RDG_PASSAGE_01", "result": "no verbatim match" },
+      { "span": "the projector wouldn't read my file", "object": "LST_CLIP_04", "result": "no verbatim match" },
+      { "span": "the second-floor computer room will stay closed", "object": "LST_CLIP_02", "result": "no verbatim match" },
+      { "span": "we need your current landlord's signature", "object": "LST_CLIP_03", "result": "no verbatim match" },
+      { "span": "The reading room gets packed after four", "object": "LST_CLIP_01", "result": "no verbatim match" },
+      { "span": "Talk about a place where you usually study or work", "object": "SPK_TASK_01", "result": "no verbatim match; results were unrelated student-opinion pages on the same everyday topic" },
+      { "span": "Some people prefer to study with other people; others prefer to study alone", "object": "SPK_TASK_02", "result": "no verbatim match; results were sample essays and opinion pieces on studying alone versus in groups, none containing this wording" },
+      { "span": "available as a recording instead of teaching it in person", "object": "WRT_TASK_02", "result": "no verbatim match; results were university lecture-recording policy pages discussing the same real-world question" },
+      { "span": "ask them to send you one thing you need for the assignment", "object": "WRT_TASK_01", "result": "no verbatim match" }
+    ],
+    "interpretation": "A shared everyday topic is not a copied item. The searches found pages on the same topics - studying alone versus in groups, lecture recordings, repair cafes, the fluency illusion - and no page containing this draft's wording. That is the expected result for original content on common topics, and it is consistent with contentOriginalityDeclaration."
+  },
+
+  "postRevisionVerification": {
+    "VALIDATOR_FIXED_BEFORE_USE": true,
+    "VALIDATOR_DEFAULT_MODE": "check (read-only)",
+    "VALIDATOR_CHECK_MODE_READ_ONLY_PASS": true,
+    "MANIFEST_REGENERATED_ONCE_INTENTIONALLY": true,
+    "SECOND_HASH_CHECK_MUTATED_FILES": false,
+    "HASH_MISMATCH_COUNT": 0,
+    "POST_REVISION_HASH_CHECK_PASS": true,
+    "MECHANICAL_VALIDATION_PASS": true,
+    "ITEM_COUNT_TOTAL": 29,
+    "COUNTS": { "listening": 10, "clips": 4, "reading": 10, "passages": 3, "speaking": 2, "writing": 2, "languageUse": 5 },
+    "OBJECTIVE_ITEMS": 25,
+    "ALL_25_OBJECTIVE_KEYS_RESOLVE_AND_ALIGN": true,
+    "CORRECT_OPTION_DISTRIBUTION": { "A": 5, "B": 7, "C": 7, "D": 6 },
+    "CORRECT_OPTION_DISTRIBUTION_CHANGED_BY_STEP_2C": false,
+    "CORRECT_OPTION_SEQUENCE": "BADBCDCABCDACBDDCDBABCABC",
+    "OBJECTIVE_TIER_DISTRIBUTION": { "D1": 6, "D2": 9, "D3": 6, "D4": 4 },
+    "TIER_DISTRIBUTION_CHANGED_BY_STEP_2C": false,
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 0,
+    "CEFR_CONTENT_LEAK_COUNT": 0,
+    "LEARNER_FACING_BRITISH_FORM_COUNT": 0,
+    "DUPLICATE_EXACT_CONTENT_COUNT": 0,
+    "UNRESOLVED_DRAFT_REFERENCES": 0,
+    "READING_TOTAL_WORD_COUNT": 407,
+    "PASSAGE_WORD_COUNTS": { "RDG_PASSAGE_01": 97, "RDG_PASSAGE_02": 151, "RDG_PASSAGE_03": 159 },
+    "LISTENING_SCRIPT_WORD_COUNTS": { "LST_CLIP_01": 76, "LST_CLIP_02": 76, "LST_CLIP_03": 77, "LST_CLIP_04": 65 }
+  },
+
+  "hashDelta": {
+    "changed": [
+      "script:LST_CLIP_02",
+      "script:LST_CLIP_04",
+      "passage:RDG_PASSAGE_02",
+      "passage:RDG_PASSAGE_03",
+      "rubrics:json",
+      "contentDraft:json"
+    ],
+    "unchanged": [
+      "script:LST_CLIP_01",
+      "script:LST_CLIP_03",
+      "passage:RDG_PASSAGE_01",
+      "prompt:SPK_TASK_01",
+      "prompt:SPK_TASK_02",
+      "prompt:WRT_TASK_01",
+      "prompt:WRT_TASK_02"
+    ],
+    "consistencyNote": "The changed set matches the revisions exactly. No revision targeted the four productive prompts or passage 1, and their hashes did not move."
+  },
+
+  "limitsOfThisPass": [
+    "This is an apply pass, not a review pass. I wrote the Step 2A content, wrote the Step 2B review and applied these revisions, so I cannot certify the result as independently reviewed.",
+    "REV-002's non-recoverability criterion was verified by argument plus a mechanical lexical-overlap check, not by a blind trial with a reviewer who had not seen the passage.",
+    "REV-004's parallelism was verified by character length and by inspection of each option's form, not by empirical item statistics.",
+    "No item difficulty claim is calibrated. D1-D4 remains DESIGN_HYPOTHESIS_NOT_CALIBRATED.",
+    "Rubric validity is unestablished: no double-marking, no rater agreement, no standard-setting evidence exists for either rubric version."
+  ],
+
+  "CONTENT_REVIEW_PASS": "REQUIRES_STEP2D_REVIEW",
+  "nextStep": "STEP_2D_INDEPENDENT_REVIEW_OF_REVISED_CONTENT"
+}

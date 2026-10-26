@@ -1,0 +1,362 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_V2_STEP_2D_FINAL_CONTENT_RE_REVIEW",
+  "reviewedAt": "2026-10-25",
+  "blueprintVersion": "V2_2026_01",
+  "contentVersionReviewed": 2,
+
+  "STEP2D_VERDICT": "REVISIONS_REQUIRED",
+  "ENTRY_DIAGNOSTIC_V2_CONTENT_REVIEW_PASS": false,
+  "verdictBasis": "One MAJOR finding (IR-001, LU_Q_002 has two defensible answers) and three of the ten required historical revisions are not fully closed (REV-001, REV-006, REV-008). Section 31's approval rule requires STAGE_A_MAJOR_COUNT=0, MULTIPLE_DEFENSIBLE_ANSWER_ITEMS=0 and all ten required revisions CLOSED. None of those three conditions holds.",
+
+  "reviewerIndependenceDisclosure": {
+    "statement": "The agent writing this artifact is the author of the content. It authored Step 2A, wrote the Step 2B review and applied the Step 2C revisions. It cannot perform a blind Stage A and did not claim to.",
+    "stageAPerformedBy": "a separately spawned reviewer started with no conversation context",
+    "whatThatReviewerCouldNotSee": [
+      "artifacts/entry-diagnostic-v2-content-review.json",
+      "artifacts/entry-diagnostic-v2-content-review.md",
+      "artifacts/entry-diagnostic-v2-content-revision-register.json",
+      "artifacts/entry-diagnostic-v2-step2c-revisions.json",
+      "artifacts/entry-diagnostic-v2-authoring-report.md"
+    ],
+    "independenceAchieved": "BLIND_TO_PRIOR_ISSUE_LIST",
+    "independenceNotAchieved": "INDEPENDENT_OF_THE_AUTHORING_MODEL",
+    "honestCharacterisation": "This is blindness to the prior issue list, not third-party independence. The same model family authored and reviewed the content. A genuinely independent review would require a human assessment specialist or a different system. That limitation is unresolved and should be weighed before activation, though it did not prevent the blind pass from finding a MAJOR defect the author's own two prior passes had explicitly dismissed.",
+    "BLIND_REVIEW_COMPLETED_BEFORE_PRIOR_ISSUE_DISCLOSURE": {
+      "forStageAReviewer": true,
+      "forTheAgentWritingThisArtifact": false
+    },
+    "STAGE_A_FINDINGS_FROZEN_BEFORE_RECONCILIATION": true,
+    "stageASelfDisclosedExposure": "The Stage A reviewer disclosed (IR-021) that the allowed content-draft file itself contains a revisionProvenance block naming three forbidden files and listing ten opaque revision IDs. It read that because it is inside an allowed file, opened no forbidden file, and states the only substantive thing absorbed was the existence of an open instruction-language decision, which it had already reached independently. Accepted as an honest disclosure; it does not invalidate the blind pass."
+  },
+
+  "coverage": {
+    "ITEMS_REVIEWED": "29/29",
+    "LISTENING_SCRIPTS_REVIEWED": "4/4",
+    "READING_PASSAGES_REVIEWED": "3/3",
+    "SPEAKING_TASKS_REVIEWED": "2/2",
+    "WRITING_TASKS_REVIEWED": "2/2",
+    "RUBRICS_REVIEWED": "2/2",
+    "sampling": "none"
+  },
+
+  "stageACounts": {
+    "STAGE_A_BLOCKER_COUNT": 0,
+    "STAGE_A_MAJOR_COUNT": 1,
+    "STAGE_A_MINOR_COUNT": 16,
+    "STAGE_A_NOTE_COUNT": 7,
+    "totalIssues": 24,
+    "NEW_INDEPENDENT_ISSUE_COUNT": 22,
+    "newIssueExplanation": "22 of the 24 findings are on objects or defects the prior register never raised. IR-017 restates the known open instruction-language decision (REV-013). IR-001/IR-002 are on REV-008's object but reach the opposite conclusion from the prior review, so they are counted as new findings rather than restatements."
+  },
+
+  "objectiveQuality": {
+    "AMBIGUOUS_OBJECTIVE_ITEMS": 1,
+    "ambiguousItems": ["LU_Q_002"],
+    "INVALID_ANSWER_KEYS": 0,
+    "MULTIPLE_DEFENSIBLE_ANSWER_ITEMS": 1,
+    "multipleDefensibleItems": ["LU_Q_002"],
+    "WEAK_DISTRACTOR_COUNT": 4,
+    "weakDistractorItems": ["LST_Q_003", "LST_Q_004", "LST_Q_008", "LST_Q_001"],
+    "UNFAIR_DISTRACTOR_COUNT": 0,
+    "OBJECTIVE_ITEM_VALIDITY_PASS": false,
+    "allKeysVerified": "All 25 answer keys were independently judged correct, and the literal string CORRECT sits at exactly the index of correctAnswer in options for all 25 items. The single validity failure is ambiguity at LU_Q_002, not a wrong key."
+  },
+
+  "listening": {
+    "LISTENING_AUDIO_REQUIRED_ITEM_COUNT": 8,
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 2,
+    "bypassableItems": ["LST_Q_005", "LST_Q_007"],
+    "LISTENING_EN_US_CONSISTENCY_PASS": false,
+    "LISTENING_SCRIPT_NATURALNESS_PASS": true,
+    "LISTENING_QUESTION_SEMANTIC_PASS": true,
+    "LST_Q_008_STATUS": "MINOR_ISSUE - two of four options are eliminable from the stem alone (IR-011); REV-006's acceptance criterion on a-priori eliminability is not met",
+    "LST_Q_009_STATUS": "SOUND on option parallelism and inference; one MINOR rationale defect introduced by the Step 2C fix (IR-014, editorial residue)",
+    "LST_Q_010_STATUS": "SOUND on key and rationale logic; one NOTE on an unsupported gendered pronoun in a rationale (IR-022)"
+  },
+
+  "reading": {
+    "READING_PASSAGE_QUALITY_PASS": true,
+    "READING_QUESTION_VALIDITY_PASS": true,
+    "RDG_Q_006_NO_PASSAGE_KEY_IDENTIFIABLE": {
+      "forATestWiseLearner": false,
+      "forADomainExpert": true,
+      "note": "The Stage A reviewer selected the key blind, but disclosed that it did so from subject-matter knowledge of the published term, not from any surface cue, and judged that route unavailable to a 16-24 general-English learner. On the brief's own standard - whether a test-wise learner can beat chance - the answer is false, which is the value approval requires. Recorded with both readings rather than only the favourable one."
+    },
+    "RDG_Q_006_WITH_PASSAGE_EXACTLY_ONE_ANSWER": true,
+    "RDG_Q_006_MEANING_IN_CONTEXT_VALID": true
+  },
+
+  "speaking": {
+    "SPK_TASK_01_CONSTRUCT_PASS": true,
+    "SPK_TASK_02_CONSTRUCT_PASS": true,
+    "SPEAKING_FLUENCY_LENGTH_DEPENDENCY_ABSENT": true,
+    "SPEAKING_RUBRIC_CRITERIA_DISTINCT_PASS": true,
+    "SPEAKING_RUBRIC_OBSERVABLE_PASS": true,
+    "SPEAKING_RUBRIC_ANCHORS_PASS": true,
+    "caseA": "A complete, smooth, natural-paced 30-second response on the 45-second task reaches fluency 4. Anchor relied on: 'A complete, smooth response scores 4 however much of the available time it uses.' No back-door length penalty exists in the other three criteria, and 30s clears minimumUsefulResponseSeconds of 15.",
+    "caseB": "A 45-second response filled with long pauses, repetition, fragmentation and word-searching cannot exceed fluency 2. Anchor 2 begins 'Keeps going' and still caps at 2; anchor 3 requires pauses mainly at clause boundaries; anchor 4 requires no disruptive restarts.",
+    "accentFairness": "No anchor references nativeness, target-variety pronunciation or accentedness. 'Accent itself is not assessed' is explicit."
+  },
+
+  "writing": {
+    "WRT_TASK_01_CONSTRUCT_PASS": true,
+    "WRT_TASK_02_CONSTRUCT_PASS": true,
+    "WRITING_TASK1_CAN_ACCESS_FULL_SCORE_RANGE": true,
+    "WRITING_TASK2_CAN_ACCESS_FULL_SCORE_RANGE": true,
+    "WRITING_RUBRIC_TASK_COMPATIBILITY_PASS": true,
+    "WRITING_RUBRIC_CROSS_TASK_COMPARABILITY_READY": false,
+    "crossTaskNote": "Not a fairness defect and not a persistence blocker. Both tasks use the identical four criteria at the same 0-4 ceiling and neither is capped by genre, but WRT_TASK_02 is substantively more demanding at that same ceiling, so an equally weighted mean of two unequated raw scales systematically pulls the Writing band down. Flagged (IR-023) for the pilot to check per-task score distributions before the equal weighting is treated as settled. No scoring formula was designed here."
+  },
+
+  "languageUse": {
+    "LANGUAGE_USE_ITEM_VALIDITY_PASS": false,
+    "LU_Q_002_TARGET_FEATURE_COHERENT": false,
+    "LU_Q_002_EXACTLY_ONE_DEFENSIBLE_ANSWER": false,
+    "failureDetail": "In the bare frame 'The session starts ____ half past nine.', the option 'by' yields an acceptable English sentence under a no-later-than reading, as in 'Doors open by seven' or 'The train leaves by six'. Nothing in the stem forces a point-in-time reading, so both 'at' and 'by' are defensible. The re-declared targetFeature preposition_of_time_point_versus_deadline also mixes two unrelated grounds of wrongness: 'on' and 'in' fail on collocational slot, while 'by' does not fail at all - it means something else."
+  },
+
+  "designModel": {
+    "DIFFICULTY_TIER_REVIEW_STATUS": "QUALITATIVE_ONLY",
+    "TIER_CHANGE_RECOMMENDATION_COUNT": 2,
+    "tierRecommendations": [
+      "RDG_Q_004 is tiered D1 but is a main-idea item on a D3 passage requiring rejection of an overstated distractor the third paragraph explicitly refuses; it is harder than the D2 literal lookups beside it (IR-013, MINOR)",
+      "RDG_Q_009 is tiered D4 but its inference is a single negation flip on one explicit clause; softer finding, recorded as a NOTE (IR-020)"
+    ],
+    "ITEM_LEVEL_STATUS": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
+    "ITEM_TIER_TO_RESULT_BAND_MAPPING_DEFINED": false,
+    "mappingEvidence": "Zero occurrences of Starter/Foundation/Intermediate/Upper anywhere in the content draft or rubrics. The only mention is in the blueprint, declaring the separation: mappingBetweenTiersAndBands = 'none - deliberately not defined'.",
+    "CEFR_CONTENT_LEAK_COUNT": 0,
+    "cefrEvidence": "Zero CEFR tokens in the content draft and rubrics. 21 occurrences in the blueprint, all inert design rationale stating that no CEFR claim ships ('No CEFR, ALTE or exam-equivalence claim', 'no CEFR wording ships with V2', 'D1-D4 are NOT CEFR levels'). None functions as an item level, learner level, rubric band, answer option or placement output."
+  },
+
+  "originality": {
+    "ORIGINALITY_OBJECTS_CHECKED": 11,
+    "ORIGINALITY_QUERIES_RUN": 12,
+    "ORIGINALITY_MEANINGFUL_MATCH_COUNT": 0,
+    "ORIGINALITY_UNRESOLVED_OBJECT_COUNT": 0,
+    "ORIGINALITY_SPOT_CHECK_PASS": true,
+    "independence": "Run fresh by the Stage A reviewer, not inherited from the Step 2C result.",
+    "reservation": "IR-018 (NOTE): no wording match exists anywhere, but SPK_TASK_01 is functionally congruent with a standard TOEFL independent-speaking task AND carries the identical 15s prep / 45s response configuration, and SPK_TASK_02's topic is among the most reproduced independent-task prompts. The contentOriginalityDeclaration claims nothing was 'copied or adapted from' commercial practice material. The 'or adapted' clause is stronger than the evidence comfortably supports for task structure and timing. Recommendation is to narrow the declaration to wording rather than change content."
+  },
+
+  "revisionClosure": {
+    "REV_REQUIRED_TOTAL": 10,
+    "REV_REQUIRED_CLOSED": 6,
+    "REV_REQUIRED_PARTIAL": 3,
+    "REV_REQUIRED_OPEN": 1,
+    "REV_REGRESSIONS_FOUND": 3,
+    "regressionNote": "Three regressions were introduced by the Step 2C fixes themselves, all MINOR or NOTE: IR-014 (editorial residue written into LST_Q_009's rationale by the REV-004 rewrite), IR-022 (an unsupported gendered pronoun written into LST_Q_010's rationale by the REV-007 rewrite), and the false claim about English written into LU_Q_002's answerRationale by the REV-008 change (IR-002). The last one is the most serious because it states a rule that is untrue.",
+    "table": [
+      {
+        "REVISION_ID": "REV-001",
+        "ORIGINAL_SEVERITY": "MAJOR",
+        "ORIGINAL_OBJECT": "LST_CLIP_01..04 locale consistency",
+        "CLOSURE_STATUS": "PARTIALLY_CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": false,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "The three words the register named were fixed, but the acceptance criterion was 'every clip's localeIntent and accentIntent match the lexis and spelling actually used in its script', and LST_CLIP_02 still ends 'bring your student card', which a general-American speaker renders 'student ID' (IR-003). The blind pass additionally found 'favour' in LU_Q_004's learner-facing stem (IR-004), and 'From 1 March', 'Only at weekends' and the ambiguous 'campus store' in RDG_PASSAGE_01 and its items (IR-005). I also found, independently of the blind pass, that 'revising' survives in RDG_Q_004's option text - my Step 2C scan matched 'revision' but not 'revising'. My Step 2C flag LEARNER_FACING_BRITISH_FORM_COUNT=0 was produced by a regex whose word list I wrote myself, so its silence proved only that my list was incomplete. Presenting it as proof of locale consistency was wrong."
+      },
+      {
+        "REVISION_ID": "REV-002",
+        "ORIGINAL_SEVERITY": "MAJOR",
+        "ORIGINAL_OBJECT": "RDG_Q_006",
+        "CLOSURE_STATUS": "CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "Independently confirmed by blind test. On stem and options alone all four are live readings of the phrase and no surface cue favours the key; after the passage exactly one answer is defensible and the context does the work. The blind reviewer did select the key before reading the passage, but from published knowledge of the term, and disclosed that route explicitly as domain expertise rather than an exploitable cue. Judged one of the stronger items in the set."
+      },
+      {
+        "REVISION_ID": "REV-003",
+        "ORIGINAL_SEVERITY": "MAJOR",
+        "ORIGINAL_OBJECT": "SPK_RUBRIC fluency",
+        "CLOSURE_STATUS": "CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "Both required cases independently verified against the anchors as written. A smooth 30-second response on a 45-second task reaches 4; a time-filling response with searching pauses cannot exceed 2. No back-door length penalty in the other three criteria. The blind reviewer raised no issue against this criterion at all."
+      },
+      {
+        "REVISION_ID": "REV-004",
+        "ORIGINAL_SEVERITY": "MAJOR",
+        "ORIGINAL_OBJECT": "LST_Q_009",
+        "CLOSURE_STATUS": "CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": true,
+        "REVIEWER_COMMENT": "Parallelism is genuinely fixed: the blind pass raised no parallelism objection to this item, and all four options are now comparable concrete claims. But the rewrite wrote process residue into the rationale - 'now stated as specifically as the correct option' - which is a statement about a revision, not about the stimulus (IR-014, MINOR). Closed on construct, with a new MINOR introduced by the fix."
+      },
+      {
+        "REVISION_ID": "REV-005",
+        "ORIGINAL_SEVERITY": "MINOR",
+        "ORIGINAL_OBJECT": "LST_Q_003",
+        "CLOSURE_STATUS": "CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "The stem no longer asserts a duration the script contradicts, the key is unchanged and no distractor became defensible. The blind pass separately found that 'The printing service' is not an area and so is eliminable from the stem (IR-007) - a pre-existing weakness on a different criterion, not a failure of this revision."
+      },
+      {
+        "REVISION_ID": "REV-006",
+        "ORIGINAL_SEVERITY": "MINOR",
+        "ORIGINAL_OBJECT": "LST_Q_008",
+        "CLOSURE_STATUS": "PARTIALLY_CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": false,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "The implausible distractor was removed and the replacement is audio-traceable, so three of four criteria are met. The fourth - 'a reviewer given only the stem and options cannot eliminate more than one option a priori' - is not met: the blind pass found that my replacement 'The landlord must send the page directly' says nothing about the deadline the stem asks about, and 'It has already passed' is defeated by the stem's own framing, leaving a real field of two (IR-011). I traded one weak distractor for another and declared the criterion met without testing it the way the criterion specifies."
+      },
+      {
+        "REVISION_ID": "REV-007",
+        "ORIGINAL_SEVERITY": "MINOR",
+        "ORIGINAL_OBJECT": "LST_Q_010",
+        "CLOSURE_STATUS": "CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": true,
+        "REVIEWER_COMMENT": "The false reasoning in the running-out-of-time rationale is corrected and the replaced projector distractor is plausible, traceable and unambiguously false. My decision to reject the register's suggested replacement on one-defensible-answer grounds was not contradicted by the blind pass. However the rewrite introduced 'a section he was unsure about'; LST_CLIP_04 establishes no gender for that speaker (IR-022, NOTE), and it would bind TTS voice casting to an assumption the script does not make."
+      },
+      {
+        "REVISION_ID": "REV-008",
+        "ORIGINAL_SEVERITY": "MINOR",
+        "ORIGINAL_OBJECT": "LU_Q_002",
+        "CLOSURE_STATUS": "NOT_CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": false,
+        "REGRESSION_FOUND": true,
+        "REVIEWER_COMMENT": "This is the pass's MAJOR finding and it is my error twice over. The register offered (a) replace 'by' with a slot-level distractor, or (b) keep 'by' and re-declare the targetFeature. I chose (b), on the stated ground that 'starts by half past nine' is semantically incoherent for a start event. That ground is false: 'by' plus a clock time with a punctual verb is a licit no-later-than reading, so the item has two defensible answers (IR-001, MAJOR). My Step 2B review had already considered and explicitly dismissed this exact ambiguity, so two consecutive passes of mine got it wrong. Worse, the Step 2C rewrite put the false generalisation into the artifact: the answerRationale now asserts that 'a start event does not take [a limit]', which is untrue of English and would propagate into learner feedback and any later item reusing the rule (IR-002, MINOR). Option (a), which I rejected, would have avoided both. REV-008 must be reopened and resolved by option (a) or by adding stem context that forces the point-in-time reading."
+      },
+      {
+        "REVISION_ID": "REV-009",
+        "ORIGINAL_SEVERITY": "MAJOR",
+        "ORIGINAL_OBJECT": "WRT_RUBRIC organisation",
+        "CLOSURE_STATUS": "CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "Independently confirmed: an excellent 60-90 word three-function message can reach 4 on every criterion including organisation, and no anchor names one task while being applied to both. The blind pass found a separate MINOR elsewhere in the same rubric - task_achievement 2's undefined 'length falls well below the stated range', which collapses 'short but complete' onto the same score as 'incomplete' (IR-016). That is a different criterion and a pre-existing anchor, not a failure of this revision."
+      },
+      {
+        "REVISION_ID": "REV-012",
+        "ORIGINAL_SEVERITY": "MINOR",
+        "ORIGINAL_OBJECT": "RDG_PASSAGE_02",
+        "CLOSURE_STATUS": "CLOSED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "The term attributed to researchers is now the term used in the literature, confirmed by the blind reviewer's own independent web search rather than inherited from the Step 2C evidence. Word count and hash were recomputed, and the passage still supports RDG_Q_006."
+      },
+      {
+        "REVISION_ID": "REV-010",
+        "ORIGINAL_SEVERITY": "NOTE",
+        "ORIGINAL_OBJECT": "RDG_Q_009",
+        "CLOSURE_STATUS": "NOTE_NO_CHANGE_REQUIRED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "Retained as authored, as the register required. The blind pass independently agreed the key is unambiguous and raised no objection to distractor C. It did however suggest the item may sit closer to D3 than D4 (IR-020, NOTE) - a tier observation, not the defensibility question REV-010 addressed."
+      },
+      {
+        "REVISION_ID": "REV-011",
+        "ORIGINAL_SEVERITY": "NOTE",
+        "ORIGINAL_OBJECT": "RDG_Q_003",
+        "CLOSURE_STATUS": "NOTE_NO_CHANGE_REQUIRED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "Subskill retained as authored. The blind pass raised no subskill objection to this item. It did flag the option 'Only at weekends' as a BrE form under IR-005, which is a locale issue on the same item, not a subskill one."
+      },
+      {
+        "REVISION_ID": "REV-013",
+        "ORIGINAL_SEVERITY": "NOTE",
+        "ORIGINAL_OBJECT": "DIAG_V2_ASSESSMENT",
+        "CLOSURE_STATUS": "NOTE_NO_CHANGE_REQUIRED",
+        "ACCEPTANCE_CRITERIA_MET": true,
+        "REGRESSION_FOUND": false,
+        "REVIEWER_COMMENT": "Still an open product decision, correctly left unchanged. The blind pass reached the same conclusion independently and strengthened the argument (IR-017): English procedural instructions such as 'You will have 15 seconds to think, then 45 seconds to speak' make task comprehension part of the measurement for exactly the weakest learners in a Vietnamese 16-24 population. It judges this a decision to close before activation, not before draft persistence. I agree."
+      }
+    ]
+  },
+
+  "POST_REVISION_REGRESSION_PASS": false,
+  "regressionReviewOfChangedObjects": {
+    "changedHashes": ["LST_CLIP_02", "LST_CLIP_04", "RDG_PASSAGE_02", "RDG_PASSAGE_03", "rubrics:json", "contentDraft:json"],
+    "LST_CLIP_02": "Dependent items LST_Q_003/004/005 all reviewed. The elevators edit introduced no item defect, but the blind pass found the causal clause itself implausible - elevator servicing does not plausibly close a second-floor room when stairs exist - and judged the wording bent to support LST_Q_003's north-side distractor (IR-012, MINOR). 'student card' also survives here (IR-003).",
+    "LST_CLIP_04": "Dependent items LST_Q_009/010 reviewed. practised->practiced introduced nothing. Two rationale regressions from the Step 2C rewrites of these items' rationales: IR-014 and IR-022.",
+    "RDG_PASSAGE_02": "Dependent items RDG_Q_004..007 reviewed. The illusion-of-fluency change is sound and RDG_Q_006 is now a strong item. But 'revising' survives in RDG_Q_004's option text although the passage's 'revision' was changed to 'studying', leaving the item and its passage lexically out of step; and RDG_Q_004's D1 tier is anomalous against the D2 items beside it (IR-013).",
+    "RDG_PASSAGE_03": "Dependent items RDG_Q_008/009/010 reviewed. queue->line and organisers->organizers propagated correctly to RDG_Q_008's option and all three rationales; no regression found.",
+    "rubrics": "Both rubrics reviewed in full. REV-003 and REV-009 verified closed. Two new MINORs found in untouched parts: IR-015 (double penalisation - 'beyond the prompt' scored under both task_fulfilment and language_use; 'pace' under both intelligibility and fluency) and IR-016.",
+    "verdict": "POST_REVISION_REGRESSION_PASS=false. Three regressions were introduced by the Step 2C fixes (IR-014, IR-022, IR-002), all in rationale prose rather than in keys or options. No key, option set or count regressed."
+  },
+
+  "BLUEPRINT_CONFORMANCE_STILL_PASS": true,
+  "conformanceEvidence": {
+    "TOTAL_ITEMS": 29,
+    "Listening": 10,
+    "ListeningClips": 4,
+    "Reading": 10,
+    "ReadingPassages": 3,
+    "Speaking": 2,
+    "Writing": 2,
+    "LanguageUse": 5,
+    "countedIndependentlyOfValidator": true
+  },
+
+  "integrity": {
+    "CONTENT_DRAFT_HASH_INTEGRITY_PASS": true,
+    "VALIDATOR_CHECK_MODE_READ_ONLY_PASS": true,
+    "CONTENT_TARGET_STABLE_DURING_REVIEW": true,
+    "HASH_MISMATCH_COUNT": 0,
+    "stabilityEvidence": "All 7 artifacts were hashed before the review, mid-review, and after a session restart that interrupted the blind pass. All three snapshots are byte-identical. The manifest sha256 b60559a2af003f883d8412aa05233b5d0c380f032c02e163e2e59bf1279611e6 is unchanged across every --check run.",
+    "CONTENT_FILES_MUTATED": false,
+    "filesCreatedByThisPass": [
+      "artifacts/entry-diagnostic-v2-step2d-review.json",
+      "artifacts/entry-diagnostic-v2-step2d-review.md"
+    ]
+  },
+
+  "safety": {
+    "DB_MUTATED": false,
+    "dbAccess": "read-only SELECT only",
+    "LEGACY_ASSESSMENT_COUNT": 1,
+    "LEGACY_QUESTION_COUNT": 20,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "v2TablesVerifiedEmpty": ["DiagnosticReadingPassage", "DiagnosticListeningClip", "DiagnosticRubric", "DiagnosticWritingResponse", "DiagnosticSkillResult"],
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "PRIOR_PASS_ARTIFACTS_MUTATED": false
+  },
+
+  "DEF_003_STATUS": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+  "def003Note": "en-US voice availability in the TTS voice set remains unconfirmed; no Azure call was made. Does not block content approval; does block Step 3 audio generation. Note that IR-003 and IR-012 both require LST_CLIP_02 script edits, so audio must not be generated before those are settled or it will be paid for twice.",
+
+  "requiredToReachApproval": {
+    "mustFixBeforePersistence": [
+      {
+        "id": "IR-001",
+        "severity": "MAJOR",
+        "object": "LU_Q_002",
+        "acceptanceCriteria": [
+          "exactly one option yields an acceptable English sentence in the given frame",
+          "either 'by' is replaced by an option wrong on the same slot-selection grounds as 'on' and 'in', keeping a pure preposition-slot construct, or 'by' is retained and the stem gains context that makes the point-in-time reading the only coherent one",
+          "targetFeature describes one coherent construct consistent with why every distractor is wrong",
+          "diagnosticUse no longer claims to diagnose a confusion the item cannot distinguish from knowledge of both constructions"
+        ]
+      },
+      {
+        "id": "IR-002",
+        "severity": "MINOR",
+        "object": "LU_Q_002",
+        "note": "Bundled with IR-001 because it is the same field. The answerRationale must make no claim untrue of English; the assertion that a start event does not take a limit must go.",
+        "acceptanceCriteria": [
+          "no rationale on this item states a rule that is untrue of English",
+          "if 'by' is retained, its rationale gives the contextual rather than categorical reason it is excluded"
+        ]
+      }
+    ],
+    "reopenedRevisions": ["REV-008 (NOT_CLOSED)", "REV-001 (PARTIALLY_CLOSED)", "REV-006 (PARTIALLY_CLOSED)"],
+    "minorsSafeToCarryInDraft": 15,
+    "minorsRecommendedBeforeAudioGeneration": ["IR-003", "IR-012"],
+    "minorsRecommendedBeforeActivation": ["IR-004", "IR-005", "IR-006", "IR-007", "IR-008", "IR-009", "IR-010", "IR-011", "IR-013", "IR-014", "IR-015", "IR-016", "IR-017"],
+    "additionalFindingByThisReviewer": "RDG_Q_004's option text still reads 'revising them' although the passage's 'revision' became 'studying' under REV-001. Same family as IR-005; MINOR; fix with the locale batch."
+  },
+
+  "whatThisReviewDoesNotEstablish": [
+    "Independence from the authoring model. The blind pass was blind to the prior issue list but was not a third party.",
+    "Any psychometric property. No calibration, no item statistics, no rater agreement, no standard setting. D1-D4 remains DESIGN_HYPOTHESIS_NOT_CALIBRATED.",
+    "Rubric validity. Neither rubric has been double-marked or trialled; the full-range tests were analytic readings of the anchors, not empirical.",
+    "That the content is free of defects a human assessment specialist would find. Two consecutive passes by the author missed the LU_Q_002 ambiguity that the blind pass caught, which is direct evidence that single-reviewer passes of this kind leak."
+  ]
+}

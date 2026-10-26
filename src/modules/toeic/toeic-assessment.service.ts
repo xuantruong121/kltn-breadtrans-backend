@@ -630,6 +630,9 @@ export class ToeicAssessmentService {
           source?.publicationStatus === QuizPublicationStatus.PUBLISHED &&
           questionCount > 0,
         sourceTitle: source?.title ?? null,
+        // Learner detail renders the real size of each component, so the count
+        // is reported here instead of being hardcoded in the frontend.
+        itemCount: questionCount,
         reason: !source
           ? 'Thiếu nguồn'
           : source.publicationStatus !== QuizPublicationStatus.PUBLISHED
@@ -685,6 +688,7 @@ export class ToeicAssessmentService {
           allPublished &&
           valid,
         sourceTitle: source?.title ?? null,
+        itemCount: exercises.length,
         coverage,
         reason: !source
           ? 'Thiếu nguồn'
@@ -720,6 +724,7 @@ export class ToeicAssessmentService {
     return {
       ready: valid,
       sourceTitle: source?.title ?? null,
+      itemCount: source?.items.length ?? 0,
       reason: !source
         ? 'Thiếu Writing Set'
         : source.publicationStatus !== QuizPublicationStatus.PUBLISHED
@@ -831,6 +836,7 @@ export class ToeicAssessmentService {
             component.speakingPracticeSetId ??
             component.writingSetId,
           sourceTitle: readiness.sourceTitle ?? null,
+          itemCount: readiness.itemCount ?? null,
           readiness,
         };
       }),
@@ -1044,7 +1050,7 @@ export class ToeicAssessmentService {
     );
     if (!valid)
       throw new BadRequestException(
-        'Writing component cần đủ 8 submission/result hoàn tất theo Set #2',
+        'Writing component cần đủ 8 bài đã được chấm',
       );
     await tx.toeicAssessmentWritingSubmission.createMany({
       data: selectedSubmissions.map((submission) => ({

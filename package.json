@@ -10,6 +10,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
+    "dev:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-backend.ps1",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -147,7 +148,8 @@
     "rootDir": "src",
     "roots": [
       "<rootDir>",
-      "<rootDir>/../prisma"
+      "<rootDir>/../prisma",
+      "<rootDir>/../test/safety"
     ],
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
@@ -157,7 +159,11 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "globalSetup": "<rootDir>/../test/safety/jest-global-setup.ts",
+    "setupFiles": [
+      "<rootDir>/../test/safety/jest-setup-isolation.ts"
+    ]
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

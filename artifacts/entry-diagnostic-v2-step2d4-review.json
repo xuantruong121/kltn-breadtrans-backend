@@ -1,0 +1,204 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_V2_STEP_2D4_COLD_CONTENT_AND_CONTRACT_VERIFICATION",
+  "reviewedAt": "2026-10-25",
+  "contentVersionReviewed": 5,
+
+  "STEP2D4_REVIEW_COMPLETE": true,
+  "STEP2D4_VERDICT": "CONTENT_REVISIONS_REQUIRED",
+  "ENTRY_DIAGNOSTIC_V2_CONTENT_REVIEW_PASS": false,
+  "STEP2E_LIVE_PERSISTENCE_ALLOWED": false,
+  "gatesAreIndependent": "Gate A fails on one MAJOR content finding. Gate B fails on a BLOCKER plus three persistence defects. Fixing either authorizes nothing about the other.",
+
+  "independence": {
+    "INDEPENDENCE_MODE": "COLD_CONTEXT_PROXY",
+    "STAGE_A_FINDINGS_FROZEN_BEFORE_RECONCILIATION": true,
+    "disclosure": "The agent writing this artifact authored the content and every revision pass including Step 2C4. It is not the reviewer. Stage A was run by an agent started with no session context, barred from all sixteen prior review and evidence artifacts, and given no expected version values.",
+    "notClaimed": "Human assessment-specialist independence and psychometric validation.",
+    "coldPassTrackRecord": "Four cold passes have each found real defects the author had cleared. This one found a MAJOR of the exact class the author had just fixed on a neighbouring clip, a BLOCKER that would 500 the live diagnostic endpoint for every learner, and the fact that the author's own 24-permutation proof is a tautology."
+  },
+
+  "gateA": {
+    "verdict": "CONTENT_REVISIONS_REQUIRED",
+    "CONTENT_BLOCKER_COUNT": 0,
+    "CONTENT_MAJOR_COUNT": 1,
+    "CONTENT_PERSISTENCE_BLOCKING_MINOR_COUNT": 0,
+    "theOnlyGatingFinding": {
+      "id": "D4-001",
+      "severity": "MAJOR",
+      "objects": ["LST_Q_009", "LST_Q_010", "LST_CLIP_04"],
+      "problem": "LST_Q_010's stem - 'Why was the presentation shorter than planned?' - asserts before any audio that the presentation did not go to plan. Exactly one of LST_Q_009's four options realises that assertion: 'A technical problem spoiled their plan'. The other three (applause showed it went well / the slides were the strongest part / the audience left before it had finished) are off-dimension or contradicted by it.",
+      "whyThisIsMine": "In Step 2C3 I fixed this exact defect class on LST_CLIP_03, where a stem asserted a fact that privileged a sibling's key. In Step 2C4 I then recorded LST_Q_010_OPTIONS_DO_NOT_LEAK_Q009=true - I checked the OPTIONS direction on CLIP_04 and never asked whether the STEM does the same thing, in the very pass that had just learned the stem direction next door. By my own recorded leak definition it counts.",
+      "scope": "One item stem. Question-only edit, no script change, no TTS cost, no re-keying.",
+      "acceptanceCriteria": [
+        "LST_Q_010's stem no longer asserts that the presentation departed from plan, or LST_Q_009's option set no longer contains a single option that uniquely realises that assertion",
+        "with the script hidden and both items' stems and options visible together, no option on either item is substantially privileged",
+        "LST_CLIP_04 script stays byte-unchanged",
+        "both items keep exactly one defensible answer and their declared inference subskill"
+      ]
+    },
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 0,
+    "LISTENING_CROSS_ITEM_LEAK_COUNT": 1,
+    "CLIP_01_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_02_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_03_CROSS_ITEM_LEAK_COUNT": 0,
+    "CLIP_04_CROSS_ITEM_LEAK_COUNT": 1,
+    "clip03FixConfirmed": "The Step 2C4 fix to LST_Q_006's stem is independently confirmed closed. The leak moved nowhere; it simply existed on CLIP_04 already and was never checked.",
+    "BLUEPRINT_WEIGHTING_CONTRADICTION_COUNT": 0,
+    "BLUEPRINT_TASK_COUNT_CONSISTENCY_PASS": true,
+    "BLUEPRINT_DIFFICULTY_DISTRIBUTION_MATCHES_CONTENT": true,
+    "BLUEPRINT_UNRESOLVED_CUTOFF_PRESENTED_AS_APPROVED": false,
+    "ITEM_LEVEL_STATUS": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": "OPEN",
+    "DEF_004_BLOCKS_V2_SCORER_IMPLEMENTATION": true,
+    "otherContentFindings": {
+      "D4-002": "MINOR - LST_Q_006 distractors B and C are categorical absolutes, leaving the key as the only bounded option. Introduced by my own Step 2C4 rewrite of that stem.",
+      "D4-007": "NOTE - LST_CLIP_02 has a 'ground floor' and a 'second floor' and no first floor, a BrE/AmE hybrid in otherwise correctly American audio. A wider 50-item sweep found zero other hits.",
+      "D4-006": "NOTE - the Listening time budget (10 min declared) does not reconcile with the authored content (6.2 min, 8.7 at two plays); total 42.0 against 46 declared. Labelled DESIGN_ESTIMATE and internally consistent with the matrix, so an observation."
+    }
+  },
+
+  "gateB": {
+    "verdict": "FORBIDDEN",
+    "STEP2E_LIVE_PERSISTENCE_ALLOWED": false,
+    "PERSISTENCE_MAPPING_GUARD_PASS": false,
+    "PURE_MAPPER_TESTS_PASS": true,
+    "LIVE_IMPORT_IDEMPOTENCY_PASS": false,
+    "noImporterExists": "Verified independently: grep for consumers of mapObjectiveQuestion / mapProductiveTask across src/ and scripts/ returns only the mapper and its own spec. The thing that would do the writing does not exist, so there is nothing to authorize. My Step 2C4 flag PERSISTENCE_MAPPING_IMPLEMENTED=true was therefore over-stated: the mapping FUNCTION is implemented and tested; the importer is not written.",
+
+    "BLOCKER": {
+      "id": "D4-011",
+      "title": "isActive defaults to true and no read path filters on status, so importing V2 would switch every learner onto it and then 500 the diagnostic endpoint",
+      "verifiedByMe": true,
+      "evidence": [
+        "prisma/schema.prisma DiagnosticAssessment: isActive Boolean @default(true) and status DiagnosticAssessmentStatus @default(ACTIVE)",
+        "The schema's own comment says 'status is authoritative for learner-current'. grep for a read path filtering on status returns 0. Four read paths filter on isActive: true (diagnostic.service.ts:527, 599, 616, 706), and getCurrentAssessment orders by id desc.",
+        "So assessment.statusOnCreate='DRAFT' in the content draft has NO effect on serving, and the failure mode is OMITTING isActive, not setting it wrong."
+      ],
+      "consequence2": "Worse than mis-serving. getCurrentAssessment calls assertQuestionBank before returning. The mapper writes productive tasks as options: [] and correctIndex: -1; getQuestionMeta takes its Array.isArray branch and returns {values: [], questionType: 'MCQ'}, so each of the 4 productive rows trips both 'invalid options' (values.length < 2) and 'invalid correct index' (-1 < 0). assertQuestionBank throws InternalServerErrorException, so GET /diagnostic/current would 500 for EVERY learner in the product, not only V2 takers. Verified by reading validateQuestionBank at diagnostic.logic.ts:242-286 and getQuestionMeta at :136-166.",
+      "whatIKnewAndWhatIMissed": "My persistence contract section 7 item 9 does say 'Create the assessment as DRAFT / inactive and assert isActive = false', so the requirement was known. What is written nowhere: that isActive DEFAULTS TO TRUE, that DRAFT does nothing because no read path reads status, and consequence 2 at all - grep for validateQuestionBank or assertQuestionBank in my persistence contract returns 0.",
+      "acceptanceCriteria": [
+        "the importer sets isActive: false explicitly in the same statement that creates the row, inside the same transaction as the questions",
+        "getCurrentAssessment and getLatestResult select on status = ACTIVE rather than isActive: true + id desc, or a single-active invariant is enforced in the database",
+        "an executable test proves that inserting a DRAFT V2 assessment leaves GET /diagnostic/current serving the V1 form and not throwing",
+        "the contract states the isActive default and the validateQuestionBank consequence"
+      ]
+    },
+
+    "activationBlockers": {
+      "D4-012": {
+        "severity": "MAJOR",
+        "title": "No V2-compliant row shape can pass the live question-bank validator without persisting a CEFR level",
+        "verifiedByMe": true,
+        "evidence": "validateQuestionBank branches on meta.questionType. For OPEN_TEXT it requires meta.stableKey && meta.section && meta.construct && meta.intendedLevel, and getQuestionMeta populates intendedLevel ONLY when the raw value is one of ['A1','A2','B1','B2'] (diagnostic.logic.ts:157). For anything else it requires values.length >= 2 and 0 <= correctIndex < values.length, which no productive task can satisfy. V2 policy forbids persisting a CEFR code and both mapper functions hard-set intendedLevel: null by design. The schema's actual discriminator, the taskType column, is never read by getQuestionMeta.",
+        "acceptance": "validateQuestionBank and getQuestionMeta read the taskType/skillCode columns as the discriminator and do not require intendedLevel; a fixture of all 29 mapped V2 rows returns zero defects."
+      },
+      "D4-013": {
+        "severity": "MAJOR",
+        "title": "The mapper's options: string[] discards every field the runtime reads from the options JSON",
+        "verifiedByMe": true,
+        "evidence": "getQuestionMeta's object branch is where section, passageText, audioUrl, stableKey, construct and activeInForm live. A plain string[] takes the array branch, which returns only {values, questionType: 'MCQ'}. Consequences: sanitizeQuestion returns audioUrl only when meta.section === 'LISTENING', so no audio would be served for the 10 Listening items - and the same undefined disables validateQuestionBank's 'missing listening audio' check, so the blueprint readiness requirement is silently unenforced. sanitizeQuestion derives passage text from meta.passageText, which the mapper never sets (it sets the passageId FK, which sanitizeQuestion never reads), so no passage text would be served for the 10 Reading items. And the submit guard filtering on section === 'SPEAKING' would never fire for V2.",
+        "acceptance": "either the mapper writes options as the object form carrying the metadata the runtime reads, or getQuestionMeta/sanitizeQuestion migrate to the dedicated V2 columns and the DiagnosticListeningClip relation; a test asserts a mapped Listening row yields a non-empty audio URL and a mapped Reading row yields its passage text."
+      },
+      "D4-015": {
+        "severity": "MAJOR",
+        "title": "GAP-1 confirmed but incomplete",
+        "detail": "The reviewer confirms there is no stable authored identity on DiagnosticQuestion and that re-import idempotency is impossible with the current schema. It adds that my MAPPING_GAPS record is incomplete: passage identity and assessment identity need the same treatment, the clip cardinality problem is a distinct defect from identity, mediaDraftKey is misclassified as authoring metadata when it is a content reference needing a target, and the rubric table is already satisfied by @@unique([skill, rubricVersion]) and should be explicitly excluded.",
+        "STABLE_AUTHORED_IDENTITY_AVAILABLE": false,
+        "REIMPORT_IDEMPOTENCY_POSSIBLE_WITH_CURRENT_SCHEMA": false,
+        "GAP_1_CONFIRMED": true
+      }
+    },
+
+    "runtimeFindings": {
+      "IS_DIAGNOSTIC_ANSWER_CORRECT_FAIL_OPEN_STATUS": "CURRENT_RUNTIME_DEFECT",
+      "failOpenDetail": "I verified this and it is worse than I reported in Step 2C4. There are FIVE production call sites, not two: diagnostic.logic.ts:305 and diagnostic.service.ts:343, 823, 1048, 1096. At 1048 and 1096 perm is computed as `attemptId && !isOpen ? getAttemptQuestionPermutation(...) : undefined` - gated on an OPTIONAL client-supplied attemptId. When it is absent, isDiagnosticAnswerCorrect falls through to `return answer === question.correctIndex`, comparing a DISPLAY index against an AUTHORED index. My Step 2C4 claim that this was 'not a current bug - both live callers pass it' was wrong on both counts.",
+      "TO_RESULT_INDEX_EXPOSURE_STATUS": "BOTH_FRAMES_RETURNED_UNMARKED",
+      "toResultDetail": "toResult returns selectedOption (a display index) beside correctOption (an authored index) with no marker distinguishing them, and gates key and rationale disclosure only on status === 'COMPLETED', never reading resultState. So a PENDING_GRADING V2 attempt could disclose all 25 keys before grading completes. D4-017.",
+      "ANSWER_RATIONALE_PRE_SUBMISSION_EXPOSURE": false,
+      "ANSWER_KEY_PRE_SUBMISSION_EXPOSURE": false,
+      "confidentialityConfirmed": "sanitizeQuestion's 12-field allowlist contains neither correctIndex nor explanation. Independently confirmed.",
+      "OPTION_RATIONALE_IDENTITY_STABLE_UNDER_SHUFFLE": "true for the mapper's own helper, NOT PROVEN for the runtime grader",
+      "permutationProofCriticism": {
+        "id": "D4-016",
+        "accepted": true,
+        "detail": "My 24-permutation grading test asserts perm[displayed] === correctIndex, which is a tautology about the permutation array - it never calls isDiagnosticAnswerCorrect. The rationale test exercises rationaleForDisplayedOption, which has no production caller. So ANSWER_KEY_STABLE_UNDER_SHUFFLE=true was proved about my own helper functions, not about the runtime. The actual runtime grader has 2-permutation coverage. This is the same failure mode I claimed to have structurally fixed: a narrow check reported under a broad flag name.",
+        "acceptance": "a test drives isDiagnosticAnswerCorrect, and ideally the sanitizeQuestion -> submit round trip, across all 24 permutations with the authored key, including the {originalIndex} answer shape with a permutation supplied; the tautological test is deleted or renamed."
+      },
+      "D4-018": "MINOR - rationaleForDisplayedOption decides isCorrect by text equality while its own module comment promises identity is never resolved by text. Mine."
+    },
+
+    "guardScopeFindings": {
+      "PROVENANCE_GUARD_NEGATIVE_FIXTURES_PASS": true,
+      "CEFR_BLUEPRINT_SEMANTIC_GUARD_PASS": true,
+      "NO_DB_IDS_NEGATIVE_FIXTURES_PASS": true,
+      "BLUEPRINT_CONFORMANCE_NEGATIVE_FIXTURES_PASS": false,
+      "D4-010": "MINOR, fixture-proved on four mutations: blueprint SKILL WEIGHTS and MATRIX TASK COUNTS are not guarded at all. blueprint.matrix and blueprint.scoring are never read by the validator. The version and the tier distribution are guarded; the weights and task counts are not. This is exactly the question I asked the reviewer to settle and the answer is the unfavourable one.",
+      "D4-008": "MINOR - the CEFR guard does not cover an active level stated in prose in a non-level-keyed field, nor bare codes in the generic keys note/status/problem, which my CEFR_HISTORICAL_KEYS allowlist exempts by leaf name rather than by path. Fixture-proved. No effect on today's package (0 CEFR tokens).",
+      "D4-009": "MINOR - NO_DB_IDS is numeric-and-camelCase only; string ids, snake_case, plural arrays and 'pk' pass. Low risk: all diagnostic models use Int @id."
+    },
+
+    "otherPersistenceFindings": {
+      "D4-003": "MINOR - scoring.minimumEvidence.objectiveSkill ('at least 3 scored items') is incompatible with perSkillFormulas' fixed /10 denominators.",
+      "D4-004": "MINOR - a four-band result model is still asserted at two sites DEF-004 never reached: blueprint.difficultyScale.notResultBands and prisma schema DiagnosticSkillResult.band.",
+      "D4-005": "MINOR - blueprint.matrix[].taskType values (MCQ_AFTER_AUDIO, MCQ_ON_PASSAGE, PRODUCTIVE_SPEAKING_RECORDING, PRODUCTIVE_WRITING_TEXT) match no member of enum DiagnosticTaskType { MCQ OPEN_TEXT SPEAKING_RESPONSE WRITING_RESPONSE }.",
+      "D4-019": "NOTE - scoring.pendingSkillRule conditions on withholding a 'placement band', a concept levelSystem now declares UNRESOLVED_DO_NOT_IMPLEMENT.",
+      "D4-020": "NOTE - my Step 2D3 artifact reported 36 unique draft keys; the reviewer counts 37 (1 assessment + 4 clips + 3 passages + 25 objective + 4 productive). Most likely DIAG_V2_ASSESSMENT was excluded. The validator prints only a boolean with no count, so nothing checks the tally. A reporting discrepancy of mine, not a content defect.",
+      "D4-021": "NOTE - the schema contains two near-homonym clip models: DiagnosticListeningClip (keyed to DiagnosticQuestion, the V2 target) and ListeningDiagnosticClip (keyed to the generic Question table). Easy to confuse during import; the contract should name the intended model."
+    }
+  },
+
+  "integrity": {
+    "TOTAL_ITEMS": 29,
+    "OBJECTIVE_ITEMS": 25,
+    "objectiveKeysValid": "25/25",
+    "HASH_MISMATCH_COUNT": 0,
+    "CONTENT_TARGET_STABLE_DURING_REVIEW": true,
+    "CONTENT_FILES_MUTATED": false,
+    "stabilityEvidence": "Seven files hashed before and after - the four artifacts plus the validator, the guard module and the mapper. All byte-identical. The code was hashed too because a guard audit is worthless if the guard can be edited underneath it.",
+    "actualVersions": {
+      "contentDraft": { "blueprintVersion": "V2_2026_01", "scoringVersion": "FOUR_SKILL_PLACEMENT_V2", "contentVersion": 5 },
+      "agreement": "the three files agree on every dimension they share"
+    },
+    "V2_SCORER_FAILS_CLOSED": true
+  },
+
+  "safety": {
+    "DB_MUTATED": false,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "legacyRows": "1 assessment / 20 questions / 1 active; V2 passages, clips and rubrics all 0",
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0,
+    "filesCreatedByThisPass": [
+      "artifacts/entry-diagnostic-v2-step2d4-review.json",
+      "artifacts/entry-diagnostic-v2-step2d4-review.md"
+    ],
+    "noOtherFileModified": true
+  },
+
+  "step2d3Reconciliation": {
+    "authorClaimed": "14 fixed, 2 contract-documented, 1 note retained, 2 open by design",
+    "reviewerVerdict": "Substantially upheld for the content and blueprint findings. The two dispositions the reviewer rejects are mine and both are flag over-claims rather than unmade edits: CLIP_04_CROSS_ITEM_LEAK_COUNT=0 (actually 1, D4-001) and the permutation proof behind ANSWER_KEY_STABLE_UNDER_SHUFFLE (a tautology, D4-016). PERSISTENCE_MAPPING_IMPLEMENTED=true is also over-stated given no importer exists."
+  },
+
+  "defectsByResolvingPhase": {
+    "beforeContentApproval": ["D4-001"],
+    "beforeLivePersistence": ["D4-011 (BLOCKER)", "D4-015 / GAP-1", "an importer must exist at all"],
+    "beforeV2Activation": ["D4-012", "D4-013", "D4-014 fail-open grading", "D4-017 result disclosure gating"],
+    "beforeV2Scorer": ["DEF-004 / D4-004", "D4-003", "D4-019"],
+    "validatorHardening": ["D4-010", "D4-008", "D4-009"],
+    "safeToCarry": ["D4-002", "D4-005", "D4-006", "D4-007", "D4-016", "D4-018", "D4-020", "D4-021"]
+  },
+
+  "whatThisGateDoesNotEstablish": [
+    "Human or psychometric independence.",
+    "That the content defect list is complete. Four cold passes have each found defects the author cleared.",
+    "Any psychometric property. D1-D4 remains uncalibrated and the equal weighting is a declared design hypothesis.",
+    "Rubric validity. Six anchor edits across five passes, never trialled against a real response.",
+    "That the V2 runtime works at all. D4-012 and D4-013 together mean no mapped V2 row currently passes the live question-bank validator, no audio would be served for Listening and no passage text for Reading. The content is nearly ready; the runtime that would deliver it is not."
+  ],
+
+  "nextStep": "Fix D4-001 (one question-only stem edit) for Gate A. Gate B needs D4-011, GAP-1 and an actual importer, and V2 activation additionally needs D4-012 and D4-013, which are runtime changes well beyond a content pass."
+}

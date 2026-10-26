@@ -1,0 +1,227 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_STEP_2C5_FINAL_CONTENT_FIX_AND_RUNTIME_FOUNDATION",
+  "appliedAt": "2026-10-25",
+  "projectStage": "LOCAL_DEVELOPMENT",
+  "realProductionUsers": 0,
+  "productTarget": "ONE_COMPLETE_FOUR_SKILL_ENTRY_DIAGNOSTIC",
+  "contentVersionBefore": 5,
+  "contentVersionAfter": 6,
+  "ENTRY_DIAGNOSTIC_STEP2C5_COMPLETE": true,
+  "ENTRY_DIAGNOSTIC_CONTENT_REVIEW_STATUS": "REQUIRES_TARGETED_COLD_VERIFICATION",
+  "selfApproval": "withheld. I authored the content and every revision pass.",
+  "historicalArtifactsMutated": false,
+
+  "partA_contentFix": {
+    "finding": "D4-001",
+    "D4_001_CLOSED": true,
+    "object": "LST_Q_010",
+    "changeType": "QUESTION_STEM_ONLY",
+    "scriptChanged": false,
+    "before": "Why was the presentation shorter than planned?",
+    "after": "What reason does the speaker give for how long the presentation ran?",
+    "mechanismOfTheLeak": "The old stem ASSERTED, before any audio, that the presentation departed from plan. LST_Q_009's key is 'A technical problem spoiled their plan' - the same proposition, down to the shared word 'plan'. One of Q009's four options therefore became the obvious answer with the clip hidden.",
+    "whyStemOnly": "The assertion lived in the stem. Options, key, key index, distractor rationales, subskill (inference) and tier (D4) are all unchanged, and LST_CLIP_04's script is byte-identical, so no TTS cost is incurred.",
+    "answerRationaleUpdated": "It referenced the same presupposition ('shorter duration') and now reads 'the length the speaker reports'.",
+    "assertedGuards": "The new stem is asserted free of the tokens plan, shorter, short, problem and technical.",
+    "perClipReview": {
+      "method": "All stems and options of each clip read together with the scripts hidden, then against the script. Semantic reasoning, not word-overlap.",
+      "CLIP_01_CROSS_ITEM_LEAK_COUNT": 0,
+      "CLIP_02_CROSS_ITEM_LEAK_COUNT": 0,
+      "CLIP_03_CROSS_ITEM_LEAK_COUNT": 0,
+      "CLIP_04_CROSS_ITEM_LEAK_COUNT": 0,
+      "CLIP_04_reasoning": "The stem now asserts only that the speaker commented on duration. A learner holding that fact has no basis to prefer 'A technical problem spoiled their plan' over the applause, slides or audience options. In the other direction, none of Q009's options mentions duration or cutting, so Q010's key is not cued either. Both items still require the audio: Q009 needs the deflection, the projector failure and the memory fallback combined; Q010 needs 'I cut the part I was least sure about'.",
+      "residualRecorded": "LST_Q_010 option 1 still reads 'They were given less time than planned'. It retains the word 'planned', but it is an OPTION - one hypothesis among four - not an assertion, and if it were true it would COMPETE with Q009's key (an externally shortened slot is not a technical problem). Left unchanged under the stem-only preference and recorded here rather than hidden."
+    },
+    "LISTENING_AUDIO_REQUIRED_ITEM_COUNT": 10,
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 0,
+    "LISTENING_CROSS_ITEM_LEAK_COUNT": 0,
+    "contentIntegrity": {
+      "TOTAL_ITEMS": 29,
+      "LISTENING": 10,
+      "READING": 10,
+      "SPEAKING": 2,
+      "WRITING": 2,
+      "LANGUAGE_USE": 5,
+      "OBJECTIVE_ITEMS": 25,
+      "OBJECTIVE_KEY_STRUCTURE_PASS": true,
+      "DRAFT_KEY_UNIQUENESS_PASS": true,
+      "UNRESOLVED_DRAFT_REFERENCES": 0,
+      "BLUEPRINT_CONFORMANCE_PASS": true,
+      "BLUEPRINT_TIER_DISTRIBUTION_CONFORMANCE_PASS": true,
+      "CEFR_CANONICAL_CONTENT_GUARD_PASS": true,
+      "CEFR_BLUEPRINT_SEMANTIC_GUARD_PASS": true,
+      "CANONICAL_PROVENANCE_GUARD_PASS": true,
+      "BLUEPRINT_VERSION_CONSISTENCY_GUARD_PASS": true,
+      "NO_DB_IDS_GUARD_PASS": true,
+      "CONTENT_HASH_CHECK_PASS": true,
+      "VALIDATOR_CHECK_MODE_READ_ONLY_PASS": true,
+      "HASH_MANIFEST_REGENERATED_ONCE": true,
+      "HASH_MISMATCH_COUNT": 0,
+      "MECHANICAL_VALIDATION_PASS": true
+    }
+  },
+
+  "partB_architectureAudit": {
+    "CURRENT_DIAGNOSTIC_ARCHITECTURE_AUDITED": true,
+    "CURRENT_REUSABLE_MODULES_IDENTIFIED": true,
+    "headline": "Substantially more is implemented than the Step 2D4 review implied. The productive-skill runtime is not missing; it is built and tested. The gap is content persistence plus four contracts, not construction from scratch.",
+    "models": {
+      "present": ["DiagnosticAssessment", "DiagnosticQuestion", "DiagnosticAttempt", "DiagnosticSpeakingResponse", "DiagnosticWritingResponse", "DiagnosticSkillResult", "DiagnosticReadingPassage", "DiagnosticListeningClip", "DiagnosticRubric"],
+      "absent": "There is no DiagnosticAnswer model. Objective answers live in DiagnosticAttempt.answers (Json), keyed by question id.",
+      "attemptReadiness": "DiagnosticAttempt already carries resultState, overallScore (documented to stay null and never 0 while any skill is incomplete), and version pinning via scoringVersion / blueprintVersion / contentVersion."
+    },
+    "capabilityMatrix": [
+      { "capability": "objective delivery and scoring", "status": "IMPLEMENTED_AND_VERIFIED", "evidence": "sanitizeQuestion, isDiagnosticAnswerCorrect, submitAssessment; 162 diagnostic tests pass" },
+      { "capability": "per-attempt option permutation", "status": "IMPLEMENTED_BUT_INCOMPLETE", "evidence": "deterministic getAttemptQuestionPermutation; fail-open fallback at 2 of 5 call sites" },
+      { "capability": "Speaking recording lifecycle", "status": "IMPLEMENTED_AND_VERIFIED", "evidence": "DiagnosticSpeakingService.confirmRecording/skip/list/audio, ownership-scoped; controller routes exist" },
+      { "capability": "Speaking audio normalisation", "status": "IMPLEMENTED_AND_VERIFIED", "evidence": "DiagnosticSpeakingAudioNormalizer, webm/opus -> 16k mono wav, own spec" },
+      { "capability": "Writing grading lifecycle", "status": "IMPLEMENTED_AND_VERIFIED", "evidence": "DiagnosticWritingService.enqueueMany/retry, async, retry route exists" },
+      { "capability": "four-skill result assembly", "status": "IMPLEMENTED_BUT_INCOMPLETE", "evidence": "DiagnosticSkillResult exists; not wired to V2 content" },
+      { "capability": "assessment lifecycle", "status": "IMPLEMENTED_BUT_INCOMPLETE", "evidence": "D4-011" },
+      { "capability": "question-bank validation", "status": "IMPLEMENTED_BUT_INCOMPLETE", "evidence": "D4-012" },
+      { "capability": "audio and passage delivery", "status": "IMPLEMENTED_BUT_UNUSED", "evidence": "see correctedAssumption" },
+      { "capability": "V2 content in the database", "status": "NOT_IMPLEMENTED", "evidence": "0 rows in all five V2 tables (read-only query)" },
+      { "capability": "frontend learner flow", "status": "IMPLEMENTED_BUT_INCOMPLETE", "evidence": "diagnostic/page.tsx is 1128 lines with getUserMedia, MediaRecorder, audioUrl, passageBody, textarea and 20 timer references; diagnosticSpeakingRecorderLogic.ts has its own tests" }
+    ],
+    "reusableFromOtherModules": "R2 object storage, BullMQ/Redis background jobs, the Gemini grading client and the Azure Speech path are already in use by the standalone Speaking module and are called by the diagnostic Speaking/Writing services. Do not build duplicates.",
+    "oneCanonicalFlow": "There is no V1-vs-V2 learner UI split to remove. /diagnostic is already the single learner route and getCurrentAssessment serves whichever assessment is current. V1 is DATA, not a parallel flow, so the canonical experience is reached by replacing content and fixing four contracts - not by deleting code."
+  },
+
+  "correctedAssumption": {
+    "what": "I expected V1 to store the rich options object that getQuestionMeta reads. It does not.",
+    "evidence": "Read-only query on DiagnosticQuestion returns a plain array: [\"At noon\", \"At the train station\", \"Near the main entrance\", \"At the café\"]. A jsonb_object_keys call on it errors with 'cannot call jsonb_object_keys on an array'.",
+    "consequence": "getQuestionMeta's object branch - which carries section, passageText, audioUrl, stableKey, construct and questionType - is fully implemented but nothing currently writes that shape. So V1 has no audio or passage delivery either, which matches the handoff's note that V1 has no genuine Listening audio.",
+    "whyItMatters": "It makes D4-013 a defect in MY Step 2C4 mapper rather than in the runtime. The mapper writes options as string[], which reproduces V1's limitation exactly. The minimal correct fix is for the importer to write the OBJECT form, which needs no schema change and no runtime change because sanitizeQuestion already derives audioUrl for LISTENING and passage text for READING from that metadata."
+  },
+
+  "designs": {
+    "D4_011_LIFECYCLE_FIX_DESIGNED": true,
+    "D4_011": {
+      "verified": "isActive Boolean @default(true) and status @default(ACTIVE). grep for a read path filtering on status returns 0; four read paths filter on isActive: true (diagnostic.service.ts:527, 599, 616, 706) and getCurrentAssessment orders by id desc. The schema comment calling status authoritative is not implemented, so statusOnCreate DRAFT has no effect on serving and OMITTING isActive is the failure mode.",
+      "secondConsequence": "getCurrentAssessment calls assertQuestionBank before returning, so an assessment that fails validation makes GET /diagnostic/current throw for every learner, not only V2 takers.",
+      "design": [
+        "the importer sets isActive:false AND status:DRAFT explicitly in the same statement that creates the row, in the same transaction as its questions - never relying on defaults",
+        "read paths select on status = ACTIVE as the authority, keeping isActive in sync during the transition rather than dropping it",
+        "activation becomes a separate explicit operation gated on a readiness check",
+        "a validation failure on a non-current assessment must never break the current one: scope assertQuestionBank to the assessment being served and fail closed to the previous ACTIVE row"
+      ],
+      "constraint": "Use the existing DiagnosticAssessmentStatus enum. No new state invented."
+    },
+    "D4_012_TASK_TYPE_VALIDATION_FIX_DESIGNED": true,
+    "D4_012": {
+      "verified": "validateQuestionBank branches on meta.questionType. OPEN_TEXT requires stableKey && section && construct && intendedLevel, and getQuestionMeta populates intendedLevel ONLY for ['A1','A2','B1','B2'] (diagnostic.logic.ts:157). Everything else requires values.length >= 2 and correctIndex in range. So a productive task can only validate by persisting a CEFR code, which V2 forbids and the mapper correctly refuses.",
+      "design": "One task-type-aware validator, not a V1/V2 pair. The discriminator is the taskType COLUMN - never correctIndex, never option count. MCQ requires 4 unique options, exactly one key in range and resolving references; LISTENING additionally requires a clip reference and the audio delivery contract; READING a passage reference; SPEAKING_RESPONSE a prompt, prep/response seconds and a resolving rubricVersion; WRITING_RESPONSE a prompt, word bounds and a resolving rubricVersion. The intendedLevel requirement is dropped outright - it is a CEFR field this product does not claim.",
+      "forbidden": "No fake options, no correctIndex -1 standing in for an MCQ, no fake key, no CEFR code to satisfy an obsolete validator."
+    },
+    "D4_013_MEDIA_DELIVERY_FIX_DESIGNED": true,
+    "D4_013": {
+      "design": "The importer writes the OBJECT form into options, carrying values, questionType, section, passageText, audioUrl, stableKey and construct. No schema change, no runtime change; it reuses the delivery code that already exists.",
+      "rejectedAlternative": "Migrating sanitizeQuestion to the dedicated V2 columns and the DiagnosticListeningClip relation. Correct long-term but a larger change than the goal requires now.",
+      "confidentialityUnchanged": "sanitizeQuestion returns a 12-field allowlist containing neither correctIndex nor explanation, and the clip script is not in the returned shape at all. That must stay true."
+    },
+    "GAP_1_IDEMPOTENT_IMPORT_FIX_DESIGNED": true,
+    "GAP_1_RESOLVED_IN_DATABASE": false,
+    "GAP_1": {
+      "partialAnswerFound": "The options object carries stableKey, which getQuestionMeta already reads and validateQuestionBank already requires for OPEN_TEXT. Writing draftKey there costs nothing and needs no migration - but a value inside a Json column cannot carry a database unique constraint, so it gives app-level identity, not a guarantee.",
+      "minimalAdditiveMigration": [
+        "DiagnosticQuestion       sourceKey String?  @@unique([assessmentId, sourceKey])",
+        "DiagnosticReadingPassage sourceKey String?  @@unique([assessmentId, sourceKey])",
+        "DiagnosticListeningClip  sourceKey String?  @@unique(...)",
+        "DiagnosticAssessment     sourceKey String?  @unique",
+        "DiagnosticRubric         already satisfied by @@unique([skill, rubricVersion])"
+      ],
+      "note": "All nullable, all additive, V1 rows stay valid. A stable question key alone is insufficient - passages and clips duplicate on re-run without their own. Import must be one transaction: passages and clips, then rubrics, then questions, then the assessment in its final DRAFT state. A failure must leave nothing active.",
+      "notAppliedHere": "Schema migration and canonical persistence belong to a later authorised phase."
+    },
+    "OBJECTIVE_PERMUTATION_FIX_DESIGNED": true,
+    "OBJECTIVE_PERMUTATION": {
+      "verifiedFailureMode": "Five production call sites, not two: diagnostic.logic.ts:305 and diagnostic.service.ts:343, 823, 1048, 1096. At :1048 and :1096 perm is `attemptId && !isOpen ? getAttemptQuestionPermutation(...) : undefined`, gated on an OPTIONAL client-supplied attemptId. When absent the function falls through to `answer === question.correctIndex`, comparing a DISPLAY index against an AUTHORED index. It fails open and mis-grades silently.",
+      "classification": "CURRENT_RUNTIME_DEFECT",
+      "fixPlan": [
+        "resolve the permutation from authoritative server-side attempt state, looked up by the attempt the submission belongs to, never from a client parameter",
+        "for an MCQ with more than one option a missing or invalid permutation becomes an error, not a fallback; return a discriminated cannot-grade rather than a boolean",
+        "tests must invoke isDiagnosticAnswerCorrect itself across all 24 permutations plus correct, incorrect, missing permutation, invalid permutation, missing attempt, wrong owner and duplicate submission",
+        "toResult returns selectedOption (display) beside correctOption (authored) with no marker; return both in one frame or drop the index fields for the text fields"
+      ],
+      "selfCriticism": "My Step 2C4 permutation suite asserts perm[displayed] === correctIndex, which is a tautology about the array and never calls the grader. It must be replaced, not extended."
+    },
+    "SPEAKING_GRADING_ARCHITECTURE_IDENTIFIED": true,
+    "WRITING_GRADING_ARCHITECTURE_IDENTIFIED": true,
+    "productiveGrading": "DiagnosticSpeakingService handles confirmRecording, skip, list and ownership-scoped audio retrieval, with DiagnosticSpeakingAudioNormalizer converting webm/opus to 16k mono wav. DiagnosticWritingService handles enqueueMany and retry asynchronously. Both call the existing R2, BullMQ and Gemini infrastructure. Controller routes exist for speaking confirm/skip/list/audio and writing retry. This is reusable as-is; the work is wiring it to V2 content and to DiagnosticSkillResult."
+  },
+
+  "FOUR_SKILL_END_TO_END_IMPLEMENTATION_PLAN_READY": true,
+  "planArtifact": "artifacts/entry-diagnostic-v2-runtime-foundation-plan.md",
+  "phaseSummary": {
+    "A": "content approval - content work done this phase; cold verification pending",
+    "B": "persistence foundation - the ONLY phase that writes to the database; HIGH risk; rehearse on kltn-postgres-shadow first",
+    "C": "canonical runtime - D4-011 + D4-012; no DB risk",
+    "D": "delivery - mostly verification, since the path already exists",
+    "E": "Listening audio - confirm the voice BEFORE paid generation",
+    "F": "scoring - permutation fix with real grader tests; four-skill assembly; blocked on DEF-004 for bands",
+    "G": "frontend - largely verification of the existing 1128-line page",
+    "H": "E2E and controlled activation",
+    "parallel": "D and E; G component work once D's DTO is fixed",
+    "sequential": "A -> B -> C -> (D,E,F) -> G -> H"
+  },
+
+  "openBlockers": {
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": "OPEN",
+    "DEF_004_BLOCKS_FINAL_SCORER_IMPLEMENTATION": true,
+    "DEF_004_detail": "Documentation names four bands, the implementation emits three, and the cutoffs also disagree - blueprint Intermediate 65-79 against resolveEstimatedLevel >= 75. Do not invent a fourth threshold and do not claim CEFR equivalence.",
+    "DEF_003_TTS_VOICE": "OPEN - blocks Phase E",
+    "LST_CLIP_03_VOICE_CASTING": "OPEN - the script names a person and uses no pronoun, so casting must be an explicit decision, not an inference",
+    "LST_CLIP_04_VOICE_CASTING": "OPEN - two distinct voices declared, not cast",
+    "GAP_1": "OPEN - blocks the Phase B importer",
+    "IR_017_INSTRUCTION_LANGUAGE": "OPEN - blocks activation only"
+  },
+
+  "testing": {
+    "BACKEND_TYPECHECK_PASS": true,
+    "DIAGNOSTIC_TESTS_PASS": "162/162 across 8 suites",
+    "CI_LINT_CHECK_PASS": true,
+    "GIT_DIFF_CHECK_PASS": true,
+    "FULL_SUITE_PASS": "NOT_CLAIMED",
+    "fullSuiteNote": "Not re-run in this phase. The last full run was 1267/1268 with a parallel-only failure in src/modules/speaking/speaking-post-processing.service.spec.ts, which passes 8/8 in isolation. Unrelated to the diagnostic change set and deliberately not touched.",
+    "TARGETED_TESTS_PASS": true
+  },
+
+  "worktreeSafety": {
+    "inspectedBeforeEditing": true,
+    "gitStatusAtStart": "only the two untracked Step 2D4 artifacts were present",
+    "filesModifiedThisPhase": [
+      "artifacts/entry-diagnostic-v2-content-draft.json (LST_Q_010 stem + its answerRationale, contentVersion 5->6)",
+      "artifacts/entry-diagnostic-v2-content-draft.sha256 (regenerated once)",
+      "artifacts/entry-diagnostic-v2-step2c5-revisions.json (new)",
+      "artifacts/entry-diagnostic-v2-runtime-foundation-plan.md (new)"
+    ],
+    "noUnrelatedModuleTouched": true,
+    "noBulkFormatting": true,
+    "frontendFilesChanged": 0
+  },
+
+  "safety": {
+    "DB_MUTATED": false,
+    "DATABASE_RESET": false,
+    "DATABASE_RESTORED": false,
+    "DATABASE_TABLES_DROPPED": 0,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "dbAccessThisPhase": "read-only SELECT only: one query on DiagnosticQuestion.options to determine the stored shape, and the V2 table row counts. No writes, no QA rows, no cleanup.",
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0,
+    "STEP2E_LIVE_PERSISTENCE_ALLOWED": false
+  },
+
+  "whatThisPhaseDoesNotEstablish": [
+    "Content approval. The flag is REQUIRES_TARGETED_COLD_VERIFICATION and is deliberately not set true. I made the change and cannot clear it.",
+    "That the four per-clip leak counts are right. They are my semantic judgement on content I just edited, and a cold pass has overturned exactly this count twice.",
+    "That any designed fix works. D4-011, D4-012, D4-013, GAP-1 and the permutation fix are designs and dependency analyses, not implementations.",
+    "That live persistence is safe. STEP2E_LIVE_PERSISTENCE_ALLOWED stays false; GAP-1 is unresolved and no importer exists.",
+    "Any psychometric property. D1-D4 remains uncalibrated and the equal weighting is a declared design hypothesis."
+  ],
+
+  "nextStep": "Targeted cold verification of the LST_Q_010 change and CLIP_04 regression, then Phase B - which must be separately authorised because it is the only phase that writes to the database."
+}

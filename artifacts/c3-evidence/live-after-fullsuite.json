@@ -1,0 +1,1441 @@
+{
+  "takenAt": "2026-10-26T04:26:54.479Z",
+  "identity": {
+    "db": "kltn_db",
+    "version": "15.19",
+    "sysid": "7674533776495505443",
+    "readOnlySession": "on"
+  },
+  "migrations": [
+    {
+      "migration_name": "20260906000000_canonical_baseline",
+      "checksum": "81b86d3e629b901867e7e200630d6b607473e98f056ddedbdc5458bd0cb43be1",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260908043214_self_paced_class_teacher_optional",
+      "checksum": "48a15fb1d6e5692dc8983c25674dfa24b0d03fb4a8d6b1e734680242a4e58ef9",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260908090000_clean_break_self_paced",
+      "checksum": "f8ca24af57c6ef488c87078e513c6fc46985791b5d030a69c62599817c884b52",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260908101929_add_google_auth_account",
+      "checksum": "b14631519bec6f5d8ceadb1915462b9d7d73734fc60df14ab09095a223151f91",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260909015835_learning_history_diagnostic_content_attempts",
+      "checksum": "001fb1dc13ed148b48bae832d56f478551feeee3d6ac6bfcb9821d6f9ea3ef31",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260909030546_add_support_chat_persistence",
+      "checksum": "5b77c0828e84edc3ebb84e623e51291876198335368dc626df25caa35118a542",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260909040226_add_notification_inbox_and_vocab_reminded",
+      "checksum": "0764824e19aac6f18df0c07de176dc93fd68624d46c56bb6d6555c9a00107399",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260909060000_upgrade_speaking_submission_durable",
+      "checksum": "19e36d92da3e41bc44db9a342d1e0e0e5373b08bec3460e1f1f34bfdc392ab33",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260909140000_remove_legacy_self_paced_fields",
+      "checksum": "7715a633fdbe68a07fbf13568860d7ed0cd3fa8fd76ae61e7aa194e1bc791eab",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260909153000_upgrade_market_product_catalog",
+      "checksum": "56335e946719ad0b0850a440a4022b3b89a414bbb02b90c9dda9d96eb040ab21",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260909170000_add_vocab_collocations",
+      "checksum": "37f4fde12e0b4b9fabcf0df993f8bc83413a5abb93e85549d216ecaf950a7123",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260909200000_dictionary_saved_words_reconciliation",
+      "checksum": "719d3e3182173778d51759f048b92fb1f5823ea6cde06bf09539e1852f2cde1c",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260914100000_add_toeic_four_skill_enum_value",
+      "checksum": "3c52e69fdc2cd1950a7da71186e55e46e4f88bee2a1fb5a7b5ef10ff00a03bb0",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260914100500_add_toeic_attempt_lifecycle",
+      "checksum": "415be7c9791e0da0d4e77baea36cb75a9d7cf689731a2e4acc957a48bea6e6ea",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260915050000_economy_remediation",
+      "checksum": "77f0b1ce2afebfaf222a3a1ea5d9df715b42227d483b00b0364e589812a94c46",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260915130000_economy_reward_fulfillment",
+      "checksum": "760607be585897e8bc4c07e93706a71f6062bd498162501cf493b8b3e6ee17c7",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260916120000_add_issue_reports",
+      "checksum": "f8385c491362cc67dfd9227eabcb3697c2f5d4078efa1d60a354c7f3851e1afb",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260918120000_listening_practice_attempts",
+      "checksum": "40468aa11147e3f99ce73773ac3b17a4d1397fd214cf5f02cf90aea051a2adb9",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260918123000_listening_attempt_active_guard",
+      "checksum": "b99684b52755d928e856231dc68fb829a055f563e24ceee8f490e9cdf8f2e5cc",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260918150000_listening_phase2_assets",
+      "checksum": "7b71a7dcf734789a6eb6937c8bcbf32252c4162257bf807d41c71e6aa8b9014a",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260921120000_add_listening_audio_artifacts",
+      "checksum": "e24d309cee95b15b95e126232ab4145c71dcd7d888370c883cd1c4e4b622c2bd",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260921133000_add_listening_reveal_and_usage",
+      "checksum": "bb1d9a64c45d2ffffe70b4839897f392a5fb9c2b8151978562d4ae70829019ff",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260922080000_add_speaking_submission_worker_id",
+      "checksum": "5d85ec041d38623d3aac54137cc9f06dbc278638b4663467ae332b6e50f87488",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260930120000_add_speaking_upload_intent",
+      "checksum": "be5cf8b1672d225db7e2d252de73ae31c9954f6ad3892fd3efd092acbd8e4fbc",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260930150000_harden_speaking_upload_intent_finalization",
+      "checksum": "c2fded8d2a425f84c90e4629fcfa59f62d879479609c2c4ab2da47bac78db6bc",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260930170000_speaking_score_fast_path",
+      "checksum": "ee7725a933ca64bccc11ccf35aaf6df5507184f474ee202aa3e080f05b49f8f3",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261001090000_speaking_post_processing_leases_and_idempotency",
+      "checksum": "0ed8025f6b431e3d81bd331df2ab78649b4c9b651d8793a57ceee0015d9d3ccd",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261001210000_add_reading_submission_idempotency",
+      "checksum": "91cca320119b56c84ffae8c0a9e534d5afc23e18684c3cef65d6566be4d288d0",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261005180000_add_subscription_plan_foundation",
+      "checksum": "a5b63ea4993e1ba5f1e3a3a7a51511bd8994bb1959d652bc62f503aec3d54455",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261005200000_harden_plan_catalog",
+      "checksum": "07051fb4722b581117c75dfd8ccd8e64abdae6510dd497cea05b96145d96ffac",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261005210000_add_plan_purchase_manual_payment",
+      "checksum": "eaab9050490d53b85e73489cd66a49ecf0510966c36442b172837388371607d5",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261006100000_harden_plan_purchase_row_constraints",
+      "checksum": "91e782a48f9c4181aa6d845de14c073284f12004316d345600f7075406f1ee95",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261006101500_add_open_plan_purchase_guard",
+      "checksum": "3c8692953b70a1d7e2706ce689fcba6c550450eee396503ea744fd57500d97a8",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261006120000_add_reading_listening_premium_content",
+      "checksum": "cb5c695eccdb08575d601be13444dfac44e921fbf6865a98be8f44de4282d931",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261006150000_add_speaking_writing_premium_content",
+      "checksum": "96b7e34c3cb27df80b0ebb16558dac23e931826b5fdc32f75511f1d7ddd809fb",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261007100000_add_plan_payment_bank_reconciliation",
+      "checksum": "f2bdfe1e8b6b019d219f420e07adcb8bd399a4cfa9daaad00cac3d71e32a0939",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261007130000_plan_payment_intent_lifecycle",
+      "checksum": "d8fb1d91741467808117431662031b8e2c17fd3e8a1e5e0d242afd54d1c8eec9",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261007150000_add_ai_generation_governance",
+      "checksum": "794ae127d36b113508c9d9fee5ac34305c34ae2fb46ae64d745c39047626a409",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261007153000_add_ai_publishing_state",
+      "checksum": "8b506c8449e321af514802c74320c8d66b7912a7499023de84454d16bea1bfd1",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261009120000_add_durable_course_curriculum",
+      "checksum": "2f6a9bcc8ef9dca29010d1417badb9a49598d87a6b48fc2278f345bae25881ab",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261009140000_add_payos_payment_intents",
+      "checksum": "4f60a94b58c93d92348dcac9d7d8aeca06e360acb0dc8fbd2a117ab560b2278c",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261009170000_add_payos_bank_details",
+      "checksum": "6c81db4064b65f1d25bcd9fd7916ef86cc98499fbbecc3cc7d24021ac8f7afe6",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261009190000_publish_pro_course_library",
+      "checksum": "18bda5c7df5295fa02155970edd347b57c6cd380e48bd40d434696c44a1f860e",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261009190100_seed_pro_course_library",
+      "checksum": "b97e6721b2664b34aa3e0c80a8e1e58451001446e890bf0d4744a111d28fda22",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261009191000_add_course_activity_engine_targets",
+      "checksum": "14e101980d938e923a33f5ca113921d5b76ef84d6da60c0f8a3d2d05f07873a3",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261009192000_add_pro_plus_entitlements",
+      "checksum": "8dbaadd9cfa0d60c624a393d1ce9a0ae4890a23f3807c9bbe9a60778e24df433",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261010120000_add_shipping_profile_and_physical_redemption",
+      "checksum": "a119c14f996481c93f6b587c989b7e6af7ea5f70c570a8d58d044474887b82d1",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261010133000_add_course_learning_experience_v5",
+      "checksum": "9bd2b444338c88c3a12fd30f730545dc952d6bd7f06fc196dec936ebfb8d2aa3",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261011090000_diagnostic_speaking_recordings",
+      "checksum": "aba6590c1e7cf28e16d0279e09167c3821a7aec989be7c9a6206fbfb9e6e8563",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261013100000_add_skill_cms_publication_status",
+      "checksum": "744584187e4e3390896d945f741a8870055b1b09095d579066e112e253e9b56b",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261014100000_phase4_knowledge_exam_publication_status",
+      "checksum": "a129c7fff4a3d7ad47f1fc59f79fc806ece597d1874df3ff323af4f8530e5712",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261015120000_add_speaking_category_taxonomy",
+      "checksum": "ff9d5c7aab33c9261e1ad25beb1d1485b52f7b83297de68849a9651f0b43da84",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261015130000_normalize_course_legacy_levels",
+      "checksum": "60b78fc87087b9512a98596044eaf3a5511f8cd2e4a7cdd1990d54a1c5cc470c",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261015150000_add_toeic_writing_sets",
+      "checksum": "b6c59639413af7e441bdd714b4a131cc95312e03678b308dfbe48db8b59fc454",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261015160000_add_toeic_assessment_composition",
+      "checksum": "15fa7850a5b7b521eb8e5f40ec4904bd78ba1bf0d4b05c897171d52da5d8f73c",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261015170000_add_speaking_task_semantics",
+      "checksum": "3c3171fa8e9fb72a6381fba08941e9593a21cee58c35024e9f87bc37a97b452a",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261015173000_backfill_speaking_picture_media",
+      "checksum": "11251145463e85c04cbcfa01c83b9815787e802ed8a6a2deed1a0ebba7179ae4",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261016100000_add_speaking_exercise_order",
+      "checksum": "cca6170d3acfb550a2dd54740559d056f57c2825eeac60fbae19c273a8971898",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261016110000_unified_exam_domain_foundation",
+      "checksum": "10a2ea7cf74b3b6ec013aa47fdce51fe404449ab32331a5a541bc3f80d7fdf7f",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261019090000_add_toeic_ai_exam_authoring",
+      "checksum": "86c65dc39e18108756d58e9b94a02105fec84f617705a0be60c8054eb2d13457",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261019100000_add_toeic_attempt_navigation_state",
+      "checksum": "ff7322c1ac482d1a961057a4a76193c7d4bf0390a894da2fc882668900d378d0",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261020193000_add_suggestions",
+      "checksum": "15adeeeb78ff8688fb000d19df40eee6b8103a674a796b544626b49bf9373b7c",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261021124110_add_lesson_requires_final_check",
+      "checksum": "53cad25eda92f064a7ae0eb34a9b70bbffa2e226f044c3f94b8cc9e0edeb2521",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261022120000_add_subscription_events",
+      "checksum": "7507f3ad8113bbc9e35ff307bafd5a212f352ac801acf2e2cfc4e5a1a356103a",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261022130000_enforce_single_active_diagnostic",
+      "checksum": "0c1267dd962045c39edd6eec54c89a6dfbe957b1c4e275881d524804f3503360",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261023130000_add_toeic_attempt_strict_section_state",
+      "checksum": "71fbdfce94814df2194ac78be9d5851bfd50c4e259d0f0ac097a5fe466aa5b15",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261025054012_diagnostic_v2_schema_foundation",
+      "checksum": "fbd411aa6425baae9de70bbd9e47a1b59ae8eff0192cc2aedc9975d7fc9b6235",
+      "finished": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261025120000_diagnostic_source_identity",
+      "checksum": "ba333dac06c01fe33a9887abe02a8d9efac01df89e1116e66c9ca3adf8262825",
+      "finished": true,
+      "rolled_back": false
+    }
+  ],
+  "sourceKeyColumns": [
+    {
+      "table_name": "DiagnosticAssessment",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "DiagnosticQuestion",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "DiagnosticReadingPassage",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    }
+  ],
+  "diagnosticIndexes": [
+    {
+      "tablename": "DiagnosticAssessment",
+      "indexname": "DiagnosticAssessment_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticAssessment_pkey\" ON public.\"DiagnosticAssessment\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticAssessment",
+      "indexname": "DiagnosticAssessment_single_active_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticAssessment_single_active_key\" ON public.\"DiagnosticAssessment\" USING btree (\"isActive\") WHERE (\"isActive\" = true)"
+    },
+    {
+      "tablename": "DiagnosticAssessment",
+      "indexname": "DiagnosticAssessment_sourceKey_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticAssessment_sourceKey_key\" ON public.\"DiagnosticAssessment\" USING btree (\"sourceKey\")"
+    },
+    {
+      "tablename": "DiagnosticAssessment",
+      "indexname": "DiagnosticAssessment_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticAssessment_status_idx\" ON public.\"DiagnosticAssessment\" USING btree (status)"
+    },
+    {
+      "tablename": "DiagnosticAttempt",
+      "indexname": "DiagnosticAttempt_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticAttempt_pkey\" ON public.\"DiagnosticAttempt\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticAttempt",
+      "indexname": "DiagnosticAttempt_userId_assessmentId_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticAttempt_userId_assessmentId_status_idx\" ON public.\"DiagnosticAttempt\" USING btree (\"userId\", \"assessmentId\", status)"
+    },
+    {
+      "tablename": "DiagnosticAttempt",
+      "indexname": "DiagnosticAttempt_userId_submittedAt_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticAttempt_userId_submittedAt_idx\" ON public.\"DiagnosticAttempt\" USING btree (\"userId\", \"submittedAt\")"
+    },
+    {
+      "tablename": "DiagnosticListeningClip",
+      "indexname": "DiagnosticListeningClip_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticListeningClip_pkey\" ON public.\"DiagnosticListeningClip\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticListeningClip",
+      "indexname": "DiagnosticListeningClip_questionId_isActive_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticListeningClip_questionId_isActive_idx\" ON public.\"DiagnosticListeningClip\" USING btree (\"questionId\", \"isActive\")"
+    },
+    {
+      "tablename": "DiagnosticListeningClip",
+      "indexname": "DiagnosticListeningClip_questionId_version_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticListeningClip_questionId_version_key\" ON public.\"DiagnosticListeningClip\" USING btree (\"questionId\", version)"
+    },
+    {
+      "tablename": "DiagnosticQuestion",
+      "indexname": "DiagnosticQuestion_assessmentId_order_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticQuestion_assessmentId_order_idx\" ON public.\"DiagnosticQuestion\" USING btree (\"assessmentId\", \"order\")"
+    },
+    {
+      "tablename": "DiagnosticQuestion",
+      "indexname": "DiagnosticQuestion_assessmentId_skillCode_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticQuestion_assessmentId_skillCode_idx\" ON public.\"DiagnosticQuestion\" USING btree (\"assessmentId\", \"skillCode\")"
+    },
+    {
+      "tablename": "DiagnosticQuestion",
+      "indexname": "DiagnosticQuestion_assessmentId_sourceKey_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticQuestion_assessmentId_sourceKey_key\" ON public.\"DiagnosticQuestion\" USING btree (\"assessmentId\", \"sourceKey\")"
+    },
+    {
+      "tablename": "DiagnosticQuestion",
+      "indexname": "DiagnosticQuestion_passageId_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticQuestion_passageId_idx\" ON public.\"DiagnosticQuestion\" USING btree (\"passageId\")"
+    },
+    {
+      "tablename": "DiagnosticQuestion",
+      "indexname": "DiagnosticQuestion_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticQuestion_pkey\" ON public.\"DiagnosticQuestion\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticReadingPassage",
+      "indexname": "DiagnosticReadingPassage_assessmentId_order_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticReadingPassage_assessmentId_order_idx\" ON public.\"DiagnosticReadingPassage\" USING btree (\"assessmentId\", \"order\")"
+    },
+    {
+      "tablename": "DiagnosticReadingPassage",
+      "indexname": "DiagnosticReadingPassage_assessmentId_sourceKey_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticReadingPassage_assessmentId_sourceKey_key\" ON public.\"DiagnosticReadingPassage\" USING btree (\"assessmentId\", \"sourceKey\")"
+    },
+    {
+      "tablename": "DiagnosticReadingPassage",
+      "indexname": "DiagnosticReadingPassage_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticReadingPassage_pkey\" ON public.\"DiagnosticReadingPassage\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticRubric",
+      "indexname": "DiagnosticRubric_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticRubric_pkey\" ON public.\"DiagnosticRubric\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticRubric",
+      "indexname": "DiagnosticRubric_skill_rubricVersion_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticRubric_skill_rubricVersion_key\" ON public.\"DiagnosticRubric\" USING btree (skill, \"rubricVersion\")"
+    },
+    {
+      "tablename": "DiagnosticSkillResult",
+      "indexname": "DiagnosticSkillResult_attemptId_skill_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticSkillResult_attemptId_skill_key\" ON public.\"DiagnosticSkillResult\" USING btree (\"attemptId\", skill)"
+    },
+    {
+      "tablename": "DiagnosticSkillResult",
+      "indexname": "DiagnosticSkillResult_attemptId_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticSkillResult_attemptId_status_idx\" ON public.\"DiagnosticSkillResult\" USING btree (\"attemptId\", status)"
+    },
+    {
+      "tablename": "DiagnosticSkillResult",
+      "indexname": "DiagnosticSkillResult_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticSkillResult_pkey\" ON public.\"DiagnosticSkillResult\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticSpeakingResponse",
+      "indexname": "DiagnosticSpeakingResponse_attemptId_questionId_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticSpeakingResponse_attemptId_questionId_key\" ON public.\"DiagnosticSpeakingResponse\" USING btree (\"attemptId\", \"questionId\")"
+    },
+    {
+      "tablename": "DiagnosticSpeakingResponse",
+      "indexname": "DiagnosticSpeakingResponse_attemptId_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticSpeakingResponse_attemptId_status_idx\" ON public.\"DiagnosticSpeakingResponse\" USING btree (\"attemptId\", status)"
+    },
+    {
+      "tablename": "DiagnosticSpeakingResponse",
+      "indexname": "DiagnosticSpeakingResponse_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticSpeakingResponse_pkey\" ON public.\"DiagnosticSpeakingResponse\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticSpeakingResponse",
+      "indexname": "DiagnosticSpeakingResponse_userId_assessmentId_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticSpeakingResponse_userId_assessmentId_status_idx\" ON public.\"DiagnosticSpeakingResponse\" USING btree (\"userId\", \"assessmentId\", status)"
+    },
+    {
+      "tablename": "DiagnosticWritingResponse",
+      "indexname": "DiagnosticWritingResponse_attemptId_questionId_key",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticWritingResponse_attemptId_questionId_key\" ON public.\"DiagnosticWritingResponse\" USING btree (\"attemptId\", \"questionId\")"
+    },
+    {
+      "tablename": "DiagnosticWritingResponse",
+      "indexname": "DiagnosticWritingResponse_attemptId_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticWritingResponse_attemptId_status_idx\" ON public.\"DiagnosticWritingResponse\" USING btree (\"attemptId\", status)"
+    },
+    {
+      "tablename": "DiagnosticWritingResponse",
+      "indexname": "DiagnosticWritingResponse_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"DiagnosticWritingResponse_pkey\" ON public.\"DiagnosticWritingResponse\" USING btree (id)"
+    },
+    {
+      "tablename": "DiagnosticWritingResponse",
+      "indexname": "DiagnosticWritingResponse_userId_assessmentId_status_idx",
+      "indexdef": "CREATE INDEX \"DiagnosticWritingResponse_userId_assessmentId_status_idx\" ON public.\"DiagnosticWritingResponse\" USING btree (\"userId\", \"assessmentId\", status)"
+    }
+  ],
+  "diagnosticConstraints": [
+    {
+      "tbl": "\"DiagnosticAssessment\"",
+      "conname": "DiagnosticAssessment_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticAssessment\"",
+      "conname": "DiagnosticAssessment_status_matches_isActive",
+      "contype": "c",
+      "def": "CHECK (((status = 'ACTIVE'::\"DiagnosticAssessmentStatus\") = \"isActive\"))"
+    },
+    {
+      "tbl": "\"DiagnosticAttempt\"",
+      "conname": "DiagnosticAttempt_assessmentId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"assessmentId\") REFERENCES \"DiagnosticAssessment\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticAttempt\"",
+      "conname": "DiagnosticAttempt_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticAttempt\"",
+      "conname": "DiagnosticAttempt_userId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticListeningClip\"",
+      "conname": "DiagnosticListeningClip_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticListeningClip\"",
+      "conname": "DiagnosticListeningClip_questionId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"questionId\") REFERENCES \"DiagnosticQuestion\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticQuestion\"",
+      "conname": "DiagnosticQuestion_assessmentId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"assessmentId\") REFERENCES \"DiagnosticAssessment\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticQuestion\"",
+      "conname": "DiagnosticQuestion_passageId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"passageId\") REFERENCES \"DiagnosticReadingPassage\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+    },
+    {
+      "tbl": "\"DiagnosticQuestion\"",
+      "conname": "DiagnosticQuestion_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticQuestion\"",
+      "conname": "DiagnosticQuestion_rubricId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"rubricId\") REFERENCES \"DiagnosticRubric\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+    },
+    {
+      "tbl": "\"DiagnosticReadingPassage\"",
+      "conname": "DiagnosticReadingPassage_assessmentId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"assessmentId\") REFERENCES \"DiagnosticAssessment\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticReadingPassage\"",
+      "conname": "DiagnosticReadingPassage_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticRubric\"",
+      "conname": "DiagnosticRubric_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticSkillResult\"",
+      "conname": "DiagnosticSkillResult_attemptId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"attemptId\") REFERENCES \"DiagnosticAttempt\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticSkillResult\"",
+      "conname": "DiagnosticSkillResult_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_assessmentId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"assessmentId\") REFERENCES \"DiagnosticAssessment\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_attemptId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"attemptId\") REFERENCES \"DiagnosticAttempt\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_questionId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"questionId\") REFERENCES \"DiagnosticQuestion\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_rubricId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"rubricId\") REFERENCES \"DiagnosticRubric\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+    },
+    {
+      "tbl": "\"DiagnosticSpeakingResponse\"",
+      "conname": "DiagnosticSpeakingResponse_userId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticWritingResponse\"",
+      "conname": "DiagnosticWritingResponse_assessmentId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"assessmentId\") REFERENCES \"DiagnosticAssessment\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticWritingResponse\"",
+      "conname": "DiagnosticWritingResponse_attemptId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"attemptId\") REFERENCES \"DiagnosticAttempt\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticWritingResponse\"",
+      "conname": "DiagnosticWritingResponse_pkey",
+      "contype": "p",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "tbl": "\"DiagnosticWritingResponse\"",
+      "conname": "DiagnosticWritingResponse_questionId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"questionId\") REFERENCES \"DiagnosticQuestion\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "tbl": "\"DiagnosticWritingResponse\"",
+      "conname": "DiagnosticWritingResponse_rubricId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"rubricId\") REFERENCES \"DiagnosticRubric\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+    },
+    {
+      "tbl": "\"DiagnosticWritingResponse\"",
+      "conname": "DiagnosticWritingResponse_userId_fkey",
+      "contype": "f",
+      "def": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+    }
+  ],
+  "tableCount": 136,
+  "tableFingerprints": {
+    "phase3c_test.Badge": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Class": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Course": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Enrollment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Leaderboard": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Lesson": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Material": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.PointHistory": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Profile": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Question": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Quiz": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Result": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.SpeakingExercise": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.SpeakingSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.Submission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.User": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test.UserBadge": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "phase3c_test._prisma_migrations": {
+      "rows": 3,
+      "md5": "c374ddacbb437e4eb665f29d3fdb35db"
+    },
+    "public.AiGenerationJob": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.AiUsage": {
+      "rows": 3,
+      "md5": "440d2a53166d31cc510d619a784b1c22"
+    },
+    "public.Announcement": {
+      "rows": 2,
+      "md5": "f35be6c08df01505370e561393e19385"
+    },
+    "public.Assignment": {
+      "rows": 6,
+      "md5": "25356043cdd0d86ce4f5ca1c61e57f2f"
+    },
+    "public.AssignmentSubmission": {
+      "rows": 3,
+      "md5": "f260f3189529eec4122cc6ac78e2c03f"
+    },
+    "public.AuthAccount": {
+      "rows": 2,
+      "md5": "74cb886069500ae2b645a9654216f1bf"
+    },
+    "public.Badge": {
+      "rows": 12,
+      "md5": "03d7a6e7310f510ef4e358dce8c889e2"
+    },
+    "public.BanhTransaction": {
+      "rows": 13,
+      "md5": "19451c91072b106e212e261988237421"
+    },
+    "public.BankTransaction": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Class": {
+      "rows": 2,
+      "md5": "39a01ed47e3ea84efeb9aa17c3bdfe39"
+    },
+    "public.ContentAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ContentTopic": {
+      "rows": 2,
+      "md5": "8006c6f721221f9431e92cfe26da3108"
+    },
+    "public.Course": {
+      "rows": 3,
+      "md5": "8fb306cdc78a0c1d6fdd9f06609eb29a"
+    },
+    "public.CourseActivity": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLesson": {
+      "rows": 24,
+      "md5": "cb1396212d2fa3523a74373a2734a4e0"
+    },
+    "public.CourseLessonAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonExercise": {
+      "rows": 48,
+      "md5": "4bcccf45e7b135e4fcbc305ee4096c41"
+    },
+    "public.CourseLessonExerciseAnswer": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonMedia": {
+      "rows": 16,
+      "md5": "d85d7ef2d2f14c74c757e247346a29e8"
+    },
+    "public.CourseLessonQuestion": {
+      "rows": 240,
+      "md5": "2f52c38f14c55727ac4e0980117348a7"
+    },
+    "public.CourseLessonReference": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.CourseLessonSection": {
+      "rows": 175,
+      "md5": "197c1de784243d12928756535a0b2001"
+    },
+    "public.CurrencyTransaction": {
+      "rows": 6,
+      "md5": "730139166a32ec261bced98fcf0b9bff"
+    },
+    "public.DailyBanhEarning": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DailyQuest": {
+      "rows": 5,
+      "md5": "85c459a0646e67e1124c724f07e20094"
+    },
+    "public.DiagnosticAssessment": {
+      "rows": 2,
+      "md5": "451ef96d7e035cce4e4795b12d063cbe"
+    },
+    "public.DiagnosticAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DiagnosticListeningClip": {
+      "rows": 10,
+      "md5": "5761279a0c7b2b16d13cc0a6e1df2df2"
+    },
+    "public.DiagnosticQuestion": {
+      "rows": 49,
+      "md5": "51df28965901b7ede1c57a91aa7c5a17"
+    },
+    "public.DiagnosticReadingPassage": {
+      "rows": 3,
+      "md5": "560493318224d4d8ffc69804b0d90500"
+    },
+    "public.DiagnosticRubric": {
+      "rows": 2,
+      "md5": "084a96553862205ff8b01e5e21d8b154"
+    },
+    "public.DiagnosticSkillResult": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DiagnosticSpeakingResponse": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.DiagnosticWritingResponse": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Enrollment": {
+      "rows": 2,
+      "md5": "835323b2925ee7034250678aa7883a9f"
+    },
+    "public.Exam": {
+      "rows": 3,
+      "md5": "0a51112f0daa29b3b791ad74f2adca3c"
+    },
+    "public.GameBattle": {
+      "rows": 1,
+      "md5": "892cde897fd6dece30ac6aa470984949"
+    },
+    "public.GamePlay": {
+      "rows": 3,
+      "md5": "7b4e4027d9bcc7f83ed9f21485e215ae"
+    },
+    "public.GameSettings": {
+      "rows": 4,
+      "md5": "5eb560a88ba5b8842fb1163a8bad54e8"
+    },
+    "public.GrammarAttempt": {
+      "rows": 3,
+      "md5": "62fa5e39eb37c957bf1b4c659d789236"
+    },
+    "public.GrammarQuestion": {
+      "rows": 60,
+      "md5": "2768ce1cbbf34c0c961564e7418c3dbd"
+    },
+    "public.GrammarTopic": {
+      "rows": 12,
+      "md5": "84e5636aa3d5b992c63bd1f39b438b62"
+    },
+    "public.IssueReport": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Leaderboard": {
+      "rows": 3,
+      "md5": "780b553d2db251fbfda710e06cf17b08"
+    },
+    "public.LearningActivity": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Lesson": {
+      "rows": 16,
+      "md5": "07b44bc965ecbd6fa5c4d142b5babae2"
+    },
+    "public.ListeningAudioArtifact": {
+      "rows": 8,
+      "md5": "bda1d1fdb46aa0cc0bc6b75a4b405b50"
+    },
+    "public.ListeningAudioUsage": {
+      "rows": 4,
+      "md5": "f6d98a56dce89633057a25980a3f5f57"
+    },
+    "public.ListeningDiagnosticClip": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ListeningPracticeAttempt": {
+      "rows": 14,
+      "md5": "d884dc7d88d128abfd4d083074e855ea"
+    },
+    "public.ListeningTranscriptReveal": {
+      "rows": 7,
+      "md5": "480a394db4f1cbf57179658b43b16f8f"
+    },
+    "public.MarketOrder": {
+      "rows": 1,
+      "md5": "d2db3c92a991ef0a7e66878ca46ca881"
+    },
+    "public.MarketPhysicalRedemption": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.MarketProduct": {
+      "rows": 12,
+      "md5": "57aaafe30209482a4f048a37c851e028"
+    },
+    "public.Material": {
+      "rows": 16,
+      "md5": "92d29050f51529c42298aa5bad247a23"
+    },
+    "public.Notification": {
+      "rows": 9,
+      "md5": "7cb4074196232e09d38b969a7878ef69"
+    },
+    "public.PayOSPaymentIntent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Payment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Plan": {
+      "rows": 3,
+      "md5": "f23c8d3de60b7d92537e0e0e9829e916"
+    },
+    "public.PlanEntitlement": {
+      "rows": 11,
+      "md5": "c08681b1b1f5cde7a88650bb53aa69d6"
+    },
+    "public.PlanPayment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.PlanPurchase": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.PlanVersion": {
+      "rows": 3,
+      "md5": "492bafdce6ba0a7c64eca2ad8d001071"
+    },
+    "public.PointHistory": {
+      "rows": 8,
+      "md5": "a537fa7cf59e9b5d5abd62ddf28ed908"
+    },
+    "public.PracticeTopic": {
+      "rows": 9,
+      "md5": "14d73a8bd09dfd8f0c04c4b62022f10e"
+    },
+    "public.Profile": {
+      "rows": 7,
+      "md5": "fa0ff9aa2f690616cc0a5015f53a1f39"
+    },
+    "public.PushSubscription": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Question": {
+      "rows": 196,
+      "md5": "436ca0d455df51f6618179cdfc838d5a"
+    },
+    "public.Quiz": {
+      "rows": 44,
+      "md5": "c038d4c1610a32dc074cf4a2b40dc159"
+    },
+    "public.QuizAudioAsset": {
+      "rows": 141,
+      "md5": "0a65712da38decc4df57536946b186fd"
+    },
+    "public.Result": {
+      "rows": 3,
+      "md5": "992336bb4e28c5bec958536edc9bf42c"
+    },
+    "public.SpeakingCategory": {
+      "rows": 5,
+      "md5": "79fb5d7a4c374d90dfe65661cfca8353"
+    },
+    "public.SpeakingExercise": {
+      "rows": 52,
+      "md5": "2e72dba974f78d30a6df900a794ab33c"
+    },
+    "public.SpeakingPracticeSet": {
+      "rows": 2,
+      "md5": "86ed5aa655aead42f6a12f8ee3510e5c"
+    },
+    "public.SpeakingRewardLedger": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SpeakingStimulus": {
+      "rows": 3,
+      "md5": "7a37dea98cb9e9bd10e60dbba7e09305"
+    },
+    "public.SpeakingSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SpeakingUploadIntent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.Submission": {
+      "rows": 3,
+      "md5": "9bcbebca2f2d17945bfc9bad9d96eea4"
+    },
+    "public.Subscription": {
+      "rows": 5,
+      "md5": "154fde504835cb1d0f7dc990f4ca0348"
+    },
+    "public.SubscriptionEvent": {
+      "rows": 5,
+      "md5": "dddc9a9bdbe3d3de3283c116a1e64945"
+    },
+    "public.Suggestion": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SuggestionAttachment": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SupportConversation": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.SupportMessage": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessment": {
+      "rows": 2,
+      "md5": "6e594673fa71f2e0f6be2bc19d398aab"
+    },
+    "public.ToeicAssessmentAttempt": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessmentAttemptComponent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessmentComponent": {
+      "rows": 5,
+      "md5": "ca075868e58db397f396d5cdb0c23e93"
+    },
+    "public.ToeicAssessmentSpeakingSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAssessmentWritingSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicAttempt": {
+      "rows": 1,
+      "md5": "0e37b1605977aaf6c7dbe9d321bb1102"
+    },
+    "public.ToeicAttemptAnswer": {
+      "rows": 200,
+      "md5": "bacfb168ec0298fe1ae9743c562aa887"
+    },
+    "public.ToeicExamSet": {
+      "rows": 2,
+      "md5": "8b0bcab8a93f59518f4f986f03f69355"
+    },
+    "public.ToeicIntegrityEvent": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicQuestion": {
+      "rows": 225,
+      "md5": "da2c9ea15767df7a474cc6a114a86eec"
+    },
+    "public.ToeicQuestionGroup": {
+      "rows": 81,
+      "md5": "ec3f4914c955887416553826e7753b9e"
+    },
+    "public.ToeicSpeakingWritingSubmission": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.ToeicWritingSet": {
+      "rows": 2,
+      "md5": "14041b166b51c08081a0b5d367e901bb"
+    },
+    "public.ToeicWritingSetItem": {
+      "rows": 16,
+      "md5": "83b112c1647203ebb50dd2d07ef588b3"
+    },
+    "public.User": {
+      "rows": 7,
+      "md5": "ca9ed8264b66ff274bedebbb69a1a801"
+    },
+    "public.UserBadge": {
+      "rows": 13,
+      "md5": "c07fe876bbc35f3078953091a430c4a3"
+    },
+    "public.UserBilling": {
+      "rows": 4,
+      "md5": "e2633d46cb4856748f0cc0b0f483c982"
+    },
+    "public.UserBookProgress": {
+      "rows": 3,
+      "md5": "3b558af0b88b401992673c87ac86b42d"
+    },
+    "public.UserGrammarReward": {
+      "rows": 3,
+      "md5": "e7e9b7a56fe4ddcf1112e7595f384c65"
+    },
+    "public.UserPet": {
+      "rows": 4,
+      "md5": "56711e9658a128644b4e04f64f532020"
+    },
+    "public.UserQuestProgress": {
+      "rows": 4,
+      "md5": "8ae34f8c477e984f030a06ac4bb64efd"
+    },
+    "public.UserQuizReward": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserSavedWord": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserShippingProfile": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserStats": {
+      "rows": 4,
+      "md5": "0c0030413531ae72f3fbfb3999449a3d"
+    },
+    "public.UserToeicReward": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserVocabMasteryReward": {
+      "rows": 0,
+      "md5": "empty"
+    },
+    "public.UserVocabWordProgress": {
+      "rows": 24,
+      "md5": "3eaa5826e542101e7b7cfb599e1d07be"
+    },
+    "public.VocabTopic": {
+      "rows": 9,
+      "md5": "2155163db8fe068a222673e34f65a57b"
+    },
+    "public.VocabWord": {
+      "rows": 353,
+      "md5": "6184bfc020be353028ebda377e6bf371"
+    },
+    "public.WatchTracking": {
+      "rows": 3,
+      "md5": "f0ef4500bdbe240411f954dabe5c8609"
+    },
+    "public._prisma_migrations": {
+      "rows": 68,
+      "md5": "c2e5ae47db5763365aaedafbcb0b161e"
+    }
+  },
+  "legacyXmin": {
+    "assessment": [
+      {
+        "id": 1,
+        "xmin": "177085"
+      }
+    ],
+    "questions": [
+      {
+        "id": 1,
+        "xmin": "171448"
+      },
+      {
+        "id": 2,
+        "xmin": "171449"
+      },
+      {
+        "id": 3,
+        "xmin": "171450"
+      },
+      {
+        "id": 4,
+        "xmin": "171451"
+      },
+      {
+        "id": 5,
+        "xmin": "171452"
+      },
+      {
+        "id": 6,
+        "xmin": "171453"
+      },
+      {
+        "id": 7,
+        "xmin": "171454"
+      },
+      {
+        "id": 8,
+        "xmin": "171455"
+      },
+      {
+        "id": 9,
+        "xmin": "171456"
+      },
+      {
+        "id": 10,
+        "xmin": "171457"
+      },
+      {
+        "id": 11,
+        "xmin": "171458"
+      },
+      {
+        "id": 12,
+        "xmin": "171459"
+      },
+      {
+        "id": 13,
+        "xmin": "171460"
+      },
+      {
+        "id": 14,
+        "xmin": "171461"
+      },
+      {
+        "id": 15,
+        "xmin": "171462"
+      },
+      {
+        "id": 16,
+        "xmin": "171463"
+      },
+      {
+        "id": 17,
+        "xmin": "171464"
+      },
+      {
+        "id": 18,
+        "xmin": "171465"
+      },
+      {
+        "id": 19,
+        "xmin": "171466"
+      },
+      {
+        "id": 20,
+        "xmin": "171467"
+      }
+    ]
+  },
+  "sequences": [
+    {
+      "name": "DiagnosticAssessment_id_seq",
+      "last_value": "5"
+    },
+    {
+      "name": "DiagnosticAttempt_id_seq",
+      "last_value": "57"
+    },
+    {
+      "name": "DiagnosticListeningClip_id_seq",
+      "last_value": "10"
+    },
+    {
+      "name": "DiagnosticQuestion_id_seq",
+      "last_value": "89"
+    },
+    {
+      "name": "DiagnosticReadingPassage_id_seq",
+      "last_value": "3"
+    },
+    {
+      "name": "DiagnosticRubric_id_seq",
+      "last_value": "2"
+    },
+    {
+      "name": "DiagnosticSkillResult_id_seq",
+      "last_value": null
+    },
+    {
+      "name": "DiagnosticSpeakingResponse_id_seq",
+      "last_value": null
+    },
+    {
+      "name": "DiagnosticWritingResponse_id_seq",
+      "last_value": null
+    }
+  ]
+}

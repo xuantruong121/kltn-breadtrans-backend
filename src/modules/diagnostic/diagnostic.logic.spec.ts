@@ -56,12 +56,16 @@ describe('diagnostic logic', () => {
   });
 
   it('marks low-sample domains as insufficient instead of precise', () => {
-    const profiles = buildSkillProfiles(questions, {
-      '1': 0,
-      '2': 1,
-      '3': 0,
-      '4': 0,
-    });
+    // Shown in authored order, so the display permutation is the identity.
+    // An index answer is only gradable through a permutation.
+    const identity = Object.fromEntries(
+      questions.map((q) => [q.id, q.options.map((_, i) => i)]),
+    );
+    const profiles = buildSkillProfiles(
+      questions,
+      { '1': 0, '2': 1, '3': 0, '4': 0 },
+      identity,
+    );
     expect(
       profiles.find((profile) => profile.skill === 'Grammar')?.percentage,
     ).toBeNull();

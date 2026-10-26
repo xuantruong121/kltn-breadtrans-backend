@@ -1493,10 +1493,9 @@ export class QuizService {
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
 
-    // Timeline offsets are safe learning metadata (they contain no answers),
-    // so expose them with the dialogue transcript when a published artifact
-    // exists. This keeps the student player authoritative instead of falling
-    // back to text-length timing heuristics.
+    // Deliver artifact timing separately from transcript text. The timeline is
+    // authoritative media metadata; it is safe for the player before reveal,
+    // while the transcript itself remains behind the reveal endpoint.
     let listeningAudioArtifact: {
       id: number;
       version: number;
@@ -1537,28 +1536,26 @@ export class QuizService {
               .map((item) => [item.turnId, item]),
           )
         : new Map<string, { turnId: string; startMs: number; endMs: number }>();
-      let turnIndex = 0;
       quiz.questions = quiz.questions.map((question) => {
         const content =
           question.content && typeof question.content === 'object'
             ? { ...(question.content as Record<string, unknown>) }
             : null;
-        if (!content || !Array.isArray(content.transcriptSegments))
-          return question;
-        const transcriptSegments = content.transcriptSegments.map((segment) => {
-          if (!segment || typeof segment !== 'object') return segment;
-          const turn = timeline.get(
-            `turn-${String(++turnIndex).padStart(3, '0')}`,
-          );
-          return turn
-            ? {
-                ...(segment as Record<string, unknown>),
+        const targetTurnId =
+          content && typeof content.targetTurnId === 'string'
+            ? content.targetTurnId
+            : null;
+        const turn = targetTurnId ? timeline.get(targetTurnId) : null;
+        return turn
+          ? {
+              ...question,
+              listeningSegment: {
+                turnId: turn.turnId,
                 startMs: turn.startMs,
                 endMs: turn.endMs,
-              }
-            : segment;
-        });
-        return { ...question, content: { ...content, transcriptSegments } };
+              },
+            }
+          : question;
       });
     }
 
@@ -1572,6 +1569,10 @@ export class QuizService {
         delete content.explanation;
         if (quiz.type === QuizType.LISTENING_PRACTICE) {
           delete content.audioText;
+          delete content.translation;
+          // This text is the learner-facing transcript/answer for Listening.
+          // Timing is provided in `question.listeningSegment` above instead.
+          delete content.transcriptSegments;
         }
         return { ...q, content };
       });
@@ -1641,8 +1642,8 @@ export class QuizService {
   /**
    * Transcript is intentionally loaded on demand. The regular learner quiz
    * payload redacts answers/audio text until the learner asks to review them;
-   * this endpoint is limited to published listening-practice dictation items
-   * and never serves TOEIC or other assessment content.
+   * the durable reveal record is the authorization boundary for every
+   * listening-practice mode, including dialogue exercises.
    */
   async revealListeningTranscript(userId: number, quizId: number, role?: Role) {
     await this.assertListeningPracticeQuiz(quizId, userId, role);
@@ -1707,10 +1708,7 @@ export class QuizService {
         Array.isArray(content.transcriptSegments)
       );
     });
-    const containsDictation = transcriptQuestions.some(
-      (question) => question.type === 'DICTATION',
-    );
-    if (containsDictation) {
+    if (transcriptQuestions.length > 0) {
       const reveal = await this.prisma.listeningTranscriptReveal.findUnique({
         where: { userId_quizId: { userId, quizId } },
         select: { id: true },
@@ -2173,6 +2171,20 @@ export class QuizService {
   async submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto) {
     const quiz = await this.getQuizById(quizId, true, userId);
 
+    // This endpoint grades only Listening and Reading practice, whose answers
+    // are validated below (complete, each question once). TOEIC and Writing
+    // quizzes have their own submit flows; reaching them here scored
+    // `dto.answers` as sent, so one question repeated N times earned N points
+    // and N x 10 XP on the leaderboard.
+    if (
+      quiz.type !== QuizType.LISTENING_PRACTICE &&
+      quiz.type !== QuizType.BILINGUAL_READING
+    ) {
+      throw new BadRequestException(
+        'Bài này không được nộp qua luyện Nghe/Đọc',
+      );
+    }
+
     if (quiz.type === QuizType.LISTENING_PRACTICE) {
       this.assertCompleteListeningSubmission(quiz.questions, dto.answers);
     } else if (quiz.type === QuizType.BILINGUAL_READING) {
@@ -2633,16 +2645,33 @@ export class QuizService {
       question.content && typeof question.content === 'object'
         ? (question.content as Record<string, unknown>)
         : {};
-    const isArtifactBackedQuestion =
-      question.type === 'DICTATION' ||
-      question.type === 'DIALOGUE' ||
-      typeof content.targetTurnId === 'string';
+    const targetTurnId =
+      typeof content.targetTurnId === 'string' ? content.targetTurnId : null;
+    const isArtifactBackedQuestion = Boolean(targetTurnId);
     if (isArtifactBackedQuestion) {
       const artifact =
         await this.listeningAudioAuthoringService.getCurrentPublishedArtifact(
           quizId,
         );
       if (artifact) {
+        const timeline = Array.isArray(artifact.timeline)
+          ? artifact.timeline
+          : [];
+        const segment = timeline.find(
+          (item) =>
+            item &&
+            typeof item === 'object' &&
+            (item as Record<string, unknown>).turnId === targetTurnId &&
+            Number.isFinite((item as Record<string, unknown>).startMs) &&
+            Number.isFinite((item as Record<string, unknown>).endMs) &&
+            Number((item as Record<string, unknown>).endMs) >
+              Number((item as Record<string, unknown>).startMs),
+        );
+        if (!segment) {
+          throw new ServiceUnavailableException(
+            'Audio toàn bài chưa có mốc thời gian hợp lệ cho câu này.',
+          );
+        }
         const result =
           await this.listeningAudioAuthoringService.getPublishedAudio(
             quizId,

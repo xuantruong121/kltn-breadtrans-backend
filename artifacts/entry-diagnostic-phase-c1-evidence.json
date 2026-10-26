@@ -1,0 +1,234 @@
+{
+  "phase": "C1",
+  "title": "Four-skill runtime foundation and objective grading correctness",
+  "date": "2026-10-26",
+  "independenceMode": "AUTHOR_SELF_VERIFICATION",
+  "credentialsPolicy": "No password, token or connection string is recorded.",
+
+  "baseline": {
+    "verifiedReadOnly": true,
+    "kltn_db": { "system_identifier": "7674533776495505443", "migrations": 68, "assessments": [{ "id": 1, "status": "ACTIVE", "isActive": true, "questions": 20 }, { "id": 5, "status": "DRAFT", "isActive": false, "questions": 29, "sourceKey": "DIAG_V2_ASSESSMENT" }], "attempts": 0, "passages": 3, "clipRegistrations": 10, "rubrics": 2 },
+    "matchesB2B": true,
+    "repository": { "head": "0adb882", "preExistingModifications": ["artifacts/offsite-backup-verification.json", "docker-compose.yml", "untracked B2A/B2B artifacts and scripts"] }
+  },
+
+  "processSafety": {
+    "port3001": "one backend instance",
+    "launcherChain": "Antigravity IDE (22232) -> integrated PowerShell terminal (11904) -> npm run start:dev (152) -> cmd.exe -> nest start --watch (16220) -> cmd.exe /d /s /c node ... (20264) -> app node dist/src/main (4660)",
+    "otherLaunchers": "no VS Code tasks or launch configs in the workspace; no pm2, nodemon, forever or concurrently process",
+    "b2bOrphanMechanism": {
+      "classification": "PLAUSIBLE_NOT_PROVEN",
+      "hypothesis": "nest --watch starts the app through an intermediate cmd.exe. Ending the nest process does not necessarily end that grandchild node process, which is then left without a parent - the state observed for PID 13232 in B2B."
+    },
+    "separateSpeakingWorker": "not running",
+    "watchReloadNote": "The running dev server reloads every source edit and is connected to kltn_db. It therefore runs the C1 code now. No test in C1 targeted the running server."
+  },
+
+  "currentStateMatrix": [
+    { "feature": "assessment selection", "source": "DiagnosticService.getCurrentAssessment / getLatestResult / startAttempt / submitAssessment, all filter isActive: true", "reusable": true, "missing": "nothing", "change": "none", "evidence": "isolated + live read-only" },
+    { "feature": "objective grading", "source": "diagnostic.logic isDiagnosticAnswerCorrect + six call sites", "reusable": false, "missing": "server-authoritative permutation; fail-closed index handling", "change": "learner-seeded permutation; resolveAuthoredOptionIndex; attempt required on submit", "evidence": "old-code repro 6/20 vs fixed 13/20; 24-permutation actual-grader tests" },
+    { "feature": "question validation", "source": "validateQuestionBank", "reusable": false, "missing": "task-type rules; required CEFR on productive tasks; conflated content and audio readiness", "change": "validateDiagnosticContent + validateRuntimeReadiness + evaluateAssessmentReadiness", "evidence": "unit tests; DRAFT id=5 content valid / runtime not ready / activation blocked on live and clone" },
+    { "feature": "learner serializer", "source": "DiagnosticService.sanitizeQuestion", "reusable": "partly", "missing": "taskType, instructions, recording limits, word bounds, explicit audio readiness", "change": "additive fields", "evidence": "real serializer on all 29 DRAFT rows and 20 live rows" },
+    { "feature": "Speaking recording and grading", "source": "DiagnosticSpeakingService.confirmRecording / skip / list / audio, DiagnosticSpeakingAudioNormalizer", "reusable": true, "missing": "per-task response-time enforcement", "change": "none in C1", "evidence": "existing unit tests 6 + 1 pass; not run end to end" },
+    { "feature": "Writing submission and grading", "source": "DiagnosticWritingService.enqueueMany / retry", "reusable": true, "missing": "no unit test exists for this service", "change": "none in C1", "evidence": "code read only" }
+  ],
+
+  "permutationDefect": {
+    "id": "C1-DEF-001",
+    "severity": "CRITICAL",
+    "summary": "Every learner's first uninterrupted attempt was graded against options other than the ones they clicked.",
+    "mechanism": [
+      "The form is fetched before an attempt exists, so getCurrentAssessment served options in AUTHORED order (activeAttemptId undefined).",
+      "Pressing Start created attempt N. The learner page does not refetch the form, so it kept showing authored order.",
+      "The page records the clicked DISPLAYED index.",
+      "submitAssessment re-derived getAttemptQuestionPermutation(N, ...) and graded permutation[clicked] against the key - a permutation the learner never saw."
+    ],
+    "additionalDefects": [
+      "isDiagnosticAnswerCorrect compared a displayed index directly with the authored correctIndex when the permutation was missing, and also when permutation[answer] was undefined because the index was out of range (fail open).",
+      "submitAssessment without attemptId created a NEW COMPLETED attempt graded with no permutation, bypassing the no-retake rule and orphaning the in-progress attempt.",
+      "toResult guessed the permutation with 'attempt.id >= 50', so an attempt created by that path was displayed with a different grade from the one stored.",
+      "toResult called weightedCore(questions, answers, attempt.id), a sixth attempt-seeded grading path not listed in earlier audits.",
+      "A client-supplied { originalIndex } was accepted as the authored option identity."
+    ],
+    "reproduction": {
+      "environment": "disposable PostgreSQL 15 clone (checkpoint restore + migration + import), system_identifier 7700804571409465384",
+      "flow": "fetch form, Start, do not refetch, click by displayed index: 13 intended correct, 7 intended wrong, submit with the attempt id",
+      "oldCodeHead0adb882": { "learner": 17, "attempt": 60, "intendedCorrect": 13, "storedCorrect": 6, "total": 20, "defectReproduced": true },
+      "fixedCode": { "learner": 20, "attempt": 61, "intendedCorrect": 13, "storedCorrect": 13, "total": 20, "defectReproduced": false },
+      "oldCodeRunFrom": "a detached git worktree of HEAD, removed afterwards"
+    },
+    "correction": {
+      "permutationSeed": "getLearnerQuestionPermutation(userId, assessmentId, questionId, optionCount). userId is the authenticated JWT subject; no client value enters the seed. The served order is therefore identical before Start, after Start, on resume and on review, so the page's existing behaviour becomes correct without a frontend change.",
+      "grader": "resolveAuthoredOptionIndex returns the authored index or null. A displayed index needs a VALID permutation of exactly the option count and an in-range integer; otherwise null. Option text resolves only when exactly one option matches. originalIndex is refused. isDiagnosticAnswerCorrect = resolved !== null && resolved === correctIndex.",
+      "attemptAuthority": "submitAssessment requires attemptId, loads the attempt, requires the caller's userId and this assessmentId, returns the recorded result for a COMPLETED attempt without regrading, rejects any status other than IN_PROGRESS, and never creates an attempt.",
+      "serialization": "a pg_advisory_xact_lock on the attempt id plus a status re-read under the lock, so a racing duplicate returns the completed attempt instead of grading and rewarding twice.",
+      "failClosedBeforeWrite": "every objective answer must resolve through the server permutation before the transaction opens.",
+      "persistedScheme": "answers.__permScheme = LEARNER_ASSESSMENT_V1. toResult re-derives the permutation from that scheme; an attempt stored by the old code with __permAttemptId is re-derived with its own scheme; an attempt with neither yields unresolvable index answers rather than a guess.",
+      "noNewTable": true
+    },
+    "callSites": [
+      { "location": "diagnostic.logic.ts buildSkillProfiles", "before": "permutation map from caller (attempt-seeded)", "after": "permutation map from the recorded scheme" },
+      { "location": "diagnostic.service.ts toResult questionsResult", "before": "__permAttemptId or attempt.id >= 50 guess", "after": "recorded scheme" },
+      { "location": "diagnostic.service.ts toResult weightedCore", "before": "seeded by attempt.id regardless of how the attempt was graded", "after": "same permutation map as the rest of toResult" },
+      { "location": "diagnostic.service.ts submitAssessment questionsResult", "before": "optional client attemptId, else direct comparison", "after": "learner permutation from the authenticated user" },
+      { "location": "diagnostic.service.ts sectionPercentage", "before": "optional client attemptId", "after": "permutation map" },
+      { "location": "diagnostic.service.ts bandPercentages", "before": "optional client attemptId", "after": "permutation map" }
+    ],
+    "OBJECTIVE_GRADING_CALL_SITES_VERIFIED": true,
+    "callSiteCountCorrection": "Earlier audits listed five call sites. There are six: toResult's weightedCore call was also seeded by attempt id."
+  },
+
+  "validation": {
+    "before": {
+      "function": "validateQuestionBank",
+      "productiveTasks": "required stableKey, section, construct AND intendedLevel (a CEFR label)",
+      "listening": "required audioUrl as a content rule",
+      "missing": "task type, passage, rubric, recording limits, word bounds"
+    },
+    "after": {
+      "classifyDiagnosticTask": "taskType column first (MCQ, SPEAKING_RESPONSE, WRITING_RESPONSE, OPEN_TEXT); options.questionType decides only for legacy rows; contradiction -> INCONSISTENT",
+      "validateDiagnosticContent": {
+        "objective": "prompt, >= 2 unique options, valid correctIndex; LISTENING needs a clip association; READING needs passage text and a passage reference",
+        "speaking": "no options; rubric present; positive prep and response seconds",
+        "writing": "no options; rubric present; positive wordMin < wordMax",
+        "neverRequired": ["options on productive tasks", "answer key on productive tasks", "correctIndex -1", "intendedLevel / CEFR"]
+      },
+      "validateRuntimeReadiness": "LISTENING needs a non-empty audioUrl",
+      "validateQuestionBank": "content AND runtime; still the gate every learner path enforces",
+      "evaluateAssessmentReadiness": "content.valid, runtime.ready, activation.ready (also requires a scorer this build implements)"
+    },
+    "liveResults": {
+      "id1": { "content": true, "runtime": true, "activation": true },
+      "id5": { "content": true, "runtime": false, "runtimeDefects": 10, "activation": false, "blockers": ["runtime: 10 defect(s)", "DIAGNOSTIC_SCORER_UNSUPPORTED: scoringVersion \"FOUR_SKILL_PLACEMENT_V2\" is known but its scorer is not implemented in this build"] }
+    }
+  },
+
+  "delivery": {
+    "addedFields": ["taskType", "instructions", "prepSeconds", "responseSeconds", "wordMin", "wordMax", "mediaStatus", "productive"],
+    "allAdditive": true,
+    "listening": "audioUrl kept; mediaStatus READY only with a non-empty URL, otherwise NOT_READY. 10/10 DRAFT items NOT_READY with null audioUrl.",
+    "reading": "10/10 DRAFT items serve the complete authored passage body under the heading",
+    "speaking": "2/2 DRAFT tasks serve prompt, prepSeconds and responseSeconds, no options",
+    "writing": "2/2 DRAFT tasks serve prompt, wordMin and wordMax, no options",
+    "confidentialityChecked": ["correctIndex", "explanation", "answerRationale", "distractorRationales", "internalLabel", "sourceKey", "stableKey", "difficulty", "intendedLevel", "rubricId", "passageId", "script", "transcript"],
+    "leaked": [],
+    "frontendConsumption": "The learner page currently reads only section among these fields. New fields are unused until the UI phase. No frontend change was needed for grading correctness.",
+    "httpLayer": "NOT_VERIFIED. Serializer and service were exercised directly; no authenticated HTTP request was made."
+  },
+
+  "speakingWritingReuse": {
+    "speaking": {
+      "CODE_PRESENT": true,
+      "UNIT_TEST_PASS": true,
+      "unitTests": "diagnostic-speaking.service.spec.ts 6, diagnostic-speaking-audio-normalizer.spec.ts 1",
+      "ISOLATED_RUNTIME_PASS": "NOT_VERIFIED",
+      "END_TO_END_VERIFIED": false,
+      "guards": "attempt owned by the user, on the assessment, IN_PROGRESS; question must be an OPEN_TEXT SPEAKING task; audio retrieval checks response ownership",
+      "gaps": ["recording duration bounded globally at 300 ms - 90 s, not by the task's responseSeconds (45 s / 60 s)", "provider is mock or Azure; not exercised in C1"]
+    },
+    "writing": {
+      "CODE_PRESENT": true,
+      "UNIT_TEST_PASS": "NO_TESTS_EXIST",
+      "ISOLATED_RUNTIME_PASS": "NOT_VERIFIED",
+      "END_TO_END_VERIFIED": false,
+      "guards": "retry requires attempt ownership and an OPEN_TEXT WRITING task with a stored answer",
+      "gaps": ["no unit test for DiagnosticWritingService", "AI grading not exercised"]
+    }
+  },
+
+  "tests": {
+    "newSpec": { "file": "src/modules/diagnostic/diagnostic.grading-integrity.spec.ts", "tests": 39, "pass": 39 },
+    "mutationCheck": "Reintroducing the fail-open fallback in resolveAuthoredOptionIndex made 3 of the 39 fail; restored, 39/39.",
+    "adaptedSpecs": [
+      "diagnostic.service.spec.ts: four submit tests now use the learner's own IN_PROGRESS attempt and click through the server permutation; one used { originalIndex }",
+      "diagnostic.scoring-contract.spec.ts: DIAG-002 submits on an attempt instead of creating one",
+      "diagnostic.logic.spec.ts: low-sample test states its identity permutation explicitly",
+      "diagnostic-ux-repair.spec.ts: originalIndex now refused; duplicated option text now unresolvable"
+    ],
+    "replacedTautology": "v2-import-mapper.spec.ts: the 24-permutation test now grades every approved item under all 24 orderings with the real grader (25 x 24 x 4 = 2400 verdicts)",
+    "focused": { "suites": "11/11", "tests": "220/220", "scope": "src/modules/diagnostic, src/worker, src/prisma" },
+    "fullSuite": { "suites": "144/144", "tests": "1323/1323" },
+    "isolatedRuntime": { "checks": 34, "pass": 34, "log": "artifacts/c1-isolated-runtime.log" },
+    "liveReadOnly": { "checks": 9, "pass": 9, "log": "artifacts/c1-live-readonly.log", "readOnlyEnforcement": "a locking read was refused with 25006" },
+    "typecheck": 0,
+    "lintCheck": 0,
+    "gitDiffCheck": 0
+  },
+
+  "isolatedRuntimeHighlights": [
+    "option order identical before and after Start; 19/20 items actually reordered",
+    "grade persisted equals the options clicked: 13/20; scheme recorded; every per-question verdict and selectedText correct; getLatestResult reproduces it",
+    "refused: no attempt id, another learner's attempt, the DRAFT assessment, an out-of-range index, a non-existent attempt - none wrote anything",
+    "a replayed all-correct submission left the grade at 13 and rewrote nothing (xmin unchanged, no new activity)",
+    "Start after completion returns the completed attempt",
+    "two concurrent submits of one attempt completed it once, one learning activity, reward at most once",
+    "DRAFT start and submit refused; 0 attempts on the DRAFT; lifecycle id=1 ACTIVE, id=5 DRAFT unchanged"
+  ],
+
+  "databaseEvidence": {
+    "REAL_DB_MUTATED": false,
+    "liveTablesChangedSinceB2B": 0,
+    "liveTablesCompared": 136,
+    "SHADOW_DB_MUTATED": false,
+    "shadowTablesChanged": 0,
+    "isolatedCloneRemoved": true,
+    "danglingVolumesBaseline": 26,
+    "danglingVolumesAfter": 26
+  },
+
+  "unchangedFiles": {
+    "CONTENT_FILES_UNCHANGED": true,
+    "contentHashCheck": "HASH_MISMATCH_COUNT=0, MECHANICAL_VALIDATION_PASS=true",
+    "migrationImporterMapperSchemaEqualHead": true,
+    "dockerCompose": "only the earlier restart-policy change"
+  },
+
+  "remainingBlockers": [
+    "Listening audio does not exist (10 items NOT_READY)",
+    "FOUR_SKILL_PLACEMENT_V2 scorer not implemented; DEF-004 open",
+    "Speaking: per-task response time not enforced; productive runtime not run end to end",
+    "Writing: no unit tests; AI grading not run",
+    "Frontend does not yet consume taskType, recording limits, word bounds or mediaStatus",
+    "Authenticated HTTP smoke not performed"
+  ],
+
+  "flags": {
+    "PHASE_C1_COMPLETE": true,
+    "TASK_TYPE_VALIDATION_IMPLEMENTED": true,
+    "PRODUCTIVE_TASK_VALIDATION_PASS": true,
+    "CONTENT_READINESS_SEPARATION_PASS": true,
+    "PRODUCTIVE_TASKS_REQUIRE_FAKE_MCQ_FIELDS": false,
+    "PRODUCTIVE_TASKS_REQUIRE_CEFR": false,
+    "LISTENING_DELIVERY_CONTRACT_PASS": true,
+    "READING_DELIVERY_CONTRACT_PASS": true,
+    "SPEAKING_DELIVERY_CONTRACT_PASS": true,
+    "WRITING_DELIVERY_CONTRACT_PASS": true,
+    "LEARNER_PAYLOAD_CONFIDENTIALITY_PASS": true,
+    "OBJECTIVE_GRADING_CALL_SITES_VERIFIED": true,
+    "PERMUTATION_FAIL_OPEN_CLOSED": true,
+    "ACTUAL_GRADER_PERMUTATION_TEST_PASS": true,
+    "ATTEMPT_OWNERSHIP_GUARD_PASS": true,
+    "DRAFT_CURRENT_SELECTION_PASS": true,
+    "DRAFT_START_DENIED": true,
+    "DRAFT_SUBMISSION_DENIED": true,
+    "ACTIVE_ASSESSMENT_PRESERVED": true,
+    "EXISTING_SPEAKING_RUNTIME_REUSE_CONFIRMED": true,
+    "EXISTING_WRITING_RUNTIME_REUSE_CONFIRMED": true,
+    "DIAGNOSTIC_TARGETED_TESTS_PASS": true,
+    "BACKEND_TYPECHECK_PASS": true,
+    "CI_LINT_CHECK_PASS": true,
+    "GIT_DIFF_CHECK_PASS": true,
+    "FULL_SUITE_PASS": true,
+    "HTTP_DELIVERY_VERIFIED": "NOT_VERIFIED",
+    "CONTENT_VERSION": 6,
+    "CONTENT_FILES_UNCHANGED": true,
+    "REAL_DB_MUTATED": false,
+    "SHADOW_DB_MUTATED": false,
+    "REAL_DATABASE_RESET": false,
+    "V2_ACTIVATED": false,
+    "TTS_CALL_COUNT": 0,
+    "AI_GRADING_CALL_COUNT": 0,
+    "DEF_004_RESULT_BAND_MODEL_MISMATCH": "OPEN",
+    "PHASE_C1_VERDICT": "RUNTIME_FOUNDATION_PASS"
+  }
+}

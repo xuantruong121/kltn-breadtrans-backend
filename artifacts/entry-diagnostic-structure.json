@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-25T03:20:12.238Z",
+  "readOnly": true,
+  "note": "DiagnosticQuestion has no audio or image column in the current schema. Any Listening/Speaking media must therefore be referenced from the prompt/options JSON or supplied at runtime; mediaReferences records what was actually found.",
+  "assessments": [
+    {
+      "assessmentId": 1,
+      "title": "Kiểm tra trình độ đầu vào",
+      "isActive": true,
+      "questionCount": 20,
+      "bySkill": {
+        "Listening": 4,
+        "Reading": 4,
+        "Grammar": 4,
+        "Vocabulary": 4,
+        "Speaking": 2,
+        "Writing": 2
+      },
+      "orderRange": {
+        "min": 1,
+        "max": 20
+      },
+      "duplicateOrders": [],
+      "duplicatePromptGroups": 0,
+      "mediaReferencesFound": 0,
+      "mediaReferences": [],
+      "attempts": 0,
+      "speakingResponses": 0
+    }
+  ],
+  "totalItems": 20,
+  "incompleteItemCount": 0,
+  "orphanQuestionCount": 0,
+  "orphanSpeakingResponseCount": 0,
+  "defects": []
+}

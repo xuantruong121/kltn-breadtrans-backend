@@ -1,0 +1,383 @@
+{
+  "target": {
+    "FE": "http://localhost:3100",
+    "BE": "http://localhost:3101"
+  },
+  "account": "fresh STUDENT on harness clone",
+  "reports": [
+    {
+      "route": "/",
+      "finalUrl": "/",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/help",
+      "finalUrl": "/help",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/privacy",
+      "finalUrl": "/privacy",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/terms",
+      "finalUrl": "/terms",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/courses",
+      "finalUrl": "/courses",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/dashboard",
+      "finalUrl": "/dashboard",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/student-home",
+      "finalUrl": "/student-home",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/hub",
+      "finalUrl": "/hub",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/learn",
+      "finalUrl": "/learn",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/diagnostic",
+      "finalUrl": "/diagnostic",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/my-courses",
+      "finalUrl": "/courses",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/listening",
+      "finalUrl": "/listening",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/reading",
+      "finalUrl": "/reading",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/reading/mistakes",
+      "finalUrl": "/reading/mistakes",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/speaking",
+      "finalUrl": "/speaking",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/writing",
+      "finalUrl": "/writing",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/exams",
+      "finalUrl": "/exams",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/toeic/assessments",
+      "finalUrl": "/exams",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/toeic/history",
+      "finalUrl": "/toeic/history",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/flashcard",
+      "finalUrl": "/flashcard",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/grammar",
+      "finalUrl": "/reading?category=grammar",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/vocabulary/saved",
+      "finalUrl": "/vocabulary/saved",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/vocabulary/study",
+      "finalUrl": "/vocabulary/study",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/arena",
+      "finalUrl": "/arena",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/classes",
+      "finalUrl": "/courses",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/market",
+      "finalUrl": "/market",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/messages",
+      "finalUrl": "/messages",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/notifications",
+      "finalUrl": "/notifications",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/pet",
+      "finalUrl": "/pet",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/plans",
+      "finalUrl": "/plans",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/change-password",
+      "finalUrl": "/change-password",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/courses/12",
+      "finalUrl": "/courses/12",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/listening (detail)",
+      "finalUrl": "",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [
+        "no detail link matching /^\\/listening\\/\\d+$/"
+      ],
+      "leaks": []
+    },
+    {
+      "route": "/reading (detail)",
+      "finalUrl": "",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [
+        "no detail link matching /^\\/reading\\/\\d+$/"
+      ],
+      "leaks": []
+    },
+    {
+      "route": "/speaking (detail)",
+      "finalUrl": "",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [
+        "no detail link matching /^\\/speaking\\/\\d+$/"
+      ],
+      "leaks": []
+    },
+    {
+      "route": "/writing (detail)",
+      "finalUrl": "",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [
+        "no detail link matching /^\\/writing\\/\\d+$/"
+      ],
+      "leaks": []
+    },
+    {
+      "route": "/exams (detail)",
+      "finalUrl": "",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [
+        "no detail link matching /^\\/exams\\/\\d+$/"
+      ],
+      "leaks": []
+    },
+    {
+      "route": "/toeic/assessments (detail)",
+      "finalUrl": "",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [
+        "no detail link matching /^\\/toeic\\/assessments\\/\\d+$/"
+      ],
+      "leaks": []
+    },
+    {
+      "route": "/flashcard/1",
+      "finalUrl": "/flashcard/1",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [],
+      "leaks": []
+    },
+    {
+      "route": "/classes (detail)",
+      "finalUrl": "",
+      "apiFailures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "errorCopy": [
+        "no detail link matching /^\\/classes\\/\\d+$/"
+      ],
+      "leaks": []
+    }
+  ]
+}

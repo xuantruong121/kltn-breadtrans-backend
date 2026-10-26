@@ -58,6 +58,36 @@ The backup service waits for `postgres` to report healthy, then dumps every
 6 hours (`BACKUP_INTERVAL_SECONDS`) and prunes dumps older than 14 days
 (`BACKUP_RETENTION_DAYS`).
 
+### Cadence and its one real limitation
+
+The automatic backup worker runs only while Docker and the host are running.
+It is not a cloud or always-on scheduler, and it cannot create backups while
+the machine is powered off.
+
+Scheduling is driven by the newest **verified** automatic dump found in the
+backup directory, not by container uptime, so:
+
+- while the host is up, one verified backup roughly every 6 hours;
+- after host downtime, if the last verified automatic backup is already older
+  than the interval, the next one runs immediately once Postgres is ready;
+- if the container restarts before the next one is due, only the remaining
+  time is waited — a restart no longer resets the cycle.
+
+A cycle that fails (Postgres unreachable, `pg_dump` error, archive that
+`pg_restore -l` cannot read) never advances the schedule and never prunes; it
+retries after `BACKUP_FAILURE_RETRY_SECONDS` (default 300s) instead of waiting
+a full interval. On startup the worker also retries readiness every
+`POSTGRES_READY_RETRY_SECONDS` up to `POSTGRES_READY_MAX_ATTEMPTS` times,
+because Docker does not re-evaluate `depends_on` when it restarts a container
+under its restart policy.
+
+### Which dumps retention can touch
+
+Only this worker's own automatic filenames, `<db>_YYYYMMDD_HHMMSS.dump`, are
+ever pruned, and never the newest one. Any dump carrying a label — `PROTECTED`,
+`PRE_*`, `POST_*`, handoff or baseline snapshots — does not match that pattern
+and is structurally exempt, so it is kept regardless of age.
+
 ## Safety guard
 
 Every migration-development npm script runs the guard first:

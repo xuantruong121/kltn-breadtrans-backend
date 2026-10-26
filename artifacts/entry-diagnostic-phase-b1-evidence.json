@@ -1,0 +1,314 @@
+{
+  "phase": "B1",
+  "title": "Isolated database migration and idempotent import rehearsal",
+  "date": "2026-10-26",
+  "independenceMode": "AUTHOR_SELF_VERIFICATION",
+  "independenceCaveat": "Phase B1 was executed by the author of the migration, mapper and importer. Every finding below was produced by a check this author also wrote, so this is self-verification, not an independent gate. Three of the defects recorded under 'harnessDefectsCorrected' were false results produced by this author's own assertions, which is the measured error rate of the harness itself.",
+  "credentialsPolicy": "No password, connection string or other credential is recorded in this file or in the report. Databases are identified by name, port and cluster system_identifier only.",
+
+  "isolation": {
+    "method": "A disposable container created for this phase, identified by its cluster system_identifier rather than by port or environment-variable name.",
+    "rehearsal": {
+      "container": "kltn-b1-rehearsal-47285",
+      "volume": "kltn-b1-rehearsal-47285-vol",
+      "labels": { "breadtrans.phase": "B1_REHEARSAL", "breadtrans.disposable": "true" },
+      "port": 5434,
+      "database": "b1_rehearsal",
+      "serverVersion": "15.19",
+      "systemIdentifier": "7700649961718374440"
+    },
+    "protected": [
+      { "database": "kltn_db", "port": 5432, "systemIdentifier": "7674533776495505443" },
+      { "database": "kltn_shadow", "port": 5433, "systemIdentifier": "7699757546958700579" }
+    ],
+    "distinctnessProof": "All three system_identifier values differ. A port alone would not have proved this; pg_control_system() reads the cluster's own identity.",
+    "harnessRefusesProtectedTargets": {
+      "byName": true,
+      "bySystemIdentifier": true,
+      "provedBy": "The harness re-invokes itself with a kltn_db URL and requires the child process to refuse. Asserted, not merely coded."
+    }
+  },
+
+  "migration": {
+    "name": "20261025120000_diagnostic_source_identity",
+    "statements": [
+      "ALTER TABLE \"DiagnosticAssessment\" ADD COLUMN \"sourceKey\" TEXT",
+      "ALTER TABLE \"DiagnosticQuestion\" ADD COLUMN \"sourceKey\" TEXT",
+      "ALTER TABLE \"DiagnosticReadingPassage\" ADD COLUMN \"sourceKey\" TEXT",
+      "CREATE UNIQUE INDEX \"DiagnosticAssessment_sourceKey_key\" ON \"DiagnosticAssessment\"(\"sourceKey\")",
+      "CREATE UNIQUE INDEX \"DiagnosticQuestion_assessmentId_sourceKey_key\" ON \"DiagnosticQuestion\"(\"assessmentId\", \"sourceKey\")",
+      "CREATE UNIQUE INDEX \"DiagnosticReadingPassage_assessmentId_sourceKey_key\" ON \"DiagnosticReadingPassage\"(\"assessmentId\", \"sourceKey\")"
+    ],
+    "destructiveStatementCount": 0,
+    "destructiveScanScope": "DROP, TRUNCATE, DELETE, UPDATE, ALTER COLUMN TYPE, SET NOT NULL",
+    "backfillRequired": false,
+    "backfillReason": "sourceKey is nullable and Postgres treats each NULL as distinct in a unique index, so the 20 pre-existing V1 rows need no value and cannot collide.",
+    "appliedWith": "prisma migrate deploy",
+    "shadowDatabaseUsed": false,
+    "shadowDatabaseNote": "migrate deploy does not create or reset a shadow database. migrate dev was never run against any database in this phase.",
+    "migrationsAppliedToRehearsal": 68,
+    "preExistingMigrations": 67,
+    "tablesGivenSourceKey": 3,
+    "tablesDeliberatelyNotGivenSourceKey": [
+      { "table": "DiagnosticRubric", "existingIdentity": "@@unique([skill, rubricVersion])" },
+      { "table": "DiagnosticListeningClip", "existingIdentity": "@@unique([questionId, version])" }
+    ]
+  },
+
+  "testA_migrationOnV1ShapedData": {
+    "result": "PASS",
+    "fixtureOrigin": "Authored in scripts/audit/b1-reset-rehearsal.sh. Never a dump or restore of kltn_db.",
+    "assertions": "1 assessment, 20 questions, 20 NULL sourceKeys, 3 new columns",
+    "observed": "1|20|20|3"
+  },
+
+  "testB_firstImport": {
+    "result": "PASS",
+    "assessmentRowsCreated": 1,
+    "importedAssessmentId": 2,
+    "questionRows": 29,
+    "passageRows": 3,
+    "clipRegistrationRows": 10,
+    "rubricRows": 2,
+    "importedIsActive": false,
+    "importedStatus": "DRAFT",
+    "questionBreakdown": { "objective": 25, "productive": 4, "listening": 10, "reading": 10, "languageUse": 5, "speaking": 2, "writing": 2 },
+    "referenceIntegrity": {
+      "readingQuestionsWithoutPassage": 0,
+      "productiveTasksWithoutRubric": 0,
+      "distinctPassagesReferencedBy10ReadingItems": 3
+    },
+    "clipCardinality": {
+      "registrationRows": 10,
+      "distinctScriptHashes": 4,
+      "decision": "One registry row per Listening question, sharing 4 audio assets. Chosen because DiagnosticListeningClip.questionId is a required 1:1 FK and the blueprint readiness guard is phrased per item. Requires no migration.",
+      "audioFilesGenerated": 0,
+      "audioFilesNote": "generationSource = PENDING_PHASE_E, url = empty, options.audioUrl = null. Ten separately generated audio files were NOT created."
+    },
+    "cefrLevelsPersisted": 0
+  },
+
+  "testC_repeatedImport": {
+    "result": "PASS",
+    "ADDITIONAL_ROWS": 0,
+    "EXISTING_ROWS_CHANGED": 0,
+    "importerCreatedCount": 0,
+    "importerUpdatedCount": 0,
+    "rowsCompared": 45,
+    "rowsPhysicallyRewritten": 0,
+    "method": "Postgres xmin, the inserting transaction id of each row, compared before and after. DiagnosticQuestion has no updatedAt column, so a timestamp check could not have detected an unnecessary rewrite; xmin changes on every UPDATE.",
+    "tablesCovered": ["DiagnosticAssessment", "DiagnosticQuestion", "DiagnosticReadingPassage", "DiagnosticListeningClip", "DiagnosticRubric"]
+  },
+
+  "testD_transactionalRollback": {
+    "result": "PASS",
+    "injectionPoints": ["passages", "questions", "clips"],
+    "everyInjectionThrew": true,
+    "countsIdenticalAfterEveryRollback": true,
+    "observedAfterEachRollback": { "assessments": 2, "questions": 49, "passages": 3, "clips": 10, "rubrics": 2 }
+  },
+
+  "testE_invalidSourceRefusal": {
+    "result": "PASS",
+    "fixtureLocation": "Temporary directories outside artifacts/. The approved artifacts were never mutated; HASH_MISMATCH_COUNT=0 after the phase confirms this.",
+    "cases": [
+      { "case": "tampered passage text", "refused": true, "message": "import refused: passage:RDG_PASSAGE_01 does not match the approved manifest hash", "rowsLeftBehind": 0 },
+      { "case": "duplicate source keys", "refused": true, "message": "import refused: duplicate question draftKey \"RDG_Q_001\"", "rowsLeftBehind": 0, "rowContentRewritten": 0, "note": "This case FAILED on first run and exposed defect B1-001." },
+      { "case": "missing passage reference", "refused": true, "message": "RDG_Q_001: passageDraftKey \"RDG_P_DOES_NOT_EXIST\" is unresolved", "rowsLeftBehind": 0 },
+      { "case": "missing clip reference", "refused": true, "message": "LST_Q_001: clip LST_C_DOES_NOT_EXIST unresolved", "rowsLeftBehind": 0 },
+      { "case": "missing rubric reference", "refused": true, "message": "SPK_TASK_01: rubricVersion \"does-not-exist\" is unresolved", "rowsLeftBehind": 0 },
+      { "case": "invalid answer key", "refused": true, "message": "RDG_Q_001: correctAnswer is not one of options", "rowsLeftBehind": 0 },
+      { "case": "ambiguous answer key", "refused": true, "message": "RDG_Q_001: correctAnswer is not unique in options", "rowsLeftBehind": 0 }
+    ],
+    "authoringMetadataCase": {
+      "refused": false,
+      "refusedIsCorrect": true,
+      "explanation": "An extra authoring field on a draft item is NOT refused and reporting it as refused would be a false PASS. The mapper names every column explicitly, so an unknown draft field is structurally unreachable and is dropped. The two claims that are true were asserted instead.",
+      "sentinelsInjected": ["internalLabel", "targetEvidence", "constructRationale", "diagnosticUse", "distractorRationales"],
+      "sentinelsReachingAnyColumn": 0,
+      "allowlistThrowsOnAuthoringFieldInPayload": true,
+      "allowlistThrowsOnNonColumnKey": true,
+      "allowlistTestedDirectly": "assertNoAuthoringFields was called with a crafted payload, so the guard was proved to fire rather than inferred from its existence."
+    },
+    "designatedColumnMappings": [
+      { "authoredField": "answerRationale", "column": "explanation", "rowsWithValue": 25, "alsoInDeliveredOptionsBlob": 0, "exposure": "result-time only, diagnostic.service.ts:365 and :846" },
+      { "authoredField": "difficultyTier", "column": "difficulty", "rowsWithValue": 25, "alsoInDeliveredOptionsBlob": 0, "reachedIntendedLevel": 0 }
+    ]
+  },
+
+  "testF_draftInvisibility": {
+    "result": "PASS",
+    "activeAssessmentQueryReturned": 1,
+    "importedAssessmentId": 2,
+    "activeAssessmentCount": 1,
+    "legacyRowByteUnchanged": true,
+    "databaseProtectionsObserved": [
+      { "mechanism": "CHECK constraint", "name": "DiagnosticAssessment_status_matches_isActive", "definition": "CHECK (((status = 'ACTIVE') = \"isActive\"))", "blocks": "isActive = true on a DRAFT row", "sqlstate": "23514" },
+      { "mechanism": "partial unique index", "name": "DiagnosticAssessment_single_active_key", "definition": "UNIQUE (\"isActive\") WHERE \"isActive\" = true", "blocks": "a second row with isActive = true", "sqlstate": "23505" }
+    ],
+    "protectionsNote": "These are two independent protections blocked by two different writes. Each was probed with the write that actually exercises it, inside a rolled-back transaction. An earlier version of this test asserted only the unique index and probed it with a write that trips the CHECK, which reported a FAIL even though the database had refused the write correctly.",
+    "attemptCreationOnDraft": "Not reachable: the active-assessment query never returns the DRAFT row, and the CHECK constraint makes an active DRAFT row impossible at the storage layer."
+  },
+
+  "testG_concurrency": {
+    "result": "PASS",
+    "actuallyTested": true,
+    "method": "Two separate PrismaClient instances, therefore separate connections, both started before either was awaited, importing into a database holding no import yet so both races to create the same assessment.",
+    "weakTestRejected": "The in-harness pair runs after the content is already imported, so both calls take the no-op path and nothing contends. That run was NOT counted as a concurrency result.",
+    "outcomes": ["rejected", "fulfilled"],
+    "CONCURRENCY_SAFETY_MECHANISM": "DATABASE_UNIQUE_CONSTRAINT",
+    "mechanismDetail": "The losing transaction was rejected by the unique index on DiagnosticAssessment.sourceKey, added by this phase's migration. Safety comes from a database constraint, not from application locking and not from transaction isolation level.",
+    "endState": { "assessments": 1, "questions": 29, "passages": 3, "clips": 10, "rubrics": 2 },
+    "duplicateRowsSurviving": 0
+  },
+
+  "learnerPayloadConfidentiality": {
+    "result": "PASS",
+    "method": "The real DiagnosticService.sanitizeQuestion was invoked on the actual imported rows, together with the real getQuestionMeta and getQuestionOptions. The mapper allowlist was NOT accepted as evidence: an allowlist proves what is written, not what is served.",
+    "servedKeys": ["audioUrl", "construct", "id", "options", "order", "passageBody", "passageText", "passageTitle", "question", "questionType", "section", "skill"],
+    "forbiddenKeysAbsent": ["correctIndex", "explanation", "difficulty", "intendedLevel"],
+    "rowsCarryingExplanation": 25,
+    "explanationTextAppearingInServedPayload": 0,
+    "meaningfulnessCheck": "25 rows do carry an explanation, so the absence check is not vacuous.",
+    "difficultyTiersInStorage": ["D1", "D2", "D3", "D4"],
+    "difficultyTiersInServedPayload": 0,
+    "optionPermutation": { "mcqItems": 25, "itemsWhoseKeyStayedInAuthoredPosition": 7, "conclusion": "Options are permuted per attempt; the key is not recoverable from position." }
+  },
+
+  "deliveryMetadataValidity": {
+    "LISTENING_DELIVERY_METADATA_VALID": true,
+    "listeningDetail": { "itemsServed": 10, "carryingAudioUrlField": 10, "audioUrlNull": 10, "fabricatedAudioPaths": 0 },
+    "READING_DELIVERY_METADATA_VALID": true,
+    "readingDetail": { "itemsServed": 10, "carryingPassageText": 10, "passagesReadBack": 3, "itemsServingTheCompleteAuthoredPassage": 10, "itemsWithOpeningParagraphHoistedIntoTitle": 0, "distinctPassageTitles": 1, "titleUsed": "the serializer's own existing generic heading" },
+    "PRODUCTIVE_TASK_METADATA_VALID": true,
+    "productiveDetail": { "tasksServed": 4, "servedAsOpenTextWithNoOptions": 4, "speakingRowsWithPrepAndResponseSeconds": 2, "writingRowsWithWordBounds": 2, "correctIndexMinusOneExposed": false },
+    "languageUseDetail": { "itemsServed": 5, "optionsPerItem": 4 }
+  },
+
+  "defectsFoundAndRemediated": [
+    {
+      "id": "B1-001",
+      "severity": "MAJOR",
+      "foundBy": "Test E, duplicate source keys",
+      "defect": "Two authored items sharing a draftKey both upsert onto the SAME row, so the second silently overwrites the first item's content. The importer's own 'expected 29 questions' assertion cannot see this, because the row count never changes.",
+      "whyItMattered": "An authoring slip would have destroyed one item's content with no error and no count change.",
+      "fix": "assertUniqueSourceKeys in v2-content-importer.ts, run before the transaction opens. Covers question, passage and clip draftKeys and rubric skill@version identities, and also refuses a missing identity.",
+      "tests": "10 cases in src/modules/diagnostic/v2-import-guards.spec.ts, each of which fails without the guard.",
+      "reVerified": true
+    },
+    {
+      "id": "B1-002",
+      "severity": "MINOR",
+      "foundBy": "Reading the idempotency comparison before trusting its result",
+      "defect": "The importer's change detection compared fields with JSON.stringify. options is a jsonb column and Postgres does not preserve object key order, so a byte-identical re-import would have reported an update and rewritten every question row.",
+      "whyItMattered": "It would have falsified the EXISTING_ROWS_CHANGED=0 claim in the direction of a false FAIL, and in a different key order could have masked a real change.",
+      "fix": "An order-independent canonical serialisation in v2-content-importer.ts.",
+      "reVerified": "45 rows, 0 physically rewritten, proved by xmin."
+    },
+    {
+      "id": "B1-003",
+      "severity": "MAJOR",
+      "foundBy": "The learner payload check, running the real serializer on the real rows",
+      "defect": "sanitizeQuestion reads line 1 of passageText as the passage TITLE and serves only the remaining lines as the body, a V1 convention where passages were stored as a title line followed by the body. The imported passages have no title line, so 7 of 10 Reading items had their opening paragraph hoisted into a heading and removed from the text the learner reads. 405 characters lost.",
+      "whyItMattered": "Three of the ten Reading items depend on information in the opening paragraph. This was a learner-facing content loss that no row count, no allowlist and no mapper unit test would have detected.",
+      "fix": "titledPassage in v2-import-mapper.ts prefixes the exact generic heading the serializer itself already falls back to for single-line passages. No new learner-facing content is introduced, the authored body is unchanged and complete after the split, and no runtime change was needed.",
+      "tests": "5 cases in src/modules/diagnostic/v2-import-guards.spec.ts, including one that reproduces the defect itself and one that proves the fix is idempotent across re-imports.",
+      "reVerified": "10 of 10 Reading items now serve the complete authored passage, compared against the DiagnosticReadingPassage.text column rather than against the stored passageText."
+    }
+  ],
+
+  "harnessDefectsCorrected": [
+    {
+      "defect": "A confidentiality check used the pattern '%D9%'. Two characters, unanchored, case-insensitive: it matched the V1 fixture's own option text \"D9\" and reported a leak that did not exist.",
+      "class": "narrow or degenerate check reported under a broad flag name",
+      "correction": "Every sentinel is now a long distinctive token, and each is reported as its own assertion."
+    },
+    {
+      "defect": "The same check asserted 'reached no column of any row' for answerRationale and difficultyTier, which are deliberately mapped to the explanation and difficulty columns. Two correct mappings were reported as leaks.",
+      "class": "assertion broader than the claim it can support",
+      "correction": "Fields were split by destination. Fields with no column must reach no row; fields with a designated column must land there and nowhere else, which is now asserted separately."
+    },
+    {
+      "defect": "Test F asserted the partial unique index but probed it with a write that trips the CHECK constraint instead, so a correct database refusal was reported as a FAIL.",
+      "class": "wrong mechanism named for an observed behaviour",
+      "correction": "Both protections are now asserted, each probed with the write that actually exercises it, inside a rolled-back transaction."
+    }
+  ],
+
+  "protectedDatabasesAfterPhase": {
+    "verificationMode": "READ_ONLY_SELECT",
+    "kltn_db": {
+      "systemIdentifier": "7674533776495505443",
+      "assessments": 1,
+      "questions": 20,
+      "attempts": 0,
+      "readingPassages": 0,
+      "listeningClips": 0,
+      "rubrics": 0,
+      "diagnosticSourceKeyColumns": 0,
+      "migrationsApplied": 67,
+      "latestMigration": "20261025054012_diagnostic_v2_schema_foundation",
+      "assessmentRows": [{ "id": 1, "isActive": true, "status": "ACTIVE", "title": "Kiểm tra trình độ đầu vào" }],
+      "conclusion": "Untouched. The B1 migration is NOT applied here: sourceKey does not exist on any Diagnostic table, and 20261025120000_diagnostic_source_identity is not in _prisma_migrations."
+    },
+    "kltn_shadow": {
+      "systemIdentifier": "7699757546958700579",
+      "publicTables": 112,
+      "diagnosticSourceKeyColumns": 0,
+      "conclusion": "Untouched and never used for this rehearsal."
+    }
+  },
+
+  "reportedInconsistency": {
+    "id": "B1-INC-001",
+    "claim": "A plan file in the workspace, C:/Users/luamo/.claude/plans/magical-snacking-crown.md, records as completed work that DiagnosticAssessment id=2 titled \"Entry Diagnostic v2\" existed in the real database and was renamed to \"Kiểm tra đầu vào\", with a related script edited to match.",
+    "verifiedState": "kltn_db contains exactly one DiagnosticAssessment row, id=1, title \"Kiểm tra trình độ đầu vào\". There is no id=2 row and no row titled \"Kiểm tra đầu vào\".",
+    "resolution": "NOT_RESOLVED. The discrepancy is reported rather than reconciled. Either that row was later removed, or the plan file describes a different database or session. No write was made to investigate, and no consistency was assumed in either direction.",
+    "impactOnB1": "None. B1 touched only the disposable rehearsal database, and the import is keyed by sourceKey, which no existing kltn_db row carries."
+  },
+
+  "verificationCommands": {
+    "typecheck": { "command": "npx tsc --noEmit", "exit": 0 },
+    "diagnosticTests": { "command": "npx jest src/modules/diagnostic", "suites": "9 passed, 9 total", "tests": "178 passed, 178 total" },
+    "lint": { "command": "npx eslint scripts/audit/b1-*.ts src/modules/diagnostic/v2-*.ts", "errors": 0 },
+    "whitespace": { "command": "git diff --check", "exit": 0 },
+    "contentArtifactIntegrity": { "command": "npx ts-node scripts/audit/validate-entry-diagnostic-v2-draft.ts --check", "HASH_MISMATCH_COUNT": 0, "MECHANICAL_VALIDATION_PASS": true },
+    "fullSuite": { "run": false, "reason": "Not run in this phase. speaking-post-processing.service.spec.ts has a pre-existing failure under the parallel full run that passes 8/8 in isolation and is unrelated to B1. A full-suite pass is NOT claimed." }
+  },
+
+  "assertionTotals": {
+    "rehearsalHarness": { "pass": 74, "fail": 0 },
+    "learnerPayloadCheck": { "pass": 23, "fail": 0 },
+    "concurrencyCheck": { "pass": 8, "fail": 0 },
+    "total": { "pass": 105, "fail": 0 },
+    "note": "All three were run against a freshly reset database after every fix, so these totals describe the current code, not an earlier state."
+  },
+
+  "filesAdded": [
+    "prisma/migrations/20261025120000_diagnostic_source_identity/migration.sql",
+    "src/modules/diagnostic/v2-content-importer.ts",
+    "src/modules/diagnostic/v2-import-guards.spec.ts",
+    "scripts/audit/b1-reset-rehearsal.sh",
+    "scripts/audit/b1-import-rehearsal.ts",
+    "scripts/audit/b1-learner-payload-check.ts",
+    "scripts/audit/b1-concurrency-check.ts",
+    "artifacts/entry-diagnostic-phase-b1-report.md",
+    "artifacts/entry-diagnostic-phase-b1-evidence.json"
+  ],
+  "filesChanged": [
+    "prisma/schema.prisma",
+    "src/modules/diagnostic/v2-import-mapper.ts",
+    "src/modules/diagnostic/v2-import-mapper.spec.ts"
+  ],
+
+  "verdict": "ISOLATED_REHEARSAL_PASS",
+  "verdictBasis": "The additive migration applied cleanly over V1-shaped data with no backfill and no destructive statement. The importer is transactional, idempotent at the storage level, refuses every invalid source fixture, imports as an inactive DRAFT that the active-assessment query does not return, is safe under real concurrency by a named and observed database constraint, and serves a learner payload that exposes no answer, rationale or tier. Three real defects were found during the rehearsal and all three were fixed, unit-tested and re-verified from a clean database.",
+  "verdictScope": "This verdict covers the isolated rehearsal only. It is self-verification by the author of the code under test, and it authorizes nothing against any real database.",
+  "STEP2E_LIVE_PERSISTENCE_ALLOWED": false,
+  "livePersistenceBlockers": [
+    "Phase B1 is author self-verification. An independent cold review of the migration, importer and learner payload has not been performed.",
+    "The passage delivery fix changes the stored shape of options.passageText by adding a heading line. The authored content is unchanged and still hash-verifies, but a reviewer should see this delivery-contract change before it is written to a real database.",
+    "Listening audio does not exist. All 10 clip rows are generationSource = PENDING_PHASE_E with an empty url and options.audioUrl = null, so the Listening section is not deliverable until Phase E.",
+    "No backup-and-restore drill for kltn_db was performed in this phase."
+  ]
+}

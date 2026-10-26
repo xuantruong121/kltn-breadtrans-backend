@@ -202,6 +202,11 @@ function difficultyLabel(values: string[]) {
   return `${labels[unique[0]]} – ${labels[unique[unique.length - 1]]}`;
 }
 
+/** Daily Speaking grading allowance per learner (see dailySpeakingQuotaError). */
+export const DAILY_PRACTICE_SPEAKING_LIMIT = 10;
+/** Three full 11-task TOEIC speaking sections per day. */
+export const DAILY_EXAM_SPEAKING_LIMIT = 33;
+
 @Injectable()
 export class SpeakingService {
   private readonly logger = new Logger(SpeakingService.name);
@@ -624,7 +629,6 @@ export class SpeakingService {
 
     // 6. Count and create under a per-user/day PostgreSQL advisory lock.
     // This keeps the quota atomic without a schema migration.
-    const DAILY_LIMIT = 10;
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     let submission;
@@ -638,14 +642,13 @@ export class SpeakingService {
           );
         `;
 
-        const submissionsToday = await tx.speakingSubmission.count({
-          where: { userId, submittedAt: { gte: startOfDay } },
-        });
-        if (submissionsToday >= DAILY_LIMIT) {
-          throw new BadRequestException(
-            `Bạn đã đạt giới hạn chấm điểm phát âm hôm nay (${DAILY_LIMIT} lần). Vui lòng quay lại vào ngày mai để luyện tập tiếp nhé!`,
-          );
-        }
+        const quotaError = await this.dailySpeakingQuotaError(
+          tx,
+          userId,
+          exercise.id,
+          startOfDay,
+        );
+        if (quotaError) throw new BadRequestException(quotaError);
 
         return tx.speakingSubmission.create({
           data: {
@@ -734,6 +737,47 @@ export class SpeakingService {
    * Phase 2.2: Create a secure upload intent for direct client upload to Cloudflare R2.
    * Server retains full authority over object key, quota, constraints, and expiration.
    */
+  /**
+   * Practice and exam Speaking have separate daily quotas. A TOEIC speaking
+   * section alone has 11 tasks, so the single shared limit of 10 made the
+   * S&W and 4 Skills exams impossible to finish, and exam recordings used to
+   * consume the learner's practice allowance. Exam tasks are the exercises of
+   * EXAM_INTERNAL practice sets; their limit still bounds provider usage.
+   */
+  private async dailySpeakingQuotaError(
+    db: Pick<
+      Prisma.TransactionClient,
+      'speakingSubmission' | 'speakingExercise'
+    >,
+    userId: number,
+    exerciseId: number,
+    startOfDay: Date,
+  ): Promise<string | null> {
+    const exercise = await db.speakingExercise.findUnique({
+      where: { id: exerciseId },
+      select: { practiceSet: { select: { scope: true } } },
+    });
+    const exam =
+      exercise?.practiceSet?.scope === SpeakingPracticeScope.EXAM_INTERNAL;
+    const examFilter: Prisma.SpeakingSubmissionWhereInput = {
+      exercise: {
+        practiceSet: { scope: SpeakingPracticeScope.EXAM_INTERNAL },
+      },
+    };
+    const count = await db.speakingSubmission.count({
+      where: {
+        userId,
+        submittedAt: { gte: startOfDay },
+        ...(exam ? examFilter : { NOT: examFilter }),
+      },
+    });
+    if (exam && count >= DAILY_EXAM_SPEAKING_LIMIT)
+      return `Bạn đã đạt giới hạn chấm bài Speaking trong đề thi hôm nay (${DAILY_EXAM_SPEAKING_LIMIT} lần). Vui lòng quay lại vào ngày mai.`;
+    if (!exam && count >= DAILY_PRACTICE_SPEAKING_LIMIT)
+      return `Bạn đã đạt giới hạn chấm điểm phát âm hôm nay (${DAILY_PRACTICE_SPEAKING_LIMIT} lần). Vui lòng quay lại vào ngày mai để luyện tập tiếp nhé!`;
+    return null;
+  }
+
   async createUploadIntent(
     exerciseId: number,
     userId: number,
@@ -769,17 +813,15 @@ export class SpeakingService {
     }
 
     // 3. Enforce daily speaking quota
-    const DAILY_LIMIT = 10;
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    const submissionsToday = await this.prisma.speakingSubmission.count({
-      where: { userId, submittedAt: { gte: startOfDay } },
-    });
-    if (submissionsToday >= DAILY_LIMIT) {
-      throw new BadRequestException(
-        `Bạn đã đạt giới hạn chấm điểm phát âm hôm nay (${DAILY_LIMIT} lần). Vui lòng quay lại vào ngày mai để luyện tập tiếp nhé!`,
-      );
-    }
+    const quotaError = await this.dailySpeakingQuotaError(
+      this.prisma,
+      userId,
+      exerciseId,
+      startOfDay,
+    );
+    if (quotaError) throw new BadRequestException(quotaError);
 
     // 4. Rate-limit / bound active unexpired intents per user (Correction I)
     const MAX_ACTIVE_INTENTS_PER_USER = 3;
@@ -1161,7 +1203,6 @@ export class SpeakingService {
     }
 
     // 7. Atomic creation and quota enforcement under PostgreSQL advisory lock
-    const DAILY_LIMIT = 10;
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
@@ -1175,14 +1216,13 @@ export class SpeakingService {
         `;
 
         // Check daily quota
-        const submissionsToday = await tx.speakingSubmission.count({
-          where: { userId, submittedAt: { gte: startOfDay } },
-        });
-        if (submissionsToday >= DAILY_LIMIT) {
-          throw new BadRequestException(
-            `Bạn đã đạt giới hạn chấm điểm phát âm hôm nay (${DAILY_LIMIT} lần). Vui lòng quay lại vào ngày mai để luyện tập tiếp nhé!`,
-          );
-        }
+        const quotaError = await this.dailySpeakingQuotaError(
+          tx,
+          userId,
+          intent.exerciseId,
+          startOfDay,
+        );
+        if (quotaError) throw new BadRequestException(quotaError);
 
         const publicUrl = this.getStorage().getPublicUrl();
         const audioUrl = publicUrl

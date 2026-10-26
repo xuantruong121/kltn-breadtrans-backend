@@ -1,0 +1,9 @@
+target kltn_db cluster 7674533776495505443 (PROTECTED, read-only session)
+assessment 5 status=DRAFT isActive=false contentVersion=1
+clip rows: 10; distinct scripts: 4; voice registry 2026-09-21.v1
+   pending: true; chars 403; turns 6
+   pending: true; chars 545; turns 1
+   pending: true; chars 410; turns 1
+   pending: true; chars 334; turns 6
+problems: none
+a publish would change: 10 DiagnosticListeningClip rows (storageKey,url,durationMs,byteSize,audioSha256,voice,generationSource,isActive) and 10 DiagnosticQuestion.options.audioUrl

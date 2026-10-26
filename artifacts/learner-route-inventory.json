@@ -1,0 +1,1345 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-25T02:03:03.878Z",
+  "source": {
+    "frontendRoot": "kltn-breadtrans-frontend-junior",
+    "appDir": "src/app",
+    "note": "Derived from the current app directory, not from the historical count of 47."
+  },
+  "counts": {
+    "pagesFound": 97,
+    "learnerRoutes": 48,
+    "excluded": 49,
+    "byDomain": {
+      "Courses": 5,
+      "Other": 1,
+      "Vocabulary 1v1 Arena": 1,
+      "Classes": 2,
+      "Dashboard": 4,
+      "Diagnostic": 1,
+      "TOEIC": 12,
+      "Flashcards": 2,
+      "Grammar": 1,
+      "Listening": 3,
+      "Market / Shop": 1,
+      "Notifications": 2,
+      "Gamification": 1,
+      "Plans / Entitlement": 1,
+      "Reading": 4,
+      "Speaking": 2,
+      "Vocabulary": 2,
+      "Writing": 3
+    },
+    "byPriority": {
+      "P0": 10,
+      "P1": 8,
+      "P3": 17,
+      "P2": 13
+    }
+  },
+  "excluded": [
+    {
+      "pattern": "/admin/ai-tools",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/assignments",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/costs",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/courses/:id/curriculum",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/courses/:id/edit",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/courses/:id/lessons/:lessonId",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/courses",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/currency",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/enroll",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/exams/:id/learner-preview",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/exams/:id",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/exams/ai/:jobId",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/exams/new",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/exams",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/grammar",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/issue-reports",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/listening/:id",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/listening/new",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/listening",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/market",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/messages",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/payments",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/plan-purchases",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/practice",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/quizzes",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/reading/:id",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/reading/new",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/reading",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/speaking",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/suggestions",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/toeic/assessments",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/toeic/writing-sets",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/users/:id",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/users",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/vocab",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/writing/:id",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/writing/new",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/admin/writing",
+      "reason": "admin-only route group"
+    },
+    {
+      "pattern": "/forgot-password",
+      "reason": "authentication plumbing, not a learner product feature"
+    },
+    {
+      "pattern": "/help",
+      "reason": "static legal/help content, no learner data or media"
+    },
+    {
+      "pattern": "/privacy",
+      "reason": "static legal/help content, no learner data or media"
+    },
+    {
+      "pattern": "/reset-password",
+      "reason": "authentication plumbing, not a learner product feature"
+    },
+    {
+      "pattern": "/terms",
+      "reason": "static legal/help content, no learner data or media"
+    },
+    {
+      "pattern": "/auth/callback",
+      "reason": "authentication plumbing, not a learner product feature"
+    },
+    {
+      "pattern": "/auth/error",
+      "reason": "authentication plumbing, not a learner product feature"
+    },
+    {
+      "pattern": "/change-password",
+      "reason": "authentication plumbing, not a learner product feature"
+    },
+    {
+      "pattern": "/login",
+      "reason": "authentication plumbing, not a learner product feature"
+    },
+    {
+      "pattern": "/register",
+      "reason": "authentication plumbing, not a learner product feature"
+    }
+  ],
+  "routes": [
+    {
+      "routeId": "courses-id",
+      "routePattern": "/courses/:id",
+      "domain": "Courses",
+      "component": "(public)/courses/[id]/page.tsx",
+      "group": "(public)",
+      "authRequired": false,
+      "dynamic": true,
+      "apis": [
+        "GET /classes",
+        "GET /courses",
+        "GET /courses/${courseId}/activities/${activityId}/access",
+        "GET /courses/${courseId}/learning",
+        "GET /courses/${courseId}/learning/lessons/${lessonId}",
+        "GET /courses/${courseId}/lessons/${lessonId}",
+        "GET /courses/${courseId}/my-enrollments",
+        "GET /courses/${id}",
+        "GET /courses/${id}/progress",
+        "GET /courses/classes/${classId}",
+        "GET /public/courses",
+        "GET /public/courses/${id}",
+        "POST /courses/${courseId}/learning/lessons/${lessonId}/exercises/${exerciseId}/submit",
+        "POST /courses/${id}/start",
+        "POST /courses/classes/${classId}/enroll"
+      ],
+      "mediaTypes": [
+        "image"
+      ],
+      "criticalInteractions": [
+        "navigation"
+      ],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "courses",
+      "routePattern": "/courses",
+      "domain": "Courses",
+      "component": "(public)/courses/page.tsx",
+      "group": "(public)",
+      "authRequired": false,
+      "dynamic": false,
+      "apis": [
+        "GET /classes",
+        "GET /courses",
+        "GET /courses/${courseId}/activities/${activityId}/access",
+        "GET /courses/${courseId}/learning",
+        "GET /courses/${courseId}/learning/lessons/${lessonId}",
+        "GET /courses/${courseId}/lessons/${lessonId}",
+        "GET /courses/${courseId}/my-enrollments",
+        "GET /courses/${id}",
+        "GET /courses/${id}/progress",
+        "GET /courses/classes/${classId}",
+        "GET /public/courses",
+        "GET /public/courses/${id}",
+        "POST /courses/${courseId}/learning/lessons/${lessonId}/exercises/${exerciseId}/submit",
+        "POST /courses/${id}/start",
+        "POST /courses/classes/${classId}/enroll"
+      ],
+      "mediaTypes": [
+        "image"
+      ],
+      "criticalInteractions": [],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "root",
+      "routePattern": "/",
+      "domain": "Other",
+      "component": "(public)/page.tsx",
+      "group": "(public)",
+      "authRequired": false,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [
+        "image"
+      ],
+      "criticalInteractions": [
+        "navigation"
+      ],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "arena",
+      "routePattern": "/arena",
+      "domain": "Vocabulary 1v1 Arena",
+      "component": "(student)/arena/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /gamification/arena/snippet",
+        "GET /gamification/badges/me",
+        "GET /gamification/dashboard/today",
+        "GET /gamification/leaderboard",
+        "GET /gamification/pet",
+        "GET /gamification/quests",
+        "GET /users/learning-history${type && type !== ",
+        "GET /users/learning-history${type && type !== \"ALL\" ? ",
+        "GET /users/me/daily-practice",
+        "GET /users/me/skill-progress",
+        "GET /users/profile",
+        "GET /users/shipping-profile",
+        "GET /users/skills-summary",
+        "GET /users/stats",
+        "PATCH /users/shipping-profile",
+        "POST /gamification/pet/change-type",
+        "POST /gamification/pet/feed"
+      ],
+      "mediaTypes": [
+        "image"
+      ],
+      "criticalInteractions": [
+        "form submit",
+        "navigation"
+      ],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "classes-classId",
+      "routePattern": "/classes/:classId",
+      "domain": "Classes",
+      "component": "(student)/classes/[classId]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /classes/${classId}",
+        "POST /courses/assignments/${selectedAssignment.id}/submit",
+        "POST /upload/file"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "write/submit"
+      ],
+      "auditPriority": "P1"
+    },
+    {
+      "routeId": "classes",
+      "routePattern": "/classes",
+      "domain": "Classes",
+      "component": "(student)/classes/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "dashboard",
+      "routePattern": "/dashboard",
+      "domain": "Dashboard",
+      "component": "(student)/dashboard/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /gamification/arena/snippet",
+        "GET /gamification/badges/me",
+        "GET /gamification/dashboard/today",
+        "GET /gamification/leaderboard",
+        "GET /gamification/pet",
+        "GET /gamification/quests",
+        "GET /plan-purchases/${id}",
+        "GET /plan-purchases/me",
+        "GET /plans/catalog",
+        "GET /subscriptions/me",
+        "GET /users/learning-history${type && type !== ",
+        "GET /users/learning-history${type && type !== \"ALL\" ? ",
+        "GET /users/me/daily-practice",
+        "GET /users/me/skill-progress",
+        "GET /users/profile",
+        "GET /users/shipping-profile",
+        "GET /users/skills-summary",
+        "GET /users/stats",
+        "PATCH /users/shipping-profile",
+        "POST /gamification/pet/change-type",
+        "POST /gamification/pet/feed",
+        "POST /payments/payos/${intentId}/sync",
+        "POST /plan-purchases",
+        "POST /plan-purchases/${id}/replace-payment",
+        "POST /plan-purchases/${id}/report-transfer"
+      ],
+      "mediaTypes": [
+        "image"
+      ],
+      "criticalInteractions": [],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "diagnostic",
+      "routePattern": "/diagnostic",
+      "domain": "Diagnostic",
+      "component": "(student)/diagnostic/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /diagnostic/current",
+        "GET /diagnostic/results/latest",
+        "POST /diagnostic/${assessmentId}/attempts",
+        "POST /diagnostic/${assessmentId}/attempts/${attemptId}/speaking/${questionId}/confirm",
+        "POST /diagnostic/${assessmentId}/attempts/${attemptId}/speaking/${questionId}/skip",
+        "POST /diagnostic/${assessmentId}/attempts/${attemptId}/writing/${questionId}/retry",
+        "POST /diagnostic/${assessmentId}/attempts/start"
+      ],
+      "mediaTypes": [
+        "audio",
+        "microphone"
+      ],
+      "criticalInteractions": [
+        "write/submit",
+        "recording",
+        "form submit"
+      ],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "exams-id",
+      "routePattern": "/exams/:id",
+      "domain": "TOEIC",
+      "component": "(student)/exams/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /exams",
+        "GET /exams/${id}"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "exams",
+      "routePattern": "/exams",
+      "domain": "TOEIC",
+      "component": "(student)/exams/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /exams",
+        "GET /exams/${id}"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "navigation",
+        "local draft/state"
+      ],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "exams-submissions-id",
+      "routePattern": "/exams/submissions/:id",
+      "domain": "TOEIC",
+      "component": "(student)/exams/submissions/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "flashcard-id",
+      "routePattern": "/flashcard/:id",
+      "domain": "Flashcards",
+      "component": "(student)/flashcard/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "DELETE /vocab/saved/${id}",
+        "GET /plan-purchases/${id}",
+        "GET /plan-purchases/me",
+        "GET /plans/catalog",
+        "GET /subscriptions/me",
+        "GET /vocab/lookup",
+        "GET /vocab/lookup/details",
+        "GET /vocab/saved",
+        "GET /vocab/topics",
+        "GET /vocab/topics/${id}",
+        "POST /payments/payos/${intentId}/sync",
+        "POST /plan-purchases",
+        "POST /plan-purchases/${id}/replace-payment",
+        "POST /plan-purchases/${id}/report-transfer",
+        "POST /vocab/saved",
+        "POST /vocab/words/${id}/master",
+        "POST /vocab/words/${id}/review",
+        "POST /vocab/words/${id}/star"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "flashcard",
+      "routePattern": "/flashcard",
+      "domain": "Flashcards",
+      "component": "(student)/flashcard/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "grammar",
+      "routePattern": "/grammar",
+      "domain": "Grammar",
+      "component": "(student)/grammar/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "hub",
+      "routePattern": "/hub",
+      "domain": "Dashboard",
+      "component": "(student)/hub/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "learn",
+      "routePattern": "/learn",
+      "domain": "Dashboard",
+      "component": "(student)/learn/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "listening-id",
+      "routePattern": "/listening/:id",
+      "domain": "Listening",
+      "component": "(student)/listening/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "listening",
+      "routePattern": "/listening",
+      "domain": "Listening",
+      "component": "(student)/listening/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /quizzes/${id}",
+        "GET /quizzes/${quizId}/transcript",
+        "GET /quizzes/${quizId}/transcript/audio${query}",
+        "GET /quizzes/listening-practice",
+        "GET /quizzes/submissions/${submissionId}/analytics",
+        "GET /quizzes/toeic-papers",
+        "PATCH /quizzes/${quizId}/listening-attempts/${attemptId}",
+        "POST /quizzes/${id}/submit",
+        "POST /quizzes/${quizId}/listening-attempts",
+        "POST /quizzes/${quizId}/listening-attempts/${attemptId}/cancel",
+        "POST /quizzes/${quizId}/questions/${questionId}/check",
+        "POST /quizzes/${quizId}/transcript/reveal"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "navigation"
+      ],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "listening-submissions-id",
+      "routePattern": "/listening/submissions/:id",
+      "domain": "Listening",
+      "component": "(student)/listening/submissions/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "market",
+      "routePattern": "/market",
+      "domain": "Market / Shop",
+      "component": "(student)/market/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "messages",
+      "routePattern": "/messages",
+      "domain": "Notifications",
+      "component": "(student)/messages/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /admin/support/conversations",
+        "GET /admin/support/conversations/${conversationId}",
+        "GET /admin/support/conversations/${conversationId}/messages",
+        "GET /admin/support/learners",
+        "GET /admin/support/unread-count",
+        "GET /support/conversations/${conversationId}/messages",
+        "GET /support/conversations/me",
+        "GET /support/unread-count",
+        "PATCH /admin/support/conversations/${conversationId}/mode",
+        "PATCH /support/conversations/${conversationId}/mode",
+        "POST /admin/support/conversations/${conversationId}/messages",
+        "POST /admin/support/conversations/start/${studentId}",
+        "POST /support/conversations/${conversationId}/ai-messages",
+        "POST /support/conversations/${conversationId}/messages"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "write/submit",
+        "form submit"
+      ],
+      "auditPriority": "P1"
+    },
+    {
+      "routeId": "my-courses-courseId-lessons-lessonId",
+      "routePattern": "/my-courses/:courseId/lessons/:lessonId",
+      "domain": "Courses",
+      "component": "(student)/my-courses/[courseId]/lessons/[lessonId]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /classes",
+        "GET /courses",
+        "GET /courses/${courseId}/activities/${activityId}/access",
+        "GET /courses/${courseId}/learning",
+        "GET /courses/${courseId}/learning/lessons/${lessonId}",
+        "GET /courses/${courseId}/lessons/${lessonId}",
+        "GET /courses/${courseId}/my-enrollments",
+        "GET /courses/${id}",
+        "GET /courses/${id}/progress",
+        "GET /courses/classes/${classId}",
+        "GET /public/courses",
+        "GET /public/courses/${id}",
+        "POST /courses/${courseId}/learning/lessons/${lessonId}/exercises/${exerciseId}/submit",
+        "POST /courses/${id}/start",
+        "POST /courses/classes/${classId}/enroll"
+      ],
+      "mediaTypes": [
+        "audio",
+        "image"
+      ],
+      "criticalInteractions": [
+        "write/submit"
+      ],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "my-courses-courseId",
+      "routePattern": "/my-courses/:courseId",
+      "domain": "Courses",
+      "component": "(student)/my-courses/[courseId]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /classes",
+        "GET /courses",
+        "GET /courses/${courseId}/activities/${activityId}/access",
+        "GET /courses/${courseId}/learning",
+        "GET /courses/${courseId}/learning/lessons/${lessonId}",
+        "GET /courses/${courseId}/lessons/${lessonId}",
+        "GET /courses/${courseId}/my-enrollments",
+        "GET /courses/${id}",
+        "GET /courses/${id}/progress",
+        "GET /courses/classes/${classId}",
+        "GET /public/courses",
+        "GET /public/courses/${id}",
+        "POST /courses/${courseId}/learning/lessons/${lessonId}/exercises/${exerciseId}/submit",
+        "POST /courses/${id}/start",
+        "POST /courses/classes/${classId}/enroll"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "my-courses",
+      "routePattern": "/my-courses",
+      "domain": "Courses",
+      "component": "(student)/my-courses/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "notifications",
+      "routePattern": "/notifications",
+      "domain": "Notifications",
+      "component": "(student)/notifications/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "DELETE /notifications/inbox/${id}",
+        "GET /notifications/inbox",
+        "GET /notifications/inbox/unread-count",
+        "PATCH /notifications/inbox/${id}/read",
+        "PATCH /notifications/inbox/read-all"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "write/submit",
+        "navigation"
+      ],
+      "auditPriority": "P1"
+    },
+    {
+      "routeId": "pet",
+      "routePattern": "/pet",
+      "domain": "Gamification",
+      "component": "(student)/pet/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /gamification/arena/snippet",
+        "GET /gamification/badges/me",
+        "GET /gamification/dashboard/today",
+        "GET /gamification/leaderboard",
+        "GET /gamification/pet",
+        "GET /gamification/quests",
+        "GET /market/currency/balance",
+        "POST /gamification/pet/change-type",
+        "POST /gamification/pet/feed"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "write/submit"
+      ],
+      "auditPriority": "P1"
+    },
+    {
+      "routeId": "plans",
+      "routePattern": "/plans",
+      "domain": "Plans / Entitlement",
+      "component": "(student)/plans/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /plan-purchases/${id}",
+        "GET /plan-purchases/me",
+        "GET /plans/catalog",
+        "GET /subscriptions/me",
+        "POST /payments/payos/${intentId}/sync",
+        "POST /plan-purchases",
+        "POST /plan-purchases/${id}/replace-payment",
+        "POST /plan-purchases/${id}/report-transfer"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "write/submit",
+        "navigation"
+      ],
+      "auditPriority": "P1"
+    },
+    {
+      "routeId": "reading-id",
+      "routePattern": "/reading/:id",
+      "domain": "Reading",
+      "component": "(student)/reading/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "reading-mistakes",
+      "routePattern": "/reading/mistakes",
+      "domain": "Reading",
+      "component": "(student)/reading/mistakes/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /reading/exercises",
+        "GET /reading/quizzes/${quizId}/theory",
+        "GET /reading/tracking"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "reading",
+      "routePattern": "/reading",
+      "domain": "Reading",
+      "component": "(student)/reading/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /grammar/topics",
+        "GET /grammar/topics/${id}",
+        "GET /reading/exercises",
+        "GET /reading/quizzes/${quizId}/theory",
+        "GET /reading/tracking",
+        "POST /grammar/topics/${id}/attempt"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "navigation"
+      ],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "reading-submissions-id",
+      "routePattern": "/reading/submissions/:id",
+      "domain": "Reading",
+      "component": "(student)/reading/submissions/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "speaking-id",
+      "routePattern": "/speaking/:id",
+      "domain": "Speaking",
+      "component": "(student)/speaking/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /speaking/capabilities",
+        "GET /speaking/exercises",
+        "GET /speaking/submissions/${submissionId}",
+        "GET /speaking/submissions/${submissionId}/audio",
+        "GET /speaking/submissions/my",
+        "POST /speaking/tts",
+        "POST /speaking/upload-intents/${uploadIntentId}/finalize",
+        "POST /toeic/assessments/attempts/${parentAttemptId}/components/${parentComponentId}/complete"
+      ],
+      "mediaTypes": [
+        "audio",
+        "image",
+        "microphone"
+      ],
+      "criticalInteractions": [
+        "audio playback",
+        "recording",
+        "navigation",
+        "local draft/state"
+      ],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "speaking",
+      "routePattern": "/speaking",
+      "domain": "Speaking",
+      "component": "(student)/speaking/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /speaking/capabilities",
+        "GET /speaking/exercises",
+        "GET /speaking/submissions/${submissionId}",
+        "GET /speaking/submissions/${submissionId}/audio",
+        "GET /speaking/submissions/my",
+        "GET /users/learning-history${type && type !== ",
+        "GET /users/learning-history${type && type !== \"ALL\" ? ",
+        "GET /users/me/daily-practice",
+        "GET /users/me/skill-progress",
+        "GET /users/profile",
+        "GET /users/shipping-profile",
+        "GET /users/skills-summary",
+        "GET /users/stats",
+        "PATCH /users/shipping-profile",
+        "POST /speaking/tts",
+        "POST /speaking/upload-intents/${uploadIntentId}/finalize"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "navigation"
+      ],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "student-home",
+      "routePattern": "/student-home",
+      "domain": "Dashboard",
+      "component": "(student)/student-home/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "toeic-examId",
+      "routePattern": "/toeic/:examId",
+      "domain": "TOEIC",
+      "component": "(student)/toeic/[examId]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "toeic-assessments-id-attempts-attemptId",
+      "routePattern": "/toeic/assessments/:id/attempts/:attemptId",
+      "domain": "TOEIC",
+      "component": "(student)/toeic/assessments/[id]/attempts/[attemptId]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /toeic/assessments/attempts/${attemptId}",
+        "GET /toeic/assessments/history",
+        "GET /toeic/attempts/${attemptId}",
+        "GET /toeic/attempts/${attemptId}/remaining-time",
+        "GET /toeic/attempts/${attemptId}/result",
+        "GET /toeic/attempts/${attemptId}/review",
+        "GET /toeic/bundles/${quizId}",
+        "GET /toeic/exams/${examId}",
+        "GET /toeic/exams/${examId}/briefing",
+        "GET /toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "GET /toeic/history",
+        "PATCH /toeic/attempts/${attemptId}/answers",
+        "POST /toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "POST /toeic/assessments/attempts/${attemptId}/components/${componentId}/start",
+        "POST /toeic/attempts/${attemptId}/begin",
+        "POST /toeic/attempts/${attemptId}/cancel",
+        "POST /toeic/attempts/${attemptId}/integrity-events",
+        "POST /toeic/attempts/${attemptId}/listening/advance",
+        "POST /toeic/attempts/${attemptId}/submit",
+        "POST /toeic/exams/${examId}/attempts"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "write/submit",
+        "navigation"
+      ],
+      "auditPriority": "P1"
+    },
+    {
+      "routeId": "toeic-assessments-id",
+      "routePattern": "/toeic/assessments/:id",
+      "domain": "TOEIC",
+      "component": "(student)/toeic/assessments/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "toeic-assessments",
+      "routePattern": "/toeic/assessments",
+      "domain": "TOEIC",
+      "component": "(student)/toeic/assessments/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "toeic-attempts-attemptId",
+      "routePattern": "/toeic/attempts/:attemptId",
+      "domain": "TOEIC",
+      "component": "(student)/toeic/attempts/[attemptId]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /toeic/assessments/history",
+        "GET /toeic/attempts/${attemptId}",
+        "GET /toeic/attempts/${attemptId}/remaining-time",
+        "GET /toeic/attempts/${attemptId}/result",
+        "GET /toeic/attempts/${attemptId}/review",
+        "GET /toeic/bundles/${quizId}",
+        "GET /toeic/exams/${examId}",
+        "GET /toeic/exams/${examId}/briefing",
+        "GET /toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "GET /toeic/history",
+        "PATCH /toeic/attempts/${attemptId}/answers",
+        "POST /toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "POST /toeic/attempts/${attemptId}/begin",
+        "POST /toeic/attempts/${attemptId}/cancel",
+        "POST /toeic/attempts/${attemptId}/integrity-events",
+        "POST /toeic/attempts/${attemptId}/listening/advance",
+        "POST /toeic/attempts/${attemptId}/submit",
+        "POST /toeic/exams/${examId}/attempts"
+      ],
+      "mediaTypes": [
+        "audio"
+      ],
+      "criticalInteractions": [
+        "audio playback",
+        "write/submit",
+        "navigation"
+      ],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "toeic-bundle-quizId",
+      "routePattern": "/toeic/bundle/:quizId",
+      "domain": "TOEIC",
+      "component": "(student)/toeic/bundle/[quizId]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /toeic/assessments/history",
+        "GET /toeic/attempts/${attemptId}",
+        "GET /toeic/attempts/${attemptId}/remaining-time",
+        "GET /toeic/attempts/${attemptId}/result",
+        "GET /toeic/attempts/${attemptId}/review",
+        "GET /toeic/bundles/${quizId}",
+        "GET /toeic/exams/${examId}",
+        "GET /toeic/exams/${examId}/briefing",
+        "GET /toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "GET /toeic/history",
+        "PATCH /toeic/attempts/${attemptId}/answers",
+        "POST /toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "POST /toeic/attempts/${attemptId}/begin",
+        "POST /toeic/attempts/${attemptId}/cancel",
+        "POST /toeic/attempts/${attemptId}/integrity-events",
+        "POST /toeic/attempts/${attemptId}/listening/advance",
+        "POST /toeic/attempts/${attemptId}/submit",
+        "POST /toeic/exams/${examId}/attempts"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "navigation"
+      ],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "toeic-history",
+      "routePattern": "/toeic/history",
+      "domain": "TOEIC",
+      "component": "(student)/toeic/history/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /toeic/assessments/history",
+        "GET /toeic/attempts/${attemptId}",
+        "GET /toeic/attempts/${attemptId}/remaining-time",
+        "GET /toeic/attempts/${attemptId}/result",
+        "GET /toeic/attempts/${attemptId}/review",
+        "GET /toeic/bundles/${quizId}",
+        "GET /toeic/exams/${examId}",
+        "GET /toeic/exams/${examId}/briefing",
+        "GET /toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "GET /toeic/history",
+        "PATCH /toeic/attempts/${attemptId}/answers",
+        "POST /toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "POST /toeic/attempts/${attemptId}/begin",
+        "POST /toeic/attempts/${attemptId}/cancel",
+        "POST /toeic/attempts/${attemptId}/integrity-events",
+        "POST /toeic/attempts/${attemptId}/listening/advance",
+        "POST /toeic/attempts/${attemptId}/submit",
+        "POST /toeic/exams/${examId}/attempts"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "navigation"
+      ],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "toeic-results-attemptId",
+      "routePattern": "/toeic/results/:attemptId",
+      "domain": "TOEIC",
+      "component": "(student)/toeic/results/[attemptId]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /toeic/assessments/history",
+        "GET /toeic/attempts/${attemptId}",
+        "GET /toeic/attempts/${attemptId}/remaining-time",
+        "GET /toeic/attempts/${attemptId}/result",
+        "GET /toeic/attempts/${attemptId}/review",
+        "GET /toeic/bundles/${quizId}",
+        "GET /toeic/exams/${examId}",
+        "GET /toeic/exams/${examId}/briefing",
+        "GET /toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "GET /toeic/history",
+        "PATCH /toeic/attempts/${attemptId}/answers",
+        "POST /toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "POST /toeic/attempts/${attemptId}/begin",
+        "POST /toeic/attempts/${attemptId}/cancel",
+        "POST /toeic/attempts/${attemptId}/integrity-events",
+        "POST /toeic/attempts/${attemptId}/listening/advance",
+        "POST /toeic/attempts/${attemptId}/submit",
+        "POST /toeic/exams/${examId}/attempts"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "write/submit",
+        "navigation"
+      ],
+      "auditPriority": "P1"
+    },
+    {
+      "routeId": "toeic-review-attemptId",
+      "routePattern": "/toeic/review/:attemptId",
+      "domain": "TOEIC",
+      "component": "(student)/toeic/review/[attemptId]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /toeic/assessments/history",
+        "GET /toeic/attempts/${attemptId}",
+        "GET /toeic/attempts/${attemptId}/remaining-time",
+        "GET /toeic/attempts/${attemptId}/result",
+        "GET /toeic/attempts/${attemptId}/review",
+        "GET /toeic/bundles/${quizId}",
+        "GET /toeic/exams/${examId}",
+        "GET /toeic/exams/${examId}/briefing",
+        "GET /toeic/groups/${groupId}/audio?attemptId=${attemptId}",
+        "GET /toeic/history",
+        "PATCH /toeic/attempts/${attemptId}/answers",
+        "POST /toeic/assessments/attempts/${attemptId}/components/${componentId}/complete",
+        "POST /toeic/attempts/${attemptId}/begin",
+        "POST /toeic/attempts/${attemptId}/cancel",
+        "POST /toeic/attempts/${attemptId}/integrity-events",
+        "POST /toeic/attempts/${attemptId}/listening/advance",
+        "POST /toeic/attempts/${attemptId}/submit",
+        "POST /toeic/exams/${examId}/attempts"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "navigation"
+      ],
+      "auditPriority": "P2"
+    },
+    {
+      "routeId": "vocabulary-saved",
+      "routePattern": "/vocabulary/saved",
+      "domain": "Vocabulary",
+      "component": "(student)/vocabulary/saved/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "DELETE /vocab/saved/${id}",
+        "GET /vocab/lookup",
+        "GET /vocab/lookup/details",
+        "GET /vocab/saved",
+        "GET /vocab/topics",
+        "GET /vocab/topics/${id}",
+        "POST /vocab/saved",
+        "POST /vocab/words/${id}/master",
+        "POST /vocab/words/${id}/review",
+        "POST /vocab/words/${id}/star"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "write/submit"
+      ],
+      "auditPriority": "P1"
+    },
+    {
+      "routeId": "vocabulary-study",
+      "routePattern": "/vocabulary/study",
+      "domain": "Vocabulary",
+      "component": "(student)/vocabulary/study/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "DELETE /vocab/saved/${id}",
+        "GET /plan-purchases/${id}",
+        "GET /plan-purchases/me",
+        "GET /plans/catalog",
+        "GET /subscriptions/me",
+        "GET /vocab/lookup",
+        "GET /vocab/lookup/details",
+        "GET /vocab/saved",
+        "GET /vocab/topics",
+        "GET /vocab/topics/${id}",
+        "POST /payments/payos/${intentId}/sync",
+        "POST /plan-purchases",
+        "POST /plan-purchases/${id}/replace-payment",
+        "POST /plan-purchases/${id}/report-transfer",
+        "POST /vocab/saved",
+        "POST /vocab/words/${id}/master",
+        "POST /vocab/words/${id}/review",
+        "POST /vocab/words/${id}/star"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "writing-id",
+      "routePattern": "/writing/:id",
+      "domain": "Writing",
+      "component": "(student)/writing/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [
+        "GET /writing/topics"
+      ],
+      "mediaTypes": [
+        "image"
+      ],
+      "criticalInteractions": [
+        "navigation",
+        "local draft/state"
+      ],
+      "auditPriority": "P0"
+    },
+    {
+      "routeId": "writing",
+      "routePattern": "/writing",
+      "domain": "Writing",
+      "component": "(student)/writing/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": false,
+      "apis": [
+        "GET /users/learning-history${type && type !== ",
+        "GET /users/learning-history${type && type !== \"ALL\" ? ",
+        "GET /users/me/daily-practice",
+        "GET /users/me/skill-progress",
+        "GET /users/profile",
+        "GET /users/shipping-profile",
+        "GET /users/skills-summary",
+        "GET /users/stats",
+        "GET /writing/topics",
+        "PATCH /users/shipping-profile"
+      ],
+      "mediaTypes": [],
+      "criticalInteractions": [
+        "navigation"
+      ],
+      "auditPriority": "P3"
+    },
+    {
+      "routeId": "writing-submissions-id",
+      "routePattern": "/writing/submissions/:id",
+      "domain": "Writing",
+      "component": "(student)/writing/submissions/[id]/page.tsx",
+      "group": "(student)",
+      "authRequired": true,
+      "dynamic": true,
+      "apis": [],
+      "mediaTypes": [],
+      "criticalInteractions": [],
+      "auditPriority": "P2"
+    }
+  ]
+}

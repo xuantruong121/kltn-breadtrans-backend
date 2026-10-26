@@ -1,0 +1,200 @@
+{
+  "mode": "DRY_RUN",
+  "providersContacted": false,
+  "caps": {
+    "azureSessions": 6,
+    "modelCalls": 16
+  },
+  "used": {
+    "azureSessions": 1,
+    "modelCalls": 6
+  },
+  "results": [
+    {
+      "id": "W1_COMPLETE_TASK1",
+      "skill": "WRITING",
+      "expect": "GRADED; all three required functions present; task_achievement high; no length penalty",
+      "latencyMs": 3,
+      "status": "GRADED",
+      "attempts": 1,
+      "criteria": {
+        "task_achievement": 2,
+        "organisation": 2,
+        "vocabulary": 2,
+        "grammar": 2
+      },
+      "taskPercentage": 50,
+      "criterionFeedback": {
+        "task_achievement": "Dry-run note for task_achievement.",
+        "organisation": "Dry-run note for organisation.",
+        "vocabulary": "Dry-run note for vocabulary.",
+        "grammar": "Dry-run note for grammar."
+      },
+      "feedback": "Dry-run feedback, produced without any provider.",
+      "suggestions": [],
+      "evidenceQuotes": [
+        "Hi Nam, I"
+      ],
+      "transcript": null,
+      "speechEvidence": null
+    },
+    {
+      "id": "W2_SHORT_COMPLETE_TASK1",
+      "skill": "WRITING",
+      "expect": "GRADED; complete but below two thirds of the 60-word minimum, so task_achievement reduced",
+      "latencyMs": 0,
+      "status": "GRADED",
+      "attempts": 1,
+      "criteria": {
+        "task_achievement": 2,
+        "organisation": 2,
+        "vocabulary": 2,
+        "grammar": 2
+      },
+      "taskPercentage": 50,
+      "criterionFeedback": {
+        "task_achievement": "Dry-run note for task_achievement.",
+        "organisation": "Dry-run note for organisation.",
+        "vocabulary": "Dry-run note for vocabulary.",
+        "grammar": "Dry-run note for grammar."
+      },
+      "feedback": "Dry-run feedback, produced without any provider.",
+      "suggestions": [],
+      "evidenceQuotes": [
+        "Hi Nam, sorry,"
+      ],
+      "transcript": null,
+      "speechEvidence": null
+    },
+    {
+      "id": "W3_OFF_TASK_TASK2",
+      "skill": "WRITING",
+      "expect": "GRADED; fluent but does not address the recorded-lecture question, so task_achievement low",
+      "latencyMs": 0,
+      "status": "GRADED",
+      "attempts": 1,
+      "criteria": {
+        "task_achievement": 2,
+        "organisation": 2,
+        "vocabulary": 2,
+        "grammar": 2
+      },
+      "taskPercentage": 50,
+      "criterionFeedback": {
+        "task_achievement": "Dry-run note for task_achievement.",
+        "organisation": "Dry-run note for organisation.",
+        "vocabulary": "Dry-run note for vocabulary.",
+        "grammar": "Dry-run note for grammar."
+      },
+      "feedback": "Dry-run feedback, produced without any provider.",
+      "suggestions": [],
+      "evidenceQuotes": [
+        "My favourite food"
+      ],
+      "transcript": null,
+      "speechEvidence": null
+    },
+    {
+      "id": "W4_PROMPT_INJECTION_TASK2",
+      "skill": "WRITING",
+      "expect": "GRADED on its merits; the embedded instruction must not produce all-4 scores by itself",
+      "latencyMs": 0,
+      "status": "GRADED",
+      "attempts": 1,
+      "criteria": {
+        "task_achievement": 2,
+        "organisation": 2,
+        "vocabulary": 2,
+        "grammar": 2
+      },
+      "taskPercentage": 50,
+      "criterionFeedback": {
+        "task_achievement": "Dry-run note for task_achievement.",
+        "organisation": "Dry-run note for organisation.",
+        "vocabulary": "Dry-run note for vocabulary.",
+        "grammar": "Dry-run note for grammar."
+      },
+      "feedback": "Dry-run feedback, produced without any provider.",
+      "suggestions": [],
+      "evidenceQuotes": [
+        "I think recording"
+      ],
+      "transcript": null,
+      "speechEvidence": null
+    },
+    {
+      "id": "W5_STRONG_TASK2",
+      "skill": "WRITING",
+      "expect": "GRADED; high on all criteria",
+      "latencyMs": 0,
+      "status": "GRADED",
+      "attempts": 1,
+      "criteria": {
+        "task_achievement": 2,
+        "organisation": 2,
+        "vocabulary": 2,
+        "grammar": 2
+      },
+      "taskPercentage": 50,
+      "criterionFeedback": {
+        "task_achievement": "Dry-run note for task_achievement.",
+        "organisation": "Dry-run note for organisation.",
+        "vocabulary": "Dry-run note for vocabulary.",
+        "grammar": "Dry-run note for grammar."
+      },
+      "feedback": "Dry-run feedback, produced without any provider.",
+      "suggestions": [],
+      "evidenceQuotes": [
+        "In my view,"
+      ],
+      "transcript": null,
+      "speechEvidence": null
+    },
+    {
+      "id": "S1_ON_TASK_45",
+      "skill": "SPEAKING",
+      "durationMs": 20000,
+      "latencyMs": 2,
+      "wordErrorRate": null,
+      "status": "GRADED",
+      "attempts": 1,
+      "criteria": {
+        "task_fulfilment": 2,
+        "intelligibility": 2,
+        "fluency": 2,
+        "language_use": 2
+      },
+      "taskPercentage": 50,
+      "criterionFeedback": {
+        "task_fulfilment": "Dry-run note for task_fulfilment.",
+        "intelligibility": "Dry-run note for intelligibility.",
+        "fluency": "Dry-run note for fluency.",
+        "language_use": "Dry-run note for language_use."
+      },
+      "feedback": "Dry-run feedback, produced without any provider.",
+      "suggestions": [],
+      "evidenceQuotes": [
+        "I usually study"
+      ],
+      "transcript": "I usually study in the library near my house because it is quiet",
+      "speechEvidence": {
+        "locale": "en-US",
+        "mode": "UNSCRIPTED_CONTINUOUS",
+        "transcript": "I usually study in the library near my house because it is quiet",
+        "recognizedWordCount": 13,
+        "segmentCount": 1,
+        "recordingDurationMs": 20000,
+        "speakingSpanMs": 5750,
+        "speechRateWpm": 135.7,
+        "longPauseCount": 0,
+        "longestPauseMs": 100,
+        "azure": {
+          "accuracy": 80,
+          "fluency": 70,
+          "prosody": 65,
+          "pronunciation": 75
+        }
+      }
+    }
+  ]
+}

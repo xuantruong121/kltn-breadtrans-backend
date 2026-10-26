@@ -1,0 +1,355 @@
+{
+  "pass": "ENTRY_DIAGNOSTIC_V2_STEP_2D2_COLD_TARGETED_RE_REVIEW",
+  "reviewedAt": "2026-10-25",
+  "blueprintVersion": "V2_2026_01",
+  "contentVersionReviewed": 3,
+
+  "STEP2D2_VERDICT": "REVISIONS_REQUIRED",
+  "ENTRY_DIAGNOSTIC_V2_CONTENT_REVIEW_PASS": false,
+  "verdictBasis": "Zero BLOCKER and zero MAJOR: the Step 2D MAJOR is genuinely closed, no answer key is wrong, no item has multiple defensible answers, and no rubric regression occurred. But four of this phase's explicitly named approval conditions fail: LU_Q_002_FEEDBACK_OVERGENERALIZATION_PRESENT is true where false was required, LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT is 2 where 0 was required, STEP2D_MINOR_OPEN_BLOCKING_PERSISTENCE is 2 where 0 was required, and CANONICAL_CONTENT_REVISION_PROVENANCE_LEAK is true where false was required. REV-001 and REV-008 are therefore not closed.",
+
+  "substantiveVsGateNote": "The cold reviewer's own summary is worth preserving: substantively this package is draft-safe content, and if the product owner chose to persist rows now against a documented MINOR list, no learner would be harmed. The approval flag is nonetheless withheld because the gate conditions are explicit and unmet, and because the two cheapest open items are single-field edits.",
+
+  "reviewerIndependenceDisclosure": {
+    "statement": "The agent writing this artifact authored the content, wrote the Step 2B review, applied the Step 2C revisions, wrote the Step 2D artifacts and applied the Step 2C2 revisions. It is not a cold-context reviewer and did not claim to be.",
+    "coldReviewPerformedBy": "a separately spawned reviewer started with no conversation context and no history with the author",
+    "whatTheAuthorContributed": "target stability baseline and post-review hash proof, the read-only validator run, and independent re-verification of every disputed claim in the cold report against the actual files",
+    "independenceAchieved": "COLD_CONTEXT_NO_PRIOR_SESSION_STATE",
+    "independenceNotAchieved": "INDEPENDENT_OF_THE_AUTHORING_MODEL",
+    "honestCharacterisation": "Cold context is resistance to prior-issue priming, not third-party validation, and not psychometric validation. It is however now twice demonstrated to work: the Step 2D cold pass caught a MAJOR two author passes had examined and dismissed, and this pass caught four over-claimed closures in the author's own Step 2C2 evidence.",
+    "disputedClaimsReVerifiedByAuthor": "All four disagreements were checked directly against the files rather than accepted on report. All four were confirmed, and three were worse than the report stated."
+  },
+
+  "counts": {
+    "STEP2D2_BLOCKER_COUNT": 0,
+    "STEP2D2_MAJOR_COUNT": 0,
+    "STEP2D2_MINOR_COUNT": 10,
+    "STEP2D2_NOTE_COUNT": 3,
+    "total": 13
+  },
+
+  "flags": {
+    "LU_Q_002_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LU_Q_002_TARGET_FEATURE_COHERENT": true,
+    "LU_Q_002_DISTRACTORS_PLAUSIBLE": true,
+    "LU_Q_002_RATIONALE_FACTUALLY_CORRECT": false,
+    "LU_Q_002_RATIONALE_NOTE": "True of the authored sentence, false as the universal rule it states.",
+    "LU_Q_002_FEEDBACK_OVERGENERALIZATION_PRESENT": true,
+    "LU_Q_002_DISTRACTOR_RATIONALE_UNTRUE_CLAIM_COUNT": 0,
+
+    "LST_Q_005_AUDIO_REQUIRED": true,
+    "LST_Q_005_LEARNER_VISIBLE_BYPASS_FOUND": false,
+    "LST_Q_007_AUDIO_REQUIRED": true,
+    "LST_Q_007_LEARNER_VISIBLE_BYPASS_FOUND": false,
+    "CROSS_ITEM_ANSWER_LEAK_FOUND": true,
+    "LISTENING_AUDIO_REQUIRED_ITEM_COUNT": 8,
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT": 2,
+    "bypassableItems": ["LST_Q_004", "LST_Q_009"],
+
+    "REV_001_CLOSED": false,
+    "REV_006_CLOSED": true,
+    "REV_006_ACCEPTANCE_TEST_INDEPENDENTLY_REPEATED": true,
+    "REV_006_ELIMINABLE_OPTION_COUNT": 0,
+    "REV_008_CLOSED": false,
+
+    "IR_003_CLOSED": true,
+    "IR_012_CLOSED": true,
+    "IR_014_CLOSED": true,
+    "IR_022_CLOSED": true,
+    "LST_Q_009_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+    "LST_Q_009_OPTION_PARALLELISM_PASS": true,
+    "LST_Q_010_UNSUPPORTED_GENDER_ASSUMPTION_PRESENT": false,
+
+    "RDG_Q_004_WORDING_CONSISTENCY_PASS": true,
+    "RDG_Q_004_EXACTLY_ONE_DEFENSIBLE_ANSWER": true,
+
+    "CANONICAL_CONTENT_REVISION_PROVENANCE_LEAK": true,
+
+    "STEP2D_MINOR_TOTAL": 16,
+    "STEP2D_MINOR_CLOSED": 13,
+    "STEP2D_MINOR_NOT_CLOSED": 2,
+    "STEP2D_MINOR_SAFE_TO_DEFER": 1,
+    "STEP2D_MINOR_REGRESSED": 0,
+    "STEP2D_MINOR_OPEN_BLOCKING_PERSISTENCE": 2,
+    "STEP2D_MINOR_OPEN_BLOCKING_PERSISTENCE_NOTE": "IR-002 and IR-004, both dispositioned MUST_FIX_BEFORE_DRAFT_PERSISTENCE by the revision pass itself. On the cold reviewer's own risk judgement the learner-facing count is 0, because both survive only in answerRationale, a field declared excluded from persistence. The gate counts the pass's own disposition, so it reports 2.",
+    "STEP2D_MINOR_OPEN_BLOCKING_TTS": 0,
+
+    "IR_017_SAFE_TO_DEFER": true,
+    "IR_017_BLOCKS_DRAFT_PERSISTENCE": false,
+    "IR_017_BLOCKS_TTS": false,
+    "IR_017_BLOCKS_ACTIVATION": true,
+
+    "SPEAKING_RUBRIC_REGRESSION_PASS": true,
+    "WRITING_RUBRIC_REGRESSION_PASS": true,
+
+    "LISTENING_EN_US_CONSISTENCY_PASS": true,
+    "LISTENING_SCRIPT_CONTENT_READY_FOR_TTS": true,
+    "LST_CLIP_02_READY_FOR_TTS": true,
+    "LST_CLIP_04_CONTENT_READY_FOR_TTS": true,
+
+    "DIFFICULTY_TIER_REVIEW_STATUS": "QUALITATIVE_ONLY",
+    "ITEM_LEVEL_STATUS": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
+    "ITEM_TIER_TO_RESULT_BAND_MAPPING_DEFINED": false,
+    "CEFR_CONTENT_LEAK_COUNT": 0,
+
+    "ORIGINALITY_RECHECK_OBJECT_COUNT": 1,
+    "ORIGINALITY_QUERIES_RUN": 4,
+    "ORIGINALITY_MEANINGFUL_MATCH_COUNT": 0,
+    "ORIGINALITY_UNRESOLVED_OBJECT_COUNT": 0,
+    "originalityNote": "The Step 2C2 claim that only one source object was materially rewritten was independently verified rather than accepted.",
+
+    "CONTENT_DRAFT_HASH_INTEGRITY_PASS": true,
+    "VALIDATOR_CHECK_MODE_READ_ONLY_PASS": true,
+    "CONTENT_TARGET_STABLE_DURING_REVIEW": true,
+    "CONTENT_FILES_MUTATED": false,
+    "HASH_MISMATCH_COUNT": 0,
+
+    "BLUEPRINT_CONFORMANCE_STILL_PASS": true,
+    "OBJECTIVE_KEY_STRUCTURE_PASS": true,
+    "DRAFT_KEY_UNIQUENESS_PASS": true,
+    "UNRESOLVED_DRAFT_REFERENCES": 0,
+    "RUBRIC_STRUCTURAL_VALIDATION_PASS": true,
+    "INDEPENDENT_CORRECT_INDEX_CHECK": "25/25 aligned, 0 misaligned",
+    "CORRECT_OPTION_SEQUENCE": "BADBCDCABCDACBDDCDBABCABC",
+    "CORRECT_OPTION_DISTRIBUTION": { "A": 5, "B": 7, "C": 7, "D": 6 },
+
+    "DB_MUTATED": false,
+    "V2_CANONICAL_CONTENT_ROWS_CREATED": 0,
+    "V2_ACTIVATED": false,
+    "AZURE_CALL_COUNT": 0,
+    "TTS_CALL_COUNT": 0,
+    "GEMINI_GRADING_CALL_COUNT": 0,
+    "R2_DIAGNOSTIC_MEDIA_CREATED": 0,
+
+    "DEF_003_STATUS": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+    "LST_CLIP_04_VOICE_CASTING_STATUS": "DEFERRED_TO_STEP3_PRE_TTS_GATE",
+    "LST_CLIP_03_VOICE_CASTING_STATUS": "NEWLY_ADDED_TO_STEP3_PRE_TTS_GATE"
+  },
+
+  "theMajorIsClosed": {
+    "item": "LU_Q_002",
+    "finding": "`to` has no licit reading in the frame `The session starts ____ half past nine`, so the item now has exactly one defensible answer and the construct is coherent. The cold reviewer attempted to defend all four options and could defend only `at`.",
+    "contrastWithThePreviousFailure": "The same adversarial standard that found `by` defensible in Step 2D was applied to `to` and did not break it. That is the strongest available evidence the REV-008 content fix was the right one.",
+    "butNotClosedBecause": "REV-008's third condition is an accurate rationale, and the rationale is not accurate as written. See D2-007."
+  },
+
+  "findings": [
+    {
+      "id": "D2-001",
+      "severity": "MINOR",
+      "type": "LOCALE_CONSISTENCY_DEFECT",
+      "object": "LU_Q_004",
+      "problem": "answerRationale still reads '\"Do someone a favour\" is the fixed collocation.' while the stem reads 'favor' and distractor rationale 4 reads '\"favor\"'. The item carries both spellings, and the British one sits in the field that defines the collocation.",
+      "whyItMatters": "IR-004 is not closed, so REV-001 is not closed. Verified directly: grep over the content draft returns favor, favour, favor. The Step 2C2 evidence asserts 'No occurrence of favour remains anywhere in the item', which is false.",
+      "authorNote": "My patch edited only `prompt` and `distractorRationales`, and my assertion checked only `distractorRationales` — so it passed while the defect survived in a field I never looked at. Third instance of one failure mode: matching one inflection or one field and reporting the scan as proof for the whole object.",
+      "acceptanceCriteria": [
+        "favour -> favor in LU_Q_004.answerRationale",
+        "grep -niE 'favou?r' over content draft and rubrics returns only 'favor'",
+        "contentDraft:json hash regenerated"
+      ],
+      "learnerFacing": false,
+      "blocksPersistence": "per the revision pass's own disposition, yes; on learner risk, no"
+    },
+    {
+      "id": "D2-002",
+      "severity": "MINOR",
+      "type": "LOCALE_CONSISTENCY_DEFECT",
+      "object": "RDG_PASSAGE_03",
+      "problem": "'a jacket with a failed zip' — `zip` as the fastener is British; American English is `zipper`. This is learner-facing Reading text in a package whose declared learner input variety is American English.",
+      "whyItMatters": "It is the only true dialect mismatch left in any learner-facing field, and it was never in scope for REV-001, IR-004 or IR-005 — which shows the en-US sweep covered the forms a previous checker had flagged rather than the text itself. The same passage gets the harder call right ('the line grows long', not 'the queue'), so the author was watching for this and simply did not re-scan the whole object.",
+      "acceptanceCriteria": [
+        "zip -> zipper",
+        "passage:RDG_PASSAGE_03 hash regenerated",
+        "one full lexical en-US pass over all 11 source objects driven by the text, not by the prior flag list"
+      ],
+      "learnerFacing": true,
+      "itemValidityAffected": false
+    },
+    {
+      "id": "D2-003",
+      "severity": "MINOR",
+      "type": "OTHER",
+      "object": "content draft, rubrics draft",
+      "problem": "Pass-name tokens remain in both canonical files: `REQUIRES_STEP2D2_REVIEW` five times in the content draft's reviewStatus and twice in the rubrics (including `DRAFT_REVISED_REQUIRES_STEP2D2_REVIEW`), plus 'Step 4 implements the scorer' and 'implementedIn: Step 4' in the rubrics. The content draft's own replacement block asserts 'No revision identifier, pass name or review filename appears anywhere in this content draft' — contradicted five lines above it in the same file.",
+      "whyItMatters": "Low learner risk: a status token naming the next review pass is not revision history, and no REV-nnn, IR-nnn, filename or history narrative remains. The real cost is that a canonical artifact now states a falsehood about itself, and the architectural fix IR-021 was raised for is asserted rather than achieved. Two aggravating facts, both verified: the rubrics file has no authoringOnlyFields/excludedFromPersistence declaration at all, and nothing enforces the exclusion — grep for `excludedFromPersistence` and `authoringOnlyFields` across all TypeScript returns zero rows, so it is a sentence in a JSON file with no consumer and no guard.",
+      "authorNote": "I wrote those reviewStatus values in the Step 2C2 patch, then scanned with a pattern (`Step ?2[ABCD]|STEP_2[ABCD]`) that structurally cannot match `STEP2D2` — no space, no underscore, and `2D2` is not `2[ABCD]`. I then reported CANONICAL_CONTENT_REVISION_PROVENANCE_LEAK=false on that pattern's silence. This is the same failure mode as D2-001 and the two I already apologised for.",
+      "acceptanceCriteria": [
+        "replace the pass-name tokens with pass-agnostic values such as REQUIRES_COLD_RE_REVIEW, or add an excludedFromPersistence declaration to the rubrics covering status/reviewStatus and correct the false sentence in revisionHistoryLocation",
+        "add a mechanical guard to the validator that fails on /REV-\\d|IR-\\d|STEP ?2[A-D]\\d?|Step ?\\d/ in either file, so the claim is machine-checked rather than asserted",
+        "hash regenerated"
+      ]
+    },
+    {
+      "id": "D2-004",
+      "severity": "MINOR",
+      "type": "AUDIO_DEPENDENCY_LEAK",
+      "object": "LST_Q_009, LST_Q_010, LST_CLIP_04",
+      "problem": "LST_Q_010's option 'The projector trouble delayed the start' uses a definite NP that presupposes projector trouble occurred — which is LST_Q_009's key, 'A technical problem spoiled their plan'. One item's option set hands a learner the other item's key before any audio plays. Compounding it, LST_Q_010's stem presupposes the presentation happened and ran short, which eliminates LST_Q_009's 'It was called off before it could begin' outright and undercuts 'The audience left before it had finished'. With the clip hidden, LST_Q_009 goes from 1-in-4 to a strongly cued single answer.",
+      "whyItMatters": "LST_Q_009 is one of only two D4 Listening items and the only Listening inference item not duplicated on the same cause, so a leak there removes the hardest discrimination the Listening section has. The leak is one-directional: a learner reasoning from Q009's options is steered toward Q010's strongest distractor, so Q010 itself is not compromised.",
+      "authorNote": "Identical defect class to IR-010. I fixed it at Q006/Q007, self-reported reintroducing it at Q007/Q008 and fixed that too, and never ran the test on CLIP_04 — where it was already present from Step 2C. The per-item test I ran cannot find this; it needs a per-clip test.",
+      "acceptanceCriteria": [
+        "restate LST_Q_010 option 2 without presupposing the failure, for example 'The start was delayed'",
+        "replace LST_Q_009 option 3 with one not defeated by LST_Q_010's stem",
+        "a reviewer shown all of LST_Q_009 and LST_Q_010's stems and options, hearing nothing, cannot name LST_Q_009's key"
+      ]
+    },
+    {
+      "id": "D2-005",
+      "severity": "MINOR",
+      "type": "AUDIO_DEPENDENCY_LEAK",
+      "object": "LST_Q_004",
+      "problem": "Stem 'How should students reserve a group study room this week?' with options At the desk / Online / By phone / By email and key 'Online'. With the clip hidden, Online is the modal real-world answer for booking a campus room; the other three are legacy channels. The key IS the world-knowledge default.",
+      "whyItMatters": "IR-009 established the correct standard for this very clip — at LST_Q_005 the world-knowledge default (student ID card) was deliberately made a wrong option so that answering without listening is punished. LST_Q_004 does the inverse. Partial mitigation weighed and rejected as insufficient: the stem's 'this week' signals a departure from normal practice and 'At the desk' is the method the script explicitly replaces, which blunts the default-guess heuristic without removing it.",
+      "acceptanceCriteria": [
+        "either make the required method non-default in the script (for example the online system is down this week and bookings move to the desk, leaving Online as the world-knowledge distractor and reusing the IR-009 pattern), or change the option set so no single option is the a-priori default",
+        "confirm the key is not nameable with the script hidden"
+      ]
+    },
+    {
+      "id": "D2-006",
+      "severity": "MINOR",
+      "type": "AUDIO_DEPENDENCY_LEAK",
+      "object": "LST_Q_003, LST_Q_006, LST_Q_007",
+      "problem": "Three items whose option field is halved by a neighbouring item's stem or options, with no audio. LST_Q_003: LST_Q_004's stem presupposes group study rooms are bookable, eliminating 'The ground-floor group study rooms'; LST_Q_005's stem presupposes printing is possible, eliminating 'The print room' — 4 options down to 2 from neighbouring stems alone. LST_Q_007: LST_Q_006's stem presupposes something IS missing, eliminating 'To confirm that the form is complete' and pragmatically favouring the key. LST_Q_006: LST_Q_008's option 'It was set by the landlord, not the office' introduces the landlord into the learner-visible set for the same clip, cueing which signature option is live.",
+      "whyItMatters": "None of these names the key, so they are not counted in LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT, but they double the guess rate. On a three-items-per-clip design, inter-item presupposition is the main residual threat to the audio-required claim, and it was only ever checked on the Q006/Q007/Q008 triangle the revision pass had itself broken.",
+      "acceptanceCriteria": [
+        "make the bypass test per clip, not per item: for each clip, a reviewer shown every stem and every option for that clip, hearing nothing, cannot eliminate more than one option on any single item",
+        "record the result per clip"
+      ]
+    },
+    {
+      "id": "D2-007",
+      "severity": "MINOR",
+      "type": "DISTRACTOR_RATIONALE_DEFECT",
+      "object": "LU_Q_002",
+      "problem": "answerRationale reads 'A clock time takes \"at\": \"at half past nine\".' The item proves only that the start-point adverbial in this frame takes `at`. As a universal it is untrue: `by half past nine`, `from half past nine`, `until half past nine`, `around half past nine`, `after half past nine` are all licit. The sharpest problem is internal — `to`, the very option the item keys against, IS a preposition used with clock times (`ten to nine`), and the item's own distractor rationale says so. The answer rationale and distractor rationale 4 contradict each other about whether clock times take anything but `at`.",
+      "whyItMatters": "IR-002's acceptance criterion was 'no rationale on this item states a rule that is untrue of English'. As a universal, this one is. Low risk today because answerRationale is excluded from persistence; higher later, because this is exactly the string a feedback surface or an AI feedback generator would quote, and it teaches a rule the learner must unlearn at the next `by` or `until`. This is why REV-008 is not closed.",
+      "authorNote": "The phase brief warned about this exact wording in advance and I still shipped it. I replaced one overgeneralisation ('a start event does not take a limit') with a narrower but still universal one, when the fix was to scope the claim to the sentence.",
+      "acceptanceCriteria": [
+        "scope the rationale to the authored sentence, for example 'For the exact start time in this sentence, use \"at\".'",
+        "no learner-visible field changes",
+        "contentDraft:json hash regenerated"
+      ]
+    },
+    {
+      "id": "D2-008",
+      "severity": "MINOR",
+      "type": "SCRIPT_NATURALNESS_DEFECT",
+      "object": "LST_CLIP_02",
+      "problem": "'The north-side elevators are out of service too — please use the main entrance.' Elevators are vertical access; an entrance is horizontal. The remedy does not follow from the fault, and that gap is precisely what LST_Q_003's third distractor rationale trades on.",
+      "whyItMatters": "IR-012's second half has moved rather than closed. The implausible causal link it described — elevator servicing closing a second-floor room reachable by stairs — is genuinely gone, and the replacement cause (second-floor power supply rewired) is sufficient and natural, so IR-012 is graded CLOSED. But a second, smaller implausible link was authored in its place, for the same distractor. The underlying pattern is bending the script to license a distractor.",
+      "acceptanceCriteria": [
+        "make the connection explicit, for example 'so if you need an elevator, come in through the main entrance', or re-base LST_Q_003's third distractor on something the announcement states cleanly",
+        "if taken, regenerate script:LST_CLIP_02 BEFORE TTS so the clip is voiced once"
+      ]
+    },
+    {
+      "id": "D2-009",
+      "severity": "MINOR",
+      "type": "OTHER",
+      "object": "LST_CLIP_03, LST_Q_008",
+      "problem": "LST_Q_008's rationales say 'says she would rather not do that' and 'though her accommodating tone may imply flexibility'. Verified: LST_CLIP_03 contains zero gendered pronouns on a word-boundary search, and names only 'Mai'. The clip metadata records no gender either — speakerLabels is ['Housing office staff'] and accentIntent is 'general American, friendly professional'.",
+      "whyItMatters": "Two things, and the author's framing differs from the cold reviewer's here. The cold reviewer treats the name as establishing a conventionally female speaker, making this a casting-constraint gap rather than an unsupported assumption. The author's position is stronger: a name does not establish anyone's pronouns, so the rationales assume pronouns the script does not supply — which is the same defect as IR-022, not merely its mirror. Either way the operational risk is identical: nothing stops Step 3 casting a voice that contradicts two graded rationales. IR-022's second acceptance criterion carried explicit voice casting to the pre-TTS gate for CLIP_04 only; CLIP_03 names a person and was not carried.",
+      "acceptanceCriteria": [
+        "either neutralise the pronouns in LST_Q_008's rationales as was done for LST_Q_010, or record an explicit speaker-identity and casting decision in LST_CLIP_03.speakerLabels/accentIntent so the rationales and the voice agree",
+        "add LST_CLIP_03 to the pre-TTS gate list beside LST_CLIP_04 and DEF-003"
+      ]
+    },
+    {
+      "id": "D2-010",
+      "severity": "MINOR",
+      "type": "RUBRIC_ANCHOR_AMBIGUOUS",
+      "object": "WRT_RUBRIC_V3.task_achievement",
+      "problem": "Anchor 3 reads 'Addresses all required elements within the stated length.' Anchor 2's two conditions are a missing or fragmentary element, or shorter than two thirds of the stated minimum. Neither covers over-length. A complete 120-word response to WRT_TASK_01 (wordMax 90) matches no anchor cleanly: anchor 3 excludes it by its own clause, anchor 2 does not catch it, anchor 4 is silent on length. normalisationIntent.wordCountHandling speaks only of 'below the stated minimum', confirming the upper bound was not intended to score.",
+      "whyItMatters": "A grading-consistency hole, not a ceiling: it does not prevent an in-range excellent response from reaching 4 on any criterion, so the Writing full-range test still passes. But an AI grader will resolve it inconsistently across submissions. The IR-016 fix closed the under-length cliff correctly and in doing so added the words that make the upper bound matter.",
+      "acceptanceCriteria": [
+        "drop 'within the stated length' from anchor 3, so length lives only in the one defined under-length condition and matches wordCountHandling",
+        "or state the over-length disposition explicitly"
+      ]
+    },
+    {
+      "id": "D2-011",
+      "severity": "NOTE",
+      "type": "RUBRIC_ANCHOR_AMBIGUOUS",
+      "object": "SPK_RUBRIC_V3",
+      "problem": "intelligibility.description says 'Pace and pausing are judged under fluency, not here', but neither fluency's description nor any of its five anchors mentions pace or speech rate. The pointer refers to a criterion that never names the thing.",
+      "whyNotADefect": "IR-015's actual defect, double-scoring, is closed — the cold reviewer checked all eight criterion descriptions and all forty anchors and found nothing scored twice. Nothing a grader needs is missing either, since rate is subsumed by 'flow'. Fixing it by adding speech rate to fluency would risk penalising a slow-but-smooth speaker, which is worse than an inaccurate pointer. Deliberately filed as a NOTE.",
+      "relatedWatchItem": "language_use disclaims content beyond the prompt while its own anchor 3 scores 'some vocabulary beyond the prompt'. The content/lexis split is defensible and the fencing holds on a careful read, but it is thin for an AI grader. Worth watching in the pilot."
+    },
+    {
+      "id": "D2-012",
+      "severity": "NOTE",
+      "type": "OTHER",
+      "object": "blueprint vs content package",
+      "problem": "Verified: the blueprint file's blueprintVersion is 'FOUR_SKILL_PLACEMENT_V2' while the content draft and rubrics carry blueprintVersion 'V2_2026_01'. Same field name, different value — and FOUR_SKILL_PLACEMENT_V2 is the scoring version, not a blueprint version. grep for blueprintVersion in the validator returns no hits, so the two are never compared, and the .sha256 manifest binds content to bytes but not to a blueprint identity.",
+      "whyItMatters": "The project's version contract requires attempts to stay pinned to their assessment, blueprint and scoring version, and forbids inferring the scorer from anything implicit. A blueprint artifact whose blueprintVersion field holds the scoring version is the kind of field confusion that contract exists to prevent. The content package has the correct value; the blueprint artifact does not.",
+      "acceptanceCriteria": [
+        "set the blueprint file's blueprintVersion to V2_2026_01, or rename its field to scoringVersion if that is what it records",
+        "add the blueprint/content blueprintVersion comparison to the validator"
+      ]
+    },
+    {
+      "id": "D2-013",
+      "severity": "NOTE",
+      "type": "OTHER",
+      "object": "scripts/audit/validate-entry-diagnostic-v2-draft.ts",
+      "problem": "Verified at line 166: const cefr = /\\b(Pre-A1|A1|A2|B1|B2|C1|C2)\\b/ — the guard does not include the literal token CEFR, so NO_CEFR_IN_CONTENT_PASS would still report true if a field read 'CEFR level' or 'roughly CEFR-ish'.",
+      "whyItMatters": "Nothing is wrong today: the content is clean on all eight tokens and on the bare word CEFR. The guard is simply narrower than the flag name claims, which is the same class of problem as a regex whose silence was taken as proof.",
+      "acceptanceCriteria": ["add CEFR to the alternation"]
+    }
+  ],
+
+  "whatHeldUp": {
+    "answerKeys": "All 25 independently judged correct; CORRECT aligned at the key index in all 25; 25/25 on an independent script; key letter sequence BADBCDCABCDACBDDCDBABCABC, A5 B7 C7 D6.",
+    "theStep2dMajor": "LU_Q_002 now has exactly one defensible answer. `to` survived the same adversarial standard that broke `by`.",
+    "REV_006": "Acceptance test independently repeated option by option; eliminable count 0 against a permitted maximum of 1. Closed.",
+    "LST_Q_005": "The IR-009 fix works as designed — world knowledge now points at a wrong option. No learner-visible bypass.",
+    "LST_Q_007": "No intra-item bypass; the key is no longer the longest option and no longer names what LST_Q_006 asks.",
+    "IR_003_IR_012_IR_014_IR_022": "All four closed.",
+    "rubrics": "Both regression tests pass. Speaking fluency is still length-independent, criteria remain observable, accent is not penalised, and nothing is double-scored. Both Writing tasks can still reach the maximum on every criterion applied to them.",
+    "RDG_Q_004": "Wording coherent and exactly one defensible answer; the deliberate retier is qualitatively plausible.",
+    "integrity": "Hash integrity, structural conformance, CEFR absence, tier/band separation and originality all clean.",
+    "safety": "No content file, rubric, blueprint or manifest byte changed during the review."
+  },
+
+  "fourPlacesTheRevisionPassOverClaimedClosure": [
+    "IR-004 / REV-001: 'No occurrence of favour remains anywhere in the item' — false; it survives in answerRationale (D2-001).",
+    "IR-021: 'A scan of the draft and rubrics for pass names now returns zero rows' — false; REQUIRES_STEP2D2_REVIEW appears 7 times across the two files, and the draft asserts its own cleanliness five lines below the violation (D2-003).",
+    "LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT=0 — two items are reachable with the script hidden (D2-004, D2-005), and three more have their option field halved by neighbouring stems (D2-006).",
+    "IR-002: 'no rationale states a rule untrue of English' — the replacement rationale states a narrower but still untrue universal (D2-007)."
+  ],
+
+  "recurringFailureModeInTheAuthorsOwnWork": {
+    "description": "Reporting a weak check's result under a strong flag's name, specifically by scanning for one inflection or one field and presenting the scan's silence as proof for the whole object.",
+    "instances": [
+      "Step 2C: LEARNER_FACING_BRITISH_FORM_COUNT=0 from a self-authored word list that missed student card, favour, at weekends and revising.",
+      "Step 2C: LISTENING_AUDIO_BYPASSABLE_ITEM_COUNT=0 from a 6-word overlap proxy, in the same artifact that said bypassability cannot be decided mechanically.",
+      "Step 2C: closed REV-006 without running the elimination test its criterion describes.",
+      "Step 2C2: revision/revising — matched the noun, missed the participle.",
+      "Step 2C2: favor/favour — edited two fields, asserted over the whole item, and the assertion only checked the fields edited (D2-001).",
+      "Step 2C2: provenance scan with a pattern that structurally cannot match the token the same patch had just introduced (D2-003).",
+      "Step 2C2: per-item bypass test where the defect class is per-clip (D2-004, D2-006)."
+    ],
+    "structuralFix": "Stop writing assertions that check the field just edited, and stop accepting a self-authored pattern's silence. Where a criterion describes a test, execute that test at the scope the criterion names — per clip, per object, per item set. Several of these belong in the validator as machine-checked guards rather than prose claims: the provenance guard (D2-003), the blueprint/content version comparison (D2-012) and the CEFR token (D2-013)."
+  },
+
+  "requiredToReachApproval": {
+    "singleFieldEdits": ["D2-001 (favour in one rationale)", "D2-007 (scope the LU_Q_002 rationale to the sentence)", "D2-002 (zip -> zipper)"],
+    "optionSetEdits": ["D2-004 (LST_Q_009 / LST_Q_010 cross-item leak)", "D2-005 (LST_Q_004 default-answer key)"],
+    "scriptEditsBeforeTts": ["D2-008 (LST_CLIP_02 elevator/entrance non-sequitur, optional but cheaper before voicing)"],
+    "metadataAndGuards": ["D2-003 (pass-name tokens + a machine-checked provenance guard)", "D2-009 (LST_CLIP_03 pronouns or casting constraint)", "D2-010 (WRT anchor 3 over-length clause)", "D2-012", "D2-013"],
+    "testMethodChange": "D2-006 requires the Listening bypass test to be re-run per clip rather than per item, and the result recorded per clip. This is a change to how the gate is evidenced, not only a content fix.",
+    "reopenedRevisions": ["REV-001 (not closed, D2-001 + D2-002)", "REV-008 (not closed, D2-007)"],
+    "notRequired": ["IR-017 remains safely deferred to activation", "D2-011, D2-012 and D2-013 are NOTEs"]
+  },
+
+  "whatThisReviewDoesNotEstablish": [
+    "Independence from the authoring model. Cold context is resistance to prior-issue priming, not third-party validation.",
+    "Any psychometric property. D1-D4 remains DESIGN_HYPOTHESIS_NOT_CALIBRATED; no calibration, item statistics, rater agreement or standard setting exists.",
+    "Rubric validity. Four anchor edits across three passes have never been trialled against real responses.",
+    "That the content is free of defects a human assessment specialist would find. Two cold passes have now each found real defects the author's own passes had cleared, which is evidence the author's self-certification is not reliable at this level of detail.",
+    "That the remaining MINOR list is complete. This was a targeted re-review by design, not a fresh 29-item independent review."
+  ],
+
+  "nextStep": "STEP_2C3_TARGETED_REVISIONS, then a further cold confirmation limited to the reopened items"
+}
