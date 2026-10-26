@@ -260,6 +260,19 @@ export function normalizeForGrounding(value: string): string {
  * - for Speaking, a transcript and speech evidence from the speech adapter.
  * Raw output is never written as a score unvalidated.
  */
+/**
+ * Vietnamese learner feedback must carry its diacritics. A reply such as
+ * "Chao ban, bai viet cua ban rat tot" is unreadable for a Vietnamese learner;
+ * any sentence of real Vietnamese has at least one marked letter. A model
+ * that drops them drops them from the whole reply, so the overall feedback
+ * is the one checked.
+ */
+const VIETNAMESE_MARKED =
+  /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/iu;
+export function hasVietnameseDiacritics(text: string): boolean {
+  return VIETNAMESE_MARKED.test(text);
+}
+
 export function validateRubricGrade(
   request: Pick<
     RubricGradeRequest,
@@ -333,6 +346,8 @@ export function validateRubricGrade(
   if (!feedback) return { ok: false, reason: 'FEEDBACK_MISSING' };
   if (feedback.length < FEEDBACK_MIN_CHARACTERS)
     return { ok: false, reason: 'FEEDBACK_TOO_SHORT' };
+  if (!hasVietnameseDiacritics(feedback))
+    return { ok: false, reason: 'FEEDBACK_WITHOUT_DIACRITICS' };
 
   const transcript =
     typeof value.transcript === 'string' && value.transcript.trim()

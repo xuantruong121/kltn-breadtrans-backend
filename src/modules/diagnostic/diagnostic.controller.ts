@@ -44,6 +44,23 @@ export class DiagnosticController {
     return this.diagnosticService.startAttempt(req.user.id, id);
   }
 
+  @Post(':id/attempts/:attemptId/abandon')
+  @ApiOperation({
+    summary:
+      'Bỏ lượt làm bài đang dở để làm lại từ đầu (lượt cũ được giữ với trạng thái ABANDONED)',
+  })
+  abandon(
+    @Request() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) assessmentId: number,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+  ) {
+    return this.diagnosticService.abandonAttempt(
+      req.user.id,
+      assessmentId,
+      attemptId,
+    );
+  }
+
   @Post(':id/attempts/:attemptId/speaking/:questionId/confirm')
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(FileInterceptor('audio'))

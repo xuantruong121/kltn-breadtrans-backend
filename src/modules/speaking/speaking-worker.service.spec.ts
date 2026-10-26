@@ -10,6 +10,7 @@ type MockPrisma = {
   $queryRaw: MockFn;
   speakingSubmission: {
     findUnique: MockFn;
+    findMany: MockFn;
     update: MockFn;
     updateMany: MockFn;
   };
@@ -27,6 +28,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
       $queryRaw: jest.fn(),
       speakingSubmission: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
         updateMany: jest.fn(),
       },

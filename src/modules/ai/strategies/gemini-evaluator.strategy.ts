@@ -1,4 +1,9 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { GenerativeModel, SchemaType } from '@google/generative-ai';
@@ -1764,14 +1769,11 @@ Use learner-visible English only.`;
     promptText: string,
     studentResponse: string,
   ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
-    if (!this.hasKeys()) {
-      return {
-        score: 3,
-        feedback:
-          '[Mock Gemini] Trả lời đúng trọng tâm câu hỏi, phát âm khá tốt.',
-        suggestions: ['Nói tự nhiên hơn và bổ sung chi tiết giải thích.'],
-      };
-    }
+    // No grader configured: refuse rather than return an invented score.
+    if (!this.hasKeys())
+      throw new ServiceUnavailableException(
+        'Chấm Speaking Part 3-5 chưa được cấu hình.',
+      );
     try {
       const prompt = `
         You are a TOEIC Speaking Examiner. Grade this Speaking Part 3-5 response.

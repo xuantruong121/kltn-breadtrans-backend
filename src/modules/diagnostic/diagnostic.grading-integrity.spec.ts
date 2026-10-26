@@ -811,7 +811,7 @@ describe('learner delivery contract (real sanitizer)', () => {
     for (const key of forbidden) expect(out).not.toHaveProperty(key);
   });
 
-  it('Reading: delivers the complete passage under its heading', () => {
+  it('Reading: delivers the complete passage; the generic label line is not a title', () => {
     const body = 'First paragraph.\n\nSecond paragraph.';
     const out = serve({
       id: 5,
@@ -826,7 +826,8 @@ describe('learner delivery contract (real sanitizer)', () => {
       order: 5,
       taskType: 'MCQ',
     });
-    expect(out.passageTitle).toBe('Đoạn đọc');
+    // "Đoạn đọc" is the page's own label, not an authored title.
+    expect(out.passageTitle).toBeNull();
     expect(out.passageBody).toBe(body);
   });
 

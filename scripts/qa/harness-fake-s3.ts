@@ -35,6 +35,19 @@ function pathOf(url: string) {
 }
 
 createServer((req, res) => {
+  // The browser uploads speaking audio straight to a presigned PUT URL, like
+  // it does to R2, so the fake bucket answers CORS the same way.
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin ?? '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    req.headers['access-control-request-headers'] ?? '*',
+  );
+  res.setHeader('Access-Control-Expose-Headers', 'ETag');
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204).end();
+    return;
+  }
   let file: string;
   try {
     file = pathOf(req.url ?? '/');

@@ -6,6 +6,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { UploadService } from '../upload/upload.service';
 import { validateSpeakingAudio } from './speaking-audio-validator';
+import {
+  assessPracticeSpeech,
+  mockPracticeSpeech,
+} from './speaking-assessment-mode';
 import { MockSpeakingEvaluator } from './mock-speaking-evaluator';
 import * as crypto from 'crypto';
 import {
@@ -427,14 +431,15 @@ export class SpeakingProcessorService implements OnModuleDestroy {
     let assessmentResult: any;
     try {
       if (MockSpeakingEvaluator.isMockEnabled()) {
-        assessmentResult = await MockSpeakingEvaluator.evaluate(
-          existing.exercise.targetText,
+        assessmentResult = await mockPracticeSpeech(
+          existing.exercise,
           audioBuffer,
           { signal },
         );
       } else {
-        assessmentResult = await this.aiService.assessPronunciation(
-          existing.exercise.targetText,
+        assessmentResult = await assessPracticeSpeech(
+          this.aiService,
+          existing.exercise,
           audioBuffer,
           { signal },
         );

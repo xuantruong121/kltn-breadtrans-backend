@@ -2,13 +2,21 @@
 == Entry Diagnostic V2 id 5 (browser, mock grader)
 PASS  the clone serves V2 id 5 as the active assessment  (5 / ACTIVE / FOUR_SKILL_PLACEMENT_V2)
 PASS  the intro counts the administered form, not the 52-task plan  (29 nhiệm vụ (25 trắc nghiệm + 4 thực hành))
-PASS  listening: the question carries playable audio (stand-in fixture)  (ening/practice/quiz-23/audio/v7/full.mp3)
-PASS  speaking 1: the stated limits are the task's own (prep 15s, 45s)
-PASS  speaking 1: the preparation countdown is shown
-PASS  speaking 1: recording started when preparation ended
-PASS  speaking 1: the take can be played back before confirming
-PASS  speaking 2: the stated limits are the task's own (prep 30s, 60s)
-PASS  speaking 2: recording stopped by itself at 60s
+PASS  desktop sidebar lists the sections in the assessment order  (21,58,104,126,149)
+PASS  listening: the question carries playable audio (stand-in fixture)  (.r2.dev/diagnostic/v2/LST_CLIP_01.v1.mp3)
+PASS  reading: the passage label appears once (no duplicated heading)
+PASS  reading 12: nothing is bolded without a quoted reference  ()
+PASS  reading 16: "the illusion of fluency" is bolded, and only it  (the illusion of fluency)
+PASS  reading 17: "it" is bolded, and only it  (it)
+PASS  reading 18: "that trade-off" is bolded, and only it  (that trade-off)
+PASS  reading 19: nothing is bolded without a quoted reference  ()
+PASS  speaking 1: no preparation step, no confirm button
+PASS  speaking 1: stopping uploads and confirms by itself
+PASS  speaking 1: the page stays on the task (no auto-advance)
+PASS  speaking 1: the length the page reports is the recording itself (within 50 ms of the server-decoded length)  (client 2100 ms, server 2100 ms)
+PASS  speaking 1: "Ghi lại" replaces the take (one row, new audio)  (1/1)
+PASS  speaking 2: no preparation step, no confirm button
+PASS  speaking 2: recording stopped by itself at 60s and was sent
 PASS  writing 1: guidance states the task's range (60–90 từ)
 PASS  writing 1: a short draft is told it is below the range but still graded
 PASS  writing 1: 65 words reads as within the range
@@ -18,7 +26,7 @@ PASS  writing 2: 95 words reads as within the range
 PASS  all 29 tasks answered through the UI  (29)
 PASS  the four-skill result reaches COMPLETE  (COMPLETE)
 PASS  Listening and Reading equal the keyed answers  (L 50 vs 50, R 50 vs 50)
-PASS  Speaking and Writing equal the mean of their graded tasks  (S 69 [62.5,75], W 75 [75,75])
+PASS  Speaking and Writing equal the mean of their graded tasks  (S 69 [75,62.5], W 75 [75,75])
 PASS  overall is the equal-weight mean of the four skills  (61 vs 61)
 PASS  Language Use is reported with weight 0
 PASS  no placement band (DEF-004 decided as D1)
@@ -44,6 +52,6 @@ PASS  the page says the overall is withheld and offers a retry per failed task
 PASS  both retries regrade through the queue and the overall returns  (COMPLETE, overall 61)
 PASS  the page shows the restored overall
 PASS  no server error during the run
-issues: console: Failed to load resource: the server responded with a status of 403 () | console: [GSI_LOGGER]: The given origin is not allowed for the given client ID. | console: Failed to load resource: the server responded with a status of 403 () | console: Failed to load resource: the server responded with a status of 403 () | console: [GSI_LOGGER]: The given origin is not allowed for the given client ID. | console: Failed to load resource: the server responded with a status of 403 () | console: [GSI_LOGGER]: The given origin is not allowed for the given client ID. | console: Failed to load resource: the server responded with a status of 403 ()
+issues: console: Failed to load resource: the server responded with a status of 403 () | console: [GSI_LOGGER]: The given origin is not allowed for the given client ID. | console: Failed to load resource: the server responded with a status of 403 () | console: [GSI_LOGGER]: The given origin is not allowed for the given client ID. | console: Failed to load resource: the server responded with a status of 403 () | console: Failed to load resource: the server responded with a status of 403 () | console: [GSI_LOGGER]: The given origin is not allowed for the given client ID.
 
 DIAGNOSTIC_V2_BROWSER_FAILURES=0

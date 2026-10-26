@@ -461,7 +461,7 @@ export class UserService {
         where: { userId, submittedAt: { not: null } },
       }),
       this.prisma.diagnosticAttempt.findFirst({
-        where: { userId },
+        where: { userId, status: { not: 'ABANDONED' } },
         orderBy: { submittedAt: 'desc' },
       }),
     ]);
@@ -506,7 +506,7 @@ export class UserService {
     const [stats, diagnostic] = await Promise.all([
       this.prisma.userStats.findUnique({ where: { userId } }),
       this.prisma.diagnosticAttempt.findFirst({
-        where: { userId },
+        where: { userId, status: { not: 'ABANDONED' } },
         orderBy: { submittedAt: 'desc' },
       }),
     ]);

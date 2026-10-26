@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import type { PronunciationFeedback } from '../ai/strategies/ai-evaluator.interface';
 import { GamificationListener } from '../gamification/gamification.listener';
+import { isScriptedSpeakingTask } from './speaking-assessment-mode';
 import {
   SPEAKING_EVENTS_CHANNEL,
   SPEAKING_FEEDBACK_COMPLETED_EVENT,
@@ -81,11 +82,20 @@ export class SpeakingPostProcessingService implements OnModuleDestroy {
         submission.aiFeedback && typeof submission.aiFeedback === 'object'
           ? (submission.aiFeedback as Record<string, unknown>)
           : {};
-      const feedback = await this.aiService.generatePronunciationFeedback(
-        submission.exercise.targetText,
-        assessment as unknown as PronunciationFeedback,
-      );
-      const merged = { ...assessment, ...feedback };
+      // The Gemini wording assumes the learner read targetText aloud. A free
+      // answer already carries feedback built from its own evidence.
+      const feedback = isScriptedSpeakingTask(submission.exercise.taskType)
+        ? await this.aiService.generatePronunciationFeedback(
+            submission.exercise.targetText,
+            assessment as unknown as PronunciationFeedback,
+          )
+        : {};
+      // Clarity is the score band; the model rewords, it does not regrade.
+      const merged = {
+        ...assessment,
+        ...feedback,
+        clarity: assessment.clarity ?? feedback.clarity,
+      };
       const feedbackPersistStartedAt = Date.now();
       const persist = await this.prisma.speakingSubmission.updateMany({
         where: {

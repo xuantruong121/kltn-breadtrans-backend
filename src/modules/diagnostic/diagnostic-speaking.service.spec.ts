@@ -215,7 +215,7 @@ function setup(
               fluency: 'Flows well.',
               language_use: 'Simple and correct.',
             },
-            feedback: 'Clear answer that stays on the topic.',
+            feedback: 'Câu trả lời rõ ràng và bám sát chủ đề.',
             evidenceQuotes: ['visit the park'],
             transcript: 'I visit the park.',
             speechEvidence: { mode: 'FAKE' },

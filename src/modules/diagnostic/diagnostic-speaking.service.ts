@@ -230,6 +230,19 @@ export class DiagnosticSpeakingService
         : Number(durationMs);
     const verdict = checkRecordingDuration(policy, measuredMs, clientMs);
     if (!verdict.ok) {
+      // Both figures, so a refused recording can be diagnosed from the log.
+      this.logger.warn(
+        JSON.stringify({
+          event: 'diagnostic_speaking_duration_refused',
+          code: verdict.code,
+          attemptId,
+          questionId,
+          measuredMs,
+          clientMs: clientMs ?? null,
+          maxMs: policy.maxMs,
+          mime,
+        }),
+      );
       throw new BadRequestException(DURATION_MESSAGES[verdict.code]);
     }
 

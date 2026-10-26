@@ -2866,6 +2866,7 @@ export class QuizService {
       maxScore: number;
       score: number;
       skill: 'WRITING';
+      practice?: Record<string, unknown>;
     } | null = null;
     if (isWritingSubmission && submission.aiFeedback) {
       try {
@@ -2886,6 +2887,21 @@ export class QuizService {
             maxScore: parsed.maxScore,
             score: parsed.score,
             skill: 'WRITING',
+            // Practice tasks graded per criterion (PRACTICE_WRITING_V1).
+            ...(parsed.rubricVersion === 'PRACTICE_WRITING_V1' &&
+            Array.isArray(parsed.criteria)
+              ? {
+                  practice: {
+                    rubricVersion: parsed.rubricVersion,
+                    criteria: parsed.criteria,
+                    strengths: parsed.strengths ?? [],
+                    corrections: parsed.corrections ?? [],
+                    wordCount: parsed.wordCount ?? null,
+                    wordRange: parsed.wordRange ?? null,
+                    keywords: parsed.keywords ?? [],
+                  },
+                }
+              : {}),
           };
         }
       } catch {
