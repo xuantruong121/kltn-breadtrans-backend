@@ -163,13 +163,13 @@ async function main() {
   await rec.page.waitForTimeout(4000);
   await rec.page.screenshot({ path: `${SHOTS}/speaking-16-recording.png` });
   await rec.page
-    .getByRole('button', { name: 'Dừng ghi âm để nghe lại' })
+    .getByRole('button', { name: 'Dừng ghi âm và chấm điểm' })
     .click();
-  await rec.page.waitForTimeout(2500);
-  await rec.page.screenshot({ path: `${SHOTS}/speaking-16-preview.png` });
-  await rec.page.getByRole('button', { name: 'Gửi đánh giá' }).first().click();
   await rec.page.waitForTimeout(12_000);
-  await rec.page.screenshot({ path: `${SHOTS}/speaking-16-after-submit.png`, fullPage: true });
+  await rec.page.screenshot({
+    path: `${SHOTS}/speaking-16-after-submit.png`,
+    fullPage: true,
+  });
   await rec.page.getByText('Hệ thống nghe được').waitFor({ timeout: 60_000 });
   const body = await rec.page.locator('body').innerText();
   check(
@@ -180,11 +180,20 @@ async function main() {
     'free-answer result has no per-word table and no completeness card',
     !body.includes('Đánh giá theo từng từ') && !/Độ hoàn thiện/i.test(body),
   );
-  check('retry is worded for an answer', body.includes('Trả lời lại'));
+  check(
+    'stop submits at once; result offers Ghi âm lại',
+    body.includes('Ghi âm lại') && !body.includes('Gửi đánh giá'),
+  );
   await rec.page.screenshot({
     path: `${SHOTS}/speaking-16-result.png`,
     fullPage: true,
   });
+  await rec.page.getByRole('button', { name: 'Ghi âm lại' }).first().click();
+  await rec.page
+    .getByRole('button', { name: 'Bắt đầu thu âm', exact: true })
+    .first()
+    .waitFor({ timeout: 10_000 });
+  check('Ghi âm lại returns to a fresh recording', true);
   await rec.page.reload();
   await rec.page.waitForTimeout(3000);
   await rec.page.screenshot({

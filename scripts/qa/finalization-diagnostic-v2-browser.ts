@@ -148,21 +148,43 @@ async function main() {
     const w = window as unknown as { __durations?: number[] };
     w.__durations = [];
     const original = FormData.prototype.append;
-    FormData.prototype.append = function (this: FormData, name: string, value: string | Blob, ...rest: [string?]) {
+    FormData.prototype.append = function (
+      this: FormData,
+      name: string,
+      value: string | Blob,
+      ...rest: [string?]
+    ) {
       if (name === 'durationMs') w.__durations!.push(Number(value));
-      return (original as (...args: unknown[]) => void).call(this, name, value, ...rest);
+      return (original as (...args: unknown[]) => void).call(
+        this,
+        name,
+        value,
+        ...rest,
+      );
     } as typeof FormData.prototype.append;
   });
   const reportedDurations = () =>
-    page.evaluate(() => (window as unknown as { __durations?: number[] }).__durations ?? []);
+    page.evaluate(
+      () => (window as unknown as { __durations?: number[] }).__durations ?? [],
+    );
   await page.getByRole('button', { name: /Bắt đầu làm bài/ }).click();
   await page.waitForTimeout(3000);
-  const sidebar = (await page.locator('aside[aria-label="Danh sách câu hỏi"]').innerText()).replace(/\s+/g, ' ');
-  const order = ['Nghe · câu 1–10', 'Đọc · câu 11–20', 'Nói · câu 21–22', 'Viết · câu 23–24', 'Ngữ pháp & Từ vựng · câu 25–29'];
+  const sidebar = (
+    await page.locator('aside[aria-label="Danh sách câu hỏi"]').innerText()
+  ).replace(/\s+/g, ' ');
+  const order = [
+    'Nghe · câu 1–10',
+    'Đọc · câu 11–20',
+    'Nói · câu 21–22',
+    'Viết · câu 23–24',
+    'Ngữ pháp & Từ vựng · câu 25–29',
+  ];
   const positions = order.map((label) => sidebar.indexOf(label));
   check(
     'desktop sidebar lists the sections in the assessment order',
-    positions.every((pos, i) => pos >= 0 && (i === 0 || pos > positions[i - 1])),
+    positions.every(
+      (pos, i) => pos >= 0 && (i === 0 || pos > positions[i - 1]),
+    ),
     `(${positions.join(',')})`,
   );
 
@@ -199,21 +221,44 @@ async function main() {
           await page.waitForTimeout(holdMs);
           await page.getByRole('button', { name: /Dừng ghi âm/ }).click();
         }
-        await page
-          .getByText(/Đã nhận bản ghi/)
-          .waitFor({ timeout: ((item.response ?? 90) + 30) * 1000 });
+        // An accepted recording moves the page to the next task.
+        await page.waitForFunction(
+          (prompt) =>
+            !Array.from(document.querySelectorAll('h2')).some((h) =>
+              (h.textContent ?? '').replace(/s+/g, ' ').includes(prompt),
+            ),
+          item.prompt.replace(/s+/g, ' ').slice(0, 60),
+          { timeout: ((item.response ?? 90) + 30) * 1000 },
+        );
+      };
+      // Speaking tasks have no "Câu trước"; go back through the navigator.
+      const backToTask = async () => {
+        const aside = page.locator('aside[aria-label="Danh sách câu hỏi"]');
+        const n = Number(/Câu (\d+)\/29/.exec(await aside.innerText())?.[1]);
+        await aside
+          .getByRole('button', { name: new RegExp(`^Câu ${n - 1},`) })
+          .click();
+        await page.waitForTimeout(500);
       };
       if (speakingSeen === 1) {
         await record(3000);
-        check('speaking 1: stopping uploads and confirms by itself', true);
         check(
-          'speaking 1: the page stays on the task (no auto-advance)',
-          (await page.locator('h2').allInnerTexts()).map(norm).includes(norm(item.prompt)),
+          'speaking 1: stopping uploads, confirms and moves to the next task by itself',
+          true,
+        );
+        await backToTask();
+        check(
+          'speaking 1: going back shows the task as recorded',
+          (await page.locator('h2').allInnerTexts())
+            .map(norm)
+            .includes(norm(item.prompt)) &&
+            (await page.getByRole('button', { name: /^Ghi lại$/ }).isVisible()),
         );
         const firstRow = harnessQuery(
           `select r.id, r."audioKey" from "DiagnosticSpeakingResponse" r join "DiagnosticAttempt" a on a.id = r."attemptId" join "User" u on u.id = a."userId" where u.email = '${account.email}' and r."questionId" = ${item.id}`,
         );
         await record(2000);
+        await backToTask();
         const secondRow = harnessQuery(
           `select r.id, r."audioKey" from "DiagnosticSpeakingResponse" r join "DiagnosticAttempt" a on a.id = r."attemptId" join "User" u on u.id = a."userId" where u.email = '${account.email}' and r."questionId" = ${item.id}`,
         );
@@ -228,15 +273,22 @@ async function main() {
         );
         check(
           'speaking 1: "Ghi lại" replaces the take (one row, new audio)',
-          firstRow.length === 1 && secondRow.length === 1 && firstRow[0][1] !== secondRow[0][1],
+          firstRow.length === 1 &&
+            secondRow.length === 1 &&
+            firstRow[0][1] !== secondRow[0][1],
           `(${firstRow.length}/${secondRow.length})`,
         );
       } else {
         await record(null);
-        check(`speaking 2: recording stopped by itself at ${item.response}s and was sent`, true);
+        check(
+          `speaking 2: recording stopped by itself at ${item.response}s and was sent`,
+          true,
+        );
       }
-      await page.getByRole('button', { name: /^Câu tiếp/ }).click();
-      await page.waitForTimeout(800);
+      if (speakingSeen === 1) {
+        await page.getByRole('button', { name: /^Câu tiếp/ }).click();
+        await page.waitForTimeout(800);
+      }
       answered += 1;
       continue;
     }
@@ -282,14 +334,29 @@ async function main() {
       const article = page.locator('article[aria-label="Đoạn đọc"]');
       const articleText = (await article.innerText()).replace(/\s+/g, ' ');
       const strong = await article.locator('strong').allInnerTexts();
-      const expected: Record<string, string> = { 16: 'the illusion of fluency', 17: 'it', 18: 'that trade-off' };
+      const expected: Record<string, string> = {
+        16: 'the illusion of fluency',
+        17: 'it',
+        18: 'that trade-off',
+      };
       const order = i + 1;
       if (order === 11)
-        check('reading: the passage label appears once (no duplicated heading)', (articleText.match(/Đoạn đọc/g) ?? []).length === 1);
+        check(
+          'reading: the passage label appears once (no duplicated heading)',
+          (articleText.match(/Đoạn đọc/g) ?? []).length === 1,
+        );
       if (expected[order])
-        check(`reading ${order}: "${expected[order]}" is bolded, and only it`, strong.length === 1 && strong[0] === expected[order], `(${strong.join('|')})`);
+        check(
+          `reading ${order}: "${expected[order]}" is bolded, and only it`,
+          strong.length === 1 && strong[0] === expected[order],
+          `(${strong.join('|')})`,
+        );
       else if (order === 12 || order === 19)
-        check(`reading ${order}: nothing is bolded without a quoted reference`, strong.length === 0, `(${strong.join('|')})`);
+        check(
+          `reading ${order}: nothing is bolded without a quoted reference`,
+          strong.length === 0,
+          `(${strong.join('|')})`,
+        );
     }
     const keyText = item.options[item.key];
     const choice =
@@ -418,6 +485,31 @@ async function main() {
     path: `${EVIDENCE}/diag-v2-result-desktop.png`,
     fullPage: true,
   });
+  check(
+    'the result page is not left in fullscreen',
+    await page.evaluate(() => document.fullscreenElement === null),
+  );
+  check(
+    'the result page no longer shows a task total',
+    !/Tổng cộng: \d+ nhiệm vụ/.test(resultText),
+  );
+  // Profile tab -> "Xem lại toàn bộ bài làm" -> "Quay lại" returns to the tab.
+  await page.goto(`${FE}/hub?tab=diagnostic-result`, {
+    waitUntil: 'networkidle',
+  });
+  await hidePet(page);
+  await page.getByText('Bài Nói và Viết').waitFor({ timeout: 30_000 });
+  await page.screenshot({
+    path: `${EVIDENCE}/diag-v2-profile-tab.png`,
+    fullPage: true,
+  });
+  await page.getByRole('link', { name: /Xem lại toàn bộ bài làm/ }).click();
+  await page.waitForURL('**/diagnostic');
+  await page.getByRole('button', { name: 'Quay lại' }).first().click();
+  await page.waitForURL('**/hub?tab=diagnostic-result', { timeout: 15_000 });
+  check('review page has a back button that returns to the profile tab', true);
+  await page.goto(`${FE}/diagnostic`, { waitUntil: 'networkidle' });
+  await hidePet(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(800);
   const overflow = await page.evaluate(

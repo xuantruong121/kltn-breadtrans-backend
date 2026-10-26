@@ -12,6 +12,8 @@
  *
  * Pure: no Prisma, no I/O.
  */
+import { hasVietnameseDiacritics } from '../diagnostic/diagnostic-productive';
+
 export const PRACTICE_WRITING_RUBRIC_VERSION = 'PRACTICE_WRITING_V1';
 
 export type PracticeCriterion = { key: string; max: number };
@@ -112,7 +114,7 @@ export function buildPracticeWritingRequest(
     'The sample response is one acceptable answer, not the only one: reasonable alternative wording must not lose points.',
     'Do not invent mistakes. If the response is correct, return no corrections.',
     'Every correction must quote the learner text EXACTLY in "original" (a short span copied character for character), give the corrected span, and explain in Vietnamese why.',
-    'All comments, explanations, strengths and suggestions are in Vietnamese, specific to this response.',
+    'All comments, explanations, strengths and suggestions are in Vietnamese with full diacritics (never unaccented), specific to this response.',
   ].join('\n');
   const prompt = JSON.stringify(
     {
@@ -257,6 +259,9 @@ export function validatePracticeWritingResult(
     return { ok: false, reason: 'UNKNOWN_CRITERION' };
   if (typeof r.feedback !== 'string' || r.feedback.trim().length < 10)
     return { ok: false, reason: 'FEEDBACK_MISSING' };
+  // Unaccented Vietnamese is unreadable for the learner; ask again.
+  if (!hasVietnameseDiacritics(r.feedback))
+    return { ok: false, reason: 'FEEDBACK_WITHOUT_DIACRITICS' };
   const strengths = texts(r.strengths);
   const suggestions = texts(r.suggestions);
   if (!strengths || !suggestions || !Array.isArray(r.corrections))

@@ -102,3 +102,41 @@ describe('SpeakingWorkerService legacy post-processing sweep', () => {
     expect(post.processReward).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('SpeakingWorkerService orphaned claims', () => {
+  it('requeues a PROCESSING claim whose poller process has exited, and only that one', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      { id: 1, workerId: 'legacy-999999-dead' },
+      { id: 2, workerId: `legacy-${process.pid}-other` },
+    ]);
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const worker = new SpeakingWorkerService(
+      {
+        speakingSubmission: { findMany, updateMany },
+      } as unknown as PrismaService,
+      {} as AiService,
+      {} as UploadService,
+      {} as EventEmitter2,
+    );
+    const kill = jest.spyOn(process, 'kill').mockImplementation(((
+      pid: number,
+    ) => {
+      if (pid === 999999)
+        throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
+      return true;
+    }) as never);
+    try {
+      await worker.recoverStuckLeases();
+    } finally {
+      kill.mockRestore();
+    }
+    expect(updateMany).toHaveBeenNthCalledWith(1, {
+      where: { id: { in: [1] }, status: 'PROCESSING' },
+      data: {
+        status: 'PENDING',
+        nextAttemptAt: expect.any(Date),
+        workerId: null,
+      },
+    });
+  });
+});

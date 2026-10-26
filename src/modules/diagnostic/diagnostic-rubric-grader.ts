@@ -50,10 +50,13 @@ export class MockDiagnosticRubricGrader implements DiagnosticRubricGrader {
       rubricVersion: request.rubric.version,
       criteria,
       criterionFeedback: Object.fromEntries(
-        request.rubric.criteria.map((c) => [c.key, `Mock note for ${c.key}.`]),
+        request.rubric.criteria.map((c) => [
+          c.key,
+          `Nhận xét mô phỏng cho ${c.key}.`,
+        ]),
       ),
-      feedback: `Mock ${request.skill.toLowerCase()} feedback for ${request.submissionRef}.`,
-      suggestions: ['Mock suggestion.'],
+      feedback: `Nhận xét mô phỏng (mock) cho bài ${request.skill.toLowerCase()} ${request.submissionRef}.`,
+      suggestions: ['Gợi ý mô phỏng.'],
       evidenceQuotes: firstWords ? [firstWords] : [],
       ...(transcript
         ? {
@@ -80,7 +83,7 @@ export class UnavailableDiagnosticRubricGrader implements DiagnosticRubricGrader
 
 // ----------------------------------------------------------------- prompts
 
-export const RUBRIC_PROMPT_VERSION = 'diagnostic-rubric-prompt-v3';
+export const RUBRIC_PROMPT_VERSION = 'diagnostic-rubric-prompt-v4';
 
 const SYSTEM_INSTRUCTION = [
   'You are a rubric grader for an English placement practice task on an educational platform.',
@@ -90,6 +93,7 @@ const SYSTEM_INSTRUCTION = [
   'For every criterion, write one sentence in Vietnamese explaining the score, in criterionFeedback.',
   'Write the overall feedback in Vietnamese, addressed to the learner, in two to four sentences.',
   'Give at most three suggestions, in Vietnamese.',
+  'All Vietnamese text must be written with full Vietnamese diacritics (for example "Bài viết của bạn rất tốt"), never as unaccented ASCII ("Bai viet cua ban rat tot").',
   'evidenceQuotes: copy one to five short spans VERBATIM from the learner response (or the transcript) that your scores rest on. Never paraphrase a quote.',
   'This is internal practice feedback. Never present the result as an official exam score, an ETS result, or a CEFR level.',
 ].join('\n');

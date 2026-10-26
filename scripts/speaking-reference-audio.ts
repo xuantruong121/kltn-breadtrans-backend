@@ -20,6 +20,11 @@
  *             premium/speaking/ (served presigned by SpeakingService).
  *             Needs SPEAKING_REF_AUDIO_PUBLISH_AUTHORIZED=publish.
  *
+ * British English variant: SPEAKING_REF_ACCENT=en-gb makes the same clips
+ * with en-GB voices for the exercises that already have their US clip, as
+ * <id>.en-gb.v1.mp3 beside it. Publish only uploads; no database field
+ * changes, the API derives the UK URL from the US one.
+ *
  * Usage: npx ts-node --transpile-only scripts/speaking-reference-audio.ts <mode> --target env:DATABASE_URL
  */
 import { createHash } from 'node:crypto';
@@ -41,7 +46,10 @@ import {
   LISTENING_VOICE_REGISTRY_VERSION,
 } from '../src/modules/quiz/listening-audio-authoring.service';
 
-const OUT = 'artifacts/speaking-reference-audio';
+const UK = process.env.SPEAKING_REF_ACCENT === 'en-gb';
+const OUT = UK
+  ? 'artifacts/speaking-reference-audio-en-gb'
+  : 'artifacts/speaking-reference-audio';
 const MAX_CALLS = 30;
 const READ_TASKS = new Set(['READ_ALOUD', 'PRONUNCIATION_DRILL']);
 const sha256 = (v: string | Buffer) =>
@@ -56,19 +64,22 @@ type Exercise = {
 
 /** Reading tasks alternate voices by id; prompts use one steady voice. */
 function voiceFor(ex: Exercise): keyof typeof LISTENING_VOICE_REGISTRY {
-  if (!READ_TASKS.has(ex.taskType ?? '')) return 'en-us-female-01';
-  return ex.id % 2 === 0 ? 'en-us-female-01' : 'en-us-male-01';
+  const female = UK ? 'en-gb-female-01' : 'en-us-female-01';
+  const male = UK ? 'en-gb-male-01' : 'en-us-male-01';
+  if (!READ_TASKS.has(ex.taskType ?? '')) return female;
+  return ex.id % 2 === 0 ? female : male;
 }
 
 function ssmlFor(ex: Exercise) {
   const voice = LISTENING_VOICE_REGISTRY[voiceFor(ex)].providerVoice;
-  return `<speak version="1.0" xml:lang="en-US" xmlns="http://www.w3.org/2001/10/synthesis"><voice name="${voice}">${escapeXml(ex.targetText.trim())}</voice></speak>`;
+  return `<speak version="1.0" xml:lang="${UK ? 'en-GB' : 'en-US'}" xmlns="http://www.w3.org/2001/10/synthesis"><voice name="${voice}">${escapeXml(ex.targetText.trim())}</voice></speak>`;
 }
 
 function keyFor(ex: Exercise) {
+  const file = `${ex.id}.${UK ? 'en-gb.' : ''}v1.mp3`;
   return ex.isPremiumContent
-    ? `premium/speaking/reference/${ex.id}.v1.mp3`
-    : `catalog/speaking/reference/${ex.id}.v1.mp3`;
+    ? `premium/speaking/reference/${file}`
+    : `catalog/speaking/reference/${file}`;
 }
 
 async function load(prisma: PrismaClient): Promise<Exercise[]> {
@@ -76,7 +87,8 @@ async function load(prisma: PrismaClient): Promise<Exercise[]> {
     where: {
       practiceSetId: null,
       publicationStatus: 'PUBLISHED',
-      audioUrl: null,
+      // The UK pass covers exactly the exercises whose US clip this tool made.
+      audioUrl: UK ? { contains: '/speaking/reference/' } : null,
     },
     select: {
       id: true,
@@ -199,7 +211,7 @@ async function main() {
       const meta = await parseBuffer(audio, { mimeType: 'audio/mpeg' });
       const durationMs = Math.round((meta.format.duration ?? 0) * 1000);
       if (durationMs < 500) throw new Error(`exercise ${ex.id}: empty audio`);
-      const file = join(OUT, `${ex.id}.v1.mp3`);
+      const file = join(OUT, keyFor(ex).split('/').pop()!);
       writeFileSync(file, audio);
       clips.push({
         id: ex.id,
@@ -271,6 +283,11 @@ async function main() {
         ex.isPremiumContent ? clip.key : `${publicBase}/${clip.key}`,
       );
       console.log(`${clip.key}: ${result}`);
+    }
+    if (UK) {
+      console.log(`uploaded UK clips: ${values.size}; database unchanged`);
+      await prisma.$disconnect();
+      return;
     }
     await prisma.$transaction(async (tx) => {
       for (const [id, audioUrl] of values) {

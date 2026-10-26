@@ -207,6 +207,16 @@ export const DAILY_PRACTICE_SPEAKING_LIMIT = 10;
 /** Three full 11-task TOEIC speaking sections per day. */
 export const DAILY_EXAM_SPEAKING_LIMIT = 33;
 
+/**
+ * Reference clips made by scripts/speaking-reference-audio.ts have a British
+ * English twin beside the US one (<id>.en-gb.v1.mp3). Other media has none.
+ */
+export function britishReferenceUrl(audioUrl: string | null): string | null {
+  return audioUrl && /\/speaking\/reference\/\d+\.v1\.mp3$/.test(audioUrl)
+    ? audioUrl.replace(/\.v1\.mp3$/, '.en-gb.v1.mp3')
+    : null;
+}
+
 @Injectable()
 export class SpeakingService {
   private readonly logger = new Logger(SpeakingService.name);
@@ -323,14 +333,23 @@ export class SpeakingService {
     if (access.isLocked) return safeMetadata;
 
     let audioUrl = exercise.audioUrl;
+    let audioUrlUk = britishReferenceUrl(exercise.audioUrl);
     if (access.isPremiumContent && audioUrl) {
       audioUrl = isPrivateSpeakingMediaKey(audioUrl)
         ? await this.uploadService.getPrivatePresignedDownloadUrl(audioUrl, 300)
         : null;
+      audioUrlUk =
+        audioUrlUk && isPrivateSpeakingMediaKey(audioUrlUk)
+          ? await this.uploadService.getPrivatePresignedDownloadUrl(
+              audioUrlUk,
+              300,
+            )
+          : null;
     }
     return {
       ...exercise,
       audioUrl,
+      audioUrlUk,
       category: effectiveCategory,
       categoryLabel: effectiveCategoryLabel,
       isPremiumContent: access.isPremiumContent,

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -47,10 +48,22 @@ const RETRY_BACKOFF_MS = [
 ];
 const LEASE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
+/** True when a local process with this pid still runs. */
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err: any) {
+    return err?.code === 'EPERM';
+  }
+}
+
 @Injectable()
 export class SpeakingWorkerService implements OnModuleInit {
   private readonly logger = new Logger(SpeakingWorkerService.name);
   private isProcessing = false;
+  /** Stamped on every claim so a restart can tell its own work from orphans. */
+  private readonly workerId = `legacy-${process.pid}-${randomUUID()}`;
 
   onModuleInit(): void {
     const mode = getSpeakingPipelineMode();
@@ -192,6 +205,7 @@ export class SpeakingWorkerService implements OnModuleInit {
    * Recovers submissions stuck in PROCESSING state beyond the LEASE_TIMEOUT_MS.
    */
   async recoverStuckLeases(): Promise<void> {
+    await this.recoverOrphanedClaims();
     const cutoff = new Date(Date.now() - LEASE_TIMEOUT_MS);
 
     // 1. Mark as FAILED if max attempts already reached
@@ -239,6 +253,38 @@ export class SpeakingWorkerService implements OnModuleInit {
   }
 
   /**
+   * A submission claimed by a legacy poller whose process has exited (backend
+   * restart, watch reload, crash) goes back to PENDING at once instead of
+   * waiting out the 5-minute lease while the learner watches a spinner. Only
+   * pids on this machine are checked; claims without a stamp keep the lease.
+   */
+  private async recoverOrphanedClaims(): Promise<void> {
+    const claimed = await this.prisma.speakingSubmission.findMany({
+      where: {
+        status: 'PROCESSING',
+        workerId: { startsWith: 'legacy-', not: this.workerId },
+      },
+      select: { id: true, workerId: true },
+    });
+    const orphans = claimed
+      .filter((row) => {
+        const pid = Number(row.workerId?.split('-')[1]);
+        return (
+          Number.isInteger(pid) && pid !== process.pid && !processAlive(pid)
+        );
+      })
+      .map((row) => row.id);
+    if (!orphans.length) return;
+    const reset = await this.prisma.speakingSubmission.updateMany({
+      where: { id: { in: orphans }, status: 'PROCESSING' },
+      data: { status: 'PENDING', nextAttemptAt: new Date(), workerId: null },
+    });
+    this.logger.warn(
+      `Requeued ${reset.count} speaking submission(s) left PROCESSING by an exited poller: ${orphans.join(', ')}`,
+    );
+  }
+
+  /**
    * Atomically claims the next PENDING submission using PostgreSQL SKIP LOCKED.
    * Multi-instance safe and deadlock free.
    */
@@ -248,6 +294,7 @@ export class SpeakingWorkerService implements OnModuleInit {
         UPDATE "SpeakingSubmission"
         SET "status" = 'PROCESSING'::"SpeakingSubmissionStatus",
             "processingStartedAt" = NOW(),
+            "workerId" = ${this.workerId},
             "attemptCount" = "attemptCount" + 1
         WHERE id = (
           SELECT id

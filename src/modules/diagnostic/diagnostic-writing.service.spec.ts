@@ -173,7 +173,7 @@ function setup(opts: { owner?: number } = {}) {
               vocabulary: 'Adequate range.',
               grammar: 'Some slips.',
             },
-            feedback: 'Clear email that covers the task.',
+            feedback: 'Email rõ ràng, đáp ứng đủ yêu cầu của đề.',
             suggestions: ['Add a closing line.'],
             evidenceQuotes: [
               (request.responseText ?? '').trim().split(/\s+/u)[0],
@@ -306,7 +306,7 @@ describe('Writing grading worker', () => {
         vocabulary: 2,
         grammar: 2,
       },
-      feedback: 'Clear email that covers the task.',
+      feedback: 'Email rõ ràng, đáp ứng đủ yêu cầu của đề.',
       criterionFeedback: { grammar: 'Some slips.' },
     });
     const [feedback] = await s.service.listFeedback(4);
@@ -314,7 +314,7 @@ describe('Writing grading worker', () => {
       status: 'GRADED',
       scoreScale: 'PERCENT_0_100',
       wordCount: 70,
-      feedback: 'Clear email that covers the task.',
+      feedback: 'Email rõ ràng, đáp ứng đủ yêu cầu của đề.',
       criterionFeedback: { grammar: 'Some slips.' },
     });
   });
