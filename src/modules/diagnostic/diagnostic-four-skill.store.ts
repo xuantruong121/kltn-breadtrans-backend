@@ -29,6 +29,11 @@ type Db = Pick<
 
 const OBJECTIVE: FourSkillKey[] = ['LISTENING', 'READING', 'LANGUAGE_USE'];
 
+/** A Writing answer submitted blank is an explicit skip (see submit). */
+export function isSkippedWritingAnswer(value: unknown): boolean {
+  return typeof value === 'string' && value.trim() === '';
+}
+
 /** Called inside the submission transaction with the graded objective items. */
 export async function writeObjectiveSkillRows(
   tx: Pick<Prisma.TransactionClient, 'diagnosticSkillResult'>,
@@ -68,6 +73,7 @@ export async function refreshFourSkillResult(
       assessmentId: true,
       status: true,
       scoringVersion: true,
+      answers: true,
       skillResults: true,
     },
   });
@@ -105,16 +111,32 @@ export async function refreshFourSkillResult(
       select: { questionId: true, status: true, score: true },
     }),
   ]);
+  // A Writing task submitted blank was skipped by the learner: it has no
+  // grading row, and its stored answer is the empty string.
+  const answers =
+    attempt.answers &&
+    typeof attempt.answers === 'object' &&
+    !Array.isArray(attempt.answers)
+      ? (attempt.answers as Record<string, unknown>)
+      : {};
+  const writingIds = productive
+    .filter((q) => q.taskType === 'WRITING_RESPONSE')
+    .map((q) => q.id);
+  const skippedWriting = writingIds
+    .filter(
+      (id) =>
+        !writing.some((row) => row.questionId === id) &&
+        isSkippedWritingAnswer(answers[String(id)]),
+    )
+    .map((questionId) => ({ questionId, status: 'SKIPPED', score: null }));
   const result = scoreFourSkillPlacementV2({
     objective,
     speakingQuestionIds: productive
       .filter((q) => q.taskType === 'SPEAKING_RESPONSE')
       .map((q) => q.id),
     speaking,
-    writingQuestionIds: productive
-      .filter((q) => q.taskType === 'WRITING_RESPONSE')
-      .map((q) => q.id),
-    writing,
+    writingQuestionIds: writingIds,
+    writing: [...writing, ...skippedWriting],
   });
 
   for (const skill of ['SPEAKING', 'WRITING'] as const) {

@@ -1,0 +1,157 @@
+{
+  "attemptId": 83,
+  "geminiRequests": 2,
+  "speaking": {
+    "row": [
+      "GRADED",
+      "gemini+azure-speech",
+      "93.75",
+      "1",
+      "",
+      "I usually study in the small library near my university. It is on the second floor of an old building next to a coffee shop. I normally go there on weekday evenings after my classes finish and I stay for about two hours. It suits me because it is quiet and the chairs are comfort rible so I can focus on my reading. There is also free Wi-Fi which I need for my online assignments. Sometimes I meet my classmates there to work on group projects."
+    ],
+    "criteria": {
+      "fluency": 4,
+      "language_use": 3,
+      "intelligibility": 4,
+      "task_fulfilment": 4
+    },
+    "criterionFeedback": {
+      "fluency": "Lời nói trôi chảy, tốc độ ổn định và các khoảng dừng tự nhiên theo ranh giới mệnh đề.",
+      "language_use": "Sử dụng kết hợp câu đơn và câu phức với vốn từ vựng phong phú, mặc dù có một lỗi phát âm hoặc từ vựng nhỏ ở từ 'comfort rible' nhưng không làm ảnh hưởng đến ý nghĩa.",
+      "intelligibility": "Phát âm rõ ràng và dễ hiểu xuyên suốt bài nói mà không gặp bất kỳ khó khăn nào trong việc tiếp nhận thông tin.",
+      "task_fulfilment": "Bài nói đã trả lời đầy đủ tất cả các phần của đề bài và phát triển ý với các chi tiết cụ thể như vị trí, thời gian và lý do phù hợp."
+    },
+    "feedback": "Chào bạn, bạn đã thực hiện bài nói rất tốt với cấu trúc rõ ràng và nội dung đầy đủ chi tiết. Phát âm của bạn rất rõ ràng và tốc độ nói trôi chảy, tự nhiên. Hãy tiếp tục phát huy phong độ này và chú ý kiểm tra lại các lỗi từ vựng nhỏ nhé.",
+    "transcript": "I usually study in the small library near my university. It is on the second floor of an old building next to a coffee shop. I normally go there on weekday evenings after my classes finish and I stay for about two hours. It suits me because it is quiet and the chairs are comfort rible so I can focus on my reading. There is also free Wi-Fi which I need for my online assignments. Sometimes I meet my classmates there to work on group projects."
+  },
+  "writing": {
+    "row": [
+      "GRADED",
+      "gemini+azure-speech",
+      "87.5",
+      "1",
+      "",
+      "81"
+    ],
+    "criteria": {
+      "grammar": 3,
+      "vocabulary": 3,
+      "organisation": 4,
+      "task_achievement": 4
+    },
+    "criterionFeedback": {
+      "grammar": "Cấu trúc ngữ pháp đa dạng với cả câu đơn và câu phức, lỗi sai không đáng kể và không làm ảnh hưởng đến nghĩa.",
+      "vocabulary": "Vốn từ vựng phong phú, sử dụng từ ngữ chính xác và tự nhiên phù hợp với ngữ cảnh.",
+      "organisation": "Các ý tưởng được sắp xếp cực kỳ rành mạch, logic và dễ theo dõi thành một khối hoàn chỉnh.",
+      "task_achievement": "Bài viết đã giải quyết đầy đủ tất cả các yêu cầu của đề bài và bổ sung các chi tiết rất phù hợp."
+    },
+    "feedback": "Chào bạn, bài viết của bạn rất xuất sắc, đáp ứng hoàn hảo mọi yêu cầu về nội dung và độ dài. Các ý được trình bày trôi chảy, tự nhiên và đúng trọng tâm của một tin nhắn thân thiện nhưng trang trọng. Bạn chỉ cần chú ý một chút về cấu trúc ngữ pháp nhỏ để bài viết hoàn thiện hơn.",
+    "suggestions": [
+      "Kiểm tra lại thì của động từ trong các câu kể về sự việc đã xảy ra.",
+      "Đa dạng hóa các từ nối để câu văn thêm phần linh hoạt.",
+      "Đọc lại bài để đảm bảo không mắc các lỗi chính tả nhỏ."
+    ]
+  },
+  "fourSkill": {
+    "scoringVersion": "FOUR_SKILL_PLACEMENT_V2",
+    "state": "NOT_STARTED",
+    "skills": {
+      "LISTENING": {
+        "skill": "LISTENING",
+        "state": "COMPLETE",
+        "score": 40,
+        "weight": 0.25,
+        "itemsScored": 4,
+        "itemsTotal": 10,
+        "tasksGraded": 0,
+        "tasksPending": 0,
+        "tasksFailed": 0,
+        "tasksSkipped": 0
+      },
+      "READING": {
+        "skill": "READING",
+        "state": "COMPLETE",
+        "score": 30,
+        "weight": 0.25,
+        "itemsScored": 3,
+        "itemsTotal": 10,
+        "tasksGraded": 0,
+        "tasksPending": 0,
+        "tasksFailed": 0,
+        "tasksSkipped": 0
+      },
+      "SPEAKING": {
+        "skill": "SPEAKING",
+        "state": "NOT_STARTED",
+        "score": null,
+        "weight": 0.25,
+        "itemsScored": 1,
+        "itemsTotal": 2,
+        "tasksGraded": 1,
+        "tasksPending": 0,
+        "tasksFailed": 0,
+        "tasksSkipped": 1
+      },
+      "WRITING": {
+        "skill": "WRITING",
+        "state": "NOT_STARTED",
+        "score": null,
+        "weight": 0.25,
+        "itemsScored": 1,
+        "itemsTotal": 2,
+        "tasksGraded": 1,
+        "tasksPending": 0,
+        "tasksFailed": 0,
+        "tasksSkipped": 1
+      },
+      "LANGUAGE_USE": {
+        "skill": "LANGUAGE_USE",
+        "state": "COMPLETE",
+        "score": 40,
+        "weight": 0,
+        "itemsScored": 2,
+        "itemsTotal": 5,
+        "tasksGraded": 0,
+        "tasksPending": 0,
+        "tasksFailed": 0,
+        "tasksSkipped": 0
+      }
+    },
+    "overall": null,
+    "placementBand": null,
+    "placementBandStatus": "D1_ADVISORY_SCORES_ONLY"
+  },
+  "advicePriorities": [
+    "READING:READING_INFERENCE | Sai 2/2 câu thuộc dạng này.",
+    "LISTENING:LISTENING_DETAIL | Sai 4/4 câu thuộc dạng này.",
+    "READING:READING_DETAIL | Sai 2/3 câu thuộc dạng này."
+  ],
+  "adviceUnassessed": [
+    {
+      "skill": "SPEAKING",
+      "reason": "SKIPPED",
+      "generalPractice": {
+        "kind": "SPEAKING_EXERCISE",
+        "id": 16,
+        "title": "Question Response A2 — Weekend",
+        "route": "/speaking/16",
+        "access": "OPEN",
+        "requirement": null
+      }
+    },
+    {
+      "skill": "WRITING",
+      "reason": "SKIPPED",
+      "generalPractice": {
+        "kind": "WRITING_QUIZ",
+        "id": 17,
+        "title": "Writing A2 — Messages & Simple Emails",
+        "route": "/writing/17",
+        "access": "OPEN",
+        "requirement": null
+      }
+    }
+  ],
+  "mockGraderEvidence": false
+}

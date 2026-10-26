@@ -1162,12 +1162,12 @@ export const SUPPORTED_DIAGNOSTIC_SCORING_VERSIONS = [
 
 /**
  * FOUR_SKILL_PLACEMENT_V2 scores the per-skill profile and the secondary
- * overall figure (see diagnostic-four-skill.ts). Its placement band is NOT
- * implemented: the band model is undecided (DEF_004_RESULT_BAND_MODEL_
- * MISMATCH). Until the owner decides it, an assessment on this version may be
- * scored but must not be activated.
+ * overall figure (see diagnostic-four-skill.ts). DEF-004 was decided by the
+ * owner as D1 (2026-10-26): advisory scores and evidence-based advice only,
+ * no named placement band. The band model is therefore decided, and this
+ * gate no longer blocks activation on its own.
  */
-export const FOUR_SKILL_PLACEMENT_BAND_DECIDED = false;
+export const FOUR_SKILL_PLACEMENT_BAND_DECIDED = true;
 
 /**
  * Scoring versions that are defined but not yet runnable in production.

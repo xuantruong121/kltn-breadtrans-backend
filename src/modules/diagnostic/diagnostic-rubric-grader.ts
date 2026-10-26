@@ -261,6 +261,10 @@ export class ProviderDiagnosticRubricGrader implements DiagnosticRubricGrader {
   readonly provider = 'gemini+azure-speech';
   readonly providerVersion = `${RUBRIC_PROMPT_VERSION}+azure-unscripted-v1`;
   readonly mode = 'real' as const;
+  /** Writing is graded by Gemini alone; Azure Speech is used only for Speaking. */
+  providerFor(skill: 'SPEAKING' | 'WRITING') {
+    return skill === 'WRITING' ? 'gemini' : this.provider;
+  }
   /**
    * gradeWithRubric asks twice when the model output is rejected. Speech
    * evidence for the same submission is reused so the second model call does

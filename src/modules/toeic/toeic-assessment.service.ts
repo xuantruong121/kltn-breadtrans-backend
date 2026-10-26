@@ -1050,7 +1050,7 @@ export class ToeicAssessmentService {
     );
     if (!valid)
       throw new BadRequestException(
-        'Writing component cần đủ 8 submission/result hoàn tất theo Set #2',
+        'Writing component cần đủ 8 bài đã được chấm',
       );
     await tx.toeicAssessmentWritingSubmission.createMany({
       data: selectedSubmissions.map((submission) => ({

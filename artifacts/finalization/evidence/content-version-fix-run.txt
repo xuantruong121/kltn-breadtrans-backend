@@ -1,0 +1,9 @@
+BEGIN
+SELECT 1
+ id | contentVersion 
+----+----------------
+  5 |              6
+(1 row)
+
+DO
+COMMIT

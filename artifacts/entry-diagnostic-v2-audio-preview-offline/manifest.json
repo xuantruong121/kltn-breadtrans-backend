@@ -1,0 +1,48 @@
+﻿[
+    {
+        "clipKey":  "LST_CLIP_01",
+        "file":  "artifacts/entry-diagnostic-v2-audio-preview-offline/LST_CLIP_01.preview.mp3",
+        "bytes":  436077,
+        "audioSha256":  "5fd5630eb37a8af1aaccf33a2d187f0549bf9926304cd2aa925e1b2cfc7c5d77",
+        "turns":  6,
+        "casting":  {
+                        "A":  "Microsoft Zira Desktop",
+                        "B":  "Microsoft David Desktop"
+                    },
+        "engine":  "System.Speech (offline, Windows built-in voices)"
+    },
+    {
+        "clipKey":  "LST_CLIP_02",
+        "file":  "artifacts/entry-diagnostic-v2-audio-preview-offline/LST_CLIP_02.preview.mp3",
+        "bytes":  483309,
+        "audioSha256":  "77622a2f356a3ddecb1146050a95c1991afac43e712f31e8591b51154f70d721",
+        "turns":  1,
+        "casting":  {
+                        "NARRATOR":  "Microsoft David Desktop"
+                    },
+        "engine":  "System.Speech (offline, Windows built-in voices)"
+    },
+    {
+        "clipKey":  "LST_CLIP_03",
+        "file":  "artifacts/entry-diagnostic-v2-audio-preview-offline/LST_CLIP_03.preview.mp3",
+        "bytes":  348813,
+        "audioSha256":  "d8206577f85e7f67c353f681a36130c45491973d4b6c41d96c8eeda5b4d24296",
+        "turns":  1,
+        "casting":  {
+                        "NARRATOR":  "Microsoft Zira Desktop"
+                    },
+        "engine":  "System.Speech (offline, Windows built-in voices)"
+    },
+    {
+        "clipKey":  "LST_CLIP_04",
+        "file":  "artifacts/entry-diagnostic-v2-audio-preview-offline/LST_CLIP_04.preview.mp3",
+        "bytes":  375885,
+        "audioSha256":  "dbecedd2dd0c232e2b9b5841707da1f5537253452f86652ec6acd697b2ec6a51",
+        "turns":  6,
+        "casting":  {
+                        "A":  "Microsoft David Desktop",
+                        "B":  "Microsoft Zira Desktop"
+                    },
+        "engine":  "System.Speech (offline, Windows built-in voices)"
+    }
+]

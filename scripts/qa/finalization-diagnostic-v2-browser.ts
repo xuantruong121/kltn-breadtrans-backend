@@ -15,7 +15,7 @@
  * simulated provider failure) to prove the withheld overall and the retry
  * path through the UI.
  */
-import { call, check, failureCount } from './harness-api';
+import { call, check, failureCount, newStudent } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessExec, harnessQuery } from './harness-db';
 
@@ -324,9 +324,9 @@ async function main() {
       fs?.skills.LANGUAGE_USE.itemsScored === (correct.LANGUAGE_USE ?? 0),
   );
   check(
-    'no placement band while DEF-004 is open',
+    'no placement band (DEF-004 decided as D1)',
     fs?.placementBand === null &&
-      fs?.placementBandStatus === 'WITHHELD_DEF_004_OPEN',
+      fs?.placementBandStatus === 'D1_ADVISORY_SCORES_ONLY',
   );
   const [attempt] = harnessQuery(
     `select "scoringVersion", "blueprintVersion", "contentVersion", "resultState", "overallScore", (select count(*) from "DiagnosticSkillResult" s where s."attemptId" = a.id) from "DiagnosticAttempt" a where id = ${res.data?.attemptId}`,
@@ -396,6 +396,120 @@ async function main() {
   });
   await page.setViewportSize({ width: 1366, height: 900 });
 
+  // D1 advice: from this attempt's evidence, linking to published content.
+  const advice = res.data?.advice;
+  check(
+    'D1 advice is returned (V1 lists are not)',
+    advice?.basis === 'D1_ADVISORY_SCORES_ONLY' &&
+      res.data?.practiceRecommendations?.length === 0 &&
+      res.data?.recommendations?.length === 0,
+  );
+  const allResources = [
+    ...(advice?.priorities ?? []),
+    ...(advice?.supplemental ?? []),
+  ].flatMap((p: any) => p.resources);
+  check(
+    'every cited resource has a real learner route',
+    allResources.length > 0 &&
+      allResources.every((r: any) =>
+        /^\/(listening|reading|writing|speaking|courses)\/\d+$/.test(r.route),
+      ),
+    `(${allResources.map((r: any) => r.route).join(' ')})`,
+  );
+  check(
+    'priorities are at most three and carry evidence',
+    (advice?.priorities?.length ?? 0) <= 3 &&
+      (advice?.priorities ?? []).every((p: any) => p.evidence && p.action),
+    `(${(advice?.priorities ?? []).map((p: any) => `${p.skill}:${p.areaKey}`).join(', ')})`,
+  );
+  check(
+    'mock-graded productive evidence is flagged to the learner',
+    advice?.mockGraderEvidence === true,
+  );
+  await page.reload({ waitUntil: 'networkidle' });
+  await hidePet(page);
+  text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+  check(
+    'the result page shows the advice with its mock-grader notice',
+    text.includes('Nên luyện gì tiếp theo') &&
+      text.includes('Căn cứ:') &&
+      text.includes('bộ chấm thử nghiệm'),
+  );
+  // Open one recommended resource and come back.
+  // Listening pages need private audio, which the harness does not serve,
+  // so the link check uses a resource whose page does not depend on media.
+  const firstOpen =
+    allResources.find(
+      (r: any) => r.access === 'OPEN' && r.kind !== 'LISTENING_QUIZ',
+    ) ?? allResources.find((r: any) => r.access === 'OPEN');
+  if (firstOpen) {
+    await page
+      .locator(
+        `section[aria-labelledby="diagnostic-advice-title"] a[href="${firstOpen.route}"]`,
+      )
+      .first()
+      .click();
+    await page.waitForURL((u) => u.pathname === firstOpen.route, {
+      timeout: 60_000,
+    });
+    await page.waitForLoadState('networkidle');
+    await page
+      .getByText(/Đang tải dữ liệu bài luyện/)
+      .first()
+      .waitFor({ state: 'hidden', timeout: 60_000 })
+      .catch(() => undefined);
+    const target = (await page.locator('body').innerText()).replace(
+      /\s+/g,
+      ' ',
+    );
+    check(
+      `the recommended ${firstOpen.kind} opens (${firstOpen.route})`,
+      !/404|Không tìm thấy|not found/i.test(target) &&
+        target.includes(firstOpen.title.slice(0, 12)),
+      `(${target.slice(0, 120)})`,
+    );
+    await page.goBack({ waitUntil: 'networkidle' }).catch(() => undefined);
+    if (
+      !(await page.locator('body').innerText()).includes(
+        'Nên luyện gì tiếp theo',
+      )
+    )
+      await page.goto(`${FE}/diagnostic`, { waitUntil: 'networkidle' });
+    check(
+      'back from the resource returns to the result',
+      (await page.locator('body').innerText()).includes(
+        'Nên luyện gì tiếp theo',
+      ),
+    );
+  }
+  await page.screenshot({
+    path: `${EVIDENCE}/diag-v2-advice-desktop.png`,
+    fullPage: true,
+  });
+  // Another learner sees none of this attempt.
+  const other = await newStudent('diag-v2-other');
+  const otherResult = await call(
+    'GET',
+    '/diagnostic/results/latest',
+    other.token,
+  );
+  check(
+    'another learner cannot read this result',
+    otherResult.data === null ||
+      otherResult.data?.attemptId !== res.data.attemptId,
+    `(${otherResult.status})`,
+  );
+  const foreignRetry = await call(
+    'POST',
+    `/diagnostic/5/attempts/${res.data.attemptId}/writing/${[...bank.values()].filter((q) => q.taskType === 'WRITING_RESPONSE')[0].id}/retry`,
+    other.token,
+  );
+  check(
+    "another learner cannot retry this attempt's grading",
+    foreignRetry.status >= 400 && foreignRetry.status < 500,
+    `(${foreignRetry.status})`,
+  );
+
   // Phase 2: simulated provider failure on the clone, then retry in the UI.
   const sId = [...bank.values()].find(
     (q) => q.taskType === 'SPEAKING_RESPONSE',
@@ -431,7 +545,7 @@ async function main() {
   text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
     'the page says the overall is withheld and offers a retry per failed task',
-    text.includes('Điểm tổng chưa hiển thị') &&
+    text.includes('Điểm tổng chưa có vì') &&
       (await page.getByRole('button', { name: /Chấm lại/ }).count()) === 2,
   );
   await page.screenshot({

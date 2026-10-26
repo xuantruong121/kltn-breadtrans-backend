@@ -108,10 +108,48 @@ describe('FOUR_SKILL_PLACEMENT_V2', () => {
     expect(r.overall).toBeNull();
   });
 
-  it('never produces a placement band while DEF-004 is open', () => {
+  it('a skipped skill has no score, is counted as skipped, and withholds the overall', () => {
+    const r = base({
+      speaking: [
+        { questionId: 21, status: 'SKIPPED', score: null },
+        { questionId: 22, status: 'SKIPPED', score: null },
+      ],
+    });
+    expect(r.skills.SPEAKING).toMatchObject({
+      state: 'NOT_STARTED',
+      score: null,
+      tasksSkipped: 2,
+      tasksGraded: 0,
+    });
+    expect(r.overall).toBeNull();
+    // The other three skills are still reported.
+    expect([
+      r.skills.LISTENING.score,
+      r.skills.READING.score,
+      r.skills.WRITING.score,
+    ]).toEqual([70, 60, 69]);
+  });
+
+  it('one skipped and one graded task leaves the skill unscored (both tasks are required)', () => {
+    const r = base({
+      writing: [
+        { questionId: 23, status: 'GRADED', score: 90 },
+        { questionId: 24, status: 'SKIPPED', score: null },
+      ],
+    });
+    expect(r.skills.WRITING).toMatchObject({
+      state: 'NOT_STARTED',
+      score: null,
+      tasksGraded: 1,
+      tasksSkipped: 1,
+    });
+    expect(r.overall).toBeNull();
+  });
+
+  it('never produces a placement band (DEF-004 decided as D1)', () => {
     const r = base();
     expect(r.placementBand).toBeNull();
-    expect(r.placementBandStatus).toBe('WITHHELD_DEF_004_OPEN');
+    expect(r.placementBandStatus).toBe('D1_ADVISORY_SCORES_ONLY');
   });
 
   it('refuses objective items without a known section instead of guessing from labels', () => {

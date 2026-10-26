@@ -35,7 +35,10 @@ import {
   FOUR_SKILL_SCORING_VERSION,
   scoreFourSkillPlacementV2,
 } from './diagnostic-four-skill';
+import { DiagnosticAdviceCatalogService } from './diagnostic-advice-catalog.service';
+import { buildDiagnosticAdvice } from './diagnostic-v2-advice';
 import {
+  isSkippedWritingAnswer,
   refreshFourSkillResult,
   writeObjectiveSkillRows,
 } from './diagnostic-four-skill.store';
@@ -67,6 +70,7 @@ export class DiagnosticService {
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
     @Optional() private readonly writingService?: DiagnosticWritingService,
+    @Optional() private readonly adviceCatalog?: DiagnosticAdviceCatalogService,
   ) {}
 
   private assertQuestionBank(questions: DiagnosticQuestionForScoring[]) {
@@ -468,6 +472,49 @@ export class DiagnosticService {
       weaknesses,
       wrongQuestions,
     );
+    // D1 advice (V2 only): findings from this attempt's own evidence and
+    // links to content that is published now, with the learner's access.
+    const advice =
+      fourSkill && this.adviceCatalog
+        ? buildDiagnosticAdvice({
+            fourSkill,
+            objective: objectiveQuestions.map((question) => ({
+              section: getQuestionMeta(question).section,
+              construct: getQuestionMeta(question).construct,
+              isCorrect:
+                questionsResult.find((r) => r.questionId === question.id)
+                  ?.isCorrect === true,
+            })),
+            productive: [
+              ...speakingRows.map((row) => {
+                const meta =
+                  row.scoreMetadata && typeof row.scoreMetadata === 'object'
+                    ? (row.scoreMetadata as Record<string, unknown>)
+                    : {};
+                return {
+                  skill: 'SPEAKING' as const,
+                  questionId: row.questionId,
+                  status: row.status,
+                  criteria: meta.criteria as Record<string, number> | null,
+                  criterionFeedback: meta.criterionFeedback as Record<
+                    string,
+                    string
+                  > | null,
+                  provider: row.provider,
+                };
+              }),
+              ...writingRows.map((row) => ({
+                skill: 'WRITING' as const,
+                questionId: row.questionId,
+                status: row.status,
+                criteria: row.criteria,
+                criterionFeedback: row.criterionFeedback,
+                provider: row.provider,
+              })),
+            ],
+            resolve: await this.adviceCatalog.resolverFor(attempt.userId),
+          })
+        : null;
     return {
       attemptId: attempt.id,
       // The form actually administered, derived from its own items. The
@@ -545,10 +592,16 @@ export class DiagnosticService {
       completedAt:
         (attempt as { completedAt?: Date }).completedAt ?? attempt.submittedAt,
       skillProfiles: profiles,
-      strengths,
-      weaknesses,
-      practiceRecommendations,
-      recommendations: await this.recommendations(referenceLevel, weaknesses),
+      // V2 uses the D1 advice below. The V1 lists are not returned for it:
+      // their thresholds are V1 rules and their practice routes point at
+      // fixed Grammar topics that may not be published.
+      strengths: advice ? [] : strengths,
+      weaknesses: advice ? [] : weaknesses,
+      practiceRecommendations: advice ? [] : practiceRecommendations,
+      recommendations: advice
+        ? []
+        : await this.recommendations(referenceLevel, weaknesses),
+      advice,
       questionsResult,
     };
   }
@@ -911,6 +964,10 @@ export class DiagnosticService {
       const selectedOption = answerMap[String(question.id)];
       if (isOpenDiagnosticQuestion(question)) {
         if (getQuestionMeta(question).section === 'SPEAKING') continue;
+        // An empty string is the learner's explicit skip of this Writing
+        // task: it is stored as such, never graded, and Writing then has no
+        // score (refreshFourSkillResult). It is not scored as 0.
+        if (isSkippedWritingAnswer(selectedOption)) continue;
         if (
           typeof selectedOption !== 'string' ||
           selectedOption.trim().length < WRITING_MIN_CHARACTERS ||

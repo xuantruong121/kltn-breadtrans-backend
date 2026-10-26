@@ -33,7 +33,11 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { parseBuffer } from 'music-metadata';
@@ -322,11 +326,31 @@ async function publish(url: string, out: string) {
   const urls = new Map<string, string>();
   for (const clip of manifest.clips) {
     const key = `${KEY_PREFIX}/${clip.clipKey}.v1.mp3`;
+    const body = readFileSync(clip.file);
+    const md5 = createHash('md5').update(body).digest('hex');
+    // Never overwrite: an existing object must be this exact file.
+    const existing = await s3
+      .send(
+        new HeadObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key }),
+      )
+      .catch((e: { $metadata?: { httpStatusCode?: number } }) => {
+        if (e?.$metadata?.httpStatusCode === 404) return null;
+        throw e;
+      });
+    if (existing) {
+      if ((existing.ETag ?? '').replace(/"/g, '') !== md5)
+        throw new Error(
+          `REFUSED: ${key} already exists with different content`,
+        );
+      console.log(`${key}: already uploaded (same content)`);
+      urls.set(clip.clipKey, `${publicBase}/${key}`);
+      continue;
+    }
     await s3.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
         Key: key,
-        Body: readFileSync(clip.file),
+        Body: body,
         ContentType: 'audio/mpeg',
       }),
     );
@@ -407,7 +431,15 @@ async function harnessFixture(url: string) {
 }
 
 async function main() {
-  const { mode, target, out } = args();
+  const parsed = args();
+  const { mode, out } = parsed;
+  let target = parsed.target;
+  // `env:DATABASE_URL` reads the URL from .env so it never appears on a command line.
+  if (target === 'env:DATABASE_URL') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('dotenv').config({ quiet: true });
+    target = process.env.DATABASE_URL;
+  }
   if (!target) throw new Error('--target <database url> is required');
   if (mode === 'plan') return plan(target);
   if (mode === 'generate') return generate(target, out);

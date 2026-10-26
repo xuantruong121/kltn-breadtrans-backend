@@ -447,7 +447,7 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
           evidenceQuotes: outcome.grade.evidenceQuotes,
         },
         rawProviderPayload: this.asJson(outcome.raw),
-        provider: this.grader.provider,
+        provider: this.grader.providerFor?.('WRITING') ?? this.grader.provider,
         providerVersion: this.grader.providerVersion,
         failureReason: null,
         gradedAt: new Date(),
@@ -455,7 +455,7 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
     } else {
       this.logger.warn(`Diagnostic Writing grading failed: ${outcome.reason}`);
       await fail(outcome.reason, {
-        provider: this.grader.provider,
+        provider: this.grader.providerFor?.('WRITING') ?? this.grader.provider,
         providerVersion: this.grader.providerVersion,
         scoreMetadata: { validated: false, rejection: outcome.reason },
         rawProviderPayload: this.asJson(outcome.raw),

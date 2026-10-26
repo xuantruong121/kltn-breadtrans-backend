@@ -342,10 +342,8 @@ describe('task-type-aware validation', () => {
     expect(draft.runtime.ready).toBe(false);
     expect(draft.activation.ready).toBe(false);
     expect(draft.activation.blockers.join(' ')).toMatch(/runtime/);
-    // Scored, but not activatable while the band model is undecided.
-    expect(draft.activation.blockers.join(' ')).toMatch(
-      /FOUR_SKILL_PLACEMENT_V2 placement band model is undecided \(DEF-004\)/,
-    );
+    // DEF-004 is decided (D1), so it is no longer an activation blocker.
+    expect(draft.activation.blockers.join(' ')).not.toMatch(/DEF-004/);
 
     const legacy = evaluateAssessmentReadiness(
       { scoringVersion: 'OBJECTIVE_POOLED_V1', status: 'ACTIVE' },

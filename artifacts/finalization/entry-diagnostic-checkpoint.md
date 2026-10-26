@@ -1,143 +1,136 @@
-# Entry Diagnostic checkpoint — 2026-10-26
+# Entry Diagnostic V2 — completion report (updated 2026-10-26)
 
-Scope: finish the Entry Diagnostic V2 (assessment id 5, `FOUR_SKILL_PLACEMENT_V2`) as far as it can go
-without real providers, protected writes or activation. No Admin CMS work was started.
+Scope: assessment id 5 (`FOUR_SKILL_PLACEMENT_V2`, 29 tasks). DEF-004 decided by the owner as **D1**
+(advisory scores and evidence-based advice; no named level). Local development; demo 2026-10-29.
 
-## 1. Evidence statuses
+## Status labels
 
 ```
-ISOLATED_MOCK_E2E_PASS=PASS          finalization-diagnostic-v2-browser.ts, 35/35, harness clone, mock grader
-REAL_BROWSER_E2E_PASS=PASS (harness) same run: Chromium, real UI, real queue/worker, fake microphone tone
-AUTHENTICATED_HTTP_PASS=PASS (harness) result API read with the learner's token inside the same run
-FINAL_SCORER_PASS=PASS (formula)     scores, overall and stored rows equal the blueprint formula
-REAL_AZURE_SMOKE_PASS=NOT_RUN        needs authorization + owner recordings
-REAL_GEMINI_SMOKE_PASS=NOT_RUN       needs authorization
-REAL_MEDIA_PLAYBACK_PASS=NOT_RUN     listening used a stand-in practice MP3 (HARNESS_FIXTURE_NOT_SCRIPT_AUDIO)
-PLACEMENT_BAND=WITHHELD_DEF_004_OPEN
-ID5_STATUS_KLTN_DB=DRAFT, inactive, contentVersion=1 (unchanged)
+FOUR_SKILL_SCORER_PASS=PASS          unit 418/418 (diagnostic), harness E2E
+MOCK_PIPELINE_PASS=PASS              upload, normalise, queue, worker, refresh, retry (mock grader, fake S3)
+REAL_BROWSER_MOCK_E2E_PASS=PASS      full journey 44/44; skip/resume journey 14/14
+RECOMMENDATION_E2E_PASS=PASS         advice built from this attempt, links open real published pages
+PROTECTED_DATA_SAFETY_PASS=PASS      only id 5 contentVersion written in kltn_db (see F)
+REAL_AZURE_SMOKE_PASS=PASS          1 graded Speaking task (synthetic voice), transcript near-verbatim
+REAL_GEMINI_SMOKE_PASS=PASS          Speaking + Writing rubric output validated, 2 requests
+REAL_GRADING_RESULT_PASS=PASS        scores, criteria and advice from the real grades (harness)
+REAL_MEDIA_PLAYBACK_PASS=PASS        published clip plays in Chromium (currentTime advancing, no error)
+ACTIVATION=DONE                      kltn_db id 5 ACTIVE, id 1 READY; DIAGNOSTIC_GRADER_MODE=real in .env
 ```
 
-What "PASS" here does not prove: the mock grader returns fixed rubric scores, and the fake microphone
-records a tone. The run proves the pipeline (upload, normalisation, queue, worker, result refresh,
-retry, UI), not the quality of Azure or Gemini grading on spoken or written English.
+## A. Writing content (id 5, verified in the database)
 
-## 2. What changed
+| Task | Type | Prompt (learner-visible) | Instructions | Words | Rubric |
+|---|---|---|---|---|---|
+| WRT_TASK_01 (q 88) | short functional message | "You agreed to meet a classmate tomorrow to work on a shared assignment, but you can no longer come. Write a short message to your classmate. In your message: explain why you cannot come, suggest another time, and ask them to send you one thing you need for the assignment." | "Write 60-90 words. You have about 7 minutes." | 60–90 | WRT_RUBRIC_V3 |
+| WRT_TASK_02 (q 89) | short opinion | "Your university is considering making one lecture each week available as a recording instead of teaching it in person. Do you think this is a good idea? Write your opinion and give at least two reasons for it." | "Write 90-130 words. You have about 9 minutes." | 90–130 | WRT_RUBRIC_V3 |
 
-Backend (`kltn-breadtrans-backend`)
-- `src/modules/diagnostic/diagnostic-four-skill.ts` (new, pure): the blueprint scorer. L and R =
-  round(correct/10 × 100); S and W = round(mean of graded task %); Language Use is reported with weight 0;
-  overall = round((L+R+S+W)/4) only when all four are COMPLETE. A pending task gives PENDING_GRADING, a
-  failed task gives GRADING_FAILED, and neither becomes 0. An objective item without a known section is
-  refused (`DIAGNOSTIC_SCORER_V2_UNSCORABLE`). No band is produced.
-- `diagnostic-four-skill.store.ts` (new): writes `DiagnosticSkillResult` rows and keeps
-  `resultState`/`overallScore` in step after submission, after every grading outcome or retry, and on read.
-- `diagnostic.service.ts`: attempts pin `scoringVersion`/`blueprintVersion`/`contentVersion`; the result
-  returns `fourSkill`, `administeredForm`, and per-task criteria, criterion feedback and rubric version for
-  Speaking (score 0–100, only when GRADED).
-- `diagnostic.logic.ts`: V2 is a supported scorer; readiness lists the open DEF-004 as a blocker, so the
-  assessment cannot be activated through the normal path.
-- Tests: diagnostic suite 400/400; `tsc` clean; lint clean on changed files.
+Grading: rubric criteria task_achievement / organisation / vocabulary / grammar, each 0–4, task score
+= criteria percentage (0–100); the skill score is the mean of both tasks and exists only when both are
+GRADED. The word range is guidance shown live under the text box ("vẫn được chấm" when short); length is
+never a submission gate. No model-answer similarity is used. The "about N minutes" is shown as text; no
+timer enforces it.
 
-Frontend (`kltn-breadtrans-frontend-junior`)
-- `src/lib/diagnostic/diagnosticTaskLogic.ts` (new, tested 5/5): form counts from the administered items,
-  per-task recording limit, word count identical to the backend, word-range guidance (never a gate),
-  criterion and state labels.
-- `src/app/(student)/diagnostic/page.tsx`: removed the hard-coded "52 nhiệm vụ / 48 trắc nghiệm / 35–50
-  phút / 16-16-16"; shows task instructions; preparation countdown that starts recording by itself;
-  recording stops at the task's `responseSeconds`; re-record before confirming; word guidance; listening
-  NOT_READY message; four-skill result (overall only when complete, Language Use auxiliary, internal
-  practice indicator wording); Speaking and Writing cards with 0–100 score, 0–4 criteria and feedback;
-  retry for failed Speaking and Writing; the polled result supersedes the submit response so grading
-  progress updates without a reload. Removed: Writing "x/5" label and the note that claimed failed
-  recordings were "ghi nhận đầy đủ … để tham chiếu năng lực". The answer review no longer shows a grading
-  status ("GRADED") as the learner's answer.
-- `src/components/profile/DiagnosticResultTab.tsx`: same hard-coded counts removed; V2 shows the four-skill
-  line instead of a level; "Điểm phát âm" relabelled "điểm Nói".
-- FE: `tsc` clean, lint 0 errors, `test:ci` 635/635.
+## B. Skip / incomplete behaviour
 
-Harness (`scripts/qa`)
-- `harness-fake-s3.ts` (new): a local S3-compatible store on 127.0.0.1:9460 for the private bucket, so
-  speaking uploads work in the harness without any R2 credential.
-- `finalization-diagnostic-v2-browser.ts` (new): the V2 journey and the failure/retry phase.
-- Clone state after the run is restored: id 1 ACTIVE, id 5 DRAFT.
+- Speaking: "Bỏ qua phần này" stores the task as `SKIPPED` (existing status).
+- Writing: new "Bỏ qua bài viết này" button; the answer is sent as the empty string, which the server
+  accepts as an explicit skip, stores in the attempt answers, and never grades (no grading row).
+  The Writing status enum was not changed (no migration).
+- Scorer reports per skill `tasksGraded / tasksPending / tasksFailed / tasksSkipped`. A skipped, pending
+  or failed task never scores 0. A productive skill needs both tasks GRADED. The overall exists only when
+  L, R, S and W all have scores.
+- Before submitting with skipped tasks the learner sees a confirmation naming them and stating that they
+  are not graded, not counted as 0, remove the overall, and cannot be redone after submission.
+- Resume: objective choices and Writing text are kept locally per attempt (localStorage); Speaking
+  confirmations come from the server. Verified by pausing after five answers and resuming.
+- Results: Listening/Reading shown; Speaking "Đã bỏ qua"; Writing "Bỏ qua 1/2 bài"; "Điểm tổng chưa có
+  vì …" names the missing skills. Browser evidence: `evidence/diag-v2-skip-run.txt` (14/14).
+- Pending and failed grading: overall withheld and stored as null; "Chấm lại" for both skills; retries
+  regrade through the queue (main E2E).
 
-## 3. Run summary (harness clone only)
+## C. Results and recommendations (D1)
 
-29 tasks answered in the UI. L 50, R 50, S 69 (tasks 62.5 and 75), W 75, overall 61 =
-round((50+50+69+75)/4). Attempt row: `FOUR_SKILL_PLACEMENT_V2 / V2_2026_01 / 6 / COMPLETE / 61`, five
-skill rows. Then one Speaking and one Writing row were set to GRADING_FAILED on the clone: the API and the
-stored attempt both moved to GRADING_FAILED with no overall, the page said the overall is withheld and
-showed two "Chấm lại" buttons, and both retries regraded to COMPLETE with the overall back at 61.
-Screenshots: `evidence/diag-v2-result-desktop.png`, `diag-v2-result-mobile.png` (no horizontal scroll at
-390 px), `diag-v2-grading-failed.png`. Log: `evidence/diag-v2-browser-run.txt`.
+- `diagnostic-v2-advice.ts` (pure, 16 tests): strengths and up to three priorities from this attempt's
+  evidence only — wrong items grouped by each item's authored construct (Listening: gist, detail,
+  purpose/intention/inference; Reading: main idea, detail, meaning in context/reference, inference) and
+  the lowest rubric criteria of graded Speaking/Writing, quoting the grader's own per-criterion comments.
+  Skills within 10 points (one objective item) are reported as balanced. Language Use is supplemental.
+  Skipped, pending or failed skills are listed as "chưa đánh giá được", never as weak; skipped ones get a
+  general-practice link labelled as such. Mock-graded evidence is flagged to the learner.
+- `diagnostic-advice-catalog.service.ts`: each cited resource is checked at request time (exists,
+  published, learner-facing) and marked LOCKED with the existing requirement ("Cần gói PLUS hoặc PRO",
+  "Cần gói PRO") when the learner's plan does not cover it. Nothing enrols the learner.
+- Resources cited (all exist and are published in kltn_db and the clone): Listening 1, 12, 23, 24, 26,
+  27; Reading 2, 6, 13, 16; Writing 17, 34, 36; Speaking exercises 11, 16, 17; courses 8, 12.
+- For V2 the V1 lists (score-threshold strengths, fixed Grammar-topic routes that point at DRAFT topics,
+  course ranking) are no longer returned.
+- Advice links use full page navigation: in a long browser session a client-side jump from the result
+  page into a practice room stayed on its loading screen; a fresh load works. Root cause not identified.
 
-## 4. Owner decisions — each is a separate request
+## D. Real providers
 
-### Request A — C3 live smoke (Azure + Gemini)
-- Calls: Azure Speech ≤ 6 sessions, ≤ 3.5 min audio in total; Gemini ≤ 16 calls.
-- Needs from you: four recordings in your own voice (`artifacts/c3-fixtures/speaking-smoke-recordings.md`:
-  on-task 45 s, on-task with pauses 60 s, 10 s silence, off-topic 45 s) plus a `.txt` of what you said.
-  I will not synthesise or imitate your voice.
-- Target: harness only, `DIAGNOSTIC_GRADER_MODE=real` on the harness process, never kltn_db.
-- Credentials present in `.env` (values not read into reports): Azure key and region SET, `GEMINI_API_KEYS` SET.
-- Reply needed: "authorize C3 smoke" and the folder holding the recordings.
+Owner confirmed: Azure Speech resource on F0; the three Gemini keys' project has no billing.
+Usage in total (hard caps: Azure 6 sessions / 210 s, Gemini 16 requests):
 
-### Request B — Listening audio (4 clips, 10 questions)
-- B1 casting decision (proposed, en-US, voices that already produced the published practice audio):
-  CLIP_01 A female (Jenny) / B male (Guy); CLIP_02 narrator male; CLIP_03 narrator female; CLIP_04 A male /
-  B female. Scripts are the approved text, unchanged (SHA-256 checked).
-- B2 generate: 4 Azure TTS calls, about 1,692 characters (403 / 545 / 410 / 334), output to
-  `artifacts/entry-diagnostic-v2-audio` for you to listen to first. Guard:
-  `DIAG_V2_TTS_AUTHORIZED=generate-4-clips`.
-- B3 publish (after you approve the audio): 4 objects to public R2 `diagnostic/v2/LST_CLIP_0n.v1.mp3`, then
-  one transaction on kltn_db updating the 10 pending `DiagnosticListeningClip` rows and the 10
-  `options.audioUrl` values of id 5. Refuses unless id 5 is an inactive DRAFT. Rollback: restore the 10
-  rows to `.pending` / null in one transaction (statement prepared with the run); the R2 objects can stay
-  unreferenced or be deleted. Guard: `DIAG_V2_AUDIO_PUBLISH_AUTHORIZED=publish-4-clips`.
+| Use | Azure sessions | Azure audio | Gemini requests |
+|---|---|---|---|
+| Clip coverage check (4 clips) | 4 | 119.4 s | 0 |
+| Grading smoke (1 Speaking, 1 Writing) | 1 | 34.5 s | 2 |
+| **Total** | **5** | **153.9 s** | **2** |
+| Azure TTS (separate F0 quota) | 4 synthesis calls, ~1,692 characters | | |
 
-### Request C — contentVersion on live id 5 (1 → 6)
-- File: `artifacts/entry-diagnostic-phase-c3-content-version-fix.sql`. One row, guarded (id 5, V2 source
-  key, still 1, still inactive DRAFT), self-rolls-back unless exactly one row changes. Rehearsed on a clone.
-- Reply needed: "authorize contentVersion SQL".
+Gemini requests are read from the credential manager's own counter (`gemini:telemetry:total_requests`,
+incremented on every outbound attempt) on the harness Redis.
 
-### Request D — DEF-004 placement band
-The scorer gives per-skill scores and an overall; the open question is whether to map them to a named band.
-- D1 (recommended): no band. Show the four skill scores and the overall as an internal practice
-  indicator, and record "no band" as the decision so readiness can pass. Reason: there is no calibration
-  data for V2, so any threshold today would be invented. A band can be added later from real attempt data.
-- D2: adopt the earlier documented bands (Starter 0–44, Foundation 45–64, Intermediate 65–79, Upper
-  80–100). They exist in documents only, were never calibrated, and the old code used three bands, not four.
-- D3: reuse V1 thresholds (≥ 75 Intermediate, ≥ 45 Foundation). V1 scored objective items only, so the
-  construct differs.
-None of these maps to CEFR or TOEIC, and none will be labelled that way.
+Smoke (harness, `scripts/qa/diagnostic-v2-real-grading-smoke.ts`, evidence
+`evidence/diag-v2-real-grading-smoke.json`):
+- Speaking SPK_TASK_01 with a **synthetic** answer (Windows "David" voice, labelled; not a person):
+  GRADED 93.75; Azure transcript near-verbatim ("comfort rible" for "comfortable" is the only ASR slip);
+  criteria task_fulfilment 4, intelligibility 4, fluency 4, language_use 3; the language_use comment cites
+  the actual slip. A synthetic voice is not evidence of grading accuracy on learner speech.
+- Writing WRT_TASK_01, synthetic message with a deliberate verb error ("my manager ask me"): GRADED 87.5,
+  grammar 3 / vocabulary 3 / organisation 4 / task_achievement 4; a suggestion points at verb tense. The
+  comments are generic rather than quoting the sentence.
+- Defect fixed: Writing rows were labelled `gemini+azure-speech`; now `gemini` (`providerFor`).
 
-### Request E — Grammar question 9 correction
-- Row: `GrammarQuestion` id 9 (topic 2). Before: "The store ______ early because of the storm." After:
-  "The store ______ early yesterday because of the storm." Explanation: "Yesterday chỉ thời điểm đã qua
-  nên dùng quá khứ đơn: closed." Rollback: restore the old text and explanation.
-- Then publication of topics 1 and 3–12 (and 2 after the fix) through the Admin publish endpoint;
-  rollback by unpublish. Details: `grammar-publication-readiness.md`. Nothing is published automatically.
+## E. Listening media
 
-### Request F — Activation of id 5
-Not requested now. It needs A (or an explicit decision to launch without a real-provider smoke), B, C and
-D first. Activation would make id 1 READY and id 5 ACTIVE in kltn_db; rollback is the reverse swap.
+Azure neural TTS (en-US Jenny female / Guy male, registry 2026-09-21.v1), approved casting, scripts
+verbatim. Owner delegated the voice choice; neural was chosen over the offline previews for quality.
+Coverage by Azure recognition: recall 99 / 98 / 99 / 95 % (misses are numbers recognised as digits and
+the name "Mai"). Published: `diagnostic/v2/LST_CLIP_0{1..4}.v1.mp3` on public R2 (HTTP 200,
+audio/mpeg, sizes match; publish refuses to overwrite a different existing object), 10 clip rows
+active and 10 question audioUrls set, in one transaction. Backup before:
+`kltn_db_DiagListening_PRE_AUDIO_PUBLISH_20261026_173411.dump`. Evidence:
+`evidence/diag-v2-audio-asr-verify.txt`, `evidence/diag-v2-audio-publish.txt`.
 
-## 5. External blockers
+## F. Data and activation
 
-| Area | Feature | Local status | Missing test | Config present (no values) | Call limit proposed | Authorization |
-|---|---|---|---|---|---|---|
-| Azure Speech | Diagnostic and practice Speaking grading | mock-graded pipeline passes on harness | real recognition and scoring | key, region SET | ≤ 6 sessions / 3.5 min | Request A |
-| Gemini | Diagnostic and practice Writing grading, Speaking rubric | mock passes; failure path passes | real rubric output | `GEMINI_API_KEYS` SET | ≤ 16 calls | Request A |
-| Azure TTS | V2 listening audio | tool ready, plan verified read-only | generation | key, region SET | 4 calls, ~1,692 chars | Request B2 |
-| R2 public | V2 listening audio publish | — | upload | account, keys, public URL SET | 4 objects | Request B3 |
-| R2 private | Speaking audio storage | works on harness via local fake S3 | real bucket round-trip | private bucket and key SET | — | with Request A if wanted |
-| PayOS | Plan purchase | fail-closed when not configured | sandbox checkout + webhook | client id, API key, checksum SET (sandbox or live not known) | 1 sandbox order | separate request, prepared next |
-| SMTP | Password-reset email delivery | token logic unit-tested 5/5 | real delivery | `SMTP_*` NOT_SET | — | needs SMTP settings |
+- kltn_db write (authorized): `DiagnosticAssessment` id 5 `contentVersion` 1 → 6 via
+  `artifacts/entry-diagnostic-phase-c3-content-version-fix.sql`. Guards held (sysid 7674533776495505443,
+  sourceKey, DRAFT, inactive, version 1); UPDATE 1. Before/after diff: only that field. Question hashes of
+  id 1 and id 5 unchanged; id 1 still ACTIVE. Backups: automatic dump 14:06 and a table dump
+  `.local-backups/breadtrans-auto/kltn_db_DiagnosticAssessment_PRE_CV_FIX_20261026_172153.dump`.
+  Rollback: set it back to 1 for id 5. Log: `evidence/content-version-fix-run.txt`.
+- Activation: `artifacts/entry-diagnostic-v2-activation.sql` (guards: id 5 DRAFT/inactive/v6/V2, id 1
+  ACTIVE, 10 active clips matching question URLs; single active assessment afterwards). Rehearsed on the
+  clone: activate, re-run aborts, rollback, activate. Run on kltn_db: id 5 ACTIVE, id 1 READY. Backup
+  `kltn_db_DiagnosticAssessment_PRE_V2_ACTIVATION_20261026_174755.dump`. Rollback:
+  `artifacts/entry-diagnostic-v2-activation-rollback.sql`.
+- `.env`: `DIAGNOSTIC_GRADER_MODE=real` (copy of the previous file in `.local-backups/`). The running
+  backend must be restarted to read it.
 
-## 6. Next (learner only)
+## G. Testing
 
-1. With the fake S3 in place, re-test ordinary Speaking practice end to end on the harness (mock scorer),
-   which was blocked only by private storage.
-2. Arena real match flow with two browser sessions; Store/Pet browser checks.
-3. Prepare the bounded PayOS sandbox request; confirm whether the configured PayOS keys are sandbox.
-4. Remaining items from the learner tracker. Admin CMS stays deferred.
+Backend diagnostic 418/418; FE `test:ci` 638/638; FE and backend tsc clean; lint 0 errors on changed
+files. Browser E2E on the disposable harness (clone DB, Redis 6392, fake S3, mock grader): main 44/44,
+skip/resume 14/14. Cross-account: another learner cannot read the result or retry its grading.
+
+## H. Remaining Entry Diagnostic work
+
+1. Restart the backend (`npm run dev:backend`) so it reads `DIAGNOSTIC_GRADER_MODE=real`.
+2. Owner's own full run of the assessment (real voice, real grading) — the evidence a synthetic voice
+   cannot give.
+3. Known, not fixed: a long-session client-side jump from the result page into a practice room could stay
+   on its loading screen; advice links use full navigation instead. Root cause unknown.

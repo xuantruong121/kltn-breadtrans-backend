@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-10-26T10:30:55.689Z",
+  "calls": 4,
+  "clips": [
+    {
+      "clipKey": "LST_CLIP_01",
+      "file": "artifacts\\entry-diagnostic-v2-audio\\LST_CLIP_01.v1.mp3",
+      "bytes": 520704,
+      "durationMs": 32544,
+      "audioSha256": "28b1c0c14a96c12a07ecf41e91e75224e7ed235c4f1f75d6bdce84e5fa830bc7",
+      "scriptSha256": "8ecdf1c5b274d5074ce0cf50e8866141e51652b5e4130e155e94b86a758ef83b",
+      "ssmlSha256": "30a2bfdd3cddfad459eea3633af130892d2d5df8628452559b34f1a74debcfde",
+      "casting": {
+        "A": "en-us-female-01",
+        "B": "en-us-male-01"
+      },
+      "voiceRegistryVersion": "2026-09-21.v1",
+      "outputFormat": "Audio16Khz128KBitRateMonoMp3"
+    },
+    {
+      "clipKey": "LST_CLIP_02",
+      "file": "artifacts\\entry-diagnostic-v2-audio\\LST_CLIP_02.v1.mp3",
+      "bytes": 525312,
+      "durationMs": 32832,
+      "audioSha256": "8268da739e19d2b8b2488ab0be6b2145488e788ec7ccfd2927de9d163343ec4b",
+      "scriptSha256": "2a3817edebbf148111a0ee17da81b92fd55feee4a8d19368a900efa65933f3b6",
+      "ssmlSha256": "93ddbb67bd4d69318b5d97cb8d0f71e109c347d23845a81d6d9016df936bd93a",
+      "casting": {
+        "NARRATOR": "en-us-male-01"
+      },
+      "voiceRegistryVersion": "2026-09-21.v1",
+      "outputFormat": "Audio16Khz128KBitRateMonoMp3"
+    },
+    {
+      "clipKey": "LST_CLIP_03",
+      "file": "artifacts\\entry-diagnostic-v2-audio\\LST_CLIP_03.v1.mp3",
+      "bytes": 410112,
+      "durationMs": 25632,
+      "audioSha256": "12ba501628b1a2c2d373b039406e650f39b6768c692cc0698da451c880c1480a",
+      "scriptSha256": "0cfbba4cbb011ad6ee8186d8716af2afb4be4993f280ae2c2970189857b9d906",
+      "ssmlSha256": "7093121f59d0904f4232683b44e1c4f653bedcbcf61425653c4c86beb93f98d7",
+      "casting": {
+        "NARRATOR": "en-us-female-01"
+      },
+      "voiceRegistryVersion": "2026-09-21.v1",
+      "outputFormat": "Audio16Khz128KBitRateMonoMp3"
+    },
+    {
+      "clipKey": "LST_CLIP_04",
+      "file": "artifacts\\entry-diagnostic-v2-audio\\LST_CLIP_04.v1.mp3",
+      "bytes": 455040,
+      "durationMs": 28440,
+      "audioSha256": "1b39040a07ffc45a04a2f9359c0a05460a756e558e97bdb2005edc3b424efe83",
+      "scriptSha256": "a48d5ab348a22c351df09b150ef90eb9d93d32feba1bc56ea5acca6e25810e17",
+      "ssmlSha256": "e2bcb234cd25e76d1db3c9be5adae260dc2553ad8857d9848ec3d8912601a358",
+      "casting": {
+        "A": "en-us-male-01",
+        "B": "en-us-female-01"
+      },
+      "voiceRegistryVersion": "2026-09-21.v1",
+      "outputFormat": "Audio16Khz128KBitRateMonoMp3"
+    }
+  ]
+}

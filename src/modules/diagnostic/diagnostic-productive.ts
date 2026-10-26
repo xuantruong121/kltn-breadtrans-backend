@@ -417,6 +417,8 @@ export interface DiagnosticRubricGrader {
   readonly provider: string;
   readonly providerVersion: string;
   readonly mode: DiagnosticGraderMode;
+  /** The services actually used for one skill, when narrower than `provider`. */
+  providerFor?(skill: 'SPEAKING' | 'WRITING'): string;
   grade(request: RubricGradeRequest): Promise<unknown>;
 }
 

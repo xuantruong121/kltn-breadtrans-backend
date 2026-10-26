@@ -10,10 +10,10 @@
  *   overall     = round((L + R + S + W) / 4), ONLY when all four are COMPLETE
  *
  * The per-skill profile is the primary result; the overall figure is a
- * secondary routing indicator. A pending or failed productive task never
- * scores 0 and never lets an overall figure be computed. No placement band is
- * produced: the band model is undecided (DEF_004_RESULT_BAND_MODEL_MISMATCH),
- * so it is withheld rather than borrowed from V1 thresholds.
+ * secondary routing indicator. A pending, failed or skipped productive task
+ * never scores 0 and never lets an overall figure be computed. No placement
+ * band is produced: DEF-004 is decided as D1 (advisory scores only), so no
+ * score is mapped to a named level and V1 thresholds are not borrowed.
  *
  * Pure: no Prisma, no I/O.
  */
@@ -56,6 +56,15 @@ export type FourSkillSkillResult = {
   weight: number;
   itemsScored: number;
   itemsTotal: number;
+  /**
+   * Productive skills only: per-task status counts, so a learner can see
+   * that a missing score comes from a skipped, pending or failed task and
+   * not from a weak answer. Zero for objective skills.
+   */
+  tasksGraded: number;
+  tasksPending: number;
+  tasksFailed: number;
+  tasksSkipped: number;
 };
 
 export type FourSkillResult = {
@@ -66,8 +75,11 @@ export type FourSkillResult = {
   /** round((L+R+S+W)/4) when complete; otherwise null, never 0. */
   overall: number | null;
   placementBand: null;
-  placementBandStatus: 'WITHHELD_DEF_004_OPEN';
+  placementBandStatus: typeof PLACEMENT_BAND_STATUS;
 };
+
+/** DEF-004 decision: scores and advice only, never a named level. */
+export const PLACEMENT_BAND_STATUS = 'D1_ADVISORY_SCORES_ONLY';
 
 export type ObjectiveItemOutcome = {
   /** From the item's persisted section metadata, never from its skill label. */
@@ -98,6 +110,10 @@ function objectiveSkill(
     weight: FOUR_SKILL_WEIGHTS[skill],
     itemsScored: correct,
     itemsTotal: own.length,
+    tasksGraded: 0,
+    tasksPending: 0,
+    tasksFailed: 0,
+    tasksSkipped: 0,
   };
 }
 
@@ -110,6 +126,7 @@ function productiveSkill(
   const graded: number[] = [];
   let pending = 0;
   let failed = 0;
+  let skipped = 0;
   for (const id of expectedQuestionIds) {
     const task = byQuestion.get(id);
     if (
@@ -120,6 +137,7 @@ function productiveSkill(
       graded.push(task.score);
     else if (task && PENDING_TASK_STATES.has(task.status)) pending += 1;
     else if (task?.status === 'GRADING_FAILED') failed += 1;
+    else if (task?.status === 'SKIPPED') skipped += 1;
   }
   const complete =
     expectedQuestionIds.length > 0 &&
@@ -142,6 +160,10 @@ function productiveSkill(
     weight: FOUR_SKILL_WEIGHTS[skill],
     itemsScored: graded.length,
     itemsTotal: expectedQuestionIds.length,
+    tasksGraded: graded.length,
+    tasksPending: pending,
+    tasksFailed: failed,
+    tasksSkipped: skipped,
   };
 }
 
@@ -200,6 +222,6 @@ export function scoreFourSkillPlacementV2(input: {
     skills,
     overall,
     placementBand: null,
-    placementBandStatus: 'WITHHELD_DEF_004_OPEN',
+    placementBandStatus: PLACEMENT_BAND_STATUS,
   };
 }

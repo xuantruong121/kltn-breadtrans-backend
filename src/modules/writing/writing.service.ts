@@ -19,14 +19,22 @@ const GENERAL_WRITING_TYPES: QuizType[] = [
   QuizType.WRITING_EMAIL,
 ];
 
+/**
+ * A Writing task is either a catalog practice task (Writing Part 1/2 topic) or
+ * a task of a TOEIC exam writing set. Exam tasks have no practice topic, so
+ * requiring one made every exam Writing task answer "not found"; access to
+ * them is still restricted by assertExamInternalWritingAccess.
+ */
 function isWritingQuiz(quiz: {
   type: QuizType;
   practiceTopic?: { category: TopicCategory } | null;
+  toeicWritingSetItems?: unknown[];
 }) {
   return (
     GENERAL_WRITING_TYPES.includes(quiz.type) &&
     (quiz.practiceTopic?.category === TopicCategory.WRITING_PART1 ||
-      quiz.practiceTopic?.category === TopicCategory.WRITING_PART2)
+      quiz.practiceTopic?.category === TopicCategory.WRITING_PART2 ||
+      (quiz.toeicWritingSetItems?.length ?? 0) > 0)
   );
 }
 
@@ -50,6 +58,7 @@ export class WritingService {
       where: { id: quizId },
       include: {
         practiceTopic: true,
+        toeicWritingSetItems: { select: { id: true }, take: 1 },
         questions: {
           select: { id: true, content: true },
           orderBy: { order: 'asc' },
@@ -448,6 +457,7 @@ export class WritingService {
       where: { id: quizId },
       include: {
         practiceTopic: true,
+        toeicWritingSetItems: { select: { id: true }, take: 1 },
         questions: {
           select: { id: true, content: true },
           orderBy: { order: 'asc' },
@@ -567,6 +577,7 @@ export class WritingService {
       where: { id: quizId },
       include: {
         practiceTopic: true,
+        toeicWritingSetItems: { select: { id: true }, take: 1 },
         questions: {
           select: { id: true, content: true },
           orderBy: { order: 'asc' },

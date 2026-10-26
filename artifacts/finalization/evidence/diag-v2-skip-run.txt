@@ -1,0 +1,19 @@
+
+== Entry Diagnostic V2 id 5: skip / incomplete / resume (browser)
+PASS  resume keeps the answers given before pausing  (A
+Working on their project together)
+PASS  skipping a Writing task says it will not be graded
+PASS  the pre-submit confirmation names the skipped tasks and the consequence  (Nộp bài khi còn phần bỏ qua? Bạn đã bỏ qua 2 bài Nói và 1 bài Viết. Phần bỏ qua không được chấm và không bị tính là 0 điểm, nhưng kỹ năng đó sẽ không có điểm và)
+PASS  Listening and Reading are scored  (L 100, R 100)
+PASS  Speaking: both tasks skipped, no score, not 0  ({"skill":"SPEAKING","state":"NOT_STARTED","score":null,"weight":0.25,"itemsScored":0,"itemsTotal":2,"tasksGraded":0,"tasksPending":0,"tasksFailed":0,"tasksSkipped":2})
+PASS  Writing: one graded, one skipped, no skill score (both tasks are required)  ({"skill":"WRITING","state":"NOT_STARTED","score":null,"weight":0.25,"itemsScored":1,"itemsTotal":2,"tasksGraded":1,"tasksPending":0,"tasksFailed":0,"tasksSkipped":1})
+PASS  overall is withheld  (null)
+PASS  stored: no overall, and the skipped Writing task created no grading row  (NOT_STARTED /  / 1)
+PASS  advice: Speaking and Writing are unassessed (skipped), with general practice, never a weakness  ([{"skill":"SPEAKING","reason":"SKIPPED","generalPractice":{"kind":"SPEAKING_EXERCISE","id":16,"title":"Question Response A2 — Weekend","route":"/speaking/16","access":"OPEN","requirement":null}},{"skill":"WRITING","reason":"SKIPPED","generalPractice":{"kind":"WRITING_QUIZ","id":17,"title":"Writing A2 — Messages & Simple Emails","route":"/writing/17","access":"OPEN","requirement":null}}])
+PASS  the page labels Speaking skipped and Writing partly skipped
+PASS  the page explains why there is no overall and still shows the scored skills
+PASS  the page lists unassessed skills and labels the practice as general
+PASS  the skipped Writing card says it was not graded and not scored 0
+PASS  no server error
+
+DIAGNOSTIC_V2_SKIP_BROWSER_FAILURES=0

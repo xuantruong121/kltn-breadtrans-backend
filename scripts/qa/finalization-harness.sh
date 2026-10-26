@@ -52,6 +52,17 @@ start_fake_s3() {
       > "$WORK/fake-s3.log" 2>&1 < /dev/null &)
 }
 
+# HARNESS_REAL_GRADER=1 keeps only the Gemini and Azure Speech credentials
+# from .env and sets DIAGNOSTIC_GRADER_MODE=real, for a bounded real-provider
+# smoke; every other provider, payment and storage secret stays blank.
+grader_env() {
+  if [ "${HARNESS_REAL_GRADER:-}" = "1" ]; then
+    echo "DIAGNOSTIC_GRADER_MODE=real"
+  else
+    echo "GEMINI_API_KEYS= GEMINI_API_KEY= AZURE_SPEECH_KEY= AZURE_SPEECH_REGION= DIAGNOSTIC_GRADER_MODE=mock MOCK_AZURE_SPEECH=true"
+  fi
+}
+
 start_backend() {
   kill_port 3101
   start_fake_s3
@@ -60,14 +71,15 @@ start_backend() {
   (cd "$ROOT" && env \
       NODE_ENV=development PORT=3101 DATABASE_URL="$DB_URL" SHADOW_DATABASE_URL="$DB_URL" \
       REDIS_URL=redis://127.0.0.1:6392 REDIS_HOST=127.0.0.1 REDIS_PORT=6392 \
-      GEMINI_API_KEYS= GEMINI_API_KEY= AZURE_SPEECH_KEY= AZURE_SPEECH_REGION= \
       PAYOS_CLIENT_ID= PAYOS_API_KEY= PAYOS_CHECKSUM_KEY= CLOUDFLARE_AI_API_TOKEN= CLOUDFLARE_ACCOUNT_ID= \
       PIXABAY_API_KEY= IMAGE_SEARCH_PROVIDER= VAPID_PRIVATE_KEY= VAPID_PUBLIC_KEY= \
       R2_ACCOUNT_ID= R2_ACCESS_KEY_ID= R2_SECRET_ACCESS_KEY= R2_PRIVATE_ACCESS_KEY_ID= R2_PRIVATE_SECRET_ACCESS_KEY= \
       R2_BACKUP_ACCESS_KEY_ID= R2_BACKUP_SECRET_ACCESS_KEY= R2_BACKUP_ENDPOINT= \
+      LOCAL_S3_ENDPOINT=http://127.0.0.1:9460 LOCAL_S3_BUCKET=harness-public LOCAL_S3_ACCESS_KEY_ID=harness \
+      LOCAL_S3_SECRET_ACCESS_KEY=harness LOCAL_S3_PUBLIC_URL=http://127.0.0.1:9460/harness-public \
       R2_PRIVATE_ENDPOINT=http://127.0.0.1:9460 R2_PRIVATE_BUCKET_NAME=harness-private \
       R2_PRIVATE_ACCESS_KEY_ID=harness R2_PRIVATE_SECRET_ACCESS_KEY=harness R2_PRIVATE_FORCE_PATH_STYLE=true \
-      POSTGRES_BACKUP_DIR="$WORK/backups" DIAGNOSTIC_GRADER_MODE=mock \
+      POSTGRES_BACKUP_DIR="$WORK/backups" $(grader_env) \
       NODE_PATH="$ROOT/node_modules" \
       nohup node "$WORK/be-dist/src/main.js" > "$WORK/backend.log" 2>&1 < /dev/null &
     echo $! > "$WORK/backend.pid")
