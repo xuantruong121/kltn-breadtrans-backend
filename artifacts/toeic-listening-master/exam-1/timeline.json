@@ -1,0 +1,640 @@
+{
+  "examId": 1,
+  "builtAt": "2026-10-27T06:07:34.721Z",
+  "file": "master.mp3",
+  "bytes": 15862700,
+  "sha256": "55065e0dfc19f3e56d689bdd76a10d4af82fa17362ae9c99052e9f885919a101",
+  "durationSeconds": 1982.808,
+  "plannedSeconds": 1982.755,
+  "format": "mp3 24000 Hz 1ch 64 kb/s CBR",
+  "responseGapSeconds": {
+    "1": 5,
+    "2": 5,
+    "3": 8,
+    "4": 8
+  },
+  "clipSeconds": 994.4,
+  "narrationSeconds": 217.3,
+  "timeline": [
+    {
+      "kind": "INTRO",
+      "start": 0,
+      "end": 31.275
+    },
+    {
+      "kind": "DIRECTIONS",
+      "part": 1,
+      "start": 33.275,
+      "end": 51.076
+    },
+    {
+      "kind": "GROUP",
+      "part": 1,
+      "groupId": 1,
+      "questionNumbers": [
+        1
+      ],
+      "start": 53.076,
+      "end": 76.407
+    },
+    {
+      "kind": "GROUP",
+      "part": 1,
+      "groupId": 2,
+      "questionNumbers": [
+        2
+      ],
+      "start": 76.407,
+      "end": 99.425
+    },
+    {
+      "kind": "GROUP",
+      "part": 1,
+      "groupId": 3,
+      "questionNumbers": [
+        3
+      ],
+      "start": 99.425,
+      "end": 123.775
+    },
+    {
+      "kind": "GROUP",
+      "part": 1,
+      "groupId": 4,
+      "questionNumbers": [
+        4
+      ],
+      "start": 123.775,
+      "end": 147.367
+    },
+    {
+      "kind": "GROUP",
+      "part": 1,
+      "groupId": 5,
+      "questionNumbers": [
+        5
+      ],
+      "start": 147.367,
+      "end": 171.61
+    },
+    {
+      "kind": "GROUP",
+      "part": 1,
+      "groupId": 6,
+      "questionNumbers": [
+        6
+      ],
+      "start": 171.61,
+      "end": 196.173
+    },
+    {
+      "kind": "DIRECTIONS",
+      "part": 2,
+      "start": 196.173,
+      "end": 214.479
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 7,
+      "questionNumbers": [
+        7
+      ],
+      "start": 216.479,
+      "end": 237.048
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 8,
+      "questionNumbers": [
+        8
+      ],
+      "start": 237.048,
+      "end": 257.402
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 9,
+      "questionNumbers": [
+        9
+      ],
+      "start": 257.402,
+      "end": 278.853
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 10,
+      "questionNumbers": [
+        10
+      ],
+      "start": 278.853,
+      "end": 298.944
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 11,
+      "questionNumbers": [
+        11
+      ],
+      "start": 298.944,
+      "end": 319.152
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 12,
+      "questionNumbers": [
+        12
+      ],
+      "start": 319.152,
+      "end": 340.542
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 13,
+      "questionNumbers": [
+        13
+      ],
+      "start": 340.542,
+      "end": 361.786
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 14,
+      "questionNumbers": [
+        14
+      ],
+      "start": 361.786,
+      "end": 382.032
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 15,
+      "questionNumbers": [
+        15
+      ],
+      "start": 382.032,
+      "end": 402.857
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 16,
+      "questionNumbers": [
+        16
+      ],
+      "start": 402.857,
+      "end": 423.495
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 17,
+      "questionNumbers": [
+        17
+      ],
+      "start": 423.495,
+      "end": 445.362
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 18,
+      "questionNumbers": [
+        18
+      ],
+      "start": 445.362,
+      "end": 465.697
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 19,
+      "questionNumbers": [
+        19
+      ],
+      "start": 465.697,
+      "end": 486.844
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 20,
+      "questionNumbers": [
+        20
+      ],
+      "start": 486.844,
+      "end": 506.413
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 21,
+      "questionNumbers": [
+        21
+      ],
+      "start": 506.413,
+      "end": 528.444
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 22,
+      "questionNumbers": [
+        22
+      ],
+      "start": 528.444,
+      "end": 549.912
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 23,
+      "questionNumbers": [
+        23
+      ],
+      "start": 549.912,
+      "end": 571.445
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 24,
+      "questionNumbers": [
+        24
+      ],
+      "start": 571.445,
+      "end": 592.504
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 25,
+      "questionNumbers": [
+        25
+      ],
+      "start": 592.504,
+      "end": 612.649
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 26,
+      "questionNumbers": [
+        26
+      ],
+      "start": 612.649,
+      "end": 634.222
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 27,
+      "questionNumbers": [
+        27
+      ],
+      "start": 634.222,
+      "end": 654.942
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 28,
+      "questionNumbers": [
+        28
+      ],
+      "start": 654.942,
+      "end": 675.933
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 29,
+      "questionNumbers": [
+        29
+      ],
+      "start": 675.933,
+      "end": 698.005
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 30,
+      "questionNumbers": [
+        30
+      ],
+      "start": 698.005,
+      "end": 718.747
+    },
+    {
+      "kind": "GROUP",
+      "part": 2,
+      "groupId": 31,
+      "questionNumbers": [
+        31
+      ],
+      "start": 718.747,
+      "end": 741.797
+    },
+    {
+      "kind": "DIRECTIONS",
+      "part": 3,
+      "start": 741.797,
+      "end": 759.287
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 32,
+      "questionNumbers": [
+        32,
+        33,
+        34
+      ],
+      "start": 761.287,
+      "end": 808.759
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 33,
+      "questionNumbers": [
+        35,
+        36,
+        37
+      ],
+      "start": 808.759,
+      "end": 858.78
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 34,
+      "questionNumbers": [
+        38,
+        39,
+        40
+      ],
+      "start": 858.78,
+      "end": 909.933
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 35,
+      "questionNumbers": [
+        41,
+        42,
+        43
+      ],
+      "start": 909.933,
+      "end": 962.856
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 36,
+      "questionNumbers": [
+        44,
+        45,
+        46
+      ],
+      "start": 962.856,
+      "end": 1015.577
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 37,
+      "questionNumbers": [
+        47,
+        48,
+        49
+      ],
+      "start": 1015.577,
+      "end": 1066.095
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 38,
+      "questionNumbers": [
+        50,
+        51,
+        52
+      ],
+      "start": 1066.095,
+      "end": 1116.371
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 39,
+      "questionNumbers": [
+        53,
+        54,
+        55
+      ],
+      "start": 1116.371,
+      "end": 1170.958
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 40,
+      "questionNumbers": [
+        56,
+        57,
+        58
+      ],
+      "start": 1170.958,
+      "end": 1221.86
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 41,
+      "questionNumbers": [
+        59,
+        60,
+        61
+      ],
+      "start": 1221.86,
+      "end": 1271.487
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 42,
+      "questionNumbers": [
+        62,
+        63,
+        64
+      ],
+      "start": 1271.487,
+      "end": 1322.517
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 43,
+      "questionNumbers": [
+        65,
+        66,
+        67
+      ],
+      "start": 1322.517,
+      "end": 1373.816
+    },
+    {
+      "kind": "GROUP",
+      "part": 3,
+      "groupId": 44,
+      "questionNumbers": [
+        68,
+        69,
+        70
+      ],
+      "start": 1373.816,
+      "end": 1423.883
+    },
+    {
+      "kind": "DIRECTIONS",
+      "part": 4,
+      "start": 1423.883,
+      "end": 1443.083
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 45,
+      "questionNumbers": [
+        71,
+        72,
+        73
+      ],
+      "start": 1445.083,
+      "end": 1494.929
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 46,
+      "questionNumbers": [
+        74,
+        75,
+        76
+      ],
+      "start": 1494.929,
+      "end": 1547.047
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 47,
+      "questionNumbers": [
+        77,
+        78,
+        79
+      ],
+      "start": 1547.047,
+      "end": 1599.381
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 48,
+      "questionNumbers": [
+        80,
+        81,
+        82
+      ],
+      "start": 1599.381,
+      "end": 1652.558
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 49,
+      "questionNumbers": [
+        83,
+        84,
+        85
+      ],
+      "start": 1652.558,
+      "end": 1706.187
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 50,
+      "questionNumbers": [
+        86,
+        87,
+        88
+      ],
+      "start": 1706.187,
+      "end": 1761.154
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 51,
+      "questionNumbers": [
+        89,
+        90,
+        91
+      ],
+      "start": 1761.154,
+      "end": 1813.495
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 52,
+      "questionNumbers": [
+        92,
+        93,
+        94
+      ],
+      "start": 1813.495,
+      "end": 1869.725
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 53,
+      "questionNumbers": [
+        95,
+        96,
+        97
+      ],
+      "start": 1869.725,
+      "end": 1924.516
+    },
+    {
+      "kind": "GROUP",
+      "part": 4,
+      "groupId": 54,
+      "questionNumbers": [
+        98,
+        99,
+        100
+      ],
+      "start": 1924.516,
+      "end": 1977.696
+    },
+    {
+      "kind": "END",
+      "start": 1977.696,
+      "end": 1982.755
+    }
+  ]
+}

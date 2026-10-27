@@ -89,13 +89,13 @@ export class ResetPasswordDto {
 export class ChangePasswordDto {
   @ApiProperty({ example: 'temporary-password' })
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Vui lòng nhập mật khẩu hiện tại.' })
   currentPassword: string;
 
   @ApiProperty({ example: 'NewStrongPassword123!' })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(8)
+  @IsNotEmpty({ message: 'Vui lòng nhập mật khẩu mới.' })
+  @MinLength(8, { message: 'Mật khẩu mới cần có ít nhất 8 ký tự.' })
   newPassword: string;
 }
 

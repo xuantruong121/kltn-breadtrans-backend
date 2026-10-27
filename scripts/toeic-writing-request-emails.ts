@@ -9,7 +9,10 @@
  *          content.email only where the prompt matches exactly and no e-mail
  *          exists, in one transaction. Needs TOEIC_EMAIL_FIX_AUTHORIZED=apply.
  *
- * Usage: npx ts-node --transpile-only scripts/toeic-writing-request-emails.ts plan|apply --target env:DATABASE_URL
+ * --expect 186,187,194,195 refuses to apply unless exactly those questions
+ * are the ones to update.
+ *
+ * Usage: npx ts-node --transpile-only scripts/toeic-writing-request-emails.ts plan|apply --target env:DATABASE_URL [--expect ids]
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -24,7 +27,7 @@ const EMAILS: Record<string, string> = {
 };
 
 async function main() {
-  const [mode, , target] = process.argv.slice(2);
+  const [mode, , target, , expectArg] = process.argv.slice(2);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('dotenv').config({ quiet: true });
   const url = target === 'env:DATABASE_URL' ? process.env.DATABASE_URL : target;
@@ -46,6 +49,18 @@ async function main() {
     `written-request questions: ${rows.length}; to update: ${targets.map((t) => `${t.id} (quiz ${t.quizId})`).join(', ') || 'none'}`,
   );
   if (mode !== 'apply') return prisma.$disconnect();
+  if (
+    expectArg &&
+    targets.map((t) => t.id).join(',') !==
+      expectArg
+        .split(',')
+        .map(Number)
+        .sort((a, b) => a - b)
+        .join(',')
+  )
+    throw new Error(
+      `STOP: targets ${targets.map((t) => t.id).join(',')} differ from --expect ${expectArg}`,
+    );
   if (process.env.TOEIC_EMAIL_FIX_AUTHORIZED !== 'apply')
     throw new Error('REFUSED: TOEIC_EMAIL_FIX_AUTHORIZED=apply not set');
   const dir = join(

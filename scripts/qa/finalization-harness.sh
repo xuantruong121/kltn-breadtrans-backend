@@ -79,6 +79,7 @@ start_backend() {
       LOCAL_S3_SECRET_ACCESS_KEY=harness LOCAL_S3_PUBLIC_URL=http://127.0.0.1:9460/harness-public \
       R2_PRIVATE_ENDPOINT=http://127.0.0.1:9460 R2_PRIVATE_BUCKET_NAME=harness-private \
       R2_PRIVATE_ACCESS_KEY_ID=harness R2_PRIVATE_SECRET_ACCESS_KEY=harness R2_PRIVATE_FORCE_PATH_STYLE=true \
+      TOEIC_LISTENING_MASTER_BASE_URL=http://127.0.0.1:9460/harness-public \
       POSTGRES_BACKUP_DIR="$WORK/backups" $(grader_env) \
       NODE_PATH="$ROOT/node_modules" \
       nohup node "$WORK/be-dist/src/main.js" > "$WORK/backend.log" 2>&1 < /dev/null &

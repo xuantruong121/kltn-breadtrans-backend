@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -361,14 +362,16 @@ export class AuthService {
       !user.password ||
       !(await bcrypt.compare(currentPassword, user.password))
     )
-      throw new UnauthorizedException('Current password is invalid');
+      // 400, not 401: the session is valid, only the typed password is wrong.
+      // A 401 here makes the client refresh its token on every typo.
+      throw new BadRequestException('Mật khẩu hiện tại không đúng.');
 
     const password = await bcrypt.hash(newPassword, 12);
     await this.prisma.user.update({
       where: { id: userId },
       data: { password, mustChangePassword: false },
     });
-    return { message: 'Password changed successfully' };
+    return { message: 'Đổi mật khẩu thành công.' };
   }
 
   /**
@@ -590,14 +593,13 @@ export class AuthService {
       });
     }
 
-    const randomPassword = await bcrypt.hash(
-      crypto.randomBytes(32).toString('hex'),
-      12,
-    );
+    // No password: the learner never chose one. Password login stays closed
+    // (it rejects a null password) until they set one via "Quên mật khẩu",
+    // and the account page hides "Đổi mật khẩu" while it is null.
     return this.prisma.user.create({
       data: {
         email: profile.email,
-        password: randomPassword,
+        password: null,
         role: Role.STUDENT,
         emailVerifiedAt: new Date(),
         profile: {

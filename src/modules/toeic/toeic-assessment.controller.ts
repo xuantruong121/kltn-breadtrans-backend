@@ -9,6 +9,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -105,6 +106,20 @@ export class ToeicAssessmentController {
     @Req() req: any,
   ) {
     return this.assessments.getAttempt(attemptId, req.user.id);
+  }
+
+  @Get('attempts/:attemptId/review')
+  @ApiOperation({
+    summary:
+      'Kết quả từng câu Speaking/Writing và lượt L&R con (chỉ đọc, không chấm lại)',
+  })
+  @ApiResponse({ status: 200, description: 'Danh sách task theo thứ tự đề' })
+  @ApiResponse({ status: 403, description: 'Không phải lượt của bạn' })
+  getAttemptReview(
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+    @Req() req: any,
+  ) {
+    return this.assessments.getAttemptReview(attemptId, req.user.id);
   }
 
   @Post('attempts/:attemptId/components/:componentId/start')

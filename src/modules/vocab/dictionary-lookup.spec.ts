@@ -47,7 +47,7 @@ describe('DictionaryLookupService', () => {
     });
   });
 
-  it('does not expose premium curated words through the generic lookup route', async () => {
+  it('serves every curated word to every learner (vocabulary is free)', async () => {
     const prisma = {
       vocabWord: { findMany: jest.fn().mockResolvedValue([]) },
     } as unknown as PrismaService;
@@ -66,11 +66,10 @@ describe('DictionaryLookupService', () => {
 
     await service.lookup('museum', 7);
 
-    expect(prisma.vocabWord.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ topic: { isPro: false } }),
-      }),
-    );
+    const where = (prisma.vocabWord.findMany as jest.Mock).mock.calls[0][0]
+      .where;
+    expect(where).not.toHaveProperty('topic');
+    expect(subscriptionService.hasFeature).not.toHaveBeenCalled();
   });
 
   it('keeps IPA available for common function words such as within', async () => {
@@ -187,7 +186,7 @@ describe('DictionaryLookupService', () => {
     expect(result.entries[0].partOfSpeech).toBe('noun');
     expect(result.entries[0].definitions[0].definition).toContain('design');
     expect(redis.set).toHaveBeenCalledWith(
-      expect.stringContaining('dictionary:v3:free:en:architecture'),
+      expect.stringContaining('dictionary:v3:premium:en:architecture'),
       expect.any(String),
       'EX',
       5 * 60,

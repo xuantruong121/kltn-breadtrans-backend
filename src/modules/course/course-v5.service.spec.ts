@@ -92,6 +92,40 @@ describe('CourseLearningV5Service', () => {
     expect(result.lesson.exercises[0]).toHaveProperty('rubric');
   });
 
+  it('keeps a passed lesson completed after a weaker retry (progress never goes backwards)', async () => {
+    prisma.courseLesson.findMany.mockResolvedValue([
+      {
+        id: 11,
+        slug: 'l1',
+        order: 1,
+        title: 'One',
+        summary: 'S',
+        estimatedMinutes: 10,
+        difficulty: 'A2',
+        coverImage: null,
+        exercises: [{ id: 44, minimumScore: null }],
+      },
+    ]);
+    // Newest first, as the service orders them: a failed retry after a pass.
+    prisma.courseLessonAttempt.findMany.mockResolvedValue([
+      { lessonId: 11, exerciseId: 44, score: 1, maxScore: 3 },
+      { lessonId: 11, exerciseId: 44, score: 3, maxScore: 3 },
+    ]);
+    const overview = await service.getOverview(1, user);
+    expect(overview.lessons[0].completed).toBe(true);
+    expect(overview.progress).toMatchObject({
+      completedLessons: 1,
+      percentage: 100,
+      isComplete: true,
+    });
+
+    prisma.courseLessonAttempt.findMany.mockResolvedValue([
+      { lessonId: 11, exerciseId: 44, score: 1, maxScore: 3 },
+    ]);
+    const failedOnly = await service.getOverview(1, user);
+    expect(failedOnly.lessons[0].completed).toBe(false);
+  });
+
   it('returns guided and final exercises once with distinct question identities', async () => {
     prisma.courseLesson.findFirst.mockResolvedValue({
       id: 12,

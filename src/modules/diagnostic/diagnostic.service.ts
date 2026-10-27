@@ -1147,12 +1147,9 @@ export class DiagnosticService {
       if (currentAttempt?.status === 'COMPLETED') return currentAttempt;
       if (currentAttempt?.status !== 'IN_PROGRESS')
         throw new BadRequestException('Phiên kiểm tra không hợp lệ');
-      // The first-completion reward is a read-then-write decision. Serialize
-      // it per learner/assessment so concurrent submissions cannot both earn it.
+      // Serialize completion per learner/assessment (the lock name predates
+      // the removal of the first-completion reward and is kept unchanged).
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`diagnostic:reward:${userId}:${assessmentId}`}, 0))`;
-      const previousAttempts = await tx.diagnosticAttempt.count({
-        where: { userId, status: 'COMPLETED' },
-      });
       const storedAnswers = {
         ...answerMap,
         ...(submissionToken ? { __submissionToken: submissionToken } : {}),
@@ -1190,23 +1187,7 @@ export class DiagnosticService {
           sourceId: String(created.id),
         },
       });
-      if (previousAttempts === 0) {
-        await this.gamificationService.awardBanh(
-          userId,
-          50,
-          'DIAGNOSTIC_COMPLETION',
-          `diagnostic:assessment:${assessmentId}:first`,
-          {
-            isCapped: true,
-            metadata: {
-              assessmentId,
-              attemptId: created.id,
-              rewardType: 'DIAGNOSTIC_FIRST_COMPLETION',
-            },
-          },
-          tx,
-        );
-      }
+      // Owner policy: the Entry Diagnostic earns no Bánh mì or XP.
       return created;
     });
 

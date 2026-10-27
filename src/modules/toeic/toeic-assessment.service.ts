@@ -7,6 +7,10 @@ import {
 } from '@nestjs/common';
 import { summarizeAssessmentSkills } from './toeic-assessment-result';
 import {
+  reviewSpeakingTasks,
+  reviewWritingTasks,
+} from './toeic-assessment-review';
+import {
   Prisma,
   QuizPublicationStatus,
   Role,
@@ -276,7 +280,122 @@ export class ToeicAssessmentService {
       throw new ForbiddenException(
         'Bạn không có quyền truy cập lượt làm bài này',
       );
-    return this.projectAttempt(attempt);
+    const projected = this.projectAttempt(attempt);
+    // Writing submissions are linked only when the section completes, so while
+    // it is open "written" is derived the same way completion selects them:
+    // this learner's graded submissions of the set's quizzes since the start.
+    for (const component of projected.components) {
+      if (
+        component.kind !== 'WRITING' ||
+        component.status === 'COMPLETED' ||
+        component.writingQuizIds.length === 0
+      )
+        continue;
+      const row = attempt.components.find((c: any) => c.id === component.id);
+      const since = row?.startedAt ?? attempt.startedAt;
+      const submissions = await this.db.submission.findMany({
+        where: {
+          userId,
+          quizId: { in: component.writingQuizIds },
+          submittedAt: { gte: since },
+        },
+        select: {
+          quizId: true,
+          score: true,
+          results: { select: { score: true } },
+        },
+      });
+      component.writtenQuizIds = [
+        ...new Set(
+          submissions
+            .filter(
+              (s) =>
+                s.score !== null || s.results.some((r) => r.score !== null),
+            )
+            .map((s) => s.quizId),
+        ),
+      ];
+    }
+    return projected;
+  }
+
+  /**
+   * Per-task result review of an attempt: the stored grade of every Speaking
+   * and Writing task plus the child L&R attempt id. Read-only: grading is
+   * never started or retried from here.
+   */
+  async getAttemptReview(attemptId: number, userId: number) {
+    const attempt = await this.getOwnedAttempt(attemptId, userId);
+    const sources = (attempt.assessment as any).components ?? [];
+    const components = await Promise.all(
+      attempt.components.map(async (component: any) => {
+        const kind = component.assessmentComponent.kind;
+        const source = sources.find(
+          (c: any) => c.id === component.assessmentComponentId,
+        );
+        const base = {
+          id: component.id,
+          kind,
+          order: component.assessmentComponent.order,
+          status: component.status,
+          startedAt: component.startedAt,
+          completedAt: component.completedAt,
+        };
+        if (kind === 'LISTENING_READING')
+          return {
+            ...base,
+            childAttemptId: component.toeicAttemptId ?? null,
+            childStatus: component.toeicAttempt?.status ?? null,
+          };
+        // A completed section reviews exactly the submissions linked to it;
+        // an open one shows this learner's work since the section started.
+        const since = component.startedAt ?? attempt.startedAt;
+        if (kind === 'SPEAKING') {
+          const exercises = source?.speakingPracticeSet?.exercises ?? [];
+          const rows = component.speakingSubmissions?.length
+            ? component.speakingSubmissions.map(
+                (l: any) => l.speakingSubmission,
+              )
+            : since
+              ? await this.db.speakingSubmission.findMany({
+                  where: {
+                    userId,
+                    exerciseId: { in: exercises.map((e: any) => e.id) },
+                    submittedAt: { gte: since },
+                  },
+                })
+              : [];
+          return { ...base, tasks: reviewSpeakingTasks(exercises, rows) };
+        }
+        const items = source?.writingSet?.items ?? [];
+        const rows = component.writingSubmissions?.length
+          ? component.writingSubmissions.map((l: any) => l.submission)
+          : since
+            ? await this.db.submission.findMany({
+                where: {
+                  userId,
+                  quizId: { in: items.map((i: any) => i.writingQuizId) },
+                  submittedAt: { gte: since },
+                },
+              })
+            : [];
+        return { ...base, tasks: reviewWritingTasks(items, rows) };
+      }),
+    );
+    return {
+      id: attempt.id,
+      assessmentId: attempt.assessmentId,
+      assessment: {
+        id: attempt.assessment.id,
+        title: attempt.assessment.title,
+        productFamily: attempt.assessment.productFamily,
+      },
+      status: attempt.status,
+      startedAt: attempt.startedAt,
+      completedAt: attempt.completedAt,
+      skills: summarizeAssessmentSkills(attempt.components),
+      components,
+    };
   }
 
   async startComponent(attemptId: number, componentId: number, userId: number) {
@@ -875,6 +994,15 @@ export class ToeicAssessmentService {
         linkedWritingSubmissionIds:
           component.writingSubmissions?.map((link: any) => link.submissionId) ??
           [],
+        // Writing tasks already submitted in this attempt, so the learner
+        // resumes at the first unwritten task instead of task 1.
+        writtenQuizIds: [
+          ...new Set<number>(
+            (component.writingSubmissions ?? [])
+              .map((link: any) => link.submission?.quizId)
+              .filter((id: unknown): id is number => Number.isInteger(id)),
+          ),
+        ],
       };
     });
     return {

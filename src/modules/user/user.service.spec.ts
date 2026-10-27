@@ -134,6 +134,21 @@ describe('UserService', () => {
       });
       expect(result).toHaveProperty('id', 1);
       expect(result).not.toHaveProperty('password');
+      expect(result).toHaveProperty('hasPassword', true);
+    });
+
+    it('reports hasPassword=false for a Google sign-up account (null password)', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 2,
+        email: 'g@test.com',
+        password: null,
+        profile: null,
+      });
+
+      const result = await service.getUserProfile(2);
+
+      expect(result).toHaveProperty('hasPassword', false);
+      expect(result).not.toHaveProperty('password');
     });
 
     it('should throw NotFoundException if user not found', async () => {

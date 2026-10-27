@@ -61,25 +61,12 @@ export class CourseLearningV5Service {
         maxScore: true,
       },
     });
-    const latest = new Map<number, (typeof attempts)[number]>();
-    for (const attempt of attempts) {
-      if (!latest.has(attempt.exerciseId))
-        latest.set(attempt.exerciseId, attempt);
-    }
     const summaries = lessons.map((lesson) => {
       const completed =
         lesson.exercises.length === 0 ||
-        lesson.exercises.every((exercise) => {
-          const attempt = latest.get(exercise.id);
-          return Boolean(
-            attempt &&
-            this.isSuccessful(
-              attempt.score,
-              attempt.maxScore,
-              exercise.minimumScore,
-            ),
-          );
-        });
+        lesson.exercises.every((exercise) =>
+          this.everPassed(attempts, exercise.id, exercise.minimumScore),
+        );
       return {
         id: lesson.id,
         slug: lesson.slug,
@@ -152,10 +139,6 @@ export class CourseLearningV5Service {
         submittedAt: true,
       },
     });
-    const latest = new Map<number, (typeof attempts)[number]>();
-    for (const attempt of attempts)
-      if (!latest.has(attempt.exerciseId))
-        latest.set(attempt.exerciseId, attempt);
     return {
       courseId,
       course: {
@@ -197,17 +180,11 @@ export class CourseLearningV5Service {
             prompt: question.prompt,
             options: question.options,
           })),
-          completed: (() => {
-            const attempt = latest.get(exercise.id);
-            return Boolean(
-              attempt &&
-              this.isSuccessful(
-                attempt.score,
-                attempt.maxScore,
-                exercise.minimumScore,
-              ),
-            );
-          })(),
+          completed: this.everPassed(
+            attempts,
+            exercise.id,
+            exercise.minimumScore,
+          ),
         })),
       },
       navigation: {
@@ -395,6 +372,27 @@ export class CourseLearningV5Service {
         persisted.find((answer) => answer.questionId === question.id)?.answer,
         submitted.get(question.id),
       ),
+    );
+  }
+
+  /**
+   * Completion is earned once and kept: a later, weaker retry is practice and
+   * must not take back a lesson the learner already passed. Judging only the
+   * latest attempt made course progress go backwards after a review retry.
+   */
+  private everPassed(
+    attempts: Array<{
+      exerciseId: number;
+      score: number | null;
+      maxScore: number | null;
+    }>,
+    exerciseId: number,
+    minimumScore: number | null,
+  ) {
+    return attempts.some(
+      (attempt) =>
+        attempt.exerciseId === exerciseId &&
+        this.isSuccessful(attempt.score, attempt.maxScore, minimumScore),
     );
   }
 

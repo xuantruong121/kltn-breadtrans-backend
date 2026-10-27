@@ -840,7 +840,7 @@ export class ListeningAudioAuthoringService {
     );
     return {
       artifact,
-      buffer: isPremium
+      buffer: isPrivateListeningMediaKey(artifact.r2Key)
         ? await this.uploadService.downloadPrivateFileBuffer(artifact.r2Key)
         : await this.uploadService.downloadFileBuffer(artifact.r2Key),
     };
@@ -987,7 +987,7 @@ export class ListeningAudioAuthoringService {
     );
     return {
       artifact,
-      buffer: isPremium
+      buffer: isPrivateListeningMediaKey(artifact.r2Key)
         ? await this.uploadService.downloadPrivateFileBuffer(artifact.r2Key)
         : await this.uploadService.downloadFileBuffer(artifact.r2Key),
     };

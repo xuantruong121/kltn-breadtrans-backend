@@ -1,0 +1,162 @@
+[
+  {
+    "table": "SpeakingExercise",
+    "id": 12,
+    "from": "catalog/speaking/reference/12.v1.mp3",
+    "to": "premium/speaking/reference/12.v1.mp3",
+    "bytes": 84096,
+    "sha256": "a5dac21f57eb69480a1d8270fc60e7a2452dc40aed58ba198e607c6aaade7444"
+  },
+  {
+    "table": "SpeakingExercise",
+    "id": 12,
+    "from": "catalog/speaking/reference/12.en-gb.v1.mp3",
+    "to": "premium/speaking/reference/12.en-gb.v1.mp3",
+    "bytes": 83520,
+    "sha256": "83fd5b88e1227d97245f0114f253f423913731858a4278803aac4e6db43a47bf"
+  },
+  {
+    "table": "SpeakingExercise",
+    "id": 14,
+    "from": "catalog/speaking/reference/14.v1.mp3",
+    "to": "premium/speaking/reference/14.v1.mp3",
+    "bytes": 100224,
+    "sha256": "0387f8e6778aee72db771d27da6070fae94fc3ebd51697e2117b1c9f804318a4"
+  },
+  {
+    "table": "SpeakingExercise",
+    "id": 14,
+    "from": "catalog/speaking/reference/14.en-gb.v1.mp3",
+    "to": "premium/speaking/reference/14.en-gb.v1.mp3",
+    "bytes": 101376,
+    "sha256": "3ee0825865a59a9629372a31df88995ab8c30ca98e73c1654ec648f4214bb4af"
+  },
+  {
+    "table": "SpeakingExercise",
+    "id": 15,
+    "from": "catalog/speaking/reference/15.v1.mp3",
+    "to": "premium/speaking/reference/15.v1.mp3",
+    "bytes": 74880,
+    "sha256": "74afa3110b13aa1ad6eaf5e01717ea81675752c91113d0420f8cc416ef4df763"
+  },
+  {
+    "table": "SpeakingExercise",
+    "id": 15,
+    "from": "catalog/speaking/reference/15.en-gb.v1.mp3",
+    "to": "premium/speaking/reference/15.en-gb.v1.mp3",
+    "bytes": 74880,
+    "sha256": "537195c471646f431a170e6ced613a7131e2787a2668fb9abe53b55d26dc997c"
+  },
+  {
+    "table": "SpeakingExercise",
+    "id": 11,
+    "from": "catalog/speaking/reference/11.v1.mp3",
+    "to": "premium/speaking/reference/11.v1.mp3",
+    "bytes": 69696,
+    "sha256": "7eb62ff6465750f4f0eac12d6cf077f8e773882dc04eba1d25b173efc9d0548f"
+  },
+  {
+    "table": "SpeakingExercise",
+    "id": 11,
+    "from": "catalog/speaking/reference/11.en-gb.v1.mp3",
+    "to": "premium/speaking/reference/11.en-gb.v1.mp3",
+    "bytes": 65664,
+    "sha256": "bc6f06f10b4f221710606fe76531ca0c063e9ae851ee3439b71b4d261f637b91"
+  },
+  {
+    "table": "SpeakingExercise",
+    "id": 13,
+    "from": "catalog/speaking/reference/13.v1.mp3",
+    "to": "premium/speaking/reference/13.v1.mp3",
+    "bytes": 80640,
+    "sha256": "0a5cc92fd4f4e492cab0721e70747ae0e468bea74ffe20ce20f074ba0c71bcc0"
+  },
+  {
+    "table": "SpeakingExercise",
+    "id": 13,
+    "from": "catalog/speaking/reference/13.en-gb.v1.mp3",
+    "to": "premium/speaking/reference/13.en-gb.v1.mp3",
+    "bytes": 79488,
+    "sha256": "668b47eec62b1b4c8712d1684ca62ea2f954aabceac7ae4c3b8608cda43895d2"
+  },
+  {
+    "table": "QuizAudioAsset",
+    "id": 149,
+    "from": "catalog/listening/practice/audio/quiz-27/question-177/dialogue-v3.mp3",
+    "to": "premium/listening/practice/audio/quiz-27/question-177/dialogue-v3.mp3",
+    "bytes": 252864,
+    "sha256": "1bbde882eec590e17ab1c252baae011d51fae413d44a62c38c6ed853908cce7a"
+  },
+  {
+    "table": "QuizAudioAsset",
+    "id": 151,
+    "from": "catalog/listening/practice/audio/quiz-28/question-179/dialogue-v3.mp3",
+    "to": "premium/listening/practice/audio/quiz-28/question-179/dialogue-v3.mp3",
+    "bytes": 332352,
+    "sha256": "cb8a9a5413ccb16c3cdfa8b68bf30139b0a85136473ef66bd6682abdd51694ec"
+  },
+  {
+    "table": "QuizAudioAsset",
+    "id": 152,
+    "from": "catalog/listening/practice/audio/quiz-28/question-180/dialogue-v3.mp3",
+    "to": "premium/listening/practice/audio/quiz-28/question-180/dialogue-v3.mp3",
+    "bytes": 332352,
+    "sha256": "13f97d183c9fc1f85b073dde23ccf3d2a1b7e6e3ad2a86f4bd61e0733d41b471"
+  },
+  {
+    "table": "QuizAudioAsset",
+    "id": 150,
+    "from": "catalog/listening/practice/audio/quiz-27/question-178/dialogue-v3.mp3",
+    "to": "premium/listening/practice/audio/quiz-27/question-178/dialogue-v3.mp3",
+    "bytes": 252864,
+    "sha256": "33f9cac63b44c2eff660c9cb762a14e0e7cbf4c0a8d6e1caf2b6eb68636087bf"
+  },
+  {
+    "table": "QuizAudioAsset",
+    "id": 183,
+    "from": "catalog/listening/practice/audio/quiz-27/question-177/dialogue-v4.mp3",
+    "to": "premium/listening/practice/audio/quiz-27/question-177/dialogue-v4.mp3",
+    "bytes": 265536,
+    "sha256": "b806c14dc8c258eb87efffe83d38e293483b4e633c7af083be89ec75098e2d50"
+  },
+  {
+    "table": "QuizAudioAsset",
+    "id": 184,
+    "from": "catalog/listening/practice/audio/quiz-27/question-178/dialogue-v4.mp3",
+    "to": "premium/listening/practice/audio/quiz-27/question-178/dialogue-v4.mp3",
+    "bytes": 265536,
+    "sha256": "a993d7d45f9cc3a4748a53e3a224864b08716e8342cba762d27b8d17d36e61cd"
+  },
+  {
+    "table": "QuizAudioAsset",
+    "id": 185,
+    "from": "catalog/listening/practice/audio/quiz-28/question-179/dialogue-v4.mp3",
+    "to": "premium/listening/practice/audio/quiz-28/question-179/dialogue-v4.mp3",
+    "bytes": 335232,
+    "sha256": "19df81d03edba280f8f6b3ff53c9d9d127481cf47f4a0aed45b6ba4e8e92501f"
+  },
+  {
+    "table": "QuizAudioAsset",
+    "id": 186,
+    "from": "catalog/listening/practice/audio/quiz-28/question-180/dialogue-v4.mp3",
+    "to": "premium/listening/practice/audio/quiz-28/question-180/dialogue-v4.mp3",
+    "bytes": 335232,
+    "sha256": "4b3b730d7e9437abf739a7c04a937f9b610e8c4d81c260c5c994523b99545877"
+  },
+  {
+    "table": "ListeningAudioArtifact",
+    "id": 4,
+    "from": "catalog/listening/practice/quiz-28/audio/v1/full.mp3",
+    "to": "premium/listening/practice/quiz-28/audio/v1/full.mp3",
+    "bytes": 344448,
+    "sha256": "fb9bb7a661d50515d8234c70e7dea6087011f34bf68864d961fa501036bf1d0a"
+  },
+  {
+    "table": "ListeningAudioArtifact",
+    "id": 8,
+    "from": "catalog/listening/practice/quiz-28/audio/v2/full.mp3",
+    "to": "premium/listening/practice/quiz-28/audio/v2/full.mp3",
+    "bytes": 344448,
+    "sha256": "123f74e0f1c1f865446c42c813fb610b5b351ef0a34e93699115f096a634807d"
+  }
+]

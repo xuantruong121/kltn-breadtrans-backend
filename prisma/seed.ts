@@ -11658,11 +11658,11 @@ async function main() {
 
   const quests: Array<[string, string, string, number, number, number]> = [
     ['Học 10 từ vựng', 'Học từ mới trong Flashcard', 'LEARN_VOCAB', 10, 15, 5],
-    // COMPLETE_QUIZ advances on any completed quiz (Listening, Reading,
-    // Grammar, Writing), so the title names a practice, not only listening.
+    // COMPLETE_QUIZ advances only on rewarded standalone practice
+    // (gamification/reward-eligibility.ts): Listening, Reading, Writing.
     [
-      'Hoàn thành 1 bài luyện tập',
-      'Hoàn thành một bài luyện Nghe, Đọc, Viết hoặc Ngữ pháp',
+      'Hoàn thành 1 bài luyện kỹ năng',
+      'Hoàn thành một bài luyện Nghe, Đọc hoặc Viết',
       'COMPLETE_QUIZ',
       1,
       20,
@@ -11678,7 +11678,11 @@ async function main() {
     ],
     ['Hoàn thành bài học', 'Xem xong một lesson', 'COMPLETE_LESSON', 1, 20, 8],
   ];
+  // Flashcard vocabulary and lessons earn no rewards (owner policy), so their
+  // quests can never complete and are kept inactive.
+  const inactiveQuestTypes = new Set(['LEARN_VOCAB', 'COMPLETE_LESSON']);
   for (let index = 0; index < quests.length; index += 1) {
+    const isActive = !inactiveQuestTypes.has(quests[index][2]);
     const quest = await prisma.dailyQuest.upsert({
       where: { id: index + 1 },
       update: {
@@ -11688,6 +11692,7 @@ async function main() {
         targetValue: quests[index][3],
         rewardXP: quests[index][4],
         rewardBanh: quests[index][5],
+        isActive,
       },
       create: {
         id: index + 1,
@@ -11697,6 +11702,7 @@ async function main() {
         targetValue: quests[index][3],
         rewardXP: quests[index][4],
         rewardBanh: quests[index][5],
+        isActive,
       },
     });
     await prisma.userQuestProgress.upsert({

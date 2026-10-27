@@ -1604,35 +1604,27 @@ export class QuizService {
       }>;
     },
   >(quiz: T, accessQuiz: { type: QuizType; isPremiumContent: boolean }) {
-    if (
-      accessQuiz.type !== QuizType.LISTENING_PRACTICE ||
-      !accessQuiz.isPremiumContent ||
-      !quiz.questions
-    ) {
+    if (accessQuiz.type !== QuizType.LISTENING_PRACTICE || !quiz.questions) {
       return quiz;
     }
+    // Presign every private object (premium, or an A1/A2 quiz that kept its
+    // private assets after moving to free); public objects keep their URL.
+    const sign = async (item: { key: string; url: string }) =>
+      isPrivateListeningMediaKey(item.key)
+        ? {
+            ...item,
+            url: await this.uploadService.getPrivatePresignedDownloadUrl(
+              item.key,
+              300,
+            ),
+          }
+        : item;
 
     const questions = await Promise.all(
       quiz.questions.map(async (question) => {
         const [audioAssets, diagnosticClips] = await Promise.all([
-          Promise.all(
-            (question.audioAssets ?? []).map(async (asset) => ({
-              ...asset,
-              url: await this.uploadService.getPrivatePresignedDownloadUrl(
-                asset.key,
-                300,
-              ),
-            })),
-          ),
-          Promise.all(
-            (question.diagnosticClips ?? []).map(async (clip) => ({
-              ...clip,
-              url: await this.uploadService.getPrivatePresignedDownloadUrl(
-                clip.key,
-                300,
-              ),
-            })),
-          ),
+          Promise.all((question.audioAssets ?? []).map(sign)),
+          Promise.all((question.diagnosticClips ?? []).map(sign)),
         ]);
         return { ...question, audioAssets, diagnosticClips };
       }),
@@ -2694,11 +2686,9 @@ export class QuizService {
     const activeAsset = question.audioAssets[0];
     // Published student playback is R2-only. Never call Azure from this
     // request path; content must be synthesized and approved by an author.
-    if (
-      activeAsset &&
-      question.quiz.isPremiumContent &&
-      isPrivateListeningMediaKey(activeAsset.key)
-    ) {
+    // Private media is read from the private bucket whatever the quiz tier:
+    // an A2 quiz moved to free keeps its private assets.
+    if (activeAsset && isPrivateListeningMediaKey(activeAsset.key)) {
       return this.uploadService.downloadPrivateFileBuffer(activeAsset.key);
     }
     if (

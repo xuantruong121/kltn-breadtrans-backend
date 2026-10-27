@@ -15,8 +15,10 @@ All accounts are free tier (owner-confirmed: Azure Speech F0, Gemini keys withou
 | 2026-10-26 | Azure Speech | TTS | 30 | 2,753 chars | Speaking reference clips en-GB | exact |
 | 2026-10-26 | Gemini | structured grading | 2 | – | Entry Diagnostic V2 real smoke | exact |
 | 2026-10-27 | Azure Speech | TTS | 7 | 722 chars | TOEIC Speaking exam question audio (Q5-11, shared by S&W and 4 Skills) | exact |
+| 2026-10-27 | Azure Speech | TTS (one SSML request with bookmarks) | 2 | 2 × 3,506 chars | TOEIC L&R Listening master narration (intro, Part directions, 54 number cues); the first request's bookmarks were not saved, so it was repeated once; cached since | exact |
 | 2026-10-26 | Gemini | structured grading | 3 grades | – | Writing practice real grading (quiz 3, quiz 17, duplicate test) | 3–6 requests: per-grade retries were not logged |
 | 2026-10-27 | Gemini | TOEIC Writing grading (text + vision) | 8 tasks | – | One real S&W Writing section, assessment 1 (cap 12 incl. retries) | 8 sent by the script; key-rotation retries are not logged, so 8 or more |
+| 2026-10-27 | Azure Speech | TTS | 34 | 4,412 chars | 17 new Speaking practice tasks (question/prompt read aloud, en-US + en-GB), scripts/practice-level-normalization.ts tts; cached in artifacts/speaking-practice-new | exact |
 
 Totals against the C3 smoke cap: Azure STT 6/6 sessions, 188.4/210 s (cap exhausted; any new
 session needs a new owner-approved cap). Gemini: 5–8 of the C3 16 before TOEIC; TOEIC Writing used its own cap of 12 (8 sent).

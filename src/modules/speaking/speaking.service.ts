@@ -37,6 +37,11 @@ import {
 import type { SpeakingSubmission } from '@prisma/client';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
 import { resolveSpeakingPracticeSet } from './speaking-practice-set';
+import {
+  levelGroup,
+  levelLabel,
+  parseCefrRange,
+} from '../subscription/practice-level';
 import { SpeakingCategoryService } from '../content/speaking-category.service';
 
 export interface SubmitSpeakingResponse {
@@ -356,18 +361,18 @@ export class SpeakingService {
 
     let audioUrl = exercise.audioUrl;
     let audioUrlUk = britishReferenceUrl(exercise.audioUrl);
-    if (access.isPremiumContent && audioUrl) {
-      audioUrl = isPrivateSpeakingMediaKey(audioUrl)
-        ? await this.uploadService.getPrivatePresignedDownloadUrl(audioUrl, 300)
-        : null;
-      audioUrlUk =
-        audioUrlUk && isPrivateSpeakingMediaKey(audioUrlUk)
-          ? await this.uploadService.getPrivatePresignedDownloadUrl(
-              audioUrlUk,
-              300,
-            )
-          : null;
-    }
+    // Private keys are always signed (also for a free exercise that kept its
+    // private clip); a premium exercise never hands out a public URL.
+    const resolve = async (url: string | null) =>
+      !url
+        ? null
+        : isPrivateSpeakingMediaKey(url)
+          ? this.uploadService.getPrivatePresignedDownloadUrl(url, 300)
+          : access.isPremiumContent
+            ? null
+            : url;
+    audioUrl = await resolve(audioUrl);
+    audioUrlUk = await resolve(audioUrlUk);
     return {
       ...exercise,
       timing: timingOf(exercise),
@@ -503,6 +508,9 @@ export class SpeakingService {
         completedCount: number;
         exerciseIds: number[];
         difficultyLabel: string;
+        /** Authored CEFR span of the set ("A1-A2"), when the set has one. */
+        level: string | null;
+        levelGroup: string | null;
       }
     >();
 
@@ -530,7 +538,16 @@ export class SpeakingService {
                 (b.order ?? Number.MAX_SAFE_INTEGER) || a.id - b.id,
           )
           .map((item) => item.id),
-        difficultyLabel: difficultyLabel(items.map((item) => item.difficulty)),
+        // A practice set carries its authored level; derived groups fall back
+        // to the coarse difficulty of their items.
+        difficultyLabel:
+          levelLabel(parseCefrRange(items[0].practiceSet?.level)) ??
+          difficultyLabel(items.map((item) => item.difficulty)),
+        level: items[0].practiceSet?.level ?? null,
+        levelGroup: (() => {
+          const range = parseCefrRange(items[0].practiceSet?.level);
+          return range ? levelGroup(range) : null;
+        })(),
       });
     }
 

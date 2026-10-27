@@ -155,8 +155,8 @@ export class GrammarService {
     const totalQuestions = topic.questions.length || 1;
     const score = Math.round((correctCount / totalQuestions) * 100);
 
-    let rewardBanh = 0;
-    let rewardXP = 0;
+    const rewardBanh = 0;
+    const rewardXP = 0;
     let isFirstCompletion = false;
 
     // Attempt, first-completion guard, wallet and immutable ledger must commit
@@ -181,40 +181,12 @@ export class GrammarService {
       if (!existingReward) {
         await tx.userGrammarReward.create({ data: { userId, topicId } });
         isFirstCompletion = true;
-        rewardBanh = Math.max(5, Math.floor(score / 10));
-        rewardXP = score;
-
-        const awardResult = await this.gamificationService.awardBanh(
-          userId,
-          rewardBanh,
-          'GRAMMAR_COMPLETION',
-          `grammar:topic:${topicId}`,
-          {
-            isCapped: true,
-            metadata: { topicId, attemptId: created.id, score },
-          },
-          tx,
-        );
-        rewardBanh = awardResult.granted;
-
-        await tx.pointHistory.create({
-          data: {
-            userId,
-            points: rewardBanh,
-            reason: `Hoàn thành bài Ngữ pháp lần đầu: ${topic.title} (${score}%)`,
-          },
-        });
+        // Owner policy: grammar outside the four skill-practice pages earns
+        // no Bánh mì or XP; the first completion is still recorded.
       }
 
       return created;
     });
-
-    if (isFirstCompletion) {
-      this.eventEmitter.emit('gamification.xp_earned', {
-        userId,
-        points: rewardXP,
-      });
-    }
 
     return {
       attemptId: attempt.id,

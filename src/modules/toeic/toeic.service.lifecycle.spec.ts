@@ -14,7 +14,10 @@ describe('ToeicService learner publication boundary', () => {
           groups: [],
         }),
       },
-      toeicAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
+      toeicAttempt: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     const service = new ToeicService(prisma, {} as any);
 

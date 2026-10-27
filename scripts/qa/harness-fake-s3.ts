@@ -82,9 +82,39 @@ createServer((req, res) => {
       return;
     }
     const body = readFileSync(file);
+    const type = file.endsWith('.mp3')
+      ? 'audio/mpeg'
+      : file.endsWith('.json')
+        ? 'application/json'
+        : 'application/octet-stream';
+    // Byte ranges, as R2 serves them, so <audio> can seek a long file.
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
+    if (range && (range[1] || range[2])) {
+      const start = range[1]
+        ? Number(range[1])
+        : body.length - Number(range[2]);
+      const end =
+        range[1] && range[2]
+          ? Math.min(Number(range[2]), body.length - 1)
+          : body.length - 1;
+      if (start < 0 || start > end) {
+        res.writeHead(416, { 'Content-Range': `bytes */${body.length}` }).end();
+        return;
+      }
+      res.writeHead(206, {
+        'Content-Length': end - start + 1,
+        'Content-Range': `bytes ${start}-${end}/${body.length}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Type': type,
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(req.method === 'GET' ? body.subarray(start, end + 1) : undefined);
+      return;
+    }
     res.writeHead(200, {
       'Content-Length': body.length,
-      'Content-Type': 'application/octet-stream',
+      'Content-Type': type,
+      'Accept-Ranges': 'bytes',
       ETag: '"harness"',
       'Access-Control-Allow-Origin': '*',
     });

@@ -29,3 +29,12 @@ cloudflared.exe
 db-backups/
 .local-backups/
 recovery-inspect.sql
+
+# Local data backups (may contain learner data) - never commit
+/backups/
+
+# TOEIC Listening master media (rebuild with scripts/toeic-listening-master.ts); keep only the JSON manifests
+artifacts/toeic-listening-master/**/build/
+artifacts/toeic-listening-master/**/clips/
+artifacts/toeic-listening-master/**/*.wav
+artifacts/toeic-listening-master/**/*.mp3

@@ -150,46 +150,8 @@ async function main() {
     const expectedCorrect = questions.filter(
       (_: any, i: number) => i % 2 === 0,
     ).length;
-    // Strict full test: Listening answers while in Listening, then the
-    // one-pass cursor to the end, then Reading.
-    const ls = await call(
-      'PATCH',
-      `/toeic/attempts/${child}/answers`,
-      s.token,
-      { answers: pick(listening) },
-    );
-    check(
-      'Listening answers saved in the Listening section',
-      ls.status < 300,
-      `${ls.status} ${JSON.stringify(ls.data).slice(0, 100)}`,
-    );
-    const early2 = await call(
-      'PATCH',
-      `/toeic/attempts/${child}/answers`,
-      s.token,
-      { answers: pick(reading.slice(0, 1)) },
-    );
-    check(
-      'Reading answers are refused before Reading starts',
-      early2.status === 400,
-      String(early2.status),
-    );
-    const manifest = await call(
-      'GET',
-      `/toeic/attempts/${child}/listening/manifest`,
-      s.token,
-    );
-    for (
-      let i = manifest.data.listeningPosition;
-      i < manifest.data.totalSegments;
-      i += 1
-    )
-      await call(
-        'POST',
-        `/toeic/attempts/${child}/listening/advance`,
-        s.token,
-        {},
-      );
+    // Full Test (owner decision 2026-10-27): one 120-minute paper, any
+    // Part in any order; Reading answers are accepted before Listening ends.
     const rs = await call(
       'PATCH',
       `/toeic/attempts/${child}/answers`,
@@ -197,9 +159,20 @@ async function main() {
       { answers: pick(reading) },
     );
     check(
-      'Reading answers saved after the Listening cursor ends',
+      'Reading answers saved straight away (no section lock)',
       rs.status < 300,
       `${rs.status} ${JSON.stringify(rs.data).slice(0, 100)}`,
+    );
+    const ls = await call(
+      'PATCH',
+      `/toeic/attempts/${child}/answers`,
+      s.token,
+      { answers: pick(listening) },
+    );
+    check(
+      'Listening answers saved after Reading ones',
+      ls.status < 300,
+      `${ls.status} ${JSON.stringify(ls.data).slice(0, 100)}`,
     );
     const submit = await call(
       'POST',

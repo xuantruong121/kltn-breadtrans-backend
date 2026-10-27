@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
@@ -34,6 +35,8 @@ type IntentWithTarget = Prisma.PayOSPaymentIntentGetPayload<{
 
 @Injectable()
 export class PayosPaymentService {
+  private readonly logger = new Logger(PayosPaymentService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly provider: PayosProvider,
@@ -66,7 +69,9 @@ export class PayosPaymentService {
         type: PayOSPaymentIntentType.PLAN,
         planPaymentId,
         amountVnd: payment.amountVnd,
-        description: 'BreadTrans Plus',
+        // The plan bought ("BreadTrans Pro — 30 ngày" → "BreadTrans Pro"); it
+        // used to say Plus for every plan. PayOS caps descriptions at 25.
+        description: itemName.split(' — ')[0].slice(0, 25),
       }));
     return this.createProviderLink(intent, itemName);
   }
@@ -116,7 +121,20 @@ export class PayosPaymentService {
     const intent = await this.findByOrderCode(orderCode);
     const remote = await this.provider.getPayment(orderCode);
     const providerStatus = remote.status;
-    const mappedStatus = this.mapStatus(providerStatus);
+    let mappedStatus = this.mapStatus(providerStatus);
+    // "PAID" alone does not settle this order: the provider record must be
+    // our payment link, for our amount, fully paid.
+    if (
+      mappedStatus === PayOSPaymentIntentStatus.PAID &&
+      ((intent.paymentLinkId && remote.id !== intent.paymentLinkId) ||
+        remote.amount !== intent.amountVnd ||
+        remote.amountPaid < intent.amountVnd)
+    ) {
+      this.logger.warn(
+        `PayOS sync refused for intent ${intent.id}: link/amount mismatch`,
+      );
+      mappedStatus = intent.status;
+    }
     const status =
       intent.status === PayOSPaymentIntentStatus.PAID &&
       mappedStatus !== PayOSPaymentIntentStatus.PAID
@@ -192,6 +210,15 @@ export class PayosPaymentService {
       throw new BadRequestException(
         'PayOS webhook is not a successful payment',
       );
+    }
+    // A signed notification for a different payment link of the same order
+    // code is not this payment; never adopt the webhook's link id.
+    if (
+      intent.paymentLinkId &&
+      data.paymentLinkId &&
+      data.paymentLinkId !== intent.paymentLinkId
+    ) {
+      throw new BadRequestException('PayOS payment link mismatch');
     }
     const paymentLinkId = data.paymentLinkId || intent.paymentLinkId;
     await this.prisma.payOSPaymentIntent.update({
