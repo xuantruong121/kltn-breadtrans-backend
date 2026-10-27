@@ -85,7 +85,7 @@ void (async () => {
   const at = hub.indexOf('Hoạt động gần đây');
   check(
     'Tiến độ học tập lists the listening practice under recent activity',
-    at >= 0 && /Luyện nghe hiểu 8/8 câu đúng/.test(hub.slice(at)),
+    at >= 0 && hub.slice(at).includes('Luyện nghe hiểu 8/8 câu đúng'),
     hub.slice(Math.max(at, 0), Math.max(at, 0) + 260),
   );
   await page.goto(`${FE}/pet`, { waitUntil: 'networkidle', timeout: 120_000 });
