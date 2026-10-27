@@ -29,6 +29,9 @@ async function grammar() {
     ([id]) => Number(id),
   );
   const results: string[] = [];
+  // A previous run on the same clone may have published topic 2; put it back
+  // to DRAFT through the Admin API so the gating checks below are meaningful.
+  await call('POST', '/grammar/topics/2/unpublish', admin.token);
   for (const id of ids) {
     if (id === 2) continue; // kept DRAFT to test gating
     const r = await call('POST', `/grammar/topics/${id}/publish`, admin.token);
@@ -89,8 +92,9 @@ async function grammar() {
     `(api ${first.data?.score}, expected ${expected})`,
   );
   check(
-    'first completion grants a reward',
-    first.data?.isFirstCompletion === true && first.data?.rewardBanh > 0,
+    // Owner reward policy: Grammar is not reward-eligible.
+    'first completion is recorded and grants no reward',
+    first.data?.isFirstCompletion === true && first.data?.rewardBanh === 0,
     `(banh ${first.data?.rewardBanh})`,
   );
   const second = await call('POST', '/grammar/topics/1/attempt', a.token, {
@@ -152,32 +156,12 @@ async function vocab() {
     detail.status === 200 && words.length > 0,
     `(${words.length})`,
   );
-  if (locked) {
-    const l = await call('GET', `/vocab/topics/${locked.id}`, a.token);
-    check(
-      'a locked topic is refused to a free learner',
-      l.status === 403,
-      `(status ${l.status})`,
-    );
-    const lockedWord = harnessQuery(
-      `select id from "VocabWord" where "topicId" = ${locked.id} limit 1`,
-    )[0]?.[0];
-    if (lockedWord) {
-      const m = await call(
-        'POST',
-        `/vocab/words/${lockedWord}/master`,
-        a.token,
-        { isMastered: true },
-      );
-      check(
-        'a word of a locked topic cannot be marked',
-        m.status === 403,
-        `(status ${m.status})`,
-      );
-    }
-  } else {
-    check('catalog has a locked topic to test gating', false);
-  }
+  // Owner policy: Vocabulary/Flashcard is free, so no topic may be locked.
+  check(
+    'no vocabulary topic is locked for a free learner',
+    !locked,
+    locked ? `(topic ${locked.id})` : '',
+  );
   const w = words[0];
   const master = await call('POST', `/vocab/words/${w.id}/master`, a.token, {
     isMastered: true,

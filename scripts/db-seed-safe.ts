@@ -86,7 +86,18 @@ async function main() {
 
     // 3. Run the canonical seed unchanged.
     console.log('\nRunning canonical seed (prisma db seed) ...');
-    execSync('npx prisma db seed', { stdio: 'inherit' });
+    // prisma/seed.ts refuses a populated database by itself; --reconstruct
+    // acknowledges this one database by name, never a protected one.
+    const [{ db }] = await prisma.$queryRawUnsafe<{ db: string }[]>(
+      'SELECT current_database() AS db',
+    );
+    execSync('npx prisma db seed', {
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        ...(reconstruct ? { SEED_RECONSTRUCT_DATABASE: db } : {}),
+      },
+    });
 
     // 4. The seed writes explicit primary keys (stable TOEIC group ids keep
     //    media object keys valid), which leaves identity sequences behind

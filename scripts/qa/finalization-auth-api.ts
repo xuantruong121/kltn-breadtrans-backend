@@ -1,20 +1,11 @@
 /**
  * Authentication and profile over HTTP, disposable harness only. SMTP is not
- * configured there, so the password-reset link is read from the harness
- * backend log (dev-only debug line); no email is sent.
+ * configured there, so no email is sent; reset-link delivery is covered by a
+ * unit spec with a mock mail adapter.
  */
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { call, check, failureCount, newStudent } from './harness-api';
-
-const LOG = join(
-  process.env.HARNESS_WORK ??
-    join(process.env.TEMP ?? '', 'breadtrans-harness'),
-  'backend.log',
-);
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   console.log('\n== Register / login');
@@ -206,47 +197,14 @@ async function main() {
       JSON.stringify(unknown.data) === JSON.stringify(known.data),
     `(${unknown.status}/${known.status})`,
   );
-  await sleep(1500);
-  const lines = readFileSync(LOG, 'utf8')
-    .split('\n')
-    .filter((l) => l.includes(`Password reset URL for ${other.email}`));
-  const token = /token=([A-Za-z0-9._~-]+)/.exec(lines.at(-1) ?? '')?.[1];
-  if (!token) {
-    check(
-      'reset link available from the dev log',
-      false,
-      '(debug line not found; NOT_VERIFIED)',
-    );
-  } else {
-    const resetPw = `Reset-${randomUUID().slice(0, 6)}-Aa1!`;
-    const reset = await call('POST', '/auth/reset-password', undefined, {
-      token,
-      newPassword: resetPw,
-    });
-    check(
-      'reset with the emailed token succeeds',
-      reset.status < 300,
-      `(status ${reset.status} ${JSON.stringify(reset.message)})`,
-    );
-    const reuseReset = await call('POST', '/auth/reset-password', undefined, {
-      token,
-      newPassword: `Again-${randomUUID().slice(0, 6)}-Aa1!`,
-    });
-    check(
-      'the reset token is single-use',
-      reuseReset.status >= 400,
-      `(status ${reuseReset.status})`,
-    );
-    check(
-      'login works with the reset password',
-      (
-        await call('POST', '/auth/login', undefined, {
-          email: other.email,
-          password: resetPw,
-        })
-      ).status < 300,
-    );
-  }
+  // The emailed token is not observable over HTTP and a log file is not an
+  // authoritative source of sent mail. Token use, single use, newer-link
+  // invalidation and the sent message are covered by
+  // src/modules/auth/auth.password-reset.spec.ts with a mock mail adapter.
+  // Real SMTP delivery is NOT_VERIFIED (no provider is configured).
+  console.log(
+    'SKIP  reset-link delivery over HTTP (see auth.password-reset.spec.ts; SMTP delivery NOT_VERIFIED)',
+  );
 
   console.log(`\nAUTH_API_FAILURES=${failureCount()}`);
   process.exit(failureCount() ? 1 : 0);
