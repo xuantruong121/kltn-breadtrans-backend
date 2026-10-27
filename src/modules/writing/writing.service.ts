@@ -1,5 +1,8 @@
 import { hasVietnameseDiacritics } from '../diagnostic/diagnostic-productive';
-import { loadWritingExerciseProgress } from './writing-exercise-progress';
+import {
+  completedWritingQuizIds,
+  loadWritingExerciseProgress,
+} from './writing-exercise-progress';
 import {
   buildPracticeWritingRequest,
   practiceRubric,
@@ -446,17 +449,27 @@ export class WritingService {
       orderBy: { id: 'desc' },
     });
 
-    const userSubmissions = userId
-      ? await this.prisma.submission.findMany({
-          where: {
-            userId,
-            quizId: { in: quizzes.map((q) => q.id) },
-          },
-          select: { quizId: true },
-        })
-      : [];
+    const quizIds = quizzes.map((q) => q.id);
+    const [allQuestions, gradedResults] = userId
+      ? await Promise.all([
+          this.prisma.question.findMany({
+            where: { quizId: { in: quizIds } },
+            select: { id: true, quizId: true },
+          }),
+          this.prisma.result.findMany({
+            where: {
+              score: { not: null },
+              submission: { userId, quizId: { in: quizIds } },
+            },
+            select: { questionId: true },
+          }),
+        ])
+      : [[], []];
 
-    const completedQuizIds = new Set(userSubmissions.map((s) => s.quizId));
+    const completedQuizIds = completedWritingQuizIds(
+      allQuestions,
+      gradedResults.map((r) => r.questionId),
+    );
 
     const accessByQuiz = await this.resolveWritingAccess(quizzes, userId, role);
 

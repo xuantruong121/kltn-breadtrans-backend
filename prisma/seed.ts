@@ -59,6 +59,7 @@ import {
   RETITLE as SPEAKING_PRACTICE_RETITLE,
   SETS as SPEAKING_PRACTICE_SETS,
 } from './data/speaking-practice-sets';
+import { GRAMMAR_REPLACEMENTS } from './data/grammar-replacements';
 
 const prisma = new PrismaClient();
 
@@ -8539,6 +8540,48 @@ async function main() {
         },
       });
       grammarQuestionId += 1;
+    }
+  }
+  // Checkpoint 56: topics 1-2 stay DRAFT (their attempts block edits); the
+  // published replacements 13-14 take their catalog places with the corrected
+  // items (prisma/data/grammar-replacements.ts) and the other items verbatim.
+  let replacementQuestionId = 61;
+  for (const replacement of GRAMMAR_REPLACEMENTS) {
+    const source = grammarTopics[replacement.originalId - 1];
+    const firstOriginalQuestionId =
+      grammarTopics
+        .slice(0, replacement.originalId - 1)
+        .reduce((n, t) => n + t.questions.length, 0) + 1;
+    const topicData = {
+      title: source.title,
+      level: source.level,
+      description: source.description,
+      keyFormula: source.keyFormula,
+      order: replacement.originalId,
+      publicationStatus: QuizPublicationStatus.PUBLISHED,
+    };
+    await prisma.grammarTopic.upsert({
+      where: { id: replacement.replacementId },
+      update: topicData,
+      create: { id: replacement.replacementId, ...topicData },
+    });
+    for (const [index, original] of source.questions.entries()) {
+      const corrected =
+        replacement.corrections[firstOriginalQuestionId + index];
+      const questionData = {
+        topicId: replacement.replacementId,
+        question: corrected?.question ?? original[0],
+        options: [...(corrected?.options ?? original[1])],
+        correctIndex: corrected?.correctIndex ?? original[2],
+        explanation: corrected?.explanation ?? original[3],
+        order: index + 1,
+      };
+      await prisma.grammarQuestion.upsert({
+        where: { id: replacementQuestionId },
+        update: questionData,
+        create: { id: replacementQuestionId, ...questionData },
+      });
+      replacementQuestionId += 1;
     }
   }
   // The prior seed created generic five-question sets. Remove only its unused IDs.

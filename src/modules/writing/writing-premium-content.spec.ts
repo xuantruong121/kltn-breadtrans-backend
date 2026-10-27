@@ -31,6 +31,8 @@ describe('Writing premium content boundary', () => {
     practiceTopic: { findMany: jest.fn() },
     quiz: { findMany: jest.fn(), findUnique: jest.fn() },
     submission: { findMany: jest.fn() },
+    question: { findMany: jest.fn() },
+    result: { findMany: jest.fn() },
   };
   const ai = {
     evaluateWritingPart2: jest.fn(),
@@ -56,6 +58,8 @@ describe('Writing premium content boundary', () => {
     prisma.quiz.findMany.mockResolvedValue([quiz]);
     prisma.practiceTopic.findMany.mockResolvedValue([]);
     prisma.submission.findMany.mockResolvedValue([]);
+    prisma.question.findMany.mockResolvedValue([]);
+    prisma.result.findMany.mockResolvedValue([]);
     service = new WritingService(
       prisma as unknown as PrismaService,
       ai as unknown as AiService,

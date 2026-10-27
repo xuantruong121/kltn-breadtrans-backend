@@ -14,7 +14,7 @@ const AUDIO_5XX =
 async function listening() {
   console.log('\n== Listening (browser)');
   const { browser, page, account, issues } = await studentPage('listen-ui');
-  const quizId = 28;
+  const quizId = 26; // FREE A2 conversation (quiz 28 is B2 PLUS since Checkpoint 51)
   await page.goto(`${FE}/listening/${quizId}`, {
     waitUntil: 'networkidle',
     timeout: 90_000,
