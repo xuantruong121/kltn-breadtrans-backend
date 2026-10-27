@@ -180,6 +180,27 @@ export class UploadService {
     return this.r2.downloadPrivateFileBuffer(key);
   }
 
+  // Learner Speaking recordings. New ones live in the private bucket under
+  // premium/speaking/practice/; recordings made before that change stay in
+  // the public bucket and are still read from there.
+  async getRecordingUploadUrl(key: string, mimeType: string, expiresIn = 600) {
+    return isPrivatePremiumMediaKey(key)
+      ? this.r2.getPrivatePresignedUploadUrl(key, mimeType, expiresIn)
+      : this.r2.getPresignedUploadUrl(key, mimeType, expiresIn);
+  }
+
+  async getRecordingDownloadUrl(key: string, expiresIn = 600) {
+    return isPrivatePremiumMediaKey(key)
+      ? this.r2.getPrivatePresignedDownloadUrl(key, expiresIn)
+      : this.r2.getPresignedDownloadUrl(key, expiresIn);
+  }
+
+  async downloadRecordingBuffer(key: string): Promise<Buffer> {
+    return isPrivatePremiumMediaKey(key)
+      ? this.r2.downloadPrivateFileBuffer(key)
+      : this.r2.downloadFileBuffer(key);
+  }
+
   /** Phân loại thư mục theo MIME type */
   private resolveFolder(mimeType: string): string {
     if (mimeType.startsWith('image/')) return 'images';

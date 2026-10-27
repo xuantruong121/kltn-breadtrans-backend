@@ -376,7 +376,9 @@ export class ContentService {
     ).length;
     const totalCount = exercises.length;
     const score = Math.round((correctCount / totalCount) * 100);
-    const rewardBanh = correctCount * 5;
+    // Owner policy (gamification/reward-eligibility.ts): course and lesson
+    // content earns no Bánh mì or XP; the attempt and score are still stored.
+    const rewardBanh = 0;
 
     const attempt = await this.prisma.$transaction(async (tx) => {
       const created = await tx.contentAttempt.create({
@@ -389,23 +391,6 @@ export class ContentService {
           score,
         },
       });
-      if (rewardBanh > 0) {
-        await this.gamificationService.awardBanh(
-          userId,
-          rewardBanh,
-          'CONTENT_COMPLETION',
-          `content:attempt:${created.id}`,
-          {
-            isCapped: true,
-            metadata: {
-              contentTopicId: topic.id,
-              attemptId: created.id,
-              score,
-            },
-          },
-          tx,
-        );
-      }
       await tx.learningActivity.create({
         data: {
           userId,

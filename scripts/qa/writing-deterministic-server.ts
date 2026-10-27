@@ -26,8 +26,8 @@ function evaluate(score: number) {
     throw new Error('deterministic writing provider unavailable');
   return {
     score,
-    feedback: 'Deterministic acceptance feedback.',
-    suggestions: ['Deterministic improvement suggestion.'],
+    feedback: 'Nhận xét tất định cho bài kiểm thử.',
+    suggestions: ['Gợi ý cải thiện tất định.'],
   };
 }
 
@@ -48,6 +48,42 @@ const provider = {
   evaluateWritingPart2: async () => evaluate(4),
   evaluateWritingPart3: async () => evaluate(5),
   evaluateSpeakingPart3To5: async () => evaluate(5),
+  // Practice Writing (PRACTICE_WRITING_V1): one point below full marks on the
+  // first criterion, and a correction only when the learner wrote "ask" after
+  // a singular subject, quoted from the learner text.
+  generateStructuredJson: async (input: { prompt: string }) => {
+    calls += 1;
+    persistCounter();
+    if (mode === 'failure')
+      throw new Error('deterministic writing provider unavailable');
+    const data = JSON.parse(input.prompt) as {
+      rubric: Array<{ key: string; max: number }>;
+      learnerResponse: string;
+    };
+    const slip = /\b(\w+) ask\b/.exec(data.learnerResponse);
+    return {
+      model: 'deterministic',
+      text: JSON.stringify({
+        criteria: data.rubric.map((c, i) => ({
+          key: c.key,
+          score: i === 0 ? c.max - 1 : c.max,
+          comment: 'Nhận xét tất định cho tiêu chí này.',
+        })),
+        strengths: ['Bài viết đúng chủ đề.'],
+        corrections: slip
+          ? [
+              {
+                original: slip[0],
+                corrected: `${slip[1]} asks`,
+                explanation: 'Chủ ngữ số ít nên động từ thêm "s".',
+              },
+            ]
+          : [],
+        feedback: 'Nhận xét tất định: bài viết đáp ứng yêu cầu chính của đề.',
+        suggestions: ['Kiểm tra lại cách chia động từ.'],
+      }),
+    };
+  },
   importEtsPdf: async () => [],
   generateSmartContentFromDocument: async () => ({
     quizQuestions: [],

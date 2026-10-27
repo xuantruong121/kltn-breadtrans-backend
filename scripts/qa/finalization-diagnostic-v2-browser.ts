@@ -592,10 +592,18 @@ async function main() {
       /\s+/g,
       ' ',
     );
+    // A Speaking task inside a practice set is headed by the set's title.
+    const speakingId = /^\/speaking\/(\d+)$/.exec(firstOpen.route)?.[1];
+    const setTitle = speakingId
+      ? harnessQuery(
+          `select s.title from "SpeakingExercise" e join "SpeakingPracticeSet" s on s.id = e."practiceSetId" where e.id = ${speakingId}`,
+        )[0]?.[0]
+      : undefined;
     check(
       `the recommended ${firstOpen.kind} opens (${firstOpen.route})`,
       !/404|Không tìm thấy|not found/i.test(target) &&
-        target.includes(firstOpen.title.slice(0, 12)),
+        (target.includes(firstOpen.title.slice(0, 12)) ||
+          (!!setTitle && target.includes(setTitle))),
       `(${target.slice(0, 120)})`,
     );
     await page.goBack({ waitUntil: 'networkidle' }).catch(() => undefined);

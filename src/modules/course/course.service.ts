@@ -332,9 +332,12 @@ export class CourseService {
       throw new NotFoundException('Course not found');
     }
 
-    const isV5Only =
-      (course.lessons?.length ?? 0) === 0 &&
-      Boolean(course.courseLessons && course.courseLessons.length > 0);
+    // Learners study the published Course Learning 5.0 lessons. Courses 1 and 8
+    // still carry an older legacy outline (different titles, no activities);
+    // showing it listed lessons the learner never sees and could never complete.
+    const isV5Only = Boolean(
+      course.courseLessons && course.courseLessons.length > 0,
+    );
 
     const access = await this.resolveCourseAccess(id, userId, role);
     const curriculum = isV5Only
@@ -1332,10 +1335,10 @@ export class CourseService {
     });
     const visible = [];
     for (const course of courses) {
-      const isV5Only =
-        course.lessons.length === 0 &&
-        course.courseLessons &&
-        course.courseLessons.length > 0;
+      // Published V5 lessons win over a legacy outline (see getCourseById).
+      const isV5Only = Boolean(
+        course.courseLessons && course.courseLessons.length > 0,
+      );
       const curriculum = isV5Only
         ? this.buildV5FallbackCurriculum(course.courseLessons)
         : buildCourseCurriculum(
@@ -1435,10 +1438,10 @@ export class CourseService {
       );
     }
     const access = await this.resolveCourseAccess(id, userId, role);
-    const isV5Only =
-      course.lessons.length === 0 &&
-      course.courseLessons &&
-      course.courseLessons.length > 0;
+    // Published V5 lessons win over a legacy outline (see getCourseById).
+    const isV5Only = Boolean(
+      course.courseLessons && course.courseLessons.length > 0,
+    );
 
     const curriculum = isV5Only
       ? this.buildV5FallbackCurriculum(course.courseLessons)
@@ -1448,7 +1451,9 @@ export class CourseService {
           access.canAccess ? course.activities : [],
           course.curriculumType,
         );
-    if (course.status !== CourseStatus.PUBLISHED && !access.canAccess) {
+    // A PRO subscription grants canAccess to every course, so it must not also
+    // unlock drafts: only an admin may see an unpublished course.
+    if (course.status !== CourseStatus.PUBLISHED && role !== Role.ADMIN) {
       throw new NotFoundException(
         'Khóa học không tồn tại hoặc chưa được công khai',
       );

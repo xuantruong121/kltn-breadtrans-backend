@@ -65,7 +65,7 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
     };
 
     mockUploadService = {
-      downloadFileBuffer: jest.fn().mockResolvedValue(validWav),
+      downloadRecordingBuffer: jest.fn().mockResolvedValue(validWav),
     };
 
     mockEventEmitter = {
@@ -221,7 +221,7 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
     await service.processJob({ submissionId: 102, traceId: 'trace-dup' });
 
     expect(mockPrisma.speakingSubmission.updateMany).not.toHaveBeenCalled();
-    expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    expect(mockUploadService.downloadRecordingBuffer).not.toHaveBeenCalled();
     expect(publishSpy).not.toHaveBeenCalled();
   });
 
@@ -269,7 +269,7 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
       new Error('The specified key does not exist.'),
       { name: 'NoSuchKey' },
     );
-    mockUploadService.downloadFileBuffer.mockRejectedValueOnce(missing);
+    mockUploadService.downloadRecordingBuffer.mockRejectedValueOnce(missing);
 
     await expect(
       service.processJob({ submissionId: 107, traceId: 'trace-missing' }),
@@ -305,7 +305,7 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
       exercise: { targetText: 'Corrupt audio' },
     });
 
-    mockUploadService.downloadFileBuffer.mockResolvedValueOnce(
+    mockUploadService.downloadRecordingBuffer.mockResolvedValueOnce(
       Buffer.from('not-a-wav-file'),
     );
 
@@ -378,7 +378,7 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
     });
 
     jest
-      .spyOn(mockUploadService, 'downloadFileBuffer')
+      .spyOn(mockUploadService, 'downloadRecordingBuffer')
       .mockImplementation(
         () =>
           new Promise((resolve) => setTimeout(() => resolve(validWav), 200)),
@@ -462,7 +462,7 @@ describe('SpeakingProcessorService (BullMQ Pipeline Phase 1)', () => {
     const workerAPromise = (async () => {
       // simulate slow audio evaluation
       jest
-        .spyOn(mockUploadService, 'downloadFileBuffer')
+        .spyOn(mockUploadService, 'downloadRecordingBuffer')
         .mockImplementationOnce(
           () =>
             new Promise((resolve) =>

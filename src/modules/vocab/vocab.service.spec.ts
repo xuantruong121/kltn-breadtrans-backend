@@ -1,10 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  ForbiddenException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { PlanFeatureKey } from '@prisma/client';
+import { NotFoundException } from '@nestjs/common';
 import { VocabService } from './vocab.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -96,7 +91,7 @@ describe('VocabService', () => {
       );
     });
 
-    it('returns safe locked metadata for premium topics without leaking words', async () => {
+    it('lists every topic unlocked, including legacy isPro topics (owner policy: vocabulary is free)', async () => {
       const { service, prisma, subscriptionService } =
         createPremiumService(false);
       prisma.vocabTopic.findMany = jest
@@ -105,75 +100,29 @@ describe('VocabService', () => {
 
       const result = await service.getTopics(7);
 
-      expect(subscriptionService.hasFeature).toHaveBeenCalledWith(
-        7,
-        PlanFeatureKey.PREMIUM_VOCAB,
-      );
+      expect(subscriptionService.hasFeature).not.toHaveBeenCalled();
       expect(result.topics).toEqual([
         expect.objectContaining({ id: 1, isPro: false, isLocked: false }),
-        expect.objectContaining({ id: 2, isPro: true, isLocked: true }),
+        expect.objectContaining({ id: 2, isPro: false, isLocked: false }),
       ]);
-      expect(result.topics[1]).not.toHaveProperty('words');
     });
   });
 
-  describe('premium topic access', () => {
-    it('rejects an unauthenticated premium detail request with 401', async () => {
-      const { service, prisma } = createPremiumService(false);
-
-      await expect(service.getTopicDetails(2)).rejects.toThrow(
-        UnauthorizedException,
-      );
-      expect(prisma.vocabWord.findMany).not.toHaveBeenCalled();
-    });
-
-    it('rejects an authenticated user without PREMIUM_VOCAB with a structured 403', async () => {
-      const { service, prisma } = createPremiumService(false);
-
-      const error = await service
-        .getTopicDetails(2, 7)
-        .catch((value: unknown) => value);
-
-      expect(error).toBeInstanceOf(ForbiddenException);
-      const response = (error as ForbiddenException).getResponse();
-      expect(response).toMatchObject({
-        error: {
-          code: 'FEATURE_NOT_INCLUDED',
-          featureKey: PlanFeatureKey.PREMIUM_VOCAB,
-        },
-      });
-      expect(prisma.vocabWord.findMany).not.toHaveBeenCalled();
-    });
-
-    it('allows premium content when the entitlement is enabled regardless of plan code', async () => {
+  describe('free vocabulary access', () => {
+    it('opens a legacy isPro topic for a guest and for a FREE learner', async () => {
       const { service, prisma, subscriptionService } =
-        createPremiumService(true);
-      prisma.vocabWord.findMany.mockResolvedValue([
-        {
-          id: 20,
-          topicId: 2,
-          word: 'museum',
-          pos: 'noun',
-          meaning: 'a museum',
-          ipaUs: null,
-          ipaUk: null,
-          audioUs: null,
-          audioUk: null,
-          exampleEn: null,
-          exampleVi: null,
-          collocations: null,
-          order: 0,
-        },
-      ]);
+        createPremiumService(false);
+      prisma.vocabWord.findMany.mockResolvedValue([]);
 
-      const result = await service.getTopicDetails(2, 7);
-
-      expect(subscriptionService.hasFeature).toHaveBeenCalledWith(
-        7,
-        PlanFeatureKey.PREMIUM_VOCAB,
-      );
-      expect(result.words).toHaveLength(1);
-      expect(result.words[0].word).toBe('museum');
+      await expect(service.getTopicDetails(2)).resolves.toMatchObject({
+        topicId: 2,
+        isPro: false,
+      });
+      await expect(service.getTopicDetails(2, 7)).resolves.toMatchObject({
+        topicId: 2,
+      });
+      expect(subscriptionService.hasFeature).not.toHaveBeenCalled();
+      expect(prisma.vocabWord.findMany).toHaveBeenCalled();
     });
 
     it('keeps free topic detail accessible without a subscription', async () => {

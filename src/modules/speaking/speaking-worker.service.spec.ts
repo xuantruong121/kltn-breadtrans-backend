@@ -20,7 +20,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
   let worker: SpeakingWorkerService;
   let mockPrisma: MockPrisma;
   let mockAiService: { assessPronunciation: MockFn };
-  let mockUploadService: { downloadFileBuffer: MockFn };
+  let mockUploadService: { downloadRecordingBuffer: MockFn };
   let mockEventEmitter: { emitAsync: MockFn };
 
   beforeEach(() => {
@@ -37,7 +37,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
       assessPronunciation: jest.fn(),
     };
     mockUploadService = {
-      downloadFileBuffer: jest.fn(),
+      downloadRecordingBuffer: jest.fn(),
     };
     mockEventEmitter = {
       emitAsync: jest.fn(),
@@ -95,7 +95,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
       });
 
       // Corrupt buffer (not RIFF/WAVE)
-      mockUploadService.downloadFileBuffer.mockResolvedValueOnce(
+      mockUploadService.downloadRecordingBuffer.mockResolvedValueOnce(
         Buffer.from('CORRUPTED_NON_WAV_BYTES_12345'),
       );
 
@@ -126,7 +126,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
         attemptCount: 1, // First attempt
         exercise: { targetText: 'Good morning' },
       });
-      mockUploadService.downloadFileBuffer.mockResolvedValueOnce(validWav);
+      mockUploadService.downloadRecordingBuffer.mockResolvedValueOnce(validWav);
 
       const timeoutErr: any = new Error('Azure timed out');
       timeoutErr.code = 'PROVIDER_TIMEOUT';
@@ -153,7 +153,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
         attemptCount: 4, // Reached max
         exercise: { targetText: 'Good morning' },
       });
-      mockUploadService.downloadFileBuffer.mockResolvedValueOnce(validWav);
+      mockUploadService.downloadRecordingBuffer.mockResolvedValueOnce(validWav);
 
       const providerErr: any = new Error('Service Unavailable');
       providerErr.code = 'PROVIDER_UNAVAILABLE';
@@ -185,7 +185,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
         attemptCount: 1,
         exercise: { targetText: 'Hello world' },
       });
-      mockUploadService.downloadFileBuffer.mockResolvedValueOnce(
+      mockUploadService.downloadRecordingBuffer.mockResolvedValueOnce(
         createWavBuffer({ durationSeconds: 1, silent: true }),
       );
 
@@ -213,7 +213,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
         rewardGrantedAt: null, // Not yet granted
         exercise: { targetText: 'Hello world' },
       });
-      mockUploadService.downloadFileBuffer.mockResolvedValueOnce(validWav);
+      mockUploadService.downloadRecordingBuffer.mockResolvedValueOnce(validWav);
 
       mockAiService.assessPronunciation.mockResolvedValueOnce({
         overallScore: 8.5,
@@ -272,7 +272,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
         rewardGrantedAt: null,
         exercise: { targetText: 'Hello world' },
       });
-      mockUploadService.downloadFileBuffer.mockResolvedValueOnce(validWav);
+      mockUploadService.downloadRecordingBuffer.mockResolvedValueOnce(validWav);
 
       mockAiService.assessPronunciation.mockResolvedValueOnce({
         overallScore: null,
@@ -316,7 +316,7 @@ describe('SpeakingWorkerService - Durable Processing & Failure Semantics', () =>
         rewardGrantedAt: new Date(), // Already granted previously
         exercise: { targetText: 'Hello world' },
       });
-      mockUploadService.downloadFileBuffer.mockResolvedValueOnce(validWav);
+      mockUploadService.downloadRecordingBuffer.mockResolvedValueOnce(validWav);
 
       mockAiService.assessPronunciation.mockResolvedValueOnce({
         overallScore: 9.0,

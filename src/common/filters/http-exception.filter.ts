@@ -18,10 +18,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
+    // body-parser rejects oversized bodies with a plain error carrying
+    // `type: 'entity.too.large'`; it is a client error (413), not a server fault.
+    const tooLarge =
+      (exception as { type?: string } | null)?.type === 'entity.too.large';
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+        : tooLarge
+          ? HttpStatus.PAYLOAD_TOO_LARGE
+          : HttpStatus.INTERNAL_SERVER_ERROR;
     const requestId = randomUUID();
 
     let message = 'Internal server error';
@@ -35,6 +41,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
       } else {
         message = responseObj.toString();
       }
+    } else if (tooLarge) {
+      message = 'Dữ liệu gửi lên quá lớn. Vui lòng dùng tệp hoặc ảnh nhỏ hơn.';
+      errorDetails = 'PAYLOAD_TOO_LARGE';
     } else if (exception instanceof Error) {
       message = exception.message;
     }

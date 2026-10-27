@@ -8,7 +8,7 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -39,6 +39,10 @@ interface ServerQuestion {
   correctAnswer: string;
   explanation?: string;
 }
+
+/** Deletes a lock only if this caller still owns it. */
+const UNLOCK_SCRIPT =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
 
 interface MatchPlayer {
   userId: number;
@@ -79,7 +83,13 @@ interface MatchState {
   cors: getSocketCorsConfig(),
   namespace: '/arena',
 })
-export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ArenaGateway
+  implements
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnModuleInit,
+    OnModuleDestroy
+{
   @WebSocketServer()
   server: Server;
 
@@ -94,7 +104,149 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly jwtService: JwtService,
   ) {}
 
+  private escrowSweep?: NodeJS.Timeout;
+
+  onModuleInit() {
+    // Round timers live in this process: after a restart an escrowed match
+    // can never finish, so its stakes are returned once it is clearly dead.
+    void this.refundStaleEscrows().catch((err) =>
+      this.logger.error('[Arena] Stale escrow sweep failed:', err),
+    );
+    this.escrowSweep = setInterval(() => {
+      void this.refundStaleEscrows().catch((err) =>
+        this.logger.error('[Arena] Stale escrow sweep failed:', err),
+      );
+    }, 5 * 60_000);
+    this.escrowSweep.unref?.();
+  }
+
+  onModuleDestroy() {
+    if (this.escrowSweep) clearInterval(this.escrowSweep);
+  }
+
+  /**
+   * Refund both stakes of matches still escrowed after `olderThanMs` (a match
+   * lasts about two minutes; its Redis state expires after 15). The status
+   * claim escrowed → cancelled happens once, so a refund is paid at most once
+   * and a match settled meanwhile is never touched.
+   */
+  async refundStaleEscrows(olderThanMs = 20 * 60_000): Promise<number> {
+    const stale = await this.prisma.gameBattle.findMany({
+      where: {
+        status: 'escrowed',
+        escrowedAt: { lt: new Date(Date.now() - olderThanMs) },
+      },
+    });
+    let refunded = 0;
+    for (const battle of stale) {
+      const done = await this.prisma.$transaction(async (tx) => {
+        const claim = await tx.gameBattle.updateMany({
+          where: { id: battle.id, status: 'escrowed' },
+          data: { status: 'cancelled', settledAt: new Date() },
+        });
+        if (claim.count !== 1) return false;
+        for (const userId of [battle.p1Id, battle.p2Id]) {
+          const stats = await tx.userStats.update({
+            where: { userId },
+            data: { totalBanhRan: { increment: battle.stake } },
+          });
+          await tx.banhTransaction.create({
+            data: {
+              userId,
+              amount: battle.stake,
+              source: 'ARENA_REFUND',
+              reference: `arena:match:${battle.roomId}:refund:${userId}`,
+              dateKey: this.getVietnamDateKey(),
+              isCapped: false,
+              balanceAfter: stats.totalBanhRan,
+              metadata: { matchId: battle.roomId, reason: 'stale_escrow' },
+            },
+          });
+        }
+        return true;
+      });
+      if (done) {
+        refunded += 1;
+        this.logger.warn(
+          `[Arena] Refunded stale escrow of match ${battle.roomId}`,
+        );
+      }
+    }
+    return refunded;
+  }
+
   async handleConnection(client: Socket) {
+    // Authentication is async; a message sent right after "connect" must
+    // wait for it instead of being treated as unauthenticated.
+    let authDone!: () => void;
+    client.data.authReady = new Promise<void>((resolve) => {
+      authDone = resolve;
+    });
+    try {
+      await this.authenticate(client);
+    } finally {
+      authDone();
+    }
+  }
+
+  /**
+   * A connected socket of this gateway. With a namespace, @WebSocketServer()
+   * is the Namespace, whose `sockets` is already the Map (Server.sockets is
+   * the main Namespace). `server.sockets.sockets` was undefined here, so
+   * matchmaking threw after popping both players from the queue.
+   */
+  private socketById(id: string): Socket | undefined {
+    const holder = this.server as unknown as {
+      sockets: Map<string, Socket> | { sockets: Map<string, Socket> };
+    };
+    const map =
+      holder.sockets instanceof Map ? holder.sockets : holder.sockets.sockets;
+    return map.get(id);
+  }
+
+  /**
+   * Read-modify-write of a match under a per-match Redis lock. Without it two
+   * answers submitted at the same moment both read the old state and the
+   * second write dropped the first player's answer. `mutate` returns false to
+   * leave the stored state unchanged. Returns the stored state, or null when
+   * the match is gone or the mutation was skipped.
+   */
+  private async updateMatch(
+    matchId: string,
+    mutate: (match: MatchState) => boolean | void,
+  ): Promise<MatchState | null> {
+    const lockKey = `arena:lock:match:${matchId}`;
+    const owner = crypto.randomUUID();
+    for (let attempt = 0; attempt < 150; attempt += 1) {
+      if (await this.redis.set(lockKey, owner, 'PX', 3000, 'NX')) {
+        try {
+          const raw = await this.redis.get(`arena:match:${matchId}`);
+          if (!raw) return null;
+          const match: MatchState = JSON.parse(raw);
+          if (mutate(match) === false) return null;
+          await this.redis.set(
+            `arena:match:${matchId}`,
+            JSON.stringify(match),
+            'EX',
+            900,
+          );
+          return match;
+        } finally {
+          await this.redis.eval(UNLOCK_SCRIPT, 1, lockKey, owner);
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error(`ARENA_MATCH_LOCK_TIMEOUT ${matchId}`);
+  }
+
+  /** Resolves once handleConnection has finished authenticating. */
+  private async authUser(client: Socket) {
+    await client.data?.authReady;
+    return client.data?.user;
+  }
+
+  private async authenticate(client: Socket) {
     const token =
       client.handshake.auth?.token ||
       client.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
@@ -210,11 +362,16 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
 
         if (disconnectedPlayerRole) {
-          const disconnectedPlayer = match[disconnectedPlayerRole];
-
-          disconnectedPlayer.isDisconnected = true;
-          disconnectedPlayer.disconnectedAt = Date.now();
-          await this.redis.set(mKey, JSON.stringify(match), 'EX', 900);
+          const role = disconnectedPlayerRole;
+          const updated = await this.updateMatch(match.matchId, (m) => {
+            const p = m[role];
+            if (m.isSettled || p.socketId !== socketId || p.isDisconnected)
+              return false;
+            p.isDisconnected = true;
+            p.disconnectedAt = Date.now();
+          });
+          if (!updated) continue;
+          const disconnectedPlayer = updated[role];
 
           this.logger.warn(
             `[Arena] Player #${disconnectedPlayer.userId} (${disconnectedPlayer.userName}) disconnected from match ${match.matchId}. Grace period: 15s.`,
@@ -262,14 +419,15 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       gameId?: string;
     },
   ) {
-    const authUser = client.data?.user;
+    const authUser = await this.authUser(client);
     if (!authUser) {
       client.emit('arena:error', { message: 'Chưa xác thực danh tính!' });
       client.disconnect(true);
       return;
     }
 
-    const allowedStakes = [10, 20, 50, 100];
+    // The stakes the Arena page offers; 10 was accepted only from crafted clients.
+    const allowedStakes = [20, 50, 100];
     const stake = payload.stake;
     if (
       typeof stake !== 'number' ||
@@ -382,7 +540,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('cancel_queue')
   async handleCancelQueue(@ConnectedSocket() client: Socket) {
-    const authUser = client.data?.user;
+    const authUser = await this.authUser(client);
     if (authUser?.userId) {
       await this.removeUserFromQueues(authUser.userId);
     }
@@ -425,6 +583,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return; // Một tiến trình khác đang xử lý ghép cặp cho queue này
     }
 
+    const popped: Array<{ userId: number; socketId: string }> = [];
     try {
       const p1Raw = await this.redis.lpop(queueKey);
       const p2Raw = await this.redis.lpop(queueKey);
@@ -436,6 +595,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const p1 = JSON.parse(p1Raw);
       const p2 = JSON.parse(p2Raw);
+      popped.push(p1, p2);
 
       // Sanity check: cùng 1 user không tự đấu với chính mình
       if (p1.userId === p2.userId) {
@@ -445,8 +605,8 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // Check both sockets are alive
-      const s1 = this.server.sockets.sockets.get(p1.socketId);
-      const s2 = this.server.sockets.sockets.get(p2.socketId);
+      const s1 = this.socketById(p1.socketId);
+      const s2 = this.socketById(p2.socketId);
 
       if (!s1 || !s2) {
         if (s1) {
@@ -682,6 +842,14 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }, 2500);
     } catch (err) {
       this.logger.error('[Arena] Error in tryMatchPlayers:', err);
+      // Popped players are neither queued nor matched: free them to retry.
+      for (const p of popped) {
+        await this.redis.srem('arena:queued_users', String(p.userId));
+        await this.redis.del(`arena:user_queued:${p.userId}`);
+        this.socketById(p.socketId)?.emit('arena:error', {
+          message: 'Chưa ghép được trận, vui lòng thử lại.',
+        });
+      }
     } finally {
       await this.redis.del(matchMutexKey);
     }
@@ -704,15 +872,14 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      match.currentRound = roundIndex;
-      match.roundStartTime = Date.now();
-      match.roundDuration = 15;
-      await this.redis.set(
-        `arena:match:${matchId}`,
-        JSON.stringify(match),
-        'EX',
-        900,
-      );
+      const started = await this.updateMatch(matchId, (m) => {
+        if (m.isSettled) return false;
+        m.currentRound = roundIndex;
+        m.roundStartTime = Date.now();
+        m.roundDuration = 15;
+      });
+      if (!started) return;
+      match.roundStartTime = started.roundStartTime;
 
       const q = match.questions[roundIndex];
 
@@ -768,64 +935,48 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!matchId) return;
 
     try {
-      const rawMatch = await this.redis.get(`arena:match:${matchId}`);
-      if (!rawMatch) return;
-
-      const match: MatchState = JSON.parse(rawMatch);
-      if (match.isSettled) return;
-
+      const authUser = await this.authUser(client);
+      if (!authUser) return;
+      const userId = authUser.userId;
       const roundIndex =
         payload.roundIndex !== undefined
           ? payload.roundIndex
           : payload.questionIndex || 0;
-      if (roundIndex !== match.currentRound) {
-        return; // Stale round answer, ignore
-      }
 
-      const authUser = client.data?.user;
-      if (!authUser) return;
-
-      const userId = authUser.userId;
-      const isP1 = match.p1.userId === userId;
-      const isP2 = match.p2.userId === userId;
-
-      if (!isP1 && !isP2) {
-        this.logger.warn(
-          `[Arena] User #${userId} attempted to submit answer to match ${matchId} but is not a participant`,
-        );
-        return;
-      }
-
-      const player = isP1 ? match.p1 : match.p2;
-
-      // Prevent answering twice in same round
-      if (player.answers[roundIndex]) return;
-
-      const currentQ = match.questions[roundIndex];
-      const isCorrect = payload.selectedOption === currentQ.correctAnswer;
-      const elapsedMs = Math.max(0, Date.now() - match.roundStartTime);
-
-      // Score formula: Base 100 + Speed Bonus (up to 50 for <3s)
+      let player!: MatchPlayer;
+      let isCorrect = false;
       let addedPoints = 0;
-      if (isCorrect) {
-        const speedBonus = Math.max(0, Math.floor((15000 - elapsedMs) / 300));
-        addedPoints = 100 + speedBonus;
-        player.score += addedPoints;
-      }
+      const match = await this.updateMatch(matchId, (m) => {
+        if (m.isSettled) return false;
+        if (roundIndex !== m.currentRound) return false; // stale round answer
+        const isP1 = m.p1.userId === userId;
+        if (!isP1 && m.p2.userId !== userId) {
+          this.logger.warn(
+            `[Arena] User #${userId} attempted to submit answer to match ${matchId} but is not a participant`,
+          );
+          return false;
+        }
+        player = isP1 ? m.p1 : m.p2;
+        // Prevent answering twice in same round
+        if (player.answers[roundIndex]) return false;
 
-      player.answers[roundIndex] = {
-        selectedOption: payload.selectedOption,
-        isCorrect,
-        addedPoints,
-        answeredAt: Date.now(),
-      };
-
-      await this.redis.set(
-        `arena:match:${matchId}`,
-        JSON.stringify(match),
-        'EX',
-        900,
-      );
+        const currentQ = m.questions[roundIndex];
+        isCorrect = payload.selectedOption === currentQ.correctAnswer;
+        const elapsedMs = Math.max(0, Date.now() - m.roundStartTime);
+        // Score formula: Base 100 + Speed Bonus (up to 50 for <3s)
+        if (isCorrect) {
+          const speedBonus = Math.max(0, Math.floor((15000 - elapsedMs) / 300));
+          addedPoints = 100 + speedBonus;
+          player.score += addedPoints;
+        }
+        player.answers[roundIndex] = {
+          selectedOption: payload.selectedOption,
+          isCorrect,
+          addedPoints,
+          answeredAt: Date.now(),
+        };
+      });
+      if (!match) return;
 
       this.logger.log(
         `[Arena] [${matchId}] Player #${player.userId} answered Q${roundIndex + 1}: ${isCorrect ? 'CORRECT' : 'WRONG'} (+${addedPoints} pts, Total: ${player.score})`,
@@ -865,6 +1016,16 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private async endRound(matchId: string, roundIndex: number) {
     try {
+      // The timer and the "both answered" path can both end a round; only
+      // the first one reveals it and schedules the next round.
+      const first = await this.redis.set(
+        `arena:round_ended:${matchId}:${roundIndex}`,
+        '1',
+        'EX',
+        900,
+        'NX',
+      );
+      if (!first) return;
       const rawMatch = await this.redis.get(`arena:match:${matchId}`);
       if (!rawMatch) return;
 
@@ -921,7 +1082,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { matchId: string; userId?: number },
   ) {
-    const authUser = client.data?.user;
+    const authUser = await this.authUser(client);
     if (!authUser) return;
 
     try {
@@ -947,17 +1108,19 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private async reconnectPlayerToMatch(
     client: Socket,
-    match: MatchState,
+    stale: MatchState,
     userId: number,
   ) {
-    const isP1 = match.p1.userId === userId;
-    const isP2 = match.p2.userId === userId;
-    if (!isP1 && !isP2) return;
-
-    const player = isP1 ? match.p1 : match.p2;
-    player.socketId = client.id;
-    player.isDisconnected = false;
-    delete player.disconnectedAt;
+    if (stale.p1.userId !== userId && stale.p2.userId !== userId) return;
+    const match = await this.updateMatch(stale.matchId, (m) => {
+      if (m.isSettled) return false;
+      const p = m.p1.userId === userId ? m.p1 : m.p2;
+      p.socketId = client.id;
+      p.isDisconnected = false;
+      delete p.disconnectedAt;
+    });
+    if (!match) return;
+    const player = match.p1.userId === userId ? match.p1 : match.p2;
 
     // Clear disconnect timer if active
     const timerKey = `${match.matchId}_${userId}`;
@@ -966,12 +1129,6 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.disconnectTimers.delete(timerKey);
     }
 
-    await this.redis.set(
-      `arena:match:${match.matchId}`,
-      JSON.stringify(match),
-      'EX',
-      900,
-    );
     await client.join(match.matchId);
 
     this.logger.log(
@@ -1164,7 +1321,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.eventsGateway.sendCurrencyUpdate(winner.userId, {
           amount: totalReward,
           newBalance: updatedStats.totalBanhRan,
-          reason: `Chiến thắng Đấu Trường 1v1 (+${totalReward} 🍞)`,
+          reason: `Chiến thắng Đấu Trường 1v1 (+${totalReward} Bánh Mì)`,
           studentName: winner.userName,
         });
       } else {
@@ -1304,9 +1461,7 @@ export class ArenaGateway implements OnGatewayConnection, OnGatewayDisconnect {
         `[Arena] [${match.matchId}] Match finalized. Winner: ${winnerRole} (${winnerUserId || 'Draw'})`,
       );
     } finally {
-      const unlockScript =
-        'if redis.call(get, KEYS[1]) == ARGV[1] then return redis.call(del, KEYS[1]) else return 0 end';
-      await this.redis.eval(unlockScript, 1, lockKey, lockOwner);
+      await this.redis.eval(UNLOCK_SCRIPT, 1, lockKey, lockOwner);
     }
   }
 

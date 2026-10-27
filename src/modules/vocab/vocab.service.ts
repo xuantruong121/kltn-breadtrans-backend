@@ -1,13 +1,11 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
   Optional,
-  UnauthorizedException,
 } from '@nestjs/common';
-import { PlanFeatureKey, QuizPublicationStatus } from '@prisma/client';
+import { QuizPublicationStatus } from '@prisma/client';
 import { DictionaryLookupService } from './dictionary-lookup.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -61,12 +59,9 @@ export class VocabService {
   }
 
   async getTopics(userId?: number) {
-    const canAccessPremium = userId
-      ? await this.subscriptionService?.hasFeature(
-          userId,
-          PlanFeatureKey.PREMIUM_VOCAB,
-        )
-      : false;
+    // Owner policy: standalone Vocabulary and Flashcards are free for every
+    // learner, whatever the topic's legacy isPro flag says.
+    void userId;
     const topics = await this.prisma.vocabTopic.findMany({
       where: {
         categoryName: { not: 'SYSTEM_DICTIONARY' },
@@ -124,8 +119,8 @@ export class VocabService {
         totalWords: t.totalWords,
         learnedCount: prog.mastered,
         needReviewCount: prog.needReview,
-        isPro: t.isPro,
-        isLocked: t.isPro && !canAccessPremium,
+        isPro: false,
+        isLocked: false,
       });
     });
 
@@ -148,8 +143,8 @@ export class VocabService {
         totalWords: t.totalWords,
         learnedCount: prog.mastered,
         needReviewCount: prog.needReview,
-        isPro: t.isPro,
-        isLocked: t.isPro && !canAccessPremium,
+        isPro: false,
+        isLocked: false,
       };
     });
 
@@ -170,26 +165,6 @@ export class VocabService {
         topic.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
       throw new NotFoundException('Topic not found');
-    }
-
-    if (topic.isPro) {
-      if (!userId) {
-        throw new UnauthorizedException('Authentication is required');
-      }
-      const canAccess = await this.subscriptionService?.hasFeature(
-        userId,
-        PlanFeatureKey.PREMIUM_VOCAB,
-      );
-      if (!canAccess) {
-        throw new ForbiddenException({
-          statusCode: 403,
-          message: 'Premium vocabulary entitlement is required',
-          error: {
-            code: 'FEATURE_NOT_INCLUDED',
-            featureKey: PlanFeatureKey.PREMIUM_VOCAB,
-          },
-        });
-      }
     }
 
     const words = await this.prisma.vocabWord.findMany({
@@ -240,7 +215,7 @@ export class VocabService {
       topicId: topic.id,
       title: topic.title,
       categoryName: topic.categoryName,
-      isPro: topic.isPro,
+      isPro: false,
       totalWords: mappedWords.length,
       words: mappedWords,
     };
@@ -268,23 +243,6 @@ export class VocabService {
         word.topic.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
       throw new NotFoundException('Vocabulary word not found');
-    }
-
-    if (word.topic.isPro) {
-      const canAccess = await this.subscriptionService?.hasFeature(
-        userId,
-        PlanFeatureKey.PREMIUM_VOCAB,
-      );
-      if (!canAccess) {
-        throw new ForbiddenException({
-          statusCode: 403,
-          message: 'Premium vocabulary entitlement is required',
-          error: {
-            code: 'FEATURE_NOT_INCLUDED',
-            featureKey: PlanFeatureKey.PREMIUM_VOCAB,
-          },
-        });
-      }
     }
   }
 

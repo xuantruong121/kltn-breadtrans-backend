@@ -310,3 +310,40 @@ export function validatePracticeWritingResult(
     },
   };
 }
+
+/**
+ * A catalog Writing exercise holds 1-5 independent tasks, each with its own
+ * rubric. The learner answers them one at a time; the exercise is complete
+ * only when every task has a graded answer, and its score is the mean of the
+ * latest grade of each task as a percentage (the same policy as the Entry
+ * Diagnostic Writing skill: the mean of graded tasks). A missing or failed
+ * grade never counts as full marks: the exercise simply stays incomplete.
+ */
+export type WritingTaskGrade = { score: number; maxScore: number };
+
+export function summarizeWritingExercise(
+  questionIds: number[],
+  latest: Map<number, WritingTaskGrade>,
+) {
+  const graded = questionIds.filter((id) => {
+    const g = latest.get(id);
+    return !!g && g.maxScore > 0 && Number.isFinite(g.score);
+  });
+  const complete =
+    questionIds.length > 0 && graded.length === questionIds.length;
+  const percent = complete
+    ? Math.round(
+        questionIds.reduce((sum, id) => {
+          const g = latest.get(id)!;
+          return sum + (g.score / g.maxScore) * 100;
+        }, 0) / questionIds.length,
+      )
+    : null;
+  return {
+    total: questionIds.length,
+    answered: graded.length,
+    complete,
+    percent,
+    nextQuestionId: questionIds.find((id) => !latest.has(id)) ?? null,
+  };
+}

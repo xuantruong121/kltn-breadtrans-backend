@@ -222,13 +222,9 @@ export class AssignmentService {
       if (awardUpdate.count === 1) {
         const rawPoints = Math.round(grade * 10); // 10 điểm = 100 xp
         const points = isLate ? Math.round(rawPoints * 0.5) : rawPoints;
-        if (points > 0) {
-          await this.gamification.addPoints(
-            userId,
-            points,
-            `${historyKey}${isLate ? ' (Nộp trễ - Giảm 50% thưởng)' : ''}`,
-          );
-        }
+        // Owner policy: assignments earn no XP or Bánh mì.
+        void points;
+        void historyKey;
       }
     }
 
@@ -292,13 +288,8 @@ export class AssignmentService {
       const rawPoints = Math.round(dto.grade * 10); // Điểm 10 -> tối đa 100 XP / Bánh Mì
       const points = isLate ? Math.round(rawPoints * 0.5) : rawPoints;
 
-      if (points > 0) {
-        await this.gamification.addPoints(
-          updated.userId,
-          points,
-          `Giáo viên chấm điểm bài tập: ${updated.assignment.title}${isLate ? ' (Nộp trễ - Giảm 50% thưởng)' : ''}`,
-        );
-      }
+      // Owner policy: assignments earn no XP or Bánh mì.
+      void points;
     }
 
     return updated;

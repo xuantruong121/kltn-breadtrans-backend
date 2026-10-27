@@ -26,33 +26,68 @@ const WRITING =
 
 const geminiRequests = () =>
   Number(
-    execFileSync('docker', ['exec', 'harness-redis', 'redis-cli', 'get', 'gemini:telemetry:total_requests'], {
-      encoding: 'utf8',
-    }).trim() || 0,
+    execFileSync(
+      'docker',
+      [
+        'exec',
+        'harness-redis',
+        'redis-cli',
+        'get',
+        'gemini:telemetry:total_requests',
+      ],
+      {
+        encoding: 'utf8',
+      },
+    ).trim() || 0,
   );
 
 async function main() {
-  if (!WAV) throw new Error('usage: diagnostic-v2-real-grading-smoke.ts <synthetic-answer.wav>');
-  const [active] = harnessQuery(`select id from "DiagnosticAssessment" where "isActive" = true`);
-  if (active?.[0] !== '5') throw new Error('REFUSED: the clone does not serve id 5');
+  if (!WAV)
+    throw new Error(
+      'usage: diagnostic-v2-real-grading-smoke.ts <synthetic-answer.wav>',
+    );
+  const [active] = harnessQuery(
+    `select id from "DiagnosticAssessment" where "isActive" = true`,
+  );
+  if (active?.[0] !== '5')
+    throw new Error('REFUSED: the clone does not serve id 5');
   const before = geminiRequests();
   const s = await newStudent('real-smoke');
   const cur = await call('GET', '/diagnostic/current', s.token);
   const start = await call('POST', '/diagnostic/5/attempts/start', s.token);
   const attemptId = start.data.attemptId;
-  const speaking = cur.data.questions.filter((q: any) => q.taskType === 'SPEAKING_RESPONSE');
-  const writing = cur.data.questions.filter((q: any) => q.taskType === 'WRITING_RESPONSE');
+  const speaking = cur.data.questions.filter(
+    (q: any) => q.taskType === 'SPEAKING_RESPONSE',
+  );
+  const writing = cur.data.questions.filter(
+    (q: any) => q.taskType === 'WRITING_RESPONSE',
+  );
 
   const form = new FormData();
-  form.append('audio', new Blob([readFileSync(WAV)], { type: 'audio/wav' }), 'synthetic.wav');
+  form.append(
+    'audio',
+    new Blob([readFileSync(WAV)], { type: 'audio/wav' }),
+    'synthetic.wav',
+  );
   form.append('durationMs', '34500');
-  const confirm = await fetch(`${BE}/diagnostic/5/attempts/${attemptId}/speaking/${speaking[0].id}/confirm`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${s.token}` },
-    body: form,
-  });
-  console.log('speaking confirm', confirm.status, (await confirm.text()).slice(0, 160));
-  await call('POST', `/diagnostic/5/attempts/${attemptId}/speaking/${speaking[1].id}/skip`, s.token);
+  const confirm = await fetch(
+    `${BE}/diagnostic/5/attempts/${attemptId}/speaking/${speaking[0].id}/confirm`,
+    {
+      method: 'POST',
+      headers: { authorization: `Bearer ${s.token}` },
+      body: form,
+    },
+  );
+  console.log(
+    'speaking confirm',
+    confirm.status,
+    (await confirm.text()).slice(0, 160),
+  );
+  await call(
+    'POST',
+    `/diagnostic/5/attempts/${attemptId}/speaking/${speaking[1].id}/skip`,
+    s.token,
+  );
 
   const answers: Record<string, number | string> = {};
   for (const q of cur.data.questions) {
@@ -69,9 +104,18 @@ async function main() {
 
   let res = await call('GET', '/diagnostic/results/latest', s.token);
   const settled = (r: any) => {
-    const sp = r.data?.speakingResponses?.find((x: any) => x.questionId === speaking[0].id);
-    const wr = r.data?.writingFeedback?.find((x: any) => x.questionId === writing[0].id);
-    return sp && wr && !['SUBMITTED', 'QUEUED', 'GRADING'].includes(sp.status) && !['QUEUED', 'GRADING'].includes(wr.status);
+    const sp = r.data?.speakingResponses?.find(
+      (x: any) => x.questionId === speaking[0].id,
+    );
+    const wr = r.data?.writingFeedback?.find(
+      (x: any) => x.questionId === writing[0].id,
+    );
+    return (
+      sp &&
+      wr &&
+      !['SUBMITTED', 'QUEUED', 'GRADING'].includes(sp.status) &&
+      !['QUEUED', 'GRADING'].includes(wr.status)
+    );
   };
   const until = Date.now() + 240_000;
   while (!settled(res) && Date.now() < until) {
@@ -85,19 +129,40 @@ async function main() {
   const [wr] = harnessQuery(
     `select status, provider, score, "gradingAttempts", "failureReason", "wordCount" from "DiagnosticWritingResponse" where "attemptId" = ${attemptId} and "questionId" = ${writing[0].id}`,
   );
-  const spApi = res.data?.speakingResponses?.find((x: any) => x.questionId === speaking[0].id);
-  const wrApi = res.data?.writingFeedback?.find((x: any) => x.questionId === writing[0].id);
+  const spApi = res.data?.speakingResponses?.find(
+    (x: any) => x.questionId === speaking[0].id,
+  );
+  const wrApi = res.data?.writingFeedback?.find(
+    (x: any) => x.questionId === writing[0].id,
+  );
   const report = {
     attemptId,
     geminiRequests: after - before,
-    speaking: { row: sp, criteria: spApi?.criteria, criterionFeedback: spApi?.criterionFeedback, feedback: spApi?.feedback, transcript: spApi?.transcript },
-    writing: { row: wr, criteria: wrApi?.criteria, criterionFeedback: wrApi?.criterionFeedback, feedback: wrApi?.feedback, suggestions: wrApi?.suggestions },
+    speaking: {
+      row: sp,
+      criteria: spApi?.criteria,
+      criterionFeedback: spApi?.criterionFeedback,
+      feedback: spApi?.feedback,
+      transcript: spApi?.transcript,
+    },
+    writing: {
+      row: wr,
+      criteria: wrApi?.criteria,
+      criterionFeedback: wrApi?.criterionFeedback,
+      feedback: wrApi?.feedback,
+      suggestions: wrApi?.suggestions,
+    },
     fourSkill: res.data?.fourSkill,
-    advicePriorities: res.data?.advice?.priorities?.map((p: any) => `${p.skill}:${p.areaKey} | ${p.evidence}`),
+    advicePriorities: res.data?.advice?.priorities?.map(
+      (p: any) => `${p.skill}:${p.areaKey} | ${p.evidence}`,
+    ),
     adviceUnassessed: res.data?.advice?.unassessed,
     mockGraderEvidence: res.data?.advice?.mockGraderEvidence,
   };
-  writeFileSync('artifacts/finalization/evidence/diag-v2-real-grading-smoke.json', JSON.stringify(report, null, 2));
+  writeFileSync(
+    'artifacts/finalization/evidence/diag-v2-real-grading-smoke.json',
+    JSON.stringify(report, null, 2),
+  );
   console.log(JSON.stringify(report, null, 2).slice(0, 6000));
 }
 main().catch((e) => {

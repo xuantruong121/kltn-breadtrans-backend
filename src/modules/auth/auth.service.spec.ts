@@ -258,6 +258,7 @@ describe('AuthService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             email: 'newuser@gmail.com',
+            password: null,
             role: Role.STUDENT,
             authAccounts: {
               create: {

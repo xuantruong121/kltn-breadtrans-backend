@@ -31,7 +31,11 @@ describe('PayosPaymentService', () => {
   });
 
   it('does not mark a verified webhook paid before entitlement fulfillment', async () => {
-    const intent = makeIntent(PayOSPaymentIntentStatus.PENDING);
+    // No link stored yet: the verified webhook's link id is recorded.
+    const intent = {
+      ...makeIntent(PayOSPaymentIntentStatus.PENDING),
+      paymentLinkId: null,
+    };
     const prisma = {
       payOSPaymentIntent: {
         findUnique: jest.fn().mockResolvedValue(intent),
@@ -70,6 +74,32 @@ describe('PayosPaymentService', () => {
         }),
       }),
     );
+  });
+
+  it('refuses a verified webhook whose payment link differs from the stored one', async () => {
+    const intent = makeIntent(PayOSPaymentIntentStatus.PENDING);
+    const prisma = {
+      payOSPaymentIntent: {
+        findUnique: jest.fn().mockResolvedValue(intent),
+        update: jest.fn(),
+      },
+    };
+    const provider = {
+      verifyWebhook: jest.fn().mockResolvedValue({
+        orderCode: Number(intent.orderCode),
+        amount: 99000,
+        currency: 'VND',
+        code: '00',
+        paymentLinkId: 'other-link',
+      }),
+    };
+    const service = new PayosPaymentService(
+      prisma as never,
+      provider as never,
+      {} as never,
+    );
+    await expect(service.resolveWebhook({})).rejects.toThrow('link mismatch');
+    expect(prisma.payOSPaymentIntent.update).not.toHaveBeenCalled();
   });
 
   it('creates a provider order with a merchant-global time-based code', async () => {

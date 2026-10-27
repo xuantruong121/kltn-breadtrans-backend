@@ -29,12 +29,18 @@ async function run(width: number, wav: string) {
     .getByRole('button', { name: /Dừng ghi âm và chấm điểm|Dừng & chấm điểm/ })
     .first()
     .click();
-  await page.getByRole('button', { name: /Câu tiếp theo/ }).waitFor({ timeout: 60_000 });
+  await page
+    .getByRole('button', { name: /Câu tiếp theo/ })
+    .waitFor({ timeout: 60_000 });
   await page.waitForTimeout(1000);
 
   const visible = (name: RegExp) =>
     page.getByRole('button', { name }).filter({ visible: true }).count();
-  check(`${width}px: one "Ghi âm lại" control`, (await visible(/Ghi âm lại/)) === 1, String(await visible(/Ghi âm lại/)));
+  check(
+    `${width}px: one "Ghi âm lại" control`,
+    (await visible(/Ghi âm lại/)) === 1,
+    String(await visible(/Ghi âm lại/)),
+  );
   check(
     `${width}px: one next control, none inside the card`,
     (await visible(/Bài tiếp theo|Câu tiếp theo/)) === 1,
@@ -43,7 +49,9 @@ async function run(width: number, wav: string) {
 
   // Scroll every scrollable region to the end, then measure the bars.
   await page.evaluate(() => {
-    for (const el of Array.from(document.querySelectorAll<HTMLElement>('main, main section')))
+    for (const el of Array.from(
+      document.querySelectorAll<HTMLElement>('main, main section'),
+    ))
       el.scrollTop = el.scrollHeight;
     window.scrollTo(0, document.body.scrollHeight);
   });
@@ -51,7 +59,12 @@ async function run(width: number, wav: string) {
   const bars = await page.evaluate(() => {
     const header = document.querySelector('header')!.getBoundingClientRect();
     const footer = document.querySelector('footer')!.getBoundingClientRect();
-    return { headerTop: header.top, footerBottom: footer.bottom, vh: window.innerHeight, pageScroll: document.scrollingElement!.scrollHeight > window.innerHeight };
+    return {
+      headerTop: header.top,
+      footerBottom: footer.bottom,
+      vh: window.innerHeight,
+      pageScroll: document.scrollingElement!.scrollHeight > window.innerHeight,
+    };
   });
   check(
     `${width}px: header and footer stay on screen after scrolling`,
@@ -64,6 +77,8 @@ async function run(width: number, wav: string) {
 
 void (async () => {
   for (const width of [1366, 390]) await run(width, process.argv[2]);
-  console.log(`\n${failureCount() ? 'FAILURES: ' + failureCount() : 'ALL PASS'}`);
+  console.log(
+    `\n${failureCount() ? 'FAILURES: ' + failureCount() : 'ALL PASS'}`,
+  );
   process.exit(failureCount() ? 1 : 0);
 })();

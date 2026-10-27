@@ -122,31 +122,44 @@ async function main() {
     const position = async () =>
       Number(
         /Câu (\d+)\/29/.exec(
-          await page.locator('aside[aria-label="Danh sách câu hỏi"]').innerText(),
+          await page
+            .locator('aside[aria-label="Danh sách câu hỏi"]')
+            .innerText(),
         )?.[1],
       );
     if (item.taskType === 'SPEAKING_RESPONSE') {
       const before = await position();
       await page.getByRole('button', { name: /^Bỏ qua$/ }).click();
       await page.waitForFunction(
-        (n) => document.querySelector('aside[aria-label="Danh sách câu hỏi"]')?.textContent?.includes(`Câu ${n}/29`),
+        (n) =>
+          document
+            .querySelector('aside[aria-label="Danh sách câu hỏi"]')
+            ?.textContent?.includes(`Câu ${n}/29`),
         before + 1,
         { timeout: 10_000 },
       );
-      check(`Speaking skip at ${before} moves straight to ${before + 1}`, (await position()) === before + 1);
+      check(
+        `Speaking skip at ${before} moves straight to ${before + 1}`,
+        (await position()) === before + 1,
+      );
       continue;
     }
     if (item.taskType === 'WRITING_RESPONSE') {
       writingSeen += 1;
       if (writingSeen === 1) {
-        await page.getByLabel('Câu trả lời tự luận').fill(essay(item.wordMin + 5));
+        await page
+          .getByLabel('Câu trả lời tự luận')
+          .fill(essay(item.wordMin + 5));
         await page.getByRole('button', { name: /^Câu tiếp/ }).click();
         await page.waitForTimeout(500);
       } else {
         const before = await position();
         await page.getByRole('button', { name: /^Bỏ qua$/ }).click();
         await page.waitForTimeout(500);
-        check(`Writing skip at ${before} moves straight to ${before + 1}`, (await position()) === before + 1);
+        check(
+          `Writing skip at ${before} moves straight to ${before + 1}`,
+          (await position()) === before + 1,
+        );
       }
       continue;
     }

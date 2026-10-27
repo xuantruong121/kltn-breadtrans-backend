@@ -25,11 +25,12 @@ export class CreateUploadIntentDto {
 
   @ApiProperty({
     example: 15000,
-    description: 'Spoken audio duration in milliseconds (300ms to 45000ms)',
+    description:
+      'Spoken audio duration in milliseconds (300 ms up to the task limit, at most 61500 ms)',
   })
   @IsInt()
   @Min(300, { message: 'Thời lượng audio tối thiểu là 300ms' })
-  @Max(45000, { message: 'Thời lượng audio tối đa là 45 giây' })
+  @Max(61500, { message: 'Thời lượng audio tối đa là 60 giây' })
   durationMs: number;
 
   @ApiProperty({

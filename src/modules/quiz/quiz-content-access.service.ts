@@ -5,12 +5,18 @@ import {
 } from '@nestjs/common';
 import { PlanFeatureKey, QuizType, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
+import {
+  parseCefrRange,
+  practiceRequiresPlus,
+} from '../subscription/practice-level';
 
 export type QuizContentAccessSubject = {
   id: number;
   type: QuizType;
   isPremiumContent: boolean;
   courseId: number | null;
+  /** Present on full rows; carries the authored CEFR tag of practice items. */
+  title?: string;
 };
 
 export type QuizContentAccess = {
@@ -26,6 +32,19 @@ export type QuizContentAccess = {
 @Injectable()
 export class QuizContentAccessService {
   constructor(private readonly subscriptionService: SubscriptionService) {}
+
+  /**
+   * Whether this quiz needs a plan. Standalone practice (no course) with an
+   * authored CEFR tag follows the owner policy: A1/A2 free, B1+ PLUS. Other
+   * quizzes (courses, TOEIC sets, untagged content) keep their stored flag.
+   */
+  isPremium(quiz: QuizContentAccessSubject): boolean {
+    if (this.featureForQuizType(quiz.type) && quiz.courseId == null) {
+      const range = parseCefrRange(quiz.title);
+      if (range) return practiceRequiresPlus(range);
+    }
+    return quiz.isPremiumContent;
+  }
 
   featureForQuizType(type: QuizType): PlanFeatureKey | null {
     if (type === QuizType.BILINGUAL_READING) {
@@ -46,9 +65,10 @@ export class QuizContentAccessService {
     role?: Role,
   ): Promise<QuizContentAccess> {
     const featureKey = this.featureForQuizType(quiz.type);
-    if (!quiz.isPremiumContent || !featureKey || role === Role.ADMIN) {
+    const premium = this.isPremium(quiz);
+    if (!premium || !featureKey || role === Role.ADMIN) {
       return {
-        isPremiumContent: quiz.isPremiumContent,
+        isPremiumContent: premium,
         isLocked: false,
         featureKey,
       };
@@ -78,7 +98,7 @@ export class QuizContentAccessService {
     const result = new Map<number, QuizContentAccess>();
     const eligible = quizzes.filter(
       (quiz) =>
-        quiz.isPremiumContent &&
+        this.isPremium(quiz) &&
         this.featureForQuizType(quiz.type) !== null &&
         role !== Role.ADMIN,
     );
@@ -86,11 +106,10 @@ export class QuizContentAccessService {
     if (eligible.length === 0 || !userId) {
       for (const quiz of quizzes) {
         const featureKey = this.featureForQuizType(quiz.type);
+        const premium = this.isPremium(quiz);
         result.set(quiz.id, {
-          isPremiumContent: quiz.isPremiumContent,
-          isLocked: Boolean(
-            quiz.isPremiumContent && featureKey && role !== Role.ADMIN,
-          ),
+          isPremiumContent: premium,
+          isLocked: Boolean(premium && featureKey && role !== Role.ADMIN),
           featureKey,
         });
       }
@@ -113,9 +132,10 @@ export class QuizContentAccessService {
 
     for (const quiz of quizzes) {
       const featureKey = this.featureForQuizType(quiz.type);
-      if (!quiz.isPremiumContent || !featureKey || role === Role.ADMIN) {
+      const premium = this.isPremium(quiz);
+      if (!premium || !featureKey || role === Role.ADMIN) {
         result.set(quiz.id, {
-          isPremiumContent: quiz.isPremiumContent,
+          isPremiumContent: premium,
           isLocked: false,
           featureKey,
         });

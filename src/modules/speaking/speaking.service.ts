@@ -9,6 +9,12 @@ import {
   ServiceUnavailableException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import {
+  maxRecordingMs,
+  speakingTaskTiming,
+  SPEAKING_DURATION_TOLERANCE_MS,
+  SPEAKING_MAX_RESPONSE_SECONDS,
+} from './speaking-task-timing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { UploadService } from '../upload/upload.service';
@@ -31,6 +37,11 @@ import {
 import type { SpeakingSubmission } from '@prisma/client';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
 import { resolveSpeakingPracticeSet } from './speaking-practice-set';
+import {
+  levelGroup,
+  levelLabel,
+  parseCefrRange,
+} from '../subscription/practice-level';
 import { SpeakingCategoryService } from '../content/speaking-category.service';
 
 export interface SubmitSpeakingResponse {
@@ -77,6 +88,7 @@ type SpeakingExerciseProjectionInput = {
   categoryTaxonomy?: SpeakingTaxonomyRef | null;
   practiceSet?: {
     id: string;
+    scope?: string | null;
     title: string;
     description: string;
     category: string;
@@ -217,6 +229,20 @@ export function britishReferenceUrl(audioUrl: string | null): string | null {
     : null;
 }
 
+/** Timing contract of an exercise (exam tasks follow the ETS format). */
+function timingOf(exercise: {
+  taskType?: string | null;
+  order?: number | null;
+  practiceSet?: { scope?: string | null } | null;
+}) {
+  return speakingTaskTiming({
+    taskType: exercise.taskType ?? null,
+    order: exercise.order,
+    examTask:
+      exercise.practiceSet?.scope === SpeakingPracticeScope.EXAM_INTERNAL,
+  });
+}
+
 @Injectable()
 export class SpeakingService {
   private readonly logger = new Logger(SpeakingService.name);
@@ -318,6 +344,7 @@ export class SpeakingService {
       taxonomy?.name ||
       SpeakingCategoryService.labelForLegacyCode(effectiveCategory);
     const safeMetadata = {
+      timing: timingOf(exercise),
       id: exercise.id,
       title: exercise.title,
       difficulty: exercise.difficulty,
@@ -334,20 +361,21 @@ export class SpeakingService {
 
     let audioUrl = exercise.audioUrl;
     let audioUrlUk = britishReferenceUrl(exercise.audioUrl);
-    if (access.isPremiumContent && audioUrl) {
-      audioUrl = isPrivateSpeakingMediaKey(audioUrl)
-        ? await this.uploadService.getPrivatePresignedDownloadUrl(audioUrl, 300)
-        : null;
-      audioUrlUk =
-        audioUrlUk && isPrivateSpeakingMediaKey(audioUrlUk)
-          ? await this.uploadService.getPrivatePresignedDownloadUrl(
-              audioUrlUk,
-              300,
-            )
-          : null;
-    }
+    // Private keys are always signed (also for a free exercise that kept its
+    // private clip); a premium exercise never hands out a public URL.
+    const resolve = async (url: string | null) =>
+      !url
+        ? null
+        : isPrivateSpeakingMediaKey(url)
+          ? this.uploadService.getPrivatePresignedDownloadUrl(url, 300)
+          : access.isPremiumContent
+            ? null
+            : url;
+    audioUrl = await resolve(audioUrl);
+    audioUrlUk = await resolve(audioUrlUk);
     return {
       ...exercise,
+      timing: timingOf(exercise),
       audioUrl,
       audioUrlUk,
       category: effectiveCategory,
@@ -480,6 +508,9 @@ export class SpeakingService {
         completedCount: number;
         exerciseIds: number[];
         difficultyLabel: string;
+        /** Authored CEFR span of the set ("A1-A2"), when the set has one. */
+        level: string | null;
+        levelGroup: string | null;
       }
     >();
 
@@ -507,7 +538,16 @@ export class SpeakingService {
                 (b.order ?? Number.MAX_SAFE_INTEGER) || a.id - b.id,
           )
           .map((item) => item.id),
-        difficultyLabel: difficultyLabel(items.map((item) => item.difficulty)),
+        // A practice set carries its authored level; derived groups fall back
+        // to the coarse difficulty of their items.
+        difficultyLabel:
+          levelLabel(parseCefrRange(items[0].practiceSet?.level)) ??
+          difficultyLabel(items.map((item) => item.difficulty)),
+        level: items[0].practiceSet?.level ?? null,
+        levelGroup: (() => {
+          const range = parseCefrRange(items[0].practiceSet?.level);
+          return range ? levelGroup(range) : null;
+        })(),
       });
     }
 
@@ -632,6 +672,7 @@ export class SpeakingService {
     const audioValidation = validateSpeakingAudio(
       audioFile.buffer,
       audioFile.mimetype || undefined,
+      maxRecordingMs(timingOf(exercise)),
     );
 
     // 5. Upload original audio to the catalog namespace in R2.
@@ -640,10 +681,10 @@ export class SpeakingService {
     this.logger.log(
       `Uploading audio for exercise #${exerciseId} by user #${userId} (${audioValidation.durationMs}ms, traceId=${traceId})`,
     );
-    const uploadResult = await this.uploadService.uploadRawBuffer(
+    const uploadResult = await this.uploadService.putPrivateObjectAtKey(
+      `premium/speaking/practice/${userId}/${crypto.randomUUID()}.wav`,
       audioFile.buffer,
       audioValidation.audioMimeType,
-      'catalog/speaking/submissions',
     );
 
     // 6. Count and create under a per-user/day PostgreSQL advisory lock.
@@ -675,7 +716,8 @@ export class SpeakingService {
             userId,
             status: 'PENDING',
             audioKey: uploadResult.key,
-            audioUrl: uploadResult.url,
+            // Private object: no public URL; playback is signed per request.
+            audioUrl: uploadResult.key,
             audioMimeType: audioValidation.audioMimeType,
             durationMs: audioValidation.durationMs,
             audioQuality: audioValidation.quality as any,
@@ -745,7 +787,9 @@ export class SpeakingService {
     return {
       uploadMode: uploadMode === 'proxy' ? 'proxy' : 'presigned',
       maxSizeBytes: 10 * 1024 * 1024,
-      maxDurationMs: 45000,
+      // The longest task (an opinion); each exercise carries its own timing.
+      maxDurationMs:
+        SPEAKING_MAX_RESPONSE_SECONDS * 1000 + SPEAKING_DURATION_TOLERANCE_MS,
       minDurationMs: 300,
       allowedContentTypes: ['audio/wav', 'audio/x-wav'],
       uploadTtlSeconds,
@@ -825,9 +869,10 @@ export class SpeakingService {
     if (dto.sizeBytes <= 0 || dto.sizeBytes > 10 * 1024 * 1024) {
       throw new BadRequestException('Dung lượng audio phải từ 1 byte đến 10MB');
     }
-    if (dto.durationMs < 300 || dto.durationMs > 45000) {
+    const limitMs = maxRecordingMs(timingOf(exercise));
+    if (dto.durationMs < 300 || dto.durationMs > limitMs) {
       throw new BadRequestException(
-        'Thời lượng audio phải từ 300ms đến 45 giây',
+        `Thời lượng audio phải từ 300ms đến ${timingOf(exercise).responseSeconds} giây`,
       );
     }
 
@@ -926,7 +971,7 @@ export class SpeakingService {
           Math.floor((existingIntent.expiresAt.getTime() - Date.now()) / 1000),
           60,
         );
-        const uploadUrl = await this.getStorage().getPresignedUploadUrl(
+        const uploadUrl = await this.uploadService.getRecordingUploadUrl(
           existingIntent.objectKey,
           existingIntent.expectedContentType,
           remainingSecs,
@@ -959,11 +1004,12 @@ export class SpeakingService {
       600,
     );
     const uploadIntentId = crypto.randomUUID();
-    const objectKey = `speaking/pending/${userId}/${uploadIntentId}.wav`;
+    // Learner recordings are private (served only through short-lived signed URLs).
+    const objectKey = `premium/speaking/practice/pending/${userId}/${uploadIntentId}.wav`;
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
     // 7. Generate presigned PUT URL
-    const uploadUrl = await this.getStorage().getPresignedUploadUrl(
+    const uploadUrl = await this.uploadService.getRecordingUploadUrl(
       objectKey,
       dto.contentType,
       ttlSeconds,
@@ -1244,9 +1290,10 @@ export class SpeakingService {
         if (quotaError) throw new BadRequestException(quotaError);
 
         const publicUrl = this.getStorage().getPublicUrl();
-        const audioUrl = publicUrl
-          ? `${publicUrl}/${intent.objectKey}`
-          : intent.objectKey;
+        const audioUrl =
+          publicUrl && !isPrivateSpeakingMediaKey(intent.objectKey)
+            ? `${publicUrl}/${intent.objectKey}`
+            : intent.objectKey;
 
         // Create submission
         const newSub = await tx.speakingSubmission.create({
@@ -1403,7 +1450,7 @@ export class SpeakingService {
     let safeAudioUrl: string | null = null;
     if (submission.audioKey) {
       try {
-        safeAudioUrl = await this.uploadService.getPresignedDownloadUrl(
+        safeAudioUrl = await this.uploadService.getRecordingDownloadUrl(
           submission.audioKey,
           3600,
         );
@@ -1460,7 +1507,7 @@ export class SpeakingService {
     let signedUrl = '';
     if (submission.audioKey) {
       try {
-        signedUrl = await this.uploadService.getPresignedDownloadUrl(
+        signedUrl = await this.uploadService.getRecordingDownloadUrl(
           submission.audioKey,
           3600,
         );

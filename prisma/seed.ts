@@ -20,14 +20,58 @@ import {
   User,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ensureCanonicalPlanCatalog } from '../src/modules/subscription/canonical-plan-catalog';
+import {
+  LEVEL_GROUP_DIFFICULTY,
+  levelGroup,
+  parseCefrRange,
+  practiceRequiresPlus,
+} from '../src/modules/subscription/practice-level';
+
+/**
+ * Reviewed CEFR tags of the Speaking practice items (Checkpoint 51,
+ * scripts/practice-level-normalization.ts). The seed keeps the original
+ * titles for task-type and media inference, then stores the tagged title,
+ * the level group and the owner access policy (A1/A2 free, B1+ PLUS).
+ * Sets, the extra tasks and their reference audio are seeded further down.
+ */
+function speakingPracticeLevelFields(id: number, title: string) {
+  const tagged = SPEAKING_PRACTICE_RETITLE[id]?.[1] ?? title;
+  const range = parseCefrRange(tagged);
+  if (!range) return { title: tagged };
+  const group = levelGroup(range);
+  return {
+    title: tagged,
+    isPremiumContent: practiceRequiresPlus(range),
+    ...(group ? { difficulty: LEVEL_GROUP_DIFFICULTY[group] } : {}),
+  };
+}
 import {
   SPEAKING_DICTIONARY_ENTRIES,
   SPEAKING_DICTIONARY_METADATA,
   tokenizeSpeakingDictionaryText,
 } from './data/speaking-dictionary';
+import {
+  DIFFICULTY as SPEAKING_SET_DIFFICULTY,
+  EXTRA as SPEAKING_PRACTICE_EXTRA,
+  RETITLE as SPEAKING_PRACTICE_RETITLE,
+  SETS as SPEAKING_PRACTICE_SETS,
+} from './data/speaking-practice-sets';
 
 const prisma = new PrismaClient();
+
+type PracticeMediaManifest = {
+  listeningAssets: {
+    questionId: number;
+    version: number;
+    key: string;
+    isActive: boolean;
+    mimeType: string;
+  }[];
+  speakingAudio: Record<string, string>;
+};
 const PASSWORD = 'Password123!';
 
 /** Mirrors GamificationService.getTodayDateKey — seed.ts runs standalone,
@@ -1075,7 +1119,83 @@ const VOCAB_COLLOCATIONS: Record<string, SeedCollocation[]> = {
   goal: [{ phrase: 'achieve a goal', meaningVi: 'đạt mục tiêu' }],
 };
 
+/**
+ * Fail-closed target check, run before any write whatever the entry point
+ * (`prisma db seed`, `ts-node prisma/seed.ts`, scripts/db-seed-safe.ts).
+ * The seed rebuilds TOEIC question groups (learner answers cascade) and
+ * resets the demo accounts' passwords, so it may only run on:
+ *   - a fresh database (no users), or
+ *   - a database built by this seed: only seed accounts and only the seed's
+ *     own fixture attempts/submissions.
+ * Anything else is a populated learner database and is refused, unless
+ * SEED_RECONSTRUCT_DATABASE names this exact database (set by
+ * `db-seed-safe --reconstruct`). The protected development and shadow
+ * databases are refused always, recognised by name and by cluster identity.
+ */
+const PROTECTED_DATABASES = new Set(['kltn_db', 'kltn_shadow']);
+const PROTECTED_SYSTEM_IDS = new Set([
+  '7674533776495505443', // kltn-postgres (kltn_db)
+  '7699757546958700579', // kltn-postgres-shadow (kltn_shadow)
+]);
+const SEED_ACCOUNT_EMAIL = /^(admin|student\d+)@breadtrans\.com$/;
+
+async function assertSeedTarget() {
+  const [{ db, sysid }] = await prisma.$queryRawUnsafe<
+    { db: string; sysid: string }[]
+  >(
+    'SELECT current_database() AS db, system_identifier::text AS sysid FROM pg_control_system()',
+  );
+  if (PROTECTED_DATABASES.has(db) || PROTECTED_SYSTEM_IDS.has(sysid)) {
+    throw new Error(
+      `SEED REFUSED: ${db} is a protected database; nothing was written.`,
+    );
+  }
+  const users = await prisma.user.findMany({ select: { email: true } });
+  const learnerData = {
+    nonSeedAccounts: users.filter((u) => !SEED_ACCOUNT_EMAIL.test(u.email))
+      .length,
+    toeicAttempts: await prisma.toeicAttempt.count(),
+    speakingSubmissions: await prisma.speakingSubmission.count(),
+    quizSubmissions: await prisma.submission.count({
+      where: { id: { notIn: [200, 201, 202, 203] } },
+    }),
+    diagnosticAttempts: await prisma.diagnosticAttempt.count(),
+  };
+  // The seed's single TOEIC fixture attempt belongs to student 1.
+  const fixtureToeic = await prisma.toeicAttempt.count({
+    where: { user: { email: 'student1@breadtrans.com' } },
+  });
+  learnerData.toeicAttempts -= Math.min(fixtureToeic, 1);
+  const populated = Object.values(learnerData).some((n) => n > 0);
+  if (!populated) return;
+  if (process.env.SEED_RECONSTRUCT_DATABASE === db) {
+    console.warn(
+      `Seed: reconstructing populated database ${db} (explicitly acknowledged).`,
+    );
+    return;
+  }
+  throw new Error(
+    `SEED REFUSED: ${db} holds learner data ${JSON.stringify(learnerData)}; nothing was written. ` +
+      'Use a fresh disposable database, or scripts/db-seed-safe.ts --reconstruct for an intentional rebuild.',
+  );
+}
+
 async function main() {
+  await assertSeedTarget();
+  // Fail before any write when a fixed Speaking task id already holds another
+  // task (a database whose extra tasks were created in a different order).
+  const fixedSpeakingIds = await prisma.speakingExercise.findMany({
+    where: { id: { in: SPEAKING_PRACTICE_EXTRA.map((task) => task.id) } },
+    select: { id: true, title: true },
+  });
+  for (const row of fixedSpeakingIds) {
+    const task = SPEAKING_PRACTICE_EXTRA.find((x) => x.id === row.id)!;
+    if (row.title !== task.title) {
+      throw new Error(
+        `Speaking exercise ${row.id} is "${row.title}", expected "${task.title}"; nothing was seeded`,
+      );
+    }
+  }
   await ensureCanonicalPlanCatalog(prisma);
   const password = await bcrypt.hash(PASSWORD, 12);
   const admin = await prisma.user.upsert({
@@ -1137,8 +1257,10 @@ async function main() {
     });
     // Keep the ledger consistent with the opening balance above — a seeded
     // balance with no matching BanhTransaction is exactly the drift bug this
-    // fixture must not reintroduce.
-    if (index * 35 > 0) {
+    // fixture must not reintroduce. Student 1 also pays the 100-Bread fixture
+    // order 601 below, so its opening credit covers it: 135 - 100 = 35.
+    const openingBanh = index * 35 + (index === 1 ? 100 : 0);
+    if (openingBanh > 0) {
       await prisma.banhTransaction.upsert({
         where: {
           userId_source_reference: {
@@ -1147,15 +1269,15 @@ async function main() {
             reference: `seed:opening-balance:${student.id}`,
           },
         },
-        update: { amount: index * 35, balanceAfter: index * 35 },
+        update: { amount: openingBanh, balanceAfter: openingBanh },
         create: {
           userId: student.id,
-          amount: index * 35,
+          amount: openingBanh,
           source: 'SEED_FIXTURE',
           reference: `seed:opening-balance:${student.id}`,
           dateKey: getTodayDateKeyForSeed(),
           isCapped: false,
-          balanceAfter: index * 35,
+          balanceAfter: openingBanh,
           metadata: { reason: 'Seed demo opening balance' },
         },
       });
@@ -2091,119 +2213,119 @@ async function main() {
 
   if (offerings.length > 0) {
     for (let index = 1; index <= 3; index += 1) {
-    await prisma.assignmentSubmission.upsert({
-      where: {
-        assignmentId_userId: { assignmentId: index, userId: students[0].id },
-      },
-      update: {
-        content:
-          index === 3
-            ? 'I study English every morning before work. I review vocabulary at seven o’clock and listen to a short dialogue on the bus. In the evening, I usually write a short journal entry because it helps me remember new expressions.'
-            : null,
-        quizAnswers: index < 3 ? [2, 1, 2, 0, 2] : undefined,
-        grade: index === 3 ? 8.5 : 9,
-        feedback:
-          'Bài làm rõ ràng, đúng trọng tâm. Hãy tiếp tục chú ý collocation và độ tự nhiên của câu.',
-        isPointsAwarded: true,
-      },
-      create: {
-        assignmentId: index,
-        userId: students[0].id,
-        content:
-          index === 3
-            ? 'I study English every morning before work. I review vocabulary at seven o’clock and listen to a short dialogue on the bus. In the evening, I usually write a short journal entry because it helps me remember new expressions.'
-            : null,
-        quizAnswers: index < 3 ? [2, 1, 2, 0, 2] : undefined,
-        grade: index === 3 ? 8.5 : 9,
-        feedback:
-          'Bài làm rõ ràng, đúng trọng tâm. Hãy tiếp tục chú ý collocation và độ tự nhiên của câu.',
-        isPointsAwarded: true,
-      },
-    });
+      await prisma.assignmentSubmission.upsert({
+        where: {
+          assignmentId_userId: { assignmentId: index, userId: students[0].id },
+        },
+        update: {
+          content:
+            index === 3
+              ? 'I study English every morning before work. I review vocabulary at seven o’clock and listen to a short dialogue on the bus. In the evening, I usually write a short journal entry because it helps me remember new expressions.'
+              : null,
+          quizAnswers: index < 3 ? [2, 1, 2, 0, 2] : undefined,
+          grade: index === 3 ? 8.5 : 9,
+          feedback:
+            'Bài làm rõ ràng, đúng trọng tâm. Hãy tiếp tục chú ý collocation và độ tự nhiên của câu.',
+          isPointsAwarded: true,
+        },
+        create: {
+          assignmentId: index,
+          userId: students[0].id,
+          content:
+            index === 3
+              ? 'I study English every morning before work. I review vocabulary at seven o’clock and listen to a short dialogue on the bus. In the evening, I usually write a short journal entry because it helps me remember new expressions.'
+              : null,
+          quizAnswers: index < 3 ? [2, 1, 2, 0, 2] : undefined,
+          grade: index === 3 ? 8.5 : 9,
+          feedback:
+            'Bài làm rõ ràng, đúng trọng tâm. Hãy tiếp tục chú ý collocation và độ tự nhiên của câu.',
+          isPointsAwarded: true,
+        },
+      });
     }
   }
 
   if (offerings.length >= 4) {
     let enrollmentIndex = 1;
     for (const [studentIndex, student] of students.entries()) {
-    const freeOffering = offerings[studentIndex % 2 === 0 ? 0 : 2];
-    await prisma.enrollment.upsert({
-      where: {
-        userId_classId: { userId: student.id, classId: freeOffering.id },
-      },
-      update: {
-        status: EnrollmentStatus.ACTIVE,
-        progress: Math.min(96, studentIndex * 7),
-      },
-      create: {
-        userId: student.id,
-        classId: freeOffering.id,
-        status: EnrollmentStatus.ACTIVE,
-        progress: Math.min(96, studentIndex * 7),
-      },
-    });
-    if (studentIndex < 8) {
-      const paidOffering = offerings[studentIndex % 2 === 0 ? 1 : 3];
-      const status =
-        studentIndex % 3 === 0
-          ? EnrollmentStatus.COMPLETED
-          : studentIndex % 3 === 1
-            ? EnrollmentStatus.PENDING_PAYMENT
-            : EnrollmentStatus.ACTIVE;
-      const enrollment = await prisma.enrollment.upsert({
+      const freeOffering = offerings[studentIndex % 2 === 0 ? 0 : 2];
+      await prisma.enrollment.upsert({
         where: {
-          userId_classId: { userId: student.id, classId: paidOffering.id },
+          userId_classId: { userId: student.id, classId: freeOffering.id },
         },
         update: {
-          status,
-          progress:
-            status === EnrollmentStatus.COMPLETED ? 100 : studentIndex * 5,
+          status: EnrollmentStatus.ACTIVE,
+          progress: Math.min(96, studentIndex * 7),
         },
         create: {
           userId: student.id,
-          classId: paidOffering.id,
-          status,
-          progress:
-            status === EnrollmentStatus.COMPLETED ? 100 : studentIndex * 5,
+          classId: freeOffering.id,
+          status: EnrollmentStatus.ACTIVE,
+          progress: Math.min(96, studentIndex * 7),
         },
       });
-      await prisma.payment.upsert({
-        where: { enrollmentId: enrollment.id },
-        update: {
-          amountVnd: paidOffering.tuitionFeeVnd,
-          status:
-            status === EnrollmentStatus.PENDING_PAYMENT
-              ? PaymentStatus.PENDING
-              : PaymentStatus.CONFIRMED,
-          reportedAt:
-            status === EnrollmentStatus.PENDING_PAYMENT
-              ? null
-              : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
-          confirmedAt:
-            status === EnrollmentStatus.PENDING_PAYMENT
-              ? null
-              : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
-        },
-        create: {
-          enrollmentId: enrollment.id,
-          amountVnd: paidOffering.tuitionFeeVnd,
-          transferCode: `BT-SEED-${String(enrollmentIndex).padStart(4, '0')}`,
-          status:
-            status === EnrollmentStatus.PENDING_PAYMENT
-              ? PaymentStatus.PENDING
-              : PaymentStatus.CONFIRMED,
-          reportedAt:
-            status === EnrollmentStatus.PENDING_PAYMENT
-              ? null
-              : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
-          confirmedAt:
-            status === EnrollmentStatus.PENDING_PAYMENT
-              ? null
-              : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
-        },
-      });
-      enrollmentIndex += 1;
-    }
+      if (studentIndex < 8) {
+        const paidOffering = offerings[studentIndex % 2 === 0 ? 1 : 3];
+        const status =
+          studentIndex % 3 === 0
+            ? EnrollmentStatus.COMPLETED
+            : studentIndex % 3 === 1
+              ? EnrollmentStatus.PENDING_PAYMENT
+              : EnrollmentStatus.ACTIVE;
+        const enrollment = await prisma.enrollment.upsert({
+          where: {
+            userId_classId: { userId: student.id, classId: paidOffering.id },
+          },
+          update: {
+            status,
+            progress:
+              status === EnrollmentStatus.COMPLETED ? 100 : studentIndex * 5,
+          },
+          create: {
+            userId: student.id,
+            classId: paidOffering.id,
+            status,
+            progress:
+              status === EnrollmentStatus.COMPLETED ? 100 : studentIndex * 5,
+          },
+        });
+        await prisma.payment.upsert({
+          where: { enrollmentId: enrollment.id },
+          update: {
+            amountVnd: paidOffering.tuitionFeeVnd,
+            status:
+              status === EnrollmentStatus.PENDING_PAYMENT
+                ? PaymentStatus.PENDING
+                : PaymentStatus.CONFIRMED,
+            reportedAt:
+              status === EnrollmentStatus.PENDING_PAYMENT
+                ? null
+                : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
+            confirmedAt:
+              status === EnrollmentStatus.PENDING_PAYMENT
+                ? null
+                : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
+          },
+          create: {
+            enrollmentId: enrollment.id,
+            amountVnd: paidOffering.tuitionFeeVnd,
+            transferCode: `BT-SEED-${String(enrollmentIndex).padStart(4, '0')}`,
+            status:
+              status === EnrollmentStatus.PENDING_PAYMENT
+                ? PaymentStatus.PENDING
+                : PaymentStatus.CONFIRMED,
+            reportedAt:
+              status === EnrollmentStatus.PENDING_PAYMENT
+                ? null
+                : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
+            confirmedAt:
+              status === EnrollmentStatus.PENDING_PAYMENT
+                ? null
+                : new Date(Date.UTC(2026, 8, 1 + studentIndex)),
+          },
+        });
+        enrollmentIndex += 1;
+      }
     }
   }
 
@@ -2784,7 +2906,7 @@ async function main() {
     },
     {
       id: 3,
-      title: 'Writing A2–B1 — Sentence Builder',
+      title: 'Writing A2 — Sentence Builder',
       type: 'WRITING_PICTURE',
       description: 'Viết câu đúng ngữ pháp dựa trên tình huống và từ khóa.',
       timeLimit: 20,
@@ -5540,38 +5662,6 @@ async function main() {
     }
   }
 
-  // General listening audio is materialized once in R2 and is deliberately
-  // relinked during every canonical seed. The seed never invokes TTS: that
-  // would make reconstruction non-deterministic and consume a provider quota.
-  const seededListeningQuestions = await prisma.question.findMany({
-    where: { quiz: { type: QuizType.LISTENING_PRACTICE } },
-    select: { id: true, quizId: true, content: true },
-  });
-  for (const question of seededListeningQuestions) {
-    const content = question.content as Record<string, unknown>;
-    if (typeof content.audioText !== 'string' || !content.audioText.trim()) {
-      continue;
-    }
-    const isDialogue = Array.isArray(content.transcriptSegments);
-    const key = isDialogue
-      ? `catalog/listening/practice/audio/quiz-${question.quizId}/question-${question.id}/dialogue-v3.mp3`
-      : `catalog/listening/practice/audio/quiz-${question.quizId}/question-${question.id}/v1.mp3`;
-    const url = listeningPracticeAudioUrl(key);
-    if (!url) continue;
-    await prisma.quizAudioAsset.upsert({
-      where: { questionId_version: { questionId: question.id, version: 1 } },
-      update: { key, url, mimeType: 'audio/mpeg', isActive: true },
-      create: {
-        questionId: question.id,
-        version: 1,
-        key,
-        url,
-        mimeType: 'audio/mpeg',
-        isActive: true,
-      },
-    });
-  }
-
   const toeicSpeakingWritingQuiz = await prisma.quiz.upsert({
     where: { id: 20 },
     update: {
@@ -6144,6 +6234,111 @@ async function main() {
     }
   }
 
+  // Runs after every Listening practice quiz exists (the dictation and
+  // conversation quizzes 23+ are appended above), so a fresh database gets
+  // all audio on the first run.
+  // Listening practice audio is materialized once in R2 and relinked on every
+  // canonical seed from prisma/seed-data/practice-media.json, a read-only
+  // export of the keys that really exist (scripts/export-seed-media-manifest.ts).
+  // B1+ quizzes keep their audio under private `premium/` keys, served only as
+  // signed URLs, so their stored url stays ''. The seed never invokes TTS and
+  // never guesses a public key: a premium quiz that would end up with a public
+  // active asset stops the seed instead of silently exposing the audio.
+  const practiceMedia = JSON.parse(
+    readFileSync(join(__dirname, 'seed-data', 'practice-media.json'), 'utf8'),
+  ) as PracticeMediaManifest;
+  const manifestAssetsByQuestion = new Map<
+    number,
+    PracticeMediaManifest['listeningAssets']
+  >();
+  for (const asset of practiceMedia.listeningAssets) {
+    const list = manifestAssetsByQuestion.get(asset.questionId) ?? [];
+    list.push(asset);
+    manifestAssetsByQuestion.set(asset.questionId, list);
+  }
+  const seededListeningQuestions = await prisma.question.findMany({
+    where: { quiz: { type: QuizType.LISTENING_PRACTICE } },
+    select: {
+      id: true,
+      quizId: true,
+      content: true,
+      quiz: { select: { title: true, courseId: true } },
+    },
+  });
+  const premiumListeningQuizIds = new Set<number>();
+  for (const question of seededListeningQuestions) {
+    const range = parseCefrRange(question.quiz.title);
+    if (
+      question.quiz.courseId == null &&
+      range &&
+      practiceRequiresPlus(range)
+    ) {
+      premiumListeningQuizIds.add(question.quizId);
+    }
+  }
+  for (const question of seededListeningQuestions) {
+    const content = question.content as Record<string, unknown>;
+    if (typeof content.audioText !== 'string' || !content.audioText.trim()) {
+      continue;
+    }
+    const premium = premiumListeningQuizIds.has(question.quizId);
+    const assets = manifestAssetsByQuestion.get(question.id) ?? [];
+    if (assets.length === 0) {
+      throw new Error(
+        `Listening question ${question.id} (quiz ${question.quizId}) has audio text but no entry in prisma/seed-data/practice-media.json`,
+      );
+    }
+    for (const asset of assets) {
+      // Keys embed the question id, so a drifted id sequence cannot relink
+      // one question's audio to another.
+      if (!asset.key.includes(`/question-${question.id}/`)) {
+        throw new Error(
+          `Audio key ${asset.key} does not belong to question ${question.id}`,
+        );
+      }
+      const isPrivate = asset.key.startsWith('premium/');
+      if (premium && asset.isActive && !isPrivate) {
+        throw new Error(
+          `Premium listening quiz ${question.quizId} would get public audio key ${asset.key}`,
+        );
+      }
+      const url = isPrivate ? '' : listeningPracticeAudioUrl(asset.key);
+      if (url === null) continue;
+      const data = {
+        key: asset.key,
+        url,
+        mimeType: asset.mimeType,
+        isActive: asset.isActive,
+      };
+      await prisma.quizAudioAsset.upsert({
+        where: {
+          questionId_version: {
+            questionId: question.id,
+            version: asset.version,
+          },
+        },
+        update: data,
+        create: { questionId: question.id, version: asset.version, ...data },
+      });
+    }
+  }
+  // Rows outside the manifest are left alone, so check the stored result too.
+  const exposedPremiumAudio = await prisma.quizAudioAsset.findMany({
+    where: {
+      isActive: true,
+      NOT: { key: { startsWith: 'premium/' } },
+      question: { quizId: { in: [...premiumListeningQuizIds] } },
+    },
+    select: { questionId: true, version: true },
+  });
+  if (exposedPremiumAudio.length > 0) {
+    throw new Error(
+      `Premium listening audio still active on public keys: ${exposedPremiumAudio
+        .map((a) => `question ${a.questionId} v${a.version}`)
+        .join(', ')}`,
+    );
+  }
+
   for (let index = 0; index < 4; index += 1) {
     const quizId = index + 1;
     const firstQuestion = await prisma.question.findFirst({
@@ -6497,6 +6692,7 @@ async function main() {
       ...(taskType === SpeakingExerciseTaskType.RESPOND_USING_INFORMATION
         ? { stimulusId: seminarStimulus.id }
         : {}),
+      ...speakingPracticeLevelFields(index + 1, item.title),
     };
     await prisma.speakingExercise.upsert({
       where: { id: index + 1 },
@@ -6504,6 +6700,132 @@ async function main() {
       create: { id: index + 1, ...semanticItem },
     });
   }
+  // Speaking practice sets (Checkpoint 51 grouping, prisma/data/
+  // speaking-practice-sets.ts): one task type and one level group per set, at
+  // least five tasks, the original extra tasks at their fixed ids. Reference
+  // audio comes from prisma/seed-data/practice-media.json; a premium (B1+)
+  // task must use a private premium/ key, so a public one stops the seed.
+  await prisma.$executeRaw`
+    SELECT setval(
+      pg_get_serial_sequence('"SpeakingStimulus"', 'id'),
+      COALESCE((SELECT MAX("id") FROM "SpeakingStimulus"), 1),
+      true
+    )
+  `;
+  const speakingCategoryIds = new Map(
+    (
+      await prisma.speakingCategory.findMany({
+        select: { id: true, code: true },
+      })
+    ).map((c) => [c.code, c.id]),
+  );
+  const speakingAudioFor = (id: number, premium: boolean): string | null => {
+    const key = practiceMedia.speakingAudio[String(id)];
+    if (!key) {
+      throw new Error(
+        `Speaking task ${id} has no reference audio in prisma/seed-data/practice-media.json`,
+      );
+    }
+    const isPrivate = key.startsWith('premium/');
+    if (premium && !isPrivate) {
+      throw new Error(
+        `Premium speaking task ${id} would get public audio ${key}`,
+      );
+    }
+    return isPrivate ? key : seedAssetUrl(key);
+  };
+  for (const set of SPEAKING_PRACTICE_SETS) {
+    const range = parseCefrRange(set.level)!;
+    const premium = practiceRequiresPlus(range);
+    const difficulty = SPEAKING_SET_DIFFICULTY[levelGroup(range)!];
+    const categoryId = speakingCategoryIds.get(set.category);
+    if (categoryId === undefined) {
+      throw new Error(`Speaking category ${set.category} is missing`);
+    }
+    const setData = {
+      title: set.title,
+      description: set.description,
+      category: set.category,
+      categoryId,
+      level: set.level,
+      scope: 'SKILL_PRACTICE' as const,
+      publicationStatus: QuizPublicationStatus.PUBLISHED,
+    };
+    await prisma.speakingPracticeSet.upsert({
+      where: { id: set.id },
+      update: setData,
+      create: { id: set.id, ...setData },
+    });
+    let order = 1;
+    for (const id of set.members) {
+      const audioUrl = speakingAudioFor(id, premium);
+      await prisma.speakingExercise.update({
+        where: { id },
+        data: {
+          practiceSetId: set.id,
+          order: order++,
+          difficulty,
+          isPremiumContent: premium,
+          ...(audioUrl ? { audioUrl } : {}),
+        },
+      });
+    }
+    for (const task of SPEAKING_PRACTICE_EXTRA.filter(
+      (x) => x.set === set.id,
+    )) {
+      let stimulusId: number | null = null;
+      if ('stimulus' in task) {
+        const stimulus =
+          (await prisma.speakingStimulus.findFirst({
+            where: { kind: 'INFORMATION', title: task.stimulus.title },
+          })) ??
+          (await prisma.speakingStimulus.create({
+            data: {
+              kind: 'INFORMATION',
+              title: task.stimulus.title,
+              content: task.stimulus.content,
+            },
+          }));
+        stimulusId = stimulus.id;
+      }
+      const existing = await prisma.speakingExercise.findUnique({
+        where: { id: task.id },
+        select: { title: true },
+      });
+      if (existing && existing.title !== task.title) {
+        throw new Error(
+          `Speaking exercise ${task.id} is "${existing.title}", expected "${task.title}"`,
+        );
+      }
+      const audioUrl = speakingAudioFor(task.id, premium);
+      const taskData = {
+        title: task.title,
+        targetText: task.text,
+        taskType: task.taskType,
+        difficulty,
+        category: set.category,
+        isPremiumContent: premium,
+        imageUrl: 'image' in task ? seedAssetUrl(task.image) : null,
+        stimulusId,
+        practiceSetId: set.id,
+        order: order++,
+        publicationStatus: QuizPublicationStatus.PUBLISHED,
+        ...(audioUrl ? { audioUrl } : {}),
+      };
+      await prisma.speakingExercise.upsert({
+        where: { id: task.id },
+        update: taskData,
+        create: { id: task.id, ...taskData },
+      });
+    }
+  }
+  await prisma.$executeRaw`
+    SELECT setval(
+      pg_get_serial_sequence('"SpeakingExercise"', 'id'),
+      COALESCE((SELECT MAX("id") FROM "SpeakingExercise"), 1),
+      true
+    )
+  `;
   // Remove legacy demo submissions that referenced non-existent seed audio.
   // The URL guard prevents touching a real learner submission if an ID is reused.
   await prisma.speakingSubmission.deleteMany({
@@ -7898,8 +8220,8 @@ async function main() {
           'Could you please… là yêu cầu lịch sự.',
         ],
         [
-          'Employees ______ wear their ID badges inside the building.',
-          ['might', 'would', 'must', 'could have'],
+          'For security reasons, employees ______ wear their ID badges inside the building.',
+          ['must to', 'are', 'must', 'could have'],
           2,
           'Must diễn tả nghĩa vụ bắt buộc.',
         ],
@@ -7997,7 +8319,7 @@ async function main() {
           'Storage không đếm được; so sánh tăng dùng more.',
         ],
         [
-          'Which route is the ______ one to the airport?',
+          'Which of the three routes is the ______ one to the airport?',
           ['most fastly', 'faster', 'more fast', 'fastest'],
           3,
           'So sánh nhất dùng fastest.',
@@ -8163,6 +8485,10 @@ async function main() {
       ],
     },
   ] as const;
+  // Checkpoint 54 content review: topics 1-2 keep ambiguous items that the
+  // history guard does not allow editing, so they stay DRAFT; 3-12 are published.
+  const grammarPublicationStatus = (id: number) =>
+    id <= 2 ? QuizPublicationStatus.DRAFT : QuizPublicationStatus.PUBLISHED;
   let grammarQuestionId = 1;
   for (let topicIndex = 0; topicIndex < grammarTopics.length; topicIndex += 1) {
     const topic = await prisma.grammarTopic.upsert({
@@ -8173,6 +8499,7 @@ async function main() {
         description: grammarTopics[topicIndex].description,
         keyFormula: grammarTopics[topicIndex].keyFormula,
         order: topicIndex + 1,
+        publicationStatus: grammarPublicationStatus(topicIndex + 1),
       },
       create: {
         id: topicIndex + 1,
@@ -8181,6 +8508,7 @@ async function main() {
         description: grammarTopics[topicIndex].description,
         keyFormula: grammarTopics[topicIndex].keyFormula,
         order: topicIndex + 1,
+        publicationStatus: grammarPublicationStatus(topicIndex + 1),
       },
     });
     for (
@@ -11656,27 +11984,50 @@ async function main() {
 
   // 4-skill TOEIC in BreadTrans is modeled as the L&R full mock above plus the 11-question Speaking / 8-question Writing generic Quiz seeded earlier.
 
-  const quests: Array<[string, string, string, number, number, number]> = [
-    ['Học 10 từ vựng', 'Học từ mới trong Flashcard', 'LEARN_VOCAB', 10, 15, 5],
+  const quests: Array<[string, string | null, string, number, number, number]> =
     [
-      'Làm 1 bài luyện nghe',
-      'Hoàn thành một bài nghe',
-      'COMPLETE_QUIZ',
-      1,
-      20,
-      8,
-    ],
-    [
-      'Luyện Speaking',
-      'Nộp một bài nói để nhận phản hồi',
-      'DO_SPEAKING',
-      1,
-      25,
-      10,
-    ],
-    ['Hoàn thành bài học', 'Xem xong một lesson', 'COMPLETE_LESSON', 1, 20, 8],
-  ];
+      [
+        'Học 10 từ vựng',
+        'Học từ mới trong Flashcard',
+        'LEARN_VOCAB',
+        10,
+        15,
+        5,
+      ],
+      // COMPLETE_QUIZ advances only on rewarded standalone practice
+      // (gamification/reward-eligibility.ts): Listening, Reading, Writing.
+      [
+        'Hoàn thành 1 bài luyện kỹ năng',
+        'Hoàn thành một bài luyện Nghe, Đọc hoặc Viết',
+        'COMPLETE_QUIZ',
+        1,
+        20,
+        8,
+      ],
+      [
+        'Luyện Speaking',
+        'Nộp một bài nói để nhận phản hồi',
+        'DO_SPEAKING',
+        1,
+        25,
+        10,
+      ],
+      [
+        'Hoàn thành bài học',
+        'Xem xong một lesson',
+        'COMPLETE_LESSON',
+        1,
+        20,
+        8,
+      ],
+      // As configured on the development database (owner-approved quest set).
+      ['Thực hành phát âm', null, 'PRACTICE_SPEAKING', 5, 25, 15],
+    ];
+  // Flashcard vocabulary and lessons earn no rewards (owner policy), so their
+  // quests can never complete and are kept inactive.
+  const inactiveQuestTypes = new Set(['LEARN_VOCAB', 'COMPLETE_LESSON']);
   for (let index = 0; index < quests.length; index += 1) {
+    const isActive = !inactiveQuestTypes.has(quests[index][2]);
     const quest = await prisma.dailyQuest.upsert({
       where: { id: index + 1 },
       update: {
@@ -11686,6 +12037,7 @@ async function main() {
         targetValue: quests[index][3],
         rewardXP: quests[index][4],
         rewardBanh: quests[index][5],
+        isActive,
       },
       create: {
         id: index + 1,
@@ -11695,6 +12047,7 @@ async function main() {
         targetValue: quests[index][3],
         rewardXP: quests[index][4],
         rewardBanh: quests[index][5],
+        isActive,
       },
     });
     await prisma.userQuestProgress.upsert({
@@ -11973,6 +12326,7 @@ async function main() {
       totalBanh: 100,
       status: 'approved',
       currencyTxId: 600,
+      balanceAtCheckout: 35,
     },
     create: {
       id: 601,
@@ -11984,7 +12338,7 @@ async function main() {
       status: 'approved',
       currencyTxId: 600,
       paidAtCheckout: true,
-      balanceAtCheckout: 125,
+      balanceAtCheckout: 35,
       // Without this, the fixture is indistinguishable from an order created
       // by bypassing MarketService.createOrder entirely (no real checkout
       // ever happened) — a prior real-data audit found exactly this gap.
@@ -12003,7 +12357,7 @@ async function main() {
         reference: `market:order:checkout:${seedOrder601CheckoutKey}`,
       },
     },
-    update: {},
+    update: { balanceAfter: 35 },
     create: {
       userId: students[0].id,
       amount: -100,
@@ -12011,7 +12365,7 @@ async function main() {
       reference: `market:order:checkout:${seedOrder601CheckoutKey}`,
       dateKey: getTodayDateKeyForSeed(),
       isCapped: false,
-      balanceAfter: 125,
+      balanceAfter: 35,
       metadata: { orderId: 601, seedFixture: true },
     },
   });
@@ -12255,20 +12609,25 @@ async function main() {
     },
   });
 
+  // Legacy v1 form. It is never the learner-current form: the active Entry
+  // Diagnostic (V2) comes from the reviewed importer and owner activation, and
+  // the CHECK (status = ACTIVE) = isActive forbids writing isActive alone.
   const diagnostic = await prisma.diagnosticAssessment.upsert({
     where: { id: 1 },
     update: {
       title: 'Kiểm tra trình độ đầu vào',
       description:
         'Bài sàng lọc 20 câu đánh giá Listening, Reading và kiến thức nền hỗ trợ Speaking/Writing, Grammar/Vocabulary để gợi ý điểm bắt đầu. Phần Speaking/Writing thực hành phải được đánh giá ở bài luyện chuyên biệt.',
-      isActive: true,
+      isActive: false,
+      status: 'READY',
     },
     create: {
       id: 1,
       title: 'Kiểm tra trình độ đầu vào',
       description:
         'Bài sàng lọc 20 câu đánh giá Listening, Reading và kiến thức nền hỗ trợ Speaking/Writing, Grammar/Vocabulary để gợi ý điểm bắt đầu. Phần Speaking/Writing thực hành phải được đánh giá ở bài luyện chuyên biệt.',
-      isActive: true,
+      isActive: false,
+      status: 'READY',
     },
   });
   const diagnosticQuestions = [
@@ -12490,6 +12849,68 @@ async function main() {
         order: index + 1,
       },
     });
+  }
+
+  // Standalone practice quizzes carry their level in the title tag; keep the
+  // stored flag equal to the policy the access services enforce (A1/A2 free,
+  // B1+ PLUS). Course-embedded quizzes keep their own flag: courses are PRO.
+  const standalonePracticeQuizzes = await prisma.quiz.findMany({
+    where: {
+      courseId: null,
+      type: {
+        in: [
+          QuizType.LISTENING_PRACTICE,
+          QuizType.BILINGUAL_READING,
+          QuizType.WRITING_PICTURE,
+          QuizType.WRITING_EMAIL,
+        ],
+      },
+    },
+    select: { id: true, title: true, isPremiumContent: true },
+  });
+  for (const quiz of standalonePracticeQuizzes) {
+    const range = parseCefrRange(quiz.title);
+    if (!range) continue;
+    const premium = practiceRequiresPlus(range);
+    if (quiz.isPremiumContent !== premium) {
+      await prisma.quiz.update({
+        where: { id: quiz.id },
+        data: { isPremiumContent: premium },
+      });
+    }
+  }
+
+  // Rows above are written with explicit ids, which never advance a serial
+  // sequence; the first runtime insert after a fresh seed would otherwise
+  // collide (e.g. PointHistory, whose listener swallows the error and loses
+  // the reward). Raise every lagging id sequence to its table's MAX(id);
+  // a sequence that is already ahead is left alone.
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    DECLARE r record; max_id bigint; current_value bigint;
+    BEGIN
+      FOR r IN
+        SELECT c.relname AS tbl,
+               pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), 'id') AS seq
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'r'
+          AND pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), 'id') IS NOT NULL
+      LOOP
+        EXECUTE format('SELECT MAX(id) FROM public.%I', r.tbl) INTO max_id;
+        SELECT last_value INTO current_value FROM pg_sequences
+          WHERE format('%I.%I', schemaname, sequencename) = r.seq;
+        IF max_id IS NOT NULL AND (current_value IS NULL OR current_value < max_id) THEN
+          PERFORM setval(r.seq, max_id, true);
+        END IF;
+      END LOOP;
+    END $$;
+  `);
+
+  const activeDiagnostics = await prisma.diagnosticAssessment.count({
+    where: { isActive: true },
+  });
+  if (activeDiagnostics > 1) {
+    throw new Error(`${activeDiagnostics} active diagnostic assessments`);
   }
 
   console.log(

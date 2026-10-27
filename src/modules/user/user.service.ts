@@ -261,8 +261,12 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, refreshToken, ...userWithoutSensitiveData } = user;
+    const {
+      password,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      refreshToken,
+      ...userWithoutSensitiveData
+    } = user;
     const shippingComplete = isShippingProfileComplete(user.shippingProfile);
     const formattedAddress = user.shippingProfile
       ? buildFormattedAddress(
@@ -274,6 +278,10 @@ export class UserService {
 
     return {
       ...userWithoutSensitiveData,
+      // False when the learner never chose a password (Google sign-up stores
+      // none); the account page then hides "Đổi mật khẩu". Older Google
+      // accounts that still hold a random hash report true and keep the tab.
+      hasPassword: password !== null,
       shippingProfileComplete: shippingComplete,
       shippingProfile: user.shippingProfile
         ? {

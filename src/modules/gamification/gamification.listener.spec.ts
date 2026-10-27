@@ -1,3 +1,4 @@
+import type { RewardEligibilityService } from './reward-eligibility';
 import { GamificationListener } from './gamification.listener';
 import { GamificationService } from './gamification.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -22,6 +23,7 @@ describe('GamificationListener', () => {
     awardBadgeIfEarned: jest.Mock;
     advanceDailyQuestAndGrantRewardsTx: jest.Mock;
   };
+  let eligibilityMock: { quiz: jest.Mock; speakingExercise: jest.Mock };
   let listener: GamificationListener;
 
   beforeEach(() => {
@@ -78,70 +80,72 @@ describe('GamificationListener', () => {
       }),
     };
 
+    // These tests cover the rewarded activities (standalone practice);
+    // eligibility itself is tested in reward-eligibility.spec.ts.
+    eligibilityMock = {
+      quiz: jest.fn().mockResolvedValue(true),
+      speakingExercise: jest.fn().mockResolvedValue(true),
+    };
     listener = new GamificationListener(
       prismaMock as unknown as PrismaService,
       gamificationServiceMock as unknown as GamificationService,
+      undefined,
+      eligibilityMock as unknown as RewardEligibilityService,
     );
   });
 
-  describe('handleVocabLearnedEvent', () => {
-    it('advances quest progress via advanceDailyQuestAndGrantRewardsTx', async () => {
-      await listener.handleVocabLearnedEvent({
+  describe('owner reward policy', () => {
+    it('a quiz outside standalone practice (TOEIC writing, course, grammar...) earns nothing', async () => {
+      eligibilityMock.quiz.mockResolvedValue(false);
+      await listener.handleQuizSubmittedEvent({
         userId: 11,
-        count: 10,
-        wordIds: Array.from({ length: 10 }, (_, index) => 101 + index),
-        source: 'vocabulary_review',
+        quizId: 34,
+        score: 90,
+        isFirstSubmission: true,
       });
-
-      expect(gamificationServiceMock.awardXp).toHaveBeenCalledWith(
-        11,
-        50,
-        'Học 10 từ vựng mới',
-      );
-      expect(
-        gamificationServiceMock.awardVocabMasteryReward,
-      ).toHaveBeenCalledWith(11, 101);
-      expect(
-        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
-      ).toHaveBeenCalledWith(
-        11,
-        expect.objectContaining({ id: 3, type: 'LEARN_VOCAB' }),
-        10,
-        expect.any(String),
-      );
-    });
-
-    it('does not grant EXP, Bánh Mì, or quest progress if word identity is missing', async () => {
-      await listener.handleVocabLearnedEvent({
-        userId: 11,
-        count: 5,
-        source: 'legacy_call',
-      });
-
       expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
-      expect(
-        gamificationServiceMock.awardVocabMasteryReward,
-      ).not.toHaveBeenCalled();
       expect(gamificationServiceMock.awardBanh).not.toHaveBeenCalled();
       expect(
         gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
       ).not.toHaveBeenCalled();
     });
 
-    it('does not grant EXP or quest progress for an already mastered word', async () => {
-      gamificationServiceMock.awardVocabMasteryReward.mockResolvedValue({
-        granted: 0,
-        firstMastery: false,
+    it('an exam or course recording earns nothing', async () => {
+      eligibilityMock.speakingExercise.mockResolvedValue(false);
+      await listener.handleSpeakingSubmittedEvent({
+        userId: 11,
+        submissionId: 9,
+        exerciseId: 36,
+        overallScore: 8,
       });
+      expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
+      expect(
+        gamificationServiceMock.awardSpeakingReward,
+      ).not.toHaveBeenCalled();
+    });
 
+    it('without an eligibility decision nothing is paid (fail closed)', async () => {
+      const bare = new GamificationListener(
+        prismaMock as unknown as PrismaService,
+        gamificationServiceMock as unknown as GamificationService,
+      );
+      await bare.handleQuizSubmittedEvent({ userId: 1, quizId: 1, score: 100 });
+      expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleVocabLearnedEvent', () => {
+    it('flashcard and vocabulary learning earn no XP, Bánh mì or quest progress', async () => {
       await listener.handleVocabLearnedEvent({
         userId: 11,
-        count: 1,
-        wordId: 101,
+        count: 10,
+        wordIds: Array.from({ length: 10 }, (_, index) => 101 + index),
         source: 'vocabulary_review',
       });
-
       expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
+      expect(
+        gamificationServiceMock.awardVocabMasteryReward,
+      ).not.toHaveBeenCalled();
       expect(
         gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
       ).not.toHaveBeenCalled();
@@ -326,20 +330,16 @@ describe('GamificationListener', () => {
   });
 
   describe('handleToeicSubmittedEvent', () => {
-    it('delegates to awardToeicReward with examId and mode', async () => {
+    it('a TOEIC exam earns no XP or Bánh mì', async () => {
       await listener.handleToeicSubmittedEvent({
         userId: 18,
         examId: 2,
         mode: 'FULL_TEST',
         attemptId: 42,
       });
-
-      expect(gamificationServiceMock.awardToeicReward).toHaveBeenCalledWith(
-        18,
-        2,
-        'FULL_TEST',
-        42,
-      );
+      expect(gamificationServiceMock.awardToeicReward).not.toHaveBeenCalled();
+      expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
+      expect(gamificationServiceMock.awardBanh).not.toHaveBeenCalled();
     });
   });
 });

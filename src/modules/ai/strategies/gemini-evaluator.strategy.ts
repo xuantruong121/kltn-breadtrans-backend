@@ -1605,6 +1605,7 @@ Use learner-visible English only.`;
           "score": 3,
           "feedback": "Your explanation here in Vietnamese"
         }
+        Write the feedback in Vietnamese with full diacritics (never unaccented), and name the learner's actual mistake if there is one.
       `;
 
       // Fetch the image as buffer to send to Gemini. The stored URL may point
@@ -1687,7 +1688,7 @@ Use learner-visible English only.`;
     }
     try {
       const prompt = `
-        You are a certified ETS TOEIC Writing Evaluator. Evaluate this TOEIC Writing Part 2 response (Respond to an Email Request).
+        You grade a TOEIC-format Writing practice task (Respond to an Email Request) for an internal practice platform.
         Original Email Request: "${emailPrompt}"
         Student's Response Email: "${userResponse}"
         
@@ -1704,6 +1705,7 @@ Use learner-visible English only.`;
           "feedback": "Phản hồi chi tiết bằng tiếng Việt...",
           "suggestions": ["Gợi ý 1", "Gợi ý 2"]
         }
+        Write feedback and suggestions in Vietnamese with full diacritics (never unaccented). Say which requested points are present or missing, quoting the student's words.
       `;
 
       const result = await this.executeWithRotation((m) =>
@@ -1730,7 +1732,7 @@ Use learner-visible English only.`;
     }
     try {
       const prompt = `
-        You are an ETS TOEIC Writing Evaluator. Grade this TOEIC Writing Part 3 (Write an Opinion Essay).
+        You grade a TOEIC-format Writing practice task (Write an Opinion Essay) for an internal practice platform.
         Essay Topic: "${essayTopic}"
         Student's Essay: "${userEssay}"
 
@@ -1748,6 +1750,7 @@ Use learner-visible English only.`;
           "feedback": "Phận xét chi tiết bài luận bằng tiếng Việt...",
           "suggestions": ["Khuyên 1", "Khuyên 2"]
         }
+        Write feedback and suggestions in Vietnamese with full diacritics (never unaccented), referring to the student's actual sentences.
       `;
 
       const result = await this.executeWithRotation((m) =>

@@ -8,6 +8,9 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 import {
   AttemptMode,
   AttemptStatus,
@@ -20,6 +23,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SpeakingService } from '../speaking/speaking.service';
 import { validateToeicExam } from './toeic.validation';
 import { buildToeicListeningAudioScript } from './toeic-listening-audio';
+import { buildLrStats, parseToeicGoal } from './toeic-lr-stats';
+import { reviewStatus, summarizeLrReview } from './toeic-lr-review';
+import { toeicQuestionType } from './toeic-question-type';
+import {
+  listeningMasterFor,
+  listeningMasterUrl,
+  masterMatchesGroups,
+} from './toeic-listening-master';
 
 const MIN_DURATION = 60;
 const MAX_DURATION = 21600;
@@ -118,9 +129,10 @@ export class ToeicService {
   private async getQuestionCounts(
     tx: Prisma.TransactionClient,
     examId: number,
+    parts: number[] = [],
   ) {
     const groups = await tx.toeicQuestionGroup.findMany({
-      where: { examId },
+      where: { examId, ...(parts.length ? { part: { in: parts } } : {}) },
       select: { part: true, questions: { select: { id: true } } },
     });
     return groups.reduce<{
@@ -253,6 +265,27 @@ export class ToeicService {
     }
 
     const validation = validateToeicExam(exam);
+    // Every unfinished attempt of this learner on this exam, per mode, so the
+    // start screen can offer "continue" for the right mode.
+    const activeAttempts = userId
+      ? await this.prisma.toeicAttempt.findMany({
+          where: {
+            userId,
+            examId,
+            status: {
+              in: [AttemptStatus.PENDING_START, AttemptStatus.IN_PROGRESS],
+            },
+          },
+          orderBy: { id: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            deadline: true,
+            mode: true,
+            selectedParts: true,
+          },
+        })
+      : [];
     const activeAttempt = userId
       ? await this.prisma.toeicAttempt.findFirst({
           where: {
@@ -280,6 +313,7 @@ export class ToeicService {
       learnerReady: validation.learnerReady,
       validation: { counts: validation.counts, issues: validation.issues },
       activeAttempt,
+      activeAttempts,
       parts: Array.from(partQuestionCounts.entries())
         .sort(([partA], [partB]) => partA - partB)
         .map(([part, questionCount]) => ({ part, questionCount })),
@@ -447,7 +481,15 @@ export class ToeicService {
     userId: number,
     examId: number,
     mode: AttemptMode = AttemptMode.PRACTICE,
+    parts: number[] = [],
   ) {
+    // Practice may cover chosen Parts; Full Test is always the whole exam.
+    // An empty list (or all seven) means the whole exam.
+    const chosen = [...new Set(parts)]
+      .filter((p) => Number.isInteger(p) && p >= 1 && p <= 7)
+      .sort((a, b) => a - b);
+    const selectedParts =
+      mode === AttemptMode.PRACTICE && chosen.length < 7 ? chosen : [];
     try {
       return await this.prisma.$transaction(async (tx) => {
         await this.lockTuple(tx, userId, examId, mode);
@@ -461,6 +503,11 @@ export class ToeicService {
         }
         this.validateDuration(exam.durationSeconds);
         this.validateModeCompatibility(exam.type, mode);
+        if (selectedParts.length) {
+          const available = new Set(exam.groups.map((g) => g.part));
+          if (selectedParts.some((p) => !available.has(p)))
+            throw new BadRequestException('Đề này không có Part đã chọn');
+        }
         if (mode === AttemptMode.FULL_TEST) {
           const validation = validateToeicExam(exam);
           if (!validation.learnerReady)
@@ -493,6 +540,13 @@ export class ToeicService {
             // Finalize the expired attempt, then create a fresh pending attempt
             // for the new start request. The historical result remains intact.
             await this.finalizeExpiredTx(tx, active.id, userId);
+          } else if (
+            active.selectedParts.join(',') !== selectedParts.join(',')
+          ) {
+            // Never silently resume a practice covering different Parts.
+            throw new ConflictException(
+              'Bạn đang có lượt luyện tập dở với các Part khác. Hãy làm tiếp hoặc hủy lượt đó trước.',
+            );
           } else return { ...active, reused: true };
         }
         const created = await tx.toeicAttempt.create({
@@ -500,6 +554,7 @@ export class ToeicService {
             userId,
             examId,
             mode,
+            selectedParts,
             durationSeconds: exam.durationSeconds,
             status: AttemptStatus.PENDING_START,
           },
@@ -546,11 +601,10 @@ export class ToeicService {
           status: AttemptStatus.IN_PROGRESS,
           startedAt,
           deadline,
-          // Strict Full Test starts in the Listening section at manifest
-          // position 0; Practice never gets a section (stays null).
-          ...(attempt.mode === AttemptMode.FULL_TEST
-            ? { section: ToeicAttemptSection.LISTENING, listeningPosition: 0 }
-            : {}),
+          // No section: owner decision 2026-10-27, Full Test has seekable
+          // audio and open navigation under one 120-minute deadline. The
+          // section/one-pass rules below still apply to attempts begun before
+          // (their `section` is set), so those are not changed mid-attempt.
         },
       });
     });
@@ -564,6 +618,96 @@ export class ToeicService {
       orderBy: [{ part: 'asc' }, { groupOrder: 'asc' }],
     });
     return groups.map((g) => g.id);
+  }
+
+  /**
+   * The continuous Listening recording for a Practice or Full Test attempt,
+   * or `available: false` with the reason. Only a legacy strict attempt
+   * (begun with a one-pass `section`) is refused; its audio stays group by
+   * group, enforced above.
+   * Published-ness is checked with a cached HEAD so an unpublished master
+   * falls back to per-group audio instead of a broken player.
+   */
+  async getListeningMaster(attemptId: number, userId: number) {
+    const attempt = await this.prisma.toeicAttempt.findUnique({
+      where: { id: attemptId },
+      select: { userId: true, examId: true, status: true, section: true },
+    });
+    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (attempt.userId !== userId)
+      throw new ForbiddenException('Bạn không có quyền truy cập bài thi này');
+    // After submission the recording is replayable in the answer review.
+    // Before that, only a legacy strict attempt (one-pass section) is refused.
+    const submitted = attempt.status === AttemptStatus.SUBMITTED;
+    if (attempt.section && !submitted)
+      return { available: false as const, reason: 'STRICT_MODE' };
+    if (attempt.status !== AttemptStatus.IN_PROGRESS && !submitted)
+      return { available: false as const, reason: 'NOT_IN_PROGRESS' };
+    const master = listeningMasterFor(attempt.examId);
+    if (!master) return { available: false as const, reason: 'NO_MASTER' };
+    const groupIds = await this.getListeningManifestGroupIds(attempt.examId);
+    if (!masterMatchesGroups(master, groupIds))
+      return { available: false as const, reason: 'STALE' };
+    const url = listeningMasterUrl(master);
+    // Published object first; otherwise the verified local build (local
+    // development before the owner approves publishing to R2).
+    const source =
+      url && (await this.isPublished(url))
+        ? { url, path: null }
+        : this.localMasterFile(attempt.examId)
+          ? {
+              url: null,
+              path: `/toeic/listening-master/${attempt.examId}/audio`,
+            }
+          : null;
+    if (!source) return { available: false as const, reason: 'NOT_PUBLISHED' };
+    return {
+      available: true as const,
+      ...source,
+      durationSeconds: master.durationSeconds,
+      timeline: master.timeline,
+    };
+  }
+
+  private readonly localMasterCache = new Map<number, string | null>();
+
+  /** The local master build, only when its bytes match the registry (sha256). */
+  localMasterFile(examId: number): string | null {
+    if (this.localMasterCache.has(examId))
+      return this.localMasterCache.get(examId)!;
+    const master = listeningMasterFor(examId);
+    const file = resolvePath(
+      process.cwd(),
+      'artifacts',
+      'toeic-listening-master',
+      `exam-${examId}`,
+      'master.mp3',
+    );
+    let found: string | null = null;
+    if (master && existsSync(file)) {
+      const sha = createHash('sha256').update(readFileSync(file)).digest('hex');
+      if (sha === master.sha256) found = file;
+    }
+    this.localMasterCache.set(examId, found);
+    return found;
+  }
+
+  private readonly publishedCache = new Map<
+    string,
+    { ok: boolean; at: number }
+  >();
+
+  private async isPublished(url: string) {
+    const cached = this.publishedCache.get(url);
+    if (cached && Date.now() - cached.at < 5 * 60_000) return cached.ok;
+    let ok = false;
+    try {
+      ok = (await fetch(url, { method: 'HEAD' })).ok;
+    } catch {
+      ok = false;
+    }
+    this.publishedCache.set(url, { ok, at: Date.now() });
+    return ok;
   }
 
   /**
@@ -686,6 +830,7 @@ export class ToeicService {
         submittedAt: true,
         currentQuestionId: true,
         markedQuestionIds: true,
+        selectedParts: true,
         section: true,
         listeningPosition: true,
         readingStartedAt: true,
@@ -734,25 +879,33 @@ export class ToeicService {
       markedQuestionIds: this.safeMarkedQuestionIds(current.markedQuestionIds),
       exam: {
         ...current.exam,
-        groups: current.exam.groups.map((group) => ({
-          ...group,
-          passageText: group.part <= 4 ? null : group.passageText,
-          questions: group.questions.map((question) => {
-            // In a full-test attempt Part 1 and Part 2 prompts/options are
-            // audio-only. Keep option cardinality for the answer UI, but do
-            // not send the answer text to the browser before submission.
-            if (current.mode === AttemptMode.FULL_TEST && group.part <= 2) {
-              return {
-                ...question,
-                text: null,
-                options: Array.isArray(question.options)
-                  ? question.options.map(() => '')
-                  : [],
-              };
-            }
-            return question;
-          }),
-        })),
+        // A part practice serves only its chosen Parts.
+        groups: current.exam.groups
+          .filter(
+            (group) =>
+              current.selectedParts.length === 0 ||
+              current.selectedParts.includes(group.part),
+          )
+          .map((group) => ({
+            ...group,
+            passageText: group.part <= 4 ? null : group.passageText,
+            questions: group.questions.map((question) => {
+              // Part 1 and Part 2 prompts/options are audio-only in every mode:
+              // the printed options are the spoken answers, so sending them
+              // (as Practice once did) gave the answer away. Keep the option
+              // cardinality for the answer UI; review shows the text afterwards.
+              if (group.part <= 2) {
+                return {
+                  ...question,
+                  text: null,
+                  options: Array.isArray(question.options)
+                    ? question.options.map(() => '')
+                    : [],
+                };
+              }
+              return question;
+            }),
+          })),
       },
     };
   }
@@ -770,9 +923,10 @@ export class ToeicService {
       examId: number;
       mode: AttemptMode;
       section: ToeicAttemptSection | null;
+      selectedParts?: number[];
     },
     userId: number,
-    answers: Record<string, number>,
+    answers: Record<string, number | null>,
   ) {
     const ids = Object.keys(answers).map(Number);
     if (
@@ -786,6 +940,11 @@ export class ToeicService {
     });
     if (questions.length !== ids.length)
       throw new BadRequestException('Câu hỏi không thuộc đề thi này');
+    if (
+      attempt.selectedParts?.length &&
+      questions.some((q) => !attempt.selectedParts!.includes(q.group.part))
+    )
+      throw new BadRequestException('Câu hỏi không thuộc các Part đã chọn');
     if (attempt.mode === AttemptMode.FULL_TEST && attempt.section) {
       for (const question of questions) {
         const isListening = question.group.part <= 4;
@@ -797,9 +956,12 @@ export class ToeicService {
           throw new BadRequestException('Phần Reading chưa bắt đầu');
       }
     }
+    // null clears a saved answer (restoring a checkpoint taken before it).
+    const cleared = ids.filter((id) => answers[String(id)] === null);
     for (const question of questions) {
       const options = Array.isArray(question.options) ? question.options : [];
       const selected = answers[String(question.id)];
+      if (selected === null) continue;
       if (
         !Number.isInteger(selected) ||
         selected < 0 ||
@@ -807,8 +969,13 @@ export class ToeicService {
       )
         throw new BadRequestException('Đáp án được chọn không hợp lệ');
     }
-    if (ids.length > 0) {
-      const rows = ids.map(
+    if (cleared.length > 0)
+      await tx.toeicAttemptAnswer.deleteMany({
+        where: { attemptId: attempt.id, questionId: { in: cleared } },
+      });
+    const chosen = ids.filter((id) => answers[String(id)] !== null);
+    if (chosen.length > 0) {
+      const rows = chosen.map(
         (questionId) =>
           Prisma.sql`(${attempt.id}, ${questionId}, ${answers[String(questionId)]})`,
       );
@@ -827,13 +994,13 @@ export class ToeicService {
     payload:
       | Record<string, number>
       | {
-          answers: Record<string, number>;
+          answers: Record<string, number | null>;
           markedQuestionIds?: number[];
           currentQuestionId?: number;
         },
   ) {
     const request: {
-      answers: Record<string, number>;
+      answers: Record<string, number | null>;
       markedQuestionIds?: number[];
       currentQuestionId?: number;
     } =
@@ -842,7 +1009,7 @@ export class ToeicService {
       'answers' in payload &&
       typeof (payload as { answers?: unknown }).answers === 'object'
         ? (payload as {
-            answers: Record<string, number>;
+            answers: Record<string, number | null>;
             markedQuestionIds?: number[];
             currentQuestionId?: number;
           })
@@ -886,17 +1053,29 @@ export class ToeicService {
         };
       }
       await this.validateAndSaveAnswers(tx, attempt, userId, request.answers);
-      const markedQuestionIds = request.markedQuestionIds ?? [];
-      if (markedQuestionIds.some((id) => !Number.isInteger(id) || id <= 0))
-        throw new BadRequestException('Danh sách câu đánh dấu không hợp lệ');
-      const markedQuestions = await tx.toeicQuestion.count({
-        where: {
-          id: { in: markedQuestionIds },
-          group: { examId: attempt.examId },
-        },
-      });
-      if (markedQuestions !== new Set(markedQuestionIds).size)
-        throw new BadRequestException('Câu đánh dấu không thuộc đề thi này');
+      // Omitted = keep the saved flags (an answer-only save must not clear
+      // them); an array, even [], replaces them.
+      const markedQuestionIds = request.markedQuestionIds;
+      if (markedQuestionIds !== undefined) {
+        if (
+          !Array.isArray(markedQuestionIds) ||
+          markedQuestionIds.some((id) => !Number.isInteger(id) || id <= 0)
+        )
+          throw new BadRequestException('Danh sách câu đánh dấu không hợp lệ');
+        const markedQuestions = await tx.toeicQuestion.count({
+          where: {
+            id: { in: markedQuestionIds },
+            group: {
+              examId: attempt.examId,
+              ...(attempt.selectedParts?.length
+                ? { part: { in: attempt.selectedParts } }
+                : {}),
+            },
+          },
+        });
+        if (markedQuestions !== new Set(markedQuestionIds).size)
+          throw new BadRequestException('Câu đánh dấu không thuộc đề thi này');
+      }
       if (
         request.currentQuestionId !== undefined &&
         (request.currentQuestionId <= 0 ||
@@ -911,7 +1090,9 @@ export class ToeicService {
       await tx.toeicAttempt.update({
         where: { id: attempt.id },
         data: {
-          markedQuestionIds: [...new Set(markedQuestionIds)],
+          ...(markedQuestionIds !== undefined
+            ? { markedQuestionIds: [...new Set(markedQuestionIds)] }
+            : {}),
           ...(request.currentQuestionId !== undefined
             ? { currentQuestionId: request.currentQuestionId }
             : {}),
@@ -960,10 +1141,15 @@ export class ToeicService {
     submittedAt: Date,
   ) {
     const counts = this.getRawCounts(attempt.answers);
-    const scores = this.legacyScores(
+    // A part practice is not a 200-question test: no converted scores.
+    const partial = (attempt.selectedParts ?? []).length > 0;
+    const full = this.legacyScores(
       counts.listeningCorrect,
       counts.readingCorrect,
     );
+    const scores = partial
+      ? { listeningScore: null, readingScore: null }
+      : full;
     const updated = await tx.toeicAttempt.update({
       where: { id: attempt.id },
       data: {
@@ -973,7 +1159,7 @@ export class ToeicService {
         readingCorrect: counts.readingCorrect,
         totalCorrect: counts.listeningCorrect + counts.readingCorrect,
         ...scores,
-        totalScore: scores.listeningScore + scores.readingScore,
+        totalScore: partial ? null : full.listeningScore + full.readingScore,
       },
     });
     return { ...updated, answers: attempt.answers };
@@ -1020,7 +1206,11 @@ export class ToeicService {
         return {
           formatted: this.formatResult(
             attempt,
-            await this.getQuestionCounts(tx, attempt.examId),
+            await this.getQuestionCounts(
+              tx,
+              attempt.examId,
+              attempt.selectedParts,
+            ),
           ),
           shouldEmit: false,
           attempt,
@@ -1035,7 +1225,11 @@ export class ToeicService {
       return {
         formatted: this.formatResult(
           updated,
-          await this.getQuestionCounts(tx, attempt.examId),
+          await this.getQuestionCounts(
+            tx,
+            attempt.examId,
+            attempt.selectedParts,
+          ),
         ),
         shouldEmit: true,
         attempt: updated,
@@ -1085,6 +1279,123 @@ export class ToeicService {
     };
   }
 
+  /**
+   * Statistics over this learner's submitted L&R attempts (standalone and
+   * 4 Skills children), for the last `days` before the latest submission
+   * (all time when `days` is null).
+   */
+  async getLrStats(userId: number, days: number | null) {
+    const attempts = await this.prisma.toeicAttempt.findMany({
+      where: {
+        userId,
+        status: AttemptStatus.SUBMITTED,
+        submittedAt: { not: null },
+      },
+      select: {
+        id: true,
+        examId: true,
+        mode: true,
+        startedAt: true,
+        submittedAt: true,
+        listeningScore: true,
+        readingScore: true,
+        totalScore: true,
+        selectedParts: true,
+        exam: { select: { title: true } },
+        assessmentComponent: { select: { id: true } },
+      },
+    });
+    const examIds = [...new Set(attempts.map((a) => a.examId))];
+    const [questions, answers] = await Promise.all([
+      this.prisma.toeicQuestion.findMany({
+        where: { group: { examId: { in: examIds } } },
+        select: {
+          id: true,
+          text: true,
+          options: true,
+          correctIndex: true,
+          group: { select: { examId: true, part: true, passageText: true } },
+        },
+      }),
+      this.prisma.toeicAttemptAnswer.findMany({
+        where: { attemptId: { in: attempts.map((a) => a.id) } },
+        select: { attemptId: true, questionId: true, selectedIndex: true },
+      }),
+    ]);
+    const profile = await this.prisma.profile.findUnique({
+      where: { userId },
+      select: { targetScore: true, nextExamDate: true },
+    });
+    const stats = buildLrStats({
+      days,
+      attempts: attempts.map((a) => ({
+        id: a.id,
+        examId: a.examId,
+        examTitle: a.exam.title,
+        mode: a.mode,
+        inAssessment: Boolean(a.assessmentComponent),
+        startedAt: a.startedAt,
+        submittedAt: a.submittedAt!,
+        listeningScore: a.listeningScore,
+        readingScore: a.readingScore,
+        totalScore: a.totalScore,
+        parts: a.selectedParts,
+      })),
+      questions: questions.map((q) => ({
+        id: q.id,
+        examId: q.group.examId,
+        part: q.group.part,
+        correctIndex: q.correctIndex,
+        type: toeicQuestionType({
+          part: q.group.part,
+          text: q.text,
+          options: q.options,
+          correctIndex: q.correctIndex,
+          groupText: q.group.passageText,
+        }),
+      })),
+      answers,
+    });
+    return { ...stats, goal: parseToeicGoal(profile) };
+  }
+
+  /** Save the learner's TOEIC exam date and target score on their profile. */
+  async saveToeicGoal(
+    userId: number,
+    goal: { examDate?: string | null; targetScore?: number | null },
+  ) {
+    const examDate = goal.examDate ?? null;
+    if (examDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(examDate))
+      throw new BadRequestException('Ngày dự thi phải có dạng YYYY-MM-DD');
+    if (examDate !== null && Number.isNaN(Date.parse(examDate)))
+      throw new BadRequestException('Ngày dự thi không hợp lệ');
+    const target = goal.targetScore ?? null;
+    if (
+      target !== null &&
+      (!Number.isInteger(target) ||
+        target < 10 ||
+        target > 990 ||
+        target % 5 !== 0)
+    )
+      throw new BadRequestException(
+        'Điểm mục tiêu TOEIC phải là bội số của 5, từ 10 đến 990',
+      );
+    const profile = await this.prisma.profile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ học viên');
+    const saved = await this.prisma.profile.update({
+      where: { userId },
+      data: {
+        nextExamDate: examDate,
+        targetScore: target === null ? null : `TOEIC ${target}`,
+      },
+      select: { targetScore: true, nextExamDate: true },
+    });
+    return parseToeicGoal(saved);
+  }
+
   async getHistory(userId: number) {
     const attempts = await this.prisma.toeicAttempt.findMany({
       // Child attempts that belong to a unified assessment are represented by
@@ -1124,6 +1435,7 @@ export class ToeicService {
             },
           },
         },
+        assessmentComponent: { select: { id: true } },
         answers: {
           include: {
             question: {
@@ -1146,45 +1458,92 @@ export class ToeicService {
     if (!attempt) throw new NotFoundException('Review not found');
     if (role !== 'ADMIN' && attempt.userId !== userId)
       throw new ForbiddenException('Bạn không có quyền xem bài review này');
+    // Answer keys, transcripts and explanations exist only after submission.
     if (attempt.status !== AttemptStatus.SUBMITTED)
       throw new BadRequestException('Chỉ có thể xem review sau khi nộp bài');
+    const inScope = (part: number) =>
+      attempt.selectedParts.length === 0 ||
+      attempt.selectedParts.includes(part);
+    const answerOf = new Map(
+      attempt.answers.map((a) => [a.questionId, a.selectedIndex]),
+    );
+    const marked = new Set(
+      this.safeMarkedQuestionIds(attempt.markedQuestionIds),
+    );
+    const groups = attempt.exam.groups.filter((g) => inScope(g.part));
+    // The listening transcript is the exact authored text the group's audio
+    // was synthesized from; null when it cannot be built.
+    const transcriptOf = (group: (typeof groups)[number]) => {
+      if (group.part > 4) return null;
+      try {
+        return buildToeicListeningAudioScript(group);
+      } catch {
+        return null;
+      }
+    };
+    const questions = groups
+      .flatMap((group) =>
+        group.questions.map((question) => ({ group, question })),
+      )
+      .sort((a, b) => a.question.questionNumber - b.question.questionNumber)
+      .map(({ group, question }) => {
+        const selected = answerOf.get(question.id) ?? null;
+        const options = Array.isArray(question.options)
+          ? (question.options as string[])
+          : [];
+        const status = reviewStatus(selected, question.correctIndex);
+        return {
+          questionId: question.id,
+          questionNumber: question.questionNumber,
+          part: group.part,
+          groupId: group.id,
+          passageText: group.part <= 4 ? null : group.passageText,
+          imageUrl: group.imageUrl,
+          transcript: transcriptOf(group),
+          questionText: question.text,
+          options,
+          selectedIndex: selected,
+          correctIndex: question.correctIndex,
+          learnerAnswer: selected === null ? null : (options[selected] ?? null),
+          standardAnswer: options[question.correctIndex] ?? null,
+          status,
+          isCorrect: status === 'CORRECT',
+          flagged: marked.has(question.id),
+          explanation: question.explanation ?? null,
+        };
+      });
+    const durationSeconds =
+      attempt.startedAt && attempt.submittedAt
+        ? Math.max(
+            0,
+            Math.round(
+              (attempt.submittedAt.getTime() - attempt.startedAt.getTime()) /
+                1000,
+            ),
+          )
+        : null;
     return {
       attemptId: attempt.id,
-      exam: attempt.exam,
+      exam: {
+        id: attempt.exam.id,
+        title: attempt.exam.title,
+        type: attempt.exam.type,
+      },
+      mode: attempt.mode,
+      selectedParts: attempt.selectedParts,
+      inAssessment: Boolean(attempt.assessmentComponent),
+      startedAt: attempt.startedAt,
       submittedAt: attempt.submittedAt,
-      questions: attempt.exam.groups
-        .flatMap((group) =>
-          group.questions.map((question) => ({ group, question })),
-        )
-        .sort((a, b) => a.question.questionNumber - b.question.questionNumber)
-        .map(({ group, question }) => {
-          const answer = attempt.answers.find(
-            (candidate) => candidate.questionId === question.id,
-          );
-          const options = Array.isArray(question.options)
-            ? question.options
-            : [];
-          const standardAnswer = options[question.correctIndex];
-          return {
-            questionId: question.id,
-            questionNumber: question.questionNumber,
-            part: group.part,
-            passageText: group.passageText,
-            imageUrl: group.imageUrl,
-            questionText: question.text,
-            options,
-            learnerAnswer:
-              answer?.selectedIndex == null
-                ? null
-                : (options[answer.selectedIndex] ?? null),
-            standardAnswer:
-              typeof standardAnswer === 'string' ? standardAnswer : null,
-            isCorrect:
-              answer?.selectedIndex != null &&
-              answer.selectedIndex === question.correctIndex,
-            explanation: question.explanation ?? null,
-          };
-        }),
+      durationSeconds,
+      // Internal conversion (5 points per correct answer per skill); null for
+      // a part practice. Not an ETS score.
+      scores: {
+        listening: attempt.listeningScore,
+        reading: attempt.readingScore,
+        total: attempt.totalScore,
+      },
+      summary: summarizeLrReview(questions),
+      questions,
     };
   }
 
@@ -1323,7 +1682,11 @@ export class ToeicService {
       return {
         formatted: this.formatResult(
           current,
-          await this.getQuestionCounts(tx, current.examId),
+          await this.getQuestionCounts(
+            tx,
+            current.examId,
+            current.selectedParts,
+          ),
         ),
       };
     });

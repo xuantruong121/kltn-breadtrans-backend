@@ -4,7 +4,6 @@ import {
   Logger,
   Optional,
 } from '@nestjs/common';
-import { PlanFeatureKey } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -307,12 +306,11 @@ export class DictionaryLookupService {
     return this.toLocalResponse(query, orderedRows);
   }
 
-  private async canAccessPremium(userId?: number): Promise<boolean> {
-    if (!userId || !this.subscriptionService) return false;
-    return this.subscriptionService.hasFeature(
-      userId,
-      PlanFeatureKey.PREMIUM_VOCAB,
-    );
+  // Owner policy: standalone Vocabulary is free, so every curated word is
+  // served to every learner (the cache keeps its free/premium namespaces).
+  private canAccessPremium(userId?: number): Promise<boolean> {
+    void userId;
+    return Promise.resolve(true);
   }
 
   private toLocalResponse(query: string, rows: Array<Record<string, unknown>>) {

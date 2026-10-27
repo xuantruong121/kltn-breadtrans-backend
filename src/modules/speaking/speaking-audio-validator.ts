@@ -19,7 +19,8 @@ export interface AudioValidationResult {
 }
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 10MB
-const MAX_DURATION_MS = 45 * 1000; // 45 seconds
+/** Default when the caller gives no task limit (ordinary practice). */
+const MAX_DURATION_MS = 45 * 1000;
 const MIN_DURATION_MS = 300; // 300ms minimum to prevent empty taps
 
 /**
@@ -36,6 +37,8 @@ const MIN_DURATION_MS = 300; // 300ms minimum to prevent empty taps
 export function validateSpeakingAudio(
   buffer: Buffer,
   declaredMimeType?: string,
+  /** The task's own limit (speaking-task-timing); 45 s when omitted. */
+  maxDurationMs: number = MAX_DURATION_MS,
 ): AudioValidationResult {
   if (!buffer || buffer.length === 0) {
     throw new BadRequestException('Audio file is empty');
@@ -157,9 +160,9 @@ export function validateSpeakingAudio(
   );
   const durationMs = Math.round((availableData / bytesPerSecond) * 1000);
 
-  if (durationMs > MAX_DURATION_MS) {
+  if (durationMs > maxDurationMs) {
     throw new BadRequestException(
-      `Audio duration (${(durationMs / 1000).toFixed(1)}s) exceeds maximum allowed duration of ${MAX_DURATION_MS / 1000} seconds`,
+      `Audio duration (${(durationMs / 1000).toFixed(1)}s) exceeds maximum allowed duration of ${Math.round(maxDurationMs / 1000)} seconds`,
     );
   }
 

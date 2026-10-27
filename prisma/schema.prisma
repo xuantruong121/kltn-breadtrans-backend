@@ -2240,6 +2240,8 @@ model ToeicAttempt {
   submittedAt       DateTime?
   currentQuestionId Int?
   markedQuestionIds Json          @default("[]")
+  /// Parts covered by a Practice attempt; empty = the whole exam.
+  selectedParts     Int[]         @default([])
   timeRemaining     Int? // In seconds
   listeningScore    Int?
   readingScore      Int?

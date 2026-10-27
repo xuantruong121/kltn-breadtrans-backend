@@ -5,10 +5,18 @@ import {
 } from '@nestjs/common';
 import { PlanFeatureKey, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
+import {
+  parseCefrRange,
+  practiceRequiresPlus,
+} from '../subscription/practice-level';
 
 export type SpeakingContentAccessSubject = {
   id: number;
   isPremiumContent: boolean;
+  /** Present on full rows; carries the authored CEFR tag. */
+  title?: string;
+  /** Present when the row was loaded with its practice set. */
+  practiceSet?: { scope?: string | null; level?: string | null } | null;
 };
 
 export type SpeakingContentAccess = {
@@ -24,14 +32,30 @@ export class SpeakingContentAccessService {
 
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
+  /**
+   * Whether this exercise needs a plan. Standalone practice follows the owner
+   * policy (A1/A2 free, B1+ PLUS) from its practice set level, else from the
+   * CEFR tag of its title. TOEIC exam tasks and untagged items keep their
+   * stored flag.
+   */
+  isPremium(exercise: SpeakingContentAccessSubject): boolean {
+    if (exercise.practiceSet?.scope === 'EXAM_INTERNAL')
+      return exercise.isPremiumContent;
+    const range =
+      parseCefrRange(exercise.practiceSet?.level) ??
+      parseCefrRange(exercise.title);
+    return range ? practiceRequiresPlus(range) : exercise.isPremiumContent;
+  }
+
   async resolve(
     exercise: SpeakingContentAccessSubject,
     userId?: number,
     role?: Role,
   ): Promise<SpeakingContentAccess> {
-    if (!exercise.isPremiumContent || role === Role.ADMIN) {
+    const premium = this.isPremium(exercise);
+    if (!premium || role === Role.ADMIN) {
       return {
-        isPremiumContent: exercise.isPremiumContent,
+        isPremiumContent: premium,
         isLocked: false,
         featureKey: this.featureKey,
       };
@@ -60,15 +84,16 @@ export class SpeakingContentAccessService {
     role?: Role,
   ): Promise<Map<number, SpeakingContentAccess>> {
     const result = new Map<number, SpeakingContentAccess>();
-    const hasPremium = exercises.some((exercise) => exercise.isPremiumContent);
+    const hasPremium = exercises.some((exercise) => this.isPremium(exercise));
     const entitled =
       hasPremium && userId && role !== Role.ADMIN
         ? await this.subscriptionService.hasFeature(userId, this.featureKey)
         : false;
     for (const exercise of exercises) {
+      const premium = this.isPremium(exercise);
       result.set(exercise.id, {
-        isPremiumContent: exercise.isPremiumContent,
-        isLocked: exercise.isPremiumContent && role !== Role.ADMIN && !entitled,
+        isPremiumContent: premium,
+        isLocked: premium && role !== Role.ADMIN && !entitled,
         featureKey: this.featureKey,
       });
     }

@@ -2,7 +2,8 @@ import { IsArray, IsInt, IsObject, IsOptional } from 'class-validator';
 
 export class SaveAnswersDto {
   @IsObject()
-  answers!: Record<string, number>;
+  /** Question id → option index; null clears a saved answer. */
+  answers!: Record<string, number | null>;
 
   @IsOptional()
   @IsArray()

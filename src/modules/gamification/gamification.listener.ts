@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { RewardEligibilityService } from './reward-eligibility';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Prisma, QuizType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -12,6 +13,7 @@ export class GamificationListener {
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
     @Optional() private readonly eventEmitter?: EventEmitter2,
+    @Optional() private readonly eligibility?: RewardEligibilityService,
   ) {}
 
   @OnEvent('quiz.submitted')
@@ -25,6 +27,14 @@ export class GamificationListener {
     this.logger.log(
       `Handling quiz.submitted event for user ${payload.userId} with score ${payload.score} (firstSubmission: ${payload.isFirstSubmission})`,
     );
+    // Only standalone Listening/Reading/Writing practice earns XP, Bánh mì,
+    // quest progress or badges (reward-eligibility.ts). Fail closed.
+    if (!(await this.eligibility?.quiz(payload.quizId))) {
+      this.logger.log(
+        `quiz.submitted for quiz ${payload.quizId}: not a rewarded activity, no reward`,
+      );
+      return;
+    }
 
     try {
       // XP only for first submission
@@ -225,6 +235,14 @@ export class GamificationListener {
       `Handling speaking.submitted event for user ${payload.userId} with score ${payload.overallScore} (submissionId: ${payload.submissionId})`,
     );
 
+    // Exam and course recordings are graded but never rewarded.
+    if (!(await this.eligibility?.speakingExercise(payload.exerciseId))) {
+      this.logger.log(
+        `speaking.submitted for exercise ${payload.exerciseId}: not a rewarded activity, no reward`,
+      );
+      return;
+    }
+
     try {
       if (payload.isSilentOrNoSpeech) return;
 
@@ -397,80 +415,20 @@ export class GamificationListener {
     }
   }
 
+  // Owner policy (reward-eligibility.ts): vocabulary outside the Arena earns
+  // no XP, Bánh mì or quest progress. Mastery itself is stored by VocabService.
   @OnEvent('vocab.learned')
+  // eslint-disable-next-line @typescript-eslint/require-await
   async handleVocabLearnedEvent(payload: {
     userId: number;
     count: number;
     wordId?: number;
     wordIds?: number[];
     source?: string;
-  }) {
-    this.logger.log(`Handling vocab.learned event for user ${payload.userId}`);
-    try {
-      const count = Number.isFinite(payload.count)
-        ? Math.max(0, Math.trunc(payload.count))
-        : 0;
-      if (count === 0) return;
-
-      // Collect wordIds for lifetime first-mastery guard
-      const wordIds: number[] = [];
-      if (typeof payload.wordId === 'number') {
-        wordIds.push(payload.wordId);
-      }
-      if (Array.isArray(payload.wordIds)) {
-        for (const id of payload.wordIds) {
-          if (typeof id === 'number' && !wordIds.includes(id)) {
-            wordIds.push(id);
-          }
-        }
-      }
-
-      // Safe guard: Never reward unidentified vocabulary events.
-      if (wordIds.length === 0) {
-        this.logger.warn(
-          `[vocab.learned] Missing wordId for user ${payload.userId}. No Bánh Mì awarded.`,
-        );
-        return;
-      } else {
-        let firstMasteryCount = 0;
-        for (const wordId of wordIds) {
-          const reward = await this.gamificationService.awardVocabMasteryReward(
-            payload.userId,
-            wordId,
-          );
-          if (reward.firstMastery) firstMasteryCount += 1;
-        }
-
-        // A word contributes EXP and a daily quest only once in its lifetime.
-        if (firstMasteryCount === 0) return;
-
-        await this.gamificationService.awardXp(
-          payload.userId,
-          firstMasteryCount * 5,
-          `Học ${firstMasteryCount} từ vựng mới`,
-        );
-
-        // Advance daily quests with the exact number of first masteries.
-        const today = getTodayDateKey('Asia/Ho_Chi_Minh');
-        const activeQuests = await this.prisma.dailyQuest.findMany({
-          where: { isActive: true, type: { in: ['LEARN_VOCAB', 'DO_VOCAB'] } },
-        });
-
-        for (const quest of activeQuests) {
-          await this.gamificationService.advanceDailyQuestAndGrantRewardsTx(
-            payload.userId,
-            quest,
-            firstMasteryCount,
-            today,
-          );
-        }
-      }
-    } catch (error) {
-      this.logger.error(
-        `Failed to handle vocab.learned for user ${payload.userId}`,
-        error,
-      );
-    }
+  }): Promise<void> {
+    this.logger.log(
+      `vocab.learned for user ${payload.userId} (${payload.count}): not a rewarded activity, no reward`,
+    );
   }
 
   @OnEvent('gamification.xp_earned')
@@ -501,28 +459,18 @@ export class GamificationListener {
     }
   }
 
+  // Owner policy: TOEIC exams earn no XP or Bánh mì; results and history
+  // are stored by ToeicService.
   @OnEvent('toeic.submitted')
+  // eslint-disable-next-line @typescript-eslint/require-await
   async handleToeicSubmittedEvent(payload: {
     userId: number;
     examId: number;
-    mode: string;
+    mode?: string;
     attemptId?: number;
-  }) {
+  }): Promise<void> {
     this.logger.log(
-      `Handling toeic.submitted event for user ${payload.userId} (examId: ${payload.examId}, mode: ${payload.mode})`,
+      `toeic.submitted for user ${payload.userId} (exam ${payload.examId}): not a rewarded activity, no reward`,
     );
-    try {
-      await this.gamificationService.awardToeicReward(
-        payload.userId,
-        payload.examId,
-        payload.mode,
-        payload.attemptId,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to handle toeic.submitted for user ${payload.userId}`,
-        error,
-      );
-    }
   }
 }

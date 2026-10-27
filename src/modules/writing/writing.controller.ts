@@ -32,6 +32,11 @@ class SubmitWritingDto {
   @IsOptional()
   @IsUUID()
   clientAttemptId?: string;
+
+  /** The task of a multi-task exercise being answered; defaults to the first. */
+  @IsOptional()
+  @IsInt()
+  questionId?: number;
 }
 
 class SubmitWritingPart2Dto {
@@ -122,6 +127,7 @@ export class WritingController {
       properties: {
         answer: { type: 'string' },
         clientAttemptId: { type: 'string', format: 'uuid' },
+        questionId: { type: 'integer' },
       },
     },
   })
@@ -144,6 +150,7 @@ export class WritingController {
             componentId: Number(parentComponentId),
           }
         : undefined,
+      body.questionId,
     );
   }
 

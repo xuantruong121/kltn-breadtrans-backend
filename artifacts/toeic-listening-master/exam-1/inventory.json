@@ -1,0 +1,944 @@
+{
+  "examId": 1,
+  "generatedAt": "2026-10-27T05:58:46.367Z",
+  "clipCount": 54,
+  "clipSeconds": 994.4,
+  "byPart": [
+    {
+      "part": 1,
+      "clips": 6,
+      "questions": 6,
+      "seconds": 102.4
+    },
+    {
+      "part": 2,
+      "clips": 25,
+      "questions": 25,
+      "seconds": 351.9
+    },
+    {
+      "part": 3,
+      "clips": 13,
+      "questions": 39,
+      "seconds": 290.2
+    },
+    {
+      "part": 4,
+      "clips": 10,
+      "questions": 30,
+      "seconds": 249.9
+    }
+  ],
+  "clips": [
+    {
+      "groupId": 1,
+      "part": 1,
+      "groupOrder": 1,
+      "questionNumbers": [
+        1
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/1-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\1-001-g1.mp3",
+      "bytes": 266112,
+      "sha256": "834891e6e1fa4589d19dd89edbe619eeabd73c6a6f19069193aadcb012b16ba2",
+      "durationSeconds": 16.632,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 2,
+      "part": 1,
+      "groupOrder": 2,
+      "questionNumbers": [
+        2
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/2-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\1-002-g2.mp3",
+      "bytes": 260352,
+      "sha256": "fb15e5ee8ba5afcf28902269c3061603d5b275b23b50fec94bcc47e594d09f8d",
+      "durationSeconds": 16.272,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 3,
+      "part": 1,
+      "groupOrder": 3,
+      "questionNumbers": [
+        3
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/3-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\1-003-g3.mp3",
+      "bytes": 281664,
+      "sha256": "c42290172f07892e1d392a9346a4b11e6a67f75091c7a3ffdb44b23516440054",
+      "durationSeconds": 17.604,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 4,
+      "part": 1,
+      "groupOrder": 4,
+      "questionNumbers": [
+        4
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/4-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\1-004-g4.mp3",
+      "bytes": 268992,
+      "sha256": "521528c16eaf19dd3925615e7b1d769a5adb131b7573ed20635ee26ca755fcfa",
+      "durationSeconds": 16.812,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 5,
+      "part": 1,
+      "groupOrder": 5,
+      "questionNumbers": [
+        5
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/5-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\1-005-g5.mp3",
+      "bytes": 278208,
+      "sha256": "3c645c933e78d2bdb81e284c0d5715f4a8be8c023aecc1abbf370df2e5137236",
+      "durationSeconds": 17.388,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 6,
+      "part": 1,
+      "groupOrder": 6,
+      "questionNumbers": [
+        6
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/6-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\1-006-g6.mp3",
+      "bytes": 283392,
+      "sha256": "05daa5531b2eb24e7c67b46c2fe72d00de55a8464f0285bf724f0f8a9cc0689b",
+      "durationSeconds": 17.712,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 7,
+      "part": 2,
+      "groupOrder": 7,
+      "questionNumbers": [
+        7
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/7-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-007-g7.mp3",
+      "bytes": 220032,
+      "sha256": "f7dd072dab741017a500c8d69cc40d50cc7f82543376b7cd3a1658231a6682e0",
+      "durationSeconds": 13.752,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 8,
+      "part": 2,
+      "groupOrder": 8,
+      "questionNumbers": [
+        8
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/8-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-008-g8.mp3",
+      "bytes": 218304,
+      "sha256": "810f4622bfe710d64a8a586a064414e737a176d197c904bedddb7f0004821407",
+      "durationSeconds": 13.644,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 9,
+      "part": 2,
+      "groupOrder": 9,
+      "questionNumbers": [
+        9
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/9-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-009-g9.mp3",
+      "bytes": 235008,
+      "sha256": "27151af4ee6da134515efa9ac9a851cfa2ab8faaa610a8a26ad537943352ad07",
+      "durationSeconds": 14.688,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 10,
+      "part": 2,
+      "groupOrder": 10,
+      "questionNumbers": [
+        10
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/10-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-010-g10.mp3",
+      "bytes": 213120,
+      "sha256": "bfa70f3ec655c66c02f838de24facd3068ccc255d83c3a053831b01bb5ca7592",
+      "durationSeconds": 13.32,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 11,
+      "part": 2,
+      "groupOrder": 11,
+      "questionNumbers": [
+        11
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/11-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-011-g11.mp3",
+      "bytes": 214272,
+      "sha256": "74eefa039f84dde98a852ea679a6186366acfd5b1a03a2950b7826e7b4105fd8",
+      "durationSeconds": 13.392,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 12,
+      "part": 2,
+      "groupOrder": 12,
+      "questionNumbers": [
+        12
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/12-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-012-g12.mp3",
+      "bytes": 234432,
+      "sha256": "7ddf7f87c2b986e88489f8694fa3313eb6ce29234b95983d2c1ccfc0393f123a",
+      "durationSeconds": 14.652,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 13,
+      "part": 2,
+      "groupOrder": 13,
+      "questionNumbers": [
+        13
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/13-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-013-g13.mp3",
+      "bytes": 228096,
+      "sha256": "e502c7b5253d443174f7c627079055d57e551c19a76991052e5e966a1a3801d1",
+      "durationSeconds": 14.256,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 14,
+      "part": 2,
+      "groupOrder": 14,
+      "questionNumbers": [
+        14
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/14-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-014-g14.mp3",
+      "bytes": 211968,
+      "sha256": "bc456a89536010ecff94b2342cfa71df644952494e342a0ddda63e35ac76d0c1",
+      "durationSeconds": 13.248,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 15,
+      "part": 2,
+      "groupOrder": 15,
+      "questionNumbers": [
+        15
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/15-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-015-g15.mp3",
+      "bytes": 221760,
+      "sha256": "db278ddd0b7e6ff2fd48fe5103038558b5be4d1ce262da07604dffd7ea758895",
+      "durationSeconds": 13.86,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 16,
+      "part": 2,
+      "groupOrder": 16,
+      "questionNumbers": [
+        16
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/16-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-016-g16.mp3",
+      "bytes": 217728,
+      "sha256": "4ef898a440e59fd477a0e22618b043b74571d05b5e8f60422f8ccd93551bbc4b",
+      "durationSeconds": 13.608,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 17,
+      "part": 2,
+      "groupOrder": 17,
+      "questionNumbers": [
+        17
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/17-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-017-g17.mp3",
+      "bytes": 236736,
+      "sha256": "266bfee5a44fa677287fe66690c2611d8052d41a762eeab9824f5831b0b752b1",
+      "durationSeconds": 14.796,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 18,
+      "part": 2,
+      "groupOrder": 18,
+      "questionNumbers": [
+        18
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/18-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-018-g18.mp3",
+      "bytes": 214848,
+      "sha256": "b6e9911278a97820ec1522c33c97d00ea2eadd2be277f592ffbba4ade678c56f",
+      "durationSeconds": 13.428,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 19,
+      "part": 2,
+      "groupOrder": 19,
+      "questionNumbers": [
+        19
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/19-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-019-g19.mp3",
+      "bytes": 227520,
+      "sha256": "2c17ab23f6b100c1f1f88c29cdb2464439a6f43db80ccf49caecb0915a16e634",
+      "durationSeconds": 14.22,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 20,
+      "part": 2,
+      "groupOrder": 20,
+      "questionNumbers": [
+        20
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/20-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-020-g20.mp3",
+      "bytes": 204480,
+      "sha256": "7b888afef4cb95b39ffc2b76915c198ae266e2c362e39f10b25b1d7920508587",
+      "durationSeconds": 12.78,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 21,
+      "part": 2,
+      "groupOrder": 21,
+      "questionNumbers": [
+        21
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/21-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-021-g21.mp3",
+      "bytes": 240768,
+      "sha256": "996f99e52767bbcd6d206e10c70b254168972724ded5c18344127a44abdc887d",
+      "durationSeconds": 15.048,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 22,
+      "part": 2,
+      "groupOrder": 22,
+      "questionNumbers": [
+        22
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/22-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-022-g22.mp3",
+      "bytes": 230976,
+      "sha256": "07552f26c689fce92e61522def1874fb2de030ac19c87e756b38534970ed1699",
+      "durationSeconds": 14.436,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 23,
+      "part": 2,
+      "groupOrder": 23,
+      "questionNumbers": [
+        23
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/23-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-023-g23.mp3",
+      "bytes": 232128,
+      "sha256": "f3120b00ab6338482c5863258e09ba29ccee05365dc842ec04440b720764616e",
+      "durationSeconds": 14.508,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 24,
+      "part": 2,
+      "groupOrder": 24,
+      "questionNumbers": [
+        24
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/24-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-024-g24.mp3",
+      "bytes": 224064,
+      "sha256": "74d9f02728db8c759ed79713ff3772b3e9405b65e69eb5bffa96bc4c7af96fdb",
+      "durationSeconds": 14.004,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 25,
+      "part": 2,
+      "groupOrder": 25,
+      "questionNumbers": [
+        25
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/25-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-025-g25.mp3",
+      "bytes": 209664,
+      "sha256": "58e4f95f9b713a83daf81385db4d3f5938e7405d35fe4f1114293803f9667a56",
+      "durationSeconds": 13.104,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 26,
+      "part": 2,
+      "groupOrder": 26,
+      "questionNumbers": [
+        26
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/26-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-026-g26.mp3",
+      "bytes": 231552,
+      "sha256": "9cc9b1261f5a823cde7b906932e7e4c5eff3a4768652e2a46c7e17ff50977476",
+      "durationSeconds": 14.472,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 27,
+      "part": 2,
+      "groupOrder": 27,
+      "questionNumbers": [
+        27
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/27-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-027-g27.mp3",
+      "bytes": 218304,
+      "sha256": "9618e47ed04d3b202a9dfe3811a4bb479d560d05db673fe1818c330152332b22",
+      "durationSeconds": 13.644,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 28,
+      "part": 2,
+      "groupOrder": 28,
+      "questionNumbers": [
+        28
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/28-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-028-g28.mp3",
+      "bytes": 224064,
+      "sha256": "c31e318fe0474351232ae238891d3438ef371bb2e25b481ecd6d1a5297b5053c",
+      "durationSeconds": 14.004,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 29,
+      "part": 2,
+      "groupOrder": 29,
+      "questionNumbers": [
+        29
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/29-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-029-g29.mp3",
+      "bytes": 240768,
+      "sha256": "c62362f94413016e1943e9c46dbc1ca0994c2e96ad129f17c68c64c443f7bf50",
+      "durationSeconds": 15.048,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 30,
+      "part": 2,
+      "groupOrder": 30,
+      "questionNumbers": [
+        30
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/30-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-030-g30.mp3",
+      "bytes": 223488,
+      "sha256": "1b972b7fe1ca3e2107cf6009fcba10088390742e5b075be325de5dd74f17a79a",
+      "durationSeconds": 13.968,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 31,
+      "part": 2,
+      "groupOrder": 31,
+      "questionNumbers": [
+        31
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/31-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\2-031-g31.mp3",
+      "bytes": 256896,
+      "sha256": "c0246865638d5cd5d67443d1d5b3bdc39fd5e28c4f5d48e44878b898508bfcf1",
+      "durationSeconds": 16.056,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 32,
+      "part": 3,
+      "groupOrder": 32,
+      "questionNumbers": [
+        32,
+        33,
+        34
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/32-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-032-g32.mp3",
+      "bytes": 301248,
+      "sha256": "0175bddc58283a8f887b1b10af8786075b616452cedb2a4416e2c6313bfd1eea",
+      "durationSeconds": 18.828,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 33,
+      "part": 3,
+      "groupOrder": 33,
+      "questionNumbers": [
+        35,
+        36,
+        37
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/33-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-033-g33.mp3",
+      "bytes": 339840,
+      "sha256": "a6e60cd5040bff064a945f8a2e3348925624e82c8cbd91db1df8fba64bf36d22",
+      "durationSeconds": 21.24,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 34,
+      "part": 3,
+      "groupOrder": 34,
+      "questionNumbers": [
+        38,
+        39,
+        40
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/34-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-034-g34.mp3",
+      "bytes": 365184,
+      "sha256": "f6036bfb6d38749431bcc39cbe809ab5b23a9a5813cfb5038288823e5465b85a",
+      "durationSeconds": 22.824,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 35,
+      "part": 3,
+      "groupOrder": 35,
+      "questionNumbers": [
+        41,
+        42,
+        43
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/35-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-035-g35.mp3",
+      "bytes": 388800,
+      "sha256": "4624e4db8b22b0d1cc792017b2dd2a08c937058c9fce6ef6621b69a259b5319c",
+      "durationSeconds": 24.3,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 36,
+      "part": 3,
+      "groupOrder": 36,
+      "questionNumbers": [
+        44,
+        45,
+        46
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/36-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-036-g36.mp3",
+      "bytes": 384192,
+      "sha256": "609efbe8bd4b7b1059ff2f9312963d0d50e102ce25ca3269c99150a148ef2ef2",
+      "durationSeconds": 24.012,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 37,
+      "part": 3,
+      "groupOrder": 37,
+      "questionNumbers": [
+        47,
+        48,
+        49
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/37-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-037-g37.mp3",
+      "bytes": 347904,
+      "sha256": "9393fdc16fad479c88a8b2be1f41dc543ed151804e968ff57b556db21d645fb6",
+      "durationSeconds": 21.744,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 38,
+      "part": 3,
+      "groupOrder": 38,
+      "questionNumbers": [
+        50,
+        51,
+        52
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/38-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-038-g38.mp3",
+      "bytes": 349056,
+      "sha256": "a157cf06f738e5ab1cf86d592546de232a119ee6246f3a2d9c3799a286760d91",
+      "durationSeconds": 21.816,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 39,
+      "part": 3,
+      "groupOrder": 39,
+      "questionNumbers": [
+        53,
+        54,
+        55
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/39-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-039-g39.mp3",
+      "bytes": 413568,
+      "sha256": "41fdbefb3ae30649117b01941b96b0b7d53e78a924cf63be2cba0e1ce64e3fb4",
+      "durationSeconds": 25.848,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 40,
+      "part": 3,
+      "groupOrder": 40,
+      "questionNumbers": [
+        56,
+        57,
+        58
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/40-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-040-g40.mp3",
+      "bytes": 355392,
+      "sha256": "b43e6458a4794ae6ba0a8d694bf2617a90af23dfe71c0c62ae6481a0ecc0153c",
+      "durationSeconds": 22.212,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 41,
+      "part": 3,
+      "groupOrder": 41,
+      "questionNumbers": [
+        59,
+        60,
+        61
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/41-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-041-g41.mp3",
+      "bytes": 334656,
+      "sha256": "afee15fd808e01e19f8f58c6cfe02cf1bf8f55b3beed7b25db9c1110e52630d4",
+      "durationSeconds": 20.916,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 42,
+      "part": 3,
+      "groupOrder": 42,
+      "questionNumbers": [
+        62,
+        63,
+        64
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/42-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-042-g42.mp3",
+      "bytes": 357696,
+      "sha256": "5fa41f4daf80138e9c6adcaeb2a57f218865792f1d253cc3e47ae7e30c297332",
+      "durationSeconds": 22.356,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 43,
+      "part": 3,
+      "groupOrder": 43,
+      "questionNumbers": [
+        65,
+        66,
+        67
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/43-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-043-g43.mp3",
+      "bytes": 358848,
+      "sha256": "fb4fb8d3100e5d148457ce31622360a39e1a81d121d10c33d38090c5af396a6e",
+      "durationSeconds": 22.428,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 44,
+      "part": 3,
+      "groupOrder": 44,
+      "questionNumbers": [
+        68,
+        69,
+        70
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/44-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-044-g44.mp3",
+      "bytes": 346176,
+      "sha256": "688f8b696e80c38e1c159ce26cf433b0fe9d3b935264f7e12546a6656e8011c3",
+      "durationSeconds": 21.636,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 45,
+      "part": 4,
+      "groupOrder": 45,
+      "questionNumbers": [
+        71,
+        72,
+        73
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/45-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-045-g45.mp3",
+      "bytes": 343296,
+      "sha256": "4446abf331a7864999d2c98aadbf7366fcb9d6ddcb4a9d277a1cb5f2d7e5589c",
+      "durationSeconds": 21.456,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 46,
+      "part": 4,
+      "groupOrder": 46,
+      "questionNumbers": [
+        74,
+        75,
+        76
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/46-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-046-g46.mp3",
+      "bytes": 377856,
+      "sha256": "1939b323073e602d23b802688c764fee0095259357792e364d2c9d96821f3262",
+      "durationSeconds": 23.616,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 47,
+      "part": 4,
+      "groupOrder": 47,
+      "questionNumbers": [
+        77,
+        78,
+        79
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/47-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-047-g47.mp3",
+      "bytes": 380736,
+      "sha256": "1646c977f948f0b5c80e3c763bbdae8285e535b4fd73b2a51c453d546f5824e8",
+      "durationSeconds": 23.796,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 48,
+      "part": 4,
+      "groupOrder": 48,
+      "questionNumbers": [
+        80,
+        81,
+        82
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/48-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-048-g48.mp3",
+      "bytes": 403200,
+      "sha256": "721c31e0fc35880abfbbdeb596f91cd26e0cd6fbfd30937b9f9af626bafebe81",
+      "durationSeconds": 25.2,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 49,
+      "part": 4,
+      "groupOrder": 49,
+      "questionNumbers": [
+        83,
+        84,
+        85
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/49-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-049-g49.mp3",
+      "bytes": 407808,
+      "sha256": "236102076eb3077d610f2df5ceeae21c321abfb63e5b9523071468d121422975",
+      "durationSeconds": 25.488,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 50,
+      "part": 4,
+      "groupOrder": 50,
+      "questionNumbers": [
+        86,
+        87,
+        88
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/50-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-050-g50.mp3",
+      "bytes": 428544,
+      "sha256": "558f05ac420fd9d30e39df913fe47009d56d60e073567a26e3da9ff97835346e",
+      "durationSeconds": 26.784,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 51,
+      "part": 4,
+      "groupOrder": 51,
+      "questionNumbers": [
+        89,
+        90,
+        91
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/51-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-051-g51.mp3",
+      "bytes": 387648,
+      "sha256": "7ced29832a8c79235b080c172f897b5283a6a003239c37d1b409d5f73e8cbc24",
+      "durationSeconds": 24.228,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 52,
+      "part": 4,
+      "groupOrder": 52,
+      "questionNumbers": [
+        92,
+        93,
+        94
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/52-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-052-g52.mp3",
+      "bytes": 446976,
+      "sha256": "33833bd1157fd0ac3c8330325b970f5a2a661ad8f8ecff4295fee1cc05429149",
+      "durationSeconds": 27.936,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 53,
+      "part": 4,
+      "groupOrder": 53,
+      "questionNumbers": [
+        95,
+        96,
+        97
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/53-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-053-g53.mp3",
+      "bytes": 422208,
+      "sha256": "b833a45935d82189256998dad8c8903428f51d137396c1d92b23f6c3a8c0cbdc",
+      "durationSeconds": 26.388,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "groupId": 54,
+      "part": 4,
+      "groupOrder": 54,
+      "questionNumbers": [
+        98,
+        99,
+        100
+      ],
+      "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/toeic/exams/1/groups/54-phase0.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-054-g54.mp3",
+      "bytes": 400320,
+      "sha256": "84012b3eecc7b5c0e45e6eade8e1e4fbb04fbe434dc9c333309fd3c9327008e6",
+      "durationSeconds": 25.02,
+      "codec": "mp3",
+      "sampleRate": 16000,
+      "channels": 1
+    }
+  ]
+}

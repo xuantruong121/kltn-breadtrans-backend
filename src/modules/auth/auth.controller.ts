@@ -182,6 +182,12 @@ export class AuthController {
   @Post('change-password')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Đổi mật khẩu' })
+  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công' })
+  @ApiResponse({
+    status: 400,
+    description: 'Mật khẩu hiện tại không đúng hoặc mật khẩu mới không hợp lệ',
+  })
   @HttpCode(HttpStatus.OK)
   async changePassword(@Request() req: any, @Body() body: ChangePasswordDto) {
     return this.authService.changePassword(
