@@ -54,3 +54,25 @@ export async function loadWritingExerciseProgress(
   }
   return { latest, summary: summarizeWritingExercise(questionIds, latest) };
 }
+
+/**
+ * Catalog completion: a Writing quiz counts as completed only when every one
+ * of its tasks has a graded answer from the learner, the same condition that
+ * releases the exercise reward. One graded task of five is not completion.
+ */
+export function completedWritingQuizIds(
+  questions: Array<{ id: number; quizId: number }>,
+  gradedQuestionIds: Iterable<number>,
+): Set<number> {
+  const graded = new Set(gradedQuestionIds);
+  const pending = new Map<number, boolean>();
+  for (const q of questions) {
+    pending.set(
+      q.quizId,
+      (pending.get(q.quizId) ?? false) || !graded.has(q.id),
+    );
+  }
+  return new Set(
+    [...pending].filter(([, hasPending]) => !hasPending).map(([id]) => id),
+  );
+}
