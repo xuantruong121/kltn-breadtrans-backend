@@ -518,8 +518,31 @@ export class UserService {
         orderBy: { submittedAt: 'desc' },
       }),
     ]);
+    // The practice quiz behind each row, so the learner app can show the
+    // same display title as the catalog. Read-only; rows are not changed.
+    const writingSubmissionIds = activities
+      .filter((a) => a.sourceType === 'WRITING_SUBMISSION' && a.sourceId)
+      .map((a) => Number(a.sourceId))
+      .filter(Number.isInteger);
+    const writingQuizBySubmission = new Map(
+      writingSubmissionIds.length
+        ? (
+            await this.prisma.submission.findMany({
+              where: { id: { in: writingSubmissionIds } },
+              select: { id: true, quizId: true },
+            })
+          ).map((row) => [row.id, row.quizId])
+        : [],
+    );
+    const quizIdOf = (a: (typeof activities)[number]) => {
+      if (a.sourceType === 'QUIZ' && a.sourceId) return Number(a.sourceId);
+      if (a.sourceType === 'WRITING_SUBMISSION' && a.sourceId)
+        return writingQuizBySubmission.get(Number(a.sourceId)) ?? null;
+      return null;
+    };
+
     return {
-      activities,
+      activities: activities.map((a) => ({ ...a, quizId: quizIdOf(a) })),
       summary: {
         completedCount: activities.length,
         streakCount: stats?.streakCount || 0,
