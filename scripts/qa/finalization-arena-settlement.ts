@@ -115,8 +115,8 @@ async function main() {
     `(${sa.bread}, ${sb.bread})`,
   );
   check(
-    'winner XP +40 exactly once, loser +0',
-    sa.xp - xp0[0] === 40 && sb.xp - xp0[1] === 0,
+    'Arena pays Bread only: no XP history for winner or loser',
+    sa.xp - xp0[0] === 0 && sb.xp - xp0[1] === 0,
     `(${sa.xp - xp0[0]}, ${sb.xp - xp0[1]})`,
   );
   check(

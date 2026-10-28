@@ -176,8 +176,8 @@ async function scenarioWin(a: Player, b: Player) {
     `(${bread(a.userId)}, ${bread(b.userId)})`,
   );
   check(
-    'XP: winner +40 once, loser +0',
-    xp(a.userId) - xpA === 40 && xp(b.userId) - xpB === 0,
+    'Arena pays Bread only: no XP history for winner or loser',
+    xp(a.userId) - xpA === 0 && xp(b.userId) - xpB === 0,
     `(${xp(a.userId) - xpA}, ${xp(b.userId) - xpB})`,
   );
   const ledger = harnessQuery(
