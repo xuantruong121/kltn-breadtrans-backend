@@ -16,6 +16,7 @@
  * 12. Test 9 — BullMQ worker processing & completion with MockSpeakingEvaluator.
  * 13. Test 10 — Performance benchmark with evidence-bounded wording.
  */
+import './qa/qa-legacy-guard';
 
 import * as http from 'http';
 import { AddressInfo } from 'net';

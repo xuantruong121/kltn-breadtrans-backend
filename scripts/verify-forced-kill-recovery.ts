@@ -12,6 +12,7 @@
  * 7. Evaluator invocations (=2, at-least-once) are distinguished from terminal persistence (=1).
  * 8. No submission remains indefinitely in PROCESSING.
  */
+import './qa/qa-legacy-guard';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';

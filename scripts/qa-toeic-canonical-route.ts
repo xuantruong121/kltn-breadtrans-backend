@@ -8,6 +8,7 @@
  *
  * Read-only against product data. Creates one QA learner and deletes it.
  */
+import './qa/qa-legacy-guard';
 import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import { appendFile, mkdir } from 'node:fs/promises';

@@ -9,6 +9,9 @@ import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 
 import { assessPracticeSpeech } from '../../src/modules/speaking/speaking-assessment-mode';
+import { requireExplicitOptIn } from './qa-target-guard';
+
+requireExplicitOptIn('QA_ALLOW_REAL_PROVIDER', 'speaking-practice-real-azure-smoke calls a real paid provider');
 
 void (async () => {
   const wav = readFileSync(process.argv[2]);

@@ -1,3 +1,4 @@
+import './qa/qa-legacy-guard';
 import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient, QuizPublicationStatus, Role } from '@prisma/client';

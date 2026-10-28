@@ -8,6 +8,7 @@
  *
  * Creates one QA learner plus its own attempt, and removes both.
  */
+import './qa/qa-legacy-guard';
 import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import { appendFile, mkdir } from 'node:fs/promises';

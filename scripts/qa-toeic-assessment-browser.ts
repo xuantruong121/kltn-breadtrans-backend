@@ -1,3 +1,4 @@
+import './qa/qa-legacy-guard';
 import 'dotenv/config';
 import { randomUUID } from 'crypto'; import { appendFile, mkdir } from 'node:fs/promises'; import { dirname, resolve } from 'node:path';
 import * as bcrypt from 'bcrypt'; import { chromium } from 'playwright'; import { PrismaClient, Role, SubscriptionStatus } from '@prisma/client';

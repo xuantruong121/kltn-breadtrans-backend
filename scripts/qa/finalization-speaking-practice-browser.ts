@@ -19,6 +19,9 @@ import { mkdirSync } from 'node:fs';
 import { check, failureCount } from './harness-api';
 import { harnessExec } from './harness-db';
 import { FE, hidePet, studentPage } from './harness-browser';
+import { requireExplicitOptIn } from './qa-target-guard';
+
+requireExplicitOptIn('QA_ALLOW_REAL_R2_READ', 'finalization-speaking-practice-browser reads objects from the real R2 private bucket');
 
 const KEY = 'premium/speaking/reference/6.v1.mp3';
 const SHOTS = `${process.env.TEMP ?? '.'}/breadtrans-harness/shots`;

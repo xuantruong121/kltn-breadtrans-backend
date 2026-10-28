@@ -1,3 +1,4 @@
+import './qa/qa-legacy-guard';
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 

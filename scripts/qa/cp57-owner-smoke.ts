@@ -5,6 +5,9 @@
  * Usage: npx ts-node --transpile-only scripts/qa/cp57-owner-smoke.ts
  */
 import { chromium } from 'playwright';
+import { requireExplicitOptIn } from './qa-target-guard';
+
+requireExplicitOptIn('QA_OWNER_READONLY', 'cp57-owner-smoke drives the owner app (:3000/:3001, kltn_db) read-only; logins still write sessions');
 
 const FE = 'http://localhost:3000';
 const BE = 'http://127.0.0.1:3001';
