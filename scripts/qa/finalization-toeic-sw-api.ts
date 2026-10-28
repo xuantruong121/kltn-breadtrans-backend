@@ -4,11 +4,13 @@
  *
  *   start attempt -> start Speaking -> 11 x (upload intent, PUT, finalize,
  *   poll to COMPLETED) -> complete Speaking -> start Writing -> submit one
- *   task (expects the honest "grader unavailable" refusal without Gemini)
- *   -> completing Writing is refused until all 8 tasks are graded.
+ *   task -> completing Writing is refused until all 8 tasks are graded.
+ *   With the harness in provider failure mode (cp60-harness-fail.sh) pass
+ *   `fail`: the Writing task must be refused honestly, not scored. Without
+ *   it the deterministic mock grader scores the task.
  * Also: another learner cannot read or drive this attempt.
  *
- * Usage: npx ts-node --transpile-only scripts/qa/finalization-toeic-sw-api.ts <assessmentId> <answer.wav>
+ * Usage: npx ts-node --transpile-only scripts/qa/finalization-toeic-sw-api.ts <assessmentId> <answer.wav> [fail]
  */
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -17,6 +19,7 @@ import { call, check, failureCount, newStudent } from './harness-api';
 
 const assessmentId = Number(process.argv[2] ?? 1);
 const wav = readFileSync(process.argv[3]);
+const providerFailure = process.argv[4] === 'fail';
 
 async function main() {
   console.log(
@@ -82,7 +85,8 @@ async function main() {
       {
         contentType: 'audio/wav',
         sizeBytes: wav.length,
-        durationMs: 34500,
+        // The answer file is the 10 s synthetic WAV; every task allows 15 s or more.
+        durationMs: 10000,
         idempotencyKey: randomUUID(),
       },
     );
@@ -201,11 +205,18 @@ async function main() {
       clientAttemptId: randomUUID(),
     },
   );
-  check(
-    'without Gemini a Writing task is refused honestly, not scored',
-    sub.status === 503,
-    `(${sub.status} ${JSON.stringify(sub.data).slice(0, 140)})`,
-  );
+  if (providerFailure)
+    check(
+      'without a grader a Writing task is refused honestly, not scored',
+      sub.status === 503,
+      `(${sub.status} ${JSON.stringify(sub.data).slice(0, 140)})`,
+    );
+  else
+    check(
+      'the mock grader scores the Writing task',
+      sub.status < 300 && sub.data?.status === 'COMPLETED',
+      `(${sub.status} ${sub.data?.status})`,
+    );
   const wdone = await call(
     'POST',
     `/toeic/assessments/attempts/${attempt.id}/components/${writingId}/complete`,

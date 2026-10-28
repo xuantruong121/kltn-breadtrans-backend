@@ -121,14 +121,15 @@ async function main() {
     (await call('GET', `/courses/${ids.course}/learning`, a.token)).status;
 
   console.log('\n== Quiz-backed practice: direct detail requests');
-  for (const [label, id, freeOk] of [
-    ['Listening A2 (was PLUS)', ids.listeningA2, true],
-    ['Listening B1 (was FREE)', ids.listeningB1, false],
-    ['Reading A1–A2', ids.readingA, true],
-    ['Reading B1 (was FREE)', ids.readingB1, false],
-    ['Reading C1', ids.readingC1, false],
-    ['Writing A2', ids.writingA2, true],
-    ['Writing B1', ids.writingB1, false],
+  // CP58 matrix: Listening/Reading B1+ need PLUS, Writing B1+ needs PRO.
+  for (const [label, id, minPlan] of [
+    ['Listening A2 (was PLUS)', ids.listeningA2, 'FREE'],
+    ['Listening B1 (was FREE)', ids.listeningB1, 'PLUS'],
+    ['Reading A1–A2', ids.readingA, 'FREE'],
+    ['Reading B1 (was FREE)', ids.readingB1, 'PLUS'],
+    ['Reading C1', ids.readingC1, 'PLUS'],
+    ['Writing A2', ids.writingA2, 'FREE'],
+    ['Writing B1', ids.writingB1, 'PRO'],
   ] as const) {
     const [f, p, r] = [
       await quiz(free, id),
@@ -136,8 +137,10 @@ async function main() {
       await quiz(pro, id),
     ];
     check(
-      `${label}: FREE ${freeOk ? 'opens' : 'refused'}, PLUS and PRO open`,
-      (freeOk ? f === 200 : f === 403) && p === 200 && r === 200,
+      `${label}: opens from ${minPlan}`,
+      f === (minPlan === 'FREE' ? 200 : 403) &&
+        p === (minPlan === 'PRO' ? 403 : 200) &&
+        r === 200,
       `(${f}/${p}/${r})`,
     );
   }
@@ -187,13 +190,15 @@ async function main() {
       await speakingDetail(plus, id),
       await speakingDetail(pro, id),
     ];
+    // CP58 matrix: Speaking B1+ needs PRO, so PLUS is refused like FREE.
     check(
-      `${label}: locked only for FREE${freeOk ? ' (never)' : ''}`,
+      `${label}: ${freeOk ? 'open to every plan' : 'PRO only'}`,
       (freeOk
-        ? d[0].status === 200 && d[0].isLocked === false
-        : d[0].status === 403) &&
-        d[1].status === 200 &&
-        d[1].isLocked === false &&
+        ? d[0].status === 200 &&
+          d[0].isLocked === false &&
+          d[1].status === 200 &&
+          d[1].isLocked === false
+        : d[0].status === 403 && d[1].status === 403) &&
         d[2].status === 200 &&
         d[2].isLocked === false,
       `(${d.map((x) => x.status).join('/')})`,
@@ -213,12 +218,16 @@ async function main() {
     (await speak(free.token, ids.speakingB1)) === 403,
   );
   check(
-    'PLUS submits a C1 recording',
-    (await speak(plus.token, ids.speakingC1)) < 300,
+    'PLUS cannot submit a C1 recording directly',
+    (await speak(plus.token, ids.speakingC1)) === 403,
   );
-  const b1 = await speakingDetail(plus, ids.speakingB1);
   check(
-    'PLUS gets the moved B1 reference clip as a signed private URL',
+    'PRO submits a C1 recording',
+    (await speak(pro.token, ids.speakingC1)) < 300,
+  );
+  const b1 = await speakingDetail(pro, ids.speakingB1);
+  check(
+    'PRO gets the moved B1 reference clip as a signed private URL',
     /X-Amz/.test(b1?.audioUrl ?? '') &&
       (await fetch(b1.audioUrl)).status === 200,
   );
@@ -326,10 +335,10 @@ async function main() {
       /\s+/g,
       ' ',
     );
-    const locks = await s.page.getByText('Mở khóa với PLUS').count();
+    const locks = await s.page.getByText('Mở khóa với PRO').count();
     if (who === 'free') {
       check(
-        'FREE /speaking: basic sets open, B1+ sets show "Mở khóa với PLUS"',
+        'FREE /speaking: basic sets open, B1+ sets show "Mở khóa với PRO"',
         locks >= 6 &&
           body.includes('Cơ bản · A1–A2') &&
           body.includes('Cơ bản · A2'),
@@ -350,13 +359,14 @@ async function main() {
       );
       check(
         'filter "Nâng cao" shows only the C1 set',
-        adv.includes('Trình bày quan điểm — Nâng cao') &&
+        adv.includes('Bảo vệ quan điểm về vấn đề xã hội') &&
           !adv.includes('Cơ bản ·') &&
           !adv.includes('Trung cấp ·'),
+        adv.slice(0, 300),
       );
     } else {
       check(
-        'PRO /speaking at 390 px: no PLUS lock anywhere',
+        'PRO /speaking at 390 px: no PRO lock anywhere',
         locks === 0 && body.includes('Nâng cao · C1'),
         `(${locks})`,
       );

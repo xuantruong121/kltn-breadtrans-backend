@@ -114,9 +114,11 @@ async function main() {
   );
   await page.waitForTimeout(1000);
   check(
-    'XP granted once, at completion, from the exercise mean (percent x 10)',
-    xp().length === 1 && Number(xp()[0][1]) === percent * 10 && rewards() === 1,
-    `${JSON.stringify(xp())} expected ${percent * 10}`,
+    'XP granted once, at completion, equal to the exercise percent (CP57-O1)',
+    xp().length === 1 &&
+      Number(xp()[0][1]) === Math.round(percent) &&
+      rewards() === 1,
+    `${JSON.stringify(xp())} expected ${Math.round(percent)}`,
   );
 
   await page.reload();

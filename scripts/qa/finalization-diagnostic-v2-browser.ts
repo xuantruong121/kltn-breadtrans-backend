@@ -136,6 +136,11 @@ async function main() {
     timeout: 120_000,
   });
   await hidePet(page);
+  await page
+    .getByText(/\d+ nhiệm vụ/)
+    .first()
+    .waitFor({ timeout: 60_000 })
+    .catch(() => undefined);
   const intro = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
     'the intro counts the administered form, not the 52-task plan',
@@ -573,12 +578,18 @@ async function main() {
       (r: any) => r.access === 'OPEN' && r.kind !== 'LISTENING_QUIZ',
     ) ?? allResources.find((r: any) => r.access === 'OPEN');
   if (firstOpen) {
-    await page
+    const link = page
       .locator(
         `section[aria-labelledby="diagnostic-advice-title"] a[href="${firstOpen.route}"]`,
       )
-      .first()
-      .click();
+      .first();
+    // The panel shows the learner-facing title (CP60-UX-01), which is what
+    // the opened page is headed by; the API title may be the stored one.
+    // The second line of the card is its title; the first is the kind label.
+    const shownTitle = (
+      await link.locator('span.block').nth(1).innerText()
+    ).trim();
+    await link.click();
     await page.waitForURL((u) => u.pathname === firstOpen.route, {
       timeout: 60_000,
     });
@@ -587,6 +598,11 @@ async function main() {
       .getByText(/Đang tải dữ liệu bài luyện/)
       .first()
       .waitFor({ state: 'hidden', timeout: 60_000 })
+      .catch(() => undefined);
+    await page
+      .getByText(shownTitle.slice(0, 12))
+      .first()
+      .waitFor({ timeout: 60_000 })
       .catch(() => undefined);
     const target = (await page.locator('body').innerText()).replace(
       /\s+/g,
@@ -603,8 +619,9 @@ async function main() {
       `the recommended ${firstOpen.kind} opens (${firstOpen.route})`,
       !/404|Không tìm thấy|not found/i.test(target) &&
         (target.includes(firstOpen.title.slice(0, 12)) ||
+          (!!shownTitle && target.includes(shownTitle.slice(0, 12))) ||
           (!!setTitle && target.includes(setTitle))),
-      `(${target.slice(0, 120)})`,
+      `(shown "${shownTitle}"; ${target.slice(0, 120)})`,
     );
     await page.goBack({ waitUntil: 'networkidle' }).catch(() => undefined);
     if (

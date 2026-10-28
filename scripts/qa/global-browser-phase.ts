@@ -368,7 +368,10 @@ function routesFor(phase: string, ids: Ids): RouteExpectation[] {
                 path: `/exams/${lr.id}`,
                 domain: 'TOEIC',
                 identity: /200 câu|Part 1/,
-                primaryAction: /Bắt đầu làm bài|Tiếp tục làm bài/,
+                // The page opens in part practice; its CTA starts the attempt
+                // full screen, or asks for a part first.
+                primaryAction:
+                  /Bắt đầu ở chế độ toàn màn hình|Làm tiếp ở chế độ toàn màn hình|Chọn ít nhất một Part/,
               } as RouteExpectation,
             ]
           : []),
