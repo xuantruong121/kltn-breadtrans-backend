@@ -27,9 +27,11 @@ void (async () => {
   }).then((r) => r.json())) as any;
   const token = login.data?.accessToken ?? login.data?.access_token;
   const get = async (p: string) =>
-    ((await fetch(`${BE}${p}`, {
-      headers: { authorization: `Bearer ${token}` },
-    }).then((r) => r.json())) as any).data;
+    (
+      (await fetch(`${BE}${p}`, {
+        headers: { authorization: `Bearer ${token}` },
+      }).then((r) => r.json())) as any
+    ).data;
 
   type Row = {
     skill: PracticeSkill;
@@ -93,7 +95,17 @@ void (async () => {
       problems.push(`cefrLevel ${r.cefrLevel} ≠ ${span(r.policy)}`);
     if (problems.length) mismatches++;
     console.log(
-      [r.skill, r.id, span(r.policy), plan, r.requiredPlan ?? '-', r.cefrLevel ?? '-', r.exposed, r.title, problems.join('; ')].join(' | '),
+      [
+        r.skill,
+        r.id,
+        span(r.policy),
+        plan,
+        r.requiredPlan ?? '-',
+        r.cefrLevel ?? '-',
+        r.exposed,
+        r.title,
+        problems.join('; '),
+      ].join(' | '),
     );
   }
   console.log(`\nITEMS=${rows.length}`);
