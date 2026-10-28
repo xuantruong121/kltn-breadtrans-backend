@@ -247,6 +247,13 @@ async function main() {
 
   await page.reload({ waitUntil: 'networkidle' });
   await hidePet(page);
+  // Read the result once it has rendered, not at networkidle (CP60.3 flake on
+  // a busy dev server); a result that never renders still fails below.
+  await page
+    .getByText('Điểm tổng chưa có vì')
+    .first()
+    .waitFor({ timeout: 60_000 })
+    .catch(() => undefined);
   const text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
     'the page labels Speaking skipped and Writing partly skipped',
