@@ -17,52 +17,45 @@ import { dirname, resolve } from 'node:path';
 import * as bcrypt from 'bcrypt';
 import { chromium, type Browser, type Page } from 'playwright';
 import { PrismaClient, Role, SubscriptionStatus } from '@prisma/client';
+import {
+  assertBackendUsesTargets,
+  assertIsolatedTargets,
+  readIsolatedTargets,
+  type IsolatedTargets,
+} from './qa-target-guard';
 
 /**
- * Targets are explicit; there is no default. This audit creates and deletes
- * QA learners directly in the database, so it must never fall back to `.env`
- * (kltn_db) or to the owner's running app (:3000/:3001). CP60.1 found that
- * the old defaults did exactly that.
+ * Targets are explicit and verified (scripts/qa/qa-target-guard.ts). This
+ * audit creates and deletes QA learners directly in the database, so it must
+ * never fall back to `.env` (kltn_db) or to the owner's app (:3000/:3001) —
+ * CP60/CP60.1 found that the old defaults did exactly that.
  *
- *   RECOVERY_FE_BASE_URL       e.g. http://localhost:3100 (harness FE)
- *   SMOKE_BASE_URL             e.g. http://localhost:3101 (harness API)
- *   GLOBAL_AUDIT_DATABASE_URL  the database behind SMOKE_BASE_URL
- *
- * assertAuditTarget() refuses the protected kltn_db cluster unless
- * GLOBAL_AUDIT_PROTECTED_DB=owner-approved is set for an owner-approved run.
+ * At import: QA_TARGET=isolated and every target present, no owner port, no
+ * value inherited from `.env`. Before the first write: database and Redis
+ * identities are not the protected ones. After the first learner: the
+ * backend logs it in and writes its session to the verified Redis. There is
+ * no override for the protected database.
  */
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value)
-    throw new Error(
-      `${name} is required: the global audit has no default target (see global-audit-lib.ts)`,
-    );
-  return value;
-}
+const selected = readIsolatedTargets();
+if (!selected.ok) throw new Error(`QA target refused: ${selected.reason}`);
+const targets: IsolatedTargets = selected.targets;
 
-/** pg_control_system().system_identifier of the kltn_db cluster. */
-const PROTECTED_SYSTEM_IDENTIFIER = '7674533776495505443';
-
-export const FE = requireEnv('RECOVERY_FE_BASE_URL');
-export const BE = requireEnv('SMOKE_BASE_URL');
+export const FE = targets.frontendUrl;
+export const BE = targets.backendUrl;
 export const EVIDENCE = resolve('artifacts/learner-runtime-qa.jsonl');
 export const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 export const prisma = new PrismaClient({
-  datasources: { db: { url: requireEnv('GLOBAL_AUDIT_DATABASE_URL') } },
+  datasources: { db: { url: targets.databaseUrl } },
 });
 
-/** Call before the first write: refuses the protected cluster. */
+let identitiesVerified: Promise<IsolatedTargets> | undefined;
+let backendVerified = false;
+
+/** Database and Redis identities; memoised. Call before the first write. */
 export async function assertAuditTarget() {
-  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-    SELECT system_identifier::text AS id FROM pg_control_system()`;
-  if (
-    rows[0]?.id === PROTECTED_SYSTEM_IDENTIFIER &&
-    process.env.GLOBAL_AUDIT_PROTECTED_DB !== 'owner-approved'
-  )
-    throw new Error(
-      'GLOBAL_AUDIT_DATABASE_URL is the protected kltn_db cluster; refusing to create QA learners there',
-    );
+  identitiesVerified ??= assertIsolatedTargets();
+  await identitiesVerified;
 }
 
 /** Markers are phase-scoped so cleanup can assert zero orphans per phase. */
@@ -102,6 +95,7 @@ export async function createQaLearner(
   tier: 'FREE' | 'PLUS' | 'PRO' = 'PLUS',
   suffix = '',
 ): Promise<QaLearner> {
+  await assertAuditTarget();
   const email = `${marker}${suffix}@breadtrans.local`;
   const password = `Qa-${randomUUID()}-Aa1!`;
   const user = await prisma.user.create({
@@ -131,6 +125,19 @@ export async function createQaLearner(
         endsAt: new Date(Date.now() + 3_600_000),
       },
     });
+  }
+  if (!backendVerified) {
+    try {
+      await assertBackendUsesTargets(targets, {
+        userId: user.id,
+        email,
+        password,
+      });
+      backendVerified = true;
+    } catch (error) {
+      await destroyQaLearner(user.id);
+      throw error;
+    }
   }
   return { userId: user.id, email, password };
 }
