@@ -358,6 +358,7 @@ export class ReadingService {
           isPremiumContent: access.isPremiumContent,
           isLocked: access.isLocked,
           requiredPlan: access.requiredPlan ?? 'FREE',
+          cefrLevel: 'cefrLevel' in access ? access.cefrLevel : null,
           completionStatus: isComplete
             ? 'COMPLETED'
             : completedQuestionCount > 0

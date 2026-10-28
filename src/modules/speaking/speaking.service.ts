@@ -334,6 +334,7 @@ export class SpeakingService {
       isPremiumContent: boolean;
       isLocked: boolean;
       requiredPlan?: string;
+      cefrLevel?: string | null;
     },
   ) {
     const taxonomy =
@@ -361,6 +362,7 @@ export class SpeakingService {
       isPremiumContent: access.isPremiumContent,
       isLocked: access.isLocked,
       requiredPlan: access.requiredPlan ?? 'FREE',
+      cefrLevel: access.cefrLevel ?? null,
     };
     if (access.isLocked) return safeMetadata;
 
@@ -387,6 +389,8 @@ export class SpeakingService {
       categoryLabel: effectiveCategoryLabel,
       isPremiumContent: access.isPremiumContent,
       isLocked: false,
+      requiredPlan: access.requiredPlan ?? 'FREE',
+      cefrLevel: access.cefrLevel ?? null,
     };
   }
 

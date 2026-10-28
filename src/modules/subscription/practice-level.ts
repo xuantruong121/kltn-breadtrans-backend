@@ -34,6 +34,15 @@ export function parseCefrRange(
   return rank(a) <= rank(b) ? { min: a, max: b } : { min: b, max: a };
 }
 
+/**
+ * The one level string every practice catalog exposes ("B1", "B2-C1"), from
+ * the same range the access policy reads. Null when the item has no tag.
+ */
+export function cefrSpan(range: CefrRange | null): string | null {
+  if (!range) return null;
+  return range.min === range.max ? range.min : `${range.min}-${range.max}`;
+}
+
 /** True when any part of the range is B1 or above. */
 export function practiceRequiresPlus(range: CefrRange): boolean {
   return rank(range.max) >= rank('B1');

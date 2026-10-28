@@ -42,6 +42,22 @@ describe('SpeakingContentAccessService (owner matrix 2026-10-28)', () => {
     expect((await service.resolve(exercise('B1'), 7)).isLocked).toBe(locked);
   });
 
+  it('exposes the practice set level, never one for an exam task', async () => {
+    expect((await service.resolve(exercise('B1-B2'), 7)).cefrLevel).toBe(
+      'B1-B2',
+    );
+    expect(
+      (
+        await service.resolve(
+          exercise(null, {
+            practiceSet: { scope: 'EXAM_INTERNAL', level: 'A2' },
+          }),
+          7,
+        )
+      ).cefrLevel,
+    ).toBeNull();
+  });
+
   it('exam tasks keep their stored flag, which then needs PRO', () => {
     expect(
       service.requiredPlan(

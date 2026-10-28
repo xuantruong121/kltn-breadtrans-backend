@@ -49,6 +49,20 @@ describe('QuizContentAccessService (owner matrix 2026-10-28)', () => {
     expect(service.requiredPlan(quiz(type, title))).toBe(required);
   });
 
+  it('exposes the CEFR level the plan was decided from', async () => {
+    // Writing quiz 4 has no content level; its title tag is the authority.
+    const access = await service.resolve(
+      quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional Email'),
+      7,
+    );
+    expect(access).toMatchObject({ cefrLevel: 'B1', requiredPlan: 'PRO' });
+    const course = await service.resolve(
+      quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Course', { courseId: 3 }),
+      7,
+    );
+    expect(course.cefrLevel).toBeNull();
+  });
+
   it('an untagged item never opens just because its tag is missing', () => {
     expect(
       service.requiredPlan(

@@ -1,4 +1,5 @@
 import {
+  cefrSpan,
   levelGroup,
   levelLabel,
   parseCefrRange,
@@ -41,5 +42,14 @@ describe('practice level policy (A1/A2 free, B1+ PLUS)', () => {
     expect(levelLabel({ min: 'A1', max: 'A2' })).toBe('Cơ bản · A1–A2');
     expect(levelLabel({ min: 'B1', max: 'B1' })).toBe('Trung cấp · B1');
     expect(levelLabel({ min: 'B2', max: 'C1' })).toBeNull();
+  });
+
+  it('exposes one level string per item, or null without a tag', () => {
+    expect(cefrSpan(parseCefrRange('Writing B1 — Professional Email'))).toBe(
+      'B1',
+    );
+    expect(cefrSpan(parseCefrRange('Writing B2–C1 — Argument'))).toBe('B2-C1');
+    expect(cefrSpan(parseCefrRange('A1-A2'))).toBe('A1-A2');
+    expect(cefrSpan(parseCefrRange('Untitled'))).toBeNull();
   });
 });

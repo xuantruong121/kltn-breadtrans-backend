@@ -7,6 +7,8 @@ import { PlanFeatureKey, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
   advancedPracticePlan,
+  cefrSpan,
+  type CefrRange,
   parseCefrRange,
   planSatisfies,
   type PracticePlan,
@@ -28,6 +30,8 @@ export type SpeakingContentAccess = {
   featureKey: PlanFeatureKey;
   /** Lowest plan that opens this exercise (FREE when it is not premium). */
   requiredPlan: PracticePlan;
+  /** Authored CEFR level the plan was decided from ("A2", "B1-B2"). */
+  cefrLevel: string | null;
 };
 
 /** Backend-authoritative access policy for Speaking exercise content. */
@@ -44,15 +48,20 @@ export class SpeakingContentAccessService {
    * stored flag, which then needs PRO.
    */
   requiredPlan(exercise: SpeakingContentAccessSubject): PracticePlan {
-    if (exercise.practiceSet?.scope !== 'EXAM_INTERNAL') {
-      const range =
-        parseCefrRange(exercise.practiceSet?.level) ??
-        parseCefrRange(exercise.title);
-      if (range) return requiredPracticePlan('SPEAKING', range);
-    }
+    const range = this.cefrRange(exercise);
+    if (range) return requiredPracticePlan('SPEAKING', range);
     return exercise.isPremiumContent
       ? advancedPracticePlan('SPEAKING')
       : 'FREE';
+  }
+
+  /** Practice set level, else the title tag; null for TOEIC exam tasks. */
+  cefrRange(exercise: SpeakingContentAccessSubject): CefrRange | null {
+    if (exercise.practiceSet?.scope === 'EXAM_INTERNAL') return null;
+    return (
+      parseCefrRange(exercise.practiceSet?.level) ??
+      parseCefrRange(exercise.title)
+    );
   }
 
   isPremium(exercise: SpeakingContentAccessSubject): boolean {
@@ -74,6 +83,7 @@ export class SpeakingContentAccessService {
         !planSatisfies(planCode, requiredPlan),
       featureKey: this.featureKey,
       requiredPlan,
+      cefrLevel: cefrSpan(this.cefrRange(exercise)),
     };
   }
 

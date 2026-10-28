@@ -7,6 +7,8 @@ import { PlanFeatureKey, QuizType, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
   advancedPracticePlan,
+  cefrSpan,
+  type CefrRange,
   parseCefrRange,
   planSatisfies,
   type PracticePlan,
@@ -29,6 +31,8 @@ export type QuizContentAccess = {
   featureKey: PlanFeatureKey | null;
   /** Lowest plan that opens this item (FREE when it is not premium). */
   requiredPlan: PracticePlan;
+  /** Authored CEFR level the plan was decided from ("B1", "B2-C1"). */
+  cefrLevel: string | null;
 };
 
 /**
@@ -67,11 +71,15 @@ export class QuizContentAccessService {
   requiredPlan(quiz: QuizContentAccessSubject): PracticePlan {
     const skill = this.skillForQuizType(quiz.type);
     if (!skill) return 'FREE';
-    if (quiz.courseId == null) {
-      const range = parseCefrRange(quiz.title);
-      if (range) return requiredPracticePlan(skill, range);
-    }
+    const range = this.cefrRange(quiz);
+    if (range) return requiredPracticePlan(skill, range);
     return quiz.isPremiumContent ? advancedPracticePlan(skill) : 'FREE';
+  }
+
+  /** CEFR range of standalone skill practice; null for anything else. */
+  cefrRange(quiz: QuizContentAccessSubject): CefrRange | null {
+    if (!this.skillForQuizType(quiz.type) || quiz.courseId != null) return null;
+    return parseCefrRange(quiz.title);
   }
 
   isPremium(quiz: QuizContentAccessSubject): boolean {
@@ -94,6 +102,7 @@ export class QuizContentAccessService {
         !planSatisfies(planCode, requiredPlan),
       featureKey,
       requiredPlan,
+      cefrLevel: cefrSpan(this.cefrRange(quiz)),
     };
   }
 
