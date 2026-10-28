@@ -345,3 +345,189 @@ describe('B1 picture tasks: one sentence linking two ideas', () => {
     ).toContain('SAMPLE_ONE_SENTENCE');
   });
 });
+
+describe('picture writing: scene relevance policy (CP58-H)', () => {
+  const content = {
+    taskType: 'PICTURE_SENTENCE',
+    imageUrl:
+      'https://example.r2.dev/catalog/toeic/shared/images/construction-plan.png',
+    sceneDescription:
+      'At a construction site, two men wearing hard hats, one white and one yellow, and bright safety vests hold a large paper plan and study it together. Behind them is an unfinished concrete building.',
+    prompt: 'Viết MỘT câu nối hai ý bằng từ nối.',
+    requirements: ['Viết một câu nối hai ý bằng từ nối.'],
+    requireLinking: true,
+    requiredKeywords: ['plan', 'site'],
+    sampleResponse:
+      'Two engineers are studying a large plan at a construction site where the walls are unfinished.',
+    wordRange: [1, 40],
+    rubric: { grammar: 4, vocabulary: 2, taskCompletion: 4 },
+  };
+  const task = practiceWritingTask(content, 'fallback')!;
+  // G4 from the live check (2026-10-28): correct English, both cue words and
+  // a connector, but a different scene; Gemini returned 4 + 2 + 1 = 7/10.
+  const g4 =
+    'Two children are drawing a plan for a sandcastle at the beach site because they want to win a prize.';
+  const graded = (
+    scores: [number, number, number],
+    sceneMatch?: string,
+    sceneEvidence = 'Câu tả trẻ em vẽ lâu đài cát ở bãi biển, còn tranh là hai kỹ sư xem bản vẽ ở công trường.',
+  ) => ({
+    criteria: [
+      {
+        key: 'grammar',
+        score: scores[0],
+        comment: 'Câu đúng ngữ pháp, chia động từ chính xác.',
+      },
+      {
+        key: 'vocabulary',
+        score: scores[1],
+        comment: 'Dùng đúng hai từ gợi ý plan và site.',
+      },
+      {
+        key: 'taskCompletion',
+        score: scores[2],
+        comment: 'Nhận xét về mức độ đáp ứng yêu cầu.',
+      },
+    ],
+    strengths: ['Câu có cấu trúc rõ ràng.'],
+    corrections: [],
+    feedback: 'Bài viết đúng ngữ pháp và có dùng từ nối.',
+    suggestions: ['Hãy mô tả đúng người và hành động trong tranh.'],
+    ...(sceneMatch ? { sceneMatch, sceneEvidence } : {}),
+  });
+  const validate = (raw: unknown, text = g4) =>
+    validatePracticeWritingResult(
+      raw,
+      task,
+      text,
+      buildPracticeWritingRequest(task, text).facts,
+    );
+
+  it('asks the grader for a relevance verdict on picture tasks only', () => {
+    const picture = buildPracticeWritingRequest(task, g4);
+    expect(picture.responseSchema.required).toEqual(
+      expect.arrayContaining(['sceneMatch', 'sceneEvidence']),
+    );
+    expect(picture.systemInstruction).toContain('Return sceneMatch');
+    const sentence = buildPracticeWritingRequest(sentenceTask, answer);
+    expect(sentence.responseSchema.required).not.toContain('sceneMatch');
+    expect(sentence.systemInstruction).not.toContain('sceneMatch');
+  });
+
+  it('MISMATCH: the provider total 7/10 becomes at most 4/10 with task completion 0', () => {
+    const r = validate(graded([4, 2, 1], 'MISMATCH'));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.score).toBeLessThanOrEqual(4);
+    expect(r.value.score).toBe(4);
+    const task0 = r.value.criteria.find((c) => c.key === 'taskCompletion')!;
+    expect(task0.score).toBe(0);
+    expect(task0.comment).toContain('không mô tả nội dung bức tranh');
+    expect(r.value.criteria.reduce((n, c) => n + c.score, 0)).toBe(
+      r.value.score,
+    );
+    expect(
+      r.value.criteria.find((c) => c.key === 'grammar')!.comment,
+    ).toContain('đúng ngữ pháp');
+    expect(r.value.scoreAdjustment).toEqual({
+      reason: 'SCENE_MISMATCH',
+      providerScore: 7,
+      cap: 4,
+    });
+    expect(r.value.feedback).toContain('chưa mô tả đúng bức tranh');
+    expect(r.value.scene?.match).toBe('MISMATCH');
+  });
+
+  it('MISMATCH is enforced even when the grader still gives full task marks', () => {
+    const r = validate(graded([4, 2, 4], 'MISMATCH'));
+    expect(r.ok && r.value.score).toBe(4);
+    expect(r.ok && r.value.scoreAdjustment?.providerScore).toBe(10);
+  });
+
+  it('MISMATCH with already low marks keeps them and adds no adjustment', () => {
+    const r = validate(graded([1, 1, 0], 'MISMATCH'));
+    expect(r.ok && r.value.score).toBe(2);
+    expect(r.ok && r.value.scoreAdjustment).toBeUndefined();
+  });
+
+  it('MATCH keeps the grader score (valid A2/B1 answers are not capped)', () => {
+    const text =
+      'Two engineers in hard hats study a plan at the construction site, which is still unfinished.';
+    const r = validate(
+      graded(
+        [4, 2, 4],
+        'MATCH',
+        'Câu tả đúng hai kỹ sư xem bản vẽ ở công trường.',
+      ),
+      text,
+    );
+    expect(r.ok && r.value.score).toBe(10);
+    expect(r.ok && r.value.scoreAdjustment).toBeUndefined();
+  });
+
+  it('PARTIAL and UNCERTAIN are not capped automatically', () => {
+    const partial = validate(
+      graded(
+        [4, 2, 2],
+        'PARTIAL',
+        'Câu nói đúng bản vẽ nhưng sai số người trong tranh.',
+      ),
+    );
+    expect(partial.ok && partial.value.score).toBe(8);
+    const uncertain = validate(
+      graded(
+        [4, 2, 3],
+        'UNCERTAIN',
+        'Không chắc câu có tả đúng hành động trong tranh.',
+      ),
+    );
+    expect(uncertain.ok && uncertain.value.score).toBe(9);
+  });
+
+  it('a picture result without a verdict or evidence is rejected (the grader is asked again)', () => {
+    expect(validate(graded([4, 2, 1])).ok).toBe(false);
+    const noEvidence = validate(graded([4, 2, 1], 'MISMATCH', 'no detail'));
+    expect(!noEvidence.ok && noEvidence.reason).toBe('SCENE_EVIDENCE_MISSING');
+    expect(validate(graded([4, 2, 1], 'OFFTOPIC')).ok).toBe(false);
+  });
+
+  it('ordinary sentence tasks ignore any scene fields and keep their score', () => {
+    const r = validatePracticeWritingResult(
+      {
+        ...good,
+        sceneMatch: 'MISMATCH',
+        sceneEvidence: 'Không liên quan đến tranh nào.',
+      },
+      sentenceTask,
+      answer,
+      facts,
+    );
+    expect(r.ok && r.value.score).toBe(9);
+    expect(r.ok && r.value.scene).toBeUndefined();
+  });
+
+  it('the cap splits the remaining points proportionally and never exceeds 4/10', () => {
+    for (const s of [
+      [4, 2, 4],
+      [4, 2, 0],
+      [3, 2, 2],
+      [4, 1, 3],
+      [2, 2, 4],
+    ] as Array<[number, number, number]>) {
+      const r = validate(graded(s, 'MISMATCH'));
+      expect(r.ok && r.value.score).toBeLessThanOrEqual(4);
+      expect(
+        r.ok && r.value.criteria.every((c) => c.score >= 0 && c.score <= c.max),
+      ).toBe(true);
+    }
+  });
+
+  it('B1 guidance: two correct sentences are a task issue, not a grammar error', () => {
+    const { systemInstruction } = buildPracticeWritingRequest(
+      task,
+      'A man reads a plan. The site is big.',
+    );
+    expect(systemInstruction).toContain('not a grammar error');
+    expect(systemInstruction).toContain('natural English');
+  });
+});

@@ -348,6 +348,10 @@ export class WritingService {
             wordRange: detail.wordRange,
             keywords: detail.keywords,
             ...(detail.linking ? { linking: detail.linking } : {}),
+            ...(detail.scene ? { scene: detail.scene } : {}),
+            ...(detail.scoreAdjustment
+              ? { scoreAdjustment: detail.scoreAdjustment }
+              : {}),
           }
         : {}),
     };

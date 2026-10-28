@@ -322,6 +322,82 @@ void (async () => {
     `(${proTry.status})`,
   );
 
+  console.log('\n== Scene relevance (CP58-H, mock verdicts)');
+  const sceneUser = await newStudent('cp58-pic-scene');
+  await grant(admin.token, sceneUser.userId, 'PRO');
+  const sb1 = tasksOf(B1);
+  const mismatch = await submit(
+    sceneUser,
+    B1,
+    sb1[2],
+    'Two children are drawing a plan for a sandcastle at the beach site because they want to win a prize [[scene:MISMATCH]] [[percent:90]].',
+  );
+  const mismatchRow = harnessQuery(
+    `select s.score, r.score from "Submission" s join "Result" r on r."submissionId" = s.id where s.id = ${mismatch.data?.submissionId}`,
+  )[0];
+  check(
+    'MISMATCH with cue words + connector: final <= 4/10, task completion 0, adjustment recorded',
+    mismatch.data?.score <= 4 &&
+      mismatch.data?.criteria?.find((c: any) => c.key === 'taskCompletion')
+        ?.score === 0 &&
+      mismatch.data?.scoreAdjustment?.reason === 'SCENE_MISMATCH' &&
+      mismatch.data?.scene?.match === 'MISMATCH',
+    JSON.stringify([mismatch.data?.score, mismatch.data?.scoreAdjustment]),
+  );
+  check(
+    'persisted submission and result use the capped score',
+    Number(mismatchRow?.[0]) === mismatch.data?.score &&
+      Number(mismatchRow?.[1]) === mismatch.data?.score,
+    JSON.stringify(mismatchRow),
+  );
+  const analytics = await call(
+    'GET',
+    `/quizzes/submissions/${mismatch.data?.submissionId}/analytics`,
+    sceneUser.token,
+  );
+  check(
+    'result view serves the same capped score',
+    JSON.stringify(analytics.data ?? {}).includes(
+      `"score":${mismatch.data?.score}`,
+    ),
+  );
+  const partial = await submit(
+    sceneUser,
+    B1,
+    sb1[0],
+    'A manager points at a chart during a presentation while people sit [[scene:PARTIAL]] [[percent:80]].',
+  );
+  check(
+    'PARTIAL is not capped',
+    partial.data?.score === 8 && !partial.data?.scoreAdjustment,
+    JSON.stringify([partial.data?.score]),
+  );
+  const uncertain = await submit(
+    sceneUser,
+    B1,
+    sb1[1],
+    'A woman is putting a file on a shelf while she organises the office [[scene:UNCERTAIN]] [[percent:90]].',
+  );
+  check(
+    'UNCERTAIN alternative description is not capped',
+    uncertain.data?.score === 10 && !uncertain.data?.scoreAdjustment,
+  );
+  for (const q of [sb1[3], sb1[4]])
+    await submit(
+      sceneUser,
+      B1,
+      q,
+      'A worker stands on a ladder so that he can replace a light [[percent:100]].',
+    );
+  await settle();
+  const sceneEx = (await call('GET', `/writing/quizzes/${B1}`, sceneUser.token))
+    .data?.exercise;
+  check(
+    `completion XP uses the capped task score (percent ${sceneEx?.percent})`,
+    sceneEx?.complete === true && xp(sceneUser) === sceneEx?.percent,
+    `(xp ${xp(sceneUser)})`,
+  );
+
   console.log(`\nCP58_PICTURE_WRITING_FAILURES=${failureCount()}`);
   process.exit(failureCount() ? 1 : 0);
 })();

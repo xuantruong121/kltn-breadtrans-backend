@@ -143,6 +143,48 @@ void (async () => {
     await page.screenshot({
       path: `artifacts/qa-screens/cp58-picture-workspace-${width}.png`,
     });
+    // CP58-H: an off-topic answer is capped, and the page shows the stored score.
+    await page.getByRole('button', { name: 'Tranh tiếp theo' }).click();
+    await page.waitForTimeout(1500);
+    await page
+      .locator('#picture-answer')
+      .fill(
+        'Two children are playing football at the beach because it is sunny [[scene:MISMATCH]] [[percent:90]].',
+      );
+    const submitted = page.waitForResponse(
+      (r) =>
+        /\/writing\/quizzes\/\d+\/submit/.test(r.url()) &&
+        r.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Chấm bài' }).click();
+    const stored = (await (await submitted).json()).data;
+    await page
+      .getByRole('heading', { name: 'Kết quả' })
+      .waitFor({ timeout: 60_000 });
+    const capped = (
+      await page.getByRole('region', { name: 'Bài viết của bạn' }).innerText()
+    ).replace(/\s+/g, ' ');
+    check(
+      'off-topic answer: page shows the capped stored score and why',
+      stored?.score <= 4 &&
+        capped.includes(`Kết quả ${stored?.score}/${stored?.maxScore}`) &&
+        capped.includes('không mô tả nội dung bức tranh'),
+      capped.slice(0, 160),
+    );
+    await page.goto(`${FE}/writing/submissions/${stored?.submissionId}`, {
+      waitUntil: 'networkidle',
+      timeout: 120_000,
+    });
+    await page.waitForTimeout(2000);
+    const review = (await page.locator('body').innerText()).replace(
+      /\s+/g,
+      ' ',
+    );
+    check(
+      'result page shows the same stored score',
+      new RegExp(`${stored?.score}\\s*/\\s*${stored?.maxScore}`).test(review),
+      review.slice(0, 160),
+    );
 
     // Direct link to a B1 picture as FREE
     await page.goto(`${FE}/writing/${B1}`, {

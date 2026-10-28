@@ -146,6 +146,53 @@ export function pictureTaskIssues(content: Record<string, unknown>): string[] {
   return issues;
 }
 
+/** How well a picture answer describes the authored scene. */
+export const SCENE_MATCHES = [
+  'MATCH',
+  'PARTIAL',
+  'MISMATCH',
+  'UNCERTAIN',
+] as const;
+export type SceneMatch = (typeof SCENE_MATCHES)[number];
+
+/** Owner policy: an answer that does not describe the scene scores <= 40 %. */
+export const SCENE_MISMATCH_CAP_RATIO = 0.4;
+
+/**
+ * Picture tasks only: a confirmed MISMATCH sets the task criterion to 0 and
+ * caps the total at 40 % of the maximum (4/10). Grammar and vocabulary keep
+ * their comments; their points are scaled down proportionally (largest
+ * remainder) so the criteria still add up to the capped total. PARTIAL and
+ * UNCERTAIN keep the grader's scores.
+ */
+export function applySceneMismatchCap(
+  criteria: Array<{ key: string; score: number; max: number }>,
+  taskKey = 'taskCompletion',
+): { criteria: typeof criteria; providerScore: number; cap: number } {
+  const providerScore = criteria.reduce((n, c) => n + c.score, 0);
+  const maxScore = criteria.reduce((n, c) => n + c.max, 0);
+  const cap = Math.floor(maxScore * SCENE_MISMATCH_CAP_RATIO);
+  const zeroed = criteria.map((c) =>
+    c.key === taskKey ? { ...c, score: 0 } : { ...c },
+  );
+  const rest = zeroed.reduce((n, c) => n + c.score, 0);
+  if (rest <= cap) return { criteria: zeroed, providerScore, cap };
+  const exact = zeroed.map((c) => (c.score * cap) / rest);
+  const scaled = zeroed.map((c, i) => ({ ...c, score: Math.floor(exact[i]) }));
+  let left = cap - scaled.reduce((n, c) => n + c.score, 0);
+  const order = exact
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (const { i } of order) {
+    if (left <= 0) break;
+    if (scaled[i].score < scaled[i].max && scaled[i].key !== taskKey) {
+      scaled[i].score += 1;
+      left -= 1;
+    }
+  }
+  return { criteria: scaled, providerScore, cap };
+}
+
 /** The 40-word limit applies to picture tasks only. */
 export function exceedsPictureWordLimit(
   task: PracticeWritingTask | null,
@@ -307,6 +354,9 @@ export function buildPracticeWritingRequest(
           'Under taskCompletion, the response must describe that picture and use both required keywords (facts.keywords already accounts for inflected forms such as scans, carried, shelves).',
           'Any accurate sentence about people, actions or objects in task.picture is valid; never deduct for wording that differs from the sample response.',
           'Statements that contradict task.picture lose taskCompletion points; plausible details that the description does not mention are acceptable. A sentence unrelated to the picture scores 0 for taskCompletion.',
+          'Return sceneMatch: MATCH (the answer describes people, actions or objects of task.picture), PARTIAL (partly relevant, with important details missing or wrong), MISMATCH (clearly describes a different scene or contradicts task.picture), UNCERTAIN (cannot tell). Using the required keywords never makes an answer MATCH by itself; different wording from the sample is never MISMATCH.',
+          'Return sceneEvidence in Vietnamese with full diacritics: one sentence naming the concrete details of the answer that agree with or contradict task.picture.',
+          'Score grammar on grammatical accuracy only. Writing two correct sentences instead of the one requested sentence is a task requirement issue for taskCompletion, not a grammar error. A correction that joins sentences must be natural English that keeps the meaning, using a fitting connector or a relative clause.',
         ]
       : []),
     ...(task.requireLinking
@@ -373,6 +423,16 @@ export function buildPracticeWritingRequest(
       'suggestions',
     ],
   };
+  if (task.picture) {
+    (responseSchema.properties as Record<string, unknown>).sceneMatch = {
+      type: 'string',
+      enum: [...SCENE_MATCHES],
+    };
+    (responseSchema.properties as Record<string, unknown>).sceneEvidence = {
+      type: 'string',
+    };
+    responseSchema.required.push('sceneMatch', 'sceneEvidence');
+  }
   return {
     systemInstruction,
     prompt,
@@ -405,6 +465,14 @@ export type PracticeWritingResult = {
   keywords: Array<{ keyword: string; present: boolean }>;
   /** B1 picture tasks: the connector found and the sentence count. */
   linking?: { required: true; found: string | null; sentences: number };
+  /** Picture tasks: the grader's relevance verdict and its evidence. */
+  scene?: { match: SceneMatch; evidence: string };
+  /** Present when the server lowered the grader's total (scene mismatch). */
+  scoreAdjustment?: {
+    reason: 'SCENE_MISMATCH';
+    providerScore: number;
+    cap: number;
+  };
   /** Corrections dropped because they did not quote the learner's text. */
   ungroundedDropped: number;
 };
@@ -461,6 +529,35 @@ export function validatePracticeWritingResult(
   }
   if ((r.criteria as unknown[]).length !== task.rubric.length)
     return { ok: false, reason: 'UNKNOWN_CRITERION' };
+  let scene: PracticeWritingResult['scene'];
+  let scoreAdjustment: PracticeWritingResult['scoreAdjustment'];
+  let finalCriteria = criteria;
+  if (task.picture) {
+    if (!SCENE_MATCHES.includes(r.sceneMatch as SceneMatch))
+      return { ok: false, reason: 'SCENE_MATCH_MISSING' };
+    const evidence =
+      typeof r.sceneEvidence === 'string' ? r.sceneEvidence.trim() : '';
+    if (evidence.length < 10 || !hasVietnameseDiacritics(evidence))
+      return { ok: false, reason: 'SCENE_EVIDENCE_MISSING' };
+    scene = { match: r.sceneMatch as SceneMatch, evidence };
+    if (scene.match === 'MISMATCH') {
+      const capped = applySceneMismatchCap(criteria);
+      finalCriteria = criteria.map((c, i) => ({
+        ...c,
+        score: capped.criteria[i].score,
+        comment:
+          c.key === 'taskCompletion'
+            ? `0 điểm vì câu trả lời không mô tả nội dung bức tranh. ${evidence}`
+            : c.comment,
+      }));
+      if (capped.providerScore > finalCriteria.reduce((n, c) => n + c.score, 0))
+        scoreAdjustment = {
+          reason: 'SCENE_MISMATCH',
+          providerScore: capped.providerScore,
+          cap: capped.cap,
+        };
+    }
+  }
   if (typeof r.feedback !== 'string' || r.feedback.trim().length < 10)
     return { ok: false, reason: 'FEEDBACK_MISSING' };
   // Unaccented Vietnamese is unreadable for the learner; ask again.
@@ -500,17 +597,22 @@ export function validatePracticeWritingResult(
     ok: true,
     value: {
       rubricVersion: PRACTICE_WRITING_RUBRIC_VERSION,
-      score: criteria.reduce((n, c) => n + c.score, 0),
+      score: finalCriteria.reduce((n, c) => n + c.score, 0),
       maxScore: task.rubric.reduce((n, c) => n + c.max, 0),
-      criteria,
+      criteria: finalCriteria,
       strengths,
       corrections,
-      feedback: r.feedback.trim(),
+      feedback:
+        scene?.match === 'MISMATCH'
+          ? `Câu trả lời chưa mô tả đúng bức tranh nên điểm tối đa là ${Math.floor(task.rubric.reduce((n, c) => n + c.max, 0) * SCENE_MISMATCH_CAP_RATIO)}/${task.rubric.reduce((n, c) => n + c.max, 0)}. ${scene.evidence} ${r.feedback.trim()}`
+          : r.feedback.trim(),
       suggestions,
       wordCount: facts.wordCount,
       wordRange: task.wordRange,
       keywords: facts.keywords,
       ...(facts.linking ? { linking: facts.linking } : {}),
+      ...(scene ? { scene } : {}),
+      ...(scoreAdjustment ? { scoreAdjustment } : {}),
       ungroundedDropped: dropped,
     },
   };
