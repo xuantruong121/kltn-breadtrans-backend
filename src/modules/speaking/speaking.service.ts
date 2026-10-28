@@ -330,7 +330,11 @@ export class SpeakingService {
 
   private async projectExercise(
     exercise: SpeakingExerciseProjectionInput,
-    access: { isPremiumContent: boolean; isLocked: boolean },
+    access: {
+      isPremiumContent: boolean;
+      isLocked: boolean;
+      requiredPlan?: string;
+    },
   ) {
     const taxonomy =
       exercise.categoryTaxonomy ?? exercise.practiceSet?.categoryTaxonomy;
@@ -356,6 +360,7 @@ export class SpeakingService {
       stimulusId: exercise.stimulusId,
       isPremiumContent: access.isPremiumContent,
       isLocked: access.isLocked,
+      requiredPlan: access.requiredPlan ?? 'FREE',
     };
     if (access.isLocked) return safeMetadata;
 

@@ -1,79 +1,82 @@
-import { UnauthorizedException } from '@nestjs/common';
-import { PlanFeatureKey, Role } from '@prisma/client';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
 
-describe('SpeakingContentAccessService', () => {
-  const subscription = { hasFeature: jest.fn() };
+describe('SpeakingContentAccessService (owner matrix 2026-10-28)', () => {
+  const subscriptions = { effectivePlanCode: jest.fn() };
   let service: SpeakingContentAccessService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    subscription.hasFeature.mockResolvedValue(false);
+    subscriptions.effectivePlanCode.mockResolvedValue('FREE');
     service = new SpeakingContentAccessService(
-      subscription as unknown as SubscriptionService,
+      subscriptions as unknown as SubscriptionService,
     );
   });
 
-  const premium = { id: 1, isPremiumContent: true };
+  const exercise = (level: string | null, overrides = {}) => ({
+    id: 5,
+    isPremiumContent: false,
+    title: 'Task',
+    practiceSet: level ? { scope: 'SKILL_PRACTICE', level } : null,
+    ...overrides,
+  });
 
-  it('keeps existing free content accessible without entitlement', async () => {
+  it.each([
+    ['A1-A2', 'FREE'],
+    ['A2', 'FREE'],
+    ['B1', 'PRO'],
+    ['B1-B2', 'PRO'],
+    ['C1', 'PRO'],
+  ])('a %s set requires %s', (level, required) => {
+    expect(service.requiredPlan(exercise(level))).toBe(required);
+  });
+
+  it.each([
+    ['FREE', true],
+    ['PLUS', true],
+    ['PRO', false],
+  ])('a %s learner on B1 Speaking: locked = %s', async (plan, locked) => {
+    subscriptions.effectivePlanCode.mockResolvedValue(plan);
+    expect((await service.resolve(exercise('B1'), 7)).isLocked).toBe(locked);
+  });
+
+  it('exam tasks keep their stored flag, which then needs PRO', () => {
+    expect(
+      service.requiredPlan(
+        exercise(null, {
+          isPremiumContent: true,
+          practiceSet: { scope: 'EXAM_INTERNAL', level: 'A2' },
+        }),
+      ),
+    ).toBe('PRO');
+  });
+
+  it('refuses a PLUS learner with PRO as the required plan, and asks guests to sign in', async () => {
+    subscriptions.effectivePlanCode.mockResolvedValue('PLUS');
+    await expect(service.assertAccess(exercise('C1'), 7)).rejects.toMatchObject(
+      { response: { error: { requiredPlan: 'PRO' } } },
+    );
     await expect(
-      service.assertAccess({ id: 2, isPremiumContent: false }, 7),
-    ).resolves.toBeUndefined();
-    expect(subscription.hasFeature).not.toHaveBeenCalled();
-  });
-
-  it('returns locked metadata without leaking content entitlement', async () => {
-    await expect(service.resolve(premium, 7)).resolves.toMatchObject({
-      isPremiumContent: true,
-      isLocked: true,
-      featureKey: PlanFeatureKey.PREMIUM_SPEAKING_CONTENT,
-    });
-  });
-
-  it('rejects guests and non-entitled users with the commercial error contract', async () => {
-    await expect(service.assertAccess(premium)).rejects.toBeInstanceOf(
+      service.assertAccess(exercise('C1'), 7),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.assertAccess(exercise('C1'))).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
-    await expect(service.assertAccess(premium, 7)).rejects.toMatchObject({
-      response: {
-        error: {
-          code: 'FEATURE_NOT_INCLUDED',
-          featureKey: PlanFeatureKey.PREMIUM_SPEAKING_CONTENT,
-        },
-      },
-    });
   });
 
-  it('requires the exact content feature and not a generic paid plan', async () => {
-    subscription.hasFeature.mockResolvedValue(true);
-    await expect(service.assertAccess(premium, 7)).resolves.toBeUndefined();
-    expect(subscription.hasFeature).toHaveBeenCalledWith(
-      7,
-      PlanFeatureKey.PREMIUM_SPEAKING_CONTENT,
-    );
-  });
-
-  it('allows Admin preview without commercial entitlement', async () => {
-    await expect(
-      service.assertAccess(premium, 1, Role.ADMIN),
-    ).resolves.toBeUndefined();
-    expect(subscription.hasFeature).not.toHaveBeenCalled();
-  });
-
-  it('checks a list once and marks each premium item consistently', async () => {
-    const result = await service.resolveMany(
-      [
-        premium,
-        { id: 2, isPremiumContent: true },
-        { id: 3, isPremiumContent: false },
-      ],
+  it('a list resolves the plan once; admins are never locked', async () => {
+    subscriptions.effectivePlanCode.mockResolvedValue('PLUS');
+    const map = await service.resolveMany(
+      [exercise('A2', { id: 1 }), exercise('B2', { id: 2 })],
       7,
     );
-    expect(subscription.hasFeature).toHaveBeenCalledTimes(1);
-    expect(result.get(1)?.isLocked).toBe(true);
-    expect(result.get(2)?.isLocked).toBe(true);
-    expect(result.get(3)?.isLocked).toBe(false);
+    expect(subscriptions.effectivePlanCode).toHaveBeenCalledTimes(1);
+    expect(map.get(1)?.isLocked).toBe(false);
+    expect(map.get(2)).toMatchObject({ isLocked: true, requiredPlan: 'PRO' });
+    expect(
+      (await service.resolve(exercise('B2'), 7, Role.ADMIN)).isLocked,
+    ).toBe(false);
   });
 });

@@ -401,6 +401,8 @@ export class WritingService {
       type: QuizType;
       isPremiumContent: boolean;
       courseId: number | null;
+      /** Carries the authored CEFR tag the access policy reads. */
+      title?: string;
     }>,
     userId?: number,
     role?: import('@prisma/client').Role,
@@ -411,7 +413,11 @@ export class WritingService {
     return new Map(
       quizzes.map((quiz) => [
         quiz.id,
-        { isPremiumContent: quiz.isPremiumContent, isLocked: false },
+        {
+          isPremiumContent: quiz.isPremiumContent,
+          isLocked: false,
+          requiredPlan: 'FREE',
+        },
       ]),
     );
   }
@@ -483,6 +489,7 @@ export class WritingService {
         const access = accessByQuiz.get(q.id) ?? {
           isPremiumContent: Boolean(q.isPremiumContent),
           isLocked: false,
+          requiredPlan: 'FREE',
         };
         const safeMetadata = {
           id: q.id,
@@ -496,6 +503,7 @@ export class WritingService {
           isCompleted: completedQuizIds.has(q.id),
           isPremiumContent: access.isPremiumContent,
           isLocked: access.isLocked,
+          requiredPlan: access.requiredPlan ?? 'FREE',
         };
         if (access.isLocked) return safeMetadata;
         return {

@@ -1,146 +1,145 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { PlanFeatureKey, QuizType, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { QuizContentAccessService } from './quiz-content-access.service';
 
-describe('QuizContentAccessService', () => {
-  const subscriptions = { hasFeature: jest.fn() };
+describe('QuizContentAccessService (owner matrix 2026-10-28)', () => {
+  const subscriptions = { effectivePlanCode: jest.fn() };
   let service: QuizContentAccessService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    subscriptions.hasFeature.mockResolvedValue(false);
+    subscriptions.effectivePlanCode.mockResolvedValue('FREE');
     service = new QuizContentAccessService(
       subscriptions as unknown as SubscriptionService,
     );
   });
 
-  const readingQuiz = (overrides: Record<string, unknown> = {}) => ({
+  const quiz = (
+    type: QuizType,
+    title: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     id: 10,
-    type: QuizType.BILINGUAL_READING,
-    isPremiumContent: true,
+    type,
+    title,
+    isPremiumContent: false,
     courseId: null,
     ...overrides,
   });
 
-  const writingQuiz = (overrides: Record<string, unknown> = {}) => ({
-    id: 20,
-    type: QuizType.WRITING_EMAIL,
-    isPremiumContent: true,
-    courseId: null,
-    ...overrides,
-  });
-
-  it('maps Writing content to its own content feature', () => {
+  it('keeps the content feature of each skill for callers that report it', () => {
     expect(service.featureForQuizType(QuizType.WRITING_EMAIL)).toBe(
       PlanFeatureKey.PREMIUM_WRITING_CONTENT,
     );
-    expect(service.featureForQuizType(QuizType.WRITING_PICTURE)).toBe(
-      PlanFeatureKey.PREMIUM_WRITING_CONTENT,
+    expect(service.featureForQuizType(QuizType.LISTENING_PRACTICE)).toBe(
+      PlanFeatureKey.PREMIUM_LISTENING,
     );
+    expect(service.featureForQuizType(QuizType.TOEIC)).toBeNull();
   });
 
-  it('does not allow course-linked premium Writing without its entitlement', async () => {
-    await expect(
-      service.assertAccess(writingQuiz({ courseId: 9 }), 7),
-    ).rejects.toMatchObject({
-      response: {
-        error: { featureKey: PlanFeatureKey.PREMIUM_WRITING_CONTENT },
-      },
-    });
+  it.each([
+    [QuizType.LISTENING_PRACTICE, 'Listening A2 — Travel', 'FREE'],
+    [QuizType.LISTENING_PRACTICE, 'Listening B1 — Work', 'PLUS'],
+    [QuizType.BILINGUAL_READING, 'Reading C1 — Analysis', 'PLUS'],
+    [QuizType.WRITING_EMAIL, 'Writing A2 — Messages', 'FREE'],
+    [QuizType.WRITING_EMAIL, 'Writing B1 — Professional', 'PRO'],
+    [QuizType.WRITING_PICTURE, 'Writing B2 — Pictures', 'PRO'],
+  ])('%s "%s" requires %s', (type, title, required) => {
+    expect(service.requiredPlan(quiz(type, title))).toBe(required);
   });
 
-  it('does not let the existing vocabulary entitlement unlock Writing', async () => {
-    subscriptions.hasFeature.mockImplementation(
-      (_userId: number, key: PlanFeatureKey) =>
-        key === PlanFeatureKey.PREMIUM_VOCAB,
-    );
-    await expect(service.assertAccess(writingQuiz(), 7)).rejects.toMatchObject({
-      response: {
-        error: {
-          code: 'FEATURE_NOT_INCLUDED',
-          featureKey: PlanFeatureKey.PREMIUM_WRITING_CONTENT,
-        },
-      },
-    });
-  });
-
-  it('locks premium Reading without the feature', async () => {
-    const rejection = service.assertAccess(readingQuiz(), 7);
-    await expect(rejection).rejects.toMatchObject({
-      response: {
-        error: {
-          code: 'FEATURE_NOT_INCLUDED',
-          featureKey: PlanFeatureKey.PREMIUM_READING,
-        },
-      },
-    });
-  });
-
-  it('allows premium Reading with the exact feature entitlement', async () => {
-    subscriptions.hasFeature.mockResolvedValue(true);
-    await expect(
-      service.assertAccess(readingQuiz(), 7),
-    ).resolves.toBeUndefined();
-    expect(subscriptions.hasFeature).toHaveBeenCalledWith(
-      7,
-      PlanFeatureKey.PREMIUM_READING,
-    );
-  });
-
-  it('does not allow an enrollment record to bypass premium Reading entitlement', async () => {
-    await expect(
-      service.assertAccess(readingQuiz({ courseId: 3 }), 7),
-    ).rejects.toMatchObject({
-      response: { error: { featureKey: PlanFeatureKey.PREMIUM_READING } },
-    });
-  });
-
-  it('does not lock free content or require a subscription', async () => {
-    await expect(
-      service.assertAccess(readingQuiz({ isPremiumContent: false }), 7),
-    ).resolves.toBeUndefined();
-    expect(subscriptions.hasFeature).not.toHaveBeenCalled();
-  });
-
-  it('returns locked metadata for a guest without exposing content', async () => {
-    await expect(service.assertAccess(readingQuiz())).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
-    await expect(
-      service.resolve(readingQuiz(), undefined),
-    ).resolves.toMatchObject({
-      isPremiumContent: true,
-      isLocked: true,
-      featureKey: PlanFeatureKey.PREMIUM_READING,
-    });
-  });
-
-  it('lets Admin preview premium content without a PLUS subscription', async () => {
-    await expect(
-      service.assertAccess(readingQuiz(), 1, Role.ADMIN),
-    ).resolves.toBeUndefined();
-    expect(subscriptions.hasFeature).not.toHaveBeenCalled();
-  });
-
-  it('resolves list entitlement once per feature', async () => {
-    const result = await service.resolveMany(
-      [
-        readingQuiz({ id: 1 }),
-        readingQuiz({ id: 2 }),
-        {
-          id: 3,
-          type: QuizType.LISTENING_PRACTICE,
+  it('an untagged item never opens just because its tag is missing', () => {
+    expect(
+      service.requiredPlan(
+        quiz(QuizType.WRITING_EMAIL, 'Untitled', { isPremiumContent: true }),
+      ),
+    ).toBe('PRO');
+    expect(
+      service.requiredPlan(
+        quiz(QuizType.LISTENING_PRACTICE, 'Untitled', {
           isPremiumContent: true,
-          courseId: null,
-        },
+        }),
+      ),
+    ).toBe('PLUS');
+  });
+
+  it.each([
+    ['FREE', 'Listening B1 — Work', true],
+    ['PLUS', 'Listening B1 — Work', false],
+    ['PLUS', 'Writing B1 — Professional', true],
+    ['PRO', 'Writing B1 — Professional', false],
+    ['PRO', 'Listening B1 — Work', false],
+  ])('a %s learner on "%s": locked = %s', async (plan, title, locked) => {
+    subscriptions.effectivePlanCode.mockResolvedValue(plan);
+    const type = title.startsWith('Writing')
+      ? QuizType.WRITING_EMAIL
+      : QuizType.LISTENING_PRACTICE;
+    const access = await service.resolve(quiz(type, title), 7);
+    expect(access.isLocked).toBe(locked);
+  });
+
+  it('an unknown plan code ranks as FREE (fail closed)', async () => {
+    subscriptions.effectivePlanCode.mockResolvedValue('LEGACY_GOLD');
+    const access = await service.resolve(
+      quiz(QuizType.LISTENING_PRACTICE, 'Listening B1 — Work'),
+      7,
+    );
+    expect(access.isLocked).toBe(true);
+  });
+
+  it('a PLUS learner on B1 Writing is refused with PRO as the required plan', async () => {
+    subscriptions.effectivePlanCode.mockResolvedValue('PLUS');
+    await expect(
+      service.assertAccess(
+        quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional'),
+        7,
+      ),
+    ).rejects.toMatchObject({
+      response: { error: { requiredPlan: 'PRO' } },
+    });
+    await expect(
+      service.assertAccess(
+        quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional'),
+        7,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('a guest is asked to sign in for premium content', async () => {
+    await expect(
+      service.assertAccess(
+        quiz(QuizType.BILINGUAL_READING, 'Reading B1 — Documents'),
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('free content and admins never resolve a plan', async () => {
+    await service.resolve(
+      quiz(QuizType.LISTENING_PRACTICE, 'Listening A2 — Travel'),
+      7,
+    );
+    await service.resolve(
+      quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional'),
+      7,
+      Role.ADMIN,
+    );
+    expect(subscriptions.effectivePlanCode).not.toHaveBeenCalled();
+  });
+
+  it('a list resolves the plan once', async () => {
+    subscriptions.effectivePlanCode.mockResolvedValue('PLUS');
+    const map = await service.resolveMany(
+      [
+        quiz(QuizType.LISTENING_PRACTICE, 'Listening B1 — Work', { id: 1 }),
+        quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional', { id: 2 }),
+        quiz(QuizType.WRITING_EMAIL, 'Writing A2 — Messages', { id: 3 }),
       ],
       7,
     );
-
-    expect(subscriptions.hasFeature).toHaveBeenCalledTimes(2);
-    expect(result.get(1)?.isLocked).toBe(true);
-    expect(result.get(2)?.isLocked).toBe(true);
-    expect(result.get(3)?.featureKey).toBe(PlanFeatureKey.PREMIUM_LISTENING);
+    expect(subscriptions.effectivePlanCode).toHaveBeenCalledTimes(1);
+    expect(map.get(1)?.isLocked).toBe(false);
+    expect(map.get(2)).toMatchObject({ isLocked: true, requiredPlan: 'PRO' });
+    expect(map.get(3)).toMatchObject({ isLocked: false, requiredPlan: 'FREE' });
   });
 });

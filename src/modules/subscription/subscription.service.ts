@@ -399,6 +399,11 @@ export class SubscriptionService {
     );
   }
 
+  /** Code of the plan in effect now (FREE when no paid subscription is active). */
+  async effectivePlanCode(userId: number, now = new Date()): Promise<string> {
+    return (await this.resolveEffectivePlan(userId, now)).plan.code;
+  }
+
   async hasFeature(
     userId: number,
     featureKey: PlanFeatureKey,

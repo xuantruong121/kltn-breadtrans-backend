@@ -1224,6 +1224,7 @@ export class QuizService {
         isCompleted,
         isPremiumContent: accessByQuiz.get(quiz.id)?.isPremiumContent ?? false,
         isLocked: accessByQuiz.get(quiz.id)?.isLocked ?? false,
+        requiredPlan: accessByQuiz.get(quiz.id)?.requiredPlan ?? 'FREE',
       };
     };
 

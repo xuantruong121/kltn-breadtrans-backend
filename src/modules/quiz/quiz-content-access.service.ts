@@ -6,8 +6,12 @@ import {
 import { PlanFeatureKey, QuizType, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
+  advancedPracticePlan,
   parseCefrRange,
-  practiceRequiresPlus,
+  planSatisfies,
+  type PracticePlan,
+  type PracticeSkill,
+  requiredPracticePlan,
 } from '../subscription/practice-level';
 
 export type QuizContentAccessSubject = {
@@ -23,40 +27,74 @@ export type QuizContentAccess = {
   isPremiumContent: boolean;
   isLocked: boolean;
   featureKey: PlanFeatureKey | null;
+  /** Lowest plan that opens this item (FREE when it is not premium). */
+  requiredPlan: PracticePlan;
 };
 
 /**
  * Single policy boundary for commercial access to Quiz-backed skill content.
- * Premium Quiz content is governed only by the user's active plan entitlement.
+ * The required plan comes from the skill and the authored CEFR level
+ * (practice-level.ts); the user's plan in effect (expiry included) must reach
+ * it. Stored per-version entitlements no longer decide it, so a plan bought
+ * under an older policy follows the current one.
  */
 @Injectable()
 export class QuizContentAccessService {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
-  /**
-   * Whether this quiz needs a plan. Standalone practice (no course) with an
-   * authored CEFR tag follows the owner policy: A1/A2 free, B1+ PLUS. Other
-   * quizzes (courses, TOEIC sets, untagged content) keep their stored flag.
-   */
-  isPremium(quiz: QuizContentAccessSubject): boolean {
-    if (this.featureForQuizType(quiz.type) && quiz.courseId == null) {
-      const range = parseCefrRange(quiz.title);
-      if (range) return practiceRequiresPlus(range);
-    }
-    return quiz.isPremiumContent;
+  skillForQuizType(type: QuizType): PracticeSkill | null {
+    if (type === QuizType.BILINGUAL_READING) return 'READING';
+    if (type === QuizType.LISTENING_PRACTICE) return 'LISTENING';
+    if (type === QuizType.WRITING_PICTURE || type === QuizType.WRITING_EMAIL)
+      return 'WRITING';
+    return null;
   }
 
   featureForQuizType(type: QuizType): PlanFeatureKey | null {
-    if (type === QuizType.BILINGUAL_READING) {
-      return PlanFeatureKey.PREMIUM_READING;
-    }
-    if (type === QuizType.LISTENING_PRACTICE) {
-      return PlanFeatureKey.PREMIUM_LISTENING;
-    }
-    if (type === QuizType.WRITING_PICTURE || type === QuizType.WRITING_EMAIL) {
-      return PlanFeatureKey.PREMIUM_WRITING_CONTENT;
-    }
+    const skill = this.skillForQuizType(type);
+    if (skill === 'READING') return PlanFeatureKey.PREMIUM_READING;
+    if (skill === 'LISTENING') return PlanFeatureKey.PREMIUM_LISTENING;
+    if (skill === 'WRITING') return PlanFeatureKey.PREMIUM_WRITING_CONTENT;
     return null;
+  }
+
+  /**
+   * Lowest plan for this quiz. Standalone practice with an authored CEFR tag
+   * follows the owner matrix; other quizzes (courses, TOEIC sets, untagged
+   * content) keep their stored flag, which then needs the skill's advanced
+   * plan. An untagged item is never opened just because its tag is missing.
+   */
+  requiredPlan(quiz: QuizContentAccessSubject): PracticePlan {
+    const skill = this.skillForQuizType(quiz.type);
+    if (!skill) return 'FREE';
+    if (quiz.courseId == null) {
+      const range = parseCefrRange(quiz.title);
+      if (range) return requiredPracticePlan(skill, range);
+    }
+    return quiz.isPremiumContent ? advancedPracticePlan(skill) : 'FREE';
+  }
+
+  isPremium(quiz: QuizContentAccessSubject): boolean {
+    return this.requiredPlan(quiz) !== 'FREE';
+  }
+
+  private access(
+    quiz: QuizContentAccessSubject,
+    planCode: string | null,
+    role?: Role,
+  ): QuizContentAccess {
+    const requiredPlan = this.requiredPlan(quiz);
+    const featureKey = this.featureForQuizType(quiz.type);
+    const premium = requiredPlan !== 'FREE';
+    return {
+      isPremiumContent: premium,
+      isLocked:
+        premium &&
+        role !== Role.ADMIN &&
+        !planSatisfies(planCode, requiredPlan),
+      featureKey,
+      requiredPlan,
+    };
   }
 
   async resolve(
@@ -64,30 +102,11 @@ export class QuizContentAccessService {
     userId?: number,
     role?: Role,
   ): Promise<QuizContentAccess> {
-    const featureKey = this.featureForQuizType(quiz.type);
-    const premium = this.isPremium(quiz);
-    if (!premium || !featureKey || role === Role.ADMIN) {
-      return {
-        isPremiumContent: premium,
-        isLocked: false,
-        featureKey,
-      };
-    }
-
-    if (!userId) {
-      return { isPremiumContent: true, isLocked: true, featureKey };
-    }
-
-    const entitled = await this.subscriptionService.hasFeature(
-      userId,
-      featureKey,
-    );
-
-    return {
-      isPremiumContent: true,
-      isLocked: !entitled,
-      featureKey,
-    };
+    const needsPlan = this.isPremium(quiz) && role !== Role.ADMIN && userId;
+    const planCode = needsPlan
+      ? await this.subscriptionService.effectivePlanCode(userId)
+      : null;
+    return this.access(quiz, planCode, role);
   }
 
   async resolveMany(
@@ -95,59 +114,16 @@ export class QuizContentAccessService {
     userId?: number,
     role?: Role,
   ): Promise<Map<number, QuizContentAccess>> {
-    const result = new Map<number, QuizContentAccess>();
-    const eligible = quizzes.filter(
-      (quiz) =>
-        this.isPremium(quiz) &&
-        this.featureForQuizType(quiz.type) !== null &&
-        role !== Role.ADMIN,
+    const needsPlan =
+      userId &&
+      role !== Role.ADMIN &&
+      quizzes.some((quiz) => this.isPremium(quiz));
+    const planCode = needsPlan
+      ? await this.subscriptionService.effectivePlanCode(userId)
+      : null;
+    return new Map(
+      quizzes.map((quiz) => [quiz.id, this.access(quiz, planCode, role)]),
     );
-
-    if (eligible.length === 0 || !userId) {
-      for (const quiz of quizzes) {
-        const featureKey = this.featureForQuizType(quiz.type);
-        const premium = this.isPremium(quiz);
-        result.set(quiz.id, {
-          isPremiumContent: premium,
-          isLocked: Boolean(premium && featureKey && role !== Role.ADMIN),
-          featureKey,
-        });
-      }
-      return result;
-    }
-
-    const featureKeys = [
-      ...new Set(
-        eligible
-          .map((quiz) => this.featureForQuizType(quiz.type))
-          .filter((key): key is PlanFeatureKey => key !== null),
-      ),
-    ];
-    const entitledFeatures = new Set<PlanFeatureKey>();
-    for (const featureKey of featureKeys) {
-      if (await this.subscriptionService.hasFeature(userId, featureKey)) {
-        entitledFeatures.add(featureKey);
-      }
-    }
-
-    for (const quiz of quizzes) {
-      const featureKey = this.featureForQuizType(quiz.type);
-      const premium = this.isPremium(quiz);
-      if (!premium || !featureKey || role === Role.ADMIN) {
-        result.set(quiz.id, {
-          isPremiumContent: premium,
-          isLocked: false,
-          featureKey,
-        });
-        continue;
-      }
-      result.set(quiz.id, {
-        isPremiumContent: true,
-        isLocked: !entitledFeatures.has(featureKey),
-        featureKey,
-      });
-    }
-    return result;
   }
 
   async assertAccess(
@@ -163,10 +139,11 @@ export class QuizContentAccessService {
     }
     throw new ForbiddenException({
       statusCode: 403,
-      message: 'Nội dung cao cấp yêu cầu quyền truy cập phù hợp',
+      message: `Bài luyện này yêu cầu gói ${access.requiredPlan}.`,
       error: {
         code: 'FEATURE_NOT_INCLUDED',
         featureKey: access.featureKey,
+        requiredPlan: access.requiredPlan,
       },
     });
   }
