@@ -10,11 +10,6 @@ import type { Page } from 'playwright';
 import { check, failureCount } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 
-const BAND_RANK: Record<string, number> = {
-  'Cơ bản': 0,
-  'Trung cấp': 1,
-  'Nâng cao': 2,
-};
 const CEFR = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const LABEL = /(Cơ bản|Trung cấp|Nâng cao) · ([ABC][12])(?:–([ABC][12]))?/;
 
@@ -120,8 +115,7 @@ void (async () => {
     );
     await hidePet(page);
 
-    const listening = await checkSkill(page, 'Listening', '/listening');
-    void listening;
+    await checkSkill(page, 'Listening', '/listening');
     await checkSkill(page, 'Reading', '/reading');
     await checkSkill(page, 'Speaking', '/speaking');
     await checkSkill(page, 'Writing', '/writing');
