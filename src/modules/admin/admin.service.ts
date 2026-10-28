@@ -513,24 +513,10 @@ export class AdminService {
           select: { totalPoints: true, weeklyExp: true, tier: true },
         },
         pet: { select: { level: true, exp: true } },
-        enrollments: {
-          where: { status: EnrollmentStatus.ACTIVE },
-          select: {
-            class: {
-              select: {
-                course: { select: { id: true, title: true, level: true } },
-              },
-            },
-          },
-        },
       },
     });
 
     if (!user) throw new NotFoundException('Không tìm thấy học viên');
-
-    const enrolledCourseIds = user.enrollments.map(
-      (enrollment) => enrollment.class.course.id,
-    );
 
     const [
       courseLessons,
@@ -547,14 +533,10 @@ export class AdminService {
       recentActivity,
     ] = await Promise.all([
       this.prisma.courseLesson.findMany({
+        // Self-paced courses: a learner's courses are the ones they studied.
         where: {
           status: CourseLessonStatus.PUBLISHED,
-          OR: [
-            ...(enrolledCourseIds.length
-              ? [{ courseId: { in: enrolledCourseIds } }]
-              : []),
-            { attempts: { some: { userId } } },
-          ],
+          attempts: { some: { userId } },
         },
         orderBy: [{ courseId: 'asc' }, { order: 'asc' }],
         select: {
@@ -741,17 +723,6 @@ export class AdminService {
         : score === maxScore);
 
     const coursesById = new Map<number, any>();
-    for (const enrollment of user.enrollments) {
-      const course = enrollment.class.course;
-      coursesById.set(course.id, {
-        id: course.id,
-        title: course.title,
-        level: course.level,
-        completedLessons: 0,
-        totalLessons: 0,
-        lessons: [],
-      });
-    }
     for (const lesson of courseLessons) {
       const latestByExercise = new Map<
         number,
@@ -1079,74 +1050,10 @@ export class AdminService {
     });
   }
 
-  async enrollUserInClass(userId: number, classId: number) {
-    return this.courseService.enrollInClass(classId, userId, {
-      isAdminOverride: true,
-    });
-  }
-
-  async removeEnrollment(userId: number, classId: number) {
-    const paymentCount = await this.prisma.payment.count({
-      where: { enrollment: { userId, classId } },
-    });
-    if (paymentCount > 0) {
-      throw new ConflictException(
-        'Không thể xóa ghi danh vì tồn tại lịch sử thanh toán cần được lưu giữ.',
-      );
-    }
-    return this.prisma.enrollment.deleteMany({ where: { userId, classId } });
-  }
-
-  async getEnrollmentsByClass(classId: number) {
-    return this.prisma.enrollment.findMany({
-      where: { classId },
-      orderBy: { joinedAt: 'desc' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            profile: { select: { fullName: true, avatar: true, phone: true } },
-          },
-        },
-      },
-    });
-  }
-
-  // ============== COURSE MANAGEMENT ==============
-
   async getAdminCourses() {
-    const courses = await this.prisma.course.findMany({
-      include: {
-        classes: {
-          include: {
-            _count: { select: { enrollments: true } },
-            enrollments: {
-              where: { status: EnrollmentStatus.ACTIVE },
-              select: { id: true },
-            },
-          },
-        },
-        _count: { select: { classes: true } },
-      },
+    return this.prisma.course.findMany({
       orderBy: { createdAt: 'desc' },
     });
-
-    return courses.map((course) => ({
-      ...course,
-      classes: (course.classes || []).map((cls) => {
-        const totalEnrollmentCount = cls._count?.enrollments ?? 0;
-        const activeEnrollmentCount = cls.enrollments?.length ?? 0;
-        return {
-          ...cls,
-          tuitionFeeVnd: cls.tuitionFeeVnd ?? 0,
-          activeEnrollmentCount,
-          totalEnrollmentCount,
-          hasEnrollments: totalEnrollmentCount > 0,
-          studentCount: activeEnrollmentCount,
-        };
-      }),
-    }));
   }
 
   async adminCreateCourse(dto: {
@@ -1185,75 +1092,6 @@ export class AdminService {
     return this.courseService.reviewCourse(courseId, action, {
       id: 0,
       role: Role.ADMIN,
-    });
-  }
-
-  // ============== CLASS MANAGEMENT ==============
-
-  async getAllClasses() {
-    const classes = await this.prisma.class.findMany({
-      include: {
-        course: { select: { id: true, title: true, thumbnail: true } },
-        _count: { select: { enrollments: true } },
-        enrollments: {
-          where: { status: EnrollmentStatus.ACTIVE },
-          select: { id: true },
-        },
-      },
-      orderBy: { id: 'desc' },
-    });
-
-    return classes.map((cls) => {
-      const totalEnrollmentCount = cls._count?.enrollments ?? 0;
-      const activeEnrollmentCount = cls.enrollments?.length ?? 0;
-      return {
-        ...cls,
-        tuitionFeeVnd: cls.tuitionFeeVnd ?? 0,
-        activeEnrollmentCount,
-        totalEnrollmentCount,
-        hasEnrollments: totalEnrollmentCount > 0,
-        studentCount: activeEnrollmentCount,
-      };
-    });
-  }
-
-  async adminCreateClass(
-    courseId: number,
-    dto: {
-      name: string;
-      startDate?: string;
-      endDate?: string;
-      capacity?: number;
-    },
-  ) {
-    return this.courseService.createClass(
-      courseId,
-      { id: 0, role: Role.ADMIN },
-      dto,
-    );
-  }
-
-  async getClassWithEnrollments(classId: number) {
-    return this.prisma.class.findUnique({
-      where: { id: classId },
-      include: {
-        course: { select: { id: true, title: true, thumbnail: true } },
-        enrollments: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                profile: {
-                  select: { fullName: true, avatar: true, phone: true },
-                },
-              },
-            },
-          },
-          orderBy: { joinedAt: 'desc' },
-        },
-        _count: { select: { enrollments: true } },
-      },
     });
   }
 
