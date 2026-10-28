@@ -2,11 +2,7 @@ import { PayosWebhookController } from './payos-webhook.controller';
 
 describe('PayosWebhookController', () => {
   it('returns success for the PayOS endpoint verification probe', () => {
-    const controller = new PayosWebhookController(
-      {} as never,
-      {} as never,
-      {} as never,
-    );
+    const controller = new PayosWebhookController({} as never, {} as never);
 
     expect(controller.health()).toEqual({ success: true });
   });
@@ -24,31 +20,46 @@ describe('PayosWebhookController', () => {
     const plans = {
       confirmPurchaseFromWebhook: jest.fn().mockResolvedValue({}),
     };
-    const courses = { confirmPaymentFromPayos: jest.fn() };
     const controller = new PayosWebhookController(
       payos as never,
       plans as never,
-      courses as never,
     );
 
     await expect(controller.receive({})).resolves.toEqual({ success: true });
     expect(plans.confirmPurchaseFromWebhook).toHaveBeenCalledWith(7, undefined);
-    expect(courses.confirmPaymentFromPayos).not.toHaveBeenCalled();
     expect(payos.markWebhookFulfilled).toHaveBeenCalledWith(91);
   });
 
   it('acknowledges a verified PayOS probe with an unknown sample order', async () => {
     const payos = { resolveWebhook: jest.fn().mockResolvedValue(null) };
     const plans = { confirmPurchaseFromWebhook: jest.fn() };
-    const courses = { confirmPaymentFromPayos: jest.fn() };
     const controller = new PayosWebhookController(
       payos as never,
       plans as never,
-      courses as never,
     );
 
     await expect(controller.receive({})).resolves.toEqual({ success: true });
     expect(plans.confirmPurchaseFromWebhook).not.toHaveBeenCalled();
-    expect(courses.confirmPaymentFromPayos).not.toHaveBeenCalled();
+  });
+
+  it('grants nothing for a retired classroom tuition intent', async () => {
+    const payos = {
+      resolveWebhook: jest.fn().mockResolvedValue({
+        id: 92,
+        type: 'COURSE',
+        planPayment: null,
+        coursePayment: { id: 3, amountVnd: 500000 },
+      }),
+      markWebhookFulfilled: jest.fn(),
+    };
+    const plans = { confirmPurchaseFromWebhook: jest.fn() };
+    const controller = new PayosWebhookController(
+      payos as never,
+      plans as never,
+    );
+
+    await expect(controller.receive({})).resolves.toEqual({ success: true });
+    expect(plans.confirmPurchaseFromWebhook).not.toHaveBeenCalled();
+    expect(payos.markWebhookFulfilled).not.toHaveBeenCalled();
   });
 });
