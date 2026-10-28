@@ -221,6 +221,55 @@ describe('GamificationListener', () => {
       );
     });
 
+    it.each([
+      ['zero', 0, 0],
+      ['NaN', Number.NaN, 0],
+      ['Infinity', Number.POSITIVE_INFINITY, 0],
+      ['negative', -5, 0],
+      ['above one exercise', 1_000_000, 100],
+      ['fractional', 91.6, 92],
+    ])(
+      'an explicit xp that is %s pays %d and never falls back to score × 10',
+      async (_label, xp, expected) => {
+        prismaMock.dailyQuest.findMany.mockResolvedValueOnce([]);
+
+        await listener.handleQuizSubmittedEvent({
+          userId: 12,
+          quizId: 17,
+          score: 92,
+          xp,
+          isFirstSubmission: true,
+        });
+
+        if (expected === 0) {
+          expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
+        } else {
+          expect(gamificationServiceMock.awardXp).toHaveBeenCalledWith(
+            12,
+            expected,
+            'Hoàn thành bài thi (Quiz)',
+          );
+        }
+      },
+    );
+
+    it('without an explicit xp the existing score × 10 rule applies', async () => {
+      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([]);
+
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 9,
+        score: 8,
+        isFirstSubmission: true,
+      });
+
+      expect(gamificationServiceMock.awardXp).toHaveBeenCalledWith(
+        12,
+        80,
+        'Hoàn thành bài thi (Quiz)',
+      );
+    });
+
     it('a repeated Writing completion earns no XP even with an explicit value', async () => {
       prismaMock.dailyQuest.findMany.mockResolvedValueOnce([]);
 
