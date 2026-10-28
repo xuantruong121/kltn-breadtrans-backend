@@ -119,7 +119,8 @@ export function weightedTaskPercentage(
     assessedWeight += weights[c.key];
   }
   return {
-    percentage: assessedWeight > 0 ? (numerator / assessedWeight) * 100 : null,
+    percentage:
+      assessedWeight > 0 ? round1((numerator / assessedWeight) * 100) : null,
     unavailableCriteria,
     assessedWeight: Math.round(assessedWeight * 1000) / 1000,
     weightingVersion: RUBRIC_WEIGHTING_VERSION,

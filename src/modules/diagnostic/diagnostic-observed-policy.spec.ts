@@ -297,6 +297,17 @@ describe('weighted rubric task percentage', () => {
     expect(r.assessedWeight).toBe(1);
   });
 
+  it('stores the task percentage to one decimal (no float residue)', () => {
+    // 0.3*0.25 + 0.7*0.75 = 0.6, which floating point makes 60.00000000000001.
+    const r = weightedTaskPercentage('SPEAKING', spk, {
+      task_fulfilment: 1,
+      intelligibility: 3,
+      fluency: 3,
+      language_use: 3,
+    });
+    expect(r.percentage).toBe(60);
+  });
+
   it('applies 30/25/20/25 to Writing; all-zero and all-max edges', () => {
     const r = weightedTaskPercentage('WRITING', wrt, {
       task_achievement: 0,
