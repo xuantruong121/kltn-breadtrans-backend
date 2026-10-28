@@ -64,8 +64,11 @@ export class ClassService {
           'Bạn chưa ghi danh hoặc không có quyền truy cập bài giảng và tài liệu của lớp học này',
         );
       }
+      // A learner sees only their own enrollment: classmates' e-mail addresses
+      // and profiles are not theirs to read.
       return {
         ...cls,
+        enrollments: [currentEnrollment],
         progress: currentEnrollment.progress,
         enrollmentProgress: currentEnrollment.progress,
         enrollmentStatus: currentEnrollment.status,

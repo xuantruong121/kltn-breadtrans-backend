@@ -37,6 +37,21 @@ describe('ClassService self-paced access', () => {
     expect(result).not.toHaveProperty('sessions');
   });
 
+  it("never returns classmates' enrollments or e-mail addresses to a learner", async () => {
+    prisma.class.findUnique.mockResolvedValue({
+      id: 1,
+      enrollments: [
+        { userId: 7, status: 'ACTIVE', user: { id: 7, email: 'me@x.test' } },
+        { userId: 8, status: 'ACTIVE', user: { id: 8, email: 'mate@x.test' } },
+      ],
+      course: { lessons: [] },
+      assignments: [],
+    });
+    const result = await service.getClassDetail(1, 7, 'STUDENT');
+    expect(result.enrollments).toHaveLength(1);
+    expect(JSON.stringify(result)).not.toContain('mate@x.test');
+  });
+
   it('stores watch progress under the selected offering and updates only that enrollment', async () => {
     prisma.lesson.findFirst.mockResolvedValue({ id: 9, courseId: 5 });
     prisma.enrollment.findMany.mockResolvedValue([
