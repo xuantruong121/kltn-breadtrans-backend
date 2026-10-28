@@ -1254,17 +1254,11 @@ export class MarketService {
       };
     }
 
-    // PointHistory + CurrencyTransaction (sổ cũ) chỉ ghi khi điều chỉnh thực
-    // sự áp dụng lần đầu — tránh double-write trên retry. Giữ nguyên 2 bảng
-    // này trong giai đoạn này (dọn CurrencyTransaction là việc tương lai).
+    // CurrencyTransaction (sổ cũ) chỉ ghi khi điều chỉnh thực sự áp dụng lần
+    // đầu — tránh double-write trên retry (dọn bảng này là việc tương lai).
+    // Đây là điều chỉnh Bánh Mì: không ghi PointHistory (sổ XP) và không đổi
+    // XP / bảng xếp hạng.
     await this.prisma.$transaction(async (tx) => {
-      await tx.pointHistory.create({
-        data: {
-          userId: dto.userId,
-          points: dto.amount,
-          reason: `[Admin: ${adminName}] ${dto.reason}`,
-        },
-      });
       await tx.currencyTransaction.create({
         data: {
           studentId: dto.userId,

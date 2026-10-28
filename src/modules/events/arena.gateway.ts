@@ -1255,7 +1255,10 @@ export class ArenaGateway
         const winner = match[winnerRole];
         winnerUserId = winner.userId;
 
-        // Wrap balance update, PointHistory, and CurrencyTransaction in an atomic transaction
+        // Balance, Bread ledger (BanhTransaction) and the legacy
+        // CurrencyTransaction commit together. The Arena pays Bread only: no
+        // XP amount is defined for it, so nothing is written to PointHistory
+        // (the XP log), which a Bread payout used to pollute.
         const { updatedStats } = await this.prisma.$transaction(async (tx) => {
           const claim = await tx.gameBattle.updateMany({
             where: { roomId: match.matchId, status: 'escrowed' },
@@ -1274,16 +1277,6 @@ export class ArenaGateway
           const stats = await tx.userStats.update({
             where: { userId: winner.userId },
             data: { totalBanhRan: { increment: totalReward } },
-          });
-
-          await tx.pointHistory.create({
-            data: {
-              userId: winner.userId,
-              points: totalReward,
-              reason: isForfeit
-                ? `Thắng do đối thủ bỏ cuộc trong Đấu Trường 1v1 (${match.matchId})`
-                : `Thắng trận Đấu Trường 1v1 (${match.matchId})`,
-            },
           });
 
           await tx.currencyTransaction.create({
