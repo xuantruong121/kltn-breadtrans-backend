@@ -80,9 +80,9 @@ void (async () => {
       .locator(`${sectionSel} > div > span`)
       .allInnerTexts();
     check(
-      'section counts come from the data (3/15, 7/35, 2/10)',
+      'section counts come from the data (2/10, 7/35, 3/15)',
       counts.join('|') ===
-        '3 chủ đề · 15 câu hỏi|7 chủ đề · 35 câu hỏi|2 chủ đề · 10 câu hỏi',
+        '2 chủ đề · 10 câu hỏi|7 chủ đề · 35 câu hỏi|3 chủ đề · 15 câu hỏi',
       counts.join('|'),
     );
     const tabs = page.getByRole('group', { name: 'Phân loại ngữ pháp' });
@@ -92,6 +92,12 @@ void (async () => {
     await page.screenshot({
       path: `artifacts/qa-screens/cp58-owner-grammar-${width}.png`,
     });
+    check(
+      'the random button explains it opens one topic',
+      (await page.locator('#grammar-random-hint').innerText()).includes(
+        'Mở một chủ đề ngẫu nhiên',
+      ),
+    );
     await page.getByRole('button', { name: 'Luyện ngẫu nhiên' }).click();
     await page.waitForTimeout(3000);
     const opened = (await page.locator('body').innerText()).replace(

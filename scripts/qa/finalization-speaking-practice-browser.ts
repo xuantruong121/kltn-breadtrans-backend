@@ -72,7 +72,7 @@ async function main() {
   const pro = await studentPage('spk-br-pro', 1366, true);
   await pro.page.addInitScript(TRACK_AUDIO);
   const media: Array<{ url: string; status: number; bytes: number }> = [];
-  pro.page.on('response', async (r) => {
+  pro.page.on('response', (r) => {
     if (r.url().includes('/harness-private/'))
       media.push({
         url: r.url(),
