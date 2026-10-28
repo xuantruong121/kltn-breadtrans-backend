@@ -37,6 +37,10 @@ export type ResolvedResource = ResourceRef & {
   access: 'OPEN' | 'LOCKED';
   /** Learner-facing requirement when LOCKED, e.g. "Cần gói PRO". */
   requirement: string | null;
+  /** Speaking: the practice set the exercise belongs to (the catalog unit). */
+  setKey?: string | null;
+  /** Speaking: the set's authored CEFR level, for the display title. */
+  cefrLevel?: string | null;
 };
 
 export type ResourceResolver = (ref: ResourceRef) => ResolvedResource | null;
