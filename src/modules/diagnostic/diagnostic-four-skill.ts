@@ -18,6 +18,7 @@
  * Pure: no Prisma, no I/O.
  */
 
+import type { ObservedResult } from './diagnostic-observed-policy';
 export const FOUR_SKILL_SCORING_VERSION = 'FOUR_SKILL_PLACEMENT_V2';
 
 export const FOUR_SKILL_WEIGHTS = {
@@ -76,6 +77,13 @@ export type FourSkillResult = {
   overall: number | null;
   placementBand: null;
   placementBandStatus: typeof PLACEMENT_BAND_STATUS;
+  /**
+   * Present for FOUR_SKILL_OBSERVED_V3 attempts: the observed score, the
+   * objective core, coverage and per-task statuses. When present, `overall`,
+   * `state` and the Speaking/Writing entries follow it (partial coverage
+   * scored); older attempts keep the V2 meaning above.
+   */
+  observed?: ObservedResult;
 };
 
 /** DEF-004 decision: scores and advice only, never a named level. */

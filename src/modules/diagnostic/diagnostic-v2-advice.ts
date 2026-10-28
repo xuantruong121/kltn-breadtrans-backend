@@ -274,7 +274,8 @@ export type ProductiveTaskEvidence = {
   skill: 'SPEAKING' | 'WRITING';
   questionId: number;
   status: string;
-  criteria: Record<string, number> | null | undefined;
+  /** A null criterion was UNAVAILABLE and is never treated as a score. */
+  criteria: Record<string, number | null> | null | undefined;
   criterionFeedback: Record<string, string> | null | undefined;
   provider: string | null | undefined;
 };

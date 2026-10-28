@@ -1,3 +1,8 @@
+import {
+  rubricScoringFor,
+  taskWeightingView,
+  weightingMetadata,
+} from './diagnostic-result-policy.store';
 import { refreshFourSkillResult } from './diagnostic-four-skill.store';
 import {
   BadRequestException,
@@ -576,16 +581,23 @@ export class DiagnosticSpeakingService
       return;
     }
 
+    // The attempt's persisted result policy decides how the grade becomes a
+    // task percentage; older attempts keep the plain rubric mean.
+    const scoring = await rubricScoringFor(this.prisma, response.attemptId);
     const startedAt = Date.now();
-    const outcome = await gradeWithRubric(this.grader, {
-      skill: 'SPEAKING',
-      submissionRef: `speaking:${response.id}:${job.data.audioKey}`,
-      rubric,
-      taskPrompt: question.question,
-      taskInstructions: question.instructions ?? null,
-      audio: normalized.buffer,
-      durationMs: normalized.durationMs,
-    });
+    const outcome = await gradeWithRubric(
+      this.grader,
+      {
+        skill: 'SPEAKING',
+        submissionRef: `speaking:${response.id}:${job.data.audioKey}`,
+        rubric,
+        taskPrompt: question.question,
+        taskInstructions: question.instructions ?? null,
+        audio: normalized.buffer,
+        durationMs: normalized.durationMs,
+      },
+      scoring,
+    );
     this.logger.log(
       JSON.stringify({
         event: 'diagnostic_speaking_rubric_result',
@@ -616,6 +628,7 @@ export class DiagnosticSpeakingService
             speechEvidence: (outcome.grade.speechEvidence ??
               null) as Prisma.InputJsonValue | null,
             measuredDurationMs: normalized.durationMs,
+            ...weightingMetadata(outcome.grade),
           },
           provider: this.grader.provider,
           providerVersion: this.grader.providerVersion,
@@ -675,6 +688,7 @@ export class DiagnosticSpeakingService
       criterionFeedback:
         row.status === 'GRADED' ? (meta.criterionFeedback ?? null) : null,
       feedback: row.status === 'GRADED' ? (meta.feedback ?? null) : null,
+      ...taskWeightingView('SPEAKING', row.status === 'GRADED', meta),
       provider: row.provider,
       graderVersion: row.graderVersion,
       rubricVersion: row.rubricVersion ?? null,

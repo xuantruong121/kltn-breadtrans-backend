@@ -9,12 +9,20 @@
  * submission, after every grading outcome or retry, and when a result is
  * read, so the stored state can never stay behind the grading state.
  */
+import {
+  OBSERVED_RESULT_POLICY,
+  PRODUCTIVE_TASK_WEIGHT,
+  readResultPolicy,
+  scoreObservedV3,
+  type ObservedResult,
+} from './diagnostic-observed-policy';
 import type { Prisma, PrismaClient } from '@prisma/client';
 
 import {
   FOUR_SKILL_SCORING_VERSION,
   type FourSkillKey,
   type FourSkillResult,
+  type SkillState,
   scoreFourSkillPlacementV2,
 } from './diagnostic-four-skill';
 
@@ -129,15 +137,30 @@ export async function refreshFourSkillResult(
         isSkippedWritingAnswer(answers[String(id)]),
     )
     .map((questionId) => ({ questionId, status: 'SKIPPED', score: null }));
-  const result = scoreFourSkillPlacementV2({
+  const speakingIds = productive
+    .filter((q) => q.taskType === 'SPEAKING_RESPONSE')
+    .map((q) => q.id);
+  const v2 = scoreFourSkillPlacementV2({
     objective,
-    speakingQuestionIds: productive
-      .filter((q) => q.taskType === 'SPEAKING_RESPONSE')
-      .map((q) => q.id),
+    speakingQuestionIds: speakingIds,
     speaking,
     writingQuestionIds: writingIds,
     writing: [...writing, ...skippedWriting],
   });
+  // The attempt's persisted policy decides the meaning; it is never inferred.
+  const result =
+    readResultPolicy(attempt.answers) === OBSERVED_RESULT_POLICY
+      ? withObservedPolicy(
+          v2,
+          scoreObservedV3({
+            objective,
+            speakingQuestionIds: speakingIds,
+            speaking,
+            writingQuestionIds: writingIds,
+            writing: [...writing, ...skippedWriting],
+          }),
+        )
+      : v2;
 
   for (const skill of ['SPEAKING', 'WRITING'] as const) {
     const s = result.skills[skill];
@@ -164,4 +187,54 @@ export async function refreshFourSkillResult(
     data: { resultState: result.state, overallScore: result.overall },
   });
   return result;
+}
+
+/**
+ * FOUR_SKILL_OBSERVED_V3 view of a four-skill result: the observed score is
+ * the overall, and a productive skill with at least one graded task (none
+ * pending or failed) is COMPLETE with the mean of its graded tasks, its
+ * coverage carried by itemsScored/itemsTotal. Pending or failed tasks keep
+ * the skill and the attempt pending/failed; a skill with nothing graded and
+ * nothing in flight is NOT_STARTED ("Chưa đánh giá"), never 0.
+ */
+export function withObservedPolicy(
+  v2: FourSkillResult,
+  observed: ObservedResult,
+): FourSkillResult {
+  const skills = { ...v2.skills };
+  for (const p of [observed.speaking, observed.writing]) {
+    const state: SkillState =
+      p.pending > 0
+        ? 'PENDING_GRADING'
+        : p.failed > 0
+          ? 'GRADING_FAILED'
+          : p.graded > 0
+            ? 'COMPLETE'
+            : 'NOT_STARTED';
+    skills[p.skill] = {
+      ...skills[p.skill],
+      state,
+      score: state === 'COMPLETE' ? p.score : null,
+      weight: PRODUCTIVE_TASK_WEIGHT * p.total,
+      itemsScored: p.graded,
+      itemsTotal: p.total,
+    };
+  }
+  skills.LISTENING = { ...skills.LISTENING, weight: observed.listening.weight };
+  skills.READING = { ...skills.READING, weight: observed.reading.weight };
+  const state: FourSkillResult['state'] =
+    observed.observed.score !== null
+      ? 'COMPLETE'
+      : observed.observed.withheldReason === 'PRODUCTIVE_PENDING'
+        ? 'PENDING_GRADING'
+        : observed.observed.withheldReason === 'PRODUCTIVE_FAILED'
+          ? 'GRADING_FAILED'
+          : 'NOT_STARTED';
+  return {
+    ...v2,
+    state,
+    skills,
+    overall: observed.observed.score,
+    observed,
+  };
 }
