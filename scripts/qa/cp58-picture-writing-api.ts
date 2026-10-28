@@ -260,6 +260,63 @@ void (async () => {
     'A manager gives a presentation about a chart. [[percent:80]]',
   );
   check(
+    'B1: the result reports the connector of a linked sentence',
+    proTry.data?.linking?.found !== undefined,
+    JSON.stringify(proTry.data?.linking),
+  );
+  const b1Detail = JSON.stringify(
+    (await call('GET', `/writing/quizzes/${B1}`, pro.token)).data,
+  );
+  check(
+    'B1 instructions tell the learner to link two ideas in one sentence',
+    b1Detail.includes('MỘT câu') && b1Detail.includes('từ nối'),
+  );
+  const linked = await submit(
+    pro,
+    B1,
+    b1Tasks[3],
+    'A worker stands on a ladder so that he can replace a light [[percent:90]].',
+  );
+  check(
+    'B1 linked sentence: connector "so that", one sentence, cues found',
+    linked.data?.linking?.found === 'so that' &&
+      linked.data?.linking?.sentences === 1 &&
+      linked.data?.keywords?.every((k: any) => k.present),
+    JSON.stringify([linked.data?.linking, linked.data?.keywords]),
+  );
+  const split = await submit(
+    pro,
+    B1,
+    b1Tasks[4],
+    'There are bicycles in a rack. The entrance has a door [[percent:60]].',
+  );
+  check(
+    'B1 two short sentences: no connector, two sentences reported',
+    split.data?.linking?.found === null && split.data?.linking?.sentences === 2,
+    JSON.stringify(split.data?.linking),
+  );
+  const offTopic = await submit(
+    pro,
+    B1,
+    b1Tasks[1],
+    'My favourite food is pizza because it is delicious. [[percent:10]]',
+  );
+  check(
+    'off-topic answer: both cue words reported missing',
+    offTopic.data?.keywords?.every((k: any) => !k.present),
+    JSON.stringify(offTopic.data?.keywords),
+  );
+  const a2Answer = await submit(
+    pro,
+    A2,
+    tasksOf(A2)[0],
+    'The cashier scans a jar. [[percent:90]]',
+  );
+  check(
+    'A2 results carry no linking rule',
+    a2Answer.status < 300 && a2Answer.data?.linking === undefined,
+  );
+  check(
     'PRO grades B1 picture writing',
     proTry.status < 300,
     `(${proTry.status})`,

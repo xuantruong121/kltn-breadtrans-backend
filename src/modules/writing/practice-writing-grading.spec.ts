@@ -1,5 +1,7 @@
 import {
   buildPracticeWritingRequest,
+  countSentences,
+  linkingWord,
   exceedsPictureWordLimit,
   keywordCheck,
   pictureTaskIssues,
@@ -254,5 +256,92 @@ describe('picture grading instructions', () => {
       'never deduct for wording that differs',
     );
     expect(systemInstruction).toContain('scores 0 for taskCompletion');
+  });
+});
+
+describe('B1 picture tasks: one sentence linking two ideas', () => {
+  const b1 = {
+    taskType: 'PICTURE_SENTENCE',
+    imageUrl:
+      'https://example.r2.dev/catalog/toeic/shared/images/ceiling-light.png',
+    sceneDescription:
+      'In a long office corridor, a man in a dark polo shirt and jeans stands on a yellow stepladder and replaces a round ceiling light.',
+    prompt: 'Viết MỘT câu ... nối hai ý bằng từ nối.',
+    requirements: ['Viết một câu nối hai ý bằng từ nối.'],
+    requireLinking: true,
+    requiredKeywords: ['ladder', 'replace'],
+    sampleResponse:
+      'A worker is standing on a yellow ladder so that he can replace a ceiling light.',
+    wordRange: [1, 40],
+    rubric: { grammar: 4, vocabulary: 2, taskCompletion: 4 },
+  };
+  const task = practiceWritingTask(b1, 'fallback')!;
+
+  it.each([
+    ['A man stands on a ladder while he replaces a light.', 'while'],
+    ['He replaced the light because it was broken.', 'because'],
+    ['A worker, who is on a ladder, replaces a lamp.', 'who'],
+    ['A man is on a ladder. He replaces a light.', null],
+    ['The meeting is in a classroom.', null],
+  ])('connector in "%s" is %s', (text, word) => {
+    expect(linkingWord(text)).toBe(word);
+  });
+
+  it('counts sentences', () => {
+    expect(countSentences('A man is on a ladder. He replaces a light.')).toBe(
+      2,
+    );
+    expect(
+      countSentences('A man is on a ladder while he replaces a light.'),
+    ).toBe(1);
+    expect(countSentences('A man on a ladder replacing a light')).toBe(1);
+  });
+
+  it('passes the connector and sentence count to the grader with the B1 rule', () => {
+    const ok = buildPracticeWritingRequest(
+      task,
+      'A man stands on a ladder while he replaces a light.',
+    );
+    expect(ok.facts.linking).toEqual({
+      required: true,
+      found: 'while',
+      sentences: 1,
+    });
+    expect(ok.systemInstruction).toContain('ONE sentence that links two ideas');
+    const two = buildPracticeWritingRequest(
+      task,
+      'A man is on a ladder. He replaces a light.',
+    );
+    expect(two.facts.linking).toEqual({
+      required: true,
+      found: null,
+      sentences: 2,
+    });
+  });
+
+  it('A2 picture tasks carry no linking rule', () => {
+    const a2 = practiceWritingTask(
+      { ...b1, requireLinking: false },
+      'fallback',
+    )!;
+    const request = buildPracticeWritingRequest(a2, 'A man is on a ladder.');
+    expect(request.facts.linking).toBeUndefined();
+    expect(request.systemInstruction).not.toContain('B1 task');
+  });
+
+  it('a B1 sample without a connector, or of two sentences, is not publishable', () => {
+    expect(
+      pictureTaskIssues({
+        ...b1,
+        sampleResponse: 'A worker can replace a light from a ladder.',
+      }),
+    ).toContain('SAMPLE_LINKS_TWO_IDEAS');
+    expect(
+      pictureTaskIssues({
+        ...b1,
+        sampleResponse:
+          'A worker is on a ladder. He can replace a light while he stands there.',
+      }),
+    ).toContain('SAMPLE_ONE_SENTENCE');
   });
 });

@@ -34,6 +34,14 @@ describe('picture writing content (Viết câu theo tranh)', () => {
     expect(plans).toEqual(['FREE', 'PRO']);
   });
 
+  it('B1 asks for one linked sentence and says so; A2 does not', () => {
+    const [a2, b1] = PICTURE_WRITING_EXERCISES;
+    expect(a2.requireLinking).toBe(false);
+    expect(b1.requireLinking).toBe(true);
+    expect(b1.prompt).toContain('MỘT câu');
+    expect(b1.requirements.join(' ')).toContain('từ nối');
+  });
+
   it('every exercise has five tasks with distinct pictures', () => {
     const images = PICTURE_WRITING_EXERCISES.flatMap((e) =>
       e.tasks.map((t) => t.image),

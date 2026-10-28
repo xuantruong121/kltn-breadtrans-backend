@@ -347,6 +347,7 @@ export class WritingService {
             wordCount: detail.wordCount,
             wordRange: detail.wordRange,
             keywords: detail.keywords,
+            ...(detail.linking ? { linking: detail.linking } : {}),
           }
         : {}),
     };

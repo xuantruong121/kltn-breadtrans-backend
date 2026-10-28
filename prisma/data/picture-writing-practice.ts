@@ -20,11 +20,6 @@ export const PICTURE_WRITING_TOPIC = {
 export const PICTURE_IMAGE_PREFIX = 'catalog/toeic/shared/images';
 
 const RUBRIC = { grammar: 4, vocabulary: 2, taskCompletion: 4 };
-const REQUIREMENTS = [
-  'Dùng đúng cả hai từ gợi ý.',
-  'Mô tả đúng nội dung bức tranh.',
-  'Tối đa 40 từ.',
-];
 
 export type PictureTaskSeed = {
   image: string;
@@ -38,6 +33,10 @@ export type PictureExerciseSeed = {
   description: string;
   isPremiumContent: boolean;
   prompt: string;
+  /** Shown to the learner; the grader receives the same list. */
+  requirements: string[];
+  /** B1: one sentence linking two ideas with a connector. */
+  requireLinking: boolean;
   tasks: PictureTaskSeed[];
 };
 
@@ -49,6 +48,12 @@ export const PICTURE_WRITING_EXERCISES: PictureExerciseSeed[] = [
     isPremiumContent: false,
     prompt:
       'Viết một hoặc hai câu mô tả bức tranh, dùng đúng cả hai từ gợi ý. Tối đa 40 từ.',
+    requirements: [
+      'Dùng đúng cả hai từ gợi ý (có thể chia động từ, số nhiều).',
+      'Mô tả đúng người, hành động hoặc đồ vật trong tranh.',
+      'Tối đa 40 từ.',
+    ],
+    requireLinking: false,
     tasks: [
       {
         image: 'grocery-checkout.png',
@@ -95,10 +100,17 @@ export const PICTURE_WRITING_EXERCISES: PictureExerciseSeed[] = [
   {
     title: 'Viết câu theo tranh: nơi làm việc (B1)',
     description:
-      'Nhìn tranh về công việc và viết câu có hành động, bối cảnh và chi tiết rõ ràng, dùng hai từ gợi ý.',
+      'Nhìn tranh về công việc và viết một câu nối hai ý (hai hành động, hành động và bối cảnh, hoặc mục đích) bằng từ nối, dùng hai từ gợi ý.',
     isPremiumContent: true,
     prompt:
-      'Viết một hoặc hai câu mô tả bức tranh, có hành động và bối cảnh, dùng đúng cả hai từ gợi ý. Tối đa 40 từ.',
+      'Viết MỘT câu mô tả bức tranh, nối hai ý trong tranh bằng một từ nối như while, because, so that, when hoặc which, và dùng đúng cả hai từ gợi ý. Tối đa 40 từ.',
+    requirements: [
+      'Dùng đúng cả hai từ gợi ý (có thể chia động từ, số nhiều).',
+      'Viết một câu nối hai ý bằng từ nối: while, when, because, so that, which, who, where, although…',
+      'Chỉ dùng chi tiết có trong tranh.',
+      'Tối đa 40 từ.',
+    ],
+    requireLinking: true,
     tasks: [
       {
         image: 'office-meeting.png',
@@ -106,7 +118,7 @@ export const PICTURE_WRITING_EXERCISES: PictureExerciseSeed[] = [
         sceneDescription:
           'In a meeting room with a large window, a man in a dark suit stands and points with a pen at bar and pie charts on a flip chart. Three colleagues sit at a wooden table with laptops, papers and a coffee cup and listen to him; two of them take notes.',
         sampleResponse:
-          'A manager is giving a presentation and pointing at a chart while his colleagues take notes.',
+          'A manager is pointing at a chart during his presentation while two colleagues take notes.',
       },
       {
         image: 'folders-cabinet.png',
@@ -114,7 +126,7 @@ export const PICTURE_WRITING_EXERCISES: PictureExerciseSeed[] = [
         sceneDescription:
           'In an office storeroom, a woman in a light blue shirt puts a brown folder onto a tall metal shelf full of folders and blue magazine files. Piles of papers lie on a desk in front of her, and a grey filing cabinet stands near the window.',
         sampleResponse:
-          'An office worker is putting a file on a tall shelf full of folders.',
+          'An office worker is putting a file on a tall shelf while piles of papers wait on the desk in front of her.',
       },
       {
         image: 'construction-plan.png',
@@ -122,7 +134,7 @@ export const PICTURE_WRITING_EXERCISES: PictureExerciseSeed[] = [
         sceneDescription:
           'At a construction site, two men wearing hard hats, one white and one yellow, and bright safety vests hold a large paper plan and study it together. Behind them is an unfinished concrete building with block walls and wooden boards.',
         sampleResponse:
-          'Two engineers in hard hats are checking a building plan at the construction site.',
+          'Two engineers in hard hats are studying a large plan at a construction site where the concrete walls are still unfinished.',
       },
       {
         image: 'ceiling-light.png',
@@ -130,7 +142,7 @@ export const PICTURE_WRITING_EXERCISES: PictureExerciseSeed[] = [
         sceneDescription:
           'In a long office corridor, a man in a dark polo shirt and jeans stands on a yellow stepladder and replaces a round ceiling light. The hallway has a grey carpet, several doors and framed pictures on the walls.',
         sampleResponse:
-          'A worker is standing on a ladder to replace a light in the hallway.',
+          'A worker is standing on a yellow ladder so that he can replace a ceiling light in the office hallway.',
       },
       {
         image: 'bicycle-rack.png',
@@ -138,7 +150,7 @@ export const PICTURE_WRITING_EXERCISES: PictureExerciseSeed[] = [
         sceneDescription:
           'Outside a modern glass office building, several bicycles are parked in a metal rack on the pavement. Near the revolving door at the entrance there is a large planter with white flowers, and young trees stand along the building.',
         sampleResponse:
-          'Several bicycles are parked in a rack near the entrance of an office building.',
+          'Several bicycles are parked in a metal rack near the entrance of a glass building, which has a revolving door.',
       },
     ],
   },
@@ -155,7 +167,8 @@ export function pictureTaskContent(
     taskType: 'PICTURE_SENTENCE',
     imageUrl: `${imageBaseUrl.replace(/\/$/, '')}/${PICTURE_IMAGE_PREFIX}/${task.image}`,
     prompt: exercise.prompt,
-    requirements: REQUIREMENTS,
+    requirements: exercise.requirements,
+    requireLinking: exercise.requireLinking,
     requiredKeywords: [...task.keywords],
     sceneDescription: task.sceneDescription,
     sampleResponse: task.sampleResponse,
