@@ -12,7 +12,8 @@ import { check, failureCount, newAdmin } from './harness-api';
 import { FE, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
-const CLASSROOM_WORDS = /gói học|lớp học|học phí|ghi danh|giáo viên|sức chứa/i;
+// Product wording only: "lớp học" also appears in lesson content (a classroom as a scenario).
+const CLASSROOM_WORDS = /gói học|học phí|ghi danh|giáo viên|sức chứa|lớp legacy/i;
 
 async function text(page: Page) {
   return (await page.locator('main').first().innerText()).replace(/\s+/g, ' ');

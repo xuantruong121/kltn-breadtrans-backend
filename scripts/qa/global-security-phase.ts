@@ -10,6 +10,7 @@
 import {
   BE,
   FE,
+  assertAuditTarget,
   createQaLearner,
   destroyQaLearner,
   launch,
@@ -64,6 +65,7 @@ async function main() {
   const idorRows: Array<Record<string, unknown>> = [];
   const emptyRows: Array<Record<string, unknown>> = [];
   try {
+    await assertAuditTarget();
     const a = await createQaLearner(marker, 'PRO', '-a');
     const b = await createQaLearner(marker, 'PRO', '-b');
     learnerIds.push(a.userId, b.userId);

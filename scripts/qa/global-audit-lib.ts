@@ -18,12 +18,52 @@ import * as bcrypt from 'bcrypt';
 import { chromium, type Browser, type Page } from 'playwright';
 import { PrismaClient, Role, SubscriptionStatus } from '@prisma/client';
 
-export const FE = process.env.RECOVERY_FE_BASE_URL ?? 'http://localhost:3000';
-export const BE = process.env.SMOKE_BASE_URL ?? 'http://localhost:3001';
+/**
+ * Targets are explicit; there is no default. This audit creates and deletes
+ * QA learners directly in the database, so it must never fall back to `.env`
+ * (kltn_db) or to the owner's running app (:3000/:3001). CP60.1 found that
+ * the old defaults did exactly that.
+ *
+ *   RECOVERY_FE_BASE_URL       e.g. http://localhost:3100 (harness FE)
+ *   SMOKE_BASE_URL             e.g. http://localhost:3101 (harness API)
+ *   GLOBAL_AUDIT_DATABASE_URL  the database behind SMOKE_BASE_URL
+ *
+ * assertAuditTarget() refuses the protected kltn_db cluster unless
+ * GLOBAL_AUDIT_PROTECTED_DB=owner-approved is set for an owner-approved run.
+ */
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value)
+    throw new Error(
+      `${name} is required: the global audit has no default target (see global-audit-lib.ts)`,
+    );
+  return value;
+}
+
+/** pg_control_system().system_identifier of the kltn_db cluster. */
+const PROTECTED_SYSTEM_IDENTIFIER = '7674533776495505443';
+
+export const FE = requireEnv('RECOVERY_FE_BASE_URL');
+export const BE = requireEnv('SMOKE_BASE_URL');
 export const EVIDENCE = resolve('artifacts/learner-runtime-qa.jsonl');
 export const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
-export const prisma = new PrismaClient();
+export const prisma = new PrismaClient({
+  datasources: { db: { url: requireEnv('GLOBAL_AUDIT_DATABASE_URL') } },
+});
+
+/** Call before the first write: refuses the protected cluster. */
+export async function assertAuditTarget() {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT system_identifier::text AS id FROM pg_control_system()`;
+  if (
+    rows[0]?.id === PROTECTED_SYSTEM_IDENTIFIER &&
+    process.env.GLOBAL_AUDIT_PROTECTED_DB !== 'owner-approved'
+  )
+    throw new Error(
+      'GLOBAL_AUDIT_DATABASE_URL is the protected kltn_db cluster; refusing to create QA learners there',
+    );
+}
 
 /** Markers are phase-scoped so cleanup can assert zero orphans per phase. */
 export function makeMarker(phase: string) {

@@ -26,6 +26,7 @@ import {
   makeMarker,
   orphanCount,
   prisma,
+  assertAuditTarget,
   BE,
   FE,
 } from './global-audit-lib';
@@ -543,6 +544,7 @@ async function main() {
   let learnerId: number | undefined;
   const started = Date.now();
   try {
+    await assertAuditTarget();
     const ids = await resolveIds();
     const learner = await createQaLearner(marker, 'PLUS');
     learnerId = learner.userId;
