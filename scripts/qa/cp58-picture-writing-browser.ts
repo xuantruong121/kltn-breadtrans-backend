@@ -106,6 +106,19 @@ void (async () => {
         Math.abs(pictureBox.y - answerBox.y) < 40,
     );
     const img = page.locator('section[aria-label="Tranh và từ gợi ý"] img');
+    // The picture comes over the network: wait for it rather than sampling
+    // the element at once (CP60.2 flake). A picture that never loads fails.
+    await img
+      .evaluate((el: HTMLImageElement) =>
+        el.complete
+          ? undefined
+          : new Promise((done) => {
+              el.addEventListener('load', done, { once: true });
+              el.addEventListener('error', done, { once: true });
+              setTimeout(done, 30_000);
+            }),
+      )
+      .catch(() => undefined);
     check(
       'the picture loaded',
       await img.evaluate(

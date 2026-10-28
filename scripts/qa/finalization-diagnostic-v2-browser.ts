@@ -91,6 +91,22 @@ async function waitFor<T>(
   return value;
 }
 
+/**
+ * After a reload or navigation, wait for the page's own content instead of
+ * reading at networkidle: a cold dev server renders the result page late
+ * (CP60.2 flake). A page that never renders still fails its check.
+ */
+async function settled(page: import('playwright').Page) {
+  await page
+    .waitForFunction(
+      () =>
+        (document.querySelector('main')?.textContent ?? '').trim().length > 400,
+      undefined,
+      { timeout: 60_000 },
+    )
+    .catch(() => undefined);
+}
+
 async function main() {
   console.log('\n== Entry Diagnostic V2 id 5 (browser, mock grader)');
   const [active] = harnessQuery(
@@ -453,6 +469,7 @@ async function main() {
   );
 
   await page.reload({ waitUntil: 'networkidle' });
+  await settled(page);
   await hidePet(page);
   let text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
@@ -562,6 +579,7 @@ async function main() {
     advice?.mockGraderEvidence === true,
   );
   await page.reload({ waitUntil: 'networkidle' });
+  await settled(page);
   await hidePet(page);
   text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
@@ -624,12 +642,15 @@ async function main() {
       `(shown "${shownTitle}"; ${target.slice(0, 120)})`,
     );
     await page.goBack({ waitUntil: 'networkidle' }).catch(() => undefined);
+    await settled(page);
     if (
       !(await page.locator('body').innerText()).includes(
         'Nên luyện gì tiếp theo',
       )
-    )
+    ) {
       await page.goto(`${FE}/diagnostic`, { waitUntil: 'networkidle' });
+      await settled(page);
+    }
     check(
       'back from the resource returns to the result',
       (await page.locator('body').innerText()).includes(
@@ -696,6 +717,7 @@ async function main() {
     `(${stored?.join(' / ')})`,
   );
   await page.reload({ waitUntil: 'networkidle' });
+  await settled(page);
   await hidePet(page);
   text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
@@ -728,6 +750,7 @@ async function main() {
     `(${res.data?.fourSkill?.state}, overall ${res.data?.fourSkill?.overall})`,
   );
   await page.reload({ waitUntil: 'networkidle' });
+  await settled(page);
   text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
     'the page shows the restored overall',

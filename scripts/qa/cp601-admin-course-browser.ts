@@ -13,7 +13,8 @@ import { FE, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
 // Product wording only: "lớp học" also appears in lesson content (a classroom as a scenario).
-const CLASSROOM_WORDS = /gói học|học phí|ghi danh|giáo viên|sức chứa|lớp legacy/i;
+const CLASSROOM_WORDS =
+  /gói học|học phí|ghi danh|giáo viên|sức chứa|lớp legacy/i;
 
 async function text(page: Page) {
   return (await page.locator('main').first().innerText()).replace(/\s+/g, ' ');
@@ -109,6 +110,10 @@ async function main() {
         waitUntil: 'networkidle',
         timeout: 120_000,
       });
+      // The redirect lands client-side, 1–5 s after networkidle on a dev server.
+      await page
+        .waitForURL((u) => u.pathname === to, { timeout: 30_000 })
+        .catch(() => undefined);
       check(
         `@${width} ${from} redirects to ${to}`,
         new URL(page.url()).pathname === to,
@@ -142,6 +147,9 @@ async function main() {
       waitUntil: 'networkidle',
       timeout: 120_000,
     });
+    await page
+      .waitForURL((u) => u.pathname === '/courses', { timeout: 30_000 })
+      .catch(() => undefined);
     check(
       `${path} redirects to /courses`,
       new URL(page.url()).pathname === '/courses',
