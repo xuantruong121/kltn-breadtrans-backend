@@ -51,7 +51,10 @@ async function run(label: string, width: number, plan: Plan, expect: string[]) {
       .locator('section')
       .first()
       .screenshot({ path: `${SHOTS}/${label}-${width}-overview.png` });
-    if (process.env.DUMP) console.log(text.slice(text.indexOf('Bài Nói'), text.indexOf('Bài Nói') + 900));
+    if (process.env.DUMP)
+      console.log(
+        text.slice(text.indexOf('Bài Nói'), text.indexOf('Bài Nói') + 900),
+      );
     check(
       `${label}@${width} result page shows ${expect.join(' | ')}`,
       expect.every((t) => text.includes(t)),
@@ -91,7 +94,11 @@ async function run(label: string, width: number, plan: Plan, expect: string[]) {
     const real = issues.filter(
       (i) => !/GSI_LOGGER|status of 403 \(\)$/.test(i),
     );
-    check(`${label}@${width} no page errors`, real.length === 0, real.join('; '));
+    check(
+      `${label}@${width} no page errors`,
+      real.length === 0,
+      real.join('; '),
+    );
   } finally {
     await browser.close();
   }
@@ -103,21 +110,49 @@ async function main() {
     await run(
       'T01',
       width,
-      { listening: 6, reading: 8, speaking: ['skip', 'skip'], writing: ['skip', 'skip'] },
-      ['70', 'Chưa đánh giá', 'không phải điểm 0', 'bỏ qua – không tính điểm', '= 70%'],
+      {
+        listening: 6,
+        reading: 8,
+        speaking: ['skip', 'skip'],
+        writing: ['skip', 'skip'],
+      },
+      [
+        '70',
+        'Chưa đánh giá',
+        'không phải điểm 0',
+        'bỏ qua – không tính điểm',
+        '= 70%',
+      ],
     );
   // T08: one task each -> limited evidence on both.
   await run(
     'T08',
     1366,
-    { listening: 5, reading: 5, speaking: ['record', 'skip'], writing: ['full', 'skip'] },
-    ['54,4', 'Đánh giá 1/2 bài', 'bằng chứng còn hạn chế', '= 85%', 'Độ khó 1/4', 'Hoàn thành yêu cầu (30%)'],
+    {
+      listening: 5,
+      reading: 5,
+      speaking: ['record', 'skip'],
+      writing: ['full', 'skip'],
+    },
+    [
+      '54,4',
+      'Đánh giá 1/2 bài',
+      'bằng chứng còn hạn chế',
+      '= 85%',
+      'Độ khó 1/4',
+      'Hoàn thành yêu cầu (30%)',
+    ],
   );
   // T10: full evidence.
   await run(
     'T10',
     1440,
-    { listening: 10, reading: 10, speaking: ['record', 'record'], writing: ['full', 'full'] },
+    {
+      listening: 10,
+      reading: 10,
+      speaking: ['record', 'record'],
+      writing: ['full', 'full'],
+    },
     ['92,5', 'Đủ 2/2 bài', '= 100%'],
   );
   console.log(`\nCP60DIAG_RESULT_BROWSER_FAILURES=${failureCount()}`);
