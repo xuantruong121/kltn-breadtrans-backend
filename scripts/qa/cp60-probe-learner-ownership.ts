@@ -206,75 +206,32 @@ void (async () => {
     ),
   );
 
-  console.log('\n== Class assignments');
+  // Class assignments were retired in CP60.1 (self-paced courses, no
+  // classrooms); a class member and a stranger both get 404.
+  console.log('\n== Class assignments (retired)');
   const classId = Number(
     harnessQuery(`select id from "Class" order by id limit 1`)[0][0],
   );
   harnessExec(
     `insert into "Enrollment" ("userId","classId","status","progress","joinedAt") values (${a.userId}, ${classId}, 'ACTIVE', 0, now())`,
   );
-  const listA = await call(
-    'GET',
-    `/courses/classes/${classId}/assignments`,
-    a.token,
-  );
-  const listB = await call(
-    'GET',
-    `/courses/classes/${classId}/assignments`,
-    b.token,
-  );
+  const assignmentId =
+    harnessQuery(
+      `select id from "Assignment" where "classId" = ${classId} order by id limit 1`,
+    )[0]?.[0] ?? 1;
+  const retired = [
+    await call('GET', `/courses/classes/${classId}/assignments`, a.token),
+    await call('GET', `/courses/classes/${classId}/assignments`, b.token),
+    await call('GET', `/courses/assignments/${assignmentId}`, a.token),
+    await call('POST', `/courses/assignments/${assignmentId}/submit`, b.token, {
+      content: 'CP60 probe',
+    }),
+    await call('PUT', '/courses/submissions/1/grade', a.token, { score: 10 }),
+  ];
   check(
-    'a member lists the class assignments; a non-member is refused',
-    listA.status === 200 && listB.status === 403,
-    `(${listA.status}/${listB.status})`,
-  );
-  const assignmentId = harnessQuery(
-    `select id from "Assignment" where "classId" = ${classId} order by id limit 1`,
-  )[0]?.[0];
-  if (assignmentId) {
-    const dB = await call(
-      'GET',
-      `/courses/assignments/${assignmentId}`,
-      b.token,
-    );
-    const sB = await call(
-      'POST',
-      `/courses/assignments/${assignmentId}/submit`,
-      b.token,
-      {
-        content: 'CP60 probe',
-      },
-    );
-    check(
-      'a non-member can neither open nor submit an assignment',
-      dB.status === 403 && sB.status === 403,
-      `(${dB.status}/${sB.status})`,
-    );
-    const dA = await call(
-      'GET',
-      `/courses/assignments/${assignmentId}`,
-      a.token,
-    );
-    const others = (dA.data?.submissions ?? []).filter(
-      (s: any) => s.userId !== a.userId,
-    );
-    check(
-      "a member sees no other learner's submission",
-      dA.status === 200 && others.length === 0,
-      `(${dA.status}, others=${others.length})`,
-    );
-  } else {
-    console.log('NOT_RUN  assignment detail/submit: class has no assignment');
-  }
-  check(
-    'a learner cannot grade a submission',
-    [401, 403].includes(
-      (
-        await call('PUT', '/courses/submissions/1/grade', a.token, {
-          score: 10,
-        })
-      ).status,
-    ),
+    'class assignment routes are retired for members and strangers (404)',
+    retired.every((r) => r.status === 404),
+    `(${retired.map((r) => r.status).join('/')})`,
   );
 
   console.log('\n== Daily quests, pet, leaderboard');

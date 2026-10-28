@@ -14,7 +14,9 @@
 - **Tương tác AI:** Nhận feedback tự động từ AI sau khi nộp bài Writing. Trò chuyện với Chatbot AI để giải đáp thắc mắc.
 - **Gamification:** Xem điểm tích lũy, huy hiệu đạt được và xem bảng xếp hạng (Leaderboard) của lớp/trường.
 
-### 2.2. Đối với Giáo viên (Teacher)
+> **Superseded (2026-09-08 / CP60.1, 2026-10-28):** vai trò Giáo viên, lớp học, ghi danh lớp và học phí lớp không còn thuộc sản phẩm. BreadTrans chỉ có Học viên và Quản trị viên; khóa học là tự học, mở bằng gói PRO. Phần 2.2 và các yêu cầu lớp học bên dưới được giữ làm lịch sử.
+
+### 2.2. Đối với Giáo viên (Teacher) — đã ngừng
 - **Quản lý khóa học/lớp học:** Tạo mới khóa học, mở lớp, gán link học trực tuyến (Meet/Zoom).
 - **Quản lý tài liệu:** Tải giáo trình (PDF/Video) lên hệ thống.
 - **Quản lý bài tập:** Tạo ngân hàng câu hỏi đa dạng (Trắc nghiệm, Tự luận), set thời gian làm bài.
