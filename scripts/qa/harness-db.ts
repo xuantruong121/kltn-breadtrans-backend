@@ -18,12 +18,17 @@ const psql = (db: string) => [
   '-tA',
 ];
 
-/** `db` defaults to the shared clone; another database in harness-pg may be named. */
-export function harnessQuery(sql: string, db = 'harness_clone'): string[][] {
+/**
+ * `db` defaults to HARNESS_DB (the database the running harness backend
+ * uses), else the shared clone. Always a database inside harness-pg.
+ */
+const DEFAULT_DB = process.env.HARNESS_DB ?? 'harness_clone';
+
+export function harnessQuery(sql: string, db = DEFAULT_DB): string[][] {
   return run(sql, true, db);
 }
 
-export function harnessExec(sql: string, db = 'harness_clone'): string[][] {
+export function harnessExec(sql: string, db = DEFAULT_DB): string[][] {
   return run(sql, false, db);
 }
 
