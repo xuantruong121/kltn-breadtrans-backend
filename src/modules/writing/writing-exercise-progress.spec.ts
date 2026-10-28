@@ -1,6 +1,7 @@
 import {
   completedWritingQuizIds,
   writingCompletionXp,
+  writingCompletionStatuses,
 } from './writing-exercise-progress';
 
 describe('completedWritingQuizIds', () => {
@@ -40,5 +41,20 @@ describe('writingCompletionXp', () => {
     expect(writingCompletionXp(120)).toBe(100);
     expect(writingCompletionXp(-5)).toBe(0);
     expect(writingCompletionXp(Number.NaN)).toBe(0);
+  });
+});
+
+describe('writingCompletionStatuses', () => {
+  it('tracks not started, partly graded and fully graded exercises', () => {
+    const questions = [
+      { id: 1, quizId: 4 },
+      { id: 2, quizId: 4 },
+      { id: 3, quizId: 7 },
+      { id: 4, quizId: 9 },
+    ];
+    const statuses = writingCompletionStatuses(questions, [1, 3]);
+    expect(statuses.get(4)).toBe('IN_PROGRESS');
+    expect(statuses.get(7)).toBe('COMPLETED');
+    expect(statuses.get(9)).toBe('NOT_STARTED');
   });
 });

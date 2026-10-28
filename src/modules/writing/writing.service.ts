@@ -2,6 +2,7 @@ import { hasVietnameseDiacritics } from '../diagnostic/diagnostic-productive';
 import {
   completedWritingQuizIds,
   loadWritingExerciseProgress,
+  writingCompletionStatuses,
   writingCompletionXp,
 } from './writing-exercise-progress';
 import {
@@ -479,6 +480,10 @@ export class WritingService {
       allQuestions,
       gradedResults.map((r) => r.questionId),
     );
+    const statuses = writingCompletionStatuses(
+      allQuestions,
+      gradedResults.map((r) => r.questionId),
+    );
 
     const accessByQuiz = await this.resolveWritingAccess(quizzes, userId, role);
 
@@ -502,6 +507,7 @@ export class WritingService {
           level: content.level,
           taskType: content.taskType,
           isCompleted: completedQuizIds.has(q.id),
+          completionStatus: statuses.get(q.id) ?? 'NOT_STARTED',
           isPremiumContent: access.isPremiumContent,
           isLocked: access.isLocked,
           requiredPlan: access.requiredPlan ?? 'FREE',
