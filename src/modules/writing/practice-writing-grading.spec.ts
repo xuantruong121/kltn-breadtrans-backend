@@ -1,6 +1,8 @@
 import {
   buildPracticeWritingRequest,
+  exceedsPictureWordLimit,
   keywordCheck,
+  pictureTaskIssues,
   practiceWritingTask,
   validatePracticeWritingResult,
 } from './practice-writing-grading';
@@ -123,5 +125,72 @@ describe('practice writing grading (PRACTICE_WRITING_V1)', () => {
 
   it('a task without a usable rubric is not handled by this grader', () => {
     expect(practiceWritingTask({ prompt: 'x' }, 'x')).toBeNull();
+  });
+});
+
+describe('picture writing ("Viết câu theo tranh")', () => {
+  const content = {
+    taskType: 'PICTURE_SENTENCE',
+    imageUrl:
+      'https://example.r2.dev/catalog/toeic/shared/images/grocery-checkout.png',
+    sceneDescription:
+      'A smiling customer in a beige coat pays by card at a supermarket checkout while a cashier in a black apron scans a jar of sauce.',
+    prompt: 'Viết một hoặc hai câu mô tả bức tranh, dùng cả hai từ gợi ý.',
+    requiredKeywords: ['cashier', 'pay'],
+    sampleResponse:
+      'The cashier is scanning a jar while the woman pays by card.',
+    wordRange: [1, 40],
+    rubric: { grammar: 4, vocabulary: 2, taskCompletion: 4 },
+  };
+
+  it('a complete authored task is publishable', () => {
+    expect(pictureTaskIssues(content)).toEqual([]);
+  });
+
+  it('refuses a task without image, scene, two cue words or the 40-word limit', () => {
+    expect(
+      pictureTaskIssues({
+        ...content,
+        imageUrl: 'not-a-url',
+        sceneDescription: 'A shop.',
+        requiredKeywords: ['cashier'],
+        wordRange: [1, 120],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        'IMAGE_URL',
+        'SCENE_DESCRIPTION',
+        'TWO_CUE_WORDS',
+        'WORD_LIMIT',
+      ]),
+    );
+    expect(
+      pictureTaskIssues({ ...content, sampleResponse: 'A woman is shopping.' }),
+    ).toContain('SAMPLE_USES_CUE_WORDS');
+  });
+
+  it('the grader receives the scene as ground truth', () => {
+    const task = practiceWritingTask(content, 'fallback')!;
+    const request = buildPracticeWritingRequest(
+      task,
+      'The cashier helps a woman pay.',
+    );
+    expect(JSON.parse(request.prompt).task.picture).toBe(
+      content.sceneDescription,
+    );
+    expect(request.systemInstruction).toContain('task.picture');
+  });
+
+  it('ordinary sentence tasks carry no picture and no 40-word limit', () => {
+    expect(sentenceTask.picture).toBeNull();
+    expect(exceedsPictureWordLimit(sentenceTask, 'word '.repeat(60))).toBe(
+      false,
+    );
+  });
+
+  it('a picture answer over 40 words is refused, 40 is accepted', () => {
+    const task = practiceWritingTask(content, 'fallback')!;
+    expect(exceedsPictureWordLimit(task, 'word '.repeat(41))).toBe(true);
+    expect(exceedsPictureWordLimit(task, 'word '.repeat(40))).toBe(false);
   });
 });

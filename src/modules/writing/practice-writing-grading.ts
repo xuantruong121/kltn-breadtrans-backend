@@ -21,6 +21,11 @@ export type PracticeCriterion = { key: string; max: number };
 export type PracticeWritingTask = {
   taskType: string | null;
   prompt: string;
+  /**
+   * Picture tasks only: the authored description of what the image shows.
+   * The grader cannot see the image; this text is its ground truth.
+   */
+  picture: string | null;
   requirements: string[];
   wordRange: [number, number] | null;
   requiredKeywords: string[];
@@ -68,6 +73,12 @@ export function practiceWritingTask(
       : null;
   return {
     taskType: typeof content.taskType === 'string' ? content.taskType : null,
+    picture:
+      content.taskType === PICTURE_SENTENCE &&
+      typeof content.sceneDescription === 'string' &&
+      content.sceneDescription.trim()
+        ? content.sceneDescription.trim()
+        : null,
     prompt:
       typeof content.prompt === 'string' && content.prompt.trim()
         ? content.prompt
@@ -81,6 +92,57 @@ export function practiceWritingTask(
         : null,
     rubric,
   };
+}
+
+/** "Viết câu theo tranh": one picture, two cue words, at most 40 words. */
+export const PICTURE_SENTENCE = 'PICTURE_SENTENCE';
+export const PICTURE_SENTENCE_MAX_WORDS = 40;
+
+/**
+ * Why a picture task is not publishable (empty when it is): it needs an
+ * image, a scene description the grader can rely on, exactly two cue words
+ * that appear in its sample answer, a 40-word limit and a rubric.
+ */
+export function pictureTaskIssues(content: Record<string, unknown>): string[] {
+  const issues: string[] = [];
+  const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  if (content.taskType !== PICTURE_SENTENCE) issues.push('TASK_TYPE');
+  if (!/^https?:\/\/\S+\.(png|jpe?g|webp)$/i.test(text(content.imageUrl)))
+    issues.push('IMAGE_URL');
+  if (text(content.sceneDescription).split(/\s+/).length < 12)
+    issues.push('SCENE_DESCRIPTION');
+  const keywords = Array.isArray(content.requiredKeywords)
+    ? content.requiredKeywords.filter(
+        (k): k is string => typeof k === 'string' && !!k.trim(),
+      )
+    : [];
+  if (keywords.length !== 2) issues.push('TWO_CUE_WORDS');
+  const sample = text(content.sampleResponse);
+  if (!sample) issues.push('SAMPLE_RESPONSE');
+  else if (keywordCheck(sample, keywords).some((k) => !k.present))
+    issues.push('SAMPLE_USES_CUE_WORDS');
+  else if (countWords(sample) > PICTURE_SENTENCE_MAX_WORDS)
+    issues.push('SAMPLE_TOO_LONG');
+  const range = content.wordRange;
+  if (
+    !Array.isArray(range) ||
+    range.length !== 2 ||
+    range[1] !== PICTURE_SENTENCE_MAX_WORDS
+  )
+    issues.push('WORD_LIMIT');
+  if (!practiceRubric(content)) issues.push('RUBRIC');
+  return issues;
+}
+
+/** The 40-word limit applies to picture tasks only. */
+export function exceedsPictureWordLimit(
+  task: PracticeWritingTask | null,
+  answer: string,
+): boolean {
+  return (
+    task?.taskType === PICTURE_SENTENCE &&
+    countWords(answer) > PICTURE_SENTENCE_MAX_WORDS
+  );
 }
 
 export function countWords(text: string): number {
@@ -115,12 +177,19 @@ export function buildPracticeWritingRequest(
     'Do not invent mistakes. If the response is correct, return no corrections.',
     'Every correction must quote the learner text EXACTLY in "original" (a short span copied character for character), give the corrected span, and explain in Vietnamese why.',
     'All comments, explanations, strengths and suggestions are in Vietnamese with full diacritics (never unaccented), specific to this response.',
+    ...(task.picture
+      ? [
+          'This task is about a picture. task.picture describes what the picture shows; treat it as the truth about the image.',
+          'Under taskCompletion, the response must describe that picture and use both required keywords. Statements that contradict task.picture lose taskCompletion points; plausible details that the description does not mention are acceptable.',
+        ]
+      : []),
   ].join('\n');
   const prompt = JSON.stringify(
     {
       task: {
         type: task.taskType,
         prompt: task.prompt,
+        ...(task.picture ? { picture: task.picture } : {}),
         requirements: task.requirements,
         wordRange: task.wordRange,
         requiredKeywords: task.requiredKeywords,
