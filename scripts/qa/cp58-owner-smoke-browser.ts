@@ -2,8 +2,8 @@
  * Checkpoint 58 owner app (:3000 / :3001, kltn_db) smoke as the QA FREE
  * learner. Read-only: it opens catalogs and never submits. It shows that the
  * owner app runs the same rules as the harness: shared filters with Dễ → Khó,
- * Writing B1 labelled Trung cấp and locked for PRO, and no "Viết câu theo
- * tranh" tab while kltn_db holds no picture exercises.
+ * Writing B1 labelled Trung cấp and locked for PRO, and the "Viết câu theo
+ * tranh" tab (picture exercises deployed 2026-10-28).
  * Usage: npx ts-node --transpile-only scripts/qa/cp58-owner-smoke-browser.ts
  */
 import { chromium } from 'playwright';
@@ -75,10 +75,11 @@ void (async () => {
       !emailText.includes('Cơ bản'),
     emailText.slice(0, 120),
   );
+  // Picture writing was deployed to kltn_db on 2026-10-28 (owner-approved).
   check(
-    'no picture tab while kltn_db has no picture exercises',
+    'picture tab shown now that kltn_db holds picture exercises',
     (await page.getByRole('tab', { name: 'Viết câu theo tranh' }).count()) ===
-      0,
+      1,
   );
   await page.screenshot({
     path: 'artifacts/qa-screens/cp58-owner-writing-1440.png',
