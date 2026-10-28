@@ -76,3 +76,15 @@ export function completedWritingQuizIds(
     [...pending].filter(([, hasPending]) => !hasPending).map(([id]) => id),
   );
 }
+
+/**
+ * XP for a completed standalone Writing exercise: one point per percent of
+ * the final server-computed score (92 % → 92 XP, at most 100). The shared
+ * listener computes `score × 10`, which suits Listening/Reading, whose score
+ * is a count of correct answers; Writing's score is a percentage, so it
+ * passes this value instead. Bread, badges and quests keep using `score`.
+ */
+export function writingCompletionXp(percent: number): number {
+  if (!Number.isFinite(percent)) return 0;
+  return Math.min(100, Math.max(0, Math.round(percent)));
+}

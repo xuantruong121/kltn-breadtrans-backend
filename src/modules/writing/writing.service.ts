@@ -2,6 +2,7 @@ import { hasVietnameseDiacritics } from '../diagnostic/diagnostic-productive';
 import {
   completedWritingQuizIds,
   loadWritingExerciseProgress,
+  writingCompletionXp,
 } from './writing-exercise-progress';
 import {
   buildPracticeWritingRequest,
@@ -268,6 +269,7 @@ export class WritingService {
         userId: input.userId,
         quizId: input.quizId,
         score,
+        xp: writingCompletionXp(score),
         quizType: input.quizType,
         submissionId: submission.id,
         isFirstSubmission: rewardInsert.count === 1,

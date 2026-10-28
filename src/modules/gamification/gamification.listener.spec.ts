@@ -195,6 +195,47 @@ describe('GamificationListener', () => {
       );
     });
 
+    it('a Writing exercise passes its XP explicitly; Bánh mì still comes from the score', async () => {
+      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([]);
+
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 17,
+        score: 92,
+        xp: 92,
+        isFirstSubmission: true,
+      });
+
+      expect(gamificationServiceMock.awardXp).toHaveBeenCalledWith(
+        12,
+        92,
+        'Hoàn thành bài thi (Quiz)',
+      );
+      // Unchanged Bread rule: Math.round(92 * 0.4) = 37, capped at 40.
+      expect(gamificationServiceMock.awardBanh).toHaveBeenCalledWith(
+        12,
+        37,
+        'QUIZ_FIRST_COMPLETION',
+        'quiz:17',
+        expect.objectContaining({ isCapped: true }),
+      );
+    });
+
+    it('a repeated Writing completion earns no XP even with an explicit value', async () => {
+      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([]);
+
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 17,
+        score: 92,
+        xp: 92,
+        isFirstSubmission: false,
+      });
+
+      expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
+      expect(gamificationServiceMock.awardBanh).not.toHaveBeenCalled();
+    });
+
     it('allows Reading to advance generic and perfect quests but not Listening quests', async () => {
       prismaMock.dailyQuest.findMany.mockResolvedValueOnce([
         { id: 1, type: 'COMPLETE_QUIZ', targetValue: 1 },

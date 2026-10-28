@@ -60,13 +60,22 @@ const provider = {
       rubric: Array<{ key: string; max: number }>;
       learnerResponse: string;
     };
+    // QA markers in the learner text: "[[fail]]" makes this grading call
+    // fail; "[[percent:NN]]" scores every criterion at NN % of its maximum.
+    if (/\[\[fail\]\]/.test(data.learnerResponse))
+      throw new Error('deterministic writing provider unavailable');
+    const pct = /\[\[percent:(\d{1,3})\]\]/.exec(data.learnerResponse);
     const slip = /\b(\w+) ask\b/.exec(data.learnerResponse);
     return {
       model: 'deterministic',
       text: JSON.stringify({
         criteria: data.rubric.map((c, i) => ({
           key: c.key,
-          score: i === 0 ? c.max - 1 : c.max,
+          score: pct
+            ? Math.round((c.max * Number(pct[1])) / 100)
+            : i === 0
+              ? c.max - 1
+              : c.max,
           comment: 'Nhận xét tất định cho tiêu chí này.',
         })),
         strengths: ['Bài viết đúng chủ đề.'],
