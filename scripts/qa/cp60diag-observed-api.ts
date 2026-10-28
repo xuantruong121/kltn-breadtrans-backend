@@ -15,7 +15,7 @@ import { BE, call, check, failureCount, newStudent } from './harness-api';
 import { harnessExec, harnessQuery } from './harness-db';
 
 type Learner = Awaited<ReturnType<typeof newStudent>>;
-const wav = readFileSync(process.argv[2]);
+const wav = () => readFileSync(process.env.QA_WAV ?? process.argv[2]);
 const DB = process.env.QA_DB_NAME ?? 'diag_clone';
 const q = (sql: string) => harnessQuery(sql, DB);
 
@@ -26,7 +26,7 @@ const observed = (l: number, r: number, tasks: number[]) =>
       (0.7 + 0.075 * tasks.length),
   );
 
-type Plan = {
+export type Plan = {
   listening: number; // correct out of 10
   reading: number; // correct out of 10
   speaking: Array<'record' | 'skip'>;
@@ -50,8 +50,8 @@ function correctText(questionId: number): string {
   )[0][0];
 }
 
-async function runCase(label: string, plan: Plan) {
-  const learner = await newStudent(`cp60diag-${label}`);
+export async function runCase(label: string, plan: Plan, given?: Learner) {
+  const learner = given ?? (await newStudent(`cp60diag-${label}`));
   const { cur, attemptId, token } = await startAttempt(learner);
   const questions: any[] = cur.questions;
   const answers: Record<string, unknown> = {};
@@ -83,7 +83,7 @@ async function runCase(label: string, plan: Plan) {
       const form = new FormData();
       form.append(
         'audio',
-        new Blob([wav], { type: 'audio/wav' }),
+        new Blob([wav()], { type: 'audio/wav' }),
         'answer.wav',
       );
       form.append('durationMs', '10000');
@@ -434,7 +434,8 @@ async function main() {
   process.exit(failureCount() ? 1 : 0);
 }
 
-main().catch((e) => {
-  console.error('ERROR', e);
-  process.exit(2);
-});
+if (require.main === module)
+  main().catch((e) => {
+    console.error('ERROR', e);
+    process.exit(2);
+  });
