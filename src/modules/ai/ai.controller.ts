@@ -179,7 +179,7 @@ export class AiController {
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary:
-      'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB (Chỉ ADMIN/TEACHER)',
+      'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB (Chỉ ADMIN)',
   })
   importEtsPdf(
     @UploadedFiles()

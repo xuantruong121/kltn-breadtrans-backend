@@ -227,7 +227,7 @@ export class EventsGateway
         senderName?: string;
         timestamp?: number;
       };
-      fromRole?: 'STUDENT' | 'ADMIN' | 'TEACHER';
+      fromRole?: 'STUDENT' | 'ADMIN';
       targetUserId?: number;
     },
   ) {
