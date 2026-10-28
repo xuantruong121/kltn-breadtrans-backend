@@ -11,6 +11,9 @@
  * Token usage and the model's raw text are appended to LIVE_GEMINI_LOG (no
  * credentials). It refuses to start unless DATABASE_URL is the harness clone.
  *
+ * A second guard wraps globalThis.fetch and counts every HTTP request to the
+ * Gemini API, so SDK-level or recovery requests cannot exceed the budget.
+ *
  * Usage (from the harness launcher env): LIVE_GEMINI_BUDGET=5
  *   LIVE_GEMINI_LOG=<file.jsonl> npx ts-node --transpile-only scripts/qa/writing-live-budget-server.ts
  */
@@ -35,6 +38,24 @@ function log(entry: Record<string, unknown>) {
       `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`,
     );
 }
+
+// Second guard at the network level: every HTTP request to the Gemini API
+// counts, whatever layer sends it (SDK, retry, parse recovery). Past the
+// budget the request is refused before it leaves the process.
+let networkRequests = 0;
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (input: unknown, init?: unknown) => {
+  const url = String((input as { url?: string })?.url ?? input);
+  if (url.includes('generativelanguage.googleapis.com')) {
+    if (networkRequests >= BUDGET) {
+      log({ event: 'network-blocked', budget: BUDGET });
+      throw new Error('LIVE_GEMINI_BUDGET_REACHED');
+    }
+    networkRequests += 1;
+    log({ event: 'network', n: networkRequests });
+  }
+  return realFetch(input as never, init as never);
+};
 
 type Execute = GeminiCredentialManager['execute'];
 const realExecute: Execute = GeminiCredentialManager.prototype.execute;
