@@ -50,7 +50,13 @@ function correctText(questionId: number): string {
   )[0][0];
 }
 
-export async function runCase(label: string, plan: Plan, given?: Learner) {
+export async function runCase(
+  label: string,
+  plan: Plan,
+  given?: Learner,
+  // >1 sends the same submission concurrently (idempotency check).
+  parallelSubmits = 1,
+) {
   const learner = given ?? (await newStudent(`cp60diag-${label}`));
   const { cur, attemptId, token } = await startAttempt(learner);
   const questions: any[] = cur.questions;
@@ -109,16 +115,16 @@ export async function runCase(label: string, plan: Plan, given?: Learner) {
           ? `Short answer ${words(Math.max(1, Math.floor(min / 3)))}.`
           : '';
   }
-  const submit = await call(
-    'POST',
-    `/diagnostic/${cur.id}/attempts`,
-    learner.token,
-    {
-      answers,
-      submissionToken: token,
-      attemptId,
-    },
+  const submits = await Promise.all(
+    Array.from({ length: parallelSubmits }, () =>
+      call('POST', `/diagnostic/${cur.id}/attempts`, learner.token, {
+        answers,
+        submissionToken: token,
+        attemptId,
+      }),
+    ),
   );
+  const submit = submits[0];
   if (submit.status >= 300)
     console.log(
       'submit',
@@ -140,6 +146,7 @@ export async function runCase(label: string, plan: Plan, given?: Learner) {
     assessmentId: cur.id,
     result,
     submit,
+    submits,
     answers,
     token,
   };

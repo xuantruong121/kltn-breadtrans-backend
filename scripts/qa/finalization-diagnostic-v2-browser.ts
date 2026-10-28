@@ -420,8 +420,9 @@ async function main() {
     harnessQuery(
       `select score from "${table}" r join "DiagnosticAttempt" a on a.id = r."attemptId" where a.id = ${res.data?.attemptId} and r.status = 'GRADED'`,
     ).map(([s]) => Number(s));
-  const mean = (xs: number[]) =>
-    Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
+  // FOUR_SKILL_OBSERVED_V3 (CP60-DIAG): one decimal throughout.
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  const mean = (xs: number[]) => r1(xs.reduce((a, b) => a + b, 0) / xs.length);
   const speakingScores = graded('DiagnosticSpeakingResponse');
   const writingScores = graded('DiagnosticWritingResponse');
   check(
@@ -432,16 +433,17 @@ async function main() {
       fs?.skills.WRITING.score === mean(writingScores),
     `(S ${fs?.skills.SPEAKING.score} [${speakingScores.join(',')}], W ${fs?.skills.WRITING.score} [${writingScores.join(',')}])`,
   );
-  const overall = Math.round(
-    (fs.skills.LISTENING.score +
-      fs.skills.READING.score +
-      fs.skills.SPEAKING.score +
-      fs.skills.WRITING.score) /
-      4,
+  // Observed score: 35/35 objective + 7.5 per graded task, over the graded weight.
+  const tasks = [...speakingScores, ...writingScores];
+  const overall = r1(
+    (0.35 * fs.skills.LISTENING.score +
+      0.35 * fs.skills.READING.score +
+      tasks.reduce((sum, t) => sum + 0.075 * t, 0)) /
+      (0.7 + 0.075 * tasks.length),
   );
   check(
-    'overall is the equal-weight mean of the four skills',
-    fs?.overall === overall,
+    'overall is the observed score (35/35 + 7.5 per graded task)',
+    fs?.overall === overall && fs?.observed?.observed?.score === overall,
     `(${fs?.overall} vs ${overall})`,
   );
   check(
@@ -455,7 +457,7 @@ async function main() {
       fs?.placementBandStatus === 'D1_ADVISORY_SCORES_ONLY',
   );
   const [attempt] = harnessQuery(
-    `select "scoringVersion", "blueprintVersion", "contentVersion", "resultState", "overallScore", (select count(*) from "DiagnosticSkillResult" s where s."attemptId" = a.id) from "DiagnosticAttempt" a where id = ${res.data?.attemptId}`,
+    `select "scoringVersion", "blueprintVersion", "contentVersion", "resultState", "overallScore", (select count(*) from "DiagnosticSkillResult" s where s."attemptId" = a.id), answers->>'__resultPolicy' from "DiagnosticAttempt" a where id = ${res.data?.attemptId}`,
   );
   check(
     'the attempt pins its versions and stores the result',
@@ -464,7 +466,8 @@ async function main() {
       attempt?.[2] === '6' &&
       attempt?.[3] === 'COMPLETE' &&
       Number(attempt?.[4]) === overall &&
-      attempt?.[5] === '5',
+      attempt?.[5] === '5' &&
+      attempt?.[6] === 'FOUR_SKILL_OBSERVED_V3',
     `(${attempt?.join(' / ')})`,
   );
 
@@ -473,9 +476,10 @@ async function main() {
   await hidePet(page);
   let text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
-    'after a reload the result page shows the four-skill profile and overall',
-    text.includes('Kết quả theo bốn kỹ năng') &&
-      text.includes(`Điểm tổng tham khảo: ${overall}/100`),
+    'after a reload the result page shows the four-skill profile and observed score',
+    text.toLowerCase().includes('hồ sơ bốn kỹ năng') &&
+      text.includes('Điểm quan sát') &&
+      text.includes(`${String(overall).replace('.', ',')}/100`),
   );
   // Claims are checked in the result view's own sections, not the site
   // navigation (which links the TOEIC practice area by name).
@@ -500,7 +504,10 @@ async function main() {
   );
   check(
     'no CEFR or official-score claim',
-    !/CEFR|TOEIC|IELTS|\bETS\b/.test(resultText),
+    // The disclaimer itself says the result is not converted to CEFR.
+    !/CEFR|TOEIC|IELTS|\bETS\b/.test(
+      resultText.replace('không quy đổi sang trình độ CEFR', ''),
+    ),
     `(${resultText.match(/.{20}(CEFR|TOEIC|IELTS|\bETS\b).{20}/)?.[0]})`,
   );
   await page.screenshot({
@@ -520,7 +527,7 @@ async function main() {
     waitUntil: 'networkidle',
   });
   await hidePet(page);
-  await page.getByText('Bài Nói và Viết').waitFor({ timeout: 30_000 });
+  await page.getByText('Điểm quan sát').first().waitFor({ timeout: 30_000 });
   await page.screenshot({
     path: `${EVIDENCE}/diag-v2-profile-tab.png`,
     fullPage: true,
@@ -722,7 +729,8 @@ async function main() {
   text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
     'the page says the overall is withheld and offers a retry per failed task',
-    text.includes('Điểm tổng chưa có vì') &&
+    text.includes('Chưa có điểm tổng') &&
+      text.includes('chưa chấm được') &&
       (await page.getByRole('button', { name: /Chấm lại/ }).count()) === 2,
   );
   await page.screenshot({
@@ -754,7 +762,9 @@ async function main() {
   text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
     'the page shows the restored overall',
-    text.includes(`Điểm tổng tham khảo: ${res.data?.fourSkill?.overall}/100`),
+    text.includes(
+      `${String(res.data?.fourSkill?.overall).replace('.', ',')}/100`,
+    ),
   );
 
   check(

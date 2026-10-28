@@ -211,20 +211,40 @@ async function main() {
       fs?.skills.SPEAKING.tasksSkipped === 2,
     `(${JSON.stringify(fs?.skills.SPEAKING)})`,
   );
+  // FOUR_SKILL_OBSERVED_V3 (CP60-DIAG): a 1/2 skill is scored from its graded
+  // task with limited evidence; skipped tasks carry no score and no weight.
+  const [writingTask] = harnessQuery(
+    `select score from "DiagnosticWritingResponse" where "attemptId" = ${res.data?.attemptId} and status = 'GRADED'`,
+  ).map(([v]) => Number(v));
   check(
-    'Writing: one graded, one skipped, no skill score (both tasks are required)',
-    fs?.skills.WRITING.score === null &&
+    'Writing: one graded, one skipped; scored from the graded task, coverage partial',
+    fs?.skills.WRITING.score === writingTask &&
       fs?.skills.WRITING.tasksSkipped === 1 &&
-      fs?.skills.WRITING.tasksGraded === 1,
+      fs?.skills.WRITING.tasksGraded === 1 &&
+      fs?.observed?.writing?.coverage === 'PARTIAL',
     `(${JSON.stringify(fs?.skills.WRITING)})`,
   );
-  check('overall is withheld', fs?.overall === null, `(${fs?.overall})`);
+  const observed =
+    Math.round(
+      ((0.35 * fs.skills.LISTENING.score +
+        0.35 * fs.skills.READING.score +
+        0.075 * writingTask) /
+        0.775) *
+        10,
+    ) / 10;
+  check(
+    'overall is the observed score over L, R and the one graded task',
+    fs?.overall === observed,
+    `(${fs?.overall} vs ${observed})`,
+  );
   const [row] = harnessQuery(
     `select "resultState", "overallScore", (select count(*) from "DiagnosticWritingResponse" w where w."attemptId" = a.id) from "DiagnosticAttempt" a where id = ${res.data?.attemptId}`,
   );
   check(
-    'stored: no overall, and the skipped Writing task created no grading row',
-    row?.[1] === '' && row?.[2] === '1',
+    'stored: the observed overall, and the skipped Writing task created no grading row',
+    row?.[0] === 'COMPLETE' &&
+      Number(row?.[1]) === observed &&
+      row?.[2] === '1',
     `(${row?.join(' / ')})`,
   );
   const advice = res.data?.advice;
@@ -232,16 +252,12 @@ async function main() {
     (advice?.unassessed ?? []).map((u: any) => [u.skill, u]),
   );
   check(
-    'advice: Speaking and Writing are unassessed (skipped), with general practice, never a weakness',
+    'advice: Speaking is unassessed (skipped), with general practice, never a weakness; Writing is assessed',
     unassessed.SPEAKING?.reason === 'SKIPPED' &&
-      unassessed.WRITING?.reason === 'SKIPPED' &&
+      !unassessed.WRITING &&
       !!unassessed.SPEAKING?.generalPractice &&
-      !(advice?.priorities ?? []).some(
-        (p: any) => p.skill === 'SPEAKING' || p.skill === 'WRITING',
-      ) &&
-      !(advice?.strengths ?? []).some(
-        (s: any) => s.skill === 'SPEAKING' || s.skill === 'WRITING',
-      ),
+      !(advice?.priorities ?? []).some((p: any) => p.skill === 'SPEAKING') &&
+      !(advice?.strengths ?? []).some((s: any) => s.skill === 'SPEAKING'),
     `(${JSON.stringify(advice?.unassessed)})`,
   );
 
@@ -250,20 +266,23 @@ async function main() {
   // Read the result once it has rendered, not at networkidle (CP60.3 flake on
   // a busy dev server); a result that never renders still fails below.
   await page
-    .getByText('Điểm tổng chưa có vì')
+    .getByText('Điểm quan sát')
     .first()
     .waitFor({ timeout: 60_000 })
     .catch(() => undefined);
   const text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
-    'the page labels Speaking skipped and Writing partly skipped',
-    text.includes('Đã bỏ qua') && text.includes('Bỏ qua 1/2 bài'),
+    'the page labels Speaking unassessed and Writing partly assessed',
+    text.includes('Chưa đánh giá') &&
+      text.includes('Đánh giá 1/2 bài') &&
+      text.includes('bằng chứng còn hạn chế'),
   );
   check(
-    'the page explains why there is no overall and still shows the scored skills',
-    text.includes('Điểm tổng chưa có vì') &&
-      !text.includes('Điểm tổng tham khảo:') &&
-      text.includes(`${fs?.skills.LISTENING.score}/100`),
+    'the page shows the observed score, the objective core and how it was computed',
+    text.includes('Điểm quan sát') &&
+      text.includes(`${String(observed).replace('.', ',')}/100`) &&
+      text.includes('Điểm cốt lõi khách quan') &&
+      text.includes('Điểm được tính như thế nào?'),
   );
   check(
     'the page lists unassessed skills and labels the practice as general',
