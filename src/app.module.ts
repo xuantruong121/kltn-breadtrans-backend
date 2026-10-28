@@ -17,10 +17,8 @@ import { ReadingModule } from './modules/reading/reading.module';
 import { WritingModule } from './modules/writing/writing.module';
 import { VocabModule } from './modules/vocab/vocab.module';
 import { ToeicModule } from './modules/toeic/toeic.module';
-import { ClassModule } from './modules/class/class.module';
 import { EventsModule } from './modules/events/events.module';
 import { AdminModule } from './modules/admin/admin.module';
-import { AssignmentModule } from './modules/assignment/assignment.module';
 import { GrammarModule } from './modules/grammar/grammar.module';
 import { MarketModule } from './modules/market/market.module';
 import { ContentModule } from './modules/content/content.module';
@@ -65,10 +63,8 @@ import { SuggestionModule } from './modules/suggestion/suggestion.module';
     WritingModule,
     VocabModule,
     ToeicModule,
-    ClassModule,
     EventsModule,
     AdminModule,
-    AssignmentModule,
     GrammarModule,
     MarketModule,
     ContentModule,
