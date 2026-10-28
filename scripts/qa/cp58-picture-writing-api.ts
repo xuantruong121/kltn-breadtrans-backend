@@ -138,13 +138,79 @@ void (async () => {
       first.find((q) => q.id === A2)?.isCompleted === false &&
       xp(free) === 0,
   );
-  for (const q of tasks.slice(1))
-    await submit(
-      free,
-      A2,
-      q,
-      'The people in the picture are busy and the place looks clean. [[percent:80]]',
+  // Tasks 2-5 with the cases the server decides itself (the mock grader
+  // decides the score; real grading quality is not proven here).
+  const cueOf = (body: any) =>
+    Object.fromEntries(
+      (body?.data?.keywords ?? []).map((k: any) => [k.keyword, k.present]),
     );
+  const alt = await submit(
+    free,
+    A2,
+    tasks[1],
+    'Two customers are ordering drinks at the café counter. [[percent:80]]',
+  );
+  check(
+    'alternative wording with "ordering": both cues found',
+    cueOf(alt).order === true && cueOf(alt).counter === true,
+    JSON.stringify(cueOf(alt)),
+  );
+  const inflected = await submit(
+    free,
+    A2,
+    tasks[2],
+    'A delivery man carried three boxes into the shop. [[percent:80]]',
+  );
+  check(
+    'inflection "carried": cue "carry" found',
+    cueOf(inflected).carry === true && cueOf(inflected).boxes === true,
+    JSON.stringify(cueOf(inflected)),
+  );
+  const missing = await submit(
+    free,
+    A2,
+    tasks[3],
+    'A man is bringing food to two guests. [[percent:80]]',
+  );
+  check(
+    'missing cue: "waiter" and "table" reported absent',
+    cueOf(missing).waiter === false && cueOf(missing).table === false,
+    JSON.stringify(cueOf(missing)),
+  );
+  const mid = (await call('GET', `/writing/quizzes/${A2}`, free.token)).data
+    ?.exercise;
+  check(
+    '4/5 graded: still in progress, no XP yet',
+    mid?.answered === 4 && mid?.complete === false && xp(free) === 0,
+    JSON.stringify({ answered: mid?.answered, complete: mid?.complete }),
+  );
+  // A replayed request (same key) is graded once.
+  const key = randomUUID();
+  const body = {
+    answer:
+      'Two travellers with suitcases look at the departure board. [[percent:80]]',
+    questionId: tasks[4],
+    clientAttemptId: key,
+  };
+  const r1 = await call(
+    'POST',
+    `/writing/quizzes/${A2}/submit`,
+    free.token,
+    body,
+  );
+  const r2 = await call(
+    'POST',
+    `/writing/quizzes/${A2}/submit`,
+    free.token,
+    body,
+  );
+  check(
+    'a replayed submission returns the same result, stored once',
+    r1.data?.submissionId === r2.data?.submissionId &&
+      one(
+        `select count(*) from "Submission" where "userId" = ${free.userId} and "quizId" = ${A2}`,
+      ) === '5',
+  );
   await settle();
   const percent = (await call('GET', `/writing/quizzes/${A2}`, free.token)).data
     ?.exercise?.percent;

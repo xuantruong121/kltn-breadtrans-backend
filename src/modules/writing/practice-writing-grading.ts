@@ -149,16 +149,82 @@ export function countWords(text: string): number {
   return text.trim() ? text.trim().split(/\s+/u).length : 0;
 }
 
-/** Deterministic keyword check (whole word, any case, inflected endings allowed). */
+/** Common irregular forms of verbs a cue word may use. */
+const IRREGULAR: Record<string, string[]> = {
+  pay: ['paid'],
+  buy: ['bought'],
+  bring: ['brought'],
+  hold: ['held'],
+  stand: ['stood'],
+  sit: ['sat'],
+  sell: ['sold'],
+  meet: ['met'],
+  leave: ['left'],
+  make: ['made'],
+  take: ['took', 'taken'],
+  give: ['gave', 'given'],
+  go: ['went', 'gone'],
+  see: ['saw', 'seen'],
+  write: ['wrote', 'written'],
+  read: ['read'],
+  run: ['ran'],
+  eat: ['ate', 'eaten'],
+  drink: ['drank', 'drunk'],
+  wear: ['wore', 'worn'],
+  speak: ['spoke', 'spoken'],
+  teach: ['taught'],
+  drive: ['drove', 'driven'],
+  ride: ['rode', 'ridden'],
+  put: ['put'],
+};
+
+/**
+ * Accepted forms of one word: the word, regular -s/-es/-ed/-ing forms
+ * (final -e dropped, -y to -ies/-ied, doubled consonant), -f/-fe to -ves,
+ * the singular of a plural cue, and common irregular verb forms.
+ */
+export function wordForms(word: string): string[] {
+  const w = word.toLowerCase();
+  const forms = new Set([w, `${w}s`, `${w}es`, `${w}ed`, `${w}ing`]);
+  if (w.endsWith('e')) {
+    forms.add(`${w}d`);
+    forms.add(`${w.slice(0, -1)}ing`);
+  }
+  if (/[^aeiou]y$/.test(w)) {
+    forms.add(`${w.slice(0, -1)}ies`);
+    forms.add(`${w.slice(0, -1)}ied`);
+  }
+  if (/[^aeiou][aeiou][bdgklmnprt]$/.test(w)) {
+    forms.add(`${w}${w.at(-1)}ed`);
+    forms.add(`${w}${w.at(-1)}ing`);
+  }
+  if (w.endsWith('fe')) forms.add(`${w.slice(0, -2)}ves`);
+  else if (w.endsWith('f')) forms.add(`${w.slice(0, -1)}ves`);
+  if (/(x|s|ch|sh)es$/.test(w)) forms.add(w.slice(0, -2));
+  else if (w.endsWith('s') && !w.endsWith('ss')) forms.add(w.slice(0, -1));
+  for (const irregular of IRREGULAR[w] ?? []) forms.add(irregular);
+  return [...forms];
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Deterministic keyword check: whole words, any case; the last word of a cue
+ * may be inflected (scan → scanning, carry → carried, shelf → shelves,
+ * pay → paid). A longer word that merely starts with the cue does not count.
+ */
 export function keywordCheck(answer: string, keywords: string[]) {
   return keywords.map((keyword) => {
-    const escaped = keyword
-      .trim()
-      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      .replace(/\s+/g, '\\s+');
+    const words = keyword.trim().split(/\s+/);
+    const last = words.pop() ?? '';
+    const head = words.map(escapeRe).join('\\s+');
+    const tail = `(?:${wordForms(last).map(escapeRe).join('|')})`;
+    const pattern = head ? `${head}\\s+${tail}` : tail;
     return {
       keyword,
-      present: new RegExp(`(?<![A-Za-z])${escaped}`, 'i').test(answer),
+      present: new RegExp(`(?<![A-Za-z])${pattern}(?![A-Za-z])`, 'i').test(
+        answer,
+      ),
     };
   });
 }
@@ -179,8 +245,11 @@ export function buildPracticeWritingRequest(
     'All comments, explanations, strengths and suggestions are in Vietnamese with full diacritics (never unaccented), specific to this response.',
     ...(task.picture
       ? [
-          'This task is about a picture. task.picture describes what the picture shows; treat it as the truth about the image.',
-          'Under taskCompletion, the response must describe that picture and use both required keywords. Statements that contradict task.picture lose taskCompletion points; plausible details that the description does not mention are acceptable.',
+          'This task is about a picture. You cannot see the picture: task.picture is an authored description of it; treat it as the truth about the image.',
+          'Never say or imply that you looked at the image. In comments, refer to "nội dung bức tranh" as described, not to your own viewing.',
+          'Under taskCompletion, the response must describe that picture and use both required keywords (facts.keywords already accounts for inflected forms such as scans, carried, shelves).',
+          'Any accurate sentence about people, actions or objects in task.picture is valid; never deduct for wording that differs from the sample response.',
+          'Statements that contradict task.picture lose taskCompletion points; plausible details that the description does not mention are acceptable. A sentence unrelated to the picture scores 0 for taskCompletion.',
         ]
       : []),
   ].join('\n');

@@ -194,3 +194,65 @@ describe('picture writing ("Viết câu theo tranh")', () => {
     expect(exceedsPictureWordLimit(task, 'word '.repeat(40))).toBe(false);
   });
 });
+
+describe('cue words: inflected forms count, longer words do not', () => {
+  it.each([
+    ['scan', 'The cashier scans a jar.'],
+    ['scan', 'She is scanning a jar.'],
+    ['pay', 'The woman paid by card.'],
+    ['carry', 'He carries three boxes.'],
+    ['carry', 'He carried the boxes inside.'],
+    ['boxes', 'He carries a big box.'],
+    ['file', 'She is filing papers.'],
+    ['shelf', 'Folders are on the shelves.'],
+    ['replace', 'He is replacing a light.'],
+    ['plan', 'They are planning the work.'],
+  ])('"%s" is found in "%s"', (keyword, text) => {
+    expect(keywordCheck(text, [keyword])[0].present).toBe(true);
+  });
+
+  it.each([
+    ['scan', 'It was a scandal.'],
+    ['order', 'The room is in disorder.'],
+    ['cashier', 'A woman pays at the till.'],
+  ])('"%s" is not found in "%s"', (keyword, text) => {
+    expect(keywordCheck(text, [keyword])[0].present).toBe(false);
+  });
+
+  it('a multi-word cue inflects its last word', () => {
+    expect(
+      keywordCheck('We are checking in now.', ['check in'])[0].present,
+    ).toBe(false);
+    expect(keywordCheck('They take notes.', ['take note'])[0].present).toBe(
+      true,
+    );
+  });
+});
+
+describe('picture grading instructions', () => {
+  it('say the grader cannot see the image and must accept other wording', () => {
+    const task = practiceWritingTask(
+      {
+        taskType: 'PICTURE_SENTENCE',
+        sceneDescription:
+          'A waiter puts a plate of food on a table where two people sit.',
+        prompt: 'p',
+        requiredKeywords: ['waiter', 'table'],
+        rubric: { grammar: 4, vocabulary: 2, taskCompletion: 4 },
+      },
+      'fallback',
+    )!;
+    const { systemInstruction } = buildPracticeWritingRequest(
+      task,
+      'The waiter is serving two guests at a table.',
+    );
+    expect(systemInstruction).toContain('You cannot see the picture');
+    expect(systemInstruction).toContain(
+      'Never say or imply that you looked at the image',
+    );
+    expect(systemInstruction).toContain(
+      'never deduct for wording that differs',
+    );
+    expect(systemInstruction).toContain('scores 0 for taskCompletion');
+  });
+});
