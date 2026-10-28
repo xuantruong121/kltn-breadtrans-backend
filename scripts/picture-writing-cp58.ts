@@ -11,6 +11,8 @@
  * Usage: npx ts-node --transpile-only scripts/picture-writing-cp58.ts <dryrun|apply> --target <url|env:DATABASE_URL> [--image-base <url>]
  * apply needs PICTURE_WRITING_AUTHORIZED=create. kltn_db additionally needs
  * PICTURE_WRITING_KLTN_DB=owner-approved (separate owner authorization).
+ * PICTURE_WRITING_TEST_FAIL=after-first-quiz aborts mid-transaction to prove
+ * the rollback; it is ignored on kltn_db.
  */
 import { PrismaClient, QuizType, TopicCategory } from '@prisma/client';
 
@@ -129,6 +131,12 @@ async function main() {
           },
         });
         quizzes.push(`quiz ${quiz.id} "${quiz.title}"`);
+        // Test hook: prove the rollback on a disposable database only.
+        if (
+          process.env.PICTURE_WRITING_TEST_FAIL === 'after-first-quiz' &&
+          db !== 'kltn_db'
+        )
+          throw new Error('test failure after the first quiz');
       }
       return { topic: topic.id, quizzes };
     });
