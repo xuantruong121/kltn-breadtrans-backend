@@ -20,17 +20,17 @@ const span = (r: CefrRange | null) =>
   r ? (r.min === r.max ? r.min : `${r.min}-${r.max}`) : '?';
 
 void (async () => {
-  const login = (await fetch(`${BE}/auth/login`, {
+  const login = await fetch(`${BE}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-  }).then((r) => r.json())) as any;
+  }).then((r) => r.json());
   const token = login.data?.accessToken ?? login.data?.access_token;
   const get = async (p: string) =>
     (
-      (await fetch(`${BE}${p}`, {
+      await fetch(`${BE}${p}`, {
         headers: { authorization: `Bearer ${token}` },
-      }).then((r) => r.json())) as any
+      }).then((r) => r.json())
     ).data;
 
   type Row = {
