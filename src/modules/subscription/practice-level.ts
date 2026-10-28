@@ -34,6 +34,15 @@ export function parseCefrRange(
   return rank(a) <= rank(b) ? { min: a, max: b } : { min: b, max: a };
 }
 
+/**
+ * The one level string every practice catalog exposes ("B1", "B2-C1"), from
+ * the same range the access policy reads. Null when the item has no tag.
+ */
+export function cefrSpan(range: CefrRange | null): string | null {
+  if (!range) return null;
+  return range.min === range.max ? range.min : `${range.min}-${range.max}`;
+}
+
 /** True when any part of the range is B1 or above. */
 export function practiceRequiresPlus(range: CefrRange): boolean {
   return rank(range.max) >= rank('B1');
@@ -69,4 +78,38 @@ export function levelLabel(range: CefrRange | null): string | null {
   const span =
     range.min === range.max ? range.min : `${range.min}–${range.max}`;
   return `${LEVEL_GROUP_LABEL[group]} · ${span}`;
+}
+
+export type PracticeSkill = 'LISTENING' | 'READING' | 'SPEAKING' | 'WRITING';
+export type PracticePlan = 'FREE' | 'PLUS' | 'PRO';
+
+const PLAN_RANK: Record<PracticePlan, number> = { FREE: 0, PLUS: 1, PRO: 2 };
+
+/**
+ * Owner policy (2026-10-28) for standalone skill practice: A1/A2 is free in
+ * every skill; B1+ Listening and Reading need PLUS; B1+ Speaking and Writing
+ * need PRO. PRO includes PLUS. Courses, TOEIC and the Entry Diagnostic have
+ * their own rules and do not use this.
+ */
+export function advancedPracticePlan(skill: PracticeSkill): PracticePlan {
+  return skill === 'SPEAKING' || skill === 'WRITING' ? 'PRO' : 'PLUS';
+}
+
+export function requiredPracticePlan(
+  skill: PracticeSkill,
+  range: CefrRange,
+): PracticePlan {
+  return practiceRequiresPlus(range) ? advancedPracticePlan(skill) : 'FREE';
+}
+
+/** Rank of a plan code; an unknown code ranks as FREE (fail closed). */
+export function planRank(code: string | null | undefined): number {
+  return PLAN_RANK[code as PracticePlan] ?? 0;
+}
+
+export function planSatisfies(
+  userPlanCode: string | null | undefined,
+  required: PracticePlan,
+): boolean {
+  return planRank(userPlanCode) >= PLAN_RANK[required];
 }

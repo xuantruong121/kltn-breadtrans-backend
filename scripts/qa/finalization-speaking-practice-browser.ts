@@ -72,7 +72,7 @@ async function main() {
   const pro = await studentPage('spk-br-pro', 1366, true);
   await pro.page.addInitScript(TRACK_AUDIO);
   const media: Array<{ url: string; status: number; bytes: number }> = [];
-  pro.page.on('response', async (r) => {
+  pro.page.on('response', (r) => {
     if (r.url().includes('/harness-private/'))
       media.push({
         url: r.url(),
@@ -107,11 +107,13 @@ async function main() {
   );
   check(
     'the bytes served are the clip mapped to exercise 6',
+    // Chromium may fetch audio with a Range request: 206 is a part of the
+    // same object, so only its key and a non-empty body are checked then.
     media.some(
       (m) =>
-        m.status === 200 &&
         m.url.includes(KEY) &&
-        (m.bytes === 0 || m.bytes === size),
+        ((m.status === 200 && (m.bytes === 0 || m.bytes === size)) ||
+          (m.status === 206 && m.bytes > 0 && m.bytes <= size)),
     ),
     JSON.stringify(media.map((m) => [m.status, m.bytes])),
   );
@@ -133,9 +135,10 @@ async function main() {
   await free.page.goto(`${FE}/speaking/6`);
   await hidePet(free.page);
   await free.page
-    .getByText('Bài luyện nói này thuộc gói PLUS')
+    .getByText('Nội dung dành cho PRO')
     .waitFor({ timeout: 30_000 });
-  check('free learner sees the PLUS lock on /speaking/6', true);
+  // Owner matrix 2026-10-28: Speaking B1+ needs PRO.
+  check('free learner sees the PRO lock on /speaking/6', true);
   check(
     'free learner page requests no private media',
     privateRequests.length === 0,

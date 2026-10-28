@@ -220,7 +220,7 @@ describe('multi-task Writing exercise', () => {
     expect(events.emit).toHaveBeenCalledTimes(1);
     expect(events.emit).toHaveBeenCalledWith(
       'quiz.submitted',
-      expect.objectContaining({ score: 65, isFirstSubmission: true }),
+      expect.objectContaining({ score: 65, xp: 65, isFirstSubmission: true }),
     );
 
     // A retake after completion uses the latest grade and grants no new reward.

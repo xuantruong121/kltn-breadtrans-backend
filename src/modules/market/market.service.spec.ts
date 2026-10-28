@@ -525,7 +525,8 @@ describe('MarketService', () => {
       );
       expect(result.success).toBe(true);
       expect(result.alreadyApplied).toBe(false);
-      expect(adjustTx.pointHistory.create).toHaveBeenCalled();
+      // A Bread adjustment never writes the XP log.
+      expect(adjustTx.pointHistory.create).not.toHaveBeenCalled();
       expect(adjustTx.currencyTransaction.create).toHaveBeenCalled();
     });
 

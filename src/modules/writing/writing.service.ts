@@ -2,8 +2,13 @@ import { hasVietnameseDiacritics } from '../diagnostic/diagnostic-productive';
 import {
   completedWritingQuizIds,
   loadWritingExerciseProgress,
+  writingCompletionStatuses,
+  writingCompletionXp,
 } from './writing-exercise-progress';
 import {
+  exceedsPictureWordLimit,
+  PICTURE_SENTENCE,
+  PICTURE_SENTENCE_MAX_WORDS,
   buildPracticeWritingRequest,
   practiceRubric,
   practiceWritingTask,
@@ -23,8 +28,18 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { QuizPublicationStatus, QuizType, TopicCategory } from '@prisma/client';
 import { AiService } from '../ai/ai.service';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
+import { cefrSpan } from '../subscription/practice-level';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
+
+/** A task's cue words, from either authored field. */
+function keywordsOf(c: any): string[] {
+  return Array.isArray(c?.keywords)
+    ? c.keywords
+    : Array.isArray(c?.requiredKeywords)
+      ? c.requiredKeywords
+      : [];
+}
 
 const GENERAL_WRITING_TYPES: QuizType[] = [
   QuizType.WRITING_PICTURE,
@@ -268,6 +283,7 @@ export class WritingService {
         userId: input.userId,
         quizId: input.quizId,
         score,
+        xp: writingCompletionXp(score),
         quizType: input.quizType,
         submissionId: submission.id,
         isFirstSubmission: rewardInsert.count === 1,
@@ -331,6 +347,11 @@ export class WritingService {
             wordCount: detail.wordCount,
             wordRange: detail.wordRange,
             keywords: detail.keywords,
+            ...(detail.linking ? { linking: detail.linking } : {}),
+            ...(detail.scene ? { scene: detail.scene } : {}),
+            ...(detail.scoreAdjustment
+              ? { scoreAdjustment: detail.scoreAdjustment }
+              : {}),
           }
         : {}),
     };
@@ -399,6 +420,8 @@ export class WritingService {
       type: QuizType;
       isPremiumContent: boolean;
       courseId: number | null;
+      /** Carries the authored CEFR tag the access policy reads. */
+      title?: string;
     }>,
     userId?: number,
     role?: import('@prisma/client').Role,
@@ -409,7 +432,11 @@ export class WritingService {
     return new Map(
       quizzes.map((quiz) => [
         quiz.id,
-        { isPremiumContent: quiz.isPremiumContent, isLocked: false },
+        {
+          isPremiumContent: quiz.isPremiumContent,
+          isLocked: false,
+          requiredPlan: 'FREE',
+        },
       ]),
     );
   }
@@ -470,8 +497,53 @@ export class WritingService {
       allQuestions,
       gradedResults.map((r) => r.questionId),
     );
+    const statuses = writingCompletionStatuses(
+      allQuestions,
+      gradedResults.map((r) => r.questionId),
+    );
 
     const accessByQuiz = await this.resolveWritingAccess(quizzes, userId, role);
+
+    // "Viết câu theo tranh": every task's picture and cue words, so the
+    // catalog can show one card per picture. Not answers: the sample and the
+    // scene description stay on the server.
+    const pictureQuizIds = quizzes
+      .filter(
+        (q) =>
+          (q.questions[0]?.content as { taskType?: unknown } | null)
+            ?.taskType === PICTURE_SENTENCE,
+      )
+      .map((q) => q.id);
+    const graded = new Set(gradedResults.map((r) => r.questionId));
+    const pictureTasksByQuiz = new Map<
+      number,
+      Array<{
+        questionId: number;
+        position: number;
+        imageUrl: string | null;
+        keywords: string[];
+        isGraded: boolean;
+      }>
+    >();
+    if (pictureQuizIds.length) {
+      const rows = await this.prisma.question.findMany({
+        where: { quizId: { in: pictureQuizIds } },
+        select: { id: true, quizId: true, content: true },
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+      });
+      for (const row of rows) {
+        const c = (row.content ?? {}) as Record<string, unknown>;
+        const list = pictureTasksByQuiz.get(row.quizId) ?? [];
+        list.push({
+          questionId: row.id,
+          position: list.length + 1,
+          imageUrl: typeof c.imageUrl === 'string' ? c.imageUrl : null,
+          keywords: keywordsOf(c),
+          isGraded: graded.has(row.id),
+        });
+        pictureTasksByQuiz.set(row.quizId, list);
+      }
+    }
 
     return {
       categories,
@@ -481,6 +553,7 @@ export class WritingService {
         const access = accessByQuiz.get(q.id) ?? {
           isPremiumContent: Boolean(q.isPremiumContent),
           isLocked: false,
+          requiredPlan: 'FREE',
         };
         const safeMetadata = {
           id: q.id,
@@ -492,8 +565,14 @@ export class WritingService {
           level: content.level,
           taskType: content.taskType,
           isCompleted: completedQuizIds.has(q.id),
+          completionStatus: statuses.get(q.id) ?? 'NOT_STARTED',
+          ...(pictureTasksByQuiz.has(q.id)
+            ? { pictureTasks: pictureTasksByQuiz.get(q.id) }
+            : {}),
           isPremiumContent: access.isPremiumContent,
           isLocked: access.isLocked,
+          requiredPlan: access.requiredPlan ?? 'FREE',
+          cefrLevel: 'cefrLevel' in access ? access.cefrLevel : null,
         };
         if (access.isLocked) return safeMetadata;
         return {
@@ -557,12 +636,6 @@ export class WritingService {
     ].includes(content.taskType);
 
     // Every task of a catalog exercise, with the learner's latest grade.
-    const keywordsOf = (c: any): string[] =>
-      Array.isArray(c?.keywords)
-        ? c.keywords
-        : Array.isArray(c?.requiredKeywords)
-          ? c.requiredKeywords
-          : [];
     let exercise: Record<string, unknown> | undefined;
     if (quiz.practiceTopic) {
       const questionIds = quiz.questions.map((q) => q.id);
@@ -616,6 +689,9 @@ export class WritingService {
       type: quiz.type,
       topicName: quiz.practiceTopic?.name ?? '',
       level: content.level,
+      cefrLevel: this.quizContentAccess
+        ? cefrSpan(this.quizContentAccess.cefrRange(quiz))
+        : null,
       taskType: content.taskType,
       prompt: content.prompt,
       imageUrl: content.imageUrl,
@@ -799,6 +875,11 @@ export class WritingService {
       ? practiceWritingTask(content ?? {}, quiz.title)
       : null;
     let detail: PracticeWritingResult | undefined;
+    if (exceedsPictureWordLimit(practiceTask, answer)) {
+      throw new BadRequestException(
+        `Câu trả lời cho bài viết theo tranh tối đa ${PICTURE_SENTENCE_MAX_WORDS} từ.`,
+      );
+    }
 
     try {
       if (practiceTask) {

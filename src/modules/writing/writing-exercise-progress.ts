@@ -76,3 +76,44 @@ export function completedWritingQuizIds(
     [...pending].filter(([, hasPending]) => !hasPending).map(([id]) => id),
   );
 }
+
+/**
+ * Catalog learning state of each exercise: COMPLETED when every task has a
+ * graded answer (the same rule as completedWritingQuizIds and the reward),
+ * IN_PROGRESS when some do, NOT_STARTED otherwise.
+ */
+export function writingCompletionStatuses(
+  questions: Array<{ id: number; quizId: number }>,
+  gradedQuestionIds: Iterable<number>,
+): Map<number, 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED'> {
+  const graded = new Set(gradedQuestionIds);
+  const counts = new Map<number, { done: number; total: number }>();
+  for (const q of questions) {
+    const c = counts.get(q.quizId) ?? { done: 0, total: 0 };
+    c.total += 1;
+    if (graded.has(q.id)) c.done += 1;
+    counts.set(q.quizId, c);
+  }
+  return new Map(
+    [...counts].map(([id, c]) => [
+      id,
+      c.done === 0
+        ? 'NOT_STARTED'
+        : c.done === c.total
+          ? 'COMPLETED'
+          : 'IN_PROGRESS',
+    ]),
+  );
+}
+
+/**
+ * XP for a completed standalone Writing exercise: one point per percent of
+ * the final server-computed score (92 % → 92 XP, at most 100). The shared
+ * listener computes `score × 10`, which suits Listening/Reading, whose score
+ * is a count of correct answers; Writing's score is a percentage, so it
+ * passes this value instead. Bread, badges and quests keep using `score`.
+ */
+export function writingCompletionXp(percent: number): number {
+  if (!Number.isFinite(percent)) return 0;
+  return Math.min(100, Math.max(0, Math.round(percent)));
+}

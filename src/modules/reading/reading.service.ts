@@ -339,6 +339,7 @@ export class ReadingService {
         const access = accessByQuiz.get(quiz.id) ?? {
           isPremiumContent: quiz.isPremiumContent,
           isLocked: false,
+          requiredPlan: 'FREE' as const,
         };
         const level = resolveReadingExerciseLevel(quiz.title, quiz.questions);
 
@@ -356,6 +357,8 @@ export class ReadingService {
           microSkills: resolveReadingExerciseMicroSkills(quiz.questions),
           isPremiumContent: access.isPremiumContent,
           isLocked: access.isLocked,
+          requiredPlan: access.requiredPlan ?? 'FREE',
+          cefrLevel: 'cefrLevel' in access ? access.cefrLevel : null,
           completionStatus: isComplete
             ? 'COMPLETED'
             : completedQuestionCount > 0
@@ -463,6 +466,7 @@ export class ReadingService {
           const access = accessByQuiz.get(quiz.id) ?? {
             isPremiumContent: quiz.isPremiumContent,
             isLocked: false,
+            requiredPlan: 'FREE' as const,
           };
           return {
             id: quiz.id,
@@ -473,6 +477,7 @@ export class ReadingService {
             questionCount: quiz._count.questions,
             isPremiumContent: access.isPremiumContent,
             isLocked: access.isLocked,
+            requiredPlan: access.requiredPlan ?? 'FREE',
           };
         }),
       };
@@ -516,12 +521,14 @@ export class ReadingService {
         const access = accessByQuiz.get(quiz.id) ?? {
           isPremiumContent: quiz.isPremiumContent,
           isLocked: false,
+          requiredPlan: 'FREE' as const,
         };
         const safeQuiz = quiz;
         return {
           ...safeQuiz,
           isPremiumContent: access.isPremiumContent,
           isLocked: access.isLocked,
+          requiredPlan: access.requiredPlan ?? 'FREE',
         };
       }),
     };
@@ -773,6 +780,7 @@ export class ReadingService {
         const access = accessByQuiz.get(candidate.id) ?? {
           isPremiumContent: candidate.isPremiumContent,
           isLocked: false,
+          requiredPlan: 'FREE' as const,
         };
         recommendation = {
           subskill: weakest.key,

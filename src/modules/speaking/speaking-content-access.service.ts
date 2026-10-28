@@ -6,8 +6,13 @@ import {
 import { PlanFeatureKey, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
+  advancedPracticePlan,
+  cefrSpan,
+  type CefrRange,
   parseCefrRange,
-  practiceRequiresPlus,
+  planSatisfies,
+  type PracticePlan,
+  requiredPracticePlan,
 } from '../subscription/practice-level';
 
 export type SpeakingContentAccessSubject = {
@@ -23,6 +28,10 @@ export type SpeakingContentAccess = {
   isPremiumContent: boolean;
   isLocked: boolean;
   featureKey: PlanFeatureKey;
+  /** Lowest plan that opens this exercise (FREE when it is not premium). */
+  requiredPlan: PracticePlan;
+  /** Authored CEFR level the plan was decided from ("A2", "B1-B2"). */
+  cefrLevel: string | null;
 };
 
 /** Backend-authoritative access policy for Speaking exercise content. */
@@ -33,18 +42,49 @@ export class SpeakingContentAccessService {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
   /**
-   * Whether this exercise needs a plan. Standalone practice follows the owner
-   * policy (A1/A2 free, B1+ PLUS) from its practice set level, else from the
+   * Lowest plan for this exercise. Standalone practice follows the owner
+   * matrix (A1/A2 free, B1+ PRO) from its practice set level, else from the
    * CEFR tag of its title. TOEIC exam tasks and untagged items keep their
-   * stored flag.
+   * stored flag, which then needs PRO.
    */
-  isPremium(exercise: SpeakingContentAccessSubject): boolean {
-    if (exercise.practiceSet?.scope === 'EXAM_INTERNAL')
-      return exercise.isPremiumContent;
-    const range =
+  requiredPlan(exercise: SpeakingContentAccessSubject): PracticePlan {
+    const range = this.cefrRange(exercise);
+    if (range) return requiredPracticePlan('SPEAKING', range);
+    return exercise.isPremiumContent
+      ? advancedPracticePlan('SPEAKING')
+      : 'FREE';
+  }
+
+  /** Practice set level, else the title tag; null for TOEIC exam tasks. */
+  cefrRange(exercise: SpeakingContentAccessSubject): CefrRange | null {
+    if (exercise.practiceSet?.scope === 'EXAM_INTERNAL') return null;
+    return (
       parseCefrRange(exercise.practiceSet?.level) ??
-      parseCefrRange(exercise.title);
-    return range ? practiceRequiresPlus(range) : exercise.isPremiumContent;
+      parseCefrRange(exercise.title)
+    );
+  }
+
+  isPremium(exercise: SpeakingContentAccessSubject): boolean {
+    return this.requiredPlan(exercise) !== 'FREE';
+  }
+
+  private access(
+    exercise: SpeakingContentAccessSubject,
+    planCode: string | null,
+    role?: Role,
+  ): SpeakingContentAccess {
+    const requiredPlan = this.requiredPlan(exercise);
+    const premium = requiredPlan !== 'FREE';
+    return {
+      isPremiumContent: premium,
+      isLocked:
+        premium &&
+        role !== Role.ADMIN &&
+        !planSatisfies(planCode, requiredPlan),
+      featureKey: this.featureKey,
+      requiredPlan,
+      cefrLevel: cefrSpan(this.cefrRange(exercise)),
+    };
   }
 
   async resolve(
@@ -52,30 +92,11 @@ export class SpeakingContentAccessService {
     userId?: number,
     role?: Role,
   ): Promise<SpeakingContentAccess> {
-    const premium = this.isPremium(exercise);
-    if (!premium || role === Role.ADMIN) {
-      return {
-        isPremiumContent: premium,
-        isLocked: false,
-        featureKey: this.featureKey,
-      };
-    }
-    if (!userId) {
-      return {
-        isPremiumContent: true,
-        isLocked: true,
-        featureKey: this.featureKey,
-      };
-    }
-    const entitled = await this.subscriptionService.hasFeature(
-      userId,
-      this.featureKey,
-    );
-    return {
-      isPremiumContent: true,
-      isLocked: !entitled,
-      featureKey: this.featureKey,
-    };
+    const planCode =
+      this.isPremium(exercise) && role !== Role.ADMIN && userId
+        ? await this.subscriptionService.effectivePlanCode(userId)
+        : null;
+    return this.access(exercise, planCode, role);
   }
 
   async resolveMany(
@@ -83,21 +104,18 @@ export class SpeakingContentAccessService {
     userId?: number,
     role?: Role,
   ): Promise<Map<number, SpeakingContentAccess>> {
-    const result = new Map<number, SpeakingContentAccess>();
-    const hasPremium = exercises.some((exercise) => this.isPremium(exercise));
-    const entitled =
-      hasPremium && userId && role !== Role.ADMIN
-        ? await this.subscriptionService.hasFeature(userId, this.featureKey)
-        : false;
-    for (const exercise of exercises) {
-      const premium = this.isPremium(exercise);
-      result.set(exercise.id, {
-        isPremiumContent: premium,
-        isLocked: premium && role !== Role.ADMIN && !entitled,
-        featureKey: this.featureKey,
-      });
-    }
-    return result;
+    const planCode =
+      userId &&
+      role !== Role.ADMIN &&
+      exercises.some((exercise) => this.isPremium(exercise))
+        ? await this.subscriptionService.effectivePlanCode(userId)
+        : null;
+    return new Map(
+      exercises.map((exercise) => [
+        exercise.id,
+        this.access(exercise, planCode, role),
+      ]),
+    );
   }
 
   async assertAccess(
@@ -112,10 +130,11 @@ export class SpeakingContentAccessService {
     }
     throw new ForbiddenException({
       statusCode: 403,
-      message: 'Nội dung cao cấp yêu cầu quyền truy cập phù hợp',
+      message: `Bài luyện này yêu cầu gói ${access.requiredPlan}.`,
       error: {
         code: 'FEATURE_NOT_INCLUDED',
         featureKey: access.featureKey,
+        requiredPlan: access.requiredPlan,
       },
     });
   }

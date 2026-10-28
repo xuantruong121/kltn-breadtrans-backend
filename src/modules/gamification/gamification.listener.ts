@@ -21,6 +21,8 @@ export class GamificationListener {
     userId: number;
     quizId?: number;
     score: number;
+    /** XP to award when the score is not a count of correct answers (Writing). */
+    xp?: number;
     quizType?: QuizType | (string & {});
     isFirstSubmission?: boolean;
   }) {
@@ -38,8 +40,17 @@ export class GamificationListener {
 
     try {
       // XP only for first submission
-      const xpEarned =
-        payload.isFirstSubmission === false ? 0 : payload.score * 10;
+      // An explicit xp (Writing: one point per percent) replaces score × 10.
+      // It is computed server-side; still, a present but invalid value pays
+      // nothing rather than falling back to score × 10, and it never exceeds
+      // one completed exercise (100).
+      const baseXp =
+        payload.xp === undefined
+          ? payload.score * 10
+          : Number.isFinite(payload.xp)
+            ? Math.min(100, Math.max(0, Math.round(payload.xp)))
+            : 0;
+      const xpEarned = payload.isFirstSubmission === false ? 0 : baseXp;
 
       if (xpEarned > 0) {
         const leaderboard = await this.gamificationService.awardXp(

@@ -51,7 +51,10 @@ const provider = {
   // Practice Writing (PRACTICE_WRITING_V1): one point below full marks on the
   // first criterion, and a correction only when the learner wrote "ask" after
   // a singular subject, quoted from the learner text.
-  generateStructuredJson: async (input: { prompt: string }) => {
+  generateStructuredJson: async (input: {
+    prompt: string;
+    responseSchema?: { required?: string[] };
+  }) => {
     calls += 1;
     persistCounter();
     if (mode === 'failure')
@@ -60,13 +63,28 @@ const provider = {
       rubric: Array<{ key: string; max: number }>;
       learnerResponse: string;
     };
+    // QA markers in the learner text: "[[fail]]" makes this grading call
+    // fail; "[[percent:NN]]" scores every criterion at NN % of its maximum.
+    if (/\[\[fail\]\]/.test(data.learnerResponse))
+      throw new Error('deterministic writing provider unavailable');
+    const pct = /\[\[percent:(\d{1,3})\]\]/.exec(data.learnerResponse);
     const slip = /\b(\w+) ask\b/.exec(data.learnerResponse);
+    // Picture tasks ask for a relevance verdict: "[[scene:MISMATCH]]" (or
+    // PARTIAL / UNCERTAIN) sets it; MATCH otherwise.
+    const wantsScene = input.responseSchema?.required?.includes('sceneMatch');
+    const scene = /\[\[scene:(MATCH|PARTIAL|MISMATCH|UNCERTAIN)\]\]/.exec(
+      data.learnerResponse,
+    );
     return {
       model: 'deterministic',
       text: JSON.stringify({
         criteria: data.rubric.map((c, i) => ({
           key: c.key,
-          score: i === 0 ? c.max - 1 : c.max,
+          score: pct
+            ? Math.round((c.max * Number(pct[1])) / 100)
+            : i === 0
+              ? c.max - 1
+              : c.max,
           comment: 'Nhận xét tất định cho tiêu chí này.',
         })),
         strengths: ['Bài viết đúng chủ đề.'],
@@ -81,6 +99,13 @@ const provider = {
           : [],
         feedback: 'Nhận xét tất định: bài viết đáp ứng yêu cầu chính của đề.',
         suggestions: ['Kiểm tra lại cách chia động từ.'],
+        ...(wantsScene
+          ? {
+              sceneMatch: scene?.[1] ?? 'MATCH',
+              sceneEvidence:
+                'Nhận định tất định về mức độ khớp với nội dung bức tranh.',
+            }
+          : {}),
       }),
     };
   },

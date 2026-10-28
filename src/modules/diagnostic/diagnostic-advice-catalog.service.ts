@@ -16,31 +16,48 @@ import {
   type ResourceKind,
   type ResourceResolver,
 } from './diagnostic-v2-advice';
+import {
+  advancedPracticePlan,
+  parseCefrRange,
+  planSatisfies,
+  type PracticePlan,
+  type PracticeSkill,
+  requiredPracticePlan,
+} from '../subscription/practice-level';
 
 const QUIZ_KINDS: Partial<
   Record<
     ResourceKind,
-    { types: QuizType[]; route: string; feature: PlanFeatureKey }
+    { types: QuizType[]; route: string; skill: PracticeSkill }
   >
 > = {
   LISTENING_QUIZ: {
     types: [QuizType.LISTENING_PRACTICE],
     route: '/listening',
-    feature: PlanFeatureKey.PREMIUM_LISTENING,
+    skill: 'LISTENING',
   },
   READING_QUIZ: {
     types: [QuizType.BILINGUAL_READING],
     route: '/reading',
-    feature: PlanFeatureKey.PREMIUM_READING,
+    skill: 'READING',
   },
   WRITING_QUIZ: {
     types: [QuizType.WRITING_EMAIL, QuizType.WRITING_PICTURE],
     route: '/writing',
-    feature: PlanFeatureKey.PREMIUM_WRITING_CONTENT,
+    skill: 'WRITING',
   },
 };
 
-const PREMIUM_REQUIREMENT = 'Cần gói PLUS hoặc PRO';
+/** Same matrix as the content access services (practice-level.ts). */
+function practicePlanFor(
+  skill: PracticeSkill,
+  title: string,
+  isPremiumContent: boolean,
+): PracticePlan {
+  const range = parseCefrRange(title);
+  if (range) return requiredPracticePlan(skill, range);
+  return isPremiumContent ? advancedPracticePlan(skill) : 'FREE';
+}
 const COURSE_REQUIREMENT = 'Cần gói PRO';
 
 @Injectable()
@@ -106,6 +123,15 @@ export class DiagnosticAdviceCatalogService {
       return features.get(feature) as boolean;
     };
 
+    let code: string | null | undefined;
+    const planCode = async () => {
+      if (code === undefined)
+        code = this.subscriptionService
+          ? await this.subscriptionService.effectivePlanCode(userId)
+          : null;
+      return code;
+    };
+
     const resolved = new Map<string, ResolvedResource>();
     for (const ref of refs) {
       const key = `${ref.kind}:${ref.id}`;
@@ -115,26 +141,36 @@ export class DiagnosticAdviceCatalogService {
           (q) => q.id === ref.id && quizKind.types.includes(q.type),
         );
         if (!quiz) continue;
-        const locked = quiz.isPremiumContent && !(await has(quizKind.feature));
+        const required = practicePlanFor(
+          quizKind.skill,
+          quiz.title,
+          quiz.isPremiumContent,
+        );
+        const locked =
+          required !== 'FREE' && !planSatisfies(await planCode(), required);
         resolved.set(key, {
           ...ref,
           title: quiz.title,
           route: `${quizKind.route}/${quiz.id}`,
           access: locked ? 'LOCKED' : 'OPEN',
-          requirement: locked ? PREMIUM_REQUIREMENT : null,
+          requirement: locked ? `Cần gói ${required}` : null,
         });
       } else if (ref.kind === 'SPEAKING_EXERCISE') {
         const exercise = exercises.find((e) => e.id === ref.id);
         if (!exercise) continue;
+        const required = practicePlanFor(
+          'SPEAKING',
+          exercise.title,
+          exercise.isPremiumContent,
+        );
         const locked =
-          exercise.isPremiumContent &&
-          !(await has(PlanFeatureKey.PREMIUM_SPEAKING_CONTENT));
+          required !== 'FREE' && !planSatisfies(await planCode(), required);
         resolved.set(key, {
           ...ref,
           title: exercise.title,
           route: `/speaking/${exercise.id}`,
           access: locked ? 'LOCKED' : 'OPEN',
-          requirement: locked ? PREMIUM_REQUIREMENT : null,
+          requirement: locked ? `Cần gói ${required}` : null,
         });
       } else if (ref.kind === 'COURSE') {
         const course = courses.find((c) => c.id === ref.id);

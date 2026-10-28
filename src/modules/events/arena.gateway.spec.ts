@@ -128,5 +128,14 @@ describe('ArenaGateway security validation', () => {
     ]);
 
     expect(updateMany).toHaveBeenCalledTimes(1);
+    // The win pays Bread once (BanhTransaction ARENA_WIN) and writes nothing
+    // to the XP log.
+    expect(tx.banhTransaction.create).toHaveBeenCalledTimes(1);
+    expect(tx.banhTransaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ amount: 20, source: 'ARENA_WIN' }),
+      }),
+    );
+    expect(tx.pointHistory.create).not.toHaveBeenCalled();
   });
 });

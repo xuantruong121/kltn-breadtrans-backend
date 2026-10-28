@@ -75,19 +75,36 @@ void (async () => {
       fullPage: false,
     });
   }
-  // Recent activity lives in the account hub (Tiến độ học tập).
-  await page.goto(`${FE}/hub?tab=learning-progress`, {
-    waitUntil: 'networkidle',
-    timeout: 120_000,
-  });
-  await page.waitForTimeout(2500);
-  const hub = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
-  const at = hub.indexOf('Hoạt động gần đây');
-  check(
-    'Tiến độ học tập lists the listening practice under recent activity',
-    at >= 0 && hub.slice(at).includes('Luyện nghe hiểu 8/8 câu đúng'),
-    hub.slice(Math.max(at, 0), Math.max(at, 0) + 260),
-  );
+  // Recent activity lives in the account hub (Tiến độ học tập) and names the
+  // exercise, with the activity type and result underneath.
+  for (const width of [1366, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${FE}/hub?tab=learning-progress`, {
+      waitUntil: 'networkidle',
+      timeout: 120_000,
+    });
+    await page.waitForTimeout(2500);
+    const hub = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+    const at = hub.indexOf('Hoạt động gần đây');
+    const recent = hub.slice(Math.max(at, 0));
+    check(
+      `@${width} recent activity names the exercise and its result`,
+      at >= 0 &&
+        recent.includes('Listening A1 — Essential Everyday English') &&
+        recent.includes('Luyện nghe hiểu · 8/8 câu đúng'),
+      recent.slice(0, 200),
+    );
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    check(`@${width} no horizontal overflow`, overflow <= 1, `(${overflow}px)`);
+    await page.screenshot({
+      path: `artifacts/finalization/evidence/cp57-recent-activity-${width}.png`,
+      fullPage: false,
+    });
+  }
   await page.goto(`${FE}/pet`, { waitUntil: 'networkidle', timeout: 120_000 });
   await page.waitForTimeout(1500);
   const petText = (await page.locator('body').innerText()).replace(/\s+/g, ' ');

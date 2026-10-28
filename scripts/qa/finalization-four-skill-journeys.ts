@@ -3,8 +3,9 @@
  * open → (listening attempt) → submit → persisted result, for
  *   FREE: A1/A2 Listening, Reading, Writing, Speaking; B1+ refused on detail,
  *         submit, question audio and grading (direct API, no UI);
- *   PLUS: B1/B2 in all four skills; Courses still refused;
- *   PRO:  B2/C1 in all four skills, the C1 Speaking set, all three courses.
+ *   PLUS: B1/B2 Listening and Reading; Speaking/Writing B1+ refused with PRO
+ *         named (owner matrix 2026-10-28); Courses still refused;
+ *   PRO:  B1-C1 in all four skills, the C1 Speaking set, all three courses.
  * Graders are MOCKS (deterministic writing grader, MOCK_AZURE_SPEECH); no
  * Gemini or Azure call is made, so scores prove persistence, not quality.
  * Expected objective scores come from the clone's answer keys, not the API.
@@ -267,15 +268,26 @@ async function main() {
       ['Reading B1', 6],
       ['Reading B2', 15],
     ],
-    writing: [
-      ['Writing B1', 18],
-      ['Writing B2', 7],
-    ],
-    speaking: [
-      ['Speaking Pronunciation B1', spk.b1],
-      ['Speaking Information Response B1–B2', spk.b1b2],
-    ],
+    writing: [],
+    speaking: [],
   });
+  // Owner matrix 2026-10-28: Speaking and Writing B1+ need PRO.
+  for (const id of [18, 7]) {
+    const w = await writing(plus, id);
+    check(
+      `PLUS Writing quiz ${id} grading refused (PRO), nothing stored`,
+      w.status === 403 && !w.persisted,
+      JSON.stringify(w),
+    );
+  }
+  for (const id of [spk.b1, spk.b1b2]) {
+    const s = await speaking(plus, id);
+    check(
+      `PLUS Speaking exercise ${id} submit refused (PRO), nothing stored`,
+      s.status === 403 && !s.final,
+      JSON.stringify(s),
+    );
+  }
   const plusCourse = await call('GET', '/courses/1/learning', plus.token);
   check(
     'PLUS course learning refused',
@@ -290,8 +302,16 @@ async function main() {
       ['Dictation B1', 25],
       ['Reading C1', 16],
     ],
-    writing: [['Writing B2–C1', 19]],
-    speaking: [['Speaking Opinion C1', spk.c1]],
+    writing: [
+      ['Writing B1', 18],
+      ['Writing B2', 7],
+      ['Writing B2–C1', 19],
+    ],
+    speaking: [
+      ['Speaking Pronunciation B1', spk.b1],
+      ['Speaking Information Response B1–B2', spk.b1b2],
+      ['Speaking Opinion C1', spk.c1],
+    ],
   });
   const c1Set = (await call('GET', '/speaking/exercises', pro.token))
     .data as any[];
