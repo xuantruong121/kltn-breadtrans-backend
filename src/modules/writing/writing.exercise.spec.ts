@@ -2,7 +2,7 @@ import {
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { QuizType, TopicCategory } from '@prisma/client';
+import { Prisma, QuizType, TopicCategory } from '@prisma/client';
 
 import { summarizeWritingExercise } from './practice-writing-grading';
 import { WritingService } from './writing.service';
@@ -320,6 +320,52 @@ describe('multi-task Writing exercise', () => {
     await send(id(10));
     expect(ai.generateStructuredJson).toHaveBeenCalledTimes(2);
     expect(submissions).toHaveLength(1);
+  });
+
+  it('two concurrent requests with the same clientAttemptId store one grade and reward once', async () => {
+    const { service, ai, prisma, submissions, events } = setup();
+    // The database's unique (userId, quizId, clientAttemptId) refuses the second insert.
+    const original = prisma.submission.create.getMockImplementation()!;
+    prisma.submission.create.mockImplementation((args: any) => {
+      if (
+        submissions.some(
+          (s) =>
+            s.clientAttemptId === args.data.clientAttemptId &&
+            s.userId === args.data.userId,
+        )
+      )
+        return Promise.reject(
+          new Prisma.PrismaClientKnownRequestError('unique', {
+            code: 'P2002',
+            clientVersion: 'test',
+            meta: { target: ['userId', 'quizId', 'clientAttemptId'] },
+          }),
+        );
+      return original(args);
+    });
+    ai.generateStructuredJson.mockResolvedValue({
+      text: reply(8),
+      model: 'test',
+    });
+    const send = () =>
+      service.submitWriting(
+        quiz.id,
+        7,
+        'The meeting is tomorrow.',
+        undefined,
+        id(11),
+        undefined,
+        12,
+      );
+    const [a, b] = await Promise.all([send(), send()]);
+    expect(a.submissionId).toBe(b.submissionId);
+    expect(submissions).toHaveLength(1);
+    // Each in-flight request was graded: that is the residual cost of a true race.
+    expect(ai.generateStructuredJson).toHaveBeenCalledTimes(2);
+    expect(
+      events.emit.mock.calls.filter((c: any[]) => c[1]?.isFirstSubmission)
+        .length,
+    ).toBeLessThanOrEqual(1);
   });
 
   it('a failed grade stores nothing and the exercise stays incomplete', async () => {
