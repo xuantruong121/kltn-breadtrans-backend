@@ -123,7 +123,10 @@ describe('scripted pronunciation assessment: required Azure scores', () => {
   it('silence is still NO_SPEECH (no score, no failure)', async () => {
     respond({ RecognitionStatus: 'InitialSilenceTimeout', NBest: [] });
     const r = await assess();
-    expect(r).toMatchObject({ isSilentOrNoSpeech: true, errorCode: 'NO_SPEECH' });
+    expect(r).toMatchObject({
+      isSilentOrNoSpeech: true,
+      errorCode: 'NO_SPEECH',
+    });
   });
 
   it('a transport error stays a retryable provider failure', async () => {
