@@ -2355,8 +2355,14 @@ async function main() {
             prompt:
               'Bạn đã đăng ký một workshop vào thứ Sáu nhưng không thể tham dự. Viết email 100–130 từ cho ban tổ chức để xin chuyển sang buổi thứ Hai. Nêu lý do ngắn gọn và yêu cầu xác nhận.',
             wordRange: [100, 130],
+            requirements: [
+              'registered workshop and date',
+              'reason',
+              'request to move to Monday',
+              'ask for confirmation',
+            ],
             sampleResponse:
-              'Dear Workshop Team, I am writing about my registration for Friday’s customer-service workshop. Unfortunately, I have an important appointment that afternoon and will not be able to attend. If possible, could you please transfer my registration to the Monday session instead? I would appreciate a confirmation of the change and any updated joining instructions. Thank you for your help. Best regards, Minh',
+              'Dear Workshop Team,\n\nI am writing about my registration for the customer-service workshop on Friday afternoon. Unfortunately, I have an important appointment with a client at the same time, and I cannot change it because the client is only in the city that day.\n\nIf possible, could you please transfer my registration to the Monday session instead? I am still very interested in the topic, and the Monday date fits my schedule well.\n\nI would appreciate it if you could confirm the change by email. Please also send me any updated joining instructions, such as the room number or the start time.\n\nThank you for your help.\n\nBest regards,\nMinh',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -2373,8 +2379,14 @@ async function main() {
             prompt:
               'Viết email 100–130 từ cho đồng nghiệp để nhờ họ gửi lại phiên bản mới nhất của báo cáo trước 3 P.M. Giải thích vì sao bạn cần tài liệu và cảm ơn họ.',
             wordRange: [100, 130],
+            requirements: [
+              'ask for the latest report',
+              'deadline 3 P.M.',
+              'reason',
+              'thanks',
+            ],
             sampleResponse:
-              'Hi Alex, Could you please send me the latest version of the quarterly sales report before 3 P.M. today? I am preparing the slides for tomorrow morning’s management meeting and want to make sure the figures in my presentation match the final report. If there were any major changes since yesterday, please let me know as well. Thanks very much for your help. Best regards, Lan',
+              "Hi Alex,\n\nCould you please send me the latest version of the quarterly sales report before 3 P.M. today?\n\nI am preparing the slides for tomorrow morning's management meeting, and I want to make sure the figures in my presentation match the final report. The version I have is from last week, so some numbers may have changed since then.\n\nIf there were any major changes, for example in the regional sales figures, please let me know so that I can explain them correctly during the meeting.\n\nI know you are busy this week, so I really appreciate your help. Thanks very much.\n\nBest regards,\nLan",
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -2544,8 +2556,14 @@ async function main() {
             prompt:
               'Một khách hàng báo rằng 10 chiếc ghế trong đơn hàng vừa nhận bị trầy xước. Viết email 150–180 từ: xin lỗi, xác nhận vấn đề, đề xuất hai phương án giải quyết và nêu bước tiếp theo.',
             wordRange: [150, 180],
+            requirements: [
+              'apology',
+              'confirm the problem',
+              'two solutions',
+              'next step',
+            ],
             sampleResponse:
-              'Dear Ms. Patel, Thank you for letting us know about the damaged chairs. I am very sorry that ten items in your recent order arrived with scratches. This is not the condition we expect our products to reach customers in. We can either send ten replacement chairs at no additional cost, or issue a refund for the affected items if that is more convenient. If you choose replacement, we can dispatch the new chairs within two business days and arrange collection of the damaged ones. Please reply with your preferred option and confirm the delivery address. I apologize again for the inconvenience and appreciate your patience while we resolve this matter. Best regards, Customer Care Team',
+              'Dear Ms. Patel,\n\nThank you for letting us know about the damaged chairs. I am very sorry that ten chairs in your recent order arrived with scratches. I have checked your order details and the photos you sent, and I can confirm that the damage happened before delivery.\n\nWe would like to offer you two options. First, we can send ten replacement chairs at no additional cost. Our driver would collect the damaged chairs when the new ones are delivered. Second, if you prefer, we can give you a full refund for the ten damaged chairs and you can keep the rest of the order as it is.\n\nAs a next step, please reply to this email with your preferred option. If you choose replacement, we can deliver the new chairs within two business days, so please also confirm your delivery address and a suitable time.\n\nI apologise again for the inconvenience and thank you for your patience.\n\nBest regards,\nCustomer Care Team',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4630,7 +4648,7 @@ async function main() {
             wordRange: [40, 60],
             requirements: ['apologize', 'give a reason', 'state arrival time'],
             sampleResponse:
-              'Hi Lan, I’m sorry, but I’ll be about 15 minutes late because my bus was delayed. I should arrive at the library around 4:45. Please start without me, and I’ll join you as soon as I get there.',
+              "Hi Lan, I'm really sorry, but I'll be about 15 minutes late for our study group. My bus was delayed because of heavy traffic. I should arrive at the library around 4:45. Please start without me, and I'll join you as soon as I get there. See you soon!",
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4650,7 +4668,7 @@ async function main() {
             wordRange: [50, 70],
             requirements: ['state late arrival', 'ask about reception'],
             sampleResponse:
-              'Dear Hotel Team, I have a reservation for Friday night, but my flight arrives late, so I expect to reach the hotel after 9 P.M. Could you please confirm whether reception will still be open for check-in? Thank you for your help.',
+              'Dear Hotel Team, I have a reservation for this Friday night under the name Nguyen Minh. My flight arrives late, so I expect to reach the hotel after 9 P.M., probably around 10 P.M. Could you please tell me if reception will still be open for check-in at that time? Thank you for your help. Best regards, Minh',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4670,7 +4688,7 @@ async function main() {
             wordRange: [50, 70],
             requirements: ['place', 'time', 'reason'],
             sampleResponse:
-              'Hi Minh, Would you like to join me at the weekend book fair in the city park this Saturday at 10 A.M.? There will be English books, short talks, and a coffee area. I think it will be a fun way to practise reading together.',
+              'Hi Minh, Would you like to come to the weekend book fair with me? It is in the city park this Saturday, from 10 A.M. to 4 P.M. There will be English books, short talks and a nice coffee area. I think it will be a fun way to practise reading together. Let me know if you can come!',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4694,7 +4712,7 @@ async function main() {
               'ask for help',
             ],
             sampleResponse:
-              'Hello, I’m trying to open the vocabulary review file for Lesson 4, but the link does not work on my phone or laptop. Could you please check the file or send me another link? Thank you.',
+              "Hello, I'm trying to open the vocabulary review file for Lesson 4, but the link does not work on my phone or my laptop. I only see an error page. Could you please check the file or send me another link? Thank you very much for your help. Best regards, An",
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4714,7 +4732,7 @@ async function main() {
             wordRange: [50, 70],
             requirements: ['thank', 'mention help', 'positive closing'],
             sampleResponse:
-              'Hi Anna, Thank you very much for helping me prepare the presentation yesterday. Your suggestions made the slides much clearer, and I was able to finish on time. I really appreciate your support and hope I can help you with your next project too.',
+              'Hi Anna, Thank you very much for helping me prepare the presentation yesterday. Your suggestions made the slides much clearer, and you also helped me check the numbers. Because of you, I finished everything on time. I really appreciate your support, and I hope I can help you with your next project too. Best, Lan',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4834,9 +4852,9 @@ async function main() {
             sampleResponse:
               "Hi team,\n\nThank you for joining this morning's meeting. Here is a short summary so that everyone has the same information.\n\nWe agreed to move the product launch from 1 November to 15 November. The extra two weeks will give us time to fix the payment bug and to test the app with more users.\n\nWe also agreed on three action items:\n1. Tuan will fix the payment bug and send a test version by 5 November.\n2. Mai will invite twenty customers to try the app and collect their feedback by 9 November.\n3. I will update the launch plan and inform the marketing team about the new date by this Friday.\n\nIf I have missed anything, please reply to this email before tomorrow afternoon.\n\nBest regards,\nHoa",
             requirements: [
-              'summary',
+              'summary of the decision',
               'three action items',
-              'deadline/owner if appropriate',
+              'owner and deadline for each action',
             ],
             rubric: {
               taskAchievement: 4,
