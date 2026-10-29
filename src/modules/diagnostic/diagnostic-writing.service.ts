@@ -128,13 +128,43 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Persist and queue the Writing responses of a just-completed attempt.
+   * Queue the Writing responses of a just-completed attempt, after commit.
+   *
+   * The rows normally exist already: the submit transaction creates them
+   * (`createRowsForAttempt`) so no reader ever sees a completed attempt
+   * without its Writing rows. Any missing row is created here, then every
+   * QUEUED row gets one job per run; a replayed completion queues nothing new.
+   */
+  async enqueueForAttempt(
+    attempt: {
+      id: number;
+      userId: number;
+      assessmentId: number;
+      answers: unknown;
+    },
+    questions: DiagnosticQuestionForScoring[],
+  ) {
+    await this.createRowsForAttempt(this.prisma, attempt, questions);
+    const rows = await this.prisma.diagnosticWritingResponse.findMany({
+      where: { attemptId: attempt.id, status: 'QUEUED' },
+      orderBy: { questionId: 'asc' },
+    });
+    for (const row of rows) await this.enqueue(row.id, row.gradingAttempts);
+  }
+
+  /**
+   * Persist the Writing responses of an attempt being completed.
    *
    * Transition: (none) -> QUEUED, once per (attempt, task). The text is the
    * one submitted with the attempt, which is final from then on. A row that
-   * already exists is left alone, so a replayed completion queues nothing.
+   * already exists is left alone. `db` is the submit transaction when called
+   * from there, so the rows commit together with the COMPLETED status.
    */
-  async enqueueForAttempt(
+  async createRowsForAttempt(
+    db: Pick<
+      Prisma.TransactionClient,
+      'diagnosticWritingResponse' | 'diagnosticRubric'
+    >,
     attempt: {
       id: number;
       userId: number;
@@ -160,11 +190,11 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
         question.wordMax,
       );
       const rubric = question.rubricId
-        ? await this.prisma.diagnosticRubric.findUnique({
+        ? await db.diagnosticRubric.findUnique({
             where: { id: question.rubricId },
           })
         : null;
-      const existing = await this.prisma.diagnosticWritingResponse.findUnique({
+      const existing = await db.diagnosticWritingResponse.findUnique({
         where: {
           attemptId_questionId: {
             attemptId: attempt.id,
@@ -173,9 +203,8 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
         },
       });
       if (existing) continue;
-      let row: NonNullable<WritingRow>;
       try {
-        row = await this.prisma.diagnosticWritingResponse.create({
+        await db.diagnosticWritingResponse.create({
           data: {
             userId: attempt.userId,
             assessmentId: attempt.assessmentId,
@@ -201,7 +230,6 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
           continue;
         throw error;
       }
-      await this.enqueue(row.id, row.gradingAttempts);
     }
   }
 

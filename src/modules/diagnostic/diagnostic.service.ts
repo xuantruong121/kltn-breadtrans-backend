@@ -1208,6 +1208,15 @@ export class DiagnosticService {
       });
       if (objectiveFourSkill)
         await writeObjectiveSkillRows(tx, created.id, objectiveFourSkill);
+      // Writing rows commit with the COMPLETED status: a result read between
+      // commit and queueing must see them pending, not missing (missing reads
+      // as not attempted, which ended result polling on the learner's page).
+      if (this.writingService)
+        await this.writingService.createRowsForAttempt(
+          tx,
+          created,
+          formQuestions,
+        );
       await tx.learningActivity.create({
         data: {
           userId,
