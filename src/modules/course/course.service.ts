@@ -9,22 +9,16 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateCourseDto,
   UpdateCourseDto,
-  CreateClassDto,
-  UpdateClassDto,
   CreateLessonDto,
   UpdateLessonDto,
   CreateMaterialDto,
   UpdateMaterialDto,
   CreateCourseActivityDto,
   UpdateCourseActivityDto,
-  EnrollResponseDto,
 } from './dto/course.dto';
 import {
-  ClassStatus,
   CourseStatus,
   CourseLessonStatus,
-  EnrollmentStatus,
-  PaymentStatus,
   PlanFeatureKey,
   Role,
 } from '@prisma/client';
@@ -200,72 +194,11 @@ export class CourseService {
     });
   }
 
-  async getAllCourses(userId?: number, role?: string) {
-    if (role === Role.STUDENT && userId) {
-      const enrollments = await this.prisma.enrollment.findMany({
-        where: {
-          userId,
-        },
-        include: {
-          class: {
-            include: {
-              course: { include: { lessons: { select: { videoUrl: true } } } },
-              _count: { select: { enrollments: true } },
-            },
-          },
-        },
-        orderBy: { joinedAt: 'desc' },
-      });
-      return enrollments.map((e) => ({
-        classId: e.classId,
-        className: e.class.name,
-        classStatus: e.class.status,
-        startDate: e.class.startDate,
-        endDate: e.class.endDate,
-        capacity: e.class.capacity,
-        progress: e.progress,
-        enrollmentStatus: e.status,
-        tuitionFeeVnd: e.class.tuitionFeeVnd,
-        joinedAt: e.joinedAt,
-        studentCount: e.class._count.enrollments,
-        course: {
-          ...e.class.course,
-          lessons:
-            e.status === EnrollmentStatus.ACTIVE ||
-            e.status === EnrollmentStatus.COMPLETED
-              ? e.class.course.lessons
-              : [],
-        },
-      }));
-    }
-
+  async getAllCourses(role?: string) {
     return this.prisma.course.findMany({
       where:
         role === Role.ADMIN ? undefined : { status: CourseStatus.PUBLISHED },
-      include: {
-        classes: { include: { _count: { select: { enrollments: true } } } },
-        _count: { select: { classes: true } },
-      },
       orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async getUserClasses(userId: number, role: string) {
-    if (role !== Role.STUDENT) return [];
-    return this.prisma.enrollment.findMany({
-      where: {
-        userId,
-        status: { in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
-      },
-      include: { class: { include: { course: true } } },
-      orderBy: { joinedAt: 'desc' },
-    });
-  }
-
-  async getMyEnrollmentsInCourse(courseId: number, userId: number) {
-    return this.prisma.enrollment.findMany({
-      where: { userId, class: { courseId } },
-      select: { id: true, classId: true, status: true, joinedAt: true },
     });
   }
 
@@ -273,15 +206,6 @@ export class CourseService {
     const course = await this.prisma.course.findUnique({
       where: { id },
       include: {
-        classes: {
-          include: {
-            _count: { select: { enrollments: true } },
-            enrollments: {
-              where: { status: EnrollmentStatus.ACTIVE },
-              select: { id: true },
-            },
-          },
-        },
         lessons: { include: { materials: true }, orderBy: { order: 'asc' } },
         courseLessons: {
           where: { status: CourseLessonStatus.PUBLISHED },
@@ -350,12 +274,6 @@ export class CourseService {
         );
     const { activities: _activities, ...courseWithoutRawActivities } = course;
     void _activities;
-    const safeClasses = course.classes.map(
-      ({ enrollments: _enrollments, ...cls }) => {
-        void _enrollments;
-        return cls;
-      },
-    );
     const progress =
       access.canAccess && userId
         ? await this.getCourseProgressFromCurriculum(id, userId, curriculum)
@@ -363,7 +281,6 @@ export class CourseService {
     return {
       ...courseWithoutRawActivities,
       learning: getCourseLearningProfile(id, course.title),
-      classes: role === Role.ADMIN ? safeClasses : [],
       curriculum,
       progress,
       canAccess: access.canAccess,
@@ -835,218 +752,6 @@ export class CourseService {
     return this.prisma.course.delete({ where: { id } });
   }
 
-  async createClass(
-    courseId: number,
-    user: { id: number; role: Role },
-    dto: CreateClassDto,
-  ) {
-    this.requireAdmin(user.role);
-    const course = await this.prisma.course.findUnique({
-      where: { id: courseId },
-    });
-    if (!course) throw new NotFoundException('Course not found');
-    if (course.status !== CourseStatus.PUBLISHED) {
-      throw new BadRequestException(
-        'Chỉ có thể mở gói học cho khóa học PUBLISHED',
-      );
-    }
-    if (
-      dto.startDate &&
-      dto.endDate &&
-      new Date(dto.startDate) >= new Date(dto.endDate)
-    ) {
-      throw new BadRequestException('endDate phải sau startDate');
-    }
-    if (dto.capacity !== undefined && dto.capacity <= 0) {
-      throw new BadRequestException('capacity phải lớn hơn 0');
-    }
-    if (dto.tuitionFeeVnd !== undefined && dto.tuitionFeeVnd < 0) {
-      throw new BadRequestException('tuitionFeeVnd không được âm');
-    }
-    const duplicate = await this.prisma.class.findFirst({
-      where: { courseId, name: dto.name.trim() },
-    });
-    if (duplicate) throw new ConflictException('Gói học đã tồn tại');
-    return this.prisma.class.create({
-      data: {
-        courseId,
-        name: dto.name.trim(),
-        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-        capacity: dto.capacity ?? 30,
-        tuitionFeeVnd: dto.tuitionFeeVnd ?? 0,
-        // Offerings are self-paced; publishing a package makes it available
-        // immediately. Date windows can still be supplied for reporting.
-        status: ClassStatus.ONGOING,
-      },
-      include: { course: { select: { id: true, title: true } } },
-    });
-  }
-
-  async updateClass(
-    classId: number,
-    user: { id: number; role: Role },
-    dto: UpdateClassDto,
-  ) {
-    this.requireAdmin(user.role);
-    const current = await this.prisma.class.findUnique({
-      where: { id: classId },
-    });
-    if (!current) throw new NotFoundException('Class not found');
-    if (
-      current.status === ClassStatus.COMPLETED ||
-      current.status === ClassStatus.CANCELLED
-    ) {
-      throw new BadRequestException(
-        'Không thể chỉnh sửa gói học đã kết thúc hoặc bị hủy',
-      );
-    }
-    const data: Record<string, unknown> = {
-      name: dto.name?.trim(),
-      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-      endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-      capacity: dto.capacity,
-      tuitionFeeVnd: dto.tuitionFeeVnd,
-      status: dto.status,
-    };
-    if (dto.capacity !== undefined) {
-      const active = await this.prisma.enrollment.count({
-        where: { classId, status: EnrollmentStatus.ACTIVE },
-      });
-      if (dto.capacity < active)
-        throw new BadRequestException('capacity không được nhỏ hơn số ACTIVE');
-    }
-    if (
-      dto.tuitionFeeVnd !== undefined &&
-      dto.tuitionFeeVnd !== current.tuitionFeeVnd
-    ) {
-      const total = await this.prisma.enrollment.count({ where: { classId } });
-      const isModifiableStatus =
-        current.status === ClassStatus.UPCOMING ||
-        current.status === ClassStatus.ONGOING;
-      if (!isModifiableStatus || total > 0) {
-        throw new BadRequestException(
-          'Không thể thay đổi học phí sau khi gói học đã được sử dụng',
-        );
-      }
-    }
-    return this.prisma.class.update({
-      where: { id: classId },
-      data: data as never,
-    });
-  }
-
-  async deleteClass(classId: number, user: { id: number; role: Role }) {
-    this.requireAdmin(user.role);
-    const payments = await this.prisma.payment.count({
-      where: { enrollment: { classId } },
-    });
-    if (payments > 0)
-      throw new ConflictException('Không thể xóa gói học đã có thanh toán');
-    return this.prisma.class.delete({ where: { id: classId } });
-  }
-
-  async enrollInClass(
-    classId: number,
-    userId: number,
-    options?: { isAdminOverride?: boolean },
-  ): Promise<EnrollResponseDto> {
-    return this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<
-        Array<{
-          id: number;
-          status: ClassStatus;
-          capacity: number | null;
-          tuitionFeeVnd: number;
-        }>
-      >`SELECT id, status, capacity, "tuitionFeeVnd" FROM "Class" WHERE id = ${classId} FOR UPDATE`;
-      const current = rows[0];
-      if (!current) throw new NotFoundException('Lớp học không tồn tại');
-      if (
-        current.status === ClassStatus.CANCELLED ||
-        current.status === ClassStatus.COMPLETED
-      ) {
-        throw new BadRequestException('Không thể ghi danh vào gói học đã đóng');
-      }
-      const duplicate = await tx.enrollment.findUnique({
-        where: { userId_classId: { userId, classId } },
-      });
-      if (duplicate)
-        throw new ConflictException('Học viên đã ghi danh vào gói học này');
-      const active = await tx.enrollment.count({
-        where: { classId, status: EnrollmentStatus.ACTIVE },
-      });
-      if (current.capacity !== null && active >= current.capacity) {
-        throw new ConflictException('Gói học đã đủ sức chứa');
-      }
-      const status =
-        options?.isAdminOverride || current.tuitionFeeVnd === 0
-          ? EnrollmentStatus.ACTIVE
-          : EnrollmentStatus.PENDING_PAYMENT;
-      const enrollment = await tx.enrollment.create({
-        data: { userId, classId, status, progress: 0 },
-      });
-      if (!options?.isAdminOverride && current.tuitionFeeVnd > 0) {
-        await tx.payment.create({
-          data: {
-            enrollmentId: enrollment.id,
-            amountVnd: current.tuitionFeeVnd,
-            transferCode: `BT-${enrollment.id}`,
-            status: PaymentStatus.PENDING,
-          },
-        });
-      }
-      return {
-        enrollmentId: enrollment.id,
-        classId,
-        status: status,
-        tuitionFeeVnd: current.tuitionFeeVnd,
-        accessGranted: status === EnrollmentStatus.ACTIVE,
-        message:
-          status === EnrollmentStatus.ACTIVE
-            ? 'Ghi danh thành công'
-            : 'Vui lòng thanh toán để kích hoạt',
-      };
-    });
-  }
-
-  async getClassById(classId: number, userId?: number, role?: string) {
-    const cls = await this.prisma.class.findUnique({
-      where: { id: classId },
-      include: {
-        course: {
-          include: {
-            lessons: {
-              include: { materials: true },
-              orderBy: { order: 'asc' },
-            },
-          },
-        },
-        assignments: {
-          include: { submissions: userId ? { where: { userId } } : true },
-        },
-        enrollments: {
-          where: { userId },
-          select: { userId: true, status: true },
-        },
-      },
-    });
-    if (!cls) throw new NotFoundException('Không tìm thấy gói học');
-    if (role === Role.STUDENT) {
-      const enrollment = cls.enrollments[0];
-      if (
-        !enrollment ||
-        (enrollment.status !== EnrollmentStatus.ACTIVE &&
-          enrollment.status !== EnrollmentStatus.COMPLETED)
-      ) {
-        throw new ForbiddenException(
-          'Bạn chưa có quyền truy cập nội dung riêng tư',
-        );
-      }
-    }
-    return cls;
-  }
-
   async createLesson(
     courseId: number,
     user: { id: number; role: Role },
@@ -1320,16 +1025,6 @@ export class CourseService {
           },
           orderBy: { order: 'asc' },
         },
-        classes: {
-          where: { status: ClassStatus.UPCOMING },
-          select: {
-            id: true,
-            name: true,
-            capacity: true,
-            tuitionFeeVnd: true,
-            _count: { select: { enrollments: true } },
-          },
-        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -1359,21 +1054,10 @@ export class CourseService {
         status: course.status,
         createdAt: course.createdAt,
         curriculum,
-        classes: (course.classes || []).map((cls) => ({
-          ...cls,
-          currentEnrollmentCount: cls._count.enrollments,
-          remainingSeats:
-            cls.capacity === null
-              ? null
-              : Math.max(0, cls.capacity - cls._count.enrollments),
-          isSoldOut:
-            cls.capacity !== null && cls.capacity - cls._count.enrollments <= 0,
-        })),
         canAccess: access.canAccess,
         accessSource: access.accessSource,
         requiresPro: access.requiresPro,
         isSelfPaced: true,
-        upcomingClassCount: course.classes?.length ?? 0,
       });
     }
     return visible;
@@ -1412,23 +1096,6 @@ export class CourseService {
             grammarTopic: { include: { questions: { select: { id: true } } } },
           },
           orderBy: { order: 'asc' },
-        },
-        classes: {
-          where: { status: ClassStatus.UPCOMING },
-          select: {
-            id: true,
-            name: true,
-            startDate: true,
-            endDate: true,
-            capacity: true,
-            status: true,
-            tuitionFeeVnd: true,
-            enrollments: {
-              where: { status: EnrollmentStatus.ACTIVE },
-              select: { id: true },
-            },
-          },
-          orderBy: { startDate: 'asc' },
         },
       },
     });
@@ -1480,17 +1147,6 @@ export class CourseService {
                 ?.activities ?? [],
           })),
       curriculum,
-      classes: (course.classes || []).map(({ enrollments, ...cls }) => {
-        const current = enrollments?.length ?? 0;
-        const remaining =
-          cls.capacity === null ? null : Math.max(0, cls.capacity - current);
-        return {
-          ...cls,
-          currentEnrollmentCount: current,
-          remainingSeats: remaining,
-          isSoldOut: remaining !== null && remaining <= 0,
-        };
-      }),
       canAccess: access.canAccess,
       accessSource: access.accessSource,
       requiresPro: access.requiresPro,

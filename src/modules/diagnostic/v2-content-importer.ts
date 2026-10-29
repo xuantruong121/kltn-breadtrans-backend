@@ -89,7 +89,9 @@ export function loadApprovedContent(artifactDir: string, verifyHashes = true) {
       'utf8',
     );
     const recorded = new Map<string, string>();
-    for (const line of manifest.split('\n')) {
+    // A Windows checkout (core.autocrlf) gives CRLF lines; `.` in the
+    // pattern below does not match "\r", so split on both endings.
+    for (const line of manifest.split(/\r?\n/)) {
       const m = line.match(/^([0-9a-f]{64})\s+(.+)$/);
       if (m) recorded.set(m[2].trim(), m[1]);
     }

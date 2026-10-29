@@ -107,6 +107,13 @@ async function main() {
       ranges.push(r.status());
   });
   await page.goto(EXAM_PAGE, { waitUntil: 'networkidle', timeout: 90_000 });
+  // The exam detail renders after its data loads; read it then, not at
+  // networkidle (CP60.2: a blank page was read on a cold dev server).
+  await page
+    .getByText('Làm Full Test')
+    .first()
+    .waitFor({ timeout: 60_000 })
+    .catch(() => undefined);
   const detail = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
     'start screen offers "Luyện tập linh hoạt" and "Làm Full Test", no strict wording',

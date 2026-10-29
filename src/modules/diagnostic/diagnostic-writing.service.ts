@@ -1,3 +1,8 @@
+import {
+  rubricScoringFor,
+  taskWeightingView,
+  weightingMetadata,
+} from './diagnostic-result-policy.store';
 import { refreshFourSkillResult } from './diagnostic-four-skill.store';
 import {
   ConflictException,
@@ -40,9 +45,14 @@ export type DiagnosticWritingFeedback = {
   /** Percentage of the rubric range (0-100) once GRADED; null otherwise. */
   score: number | null;
   scoreScale?: 'PERCENT_0_100';
-  criteria?: Record<string, number> | null;
+  /** A criterion is null when it could not be assessed. */
+  criteria?: Record<string, number | null> | null;
   criterionFeedback?: Record<string, string> | null;
   rubricVersion?: string | null;
+  weightingVersion?: string | null;
+  criterionWeights?: Record<string, number> | null;
+  unavailableCriteria?: string[];
+  limitedEvidence?: boolean;
   wordCount?: number | null;
   feedback: string | null;
   suggestions: string[];
@@ -300,12 +310,13 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
       score: graded ? row.score : null,
       scoreScale: 'PERCENT_0_100',
       criteria: graded
-        ? ((meta.criteria as Record<string, number>) ?? null)
+        ? ((meta.criteria as Record<string, number | null>) ?? null)
         : null,
       criterionFeedback: graded
         ? ((meta.criterionFeedback as Record<string, string>) ?? null)
         : null,
       rubricVersion: row.rubricVersion,
+      ...taskWeightingView('WRITING', graded, meta),
       wordCount: row.wordCount,
       feedback: graded ? ((meta.feedback as string) ?? null) : null,
       suggestions:
@@ -420,19 +431,24 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const outcome = await gradeWithRubric(this.grader, {
-      skill: 'WRITING',
-      submissionRef: `writing:${row.id}:${run}`,
-      rubric,
-      taskPrompt: question.question,
-      taskInstructions: question.instructions ?? null,
-      responseText: row.responseText,
-      writingLength: assessWritingLength(
-        row.responseText,
-        question.wordMin,
-        question.wordMax,
-      ),
-    });
+    const scoring = await rubricScoringFor(this.prisma, row.attemptId);
+    const outcome = await gradeWithRubric(
+      this.grader,
+      {
+        skill: 'WRITING',
+        submissionRef: `writing:${row.id}:${run}`,
+        rubric,
+        taskPrompt: question.question,
+        taskInstructions: question.instructions ?? null,
+        responseText: row.responseText,
+        writingLength: assessWritingLength(
+          row.responseText,
+          question.wordMin,
+          question.wordMax,
+        ),
+      },
+      scoring,
+    );
     if (outcome.status === 'GRADED') {
       await finish({
         status: 'GRADED',
@@ -445,6 +461,7 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
           feedback: outcome.grade.feedback,
           suggestions: outcome.grade.suggestions,
           evidenceQuotes: outcome.grade.evidenceQuotes,
+          ...weightingMetadata(outcome.grade),
         },
         rawProviderPayload: this.asJson(outcome.raw),
         provider: this.grader.providerFor?.('WRITING') ?? this.grader.provider,

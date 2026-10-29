@@ -129,29 +129,6 @@ export class AdminController {
     return this.adminService.adminDeleteCourse(courseId);
   }
 
-  // ============== CLASS MANAGEMENT ==============
-
-  @Get('classes')
-  @ApiOperation({ summary: 'Admin: Lay toan bo danh sach lop hoc' })
-  getAllClasses() {
-    return this.adminService.getAllClasses();
-  }
-
-  @Post('courses/:courseId/classes')
-  @ApiOperation({ summary: 'Admin: Tao lop hoc trong khoa hoc' })
-  adminCreateClass(
-    @Param('courseId', ParseIntPipe) courseId: number,
-    @Body()
-    dto: {
-      name: string;
-      startDate?: string;
-      endDate?: string;
-      capacity?: number;
-    },
-  ) {
-    return this.adminService.adminCreateClass(courseId, dto);
-  }
-
   @Post('courses/:courseId/review')
   @ApiOperation({
     summary: 'Admin: Duyet hoac tu choi khoa hoc (APPROVE / REJECT)',
@@ -161,12 +138,6 @@ export class AdminController {
     @Body() dto: { action: 'APPROVE' | 'REJECT' },
   ) {
     return this.adminService.adminReviewCourse(courseId, dto.action);
-  }
-
-  @Get('classes/:classId')
-  @ApiOperation({ summary: 'Admin: Chi tiet lop hoc kem danh sach hoc vien' })
-  getClassDetail(@Param('classId', ParseIntPipe) classId: number) {
-    return this.adminService.getClassWithEnrollments(classId);
   }
 
   // ============== VOCAB MANAGEMENT (PHASE 4 CMS) ==============

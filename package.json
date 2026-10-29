@@ -34,7 +34,6 @@
     "db:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-backup.ps1",
     "db:backup:sync-r2": "ts-node scripts/db-backup-sync-all.ts",
     "db:restore:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-restore-drill.ps1",
-    "payment:backfill": "ts-node prisma/backfill-payments.ts",
     "bootstrap:plans": "ts-node scripts/bootstrap-plan-catalog.ts",
     "reconstruct:ipa-course": "ts-node scripts/reconstruct-ipa-course.ts",
     "inspect:foundation-courses": "ts-node scripts/inspect-foundation-course-state.ts",

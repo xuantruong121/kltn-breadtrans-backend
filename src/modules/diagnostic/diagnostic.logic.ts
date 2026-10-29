@@ -110,6 +110,9 @@ export type DiagnosticQuestionForScoring = {
   responseSeconds?: number | null;
   wordMin?: number | null;
   wordMax?: number | null;
+  /** Authored difficulty tier (D1-D4); content metadata only. */
+  difficulty?: string | null;
+  subskill?: string | null;
 };
 
 export type DiagnosticQuestionMeta = {

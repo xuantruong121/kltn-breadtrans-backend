@@ -3,7 +3,6 @@ import { CourseService } from './course.service';
 import { CourseController } from './course.controller';
 import { CoursePublicController } from './course-public.controller';
 import { EventsModule } from '../events/events.module';
-import { PaymentModule } from '../payment/payment.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { CourseLearningV5Service } from './course-v5.service';
 import { CourseV5AdminController } from './course-v5-admin.controller';
@@ -19,13 +18,7 @@ import { OpenverseImageSearchProvider } from '../toeic/openverse-image-search.pr
 import { WikimediaCommonsImageSearchProvider } from '../toeic/wikimedia-commons-image-search.provider';
 
 @Module({
-  imports: [
-    EventsModule,
-    PaymentModule,
-    SubscriptionModule,
-    UploadModule,
-    AiModule,
-  ],
+  imports: [EventsModule, SubscriptionModule, UploadModule, AiModule],
   providers: [
     CourseService,
     CourseLearningV5Service,

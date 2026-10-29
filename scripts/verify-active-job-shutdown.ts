@@ -9,6 +9,7 @@
  * 4. The worker exits cleanly with exit code 0.
  * 5. Timestamp evidence proves SIGTERM was sent BEFORE evaluation completed.
  */
+import './qa/qa-legacy-guard';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';

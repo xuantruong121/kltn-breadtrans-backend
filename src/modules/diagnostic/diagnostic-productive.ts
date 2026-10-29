@@ -1,3 +1,8 @@
+import {
+  ACOUSTIC_CRITERIA,
+  weightedTaskPercentage,
+} from './diagnostic-observed-policy';
+
 /**
  * Pure productive-task rules for the Entry Diagnostic: recording duration,
  * writing length, rubric parsing and validation of grader output. No Prisma,
@@ -224,7 +229,8 @@ export const EVIDENCE_QUOTES_MAX = 5;
 
 /** What a grader must return. Anything else is rejected, never coerced. */
 export type ValidatedRubricGrade = {
-  criteria: Record<string, number>;
+  /** A null score is an UNAVAILABLE criterion (weighted policy only). */
+  criteria: Record<string, number | null>;
   criterionFeedback: Record<string, string>;
   feedback: string;
   suggestions: string[];
@@ -233,9 +239,26 @@ export type ValidatedRubricGrade = {
   transcript: string | null;
   /** Speech evidence attached by the speech adapter, never by the model. */
   speechEvidence: Record<string, unknown> | null;
-  /** Mean criterion score as a percentage of each criterion's range. */
+  /**
+   * Percentage of the rubric range: the plain mean of the criteria, or under
+   * the weighted policy the weighted mean of the AVAILABLE criteria.
+   */
   taskPercentage: number;
+  /** Weighted policy only: criteria that could not be assessed. */
+  unavailableCriteria?: string[];
+  /** Weighted policy only: weight actually assessed, out of 1. */
+  assessedWeight?: number;
+  weightingVersion?: string;
 };
+
+/**
+ * How a grade is turned into a task percentage. Absent: the historical plain
+ * mean (FOUR_SKILL_PLACEMENT_V2). `weighted`: the CP60-DIAG rubric weights,
+ * and for Speaking the acoustic criteria become UNAVAILABLE when the speech
+ * evidence carries no acoustic measurement (a transcript alone cannot show
+ * pronunciation or fluency).
+ */
+export type RubricScoringOptions = { weighted: true };
 
 export type RubricGradeVerdict =
   { ok: true; grade: ValidatedRubricGrade } | { ok: false; reason: string };
@@ -279,6 +302,7 @@ export function validateRubricGrade(
     'rubric' | 'submissionRef' | 'skill' | 'responseText'
   >,
   raw: unknown,
+  options?: RubricScoringOptions,
 ): RubricGradeVerdict {
   let value: any = raw;
   if (typeof raw === 'string') {
@@ -298,8 +322,22 @@ export function validateRubricGrade(
   if (!scores || typeof scores !== 'object' || Array.isArray(scores))
     return { ok: false, reason: 'CRITERIA_MISSING' };
 
-  const criteria: Record<string, number> = {};
+  // Acoustic criteria need acoustic evidence; the speech adapter, never the
+  // model, attaches it. Without it those criteria are UNAVAILABLE whatever
+  // the model returned for them (weighted policy only).
+  const acousticUnavailable =
+    options?.weighted === true &&
+    request.skill === 'SPEAKING' &&
+    !hasAcousticEvidence(value.speechEvidence);
+  const criteria: Record<string, number | null> = {};
   for (const criterion of request.rubric.criteria) {
+    if (
+      acousticUnavailable &&
+      (ACOUSTIC_CRITERIA as readonly string[]).includes(criterion.key)
+    ) {
+      criteria[criterion.key] = null;
+      continue;
+    }
     const score = scores[criterion.key];
     if (score === undefined || score === null)
       return { ok: false, reason: `CRITERION_ABSENT:${criterion.key}` };
@@ -324,6 +362,10 @@ export function validateRubricGrade(
     return { ok: false, reason: 'CRITERION_FEEDBACK_MISSING' };
   const criterionFeedback: Record<string, string> = {};
   for (const criterion of request.rubric.criteria) {
+    if (criteria[criterion.key] === null) {
+      criterionFeedback[criterion.key] = UNAVAILABLE_ACOUSTIC_FEEDBACK;
+      continue;
+    }
     const note =
       typeof notes[criterion.key] === 'string'
         ? notes[criterion.key].trim()
@@ -385,13 +427,35 @@ export function validateRubricGrade(
       return { ok: false, reason: 'EVIDENCE_QUOTE_NOT_IN_RESPONSE' };
   }
 
-  const taskPercentage =
-    (request.rubric.criteria.reduce(
-      (sum, c) => sum + (criteria[c.key] - c.min) / (c.max - c.min),
-      0,
-    ) /
-      request.rubric.criteria.length) *
-    100;
+  let taskPercentage: number;
+  let weighting: Pick<
+    ValidatedRubricGrade,
+    'unavailableCriteria' | 'assessedWeight' | 'weightingVersion'
+  > = {};
+  if (options?.weighted) {
+    const weighted = weightedTaskPercentage(
+      request.skill,
+      request.rubric.criteria,
+      criteria,
+    );
+    if (weighted.percentage === null)
+      return { ok: false, reason: 'NO_ASSESSABLE_CRITERIA' };
+    taskPercentage = weighted.percentage;
+    weighting = {
+      unavailableCriteria: weighted.unavailableCriteria,
+      assessedWeight: weighted.assessedWeight,
+      weightingVersion: weighted.weightingVersion,
+    };
+  } else {
+    taskPercentage =
+      (request.rubric.criteria.reduce(
+        (sum, c) =>
+          sum + ((criteria[c.key] as number) - c.min) / (c.max - c.min),
+        0,
+      ) /
+        request.rubric.criteria.length) *
+      100;
+  }
 
   return {
     ok: true,
@@ -409,8 +473,24 @@ export function validateRubricGrade(
       transcript,
       speechEvidence,
       taskPercentage,
+      ...weighting,
     },
   };
+}
+
+/** Learner-facing note for a criterion the evidence could not support. */
+export const UNAVAILABLE_ACOUSTIC_FEEDBACK =
+  'Chưa đánh giá được tiêu chí này vì không có dữ liệu âm thanh đủ để đo phát âm và độ trôi chảy.';
+
+/** Azure acoustic scores present (accuracy/fluency/pronunciation numbers). */
+export function hasAcousticEvidence(speechEvidence: unknown): boolean {
+  if (!speechEvidence || typeof speechEvidence !== 'object') return false;
+  const azure = (speechEvidence as { azure?: unknown }).azure;
+  if (!azure || typeof azure !== 'object') return false;
+  const a = azure as Record<string, unknown>;
+  return ['accuracy', 'fluency', 'pronunciation'].every(
+    (k) => typeof a[k] === 'number' && Number.isFinite(a[k]),
+  );
 }
 
 // ---------------------------------------------------------- grader provider
@@ -501,6 +581,7 @@ const FAILURE_PREFIX: Record<DiagnosticGraderFailureKind, string> = {
 export async function gradeWithRubric(
   grader: DiagnosticRubricGrader,
   request: RubricGradeRequest,
+  options?: RubricScoringOptions,
 ): Promise<RubricGradeOutcome> {
   let lastReason = 'GRADER_FAILED';
   let lastRaw: unknown = null;
@@ -525,7 +606,7 @@ export async function gradeWithRubric(
       lastRaw = null;
       continue;
     }
-    const verdict = validateRubricGrade(request, lastRaw);
+    const verdict = validateRubricGrade(request, lastRaw, options);
     if (verdict.ok)
       return {
         status: 'GRADED',

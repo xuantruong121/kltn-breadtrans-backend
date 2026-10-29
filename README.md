@@ -35,7 +35,7 @@
 | **Vocabulary & Flashcard** | 4 bước học toàn diện (Flashcard 3D → Quiz → Typing → Speaking) tích hợp Text-To-Speech Neural. |
 | **Hệ Thống Gamification** | Tích lũy Bánh Mì, chuỗi Streak, Cửa hàng vật phẩm, Thú cưng (Pet) và Bảng xếp hạng học tập. |
 | **Lưu Trữ Đám Mây Cloudflare R2** | Lưu trữ vĩnh viễn Avatar, Audio luyện nói, file bài giảng PDF với chi phí băng thông egress 0đ. |
-| **Admin & Teacher CMS** | Thống kê số liệu trực quan, quản lý lớp học, phân công giáo viên, duyệt học viên và quản lý ngân hàng câu hỏi. |
+| **Admin CMS** | Thống kê, quản lý người dùng, gói PLUS/PRO, khóa học tự học (Course Studio) và ngân hàng nội dung. Không có lớp học, giáo viên hay học phí lớp (đã ngừng ở CP60.1). |
 
 ---
 
@@ -46,7 +46,7 @@
 - **Cơ sở dữ liệu & ORM:** PostgreSQL 15, Prisma ORM 6
 - **Bộ nhớ đệm & Realtime Queue:** Redis 7 (`ioredis`)
 - **Realtime Gateway:** `@nestjs/websockets`, `socket.io`
-- **Xác thực & Phân quyền:** Passport-JWT, Bcrypt, Role Guard (`STUDENT`, `TEACHER`, `ADMIN`)
+- **Xác thực & Phân quyền:** Passport-JWT, Bcrypt, Role Guard (`STUDENT`, `ADMIN`)
 - **Lưu trữ đám mây:** Cloudflare R2 (`@aws-sdk/client-s3`)
 - **Trí tuệ nhân tạo (AI):** 
   - Azure AI Speech (Pronunciation Assessment)

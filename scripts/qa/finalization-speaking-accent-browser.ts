@@ -11,6 +11,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { check, failureCount } from './harness-api';
 import { harnessExec } from './harness-db';
 import { FE, hidePet, studentPage } from './harness-browser';
+import { requireExplicitOptIn } from './qa-target-guard';
+
+requireExplicitOptIn('QA_ALLOW_REAL_R2_READ', 'finalization-speaking-accent-browser reads objects from the real R2 private bucket');
 
 const PUBLIC_1 =
   'https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/speaking/reference/1.v1.mp3';

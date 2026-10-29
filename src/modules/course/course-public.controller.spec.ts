@@ -17,7 +17,6 @@ describe('CoursePublicController (Routing & Delegation)', () => {
           level: 'ADVANCED',
           createdAt: new Date('2026-01-01'),
           teacher: { id: 5, fullName: 'Mr. David', avatar: null },
-          upcomingClassCount: 2,
         },
       ]),
       getPublicCourseDetail: jest.fn().mockResolvedValue({
@@ -35,20 +34,6 @@ describe('CoursePublicController (Routing & Delegation)', () => {
         },
         lessons: [
           { id: 1, title: 'Introduction', description: 'Intro', order: 1 },
-        ],
-        classes: [
-          {
-            id: 201,
-            name: 'Class A',
-            startDate: new Date('2026-10-01'),
-            endDate: new Date('2026-12-01'),
-            capacity: 30,
-            currentEnrollmentCount: 5,
-            remainingSeats: 25,
-            isSoldOut: false,
-            status: 'UPCOMING',
-            teacher: { id: 5, fullName: 'Mr. David', avatar: null },
-          },
         ],
       }),
     };
@@ -75,7 +60,7 @@ describe('CoursePublicController (Routing & Delegation)', () => {
     expect(service.getPublicCatalog).toHaveBeenCalledTimes(1);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe(101);
-    expect(result[0].upcomingClassCount).toBe(2);
+    expect(result[0]).not.toHaveProperty('upcomingClassCount');
   });
 
   it('getPublicCourseDetail delegates to courseService.getPublicCourseDetail with numeric id', async () => {
@@ -83,6 +68,6 @@ describe('CoursePublicController (Routing & Delegation)', () => {
     expect(service.getPublicCourseDetail).toHaveBeenCalledWith(101);
     expect(result.id).toBe(101);
     expect(result.lessons).toHaveLength(1);
-    expect(result.classes).toHaveLength(1);
+    expect(result).not.toHaveProperty('classes');
   });
 });

@@ -104,7 +104,7 @@ export class CourseController {
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả khóa học' })
   getAllCourses(@Request() req: any) {
-    return this.courseService.getAllCourses(req.user?.id, req.user?.role);
+    return this.courseService.getAllCourses(req.user?.role);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -113,7 +113,7 @@ export class CourseController {
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Lấy danh sách khóa học hệ thống (Admin)' })
   getMyCourses(@Request() req: any) {
-    return this.courseService.getAllCourses(req.user.id, req.user.role);
+    return this.courseService.getAllCourses(req.user.role);
   }
 
   @UseGuards(OptionalJwtAuthGuard)

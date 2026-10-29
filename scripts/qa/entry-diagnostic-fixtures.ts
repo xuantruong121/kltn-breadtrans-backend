@@ -1,12 +1,20 @@
-import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+import { assertIsolatedTargets, readIsolatedTargets } from './qa-target-guard';
+
+// Creates/deletes users: explicit, verified isolated target only (CP60.2);
+// never the backend .env (kltn_db).
+const selected = readIsolatedTargets();
+if (!selected.ok) throw new Error(`QA target refused: ${selected.reason}`);
+const prisma = new PrismaClient({
+  datasources: { db: { url: selected.targets.databaseUrl } },
+});
 const prefix = `entry-v2-qa-${Date.now()}`;
 const password = 'EntryDiagnosticQA!2026';
 
 async function main() {
+  await assertIsolatedTargets();
   const plans = await prisma.plan.findMany({
     where: { code: { in: ['PLUS', 'PRO'] } },
     include: {

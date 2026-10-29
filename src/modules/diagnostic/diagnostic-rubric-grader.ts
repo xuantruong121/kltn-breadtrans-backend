@@ -61,7 +61,19 @@ export class MockDiagnosticRubricGrader implements DiagnosticRubricGrader {
       ...(transcript
         ? {
             transcript,
-            speechEvidence: { mode: 'MOCK', recognizedWordCount: 5 },
+            // Labelled MOCK. The acoustic block lets the weighted policy run
+            // its normal path; its "no acoustic evidence" path is covered by
+            // unit tests (diagnostic-weighted-grade.spec).
+            speechEvidence: {
+              mode: 'MOCK',
+              recognizedWordCount: 5,
+              azure: {
+                accuracy: 75,
+                fluency: 75,
+                prosody: null,
+                pronunciation: 75,
+              },
+            },
           }
         : {}),
     });

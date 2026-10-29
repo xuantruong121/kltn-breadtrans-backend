@@ -3,7 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
-import { CourseStatus, ClassStatus } from '@prisma/client';
+import { CourseStatus } from '@prisma/client';
 import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 
@@ -96,7 +96,7 @@ describe('Public Courses API (e2e)', () => {
   });
 
   describe('GET /public/courses (Catalog for Guest)', () => {
-    it('should return 200 and list of PUBLISHED courses with upcomingClassCount without Auth header', async () => {
+    it('should return 200 and list of PUBLISHED courses without Auth header and without classroom data', async () => {
       const res = await request(app.getHttpServer())
         .get('/public/courses')
         .expect(200);
@@ -107,9 +107,10 @@ describe('Public Courses API (e2e)', () => {
       const catalog = res.body as Array<{
         id: number;
         title: string;
-        upcomingClassCount: number;
+        upcomingClassCount?: unknown;
         status: string;
         classes?: unknown;
+        isSelfPaced?: boolean;
         lessons?: unknown;
         quizzes?: unknown;
       }>;
@@ -118,15 +119,20 @@ describe('Public Courses API (e2e)', () => {
       const item = catalog.find((c) => c.id === publishedCourseId);
       expect(item).toBeDefined();
       expect(item?.title).toBeDefined();
-      expect(typeof item?.upcomingClassCount).toBe('number');
       expect(item?.status).toBe(CourseStatus.PUBLISHED);
+      expect(item?.isSelfPaced).toBe(true);
 
       // Verify no draft course leaked in public catalog
       const leakedDraft = catalog.find((c) => c.id === draftCourseId);
       expect(leakedDraft).toBeUndefined();
 
-      // Public catalog exposes only upcoming offering summaries.
-      expect(item?.classes).toBeInstanceOf(Array);
+      // Courses are self-paced and unlocked by PRO (CP60.1): the catalog
+      // carries no classes, seats or tuition.
+      expect(item?.classes).toBeUndefined();
+      expect(item?.upcomingClassCount).toBeUndefined();
+      expect(JSON.stringify(res.body)).not.toMatch(
+        /tuitionFeeVnd|remainingSeats|upcomingClassCount|"classes"/,
+      );
       expect(item?.lessons).toBeUndefined();
       expect(item?.quizzes).toBeUndefined();
     });
@@ -141,19 +147,18 @@ describe('Public Courses API (e2e)', () => {
       expect(res.body.id).toBe(publishedCourseId);
       expect(res.body.status).toBe(CourseStatus.PUBLISHED);
       expect(Array.isArray(res.body.lessons)).toBe(true);
-      expect(Array.isArray(res.body.classes)).toBe(true);
+      expect(res.body.isSelfPaced).toBe(true);
+      // No classroom data in the detail either (CP60.1).
+      expect(res.body.classes).toBeUndefined();
+      expect(JSON.stringify(res.body)).not.toMatch(
+        /tuitionFeeVnd|remainingSeats|currentEnrollmentCount|"classes"/,
+      );
 
       // Zero-leak checks on root and relations
       expect(res.body.quizzes).toBeUndefined();
       for (const lesson of res.body.lessons) {
         expect(lesson.videoUrl).toBeUndefined();
         expect(lesson.materials).toBeUndefined();
-      }
-      for (const cls of res.body.classes) {
-        expect(cls.links).toBeUndefined();
-        expect(cls.stories).toBeUndefined();
-        expect(cls.enrollments).toBeUndefined();
-        expect(cls.status).toBe(ClassStatus.UPCOMING);
       }
     });
 

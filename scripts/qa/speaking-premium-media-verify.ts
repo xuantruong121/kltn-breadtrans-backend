@@ -15,6 +15,9 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PrismaClient } from '@prisma/client';
+import { requireExplicitOptIn } from './qa-target-guard';
+
+requireExplicitOptIn('QA_ALLOW_REAL_R2_READ', 'speaking-premium-media-verify reads objects from the real R2 private bucket');
 
 async function main() {
   const env = process.env;

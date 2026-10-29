@@ -1,3 +1,4 @@
+import './qa/qa-legacy-guard';
 import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';

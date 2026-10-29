@@ -109,8 +109,11 @@ export async function studentPage(
   await page.fill('input[name="email"]', account.email);
   await page.fill('input[name="password"]', account.password);
   await page.click('#email-login-panel button[type="submit"]');
+  // 'commit': the redirect is the signal; a slow asset on the next page
+  // must not fail the login.
   await page.waitForURL((u) => !u.pathname.startsWith('/login'), {
     timeout: 60_000,
+    waitUntil: 'commit',
   });
   return { browser, page, account, issues };
 }

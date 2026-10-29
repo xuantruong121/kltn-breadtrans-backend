@@ -7,6 +7,9 @@
 import { execFileSync } from 'node:child_process';
 
 import { chromium } from 'playwright';
+import { requireExplicitOptIn } from './qa-target-guard';
+
+requireExplicitOptIn('QA_OWNER_READONLY', 'cp56-owner-grammar-verify drives the owner app (:3000/:3001, kltn_db) read-only; logins still write sessions');
 
 const BE = 'http://127.0.0.1:3001';
 const FE = 'http://localhost:3000';

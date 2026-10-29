@@ -580,13 +580,40 @@ Nội dung câu hỏi của học sinh:
       const pronScores: AzurePronScores =
         bestResult.PronunciationAssessment || bestResult;
 
-      const accuracyScore =
-        pronScores.AccuracyScore ?? bestResult.AccuracyScore ?? 0;
-      const fluencyScore =
-        pronScores.FluencyScore ?? bestResult.FluencyScore ?? 0;
-      const completenessScore =
-        pronScores.CompletenessScore ?? bestResult.CompletenessScore ?? 0;
-      const rawPronScore = pronScores.PronScore ?? bestResult.PronScore ?? 0;
+      // A scripted assessment always returns these four; a measured 0 is
+      // valid, but a missing or invalid one is a provider failure (retried by
+      // the speaking queue), never a learner score of 0. Prosody is optional.
+      const required = (value: unknown): number | null =>
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        value >= 0 &&
+        value <= 100
+          ? value
+          : null;
+      const accuracyScore = required(
+        pronScores.AccuracyScore ?? bestResult.AccuracyScore,
+      );
+      const fluencyScore = required(
+        pronScores.FluencyScore ?? bestResult.FluencyScore,
+      );
+      const completenessScore = required(
+        pronScores.CompletenessScore ?? bestResult.CompletenessScore,
+      );
+      const rawPronScore = required(
+        pronScores.PronScore ?? bestResult.PronScore,
+      );
+      if (
+        accuracyScore === null ||
+        fluencyScore === null ||
+        completenessScore === null ||
+        rawPronScore === null
+      ) {
+        const err = new Error(
+          'AZURE_RESPONSE_MISSING_SCORES: scripted assessment without valid Accuracy/Fluency/Completeness/PronScore',
+        );
+        (err as any).code = 'PROVIDER_UNAVAILABLE';
+        throw err;
+      }
 
       const bestWords: AzureWordItem[] = bestResult.Words || [];
 

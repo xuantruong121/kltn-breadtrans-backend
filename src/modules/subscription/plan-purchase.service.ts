@@ -17,7 +17,7 @@ import {
   SubscriptionStatus,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import { buildVietQrUrl } from '../payment/payment.service';
+import { buildVietQrUrl } from '../payment/vietqr';
 import { getPaymentBankConfig } from '../../common/config/payment-bank.config';
 import { PrismaService } from '../../prisma/prisma.service';
 import {

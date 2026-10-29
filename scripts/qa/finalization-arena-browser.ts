@@ -83,8 +83,8 @@ async function main() {
   await B.page.screenshot({ path: `${SHOTS}/arena-result-loser-1366.png` });
   await new Promise((ok) => setTimeout(ok, 1500));
   check(
-    'balances 120 / 80; XP +40 winner only',
-    bread(A.account.userId) === 120 && bread(B.account.userId) === 80 && xp(A.account.userId) - xpBefore[0] === 40 && xp(B.account.userId) - xpBefore[1] === 0,
+    'balances 120 / 80; no XP for either player (Arena pays Bread only, CP57-C)',
+    bread(A.account.userId) === 120 && bread(B.account.userId) === 80 && xp(A.account.userId) - xpBefore[0] === 0 && xp(B.account.userId) - xpBefore[1] === 0,
     `(${bread(A.account.userId)}, ${bread(B.account.userId)}, xp ${xp(A.account.userId) - xpBefore[0]}/${xp(B.account.userId) - xpBefore[1]})`,
   );
   const ledger = harnessQuery(`select source, count(*) from "BanhTransaction" where reference like 'arena:match:${match.matchId}:%' group by source order by source`).map(([s, n]) => `${s}=${n}`);

@@ -90,7 +90,7 @@ void (async () => {
     check(
       `@${width} recent activity names the exercise and its result`,
       at >= 0 &&
-        recent.includes('Listening A1 — Essential Everyday English') &&
+        recent.includes('Tiếng Anh thiết yếu hằng ngày (A1)') &&
         recent.includes('Luyện nghe hiểu · 8/8 câu đúng'),
       recent.slice(0, 200),
     );

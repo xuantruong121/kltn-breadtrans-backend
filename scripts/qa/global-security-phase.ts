@@ -10,6 +10,7 @@
 import {
   BE,
   FE,
+  assertAuditTarget,
   createQaLearner,
   destroyQaLearner,
   launch,
@@ -64,6 +65,7 @@ async function main() {
   const idorRows: Array<Record<string, unknown>> = [];
   const emptyRows: Array<Record<string, unknown>> = [];
   try {
+    await assertAuditTarget();
     const a = await createQaLearner(marker, 'PRO', '-a');
     const b = await createQaLearner(marker, 'PRO', '-b');
     learnerIds.push(a.userId, b.userId);
@@ -215,7 +217,19 @@ async function main() {
         waitUntil: 'networkidle',
         timeout: 35_000,
       });
-      await freePage.waitForTimeout(1300);
+      // Wait for the page's own message, not a fixed delay: on a dev server
+      // the first render can take longer than 1.3 s (CP60.2 flake). A page
+      // that never shows a message still fails below.
+      await freePage
+        .waitForFunction(
+          () =>
+            /không|chưa|trống|rỗng|hãy|sắp|bắt đầu|kiểm tra|thử/i.test(
+              document.querySelector('main')?.textContent ?? '',
+            ),
+          undefined,
+          { timeout: 30_000 },
+        )
+        .catch(() => undefined);
       const text = (await freePage.locator('body').innerText()).trim();
       const row = {
         label: check.label,

@@ -1,3 +1,4 @@
+import './qa/qa-legacy-guard';
 import 'dotenv/config';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 

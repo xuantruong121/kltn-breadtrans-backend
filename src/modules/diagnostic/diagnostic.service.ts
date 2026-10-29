@@ -1,4 +1,9 @@
 import {
+  buildObjectiveBreakdown,
+  OBSERVED_RESULT_POLICY,
+  RESULT_POLICY_ANSWER_KEY,
+} from './diagnostic-observed-policy';
+import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
@@ -36,6 +41,7 @@ import {
   scoreFourSkillPlacementV2,
 } from './diagnostic-four-skill';
 import { DiagnosticAdviceCatalogService } from './diagnostic-advice-catalog.service';
+import { taskWeightingView } from './diagnostic-result-policy.store';
 import { buildDiagnosticAdvice } from './diagnostic-v2-advice';
 import {
   isSkippedWritingAnswer,
@@ -526,8 +532,23 @@ export class DiagnosticService {
             resolve: await this.adviceCatalog.resolverFor(attempt.userId),
           })
         : null;
+    // V3 only: per-difficulty-tier and per-subskill objective evidence.
+    const objectiveBreakdown = fourSkill?.observed
+      ? buildObjectiveBreakdown(
+          objectiveQuestions.map((question) => ({
+            section: getQuestionMeta(question).section,
+            difficulty: question.difficulty ?? null,
+            subskill:
+              question.subskill ?? getQuestionMeta(question).construct ?? null,
+            isCorrect:
+              questionsResult.find((r) => r.questionId === question.id)
+                ?.isCorrect === true,
+          })),
+        )
+      : null;
     return {
       attemptId: attempt.id,
+      objectiveBreakdown,
       // The form actually administered, derived from its own items. The
       // 52-item CANONICAL_DIAGNOSTIC_BLUEPRINT exists in no backup and in no
       // live database, so it is no longer returned as `canonicalBlueprint`
@@ -597,6 +618,7 @@ export class DiagnosticService {
           suggestions:
             graded && Array.isArray(meta.suggestions) ? meta.suggestions : [],
           transcript: graded ? (row.transcript ?? null) : null,
+          ...taskWeightingView('SPEAKING', graded, meta),
         };
       }),
       submittedAt: attempt.submittedAt,
@@ -1156,7 +1178,19 @@ export class DiagnosticService {
         // Names how the options were displayed, so the result screen
         // re-derives exactly the permutation this grade was computed with.
         __permScheme: LEARNER_PERMUTATION_SCHEME,
+        // Server-owned result policy (CP60-DIAG): four-skill attempts from now
+        // on use FOUR_SKILL_OBSERVED_V3. Always written here, after the
+        // learner's map, so a client cannot choose it; older attempts have no
+        // marker and keep the policy they were scored with.
+        ...(useFourSkillV2
+          ? { [RESULT_POLICY_ANSWER_KEY]: OBSERVED_RESULT_POLICY }
+          : {}),
       };
+      // A learner-supplied marker never survives for other scorers either.
+      if (!useFourSkillV2)
+        delete (storedAnswers as Record<string, unknown>)[
+          RESULT_POLICY_ANSWER_KEY
+        ];
       const created = await tx.diagnosticAttempt.update({
         where: { id: attemptId },
         data: {

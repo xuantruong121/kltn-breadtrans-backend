@@ -131,7 +131,7 @@ function run(o: {
       status: t.status,
       score:
         t.status === 'GRADED' && t.criteria
-          ? pct(Object.values(t.criteria))
+          ? pct(Object.values(t.criteria) as number[])
           : null,
     })),
     writingQuestionIds: [23, 24],
@@ -140,7 +140,7 @@ function run(o: {
       status: t.status,
       score:
         t.status === 'GRADED' && t.criteria
-          ? pct(Object.values(t.criteria))
+          ? pct(Object.values(t.criteria) as number[])
           : null,
     })),
   });

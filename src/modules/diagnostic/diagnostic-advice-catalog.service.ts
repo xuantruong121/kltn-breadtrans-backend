@@ -103,7 +103,13 @@ export class DiagnosticAdviceCatalogService {
             },
           ],
         },
-        select: { id: true, title: true, isPremiumContent: true },
+        select: {
+          id: true,
+          title: true,
+          isPremiumContent: true,
+          practiceSetId: true,
+          practiceSet: { select: { level: true } },
+        },
       }),
       this.prisma.course.findMany({
         where: { id: { in: ids('COURSE') }, status: 'PUBLISHED' },
@@ -169,6 +175,8 @@ export class DiagnosticAdviceCatalogService {
           ...ref,
           title: exercise.title,
           route: `/speaking/${exercise.id}`,
+          setKey: exercise.practiceSetId,
+          cefrLevel: exercise.practiceSet?.level ?? null,
           access: locked ? 'LOCKED' : 'OPEN',
           requirement: locked ? `Cần gói ${required}` : null,
         });

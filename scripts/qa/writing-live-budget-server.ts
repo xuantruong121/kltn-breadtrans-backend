@@ -94,14 +94,19 @@ GeminiCredentialManager.prototype.execute = function (options) {
 
 async function assertHarness() {
   const url = process.env.DATABASE_URL ?? '';
-  if (!/@127\.0\.0\.1:5460\/harness_clone/.test(url))
-    throw new Error('REFUSED: DATABASE_URL is not the harness clone');
+  // The disposable harness cluster (:5460) holds the shared clone and the
+  // CP60-DIAG clone; the cluster identity below is what proves it.
+  if (!/@127\.0\.0\.1:5460\/(harness_clone|diag_clone)(\?|$)/.test(url))
+    throw new Error('REFUSED: DATABASE_URL is not a harness clone');
   const prisma = new PrismaClient({ datasources: { db: { url } } });
   const [{ db, sysid }] = await prisma.$queryRawUnsafe<any[]>(
     'select current_database() db, system_identifier::text sysid from pg_control_system()',
   );
   await prisma.$disconnect();
-  if (db !== 'harness_clone' || sysid === '7674533776495505443')
+  if (
+    !['harness_clone', 'diag_clone'].includes(db) ||
+    ['7674533776495505443', '7699757546958700579'].includes(sysid)
+  )
     throw new Error(`REFUSED: target ${db} ${sysid} is not the harness`);
   log({ event: 'start', db, sysid, budget: BUDGET });
 }

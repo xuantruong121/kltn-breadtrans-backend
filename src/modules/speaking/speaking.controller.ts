@@ -46,12 +46,12 @@ import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 export class SpeakingController {
   constructor(private readonly speakingService: SpeakingService) {}
 
-  // ── ADMIN / TEACHER: Quản lý bài tập ──────────────────────────────────────
+  // ── ADMIN: Quản lý bài tập ───────────────────────────────────────────────
 
   @Post('exercises')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: '[Admin/Teacher] Tạo bài tập phát âm mới' })
+  @ApiOperation({ summary: '[Admin] Tạo bài tập phát âm mới' })
   createExercise(@Body() dto: CreateExerciseDto) {
     return this.speakingService.createExercise(dto);
   }

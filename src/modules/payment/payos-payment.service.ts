@@ -76,35 +76,6 @@ export class PayosPaymentService {
     return this.createProviderLink(intent, itemName);
   }
 
-  async createForCoursePayment(
-    userId: number,
-    enrollmentId: number,
-    itemName: string,
-  ): Promise<PayosIntentDto> {
-    const payment = await this.prisma.payment.findFirst({
-      where: { enrollmentId, enrollment: { userId } },
-      include: {
-        enrollment: { include: { class: { include: { course: true } } } },
-      },
-    });
-    if (!payment) throw new NotFoundException('Course payment not found');
-    const existing = await this.prisma.payOSPaymentIntent.findUnique({
-      where: { coursePaymentId: payment.id },
-      include: { planPayment: true, coursePayment: true },
-    });
-    if (existing?.checkoutUrl && existing.qrCode) return this.toDto(existing);
-    const intent =
-      existing ??
-      (await this.createIntent({
-        userId,
-        type: PayOSPaymentIntentType.COURSE,
-        coursePaymentId: payment.id,
-        amountVnd: payment.amountVnd,
-        description: 'BreadTrans Course',
-      }));
-    return this.createProviderLink(intent, itemName);
-  }
-
   async getOwnedIntent(
     userId: number,
     intentId: number,
@@ -395,18 +366,11 @@ export class PayosPaymentService {
       await plans.confirmPurchaseFromWebhook(intent.planPayment.planPurchaseId);
       return;
     }
-    if (intent.type === PayOSPaymentIntentType.COURSE && intent.coursePayment) {
-      const payments = this.moduleRef.get<{
-        confirmPaymentFromPayos: (
-          paymentId: number,
-          providerAmountVnd: number,
-        ) => Promise<unknown>;
-      }>('PaymentService', {
-        strict: false,
-      });
-      await payments.confirmPaymentFromPayos(
-        intent.coursePayment.id,
-        intent.amountVnd,
+    if (intent.type === PayOSPaymentIntentType.COURSE) {
+      // Classroom tuition is retired: a historical course intent is never
+      // turned into a class Enrollment. Courses are unlocked by PRO.
+      this.logger.warn(
+        `PayOS intent ${intent.id} is a retired classroom tuition payment; not fulfilled`,
       );
     }
   }

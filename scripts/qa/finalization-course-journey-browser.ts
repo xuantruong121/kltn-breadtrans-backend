@@ -161,6 +161,11 @@ async function main() {
     waitUntil: 'networkidle',
     timeout: 90_000,
   });
+  await page
+    .getByText(/\d+ bài học · \d+ hoạt động/)
+    .first()
+    .waitFor({ timeout: 60_000 })
+    .catch(() => undefined);
   const detail = (await page.locator('main').first().innerText()).replace(
     /\s+/g,
     ' ',
@@ -187,6 +192,11 @@ async function main() {
     waitUntil: 'networkidle',
     timeout: 90_000,
   });
+  await page
+    .getByText(/bài tập 1/i)
+    .first()
+    .waitFor({ timeout: 60_000 })
+    .catch(() => undefined);
   const lessonText = (await page.locator('main').first().innerText()).replace(
     /\s+/g,
     ' ',

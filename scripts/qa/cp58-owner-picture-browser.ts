@@ -7,6 +7,9 @@
  * Usage: npx ts-node --transpile-only scripts/qa/cp58-owner-picture-browser.ts
  */
 import { chromium, type Page } from 'playwright';
+import { requireExplicitOptIn } from './qa-target-guard';
+
+requireExplicitOptIn('QA_OWNER_READONLY', 'cp58-owner-picture-browser drives the owner app (:3000/:3001, kltn_db) read-only; logins still write sessions');
 
 const FE = 'http://localhost:3000';
 const ACCOUNTS: Array<[string, string, string, number]> = [
