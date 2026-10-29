@@ -11,6 +11,8 @@
  * current Listening groups in order; any content change makes it stale and
  * the learner falls back to per-group audio.
  */
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
 import { EXAM_1_LISTENING_MASTER } from './listening-master/exam-1';
 
 export type ListeningMasterSegment = {
@@ -62,4 +64,46 @@ export function listeningMasterUrl(master: ListeningMaster): string | null {
     ''
   ).replace(/\/$/, '');
   return base ? `${base}/${master.key}` : null;
+}
+
+/**
+ * The local master is the exam's whole Listening section, so its stream is
+ * exam content. The stream URL is an <audio src> (no Authorization header):
+ * it carries a short-lived grant that getListeningMaster issues only after
+ * checking the attempt's owner and lifecycle. Format:
+ * `<examId>.<attemptId>.<userId>.<expiresAtSeconds>.<hmac>`.
+ */
+export const LISTENING_MASTER_GRANT_TTL_SECONDS = 4 * 60 * 60;
+
+const grantMac = (payload: string, secret: string) =>
+  createHmac('sha256', secret)
+    .update(`toeic-listening-master:${payload}`)
+    .digest('base64url');
+
+export function signListeningMasterGrant(
+  grant: { examId: number; attemptId: number; userId: number },
+  secret: string,
+  now = Date.now(),
+): string {
+  const expiresAt = Math.floor(now / 1000) + LISTENING_MASTER_GRANT_TTL_SECONDS;
+  const payload = `${grant.examId}.${grant.attemptId}.${grant.userId}.${expiresAt}`;
+  return `${payload}.${grantMac(payload, secret)}`;
+}
+
+/** True only for an unexpired, untampered grant issued for this exam. */
+export function verifyListeningMasterGrant(
+  token: unknown,
+  examId: number,
+  secret: string,
+  now = Date.now(),
+): boolean {
+  if (typeof token !== 'string') return false;
+  const parts = token.split('.');
+  if (parts.length !== 5 || !parts.slice(0, 4).every((p) => /^\d+$/.test(p)))
+    return false;
+  if (Number(parts[0]) !== examId) return false;
+  if (Number(parts[3]) * 1000 <= now) return false;
+  const given = Buffer.from(parts[4]);
+  const expected = Buffer.from(grantMac(parts.slice(0, 4).join('.'), secret));
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }

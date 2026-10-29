@@ -6,11 +6,31 @@
  *
  * Usage: HARNESS_DB=<clone> npx ts-node --transpile-only scripts/qa/toeic-exam-content-access-api.ts
  */
-import { call, check, failureCount, newAdmin, newStudent } from './harness-api';
+import {
+  BE,
+  call,
+  check,
+  failureCount,
+  newAdmin,
+  newStudent,
+} from './harness-api';
 
 const KEY = /"correctIndex"\s*:\s*\d|"explanation"\s*:\s*"[^"]/;
 const QUESTION = /"options"\s*:\s*\[\s*"/;
 const has = (data: unknown, re: RegExp) => re.test(JSON.stringify(data ?? ''));
+
+/** First KiB of a media path, without an Authorization header (an <audio src>). */
+async function media(path: string) {
+  const res = await fetch(`${BE}${path}`, {
+    headers: { Range: 'bytes=0-1023' },
+  });
+  const body = Buffer.from(await res.arrayBuffer());
+  return {
+    status: res.status,
+    type: res.headers.get('content-type') ?? '',
+    body,
+  };
+}
 
 async function main() {
   const a = await newStudent('toeic-a');
@@ -83,6 +103,25 @@ async function main() {
     (await call('GET', '/writing/quizzes/17', a.token)).status === 200,
   );
 
+  const listening = await call('GET', '/quizzes/1', a.token);
+  check(
+    'N Listening practice /quizzes/1 still served without keys',
+    listening.status === 200 && !has(listening.data, KEY),
+    `status ${listening.status}`,
+  );
+
+  // T3: the exam Listening master stream needs a grant.
+  for (const [label, path] of [
+    ['A guest stream without grant', '/toeic/listening-master/1/audio'],
+    [
+      'A guest stream with a forged grant',
+      '/toeic/listening-master/1/audio?grant=1.1.1.9999999999.forged',
+    ],
+  ]) {
+    const r = await media(path);
+    check(`${label} refused`, r.status === 404, `status ${r.status}`);
+  }
+
   // L&R attempt lifecycle on exam set 1.
   const start = await call('POST', '/toeic/exams/1/attempts', a.token, {
     mode: 'PRACTICE',
@@ -101,6 +140,16 @@ async function main() {
       pending.status < 300 && !has(pending.data, KEY),
       `status ${pending.status}`,
     );
+    const masterPending = await call(
+      'GET',
+      `/toeic/attempts/${attemptId}/listening/master`,
+      a.token,
+    );
+    check(
+      'C not-yet-begun attempt gets no Listening master',
+      masterPending.data?.available === false,
+      JSON.stringify(masterPending.data),
+    );
     const begin = await call(
       'POST',
       `/toeic/attempts/${attemptId}/begin`,
@@ -114,6 +163,48 @@ async function main() {
       `status ${active.status}`,
     );
     check('D active attempt receives no answer key', !has(active.data, KEY));
+    // T3: the exam's continuous Listening master.
+    const master = await call(
+      'GET',
+      `/toeic/attempts/${attemptId}/listening/master`,
+      a.token,
+    );
+    const path: string = master.data?.path ?? '';
+    check(
+      'D active attempt is offered the Listening master with a grant',
+      master.data?.available === true &&
+        /^\/toeic\/listening-master\/1\/audio\?grant=/.test(path),
+      JSON.stringify({ ...master.data, timeline: undefined }),
+    );
+    const stream = await media(path);
+    check(
+      'D granted stream plays (audio, Range)',
+      (stream.status === 206 || stream.status === 200) &&
+        stream.type.startsWith('audio/mpeg') &&
+        stream.body.length > 0,
+      `status ${stream.status} ${stream.type}`,
+    );
+    check(
+      'D audio bytes carry no answer key',
+      !KEY.test(stream.body.toString('latin1')),
+    );
+    const grant = new URL(`${BE}${path}`).searchParams.get('grant') ?? '';
+    check(
+      'I grant for exam 1 refused on another exam',
+      (await media(`/toeic/listening-master/2/audio?grant=${grant}`)).status ===
+        404,
+    );
+    const otherMaster = await call(
+      'GET',
+      `/toeic/attempts/${attemptId}/listening/master`,
+      b.token,
+    );
+    check(
+      'H another learner is refused the master grant',
+      otherMaster.status === 403,
+      `status ${otherMaster.status}`,
+    );
+
     const other = await call('GET', `/toeic/attempts/${attemptId}`, b.token);
     check(
       'H another learner cannot read the attempt',
@@ -132,6 +223,17 @@ async function main() {
       'L owner can review the submitted attempt',
       review.status === 200,
       `status ${review.status}; key shown=${has(review.data, KEY)}`,
+    );
+    const replay = await call(
+      'GET',
+      `/toeic/attempts/${attemptId}/listening/master`,
+      a.token,
+    );
+    check(
+      'L owner can replay the Listening master after submission',
+      replay.data?.available === true &&
+        (await media(replay.data.path)).status < 300,
+      JSON.stringify({ ...replay.data, timeline: undefined }),
     );
     const otherReview = await call(
       'GET',

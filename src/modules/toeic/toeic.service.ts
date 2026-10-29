@@ -20,6 +20,7 @@ import {
   ToeicAttemptSection,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { getJwtSecret } from '../auth/auth.constants';
 import { SpeakingService } from '../speaking/speaking.service';
 import { validateToeicExam } from './toeic.validation';
 import { buildToeicListeningAudioScript } from './toeic-listening-audio';
@@ -29,6 +30,7 @@ import { toeicQuestionType } from './toeic-question-type';
 import {
   listeningMasterFor,
   listeningMasterUrl,
+  signListeningMasterGrant,
   masterMatchesGroups,
 } from './toeic-listening-master';
 
@@ -657,7 +659,10 @@ export class ToeicService {
         : this.localMasterFile(attempt.examId)
           ? {
               url: null,
-              path: `/toeic/listening-master/${attempt.examId}/audio`,
+              path: `/toeic/listening-master/${attempt.examId}/audio?grant=${signListeningMasterGrant(
+                { examId: attempt.examId, attemptId, userId },
+                getJwtSecret(),
+              )}`,
             }
           : null;
     if (!source) return { available: false as const, reason: 'NOT_PUBLISHED' };

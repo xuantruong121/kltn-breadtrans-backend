@@ -12,9 +12,16 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { AttemptMode, Role } from '@prisma/client';
 import { ToeicService } from './toeic.service';
+import { verifyListeningMasterGrant } from './toeic-listening-master';
+import { getJwtSecret } from '../auth/auth.constants';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { StartAttemptDto } from './dto/start-attempt.dto';
@@ -175,20 +182,32 @@ export class ToeicController {
       'Bản ghi Listening liền mạch dựng sẵn trên máy (dùng khi chưa publish lên R2; hỗ trợ Range)',
   })
   @ApiResponse({ status: 200, description: 'audio/mpeg' })
-  @ApiResponse({ status: 404, description: 'Không có bản dựng khớp registry' })
+  @ApiQuery({
+    name: 'grant',
+    description:
+      'Quyền nghe ngắn hạn do GET /toeic/attempts/:id/listening/master cấp',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không có bản dựng khớp registry, hoặc thiếu/sai quyền nghe',
+  })
   getLocalListeningMaster(
     @Param('examId', ParseIntPipe) examId: number,
+    @Query('grant') grant: string | undefined,
     @Res() res: Response,
   ) {
-    // Same Listening media the exam already serves publicly; the file is used
-    // only when its sha256 matches the registry entry.
-    const file = this.toeicService.localMasterFile(examId);
+    // The whole Listening section of the exam: streamed only with a grant
+    // issued for the learner's own active or submitted attempt. The file is
+    // used only when its sha256 matches the registry entry.
+    const file = verifyListeningMasterGrant(grant, examId, getJwtSecret())
+      ? this.toeicService.localMasterFile(examId)
+      : null;
     if (!file) {
       res.status(404).json({ statusCode: 404, message: 'Not found' });
       return;
     }
     res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
     res.sendFile(file, { acceptRanges: true });
   }
 
