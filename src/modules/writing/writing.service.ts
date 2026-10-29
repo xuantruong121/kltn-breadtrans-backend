@@ -708,9 +708,10 @@ export class WritingService {
     };
   }
 
+  /** The caller's own submissions for one exercise; never other learners'. */
   async getCommunitySubmissions(
     quizId: number,
-    userId?: number,
+    userId: number,
     role?: import('@prisma/client').Role,
   ) {
     const quiz = await this.prisma.quiz.findUnique({
@@ -734,22 +735,13 @@ export class WritingService {
     }
     await this.assertWritingAccess(quiz, userId, role);
     const submissions = await this.prisma.submission.findMany({
-      where: { quizId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            profile: { select: { fullName: true } },
-          },
-        },
-        results: true,
-      },
-      orderBy: { score: 'desc' },
+      where: { quizId, userId },
+      include: { results: true },
+      orderBy: { submittedAt: 'desc' },
     });
 
     return submissions.map((sub) => ({
       id: sub.id,
-      user: sub.user.profile?.fullName || 'Học viên',
       score: sub.score,
       answer: sub.results[0]?.answer,
       feedback: sub.aiFeedback,
