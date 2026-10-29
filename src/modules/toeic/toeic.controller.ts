@@ -11,7 +11,8 @@ import {
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+import { Readable, pipeline } from 'node:stream';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -20,8 +21,6 @@ import {
 } from '@nestjs/swagger';
 import { AttemptMode, Role } from '@prisma/client';
 import { ToeicService } from './toeic.service';
-import { verifyListeningMasterGrant } from './toeic-listening-master';
-import { getJwtSecret } from '../auth/auth.constants';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { StartAttemptDto } from './dto/start-attempt.dto';
@@ -179,7 +178,7 @@ export class ToeicController {
   @Get('listening-master/:examId/audio')
   @ApiOperation({
     summary:
-      'Bản ghi Listening liền mạch dựng sẵn trên máy (dùng khi chưa publish lên R2; hỗ trợ Range)',
+      'Bản ghi Listening liền mạch của lượt thi (bản dựng trên máy hoặc bản đã publish, qua backend; hỗ trợ Range)',
   })
   @ApiResponse({ status: 200, description: 'audio/mpeg' })
   @ApiQuery({
@@ -191,24 +190,52 @@ export class ToeicController {
     status: 404,
     description: 'Không có bản dựng khớp registry, hoặc thiếu/sai quyền nghe',
   })
-  getLocalListeningMaster(
+  async getLocalListeningMaster(
     @Param('examId', ParseIntPipe) examId: number,
     @Query('grant') grant: string | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     // The whole Listening section of the exam: streamed only with a grant
-    // issued for the learner's own active or submitted attempt. The file is
-    // used only when its sha256 matches the registry entry.
-    const file = verifyListeningMasterGrant(grant, examId, getJwtSecret())
-      ? this.toeicService.localMasterFile(examId)
-      : null;
-    if (!file) {
+    // for an attempt that still allows playback (checked on every request).
+    // The local file is used only when its sha256 matches the registry.
+    const source = await this.toeicService.resolveListeningMasterStream(
+      examId,
+      grant,
+    );
+    if (!source) {
       res.status(404).json({ statusCode: 404, message: 'Not found' });
       return;
     }
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    res.sendFile(file, { acceptRanges: true });
+    if ('file' in source) {
+      res.sendFile(source.file, { acceptRanges: true });
+      return;
+    }
+    // Published object: proxied so the storage URL never reaches the
+    // learner. Only a plain byte range is forwarded.
+    const range = /^bytes=\d*-\d*$/.test(req.headers.range ?? '')
+      ? req.headers.range!
+      : undefined;
+    const upstream = await fetch(source.url, {
+      headers: range ? { Range: range } : {},
+    }).catch(() => null);
+    if (
+      !upstream?.body ||
+      (upstream.status !== 200 && upstream.status !== 206)
+    ) {
+      res.status(404).json({ statusCode: 404, message: 'Not found' });
+      return;
+    }
+    res.status(upstream.status);
+    res.setHeader('Accept-Ranges', 'bytes');
+    for (const header of ['content-length', 'content-range'])
+      if (upstream.headers.get(header))
+        res.setHeader(header, upstream.headers.get(header)!);
+    // pipeline also aborts the upstream read when the player disconnects
+    // (every seek does).
+    pipeline(Readable.fromWeb(upstream.body as any), res, () => undefined);
   }
 
   @Get('attempts/:id/listening/master')

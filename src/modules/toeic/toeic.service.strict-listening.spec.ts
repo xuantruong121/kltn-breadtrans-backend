@@ -56,16 +56,20 @@ describe('ToeicService — strict Listening runtime', () => {
     service = new ToeicService(prisma, {} as any);
   });
 
-  it('manifest only exposes audioUrl for the current listeningPosition segment', async () => {
+  it('manifest exposes only the current segment, through the guarded proxy', async () => {
     prisma.toeicAttempt.findUnique.mockResolvedValue(
       baseAttempt({ listeningPosition: 1 }),
     );
 
     const manifest = await service.getListeningManifest(1, 7);
 
-    expect(manifest.segments[0].audioUrl).toBeNull(); // past segment
-    expect(manifest.segments[1].audioUrl).toBe('https://audio/102.mp3'); // current
-    expect(manifest.segments[2].audioUrl).toBeNull(); // future segment
+    expect(manifest.segments[0].audioPath).toBeNull(); // past segment
+    expect(manifest.segments[1].audioPath).toBe(
+      '/toeic/groups/102/audio?attemptId=1',
+    ); // current
+    expect(manifest.segments[2].audioPath).toBeNull(); // future segment
+    // The storage URL of a clip never reaches the learner.
+    expect(JSON.stringify(manifest)).not.toContain('https://audio/');
   });
 
   it('advanceListening moves the cursor forward by exactly one', async () => {

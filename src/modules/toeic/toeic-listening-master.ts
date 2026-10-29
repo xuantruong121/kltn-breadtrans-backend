@@ -90,6 +90,30 @@ export function signListeningMasterGrant(
   return `${payload}.${grantMac(payload, secret)}`;
 }
 
+/**
+ * The grant's attempt and user when it is unexpired, untampered and issued
+ * for this exam; otherwise null. The grant is a capability (whoever holds the
+ * URL can use it until it expires); the stream route re-checks the attempt.
+ */
+export function readListeningMasterGrant(
+  token: unknown,
+  examId: number,
+  secret: string,
+  now = Date.now(),
+): { attemptId: number; userId: number } | null {
+  if (typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 5 || !parts.slice(0, 4).every((p) => /^\d+$/.test(p)))
+    return null;
+  if (Number(parts[0]) !== examId) return null;
+  if (Number(parts[3]) * 1000 <= now) return null;
+  const given = Buffer.from(parts[4]);
+  const expected = Buffer.from(grantMac(parts.slice(0, 4).join('.'), secret));
+  if (given.length !== expected.length || !timingSafeEqual(given, expected))
+    return null;
+  return { attemptId: Number(parts[1]), userId: Number(parts[2]) };
+}
+
 /** True only for an unexpired, untampered grant issued for this exam. */
 export function verifyListeningMasterGrant(
   token: unknown,
@@ -97,13 +121,5 @@ export function verifyListeningMasterGrant(
   secret: string,
   now = Date.now(),
 ): boolean {
-  if (typeof token !== 'string') return false;
-  const parts = token.split('.');
-  if (parts.length !== 5 || !parts.slice(0, 4).every((p) => /^\d+$/.test(p)))
-    return false;
-  if (Number(parts[0]) !== examId) return false;
-  if (Number(parts[3]) * 1000 <= now) return false;
-  const given = Buffer.from(parts[4]);
-  const expected = Buffer.from(grantMac(parts.slice(0, 4).join('.'), secret));
-  return given.length === expected.length && timingSafeEqual(given, expected);
+  return readListeningMasterGrant(token, examId, secret, now) !== null;
 }

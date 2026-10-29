@@ -18,6 +18,12 @@ import {
 const KEY = /"correctIndex"\s*:\s*\d|"explanation"\s*:\s*"[^"]/;
 const QUESTION = /"options"\s*:\s*\[\s*"/;
 const has = (data: unknown, re: RegExp) => re.test(JSON.stringify(data ?? ''));
+/**
+ * A clip or master audio storage URL (public bucket or the harness fake).
+ * Group images (Part 1 photos) are still public URLs: out of this check.
+ */
+const STORAGE_URL =
+  /"audioUrl"|https?:\/\/[^"]*\.mp3|toeic\/exams\/\d+\/groups/;
 
 /** First KiB of a media path, without an Authorization header (an <audio src>). */
 async function media(path: string) {
@@ -35,6 +41,7 @@ async function media(path: string) {
 async function main() {
   const a = await newStudent('toeic-a');
   const b = await newStudent('toeic-b');
+  const c = await newStudent('toeic-c');
   const admin = await newAdmin('toeic-admin');
 
   // Catalog: metadata only, for everyone.
@@ -125,7 +132,7 @@ async function main() {
   // L&R attempt lifecycle on exam set 1.
   const start = await call('POST', '/toeic/exams/1/attempts', a.token, {
     mode: 'PRACTICE',
-    parts: [5],
+    parts: [1, 5],
   });
   check(
     'C learner can start an attempt',
@@ -163,6 +170,37 @@ async function main() {
       `status ${active.status}`,
     );
     check('D active attempt receives no answer key', !has(active.data, KEY));
+    check(
+      'D active attempt carries no clip storage URL',
+      !has(active.data, STORAGE_URL),
+    );
+    // Clips play through the guarded proxy.
+    const part1 = (active.data?.exam?.groups ?? []).find(
+      (g: any) => g.part === 1,
+    );
+    const clipPath = `/toeic/groups/${part1?.id}/audio?attemptId=${attemptId}`;
+    const clip = await fetch(`${BE}${clipPath}`, {
+      headers: { Authorization: `Bearer ${a.token}` },
+    });
+    check(
+      'D owner plays a clip through the proxy',
+      clip.status === 200 &&
+        (clip.headers.get('content-type') ?? '').startsWith('audio/mpeg'),
+      `status ${clip.status}`,
+    );
+    await clip.arrayBuffer();
+    check(
+      'H another learner is refused the clip',
+      (
+        await fetch(`${BE}${clipPath}`, {
+          headers: { Authorization: `Bearer ${b.token}` },
+        })
+      ).status === 403,
+    );
+    check(
+      'A guest is refused the clip',
+      (await fetch(`${BE}${clipPath}`)).status === 401,
+    );
     // T3: the exam's continuous Listening master.
     const master = await call(
       'GET',
@@ -175,6 +213,11 @@ async function main() {
       master.data?.available === true &&
         /^\/toeic\/listening-master\/1\/audio\?grant=/.test(path),
       JSON.stringify({ ...master.data, timeline: undefined }),
+    );
+    check(
+      'D master response carries no storage URL',
+      master.data?.url === null &&
+        !has({ ...master.data, timeline: undefined }, /https?:\/\//),
     );
     const stream = await media(path);
     check(
@@ -193,6 +236,11 @@ async function main() {
       'I grant for exam 1 refused on another exam',
       (await media(`/toeic/listening-master/2/audio?grant=${grant}`)).status ===
         404,
+    );
+    // A grant is a capability: whoever holds the URL can use it while the
+    // attempt still allows playback. Recorded, not asserted.
+    console.log(
+      `INFO  learner B replaying A's grant URL without auth -> ${(await media(path)).status}`,
     );
     const otherMaster = await call(
       'GET',
@@ -244,6 +292,59 @@ async function main() {
       'H another learner cannot read the submitted attempt',
       otherReview.status === 403,
       `status ${otherReview.status}`,
+    );
+  }
+
+  // Full Test: strict manifest and grant revocation on cancel.
+  const full = await call('POST', '/toeic/exams/1/attempts', c.token, {
+    mode: 'FULL_TEST',
+  });
+  const fullId = full.data?.id ?? full.data?.attemptId;
+  check('C full test can start', !!fullId, `status ${full.status}`);
+  if (fullId) {
+    await call('POST', `/toeic/attempts/${fullId}/begin`, c.token);
+    const manifest = await call(
+      'GET',
+      `/toeic/attempts/${fullId}/listening/manifest`,
+      c.token,
+    );
+    const segments: any[] = manifest.data?.segments ?? [];
+    check(
+      'D manifest offers only the current segment, through the proxy',
+      manifest.status === 200 &&
+        segments.filter((s) => s.audioPath).length === 1 &&
+        /^\/toeic\/groups\/\d+\/audio\?attemptId=\d+$/.test(
+          segments[manifest.data.listeningPosition]?.audioPath ?? '',
+        ),
+      JSON.stringify(segments.slice(0, 2)),
+    );
+    check(
+      'D manifest carries no clip storage URL',
+      !has(manifest.data, STORAGE_URL),
+    );
+    check(
+      'H another learner is refused the manifest',
+      (
+        await call(
+          'GET',
+          `/toeic/attempts/${fullId}/listening/manifest`,
+          b.token,
+        )
+      ).status === 403,
+    );
+    const fullMaster = await call(
+      'GET',
+      `/toeic/attempts/${fullId}/listening/master`,
+      c.token,
+    );
+    const fullPath: string = fullMaster.data?.path ?? '';
+    const before = fullPath ? (await media(fullPath)).status : 0;
+    await call('POST', `/toeic/attempts/${fullId}/cancel`, c.token);
+    const after = fullPath ? (await media(fullPath)).status : 0;
+    check(
+      'E/F grant stops working once the attempt is cancelled',
+      before === 206 && after === 404,
+      `before ${before} after ${after} (${JSON.stringify(fullMaster.data?.reason ?? null)})`,
     );
   }
 

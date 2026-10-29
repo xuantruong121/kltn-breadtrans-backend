@@ -30,6 +30,7 @@ import { toeicQuestionType } from './toeic-question-type';
 import {
   listeningMasterFor,
   listeningMasterUrl,
+  readListeningMasterGrant,
   signListeningMasterGrant,
   masterMatchesGroups,
 } from './toeic-listening-master';
@@ -650,28 +651,58 @@ export class ToeicService {
     const groupIds = await this.getListeningManifestGroupIds(attempt.examId);
     if (!masterMatchesGroups(master, groupIds))
       return { available: false as const, reason: 'STALE' };
-    const url = listeningMasterUrl(master);
-    // Published object first; otherwise the verified local build (local
-    // development before the owner approves publishing to R2).
-    const source =
-      url && (await this.isPublished(url))
-        ? { url, path: null }
-        : this.localMasterFile(attempt.examId)
-          ? {
-              url: null,
-              path: `/toeic/listening-master/${attempt.examId}/audio?grant=${signListeningMasterGrant(
-                { examId: attempt.examId, attemptId, userId },
-                getJwtSecret(),
-              )}`,
-            }
-          : null;
-    if (!source) return { available: false as const, reason: 'NOT_PUBLISHED' };
+    // The learner always gets the API stream path, never the storage URL:
+    // the stream route re-checks the attempt and serves the verified local
+    // build or, failing that, the published object through the backend.
+    if (!(await this.listeningMasterSource(attempt.examId)))
+      return { available: false as const, reason: 'NOT_PUBLISHED' };
     return {
       available: true as const,
-      ...source,
+      url: null,
+      path: `/toeic/listening-master/${attempt.examId}/audio?grant=${signListeningMasterGrant(
+        { examId: attempt.examId, attemptId, userId },
+        getJwtSecret(),
+      )}`,
       durationSeconds: master.durationSeconds,
       timeline: master.timeline,
     };
+  }
+
+  /** Verified local build first, then the published object; null if neither. */
+  private async listeningMasterSource(
+    examId: number,
+  ): Promise<{ file: string } | { url: string } | null> {
+    const file = this.localMasterFile(examId);
+    if (file) return { file };
+    const master = listeningMasterFor(examId);
+    const url = master ? listeningMasterUrl(master) : null;
+    return url && (await this.isPublished(url)) ? { url } : null;
+  }
+
+  /**
+   * Source for GET /toeic/listening-master/:examId/audio. The grant must be
+   * valid for this exam, and on every request (each Range read) the attempt
+   * must still belong to the grant's user, be on this exam and be in a state
+   * that may play the master: in progress (not legacy strict) or submitted.
+   */
+  async resolveListeningMasterStream(examId: number, grant: unknown) {
+    const claim = readListeningMasterGrant(grant, examId, getJwtSecret());
+    if (!claim) return null;
+    const attempt = await this.prisma.toeicAttempt.findUnique({
+      where: { id: claim.attemptId },
+      select: { userId: true, examId: true, status: true, section: true },
+    });
+    const playable =
+      attempt?.status === AttemptStatus.SUBMITTED ||
+      (attempt?.status === AttemptStatus.IN_PROGRESS && !attempt.section);
+    if (
+      !attempt ||
+      attempt.userId !== claim.userId ||
+      attempt.examId !== examId ||
+      !playable
+    )
+      return null;
+    return this.listeningMasterSource(examId);
   }
 
   private readonly localMasterCache = new Map<number, string | null>();
@@ -742,11 +773,16 @@ export class ToeicService {
       section: attempt.section,
       listeningPosition: attempt.listeningPosition,
       totalSegments: groups.length,
+      // Only the current segment is playable, through the guarded proxy;
+      // the storage URL of a clip is never sent to the learner.
       segments: groups.map((group, index) => ({
         groupId: group.id,
         part: group.part,
         groupOrder: group.groupOrder,
-        audioUrl: index === attempt.listeningPosition ? group.audioUrl : null,
+        audioPath:
+          index === attempt.listeningPosition && group.audioUrl
+            ? `/toeic/groups/${group.id}/audio?attemptId=${attemptId}`
+            : null,
       })),
     };
   }
@@ -854,7 +890,6 @@ export class ToeicService {
                 examId: true,
                 part: true,
                 canonicalAccent: true,
-                audioUrl: true,
                 imageUrl: true,
                 passageText: true,
                 groupOrder: true,
