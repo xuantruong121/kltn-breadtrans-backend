@@ -53,6 +53,12 @@ const GENERAL_WRITING_TYPES: QuizType[] = [
  * them is still restricted by assertExamInternalWritingAccess.
  */
 const PRACTICE_GRADE_ATTEMPTS = 2;
+/**
+ * Practice grading deadline. A timeout is ambiguous (the provider may still
+ * finish and bill the request), so it ends the grading instead of trying
+ * another key; the learner's text is not stored and they may submit again.
+ */
+const PRACTICE_GRADE_TIMEOUT_MS = 60_000;
 
 function isWritingQuiz(quiz: {
   type: QuizType;
@@ -887,6 +893,8 @@ export class WritingService {
             prompt: request.prompt,
             responseSchema: request.responseSchema,
             temperature: 0.2,
+            timeoutMs: PRACTICE_GRADE_TIMEOUT_MS,
+            failoverOnTimeout: false,
           });
           let parsed: unknown;
           try {

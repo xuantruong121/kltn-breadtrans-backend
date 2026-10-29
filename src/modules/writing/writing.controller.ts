@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Header,
   Post,
   Param,
   ParseIntPipe,
@@ -81,8 +82,10 @@ export class WritingController {
     return this.writingService.getTopics(req?.user?.id, req?.user?.role);
   }
 
+  // Signed-in responses carry the learner's own progress: never cache them.
   @Get('quizzes/:id')
   @UseGuards(OptionalJwtAuthGuard)
+  @Header('Cache-Control', 'private, no-store')
   @ApiOperation({ summary: 'Lấy chi tiết 1 bài tập Writing Part 1' })
   getQuizDetails(
     @Param('id', ParseIntPipe) id: number,
@@ -108,6 +111,7 @@ export class WritingController {
   // to anyone, signed in or not.
   @Get('quizzes/:id/community')
   @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'private, no-store')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy các bài nộp của chính học viên cho 1 bài tập' })
   getCommunitySubmissions(

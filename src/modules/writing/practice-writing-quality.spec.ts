@@ -6,6 +6,7 @@
 import {
   buildPracticeWritingRequest,
   lengthBand,
+  lengthCapApplies,
   practiceWritingTask,
   validatePracticeWritingResult,
 } from './practice-writing-grading';
@@ -99,25 +100,20 @@ describe('Writing practice grading quality (deterministic rules)', () => {
     expect(r.ok && r.value.relevance?.verdict).toBe('PARTIAL');
   });
 
-  it('E. far too short: task criterion capped at half; slightly short is left to the grader', () => {
-    expect(lengthBand(30, [100, 140])).toBe('FAR_BELOW');
-    expect(lengthBand(80, [100, 140])).toBe('BELOW');
-    const short = words(30);
-    const r = grade(reply([2, 2, 2, 4]), short);
+  it('E. far too short: the total is capped at 5/10; criterion scores stay as graded', () => {
+    const r = grade(reply([2, 2, 2, 4]), words(30));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    const task = r.value.criteria.find((c) => c.key === 'taskAchievement')!;
-    expect(task.score).toBe(2);
-    expect(task.comment).toMatch(/^Bài chỉ có 30 từ/);
+    expect(r.value.criteria.map((c) => c.score)).toEqual([2, 2, 2, 4]);
+    expect(r.value.score).toBe(5);
     expect(r.value.scoreAdjustment).toEqual({
       reason: 'TOO_SHORT',
       providerScore: 10,
-      cap: 8,
+      cap: 5,
     });
-    expect(
-      grade(reply([2, 2, 2, 4]), words(80)).ok &&
-        grade(reply([2, 2, 2, 4]), words(80)),
-    ).toMatchObject({ value: { score: 10 } });
+    expect(r.value.feedback).toMatch(
+      /^Bài viết chỉ có 30 từ, ít hơn nhiều so với yêu cầu tối thiểu 100 từ, nên tổng điểm tối đa là 5\/10\./,
+    );
   });
 
   it('F. an overlong answer is not capped; the grader is told length is never a language error', () => {
@@ -168,5 +164,127 @@ describe('Writing practice grading quality (deterministic rules)', () => {
     expect(request.responseSchema.required).toEqual(
       expect.arrayContaining(['taskRelevance', 'relevanceEvidence']),
     );
+  });
+});
+
+describe('FAR_BELOW boundaries (minimum 60 words: two thirds = 40)', () => {
+  const task60 = practiceWritingTask(
+    {
+      taskType: 'EMAIL',
+      prompt: 'Viết email 60–90 từ.',
+      wordRange: [60, 90],
+      rubric: {
+        grammar: 2,
+        vocabulary: 2,
+        organization: 2,
+        taskAchievement: 4,
+      },
+    },
+    'fallback',
+  )!;
+  const score = (
+    n: number,
+    raw: [number, number, number, number] = [2, 2, 2, 4],
+    relevance = 'ON_TASK',
+  ) => {
+    const text = n ? words(n) : '';
+    const r = validatePracticeWritingResult(
+      reply(raw, relevance),
+      task60,
+      text,
+      buildPracticeWritingRequest(task60, text).facts,
+    );
+    if (!r.ok) throw new Error(r.reason);
+    return r.value;
+  };
+
+  it('classifies around two thirds and the range exactly', () => {
+    expect(lengthBand(39, [60, 90])).toBe('FAR_BELOW');
+    expect(lengthBand(40, [60, 90])).toBe('BELOW');
+    expect(lengthBand(41, [60, 90])).toBe('BELOW');
+    expect(lengthBand(60, [60, 90])).toBe('WITHIN');
+    expect(lengthBand(91, [60, 90])).toBe('ABOVE');
+    expect(lengthBand(0, [60, 90])).toBe('FAR_BELOW');
+    // A minimum of 100: 66 is below two thirds (66.67), 67 is not.
+    expect(lengthBand(66, [100, 140])).toBe('FAR_BELOW');
+    expect(lengthBand(67, [100, 140])).toBe('BELOW');
+  });
+
+  it('just below two thirds is capped; exactly and just above are not', () => {
+    expect(score(39).score).toBe(5);
+    expect(score(40).score).toBe(10);
+    expect(score(41).score).toBe(10);
+  });
+
+  it('exactly the minimum and above the maximum are not capped', () => {
+    expect(score(60).score).toBe(10);
+    expect(score(120).score).toBe(10);
+    expect(score(120).scoreAdjustment).toBeUndefined();
+  });
+
+  it('zero words: the cap applies at the grading layer (the API refuses an empty answer earlier)', () => {
+    expect(score(0).score).toBe(5);
+  });
+
+  it('a raw score already under the cap is kept and records no adjustment', () => {
+    const v = score(20, [1, 1, 1, 1]);
+    expect(v.score).toBe(4);
+    expect(v.scoreAdjustment).toBeUndefined();
+  });
+
+  it('a raw score above the cap is lowered to exactly 5', () => {
+    expect(score(20, [2, 2, 1, 3]).score).toBe(5);
+  });
+
+  it('OFF_TOPIC and FAR_BELOW together: the lower cap (4) wins and nothing is added', () => {
+    const v = score(20, [2, 2, 2, 3], 'OFF_TOPIC');
+    expect(v.score).toBe(4);
+    expect(v.scoreAdjustment?.reason).toBe('OFF_TOPIC');
+    expect(v.feedback).toMatch(/^Bài viết chưa đúng yêu cầu của đề/);
+  });
+
+  it('tasks without a meaningful minimum are never length-capped', () => {
+    const sentence = practiceWritingTask(
+      {
+        taskType: 'SENTENCE',
+        prompt: 'meeting / tomorrow',
+        requiredKeywords: ['meeting', 'tomorrow'],
+        rubric: { grammar: 4, naturalness: 2, taskCompletion: 4 },
+      },
+      'fallback',
+    )!;
+    expect(lengthCapApplies(sentence)).toBe(false);
+    const picture = practiceWritingTask(
+      {
+        taskType: 'PICTURE_SENTENCE',
+        prompt: 'p',
+        wordRange: [1, 40],
+        rubric: { grammar: 4, vocabulary: 2, taskCompletion: 4 },
+      },
+      'fallback',
+    )!;
+    expect(lengthCapApplies(picture)).toBe(false);
+    expect(lengthCapApplies(task60)).toBe(true);
+    // A valid very short keyword sentence keeps its full score.
+    const text = 'The meeting is tomorrow.';
+    const r = validatePracticeWritingResult(
+      {
+        criteria: [
+          { key: 'grammar', score: 4, comment: 'Câu đúng ngữ pháp.' },
+          { key: 'naturalness', score: 2, comment: 'Câu tự nhiên.' },
+          { key: 'taskCompletion', score: 4, comment: 'Dùng đủ hai từ.' },
+        ],
+        strengths: ['Ngắn gọn.'],
+        corrections: [],
+        feedback: 'Câu đúng và đủ yêu cầu của đề.',
+        suggestions: [],
+        taskRelevance: 'ON_TASK',
+        relevanceEvidence: 'Câu dùng cả meeting và tomorrow.',
+      },
+      sentence,
+      text,
+      buildPracticeWritingRequest(sentence, text).facts,
+    );
+    expect(r.ok && r.value.score).toBe(10);
   });
 });

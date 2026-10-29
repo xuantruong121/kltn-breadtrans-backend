@@ -176,11 +176,28 @@ export function taskCriterionKey(rubric: PracticeCriterion[]): string | null {
 }
 
 /**
- * Length against the authored range. FAR_BELOW is under two thirds of the
- * minimum: such a text cannot cover the task, so its task criterion is capped
- * at half (deterministic, not left to the grader). Over the range is never
- * capped: a longer answer is judged on what it says.
+ * Length against the authored range. FAR_BELOW is strictly under two thirds
+ * of the minimum (words * 3 < min * 2): such a text cannot cover the task, so
+ * eligible tasks have their total capped (FAR_BELOW_TOTAL_CAP_RATIO). Over
+ * the range is never capped: a longer answer is judged on what it says.
  */
+/** Owner policy: a far-too-short answer scores at most 50 % (5/10). */
+export const FAR_BELOW_TOTAL_CAP_RATIO = 0.5;
+/** Below this minimum a word range is a guideline, not a length requirement. */
+export const MEANINGFUL_MINIMUM_WORDS = 10;
+
+/**
+ * The length cap applies to tasks with a meaningful minimum length. Picture
+ * sentences (1-40 words) and keyword sentences (no range) are excluded.
+ */
+export function lengthCapApplies(task: PracticeWritingTask): boolean {
+  return (
+    !!task.wordRange &&
+    task.wordRange[0] >= MEANINGFUL_MINIMUM_WORDS &&
+    task.taskType !== PICTURE_SENTENCE
+  );
+}
+
 export type LengthBand =
   'NO_RANGE' | 'FAR_BELOW' | 'BELOW' | 'WITHIN' | 'ABOVE';
 export function lengthBand(
@@ -188,7 +205,7 @@ export function lengthBand(
   range: [number, number] | null,
 ): LengthBand {
   if (!range) return 'NO_RANGE';
-  if (words < Math.ceil((range[0] * 2) / 3)) return 'FAR_BELOW';
+  if (words * 3 < range[0] * 2) return 'FAR_BELOW';
   if (words < range[0]) return 'BELOW';
   return words > range[1] ? 'ABOVE' : 'WITHIN';
 }
@@ -383,10 +400,12 @@ export function buildPracticeWritingRequest(
     'Do not invent mistakes. If the response is correct, return no corrections.',
     'Every correction must quote the learner text EXACTLY in "original" (a short span copied character for character), give the corrected span, and explain in Vietnamese why.',
     'All comments, explanations, strengths and suggestions are in Vietnamese with full diacritics (never unaccented), specific to this response.',
+    'Write short, natural, grammatical Vietnamese for a learner: one idea per sentence, everyday words, numbers written so they cannot be misread (for example "hai khung giờ", not "hai mươi giờ").',
+    'Each comment must agree with its score: a criterion with full marks is not described as weak, and a low score names the concrete problem. Never contradict facts.wordCount or facts.keywords.',
     'Criteria: grammar = grammatical accuracy only; vocabulary/naturalness = word choice and natural phrasing; organization = clear order, opening and closing; taskAchievement/taskCompletion = covering every requirement in a way that fits the situation and register.',
     'Penalise each mistake under ONE criterion only: a grammar error is not also a vocabulary or organization error.',
     'The sample response only shows the expected scope and register. Never reward or penalise similarity to it: different ideas, details, names, structure or style that meet every requirement deserve full task marks.',
-    'facts.length compares the word count with task.wordRange: FAR_BELOW is enforced by the server; BELOW may cost at most one task point; ABOVE is not penalised unless the extra text breaks focus. Length is never a grammar or vocabulary error.',
+    'facts.length compares the word count with task.wordRange. FAR_BELOW: the server caps the total at half, so score every criterion only on what is actually written and do not lower grammar, vocabulary or organization for shortness. BELOW may cost at most one task point. ABOVE is not penalised unless the extra text breaks focus. Length is never a grammar or vocabulary error.',
     ...(task.picture
       ? [
           'This task is about a picture. You cannot see the picture: task.picture is an authored description of it; treat it as the truth about the image.',
@@ -652,26 +671,21 @@ export function validatePracticeWritingResult(
         };
     }
   }
-  // A text under two thirds of the minimum cannot cover the task: its task
-  // criterion is capped at half, whatever the grader said.
-  if (facts.length === 'FAR_BELOW' && taskKey && task.wordRange) {
-    const before = total(finalCriteria);
-    finalCriteria = finalCriteria.map((c) => {
-      const half = Math.floor(c.max / 2);
-      return c.key === taskKey && c.score > half
-        ? {
-            ...c,
-            score: half,
-            comment: `Bài chỉ có ${facts.wordCount} từ, ít hơn nhiều so với yêu cầu ${task.wordRange![0]}–${task.wordRange![1]} từ, nên mục này tối đa ${half}/${c.max}. ${c.comment}`,
-          }
-        : c;
-    });
-    if (!scoreAdjustment && before > total(finalCriteria))
+  // A text strictly under two thirds of the minimum cannot cover the task:
+  // the total is capped at half, whatever the grader said. Criterion scores
+  // stay as graded; when the off-topic cap is lower, it wins (caps never add).
+  let score = total(finalCriteria);
+  const lengthCap = Math.floor(maxTotal * FAR_BELOW_TOTAL_CAP_RATIO);
+  const tooShort =
+    facts.length === 'FAR_BELOW' && lengthCapApplies(task) && score > lengthCap;
+  if (tooShort) {
+    if (!scoreAdjustment)
       scoreAdjustment = {
         reason: 'TOO_SHORT',
-        providerScore: before,
-        cap: total(finalCriteria),
+        providerScore: score,
+        cap: lengthCap,
       };
+    score = lengthCap;
   }
   if (typeof r.feedback !== 'string' || r.feedback.trim().length < 10)
     return { ok: false, reason: 'FEEDBACK_MISSING' };
@@ -712,7 +726,7 @@ export function validatePracticeWritingResult(
     ok: true,
     value: {
       rubricVersion: PRACTICE_WRITING_RUBRIC_VERSION,
-      score: finalCriteria.reduce((n, c) => n + c.score, 0),
+      score,
       maxScore: task.rubric.reduce((n, c) => n + c.max, 0),
       criteria: finalCriteria,
       strengths,
@@ -722,7 +736,9 @@ export function validatePracticeWritingResult(
           ? `Câu trả lời chưa mô tả đúng bức tranh nên điểm tối đa là ${Math.floor(maxTotal * SCENE_MISMATCH_CAP_RATIO)}/${maxTotal}. ${scene.evidence} ${r.feedback.trim()}`
           : relevance?.verdict === 'OFF_TOPIC' && taskKey
             ? `Bài viết chưa đúng yêu cầu của đề nên điểm tối đa là ${Math.floor(maxTotal * SCENE_MISMATCH_CAP_RATIO)}/${maxTotal}. ${relevance.evidence} ${r.feedback.trim()}`
-            : r.feedback.trim(),
+            : tooShort
+              ? `Bài viết chỉ có ${facts.wordCount} từ, ít hơn nhiều so với yêu cầu tối thiểu ${task.wordRange![0]} từ, nên tổng điểm tối đa là ${lengthCap}/${maxTotal}. Điểm từng tiêu chí vẫn giữ như khi chấm. ${r.feedback.trim()}`
+              : r.feedback.trim(),
       suggestions,
       wordCount: facts.wordCount,
       wordRange: task.wordRange,

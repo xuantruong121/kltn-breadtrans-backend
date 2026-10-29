@@ -267,10 +267,11 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
   }
 
   private async executeWithRotation<T>(
-    operation: (model: GenerativeModel) => Promise<T>,
+    operation: (model: GenerativeModel, signal: AbortSignal) => Promise<T>,
     taskType = AiTaskType.TEXT_AUTHORING,
+    policy: { timeoutMs?: number; failoverOnTimeout?: boolean } = {},
   ): Promise<T> {
-    return this.credentials.execute({ taskType, operation });
+    return this.credentials.execute({ taskType, operation, ...policy });
   }
 
   async generateFeedback(
@@ -314,6 +315,9 @@ Hãy đưa ra nhận xét chi tiết HOÀN TOÀN BẰNG TIẾNG VIỆT với gi�
     prompt: string;
     responseSchema: unknown;
     temperature?: number;
+    /** Per-call deadline and timeout policy; defaults keep the shared behaviour. */
+    timeoutMs?: number;
+    failoverOnTimeout?: boolean;
   }): Promise<{ text: string; model: string }> {
     if (!this.hasKeys()) {
       const error = new Error('Gemini credentials are not configured');
@@ -321,18 +325,28 @@ Hãy đưa ra nhận xét chi tiết HOÀN TOÀN BẰNG TIẾNG VIỆT với gi�
       throw error;
     }
     let modelName = 'unknown';
-    const result = await this.executeWithRotation((model) => {
-      modelName = model.model;
-      return model.generateContent({
-        systemInstruction: input.systemInstruction,
-        contents: [{ role: 'user', parts: [{ text: input.prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: input.responseSchema as never,
-          temperature: input.temperature ?? 0.2,
-        },
-      });
-    }, AiTaskType.STRUCTURED_AUTHORING);
+    const result = await this.executeWithRotation(
+      (model, signal) => {
+        modelName = model.model;
+        return model.generateContent(
+          {
+            systemInstruction: input.systemInstruction,
+            contents: [{ role: 'user', parts: [{ text: input.prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: input.responseSchema as never,
+              temperature: input.temperature ?? 0.2,
+            },
+          },
+          { signal },
+        );
+      },
+      AiTaskType.STRUCTURED_AUTHORING,
+      {
+        timeoutMs: input.timeoutMs,
+        failoverOnTimeout: input.failoverOnTimeout,
+      },
+    );
     await this.recordUsage(result.response?.usageMetadata);
     return { text: result.response.text(), model: modelName };
   }

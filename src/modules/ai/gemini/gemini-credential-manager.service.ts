@@ -23,7 +23,17 @@ export type GeminiErrorClass =
 type Credential = { value: string; fingerprint: string };
 type ExecuteOptions<T> = {
   taskType: AiTaskType;
-  operation: (model: GenerativeModel) => Promise<T>;
+  /** `signal` aborts the HTTP request client-side when the deadline passes. */
+  operation: (model: GenerativeModel, signal: AbortSignal) => Promise<T>;
+  /** Response deadline for each request; default PROVIDER_TIMEOUT_MS. */
+  timeoutMs?: number;
+  /**
+   * Whether a TIMEOUT moves on to the next key (default true). A timed-out
+   * request may still be processed and billed by the provider, so callers
+   * that must not pay twice for one answer pass false: the timeout then ends
+   * the call. Definitive rejections (429, 401/403, 5xx) still fail over.
+   */
+  failoverOnTimeout?: boolean;
   onSuccess?: (
     result: T,
   ) => { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
@@ -195,17 +205,25 @@ export class GeminiCredentialManager {
     await pipeline.exec();
   }
 
-  private async withinTimeout<T>(operation: () => Promise<T>): Promise<T> {
+  private async withinTimeout<T>(
+    operation: (signal: AbortSignal) => Promise<T>,
+    timeoutMs = PROVIDER_TIMEOUT_MS,
+  ): Promise<T> {
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    // Aborting stops waiting and closes the HTTP request on our side only;
+    // the provider may still finish (and bill) it. Its late result is never
+    // read: this race has already settled.
+    const controller = new AbortController();
     try {
       return await Promise.race([
-        operation(),
+        operation(controller.signal),
         new Promise<never>((_, reject) => {
           timeout = setTimeout(() => {
+            controller.abort();
             const error = new Error('Gemini provider request timed out');
             error.name = 'AbortError';
             reject(error);
-          }, PROVIDER_TIMEOUT_MS);
+          }, timeoutMs);
         }),
       ]);
     } finally {
@@ -227,7 +245,10 @@ export class GeminiCredentialManager {
         const model = new GoogleGenerativeAI(
           credential.value,
         ).getGenerativeModel({ model: policy.model });
-        const result = await this.withinTimeout(() => options.operation(model));
+        const result = await this.withinTimeout(
+          (signal) => options.operation(model, signal),
+          options.timeoutMs,
+        );
         const responseUsage = (result as any)?.response?.usageMetadata;
         await this.telemetry({
           taskType: options.taskType,
@@ -259,7 +280,8 @@ export class GeminiCredentialManager {
         if (
           !['RATE_LIMIT', 'AUTH', 'PROVIDER_TRANSIENT', 'TIMEOUT'].includes(
             errorClass,
-          )
+          ) ||
+          (errorClass === 'TIMEOUT' && options.failoverOnTimeout === false)
         )
           break;
         retries += 1;

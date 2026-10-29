@@ -62,7 +62,7 @@ const realExecute: Execute = GeminiCredentialManager.prototype.execute;
 GeminiCredentialManager.prototype.execute = function (options) {
   return realExecute.call(this, {
     ...options,
-    operation: async (model: { model?: string }) => {
+    operation: async (model: { model?: string }, signal: AbortSignal) => {
       if (requests >= BUDGET) {
         log({ event: 'blocked', budget: BUDGET });
         throw new Error('LIVE_GEMINI_BUDGET_REACHED');
@@ -71,7 +71,7 @@ GeminiCredentialManager.prototype.execute = function (options) {
       const n = requests;
       log({ event: 'request', n, model: model.model, task: options.taskType });
       try {
-        const result = await options.operation(model as never);
+        const result = await options.operation(model as never, signal);
         const response = (result as any)?.response;
         log({
           event: 'response',

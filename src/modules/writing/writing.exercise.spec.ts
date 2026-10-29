@@ -283,6 +283,45 @@ describe('multi-task Writing exercise', () => {
     expect(events.emit).not.toHaveBeenCalled();
   });
 
+  it('C/I. a provider timeout makes one call, stores nothing; a later resubmission is stored and rewarded once', async () => {
+    const { service, ai, submissions, events } = setup();
+    ai.generateStructuredJson.mockRejectedValueOnce(
+      Object.assign(new Error('Gemini provider request timed out'), {
+        name: 'AbortError',
+      }),
+    );
+    const send = (attempt: string) =>
+      service.submitWriting(
+        quiz.id,
+        7,
+        'The meeting is tomorrow.',
+        undefined,
+        attempt,
+        undefined,
+        12,
+      );
+    await expect(send(id(9))).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(ai.generateStructuredJson).toHaveBeenCalledTimes(1);
+    expect(ai.generateStructuredJson.mock.calls[0][0]).toMatchObject({
+      timeoutMs: 60_000,
+      failoverOnTimeout: false,
+    });
+    expect(submissions).toHaveLength(0);
+    expect(events.emit).not.toHaveBeenCalled();
+
+    ai.generateStructuredJson.mockResolvedValueOnce({
+      text: reply(8),
+      model: 'test',
+    });
+    await send(id(10));
+    // Replaying the same attempt id returns the stored grade without a new call.
+    await send(id(10));
+    expect(ai.generateStructuredJson).toHaveBeenCalledTimes(2);
+    expect(submissions).toHaveLength(1);
+  });
+
   it('a failed grade stores nothing and the exercise stays incomplete', async () => {
     const { service, ai, submissions, events } = setup();
     ai.generateStructuredJson.mockResolvedValue({
