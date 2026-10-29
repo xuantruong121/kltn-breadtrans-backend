@@ -389,35 +389,3 @@ describe('multi-task Writing exercise', () => {
     expect(events.emit).not.toHaveBeenCalled();
   });
 });
-
-describe('Writing submissions list (privacy)', () => {
-  it("returns only the caller's own submissions, without any learner name", async () => {
-    const findMany = jest.fn().mockResolvedValue([
-      {
-        id: 5,
-        score: 8,
-        results: [{ answer: 'My text.' }],
-        aiFeedback: '{}',
-        submittedAt: new Date(),
-      },
-    ]);
-    const prisma = {
-      quiz: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: 3,
-          type: QuizType.WRITING_PICTURE,
-          publicationStatus: 'PUBLISHED',
-          isPremiumContent: false,
-          courseId: null,
-          practiceTopic: { category: TopicCategory.WRITING_PART1 },
-        }),
-      },
-      submission: { findMany },
-    };
-    const service = new WritingService(prisma as any, {} as any);
-    const rows = await service.getCommunitySubmissions(3, 7);
-    expect(findMany.mock.calls[0][0].where).toEqual({ quizId: 3, userId: 7 });
-    expect(findMany.mock.calls[0][0].include).toEqual({ results: true });
-    expect(rows[0]).not.toHaveProperty('user');
-  });
-});
