@@ -4,7 +4,9 @@
  * bounded attempts (in-process worker backoff 1, 5, 15 min: about 21 min),
  * with no score, no reward and the learner audio kept.
  *
- *   HARNESS_DB=diag_clone AUDIO_DIR=<dir> FAKE_FILE=<json> \
+ * Long-running (up to 25 min), so it runs only when asked for explicitly:
+ *
+ *   CP60_LONG_E2E=1 HARNESS_DB=diag_clone AUDIO_DIR=<dir> FAKE_FILE=<json> \
  *     npx ts-node --transpile-only scripts/qa/cp60-speaking-terminal-failure-browser.ts
  */
 import { writeFileSync } from 'node:fs';
@@ -16,6 +18,12 @@ import { harnessQuery } from './harness-db';
 const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
 async function main() {
+  if (process.env.CP60_LONG_E2E !== '1') {
+    console.log(
+      'NOT_RUN: long-running terminal-failure e2e (set CP60_LONG_E2E=1 to run it)',
+    );
+    process.exit(0);
+  }
   writeFileSync(
     process.env.FAKE_FILE!,
     JSON.stringify({
