@@ -1,12 +1,19 @@
 /**
- * Runs in every test worker before any spec module loads (C3-INC-001).
+ * Runs in every test worker before any spec module loads (C3-INC-001, P12.9).
  *
  * The ordinary DATABASE_URL / SHADOW_DATABASE_URL / REDIS_URL / REDIS_HOST /
  * REDIS_PORT are always overwritten. A spec sees the TEST_* target only when
  * the global setup verified that exact URL; otherwise it sees a sentinel that
  * refuses connections. Because the variables are set, Prisma never falls back
  * to `.env`.
+ *
+ * External services (P12.9): every credential, endpoint and provider mode is
+ * neutralised the same way (external-env.ts), and outbound network to anything
+ * but loopback is refused (network-guard.ts). jest-setup-external.ts is the
+ * first import, so both happen before a spec can import Prisma or a provider
+ * client; neither module imports either.
  */
+import './jest-setup-external';
 import {
   DB_VERIFIED_ENV,
   REDIS_VERIFIED_ENV,

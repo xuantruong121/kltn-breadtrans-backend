@@ -14,5 +14,8 @@
     "^src/(.*)$": "<rootDir>/../src/$1"
   },
   "globalSetup": "<rootDir>/safety/e2e-global-setup.ts",
+  "setupFiles": [
+    "<rootDir>/safety/jest-setup-external.ts"
+  ],
   "maxWorkers": 1
 }
