@@ -22,6 +22,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parse } from 'dotenv';
 
+import { GeminiEvaluatorStrategy } from '../../src/modules/ai/strategies/gemini-evaluator.strategy';
 import {
   buildPracticeWritingRequest,
   countWords,
@@ -80,10 +81,7 @@ type Case = { id: string; questionId: number; answer: string; expect: string };
 
 async function main() {
   if (BUDGET < 1) throw new Error('Set LIVE_GEMINI_BUDGET (1-6)');
-  // Imported after the env is set: the credential manager reads it on construction.
-
-  const { GeminiEvaluatorStrategy } =
-    require('../../src/modules/ai/strategies/gemini-evaluator.strategy') as typeof import('../../src/modules/ai/strategies/gemini-evaluator.strategy');
+  // Constructed after the env is set: the credential manager reads it then.
   const gemini = new GeminiEvaluatorStrategy();
   const spec = JSON.parse(readFileSync(String(process.env.LIVE_TASKS), 'utf8'));
   const tasks: Record<
