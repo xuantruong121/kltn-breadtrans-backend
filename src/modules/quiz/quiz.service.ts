@@ -1464,9 +1464,18 @@ export class QuizService {
         isPremiumContent: true,
         courseId: true,
         publicationStatus: true,
+        toeicWritingSetItems: { select: { id: true }, take: 1 },
       },
     });
     if (!accessQuiz) throw new NotFoundException('Quiz not found');
+    // TOEIC exam Writing tasks are exam content: learners read them only
+    // inside their assessment attempt (/writing/quizzes/:id with the attempt
+    // context). The generic quiz route never serves them to non-admins.
+    if (
+      role !== Role.ADMIN &&
+      (accessQuiz.toeicWritingSetItems?.length ?? 0) > 0
+    )
+      throw new NotFoundException('Quiz not found');
 
     if (
       accessQuiz.type === QuizType.LISTENING_PRACTICE &&

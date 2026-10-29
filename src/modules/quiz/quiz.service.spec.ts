@@ -258,6 +258,37 @@ describe('QuizService', () => {
       expect(result).toEqual(mockQuiz);
     });
 
+    it('never serves TOEIC exam Writing tasks to guests or learners; admins keep them', async () => {
+      const examTask = {
+        id: 29,
+        type: 'WRITING_PICTURE',
+        publicationStatus: 'PUBLISHED',
+        toeicWritingSetItems: [{ id: 1 }],
+        questions: [{ id: 290, content: { prompt: 'Exam prompt' } }],
+      };
+      mockPrismaService.quiz.findUnique.mockResolvedValue(examTask);
+      await expect(service.getQuizById(29)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getQuizById(29, false, 7, Role.STUDENT),
+      ).rejects.toThrow(NotFoundException);
+      const admin = await service.getQuizById(29, true, 1, Role.ADMIN);
+      expect(admin.questions[0].content).toEqual({ prompt: 'Exam prompt' });
+    });
+
+    it('practice Writing quizzes (no exam link) are still served', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 17,
+        type: 'WRITING_EMAIL',
+        publicationStatus: 'PUBLISHED',
+        toeicWritingSetItems: [],
+        questions: [{ id: 81, content: { prompt: 'Practice prompt' } }],
+      });
+      const result = await service.getQuizById(17, false, 7, Role.STUDENT);
+      expect(result.questions[0].content).toEqual({
+        prompt: 'Practice prompt',
+      });
+    });
+
     it('should throw NotFoundException if quiz does not exist', async () => {
       mockPrismaService.quiz.findUnique.mockResolvedValue(null);
 

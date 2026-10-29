@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Header,
   Param,
   ParseIntPipe,
   UseGuards,
@@ -13,6 +14,7 @@ export class GenericExamController {
   constructor(private readonly exams: GenericExamService) {}
 
   @Get()
+  @Header('Cache-Control', 'private, no-store')
   list() {
     return this.exams.listLearner();
   }
@@ -24,6 +26,7 @@ export class GenericExamController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'private, no-store')
   detail(@Param('id', ParseIntPipe) id: number) {
     return this.exams.getLearner(id);
   }

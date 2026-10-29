@@ -453,6 +453,41 @@ export class GenericExamService {
     return exams.map((exam) => this.project(exam));
   }
 
+  /**
+   * Learner-facing product card: an explicit allowlist of catalog metadata.
+   * `project()` also carries the authoring view (question groups with
+   * answer keys and explanations, validation, readiness), which must never
+   * leave the admin API: exam content reaches learners only inside an
+   * attempt (`/toeic/attempts/:id`, assessment components).
+   */
+  private projectLearner(exam: ProductRecord) {
+    const p = this.project(exam);
+    return {
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      familyCode: p.familyCode,
+      variantCode: p.variantCode,
+      family: p.family,
+      variant: p.variant,
+      templateKey: p.templateKey,
+      publicationStatus: p.publicationStatus,
+      updatedAt: p.updatedAt,
+      childId: p.childId,
+      runtimeId: p.runtimeId,
+      type: p.type,
+      difficulty: p.difficulty,
+      durationSeconds: p.durationSeconds,
+      totalGroups: p.totalGroups,
+      totalQuestions: p.totalQuestions,
+      questionsCount: p.questionsCount,
+      bilingualContent: p.bilingualContent,
+      attemptsCount: p.attemptsCount,
+      learnerReady: p.learnerReady,
+      assessment: p.assessment,
+    };
+  }
+
   async listLearner() {
     const exams = await this.prisma.exam.findMany({
       where: { publicationStatus: QuizPublicationStatus.PUBLISHED },
@@ -460,7 +495,7 @@ export class GenericExamService {
       orderBy: { updatedAt: 'desc' },
     });
     return exams
-      .map((exam) => this.project(exam))
+      .map((exam) => this.projectLearner(exam))
       .filter((exam) => exam.learnerReady);
   }
 
@@ -652,7 +687,7 @@ export class GenericExamService {
 
   async getLearner(id: number) {
     const exam = await this.findExam(id);
-    const projected = this.project(exam);
+    const projected = this.projectLearner(exam);
     if (
       exam.publicationStatus !== QuizPublicationStatus.PUBLISHED ||
       !projected.learnerReady
