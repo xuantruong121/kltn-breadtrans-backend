@@ -28,11 +28,16 @@ import { AppModule } from '../../src/app.module';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 import { TransformInterceptor } from '../../src/common/interceptors/transform.interceptor';
 import { GeminiEvaluatorStrategy } from '../../src/modules/ai/strategies/gemini-evaluator.strategy';
+import { AzureUnscriptedSpeechAssessor } from '../../src/modules/diagnostic/diagnostic-azure-speech';
 
+/** Azure operations of either kind (REST short audio + SDK sessions). */
 const BUDGET = Math.min(2, Number(process.env.LIVE_AZURE_BUDGET ?? 0));
+/** Gemini HTTP requests, retries and key rotation included (0 = stubbed). */
+const GEMINI_BUDGET = Math.min(2, Number(process.env.LIVE_GEMINI_BUDGET ?? 0));
 const FAKE_FILE = process.env.LIVE_AZURE_FAKE_FILE;
 const LOG = process.env.LIVE_AZURE_LOG;
 let azureCalls = 0;
+let geminiCalls = 0;
 let refused = 0;
 
 function log(entry: Record<string, unknown>) {
@@ -63,13 +68,39 @@ globalThis.fetch = async (input: unknown, init?: RequestInit) => {
       headers: { 'content-type': 'application/json' },
     });
   }
+  const isGemini =
+    method === 'POST' && url.hostname === 'generativelanguage.googleapis.com';
+  if (isGemini && geminiCalls < GEMINI_BUDGET) {
+    geminiCalls += 1;
+    const g = geminiCalls;
+    log({ event: 'gemini-request', n: g, path: url.pathname });
+    const started = Date.now();
+    const response = await realFetch(input as never, init);
+    let data: any = null;
+    try {
+      data = await response.clone().json();
+    } catch {
+      /* non-JSON */
+    }
+    log({
+      event: 'gemini-response',
+      n: g,
+      httpStatus: response.status,
+      ms: Date.now() - started,
+      model: data?.modelVersion ?? null,
+      usage: data?.usageMetadata ?? null,
+      text: data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null,
+    });
+    return response;
+  }
   if (!isAzureStt || azureCalls >= BUDGET) {
     refused += 1;
     log({
       event: 'refused',
       method,
       azure: isAzureStt,
-      reason: isAzureStt ? 'budget reached' : 'host not allowed',
+      gemini: isGemini,
+      reason: isAzureStt || isGemini ? 'budget reached' : 'host not allowed',
       refused,
     });
     throw new Error(
@@ -127,27 +158,75 @@ globalThis.fetch = async (input: unknown, init?: RequestInit) => {
   return response;
 };
 
-// The unscripted path uses the SDK over a websocket, outside fetch: refused.
-for (const method of [
-  'recognizeOnceAsync',
-  'startContinuousRecognitionAsync',
-] as const) {
-  (sdk.SpeechRecognizer.prototype as any)[method] = function (
-    _ok?: unknown,
-    err?: (e: string) => void,
-  ) {
-    refused += 1;
-    log({ event: 'refused', sdk: method, refused });
-    err?.('LIVE_AZURE_SDK_NOT_ALLOWED');
+// The unscripted path uses the SDK over a websocket, outside fetch. One
+// continuous session is one Azure operation and shares the Azure budget;
+// single-shot recognition is never used by the app and stays refused.
+const realStart = (sdk.SpeechRecognizer.prototype as any)
+  .startContinuousRecognitionAsync;
+(sdk.SpeechRecognizer.prototype as any).startContinuousRecognitionAsync =
+  function (ok?: () => void, err?: (e: string) => void) {
+    if (FAKE_FILE || azureCalls >= BUDGET) {
+      refused += 1;
+      log({
+        event: 'refused',
+        sdk: 'startContinuousRecognitionAsync',
+        refused,
+      });
+      err?.('LIVE_AZURE_SDK_NOT_ALLOWED');
+      return;
+    }
+    azureCalls += 1;
+    log({ event: 'azure-sdk-session', n: azureCalls });
+    return realStart.call(this, ok, err);
   };
-}
-
-// No Gemini call is authorized: the feedback rewording returns nothing, so
-// the Azure-derived feedback stays as graded.
-GeminiEvaluatorStrategy.prototype.generatePronunciationFeedback = function () {
-  log({ event: 'gemini-feedback-stubbed' });
-  return Promise.resolve({});
+(sdk.SpeechRecognizer.prototype as any).recognizeOnceAsync = function (
+  _ok?: unknown,
+  err?: (e: string) => void,
+) {
+  refused += 1;
+  log({ event: 'refused', sdk: 'recognizeOnceAsync', refused });
+  err?.('LIVE_AZURE_SDK_NOT_ALLOWED');
 };
+
+// The parsed unscripted evidence the app grades from (no audio, no key).
+const realAssess = AzureUnscriptedSpeechAssessor.prototype.assess;
+AzureUnscriptedSpeechAssessor.prototype.assess = async function (
+  ...args: Parameters<typeof realAssess>
+) {
+  try {
+    const evidence = await realAssess.apply(this, args);
+    log({
+      event: 'azure-sdk-evidence',
+      mode: evidence.mode,
+      locale: evidence.locale,
+      azure: evidence.azure,
+      recognizedWordCount: evidence.recognizedWordCount,
+      segmentCount: evidence.segmentCount,
+      recordingDurationMs: evidence.recordingDurationMs,
+      speechRateWpm: evidence.speechRateWpm,
+      longPauseCount: evidence.longPauseCount,
+      transcript: evidence.transcript,
+    });
+    return evidence;
+  } catch (error) {
+    log({
+      event: 'azure-sdk-error',
+      message: String((error as Error)?.message ?? error).slice(0, 200),
+    });
+    throw error;
+  }
+};
+
+// Without a Gemini budget no Gemini call is authorized: the feedback rewording
+// returns nothing, so the Azure-derived feedback stays as graded.
+if (GEMINI_BUDGET < 1)
+  GeminiEvaluatorStrategy.prototype.generatePronunciationFeedback =
+    function () {
+      // LIVE_GEMINI_FAKE_JSON: fixed wording to check how the UI shows it.
+      const fixed = process.env.LIVE_GEMINI_FAKE_JSON;
+      log({ event: 'gemini-feedback-stubbed', fixed: Boolean(fixed) });
+      return Promise.resolve(fixed ? JSON.parse(fixed) : {});
+    };
 
 async function assertHarness() {
   const url = process.env.DATABASE_URL ?? '';
@@ -165,7 +244,14 @@ async function assertHarness() {
     throw new Error(`REFUSED: target ${db} ${sysid} is not the harness`);
   if (process.env.MOCK_AZURE_SPEECH === 'true')
     throw new Error('REFUSED: MOCK_AZURE_SPEECH would bypass the live check');
-  log({ event: 'start', db, sysid, budget: BUDGET, fake: Boolean(FAKE_FILE) });
+  log({
+    event: 'start',
+    db,
+    sysid,
+    budget: BUDGET,
+    geminiBudget: GEMINI_BUDGET,
+    fake: Boolean(FAKE_FILE),
+  });
 }
 
 async function bootstrap() {
