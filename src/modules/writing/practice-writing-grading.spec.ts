@@ -37,6 +37,8 @@ const good = {
     },
   ],
   feedback: 'Câu đáp ứng yêu cầu, chỉ cần sửa thì của động từ ask.',
+  taskRelevance: 'ON_TASK',
+  relevanceEvidence: 'Câu dùng đúng hai từ và đúng tình huống của đề.',
   suggestions: ['Kiểm tra thì của động từ khi câu có mốc thời gian quá khứ.'],
 };
 

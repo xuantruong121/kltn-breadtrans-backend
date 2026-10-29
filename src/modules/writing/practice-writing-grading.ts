@@ -159,6 +159,41 @@ export type SceneMatch = (typeof SCENE_MATCHES)[number];
 export const SCENE_MISMATCH_CAP_RATIO = 0.4;
 
 /**
+ * Non-picture tasks: does the response address the task at all? OFF_TOPIC
+ * gets the same cap as a picture MISMATCH (task criterion 0, total <= 40 %),
+ * so a fluent text about something else cannot score well on language alone.
+ */
+export const TASK_RELEVANCE = ['ON_TASK', 'PARTIAL', 'OFF_TOPIC'] as const;
+export type TaskRelevance = (typeof TASK_RELEVANCE)[number];
+
+/** The criterion that measures doing what the task asked, if the rubric has one. */
+export function taskCriterionKey(rubric: PracticeCriterion[]): string | null {
+  return (
+    rubric.find(
+      (c) => c.key === 'taskAchievement' || c.key === 'taskCompletion',
+    )?.key ?? null
+  );
+}
+
+/**
+ * Length against the authored range. FAR_BELOW is under two thirds of the
+ * minimum: such a text cannot cover the task, so its task criterion is capped
+ * at half (deterministic, not left to the grader). Over the range is never
+ * capped: a longer answer is judged on what it says.
+ */
+export type LengthBand =
+  'NO_RANGE' | 'FAR_BELOW' | 'BELOW' | 'WITHIN' | 'ABOVE';
+export function lengthBand(
+  words: number,
+  range: [number, number] | null,
+): LengthBand {
+  if (!range) return 'NO_RANGE';
+  if (words < Math.ceil((range[0] * 2) / 3)) return 'FAR_BELOW';
+  if (words < range[0]) return 'BELOW';
+  return words > range[1] ? 'ABOVE' : 'WITHIN';
+}
+
+/**
  * Picture tasks only: a confirmed MISMATCH sets the task criterion to 0 and
  * caps the total at 40 % of the maximum (4/10). Grammar and vocabulary keep
  * their comments; their points are scaled down proportionally (largest
@@ -332,6 +367,7 @@ export function buildPracticeWritingRequest(
 ) {
   const keywords = keywordCheck(answer, task.requiredKeywords);
   const words = countWords(answer);
+  const length = lengthBand(words, task.wordRange);
   const linking = task.requireLinking
     ? {
         required: true as const,
@@ -347,6 +383,10 @@ export function buildPracticeWritingRequest(
     'Do not invent mistakes. If the response is correct, return no corrections.',
     'Every correction must quote the learner text EXACTLY in "original" (a short span copied character for character), give the corrected span, and explain in Vietnamese why.',
     'All comments, explanations, strengths and suggestions are in Vietnamese with full diacritics (never unaccented), specific to this response.',
+    'Criteria: grammar = grammatical accuracy only; vocabulary/naturalness = word choice and natural phrasing; organization = clear order, opening and closing; taskAchievement/taskCompletion = covering every requirement in a way that fits the situation and register.',
+    'Penalise each mistake under ONE criterion only: a grammar error is not also a vocabulary or organization error.',
+    'The sample response only shows the expected scope and register. Never reward or penalise similarity to it: different ideas, details, names, structure or style that meet every requirement deserve full task marks.',
+    'facts.length compares the word count with task.wordRange: FAR_BELOW is enforced by the server; BELOW may cost at most one task point; ABOVE is not penalised unless the extra text breaks focus. Length is never a grammar or vocabulary error.',
     ...(task.picture
       ? [
           'This task is about a picture. You cannot see the picture: task.picture is an authored description of it; treat it as the truth about the image.',
@@ -357,6 +397,12 @@ export function buildPracticeWritingRequest(
           'Return sceneMatch: MATCH (the answer describes people, actions or objects of task.picture), PARTIAL (partly relevant, with important details missing or wrong), MISMATCH (clearly describes a different scene or contradicts task.picture), UNCERTAIN (cannot tell). Using the required keywords never makes an answer MATCH by itself; different wording from the sample is never MISMATCH.',
           'Return sceneEvidence in Vietnamese with full diacritics: one sentence naming the concrete details of the answer that agree with or contradict task.picture.',
           'Score grammar on grammatical accuracy only. Writing two correct sentences instead of the one requested sentence is a task requirement issue for taskCompletion, not a grammar error. A correction that joins sentences must be natural English that keeps the meaning, using a fitting connector or a relative clause.',
+        ]
+      : []),
+    ...(!task.picture
+      ? [
+          'Return taskRelevance: ON_TASK (the response does what task.prompt asks), PARTIAL (on the topic but misses or misreads part of it), OFF_TOPIC (about something else, or ignores the situation). Good language never makes an answer ON_TASK by itself; different ideas from the sample are never OFF_TOPIC.',
+          'Return relevanceEvidence in Vietnamese with full diacritics: one sentence naming what in the response does or does not address the task.',
         ]
       : []),
     ...(task.requireLinking
@@ -378,7 +424,12 @@ export function buildPracticeWritingRequest(
         sampleResponse: task.sampleResponse,
       },
       rubric: task.rubric,
-      facts: { wordCount: words, keywords, ...(linking ? { linking } : {}) },
+      facts: {
+        wordCount: words,
+        length,
+        keywords,
+        ...(linking ? { linking } : {}),
+      },
       learnerResponse: answer,
     },
     null,
@@ -432,12 +483,21 @@ export function buildPracticeWritingRequest(
       type: 'string',
     };
     responseSchema.required.push('sceneMatch', 'sceneEvidence');
+  } else {
+    (responseSchema.properties as Record<string, unknown>).taskRelevance = {
+      type: 'string',
+      enum: [...TASK_RELEVANCE],
+    };
+    (responseSchema.properties as Record<string, unknown>).relevanceEvidence = {
+      type: 'string',
+    };
+    responseSchema.required.push('taskRelevance', 'relevanceEvidence');
   }
   return {
     systemInstruction,
     prompt,
     responseSchema,
-    facts: { wordCount: words, keywords, linking },
+    facts: { wordCount: words, length, keywords, linking },
   };
 }
 
@@ -467,9 +527,11 @@ export type PracticeWritingResult = {
   linking?: { required: true; found: string | null; sentences: number };
   /** Picture tasks: the grader's relevance verdict and its evidence. */
   scene?: { match: SceneMatch; evidence: string };
-  /** Present when the server lowered the grader's total (scene mismatch). */
+  /** Other tasks: whether the response addresses the task, with evidence. */
+  relevance?: { verdict: TaskRelevance; evidence: string };
+  /** Present when the server lowered the grader's total. */
   scoreAdjustment?: {
-    reason: 'SCENE_MISMATCH';
+    reason: 'SCENE_MISMATCH' | 'OFF_TOPIC' | 'TOO_SHORT';
     providerScore: number;
     cap: number;
   };
@@ -494,6 +556,7 @@ export function validatePracticeWritingResult(
   answer: string,
   facts: {
     wordCount: number;
+    length?: LengthBand;
     keywords: Array<{ keyword: string; present: boolean }>;
     linking?: { required: true; found: string | null; sentences: number };
   },
@@ -558,6 +621,58 @@ export function validatePracticeWritingResult(
         };
     }
   }
+  let relevance: PracticeWritingResult['relevance'];
+  const taskKey = taskCriterionKey(task.rubric);
+  const total = (list: typeof criteria) =>
+    list.reduce((n, c) => n + c.score, 0);
+  const maxTotal = task.rubric.reduce((n, c) => n + c.max, 0);
+  if (!task.picture) {
+    if (!TASK_RELEVANCE.includes(r.taskRelevance as TaskRelevance))
+      return { ok: false, reason: 'TASK_RELEVANCE_MISSING' };
+    const evidence =
+      typeof r.relevanceEvidence === 'string' ? r.relevanceEvidence.trim() : '';
+    if (evidence.length < 10 || !hasVietnameseDiacritics(evidence))
+      return { ok: false, reason: 'RELEVANCE_EVIDENCE_MISSING' };
+    relevance = { verdict: r.taskRelevance as TaskRelevance, evidence };
+    if (relevance.verdict === 'OFF_TOPIC' && taskKey) {
+      const capped = applySceneMismatchCap(criteria, taskKey);
+      finalCriteria = criteria.map((c, i) => ({
+        ...c,
+        score: capped.criteria[i].score,
+        comment:
+          c.key === taskKey
+            ? `0 điểm vì bài viết chưa làm đúng yêu cầu của đề. ${evidence}`
+            : c.comment,
+      }));
+      if (capped.providerScore > total(finalCriteria))
+        scoreAdjustment = {
+          reason: 'OFF_TOPIC',
+          providerScore: capped.providerScore,
+          cap: capped.cap,
+        };
+    }
+  }
+  // A text under two thirds of the minimum cannot cover the task: its task
+  // criterion is capped at half, whatever the grader said.
+  if (facts.length === 'FAR_BELOW' && taskKey && task.wordRange) {
+    const before = total(finalCriteria);
+    finalCriteria = finalCriteria.map((c) => {
+      const half = Math.floor(c.max / 2);
+      return c.key === taskKey && c.score > half
+        ? {
+            ...c,
+            score: half,
+            comment: `Bài chỉ có ${facts.wordCount} từ, ít hơn nhiều so với yêu cầu ${task.wordRange![0]}–${task.wordRange![1]} từ, nên mục này tối đa ${half}/${c.max}. ${c.comment}`,
+          }
+        : c;
+    });
+    if (!scoreAdjustment && before > total(finalCriteria))
+      scoreAdjustment = {
+        reason: 'TOO_SHORT',
+        providerScore: before,
+        cap: total(finalCriteria),
+      };
+  }
   if (typeof r.feedback !== 'string' || r.feedback.trim().length < 10)
     return { ok: false, reason: 'FEEDBACK_MISSING' };
   // Unaccented Vietnamese is unreadable for the learner; ask again.
@@ -604,14 +719,17 @@ export function validatePracticeWritingResult(
       corrections,
       feedback:
         scene?.match === 'MISMATCH'
-          ? `Câu trả lời chưa mô tả đúng bức tranh nên điểm tối đa là ${Math.floor(task.rubric.reduce((n, c) => n + c.max, 0) * SCENE_MISMATCH_CAP_RATIO)}/${task.rubric.reduce((n, c) => n + c.max, 0)}. ${scene.evidence} ${r.feedback.trim()}`
-          : r.feedback.trim(),
+          ? `Câu trả lời chưa mô tả đúng bức tranh nên điểm tối đa là ${Math.floor(maxTotal * SCENE_MISMATCH_CAP_RATIO)}/${maxTotal}. ${scene.evidence} ${r.feedback.trim()}`
+          : relevance?.verdict === 'OFF_TOPIC' && taskKey
+            ? `Bài viết chưa đúng yêu cầu của đề nên điểm tối đa là ${Math.floor(maxTotal * SCENE_MISMATCH_CAP_RATIO)}/${maxTotal}. ${relevance.evidence} ${r.feedback.trim()}`
+            : r.feedback.trim(),
       suggestions,
       wordCount: facts.wordCount,
       wordRange: task.wordRange,
       keywords: facts.keywords,
       ...(facts.linking ? { linking: facts.linking } : {}),
       ...(scene ? { scene } : {}),
+      ...(relevance ? { relevance } : {}),
       ...(scoreAdjustment ? { scoreAdjustment } : {}),
       ungroundedDropped: dropped,
     },

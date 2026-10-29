@@ -58,6 +58,8 @@ function reply(points: number) {
     strengths: ['Dùng đúng từ khóa.'],
     corrections: [],
     feedback: 'Câu viết rõ ràng và đúng yêu cầu của đề.',
+    taskRelevance: 'ON_TASK',
+    relevanceEvidence: 'Câu dùng đúng hai từ và đúng tình huống của đề.',
     suggestions: ['Thử dùng thêm một mệnh đề phụ.'],
   });
 }
@@ -248,6 +250,39 @@ describe('multi-task Writing exercise', () => {
     );
   });
 
+  it('G. an empty answer is refused before any grading', async () => {
+    const { service, ai, submissions } = setup();
+    await expect(
+      service.submitWriting(quiz.id, 7, '   ', undefined, id(7), undefined, 12),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(ai.generateStructuredJson).not.toHaveBeenCalled();
+    expect(submissions).toHaveLength(0);
+  });
+
+  it('J. a well-formed reply missing the relevance verdict is retried, then nothing is stored', async () => {
+    const { service, ai, submissions, events } = setup();
+    const noVerdict = JSON.parse(reply(8));
+    delete noVerdict.taskRelevance;
+    ai.generateStructuredJson.mockResolvedValue({
+      text: JSON.stringify(noVerdict),
+      model: 'test',
+    });
+    await expect(
+      service.submitWriting(
+        quiz.id,
+        7,
+        'The meeting is tomorrow.',
+        undefined,
+        id(8),
+        undefined,
+        12,
+      ),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(ai.generateStructuredJson).toHaveBeenCalledTimes(2);
+    expect(submissions).toHaveLength(0);
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+
   it('a failed grade stores nothing and the exercise stays incomplete', async () => {
     const { service, ai, submissions, events } = setup();
     ai.generateStructuredJson.mockResolvedValue({
@@ -267,5 +302,37 @@ describe('multi-task Writing exercise', () => {
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
     expect(submissions).toHaveLength(0);
     expect(events.emit).not.toHaveBeenCalled();
+  });
+});
+
+describe('Writing submissions list (privacy)', () => {
+  it("returns only the caller's own submissions, without any learner name", async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      {
+        id: 5,
+        score: 8,
+        results: [{ answer: 'My text.' }],
+        aiFeedback: '{}',
+        submittedAt: new Date(),
+      },
+    ]);
+    const prisma = {
+      quiz: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 3,
+          type: QuizType.WRITING_PICTURE,
+          publicationStatus: 'PUBLISHED',
+          isPremiumContent: false,
+          courseId: null,
+          practiceTopic: { category: TopicCategory.WRITING_PART1 },
+        }),
+      },
+      submission: { findMany },
+    };
+    const service = new WritingService(prisma as any, {} as any);
+    const rows = await service.getCommunitySubmissions(3, 7);
+    expect(findMany.mock.calls[0][0].where).toEqual({ quizId: 3, userId: 7 });
+    expect(findMany.mock.calls[0][0].include).toEqual({ results: true });
+    expect(rows[0]).not.toHaveProperty('user');
   });
 });
