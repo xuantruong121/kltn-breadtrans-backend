@@ -18,7 +18,7 @@
  *
  *   LIVE_AZURE_BUDGET=2 LIVE_AZURE_LOG=<file.jsonl> npx ts-node --transpile-only scripts/qa/speaking-live-azure-server.ts
  */
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
@@ -30,6 +30,7 @@ import { TransformInterceptor } from '../../src/common/interceptors/transform.in
 import { GeminiEvaluatorStrategy } from '../../src/modules/ai/strategies/gemini-evaluator.strategy';
 
 const BUDGET = Math.min(2, Number(process.env.LIVE_AZURE_BUDGET ?? 0));
+const FAKE_FILE = process.env.LIVE_AZURE_FAKE_FILE;
 const LOG = process.env.LIVE_AZURE_LOG;
 let azureCalls = 0;
 let refused = 0;
@@ -52,6 +53,16 @@ globalThis.fetch = async (input: unknown, init?: RequestInit) => {
     method === 'POST' &&
     /\.stt\.speech\.microsoft\.com$/.test(url.hostname) &&
     url.pathname.endsWith('/conversation/cognitiveservices/v1');
+  // Deterministic mode (LIVE_AZURE_FAKE_FILE): the Azure request is answered
+  // here from the scenario file, read at each call; nothing leaves the process.
+  if (isAzureStt && FAKE_FILE) {
+    const body = readFileSync(FAKE_FILE, 'utf8');
+    log({ event: 'fake-azure', scenario: JSON.parse(body).__scenario ?? null });
+    return new Response(body, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
   if (!isAzureStt || azureCalls >= BUDGET) {
     refused += 1;
     log({
@@ -154,11 +165,12 @@ async function assertHarness() {
     throw new Error(`REFUSED: target ${db} ${sysid} is not the harness`);
   if (process.env.MOCK_AZURE_SPEECH === 'true')
     throw new Error('REFUSED: MOCK_AZURE_SPEECH would bypass the live check');
-  log({ event: 'start', db, sysid, budget: BUDGET });
+  log({ event: 'start', db, sysid, budget: BUDGET, fake: Boolean(FAKE_FILE) });
 }
 
 async function bootstrap() {
-  if (BUDGET < 1) throw new Error('REFUSED: LIVE_AZURE_BUDGET not set');
+  if (BUDGET < 1 && !FAKE_FILE)
+    throw new Error('REFUSED: LIVE_AZURE_BUDGET not set');
   await assertHarness();
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
