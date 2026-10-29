@@ -292,6 +292,45 @@ describe('QuizService', () => {
       expect(result.questions[0].content).toEqual({ options: ['A', 'B'] });
     });
 
+    it('Writing: guests and learners get the learner contract; admins keep the authoring content', async () => {
+      const writing = (type: string) => ({
+        id: 17,
+        type,
+        publicationStatus: 'PUBLISHED',
+        questions: [
+          {
+            id: 81,
+            content: {
+              prompt: 'Viết 40–60 từ.',
+              wordRange: [40, 60],
+              imageUrl: 'https://example.test/a.png',
+              sampleResponse: 'Model answer.',
+              sceneDescription: 'Authored scene.',
+            },
+          },
+        ],
+      });
+      for (const type of ['WRITING_EMAIL', 'WRITING_PICTURE']) {
+        for (const [userId, role] of [
+          [undefined, undefined],
+          [7, Role.STUDENT],
+        ] as const) {
+          mockPrismaService.quiz.findUnique.mockResolvedValue(writing(type));
+          const result = await service.getQuizById(17, false, userId, role);
+          expect(result.questions[0].content).toEqual({
+            prompt: 'Viết 40–60 từ.',
+            wordRange: [40, 60],
+            imageUrl: 'https://example.test/a.png',
+          });
+        }
+        mockPrismaService.quiz.findUnique.mockResolvedValue(writing(type));
+        const admin = await service.getQuizById(17, true, 1, Role.ADMIN);
+        expect(admin.questions[0].content).toMatchObject({
+          sampleResponse: 'Model answer.',
+        });
+      }
+    });
+
     it('delivers artifact timing without leaking a listening transcript before reveal', async () => {
       mockPrismaService.quiz.findUnique.mockResolvedValue({
         id: 23,
@@ -909,6 +948,49 @@ describe('QuizService', () => {
           expect.objectContaining({ category: 'PURPOSE', total: 1 }),
         ]),
       });
+    });
+
+    it('Writing analytics never return reference answers to the learner; admins keep them', async () => {
+      const submission = () => ({
+        id: 91,
+        quizId: 17,
+        userId: 7,
+        score: 8,
+        aiFeedback: null,
+        quiz: {
+          id: 17,
+          title: 'Writing',
+          type: 'WRITING_EMAIL',
+          questions: [
+            {
+              id: 81,
+              type: 'WRITING',
+              content: { prompt: 'p1', sampleResponse: 'model 1' },
+            },
+            {
+              id: 82,
+              type: 'WRITING',
+              content: {
+                prompt: 'p2',
+                sampleResponse: 'model 2',
+                sceneDescription: 'scene',
+              },
+            },
+          ],
+        },
+        results: [{ questionId: 81, answer: 'my text', score: 8 }],
+      });
+      mockPrismaService.submission.findUnique.mockResolvedValue(submission());
+      const learner = await service.getSubmissionAnalytics(91, 7, Role.STUDENT);
+      expect(JSON.stringify(learner)).not.toMatch(/model 1|model 2|scene/);
+      expect(learner.questions.map((q: any) => q.content.prompt)).toEqual([
+        'p1',
+        'p2',
+      ]);
+      expect(learner.submittedAnswer).toBe('my text');
+      mockPrismaService.submission.findUnique.mockResolvedValue(submission());
+      const admin = await service.getSubmissionAnalytics(91, 1, Role.ADMIN);
+      expect(JSON.stringify(admin)).toMatch(/model 1/);
     });
 
     it('preserves submission ownership checks for Reading analytics', async () => {
