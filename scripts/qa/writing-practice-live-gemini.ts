@@ -112,6 +112,9 @@ async function main() {
         prompt: request.prompt,
         responseSchema: request.responseSchema,
         temperature: 0.2,
+        // Same policy as WritingService practice grading.
+        timeoutMs: 60_000,
+        failoverOnTimeout: false,
       });
       raw = JSON.parse(out.text);
     } catch (e) {
