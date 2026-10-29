@@ -129,6 +129,26 @@ async function main() {
     check(`${label} refused`, r.status === 404, `status ${r.status}`);
   }
 
+  // Other learner TOEIC endpoints: metadata only, no key, no audio storage URL.
+  for (const path of [
+    '/toeic/exams',
+    '/toeic/exams/1',
+    '/toeic/exams/1/briefing',
+    '/toeic/history',
+    '/toeic/stats/listening-reading',
+    '/toeic/bundles/22',
+    '/toeic/assessments',
+    '/toeic/assessments/2',
+    '/toeic/assessments/history',
+  ]) {
+    const r = await call('GET', path, a.token);
+    check(
+      `B learner ${path} has no answer key or audio storage URL`,
+      r.status < 500 && !has(r.data, KEY) && !has(r.data, STORAGE_URL),
+      `status ${r.status}`,
+    );
+  }
+
   // L&R attempt lifecycle on exam set 1.
   const start = await call('POST', '/toeic/exams/1/attempts', a.token, {
     mode: 'PRACTICE',
@@ -170,6 +190,16 @@ async function main() {
       `status ${active.status}`,
     );
     check('D active attempt receives no answer key', !has(active.data, KEY));
+    const earlyReview = await call(
+      'GET',
+      `/toeic/attempts/${attemptId}/review`,
+      a.token,
+    );
+    check(
+      'D review before submission is refused and shows no key',
+      earlyReview.status >= 400 && !has(earlyReview.data, KEY),
+      `status ${earlyReview.status}`,
+    );
     check(
       'D active attempt carries no clip storage URL',
       !has(active.data, STORAGE_URL),
@@ -266,6 +296,38 @@ async function main() {
       {},
     );
     check('G submit', submit.status < 300, `status ${submit.status}`);
+    const result = await call(
+      'GET',
+      `/toeic/attempts/${attemptId}/result`,
+      a.token,
+    );
+    check(
+      'L owner result has no audio storage URL',
+      result.status === 200 && !has(result.data, STORAGE_URL),
+      `status ${result.status}`,
+    );
+    const ownReview = await call(
+      'GET',
+      `/toeic/attempts/${attemptId}/review`,
+      a.token,
+    );
+    check(
+      'L owner post-submit review is served (keys allowed by policy), no audio storage URL',
+      ownReview.status === 200 && !has(ownReview.data, STORAGE_URL),
+      `status ${ownReview.status}; key shown=${has(ownReview.data, KEY)}`,
+    );
+    check(
+      'H another learner is refused the review',
+      (await call('GET', `/toeic/attempts/${attemptId}/review`, b.token))
+        .status === 403,
+    );
+    check(
+      'H another learner is refused the result',
+      [403, 404].includes(
+        (await call('GET', `/toeic/attempts/${attemptId}/result`, b.token))
+          .status,
+      ),
+    );
     const review = await call('GET', `/toeic/attempts/${attemptId}`, a.token);
     check(
       'L owner can review the submitted attempt',
