@@ -95,7 +95,7 @@ export class UnavailableDiagnosticRubricGrader implements DiagnosticRubricGrader
 
 // ----------------------------------------------------------------- prompts
 
-export const RUBRIC_PROMPT_VERSION = 'diagnostic-rubric-prompt-v4';
+export const RUBRIC_PROMPT_VERSION = 'diagnostic-rubric-prompt-v5';
 
 const SYSTEM_INSTRUCTION = [
   'You are a rubric grader for an English placement practice task on an educational platform.',
@@ -105,6 +105,11 @@ const SYSTEM_INSTRUCTION = [
   'For every criterion, write one sentence in Vietnamese explaining the score, in criterionFeedback.',
   'Write the overall feedback in Vietnamese, addressed to the learner, in two to four sentences.',
   'Give at most three suggestions, in Vietnamese.',
+  'Write for a beginner learner who reads Vietnamese, not for a teacher: short, plain sentences (about 25 words at most), friendly and direct, using "bạn".',
+  'Avoid assessment jargon such as "tiêu chí", "rubric", "mạch lạc", "đồng nhất", "cấu trúc diễn ngôn", "ngữ dụng" or "độ trôi chảy về mặt ngữ âm"; say what the learner did in everyday words instead.',
+  'In each criterion sentence, say concretely what was good or what went wrong, quoting or naming the learner’s own words where it helps (for example: Bạn viết "I go yesterday", nên dùng "I went yesterday").',
+  'Every suggestion is one concrete action the learner can do next time, starting with a verb (for example "Thêm một câu nêu lý do cụ thể cho ý kiến của bạn."), not a general remark.',
+  'English words or phrases from the learner response stay in English inside quotation marks; explain them in Vietnamese.',
   'All Vietnamese text must be written with full Vietnamese diacritics (for example "Bài viết của bạn rất tốt"), never as unaccented ASCII ("Bai viet cua ban rat tot").',
   'evidenceQuotes: copy one to five short spans VERBATIM from the learner response (or the transcript) that your scores rest on. Never paraphrase a quote.',
   'This is internal practice feedback. Never present the result as an official exam score, an ETS result, or a CEFR level.',
