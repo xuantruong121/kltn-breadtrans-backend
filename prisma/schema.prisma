@@ -244,6 +244,11 @@ model User {
   physicalRedemptions             MarketPhysicalRedemption[]
   courseLessonAttempts            CourseLessonAttempt[]
   examsCreated                    Exam[]                           @relation("ExamCreator")
+  learnerProfile                  LearnerProfile?
+  skillLevels                     LearnerSkillLevel[]
+  levelUnlocks                    LevelUnlock[]
+  gateAttempts                    GateAttempt[]
+  learningPlanItems               LearningPlanItem[]
 }
 
 model AuthAccount {
@@ -2874,4 +2879,183 @@ model UserToeicReward {
 
   @@unique([userId, examId, mode])
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Personalisation (owner decisions 2026-10-30, tracker
+// Project/BREADTRANS_PERSONALIZATION_EXECUTION_PLAN.md F3).
+// Practice levels are internal BreadTrans levels shown as "mức luyện tập đề
+// xuất". They are not CEFR levels and not a certificate.
+// ---------------------------------------------------------------------------
+
+/// Career or study direction the learner chose; drives content matching.
+enum LearningTrack {
+  GENERAL
+  IT_SOFTWARE
+  OFFICE_BUSINESS
+  SALES_CUSTOMER_SERVICE
+  HOSPITALITY_TOURISM
+  STUDENT_ACADEMIC
+}
+
+/// Internal practice level: Mất gốc / Cơ bản / Trung cấp / Nâng cao.
+enum PracticeLevel {
+  STARTER
+  BASIC
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum LearningGoal {
+  GENERAL
+  TOEIC_SCORE
+  WORK_COMMUNICATION
+  STUDY
+  TRAVEL
+}
+
+/// Where the learner's level came from.
+enum PlacementSource {
+  NONE
+  DIAGNOSTIC
+  SELF
+}
+
+enum PracticeSkill {
+  LISTENING
+  READING
+  SPEAKING
+  WRITING
+}
+
+enum LevelUnlockMethod {
+  PLACEMENT
+  SELF_CHOICE
+  GATE_TEST
+  PATH_PROGRESS
+}
+
+/// Practice content the personalisation layer can point at.
+enum LearningContentType {
+  QUIZ
+  SPEAKING_SET
+  CONTENT_TOPIC
+}
+
+enum LearningPlanItemStatus {
+  SUGGESTED
+  SAVED
+  DONE
+  DISMISSED
+}
+
+/// One per learner, created by onboarding (or on first use, with defaults).
+model LearnerProfile {
+  userId             Int             @id
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track              LearningTrack   @default(GENERAL)
+  goal               LearningGoal    @default(GENERAL)
+  minutesPerDay      Int             @default(15)
+  targetDate         DateTime?
+  selfLevel          PracticeLevel?
+  placementLevel     PracticeLevel?
+  placementSource    PlacementSource @default(NONE)
+  /// DiagnosticAttempt that set placementLevel, when the source is DIAGNOSTIC.
+  placementAttemptId Int?
+  onboardedAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+/// The learner's current level and ability per skill.
+model LearnerSkillLevel {
+  userId        Int
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill         PracticeSkill
+  /// Level the learner practises at now.
+  level         PracticeLevel
+  /// Highest level open to the learner (placement, gate test or progress).
+  unlockedLevel PracticeLevel
+  /// Elo-style ability estimate (logit scale), updated after graded attempts.
+  ability       Float           @default(0)
+  source        PlacementSource @default(NONE)
+  updatedAt     DateTime        @updatedAt
+
+  @@id([userId, skill])
+}
+
+/// Audit trail: one row per level opened for a skill.
+model LevelUnlock {
+  id        Int               @id @default(autoincrement())
+  userId    Int
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill     PracticeSkill
+  level     PracticeLevel
+  method    LevelUnlockMethod
+  /// e.g. { "diagnosticAttemptId": 12 } or { "gateAttemptId": 3 }.
+  evidence  Json?
+  createdAt DateTime          @default(now())
+
+  @@unique([userId, skill, level])
+  @@index([userId, skill])
+}
+
+/// A short "jump ahead" test that can open the next level of a skill.
+model GateAttempt {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill       PracticeSkill
+  level       PracticeLevel
+  /// Question ids served, in order (server-chosen).
+  questionIds Json
+  answers     Json?
+  score       Float?
+  passed      Boolean?
+  createdAt   DateTime      @default(now())
+  submittedAt DateTime?
+
+  @@index([userId, skill, level, createdAt])
+}
+
+/// Track tags on existing content; no change to the content tables.
+model ContentTrackTag {
+  contentType LearningContentType
+  contentId   Int
+  track       LearningTrack
+  createdById Int?
+  createdAt   DateTime            @default(now())
+
+  @@id([contentType, contentId, track])
+  @@index([track])
+}
+
+/// Elo-style difficulty per content item, seeded from its level tag.
+model ContentDifficulty {
+  contentType LearningContentType
+  contentId   Int
+  difficulty  Float
+  attempts    Int                 @default(0)
+  updatedAt   DateTime            @updatedAt
+
+  @@id([contentType, contentId])
+}
+
+/// Recommended or saved practice for a learner.
+model LearningPlanItem {
+  id          Int                    @id @default(autoincrement())
+  userId      Int
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentType LearningContentType
+  contentId   Int
+  skill       PracticeSkill
+  level       PracticeLevel
+  /// Short Vietnamese reason shown to the learner.
+  reason      String
+  status      LearningPlanItemStatus @default(SUGGESTED)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@unique([userId, contentType, contentId])
+  @@index([userId, status])
 }
