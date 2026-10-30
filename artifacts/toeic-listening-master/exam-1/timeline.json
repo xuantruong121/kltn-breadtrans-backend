@@ -1,11 +1,11 @@
 {
   "examId": 1,
-  "builtAt": "2026-10-27T06:07:34.721Z",
+  "builtAt": "2026-10-30T04:37:54.142Z",
   "file": "master.mp3",
-  "bytes": 15862700,
-  "sha256": "55065e0dfc19f3e56d689bdd76a10d4af82fa17362ae9c99052e9f885919a101",
-  "durationSeconds": 1982.808,
-  "plannedSeconds": 1982.755,
+  "bytes": 21017324,
+  "sha256": "ecc01cac689dc8b763d83d1f24e7f70c0c5bfd5b21f8b59cdfb2084c5710dac2",
+  "durationSeconds": 2627.136,
+  "plannedSeconds": 2627.067,
   "format": "mp3 24000 Hz 1ch 64 kb/s CBR",
   "responseGapSeconds": {
     "1": 5,
@@ -13,19 +13,19 @@
     "3": 8,
     "4": 8
   },
-  "clipSeconds": 994.4,
-  "narrationSeconds": 217.3,
+  "clipSeconds": 1639.5,
+  "narrationSeconds": 216.6,
   "timeline": [
     {
       "kind": "INTRO",
       "start": 0,
-      "end": 31.275
+      "end": 30.503
     },
     {
       "kind": "DIRECTIONS",
       "part": 1,
-      "start": 33.275,
-      "end": 51.076
+      "start": 32.503,
+      "end": 50.304
     },
     {
       "kind": "GROUP",
@@ -34,8 +34,8 @@
       "questionNumbers": [
         1
       ],
-      "start": 53.076,
-      "end": 76.407
+      "start": 52.304,
+      "end": 75.635
     },
     {
       "kind": "GROUP",
@@ -44,8 +44,8 @@
       "questionNumbers": [
         2
       ],
-      "start": 76.407,
-      "end": 99.425
+      "start": 75.635,
+      "end": 98.653
     },
     {
       "kind": "GROUP",
@@ -54,8 +54,8 @@
       "questionNumbers": [
         3
       ],
-      "start": 99.425,
-      "end": 123.775
+      "start": 98.653,
+      "end": 123.003
     },
     {
       "kind": "GROUP",
@@ -64,8 +64,8 @@
       "questionNumbers": [
         4
       ],
-      "start": 123.775,
-      "end": 147.367
+      "start": 123.003,
+      "end": 146.595
     },
     {
       "kind": "GROUP",
@@ -74,8 +74,8 @@
       "questionNumbers": [
         5
       ],
-      "start": 147.367,
-      "end": 171.61
+      "start": 146.595,
+      "end": 170.838
     },
     {
       "kind": "GROUP",
@@ -84,14 +84,14 @@
       "questionNumbers": [
         6
       ],
-      "start": 171.61,
-      "end": 196.173
+      "start": 170.838,
+      "end": 195.401
     },
     {
       "kind": "DIRECTIONS",
       "part": 2,
-      "start": 196.173,
-      "end": 214.479
+      "start": 195.401,
+      "end": 213.707
     },
     {
       "kind": "GROUP",
@@ -100,8 +100,8 @@
       "questionNumbers": [
         7
       ],
-      "start": 216.479,
-      "end": 237.048
+      "start": 215.707,
+      "end": 236.276
     },
     {
       "kind": "GROUP",
@@ -110,8 +110,8 @@
       "questionNumbers": [
         8
       ],
-      "start": 237.048,
-      "end": 257.402
+      "start": 236.276,
+      "end": 256.629
     },
     {
       "kind": "GROUP",
@@ -120,8 +120,8 @@
       "questionNumbers": [
         9
       ],
-      "start": 257.402,
-      "end": 278.853
+      "start": 256.629,
+      "end": 278.081
     },
     {
       "kind": "GROUP",
@@ -130,8 +130,8 @@
       "questionNumbers": [
         10
       ],
-      "start": 278.853,
-      "end": 298.944
+      "start": 278.081,
+      "end": 298.172
     },
     {
       "kind": "GROUP",
@@ -140,8 +140,8 @@
       "questionNumbers": [
         11
       ],
-      "start": 298.944,
-      "end": 319.152
+      "start": 298.172,
+      "end": 318.38
     },
     {
       "kind": "GROUP",
@@ -150,8 +150,8 @@
       "questionNumbers": [
         12
       ],
-      "start": 319.152,
-      "end": 340.542
+      "start": 318.38,
+      "end": 339.77
     },
     {
       "kind": "GROUP",
@@ -160,8 +160,8 @@
       "questionNumbers": [
         13
       ],
-      "start": 340.542,
-      "end": 361.786
+      "start": 339.77,
+      "end": 361.014
     },
     {
       "kind": "GROUP",
@@ -170,8 +170,8 @@
       "questionNumbers": [
         14
       ],
-      "start": 361.786,
-      "end": 382.032
+      "start": 361.014,
+      "end": 381.26
     },
     {
       "kind": "GROUP",
@@ -180,8 +180,8 @@
       "questionNumbers": [
         15
       ],
-      "start": 382.032,
-      "end": 402.857
+      "start": 381.26,
+      "end": 402.085
     },
     {
       "kind": "GROUP",
@@ -190,8 +190,8 @@
       "questionNumbers": [
         16
       ],
-      "start": 402.857,
-      "end": 423.495
+      "start": 402.085,
+      "end": 422.723
     },
     {
       "kind": "GROUP",
@@ -200,8 +200,8 @@
       "questionNumbers": [
         17
       ],
-      "start": 423.495,
-      "end": 445.362
+      "start": 422.723,
+      "end": 444.59
     },
     {
       "kind": "GROUP",
@@ -210,8 +210,8 @@
       "questionNumbers": [
         18
       ],
-      "start": 445.362,
-      "end": 465.697
+      "start": 444.59,
+      "end": 464.925
     },
     {
       "kind": "GROUP",
@@ -220,8 +220,8 @@
       "questionNumbers": [
         19
       ],
-      "start": 465.697,
-      "end": 486.844
+      "start": 464.925,
+      "end": 486.072
     },
     {
       "kind": "GROUP",
@@ -230,8 +230,8 @@
       "questionNumbers": [
         20
       ],
-      "start": 486.844,
-      "end": 506.413
+      "start": 486.072,
+      "end": 505.641
     },
     {
       "kind": "GROUP",
@@ -240,8 +240,8 @@
       "questionNumbers": [
         21
       ],
-      "start": 506.413,
-      "end": 528.444
+      "start": 505.641,
+      "end": 527.672
     },
     {
       "kind": "GROUP",
@@ -250,8 +250,8 @@
       "questionNumbers": [
         22
       ],
-      "start": 528.444,
-      "end": 549.912
+      "start": 527.672,
+      "end": 549.139
     },
     {
       "kind": "GROUP",
@@ -260,8 +260,8 @@
       "questionNumbers": [
         23
       ],
-      "start": 549.912,
-      "end": 571.445
+      "start": 549.139,
+      "end": 570.673
     },
     {
       "kind": "GROUP",
@@ -270,8 +270,8 @@
       "questionNumbers": [
         24
       ],
-      "start": 571.445,
-      "end": 592.504
+      "start": 570.673,
+      "end": 591.732
     },
     {
       "kind": "GROUP",
@@ -280,8 +280,8 @@
       "questionNumbers": [
         25
       ],
-      "start": 592.504,
-      "end": 612.649
+      "start": 591.732,
+      "end": 611.877
     },
     {
       "kind": "GROUP",
@@ -290,8 +290,8 @@
       "questionNumbers": [
         26
       ],
-      "start": 612.649,
-      "end": 634.222
+      "start": 611.877,
+      "end": 633.45
     },
     {
       "kind": "GROUP",
@@ -300,8 +300,8 @@
       "questionNumbers": [
         27
       ],
-      "start": 634.222,
-      "end": 654.942
+      "start": 633.45,
+      "end": 654.17
     },
     {
       "kind": "GROUP",
@@ -310,8 +310,8 @@
       "questionNumbers": [
         28
       ],
-      "start": 654.942,
-      "end": 675.933
+      "start": 654.17,
+      "end": 675.161
     },
     {
       "kind": "GROUP",
@@ -320,8 +320,8 @@
       "questionNumbers": [
         29
       ],
-      "start": 675.933,
-      "end": 698.005
+      "start": 675.161,
+      "end": 697.233
     },
     {
       "kind": "GROUP",
@@ -330,8 +330,8 @@
       "questionNumbers": [
         30
       ],
-      "start": 698.005,
-      "end": 718.747
+      "start": 697.233,
+      "end": 717.975
     },
     {
       "kind": "GROUP",
@@ -340,14 +340,14 @@
       "questionNumbers": [
         31
       ],
-      "start": 718.747,
-      "end": 741.797
+      "start": 717.975,
+      "end": 741.024
     },
     {
       "kind": "DIRECTIONS",
       "part": 3,
-      "start": 741.797,
-      "end": 759.287
+      "start": 741.024,
+      "end": 758.515
     },
     {
       "kind": "GROUP",
@@ -358,8 +358,8 @@
         33,
         34
       ],
-      "start": 761.287,
-      "end": 808.759
+      "start": 760.515,
+      "end": 833.043
     },
     {
       "kind": "GROUP",
@@ -370,8 +370,8 @@
         36,
         37
       ],
-      "start": 808.759,
-      "end": 858.78
+      "start": 833.043,
+      "end": 915.032
     },
     {
       "kind": "GROUP",
@@ -382,8 +382,8 @@
         39,
         40
       ],
-      "start": 858.78,
-      "end": 909.933
+      "start": 915.032,
+      "end": 994.085
     },
     {
       "kind": "GROUP",
@@ -394,8 +394,8 @@
         42,
         43
       ],
-      "start": 909.933,
-      "end": 962.856
+      "start": 994.085,
+      "end": 1075.484
     },
     {
       "kind": "GROUP",
@@ -406,8 +406,8 @@
         45,
         46
       ],
-      "start": 962.856,
-      "end": 1015.577
+      "start": 1075.484,
+      "end": 1160.857
     },
     {
       "kind": "GROUP",
@@ -418,8 +418,8 @@
         48,
         49
       ],
-      "start": 1015.577,
-      "end": 1066.095
+      "start": 1160.857,
+      "end": 1240.751
     },
     {
       "kind": "GROUP",
@@ -430,8 +430,8 @@
         51,
         52
       ],
-      "start": 1066.095,
-      "end": 1116.371
+      "start": 1240.751,
+      "end": 1317.379
     },
     {
       "kind": "GROUP",
@@ -442,8 +442,8 @@
         54,
         55
       ],
-      "start": 1116.371,
-      "end": 1170.958
+      "start": 1317.379,
+      "end": 1394.286
     },
     {
       "kind": "GROUP",
@@ -454,8 +454,8 @@
         57,
         58
       ],
-      "start": 1170.958,
-      "end": 1221.86
+      "start": 1394.286,
+      "end": 1472.259
     },
     {
       "kind": "GROUP",
@@ -466,8 +466,8 @@
         60,
         61
       ],
-      "start": 1221.86,
-      "end": 1271.487
+      "start": 1472.259,
+      "end": 1549.427
     },
     {
       "kind": "GROUP",
@@ -478,8 +478,8 @@
         63,
         64
       ],
-      "start": 1271.487,
-      "end": 1322.517
+      "start": 1549.427,
+      "end": 1628.969
     },
     {
       "kind": "GROUP",
@@ -490,8 +490,8 @@
         66,
         67
       ],
-      "start": 1322.517,
-      "end": 1373.816
+      "start": 1628.969,
+      "end": 1712.596
     },
     {
       "kind": "GROUP",
@@ -502,14 +502,14 @@
         69,
         70
       ],
-      "start": 1373.816,
-      "end": 1423.883
+      "start": 1712.596,
+      "end": 1788.259
     },
     {
       "kind": "DIRECTIONS",
       "part": 4,
-      "start": 1423.883,
-      "end": 1443.083
+      "start": 1788.259,
+      "end": 1807.459
     },
     {
       "kind": "GROUP",
@@ -520,8 +520,8 @@
         72,
         73
       ],
-      "start": 1445.083,
-      "end": 1494.929
+      "start": 1809.459,
+      "end": 1885.477
     },
     {
       "kind": "GROUP",
@@ -532,8 +532,8 @@
         75,
         76
       ],
-      "start": 1494.929,
-      "end": 1547.047
+      "start": 1885.477,
+      "end": 1967.583
     },
     {
       "kind": "GROUP",
@@ -544,8 +544,8 @@
         78,
         79
       ],
-      "start": 1547.047,
-      "end": 1599.381
+      "start": 1967.583,
+      "end": 2050.049
     },
     {
       "kind": "GROUP",
@@ -556,8 +556,8 @@
         81,
         82
       ],
-      "start": 1599.381,
-      "end": 1652.558
+      "start": 2050.049,
+      "end": 2125.582
     },
     {
       "kind": "GROUP",
@@ -568,8 +568,8 @@
         84,
         85
       ],
-      "start": 1652.558,
-      "end": 1706.187
+      "start": 2125.582,
+      "end": 2204.843
     },
     {
       "kind": "GROUP",
@@ -580,8 +580,8 @@
         87,
         88
       ],
-      "start": 1706.187,
-      "end": 1761.154
+      "start": 2204.843,
+      "end": 2290.95
     },
     {
       "kind": "GROUP",
@@ -592,8 +592,8 @@
         90,
         91
       ],
-      "start": 1761.154,
-      "end": 1813.495
+      "start": 2290.95,
+      "end": 2369.967
     },
     {
       "kind": "GROUP",
@@ -604,8 +604,8 @@
         93,
         94
       ],
-      "start": 1813.495,
-      "end": 1869.725
+      "start": 2369.967,
+      "end": 2454.169
     },
     {
       "kind": "GROUP",
@@ -616,8 +616,8 @@
         96,
         97
       ],
-      "start": 1869.725,
-      "end": 1924.516
+      "start": 2454.169,
+      "end": 2539.272
     },
     {
       "kind": "GROUP",
@@ -628,13 +628,13 @@
         99,
         100
       ],
-      "start": 1924.516,
-      "end": 1977.696
+      "start": 2539.272,
+      "end": 2622.008
     },
     {
       "kind": "END",
-      "start": 1977.696,
-      "end": 1982.755
+      "start": 2622.008,
+      "end": 2627.067
     }
   ]
 }

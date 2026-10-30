@@ -16,6 +16,10 @@
  *   AiService.generateToeicListeningAudio -> buildToeicListeningSsml
  *       (Azure SSML, with <say-as interpret-as="characters"> letter names)
  *
+ * Exam Listening audio is private (P05): objects go to the private bucket
+ * under premium/listening/toeic/ and the group stores the key, served only
+ * through /toeic/groups/:id/audio.
+ *
  * Object keys are derived from the stable seeded group ids, and a new
  * `-phase0` suffix is used so the pre-Phase-0 objects are preserved as
  * recovery artifacts rather than overwritten.
@@ -90,8 +94,8 @@ async function main() {
               async (group) =>
                 [
                   group.id,
-                  await r2.objectExists(
-                    `toeic/exams/${examSetId}/groups/${group.id}-${keySuffix}.mp3`,
+                  await r2.privateObjectExists(
+                    `premium/listening/toeic/exams/${examSetId}/groups/${group.id}-${keySuffix}.mp3`,
                   ),
                 ] as const,
             ),
@@ -118,7 +122,7 @@ async function main() {
       const metadata = (group.mediaMetadata ?? {}) as {
         audio?: { sourceHash?: string };
       };
-      const key = `toeic/exams/${examSetId}/groups/${group.id}-${keySuffix}.mp3`;
+      const key = `premium/listening/toeic/exams/${examSetId}/groups/${group.id}-${keySuffix}.mp3`;
       if (group.audioUrl && metadata.audio?.sourceHash === sourceHash) {
         report.push({
           groupId: group.id,
@@ -151,7 +155,7 @@ async function main() {
           await prisma.toeicQuestionGroup.update({
             where: { id: group.id },
             data: {
-              audioUrl: r2.getPublicAssetUrl(key),
+              audioUrl: key,
               mediaMetadata: {
                 ...(group.mediaMetadata as object | null),
                 audio: {
@@ -188,10 +192,10 @@ async function main() {
       try {
         const audio = await ai.generateToeicListeningAudio(script);
         if (!audio.length) throw new Error('provider returned empty audio');
-        await r2.putObjectAtKey(key, audio, 'audio/mpeg');
-        if (!(await r2.objectExists(key)))
+        await r2.putPrivateObjectAtKey(key, audio, 'audio/mpeg');
+        if (!(await r2.privateObjectExists(key)))
           throw new Error('R2 did not confirm the uploaded object');
-        const url = r2.getPublicAssetUrl(key);
+        const url = key;
 
         await prisma.toeicQuestionGroup.update({
           where: { id: group.id },

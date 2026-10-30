@@ -12,10 +12,13 @@
  *   build      ffmpeg: intro + per-Part directions + cues + clips + response
  *              gaps -> master.mp3 (mono 24 kHz 64 kb/s CBR, loudness
  *              normalized) and timeline.json (segment offsets per group).
+ *   registry   writes src/modules/toeic/listening-master/exam-<id>.ts from
+ *              timeline.json.
  *   publish    upload master.mp3 + timeline.json to an S3-compatible bucket
  *              under a content-hashed key, refusing to overwrite a different
  *              object. --bucket harness (local fake S3) needs nothing else;
- *              --bucket r2 needs TOEIC_MASTER_PUBLISH_AUTHORIZED=publish.
+ *              --bucket r2 needs TOEIC_MASTER_PUBLISH_AUTHORIZED=publish;
+ *              --bucket r2-private (the P05 location) needs it too.
  *
  * Usage:
  *   npx ts-node --transpile-only scripts/toeic-listening-master.ts <mode> --exam 1 --target env:DATABASE_URL
@@ -43,6 +46,14 @@ import {
   escapeXml,
   LISTENING_VOICE_REGISTRY,
 } from '../src/modules/quiz/listening-audio-authoring.service';
+import {
+  isPrivateListeningMediaKey,
+  R2Service,
+} from '../src/modules/upload/r2.service';
+import {
+  type ListeningMaster,
+  privateListeningMasterKey,
+} from '../src/modules/toeic/toeic-listening-master';
 
 const arg = (name: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -198,6 +209,7 @@ async function inventory(examId: number, dir: string) {
   await prisma.$disconnect();
   mkdirSync(join(dir, 'clips'), { recursive: true });
   const clips: InventoryClip[] = [];
+  let r2: R2Service | undefined;
   for (const g of groups) {
     if (!g.audioUrl)
       throw new Error(`group ${g.id} (Part ${g.part}) has no audioUrl`);
@@ -207,9 +219,15 @@ async function inventory(examId: number, dir: string) {
       `${String(g.part)}-${String(g.groupOrder).padStart(3, '0')}-g${g.id}.mp3`,
     );
     if (!existsSync(file)) {
-      const res = await fetch(g.audioUrl);
-      if (!res.ok) throw new Error(`GET ${g.audioUrl} -> ${res.status}`);
-      writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+      // Since P05 a group stores a private key; older rows hold a public URL.
+      if (isPrivateListeningMediaKey(g.audioUrl)) {
+        r2 ??= new R2Service();
+        writeFileSync(file, await r2.downloadPrivateFileBuffer(g.audioUrl));
+      } else {
+        const res = await fetch(g.audioUrl);
+        if (!res.ok) throw new Error(`GET ${g.audioUrl} -> ${res.status}`);
+        writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+      }
     }
     const buf = readFileSync(file);
     clips.push({
@@ -603,6 +621,31 @@ async function publish(examId: number, dir: string) {
   const bucket = arg('bucket');
   const tl = JSON.parse(readFileSync(join(dir, 'timeline.json'), 'utf8'));
   const prefix = `catalog/toeic/exam-${examId}/listening-master/${tl.sha256.slice(0, 16)}`;
+  if (bucket === 'r2-private') {
+    // Since P05 exam audio lives only in the private bucket, under the
+    // registry key's file name (privateListeningMasterKey).
+    if (process.env.TOEIC_MASTER_PUBLISH_AUTHORIZED !== 'publish')
+      throw new Error(
+        'REFUSED: TOEIC_MASTER_PUBLISH_AUTHORIZED=publish not set',
+      );
+    const key = privateListeningMasterKey({
+      examId,
+      key: `${prefix}.v1.mp3`,
+    } as ListeningMaster);
+    const body = readFileSync(join(dir, 'master.mp3'));
+    const r2 = new R2Service();
+    if (await r2.privateObjectExists(key)) {
+      if (sha256(await r2.downloadPrivateFileBuffer(key)) !== tl.sha256)
+        throw new Error(`REFUSED: ${key} exists with other content`);
+      console.log(`exists (same sha256), skipped: ${key}`);
+      return;
+    }
+    await r2.putPrivateObjectAtKey(key, body, 'audio/mpeg');
+    if (sha256(await r2.downloadPrivateFileBuffer(key)) !== tl.sha256)
+      throw new Error(`${key}: sha256 mismatch after write`);
+    console.log(`uploaded ${key} (${body.length} bytes) to the private bucket`);
+    return;
+  }
   let client: S3Client;
   let name: string;
   if (bucket === 'harness') {
@@ -629,7 +672,7 @@ async function publish(examId: number, dir: string) {
       },
     });
     name = process.env.R2_BUCKET_NAME!;
-  } else throw new Error('--bucket harness | r2');
+  } else throw new Error('--bucket harness | r2 | r2-private');
   const timeline = Buffer.from(
     JSON.stringify({ ...tl, file: `${prefix}.v1.mp3` }, null, 2),
   );
@@ -664,6 +707,42 @@ async function publish(examId: number, dir: string) {
   }
 }
 
+/** Writes the registry module the API reads (src/modules/toeic/listening-master). */
+function registry(examId: number, dir: string) {
+  const tl = JSON.parse(readFileSync(join(dir, 'timeline.json'), 'utf8'));
+  const master: ListeningMaster = {
+    examId,
+    key: `catalog/toeic/exam-${examId}/listening-master/${tl.sha256.slice(0, 16)}.v1.mp3`,
+    sha256: tl.sha256,
+    bytes: tl.bytes,
+    durationSeconds: tl.durationSeconds,
+    format: tl.format,
+    responseGapSeconds: tl.responseGapSeconds,
+    timeline: tl.timeline,
+  };
+  const file = join(
+    'src',
+    'modules',
+    'toeic',
+    'listening-master',
+    `exam-${examId}.ts`,
+  );
+  writeFileSync(
+    file,
+    `/**
+ * Generated by scripts/toeic-listening-master.ts (registry) for exam set ${examId}.
+ * Do not edit by hand: rebuild the master and regenerate this file.
+ */
+import type { ListeningMaster } from '../toeic-listening-master';
+
+export const EXAM_${examId}_LISTENING_MASTER: ListeningMaster = ${JSON.stringify(master, null, 2)};
+`,
+  );
+  console.log(
+    `wrote ${file}: ${(master.durationSeconds / 60).toFixed(2)} min, sha ${master.sha256.slice(0, 16)}`,
+  );
+}
+
 async function main() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('dotenv').config({ quiet: true });
@@ -675,7 +754,9 @@ async function main() {
   else if (mode === 'narration') await narration(examId, dir);
   else if (mode === 'build') build(examId, dir);
   else if (mode === 'publish') await publish(examId, dir);
-  else throw new Error('mode: inventory | narration | build | publish');
+  else if (mode === 'registry') registry(examId, dir);
+  else
+    throw new Error('mode: inventory | narration | build | publish | registry');
 }
 
 if (require.main === module)

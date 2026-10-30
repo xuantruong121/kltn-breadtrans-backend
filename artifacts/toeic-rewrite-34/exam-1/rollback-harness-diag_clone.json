@@ -1,0 +1,1109 @@
+{
+  "examId": 1,
+  "groups": [
+    {
+      "id": 32,
+      "part": 3,
+      "groupOrder": 32,
+      "transcriptText": null,
+      "passageText": "M: The client moved tomorrow’s meeting from ten to eleven thirty. W: That works, but Conference Room A is booked then. M: I’ll reserve Room C instead.",
+      "questions": [
+        {
+          "id": 32,
+          "questionNumber": 32,
+          "text": "What changed about the meeting?",
+          "options": [
+            "The time",
+            "The date",
+            "The topic",
+            "The client"
+          ],
+          "correctIndex": 0,
+          "explanation": "The meeting moved from 10:00 to 11:30."
+        },
+        {
+          "id": 33,
+          "questionNumber": 33,
+          "text": "What problem does the woman mention?",
+          "options": [
+            "Room A is unavailable",
+            "The report is unfinished",
+            "The office is closed",
+            "The client canceled"
+          ],
+          "correctIndex": 0,
+          "explanation": "She says Room A is booked."
+        },
+        {
+          "id": 34,
+          "questionNumber": 34,
+          "text": "What will the man probably do?",
+          "options": [
+            "Print a new contract",
+            "Cancel the meeting",
+            "Reserve Room C",
+            "Call a taxi"
+          ],
+          "correctIndex": 2,
+          "explanation": "He says he will reserve Room C."
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "part": 3,
+      "groupOrder": 33,
+      "transcriptText": null,
+      "passageText": "W: I can’t access the shared budget file. M: I forgot to update the permissions after moving it to the new folder. W: Could you send me the new link once it’s fixed? M: Sure.",
+      "questions": [
+        {
+          "id": 35,
+          "questionNumber": 35,
+          "text": "What problem does the woman have?",
+          "options": [
+            "She cannot attend a meeting",
+            "She forgot the budget total",
+            "She lost her laptop",
+            "She cannot access a file"
+          ],
+          "correctIndex": 3,
+          "explanation": "She cannot access the shared budget file."
+        },
+        {
+          "id": 36,
+          "questionNumber": 36,
+          "text": "What did the man forget to do?",
+          "options": [
+            "Update file permissions",
+            "Call a supplier",
+            "Book a meeting room",
+            "Pay an invoice"
+          ],
+          "correctIndex": 0,
+          "explanation": "He says he forgot to update permissions."
+        },
+        {
+          "id": 37,
+          "questionNumber": 37,
+          "text": "What does the woman request?",
+          "options": [
+            "A new computer",
+            "A printed budget",
+            "A password reset by phone",
+            "A new link"
+          ],
+          "correctIndex": 3,
+          "explanation": "She asks him to send the new link."
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "part": 3,
+      "groupOrder": 34,
+      "transcriptText": null,
+      "passageText": "M: Has the supplier confirmed Friday’s delivery? W: Yes, but only 60 chairs will arrive Friday. The remaining 40 will come Monday. M: Then I’ll tell the event team to use the chairs we already have in storage.",
+      "questions": [
+        {
+          "id": 38,
+          "questionNumber": 38,
+          "text": "What are the speakers discussing?",
+          "options": [
+            "A hotel reservation",
+            "A furniture delivery",
+            "A training schedule",
+            "A software license"
+          ],
+          "correctIndex": 1,
+          "explanation": "They discuss delivery of chairs."
+        },
+        {
+          "id": 39,
+          "questionNumber": 39,
+          "text": "How many chairs will arrive Monday?",
+          "options": [
+            "20",
+            "100",
+            "60",
+            "40"
+          ],
+          "correctIndex": 3,
+          "explanation": "The woman says the remaining 40 will come Monday."
+        },
+        {
+          "id": 40,
+          "questionNumber": 40,
+          "text": "What will the man do?",
+          "options": [
+            "Order 100 more chairs",
+            "Use chairs from storage",
+            "Move the event to Monday",
+            "Cancel the event"
+          ],
+          "correctIndex": 1,
+          "explanation": "He plans to use existing chairs from storage."
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "part": 3,
+      "groupOrder": 35,
+      "transcriptText": null,
+      "passageText": "W: I’m calling about my order. The tracking page says it was delivered, but I haven’t received it. M: I’m sorry about that. Let me check the delivery photo and contact the courier. W: Thank you. I’ll stay by my phone.",
+      "questions": [
+        {
+          "id": 41,
+          "questionNumber": 41,
+          "text": "Why is the woman calling?",
+          "options": [
+            "She needs a refund for a class",
+            "She wants store hours",
+            "A package is missing",
+            "She wants to place an order"
+          ],
+          "correctIndex": 2,
+          "explanation": "The tracking says delivered, but she has not received it."
+        },
+        {
+          "id": 42,
+          "questionNumber": 42,
+          "text": "What will the man do first?",
+          "options": [
+            "Close the customer account",
+            "Send a replacement immediately",
+            "Change the order quantity",
+            "Check delivery information"
+          ],
+          "correctIndex": 3,
+          "explanation": "He says he will check the delivery photo and contact the courier."
+        },
+        {
+          "id": 43,
+          "questionNumber": 43,
+          "text": "What does the woman imply?",
+          "options": [
+            "She expects a follow-up call",
+            "She is traveling today",
+            "She found the package",
+            "She will visit the store"
+          ],
+          "correctIndex": 0,
+          "explanation": "She says she will stay by her phone, implying she expects follow-up."
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "part": 3,
+      "groupOrder": 36,
+      "transcriptText": null,
+      "passageText": "M: Are you attending the software workshop next week? W: I wanted to, but Tuesday is fully booked. There are still seats on Thursday. M: Thursday works for me too. Let’s ask our manager before we register.",
+      "questions": [
+        {
+          "id": 44,
+          "questionNumber": 44,
+          "text": "Why can’t the woman attend Tuesday?",
+          "options": [
+            "The workshop was canceled",
+            "It is fully booked",
+            "Her manager refused",
+            "She is on vacation"
+          ],
+          "correctIndex": 1,
+          "explanation": "She says Tuesday is fully booked."
+        },
+        {
+          "id": 45,
+          "questionNumber": 45,
+          "text": "What do the speakers plan to do?",
+          "options": [
+            "Request manager approval",
+            "Travel on Tuesday",
+            "Cancel their registration",
+            "Create a new workshop"
+          ],
+          "correctIndex": 0,
+          "explanation": "They will ask their manager before registering."
+        },
+        {
+          "id": 46,
+          "questionNumber": 46,
+          "text": "What is suggested about Thursday?",
+          "options": [
+            "Seats are available",
+            "The instructor is different",
+            "The office is closed",
+            "It costs more"
+          ],
+          "correctIndex": 0,
+          "explanation": "The woman states seats are still available Thursday."
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "part": 3,
+      "groupOrder": 37,
+      "transcriptText": null,
+      "passageText": "W: The hotel sent the final invoice, but breakfast was charged twice. M: I’ll call the billing desk. Do you still have the receipt from checkout? W: Yes, I scanned it and saved it with the travel documents.",
+      "questions": [
+        {
+          "id": 47,
+          "questionNumber": 47,
+          "text": "What error was found?",
+          "options": [
+            "The room rate was missing",
+            "A flight was added",
+            "The hotel name was wrong",
+            "Breakfast was charged twice"
+          ],
+          "correctIndex": 3,
+          "explanation": "The woman says breakfast was charged twice."
+        },
+        {
+          "id": 48,
+          "questionNumber": 48,
+          "text": "What does the man plan to do?",
+          "options": [
+            "Call the billing desk",
+            "Ask for a new receipt from the airline",
+            "Book another hotel",
+            "Submit the invoice unchanged"
+          ],
+          "correctIndex": 0,
+          "explanation": "He says he will call billing."
+        },
+        {
+          "id": 49,
+          "questionNumber": 49,
+          "text": "What does the woman have?",
+          "options": [
+            "A new invoice",
+            "A scanned receipt",
+            "A breakfast voucher",
+            "A hotel key"
+          ],
+          "correctIndex": 1,
+          "explanation": "She saved a scanned receipt."
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "part": 3,
+      "groupOrder": 38,
+      "transcriptText": null,
+      "passageText": "M: We need a larger room for Friday’s product demonstration. W: The auditorium is free after one, but the projector there is being repaired. M: I can bring the portable projector from our department.",
+      "questions": [
+        {
+          "id": 50,
+          "questionNumber": 50,
+          "text": "What do the speakers need?",
+          "options": [
+            "A catering service",
+            "A larger room",
+            "More customers",
+            "A new product"
+          ],
+          "correctIndex": 1,
+          "explanation": "The man says they need a larger room."
+        },
+        {
+          "id": 51,
+          "questionNumber": 51,
+          "text": "What problem does the woman mention?",
+          "options": [
+            "The event starts before noon",
+            "The auditorium is occupied all day",
+            "The product is unavailable",
+            "The auditorium projector is being repaired"
+          ],
+          "correctIndex": 3,
+          "explanation": "The projector is under repair."
+        },
+        {
+          "id": 52,
+          "questionNumber": 52,
+          "text": "How does the man propose solving the problem?",
+          "options": [
+            "Bring a portable projector",
+            "Cancel the event",
+            "Rent a different building",
+            "Move the demonstration online"
+          ],
+          "correctIndex": 0,
+          "explanation": "He offers to bring a portable projector."
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "part": 3,
+      "groupOrder": 39,
+      "transcriptText": null,
+      "passageText": "W: Have you finished the monthly sales charts? M: Almost. I’m waiting for the online-store figures. W: Those were uploaded this morning. Check the folder called September Final. M: Great, then I can finish before lunch.",
+      "questions": [
+        {
+          "id": 53,
+          "questionNumber": 53,
+          "text": "What is the man preparing?",
+          "options": [
+            "Sales charts",
+            "Travel receipts",
+            "Job applications",
+            "Training materials"
+          ],
+          "correctIndex": 0,
+          "explanation": "The woman asks about monthly sales charts."
+        },
+        {
+          "id": 54,
+          "questionNumber": 54,
+          "text": "What information was the man waiting for?",
+          "options": [
+            "Employee schedules",
+            "Online-store figures",
+            "Customer names",
+            "Shipping costs"
+          ],
+          "correctIndex": 1,
+          "explanation": "He says he was waiting for online-store figures."
+        },
+        {
+          "id": 55,
+          "questionNumber": 55,
+          "text": "What will the man probably do next?",
+          "options": [
+            "Call the online store",
+            "Check the September Final folder",
+            "Upload a job posting",
+            "Go to lunch immediately"
+          ],
+          "correctIndex": 1,
+          "explanation": "He now knows where the figures are stored."
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "part": 3,
+      "groupOrder": 40,
+      "transcriptText": null,
+      "passageText": "M: The café downstairs is closed for renovation. W: I saw that. There’s a food truck outside the east entrance today. M: Perfect. I only have twenty minutes before my next call.",
+      "questions": [
+        {
+          "id": 56,
+          "questionNumber": 56,
+          "text": "What is closed?",
+          "options": [
+            "A conference room",
+            "The downstairs café",
+            "The east entrance",
+            "The parking garage"
+          ],
+          "correctIndex": 1,
+          "explanation": "The café is closed for renovation."
+        },
+        {
+          "id": 57,
+          "questionNumber": 57,
+          "text": "What does the woman suggest indirectly?",
+          "options": [
+            "Skipping lunch",
+            "Canceling a call",
+            "Buying food from the truck",
+            "Ordering office furniture"
+          ],
+          "correctIndex": 2,
+          "explanation": "She mentions a food truck as an alternative."
+        },
+        {
+          "id": 58,
+          "questionNumber": 58,
+          "text": "Why is the man in a hurry?",
+          "options": [
+            "He has a call soon",
+            "He has a train to catch",
+            "The food truck is leaving",
+            "The building is closing"
+          ],
+          "correctIndex": 0,
+          "explanation": "He has twenty minutes before his next call."
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "part": 3,
+      "groupOrder": 41,
+      "transcriptText": null,
+      "passageText": "W: I’d like to exchange this jacket. M: Of course. Do you need a different size or color? W: A smaller size, if possible. M: Let me check our stock in the back.",
+      "questions": [
+        {
+          "id": 59,
+          "questionNumber": 59,
+          "text": "What does the woman want to do?",
+          "options": [
+            "Order online",
+            "Return a gift card",
+            "Exchange a jacket",
+            "Buy shoes"
+          ],
+          "correctIndex": 2,
+          "explanation": "She asks to exchange the jacket."
+        },
+        {
+          "id": 60,
+          "questionNumber": 60,
+          "text": "What does she want changed?",
+          "options": [
+            "The price",
+            "The color",
+            "The brand",
+            "The size"
+          ],
+          "correctIndex": 3,
+          "explanation": "She asks for a smaller size."
+        },
+        {
+          "id": 61,
+          "questionNumber": 61,
+          "text": "What will the man do?",
+          "options": [
+            "Issue a refund immediately",
+            "Close the store",
+            "Call a tailor",
+            "Check inventory"
+          ],
+          "correctIndex": 3,
+          "explanation": "He says he will check stock."
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "part": 3,
+      "groupOrder": 42,
+      "transcriptText": null,
+      "passageText": "M: The interview candidate arrived early. W: Great. I’m finishing another call. Could you ask her to complete the visitor form while she waits? M: Sure, and I’ll offer her some water.",
+      "questions": [
+        {
+          "id": 62,
+          "questionNumber": 62,
+          "text": "Who has arrived?",
+          "options": [
+            "A job candidate",
+            "A customer",
+            "A delivery driver",
+            "A technician"
+          ],
+          "correctIndex": 0,
+          "explanation": "They refer to an interview candidate."
+        },
+        {
+          "id": 63,
+          "questionNumber": 63,
+          "text": "Why can’t the woman meet her immediately?",
+          "options": [
+            "She is on another call",
+            "The room is unavailable",
+            "She is out of the office",
+            "The candidate is late"
+          ],
+          "correctIndex": 0,
+          "explanation": "The woman is finishing another call."
+        },
+        {
+          "id": 64,
+          "questionNumber": 64,
+          "text": "What will the man ask the visitor to do?",
+          "options": [
+            "Review a contract",
+            "Make a presentation",
+            "Complete a form",
+            "Call the receptionist"
+          ],
+          "correctIndex": 2,
+          "explanation": "He will ask her to complete the visitor form."
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "part": 3,
+      "groupOrder": 43,
+      "transcriptText": null,
+      "passageText": "W: The marketing team wants feedback on these two poster designs. M: I prefer the second one because the event date is easier to see. W: I agree, but we should make the website address larger too.",
+      "questions": [
+        {
+          "id": 65,
+          "questionNumber": 65,
+          "text": "What are the speakers reviewing?",
+          "options": [
+            "Poster designs",
+            "Website contracts",
+            "Job applications",
+            "Sales reports"
+          ],
+          "correctIndex": 0,
+          "explanation": "They discuss two poster designs."
+        },
+        {
+          "id": 66,
+          "questionNumber": 66,
+          "text": "Why does the man prefer the second design?",
+          "options": [
+            "The website address is larger",
+            "It has fewer colors",
+            "It is cheaper",
+            "The date is clearer"
+          ],
+          "correctIndex": 3,
+          "explanation": "He says the event date is easier to see."
+        },
+        {
+          "id": 67,
+          "questionNumber": 67,
+          "text": "What change does the woman suggest?",
+          "options": [
+            "Remove the event date",
+            "Print fewer posters",
+            "Change the event location",
+            "Increase the website-address size"
+          ],
+          "correctIndex": 3,
+          "explanation": "She says the website address should be larger."
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "part": 3,
+      "groupOrder": 44,
+      "transcriptText": null,
+      "passageText": "M: I booked the 3:15 train, but the client just asked whether we can stay until four. W: There’s a 5:30 train with plenty of seats. M: Okay, I’ll change my ticket and extend the meeting.",
+      "questions": [
+        {
+          "id": 68,
+          "questionNumber": 68,
+          "text": "What problem does the man have?",
+          "options": [
+            "His train leaves before the client wants the meeting to end",
+            "The client cannot attend",
+            "His ticket was canceled",
+            "There are no later trains"
+          ],
+          "correctIndex": 0,
+          "explanation": "The original train conflicts with the requested meeting time."
+        },
+        {
+          "id": 69,
+          "questionNumber": 69,
+          "text": "What information does the woman provide?",
+          "options": [
+            "The station is closed",
+            "The client has left",
+            "A later train is available",
+            "The 3:15 train is delayed"
+          ],
+          "correctIndex": 2,
+          "explanation": "She says a 5:30 train has plenty of seats."
+        },
+        {
+          "id": 70,
+          "questionNumber": 70,
+          "text": "What will the man do?",
+          "options": [
+            "Change his ticket",
+            "Book a hotel",
+            "Ask the client to travel",
+            "End the meeting at three"
+          ],
+          "correctIndex": 0,
+          "explanation": "He says he will change the ticket."
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "part": 4,
+      "groupOrder": 45,
+      "transcriptText": null,
+      "passageText": "Attention shoppers. The store will close at seven this evening for a scheduled electrical inspection. Customers with items on hold should collect them before six thirty. Regular hours will resume tomorrow morning at nine.",
+      "questions": [
+        {
+          "id": 71,
+          "questionNumber": 71,
+          "text": "Why will the store close early?",
+          "options": [
+            "For a holiday",
+            "For an electrical inspection",
+            "For inventory delivery",
+            "For a staff party"
+          ],
+          "correctIndex": 1,
+          "explanation": "The announcement cites a scheduled electrical inspection."
+        },
+        {
+          "id": 72,
+          "questionNumber": 72,
+          "text": "What should customers do before 6:30?",
+          "options": [
+            "Apply for membership",
+            "Return purchases",
+            "Use the parking garage",
+            "Collect held items"
+          ],
+          "correctIndex": 3,
+          "explanation": "Items on hold should be collected before 6:30."
+        },
+        {
+          "id": 73,
+          "questionNumber": 73,
+          "text": "When will regular hours resume?",
+          "options": [
+            "Tomorrow at 9 A.M.",
+            "Tonight at 7 P.M.",
+            "Next week",
+            "Tomorrow at 6:30 A.M."
+          ],
+          "correctIndex": 0,
+          "explanation": "The store resumes regular hours at nine tomorrow."
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "part": 4,
+      "groupOrder": 46,
+      "transcriptText": null,
+      "passageText": "Hello, this is Daniel from Northside Dental Clinic calling for Ms. Lewis. I’m confirming your appointment for Tuesday at 2:45 P.M. If you need to change the time, please call us before noon on Monday so we can offer the appointment to another patient.",
+      "questions": [
+        {
+          "id": 74,
+          "questionNumber": 74,
+          "text": "Why is Daniel calling?",
+          "options": [
+            "To hire a receptionist",
+            "To collect a payment",
+            "To advertise a service",
+            "To confirm an appointment"
+          ],
+          "correctIndex": 3,
+          "explanation": "He explicitly says he is confirming an appointment."
+        },
+        {
+          "id": 75,
+          "questionNumber": 75,
+          "text": "When is the appointment?",
+          "options": [
+            "Tuesday at noon",
+            "Tuesday at 2:45 P.M.",
+            "Monday at noon",
+            "Monday at 2:45 P.M."
+          ],
+          "correctIndex": 1,
+          "explanation": "The stated appointment time is Tuesday at 2:45."
+        },
+        {
+          "id": 76,
+          "questionNumber": 76,
+          "text": "What should Ms. Lewis do to change the time?",
+          "options": [
+            "Call before noon Monday",
+            "Visit the clinic today",
+            "Contact another patient",
+            "Send a letter Tuesday"
+          ],
+          "correctIndex": 0,
+          "explanation": "She must call before noon Monday."
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "part": 4,
+      "groupOrder": 47,
+      "transcriptText": null,
+      "passageText": "Welcome to the City History Museum. Guided tours begin every hour from ten until four. Today, the second-floor photography gallery is closed while a new exhibition is installed. The café and gift shop remain open as usual on the ground floor.",
+      "questions": [
+        {
+          "id": 77,
+          "questionNumber": 77,
+          "text": "What is the talk mainly about?",
+          "options": [
+            "A photography competition",
+            "A city bus tour",
+            "Visitor information at a museum",
+            "A café menu"
+          ],
+          "correctIndex": 2,
+          "explanation": "The announcement gives museum visitor information."
+        },
+        {
+          "id": 78,
+          "questionNumber": 78,
+          "text": "What is closed today?",
+          "options": [
+            "The entire museum",
+            "The gift shop",
+            "The café",
+            "The photography gallery"
+          ],
+          "correctIndex": 3,
+          "explanation": "The second-floor photography gallery is closed."
+        },
+        {
+          "id": 79,
+          "questionNumber": 79,
+          "text": "Where are the café and gift shop?",
+          "options": [
+            "On the ground floor",
+            "On the second floor",
+            "Near the parking garage",
+            "Outside the museum"
+          ],
+          "correctIndex": 0,
+          "explanation": "They are on the ground floor."
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "part": 4,
+      "groupOrder": 48,
+      "transcriptText": null,
+      "passageText": "Good morning, everyone. Before today’s safety training begins, please sign the attendance sheet at the front of the room. The first session will cover emergency exits, followed by a short break at ten thirty. The equipment demonstration will take place after the break.",
+      "questions": [
+        {
+          "id": 80,
+          "questionNumber": 80,
+          "text": "What are listeners asked to do first?",
+          "options": [
+            "Take a break",
+            "Inspect equipment",
+            "Leave the room",
+            "Sign an attendance sheet"
+          ],
+          "correctIndex": 3,
+          "explanation": "They are asked to sign before training begins."
+        },
+        {
+          "id": 81,
+          "questionNumber": 81,
+          "text": "What will the first session cover?",
+          "options": [
+            "Travel safety",
+            "Emergency exits",
+            "Equipment purchasing",
+            "Customer service"
+          ],
+          "correctIndex": 1,
+          "explanation": "The first session covers emergency exits."
+        },
+        {
+          "id": 82,
+          "questionNumber": 82,
+          "text": "What happens after the break?",
+          "options": [
+            "A building tour",
+            "Lunch",
+            "An equipment demonstration",
+            "Registration"
+          ],
+          "correctIndex": 2,
+          "explanation": "The equipment demonstration follows the break."
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "part": 4,
+      "groupOrder": 49,
+      "transcriptText": null,
+      "passageText": "Due to road construction on Pine Street, Bus 42 will use Oak Avenue between Central Station and City Hall through Friday. The bus will not stop at Pine Street Library during this period. Passengers for the library should get off at Market Square and walk two blocks east.",
+      "questions": [
+        {
+          "id": 83,
+          "questionNumber": 83,
+          "text": "Why is Bus 42 changing its route?",
+          "options": [
+            "Bad weather",
+            "A holiday parade",
+            "Road construction",
+            "Vehicle repairs"
+          ],
+          "correctIndex": 2,
+          "explanation": "The announcement states road construction."
+        },
+        {
+          "id": 84,
+          "questionNumber": 84,
+          "text": "Which stop will not be served?",
+          "options": [
+            "City Hall",
+            "Central Station",
+            "Market Square",
+            "Pine Street Library"
+          ],
+          "correctIndex": 3,
+          "explanation": "The bus will not stop at the library."
+        },
+        {
+          "id": 85,
+          "questionNumber": 85,
+          "text": "What should library passengers do?",
+          "options": [
+            "Get off at Market Square",
+            "Walk from Central Station",
+            "Take a train",
+            "Wait until Friday"
+          ],
+          "correctIndex": 0,
+          "explanation": "They should get off at Market Square and walk east."
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "part": 4,
+      "groupOrder": 50,
+      "transcriptText": null,
+      "passageText": "This month, our company is introducing a new online expense system. Starting Monday, employees should upload receipts directly through the finance portal instead of emailing them. A short video tutorial is available on the staff website, and the finance team will hold two question-and-answer sessions next week.",
+      "questions": [
+        {
+          "id": 86,
+          "questionNumber": 86,
+          "text": "What change is being introduced?",
+          "options": [
+            "A new office location",
+            "A new salary schedule",
+            "A new expense system",
+            "A new travel policy"
+          ],
+          "correctIndex": 2,
+          "explanation": "The company is introducing an online expense system."
+        },
+        {
+          "id": 87,
+          "questionNumber": 87,
+          "text": "What should employees stop doing?",
+          "options": [
+            "Emailing receipts",
+            "Using the finance portal",
+            "Keeping receipts",
+            "Watching tutorials"
+          ],
+          "correctIndex": 0,
+          "explanation": "They should upload receipts rather than email them."
+        },
+        {
+          "id": 88,
+          "questionNumber": 88,
+          "text": "What support will be available?",
+          "options": [
+            "Free travel",
+            "New computers for everyone",
+            "Private accounting lessons",
+            "A tutorial and Q&A sessions"
+          ],
+          "correctIndex": 3,
+          "explanation": "The talk mentions a video tutorial and two Q&A sessions."
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "part": 4,
+      "groupOrder": 51,
+      "transcriptText": null,
+      "passageText": "Thank you for choosing Harbor Hotel. Breakfast is served on the first floor from six thirty to ten each morning. Guests who need to leave before six thirty can request a takeaway breakfast at reception by nine P.M. the previous evening. Checkout time is eleven A.M.",
+      "questions": [
+        {
+          "id": 89,
+          "questionNumber": 89,
+          "text": "Where is breakfast served?",
+          "options": [
+            "On the roof",
+            "On the first floor",
+            "In guest rooms only",
+            "At reception"
+          ],
+          "correctIndex": 1,
+          "explanation": "Breakfast is served on the first floor."
+        },
+        {
+          "id": 90,
+          "questionNumber": 90,
+          "text": "What should early-departing guests do?",
+          "options": [
+            "Call the restaurant after 6:30",
+            "Request takeaway breakfast by 9 P.M.",
+            "Check out after noon",
+            "Pay an extra room fee"
+          ],
+          "correctIndex": 1,
+          "explanation": "They can request takeaway breakfast at reception by 9 P.M. the previous evening."
+        },
+        {
+          "id": 91,
+          "questionNumber": 91,
+          "text": "What time is checkout?",
+          "options": [
+            "6:30 A.M.",
+            "9 P.M.",
+            "10 A.M.",
+            "11 A.M."
+          ],
+          "correctIndex": 3,
+          "explanation": "Checkout is at eleven A.M."
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "part": 4,
+      "groupOrder": 52,
+      "transcriptText": null,
+      "passageText": "The Lakeside Business Expo opens this Friday at the Convention Center. Online registration closes Thursday at noon, but visitors may still register at the entrance for a slightly higher fee. Parking is limited, so organizers recommend using the subway, which stops directly across from the center.",
+      "questions": [
+        {
+          "id": 92,
+          "questionNumber": 92,
+          "text": "When does online registration close?",
+          "options": [
+            "Friday morning",
+            "Thursday at noon",
+            "Friday at noon",
+            "Thursday evening"
+          ],
+          "correctIndex": 1,
+          "explanation": "Online registration closes Thursday at noon."
+        },
+        {
+          "id": 93,
+          "questionNumber": 93,
+          "text": "What is true about registering at the entrance?",
+          "options": [
+            "It requires a parking permit",
+            "It costs slightly more",
+            "It is free",
+            "It is not allowed"
+          ],
+          "correctIndex": 1,
+          "explanation": "Door registration is available for a higher fee."
+        },
+        {
+          "id": 94,
+          "questionNumber": 94,
+          "text": "Why is public transportation recommended?",
+          "options": [
+            "The center has moved",
+            "Roads are closed",
+            "The subway is free",
+            "Parking is limited"
+          ],
+          "correctIndex": 3,
+          "explanation": "Organizers recommend the subway because parking is limited."
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "part": 4,
+      "groupOrder": 53,
+      "transcriptText": null,
+      "passageText": "Hi, team. I’ve reviewed the first draft of the customer survey. The questions are clear, but the survey is currently too long. Please reduce it from twenty-five questions to about fifteen and add one optional comment box at the end. I’d like the revised version by Wednesday afternoon.",
+      "questions": [
+        {
+          "id": 95,
+          "questionNumber": 95,
+          "text": "What is the speaker discussing?",
+          "options": [
+            "A sales contract",
+            "A customer survey",
+            "An employee schedule",
+            "A training video"
+          ],
+          "correctIndex": 1,
+          "explanation": "The speaker reviewed a customer survey draft."
+        },
+        {
+          "id": 96,
+          "questionNumber": 96,
+          "text": "What change is requested?",
+          "options": [
+            "Increase it to 30 questions",
+            "Reduce the number of questions",
+            "Translate it immediately",
+            "Remove all comment fields"
+          ],
+          "correctIndex": 1,
+          "explanation": "The speaker asks to reduce 25 questions to about 15."
+        },
+        {
+          "id": 97,
+          "questionNumber": 97,
+          "text": "When is the revision wanted?",
+          "options": [
+            "Next month",
+            "Today at noon",
+            "Wednesday afternoon",
+            "Thursday morning"
+          ],
+          "correctIndex": 2,
+          "explanation": "The deadline is Wednesday afternoon."
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "part": 4,
+      "groupOrder": 54,
+      "transcriptText": null,
+      "passageText": "Passengers traveling on Flight 605 to Seoul: boarding will begin shortly at Gate 18. Because the flight is full, passengers with large carry-on bags may check them at the gate free of charge. Families traveling with young children will be invited to board first.",
+      "questions": [
+        {
+          "id": 98,
+          "questionNumber": 98,
+          "text": "Where will passengers board?",
+          "options": [
+            "The ticket counter",
+            "Gate 18",
+            "The baggage hall",
+            "Gate 605"
+          ],
+          "correctIndex": 1,
+          "explanation": "Boarding is at Gate 18."
+        },
+        {
+          "id": 99,
+          "questionNumber": 99,
+          "text": "Why may passengers check large carry-on bags?",
+          "options": [
+            "The flight is full",
+            "The bags are damaged",
+            "Security is closed",
+            "The airline changed airports"
+          ],
+          "correctIndex": 0,
+          "explanation": "The announcement says the flight is full."
+        },
+        {
+          "id": 100,
+          "questionNumber": 100,
+          "text": "Who will board first?",
+          "options": [
+            "People in Gate 18",
+            "Passengers with large bags",
+            "Business travelers",
+            "Families with young children"
+          ],
+          "correctIndex": 3,
+          "explanation": "Families with young children receive priority boarding."
+        }
+      ]
+    }
+  ]
+}
