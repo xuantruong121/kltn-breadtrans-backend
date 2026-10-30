@@ -73,10 +73,12 @@ const RESPONSE_GAP: Record<number, number> = { 1: 5, 2: 5, 3: 8, 4: 8 };
  * direction per Part) without reproducing any official test's wording.
  */
 export const NARRATION = {
+  // Short sentences: the owner found the first, longer intro rushed and
+  // hard to follow in places (2026-10-30).
   intro:
-    'Welcome to the BreadTrans TOEIC-style Listening practice test. This practice test was written by BreadTrans and is not an official TOEIC test. ' +
-    'In this section, you will hear a range of short recordings in English: statements, questions, conversations, and talks. ' +
-    'The section has one hundred questions in four parts. For each question, choose the best answer and mark A, B, C, or D. Listen carefully. We will now begin with Part One.',
+    'Welcome to the BreadTrans TOEIC Listening practice test. This test was written by BreadTrans. It is not an official TOEIC test. ' +
+    'In this section, you will hear short recordings in English: statements, questions, conversations, and talks. ' +
+    'There are one hundred questions in four parts. For each question, choose the best answer: A, B, C, or D. Listen carefully. Part One will begin now.',
   part1:
     'Part One. Photographs. Questions one to six. For each question, look at the photograph on your page. You will hear four short statements about it. The statements are not printed. Choose the statement that best describes what you see.',
   part2:
@@ -88,14 +90,32 @@ export const NARRATION = {
   end: 'This is the end of the Listening section. You may now continue with the Reading section.',
 } as const;
 
+/** Pause after a sentence, after a colon, and between answer letters. */
+export const NARRATION_BREAKS = { sentence: 200, colon: 350, letter: 300 };
+
 /**
  * Narration text as SSML. The voice spells an all-caps word letter by letter
- * ("T O E I C"), so brand and test names get a spoken alias.
+ * ("T O E I C"), so brand and test names get a pronunciation. The voice's
+ * own pauses were about 0.2 s inside lists and "A, B, C, or D", which ran the
+ * letters together, so explicit breaks are added.
  */
 export function narrationSsml(text: string): string {
-  return escapeXml(text)
-    .replace(/\bTOEIC\b/g, '<sub alias="toe-ick">TOEIC</sub>')
-    .replace(/\bBreadTrans\b/g, '<sub alias="Bread Trans">BreadTrans</sub>');
+  const b = (ms: number) => `<break time="${ms}ms"/>`;
+  return (
+    escapeXml(text)
+      .replace(
+        /\bTOEIC\b/g,
+        '<phoneme alphabet="ipa" ph="ˈtoʊ.ɪk">TOEIC</phoneme>',
+      )
+      .replace(/\bBreadTrans\b/g, '<sub alias="Bread Trans">BreadTrans</sub>')
+      // "A, B, C, or D" / "A, B, and C": each letter on its own
+      .replace(
+        /\b([A-D]), (?=(?:and |or )?[A-D]\b)/g,
+        `$1,${b(NARRATION_BREAKS.letter)} `,
+      )
+      .replace(/: /g, `:${b(NARRATION_BREAKS.colon)} `)
+      .replace(/([.?!]) (?=\S)/g, `$1${b(NARRATION_BREAKS.sentence)} `)
+  );
 }
 
 const numberWords = (n: number): string => {
@@ -310,7 +330,7 @@ async function narration(examId: number, dir: string) {
         `${narrationSsml(s.text)}<bookmark mark="${s.id}"/><break time="1200ms"/>`,
     )
     .join('');
-  const ssml = `<speak version="1.0" xml:lang="en-US" xmlns="http://www.w3.org/2001/10/synthesis"><voice name="${voice}"><prosody rate="-4%">${body}</prosody></voice></speak>`;
+  const ssml = `<speak version="1.0" xml:lang="en-US" xmlns="http://www.w3.org/2001/10/synthesis"><voice name="${voice}"><prosody rate="-8%">${body}</prosody></voice></speak>`;
   const chars = segments.reduce((n, s) => n + s.text.length, 0);
   console.log(
     `narration: ${segments.length} segments, ${chars} characters, 1 TTS request, voice ${voice}`,
