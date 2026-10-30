@@ -38,6 +38,13 @@ import { SpeakingCategoryService } from './speaking-category.service';
 import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
 import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
 import { SpeakingService } from '../speaking/speaking.service';
+import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
+import {
+  filterQuizList,
+  filterSpeakingSets,
+  quizListFacets,
+  speakingSetFacets,
+} from './skill-cms-list';
 import { UploadService } from '../upload/upload.service';
 
 type Domain = 'listening' | 'reading' | 'writing' | 'speaking';
@@ -154,25 +161,62 @@ export class SkillCmsService {
     );
   }
 
-  async list(rawDomain: string, user: Admin) {
+  /**
+   * The domain's items. Without `query.page` the full array (editors and
+   * composers need it); with it one page plus header counts, filtered and
+   * sorted on the server (see skill-cms-list.ts).
+   */
+  async list(rawDomain: string, user: Admin, query: ListQuery = {}) {
     this.admin(user);
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
-      return this.prisma.speakingPracticeSet.findMany({
-        where: { scope: 'SKILL_PRACTICE' },
-        orderBy: { updatedAt: 'desc' },
-        include: {
-          exercises: {
-            orderBy: [{ order: 'asc' }, { id: 'asc' }],
-            include: {
-              categoryTaxonomy: true,
-              stimulus: true,
-              _count: { select: { submissions: true } },
-            },
+      const include = {
+        exercises: {
+          orderBy: [{ order: 'asc' as const }, { id: 'asc' as const }],
+          include: {
+            categoryTaxonomy: true,
+            stimulus: true,
+            _count: { select: { submissions: true } },
           },
-          categoryTaxonomy: true,
         },
+        categoryTaxonomy: true,
+      };
+      if (!wantsPage(query))
+        return this.prisma.speakingPracticeSet.findMany({
+          where: { scope: 'SKILL_PRACTICE' },
+          orderBy: { updatedAt: 'desc' },
+          include,
+        });
+      // Light rows decide the page; exercises load for that page only.
+      const rows = (
+        await this.prisma.speakingPracticeSet.findMany({
+          where: { scope: 'SKILL_PRACTICE' },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            category: true,
+            level: true,
+            publicationStatus: true,
+            updatedAt: true,
+            _count: { select: { exercises: true } },
+          },
+        })
+      ).map(({ _count, ...row }) => ({
+        ...row,
+        exerciseCount: _count.exercises,
+      }));
+      const page = pageOf(filterSpeakingSets(rows, query), query, 12);
+      const full = await this.prisma.speakingPracticeSet.findMany({
+        where: { id: { in: page.items.map((row) => row.id) } },
+        include,
       });
+      const byId = new Map(full.map((set) => [set.id, set]));
+      return {
+        ...page,
+        items: page.items.map((row) => byId.get(row.id)).filter(Boolean),
+        facets: speakingSetFacets(rows),
+      };
     }
     const quizzes = await this.prisma.quiz.findMany({
       where: this.contentTypeWhere(domain),
@@ -192,7 +236,8 @@ export class SkillCmsService {
           : {}),
       },
     });
-    if (domain !== 'listening' || !quizzes.length) return quizzes;
+    if (domain !== 'listening' || !quizzes.length)
+      return this.listPage(quizzes, query);
     // Comprehension and dictation play one clip per question: count them.
     const withAudio = await this.prisma.question.groupBy({
       by: ['quizId'],
@@ -205,10 +250,24 @@ export class SkillCmsService {
     const counts = new Map(
       withAudio.map((row) => [row.quizId, row._count._all]),
     );
-    return quizzes.map((quiz) => ({
-      ...quiz,
-      questionsWithAudio: counts.get(quiz.id) ?? 0,
-    }));
+    return this.listPage(
+      quizzes.map((quiz) => ({
+        ...quiz,
+        questionsWithAudio: counts.get(quiz.id) ?? 0,
+      })),
+      query,
+    );
+  }
+
+  private listPage<T extends Parameters<typeof filterQuizList>[0][number]>(
+    rows: T[],
+    query: ListQuery,
+  ) {
+    if (!wantsPage(query)) return rows;
+    return {
+      ...pageOf(filterQuizList(rows, query), query),
+      facets: quizListFacets(rows),
+    };
   }
 
   async get(

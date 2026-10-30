@@ -261,9 +261,27 @@ export class AdminController {
 
   // ============== VOCAB MANAGEMENT (PHASE 4 CMS) ==============
   @Get('vocab/topics')
-  @ApiOperation({ summary: 'Admin: Lay danh sach chu de tu vung' })
-  getVocabTopics() {
-    return this.adminService.getVocabTopics();
+  @ApiOperation({
+    summary: 'Admin: Danh sach bo tu vung; gui page de nhan mot trang da loc',
+  })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'pageSize', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'level', required: false, description: 'A1..C2 hoac NONE' })
+  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'PUBLISHED'] })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    enum: ['NEWEST', 'TITLE', 'LEVEL', 'FEWEST'],
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Mang (khong co page) hoac { items, total, page, pageSize, facets }',
+  })
+  getVocabTopics(@Query() query: Record<string, string | undefined>) {
+    return this.adminService.getVocabTopics(query);
   }
 
   @Get('vocab/topics/:id/summary')

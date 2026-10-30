@@ -44,6 +44,8 @@ import {
   posOf,
   assertNotANumber,
 } from '../vocab/dictionary-entry';
+import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
+import { deckListFacets, filterDeckList } from './vocab-deck-list';
 
 export const DASHBOARD_RANGES = ['30d', '6m', '12m'] as const;
 export type DashboardRange = (typeof DASHBOARD_RANGES)[number];
@@ -1133,8 +1135,9 @@ export class AdminService {
   }
 
   // ============== VOCAB MANAGEMENT (PHASE 4 CMS) ==============
-  async getVocabTopics() {
-    return this.prisma.vocabTopic.findMany({
+  /** All decks, or with `query.page` one filtered page plus header counts. */
+  async getVocabTopics(query: ListQuery = {}) {
+    const decks = await this.prisma.vocabTopic.findMany({
       // The Speaking lookup dictionary is system data, not a deck to manage.
       where: { categoryName: { not: SYSTEM_DICTIONARY_CATEGORY } },
       include: {
@@ -1142,6 +1145,11 @@ export class AdminService {
       },
       orderBy: { id: 'asc' },
     });
+    if (!wantsPage(query)) return decks;
+    return {
+      ...pageOf(filterDeckList(decks, query), query),
+      facets: deckListFacets(decks),
+    };
   }
 
   async getVocabTopicDetail(id: number) {

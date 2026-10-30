@@ -11,11 +11,13 @@ import {
   Res,
   UploadedFile,
   ParseIntPipe,
+  Query,
   UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -50,8 +52,44 @@ import { SpeakingStimulusDto } from './speaking-stimulus.dto';
 export class SkillCmsController {
   constructor(private readonly service: SkillCmsService) {}
 
-  @Get(':domain') list(@Param('domain') domain: string, @Request() req: any) {
-    return this.service.list(domain, req.user);
+  @Get(':domain')
+  @ApiOperation({
+    summary:
+      'Admin: danh sách nội dung kỹ năng; gửi page để nhận một trang đã lọc',
+  })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'pageSize', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'PUBLISHED'] })
+  @ApiQuery({ name: 'level', required: false })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    enum: ['NEWEST', 'OLDEST', 'TITLE', 'LEVEL', 'FEWEST'],
+  })
+  @ApiQuery({
+    name: 'audio',
+    required: false,
+    enum: ['ok', 'pending', 'error', 'none'],
+  })
+  @ApiQuery({
+    name: 'mode',
+    required: false,
+    enum: ['COMPREHENSION', 'DICTATION', 'DIALOGUE'],
+  })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'category', required: false })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Mảng (không có page) hoặc { items, total, page, pageSize, facets }',
+  })
+  list(
+    @Param('domain') domain: string,
+    @Request() req: any,
+    @Query() query: Record<string, string | undefined>,
+  ) {
+    return this.service.list(domain, req.user, query);
   }
 
   @Get('speaking/stimuli') listSpeakingStimuli(@Request() req: any) {

@@ -12,7 +12,13 @@ import {
   BadRequestException,
   Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -51,9 +57,28 @@ export class AdminExamController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Admin: Lấy danh sách tất cả bộ đề thi' })
-  getExams() {
-    return this.genericExamService.listAdmin();
+  @ApiOperation({
+    summary: 'Admin: Danh sách bộ đề thi; gửi page để nhận một trang đã lọc',
+  })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'pageSize', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'PUBLISHED'] })
+  @ApiQuery({ name: 'family', required: false })
+  @ApiQuery({ name: 'variant', required: false })
+  @ApiQuery({ name: 'ready', required: false, enum: ['READY', 'NOT_READY'] })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    enum: ['UPDATED', 'TITLE', 'QUESTIONS'],
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Mảng (không có page) hoặc { items, total, page, pageSize, facets }',
+  })
+  getExams(@Query() query: Record<string, string | undefined>) {
+    return this.genericExamService.listAdmin(query);
   }
 
   @Post('ai/generate')
