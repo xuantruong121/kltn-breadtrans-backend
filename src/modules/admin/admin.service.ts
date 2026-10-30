@@ -91,6 +91,15 @@ export function buildDashboardBuckets(range: DashboardRange, now = new Date()) {
   });
 }
 
+const SYSTEM_DICTIONARY_CATEGORY = 'SYSTEM_DICTIONARY';
+
+function assertNotSystemCategory(categoryName?: string) {
+  if (categoryName?.trim() === SYSTEM_DICTIONARY_CATEGORY)
+    throw new BadRequestException(
+      'Chuyên mục SYSTEM_DICTIONARY dành cho hệ thống, không dùng cho bộ từ.',
+    );
+}
+
 /** Flashcards teach words; a bare number ("10", "9:00") is not one. */
 function assertNotANumber(word?: string) {
   if (word && /^\d+([.,:]\d+)*$/.test(word.trim()))
@@ -1104,6 +1113,8 @@ export class AdminService {
   // ============== VOCAB MANAGEMENT (PHASE 4 CMS) ==============
   async getVocabTopics() {
     return this.prisma.vocabTopic.findMany({
+      // The Speaking lookup dictionary is system data, not a deck to manage.
+      where: { categoryName: { not: SYSTEM_DICTIONARY_CATEGORY } },
       include: {
         _count: { select: { words: true } },
       },
@@ -1247,6 +1258,7 @@ export class AdminService {
   }
 
   async createVocabTopic(dto: CreateVocabTopicDto) {
+    assertNotSystemCategory(dto.categoryName);
     return this.prisma.vocabTopic.create({
       data: {
         title: dto.title,
@@ -1263,6 +1275,7 @@ export class AdminService {
   }
 
   async updateVocabTopic(id: number, dto: UpdateVocabTopicDto) {
+    assertNotSystemCategory(dto.categoryName);
     const topic = await this.prisma.vocabTopic.findUnique({ where: { id } });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
     return this.prisma.vocabTopic.update({

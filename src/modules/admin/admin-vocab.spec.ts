@@ -165,3 +165,31 @@ describe('AdminService vocab paging and moves', () => {
     expect(prisma.vocabWord.create).not.toHaveBeenCalled();
   });
 });
+
+describe('AdminService keeps the Speaking lookup dictionary out of the CMS', () => {
+  const build = (prisma: unknown) =>
+    new AdminService(prisma as any, {} as any, {} as any, {} as any, undefined);
+
+  it('lists decks without the system dictionary', async () => {
+    const prisma = {
+      vocabTopic: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    await build(prisma).getVocabTopics();
+    expect(prisma.vocabTopic.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { categoryName: { not: 'SYSTEM_DICTIONARY' } },
+      }),
+    );
+  });
+
+  it('refuses a deck in the system category', async () => {
+    const prisma = { vocabTopic: { create: jest.fn() } };
+    await expect(
+      build(prisma).createVocabTopic({
+        title: 'X',
+        categoryName: 'SYSTEM_DICTIONARY',
+      } as any),
+    ).rejects.toThrow('dành cho hệ thống');
+    expect(prisma.vocabTopic.create).not.toHaveBeenCalled();
+  });
+});
