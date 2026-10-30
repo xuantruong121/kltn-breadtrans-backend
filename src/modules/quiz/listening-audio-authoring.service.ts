@@ -473,8 +473,8 @@ export class ListeningAudioAuthoringService {
       });
   }
 
-  async validateContent(quizId: number) {
-    const payload = await this.loadCanonical(quizId);
+  /** At least two speakers, and not all of them on one voice. */
+  private assertSpeakersAndVoices(payload: CanonicalSynthesisPayload) {
     const speakers = new Set(payload.turns.map((turn) => turn.speakerId));
     if (speakers.size < 2) {
       throw new BadRequestException(
@@ -489,6 +489,12 @@ export class ListeningAudioAuthoringService {
         'Mỗi người nói trong hội thoại phải được ánh xạ sang một giọng đọc khác nhau.',
       );
     }
+    return speakers;
+  }
+
+  async validateContent(quizId: number) {
+    const payload = await this.loadCanonical(quizId);
+    const speakers = this.assertSpeakersAndVoices(payload);
     return {
       quizId,
       turns: payload.turns.length,
@@ -643,6 +649,9 @@ export class ListeningAudioAuthoringService {
 
   async generatePreview(quizId: number, actorId: number) {
     const payload = await this.loadCanonical(quizId);
+    // Same gate as Validate: a preview with one voice for two speakers was
+    // produced before (F8 drafts "Mark | Sarah", 2026-10-30).
+    this.assertSpeakersAndVoices(payload);
     const isPremium = await this.isPremiumListeningQuiz(quizId);
     if (isPremium && !this.uploadService.isPrivateStorageConfigured()) {
       throw new ServiceUnavailableException(
