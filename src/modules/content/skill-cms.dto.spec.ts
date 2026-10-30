@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
-import { ListeningQuestionDto } from './skill-cms.dto';
+import { ListeningQuestionDto, SkillContentDto } from './skill-cms.dto';
 
 const dto = (content: Record<string, unknown>) =>
   plainToInstance(ListeningQuestionDto, { type: 'MULTIPLE_CHOICE', content });
@@ -35,5 +35,23 @@ describe('ListeningQuestionDto content', () => {
       'accent',
       'explanation',
     ]);
+  });
+});
+
+describe('SkillContentDto bilingualContent', () => {
+  const content = (bilingualContent: unknown) =>
+    validate(
+      plainToInstance(SkillContentDto, { title: 'Quiz', bilingualContent }),
+    );
+
+  it('accepts the listening metadata object the CMS sends', async () => {
+    expect(
+      await content({ mode: 'DIALOGUE', levels: ['C1'], accents: ['US'] }),
+    ).toEqual([]);
+  });
+
+  it('accepts a reading paragraph array and rejects a string', async () => {
+    expect(await content([{ en: 'Hi', vi: 'Chào' }])).toEqual([]);
+    expect((await content('DIALOGUE'))[0].property).toBe('bilingualContent');
   });
 });

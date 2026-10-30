@@ -42,6 +42,23 @@ function IsStringOrPlainObject(options?: ValidationOptions) {
     });
 }
 
+/** Accepts an array or a plain JSON object. */
+function IsArrayOrPlainObject(options?: ValidationOptions) {
+  return (target: object, propertyName: string) =>
+    registerDecorator({
+      name: 'isArrayOrPlainObject',
+      target: target.constructor,
+      propertyName,
+      options: {
+        message: `${propertyName} must be an array or an object`,
+        ...options,
+      },
+      validator: {
+        validate: (value: unknown) => !!value && typeof value === 'object',
+      },
+    });
+}
+
 export class SkillContentDto {
   @IsString()
   @IsNotEmpty()
@@ -76,9 +93,10 @@ export class SkillContentDto {
   @IsString()
   accent?: string;
 
+  /** Reading: paragraph array. Listening: metadata object { mode, levels, accents, ... }. */
   @IsOptional()
-  @IsArray()
-  bilingualContent?: unknown[];
+  @IsArrayOrPlainObject()
+  bilingualContent?: unknown[] | Record<string, unknown>;
 
   @IsOptional()
   @IsString()
@@ -145,6 +163,15 @@ export class ListeningTranscriptSegmentDto {
   @IsOptional()
   @IsString()
   voiceKey?: string;
+
+  /**
+   * Kept so a question that copies the quiz transcript stays identical to it:
+   * the audio builder dedupes blocks on speaker, speakerId, voiceKey, text
+   * and translation.
+   */
+  @IsOptional()
+  @IsString()
+  speakerId?: string;
 }
 
 export class ListeningQuestionContentDto {
