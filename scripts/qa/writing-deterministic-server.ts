@@ -44,6 +44,11 @@ const provider = {
   explainToeicError: async () => 'Deterministic explanation.',
   generateToeicQuestions: async () => [],
   generateDictation: async () => [],
+  // Dictionary lookups: a fixed Vietnamese meaning, so an external result is
+  // complete and the store keeps it for review (F13).
+  enrichDictionaryEntry: async (input: { word: string }) => ({
+    meaningVi: `nghĩa kiểm thử của ${input.word}`,
+  }),
   evaluateWritingPart1: async () => evaluate(3),
   evaluateWritingPart2: async () => evaluate(4),
   evaluateWritingPart3: async () => evaluate(5),
