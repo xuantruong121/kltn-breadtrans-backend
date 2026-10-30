@@ -12251,12 +12251,20 @@ async function main() {
     DO $$
     DECLARE r record; max_id bigint; current_value bigint;
     BEGIN
+      -- pg_get_serial_sequence raises on a table without an id column (join
+      -- tables keyed by two ids), so it is only called where id exists.
       FOR r IN
-        SELECT c.relname AS tbl,
-               pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), 'id') AS seq
-        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = 'public' AND c.relkind = 'r'
-          AND pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), 'id') IS NOT NULL
+        SELECT t.tbl, t.seq FROM (
+          SELECT c.relname AS tbl,
+                 CASE WHEN EXISTS (
+                   SELECT 1 FROM pg_attribute a
+                   WHERE a.attrelid = c.oid AND a.attname = 'id' AND NOT a.attisdropped
+                 ) THEN pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), 'id')
+                 END AS seq
+          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public' AND c.relkind = 'r'
+        ) t
+        WHERE t.seq IS NOT NULL
       LOOP
         EXECUTE format('SELECT MAX(id) FROM public.%I', r.tbl) INTO max_id;
         SELECT last_value INTO current_value FROM pg_sequences
