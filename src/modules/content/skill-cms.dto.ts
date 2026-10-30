@@ -227,6 +227,11 @@ export class ListeningQuestionContentDto {
   @IsOptional()
   @IsIn(['LISTENING'])
   skill?: 'LISTENING';
+
+  /** Comprehension: an optional picture the question is about. */
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }
 
 export class ListeningQuestionDto {

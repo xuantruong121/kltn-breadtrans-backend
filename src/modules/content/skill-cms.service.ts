@@ -1301,7 +1301,8 @@ export class SkillCmsService {
   ) {
     this.admin(user);
     await this.assertListeningQuestion(quizId, questionId);
-    await this.assertNoHistory(quizId);
+    // Re-recording the same sentence changes no answer or score, so it is
+    // allowed after learners have taken the quiz.
     return this.requireListeningAuthoring().quiz.generateDialogueAudioAsset(
       questionId,
     );

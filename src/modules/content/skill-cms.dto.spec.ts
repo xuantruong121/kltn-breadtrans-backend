@@ -15,6 +15,7 @@ describe('ListeningQuestionDto content', () => {
         accent: 'US',
         level: 'A2',
         skill: 'LISTENING',
+        imageUrl: 'https://cdn/picture.png',
         explanation: { vi: 'Cô ấy gọi cà phê.', en: 'She orders coffee.' },
         transcriptSegments: [
           {
