@@ -24,7 +24,6 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiConsumes,
-  ApiQuery,
   ApiBody,
   ApiHeader,
   ApiResponse,
@@ -58,20 +57,7 @@ export class SpeakingController {
 
   // ── STUDENT: Xem & Làm bài ────────────────────────────────────────────────
 
-  @Get('exercises')
-  @ApiOperation({ summary: 'Lấy danh sách bài tập phát âm' })
-  @ApiQuery({
-    name: 'category',
-    required: false,
-    description: 'Speaking category code; resolved by the taxonomy source',
-  })
-  findAllExercises(@Query('category') category: string, @Request() req: any) {
-    return this.speakingService.findAllExercises(
-      category,
-      req?.user?.id,
-      req?.user?.role,
-    );
-  }
+  // GET exercises (the catalog) lives in SpeakingCatalogController: guests may browse.
 
   @Get('exercises/:id')
   @ApiOperation({ summary: 'Lấy thông tin chi tiết một bài tập' })
