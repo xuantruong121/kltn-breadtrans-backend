@@ -2,7 +2,7 @@ import {
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { QuizType, TopicCategory } from '@prisma/client';
+import { Prisma, QuizType, TopicCategory } from '@prisma/client';
 
 import { summarizeWritingExercise } from './practice-writing-grading';
 import { WritingService } from './writing.service';
@@ -58,6 +58,8 @@ function reply(points: number) {
     strengths: ['Dùng đúng từ khóa.'],
     corrections: [],
     feedback: 'Câu viết rõ ràng và đúng yêu cầu của đề.',
+    taskRelevance: 'ON_TASK',
+    relevanceEvidence: 'Câu dùng đúng hai từ và đúng tình huống của đề.',
     suggestions: ['Thử dùng thêm một mệnh đề phụ.'],
   });
 }
@@ -246,6 +248,124 @@ describe('multi-task Writing exercise', () => {
     await expect(submit(999, 8, id(5))).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  it('G. an empty answer is refused before any grading', async () => {
+    const { service, ai, submissions } = setup();
+    await expect(
+      service.submitWriting(quiz.id, 7, '   ', undefined, id(7), undefined, 12),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(ai.generateStructuredJson).not.toHaveBeenCalled();
+    expect(submissions).toHaveLength(0);
+  });
+
+  it('J. a well-formed reply missing the relevance verdict is retried, then nothing is stored', async () => {
+    const { service, ai, submissions, events } = setup();
+    const noVerdict = JSON.parse(reply(8));
+    delete noVerdict.taskRelevance;
+    ai.generateStructuredJson.mockResolvedValue({
+      text: JSON.stringify(noVerdict),
+      model: 'test',
+    });
+    await expect(
+      service.submitWriting(
+        quiz.id,
+        7,
+        'The meeting is tomorrow.',
+        undefined,
+        id(8),
+        undefined,
+        12,
+      ),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(ai.generateStructuredJson).toHaveBeenCalledTimes(2);
+    expect(submissions).toHaveLength(0);
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+
+  it('C/I. a provider timeout makes one call, stores nothing; a later resubmission is stored and rewarded once', async () => {
+    const { service, ai, submissions, events } = setup();
+    ai.generateStructuredJson.mockRejectedValueOnce(
+      Object.assign(new Error('Gemini provider request timed out'), {
+        name: 'AbortError',
+      }),
+    );
+    const send = (attempt: string) =>
+      service.submitWriting(
+        quiz.id,
+        7,
+        'The meeting is tomorrow.',
+        undefined,
+        attempt,
+        undefined,
+        12,
+      );
+    await expect(send(id(9))).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(ai.generateStructuredJson).toHaveBeenCalledTimes(1);
+    expect(ai.generateStructuredJson.mock.calls[0][0]).toMatchObject({
+      timeoutMs: 60_000,
+      failoverOnTimeout: false,
+    });
+    expect(submissions).toHaveLength(0);
+    expect(events.emit).not.toHaveBeenCalled();
+
+    ai.generateStructuredJson.mockResolvedValueOnce({
+      text: reply(8),
+      model: 'test',
+    });
+    await send(id(10));
+    // Replaying the same attempt id returns the stored grade without a new call.
+    await send(id(10));
+    expect(ai.generateStructuredJson).toHaveBeenCalledTimes(2);
+    expect(submissions).toHaveLength(1);
+  });
+
+  it('two concurrent requests with the same clientAttemptId store one grade and reward once', async () => {
+    const { service, ai, prisma, submissions, events } = setup();
+    // The database's unique (userId, quizId, clientAttemptId) refuses the second insert.
+    const original = prisma.submission.create.getMockImplementation()!;
+    prisma.submission.create.mockImplementation((args: any) => {
+      if (
+        submissions.some(
+          (s) =>
+            s.clientAttemptId === args.data.clientAttemptId &&
+            s.userId === args.data.userId,
+        )
+      )
+        return Promise.reject(
+          new Prisma.PrismaClientKnownRequestError('unique', {
+            code: 'P2002',
+            clientVersion: 'test',
+            meta: { target: ['userId', 'quizId', 'clientAttemptId'] },
+          }),
+        );
+      return original(args);
+    });
+    ai.generateStructuredJson.mockResolvedValue({
+      text: reply(8),
+      model: 'test',
+    });
+    const send = () =>
+      service.submitWriting(
+        quiz.id,
+        7,
+        'The meeting is tomorrow.',
+        undefined,
+        id(11),
+        undefined,
+        12,
+      );
+    const [a, b] = await Promise.all([send(), send()]);
+    expect(a.submissionId).toBe(b.submissionId);
+    expect(submissions).toHaveLength(1);
+    // Each in-flight request was graded: that is the residual cost of a true race.
+    expect(ai.generateStructuredJson).toHaveBeenCalledTimes(2);
+    expect(
+      events.emit.mock.calls.filter((c: any[]) => c[1]?.isFirstSubmission)
+        .length,
+    ).toBeLessThanOrEqual(1);
   });
 
   it('a failed grade stores nothing and the exercise stays incomplete', async () => {

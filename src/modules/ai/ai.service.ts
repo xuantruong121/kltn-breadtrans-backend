@@ -172,6 +172,8 @@ export class AiService {
     prompt: string;
     responseSchema: unknown;
     temperature?: number;
+    timeoutMs?: number;
+    failoverOnTimeout?: boolean;
   }): Promise<{ text: string; model: string }> {
     if (!this.aiEvaluator.generateStructuredJson) {
       const error = new Error('Structured JSON generation is not supported');

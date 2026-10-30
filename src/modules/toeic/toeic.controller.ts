@@ -11,8 +11,14 @@ import {
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
-import type { Response } from 'express';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
+import { Readable, pipeline } from 'node:stream';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { AttemptMode, Role } from '@prisma/client';
 import { ToeicService } from './toeic.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -172,24 +178,81 @@ export class ToeicController {
   @Get('listening-master/:examId/audio')
   @ApiOperation({
     summary:
-      'Bản ghi Listening liền mạch dựng sẵn trên máy (dùng khi chưa publish lên R2; hỗ trợ Range)',
+      'Bản ghi Listening liền mạch của lượt thi (bản dựng trên máy hoặc bản đã publish, qua backend; hỗ trợ Range)',
   })
   @ApiResponse({ status: 200, description: 'audio/mpeg' })
-  @ApiResponse({ status: 404, description: 'Không có bản dựng khớp registry' })
-  getLocalListeningMaster(
+  @ApiQuery({
+    name: 'grant',
+    description:
+      'Quyền nghe ngắn hạn do GET /toeic/attempts/:id/listening/master cấp',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không có bản dựng khớp registry, hoặc thiếu/sai quyền nghe',
+  })
+  async getLocalListeningMaster(
     @Param('examId', ParseIntPipe) examId: number,
+    @Query('grant') grant: string | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
-    // Same Listening media the exam already serves publicly; the file is used
-    // only when its sha256 matches the registry entry.
-    const file = this.toeicService.localMasterFile(examId);
-    if (!file) {
+    // The whole Listening section of the exam: streamed only with a grant
+    // for an attempt that still allows playback (checked on every request).
+    // The local file is used only when its sha256 matches the registry.
+    const source = await this.toeicService.resolveListeningMasterStream(
+      examId,
+      grant,
+    );
+    if (!source) {
       res.status(404).json({ statusCode: 404, message: 'Not found' });
       return;
     }
     res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.sendFile(file, { acceptRanges: true });
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    if ('file' in source) {
+      res.sendFile(source.file, { acceptRanges: true });
+      return;
+    }
+    if ('privateKey' in source) {
+      const object = await this.toeicService
+        .openPrivateMedia(source.privateKey, req.headers.range)
+        .catch(() => null);
+      if (!object) {
+        res.status(404).json({ statusCode: 404, message: 'Not found' });
+        return;
+      }
+      res.status(object.status);
+      res.setHeader('Accept-Ranges', 'bytes');
+      if (object.contentLength !== undefined)
+        res.setHeader('Content-Length', String(object.contentLength));
+      if (object.contentRange)
+        res.setHeader('Content-Range', object.contentRange);
+      pipeline(object.body, res, () => undefined);
+      return;
+    }
+    // Published object: proxied so the storage URL never reaches the
+    // learner. Only a plain byte range is forwarded.
+    const range = /^bytes=\d*-\d*$/.test(req.headers.range ?? '')
+      ? req.headers.range!
+      : undefined;
+    const upstream = await fetch(source.url, {
+      headers: range ? { Range: range } : {},
+    }).catch(() => null);
+    if (
+      !upstream?.body ||
+      (upstream.status !== 200 && upstream.status !== 206)
+    ) {
+      res.status(404).json({ statusCode: 404, message: 'Not found' });
+      return;
+    }
+    res.status(upstream.status);
+    res.setHeader('Accept-Ranges', 'bytes');
+    for (const header of ['content-length', 'content-range'])
+      if (upstream.headers.get(header))
+        res.setHeader(header, upstream.headers.get(header)!);
+    // pipeline also aborts the upstream read when the player disconnects
+    // (every seek does).
+    pipeline(Readable.fromWeb(upstream.body as any), res, () => undefined);
   }
 
   @Get('attempts/:id/listening/master')

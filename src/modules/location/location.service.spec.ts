@@ -4,9 +4,16 @@ describe('LocationService', () => {
   let service: LocationService;
 
   beforeEach(() => {
+    // The external provinces API is made unreachable here, not on the real
+    // network: these specs used to send live requests to it.
+    jest
+      .spyOn(global, 'fetch')
+      .mockRejectedValue(new Error('provinces API unreachable (test)'));
     // Instantiate with no redis to test local fallback & snapshot integrity
     service = new LocationService();
   });
+
+  afterEach(() => jest.restoreAllMocks());
 
   it('loads authoritative 34 provinces from verified snapshot when external API is unreachable', async () => {
     const provinces = await service.getProvinces();

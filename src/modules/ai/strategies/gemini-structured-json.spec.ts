@@ -51,17 +51,47 @@ describe('GeminiEvaluatorStrategy.generateStructuredJson', () => {
       model: 'models/fake',
     });
     expect(taskType).toBe(AiTaskType.STRUCTURED_AUTHORING);
-    expect(generateContent).toHaveBeenCalledWith({
-      systemInstruction: 'grade',
-      contents: [{ role: 'user', parts: [{ text: 'response text' }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: input.responseSchema,
-        temperature: 0.1,
+    expect(generateContent).toHaveBeenCalledWith(
+      {
+        systemInstruction: 'grade',
+        contents: [{ role: 'user', parts: [{ text: 'response text' }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: input.responseSchema,
+          temperature: 0.1,
+        },
       },
-    });
+      { signal: undefined },
+    );
     expect(JSON.stringify(generateContent.mock.calls)).not.toMatch(/Bánh Mì/);
     expect(recordUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards the per-call deadline and timeout policy, and the abort signal to the SDK', async () => {
+    const generateContent = jest.fn(() =>
+      Promise.resolve({ response: { text: () => '{}', usageMetadata: {} } }),
+    );
+    let policy: unknown;
+    const signal = new AbortController().signal;
+    const self = {
+      hasKeys: () => true,
+      recordUsage: jest.fn(),
+      executeWithRotation: (
+        op: (m: unknown, s: AbortSignal) => unknown,
+        _t: unknown,
+        p: unknown,
+      ) => {
+        policy = p;
+        return op({ model: 'models/fake', generateContent }, signal);
+      },
+    };
+    await run(self, {
+      ...input,
+      timeoutMs: 60_000,
+      failoverOnTimeout: false,
+    } as never);
+    expect(policy).toEqual({ timeoutMs: 60_000, failoverOnTimeout: false });
+    expect(generateContent).toHaveBeenCalledWith(expect.anything(), { signal });
   });
 
   it('propagates provider errors rather than swallowing them', async () => {

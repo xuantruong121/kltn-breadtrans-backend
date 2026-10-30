@@ -264,6 +264,43 @@ describe('Writing submission persistence', () => {
     expect(s.queued).toHaveLength(2);
   });
 
+  it('creates the rows through the completing transaction and queues nothing there', async () => {
+    const s = setup();
+    // The submit transaction passes its own client; rows must exist before it
+    // commits, so no reader sees a completed attempt without its Writing rows.
+    const tx: any = {
+      diagnosticWritingResponse: (s.service as any).prisma
+        .diagnosticWritingResponse,
+      diagnosticRubric: (s.service as any).prisma.diagnosticRubric,
+    };
+    await s.service.createRowsForAttempt(
+      tx,
+      attempt({ '20': words(70), '21': '' }),
+      QUESTIONS,
+    );
+    expect(s.rows.map((r) => [r.questionId, r.status])).toEqual([
+      [20, 'QUEUED'],
+    ]);
+    expect(s.queued).toHaveLength(0);
+  });
+
+  it('after commit, queues each row the transaction created exactly once', async () => {
+    const s = setup();
+    const a = attempt({ '20': words(70), '21': words(100) });
+    await s.service.createRowsForAttempt(
+      (s.service as any).prisma,
+      a,
+      QUESTIONS,
+    );
+    await s.service.enqueueForAttempt(a, QUESTIONS);
+    await s.service.enqueueForAttempt(a, QUESTIONS);
+    expect(s.rows).toHaveLength(2);
+    expect(s.queued).toEqual([
+      { responseId: 1, run: 1 },
+      { responseId: 2, run: 1 },
+    ]);
+  });
+
   it('two concurrent completions create one row and one job per task', async () => {
     const s = setup();
     const a = attempt({ '20': words(70), '21': words(100) });

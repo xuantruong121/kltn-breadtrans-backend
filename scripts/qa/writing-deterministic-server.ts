@@ -72,6 +72,18 @@ const provider = {
     // Picture tasks ask for a relevance verdict: "[[scene:MISMATCH]]" (or
     // PARTIAL / UNCERTAIN) sets it; MATCH otherwise.
     const wantsScene = input.responseSchema?.required?.includes('sceneMatch');
+    // Other practice tasks ask for task relevance: "[[offtopic]]" or
+    // "[[partial]]" set it; ON_TASK otherwise. "[[delay:NNNN]]" waits NNNN ms
+    // before answering (refresh / in-flight checks).
+    const wantsRelevance =
+      input.responseSchema?.required?.includes('taskRelevance');
+    const relevance = /\[\[offtopic\]\]/.test(data.learnerResponse)
+      ? 'OFF_TOPIC'
+      : /\[\[partial\]\]/.test(data.learnerResponse)
+        ? 'PARTIAL'
+        : 'ON_TASK';
+    const delay = /\[\[delay:(\d{1,5})\]\]/.exec(data.learnerResponse);
+    if (delay) await new Promise((r) => setTimeout(r, Number(delay[1])));
     const scene = /\[\[scene:(MATCH|PARTIAL|MISMATCH|UNCERTAIN)\]\]/.exec(
       data.learnerResponse,
     );
@@ -99,6 +111,15 @@ const provider = {
           : [],
         feedback: 'Nhận xét tất định: bài viết đáp ứng yêu cầu chính của đề.',
         suggestions: ['Kiểm tra lại cách chia động từ.'],
+        ...(wantsRelevance
+          ? {
+              taskRelevance: relevance,
+              relevanceEvidence:
+                relevance === 'OFF_TOPIC'
+                  ? 'Bài viết nói về chủ đề khác, không làm đúng yêu cầu của đề.'
+                  : 'Bài viết làm đúng tình huống và yêu cầu của đề.',
+            }
+          : {}),
         ...(wantsScene
           ? {
               sceneMatch: scene?.[1] ?? 'MATCH',

@@ -45,6 +45,10 @@ import {
 } from './reading-content.validation';
 import { QuizContentAccessService } from './quiz-content-access.service';
 import { loadWritingExerciseProgress } from '../writing/writing-exercise-progress';
+import {
+  isWritingQuizType,
+  learnerVisibleTaskContent,
+} from '../writing/writing-task-visibility';
 
 /**
  * Compare learner dictation without penalising typography that does not change
@@ -1460,9 +1464,18 @@ export class QuizService {
         isPremiumContent: true,
         courseId: true,
         publicationStatus: true,
+        toeicWritingSetItems: { select: { id: true }, take: 1 },
       },
     });
     if (!accessQuiz) throw new NotFoundException('Quiz not found');
+    // TOEIC exam Writing tasks are exam content: learners read them only
+    // inside their assessment attempt (/writing/quizzes/:id with the attempt
+    // context). The generic quiz route never serves them to non-admins.
+    if (
+      role !== Role.ADMIN &&
+      (accessQuiz.toeicWritingSetItems?.length ?? 0) > 0
+    )
+      throw new NotFoundException('Quiz not found');
 
     if (
       accessQuiz.type === QuizType.LISTENING_PRACTICE &&
@@ -1577,6 +1590,10 @@ export class QuizService {
           // Timing is provided in `question.listeningSegment` above instead.
           delete content.transcriptSegments;
         }
+        // Writing: only the learner-visible contract (no reference answer,
+        // no authored picture description). Admins take the includeAnswers path.
+        if (isWritingQuizType(quiz.type))
+          return { ...q, content: learnerVisibleTaskContent(content) };
         return { ...q, content };
       });
       const safeQuiz = await this.protectPremiumListeningMedia(
@@ -2938,7 +2955,14 @@ export class QuizService {
       overallAccuracyPercent: overallAccuracy,
       categoriesBreakdown,
       results: submission.results,
-      questions: submission.quiz.questions,
+      // Writing reference answers and picture descriptions are grader-only.
+      questions:
+        isWritingSubmission && role !== Role.ADMIN
+          ? submission.quiz.questions.map((q) => ({
+              ...q,
+              content: learnerVisibleTaskContent(q.content) as typeof q.content,
+            }))
+          : submission.quiz.questions,
       strengths:
         strengths.length > 0
           ? strengths

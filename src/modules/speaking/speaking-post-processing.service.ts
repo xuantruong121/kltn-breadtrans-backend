@@ -91,9 +91,17 @@ export class SpeakingPostProcessingService implements OnModuleDestroy {
           )
         : {};
       // Clarity is the score band; the model rewords, it does not regrade.
+      // Gemini may only replace the wording, and only with real text: a
+      // missing or blank field keeps the Azure-derived feedback.
+      const wording =
+        typeof feedback.feedback === 'string' ? feedback.feedback.trim() : '';
       const merged = {
         ...assessment,
-        ...feedback,
+        ...(wording ? { feedback: wording } : {}),
+        ...(Array.isArray(feedback.suggestions) &&
+        feedback.suggestions.length > 0
+          ? { suggestions: feedback.suggestions }
+          : {}),
         clarity: assessment.clarity ?? feedback.clarity,
       };
       const feedbackPersistStartedAt = Date.now();

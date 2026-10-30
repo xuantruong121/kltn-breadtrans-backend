@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   Prisma,
@@ -15,6 +16,10 @@ import {
   humanizeToeicValidationIssues,
 } from './toeic.validation';
 import { isAcceptedContentImageReference } from '../upload/content-image-validation';
+import {
+  isPrivateListeningMediaKey,
+  UploadService,
+} from '../upload/upload.service';
 import {
   EXAM_TEMPLATES,
   ExamTemplate,
@@ -40,6 +45,7 @@ export class GenericExamService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly skillCms: SkillCmsService,
+    @Optional() private readonly uploadService?: UploadService,
   ) {}
 
   listTemplates() {
@@ -450,7 +456,68 @@ export class GenericExamService {
       include: this.include,
       orderBy: { updatedAt: 'desc' },
     });
-    return exams.map((exam) => this.project(exam));
+    return Promise.all(
+      exams.map((exam) => this.withAdminPlayback(this.project(exam))),
+    );
+  }
+
+  /**
+   * A migrated clip's `audioUrl` is a private-bucket key: it stays as is (the
+   * editor saves it back unchanged) and the admin player gets a short-lived
+   * signed `audioPlaybackUrl` beside it. Legacy URLs are left alone.
+   */
+  private async withAdminPlayback<T extends { groups?: unknown }>(
+    projection: T,
+  ): Promise<T> {
+    if (!Array.isArray(projection.groups)) return projection;
+    const groups = await Promise.all(
+      projection.groups.map(async (group: { audioUrl?: string | null }) => {
+        if (!group?.audioUrl || !isPrivateListeningMediaKey(group.audioUrl))
+          return group;
+        const audioPlaybackUrl = this.uploadService
+          ? await this.uploadService
+              .getPrivatePresignedDownloadUrl(group.audioUrl, 3600)
+              .catch(() => null)
+          : null;
+        return { ...group, audioPlaybackUrl };
+      }),
+    );
+    return { ...projection, groups };
+  }
+
+  /**
+   * Learner-facing product card: an explicit allowlist of catalog metadata.
+   * `project()` also carries the authoring view (question groups with
+   * answer keys and explanations, validation, readiness), which must never
+   * leave the admin API: exam content reaches learners only inside an
+   * attempt (`/toeic/attempts/:id`, assessment components).
+   */
+  private projectLearner(exam: ProductRecord) {
+    const p = this.project(exam);
+    return {
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      familyCode: p.familyCode,
+      variantCode: p.variantCode,
+      family: p.family,
+      variant: p.variant,
+      templateKey: p.templateKey,
+      publicationStatus: p.publicationStatus,
+      updatedAt: p.updatedAt,
+      childId: p.childId,
+      runtimeId: p.runtimeId,
+      type: p.type,
+      difficulty: p.difficulty,
+      durationSeconds: p.durationSeconds,
+      totalGroups: p.totalGroups,
+      totalQuestions: p.totalQuestions,
+      questionsCount: p.questionsCount,
+      bilingualContent: p.bilingualContent,
+      attemptsCount: p.attemptsCount,
+      learnerReady: p.learnerReady,
+      assessment: p.assessment,
+    };
   }
 
   async listLearner() {
@@ -460,12 +527,12 @@ export class GenericExamService {
       orderBy: { updatedAt: 'desc' },
     });
     return exams
-      .map((exam) => this.project(exam))
+      .map((exam) => this.projectLearner(exam))
       .filter((exam) => exam.learnerReady);
   }
 
   async getAdmin(id: number) {
-    return this.project(await this.findExam(id));
+    return this.withAdminPlayback(this.project(await this.findExam(id)));
   }
 
   /**
@@ -652,7 +719,7 @@ export class GenericExamService {
 
   async getLearner(id: number) {
     const exam = await this.findExam(id);
-    const projected = this.project(exam);
+    const projected = this.projectLearner(exam);
     if (
       exam.publicationStatus !== QuizPublicationStatus.PUBLISHED ||
       !projected.learnerReady

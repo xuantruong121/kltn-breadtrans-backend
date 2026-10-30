@@ -101,6 +101,84 @@ describe('GeminiCredentialManager', () => {
     warnSpy.mockRestore();
   });
 
+  describe('response deadline and ambiguous timeouts', () => {
+    const manager = () =>
+      new GeminiCredentialManager(new GeminiModelRouter(), redis() as any);
+    const never = () => new Promise<string>(() => undefined);
+
+    it('C/D. no response: one request, the signal is aborted, no other key is tried', async () => {
+      let calls = 0;
+      let aborted = false;
+      await expect(
+        manager().execute({
+          taskType: AiTaskType.STRUCTURED_AUTHORING,
+          timeoutMs: 20,
+          failoverOnTimeout: false,
+          operation: (_model, signal) => {
+            calls += 1;
+            signal.addEventListener('abort', () => (aborted = true));
+            return never();
+          },
+        }),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+      expect(calls).toBe(1);
+      expect(aborted).toBe(true);
+    });
+
+    it('B. a slow response that arrives before the deadline is used', async () => {
+      let calls = 0;
+      await expect(
+        manager().execute({
+          taskType: AiTaskType.STRUCTURED_AUTHORING,
+          timeoutMs: 200,
+          failoverOnTimeout: false,
+          operation: () => {
+            calls += 1;
+            return new Promise((resolve) =>
+              setTimeout(() => resolve('late-ok'), 30),
+            );
+          },
+        }),
+      ).resolves.toBe('late-ok');
+      expect(calls).toBe(1);
+    });
+
+    it('F. a definitive provider rejection (503) still fails over to another key', async () => {
+      let calls = 0;
+      await expect(
+        manager().execute({
+          taskType: AiTaskType.STRUCTURED_AUTHORING,
+          timeoutMs: 200,
+          failoverOnTimeout: false,
+          operation: () => {
+            calls += 1;
+            return calls === 1
+              ? Promise.reject(
+                  Object.assign(new Error('unavailable'), { status: 503 }),
+                )
+              : Promise.resolve('ok');
+          },
+        }),
+      ).resolves.toBe('ok');
+      expect(calls).toBe(2);
+    });
+
+    it('callers that do not opt out keep the shared behaviour (a timeout tries the next key)', async () => {
+      let calls = 0;
+      await expect(
+        manager().execute({
+          taskType: AiTaskType.STRUCTURED_AUTHORING,
+          timeoutMs: 20,
+          operation: () => {
+            calls += 1;
+            return calls === 1 ? never() : Promise.resolve('ok');
+          },
+        }),
+      ).resolves.toBe('ok');
+      expect(calls).toBe(2);
+    });
+  });
+
   it('redacts keys and authorization values before logging', () => {
     const secret = 'AIza-not-for-logs';
     const value = redactGeminiError(

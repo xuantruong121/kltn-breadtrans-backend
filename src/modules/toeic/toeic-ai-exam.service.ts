@@ -1193,12 +1193,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       const script = buildToeicListeningAudioScript(group);
       const sourceHash = toeicListeningAudioFingerprint(group);
       const audio = await this.makeAudio(script);
-      const uploaded = await this.r2.putObjectAtKey(
-        `ai/toeic-exams/exam-${exam.toeicExamSet!.id}/groups/${group.id}/audio-regenerated.mp3`,
+      // Exam Listening audio goes to the private bucket; the group stores the
+      // key and learners hear it only through /toeic/groups/:id/audio.
+      const uploaded = await this.r2.putPrivateObjectAtKey(
+        `premium/listening/toeic/exams/${exam.toeicExamSet!.id}/groups/${group.id}/audio-regenerated.mp3`,
         audio,
         'audio/mpeg',
       );
-      if (!(await this.r2.objectExists(uploaded.key)))
+      if (!(await this.r2.privateObjectExists(uploaded.key)))
         throw new BadRequestException('R2 chưa xác nhận audio tạo lại');
       metadata.audio = {
         source: 'AI_GENERATED',
@@ -1211,7 +1213,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       return this.prisma.toeicQuestionGroup.update({
         where: { id: group.id },
         data: {
-          audioUrl: uploaded.url,
+          audioUrl: uploaded.key,
           mediaMetadata: metadata as Prisma.InputJsonValue,
         },
       });
@@ -1901,12 +1903,13 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       let audioResult: { url: string; key: string } | undefined;
       try {
         const audio = await this.makeAudio(script);
-        const uploaded = await this.r2.putObjectAtKey(
-          `ai/toeic-exams/exam-${examSetId}/groups/${group.id}/audio.mp3`,
+        // Private bucket; the group stores the key (see regenerate above).
+        const uploaded = await this.r2.putPrivateObjectAtKey(
+          `premium/listening/toeic/exams/${examSetId}/groups/${group.id}/audio.mp3`,
           audio,
           'audio/mpeg',
         );
-        if (!(await this.r2.objectExists(uploaded.key)))
+        if (!(await this.r2.privateObjectExists(uploaded.key)))
           throw new BadRequestException(
             'R2 chưa xác nhận audio AI vừa tải lên',
           );
@@ -1944,7 +1947,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         await this.prisma.toeicQuestionGroup.update({
           where: { id: group.id },
           data: {
-            audioUrl: audioResult.url,
+            audioUrl: audioResult.key,
             mediaMetadata: metadata as Prisma.InputJsonValue,
           },
         });

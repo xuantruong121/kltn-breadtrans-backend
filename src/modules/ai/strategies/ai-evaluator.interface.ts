@@ -110,6 +110,10 @@ export interface IAIEvaluator {
     prompt: string;
     responseSchema: unknown;
     temperature?: number;
+    /** Response deadline; omitted keeps the shared default. */
+    timeoutMs?: number;
+    /** false: a timeout ends the call instead of trying another key. */
+    failoverOnTimeout?: boolean;
   }): Promise<{ text: string; model: string }>;
 
   /**

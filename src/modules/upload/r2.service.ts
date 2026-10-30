@@ -16,6 +16,15 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 
+/** A private object opened for streaming, optionally a byte range of it. */
+export interface PrivateObjectStream {
+  status: 200 | 206;
+  body: NodeJS.ReadableStream;
+  contentLength?: number;
+  contentRange?: string;
+  contentType?: string;
+}
+
 export interface R2UploadResult {
   /** URL công khai để access file */
   url: string;
@@ -485,6 +494,48 @@ export class R2Service {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     return Buffer.concat(chunks);
+  }
+
+  /**
+   * Streams a private object, forwarding a plain `bytes=a-b` range so
+   * <audio> can seek. Null when the object does not exist (or the range is
+   * not satisfiable).
+   */
+  async openPrivateObject(
+    key: string,
+    range?: string,
+  ): Promise<PrivateObjectStream | null> {
+    if (!isPrivatePremiumMediaKey(key)) {
+      throw new BadRequestException(
+        'Protected premium media must use the private key namespace',
+      );
+    }
+    const { client, bucket } = this.requirePrivateStorage();
+    const byteRange =
+      range && /^bytes=\d*-\d*$/.test(range) ? range : undefined;
+    try {
+      const response = await client.send(
+        new GetObjectCommand({ Bucket: bucket, Key: key, Range: byteRange }),
+      );
+      if (!response.Body) return null;
+      return {
+        status: response.ContentRange ? 206 : 200,
+        body: response.Body as NodeJS.ReadableStream,
+        contentLength: response.ContentLength,
+        contentRange: response.ContentRange,
+        contentType: response.ContentType,
+      };
+    } catch (error: any) {
+      const code = (error as { $metadata?: { httpStatusCode?: number } })
+        .$metadata?.httpStatusCode;
+      if (
+        code === 404 ||
+        code === 416 ||
+        (error as { name?: string }).name === 'NoSuchKey'
+      )
+        return null;
+      throw error;
+    }
   }
 
   async downloadPrivateFileBuffer(key: string): Promise<Buffer> {

@@ -2355,8 +2355,14 @@ async function main() {
             prompt:
               'Bạn đã đăng ký một workshop vào thứ Sáu nhưng không thể tham dự. Viết email 100–130 từ cho ban tổ chức để xin chuyển sang buổi thứ Hai. Nêu lý do ngắn gọn và yêu cầu xác nhận.',
             wordRange: [100, 130],
+            requirements: [
+              'registered workshop and date',
+              'reason',
+              'request to move to Monday',
+              'ask for confirmation',
+            ],
             sampleResponse:
-              'Dear Workshop Team, I am writing about my registration for Friday’s customer-service workshop. Unfortunately, I have an important appointment that afternoon and will not be able to attend. If possible, could you please transfer my registration to the Monday session instead? I would appreciate a confirmation of the change and any updated joining instructions. Thank you for your help. Best regards, Minh',
+              'Dear Workshop Team,\n\nI am writing about my registration for the customer-service workshop on Friday afternoon. Unfortunately, I have an important appointment with a client at the same time, and I cannot change it because the client is only in the city that day.\n\nIf possible, could you please transfer my registration to the Monday session instead? I am still very interested in the topic, and the Monday date fits my schedule well.\n\nI would appreciate it if you could confirm the change by email. Please also send me any updated joining instructions, such as the room number or the start time.\n\nThank you for your help.\n\nBest regards,\nMinh',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -2373,8 +2379,14 @@ async function main() {
             prompt:
               'Viết email 100–130 từ cho đồng nghiệp để nhờ họ gửi lại phiên bản mới nhất của báo cáo trước 3 P.M. Giải thích vì sao bạn cần tài liệu và cảm ơn họ.',
             wordRange: [100, 130],
+            requirements: [
+              'ask for the latest report',
+              'deadline 3 P.M.',
+              'reason',
+              'thanks',
+            ],
             sampleResponse:
-              'Hi Alex, Could you please send me the latest version of the quarterly sales report before 3 P.M. today? I am preparing the slides for tomorrow morning’s management meeting and want to make sure the figures in my presentation match the final report. If there were any major changes since yesterday, please let me know as well. Thanks very much for your help. Best regards, Lan',
+              "Hi Alex,\n\nCould you please send me the latest version of the quarterly sales report before 3 P.M. today?\n\nI am preparing the slides for tomorrow morning's management meeting, and I want to make sure the figures in my presentation match the final report. The version I have is from last week, so some numbers may have changed since then.\n\nIf there were any major changes, for example in the regional sales figures, please let me know so that I can explain them correctly during the meeting.\n\nI know you are busy this week, so I really appreciate your help. Thanks very much.\n\nBest regards,\nLan",
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -2544,8 +2556,14 @@ async function main() {
             prompt:
               'Một khách hàng báo rằng 10 chiếc ghế trong đơn hàng vừa nhận bị trầy xước. Viết email 150–180 từ: xin lỗi, xác nhận vấn đề, đề xuất hai phương án giải quyết và nêu bước tiếp theo.',
             wordRange: [150, 180],
+            requirements: [
+              'apology',
+              'confirm the problem',
+              'two solutions',
+              'next step',
+            ],
             sampleResponse:
-              'Dear Ms. Patel, Thank you for letting us know about the damaged chairs. I am very sorry that ten items in your recent order arrived with scratches. This is not the condition we expect our products to reach customers in. We can either send ten replacement chairs at no additional cost, or issue a refund for the affected items if that is more convenient. If you choose replacement, we can dispatch the new chairs within two business days and arrange collection of the damaged ones. Please reply with your preferred option and confirm the delivery address. I apologize again for the inconvenience and appreciate your patience while we resolve this matter. Best regards, Customer Care Team',
+              'Dear Ms. Patel,\n\nThank you for letting us know about the damaged chairs. I am very sorry that ten chairs in your recent order arrived with scratches. I have checked your order details and the photos you sent, and I can confirm that the damage happened before delivery.\n\nWe would like to offer you two options. First, we can send ten replacement chairs at no additional cost. Our driver would collect the damaged chairs when the new ones are delivered. Second, if you prefer, we can give you a full refund for the ten damaged chairs and you can keep the rest of the order as it is.\n\nAs a next step, please reply to this email with your preferred option. If you choose replacement, we can deliver the new chairs within two business days, so please also confirm your delivery address and a suitable time.\n\nI apologise again for the inconvenience and thank you for your patience.\n\nBest regards,\nCustomer Care Team',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4630,7 +4648,7 @@ async function main() {
             wordRange: [40, 60],
             requirements: ['apologize', 'give a reason', 'state arrival time'],
             sampleResponse:
-              'Hi Lan, I’m sorry, but I’ll be about 15 minutes late because my bus was delayed. I should arrive at the library around 4:45. Please start without me, and I’ll join you as soon as I get there.',
+              "Hi Lan, I'm really sorry, but I'll be about 15 minutes late for our study group. My bus was delayed because of heavy traffic. I should arrive at the library around 4:45. Please start without me, and I'll join you as soon as I get there. See you soon!",
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4650,7 +4668,7 @@ async function main() {
             wordRange: [50, 70],
             requirements: ['state late arrival', 'ask about reception'],
             sampleResponse:
-              'Dear Hotel Team, I have a reservation for Friday night, but my flight arrives late, so I expect to reach the hotel after 9 P.M. Could you please confirm whether reception will still be open for check-in? Thank you for your help.',
+              'Dear Hotel Team, I have a reservation for this Friday night under the name Nguyen Minh. My flight arrives late, so I expect to reach the hotel after 9 P.M., probably around 10 P.M. Could you please tell me if reception will still be open for check-in at that time? Thank you for your help. Best regards, Minh',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4670,7 +4688,7 @@ async function main() {
             wordRange: [50, 70],
             requirements: ['place', 'time', 'reason'],
             sampleResponse:
-              'Hi Minh, Would you like to join me at the weekend book fair in the city park this Saturday at 10 A.M.? There will be English books, short talks, and a coffee area. I think it will be a fun way to practise reading together.',
+              'Hi Minh, Would you like to come to the weekend book fair with me? It is in the city park this Saturday, from 10 A.M. to 4 P.M. There will be English books, short talks and a nice coffee area. I think it will be a fun way to practise reading together. Let me know if you can come!',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4686,7 +4704,7 @@ async function main() {
             level: 'A2',
             taskType: 'REQUEST',
             prompt:
-              'Viết 40–60 từ hỏi giáo viên/nhân viên hỗ trợ về một tài liệu bạn không mở được.',
+              'Viết 40–60 từ gửi bộ phận hỗ trợ của khoá học về một tài liệu bạn không mở được.',
             wordRange: [40, 60],
             requirements: [
               'identify material',
@@ -4694,7 +4712,7 @@ async function main() {
               'ask for help',
             ],
             sampleResponse:
-              'Hello, I’m trying to open the vocabulary review file for Lesson 4, but the link does not work on my phone or laptop. Could you please check the file or send me another link? Thank you.',
+              "Hello, I'm trying to open the vocabulary review file for Lesson 4, but the link does not work on my phone or my laptop. I only see an error page. Could you please check the file or send me another link? Thank you very much for your help. Best regards, An",
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4714,7 +4732,7 @@ async function main() {
             wordRange: [50, 70],
             requirements: ['thank', 'mention help', 'positive closing'],
             sampleResponse:
-              'Hi Anna, Thank you very much for helping me prepare the presentation yesterday. Your suggestions made the slides much clearer, and I was able to finish on time. I really appreciate your support and hope I can help you with your next project too.',
+              'Hi Anna, Thank you very much for helping me prepare the presentation yesterday. Your suggestions made the slides much clearer, and you also helped me check the numbers. Because of you, I finished everything on time. I really appreciate your support, and I hope I can help you with your next project too. Best, Lan',
             rubric: {
               taskAchievement: 4,
               organization: 2,
@@ -4741,8 +4759,10 @@ async function main() {
             level: 'B1',
             taskType: 'EMAIL',
             prompt:
-              'Viết email xin đổi lịch họp vì bạn có cuộc hẹn quan trọng. Đề xuất hai giờ thay thế và yêu cầu xác nhận.',
+              'Bạn có cuộc họp với chị Hà (trưởng nhóm) lúc 2 P.M. thứ Năm, nhưng bạn có lịch khám bác sĩ đúng giờ đó. Viết email 100–140 từ xin đổi lịch: nêu lý do, đề xuất hai giờ thay thế và đề nghị chị xác nhận.',
             wordRange: [100, 140],
+            sampleResponse:
+              "Dear Ms. Ha,\n\nI am writing about our meeting on Thursday at 2 P.M. Unfortunately, I have a doctor's appointment at that time, and I was not able to change it because the clinic is fully booked this week. I am very sorry for the inconvenience.\n\nWould it be possible to move our meeting to another time? I am free on Thursday at 4 P.M. or on Friday at 10 A.M. Both times work well for me, and I will bring the updated project plan so that we can review it together.\n\nCould you please confirm which option suits you best? If neither time is convenient, please suggest another slot and I will do my best to adjust my schedule.\n\nThank you for your understanding.\n\nBest regards,\nMinh",
             requirements: [
               'reason',
               'two alternatives',
@@ -4763,8 +4783,10 @@ async function main() {
             level: 'B1',
             taskType: 'STATUS_UPDATE',
             prompt:
-              'Viết email cập nhật tiến độ dự án: hai việc đã hoàn thành, một việc đang chậm và kế hoạch xử lý.',
+              'Bạn phụ trách dự án làm lại website của công ty. Viết email 110–150 từ gửi quản lý cập nhật tiến độ: hai việc đã xong (thiết kế trang chủ, khảo sát người dùng), một việc đang chậm (ảnh sản phẩm, do nhà cung cấp giao trễ) và kế hoạch xử lý kèm ngày mới.',
             wordRange: [110, 150],
+            sampleResponse:
+              'Hi Mr. Long,\n\nHere is a short update on the website redesign project.\n\nFirst, the new homepage design is finished, and the team has already approved the final version. Second, we completed the user survey last Friday. We received 120 answers, and the results show that most customers want a faster checkout page.\n\nHowever, the product photos are behind schedule. Our photo supplier delivered the pictures five days late, so we could not upload them on time.\n\nTo solve this, I have asked two team members to edit the photos this week, and the supplier has promised to send the remaining images by Wednesday. If everything goes as planned, all photos will be online by next Monday, 18 November.\n\nPlease let me know if you have any questions.\n\nBest regards,\nLan',
             requirements: ['two completed items', 'one delay', 'next step'],
             rubric: {
               taskAchievement: 4,
@@ -4781,8 +4803,10 @@ async function main() {
             level: 'B1',
             taskType: 'CUSTOMER_EMAIL',
             prompt:
-              'Viết email phản hồi khách hàng hỏi khi nào đơn hàng sẽ đến. Nêu trạng thái, ngày dự kiến và cách theo dõi.',
+              'Một khách hàng hỏi khi nào đơn hàng #BT2048 (đặt hôm thứ Hai) sẽ đến. Viết email 100–140 từ trả lời: nêu trạng thái đơn hàng, ngày giao dự kiến và cách theo dõi đơn.',
             wordRange: [100, 140],
+            sampleResponse:
+              "Dear Mr. Nam,\n\nThank you for contacting us about your order #BT2048, which you placed on Monday.\n\nI am happy to tell you that your order was packed yesterday and has now been shipped. It is currently on its way to our local delivery centre. Based on the latest information from the courier, your package should arrive on Friday, between 9 A.M. and 5 P.M.\n\nYou can follow your delivery at any time on the courier's website. Simply enter the tracking number VN7731205 in the search box, and you will see where your package is and when it is expected to arrive.\n\nIf the order has not arrived by Friday evening, please reply to this email and we will check it for you immediately.\n\nKind regards,\nCustomer Support Team",
             requirements: ['status', 'expected date', 'tracking information'],
             rubric: {
               taskAchievement: 4,
@@ -4799,8 +4823,10 @@ async function main() {
             level: 'B1',
             taskType: 'INFORMATION_REQUEST',
             prompt:
-              'Viết email cho ban tổ chức workshop để hỏi về phí, địa điểm và yêu cầu chuẩn bị trước.',
+              'Bạn muốn tham gia workshop "Thuyết trình bằng tiếng Anh" vào thứ Bảy tới. Viết email 100–140 từ cho ban tổ chức để hỏi về học phí, địa điểm và những gì cần chuẩn bị trước.',
             wordRange: [100, 140],
+            sampleResponse:
+              'Dear Workshop Organisers,\n\nI saw your announcement about the "Presenting in English" workshop next Saturday, and I am very interested in joining. Before I register, I would like to ask a few questions.\n\nFirst, could you tell me how much the workshop costs, and whether there is a discount for students or early registration? Second, where exactly will it take place? I would also like to know if there is parking near the venue.\n\nFinally, is there anything I should prepare before the workshop? For example, should I bring a laptop or prepare a short presentation to practise with?\n\nI would be grateful if you could reply by Wednesday so that I can plan my weekend. Thank you in advance for your help.\n\nBest regards,\nThu',
             requirements: [
               'ask fee',
               'ask location',
@@ -4821,12 +4847,14 @@ async function main() {
             level: 'B1',
             taskType: 'MEETING_FOLLOWUP',
             prompt:
-              'Viết email cho đồng nghiệp tóm tắt quyết định của cuộc họp và ba hành động cần thực hiện.',
+              'Sau cuộc họp nhóm sáng nay, cả nhóm quyết định dời ngày ra mắt sản phẩm sang 15/11. Viết email 120–150 từ gửi đồng nghiệp: tóm tắt quyết định và nêu ba việc cần làm, mỗi việc có người phụ trách và hạn chót.',
             wordRange: [120, 150],
+            sampleResponse:
+              "Hi team,\n\nThank you for joining this morning's meeting. Here is a short summary so that everyone has the same information.\n\nWe agreed to move the product launch from 1 November to 15 November. The extra two weeks will give us time to fix the payment bug and to test the app with more users.\n\nWe also agreed on three action items:\n1. Tuan will fix the payment bug and send a test version by 5 November.\n2. Mai will invite twenty customers to try the app and collect their feedback by 9 November.\n3. I will update the launch plan and inform the marketing team about the new date by this Friday.\n\nIf I have missed anything, please reply to this email before tomorrow afternoon.\n\nBest regards,\nHoa",
             requirements: [
-              'summary',
+              'summary of the decision',
               'three action items',
-              'deadline/owner if appropriate',
+              'owner and deadline for each action',
             ],
             rubric: {
               taskAchievement: 4,
@@ -4855,6 +4883,8 @@ async function main() {
             prompt:
               'Một công ty đang cân nhắc cho nhân viên làm việc từ xa ba ngày mỗi tuần. Viết 180–220 từ nêu quan điểm, hai lợi ích/rủi ro và đề xuất chính sách phù hợp.',
             wordRange: [180, 220],
+            sampleResponse:
+              'In my view, allowing employees to work from home three days a week is a sensible policy, provided that the company manages it carefully.\n\nThe first benefit is productivity. Without a long daily commute, many employees have more energy and fewer interruptions, so they can concentrate on tasks that require deep focus, such as writing reports or analysing data. The second benefit is staff retention. Flexible arrangements are now highly valued, and a company that offers them is more likely to keep experienced employees and attract new talent.\n\nHowever, there are real risks. Remote work can weaken communication, especially for new staff who learn a great deal by observing colleagues. It may also blur the line between work and private life, which can lead to stress and burnout.\n\nTherefore, I would recommend a structured hybrid model. Teams should share two fixed office days for meetings, training and collaboration, while the other three days remain remote. Managers should set clear goals and review results rather than hours online, and the company should provide basic equipment and clear rules about availability. Finally, the policy should be reviewed after six months using staff feedback and performance data, so that it can be adjusted if problems appear.',
             requirements: [
               'clear position',
               'two developed reasons',
@@ -4877,6 +4907,8 @@ async function main() {
             prompt:
               'Viết 180–220 từ đề xuất cách giảm số cuộc họp không cần thiết trong một nhóm dự án mà vẫn giữ thông tin minh bạch.',
             wordRange: [180, 220],
+            sampleResponse:
+              'Our project team currently spends too much time in meetings. Many of them are status updates that could be shared in writing, and several members attend meetings where they are not needed. As a result, people have less time for actual work, and decisions are often delayed until the next meeting.\n\nI propose three changes. First, we should replace the daily status meeting with a short written update in our shared channel. Each member would post what they finished, what they plan to do next, and any blockers by 10 A.M. every day. Second, every remaining meeting should have a clear agenda sent at least a day in advance, and only the people needed for a decision should be invited. Third, after each meeting, the organiser should publish a brief summary of decisions and action items in the project tracker.\n\nThese changes would bring several benefits. Team members would gain several hours each week for focused work. Information would actually become more transparent, because written updates and meeting summaries can be read by anyone at any time, including people who were absent. Finally, meetings would become shorter and more productive, since they would focus on problems that genuinely require discussion.',
             requirements: [
               'identify problem',
               'propose actions',
@@ -4899,6 +4931,8 @@ async function main() {
             prompt:
               'Viết 200–250 từ phản hồi một báo cáo cho thấy khách hàng hài lòng với sản phẩm nhưng phàn nàn về thời gian hỗ trợ. Phân tích nguyên nhân có thể và đề xuất hai giải pháp.',
             wordRange: [200, 250],
+            sampleResponse:
+              "The report presents a mixed but useful picture. Customers are clearly satisfied with the product itself, which suggests that its features and quality meet their needs. At the same time, frequent complaints about support response times indicate that the after-sales experience is damaging an otherwise positive impression. This gap matters, because a slow response to a single problem can outweigh months of good performance in a customer's memory.\n\nSeveral causes are possible. The support team may be understaffed relative to the growing number of users, particularly at peak times such as Monday mornings. Another likely cause is the way requests are handled: if every ticket enters one queue, simple questions about passwords or invoices wait behind complex technical problems. Finally, customers may lack self-service resources, so they contact support even for issues they could easily solve themselves.\n\nI would propose two solutions. First, the company should introduce ticket categories with priority rules, so that urgent and simple requests are routed quickly to the right staff. This addresses the queue problem without immediately hiring more people. Second, it should build a searchable help centre with short guides and videos for the most common questions. Over time, this would reduce the volume of tickets and allow agents to spend more time on difficult cases. Both measures should be evaluated by tracking average response time and satisfaction scores each month.",
             requirements: [
               'interpret evidence',
               'possible causes',
@@ -4921,6 +4955,8 @@ async function main() {
             prompt:
               'Viết 220–280 từ: doanh nghiệp nên ưu tiên đào tạo kỹ năng chuyên môn hay kỹ năng giao tiếp cho nhân viên mới? Nêu quan điểm có cân nhắc mặt đối lập.',
             wordRange: [220, 280],
+            sampleResponse:
+              "When companies design training for new employees, they often face a choice between technical skills and communication skills. Although job-specific knowledge is essential, I believe businesses should give priority to communication skills, while still providing focused technical training.\n\nThe main argument for technical training is obvious: new staff must be able to do their jobs. An accountant who cannot use the company's financial software, or an engineer who does not understand its systems, will make costly mistakes. Moreover, technical results are easy to measure, so managers can quickly see whether the training has worked.\n\nHowever, technical skills are usually what companies already assess during recruitment, and many of them can be learned gradually on the job with good documentation. Communication skills, by contrast, affect almost every task. A new employee who can ask clear questions, explain a problem, write a concise email, or disagree politely will learn faster and work better with others. Poor communication, on the other hand, causes misunderstandings, repeated work and conflict, even among technically strong teams. For example, in software projects many delays come not from weak coding but from unclear requirements and late feedback.\n\nIn conclusion, the best approach is not to choose one completely. Companies should provide the minimum technical training needed for the role, but invest more heavily in communication from the first week, because it multiplies the value of every other skill.",
             requirements: [
               'position',
               'counterpoint',
@@ -4944,6 +4980,8 @@ async function main() {
             prompt:
               'Viết 200–250 từ đề xuất cách một nền tảng tự học có thể giúp người học duy trì thói quen mà không làm gamification lấn át mục tiêu học tập.',
             wordRange: [200, 250],
+            sampleResponse:
+              'The learning objective of a self-study platform should be clear: learners should make steady, measurable progress in a real skill, not simply collect points. Gamification can help people return every day, but it must support this objective rather than replace it.\n\nFirst, engagement mechanisms should reward learning behaviour. Instead of giving points for opening the app, the platform could reward completing a full lesson, reviewing mistakes, or practising a weak skill. Streaks are useful, but they should be flexible, for example by allowing one rest day per week, so that learners do not feel anxious or rush through lessons only to protect a number.\n\nSecond, the platform needs risk controls. Rewards should never be available for repeating very easy exercises again and again. Leaderboards should be optional, because public rankings can discourage beginners. In addition, the dashboard should show progress in skills, such as accuracy in listening or the quality of written answers, more prominently than points or badges.\n\nFinally, success should be measured by learning outcomes. The platform should track whether learners improve their scores on regular check-up tasks, how many weak areas they close each month, and how long they continue studying. If engagement rises but skill results do not improve, the reward system should be adjusted. In this way, gamification remains a tool for building habits rather than the goal of the experience.',
             requirements: [
               'learning objective',
               'engagement mechanism',

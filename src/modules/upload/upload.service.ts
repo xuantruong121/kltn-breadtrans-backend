@@ -180,6 +180,10 @@ export class UploadService {
     return this.r2.downloadPrivateFileBuffer(key);
   }
 
+  async openPrivateObject(key: string, range?: string) {
+    return this.r2.openPrivateObject(key, range);
+  }
+
   // Learner Speaking recordings. New ones live in the private bucket under
   // premium/speaking/practice/; recordings made before that change stay in
   // the public bucket and are still read from there.
