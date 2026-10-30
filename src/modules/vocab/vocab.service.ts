@@ -115,6 +115,8 @@ export class VocabService {
       categoriesMap[cat].push({
         id: t.id,
         title: t.title,
+        description: t.description,
+        level: t.level,
         categoryName: t.categoryName,
         totalWords: t.totalWords,
         learnedCount: prog.mastered,
@@ -139,6 +141,8 @@ export class VocabService {
       return {
         id: t.id,
         title: t.title,
+        description: t.description,
+        level: t.level,
         categoryName: t.categoryName,
         totalWords: t.totalWords,
         learnedCount: prog.mastered,

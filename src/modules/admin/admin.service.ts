@@ -1122,7 +1122,11 @@ export class AdminService {
     return this.prisma.vocabTopic.create({
       data: {
         title: dto.title,
+        description: dto.description?.trim() || null,
+        level: dto.level ?? null,
         categoryName: dto.categoryName || '600 TỪ VỰNG TOEIC',
+        // Counts the words added below; the schema default (12) was wrong.
+        totalWords: 0,
         isPro: dto.isPro ?? false,
         iconUrl: dto.iconUrl,
         publicationStatus: QuizPublicationStatus.DRAFT,
@@ -1137,6 +1141,10 @@ export class AdminService {
       where: { id },
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.description !== undefined && {
+          description: dto.description.trim() || null,
+        }),
+        ...(dto.level !== undefined && { level: dto.level }),
         ...(dto.categoryName !== undefined && {
           categoryName: dto.categoryName,
         }),
@@ -1209,6 +1217,11 @@ export class AdminService {
       where: { id: topicId },
     });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    // A word added without a position goes last, not to order 0.
+    const last = await this.prisma.vocabWord.aggregate({
+      where: { topicId },
+      _max: { order: true },
+    });
     const word = await this.prisma.vocabWord.create({
       data: {
         topicId,
@@ -1222,7 +1235,7 @@ export class AdminService {
         exampleEn: dto.exampleEn,
         exampleVi: dto.exampleVi,
         collocations: dto.collocations ?? undefined,
-        order: dto.order ?? 0,
+        order: dto.order ?? (last._max.order ?? 0) + 1,
       },
     });
     await this.prisma.vocabTopic.update({

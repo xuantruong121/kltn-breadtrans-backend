@@ -2082,6 +2082,10 @@ model ListeningAudioUsage {
 model VocabTopic {
   id                Int                   @id @default(autoincrement())
   title             String
+  /// Short line shown on the learner's deck card.
+  description       String?               @db.Text
+  /// CEFR tag (A1–C2) for filtering and personalization.
+  level             String?
   categoryName      String                @default("600 TỪ VỰNG TOEIC")
   totalWords        Int                   @default(12)
   isPro             Boolean               @default(false)
