@@ -25,6 +25,9 @@
  * <id>.en-gb.v1.mp3 beside it. Publish only uploads; no database field
  * changes, the API derives the UK URL from the US one.
  *
+ * SPEAKING_REF_SET_IDS=<ids> targets the exercises of those practice sets
+ * (hard cap 60) instead of the published standalone exercises.
+ *
  * Usage: npx ts-node --transpile-only scripts/speaking-reference-audio.ts <mode> --target env:DATABASE_URL
  */
 import { createHash } from 'node:crypto';
@@ -50,7 +53,14 @@ const UK = process.env.SPEAKING_REF_ACCENT === 'en-gb';
 const OUT = UK
   ? 'artifacts/speaking-reference-audio-en-gb'
   : 'artifacts/speaking-reference-audio';
-const MAX_CALLS = 30;
+// SPEAKING_REF_SET_IDS=<id,id,...>: the exercises of these practice sets
+// (any publication status, e.g. new DRAFT sets awaiting review) instead of
+// the published standalone exercises.
+const SET_IDS = (process.env.SPEAKING_REF_SET_IDS ?? '')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean);
+const MAX_CALLS = SET_IDS.length ? 60 : 30;
 const READ_TASKS = new Set(['READ_ALOUD', 'PRONUNCIATION_DRILL']);
 const sha256 = (v: string | Buffer) =>
   createHash('sha256').update(v).digest('hex');
@@ -85,8 +95,9 @@ function keyFor(ex: Exercise) {
 async function load(prisma: PrismaClient): Promise<Exercise[]> {
   return prisma.speakingExercise.findMany({
     where: {
-      practiceSetId: null,
-      publicationStatus: 'PUBLISHED',
+      ...(SET_IDS.length
+        ? { practiceSetId: { in: SET_IDS } }
+        : { practiceSetId: null, publicationStatus: 'PUBLISHED' }),
       // The UK pass covers exactly the exercises whose US clip this tool made.
       audioUrl: UK ? { contains: '/speaking/reference/' } : null,
     },
@@ -292,7 +303,11 @@ async function main() {
     await prisma.$transaction(async (tx) => {
       for (const [id, audioUrl] of values) {
         const changed = await tx.speakingExercise.updateMany({
-          where: { id, audioUrl: null, practiceSetId: null },
+          where: {
+            id,
+            audioUrl: null,
+            practiceSetId: SET_IDS.length ? { in: SET_IDS } : null,
+          },
           data: { audioUrl },
         });
         if (changed.count !== 1)
