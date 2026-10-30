@@ -3469,7 +3469,10 @@ Keep level and category code exactly as requested. The authoritative category co
             properties: {
               title: { type: SchemaType.STRING },
               targetText: { type: SchemaType.STRING },
-              difficulty: { type: SchemaType.STRING },
+              difficulty: {
+                type: SchemaType.STRING,
+                enum: [...SPEAKING_EXERCISE_DIFFICULTIES],
+              },
               taskType: {
                 type: SchemaType.STRING,
                 enum: [...SPEAKING_TASK_TYPES],
@@ -3585,7 +3588,10 @@ Each candidate must contain a learner-facing title, one English targetText/promp
             properties: {
               title: { type: SchemaType.STRING },
               targetText: { type: SchemaType.STRING },
-              difficulty: { type: SchemaType.STRING },
+              difficulty: {
+                type: SchemaType.STRING,
+                enum: [...SPEAKING_EXERCISE_DIFFICULTIES],
+              },
               taskType: {
                 type: SchemaType.STRING,
                 enum: [...SPEAKING_TASK_TYPES],

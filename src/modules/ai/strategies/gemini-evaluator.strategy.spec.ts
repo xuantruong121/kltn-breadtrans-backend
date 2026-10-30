@@ -710,3 +710,46 @@ describe('GeminiEvaluatorStrategy suggestCourseSectionRefinement', () => {
     ).rejects.toThrow('AI không thể tạo nội dung mục hợp lệ');
   });
 });
+
+describe('GeminiEvaluatorStrategy Speaking drafts', () => {
+  it('constrains exercise difficulty to the stored values (Gemini answered "Easy")', async () => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest.fn().mockResolvedValue({
+      response: {
+        text: () =>
+          JSON.stringify({
+            practiceSet: {
+              title: 'Hotel check-in',
+              description: 'Arriving at a hotel.',
+              category: 'GENERAL',
+              level: 'A1',
+            },
+            exercises: [
+              {
+                title: 'Greeting',
+                targetText: 'Good evening, I have a reservation.',
+                difficulty: 'BEGINNER',
+                taskType: 'READ_ALOUD',
+              },
+            ],
+          }),
+      },
+    });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    const draft = await strategy.suggestSpeakingFullDraft({
+      topic: 'checking in at a hotel',
+      level: 'A1',
+      category: 'GENERAL',
+      count: 5,
+    });
+    expect(draft.exercises).toHaveLength(1);
+    const schema =
+      generateContent.mock.calls[0][0].generationConfig.responseSchema;
+    expect(
+      schema.properties.exercises.items.properties.difficulty.enum,
+    ).toEqual(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']);
+  });
+});
