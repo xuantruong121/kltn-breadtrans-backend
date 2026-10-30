@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import {
   candidateEnvFiles,
@@ -43,24 +43,28 @@ describe('external-service environment isolation', () => {
     ).toEqual([]);
   });
 
-  it('includes the .env that the generated Prisma client resolves', () => {
-    const prismaEnv = join(
+  it('covers the .env the generated Prisma client would load, wherever it points', () => {
+    const clientDir = join(
       __dirname,
       '..',
       '..',
       'node_modules',
       '.prisma',
       'client',
-      'index.js',
     );
-    if (!existsSync(prismaEnv)) return; // client not generated: nothing loads
-    // The generated client declares where it loads `.env` from.
-    expect(readFileSync(prismaEnv, 'utf8')).toContain(
-      '"schemaEnvPath": "../../../.env"',
-    );
-    expect(candidateEnvFiles().length).toBeGreaterThanOrEqual(
-      existsSync(join(__dirname, '..', '..', '.env')) ? 1 : 0,
-    );
+    const index = join(clientDir, 'index.js');
+    if (!existsSync(index)) return; // client not generated: nothing loads
+    // `prisma generate` records where the client loads `.env` from; it is
+    // null when no .env existed at generation time (CI).
+    const declared = /"schemaEnvPath":\s*("[^"]*"|null)/.exec(
+      readFileSync(index, 'utf8'),
+    )?.[1];
+    const relative =
+      declared && declared !== 'null' ? (JSON.parse(declared) as string) : null;
+    if (!relative) return;
+    const target = resolve(realpathSync(clientDir), relative);
+    if (!existsSync(target)) return; // nothing there to load
+    expect(candidateEnvFiles().map((file) => resolve(file))).toContain(target);
   });
 
   it('loading and constructing the Prisma client cannot restore .env values', () => {
