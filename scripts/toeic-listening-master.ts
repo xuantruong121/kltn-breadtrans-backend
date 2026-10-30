@@ -77,6 +77,16 @@ export const NARRATION = {
   end: 'This is the end of the Listening section. You may now continue with the Reading section.',
 } as const;
 
+/**
+ * Narration text as SSML. The voice spells an all-caps word letter by letter
+ * ("T O E I C"), so brand and test names get a spoken alias.
+ */
+export function narrationSsml(text: string): string {
+  return escapeXml(text)
+    .replace(/\bTOEIC\b/g, '<sub alias="toe-ick">TOEIC</sub>')
+    .replace(/\bBreadTrans\b/g, '<sub alias="Bread Trans">BreadTrans</sub>');
+}
+
 const numberWords = (n: number): string => {
   const ones = [
     'zero',
@@ -279,7 +289,7 @@ async function narration(examId: number, dir: string) {
   const body = segments
     .map(
       (s) =>
-        `${escapeXml(s.text)}<bookmark mark="${s.id}"/><break time="1200ms"/>`,
+        `${narrationSsml(s.text)}<bookmark mark="${s.id}"/><break time="1200ms"/>`,
     )
     .join('');
   const ssml = `<speak version="1.0" xml:lang="en-US" xmlns="http://www.w3.org/2001/10/synthesis"><voice name="${voice}"><prosody rate="-4%">${body}</prosody></voice></speak>`;
@@ -668,7 +678,8 @@ async function main() {
   else throw new Error('mode: inventory | narration | build | publish');
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (require.main === module)
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
