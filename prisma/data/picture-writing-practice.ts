@@ -9,7 +9,7 @@
  * the grader uses as the truth about the image (the grader does not see it).
  *
  * The CEFR tag in each title decides access like every practice item:
- * A2 is free, B1 needs PRO (Writing). Written to a database only by
+ * A2 is free, B1 needs PLUS (Writing, matrix 2026-10-30). Written to a database only by
  * scripts/materialize-picture-writing.ts.
  */
 export const PICTURE_WRITING_TOPIC = {

@@ -23,7 +23,7 @@ describe('picture writing content (Viết câu theo tranh)', () => {
     );
   });
 
-  it('A2 is free, B1 needs PRO, and the stored flag agrees', () => {
+  it('A2 is free, B1 needs PLUS, and the stored flag agrees', () => {
     const plans = PICTURE_WRITING_EXERCISES.map((exercise) => {
       const range = parseCefrRange(exercise.title);
       expect(range).not.toBeNull();
@@ -31,7 +31,7 @@ describe('picture writing content (Viết câu theo tranh)', () => {
       expect(exercise.isPremiumContent).toBe(plan !== 'FREE');
       return plan;
     });
-    expect(plans).toEqual(['FREE', 'PRO']);
+    expect(plans).toEqual(['FREE', 'PLUS']);
   });
 
   it('B1 asks for one linked sentence and says so; A2 does not', () => {
