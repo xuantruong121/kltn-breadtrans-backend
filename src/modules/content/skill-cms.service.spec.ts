@@ -589,3 +589,124 @@ describe('SkillCmsService', () => {
     expect(quiz.createAudioAsset).not.toHaveBeenCalled();
   });
 });
+
+describe('Speaking reference audio follows the sample sentence', () => {
+  const admin = { id: 7, role: Role.ADMIN };
+  const exercise = {
+    id: 30,
+    practiceSetId: 'set-1',
+    targetText: 'Hello, my name is Alex.',
+    taskType: 'READ_ALOUD',
+    imageUrl: null,
+    stimulusId: null,
+    stimulus: null,
+    isPremiumContent: false,
+    audioUrl: 'https://pub/catalog/speaking/reference/30.v1.mp3',
+    practiceSet: { category: 'WORK', categoryId: 1 },
+  };
+  const prismaWith = () => ({
+    speakingExercise: {
+      findFirst: jest.fn().mockResolvedValue(exercise),
+      update: jest
+        .fn()
+        .mockImplementation(({ data }) => ({ ...exercise, ...data })),
+    },
+    speakingSubmission: { count: jest.fn().mockResolvedValue(0) },
+  });
+
+  it('clears the reference audio when the sentence changes', async () => {
+    const prisma = prismaWith();
+    const service = new SkillCmsService(prisma as any);
+    await service.updateSpeakingExercise(
+      'speaking',
+      'set-1',
+      '30',
+      { targetText: 'Hi, I am Alex.' } as any,
+      admin,
+    );
+    expect(
+      prisma.speakingExercise.update.mock.calls[0][0].data.audioUrl,
+    ).toBeNull();
+  });
+
+  it('keeps the reference audio when the sentence is unchanged', async () => {
+    const prisma = prismaWith();
+    const service = new SkillCmsService(prisma as any);
+    await service.updateSpeakingExercise(
+      'speaking',
+      'set-1',
+      '30',
+      { title: 'Greeting', targetText: 'Hello, my name is Alex.' },
+      admin,
+    );
+    expect(
+      prisma.speakingExercise.update.mock.calls[0][0].data.audioUrl,
+    ).toBeUndefined();
+  });
+
+  it('synthesizes a free reference clip to a new public key', async () => {
+    const prisma = prismaWith();
+    const speaking = {
+      generateTts: jest.fn().mockResolvedValue(Buffer.from('mp3')),
+    };
+    const upload = {
+      putObjectAtKey: jest.fn().mockImplementation((key: string) => ({
+        key,
+        url: `https://pub/${key}`,
+      })),
+      putPrivateObjectAtKey: jest.fn(),
+      isPrivateStorageConfigured: jest.fn().mockReturnValue(true),
+    };
+    const service = new SkillCmsService(
+      prisma as any,
+      undefined,
+      undefined,
+      undefined,
+      speaking as any,
+      upload as any,
+    );
+    await service.generateSpeakingReferenceAudio('set-1', '30', admin);
+    expect(speaking.generateTts).toHaveBeenCalledWith(
+      'Hello, my name is Alex.',
+      'US',
+      1,
+    );
+    const key = upload.putObjectAtKey.mock.calls[0][0] as string;
+    expect(key).toMatch(/^catalog\/speaking\/reference\/30\.r\d+\.mp3$/);
+    expect(prisma.speakingExercise.update).toHaveBeenCalledWith({
+      where: { id: 30 },
+      data: { audioUrl: `https://pub/${key}` },
+    });
+  });
+
+  it('stores a premium reference clip privately and saves its key', async () => {
+    const prisma = prismaWith();
+    prisma.speakingExercise.findFirst.mockResolvedValue({
+      ...exercise,
+      isPremiumContent: true,
+    });
+    const speaking = {
+      generateTts: jest.fn().mockResolvedValue(Buffer.from('mp3')),
+    };
+    const upload = {
+      putObjectAtKey: jest.fn(),
+      putPrivateObjectAtKey: jest.fn(),
+      isPrivateStorageConfigured: jest.fn().mockReturnValue(true),
+    };
+    const service = new SkillCmsService(
+      prisma as any,
+      undefined,
+      undefined,
+      undefined,
+      speaking as any,
+      upload as any,
+    );
+    await service.generateSpeakingReferenceAudio('set-1', '30', admin);
+    const key = upload.putPrivateObjectAtKey.mock.calls[0][0] as string;
+    expect(key).toMatch(/^premium\/speaking\/reference\/30\.r\d+\.mp3$/);
+    expect(prisma.speakingExercise.update).toHaveBeenCalledWith({
+      where: { id: 30 },
+      data: { audioUrl: key },
+    });
+  });
+});

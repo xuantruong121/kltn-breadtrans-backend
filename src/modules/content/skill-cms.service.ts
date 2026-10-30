@@ -37,6 +37,8 @@ import { SPEAKING_SET_LEVELS } from '../speaking/speaking-contract';
 import { SpeakingCategoryService } from './speaking-category.service';
 import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
 import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
+import { SpeakingService } from '../speaking/speaking.service';
+import { UploadService } from '../upload/upload.service';
 
 type Domain = 'listening' | 'reading' | 'writing' | 'speaking';
 type Admin = { id: number; role: Role };
@@ -73,6 +75,10 @@ export class SkillCmsService {
     private readonly quizService?: QuizService,
     @Optional()
     private readonly speakingCategoryService?: SpeakingCategoryService,
+    @Optional()
+    private readonly speakingService?: SpeakingService,
+    @Optional()
+    private readonly uploadService?: UploadService,
   ) {}
 
   private admin(user: Admin) {
@@ -673,7 +679,15 @@ export class SkillCmsService {
         category?.code || exercise.practiceSet?.category || exercise.category,
       difficulty: dto.difficulty,
       imageUrl: dto.imageUrl,
-      audioUrl: dto.audioUrl,
+      // A new sample sentence retires the clip that reads the old one; the
+      // CMS then offers to make a new reference audio.
+      audioUrl:
+        dto.audioUrl !== undefined
+          ? dto.audioUrl
+          : dto.targetText !== undefined &&
+              dto.targetText.trim() !== (exercise.targetText ?? '').trim()
+            ? null
+            : undefined,
       isPremiumContent: dto.isPremiumContent,
       taskType,
       stimulusId: dto.stimulusId === null ? null : stimulus?.id,
@@ -684,6 +698,57 @@ export class SkillCmsService {
     return this.prisma.speakingExercise.update({
       where: { id: exerciseId },
       data,
+    });
+  }
+
+  /**
+   * Reads the sample sentence with Azure TTS and makes it the exercise's
+   * reference audio. A new key per run, so no cache serves the old clip.
+   */
+  async generateSpeakingReferenceAudio(
+    rawSetId: string,
+    rawExerciseId: string,
+    user: Admin,
+  ) {
+    this.admin(user);
+    if (!this.speakingService || !this.uploadService)
+      throw new ServiceUnavailableException('Speaking audio is unavailable');
+    const exerciseId = this.id(rawExerciseId);
+    const exercise = await this.prisma.speakingExercise.findFirst({
+      where: { id: exerciseId, practiceSetId: rawSetId },
+    });
+    if (!exercise) throw new NotFoundException('Speaking exercise not found');
+    const text = exercise.targetText.trim();
+    if (!text) throw new BadRequestException('Câu luyện chưa có câu mẫu.');
+    if (
+      exercise.isPremiumContent &&
+      !this.uploadService.isPrivateStorageConfigured()
+    )
+      throw new ServiceUnavailableException(
+        'Protected Speaking media storage is not configured',
+      );
+    const audio = await this.speakingService.generateTts(text, 'US', 1);
+    const file = `${exerciseId}.r${Date.now()}.mp3`;
+    let audioUrl: string;
+    if (exercise.isPremiumContent) {
+      audioUrl = `premium/speaking/reference/${file}`;
+      await this.uploadService.putPrivateObjectAtKey(
+        audioUrl,
+        audio,
+        'audio/mpeg',
+      );
+    } else {
+      audioUrl = (
+        await this.uploadService.putObjectAtKey(
+          `catalog/speaking/reference/${file}`,
+          audio,
+          'audio/mpeg',
+        )
+      ).url;
+    }
+    return this.prisma.speakingExercise.update({
+      where: { id: exerciseId },
+      data: { audioUrl },
     });
   }
 

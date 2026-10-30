@@ -251,6 +251,27 @@ export class SkillCmsController {
     );
   }
 
+  @ApiOperation({
+    summary:
+      'Synthesize the reference audio of a Speaking exercise (Azure TTS)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'The exercise with its new audioUrl',
+  })
+  @Post('speaking/:setId/exercises/:exerciseId/reference-audio')
+  generateSpeakingReferenceAudio(
+    @Param('setId') setId: string,
+    @Param('exerciseId') exerciseId: string,
+    @Request() req: any,
+  ) {
+    return this.service.generateSpeakingReferenceAudio(
+      setId,
+      exerciseId,
+      req.user,
+    );
+  }
+
   @Post('listening/:id/questions/:questionId/audio-assets/generate-dialogue')
   generateListeningDialogueAudio(
     @Param('id', ParseIntPipe) id: number,
