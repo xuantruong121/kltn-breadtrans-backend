@@ -3863,6 +3863,24 @@ async function resolveOrCreateCourse(
   return { id: created.id, created: true };
 }
 
+// Dictionary entries with audio for these terms, oldest entry first per word.
+async function findPronunciationEntries(terms: string[]) {
+  const rows = await prisma.dictionaryEntry.findMany({
+    where: {
+      headword: { in: terms.map((term) => term.toLowerCase()) },
+      audioUs: { not: null },
+    },
+    orderBy: { id: 'desc' },
+    select: { displayWord: true, ipaUs: true, meaningVi: true, audioUs: true },
+  });
+  return rows.map((row) => ({
+    word: row.displayWord,
+    ipaUs: row.ipaUs,
+    meaning: row.meaningVi,
+    audioUs: row.audioUs,
+  }));
+}
+
 async function materializeLesson(
   courseId: number,
   lesson: LessonSpec,
@@ -3870,10 +3888,7 @@ async function materializeLesson(
 ) {
   const audioTerms = pronunciationAudioTerms[lesson.slug] ?? [];
   const audioRows = audioTerms.length
-    ? await prisma.vocabWord.findMany({
-        where: { word: { in: audioTerms } },
-        select: { word: true, ipaUs: true, meaning: true, audioUs: true },
-      })
+    ? await findPronunciationEntries(audioTerms)
     : [];
   const audioByWord = new Map(
     audioRows.map((row) => [row.word.toLowerCase(), row]),
@@ -4196,10 +4211,8 @@ async function writeAudits(
   const pronunciationTerms = [
     ...new Set(Object.values(pronunciationAudioTerms).flat()),
   ];
-  const pronunciationVocabRows = await prisma.vocabWord.findMany({
-    where: { word: { in: pronunciationTerms } },
-    select: { word: true, ipaUs: true, meaning: true, audioUs: true },
-  });
+  const pronunciationVocabRows =
+    await findPronunciationEntries(pronunciationTerms);
   const pronunciationVocabByWord = new Map(
     pronunciationVocabRows.map((row) => [row.word.toLowerCase(), row]),
   );
@@ -4213,7 +4226,7 @@ async function writeAudits(
               term: row.word,
               ipa: row.ipaUs,
               audioUrl: row.audioUs,
-              source: 'VocabWord.audioUs',
+              source: 'DictionaryEntry.audioUs',
             },
           ]
         : [];

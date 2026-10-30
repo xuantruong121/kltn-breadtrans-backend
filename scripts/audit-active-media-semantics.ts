@@ -383,12 +383,12 @@ async function classifyCourses() {
 async function classifyVocab() {
   const words = await prisma.vocabWord.findMany({
     where: { topic: { publicationStatus: 'PUBLISHED' } },
-    select: { id: true, word: true, audioUs: true, audioUk: true },
+    select: { id: true, entry: { select: { audioUs: true, audioUk: true } } },
     orderBy: { id: 'asc' },
   });
   let withAudio = 0;
   for (const word of words) {
-    if (word.audioUs || word.audioUk) withAudio += 1;
+    if (word.entry.audioUs || word.entry.audioUk) withAudio += 1;
   }
   // Rolled up: per-word rows would swamp the manifest without adding signal,
   // because every row would carry the same evidence and the same status.

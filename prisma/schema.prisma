@@ -2097,25 +2097,66 @@ model VocabTopic {
   words VocabWord[]
 }
 
-model VocabWord {
-  id           Int        @id @default(autoincrement())
-  topicId      Int
-  topic        VocabTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  word         String
-  pos          String     @default("noun") // "verb", "noun", "adjective", "adverb"
+enum DictionaryEntrySource {
+  CURATED
+  EXTERNAL
+  AI
+}
+
+enum DictionaryEntryStatus {
+  APPROVED
+  PENDING_REVIEW
+  REJECTED
+}
+
+/// The one word store: decks link to entries, and every lookup (Speaking,
+/// Listening, admin IPA fill), Arena and Speaking TTS read it.
+model DictionaryEntry {
+  id           Int                   @id @default(autoincrement())
+  /// Lower-case, trimmed: the lookup key.
+  headword     String
+  displayWord  String
+  pos          String                @default("noun")
   ipaUs        String?
   ipaUk        String?
-  meaning      String
   audioUs      String?
   audioUk      String?
-  exampleEn    String?    @db.Text
-  exampleVi    String?    @db.Text
+  meaningVi    String
+  definitionEn String?               @db.Text
+  exampleEn    String?               @db.Text
+  exampleVi    String?               @db.Text
   collocations Json?
-  order        Int        @default(0)
-  createdAt    DateTime   @default(now())
+  synonyms     Json?
+  antonyms     Json?
+  source       DictionaryEntrySource @default(CURATED)
+  status       DictionaryEntryStatus @default(APPROVED)
+  reviewedAt   DateTime?
+  reviewedBy   Int?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  deckWords VocabWord[]
+
+  @@unique([headword, pos])
+  @@index([headword])
+  @@index([status])
+}
+
+/// A word's place in a deck. Its id is what learner progress points at.
+model VocabWord {
+  id        Int             @id @default(autoincrement())
+  topicId   Int
+  topic     VocabTopic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  entryId   Int
+  entry     DictionaryEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  order     Int             @default(0)
+  createdAt DateTime        @default(now())
 
   userProgress   UserVocabWordProgress[]
   masteryRewards UserVocabMasteryReward[]
+
+  @@unique([topicId, entryId])
+  @@index([entryId])
 }
 
 model UserVocabWordProgress {

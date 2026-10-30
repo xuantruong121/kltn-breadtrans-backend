@@ -4,6 +4,8 @@ import {
   AuthProvider,
   Course,
   CourseStatus,
+  DictionaryEntrySource,
+  DictionaryEntryStatus,
   ExamType,
   Prisma,
   PrismaClient,
@@ -7037,6 +7039,47 @@ async function main() {
     },
   ] as const;
   let vocabWordId = 1;
+  // F13: a word lives once in DictionaryEntry, keyed by (headword, pos); a
+  // deck row only links an entry. `overwrite: false` keeps an entry that an
+  // earlier block (or an admin) already wrote, like the migration's
+  // oldest-row-wins backfill.
+  const upsertDictionaryEntry = async (
+    fields: {
+      word: string;
+      pos: string;
+      ipaUs: string | null;
+      ipaUk: string | null;
+      meaning: string;
+      exampleEn: string | null;
+      exampleVi: string | null;
+      collocations: Prisma.InputJsonValue;
+    },
+    overwrite: boolean,
+  ) => {
+    const headword = fields.word.trim().replace(/\s+/g, ' ').toLowerCase();
+    const pos = fields.pos.trim().toLowerCase();
+    const data = {
+      displayWord: fields.word.trim(),
+      ipaUs: fields.ipaUs,
+      ipaUk: fields.ipaUk,
+      meaningVi: fields.meaning,
+      exampleEn: fields.exampleEn,
+      exampleVi: fields.exampleVi,
+      collocations: fields.collocations,
+    };
+    const entry = await prisma.dictionaryEntry.upsert({
+      where: { headword_pos: { headword, pos } },
+      update: overwrite ? data : {},
+      create: {
+        headword,
+        pos,
+        ...data,
+        source: DictionaryEntrySource.CURATED,
+        status: DictionaryEntryStatus.APPROVED,
+      },
+    });
+    return entry.id;
+  };
   for (let topicIndex = 0; topicIndex < vocabTopics.length; topicIndex += 1) {
     const definition = vocabTopics[topicIndex];
     const topic = await prisma.vocabTopic.upsert({
@@ -7065,10 +7108,8 @@ async function main() {
       const [word, pos, ipaUs, ipaUk, meaning, exampleEn, exampleVi] =
         definition.words[wordIndex];
       const collocations = VOCAB_COLLOCATIONS[word] ?? [];
-      await prisma.vocabWord.upsert({
-        where: { id: vocabWordId },
-        update: {
-          topicId: topic.id,
+      const entryId = await upsertDictionaryEntry(
+        {
           word,
           pos,
           ipaUs,
@@ -7077,19 +7118,16 @@ async function main() {
           exampleEn,
           exampleVi,
           collocations,
-          order: wordIndex + 1,
         },
+        true,
+      );
+      await prisma.vocabWord.upsert({
+        where: { id: vocabWordId },
+        update: { topicId: topic.id, entryId, order: wordIndex + 1 },
         create: {
           id: vocabWordId,
           topicId: topic.id,
-          word,
-          pos,
-          ipaUs,
-          ipaUk,
-          meaning,
-          exampleEn,
-          exampleVi,
-          collocations,
+          entryId,
           order: wordIndex + 1,
         },
       });
@@ -7109,12 +7147,11 @@ async function main() {
       vocabWordId += 1;
     }
   }
-  // Canonical lemmas used by the speaking text and dictionary popup. Keep
-  // these IDs stable so repeated seeds remain idempotent and inflection
-  // lookups such as "opens" can resolve to the stored lemma "open".
+  // Canonical lemmas used by the speaking text and dictionary popup, so
+  // inflection lookups such as "opens" resolve to the stored lemma "open".
+  // They are dictionary entries only; no deck shows them.
   const canonicalLookupWords = [
     {
-      id: 1001,
       word: 'open',
       pos: 'verb',
       ipaUs: '/ˈoʊpən/',
@@ -7128,7 +7165,6 @@ async function main() {
       ],
     },
     {
-      id: 1002,
       word: 'clock',
       pos: 'noun',
       ipaUs: '/klɑːk/',
@@ -7142,7 +7178,6 @@ async function main() {
       ],
     },
     {
-      id: 1003,
       word: 'study',
       pos: 'verb',
       ipaUs: '/ˈstʌdi/',
@@ -7153,7 +7188,6 @@ async function main() {
       collocations: [{ phrase: 'study for an exam', meaningVi: 'học để thi' }],
     },
     {
-      id: 1004,
       word: 'go',
       pos: 'verb',
       ipaUs: '/ɡoʊ/',
@@ -7164,7 +7198,6 @@ async function main() {
       collocations: [{ phrase: 'go to class', meaningVi: 'đến lớp' }],
     },
     {
-      id: 1005,
       word: 'watch',
       pos: 'verb',
       ipaUs: '/wɑːtʃ/',
@@ -7175,7 +7208,6 @@ async function main() {
       collocations: [{ phrase: 'watch the clock', meaningVi: 'nhìn đồng hồ' }],
     },
     {
-      id: 1006,
       word: 'business',
       pos: 'noun',
       ipaUs: '/ˈbɪznəs/',
@@ -7188,7 +7220,6 @@ async function main() {
       ],
     },
     {
-      id: 1007,
       word: 'news',
       pos: 'noun',
       ipaUs: '/nuːz/',
@@ -7199,7 +7230,6 @@ async function main() {
       collocations: [{ phrase: 'evening news', meaningVi: 'tin tức buổi tối' }],
     },
     {
-      id: 1008,
       word: 'library',
       pos: 'noun',
       ipaUs: '/ˈlaɪbreri/',
@@ -7212,7 +7242,6 @@ async function main() {
       ],
     },
     {
-      id: 1009,
       word: 'close',
       pos: 'verb',
       ipaUs: '/kloʊz/',
@@ -7225,7 +7254,6 @@ async function main() {
       ],
     },
     {
-      id: 1010,
       word: 'evening',
       pos: 'noun',
       ipaUs: '/ˈiːvnɪŋ/',
@@ -7237,46 +7265,12 @@ async function main() {
     },
   ] as const;
   for (const definition of canonicalLookupWords) {
-    await prisma.vocabWord.upsert({
-      where: { id: definition.id },
-      update: {
-        topicId: 1,
-        word: definition.word,
-        pos: definition.pos,
-        ipaUs: definition.ipaUs,
-        ipaUk: definition.ipaUk,
-        meaning: definition.meaning,
-        exampleEn: definition.exampleEn,
-        exampleVi: definition.exampleVi,
-        collocations: definition.collocations,
-      },
-      create: {
-        id: definition.id,
-        topicId: 1,
-        word: definition.word,
-        pos: definition.pos,
-        ipaUs: definition.ipaUs,
-        ipaUk: definition.ipaUk,
-        meaning: definition.meaning,
-        exampleEn: definition.exampleEn,
-        exampleVi: definition.exampleVi,
-        collocations: definition.collocations,
-      },
-    });
+    await upsertDictionaryEntry(definition, false);
   }
 
-  // This topic is a local dictionary for the speaking workspace, not a
-  // learner-facing flashcard deck. Keeping it in VocabWord lets the existing
-  // lookup service resolve every seeded speaking token before using a remote
-  // provider, while the public topic API filters SYSTEM_DICTIONARY topics out.
-  const speakingDictionaryTopicId = 100;
-  const speakingDictionaryTotalWords =
-    SPEAKING_DICTIONARY_ENTRIES.length +
-    SPEAKING_DICTIONARY_ENTRIES.reduce(
-      (total, [word]) =>
-        total + (SPEAKING_DICTIONARY_METADATA[word]?.variants?.length ?? 0),
-      0,
-    );
+  // The Speaking workspace dictionary: entries every lookup resolves before
+  // calling a remote provider. Not a deck, so learners and the deck CMS never
+  // see it.
   const speakingDictionaryMissingIpa = SPEAKING_DICTIONARY_ENTRIES.filter(
     ([word]) => {
       const metadata = SPEAKING_DICTIONARY_METADATA[word];
@@ -7288,42 +7282,18 @@ async function main() {
       `Speaking dictionary IPA coverage failed for: ${speakingDictionaryMissingIpa.join(', ')}`,
     );
   }
-  const speakingDictionaryTopic = await prisma.vocabTopic.upsert({
-    where: { id: speakingDictionaryTopicId },
-    update: {
-      title: 'Speaking Practice Dictionary',
-      categoryName: 'SYSTEM_DICTIONARY',
-      totalWords: speakingDictionaryTotalWords,
-      isPro: false,
-    },
-    create: {
-      id: speakingDictionaryTopicId,
-      title: 'Speaking Practice Dictionary',
-      categoryName: 'SYSTEM_DICTIONARY',
-      totalWords: speakingDictionaryTotalWords,
-      isPro: false,
-    },
-  });
-
   const speakingExerciseTokens = speakingExercises.map((exercise) => ({
     targetText: exercise.targetText,
     tokens: new Set(tokenizeSpeakingDictionaryText(exercise.targetText)),
   }));
-  const speakingDictionaryWordIds: number[] = [];
 
-  for (let index = 0; index < SPEAKING_DICTIONARY_ENTRIES.length; index += 1) {
-    const [word, pos, meaning] = SPEAKING_DICTIONARY_ENTRIES[index];
+  for (const [word, pos, meaning] of SPEAKING_DICTIONARY_ENTRIES) {
     const metadata = SPEAKING_DICTIONARY_METADATA[word];
-    const id = 2000 + index;
     const exampleEn =
       speakingExerciseTokens.find((exercise) => exercise.tokens.has(word))
         ?.targetText ?? null;
-
-    speakingDictionaryWordIds.push(id);
-    await prisma.vocabWord.upsert({
-      where: { id },
-      update: {
-        topicId: speakingDictionaryTopic.id,
+    await upsertDictionaryEntry(
+      {
         word,
         pos,
         meaning,
@@ -7332,36 +7302,12 @@ async function main() {
         exampleEn,
         exampleVi: null,
         collocations: metadata?.collocations ?? [],
-        order: index + 1,
       },
-      create: {
-        id,
-        topicId: speakingDictionaryTopic.id,
-        word,
-        pos,
-        meaning,
-        ipaUs: metadata?.ipaUs ?? null,
-        ipaUk: metadata?.ipaUk ?? null,
-        exampleEn,
-        exampleVi: null,
-        collocations: metadata?.collocations ?? [],
-        order: index + 1,
-      },
-    });
-
-    const variants = metadata?.variants ?? [];
-    for (
-      let variantIndex = 0;
-      variantIndex < variants.length;
-      variantIndex += 1
-    ) {
-      const variant = variants[variantIndex];
-      const variantId = 3000 + index * 10 + variantIndex;
-      speakingDictionaryWordIds.push(variantId);
-      await prisma.vocabWord.upsert({
-        where: { id: variantId },
-        update: {
-          topicId: speakingDictionaryTopic.id,
+      false,
+    );
+    for (const variant of metadata?.variants ?? []) {
+      await upsertDictionaryEntry(
+        {
           word,
           pos: variant.partOfSpeech,
           meaning: variant.meaningVi,
@@ -7370,46 +7316,23 @@ async function main() {
           exampleEn,
           exampleVi: null,
           collocations: [],
-          order: index + 1,
         },
-        create: {
-          id: variantId,
-          topicId: speakingDictionaryTopic.id,
-          word,
-          pos: variant.partOfSpeech,
-          meaning: variant.meaningVi,
-          ipaUs: variant.ipaUs,
-          ipaUk: variant.ipaUk,
-          exampleEn,
-          exampleVi: null,
-          collocations: [],
-          order: index + 1,
-        },
-      });
+        false,
+      );
     }
   }
-
-  // Remove only stale entries previously owned by the reserved system topic.
-  await prisma.vocabWord.deleteMany({
-    where: {
-      topicId: speakingDictionaryTopic.id,
-      id: { notIn: speakingDictionaryWordIds },
-    },
-  });
 
   const uniqueSpeakingTokens = [
     ...new Set(
       speakingExerciseTokens.flatMap((exercise) => [...exercise.tokens]),
     ),
   ];
-  const locallySeededWords = await prisma.vocabWord.findMany({
-    where: {
-      word: { in: uniqueSpeakingTokens, mode: 'insensitive' },
-    },
-    select: { word: true },
+  const locallySeededWords = await prisma.dictionaryEntry.findMany({
+    where: { headword: { in: uniqueSpeakingTokens } },
+    select: { headword: true },
   });
   const localWordSet = new Set(
-    locallySeededWords.map((entry) => entry.word.toLowerCase()),
+    locallySeededWords.map((entry) => entry.headword),
   );
   const unresolvedSpeakingTokens = uniqueSpeakingTokens.filter(
     (word) => !localWordSet.has(word),

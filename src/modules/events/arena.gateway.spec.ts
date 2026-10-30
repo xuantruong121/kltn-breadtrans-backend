@@ -56,6 +56,43 @@ describe('ArenaGateway security validation', () => {
     },
   );
 
+  it('draws word questions only from reviewed curated dictionary entries', async () => {
+    const prisma = {
+      question: { findMany: jest.fn().mockResolvedValue([]) },
+      dictionaryEntry: {
+        count: jest.fn().mockResolvedValue(3),
+        findMany: jest.fn().mockResolvedValue(
+          ['agenda', 'minutes', 'deadline'].map((word, index) => ({
+            id: index + 1,
+            displayWord: word,
+            pos: 'noun',
+            meaningVi: `nghĩa ${word}`,
+            ipaUs: null,
+            ipaUk: null,
+            exampleEn: null,
+            exampleVi: null,
+          })),
+        ),
+      },
+    };
+    (gateway as unknown as { prisma: unknown }).prisma = prisma;
+
+    const questions = await (
+      gateway as unknown as {
+        fetchArenaQuestions: (count: number) => Promise<{ prompt: string }[]>;
+      }
+    ).fetchArenaQuestions(3);
+
+    const where = { status: 'APPROVED', source: 'CURATED' };
+    expect(prisma.dictionaryEntry.count).toHaveBeenCalledWith({ where });
+    expect(prisma.dictionaryEntry.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where, skip: 0, take: 200 }),
+    );
+    expect(questions.map((question) => question.prompt)).toEqual(
+      expect.arrayContaining([expect.stringContaining('"agenda"')]),
+    );
+  });
+
   it('rejects an unapproved game id', async () => {
     const socket: Partial<Socket> = {
       data: { user: { userId: 1, role: 'STUDENT' } },

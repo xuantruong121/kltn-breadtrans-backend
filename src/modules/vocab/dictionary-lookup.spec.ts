@@ -5,11 +5,11 @@ import { DictionaryProvider } from './dictionary-provider';
 describe('DictionaryLookupService', () => {
   const localWord = {
     id: 1,
-    word: 'open',
+    displayWord: 'open',
     pos: 'verb',
     ipaUs: '/oʊpən/',
     ipaUk: '/əʊpən/',
-    meaning: 'mở',
+    meaningVi: 'mở',
     exampleEn: 'Open the door.',
     exampleVi: 'Mở cửa.',
     audioUs: null,
@@ -19,7 +19,7 @@ describe('DictionaryLookupService', () => {
 
   function createService(redis?: { get: jest.Mock; set: jest.Mock }) {
     const prisma = {
-      vocabWord: { findMany: jest.fn() },
+      dictionaryEntry: { findMany: jest.fn(), createMany: jest.fn() },
     } as unknown as PrismaService;
     const service = new DictionaryLookupService(prisma, redis as never);
     return { prisma, service };
@@ -27,7 +27,9 @@ describe('DictionaryLookupService', () => {
 
   it('prefers curated local data over external provider', async () => {
     const { prisma, service } = createService();
-    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([localWord]);
+    (prisma.dictionaryEntry.findMany as jest.Mock).mockResolvedValue([
+      localWord,
+    ]);
     const provider = {
       lookup: jest.fn(),
     } satisfies jest.Mocked<DictionaryProvider>;
@@ -40,6 +42,12 @@ describe('DictionaryLookupService', () => {
     expect(result.canonicalWord).toBe('open');
     expect(result.isInflectionMatch).toBe(true);
     expect(provider.lookup).not.toHaveBeenCalled();
+    const query = (prisma.dictionaryEntry.findMany as jest.Mock).mock
+      .calls[0][0];
+    expect(query.where.status).toEqual({ not: 'REJECTED' });
+    expect(query.where.headword.in).toEqual(
+      expect.arrayContaining(['opens', 'open']),
+    );
     expect(result.entries[0].definitions[0]).toEqual({
       definition: 'mở',
       meaningVi: 'mở',
@@ -49,7 +57,7 @@ describe('DictionaryLookupService', () => {
 
   it('serves every curated word to every learner (vocabulary is free)', async () => {
     const prisma = {
-      vocabWord: { findMany: jest.fn().mockResolvedValue([]) },
+      dictionaryEntry: { findMany: jest.fn().mockResolvedValue([]) },
     } as unknown as PrismaService;
     const subscriptionService = {
       hasFeature: jest.fn().mockResolvedValue(false),
@@ -66,23 +74,23 @@ describe('DictionaryLookupService', () => {
 
     await service.lookup('museum', 7);
 
-    const where = (prisma.vocabWord.findMany as jest.Mock).mock.calls[0][0]
-      .where;
+    const where = (prisma.dictionaryEntry.findMany as jest.Mock).mock
+      .calls[0][0].where;
     expect(where).not.toHaveProperty('topic');
     expect(subscriptionService.hasFeature).not.toHaveBeenCalled();
   });
 
   it('keeps IPA available for common function words such as within', async () => {
     const { prisma, service } = createService();
-    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([
+    (prisma.dictionaryEntry.findMany as jest.Mock).mockResolvedValue([
       {
         ...localWord,
         id: 20,
-        word: 'within',
+        displayWord: 'within',
         pos: 'preposition',
         ipaUs: '/wɪˈθɪn/',
         ipaUk: '/wɪˈðɪn/',
-        meaning: 'trong vòng; bên trong',
+        meaningVi: 'trong vòng; bên trong',
       },
     ]);
 
@@ -95,11 +103,11 @@ describe('DictionaryLookupService', () => {
 
   it('uses the canonical lemma and removes duplicate local part-of-speech tabs', async () => {
     const { prisma, service } = createService();
-    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([
+    (prisma.dictionaryEntry.findMany as jest.Mock).mockResolvedValue([
       {
         ...localWord,
         id: 2,
-        word: 'opens',
+        displayWord: 'opens',
         ipaUs: null,
         ipaUk: null,
       },
@@ -116,24 +124,24 @@ describe('DictionaryLookupService', () => {
 
   it('returns every curated local part of speech with its own IPA', async () => {
     const { prisma, service } = createService();
-    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([
+    (prisma.dictionaryEntry.findMany as jest.Mock).mockResolvedValue([
       {
         ...localWord,
         id: 10,
-        word: 'present',
+        displayWord: 'present',
         pos: 'verb',
         ipaUs: '/prɪˈzent/',
         ipaUk: '/prɪˈzent/',
-        meaning: 'trình bày; giới thiệu',
+        meaningVi: 'trình bày; giới thiệu',
       },
       {
         ...localWord,
         id: 11,
-        word: 'present',
+        displayWord: 'present',
         pos: 'noun',
         ipaUs: '/ˈprezənt/',
         ipaUk: '/ˈprezənt/',
-        meaning: 'hiện tại; món quà',
+        meaningVi: 'hiện tại; món quà',
       },
     ]);
 
@@ -156,7 +164,7 @@ describe('DictionaryLookupService', () => {
       set: jest.fn().mockResolvedValue('OK'),
     };
     const { prisma, service } = createService(redis);
-    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.dictionaryEntry.findMany as jest.Mock).mockResolvedValue([]);
     const provider = {
       lookup: jest.fn().mockResolvedValue([
         {
@@ -186,11 +194,13 @@ describe('DictionaryLookupService', () => {
     expect(result.entries[0].partOfSpeech).toBe('noun');
     expect(result.entries[0].definitions[0].definition).toContain('design');
     expect(redis.set).toHaveBeenCalledWith(
-      expect.stringContaining('dictionary:v3:premium:en:architecture'),
+      expect.stringContaining('dictionary:v4:premium:en:architecture'),
       expect.any(String),
       'EX',
       5 * 60,
     );
+
+    expect(prisma.dictionaryEntry.createMany).not.toHaveBeenCalled();
 
     redis.get.mockResolvedValueOnce(JSON.stringify(result));
     const cached = await service.lookup('architecture');
@@ -204,7 +214,7 @@ describe('DictionaryLookupService', () => {
       set: jest.fn().mockResolvedValue('OK'),
     };
     const { prisma, service } = createService(redis);
-    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.dictionaryEntry.findMany as jest.Mock).mockResolvedValue([]);
     const provider = {
       lookup: jest.fn().mockRejectedValue(new Error('timeout')),
     } satisfies jest.Mocked<DictionaryProvider>;
@@ -220,7 +230,7 @@ describe('DictionaryLookupService', () => {
 
   it('falls back to AI provider when primary provider fails', async () => {
     const { prisma, service } = createService();
-    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.dictionaryEntry.findMany as jest.Mock).mockResolvedValue([]);
     const primary = {
       lookup: jest.fn().mockRejectedValue(new Error('HTTP timeout')),
     } satisfies jest.Mocked<DictionaryProvider>;
@@ -258,7 +268,7 @@ describe('DictionaryLookupService', () => {
 
   it('enriches external entries once and keeps the English provider data', async () => {
     const { prisma } = createService();
-    (prisma.vocabWord.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.dictionaryEntry.findMany as jest.Mock).mockResolvedValue([]);
     const provider = {
       lookup: jest.fn().mockResolvedValue([
         {
@@ -302,6 +312,52 @@ describe('DictionaryLookupService', () => {
     expect(result.entries[0].meaningVi).toBe('khả năng tương tác');
     expect(result.entries[0].ipaUs).toContain('ɑ');
     expect(ai.enrichDictionaryEntry).toHaveBeenCalledTimes(1);
+    expect(prisma.dictionaryEntry.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          headword: 'interoperability',
+          pos: 'noun',
+          meaningVi: 'khả năng tương tác',
+          source: 'EXTERNAL',
+          status: 'PENDING_REVIEW',
+        }),
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  it('still answers when keeping the external entry fails', async () => {
+    const { prisma } = createService();
+    (prisma.dictionaryEntry.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.dictionaryEntry.createMany as jest.Mock).mockRejectedValue(
+      new Error('db down'),
+    );
+    const ai = {
+      enrichDictionaryEntry: jest
+        .fn()
+        .mockResolvedValue({ meaningVi: 'bền vững' }),
+    };
+    const service = new DictionaryLookupService(prisma, undefined, ai as never);
+    service.provider = {
+      lookup: jest.fn().mockResolvedValue([
+        {
+          word: 'sustainable',
+          partOfSpeech: 'adjective',
+          ipaUs: null,
+          ipaUk: null,
+          audioUs: null,
+          audioUk: null,
+          definitions: [
+            { definition: 'able to last', synonyms: [], antonyms: [] },
+          ],
+        },
+      ]),
+    };
+
+    const result = await service.lookup('sustainable');
+
+    expect(result.source).toBe('EXTERNAL');
+    expect(result.entries[0].meaningVi).toBe('bền vững');
   });
 
   it('loads and enriches multiple parts of speech for progressive details', async () => {
@@ -373,7 +429,7 @@ describe('DictionaryLookupService', () => {
     ]);
     expect(ai.enrichDictionaryEntry).toHaveBeenCalledTimes(2);
     expect(redis.set).toHaveBeenCalledWith(
-      'dictionary:extended:v1:en:present',
+      'dictionary:extended:v2:en:present',
       expect.any(String),
       'EX',
       30 * 24 * 60 * 60,

@@ -1505,12 +1505,33 @@ export class ArenaGateway
         }
       }
 
-      // 2. If needed, supplement with VocabWords
+      // 2. If needed, supplement with reviewed dictionary words (F13: the
+      // store, never draft deck rows or unreviewed external entries).
       if (questions.length < count) {
         const needed = count - questions.length;
-        const words = await this.prisma.vocabWord.findMany({
-          take: 30,
+        const reviewed = { status: 'APPROVED', source: 'CURATED' } as const;
+        // A random window of the store, so every entry can come up.
+        const pool = 200;
+        const total = await this.prisma.dictionaryEntry.count({
+          where: reviewed,
         });
+        const words = (
+          await this.prisma.dictionaryEntry.findMany({
+            where: reviewed,
+            orderBy: { id: 'asc' },
+            skip: Math.floor(Math.random() * Math.max(0, total - pool + 1)),
+            take: pool,
+          })
+        ).map((entry) => ({
+          id: entry.id,
+          word: entry.displayWord,
+          pos: entry.pos,
+          meaning: entry.meaningVi,
+          ipaUs: entry.ipaUs,
+          ipaUk: entry.ipaUk,
+          exampleEn: entry.exampleEn,
+          exampleVi: entry.exampleVi,
+        }));
 
         if (words.length > 0) {
           const shuffledWords = words.sort(() => Math.random() - 0.5);

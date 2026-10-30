@@ -235,7 +235,7 @@ async function main() {
     prisma.speakingStimulus.findMany({ select: { id: true, title: true, imageUrl: true, kind: true } }),
     prisma.marketProduct.findMany({ select: { id: true, slug: true, name: true, imageUrl: true, isActive: true } }),
     prisma.vocabTopic.findMany({ select: { id: true, title: true, iconUrl: true, isPro: true, publicationStatus: true } }),
-    prisma.vocabWord.findMany({ select: { id: true, topicId: true, word: true, audioUs: true, audioUk: true } }),
+    prisma.dictionaryEntry.findMany({ select: { id: true, displayWord: true, audioUs: true, audioUk: true } }),
     prisma.toeicQuestionGroup.findMany({ select: { id: true, examId: true, part: true, groupOrder: true, audioUrl: true, imageUrl: true, mediaMetadata: true, exam: { select: { genericExam: { select: { publicationStatus: true } } } } } }),
     prisma.listeningDiagnosticClip.findMany({ select: { id: true, questionId: true, label: true, key: true, url: true } }),
     prisma.diagnosticSpeakingResponse.findMany({ select: { id: true, taskKey: true, audioKey: true, status: true } }),
@@ -304,8 +304,8 @@ async function main() {
     publicationStatus: String(topic.publicationStatus), learnerVisibility: topic.publicationStatus === QuizPublicationStatus.PUBLISHED ? 'LEARNER' : 'LEGACY_OR_DRAFT', requiredAccessTier: topic.isPro ? 'PREMIUM_VOCAB' : 'FREE', mediaField: 'iconUrl', mediaType: 'image', required: false, currentDbMediaReference: topic.iconUrl, mappingEvidence: 'Vocab topic icon optional',
   });
   for (const word of vocabWords) for (const [field, reference] of [['audioUs', word.audioUs], ['audioUk', word.audioUk]] as const) addRecord(records, objectByKey, {
-    domain: 'Flashcard', model: 'VocabWord', canonicalId: String(word.id), canonicalKey: `word-${word.id}`, title: word.word,
-    publicationStatus: 'TOPIC_GOVERNED', learnerVisibility: 'LEARNER', requiredAccessTier: 'TOPIC_GOVERNED', mediaField: field, mediaType: 'audio', required: false, currentDbMediaReference: reference, mappingEvidence: 'Vocab pronunciation audio current DB reference',
+    domain: 'Flashcard', model: 'DictionaryEntry', canonicalId: String(word.id), canonicalKey: `entry-${word.id}`, title: word.displayWord,
+    publicationStatus: 'TOPIC_GOVERNED', learnerVisibility: 'LEARNER', requiredAccessTier: 'TOPIC_GOVERNED', mediaField: field, mediaType: 'audio', required: false, currentDbMediaReference: reference, mappingEvidence: 'Dictionary entry pronunciation audio current DB reference',
   });
   for (const group of toeicGroups) {
     const examPublication = group.exam.genericExam?.publicationStatus ?? 'DRAFT';

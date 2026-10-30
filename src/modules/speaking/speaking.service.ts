@@ -1668,10 +1668,13 @@ export class SpeakingService {
 
     // 1. Prefer stored audioUs/audioUk for exact single vocabulary words if rate == 1
     if (rate === 1.0 && !trimmedText.includes(' ')) {
-      const vocabWord = await this.prisma.vocabWord.findFirst({
+      // The dictionary store; reviewed entries first, a stable pick.
+      const vocabWord = await this.prisma.dictionaryEntry.findFirst({
         where: {
-          word: { equals: trimmedText.toLowerCase(), mode: 'insensitive' },
+          headword: trimmedText.toLowerCase(),
+          status: { not: 'REJECTED' },
         },
+        orderBy: [{ status: 'asc' }, { id: 'asc' }],
         select: { audioUs: true, audioUk: true },
       });
       const storedUrl =
