@@ -2613,15 +2613,17 @@ model GrammarTopic {
 }
 
 model GrammarQuestion {
-  id           Int          @id @default(autoincrement())
-  topicId      Int
-  topic        GrammarTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  question     String       @db.Text
-  options      Json // Array of 4 strings
-  correctIndex Int
-  explanation  String?      @db.Text
-  order        Int          @default(0)
-  createdAt    DateTime     @default(now())
+  id                 Int          @id @default(autoincrement())
+  topicId            Int
+  topic              GrammarTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  question           String       @db.Text
+  options            Json // Array of 4 strings
+  correctIndex       Int
+  explanation        String?      @db.Text
+  /// Why each wrong option is wrong, aligned with options; null at the answer.
+  optionExplanations Json?
+  order              Int          @default(0)
+  createdAt          DateTime     @default(now())
 }
 
 model GrammarAttempt {

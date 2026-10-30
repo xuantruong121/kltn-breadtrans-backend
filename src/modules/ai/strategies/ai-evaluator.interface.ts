@@ -525,6 +525,8 @@ export interface ContextualGrammarCandidate {
   options: string[];
   correctIndex: number;
   explanation: string;
+  /** Why each wrong option is wrong, aligned with options ("" at the key). */
+  optionExplanations?: string[];
 }
 
 export interface ContextualGrammarSuggestion {

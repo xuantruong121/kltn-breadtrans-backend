@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { QuizPublicationStatus } from '@prisma/client';
+import { Prisma, QuizPublicationStatus, Role } from '@prisma/client';
 import { GamificationService } from '../gamification/gamification.service';
 import {
   CreateGrammarTopicDto,
@@ -14,6 +14,13 @@ import {
   CreateGrammarQuestionDto,
   UpdateGrammarQuestionDto,
 } from './dto';
+import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
+import {
+  filterGrammarTopics,
+  grammarTopicFacets,
+  normalizeOptionExplanations,
+  questionProblems,
+} from './grammar-question.logic';
 
 @Injectable()
 export class GrammarService {
@@ -114,10 +121,52 @@ export class GrammarService {
           return rest;
         });
 
+    // Staff see whether learners already answered this topic: the graded
+    // parts of its questions are then locked.
+    const learnerAttemptCount = isStaff ? await this.learnerAttempts(id) : 0;
     return {
       ...topic,
       questions: sanitizedQuestions,
       latestAttempt,
+      ...(isStaff && {
+        learnerAttemptCount,
+        locked: learnerAttemptCount > 0,
+      }),
+    };
+  }
+
+  /** Attempts by learners; an admin trying a topic does not lock it. */
+  private learnerAttempts(topicId: number) {
+    return this.prisma.grammarAttempt.count({
+      where: { topicId, user: { role: Role.STUDENT } },
+    });
+  }
+
+  /** The admin topic list: all, or with `query.page` one filtered page. */
+  async getAdminTopics(query: ListQuery = {}) {
+    const [topics, attempts] = await Promise.all([
+      this.prisma.grammarTopic.findMany({
+        include: { _count: { select: { questions: true } } },
+        orderBy: { id: 'desc' },
+      }),
+      this.prisma.grammarAttempt.groupBy({
+        by: ['topicId'],
+        where: { user: { role: Role.STUDENT } },
+        _count: { _all: true },
+      }),
+    ]);
+    const attemptsByTopic = new Map(
+      attempts.map((row) => [row.topicId, row._count._all]),
+    );
+    const rows = topics.map(({ _count, ...topic }) => ({
+      ...topic,
+      totalQuestions: _count.questions,
+      learnerAttemptCount: attemptsByTopic.get(topic.id) ?? 0,
+    }));
+    if (!wantsPage(query)) return rows;
+    return {
+      ...pageOf(filterGrammarTopics(rows, query), query),
+      facets: grammarTopicFacets(rows),
     };
   }
 
@@ -149,6 +198,7 @@ export class GrammarService {
         correctOption: q.correctIndex,
         isCorrect,
         explanation: q.explanation,
+        optionExplanations: q.optionExplanations ?? null,
       };
     });
 
@@ -272,22 +322,14 @@ export class GrammarService {
         'Chủ đề ngữ pháp phải có ít nhất 1 câu hỏi trước khi xuất bản',
       );
     }
-    for (const q of topic.questions) {
-      if (!q.question?.trim()) {
-        throw new BadRequestException(`Câu hỏi ID ${q.id} không có nội dung`);
-      }
-      const opts = Array.isArray(q.options) ? q.options : [];
-      if (opts.length < 2) {
+    const ordered = [...topic.questions].sort((a, b) => a.order - b.order);
+    ordered.forEach((q, index) => {
+      const problems = questionProblems(q);
+      if (problems.length)
         throw new BadRequestException(
-          `Câu hỏi ID ${q.id} phải có ít nhất 2 đáp án lựa chọn`,
+          `Câu ${index + 1}: ${problems.join('; ')}`,
         );
-      }
-      if (q.correctIndex < 0 || q.correctIndex >= opts.length) {
-        throw new BadRequestException(
-          `Đáp án đúng của câu hỏi ID ${q.id} không hợp lệ`,
-        );
-      }
-    }
+    });
     return this.prisma.grammarTopic.update({
       where: { id },
       data: { publicationStatus: QuizPublicationStatus.PUBLISHED },
@@ -309,10 +351,7 @@ export class GrammarService {
     if (!topic)
       throw new NotFoundException(`Grammar topic with ID ${id} not found`);
     // History safety guard
-    const hasAttempts = await this.prisma.grammarAttempt.findFirst({
-      where: { topicId: id },
-    });
-    if (hasAttempts) {
+    if (await this.learnerAttempts(id)) {
       throw new ConflictException(
         'Chủ đề ngữ pháp đã có bài làm của học viên, không thể xóa',
       );
@@ -326,24 +365,67 @@ export class GrammarService {
     });
     if (!topic)
       throw new NotFoundException(`Grammar topic with ID ${topicId} not found`);
-    if (!Array.isArray(dto.options) || dto.options.length < 2) {
-      throw new BadRequestException('Câu hỏi phải có ít nhất 2 đáp án');
-    }
-    if (dto.correctIndex < 0 || dto.correctIndex >= dto.options.length) {
-      throw new BadRequestException(
-        'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
-      );
-    }
+    const problems = questionProblems(dto);
+    if (problems.length) throw new BadRequestException(problems.join('; '));
     return this.prisma.grammarQuestion.create({
-      data: {
-        topicId,
-        question: dto.question,
-        options: dto.options,
-        correctIndex: dto.correctIndex,
-        explanation: dto.explanation,
-        order: dto.order || 0,
-      },
+      data: this.questionData(topicId, dto, dto.order || 0),
     });
+  }
+
+  /**
+   * Adds several questions after the last one, all or nothing: one invalid
+   * question rejects the batch and names it, so a paste or AI batch never
+   * lands half-way.
+   */
+  async createQuestions(topicId: number, dtos: CreateGrammarQuestionDto[]) {
+    const topic = await this.prisma.grammarTopic.findUnique({
+      where: { id: topicId },
+    });
+    if (!topic)
+      throw new NotFoundException(`Grammar topic with ID ${topicId} not found`);
+    if (!dtos.length) throw new BadRequestException('Chưa có câu hỏi nào');
+    const errors = dtos
+      .map((dto, index) => ({ index, problems: questionProblems(dto) }))
+      .filter((row) => row.problems.length);
+    if (errors.length)
+      throw new BadRequestException({
+        message: errors
+          .map((row) => `Câu ${row.index + 1}: ${row.problems.join('; ')}`)
+          .join(' | '),
+        errors,
+      });
+    const last = await this.prisma.grammarQuestion.aggregate({
+      where: { topicId },
+      _max: { order: true },
+    });
+    const start = (last._max.order ?? -1) + 1;
+    return this.prisma.$transaction(
+      dtos.map((dto, index) =>
+        this.prisma.grammarQuestion.create({
+          data: this.questionData(topicId, dto, start + index),
+        }),
+      ),
+    );
+  }
+
+  private questionData(
+    topicId: number,
+    dto: CreateGrammarQuestionDto,
+    order: number,
+  ): Prisma.GrammarQuestionUncheckedCreateInput {
+    const notes = normalizeOptionExplanations(
+      dto.optionExplanations,
+      dto.correctIndex,
+    );
+    return {
+      topicId,
+      question: dto.question.trim(),
+      options: dto.options.map((option) => String(option).trim()),
+      correctIndex: dto.correctIndex,
+      explanation: dto.explanation?.trim() || null,
+      optionExplanations: notes ?? Prisma.DbNull,
+      order,
+    };
   }
 
   async updateQuestion(
@@ -367,35 +449,43 @@ export class GrammarService {
         JSON.stringify(dto.options) !== JSON.stringify(question.options)) ||
       (dto.correctIndex !== undefined &&
         dto.correctIndex !== question.correctIndex);
-    const hasAttempts =
-      changesGradedContent &&
-      (await this.prisma.grammarAttempt.findFirst({
-        where: { topicId },
-      }));
-    if (hasAttempts) {
+    if (changesGradedContent && (await this.learnerAttempts(topicId))) {
       throw new ConflictException(
         'Chủ đề ngữ pháp đã có bài làm của học viên, không thể chỉnh sửa cấu trúc câu hỏi',
       );
     }
-    const finalOptions = dto.options ?? (question.options as string[]);
-    const finalCorrectIndex = dto.correctIndex ?? question.correctIndex;
-    if (
-      Array.isArray(finalOptions) &&
-      (finalCorrectIndex < 0 || finalCorrectIndex >= finalOptions.length)
-    ) {
-      throw new BadRequestException(
-        'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
-      );
-    }
+    const final = {
+      question: dto.question ?? question.question,
+      options: dto.options ?? question.options,
+      correctIndex: dto.correctIndex ?? question.correctIndex,
+      optionExplanations:
+        dto.optionExplanations !== undefined
+          ? dto.optionExplanations
+          : question.optionExplanations,
+    };
+    const problems = questionProblems(final);
+    if (problems.length) throw new BadRequestException(problems.join('; '));
+    // The why-wrong notes follow the answer: re-aligned whenever either changes.
+    const touchesNotes =
+      dto.optionExplanations !== undefined || dto.correctIndex !== undefined;
+    const notes = normalizeOptionExplanations(
+      final.optionExplanations,
+      final.correctIndex,
+    );
     return this.prisma.grammarQuestion.update({
       where: { id: questionId },
       data: {
-        ...(dto.question !== undefined && { question: dto.question }),
-        ...(dto.options !== undefined && { options: dto.options }),
+        ...(dto.question !== undefined && { question: dto.question.trim() }),
+        ...(dto.options !== undefined && {
+          options: dto.options.map((option) => String(option).trim()),
+        }),
         ...(dto.correctIndex !== undefined && {
           correctIndex: dto.correctIndex,
         }),
-        ...(dto.explanation !== undefined && { explanation: dto.explanation }),
+        ...(dto.explanation !== undefined && {
+          explanation: dto.explanation.trim() || null,
+        }),
+        ...(touchesNotes && { optionExplanations: notes ?? Prisma.DbNull }),
         ...(dto.order !== undefined && { order: dto.order }),
       },
     });
@@ -411,10 +501,7 @@ export class GrammarService {
       );
     }
     // History safety guard
-    const hasAttempts = await this.prisma.grammarAttempt.findFirst({
-      where: { topicId },
-    });
-    if (hasAttempts) {
+    if (await this.learnerAttempts(topicId)) {
       throw new ConflictException(
         'Chủ đề ngữ pháp đã có bài làm của học viên, không thể xóa câu hỏi',
       );
