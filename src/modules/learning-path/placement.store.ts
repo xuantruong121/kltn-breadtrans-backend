@@ -11,7 +11,11 @@
  * - an older attempt never overrides a newer placement;
  * - unlocks only grow.
  */
-import type { PracticeSkill, PrismaClient } from '@prisma/client';
+import type {
+  PracticeLevel,
+  PracticeSkill,
+  PrismaClient,
+} from '@prisma/client';
 
 import {
   ABILITY_SEED,
@@ -111,4 +115,54 @@ export async function applyDiagnosticPlacement(
     },
   });
   return placement;
+}
+
+/**
+ * The learner picks a level without the diagnostic ("Tự chọn mức", including
+ * Mất gốc). Every skill not placed by a diagnostic gets that level; unlocks
+ * only grow, so choosing a lower level never locks what was open. Levels
+ * above the choice still need a gate test or progress.
+ */
+export async function applySelfLevel(
+  db: Db,
+  userId: number,
+  level: PracticeLevel,
+): Promise<void> {
+  for (const skill of PRACTICE_SKILLS) {
+    const existing = await db.learnerSkillLevel.findUnique({
+      where: { userId_skill: { userId, skill } },
+    });
+    if (existing?.source === 'DIAGNOSTIC') continue;
+    await db.learnerSkillLevel.upsert({
+      where: { userId_skill: { userId, skill } },
+      create: {
+        userId,
+        skill,
+        level,
+        unlockedLevel: level,
+        ability: ABILITY_SEED[level],
+        source: 'SELF',
+      },
+      update: {
+        level,
+        unlockedLevel: maxLevel(existing?.unlockedLevel ?? level, level),
+        ability: ABILITY_SEED[level],
+        source: 'SELF',
+      },
+    });
+    await db.levelUnlock.createMany({
+      data: levelsUpTo(level).map((l) => ({
+        userId,
+        skill,
+        level: l,
+        method: 'SELF_CHOICE' as const,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  await db.learnerProfile.upsert({
+    where: { userId },
+    create: { userId, selfLevel: level, placementSource: 'SELF' },
+    update: { selfLevel: level, placementSource: 'SELF' },
+  });
 }

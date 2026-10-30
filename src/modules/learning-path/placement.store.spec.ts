@@ -1,49 +1,5 @@
-import { applyDiagnosticPlacement } from './placement.store';
-
-/** Minimal in-memory stand-in for the three tables the store touches. */
-function fakeDb() {
-  const profiles = new Map<number, any>();
-  const levels = new Map<string, any>();
-  const unlocks = new Map<string, any>();
-  const key = (w: any) => `${w.userId_skill.userId}:${w.userId_skill.skill}`;
-  return {
-    profiles,
-    levels,
-    unlocks,
-    learnerProfile: {
-      findUnique: ({ where }: any) =>
-        Promise.resolve(profiles.get(where.userId) ?? null),
-      upsert: ({ where, create, update }: any) => {
-        const row = profiles.has(where.userId)
-          ? { ...profiles.get(where.userId), ...update }
-          : { ...create };
-        profiles.set(where.userId, row);
-        return Promise.resolve(row);
-      },
-    },
-    learnerSkillLevel: {
-      findUnique: ({ where }: any) =>
-        Promise.resolve(levels.get(key(where)) ?? null),
-      upsert: ({ where, create, update }: any) => {
-        const k = key(where);
-        const row = levels.has(k)
-          ? { ...levels.get(k), ...update }
-          : { ...create };
-        levels.set(k, row);
-        return Promise.resolve(row);
-      },
-    },
-    levelUnlock: {
-      createMany: ({ data }: any) => {
-        for (const d of data) {
-          const k = `${d.userId}:${d.skill}:${d.level}`;
-          if (!unlocks.has(k)) unlocks.set(k, d);
-        }
-        return Promise.resolve({ count: data.length });
-      },
-    },
-  };
-}
+import { fakeDb } from './learning-path.fake-db';
+import { applyDiagnosticPlacement, applySelfLevel } from './placement.store';
 
 const done = (score: number) => ({ state: 'COMPLETE', score });
 const pending = { state: 'PENDING_GRADING', score: null };
@@ -130,5 +86,40 @@ describe('applyDiagnosticPlacement', () => {
       await applyDiagnosticPlacement(db as any, 7, 100, { READING: pending }),
     ).toBeNull();
     expect(db.profiles.size + db.levels.size + db.unlocks.size).toBe(0);
+  });
+});
+
+describe('applySelfLevel', () => {
+  it('sets every skill to the chosen level and opens levels up to it', async () => {
+    const db = fakeDb();
+    await applySelfLevel(db as any, 7, 'STARTER');
+    for (const skill of ['LISTENING', 'READING', 'SPEAKING', 'WRITING'])
+      expect(db.levels.get(`7:${skill}`)).toMatchObject({
+        level: 'STARTER',
+        unlockedLevel: 'STARTER',
+        source: 'SELF',
+      });
+    expect(db.unlocks.size).toBe(4);
+    expect(db.profiles.get(7)).toMatchObject({
+      selfLevel: 'STARTER',
+      placementSource: 'SELF',
+    });
+  });
+
+  it('choosing lower keeps what was unlocked; diagnostic skills are kept', async () => {
+    const db = fakeDb();
+    await applyDiagnosticPlacement(db as any, 7, 100, {
+      READING: { state: 'COMPLETE', score: 80 },
+    });
+    await applySelfLevel(db as any, 7, 'INTERMEDIATE');
+    await applySelfLevel(db as any, 7, 'BASIC');
+    expect(db.levels.get('7:READING')).toMatchObject({
+      level: 'ADVANCED',
+      source: 'DIAGNOSTIC',
+    });
+    expect(db.levels.get('7:LISTENING')).toMatchObject({
+      level: 'BASIC',
+      unlockedLevel: 'INTERMEDIATE',
+    });
   });
 });
