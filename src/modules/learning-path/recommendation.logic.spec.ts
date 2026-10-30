@@ -124,7 +124,7 @@ describe('recommend', () => {
     );
   });
 
-  it('skips items two levels below, and mixes skills without a filter', () => {
+  it('ranks items two levels below last, as foundation review', () => {
     const tooEasy = item('READING', 'STARTER');
     const placed = learner({
       skills: {
@@ -135,7 +135,13 @@ describe('recommend', () => {
         },
       },
     });
-    expect(recommend([tooEasy], placed, { limit: 1 })).toEqual([]);
+    const own = item('READING', 'INTERMEDIATE');
+    const r = recommend([tooEasy, own], placed, { limit: 2 });
+    expect(r.map((x) => x.candidate)).toEqual([own, tooEasy]);
+    expect(r[1].reasons).toContain('Ôn nền tảng');
+  });
+
+  it('mixes skills without a filter', () => {
     const pool = [
       item('READING', 'BASIC'),
       item('READING', 'BASIC'),

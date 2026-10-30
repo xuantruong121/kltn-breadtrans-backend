@@ -4,7 +4,9 @@
  * catalog and the learner state are loaded elsewhere.
  *
  *   fit       2 x how close the predicted success is to 70 % (ability model)
- *   level     own level 1, one above 0.5, one below 0.3; two below is skipped
+ *   level     own level 1, one above 0.5, one below 0.3, two or more
+ *             below -1 ("Ôn nền tảng"): kept so a learner whose own level
+ *             is all plan-locked still has open practice
  *   track     0.6 when the item is tagged with the learner's career track
  *   weakness  0.6 for the skill with the lowest ability
  *   novelty   0.5 when never attempted
@@ -136,7 +138,6 @@ export function scoreCandidate(
     best !== null &&
     best < 60 &&
     learner.now.getTime() - history.lastAt.getTime() >= 2 * DAY;
-  if (gap < -1 && !due) return null;
 
   const reasons: string[] = [];
   const p = successProbability(skill.ability, c.difficulty);
@@ -148,6 +149,10 @@ export function scoreCandidate(
     score += 0.5;
     reasons.push(`Thử thách mức ${PRACTICE_LEVEL_LABEL[c.level]}`);
   } else if (gap === -1) score += 0.3;
+  else if (gap < -1) {
+    score -= 1;
+    reasons.push('Ôn nền tảng');
+  }
   if (learner.track !== 'GENERAL' && c.tracks.includes(learner.track)) {
     score += 0.6;
     reasons.push(`Chủ đề ${TRACK_LABEL[learner.track]}`);
