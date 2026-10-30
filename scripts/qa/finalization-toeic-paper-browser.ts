@@ -102,8 +102,12 @@ async function main() {
   await hidePet(page);
   const ranges: number[] = [];
   page.on('response', (r) => {
-    // Published object (.mp3) or the backend's local route (/audio).
-    if (r.url().includes('listening-master') && /\.mp3$|\/audio$/.test(r.url()))
+    // Published object (.mp3) or the backend's guarded stream route
+    // (/audio?grant=...).
+    if (
+      r.url().includes('listening-master') &&
+      /\.mp3$|\/audio(\?|$)/.test(r.url())
+    )
       ranges.push(r.status());
   });
   await page.goto(EXAM_PAGE, { waitUntil: 'networkidle', timeout: 90_000 });
