@@ -57,6 +57,16 @@ export function masterMatchesGroups(
   );
 }
 
+/**
+ * Where the master lives in the private bucket. Exam audio is moved there
+ * (copied, then the public object removed) so it can only be read through
+ * the guarded stream route; the name keeps the public object's file name.
+ */
+export function privateListeningMasterKey(master: ListeningMaster): string {
+  const file = master.key.split('/').pop();
+  return `premium/listening/toeic/exam-${master.examId}/listening-master/${file}`;
+}
+
 export function listeningMasterUrl(master: ListeningMaster): string | null {
   const base = (
     process.env.TOEIC_LISTENING_MASTER_BASE_URL ??

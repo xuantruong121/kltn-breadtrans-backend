@@ -213,6 +213,23 @@ export class ToeicController {
       res.sendFile(source.file, { acceptRanges: true });
       return;
     }
+    if ('privateKey' in source) {
+      const object = await this.toeicService
+        .openPrivateMedia(source.privateKey, req.headers.range)
+        .catch(() => null);
+      if (!object) {
+        res.status(404).json({ statusCode: 404, message: 'Not found' });
+        return;
+      }
+      res.status(object.status);
+      res.setHeader('Accept-Ranges', 'bytes');
+      if (object.contentLength !== undefined)
+        res.setHeader('Content-Length', String(object.contentLength));
+      if (object.contentRange)
+        res.setHeader('Content-Range', object.contentRange);
+      pipeline(object.body, res, () => undefined);
+      return;
+    }
     // Published object: proxied so the storage URL never reaches the
     // learner. Only a plain byte range is forwarded.
     const range = /^bytes=\d*-\d*$/.test(req.headers.range ?? '')

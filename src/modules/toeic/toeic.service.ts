@@ -22,6 +22,10 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { getJwtSecret } from '../auth/auth.constants';
 import { SpeakingService } from '../speaking/speaking.service';
+import {
+  isPrivateListeningMediaKey,
+  UploadService,
+} from '../upload/upload.service';
 import { validateToeicExam } from './toeic.validation';
 import { buildToeicListeningAudioScript } from './toeic-listening-audio';
 import { buildLrStats, parseToeicGoal } from './toeic-lr-stats';
@@ -30,6 +34,7 @@ import { toeicQuestionType } from './toeic-question-type';
 import {
   listeningMasterFor,
   listeningMasterUrl,
+  privateListeningMasterKey,
   readListeningMasterGrant,
   signListeningMasterGrant,
   masterMatchesGroups,
@@ -57,6 +62,7 @@ export class ToeicService {
     private readonly prisma: PrismaService,
     private readonly speakingService: SpeakingService,
     @Optional() private readonly eventEmitter?: EventEmitter2,
+    @Optional() private readonly uploadService?: UploadService,
   ) {}
 
   private lockKey(userId: number, examId: number, mode: AttemptMode) {
@@ -455,6 +461,12 @@ export class ToeicService {
           'Không thể nghe lại hoặc nghe trước nhóm câu hỏi này trong Full Test nghiêm ngặt',
         );
     }
+    if (group.audioUrl && isPrivateListeningMediaKey(group.audioUrl)) {
+      // Migrated clip: a private-bucket key, read only through this check.
+      if (!this.uploadService)
+        throw new ServiceUnavailableException('Nhóm câu hỏi này chưa có audio');
+      return this.uploadService.downloadPrivateFileBuffer(group.audioUrl);
+    }
     if (group.audioUrl) {
       const response = await fetch(group.audioUrl);
       if (response.ok) return Buffer.from(await response.arrayBuffer());
@@ -668,15 +680,52 @@ export class ToeicService {
     };
   }
 
-  /** Verified local build first, then the published object; null if neither. */
+  /**
+   * Verified local build first, then the private-bucket copy, then the
+   * legacy public object (until it is migrated); null if none.
+   */
   private async listeningMasterSource(
     examId: number,
-  ): Promise<{ file: string } | { url: string } | null> {
+  ): Promise<
+    { file: string } | { privateKey: string } | { url: string } | null
+  > {
     const file = this.localMasterFile(examId);
     if (file) return { file };
     const master = listeningMasterFor(examId);
-    const url = master ? listeningMasterUrl(master) : null;
+    if (!master) return null;
+    const privateKey = privateListeningMasterKey(master);
+    if (await this.isPrivatelyStored(privateKey)) return { privateKey };
+    const url = listeningMasterUrl(master);
     return url && (await this.isPublished(url)) ? { url } : null;
+  }
+
+  private readonly privateCache = new Map<
+    string,
+    { ok: boolean; at: number }
+  >();
+
+  /** Cached existence check in the private bucket; false when not configured. */
+  private async isPrivatelyStored(key: string) {
+    if (!this.uploadService) return false;
+    const cached = this.privateCache.get(key);
+    if (cached && Date.now() - cached.at < 5 * 60_000) return cached.ok;
+    let ok = false;
+    try {
+      ok = await this.uploadService.privateObjectExists(key);
+    } catch {
+      ok = false;
+    }
+    this.privateCache.set(key, { ok, at: Date.now() });
+    return ok;
+  }
+
+  /** A private exam media object for the guarded stream routes. */
+  openPrivateMedia(key: string, range?: string) {
+    if (!this.uploadService)
+      throw new ServiceUnavailableException(
+        'Private media storage is unavailable',
+      );
+    return this.uploadService.openPrivateObject(key, range);
   }
 
   /**

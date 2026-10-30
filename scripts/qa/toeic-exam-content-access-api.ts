@@ -74,6 +74,23 @@ async function main() {
     `status ${adminDetail.status}`,
   );
 
+  // Migrated clips (private-bucket keys): the admin editor keeps the key and
+  // plays a signed URL. Skipped (INFO) when the data has no migrated clip.
+  const adminGroups: any[] = (adminDetail.data?.groups ?? []).filter(
+    (g: any) =>
+      typeof g.audioUrl === 'string' && g.audioUrl.startsWith('premium/'),
+  );
+  if (adminGroups.length) {
+    check(
+      'M admin keeps migrated clip keys and gets signed playback URLs',
+      adminGroups.every((g) => /^https?:\/\//.test(g.audioPlaybackUrl ?? '')),
+      `${adminGroups.length} migrated groups`,
+    );
+  } else
+    console.log(
+      'INFO  no migrated clip in this data (admin playback not checked)',
+    );
+
   // Exam-internal Writing tasks through the generic quiz route.
   for (const q of [29, 34, 36]) {
     check(
