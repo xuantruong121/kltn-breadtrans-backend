@@ -1,7 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 
 import { LearningPathService } from './learning-path.service';
-import { fakeDb } from './learning-path.fake-db';
+import { fakeDb } from '../../../test/helpers/learning-path-fake-db';
 
 function service() {
   const db: any = fakeDb();

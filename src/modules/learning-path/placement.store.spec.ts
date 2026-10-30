@@ -1,4 +1,4 @@
-import { fakeDb } from './learning-path.fake-db';
+import { fakeDb } from '../../../test/helpers/learning-path-fake-db';
 import { applyDiagnosticPlacement, applySelfLevel } from './placement.store';
 
 const done = (score: number) => ({ state: 'COMPLETE', score });
