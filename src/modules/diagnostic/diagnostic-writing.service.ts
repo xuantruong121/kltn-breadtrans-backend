@@ -15,6 +15,7 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { Job, Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { Prisma } from '@prisma/client';
@@ -68,6 +69,16 @@ export type DiagnosticWritingFeedback = {
  */
 type DiagnosticWritingJob = { responseId: number; run: number };
 
+/** A QUEUED row older than this whose job is not waiting or running is stranded. */
+const STRANDED_QUEUED_AFTER_MS = 5 * 60_000;
+const LIVE_JOB_STATES = new Set([
+  'waiting',
+  'active',
+  'delayed',
+  'prioritized',
+  'waiting-children',
+]);
+
 type WritingRow = Awaited<
   ReturnType<PrismaService['diagnosticWritingResponse']['findUnique']>
 >;
@@ -118,6 +129,58 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
       if (job)
         void this.markRunFailed(job.data, `WORKER_FAILED: ${error.message}`);
     });
+    void this.recoverStrandedQueued();
+  }
+
+  /**
+   * After a database restore the queue can still hold a finished job with the
+   * id a restored QUEUED row expects (jobs are kept 7 days), so enqueueing it
+   * again is a silent no-op and the row would wait forever; retry() only
+   * accepts GRADING_FAILED. A QUEUED row whose job is not waiting or running
+   * gets a new run, exactly as retry() would, and any old job of it is stale.
+   */
+  @Interval(STRANDED_QUEUED_AFTER_MS)
+  async recoverStrandedQueued(now = Date.now()): Promise<number> {
+    if (!this.queue) return 0;
+    try {
+      const rows = await this.prisma.diagnosticWritingResponse.findMany({
+        where: {
+          status: 'QUEUED',
+          submittedAt: { lt: new Date(now - STRANDED_QUEUED_AFTER_MS) },
+        },
+        select: { id: true, gradingAttempts: true },
+        take: 50,
+      });
+      let requeued = 0;
+      for (const row of rows) {
+        const job = await this.queue.getJob(
+          `diagnostic-writing-${row.id}-${row.gradingAttempts}`,
+        );
+        const state = job ? await job.getState() : 'missing';
+        if (LIVE_JOB_STATES.has(state)) continue;
+        const nextRun = row.gradingAttempts + 1;
+        const moved = await this.prisma.diagnosticWritingResponse.updateMany({
+          where: {
+            id: row.id,
+            status: 'QUEUED',
+            gradingAttempts: row.gradingAttempts,
+          },
+          data: { gradingAttempts: nextRun },
+        });
+        if (moved.count === 0) continue;
+        await this.enqueue(row.id, nextRun);
+        requeued += 1;
+        this.logger.warn(
+          `Writing response ${row.id} was QUEUED with no live job (${state}); requeued as run ${nextRun}`,
+        );
+      }
+      return requeued;
+    } catch (error) {
+      this.logger.warn(
+        `Stranded Writing queue check failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 0;
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
