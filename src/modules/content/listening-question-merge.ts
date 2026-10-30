@@ -21,6 +21,9 @@ export function mergeListeningContent(existing: unknown, incoming: Json): Json {
   // The form edits the Vietnamese text of a structured explanation.
   if (typeof defined.explanation === 'string' && isObject(before.explanation))
     merged.explanation = { ...before.explanation, vi: defined.explanation };
+  // A bilingual edit ({ vi, en }) keeps the stored evidence and notes.
+  if (isObject(defined.explanation) && isObject(before.explanation))
+    merged.explanation = { ...before.explanation, ...defined.explanation };
 
   // Keep each speaker's voice and ids the form does not show.
   if (

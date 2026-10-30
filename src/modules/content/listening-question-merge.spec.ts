@@ -65,4 +65,12 @@ describe('mergeListeningContent', () => {
       mergeListeningContent(published, { explanation: undefined }).explanation,
     ).toEqual(published.explanation);
   });
+
+  it('a bilingual explanation edit keeps the evidence', () => {
+    expect(
+      mergeListeningContent(published, {
+        explanation: { vi: 'Mới', en: 'New' },
+      }).explanation,
+    ).toEqual({ vi: 'Mới', en: 'New', evidence: 'Coffee, please.' });
+  });
 });
