@@ -3,6 +3,7 @@ import IORedis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { GamificationListener } from '../gamification/gamification.listener';
+import { RewardEligibilityService } from '../gamification/reward-eligibility';
 import { SpeakingPostProcessingService } from './speaking-post-processing.service';
 import { SpeakingProcessorService } from './speaking-processor.service';
 import { SpeakingWorkerService } from './speaking-worker.service';
@@ -43,10 +44,13 @@ describeWithIsolatedDatabaseAndRedis(
         eventEmitter,
         redisConnection,
       );
+      // The production module provides reward eligibility; without it the
+      // listener fails closed and grants nothing.
       gamificationListener = new GamificationListener(
         prisma,
         gamificationService,
         eventEmitter,
+        new RewardEligibilityService(prisma),
       );
       eventPublisher = new SpeakingEventPublisherService();
 

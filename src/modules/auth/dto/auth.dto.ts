@@ -6,10 +6,22 @@ import {
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+
+/**
+ * Accounts are keyed by e-mail; the API stores and looks it up trimmed and
+ * lower-case so "A@b.com" and "a@b.com " are one account (the web client
+ * already lowercases; other clients must not create a second account).
+ */
+export const NormalizeEmail = () =>
+  Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  );
 
 export class RegisterDto {
   @ApiProperty({ example: 'student@test.com' })
   @IsEmail({}, { message: 'Invalid email format' })
+  @NormalizeEmail()
   email: string;
 
   @ApiProperty({ example: 'password123' })
@@ -27,6 +39,7 @@ export class RegisterDto {
 export class LoginDto {
   @ApiProperty({ example: 'student@test.com' })
   @IsEmail({}, { message: 'Invalid email format' })
+  @NormalizeEmail()
   email: string;
 
   @ApiProperty({ example: 'password123' })
@@ -53,12 +66,14 @@ export class RefreshTokenDto {
 export class GenerateOtpDto {
   @ApiProperty({ example: 'student@test.com' })
   @IsEmail({}, { message: 'Invalid email format' })
+  @NormalizeEmail()
   email: string;
 }
 
 export class VerifyOtpDto {
   @ApiProperty({ example: 'student@test.com' })
   @IsEmail({}, { message: 'Invalid email format' })
+  @NormalizeEmail()
   email: string;
 
   @ApiProperty({ example: '123456' })
@@ -70,6 +85,7 @@ export class VerifyOtpDto {
 export class ForgotPasswordDto {
   @ApiProperty({ example: 'student@test.com' })
   @IsEmail({}, { message: 'Invalid email format' })
+  @NormalizeEmail()
   email: string;
 }
 
@@ -123,6 +139,7 @@ export class GoogleLoginDto {
 export class LinkGoogleAccountDto {
   @ApiProperty({ example: 'student@example.com' })
   @IsEmail()
+  @NormalizeEmail()
   email: string;
 
   @ApiProperty({ example: 'MyPassword123' })

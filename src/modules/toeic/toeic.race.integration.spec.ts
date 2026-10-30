@@ -7,6 +7,7 @@ import {
   ExamType,
 } from '@prisma/client';
 import { GamificationListener } from '../gamification/gamification.listener';
+import { RewardEligibilityService } from '../gamification/reward-eligibility';
 import { GamificationService } from '../gamification/gamification.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ToeicService } from './toeic.service';
@@ -268,7 +269,9 @@ describeWithIsolatedDatabase(
       expect(after).toEqual(before);
     });
 
-    it('duplicate toeic submitted event rewards once', async () => {
+    // Owner policy (7d34aa1): TOEIC exams earn no XP or Banh mi. A duplicate
+    // submitted event must still be harmless.
+    it('duplicate toeic submitted events grant nothing', async () => {
       const gamificationService = new GamificationService(
         prisma,
         eventEmitter as never,
@@ -278,6 +281,7 @@ describeWithIsolatedDatabase(
         prisma,
         gamificationService,
         eventEmitter as never,
+        new RewardEligibilityService(prisma),
       );
       const before = await prisma.banhTransaction.count({ where: { userId } });
       await Promise.all([
@@ -297,10 +301,10 @@ describeWithIsolatedDatabase(
       const reward = await prisma.userToeicReward.findUnique({
         where: { userId_examId_mode: { userId, examId: 1, mode: 'FULL_TEST' } },
       });
-      expect(reward?.banhGranted).toBe(120);
+      expect(reward).toBeNull();
       expect(
         (await prisma.banhTransaction.count({ where: { userId } })) - before,
-      ).toBe(1);
+      ).toBe(0);
     });
 
     it('TOEIC completion does not affect normal Listening or Reading progress', async () => {

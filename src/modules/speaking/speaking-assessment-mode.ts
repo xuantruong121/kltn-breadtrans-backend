@@ -24,6 +24,51 @@ import { MockSpeakingEvaluator } from './mock-speaking-evaluator';
 
 const SCRIPTED_TASKS = new Set(['READ_ALOUD', 'PRONUNCIATION_DRILL']);
 
+/** Azure REST short-audio pronunciation assessment takes at most 30 s. */
+export const SCRIPTED_MAX_AUDIO_MS = 30_000;
+
+/**
+ * The first `maxMs` of a PCM WAV. The answer window is 30 s but a recording
+ * may run up to 1.5 s longer (encoder flush); that tail is cut here so the
+ * scripted assessment never receives more than Azure accepts. Anything that
+ * is not a parseable WAV is returned unchanged (the validator rejects it).
+ */
+export function trimWavToMs(wav: Buffer, maxMs: number): Buffer {
+  if (
+    wav.length < 44 ||
+    wav.toString('ascii', 0, 4) !== 'RIFF' ||
+    wav.toString('ascii', 8, 12) !== 'WAVE'
+  )
+    return wav;
+  let offset = 12;
+  let blockAlign = 0;
+  let byteRate = 0;
+  while (offset + 8 <= wav.length) {
+    const id = wav.toString('ascii', offset, offset + 4);
+    const size = wav.readUInt32LE(offset + 4);
+    const body = offset + 8;
+    if (id === 'fmt ') {
+      byteRate = wav.readUInt32LE(body + 8);
+      blockAlign = wav.readUInt16LE(body + 12);
+    } else if (id === 'data') {
+      if (!byteRate || !blockAlign) return wav;
+      const available = Math.min(size, wav.length - body);
+      let keep = Math.floor((byteRate * maxMs) / 1000);
+      keep -= keep % blockAlign;
+      if (available <= keep) return wav;
+      const out = Buffer.concat([
+        wav.subarray(0, body),
+        wav.subarray(body, body + keep),
+      ]);
+      out.writeUInt32LE(keep, offset + 4);
+      out.writeUInt32LE(out.length - 8, 4);
+      return out;
+    }
+    offset = body + size + (size % 2);
+  }
+  return wav;
+}
+
 /** Legacy exercises without a task type were read-aloud sentences. */
 export function isScriptedSpeakingTask(
   taskType: string | null | undefined,
@@ -113,7 +158,11 @@ export async function assessPracticeSpeech(
   options?: { signal?: AbortSignal },
 ): Promise<PronunciationFeedback> {
   if (isScriptedSpeakingTask(exercise.taskType))
-    return aiService.assessPronunciation(exercise.targetText, audio, options);
+    return aiService.assessPronunciation(
+      exercise.targetText,
+      trimWavToMs(audio, SCRIPTED_MAX_AUDIO_MS),
+      options,
+    );
 
   const key = process.env.AZURE_SPEECH_KEY;
   const region = process.env.AZURE_SPEECH_REGION;

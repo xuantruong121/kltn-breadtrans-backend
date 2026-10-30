@@ -559,7 +559,12 @@ export class AuthService {
   }
 
   /** Shared account resolution for GIS and Passport OAuth callbacks. */
-  private async resolveGoogleUser(profile: GoogleProfile) {
+  private async resolveGoogleUser(rawProfile: GoogleProfile) {
+    // Same e-mail key as password accounts (see NormalizeEmail).
+    const profile = {
+      ...rawProfile,
+      email: rawProfile.email.trim().toLowerCase(),
+    };
     const linkedAccount = await this.prisma.authAccount.findUnique({
       where: {
         provider_providerAccountId: {
