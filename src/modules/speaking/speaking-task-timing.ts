@@ -4,7 +4,7 @@
  *
  * TOEIC exam tasks follow the ETS TOEIC Speaking format, by question number
  * (the task's order 1-11 inside its exam set):
- *   Q1-2  Read a text aloud            prepare 45 s, respond 45 s
+ *   Q1-2  Read a text aloud            prepare 45 s, respond 45 s (30 s here, below)
  *   Q3-4  Describe a picture           prepare 45 s, respond 30 s
  *   Q5-6  Respond to questions         prepare  3 s, respond 15 s
  *   Q7    Respond to questions         prepare  3 s, respond 30 s
@@ -17,7 +17,15 @@
  *
  * Ordinary practice keeps its untimed preparation and a 45 s answer, 60 s for
  * an opinion.
+ *
+ * Read-aloud and pronunciation drills (scripted tasks) answer in at most 30 s,
+ * exam Q1-2 included: they are scored by Azure's REST short-audio
+ * pronunciation assessment, which takes no more than 30 s of audio
+ * (learn.microsoft.com/azure/ai-services/speech-service/rest-speech-to-text-short).
+ * Owner decision 2026-10-30, a deliberate deviation from the ETS 45 s.
  */
+import { isScriptedSpeakingTask } from './speaking-assessment-mode';
+
 export type SpeakingTaskTiming = {
   /** Seconds to read on-screen information before the first question (Q8). */
   readingSeconds: number;
@@ -27,6 +35,8 @@ export type SpeakingTaskTiming = {
 
 /** Recordings may run this much past the limit (encoder flush, clock skew). */
 export const SPEAKING_DURATION_TOLERANCE_MS = 1500;
+/** Answer window of a scripted (read-aloud, drill) task. */
+export const SCRIPTED_MAX_RESPONSE_SECONDS = 30;
 /** No Speaking task anywhere allows more than this. */
 export const SPEAKING_MAX_RESPONSE_SECONDS = 60;
 
@@ -49,13 +59,23 @@ export function speakingTaskTiming(exercise: {
   order?: number | null;
   examTask: boolean;
 }): SpeakingTaskTiming {
-  if (exercise.examTask && exercise.order && EXAM_BY_QUESTION[exercise.order])
-    return EXAM_BY_QUESTION[exercise.order];
-  return {
-    readingSeconds: 0,
-    prepSeconds: 0,
-    responseSeconds: exercise.taskType === 'EXPRESS_OPINION' ? 60 : 45,
-  };
+  const timing =
+    exercise.examTask && exercise.order && EXAM_BY_QUESTION[exercise.order]
+      ? EXAM_BY_QUESTION[exercise.order]
+      : {
+          readingSeconds: 0,
+          prepSeconds: 0,
+          responseSeconds: exercise.taskType === 'EXPRESS_OPINION' ? 60 : 45,
+        };
+  return isScriptedSpeakingTask(exercise.taskType)
+    ? {
+        ...timing,
+        responseSeconds: Math.min(
+          timing.responseSeconds,
+          SCRIPTED_MAX_RESPONSE_SECONDS,
+        ),
+      }
+    : timing;
 }
 
 /** Longest recording accepted for a task, in milliseconds. */
