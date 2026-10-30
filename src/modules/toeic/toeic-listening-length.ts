@@ -45,6 +45,6 @@ export function listeningScriptLengthRule(part: number): string {
   if (!isLengthPart(part)) return '';
   const { min, max } = LISTENING_SCRIPT_WORDS[part];
   return part === 3
-    ? `Each conversation is ${min}-${max} spoken words (about 30-45 seconds), 6-10 speaker turns between two or three people, labelled "M:", "W:" or "M2:" / "W2:".`
-    : `Each talk is ${min}-${max} spoken words (about 40-60 seconds) by one speaker: an announcement, voicemail, broadcast, tour, meeting excerpt or advertisement.`;
+    ? `Each conversation is ${min}-${max} spoken words; aim for about 120 (about 40 seconds), never under ${min}. Use 6-10 speaker turns between two or three people, labelled "M:", "W:" or "M2:" / "W2:".`
+    : `Each talk is ${min}-${max} spoken words; aim for about 140 (about 50 seconds), never under ${min}. One speaker gives it: an announcement, voicemail, broadcast, tour, meeting excerpt or advertisement.`;
 }

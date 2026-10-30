@@ -12,9 +12,10 @@
  *   plan      read-only: current word counts and the request estimate.
  *   generate  Gemini, in batches of up to 5 groups; every group is validated
  *             (length, 3 spoken questions, 4 distinct options, key,
- *             explanation, composable audio script) and a batch is retried
- *             at most twice. Writes candidate.json. Needs
+ *             explanation, composable audio script); only the groups that
+ *             failed are asked for again, at most twice. Writes candidate.json. Needs
  *             TOEIC_REWRITE_GEMINI_AUTHORIZED=generate.
+ *   balance   spreads the answer keys evenly over A-D (after review).
  *   apply     writes candidate.json to --target in one transaction, after
  *             saving rollback.json. Refuses when the exam has attempts unless
  *             --allow-attempts; refuses a non-harness database unless
@@ -184,53 +185,62 @@ async function generate(examId: number, dir: string) {
     for (let start = 0; start < list.length; start += BATCH) {
       const chunk = list.slice(start, start + BATCH);
       const topic = TOPICS[part][(start / BATCH) % TOPICS[part].length];
-      let accepted: CandidateGroup[] | null = null;
-      for (let attempt = 1; attempt <= ATTEMPTS && !accepted; attempt++) {
+      // Slots still missing a valid group; a retry asks only for those.
+      const accepted: Array<CandidateGroup | null> = chunk.map(() => null);
+      for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+        const missing = chunk
+          .map((g, i) => (accepted[i] ? -1 : i))
+          .filter((i) => i >= 0);
+        if (!missing.length) break;
         requests++;
         const batch = await gemini.generateToeicExamBatch({
           part,
           topic,
           difficulty: 'medium',
-          groups: chunk.map((g) => ({
-            questionCount: g.questions.length,
+          groups: missing.map((i) => ({
+            questionCount: chunk[i].questions.length,
             kind: 'MULTIPLE' as const,
           })),
         });
-        const issues = batch.groups.map((g, i) => {
-          const issue = groupIssue(part, chunk[i].questions.length, g);
+        const issues: string[] = [];
+        batch.groups.forEach((g, k) => {
+          const slot = missing[k];
           const opening = String(g.transcript ?? '')
             .slice(0, 80)
             .toLowerCase();
-          return issue ?? (seen.has(opening) ? 'duplicate script' : null);
+          const issue =
+            groupIssue(part, chunk[slot].questions.length, g) ??
+            (seen.has(opening) ? 'duplicate script' : null);
+          if (issue) {
+            issues.push(issue);
+            return;
+          }
+          seen.add(opening);
+          accepted[slot] = {
+            groupId: chunk[slot].id,
+            part,
+            groupOrder: chunk[slot].groupOrder,
+            questionNumbers: chunk[slot].questions.map((q) => q.questionNumber),
+            transcript: String(g.transcript).trim(),
+            words: spokenWordCount(String(g.transcript)),
+            questions: g.questions.map((q) => ({
+              text: String(q.text).trim(),
+              options: q.options.map((o) => String(o).trim()),
+              correctIndex: q.correctIndex,
+              explanation: String(q.explanation).trim(),
+            })),
+          };
         });
-        if (issues.some(Boolean)) {
+        if (issues.length)
           console.log(
-            `Part ${part} groups ${chunk[0].groupOrder}-${chunk[chunk.length - 1].groupOrder} attempt ${attempt}: ${issues.filter(Boolean).join('; ')}`,
+            `Part ${part} groups ${chunk[0].groupOrder}-${chunk[chunk.length - 1].groupOrder} attempt ${attempt}: ${issues.join('; ')}`,
           );
-          continue;
-        }
-        accepted = batch.groups.map((g, i) => ({
-          groupId: chunk[i].id,
-          part,
-          groupOrder: chunk[i].groupOrder,
-          questionNumbers: chunk[i].questions.map((q) => q.questionNumber),
-          transcript: String(g.transcript).trim(),
-          words: spokenWordCount(String(g.transcript)),
-          questions: g.questions.map((q) => ({
-            text: String(q.text).trim(),
-            options: q.options.map((o) => String(o).trim()),
-            correctIndex: q.correctIndex,
-            explanation: String(q.explanation).trim(),
-          })),
-        }));
       }
-      if (!accepted)
+      if (accepted.some((g) => !g))
         throw new Error(
-          `Part ${part} batch at group ${chunk[0].groupOrder} failed ${ATTEMPTS} times; candidate.json not written`,
+          `Part ${part} batch at group ${chunk[0].groupOrder} still incomplete after ${ATTEMPTS} attempts; candidate.json not written`,
         );
-      for (const g of accepted)
-        seen.add(g.transcript.slice(0, 80).toLowerCase());
-      out.push(...accepted);
+      out.push(...(accepted as CandidateGroup[]));
     }
   }
   mkdirSync(dir, { recursive: true });
@@ -245,6 +255,72 @@ async function generate(examId: number, dir: string) {
   console.log(
     `candidate.json: ${out.length} groups, ${requests} Gemini requests, words avg ${Math.round(out.reduce((n, g) => n + g.words, 0) / out.length)}`,
   );
+}
+
+/**
+ * The generator puts most keys at A-C (39 Part 3 keys: one D). Answer
+ * choices are printed, never spoken, so moving the key by swapping two
+ * options changes no audio; explanations name no letter (checked before
+ * swapping). Keys are an even A-D mix in a seeded random order, with no
+ * letter three times in a row (owner 2026-10-30: no visible pattern).
+ */
+export function keyOrder(count: number, seed: number): number[] {
+  let state = seed >>> 0;
+  const random = () => {
+    // mulberry32
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const keys = Array.from({ length: count }, (_, i) => i % 4);
+  for (;;) {
+    for (let i = keys.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [keys[i], keys[j]] = [keys[j], keys[i]];
+    }
+    if (keys.every((k, i) => i < 2 || k !== keys[i - 1] || k !== keys[i - 2]))
+      return keys;
+  }
+}
+
+export function balanceKeys(
+  groups: CandidateGroup[],
+  seed: number,
+): CandidateGroup[] {
+  const order = keyOrder(
+    groups.reduce((n, g) => n + g.questions.length, 0),
+    seed,
+  );
+  let i = 0;
+  return groups.map((g) => ({
+    ...g,
+    questions: g.questions.map((q) => {
+      if (/\b[A-D]\)|\([A-D]\)|đáp án [A-D]\b/i.test(q.explanation))
+        throw new Error(`explanation names a letter: ${q.text}`);
+      const target = order[i++];
+      const options = [...q.options];
+      [options[target], options[q.correctIndex]] = [
+        options[q.correctIndex],
+        options[target],
+      ];
+      return { ...q, options, correctIndex: target };
+    }),
+  }));
+}
+
+function balance(examId: number, dir: string) {
+  const file = join(dir, 'candidate.json');
+  const candidate = JSON.parse(readFileSync(file, 'utf8'));
+  if (candidate.examId !== examId)
+    throw new Error('candidate is for another exam');
+  candidate.groups = balanceKeys(candidate.groups, 20261030 + examId);
+  writeFileSync(file, JSON.stringify(candidate, null, 2));
+  const counts = [0, 0, 0, 0];
+  for (const g of candidate.groups as CandidateGroup[])
+    for (const q of g.questions) counts[q.correctIndex]++;
+  console.log(`keys A/B/C/D: ${counts.join('/')}`);
 }
 
 async function apply(examId: number, dir: string) {
@@ -317,8 +393,9 @@ async function main() {
   const dir = join('artifacts', 'toeic-rewrite-34', `exam-${examId}`);
   if (mode === 'plan') await plan(examId);
   else if (mode === 'generate') await generate(examId, dir);
+  else if (mode === 'balance') balance(examId, dir);
   else if (mode === 'apply') await apply(examId, dir);
-  else throw new Error('mode: plan | generate | apply');
+  else throw new Error('mode: plan | generate | balance | apply');
 }
 
 if (require.main === module)
