@@ -53,3 +53,20 @@ export function mergeListeningContent(existing: unknown, incoming: Json): Json {
   }
   return merged;
 }
+
+/** What a question's own clip reads aloud: its statement, answer sentence and turns. */
+function spokenText(content: unknown): string {
+  const c = (content ?? {}) as Record<string, unknown>;
+  const turns = Array.isArray(c.transcriptSegments)
+    ? c.transcriptSegments.map((turn) => {
+        const t = (turn ?? {}) as Record<string, unknown>;
+        return [t.speaker ?? t.speakerId ?? '', t.text ?? ''];
+      })
+    : [];
+  return JSON.stringify([c.audioText ?? '', c.correctAnswer ?? '', turns]);
+}
+
+/** True when an edit changes what the question's clip says, so that clip no longer matches. */
+export function spokenTextChanged(before: unknown, after: unknown): boolean {
+  return spokenText(before) !== spokenText(after);
+}

@@ -1981,19 +1981,25 @@ export class QuizService {
     });
   }
 
+  /** Kept for the existing dialogue route; same as generateQuestionAudioAsset. */
   async generateDialogueAudioAsset(questionId: number) {
+    return this.generateQuestionAudioAsset(questionId);
+  }
+
+  /**
+   * Synthesizes a question's own clip and makes it the active asset:
+   * a DIALOGUE question reads its turns; a comprehension MCQ reads its
+   * audioText; a DICTATION item reads its answer sentence.
+   */
+  async generateQuestionAudioAsset(questionId: number) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: {
         quiz: { select: { id: true, type: true, isPremiumContent: true } },
       },
     });
-    if (
-      !question ||
-      question.quiz.type !== QuizType.LISTENING_PRACTICE ||
-      question.type.toUpperCase() !== 'DIALOGUE'
-    ) {
-      throw new NotFoundException('Không tìm thấy câu hội thoại luyện nghe');
+    if (!question || question.quiz.type !== QuizType.LISTENING_PRACTICE) {
+      throw new NotFoundException('Không tìm thấy câu luyện nghe');
     }
     if (
       question.quiz.isPremiumContent &&
@@ -2004,36 +2010,54 @@ export class QuizService {
       );
     }
 
-    const content = question.content as Record<string, unknown>;
-    const normalizedContent = normalizeQuestionContent(
-      question.quiz.type,
-      question.type,
-      content,
-    );
-    const segments =
-      normalizedContent.transcriptSegments as NormalizedDialogueSegment[];
-    const accent = normalizedContent.accent === 'UK' ? 'UK' : 'US';
-    const audioBuffer = await this.speakingService.generateDialogueTts(
-      segments,
-      accent,
-      1,
-    );
+    const type = question.type.toUpperCase();
+    const content = (question.content ?? {}) as Record<string, unknown>;
+    let nextContent = content;
+    let audioBuffer: Buffer;
+    if (type === 'DIALOGUE') {
+      nextContent = normalizeQuestionContent(
+        question.quiz.type,
+        question.type,
+        content,
+      );
+      audioBuffer = await this.speakingService.generateDialogueTts(
+        nextContent.transcriptSegments as NormalizedDialogueSegment[],
+        nextContent.accent === 'UK' ? 'UK' : 'US',
+        1,
+      );
+    } else {
+      const text = [
+        type === 'DICTATION' ? content.correctAnswer : undefined,
+        content.audioText,
+      ].find((value) => typeof value === 'string' && value.trim());
+      if (typeof text !== 'string') {
+        throw new BadRequestException('Câu này chưa có câu để đọc.');
+      }
+      audioBuffer = await this.speakingService.generateTts(
+        text.trim(),
+        content.accent === 'UK' ? 'UK' : 'US',
+        1,
+      );
+    }
+
     const next = await this.prisma.quizAudioAsset.aggregate({
       where: { questionId },
       _max: { version: true },
     });
     const version = (next._max.version ?? 0) + 1;
+    const fileName = type === 'DIALOGUE' ? 'dialogue.mp3' : 'audio.mp3';
+    const folder = type === 'DIALOGUE' ? 'dialogue' : 'audio';
     const upload = question.quiz.isPremiumContent
       ? await this.uploadService.putPrivateObjectAtKey(
-          `${PRIVATE_LISTENING_MEDIA_PREFIX}quiz-${question.quiz.id}/question-${questionId}/v${version}/dialogue.mp3`,
+          `${PRIVATE_LISTENING_MEDIA_PREFIX}quiz-${question.quiz.id}/question-${questionId}/v${version}/${fileName}`,
           audioBuffer,
           'audio/mpeg',
         )
       : await this.uploadService.uploadRawBuffer(
           audioBuffer,
           'audio/mpeg',
-          `catalog/listening/practice/dialogue/quiz-${question.quiz.id}/question-${questionId}/v${version}`,
-          'dialogue.mp3',
+          `catalog/listening/practice/${folder}/quiz-${question.quiz.id}/question-${questionId}/v${version}`,
+          fileName,
         );
 
     try {
@@ -2042,10 +2066,12 @@ export class QuizService {
           where: { questionId },
           data: { isActive: false },
         });
-        await tx.question.update({
-          where: { id: questionId },
-          data: { content: normalizedContent as Prisma.InputJsonValue },
-        });
+        if (nextContent !== content) {
+          await tx.question.update({
+            where: { id: questionId },
+            data: { content: nextContent as Prisma.InputJsonValue },
+          });
+        }
         return tx.quizAudioAsset.create({
           data: {
             questionId,
@@ -2703,6 +2729,22 @@ export class QuizService {
     }
 
     const activeAsset = question.audioAssets[0];
+    // A dialogue question shares the quiz conversation: with no clip of its
+    // own it plays the whole published recording (the CMS records the
+    // conversation once, not once per question).
+    if (
+      !activeAsset &&
+      Array.isArray(content.transcriptSegments) &&
+      content.transcriptSegments.length > 0 &&
+      (await this.listeningAudioAuthoringService.getCurrentPublishedArtifact(
+        quizId,
+      ))
+    ) {
+      return this.listeningAudioAuthoringService.getPublishedAudio(
+        quizId,
+        requestedIdentity,
+      );
+    }
     // Published student playback is R2-only. Never call Azure from this
     // request path; content must be synthesized and approved by an author.
     // Private media is read from the private bucket whatever the quiz tier:

@@ -473,10 +473,23 @@ export class ListeningAudioAuthoringService {
       });
   }
 
-  /** At least two speakers, and not all of them on one voice. */
-  private assertSpeakersAndVoices(payload: CanonicalSynthesisPayload) {
+  /** Dictation and comprehension may be read by one voice; a conversation may not. */
+  private async allowsOneVoice(quizId: number) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { bilingualContent: true },
+    });
+    const meta = (quiz?.bilingualContent ?? {}) as Record<string, unknown>;
+    return meta.mode === 'DICTATION' || meta.mode === 'COMPREHENSION';
+  }
+
+  /** At least two speakers (unless one voice is allowed), and not all of them on one voice. */
+  private assertSpeakersAndVoices(
+    payload: CanonicalSynthesisPayload,
+    oneVoiceAllowed = false,
+  ) {
     const speakers = new Set(payload.turns.map((turn) => turn.speakerId));
-    if (speakers.size < 2) {
+    if (speakers.size < 2 && !oneVoiceAllowed) {
       throw new BadRequestException(
         'Hội thoại production cần ít nhất hai người nói.',
       );
@@ -494,7 +507,10 @@ export class ListeningAudioAuthoringService {
 
   async validateContent(quizId: number) {
     const payload = await this.loadCanonical(quizId);
-    const speakers = this.assertSpeakersAndVoices(payload);
+    const speakers = this.assertSpeakersAndVoices(
+      payload,
+      await this.allowsOneVoice(quizId),
+    );
     return {
       quizId,
       turns: payload.turns.length,
@@ -651,7 +667,7 @@ export class ListeningAudioAuthoringService {
     const payload = await this.loadCanonical(quizId);
     // Same gate as Validate: a preview with one voice for two speakers was
     // produced before (F8 drafts "Mark | Sarah", 2026-10-30).
-    this.assertSpeakersAndVoices(payload);
+    this.assertSpeakersAndVoices(payload, await this.allowsOneVoice(quizId));
     const isPremium = await this.isPremiumListeningQuiz(quizId);
     if (isPremium && !this.uploadService.isPrivateStorageConfigured()) {
       throw new ServiceUnavailableException(

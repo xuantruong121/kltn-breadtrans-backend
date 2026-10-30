@@ -1,4 +1,7 @@
-import { mergeListeningContent } from './listening-question-merge';
+import {
+  mergeListeningContent,
+  spokenTextChanged,
+} from './listening-question-merge';
 import {
   BadRequestException,
   ConflictException,
@@ -165,7 +168,7 @@ export class SkillCmsService {
         },
       });
     }
-    return this.prisma.quiz.findMany({
+    const quizzes = await this.prisma.quiz.findMany({
       where: this.contentTypeWhere(domain),
       orderBy: { id: 'desc' },
       include: {
@@ -183,6 +186,23 @@ export class SkillCmsService {
           : {}),
       },
     });
+    if (domain !== 'listening' || !quizzes.length) return quizzes;
+    // Comprehension and dictation play one clip per question: count them.
+    const withAudio = await this.prisma.question.groupBy({
+      by: ['quizId'],
+      where: {
+        quizId: { in: quizzes.map((quiz) => quiz.id) },
+        audioAssets: { some: { isActive: true } },
+      },
+      _count: { _all: true },
+    });
+    const counts = new Map(
+      withAudio.map((row) => [row.quizId, row._count._all]),
+    );
+    return quizzes.map((quiz) => ({
+      ...quiz,
+      questionsWithAudio: counts.get(quiz.id) ?? 0,
+    }));
   }
 
   async get(
@@ -457,7 +477,7 @@ export class SkillCmsService {
             dto.content as unknown as Record<string, unknown>,
           )
         : dto.content;
-    return this.prisma.question.update({
+    const updated = await this.prisma.question.update({
       where: { id: questionId },
       data: {
         type: dto.type,
@@ -465,6 +485,13 @@ export class SkillCmsService {
         order: dto.order,
       },
     });
+    // A clip that reads the old sentence is retired; the CMS asks for a new one.
+    if (spokenTextChanged(question.content, content))
+      await this.prisma.quizAudioAsset.updateMany({
+        where: { questionId, isActive: true },
+        data: { isActive: false },
+      });
+    return updated;
   }
 
   async updateWritingQuestion(
@@ -892,7 +919,11 @@ export class SkillCmsService {
       id: number;
       type?: QuizType;
       title?: string;
-      questions: Array<{ type: string; content: unknown }>;
+      questions: Array<{
+        type: string;
+        content: unknown;
+        audioAssets?: Array<{ isActive: boolean }>;
+      }>;
     };
     const errors: string[] = [];
     if (!quiz.title?.trim()) errors.push('Thiếu tiêu đề');
@@ -993,6 +1024,28 @@ export class SkillCmsService {
         errors.push(
           `Câu ${index + 1}: Dialogue cần ít nhất 2 lượt lời hợp lệ của 2 người nói`,
         );
+    }
+    // A learner hears either the question's own clip or, for questions that
+    // share the conversation, the quiz's published recording.
+    if (domain === 'listening' && quiz.questions.length) {
+      const recording = this.listeningAudioAuthoring
+        ? await this.listeningAudioAuthoring.getCurrentPublishedArtifact(
+            quiz.id,
+          )
+        : null;
+      for (const [index, question] of quiz.questions.entries()) {
+        const content = asRecord(question.content);
+        const ownClip = (question.audioAssets ?? []).some(
+          (asset) => asset.isActive,
+        );
+        const sharesRecording =
+          Boolean(recording) &&
+          (typeof content.targetTurnId === 'string' ||
+            (Array.isArray(content.transcriptSegments) &&
+              content.transcriptSegments.length > 0));
+        if (!ownClip && !sharesRecording)
+          errors.push(`Câu ${index + 1}: chưa có audio cho học viên`);
+      }
     }
     return { valid: errors.length === 0, errors, domain, quizId: quiz.id };
   }

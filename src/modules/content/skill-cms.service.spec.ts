@@ -64,6 +64,122 @@ describe('SkillCmsService', () => {
     expect(result.errors[0]).toContain('options/correctIndex');
   });
 
+  describe('editing a Listening question', () => {
+    const setup = (content: Record<string, unknown>) => {
+      const prisma = {
+        question: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ id: 5, type: 'MULTIPLE_CHOICE', content }),
+          update: jest.fn().mockResolvedValue({ id: 5 }),
+        },
+        submission: { count: jest.fn().mockResolvedValue(0) },
+        quizAudioAsset: { updateMany: jest.fn() },
+      };
+      return { prisma, service: new SkillCmsService(prisma as any) };
+    };
+
+    it('retires the clip when the spoken sentence changes', async () => {
+      const { prisma, service } = setup({
+        audioText: 'The bus leaves at nine.',
+      });
+      await service.updateListeningQuestion(
+        '1',
+        '5',
+        {
+          type: 'MULTIPLE_CHOICE',
+          content: { audioText: 'The bus leaves at ten.' },
+        },
+        admin,
+      );
+      expect(prisma.quizAudioAsset.updateMany).toHaveBeenCalledWith({
+        where: { questionId: 5, isActive: true },
+        data: { isActive: false },
+      });
+    });
+
+    it('keeps the clip when only the question wording changes', async () => {
+      const { prisma, service } = setup({
+        audioText: 'The bus leaves at nine.',
+        text: 'When?',
+      });
+      await service.updateListeningQuestion(
+        '1',
+        '5',
+        { type: 'MULTIPLE_CHOICE', content: { text: 'What time?' } },
+        admin,
+      );
+      expect(prisma.quizAudioAsset.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Listening publish needs audio a learner can play', () => {
+    const mcq = (id: number, extra: Record<string, unknown> = {}) => ({
+      id,
+      type: 'MULTIPLE_CHOICE',
+      content: { options: ['a', 'b', 'c', 'd'], correctIndex: 1, ...extra },
+      audioAssets: [],
+      order: id,
+    });
+    const turns = [
+      { speaker: 'A', text: 'Hi.' },
+      { speaker: 'B', text: 'Hello.' },
+    ];
+    const run = async (questions: unknown[], recording: unknown) => {
+      const prisma = {
+        quiz: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 58,
+            title: 'Hội thoại C1 — A visit',
+            questions,
+            _count: { submissions: 0 },
+          }),
+        },
+      };
+      const authoring = {
+        getCurrentPublishedArtifact: jest.fn().mockResolvedValue(recording),
+      };
+      const service = new SkillCmsService(prisma as any, authoring as any);
+      return service.validate('listening', '58', admin);
+    };
+
+    it('refuses a dialogue quiz with no recording and no clips', async () => {
+      const result = await run(
+        [
+          mcq(1, { transcriptSegments: turns }),
+          mcq(2, { transcriptSegments: turns }),
+        ],
+        null,
+      );
+      expect(result.errors).toEqual([
+        'Câu 1: chưa có audio cho học viên',
+        'Câu 2: chưa có audio cho học viên',
+      ]);
+    });
+
+    it('accepts a dialogue quiz whose conversation recording is published', async () => {
+      const result = await run([mcq(1, { transcriptSegments: turns })], {
+        id: 3,
+        version: 1,
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('needs a clip per question when questions do not share a conversation', async () => {
+      const result = await run(
+        [
+          {
+            ...mcq(1, { audioText: 'The bus leaves at nine.' }),
+            audioAssets: [{ isActive: true }],
+          },
+          mcq(2, { audioText: 'The shop is closed.' }),
+        ],
+        { id: 3, version: 1 },
+      );
+      expect(result.errors).toEqual(['Câu 2: chưa có audio cho học viên']);
+    });
+  });
+
   it('does not let a content PATCH bypass publish preflight', async () => {
     const prisma = {
       quiz: {

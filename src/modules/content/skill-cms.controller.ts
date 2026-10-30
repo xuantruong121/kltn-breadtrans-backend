@@ -13,7 +13,12 @@ import {
   ParseIntPipe,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -224,6 +229,24 @@ export class SkillCmsController {
       id,
       questionId,
       file,
+      req.user,
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      'Synthesize a Listening question clip (turns, comprehension audioText or dictation sentence)',
+  })
+  @ApiResponse({ status: 201, description: 'The new active audio asset' })
+  @Post('listening/:id/questions/:questionId/audio-assets/generate')
+  generateListeningQuestionAudio(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Request() req: any,
+  ) {
+    return this.service.generateListeningDialogueAudio(
+      id,
+      questionId,
       req.user,
     );
   }

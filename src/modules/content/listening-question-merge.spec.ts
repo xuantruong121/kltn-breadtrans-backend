@@ -1,4 +1,7 @@
-import { mergeListeningContent } from './listening-question-merge';
+import {
+  mergeListeningContent,
+  spokenTextChanged,
+} from './listening-question-merge';
 
 const published = {
   text: 'What does the customer order?',
@@ -72,5 +75,46 @@ describe('mergeListeningContent', () => {
         explanation: { vi: 'Mới', en: 'New' },
       }).explanation,
     ).toEqual({ vi: 'Mới', en: 'New', evidence: 'Coffee, please.' });
+  });
+});
+
+describe('spokenTextChanged', () => {
+  it('is true when the sentence a clip reads changes', () => {
+    expect(
+      spokenTextChanged({ audioText: 'Hello.' }, { audioText: 'Hello there.' }),
+    ).toBe(true);
+    expect(
+      spokenTextChanged(
+        { correctAnswer: 'At ten.' },
+        { correctAnswer: 'At eleven.' },
+      ),
+    ).toBe(true);
+    expect(
+      spokenTextChanged(
+        { transcriptSegments: [{ speaker: 'A', text: 'Hi.' }] },
+        { transcriptSegments: [{ speaker: 'A', text: 'Hi!' }] },
+      ),
+    ).toBe(true);
+  });
+
+  it('is false when only the question, options or explanation change', () => {
+    const before = {
+      audioText: 'Hello.',
+      text: 'Who speaks?',
+      options: ['a'],
+      explanation: { vi: 'x' },
+      transcriptSegments: [{ speaker: 'A', text: 'Hi.', translation: 'Chào.' }],
+    };
+    expect(
+      spokenTextChanged(before, {
+        ...before,
+        text: 'Who is speaking?',
+        options: ['b'],
+        explanation: { vi: 'y', en: 'z' },
+        transcriptSegments: [
+          { speaker: 'A', text: 'Hi.', translation: 'Xin chào.' },
+        ],
+      }),
+    ).toBe(false);
   });
 });

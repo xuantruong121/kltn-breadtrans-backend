@@ -402,6 +402,24 @@ describe('ListeningAudioAuthoringService.generatePreview', () => {
     expect(upload.isPrivateStorageConfigured).not.toHaveBeenCalled();
   });
 
+  it('a dictation quiz may be read by one voice', async () => {
+    const { svc } = service({
+      ...quizWith([['Narrator'], ['Narrator']]),
+      bilingualContent: { mode: 'DICTATION' },
+    });
+    await expect(svc.validateContent(58)).resolves.toMatchObject({
+      speakers: ['Narrator'],
+    });
+  });
+
+  it('a dialogue quiz still needs two speakers', async () => {
+    const { svc } = service({
+      ...quizWith([['Narrator'], ['Narrator']]),
+      bilingualContent: { mode: 'DIALOGUE' },
+    });
+    await expect(svc.validateContent(58)).rejects.toThrow('hai người nói');
+  });
+
   it('an explicit voiceKey per speaker resolves the clash', async () => {
     const { svc } = service(
       quizWith([
