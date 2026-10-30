@@ -9,6 +9,7 @@
  * submission, after every grading outcome or retry, and when a result is
  * read, so the stored state can never stay behind the grading state.
  */
+import { Logger } from '@nestjs/common';
 import {
   OBSERVED_RESULT_POLICY,
   PRODUCTIVE_TASK_WEIGHT,
@@ -25,6 +26,7 @@ import {
   type SkillState,
   scoreFourSkillPlacementV2,
 } from './diagnostic-four-skill';
+import { applyDiagnosticPlacement } from '../learning-path/placement.store';
 
 type Db = Pick<
   PrismaClient,
@@ -33,7 +35,11 @@ type Db = Pick<
   | 'diagnosticQuestion'
   | 'diagnosticSpeakingResponse'
   | 'diagnosticWritingResponse'
+  | 'learnerProfile'
+  | 'learnerSkillLevel'
+  | 'levelUnlock'
 >;
+const logger = new Logger('DiagnosticFourSkillStore');
 
 const OBJECTIVE: FourSkillKey[] = ['LISTENING', 'READING', 'LANGUAGE_USE'];
 
@@ -78,6 +84,7 @@ export async function refreshFourSkillResult(
     where: { id: attemptId },
     select: {
       id: true,
+      userId: true,
       assessmentId: true,
       status: true,
       scoringVersion: true,
@@ -186,6 +193,20 @@ export async function refreshFourSkillResult(
     where: { id: attemptId },
     data: { resultState: result.state, overallScore: result.overall },
   });
+  // Practice levels follow the result (F4). A failure here must not hide
+  // the diagnostic result; the next refresh retries it.
+  try {
+    await applyDiagnosticPlacement(db, attempt.userId, attemptId, {
+      LISTENING: result.skills.LISTENING,
+      READING: result.skills.READING,
+      SPEAKING: result.skills.SPEAKING,
+      WRITING: result.skills.WRITING,
+    });
+  } catch (error) {
+    logger.error(
+      `placement for diagnostic attempt ${attemptId} failed: ${(error as Error).message}`,
+    );
+  }
   return result;
 }
 
