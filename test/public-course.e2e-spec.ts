@@ -17,7 +17,12 @@ describe('Public Courses API (e2e)', () => {
   let createdPublishedCourse = false;
   let createdDraftCourse = false;
 
+  // Courses are hidden unless COURSES_ENABLED=true (CoursesEnabledGuard,
+  // read per request). These tests cover the enabled catalog.
+  const coursesFlag = process.env.COURSES_ENABLED;
+
   beforeAll(async () => {
+    process.env.COURSES_ENABLED = 'true';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -75,6 +80,8 @@ describe('Public Courses API (e2e)', () => {
   });
 
   afterAll(async () => {
+    if (coursesFlag === undefined) delete process.env.COURSES_ENABLED;
+    else process.env.COURSES_ENABLED = coursesFlag;
     if (createdPublishedCourse && publishedCourseId) {
       await prisma.course
         .delete({ where: { id: publishedCourseId } })
@@ -93,6 +100,15 @@ describe('Public Courses API (e2e)', () => {
       await prisma.$disconnect().catch(() => null);
     }
     await app.close();
+  });
+
+  it('answers 404 while courses are hidden', async () => {
+    process.env.COURSES_ENABLED = 'false';
+    try {
+      await request(app.getHttpServer()).get('/public/courses').expect(404);
+    } finally {
+      process.env.COURSES_ENABLED = 'true';
+    }
   });
 
   describe('GET /public/courses (Catalog for Guest)', () => {
