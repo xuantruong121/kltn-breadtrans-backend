@@ -14,6 +14,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CoursesEnabledGuard } from '../../common/guards/courses-enabled.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CourseV5AdminService } from './course-v5-admin.service';
@@ -50,7 +51,7 @@ import {
 @ApiTags('admin-course-studio-v5')
 @ApiBearerAuth()
 @Controller('admin/courses')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(CoursesEnabledGuard, JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class CourseV5AdminController {
   constructor(

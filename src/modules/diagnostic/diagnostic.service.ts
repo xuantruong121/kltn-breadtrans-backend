@@ -35,6 +35,7 @@ import {
   resolveEstimatedLevel,
   validateQuestionBank,
 } from './diagnostic.logic';
+import { coursesEnabled } from '../../common/guards/courses-enabled.guard';
 import { buildCourseCurriculum } from '../course/course-curriculum';
 import {
   FOUR_SKILL_SCORING_VERSION,
@@ -199,6 +200,8 @@ export class DiagnosticService {
   }
 
   private async recommendations(level: string, weaknesses: string[]) {
+    // Hidden courses are never recommended.
+    if (!coursesEnabled()) return [];
     const courses = await this.prisma.course.findMany({
       where: { status: 'PUBLISHED', lessons: { some: {} } },
       select: {

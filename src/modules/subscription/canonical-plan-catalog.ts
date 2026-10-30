@@ -44,7 +44,7 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'PRO',
     displayName: 'BreadTrans Pro',
-    description: 'Mở toàn bộ thư viện nội dung và khóa học trong 30 ngày.',
+    description: 'Mở toàn bộ thư viện nội dung trong 30 ngày.',
     versionName: 'BreadTrans Pro — 30 ngày',
     durationDays: 30,
     priceVnd: 149_000,

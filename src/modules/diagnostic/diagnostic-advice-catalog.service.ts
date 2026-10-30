@@ -8,6 +8,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { PlanFeatureKey, QuizType } from '@prisma/client';
 
+import { coursesEnabled } from '../../common/guards/courses-enabled.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
@@ -111,10 +112,12 @@ export class DiagnosticAdviceCatalogService {
           practiceSet: { select: { level: true } },
         },
       }),
-      this.prisma.course.findMany({
-        where: { id: { in: ids('COURSE') }, status: 'PUBLISHED' },
-        select: { id: true, title: true },
-      }),
+      coursesEnabled()
+        ? this.prisma.course.findMany({
+            where: { id: { in: ids('COURSE') }, status: 'PUBLISHED' },
+            select: { id: true, title: true },
+          })
+        : Promise.resolve<{ id: number; title: string }[]>([]),
     ]);
 
     const features = new Map<PlanFeatureKey, boolean>();
@@ -181,6 +184,8 @@ export class DiagnosticAdviceCatalogService {
           requirement: locked ? `Cần gói ${required}` : null,
         });
       } else if (ref.kind === 'COURSE') {
+        // Hidden courses are never offered as advice.
+        if (!coursesEnabled()) continue;
         const course = courses.find((c) => c.id === ref.id);
         if (!course) continue;
         const locked = !(await has(PlanFeatureKey.COURSE_LIBRARY_ACCESS));
