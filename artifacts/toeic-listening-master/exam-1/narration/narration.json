@@ -1,14 +1,14 @@
 {
   "voice": "en-US-JennyNeural",
-  "characters": 3458,
+  "characters": 3439,
   "requests": 1,
-  "audioSha256": "d04a99ca8a014fb5f84e5b7d65bdd873ed1dbe1df015f401fdcaf5512d66e455",
+  "audioSha256": "ce17e6270af6ebe7af142e9d31b7c5f8dd2de647cc5e61fdc94779402c131378",
   "segments": [
     {
       "id": "intro",
-      "text": "Welcome to the BreadTrans TOEIC Listening practice test. This test was written by BreadTrans. It is not an official TOEIC test. In this section, you will hear short recordings in English: statements, questions, conversations, and talks. There are one hundred questions in four parts. For each question, choose the best answer: A, B, C, or D. Listen carefully. Part One will begin now.",
+      "text": "Welcome to the TOEIC Listening practice test. This is a practice test, not an official TOEIC test. The Listening section has four parts: photographs, questions and responses, conversations, and talks. There are one hundred questions, and the section takes about forty-five minutes. Choose the best answer to each question. Listen carefully. Part One will begin now.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\intro.wav",
-      "seconds": 33.582458
+      "seconds": 29.319708
     },
     {
       "id": "part1",
@@ -26,7 +26,7 @@
       "id": "cue-2",
       "text": "Number two.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-2.wav",
-      "seconds": 0.778833
+      "seconds": 0.778792
     },
     {
       "id": "cue-3",

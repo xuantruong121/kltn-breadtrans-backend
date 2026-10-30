@@ -73,12 +73,14 @@ const RESPONSE_GAP: Record<number, number> = { 1: 5, 2: 5, 3: 8, 4: 8 };
  * direction per Part) without reproducing any official test's wording.
  */
 export const NARRATION = {
-  // Short sentences: the owner found the first, longer intro rushed and
-  // hard to follow in places (2026-10-30).
+  // Short sentences (owner 2026-10-30): no brand name in the audio; the four
+  // parts named as they are; no "A, B, C, or D" here because Part 2 has only
+  // three choices (each Part's directions give its own letters). The
+  // "not an official TOEIC test" line stays (docs/toeic-product-contract.md).
   intro:
-    'Welcome to the BreadTrans TOEIC Listening practice test. This test was written by BreadTrans. It is not an official TOEIC test. ' +
-    'In this section, you will hear short recordings in English: statements, questions, conversations, and talks. ' +
-    'There are one hundred questions in four parts. For each question, choose the best answer: A, B, C, or D. Listen carefully. Part One will begin now.',
+    'Welcome to the TOEIC Listening practice test. This is a practice test, not an official TOEIC test. ' +
+    'The Listening section has four parts: photographs, questions and responses, conversations, and talks. ' +
+    'There are one hundred questions, and the section takes about forty-five minutes. Choose the best answer to each question. Listen carefully. Part One will begin now.',
   part1:
     'Part One. Photographs. Questions one to six. For each question, look at the photograph on your page. You will hear four short statements about it. The statements are not printed. Choose the statement that best describes what you see.',
   part2:
@@ -531,8 +533,13 @@ function build(examId: number, dir: string) {
       });
     t += seconds;
   };
+  // Lead-in silence: a browser starting playback can drop the first
+  // ~100-300 ms while the decoder spins up, which cut "Wel-" off "Welcome"
+  // (owner 2026-10-30). Part of the INTRO segment so seeking to it plays it.
   const intro = seg('intro');
+  push(silence(dir, 1.5), 1.5);
   push(intro.file, intro.seconds, { kind: 'INTRO' });
+  timeline[timeline.length - 1].start = 0;
   push(silence(dir, 2), 2);
   for (const part of [1, 2, 3, 4]) {
     const d = seg(`part${part}`);
