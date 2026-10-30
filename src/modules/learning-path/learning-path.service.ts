@@ -1,6 +1,8 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { FOUR_SKILL_SCORING_VERSION } from '../diagnostic/diagnostic-four-skill';
+import { refreshFourSkillResult } from '../diagnostic/diagnostic-four-skill.store';
 import { UpdateLearnerProfileDto } from './dto/learner-profile.dto';
 import { PRACTICE_SKILLS } from './placement.logic';
 import { applySelfLevel } from './placement.store';
@@ -11,6 +13,7 @@ export class LearningPathService {
 
   /** The learner's profile and per-skill levels; defaults before onboarding. */
   async getProfile(userId: number) {
+    await this.backfillPlacement(userId);
     const [profile, levels] = await Promise.all([
       this.prisma.learnerProfile.findUnique({ where: { userId } }),
       this.prisma.learnerSkillLevel.findMany({ where: { userId } }),
@@ -34,6 +37,28 @@ export class LearningPathService {
         };
       }),
     };
+  }
+
+  /**
+   * A four-skill diagnostic completed before placement existed (or never
+   * re-read) has no placement yet: refreshing its result applies it once.
+   */
+  private async backfillPlacement(userId: number) {
+    const profile = await this.prisma.learnerProfile.findUnique({
+      where: { userId },
+      select: { placementAttemptId: true },
+    });
+    if (profile?.placementAttemptId) return;
+    const attempt = await this.prisma.diagnosticAttempt.findFirst({
+      where: {
+        userId,
+        status: 'COMPLETED',
+        scoringVersion: FOUR_SKILL_SCORING_VERSION,
+      },
+      orderBy: { id: 'desc' },
+      select: { id: true },
+    });
+    if (attempt) await refreshFourSkillResult(this.prisma, attempt.id);
   }
 
   async updateProfile(userId: number, dto: UpdateLearnerProfileDto) {

@@ -10,6 +10,7 @@ function service() {
       [...db.levels.values()].filter((r: any) => r.userId === where.userId),
     );
   db.$transaction = (fn: (tx: unknown) => unknown) => fn(db);
+  db.diagnosticAttempt = { findFirst: () => Promise.resolve(null) };
   return { db, svc: new LearningPathService(db) };
 }
 
