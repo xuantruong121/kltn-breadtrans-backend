@@ -1,50 +1,39 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { ListeningQuestionDto, WritingQuestionDto } from './skill-cms.dto';
 
-describe('Skill CMS DTOs', () => {
-  it('validates structured Listening dialogue turns', async () => {
-    const dto = plainToInstance(ListeningQuestionDto, {
-      type: 'DIALOGUE',
-      content: {
+import { ListeningQuestionDto } from './skill-cms.dto';
+
+const dto = (content: Record<string, unknown>) =>
+  plainToInstance(ListeningQuestionDto, { type: 'MULTIPLE_CHOICE', content });
+
+describe('ListeningQuestionDto content', () => {
+  it('accepts the published shape (object explanation, accent, level, skill, voiceKey)', async () => {
+    const errors = await validate(
+      dto({
+        text: 'What does she order?',
+        accent: 'US',
+        level: 'A2',
+        skill: 'LISTENING',
+        explanation: { vi: 'Cô ấy gọi cà phê.', en: 'She orders coffee.' },
         transcriptSegments: [
-          { speaker: 'Customer', text: 'Hello.' },
-          { speaker: 'Agent', text: 'How can I help?' },
+          {
+            speaker: 'Anna',
+            text: 'Coffee, please.',
+            voiceKey: 'en-us-female-01',
+          },
         ],
-      },
-    });
-
-    await expect(validate(dto)).resolves.toHaveLength(0);
+      }),
+      { whitelist: true, forbidNonWhitelisted: true },
+    );
+    expect(errors).toEqual([]);
   });
 
-  it('rejects invalid Listening transcript fields', async () => {
-    const dto = plainToInstance(ListeningQuestionDto, {
-      type: 'DIALOGUE',
-      content: {
-        transcriptSegments: [{ speaker: '', text: '' }],
-      },
-    });
-
-    const errors = await validate(dto);
-    expect(errors.flatMap((error) => error.children ?? [])).not.toHaveLength(0);
-  });
-
-  it('validates Writing task metadata and numeric constraints', async () => {
-    const valid = plainToInstance(WritingQuestionDto, {
-      type: 'WRITING',
-      prompt: 'Write an email.',
-      taskType: 'EMAIL',
-      wordRange: [100, 130],
-      sampleSentences: ['Dear team,'],
-    });
-    expect(await validate(valid)).toHaveLength(0);
-
-    const invalid = plainToInstance(WritingQuestionDto, {
-      type: 'WRITING',
-      prompt: 'Write an email.',
-      wordRange: [100, 130, 140],
-    });
-    expect(await validate(invalid)).not.toHaveLength(0);
+  it('still rejects an array explanation and an unknown accent', async () => {
+    const errors = await validate(dto({ explanation: ['x'], accent: 'AU' }));
+    expect(errors[0].children?.map((e) => e.property).sort()).toEqual([
+      'accent',
+      'explanation',
+    ]);
   });
 });

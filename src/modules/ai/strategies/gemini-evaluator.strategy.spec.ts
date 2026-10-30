@@ -753,3 +753,62 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
     ).toEqual(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']);
   });
 });
+
+describe('GeminiEvaluatorStrategy Listening drafts are bilingual', () => {
+  it('asks for English content, Vietnamese translations and an English + Vietnamese explanation', async () => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest.fn().mockResolvedValue({
+      response: {
+        text: () =>
+          JSON.stringify({
+            title: 'At the clinic',
+            description: 'A short visit.',
+            level: 'B1',
+            mode: 'DIALOGUE',
+            turns: [
+              {
+                speaker: 'Doctor',
+                text: 'How are you?',
+                translation: 'Bạn khỏe không?',
+              },
+              {
+                speaker: 'Patient',
+                text: 'Not great.',
+                translation: 'Không ổn lắm.',
+              },
+            ],
+            questions: [
+              {
+                prompt: 'How does the patient feel?',
+                options: ['Fine', 'Not great', 'Tired', 'Happy'],
+                correctIndex: 1,
+                explanation: 'Bệnh nhân nói "Not great".',
+                explanationEn: 'The patient says "Not great".',
+              },
+            ],
+          }),
+      },
+    });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    const draft = await strategy.suggestListeningFullDraft({
+      topic: 'a clinic visit',
+      level: 'B1',
+      mode: 'DIALOGUE',
+      count: 1,
+    });
+    expect(draft.questions[0].explanationEn).toBe(
+      'The patient says "Not great".',
+    );
+    const request = generateContent.mock.calls[0][0];
+    const text = request.contents[0].parts[0].text as string;
+    expect(text).toMatch(/translation in natural Vietnamese/);
+    expect(text).toMatch(/explanationEn in English/);
+    expect(
+      request.generationConfig.responseSchema.properties.questions.items
+        .required,
+    ).toContain('explanationEn');
+  });
+});

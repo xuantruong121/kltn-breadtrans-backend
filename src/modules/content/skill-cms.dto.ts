@@ -13,6 +13,8 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ValidateNested,
+  registerDecorator,
+  type ValidationOptions,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { QuizPublicationStatus } from '@prisma/client';
@@ -20,6 +22,25 @@ import {
   SPEAKING_EXERCISE_DIFFICULTIES,
   SPEAKING_TASK_TYPES,
 } from '../speaking/speaking-contract';
+
+/** Accepts a string or a plain JSON object (never an array). */
+function IsStringOrPlainObject(options?: ValidationOptions) {
+  return (target: object, propertyName: string) =>
+    registerDecorator({
+      name: 'isStringOrPlainObject',
+      target: target.constructor,
+      propertyName,
+      options: {
+        message: `${propertyName} must be a string or an object`,
+        ...options,
+      },
+      validator: {
+        validate: (value: unknown) =>
+          typeof value === 'string' ||
+          (!!value && typeof value === 'object' && !Array.isArray(value)),
+      },
+    });
+}
 
 export class SkillContentDto {
   @IsString()
@@ -119,6 +140,11 @@ export class ListeningTranscriptSegmentDto {
   @IsOptional()
   @IsString()
   translation?: string;
+
+  /** Explicit voice for this speaker (e.g. en-us-female-01). */
+  @IsOptional()
+  @IsString()
+  voiceKey?: string;
 }
 
 export class ListeningQuestionContentDto {
@@ -158,9 +184,22 @@ export class ListeningQuestionContentDto {
   @Min(0)
   correctIndex?: number;
 
+  /** Vietnamese text, or { vi, en, evidence } as published content stores it. */
+  @IsOptional()
+  @IsStringOrPlainObject()
+  explanation?: string | Record<string, unknown>;
+
+  @IsOptional()
+  @IsIn(['US', 'UK'])
+  accent?: 'US' | 'UK';
+
   @IsOptional()
   @IsString()
-  explanation?: string;
+  level?: string;
+
+  @IsOptional()
+  @IsIn(['LISTENING'])
+  skill?: 'LISTENING';
 }
 
 export class ListeningQuestionDto {

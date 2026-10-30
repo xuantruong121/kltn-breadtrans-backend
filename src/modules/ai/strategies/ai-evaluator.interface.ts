@@ -631,7 +631,10 @@ export interface ContextualListeningQuestionCandidate {
   prompt: string;
   options: string[];
   correctIndex: number;
+  /** Vietnamese. */
   explanation: string;
+  /** The same explanation in English (owner 2026-10-30: bilingual). */
+  explanationEn?: string;
 }
 
 export interface ContextualListeningQuestionsSuggestion {
