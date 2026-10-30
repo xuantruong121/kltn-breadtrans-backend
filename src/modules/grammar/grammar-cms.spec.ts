@@ -170,6 +170,51 @@ describe('AdminGrammarCMS (Phase 4)', () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    it('lets an explanation be corrected after learners attempted the topic', async () => {
+      prisma.grammarQuestion.findUnique.mockResolvedValue({
+        id: 10,
+        topicId: 201,
+        question: 'She ___ here.',
+        options: ['is', 'are', 'am', 'be'],
+        correctIndex: 0,
+      });
+      prisma.grammarAttempt.findFirst.mockResolvedValue({
+        id: 777,
+        topicId: 201,
+      });
+      prisma.grammarQuestion.update.mockResolvedValue({
+        id: 10,
+        explanation: 'x',
+      });
+
+      await expect(
+        grammarService.updateQuestion(201, 10, {
+          question: 'She ___ here.',
+          options: ['is', 'are', 'am', 'be'],
+          correctIndex: 0,
+          explanation: 'Chủ ngữ số ít dùng is.',
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('still blocks a changed answer after attempts', async () => {
+      prisma.grammarQuestion.findUnique.mockResolvedValue({
+        id: 10,
+        topicId: 201,
+        question: 'She ___ here.',
+        options: ['is', 'are', 'am', 'be'],
+        correctIndex: 0,
+      });
+      prisma.grammarAttempt.findFirst.mockResolvedValue({
+        id: 777,
+        topicId: 201,
+      });
+
+      await expect(
+        grammarService.updateQuestion(201, 10, { correctIndex: 1 }),
+      ).rejects.toThrow(ConflictException);
+    });
+
     it('allows question update if no attempts exist on topic', async () => {
       prisma.grammarQuestion.findUnique.mockResolvedValue({
         id: 10,

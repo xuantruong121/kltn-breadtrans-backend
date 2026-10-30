@@ -359,10 +359,19 @@ export class GrammarService {
         'Câu hỏi không tồn tại trong chủ đề ngữ pháp này',
       );
     }
-    // History safety guard: if attempts exist, block changing options/answers
-    const hasAttempts = await this.prisma.grammarAttempt.findFirst({
-      where: { topicId },
-    });
+    // History safety guard: once learners attempted the topic, the prompt,
+    // options and answer stay as graded; the explanation may still be fixed.
+    const changesGradedContent =
+      (dto.question !== undefined && dto.question !== question.question) ||
+      (dto.options !== undefined &&
+        JSON.stringify(dto.options) !== JSON.stringify(question.options)) ||
+      (dto.correctIndex !== undefined &&
+        dto.correctIndex !== question.correctIndex);
+    const hasAttempts =
+      changesGradedContent &&
+      (await this.prisma.grammarAttempt.findFirst({
+        where: { topicId },
+      }));
     if (hasAttempts) {
       throw new ConflictException(
         'Chủ đề ngữ pháp đã có bài làm của học viên, không thể chỉnh sửa cấu trúc câu hỏi',
