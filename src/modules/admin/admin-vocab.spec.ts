@@ -63,3 +63,105 @@ describe('AdminService vocab decks', () => {
     });
   });
 });
+
+describe('AdminService vocab paging and moves', () => {
+  const build = (prisma: unknown) =>
+    new AdminService(prisma as any, {} as any, {} as any, {} as any, undefined);
+
+  it('pages the words of a deck in order, with an optional search', async () => {
+    const prisma = {
+      vocabTopic: { findUnique: jest.fn().mockResolvedValue({ id: 3 }) },
+      vocabWord: {
+        findMany: jest.fn().mockResolvedValue([{ id: 21 }]),
+        count: jest.fn().mockResolvedValue(45),
+      },
+    };
+    const result = await build(prisma).getVocabWordsPage(3, {
+      page: 2,
+      pageSize: 20,
+      q: 'meet',
+    });
+    expect(prisma.vocabWord.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 20,
+        take: 20,
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        where: expect.objectContaining({ topicId: 3, OR: expect.any(Array) }),
+      }),
+    );
+    expect(result).toEqual({
+      items: [{ id: 21 }],
+      total: 45,
+      page: 2,
+      pageSize: 20,
+    });
+  });
+
+  it('summarizes a deck for the checklist without loading every word', async () => {
+    const prisma = {
+      vocabTopic: {
+        findUnique: jest.fn().mockResolvedValue({ id: 3, title: 'Họp' }),
+      },
+      vocabWord: {
+        count: jest
+          .fn()
+          .mockResolvedValueOnce(40)
+          .mockResolvedValueOnce(38)
+          .mockResolvedValueOnce(35)
+          .mockResolvedValueOnce(2),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { meaning: 'chương trình' },
+            { meaning: 'biên bản' },
+          ]),
+      },
+    };
+    const summary = await build(prisma).getVocabTopicSummary(3);
+    expect(summary.stats).toEqual({
+      total: 40,
+      withIpa: 38,
+      withExample: 35,
+      withAudio: 2,
+      distinctMeanings: 2,
+      sampleMeanings: ['chương trình', 'biên bản'],
+    });
+  });
+
+  it('swaps a word with its neighbour', async () => {
+    const tx = { vocabWord: { update: jest.fn() } };
+    const prisma = {
+      vocabWord: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 9, topicId: 3, order: 4 }),
+        findFirst: jest.fn().mockResolvedValue({ id: 7, topicId: 3, order: 3 }),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      $transaction: jest
+        .fn()
+        .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    };
+    (prisma as any).vocabWord.update = tx.vocabWord.update;
+    await build(prisma).moveVocabWord(3, 9, -1);
+    expect(tx.vocabWord.update).toHaveBeenCalledWith({
+      where: { id: 9 },
+      data: { order: 3 },
+    });
+    expect(tx.vocabWord.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { order: 4 },
+    });
+  });
+
+  it('refuses a number as a vocabulary word', async () => {
+    const prisma = {
+      vocabTopic: { findUnique: jest.fn().mockResolvedValue({ id: 3 }) },
+      vocabWord: { aggregate: jest.fn(), create: jest.fn() },
+    };
+    await expect(
+      build(prisma).addVocabWord(3, { word: '10', meaning: 'số mười' } as any),
+    ).rejects.toThrow('Số không dùng làm từ vựng');
+    expect(prisma.vocabWord.create).not.toHaveBeenCalled();
+  });
+});

@@ -147,6 +147,43 @@ export class AdminController {
     return this.adminService.getVocabTopics();
   }
 
+  @Get('vocab/topics/:id/summary')
+  @ApiOperation({
+    summary: 'Admin: Chu de tu vung kem so lieu cho checklist (khong kem tu)',
+  })
+  getVocabTopicSummary(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.getVocabTopicSummary(id);
+  }
+
+  @Get('vocab/topics/:id/words')
+  @ApiOperation({ summary: 'Admin: Danh sach tu cua chu de, phan trang' })
+  getVocabWordsPage(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('q') q?: string,
+  ) {
+    return this.adminService.getVocabWordsPage(id, {
+      page: Number(page),
+      pageSize: Number(pageSize),
+      q,
+    });
+  }
+
+  @Post('vocab/topics/:topicId/words/:wordId/move')
+  @ApiOperation({ summary: 'Admin: Doi vi tri mot tu len (-1) hoac xuong (1)' })
+  moveVocabWord(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Param('wordId', ParseIntPipe) wordId: number,
+    @Body('direction') direction: number,
+  ) {
+    return this.adminService.moveVocabWord(
+      topicId,
+      wordId,
+      direction < 0 ? -1 : 1,
+    );
+  }
+
   @Get('vocab/topics/:id')
   @ApiOperation({ summary: 'Admin: Chi tiet chu de tu vung kem danh sach tu' })
   getVocabTopicDetail(@Param('id', ParseIntPipe) id: number) {

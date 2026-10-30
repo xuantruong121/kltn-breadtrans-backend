@@ -91,6 +91,12 @@ export function buildDashboardBuckets(range: DashboardRange, now = new Date()) {
   });
 }
 
+/** Flashcards teach words; a bare number ("10", "9:00") is not one. */
+function assertNotANumber(word?: string) {
+  if (word && /^\d+([.,:]\d+)*$/.test(word.trim()))
+    throw new BadRequestException('Số không dùng làm từ vựng flashcard.');
+}
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -1118,6 +1124,128 @@ export class AdminService {
     return topic;
   }
 
+  /** One page of a deck's words, in learner order; `q` searches word and meaning. */
+  async getVocabWordsPage(
+    topicId: number,
+    query: { page?: number; pageSize?: number; q?: string },
+  ) {
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id: topicId },
+    });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    const page = Math.max(1, Math.floor(Number(query.page) || 1));
+    const pageSize = Math.min(
+      100,
+      Math.max(1, Math.floor(Number(query.pageSize) || 20)),
+    );
+    const q = query.q?.trim();
+    const where = {
+      topicId,
+      ...(q
+        ? {
+            OR: [
+              { word: { contains: q, mode: 'insensitive' as const } },
+              { meaning: { contains: q, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.vocabWord.findMany({
+        where,
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.vocabWord.count({ where }),
+    ]);
+    return { items, total, page, pageSize };
+  }
+
+  /** The deck and the counts its publish checklist needs, without the words. */
+  async getVocabTopicSummary(topicId: number) {
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id: topicId },
+    });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    const filled = (field: 'ipaUs' | 'exampleEn' | 'audioUs') => ({
+      topicId,
+      AND: [{ [field]: { not: null } }, { NOT: { [field]: '' } }],
+    });
+    const [total, withIpa, withExample, withAudio, meanings] =
+      await Promise.all([
+        this.prisma.vocabWord.count({ where: { topicId } }),
+        this.prisma.vocabWord.count({ where: filled('ipaUs') }),
+        this.prisma.vocabWord.count({ where: filled('exampleEn') }),
+        this.prisma.vocabWord.count({ where: filled('audioUs') }),
+        this.prisma.vocabWord.findMany({
+          where: { topicId },
+          distinct: ['meaning'],
+          select: { meaning: true },
+        }),
+      ]);
+    return {
+      ...topic,
+      stats: {
+        total,
+        withIpa,
+        withExample,
+        withAudio,
+        distinctMeanings: meanings.length,
+        // The quiz-step preview draws distractors from these.
+        sampleMeanings: meanings.slice(0, 12).map((m) => m.meaning),
+      },
+    };
+  }
+
+  /**
+   * Moves a word one place up (-1) or down (1). Swaps with the neighbour;
+   * when orders collide (old decks saved order 0), renumbers the deck first.
+   */
+  async moveVocabWord(topicId: number, wordId: number, direction: -1 | 1) {
+    const current = await this.prisma.vocabWord.findUnique({
+      where: { id: wordId },
+    });
+    if (!current || current.topicId !== topicId)
+      throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
+    const collisions = await this.prisma.vocabWord.count({
+      where: { topicId, order: current.order, NOT: { id: wordId } },
+    });
+    if (collisions > 0) {
+      const ids = (
+        await this.prisma.vocabWord.findMany({
+          where: { topicId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        })
+      ).map((w) => w.id);
+      const index = ids.indexOf(wordId);
+      const target = index + direction;
+      if (target < 0 || target >= ids.length) return { success: true };
+      [ids[index], ids[target]] = [ids[target], ids[index]];
+      return this.reorderVocabWords(topicId, ids);
+    }
+    const neighbour = await this.prisma.vocabWord.findFirst({
+      where: {
+        topicId,
+        order: direction < 0 ? { lt: current.order } : { gt: current.order },
+      },
+      orderBy: { order: direction < 0 ? 'desc' : 'asc' },
+    });
+    if (!neighbour) return { success: true };
+    await this.prisma.$transaction([
+      this.prisma.vocabWord.update({
+        where: { id: current.id },
+        data: { order: neighbour.order },
+      }),
+      this.prisma.vocabWord.update({
+        where: { id: neighbour.id },
+        data: { order: current.order },
+      }),
+    ]);
+    return { success: true };
+  }
+
   async createVocabTopic(dto: CreateVocabTopicDto) {
     return this.prisma.vocabTopic.create({
       data: {
@@ -1217,6 +1345,7 @@ export class AdminService {
       where: { id: topicId },
     });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    assertNotANumber(dto.word);
     // A word added without a position goes last, not to order 0.
     const last = await this.prisma.vocabWord.aggregate({
       where: { topicId },
@@ -1256,6 +1385,7 @@ export class AdminService {
     if (!word || word.topicId !== topicId) {
       throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
     }
+    if (dto.word !== undefined) assertNotANumber(dto.word);
     // History safety guard: if learner progress exists, block semantic identity change
     const isWordChanged =
       dto.word &&
