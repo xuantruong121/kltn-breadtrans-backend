@@ -1,3 +1,4 @@
+import { mergeListeningContent } from './listening-question-merge';
 import {
   BadRequestException,
   ConflictException,
@@ -435,11 +436,19 @@ export class SkillCmsService {
         'Question does not belong to Listening content',
       );
     await this.assertNoHistory(quizId);
+    // Same type: merge, so fields the form does not show survive the edit.
+    const content =
+      dto.type === question.type
+        ? mergeListeningContent(
+            question.content,
+            dto.content as unknown as Record<string, unknown>,
+          )
+        : dto.content;
     return this.prisma.question.update({
       where: { id: questionId },
       data: {
         type: dto.type,
-        content: asJson(dto.content),
+        content: asJson(content),
         order: dto.order,
       },
     });
