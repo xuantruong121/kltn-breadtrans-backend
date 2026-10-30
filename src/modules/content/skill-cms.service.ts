@@ -168,7 +168,20 @@ export class SkillCmsService {
     return this.prisma.quiz.findMany({
       where: this.contentTypeWhere(domain),
       orderBy: { id: 'desc' },
-      include: { _count: { select: { questions: true, submissions: true } } },
+      include: {
+        _count: { select: { questions: true, submissions: true } },
+        // The list card shows the newest recording's state; whether it still
+        // matches the transcript is decided in the editor.
+        ...(domain === 'listening'
+          ? {
+              listeningAudioArtifacts: {
+                orderBy: { version: 'desc' as const },
+                take: 1,
+                select: { version: true, status: true, durationMs: true },
+              },
+            }
+          : {}),
+      },
     });
   }
 
