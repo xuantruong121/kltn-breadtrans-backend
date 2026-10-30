@@ -57,14 +57,18 @@ export function levelFromScore(score: number): PracticeLevel {
 }
 
 /**
- * Starting ability (logit scale) for the Elo-style model of F6, from a
- * level: the centre of the level's band.
+ * Starting ability (logit scale) for the Elo-style model of F6: the typical
+ * difficulty of the level's own content (ability.logic CEFR_DIFFICULTY:
+ * A1 -1.25, A2 -0.5, B1/B2 ~0.6, C1 1.6) plus 0.75, so an item at the
+ * learner's level starts near the 68 % predicted success the recommender
+ * aims for. Measured on the harness 2026-10-30: the first seeds (-1.5 ...)
+ * gave a Mất gốc learner 44 % on A1 items.
  */
 export const ABILITY_SEED: Record<PracticeLevel, number> = {
-  STARTER: -1.5,
-  BASIC: -0.5,
-  INTERMEDIATE: 0.5,
-  ADVANCED: 1.5,
+  STARTER: -0.5,
+  BASIC: 0.25,
+  INTERMEDIATE: 1.3,
+  ADVANCED: 2.35,
 };
 
 export type SkillScores = Partial<Record<PracticeSkill, number | null>>;

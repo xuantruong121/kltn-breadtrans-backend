@@ -25,6 +25,7 @@ import type {
 
 import { fitScore, successProbability } from './ability.logic';
 import {
+  ABILITY_SEED,
   levelIndex,
   PRACTICE_LEVEL_LABEL,
   PRACTICE_SKILLS,
@@ -99,19 +100,26 @@ const DAY = 24 * 60 * 60 * 1000;
 const UNPLACED: SkillState = {
   level: 'BASIC',
   unlockedLevel: 'ADVANCED',
-  ability: -0.5,
+  ability: ABILITY_SEED.BASIC,
 };
+/** A skill is "weakest" only when clearly below the others. */
+const WEAKNESS_MARGIN = 0.2;
 
-/** The placed skill with the lowest ability, if any skill is placed. */
+/**
+ * The placed skill whose ability is at least WEAKNESS_MARGIN below every
+ * other placed skill; null when skills are level (e.g. a self-chosen level)
+ * or fewer than two are placed.
+ */
 export function weakestSkill(learner: LearnerState): PracticeSkill | null {
-  let best: PracticeSkill | null = null;
-  for (const skill of PRACTICE_SKILLS) {
-    const s = learner.skills[skill];
-    if (!s) continue;
-    if (best === null || s.ability < learner.skills[best]!.ability)
-      best = skill;
-  }
-  return best;
+  const placed = PRACTICE_SKILLS.filter((s) => learner.skills[s]).sort(
+    (a, b) => learner.skills[a]!.ability - learner.skills[b]!.ability,
+  );
+  if (placed.length < 2) return null;
+  const [low, next] = placed;
+  return learner.skills[next]!.ability - learner.skills[low]!.ability >=
+    WEAKNESS_MARGIN
+    ? low
+    : null;
 }
 
 export function scoreCandidate(

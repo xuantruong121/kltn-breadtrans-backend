@@ -158,12 +158,23 @@ describe('recommend', () => {
       [
         item('READING', 'BASIC', { minutes: 10 }),
         item('LISTENING', 'BASIC', { minutes: 10 }),
-        item('WRITING', 'BASIC', { minutes: 15 }),
+        item('WRITING', 'BASIC', { minutes: 10 }),
       ],
       learner(),
       { limit: 3 },
     );
     expect(dailyPlan(ranked, 20)).toHaveLength(2);
     expect(dailyPlan(ranked, 5)).toHaveLength(1);
+  });
+
+  it('names no weakest skill when skills are level', () => {
+    const even = learner({
+      skills: {
+        LISTENING: { level: 'BASIC', unlockedLevel: 'BASIC', ability: 0.25 },
+        READING: { level: 'BASIC', unlockedLevel: 'BASIC', ability: 0.3 },
+      },
+    });
+    const r = recommend([item('LISTENING', 'BASIC')], even, { limit: 1 });
+    expect(r[0].reasons.join(' ')).not.toMatch(/cần cải thiện/);
   });
 });

@@ -11,7 +11,12 @@ function service() {
     );
   db.$transaction = (fn: (tx: unknown) => unknown) => fn(db);
   db.diagnosticAttempt = { findFirst: () => Promise.resolve(null) };
-  return { db, svc: new LearningPathService(db) };
+  return {
+    db,
+    svc: new LearningPathService(db, {
+      effectivePlanCode: () => Promise.resolve(null),
+    } as never),
+  };
 }
 
 describe('LearningPathService profile', () => {

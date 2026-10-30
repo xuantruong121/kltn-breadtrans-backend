@@ -1,15 +1,135 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type { LearningContentType, PracticeSkill } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { FOUR_SKILL_SCORING_VERSION } from '../diagnostic/diagnostic-four-skill';
 import { refreshFourSkillResult } from '../diagnostic/diagnostic-four-skill.store';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { UpdateLearnerProfileDto } from './dto/learner-profile.dto';
-import { PRACTICE_SKILLS } from './placement.logic';
+import { loadCandidates, loadLearnerState } from './learning-path.catalog';
+import {
+  contentKey,
+  dailyPlan,
+  recommend,
+  type Recommendation,
+} from './recommendation.logic';
+import { PRACTICE_LEVEL_LABEL, PRACTICE_SKILLS } from './placement.logic';
 import { applySelfLevel } from './placement.store';
 
 @Injectable()
 export class LearningPathService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subscriptions: SubscriptionService,
+  ) {}
+
+  private async context(userId: number) {
+    const planCode = await this.subscriptions.effectivePlanCode(userId);
+    const catalog = await loadCandidates(this.prisma, planCode);
+    const learner = await loadLearnerState(
+      this.prisma,
+      userId,
+      catalog.setKeyOfExercise,
+    );
+    return { catalog, learner };
+  }
+
+  private view(r: Recommendation, saved: Set<string>) {
+    const c = r.candidate;
+    return {
+      contentType: c.type,
+      contentId: c.id,
+      skill: c.skill,
+      level: c.level,
+      levelLabel: PRACTICE_LEVEL_LABEL[c.level],
+      title: c.title,
+      route: c.route,
+      minutes: c.minutes,
+      status: r.status,
+      reasons: r.reasons,
+      predictedSuccess: r.predictedSuccess,
+      saved: saved.has(contentKey(c)),
+    };
+  }
+
+  /** "Nhiệm vụ hôm nay": open items filling the learner's daily minutes. */
+  async today(userId: number) {
+    const { catalog, learner } = await this.context(userId);
+    const ranked = recommend(catalog.candidates, learner, { limit: 12 });
+    return {
+      minutesPerDay: learner.minutesPerDay,
+      items: dailyPlan(ranked, learner.minutesPerDay).map((r) =>
+        this.view(r, learner.saved),
+      ),
+    };
+  }
+
+  /** "Đề xuất cho bạn" on a skill page, locked items included with reasons. */
+  async recommendedForSkill(userId: number, skill: PracticeSkill) {
+    const { catalog, learner } = await this.context(userId);
+    return recommend(catalog.candidates, learner, {
+      limit: 12,
+      skill,
+      includeLocked: true,
+    }).map((r) => this.view(r, learner.saved));
+  }
+
+  async saved(userId: number) {
+    const { catalog, learner } = await this.context(userId);
+    return recommend(
+      catalog.candidates.filter((c) => learner.saved.has(contentKey(c))),
+      learner,
+      { limit: 100, includeLocked: true },
+    ).map((r) => this.view(r, learner.saved));
+  }
+
+  async saveItem(
+    userId: number,
+    contentType: LearningContentType,
+    contentId: number,
+  ) {
+    const { catalog, learner } = await this.context(userId);
+    const r = recommend(
+      catalog.candidates.filter(
+        (c) => c.type === contentType && c.id === contentId,
+      ),
+      { ...learner, history: new Map() },
+      { limit: 1, includeLocked: true },
+    )[0];
+    if (!r) throw new NotFoundException('Không tìm thấy bài luyện này');
+    const reason = r.reasons[0] ?? 'Bạn đã lưu bài này';
+    await this.prisma.learningPlanItem.upsert({
+      where: {
+        userId_contentType_contentId: { userId, contentType, contentId },
+      },
+      create: {
+        userId,
+        contentType,
+        contentId,
+        skill: r.candidate.skill,
+        level: r.candidate.level,
+        reason,
+        status: 'SAVED',
+      },
+      update: { status: 'SAVED', reason },
+    });
+    return { saved: true };
+  }
+
+  async unsaveItem(
+    userId: number,
+    contentType: LearningContentType,
+    contentId: number,
+  ) {
+    await this.prisma.learningPlanItem.deleteMany({
+      where: { userId, contentType, contentId },
+    });
+    return { saved: false };
+  }
 
   /** The learner's profile and per-skill levels; defaults before onboarding. */
   async getProfile(userId: number) {
