@@ -18,6 +18,7 @@ import type {
 } from '@prisma/client';
 
 import {
+  isDictationContent,
   parseCefrRange,
   planSatisfies,
   requiredPracticePlan,
@@ -83,7 +84,7 @@ export async function loadCandidates(
           none: { writingSet: { assessmentComponents: { some: {} } } },
         },
       },
-      select: { id: true, type: true, title: true },
+      select: { id: true, type: true, title: true, bilingualContent: true },
     }),
     db.speakingPracticeSet.findMany({
       where: { scope: 'SKILL_PRACTICE', publicationStatus: 'PUBLISHED' },
@@ -124,7 +125,12 @@ export async function loadCandidates(
       route: `${ROUTE[skill]}/${q.id}`,
       difficulty: difficultyOf('QUIZ', q.id) ?? seedDifficulty(range),
       tracks: tracksOf('QUIZ', q.id),
-      planLocked: !planSatisfies(planCode, requiredPracticePlan(skill, range)),
+      planLocked: !planSatisfies(
+        planCode,
+        requiredPracticePlan(skill, range, {
+          dictation: isDictationContent(q.bilingualContent),
+        }),
+      ),
       minutes: MINUTES[skill],
     });
   }

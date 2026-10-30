@@ -4,11 +4,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PlanFeatureKey, QuizType, Role } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
   advancedPracticePlan,
   cefrSpan,
   type CefrRange,
+  isDictationContent,
   parseCefrRange,
   planSatisfies,
   type PracticePlan,
@@ -23,6 +25,12 @@ export type QuizContentAccessSubject = {
   courseId: number | null;
   /** Present on full rows; carries the authored CEFR tag of practice items. */
   title?: string;
+  /**
+   * Listening practice keeps its mode here (DICTATION is paid from B1).
+   * resolve/resolveMany load it when a caller did not select it; a
+   * Listening item reaching requiredPlan without it counts as dictation.
+   */
+  bilingualContent?: unknown;
 };
 
 export type QuizContentAccess = {
@@ -44,7 +52,32 @@ export type QuizContentAccess = {
  */
 @Injectable()
 export class QuizContentAccessService {
-  constructor(private readonly subscriptionService: SubscriptionService) {}
+  constructor(
+    private readonly subscriptionService: SubscriptionService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  /** Fills bilingualContent for Listening quizzes selected without it. */
+  private async withListeningModes<T extends QuizContentAccessSubject>(
+    quizzes: T[],
+  ): Promise<T[]> {
+    const missing = quizzes.filter(
+      (q) =>
+        this.skillForQuizType(q.type) === 'LISTENING' &&
+        q.bilingualContent === undefined,
+    );
+    if (!missing.length) return quizzes;
+    const rows = await this.prisma.quiz.findMany({
+      where: { id: { in: missing.map((q) => q.id) } },
+      select: { id: true, bilingualContent: true },
+    });
+    const mode = new Map(rows.map((r) => [r.id, r.bilingualContent]));
+    return quizzes.map((q) =>
+      missing.includes(q)
+        ? { ...q, bilingualContent: mode.get(q.id) ?? null }
+        : q,
+    );
+  }
 
   skillForQuizType(type: QuizType): PracticeSkill | null {
     if (type === QuizType.BILINGUAL_READING) return 'READING';
@@ -72,7 +105,13 @@ export class QuizContentAccessService {
     const skill = this.skillForQuizType(quiz.type);
     if (!skill) return 'FREE';
     const range = this.cefrRange(quiz);
-    if (range) return requiredPracticePlan(skill, range);
+    if (range)
+      return requiredPracticePlan(skill, range, {
+        dictation:
+          skill === 'LISTENING' &&
+          (quiz.bilingualContent === undefined ||
+            isDictationContent(quiz.bilingualContent)),
+      });
     return quiz.isPremiumContent ? advancedPracticePlan(skill) : 'FREE';
   }
 
@@ -107,10 +146,11 @@ export class QuizContentAccessService {
   }
 
   async resolve(
-    quiz: QuizContentAccessSubject,
+    subject: QuizContentAccessSubject,
     userId?: number,
     role?: Role,
   ): Promise<QuizContentAccess> {
+    const [quiz] = await this.withListeningModes([subject]);
     const needsPlan = this.isPremium(quiz) && role !== Role.ADMIN && userId;
     const planCode = needsPlan
       ? await this.subscriptionService.effectivePlanCode(userId)
@@ -119,10 +159,11 @@ export class QuizContentAccessService {
   }
 
   async resolveMany(
-    quizzes: QuizContentAccessSubject[],
+    subjects: QuizContentAccessSubject[],
     userId?: number,
     role?: Role,
   ): Promise<Map<number, QuizContentAccess>> {
+    const quizzes = await this.withListeningModes(subjects);
     const needsPlan =
       userId &&
       role !== Role.ADMIN &&

@@ -19,6 +19,7 @@ import {
 } from './diagnostic-v2-advice';
 import {
   advancedPracticePlan,
+  isDictationContent,
   parseCefrRange,
   planSatisfies,
   type PracticePlan,
@@ -54,9 +55,13 @@ function practicePlanFor(
   skill: PracticeSkill,
   title: string,
   isPremiumContent: boolean,
+  bilingualContent: unknown = null,
 ): PracticePlan {
   const range = parseCefrRange(title);
-  if (range) return requiredPracticePlan(skill, range);
+  if (range)
+    return requiredPracticePlan(skill, range, {
+      dictation: isDictationContent(bilingualContent),
+    });
   return isPremiumContent ? advancedPracticePlan(skill) : 'FREE';
 }
 const COURSE_REQUIREMENT = 'Cần gói PRO';
@@ -87,7 +92,13 @@ export class DiagnosticAdviceCatalogService {
             none: { writingSet: { assessmentComponents: { some: {} } } },
           },
         },
-        select: { id: true, title: true, type: true, isPremiumContent: true },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          isPremiumContent: true,
+          bilingualContent: true,
+        },
       }),
       this.prisma.speakingExercise.findMany({
         where: {
@@ -154,6 +165,7 @@ export class DiagnosticAdviceCatalogService {
           quizKind.skill,
           quiz.title,
           quiz.isPremiumContent,
+          quiz.bilingualContent,
         );
         const locked =
           required !== 'FREE' && !planSatisfies(await planCode(), required);

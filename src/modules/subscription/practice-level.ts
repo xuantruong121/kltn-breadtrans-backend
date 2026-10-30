@@ -86,20 +86,44 @@ export type PracticePlan = 'FREE' | 'PLUS' | 'PRO';
 const PLAN_RANK: Record<PracticePlan, number> = { FREE: 0, PLUS: 1, PRO: 2 };
 
 /**
- * Owner policy (2026-10-28) for standalone skill practice: A1/A2 is free in
- * every skill; B1+ Listening and Reading need PLUS; B1+ Speaking and Writing
- * need PRO. PRO includes PLUS. Courses, TOEIC and the Entry Diagnostic have
- * their own rules and do not use this.
+ * Owner policy (2026-10-30, replaces 2026-10-28) for standalone skill
+ * practice. PRO includes PLUS.
+ *   Reading                      every level FREE
+ *   Listening                    every level FREE, except dictation
+ *                                ("Nghe chép") B1-C2: PLUS
+ *   Speaking / Writing A1-A2     FREE
+ *   Speaking / Writing B1-B2     PLUS
+ *   Speaking / Writing C1-C2     PRO (any part of the range at C1+)
+ * Courses, TOEIC and the Entry Diagnostic have their own rules.
  */
-export function advancedPracticePlan(skill: PracticeSkill): PracticePlan {
-  return skill === 'SPEAKING' || skill === 'WRITING' ? 'PRO' : 'PLUS';
-}
-
 export function requiredPracticePlan(
   skill: PracticeSkill,
   range: CefrRange,
+  options: { dictation?: boolean } = {},
 ): PracticePlan {
-  return practiceRequiresPlus(range) ? advancedPracticePlan(skill) : 'FREE';
+  if (skill === 'READING') return 'FREE';
+  if (skill === 'LISTENING')
+    return options.dictation && practiceRequiresPlus(range) ? 'PLUS' : 'FREE';
+  if (rank(range.max) >= rank('C1')) return 'PRO';
+  return practiceRequiresPlus(range) ? 'PLUS' : 'FREE';
+}
+
+/**
+ * Plan for an untagged item that is flagged premium (no level to read): the
+ * highest plan its skill can need, so a missing tag never opens anything.
+ */
+export function advancedPracticePlan(skill: PracticeSkill): PracticePlan {
+  if (skill === 'READING') return 'FREE';
+  return skill === 'LISTENING' ? 'PLUS' : 'PRO';
+}
+
+/** A Listening quiz authored as dictation (stored in bilingualContent.mode). */
+export function isDictationContent(bilingualContent: unknown): boolean {
+  return (
+    !!bilingualContent &&
+    typeof bilingualContent === 'object' &&
+    (bilingualContent as { mode?: unknown }).mode === 'DICTATION'
+  );
 }
 
 /** Rank of a plan code; an unknown code ranks as FREE (fail closed). */
