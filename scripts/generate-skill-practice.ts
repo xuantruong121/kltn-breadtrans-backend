@@ -8,6 +8,8 @@
  *   plan      read-only: the 48-item spec and the request count.
  *   generate  Gemini, one request per item (drafts.json). Needs
  *             SKILL_PRACTICE_GEMINI_AUTHORIZED=generate.
+ *   balance   spreads Listening/Reading answer keys over A-D in a seeded
+ *             random order (the raw drafts had D in 5 of 120).
  *   apply     DRAFT content + ContentTrackTag rows on --target, then the CMS
  *             validation of each item (applied.json). A non-harness target
  *             needs SKILL_PRACTICE_APPLY_AUTHORIZED=apply.
@@ -25,6 +27,8 @@ import { LearningTrack, PrismaClient } from '@prisma/client';
 import { AiService } from '../src/modules/ai/ai.service';
 import { GeminiEvaluatorStrategy } from '../src/modules/ai/strategies/gemini-evaluator.strategy';
 import { SkillCmsService } from '../src/modules/content/skill-cms.service';
+import { SpeakingCategoryService } from '../src/modules/content/speaking-category.service';
+import { keyOrder } from './toeic-rewrite-listening-34';
 import {
   parseCefrRange,
   requiredPracticePlan,
@@ -224,6 +228,30 @@ async function generate() {
   );
 }
 
+function balance() {
+  const file = join(DIR, 'drafts.json');
+  const drafts = JSON.parse(readFileSync(file, 'utf8'));
+  const questions = buildSpec()
+    .filter((s) => s.skill === 'LISTENING' || s.skill === 'READING')
+    .flatMap((s) => drafts[s.key]?.questions ?? []);
+  const order = keyOrder(questions.length, 20261030);
+  questions.forEach((q: { options: string[]; correctIndex: number }, i) => {
+    const target = order[i];
+    [q.options[target], q.options[q.correctIndex]] = [
+      q.options[q.correctIndex],
+      q.options[target],
+    ];
+    q.correctIndex = target;
+  });
+  writeFileSync(file, JSON.stringify(drafts, null, 2));
+  const counts = [0, 1, 2, 3].map(
+    (k) =>
+      questions.filter((q: { correctIndex: number }) => q.correctIndex === k)
+        .length,
+  );
+  console.log(`keys A/B/C/D: ${counts.join('/')}`);
+}
+
 async function apply() {
   const target = arg('target');
   const url = target === 'env:DATABASE_URL' ? process.env.DATABASE_URL : target;
@@ -235,7 +263,12 @@ async function apply() {
     );
   const drafts = JSON.parse(readFileSync(join(DIR, 'drafts.json'), 'utf8'));
   const prisma = new PrismaClient({ datasources: { db: { url } } });
-  const cms = new SkillCmsService(prisma);
+  const cms = new SkillCmsService(
+    prisma,
+    undefined,
+    undefined,
+    new SpeakingCategoryService(prisma),
+  );
   const admin = await prisma.user.findFirst({
     where: { role: 'ADMIN' },
     orderBy: { id: 'asc' },
@@ -447,8 +480,9 @@ async function main() {
   const mode = process.argv[2];
   if (mode === 'plan') plan();
   else if (mode === 'generate') await generate();
+  else if (mode === 'balance') balance();
   else if (mode === 'apply') await apply();
-  else throw new Error('mode: plan | generate | apply');
+  else throw new Error('mode: plan | generate | balance | apply');
 }
 
 if (require.main === module)

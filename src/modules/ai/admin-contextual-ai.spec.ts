@@ -163,7 +163,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       const speakingSetErrors = await validate(
         plainToInstance(SuggestSpeakingPracticeSetDto, {
           topic: '',
-          level: 'A1',
+          level: 'BEGINNER',
           category: 'UNKNOWN',
         }),
       );

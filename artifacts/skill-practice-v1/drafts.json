@@ -1,0 +1,2755 @@
+{
+  "LISTENING-1": {
+    "title": "A Software Team Stand-up Meeting",
+    "description": "Listen to a short daily stand-up meeting between two software team members discussing their tasks.",
+    "level": "A1",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Manager",
+        "text": "Good morning, team. Let us start our daily stand-up. Alex, what is your update?",
+        "translation": "Good morning, team. Let us start our daily stand-up. Alex, what is your update?"
+      },
+      {
+        "speaker": "Alex",
+        "text": "Good morning! Yesterday, I finished fixing the login bug. Today, I am going to test the new payment page.",
+        "translation": "Good morning! Yesterday, I finished fixing the login bug. Today, I am going to test the new payment page."
+      },
+      {
+        "speaker": "Manager",
+        "text": "Great. Do you have any blockers?",
+        "translation": "Great. Do you have any blockers?"
+      },
+      {
+        "speaker": "Alex",
+        "text": "No, everything is fine.",
+        "translation": "No, everything is fine."
+      },
+      {
+        "speaker": "Manager",
+        "text": "Thanks, Alex. Sam, how about you?",
+        "translation": "Thanks, Alex. Sam, how about you?"
+      },
+      {
+        "speaker": "Sam",
+        "text": "I updated the user database yesterday. Today, I will write the API documentation.",
+        "translation": "I updated the user database yesterday. Today, I will write the API documentation."
+      },
+      {
+        "speaker": "Manager",
+        "text": "Awesome. Let me know if you need any help. Have a good day, everyone!",
+        "translation": "Awesome. Let me know if you need any help. Have a good day, everyone!"
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What did Alex do yesterday?",
+        "options": [
+          "Fixed a login bug",
+          "Wrote a report",
+          "Created a new database",
+          "Designed a logo"
+        ],
+        "correctIndex": 0,
+        "explanation": "Alex states, 'Yesterday, I finished fixing the login bug.'"
+      },
+      {
+        "prompt": "What is Alex going to do today?",
+        "options": [
+          "Take a day off",
+          "Write unit tests",
+          "Test the payment page",
+          "Talk to the manager"
+        ],
+        "correctIndex": 2,
+        "explanation": "Alex says, 'Today, I am going to test the new payment page.'"
+      },
+      {
+        "prompt": "Does Alex have any problems or blockers?",
+        "options": [
+          "Yes, the computer is broken",
+          "Yes, missing passwords",
+          "No, everything is fine",
+          "Yes, waiting for an API"
+        ],
+        "correctIndex": 2,
+        "explanation": "When asked about blockers, Alex replies, 'No, everything is fine.'"
+      },
+      {
+        "prompt": "What did Sam do yesterday?",
+        "options": [
+          "Updated the user interface",
+          "Updated the documentation",
+          "Updated the server",
+          "Updated the user database"
+        ],
+        "correctIndex": 3,
+        "explanation": "Sam mentions, 'I updated the user database yesterday.'"
+      },
+      {
+        "prompt": "What is Sam planning to do today?",
+        "options": [
+          "Sleep all day",
+          "Fix the login bug",
+          "Build the homepage",
+          "Write the API documentation"
+        ],
+        "correctIndex": 3,
+        "explanation": "Sam says, 'Today, I will write the API documentation.'"
+      }
+    ]
+  },
+  "LISTENING-2": {
+    "title": "Ordering Office Supplies",
+    "description": "An A1 listening dialogue about a worker ordering new supplies for the office.",
+    "level": "A1",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Mark",
+        "text": "Hi Sarah, can I help you with anything?",
+        "translation": "Hi Sarah, can I help you with anything?"
+      },
+      {
+        "speaker": "Sarah",
+        "text": "Yes, Mark. We need to order some new office supplies.",
+        "translation": "Yes, Mark. We need to order some new office supplies."
+      },
+      {
+        "speaker": "Mark",
+        "text": "Okay, what do we need?",
+        "translation": "Okay, what do we need?"
+      },
+      {
+        "speaker": "Sarah",
+        "text": "We need a box of blue pens and two boxes of printer paper.",
+        "translation": "We need a box of blue pens and two boxes of printer paper."
+      },
+      {
+        "speaker": "Mark",
+        "text": "Got it. Blue pens and two boxes of printer paper. Anything else?",
+        "translation": "Got it. Blue pens and two boxes of printer paper. Anything else?"
+      },
+      {
+        "speaker": "Sarah",
+        "text": "No, that is all for today. Thank you!",
+        "translation": "No, that is all for today. Thank you!"
+      },
+      {
+        "speaker": "Mark",
+        "text": "You are welcome. I will order them online right now.",
+        "translation": "You are welcome. I will order them online right now."
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What does Sarah want to order?",
+        "options": [
+          "New chairs",
+          "Coffee and tea",
+          "Pens and paper",
+          "Computers"
+        ],
+        "correctIndex": 2,
+        "explanation": "Sarah mentions they need more blue pens and printer paper."
+      },
+      {
+        "prompt": "How many boxes of paper does Sarah need?",
+        "options": [
+          "One box",
+          "Two boxes",
+          "Three boxes",
+          "Five boxes"
+        ],
+        "correctIndex": 1,
+        "explanation": "Sarah specifically asks for two boxes of printer paper."
+      },
+      {
+        "prompt": "What color pens does Sarah ask for?",
+        "options": [
+          "Black",
+          "Red",
+          "Green",
+          "Blue"
+        ],
+        "correctIndex": 3,
+        "explanation": "Sarah says they need a box of blue pens."
+      },
+      {
+        "prompt": "Who is Mark talking to?",
+        "options": [
+          "John",
+          "Anna",
+          "Sarah",
+          "The manager"
+        ],
+        "correctIndex": 2,
+        "explanation": "Mark is having a conversation with Sarah about the office supplies."
+      },
+      {
+        "prompt": "What will Mark do next?",
+        "options": [
+          "Order the supplies online",
+          "Go home",
+          "Clean the office",
+          "Make coffee"
+        ],
+        "correctIndex": 0,
+        "explanation": "Mark says he will order them online right now."
+      }
+    ]
+  },
+  "LISTENING-3": {
+    "title": "Explaining a Refund Policy",
+    "description": "A customer service representative explains the store's refund policy to a shopper.",
+    "level": "A1",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Clerk",
+        "text": "Hello! Can I help you with something today?",
+        "translation": "Hello! Can I help you with something today?"
+      },
+      {
+        "speaker": "Customer",
+        "text": "Yes, I would like to return this shirt, please. It is too small.",
+        "translation": "Yes, I would like to return this shirt, please. It is too small."
+      },
+      {
+        "speaker": "Clerk",
+        "text": "No problem. Do you have the receipt?",
+        "translation": "No problem. Do you have the receipt?"
+      },
+      {
+        "speaker": "Customer",
+        "text": "Yes, here it is.",
+        "translation": "Yes, here it is."
+      },
+      {
+        "speaker": "Clerk",
+        "text": "Thank you. Our policy allows returns within 30 days with a receipt. Since you bought it last week, I can give you a full refund.",
+        "translation": "Thank you. Our policy allows returns within 30 days with a receipt. Since you bought it last week, I can give you a full refund."
+      },
+      {
+        "speaker": "Customer",
+        "text": "Wonderful. Will the money go back on my credit card?",
+        "translation": "Wonderful. Will the money go back on my credit card?"
+      },
+      {
+        "speaker": "Clerk",
+        "text": "Yes, it will take about two to three business days.",
+        "translation": "Yes, it will take about two to three business days."
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What does the customer want to do?",
+        "options": [
+          "Return a shirt",
+          "Buy a new shirt",
+          "Exchange a shirt for shoes",
+          "Wash a shirt"
+        ],
+        "correctIndex": 0,
+        "explanation": "The customer explicitly states she wants to return a shirt."
+      },
+      {
+        "prompt": "Why does the customer want to return the shirt?",
+        "options": [
+          "It has a hole",
+          "It is too small",
+          "It is the wrong color",
+          "It is dirty"
+        ],
+        "correctIndex": 1,
+        "explanation": "The customer says the shirt is too small."
+      },
+      {
+        "prompt": "Does the customer have the receipt?",
+        "options": [
+          "No, she lost it",
+          "The receipt is in the bag",
+          "No, she forgot it at home",
+          "Yes, she has it"
+        ],
+        "correctIndex": 3,
+        "explanation": "When asked for the receipt, the customer replies, 'Yes, here it is.'"
+      },
+      {
+        "prompt": "What is the store's rule for refunds?",
+        "options": [
+          "Within 30 days",
+          "Within 14 days",
+          "Within 7 days",
+          "No refunds allowed"
+        ],
+        "correctIndex": 0,
+        "explanation": "The clerk states that returns are allowed within 30 days."
+      },
+      {
+        "prompt": "How will the customer get her money back?",
+        "options": [
+          "Cash",
+          "Original payment method",
+          "Store credit",
+          "Bank transfer"
+        ],
+        "correctIndex": 1,
+        "explanation": "The clerk confirms the money will go back onto the customer's credit card."
+      }
+    ]
+  },
+  "LISTENING-4": {
+    "title": "Booking a City Tour",
+    "description": "A tourist visits a local information desk to book a guided walking tour of the city.",
+    "level": "A2",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Agent",
+        "text": "Good morning! Welcome to the city visitor center. How can I help you today?",
+        "translation": "¡Buenos días! Bienvenido al centro de visitantes de la ciudad. ¿Cómo puedo ayudarle hoy?"
+      },
+      {
+        "speaker": "Customer",
+        "text": "Hello, I would like to book a guided tour of the city, please.",
+        "translation": "Hola, me gustaría reservar una visita guiada por la ciudad, por favor."
+      },
+      {
+        "speaker": "Agent",
+        "text": "Certainly. We have a very popular walking tour of the historical center. Are you interested in that one?",
+        "translation": "Por supuesto. Tenemos un recorrido a pie muy popular por el centro histórico. ¿Le interesa ese?"
+      },
+      {
+        "speaker": "Customer",
+        "text": "Yes, that sounds great. When does it start?",
+        "translation": "Sí, suena bien. ¿A qué hora empieza?"
+      },
+      {
+        "speaker": "Agent",
+        "text": "We have availability tomorrow morning at 10:00 AM. It lasts about two hours.",
+        "translation": "Tenemos disponibilidad mañana por la mañana a las 10:00. Dura unas dos horas."
+      },
+      {
+        "speaker": "Customer",
+        "text": "Perfect. I need two tickets, please; one for me and one for my wife.",
+        "translation": "Perfecto. Necesito dos entradas, por favor; una para mí y otra para mi esposa."
+      },
+      {
+        "speaker": "Agent",
+        "text": "Great. That will be 20 euros per ticket, so 40 euros in total.",
+        "translation": "Genial. Serán 20 euros por entrada, así que 40 euros en total."
+      },
+      {
+        "speaker": "Customer",
+        "text": "Here is my credit card.",
+        "translation": "Aquí tiene mi tarjeta de crédito."
+      },
+      {
+        "speaker": "Agent",
+        "text": "Thank you. Please enter your PIN here. And here are your tickets and a map of the meeting point.",
+        "translation": "Gracias. Por favor, introduzca su PIN aquí. Y aquí tiene sus entradas y un mapa del punto de encuentro."
+      },
+      {
+        "speaker": "Customer",
+        "text": "Thank you very much for your help. Have a nice day!",
+        "translation": "Muchas gracias por su ayuda. ¡Que tenga un buen día!"
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What kind of tour does the customer want to book?",
+        "options": [
+          "A bus tour",
+          "A boat tour",
+          "A walking tour",
+          "A night tour"
+        ],
+        "correctIndex": 2,
+        "explanation": "The customer explicitly asks for a walking tour of the city center."
+      },
+      {
+        "prompt": "When is the tour scheduled to take place?",
+        "options": [
+          "This morning at 9:00",
+          "This afternoon at 2:00",
+          "Tomorrow morning at 10:00",
+          "Tomorrow afternoon at 3:00"
+        ],
+        "correctIndex": 2,
+        "explanation": "The agent confirms there is a tour tomorrow morning at 10:00."
+      },
+      {
+        "prompt": "How much does one ticket cost?",
+        "options": [
+          "20 euros",
+          "15 euros",
+          "25 euros",
+          "30 euros"
+        ],
+        "correctIndex": 0,
+        "explanation": "The agent states that tickets are 20 euros each."
+      },
+      {
+        "prompt": "How many tickets does the customer buy?",
+        "options": [
+          "One ticket",
+          "Two tickets",
+          "Three tickets",
+          "Four tickets"
+        ],
+        "correctIndex": 1,
+        "explanation": "The customer asks for two tickets, saying it is for himself and his wife."
+      },
+      {
+        "prompt": "How does the customer pay for the tickets?",
+        "options": [
+          "With cash",
+          "With a mobile phone",
+          "With a credit card",
+          "By bank transfer"
+        ],
+        "correctIndex": 2,
+        "explanation": "The customer says he will pay by credit card when handing it over."
+      }
+    ]
+  },
+  "LISTENING-5": {
+    "title": "Borrowing Books from the University Library",
+    "description": "A student asks a librarian at the university library about how to borrow books and check out policies.",
+    "level": "A2",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Librarian",
+        "text": "Good morning. Welcome to the university library. How can I help you today?",
+        "translation": "早上好。欢迎来到大学图书馆。今天有什么我可以帮您的吗？"
+      },
+      {
+        "speaker": "Student",
+        "text": "Good morning. I need to borrow a few books for a history essay, but I am not sure how it works.",
+        "translation": "早上好。我需要借几本书来写历史论文，但我不太确定这是怎么运作的。"
+      },
+      {
+        "speaker": "Librarian",
+        "text": "No problem at all. Do you have your student ID card with you?",
+        "translation": "没问题。你随身带了学生证吗？"
+      },
+      {
+        "speaker": "Student",
+        "text": "Yes, here it is.",
+        "translation": "带了，在这儿。"
+      },
+      {
+        "speaker": "Librarian",
+        "text": "Thank you. I will just scan it to activate your library account. As an undergraduate student, you can borrow up to five books at one time.",
+        "translation": "谢谢。我来刷一下以激活你的图书馆账户。作为本科生，你一次最多可以借五本书。"
+      },
+      {
+        "speaker": "Student",
+        "text": "That sounds great. How long can I keep the books?",
+        "translation": "听起来不错。这些书我可以借多久？"
+      },
+      {
+        "speaker": "Librarian",
+        "text": "The standard loan period is two weeks. If you still need them after two weeks, you can renew them either online or here at the front desk.",
+        "translation": "标准借期是两周。如果两周后你仍然需要它们，你可以在网上或在前台续借。"
+      },
+      {
+        "speaker": "Student",
+        "text": "Perfect. Where can I find the history books?",
+        "translation": "太完美了。我在哪里可以找到历史类书籍？"
+      },
+      {
+        "speaker": "Librarian",
+        "text": "History section is on the second floor, down the left aisle. Let me know if you need help finding a specific title.",
+        "translation": "历史区在二楼，左边的走廊尽头。如果你找不到某本特定的书，请告诉我。"
+      },
+      {
+        "speaker": "Student",
+        "text": "Thank you very much for your help!",
+        "translation": "非常感谢您的帮助！"
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What does the student want to do?",
+        "options": [
+          "Buy a new textbook",
+          "Return a laptop",
+          "Borrow some books",
+          "Pay a library fine"
+        ],
+        "correctIndex": 2,
+        "explanation": "The student approaches the desk to ask about borrowing books for a history essay."
+      },
+      {
+        "prompt": "What does the student need to show to get a library card?",
+        "options": [
+          "A student ID card",
+          "A passport",
+          "A driver's license",
+          "A credit card"
+        ],
+        "correctIndex": 0,
+        "explanation": "The librarian tells the student to show their student ID card to open an account."
+      },
+      {
+        "prompt": "How many books can the student borrow at one time?",
+        "options": [
+          "Five books",
+          "Three books",
+          "Ten books",
+          "Fifteen books"
+        ],
+        "correctIndex": 0,
+        "explanation": "The librarian states that undergraduate students can borrow up to five books at once."
+      },
+      {
+        "prompt": "How long is the normal loan period for books?",
+        "options": [
+          "One week",
+          "Two weeks",
+          "Three weeks",
+          "One month"
+        ],
+        "correctIndex": 1,
+        "explanation": "The librarian mentions that books can be kept for two weeks."
+      },
+      {
+        "prompt": "Can the student renew the books if they need them longer?",
+        "options": [
+          "No, never",
+          "Yes, only by calling the library",
+          "Yes, online or at the desk",
+          "Only if they pay a fee"
+        ],
+        "correctIndex": 2,
+        "explanation": "The librarian explains that books can be renewed online or at the front desk."
+      }
+    ]
+  },
+  "LISTENING-6": {
+    "title": "Shopping at the Supermarket",
+    "description": "Listen to a conversation between a customer and a grocery store clerk about finding items and paying.",
+    "level": "A2",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Customer",
+        "text": "Excuse me, could you tell me where I can find the milk?",
+        "translation": "Disculpe, ¿podría decirme dónde puedo encontrar la leche?"
+      },
+      {
+        "speaker": "Clerk",
+        "text": "Of course! The milk is in aisle 4, right at the back of the store.",
+        "translation": "¡Por supuesto! La leche está en el pasillo 4, justo al fondo de la tienda."
+      },
+      {
+        "speaker": "Customer",
+        "text": "Thank you. And where is the fresh bread?",
+        "translation": "Gracias. ¿Y dónde está el pan fresco?"
+      },
+      {
+        "speaker": "Clerk",
+        "text": "The bakery section is right next to aisle 4. We just baked some fresh bread this morning.",
+        "translation": "La sección de panadería está justo al lado del pasillo 4. Acabamos de hornear un poco de pan fresco esta mañana."
+      },
+      {
+        "speaker": "Customer",
+        "text": "Great! Also, are the apples on sale?",
+        "translation": "¡Genial! Además, ¿las manzanas están en oferta?"
+      },
+      {
+        "speaker": "Clerk",
+        "text": "Yes, they are one dollar and fifty cents a pound.",
+        "translation": "Sí, cuestan un dólar con cincuenta centavos la libra."
+      },
+      {
+        "speaker": "Customer",
+        "text": "I will take a small bag of them then. Thanks for your help.",
+        "translation": "Entonces me llevaré una bolsa pequeña. Gracias por su ayuda."
+      },
+      {
+        "speaker": "Clerk",
+        "text": "You're welcome. You can check out at register number 2.",
+        "translation": "De nada. Puede pagar en la caja número 2."
+      },
+      {
+        "speaker": "Cashier",
+        "text": "Did you find everything you needed today?",
+        "translation": "¿Encontró todo lo que necesitaba hoy?"
+      },
+      {
+        "speaker": "Customer",
+        "text": "Yes, thank you. Can I pay with a credit card?",
+        "translation": "Sí, gracias. ¿Puedo pagar con tarjeta de crédito?"
+      },
+      {
+        "speaker": "Cashier",
+        "text": "Yes, just tap your card on the machine. Would you like a receipt?",
+        "translation": "Sí, solo acerque su tarjeta a la máquina. ¿Le gustaría un recibo?"
+      },
+      {
+        "speaker": "Customer",
+        "text": "Yes, please. Here it is.",
+        "translation": "Sí, por favor. Aquí está."
+      },
+      {
+        "speaker": "Cashier",
+        "text": "Thank you, have a wonderful day!",
+        "translation": "¡Gracias, que tenga un día maravilloso!"
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "Where does the customer want to find the milk?",
+        "options": [
+          "Aisle 3",
+          "Aisle 5",
+          "Aisle 4",
+          "Aisle 6"
+        ],
+        "correctIndex": 2,
+        "explanation": "The clerk states that the milk is in aisle 4, at the back of the store."
+      },
+      {
+        "prompt": "Does the store have fresh bread available?",
+        "options": [
+          "Yes, but it is sold out.",
+          "No, the bakery is closed.",
+          "No, they only have frozen bread.",
+          "Yes, just baked this morning."
+        ],
+        "correctIndex": 3,
+        "explanation": "The clerk says that the fresh bread was just baked this morning in the bakery section."
+      },
+      {
+        "prompt": "How much do the apples cost per pound?",
+        "options": [
+          "Two dollars",
+          "One dollar and fifty cents",
+          "Two dollars and fifty cents",
+          "Three dollars"
+        ],
+        "correctIndex": 1,
+        "explanation": "The clerk mentions that the apples are on sale for one dollar and fifty cents a pound."
+      },
+      {
+        "prompt": "How does the customer pay for the groceries?",
+        "options": [
+          "With cash",
+          "With a check",
+          "With a credit card",
+          "With a gift card"
+        ],
+        "correctIndex": 2,
+        "explanation": "The customer asks if they can pay with a credit card, and the cashier says yes."
+      },
+      {
+        "prompt": "What does the cashier ask for at the end of the transaction?",
+        "options": [
+          "If the customer wants a plastic bag",
+          "If the customer needs a receipt",
+          "If the customer has a loyalty card",
+          "If the customer needs help carrying the bags"
+        ],
+        "correctIndex": 1,
+        "explanation": "The cashier asks if the customer needs a receipt before saying goodbye."
+      }
+    ]
+  },
+  "LISTENING-7": {
+    "title": "Setting Up a New Laptop",
+    "description": "An employee and an IT support technician go through the steps of setting up a new work laptop.",
+    "level": "B1",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Alex",
+        "text": "Hi Jamie, do you have a few minutes? I just unboxed my new work laptop and I am not sure where to start with the setup.",
+        "translation": "Hi Jamie, do you have a few minutes? I just unboxed my new work laptop and I am not sure where to start with the setup."
+      },
+      {
+        "speaker": "Jamie",
+        "text": "Of course, Alex. Let us get that configured for you right now. First, turn it on and connect to the Wi-Fi network named CorpNet-Secure.",
+        "translation": "Of course, Alex. Let us get that configured for you right now. First, turn it on and connect to the Wi-Fi network named CorpNet-Secure."
+      },
+      {
+        "speaker": "Alex",
+        "text": "Got it, connected. Now it is asking me to sign in. Should I use my personal Microsoft account?",
+        "translation": "Got it, connected. Now it is asking me to sign in. Should I use my personal Microsoft account?"
+      },
+      {
+        "speaker": "Jamie",
+        "text": "No, definitely use your company email address and your standard network password. That will sync all your corporate credentials.",
+        "translation": "No, definitely use your company email address and your standard network password. That will sync all your corporate credentials."
+      },
+      {
+        "speaker": "Alex",
+        "text": "Okay, logging in now. It says it is checking for updates.",
+        "translation": "Okay, logging in now. It says it is checking for updates."
+      },
+      {
+        "speaker": "Jamie",
+        "text": "Perfect. Let those run. Once the initial updates finish, you will need to do a quick system restart.",
+        "translation": "Perfect. Let those run. Once the initial updates finish, you will need to do a quick system restart."
+      },
+      {
+        "speaker": "Alex",
+        "text": "Will do. Also, how do I get my design software installed? I don't see it on the desktop.",
+        "translation": "Will do. Also, how do I get my design software installed? I don't see it on the desktop."
+      },
+      {
+        "speaker": "Jamie",
+        "text": "Open up the company software portal from the start menu. You will find all approved programs listed there for one-click installation.",
+        "translation": "Open up the company software portal from the start menu. You will find all approved programs listed there for one-click installation."
+      },
+      {
+        "speaker": "Alex",
+        "text": "Found it. Starting the download now. Thanks for your help, Jamie!",
+        "translation": "Found it. Starting the download now. Thanks for your help, Jamie!"
+      },
+      {
+        "speaker": "Jamie",
+        "text": "Anytime, Alex. Let me know if you run into any other issues.",
+        "translation": "Anytime, Alex. Let me know if you run into any other issues."
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What does Alex need help with?",
+        "options": [
+          "Connecting to the office printer",
+          "Installing a spreadsheet application",
+          "Resetting a forgotten password",
+          "Setting up a new work laptop"
+        ],
+        "correctIndex": 3,
+        "explanation": "Alex mentions at the beginning of the conversation that he just unboxed his new work laptop and needs help getting it set up."
+      },
+      {
+        "prompt": "What is the first thing Jamie asks Alex to do?",
+        "options": [
+          "Connect to the secure Wi-Fi network",
+          "Log in with his personal email",
+          "Install the latest updates",
+          "Change his desktop background"
+        ],
+        "correctIndex": 0,
+        "explanation": "Jamie instructs Alex to connect to the company Wi-Fi network called 'CorpNet-Secure' as the first step."
+      },
+      {
+        "prompt": "What should Alex use to log into the laptop?",
+        "options": [
+          "A local administrator account",
+          "His personal Google account",
+          "A temporary guest password provided by IT",
+          "His company email address and domain password"
+        ],
+        "correctIndex": 3,
+        "explanation": "Jamie tells Alex to use his company email address and network password to sign in."
+      },
+      {
+        "prompt": "Why does Jamie recommend restarting the computer?",
+        "options": [
+          "To clear out the temporary internet files",
+          "To fix a broken screen resolution",
+          "To save battery life for later",
+          "To apply the automated security updates"
+        ],
+        "correctIndex": 3,
+        "explanation": "Jamie says that a restart is necessary to finish applying all the automated security patches and updates."
+      },
+      {
+        "prompt": "What software does Alex need to install manually?",
+        "options": [
+          "The design software",
+          "The web browser",
+          "The antivirus program",
+          "The chat and meeting application"
+        ],
+        "correctIndex": 0,
+        "explanation": "Alex asks about the graphic design software for his projects, and Jamie directs him to the company software portal to download it."
+      }
+    ]
+  },
+  "LISTENING-8": {
+    "title": "Welcoming a New Colleague",
+    "description": "Listen to a conversation where an employee welcomes a new team member to the office and shows them around.",
+    "level": "B1",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Sarah",
+        "text": "Hi there! You must be David. Welcome to the team!",
+        "translation": "Hola. Debes ser David. ¡Bienvenido al equipo!"
+      },
+      {
+        "speaker": "David",
+        "text": "Yes, that is me. Thank you so much! I am really glad to finally be here.",
+        "translation": "Sí, soy yo. ¡Muchas gracias! Estoy muy contento de estar aquí por fin."
+      },
+      {
+        "speaker": "Sarah",
+        "text": "I heard you transferred from our Chicago office. How was the move?",
+        "translation": "Escuché que te transferiste desde nuestra oficina de Chicago. ¿Cómo fue la mudanza?"
+      },
+      {
+        "speaker": "David",
+        "text": "It was a bit tiring, to be honest, but everything is unpacked now and I am ready to get to work.",
+        "translation": "Fue un poco cansado, para ser honesto, pero ya está todo desempacado y estoy listo para trabajar."
+      },
+      {
+        "speaker": "Sarah",
+        "text": "That is great to hear. Would you like a quick tour of the floor before you settle in?",
+        "translation": "Qué bueno escuchar eso. ¿Te gustaría un recorrido rápido por la planta antes de instalarte?"
+      },
+      {
+        "speaker": "David",
+        "text": "I would love that, thank you. Especially if you can show me where the coffee is.",
+        "translation": "Me encantaría, gracias. Especialmente si puedes mostrarme dónde está el café."
+      },
+      {
+        "speaker": "Sarah",
+        "text": "First stop on the tour! The coffee machine is essential for survival around here. Right this way.",
+        "translation": "¡Primera parada del recorrido! La máquina de café es esencial para sobrevivir por aquí. Por aquí, por favor."
+      },
+      {
+        "speaker": "David",
+        "text": "Lead the way. By the way, do I have any meetings today or should I focus on setting up my computer?",
+        "translation": "Guía el camino. Por cierto, ¿tengo alguna reunión hoy o debería concentrarme en configurar mi computadora?"
+      },
+      {
+        "speaker": "Sarah",
+        "text": "No formal meetings today. Just get your computer ready, and at noon, a few of us are taking you out for lunch.",
+        "translation": "No hay reuniones formales hoy. Solo prepara tu computadora y al mediodía algunos de nosotros te llevaremos a almorzar."
+      },
+      {
+        "speaker": "David",
+        "text": "That sounds wonderful. I really appreciate your help today.",
+        "translation": "Suena maravilloso. Realmente aprecio tu ayuda hoy."
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What is the name of the new colleague?",
+        "options": [
+          "Sarah",
+          "Daniel",
+          "Mark",
+          "David"
+        ],
+        "correctIndex": 3,
+        "explanation": "Sarah greets the new colleague by name, saying 'Welcome to the team, David!'"
+      },
+      {
+        "prompt": "Where did David work previously?",
+        "options": [
+          "In the marketing department",
+          "As a freelance consultant",
+          "At a smaller startup",
+          "In the Chicago office"
+        ],
+        "correctIndex": 3,
+        "explanation": "Sarah mentions she heard he transferred from their Chicago office."
+      },
+      {
+        "prompt": "What does Sarah offer to show David first?",
+        "options": [
+          "The meeting rooms",
+          "The coffee machine",
+          "His desk",
+          "The restroom"
+        ],
+        "correctIndex": 1,
+        "explanation": "Sarah asks if he wants a quick tour, starting with where the coffee machine is."
+      },
+      {
+        "prompt": "Why is the coffee machine important to the team?",
+        "options": [
+          "It makes espresso",
+          "It is brand new",
+          "It keeps them awake during morning meetings",
+          "It is the heart of the office and vital for survival"
+        ],
+        "correctIndex": 3,
+        "explanation": "Sarah jokes that the coffee machine is 'essential for survival around here.'"
+      },
+      {
+        "prompt": "What is planned for later in the day?",
+        "options": [
+          "An IT setup session",
+          "A formal presentation",
+          "A meeting with the director",
+          "A team lunch"
+        ],
+        "correctIndex": 3,
+        "explanation": "Sarah mentions that some of the team members are taking him out for lunch to welcome him."
+      }
+    ]
+  },
+  "LISTENING-9": {
+    "title": "Choosing the Right Laptop",
+    "description": "A customer service representative helps a client select a laptop that fits their professional video editing needs.",
+    "level": "B2",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Agent",
+        "text": "Good afternoon! Welcome to TechWorld. Are you finding everything okay, or are you looking for something specific today?",
+        "translation": "Good afternoon! Welcome to TechWorld. Are you finding everything okay, or are you looking for something specific today?"
+      },
+      {
+        "speaker": "Customer",
+        "text": "Hi. Actually, I am looking for a new laptop. My current one is really struggling with my workload, and I need an upgrade.",
+        "translation": "Hi. Actually, I am looking for a new laptop. My current one is really struggling with my workload, and I need an upgrade."
+      },
+      {
+        "speaker": "Agent",
+        "text": "I can certainly help with that. What kind of applications do you typically use? That will help me narrow down the processing power you need.",
+        "translation": "I can certainly help with that. What kind of applications do you typically use? That will help me narrow down the processing power you need."
+      },
+      {
+        "speaker": "Customer",
+        "text": "I work in professional video editing. I usually render 4K footage, and my current machine lags terribly and sometimes even crashes.",
+        "translation": "I work in professional video editing. I usually render 4K footage, and my current machine lags terribly and sometimes even crashes."
+      },
+      {
+        "speaker": "Agent",
+        "text": "Ah, 4K rendering is definitely demanding. You are going to need a robust dedicated graphics card and at least thirty-two gigabytes of RAM to keep things smooth.",
+        "translation": "Ah, 4K rendering is definitely demanding. You are going to need a robust dedicated graphics card and at least thirty-two gigabytes of RAM to keep things smooth."
+      },
+      {
+        "speaker": "Customer",
+        "text": "That is what I figured. Do you have anything in stock that fits those specifications without costing a small fortune?",
+        "translation": "That is what I figured. Do you have anything in stock that fits those specifications without costing a small fortune?"
+      },
+      {
+        "speaker": "Agent",
+        "text": "We have two great models. The first is the CreatorPro 15, which has a solid GPU and thirty-two gigabytes of RAM. The second is the CreatorPro 17, which features a faster processor and a larger screen for two hundred dollars more.",
+        "translation": "We have two great models. The first is the CreatorPro 15, which has a solid GPU and thirty-two gigabytes of RAM. The second is the CreatorPro 17, which features a faster processor and a larger screen for two hundred dollars more."
+      },
+      {
+        "speaker": "Customer",
+        "text": "That faster processor sounds tempting since rendering times cut into my deadlines constantly. I think it is worth the extra two hundred dollars.",
+        "translation": "That faster processor sounds tempting since rendering times cut into my deadlines constantly. I think it is worth the extra two hundred dollars."
+      },
+      {
+        "speaker": "Agent",
+        "text": "Excellent choice. Let me grab that boxed up for you along with a compatible USB-C docking station if you need one.",
+        "translation": "Excellent choice. Let me grab that boxed up for you along with a compatible USB-C docking station if you need one."
+      },
+      {
+        "speaker": "Customer",
+        "text": "I will take the docking station as well. Let us get this purchase completed.",
+        "translation": "I will take the docking station as well. Let us get this purchase completed."
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What is the customer's primary profession?",
+        "options": [
+          "Video editor",
+          "Graphic designer",
+          "Software engineer",
+          "Accountant"
+        ],
+        "correctIndex": 0,
+        "explanation": "The customer mentions he does professional video editing and needs a machine that can handle heavy rendering tasks."
+      },
+      {
+        "prompt": "What is the main issue the customer has with his current laptop?",
+        "options": [
+          "It is too heavy to carry around",
+          "It lags and crashes during video rendering",
+          "The screen resolution is too low",
+          "The battery life does not last long enough"
+        ],
+        "correctIndex": 1,
+        "explanation": "The customer states that his current laptop lags and sometimes crashes when he tries to render 4K video files."
+      },
+      {
+        "prompt": "Which component does the sales representative emphasize as crucial for the customer's work?",
+        "options": [
+          "The graphics card and RAM",
+          "The battery capacity",
+          "The built-in webcam",
+          "The keyboard backlight"
+        ],
+        "correctIndex": 0,
+        "explanation": "The representative explains that a powerful dedicated graphics card and at least 32 gigabytes of RAM are essential for smooth video editing."
+      },
+      {
+        "prompt": "What is the price difference between the two models the representative suggests?",
+        "options": [
+          "The first model is cheaper by five hundred dollars",
+          "The second model is two hundred dollars more expensive",
+          "They both cost the exact same amount",
+          "The second model is twice as expensive as the first"
+        ],
+        "correctIndex": 1,
+        "explanation": "The representative mentions that the upgraded model with the better processor is two hundred dollars more than the standard recommendation."
+      },
+      {
+        "prompt": "What does the customer decide to do at the end of the conversation?",
+        "options": [
+          "Leave the store without buying anything",
+          "Order a custom build online instead",
+          "Wait for a holiday sale next month",
+          "Purchase the upgraded model today"
+        ],
+        "correctIndex": 3,
+        "explanation": "The customer decides that the performance boost is worth the extra cost and agrees to purchase the upgraded model immediately."
+      }
+    ]
+  },
+  "LISTENING-10": {
+    "title": "Ordering Dinner at an Upscale Bistro",
+    "description": "Listen to a conversation between a customer and a waiter at an upscale restaurant, focusing on dietary preferences, recommendations, and placing a full order.",
+    "level": "B2",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Waiter",
+        "text": "Good evening, sir. Are you ready to order, or would you like a few more minutes with the menu?",
+        "translation": "Good evening, sir. Are you ready to order, or would you like a few more minutes with the menu?"
+      },
+      {
+        "speaker": "Customer",
+        "text": "Good evening. I think I need just another minute, actually. There are so many wonderful options. Could you perhaps recommend a starter?",
+        "translation": "Good evening. I think I need just another minute, actually. There are so many wonderful options. Could you perhaps recommend a starter?"
+      },
+      {
+        "speaker": "Waiter",
+        "text": "Certainly! Our roasted beet and goat cheese salad with candied walnuts and a balsamic reduction has been very popular tonight.",
+        "translation": "Certainly! Our roasted beet and goat cheese salad with candied walnuts and a balsamic reduction has been very popular tonight."
+      },
+      {
+        "speaker": "Customer",
+        "text": "That sounds delightful. I will start with that, please. And for the main course, I am leaning toward the ribeye steak.",
+        "translation": "That sounds delightful. I will start with that, please. And for the main course, I am leaning toward the ribeye steak."
+      },
+      {
+        "speaker": "Waiter",
+        "text": "An excellent choice. How would you like the steak prepared?",
+        "translation": "An excellent choice. How would you like the steak prepared?"
+      },
+      {
+        "speaker": "Customer",
+        "text": "Medium-rare, please. And does it come with mashed potatoes?",
+        "translation": "Medium-rare, please. And does it come with mashed potatoes?"
+      },
+      {
+        "speaker": "Waiter",
+        "text": "It is served with garlic herb mashed potatoes and asparagus.",
+        "translation": "It is served with garlic herb mashed potatoes and asparagus."
+      },
+      {
+        "speaker": "Customer",
+        "text": "Wonderful. To drink, I would love a glass of your robust Cabernet Sauvignon.",
+        "translation": "Wonderful. To drink, I would love a glass of your robust Cabernet Sauvignon."
+      },
+      {
+        "speaker": "Waiter",
+        "text": "Very well. A beet salad, a ribeye medium-rare with the standard sides, and a glass of Cabernet Sauvignon. I will have that right out for you.",
+        "translation": "Very well. A beet salad, a ribeye medium-rare with the standard sides, and a glass of Cabernet Sauvignon. I will have that right out for you."
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What does the customer ask for right at the beginning of the interaction?",
+        "options": [
+          "A table by the window",
+          "A glass of tap water",
+          "A moment to look over the menu",
+          "The dessert menu"
+        ],
+        "correctIndex": 2,
+        "explanation": "The customer begins by asking for a few more minutes to look over the menu when the waiter approaches."
+      },
+      {
+        "prompt": "Which appetizer does the waiter recommend?",
+        "options": [
+          "The truffle mushroom risotto",
+          "The pan-seared scallops",
+          "The roasted beet and goat cheese salad",
+          "The artisanal cheese board"
+        ],
+        "correctIndex": 2,
+        "explanation": "The waiter specifically recommends the roasted beet and goat cheese salad with candied walnuts."
+      },
+      {
+        "prompt": "How does the customer prefer their steak cooked?",
+        "options": [
+          "Medium-rare",
+          "Rare",
+          "Medium",
+          "Well-done"
+        ],
+        "correctIndex": 0,
+        "explanation": "When ordering the ribeye steak, the customer explicitly requests it to be prepared medium-rare."
+      },
+      {
+        "prompt": "What modification does the customer request for their side dish?",
+        "options": [
+          "No butter on the potatoes",
+          "Extra garlic on the vegetables",
+          "A side of truffle fries instead",
+          "Steamed vegetables instead of mashed potatoes"
+        ],
+        "correctIndex": 3,
+        "explanation": "The customer asks if they can substitute the mashed potatoes for steamed seasonal vegetables."
+      },
+      {
+        "prompt": "What beverage does the customer order to accompany the meal?",
+        "options": [
+          "A glass of house white wine",
+          "A robust Cabernet Sauvignon",
+          "Sparkling mineral water",
+          "An artisanal craft beer"
+        ],
+        "correctIndex": 1,
+        "explanation": "The customer asks for a glass of the local Cabernet Sauvignon to go with the ribeye steak."
+      }
+    ]
+  },
+  "LISTENING-11": {
+    "title": "Joining an Advanced Study Group",
+    "description": "Two university students discuss the formalities and rigorous expectations of joining a peer-led postgraduate study group.",
+    "level": "C1",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Julian",
+        "text": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group.",
+        "translation": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group."
+      },
+      {
+        "speaker": "Clara",
+        "text": "Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it.",
+        "translation": "Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it."
+      },
+      {
+        "speaker": "Julian",
+        "text": "Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload.",
+        "translation": "Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload."
+      },
+      {
+        "speaker": "Clara",
+        "text": "I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft.",
+        "translation": "I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft."
+      },
+      {
+        "speaker": "Julian",
+        "text": "Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option.",
+        "translation": "Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option."
+      },
+      {
+        "speaker": "Clara",
+        "text": "That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind?",
+        "translation": "That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind?"
+      },
+      {
+        "speaker": "Julian",
+        "text": "We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum.",
+        "translation": "We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum."
+      },
+      {
+        "speaker": "Clara",
+        "text": "That is completely fair. How can I get started? Should I submit a writing sample?",
+        "translation": "That is completely fair. How can I get started? Should I submit a writing sample?"
+      },
+      {
+        "speaker": "Julian",
+        "text": "No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit.",
+        "translation": "No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit."
+      },
+      {
+        "speaker": "Clara",
+        "text": "That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+        "translation": "That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday."
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What is the primary prerequisite for joining the study group mentioned by Julian?",
+        "options": [
+          "Participating in an informal interview and vetting process",
+          "Submitting a comprehensive research proposal",
+          "Having a high GPA in undergraduate courses",
+          "Paying a small monthly membership fee"
+        ],
+        "correctIndex": 0,
+        "explanation": "Julian mentions that prospective members must undergo an informal vetting process to ensure they match the group's rigorous commitment level."
+      },
+      {
+        "prompt": "How does Clara feel about the heavy reading workload?",
+        "options": [
+          "She is hesitant and thinks it might be excessively demanding alongside her thesis.",
+          "She feels the reading list is outdated and irrelevant to modern academia.",
+          "She welcomes the challenge and believes it will complement her current research.",
+          "She has already read most of the literature on the syllabus."
+        ],
+        "correctIndex": 2,
+        "explanation": "Clara states that she welcomes the challenge and sees it as a great way to push her academic boundaries and complement her thesis."
+      },
+      {
+        "prompt": "What specific format does the group use for their weekly sessions?",
+        "options": [
+          "Lectures given by visiting professors",
+          "Open-ended debates on contemporary philosophical issues",
+          "Roundtable critiques of pre-circulated draft papers",
+          "Collaborative textbook reading aloud"
+        ],
+        "correctIndex": 2,
+        "explanation": "Julian clarifies that the sessions are structured around rigorous roundtable critiques where members dissect pre-circulated draft papers."
+      },
+      {
+        "prompt": "What consequence does Julian outline for members who consistently fail to contribute?",
+        "options": [
+          "They are politely asked to step down to maintain the group's equilibrium.",
+          "They are required to host the next three meetings.",
+          "They are permanently banned from the university library.",
+          "They must pay a fine to the group's coffee fund."
+        ],
+        "correctIndex": 0,
+        "explanation": "Julian explains that if someone chronically underperforms or fails to contribute, they are asked to step down to keep the intellectual momentum intact."
+      },
+      {
+        "prompt": "What is Clara's next immediate step regarding the study group?",
+        "options": [
+          "To attend this Thursday's meeting as an observer",
+          "To submit her application form by midnight",
+          "To present her dissertation outline to Julian",
+          "To purchase the mandatory reading materials"
+        ],
+        "correctIndex": 0,
+        "explanation": "Clara decides to attend this Thursday's session as an observer to get a firsthand feel for the dynamics before officially committing."
+      }
+    ]
+  },
+  "LISTENING-12": {
+    "title": "A Visit to the Specialist",
+    "description": "A C1-level dialogue between a patient and a medical specialist discussing persistent somatic symptoms and a proposed diagnostic pathway.",
+    "level": "C1",
+    "mode": "DIALOGUE",
+    "turns": [
+      {
+        "speaker": "Dr. Vance",
+        "text": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words.",
+        "translation": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words."
+      },
+      {
+        "speaker": "Ms. Holloway",
+        "text": "Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings.",
+        "translation": "Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings."
+      },
+      {
+        "speaker": "Dr. Vance",
+        "text": "And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema?",
+        "translation": "And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema?"
+      },
+      {
+        "speaker": "Ms. Holloway",
+        "text": "It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of.",
+        "translation": "It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of."
+      },
+      {
+        "speaker": "Dr. Vance",
+        "text": "Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints.",
+        "translation": "Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints."
+      },
+      {
+        "speaker": "Ms. Holloway",
+        "text": "Should I be preparing myself for a complex treatment regimen once the results come in?",
+        "translation": "Should I be preparing myself for a complex treatment regimen once the results come in?"
+      },
+      {
+        "speaker": "Dr. Vance",
+        "text": "Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+        "translation": "Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities."
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "What primary symptom brings the patient to the specialist?",
+        "options": [
+          "Intermittent acute migraines",
+          "Persistent fatigue and joint stiffness",
+          "Chronic respiratory congestion",
+          "Gastrointestinal discomfort"
+        ],
+        "correctIndex": 1,
+        "explanation": "The patient mentions dealing with lingering fatigue and noticeable stiffness in the joints, particularly in the mornings."
+      },
+      {
+        "prompt": "How long has the patient been experiencing these symptoms?",
+        "options": [
+          "Roughly three weeks",
+          "Over six months",
+          "Just under two months",
+          "More than a year"
+        ],
+        "correctIndex": 1,
+        "explanation": "The patient states that the symptoms have been ongoing for over half a year now, gradually worsening."
+      },
+      {
+        "prompt": "What initial diagnostic step does the doctor recommend?",
+        "options": [
+          "A comprehensive blood panel and an MRI",
+          "Immediate exploratory surgery",
+          "A strict elimination diet",
+          "Physical therapy sessions only"
+        ],
+        "correctIndex": 0,
+        "explanation": "The doctor suggests running a comprehensive blood panel to check inflammatory markers and scheduling an MRI for a clearer view."
+      },
+      {
+        "prompt": "What does the doctor say about the preliminary differential diagnosis?",
+        "options": [
+          "It points toward an inflammatory arthropathy, but requires confirmation",
+          "It is likely just stress-related exhaustion",
+          "It is definitively an autoimmune disorder",
+          "It indicates a rare neurological condition"
+        ],
+        "correctIndex": 0,
+        "explanation": "The doctor notes that the clinical presentation points toward an inflammatory arthropathy, though further testing is required to confirm."
+      },
+      {
+        "prompt": "What advice does the doctor give the patient regarding lifestyle adjustments in the interim?",
+        "options": [
+          "To cease all physical activity immediately",
+          "To maintain a symptom diary and pace physical activities",
+          "To double their daily caffeine intake",
+          "To begin high-intensity interval training"
+        ],
+        "correctIndex": 1,
+        "explanation": "The doctor advises keeping a detailed symptom diary and pacing daily physical exertion to avoid exacerbating the fatigue."
+      }
+    ]
+  },
+  "READING-1": {
+    "title": "Ordering Office Supplies",
+    "description": "A beginner-level reading lesson about ordering office supplies for the workplace.",
+    "level": "A1",
+    "passage": "Anna works in an office. Today, she needs to order new office supplies. She checks the supply closet and sees that they have very few pens and paper. She opens her computer and makes a list. She needs ten blue pens, five notebooks, and three boxes of printer paper. Anna submits the order to the manager. The manager approves the order in the afternoon. The new supplies will arrive on Friday.",
+    "questions": [
+      {
+        "prompt": "Where does Anna work?",
+        "options": [
+          "In a store",
+          "At a school",
+          "In an office",
+          "At a hospital"
+        ],
+        "correctIndex": 2,
+        "explanation": "The text states that Anna works in an office.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What items are there very few of in the supply closet?",
+        "options": [
+          "Coffee and tea",
+          "Desks and chairs",
+          "Computers and phones",
+          "Pens and paper"
+        ],
+        "correctIndex": 3,
+        "explanation": "The text mentions she sees that they have very few pens and paper.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "How many notebooks does Anna need?",
+        "options": [
+          "Three",
+          "Five",
+          "Ten",
+          "Fifteen"
+        ],
+        "correctIndex": 1,
+        "explanation": "The text states she needs five notebooks.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "Who approves the order?",
+        "options": [
+          "The manager",
+          "Anna",
+          "The delivery driver",
+          "No one"
+        ],
+        "correctIndex": 0,
+        "explanation": "The text says the manager approves the order in the afternoon.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "When will the new supplies arrive?",
+        "options": [
+          "On Monday",
+          "On Friday",
+          "On Thursday",
+          "On Wednesday"
+        ],
+        "correctIndex": 1,
+        "explanation": "The text states that the new supplies will arrive on Friday.",
+        "questionType": "detail"
+      }
+    ]
+  },
+  "READING-2": {
+    "title": "Store Refund Policy",
+    "description": "Learn how to understand a basic store refund policy at level A1.",
+    "level": "A1",
+    "passage": "Welcome to our store. You can return most items within 30 days of purchase. You must bring your receipt. The item must be in good condition and in its original box. We give a full refund to your original payment method. If you do not have a receipt, we can only give you a store credit. Sale items are final and cannot be returned. Please ask a worker if you have questions.",
+    "questions": [
+      {
+        "prompt": "How many days do you have to return most items?",
+        "options": [
+          "10 days",
+          "20 days",
+          "30 days",
+          "60 days"
+        ],
+        "correctIndex": 2,
+        "explanation": "The passage states that you can return most items within 30 days of purchase.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What do you need to bring for a full refund?",
+        "options": [
+          "Your ID",
+          "Your receipt",
+          "A photo",
+          "A credit card"
+        ],
+        "correctIndex": 1,
+        "explanation": "The text says you must bring your receipt to get a full refund.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What happens if you do not have a receipt?",
+        "options": [
+          "You get no money",
+          "You get cash",
+          "You get a store credit",
+          "You get a free item"
+        ],
+        "correctIndex": 2,
+        "explanation": "The passage explains that if you do not have a receipt, you get a store credit.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "Can you return sale items?",
+        "options": [
+          "No, they are final",
+          "Yes, within 10 days",
+          "Yes, always",
+          "Only with a manager"
+        ],
+        "correctIndex": 0,
+        "explanation": "The text states that sale items are final and cannot be returned.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What must the item be in?",
+        "options": [
+          "Its original box",
+          "A plastic bag",
+          "A new package",
+          "Paper wrapping"
+        ],
+        "correctIndex": 0,
+        "explanation": "The passage specifies that the item must be in good condition and in its original box.",
+        "questionType": "detail"
+      }
+    ]
+  },
+  "READING-3": {
+    "title": "Booking a City Tour",
+    "description": "Learn how to book a sightseeing tour in a new city.",
+    "level": "A1",
+    "passage": "Hello! I want to book a city tour for tomorrow. Do you have any English tours available? Yes, we do! Our classic bus tour starts at 10:00 AM and 2:00 PM. It takes two hours and costs 25 euros per person. That sounds great. Can I pay with a credit card? Of course. Here is your ticket and receipt. Enjoy your tour!",
+    "questions": [
+      {
+        "prompt": "What does the customer want to book?",
+        "options": [
+          "A hotel room",
+          "A dinner table",
+          "A train ticket",
+          "A city tour"
+        ],
+        "correctIndex": 3,
+        "explanation": "The customer says, 'I want to book a city tour for tomorrow.'",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "When does the classic bus tour start?",
+        "options": [
+          "At 9:00 AM and 1:00 PM",
+          "At 12:00 PM and 4:00 PM",
+          "At 11:00 AM and 3:00 PM",
+          "At 10:00 AM and 2:00 PM"
+        ],
+        "correctIndex": 3,
+        "explanation": "The passage states the tour starts at 10:00 AM and 2:00 PM.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "How long does the tour take?",
+        "options": [
+          "Two hours",
+          "One hour",
+          "Three hours",
+          "Four hours"
+        ],
+        "correctIndex": 0,
+        "explanation": "The text mentions, 'It takes two hours.'",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "How much does the tour cost per person?",
+        "options": [
+          "15 euros",
+          "25 euros",
+          "20 euros",
+          "30 euros"
+        ],
+        "correctIndex": 1,
+        "explanation": "The passage states it costs 25 euros per person.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "Can the customer pay with a credit card?",
+        "options": [
+          "No, only cash",
+          "No, only mobile payments",
+          "Yes, credit card is accepted",
+          "Yes, but with an extra fee"
+        ],
+        "correctIndex": 2,
+        "explanation": "The agent replies, 'Of course' when asked about paying with a credit card.",
+        "questionType": "inference"
+      }
+    ]
+  },
+  "READING-4": {
+    "title": "Borrowing Books from the University Library",
+    "description": "Learn how to use your student ID to borrow, renew, and return books at the university library.",
+    "level": "A2",
+    "passage": "Welcome to the university library. All current students can borrow books using their student ID card. To find a book, you can use the library computer system to search for the title or author. Each student can borrow up to five books at one time. The standard borrowing period is three weeks. If you need the book for a longer time, you can renew it online before the due date. Please return all borrowed books on time to avoid paying late fees. If you have any questions, the staff at the front desk are always happy to help you.",
+    "questions": [
+      {
+        "prompt": "What do you need to borrow books from the library?",
+        "options": [
+          "A library ticket",
+          "A driver license",
+          "A credit card",
+          "A student ID card"
+        ],
+        "correctIndex": 3,
+        "explanation": "The text states that all current students can borrow books using their student ID card.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "How many books can a student borrow at one time?",
+        "options": [
+          "Up to three books",
+          "Up to five books",
+          "Ten books",
+          "As many as they want"
+        ],
+        "correctIndex": 1,
+        "explanation": "The passage mentions that each student can borrow up to five books at one time.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "How long is the standard borrowing period?",
+        "options": [
+          "One week",
+          "Two weeks",
+          "Three weeks",
+          "One month"
+        ],
+        "correctIndex": 2,
+        "explanation": "The text explicitly states that the standard borrowing period is three weeks.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "What can you do if you need a book for a longer time?",
+        "options": [
+          "Buy the book",
+          "Hide the book",
+          "Call the author",
+          "Renew it online"
+        ],
+        "correctIndex": 3,
+        "explanation": "The passage explains that you can renew the book online before the due date.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "Why should you return books on time?",
+        "options": [
+          "To get a free gift",
+          "To help the staff",
+          "To avoid paying late fees",
+          "To get better grades"
+        ],
+        "correctIndex": 2,
+        "explanation": "The text advises returning books on time to avoid paying late fees.",
+        "questionType": "Detail"
+      }
+    ]
+  },
+  "READING-5": {
+    "title": "Shopping at the Supermarket",
+    "description": "A short reading lesson about buying food and groceries at a supermarket.",
+    "level": "A2",
+    "passage": "Every Saturday morning, Maria goes to the supermarket to buy food for the week. First, she gets a shopping cart near the entrance. Then, she walks down the fresh produce aisle to pick out red apples, green broccoli, and ripe bananas. After that, she visits the bakery section for a warm loaf of bread. Maria always checks her shopping list so she does not forget anything. Next, she goes to the dairy aisle to grab a carton of milk and some cheese. Finally, she waits in line at the checkout counter, pays for her groceries with a credit card, and carries her bags home.",
+    "questions": [
+      {
+        "prompt": "When does Maria go to the supermarket?",
+        "options": [
+          "Every Sunday afternoon",
+          "Every Saturday morning",
+          "On Friday evenings",
+          "Once a month"
+        ],
+        "correctIndex": 1,
+        "explanation": "The text states that 'Every Saturday morning, Maria goes to the supermarket'.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What does Maria get first when she enters the supermarket?",
+        "options": [
+          "A shopping cart",
+          "A basket",
+          "A plastic bag",
+          "A shopping list"
+        ],
+        "correctIndex": 0,
+        "explanation": "The passage mentions that 'First, she gets a shopping cart near the entrance.'",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "Which items does Maria find in the produce aisle?",
+        "options": [
+          "Milk and cheese",
+          "Bread and cookies",
+          "Apples, broccoli, and bananas",
+          "Meat and fish"
+        ],
+        "correctIndex": 2,
+        "explanation": "The text says she picks out 'red apples, green broccoli, and ripe bananas' in the fresh produce aisle.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "Why does Maria check her shopping list?",
+        "options": [
+          "To find the cheapest prices",
+          "To know the store hours",
+          "So she does not forget anything",
+          "To see where the bakery is"
+        ],
+        "correctIndex": 2,
+        "explanation": "The passage explicitly states that she checks her list 'so she does not forget anything.'",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "How does Maria pay for her groceries?",
+        "options": [
+          "With cash",
+          "With a credit card",
+          "With a mobile phone",
+          "With a check"
+        ],
+        "correctIndex": 1,
+        "explanation": "The text concludes by stating she 'pays for her groceries with a credit card'.",
+        "questionType": "detail"
+      }
+    ]
+  },
+  "READING-6": {
+    "title": "Setting Up a New Work Laptop",
+    "description": "Learn the basic steps to set up a new work laptop on your first day.",
+    "level": "A2",
+    "passage": "Welcome to your new job! Your first task is to set up your new work laptop. First, connect the laptop to the power charger and turn it on. Next, select your preferred language and connect to the secure office Wi-Fi network. You will need to enter your employee password to log in for the very first time. After you are logged in, open the web browser and check your corporate email. Finally, download the company messaging app so you can chat with your team. If you have any problems, call the IT support department for help.",
+    "questions": [
+      {
+        "prompt": "What should you do first when you get your new laptop?",
+        "options": [
+          "Open your corporate email",
+          "Download the messaging app",
+          "Call IT support",
+          "Connect it to the power charger and turn it on"
+        ],
+        "correctIndex": 3,
+        "explanation": "The passage states that the first task is to connect the laptop to the power charger and turn it on.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What network do you need to connect to?",
+        "options": [
+          "Home Wi-Fi",
+          "Public Wi-Fi",
+          "Secure office Wi-Fi",
+          "Guest network"
+        ],
+        "correctIndex": 2,
+        "explanation": "The text mentions connecting to the secure office Wi-Fi network.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What do you need to enter to log in for the first time?",
+        "options": [
+          "Your home address",
+          "Your employee password",
+          "A phone number",
+          "A credit card number"
+        ],
+        "correctIndex": 1,
+        "explanation": "The passage explicitly states you need to enter your employee password to log in.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "Where should you check your messages after logging in?",
+        "options": [
+          "Through regular mail",
+          "On a personal smartphone",
+          "By sending a fax",
+          "In the web browser via corporate email"
+        ],
+        "correctIndex": 3,
+        "explanation": "The text says to open the web browser and check your corporate email.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "Who should you call if you have problems?",
+        "options": [
+          "The office manager",
+          "Human resources",
+          "IT support department",
+          "The company CEO"
+        ],
+        "correctIndex": 2,
+        "explanation": "The final sentence notes that you should call the IT support department for help if you have any problems.",
+        "questionType": "detail"
+      }
+    ]
+  },
+  "READING-7": {
+    "title": "Welcoming a New Colleague",
+    "description": "A reading comprehension lesson about how an office welcomes a new team member at B1 level.",
+    "level": "B1",
+    "passage": "Last Monday, our office welcomed a new team member named Sarah. To make her feel comfortable on her first day, our manager, David, organized a short morning meeting to introduce her to everyone. Sarah brought in some homemade biscuits, which immediately made her popular with the staff. During lunch, a few of us invited her to the local cafe to help her get familiar with the neighborhood. I showed her where the supplies are kept and explained how the printer works. Sarah mentioned that she was a bit nervous at first, but everyone's friendliness helped her relax quickly. By the end of the week, she had already learned the basic daily routines and started contributing to our current project. Welcoming a new colleague properly makes a huge difference in how fast they adapt to the workplace.",
+    "questions": [
+      {
+        "prompt": "What did Sarah do to make a good first impression?",
+        "options": [
+          "She organized a morning meeting.",
+          "She brought in homemade biscuits.",
+          "She showed everyone how the printer works.",
+          "She invited the team to a local cafe."
+        ],
+        "correctIndex": 1,
+        "explanation": "The passage states that Sarah brought in some homemade biscuits, which immediately made her popular.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "Who is David?",
+        "options": [
+          "The office manager",
+          "Sarah's husband",
+          "The IT technician",
+          "The owner of the cafe"
+        ],
+        "correctIndex": 0,
+        "explanation": "The text mentions 'our manager, David, organized a short morning meeting'.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "When did some colleagues take Sarah to the local cafe?",
+        "options": [
+          "During the morning meeting",
+          "On Tuesday afternoon",
+          "By the end of the week",
+          "During lunch"
+        ],
+        "correctIndex": 3,
+        "explanation": "The passage says 'During lunch, a few of us invited her to the local cafe'.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "How did Sarah feel at the very beginning of her first day?",
+        "options": [
+          "Very confident",
+          "Angry and stressed",
+          "Bored",
+          "A bit nervous"
+        ],
+        "correctIndex": 3,
+        "explanation": "Sarah mentioned that she was a bit nervous at first.",
+        "questionType": "inference"
+      },
+      {
+        "prompt": "What is the main idea of the passage?",
+        "options": [
+          "How to bake biscuits for an office",
+          "The importance of welcoming a new colleague properly",
+          "How to operate office printers",
+          "The challenges of finding a local cafe"
+        ],
+        "correctIndex": 1,
+        "explanation": "The final sentence summarizes that welcoming a new colleague properly makes a huge difference in how fast they adapt.",
+        "questionType": "main_idea"
+      }
+    ]
+  },
+  "READING-8": {
+    "title": "Finding the Right Camera",
+    "description": "A reading lesson about a shop assistant helping a customer choose a digital camera based on their needs.",
+    "level": "B1",
+    "passage": "A customer walks into an electronics store, looking a bit confused by the large display of digital cameras. A shop assistant named Mark notices him and walks over. Mark smiles and asks, \"Hello! Are you looking for something specific today?\" The customer, David, replies, \"I am, but I am not very tech-savvy. I need a camera for my upcoming vacation to Italy, but I do not want anything too complicated.\" Mark nods and points to two different models on the shelf. He explains that the first model is very compact and lightweight, making it easy to carry around all day while sightseeing. It also has an automatic mode that adjusts settings for you. The second model is slightly larger, but it has a much better zoom lens and a longer battery life, which is great for landscape photography. David thinks about his trip and realizes he will be walking a lot and mostly taking pictures of historical buildings and food. He decides that the lightweight model with the automatic mode is the best choice for him. Mark helps him set it up and includes a free protective case with the purchase.",
+    "questions": [
+      {
+        "prompt": "Why did David visit the electronics store?",
+        "options": [
+          "To apply for a job as a shop assistant",
+          "To return a broken phone",
+          "To buy a camera for his vacation",
+          "To meet his friend Mark"
+        ],
+        "correctIndex": 2,
+        "explanation": "The text states that David needed a camera for his upcoming vacation to Italy.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "How does David describe his own technical skills?",
+        "options": [
+          "He is an expert photographer.",
+          "He only uses vintage cameras.",
+          "He works in electronics.",
+          "He is not very tech-savvy."
+        ],
+        "correctIndex": 3,
+        "explanation": "David explicitly tells Mark that he is not very tech-savvy.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "What is an advantage of the second camera model?",
+        "options": [
+          "It has a better zoom lens and longer battery life.",
+          "It comes with a free protective case.",
+          "It is the lightest model available.",
+          "It is the cheapest option in the store."
+        ],
+        "correctIndex": 0,
+        "explanation": "Mark explains that the second model has a much better zoom lens and a longer battery life.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "Which camera model does David finally choose?",
+        "options": [
+          "The model with the best zoom lens",
+          "The most expensive model",
+          "He decides not to buy any camera.",
+          "The lightweight model with an automatic mode"
+        ],
+        "correctIndex": 3,
+        "explanation": "David decides that the lightweight model with the automatic mode is the best choice for him.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "What extra item does Mark give David with his purchase?",
+        "options": [
+          "A free memory card",
+          "A free protective case",
+          "A spare battery",
+          "A discount coupon for Italy"
+        ],
+        "correctIndex": 1,
+        "explanation": "The text concludes by stating that Mark includes a free protective case with the purchase.",
+        "questionType": "Detail"
+      }
+    ]
+  },
+  "READING-9": {
+    "title": "Dining Out: Ordering at a Restaurant",
+    "description": "Learn useful phrases and cultural etiquette for ordering food at a restaurant in an English-speaking country.",
+    "level": "B2",
+    "passage": "Dining out is a popular social activity, but navigating a restaurant menu and placing an order in a foreign language can sometimes feel intimidating. When you arrive at a restaurant, the host will usually greet you and ask if you have a reservation. Once seated, your server will provide menus and often ask if you would like to start with any drinks or appetizers. It is polite to take your time looking over the menu, and if you are unsure about any ingredients or preparation methods, do not hesitate to ask your server for clarification or recommendations. When you are ready to order, the server will return to take your meal selections. Common phrases to use include \"I would like to have...\" or \"Could I please get the...\". After finishing your meal, you will eventually need to ask for the bill, which can be done by simply saying, \"Could we have the check, please?\" In many Western countries, leaving a tip for good service is customary, typically ranging from fifteen to twenty percent of the total bill before taxes.",
+    "questions": [
+      {
+        "prompt": "What is one of the first things a host typically asks when you arrive at a restaurant?",
+        "options": [
+          "If you have a reservation",
+          "If you are ready to pay the bill",
+          "What your favorite dish is",
+          "How much tip you plan to leave"
+        ],
+        "correctIndex": 0,
+        "explanation": "The passage states that the host will usually greet you and ask if you have a reservation.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What should you do if you are unsure about ingredients on the menu?",
+        "options": [
+          "Ask your server for clarification",
+          "Leave the restaurant immediately",
+          "Guess what the dish contains",
+          "Order the most expensive item"
+        ],
+        "correctIndex": 0,
+        "explanation": "The text advises not to hesitate to ask your server for clarification or recommendations if you are unsure about any ingredients.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "Which of the following is a polite phrase suggested for ordering a meal?",
+        "options": [
+          "Bring me the food now.",
+          "Could I please get the...",
+          "I demand this dish.",
+          "You must serve me this."
+        ],
+        "correctIndex": 1,
+        "explanation": "The passage lists \"Could I please get the...\" as a common phrase to use when ordering.",
+        "questionType": "vocabulary"
+      },
+      {
+        "prompt": "How do you typically request the bill at the end of the meal?",
+        "options": [
+          "By asking, \"Could we have the check, please?\"",
+          "By walking directly to the kitchen",
+          "By leaving money on the table and walking out",
+          "By asking for the dessert menu again"
+        ],
+        "correctIndex": 0,
+        "explanation": "The text mentions asking for the bill by saying, \"Could we have the check, please?\"",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What is customary regarding tipping in many Western countries?",
+        "options": [
+          "Tipping is strictly forbidden.",
+          "Tips are always included automatically in the food price.",
+          "You should only tip if the manager asks you to.",
+          "Leaving fifteen to twenty percent is customary for good service."
+        ],
+        "correctIndex": 3,
+        "explanation": "The passage notes that leaving a tip ranging from fifteen to twenty percent for good service is customary in many Western countries.",
+        "questionType": "inference"
+      }
+    ]
+  },
+  "READING-10": {
+    "title": "Joining a Study Group",
+    "description": "A reading lesson about the benefits and process of participating in an academic study group.",
+    "level": "B2",
+    "passage": "Preparing for university exams can often feel overwhelming when tackled alone. Many students find that joining a study group transforms their academic experience by offering different perspectives and sharing the workload. When students collaborate, they are able to divide complex reading assignments into manageable sections and teach concepts to one another, which significantly improves retention. Furthermore, regular meetings enforce a sense of accountability, reducing the temptation to procrastinate. However, to be truly effective, a study group requires clear organization. Members should establish an agenda before each meeting, set specific goals, and ensure that everyone participates equally rather than letting one person dominate the discussion. Ultimately, a well-managed study group fosters not only better grades but also valuable communication and teamwork skills that extend far beyond the classroom.",
+    "questions": [
+      {
+        "prompt": "What is one main benefit of joining a study group according to the passage?",
+        "options": [
+          "It eliminates all exam stress completely.",
+          "It replaces the need to attend lectures.",
+          "It guarantees the highest grade in the class.",
+          "It allows students to share the workload and gain different perspectives."
+        ],
+        "correctIndex": 3,
+        "explanation": "The passage states that joining a study group transforms the academic experience by offering different perspectives and sharing the workload.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "How does teaching concepts to one another help students?",
+        "options": [
+          "It shortens the length of the exam.",
+          "It gives them extra credit.",
+          "It improves their retention of the material.",
+          "It reduces the cost of textbooks."
+        ],
+        "correctIndex": 2,
+        "explanation": "The text explains that teaching concepts to one another significantly improves retention.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "What negative behavior does regular group meetings help reduce?",
+        "options": [
+          "Aggressive competition",
+          "Procrastination",
+          "Public speaking anxiety",
+          "Poor attendance"
+        ],
+        "correctIndex": 1,
+        "explanation": "The passage notes that regular meetings enforce a sense of accountability, reducing the temptation to procrastinate.",
+        "questionType": "Vocabulary/Inference"
+      },
+      {
+        "prompt": "According to the text, what is required for a study group to be truly effective?",
+        "options": [
+          "Clear organization",
+          "A large number of members",
+          "A faculty supervisor",
+          "Meeting every single day"
+        ],
+        "correctIndex": 0,
+        "explanation": "The text explicitly states that 'to be truly effective, a study group requires clear organization.'",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "What additional skill does a well-managed study group help develop beyond academics?",
+        "options": [
+          "Programming and coding",
+          "Communication and teamwork",
+          "Financial management",
+          "Foreign language fluency"
+        ],
+        "correctIndex": 2,
+        "explanation": "The passage concludes by stating that a well-managed group fosters valuable communication and teamwork skills.",
+        "questionType": "Detail"
+      }
+    ]
+  },
+  "READING-11": {
+    "title": "Navigating the Modern Medical Consultation",
+    "description": "An advanced reading comprehension lesson exploring the dynamic between patients and physicians during routine clinical consultations.",
+    "level": "C1",
+    "passage": "The modern medical consultation is increasingly constrained by time, forcing both physicians and patients to distill complex physiological narratives into compressed clinical encounters. When a patient enters the examination room, they bring a constellation of subjective symptoms, anxieties, and lifestyle contexts. The clinician, conversely, is tasked with rapidly filtering this narrative through a diagnostic lens, filtering out extraneous details while zeroing in on pathognomonic indicators. This tension between the patient's holistic experience of illness and the biomedical reductionism required for efficient diagnosis often creates a communicative chasm. Effective consultations rely heavily on shared decision-making, where the physician balances authoritative medical expertise with the patient's personal values and preferences. Furthermore, the integration of electronic health records into the consultation room has fundamentally altered the interpersonal dynamic, occasionally diverting the clinician's gaze from the patient to the screen. Consequently, modern patients must act as effective advocates for their own health, organizing their symptoms coherently and preparing targeted questions prior to their appointment to maximize the efficacy of these fleeting clinical interactions.",
+    "questions": [
+      {
+        "prompt": "What is described as the primary constraint in the modern medical consultation?",
+        "options": [
+          "Outdated medical technology",
+          "Insufficient medical training",
+          "Patient non-compliance",
+          "Limited time"
+        ],
+        "correctIndex": 3,
+        "explanation": "The passage explicitly states that the modern medical consultation is 'increasingly constrained by time, forcing both physicians and patients to distill complex physiological narratives into compressed clinical encounters.'",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "According to the text, what tension often exists during a clinical encounter?",
+        "options": [
+          "Between hospital administrators and practicing physicians",
+          "Between preventive care and acute treatment",
+          "Between electronic health records and physical charts",
+          "Between the patient's holistic illness experience and biomedical reductionism"
+        ],
+        "correctIndex": 3,
+        "explanation": "The text highlights the 'tension between the patient's holistic experience of illness and the biomedical reductionism required for efficient diagnosis.'",
+        "questionType": "Inference"
+      },
+      {
+        "prompt": "What does the word 'pathognomonic' most likely mean in the context of the passage?",
+        "options": [
+          "Irrelevant or misleading",
+          "Characteristically indicative of a disease",
+          "Subjectively painful",
+          "Chronically recurring"
+        ],
+        "correctIndex": 1,
+        "explanation": "In medical terminology, pathognomonic refers to signs or symptoms that are specifically characteristic or indicative of a particular disease or condition, matching the clinician's search for diagnostic indicators.",
+        "questionType": "Vocabulary"
+      },
+      {
+        "prompt": "How has the integration of electronic health records affected the consultation room?",
+        "options": [
+          "It has improved the patient's holistic storytelling ability.",
+          "It has accelerated the diagnostic process without any drawbacks.",
+          "It has occasionally diverted the clinician's attention away from the patient.",
+          "It has completely eliminated face-to-face communication."
+        ],
+        "correctIndex": 0,
+        "explanation": "The passage notes that electronic health records have 'occasionally diverting the clinician's gaze from the patient to the screen,' altering the interpersonal dynamic.",
+        "questionType": "Detail"
+      },
+      {
+        "prompt": "What is suggested as a necessary action for modern patients?",
+        "options": [
+          "Acting as effective advocates by organizing symptoms and questions beforehand",
+          "Learning to interpret their own electronic health records",
+          "Demanding longer appointment times from their physicians",
+          "Rejecting biomedical reductionism in favor of holistic care"
+        ],
+        "correctIndex": 0,
+        "explanation": "The conclusion advises that 'modern patients must act as effective advocates for their own health, organizing their symptoms coherently and preparing targeted questions prior to their appointment.'",
+        "questionType": "Main Idea"
+      }
+    ]
+  },
+  "READING-12": {
+    "title": "Navigating the Agile Stand-up",
+    "description": "An advanced reading lesson focusing on the dynamics and optimization of software team daily stand-up meetings.",
+    "level": "C1",
+    "passage": "The daily stand-up is a cornerstone of Agile software development, ostensibly designed to foster alignment, transparency, and rapid impediment removal among cross-functional team members. However, as organizations scale, these fifteen-minute synchronization rituals frequently morph into protracted status updates directed solely at the project manager or technical lead. This anti-pattern not only erodes team autonomy but also induces meeting fatigue, ultimately defeating the core philosophy of Agile methodologies. To reclaim the efficacy of the stand-up, teams must pivot from a reporting mindset to a tactical problem-solving paradigm. Participants should focus exclusively on commitments made toward the sprint goal rather than reciting exhaustive chronological logs of yesterday's activities. Furthermore, when blockers are identified, the discussion must avoid spiraling into deep architectural debates; instead, a subset of the team should spin off into a separate breakout session. By strictly timeboxing the meeting and encouraging peer-to-peer accountability, engineering squads can transform the stand-up from an obligatory administrative chore into a high-value synchronization mechanism that genuinely accelerates software delivery.",
+    "questions": [
+      {
+        "prompt": "What is the primary intended purpose of the daily stand-up in Agile development?",
+        "options": [
+          "To conduct deep architectural debates on complex codebases",
+          "To provide detailed status reports exclusively to the project manager",
+          "To foster alignment, transparency, and rapid impediment removal",
+          "To evaluate individual employee performance over the sprint"
+        ],
+        "correctIndex": 2,
+        "explanation": "The passage explicitly states that the stand-up is ostensibly designed to foster alignment, transparency, and rapid impediment removal among cross-functional team members.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "According to the text, what common anti-pattern occurs as organizations scale?",
+        "options": [
+          "Teams completely abandon Agile methodologies",
+          "Engineers refuse to participate in breakout sessions",
+          "Stand-ups turn into protracted status updates directed at leadership",
+          "Daily meetings exceed the standard fifteen-minute limit by hours"
+        ],
+        "correctIndex": 2,
+        "explanation": "The text notes that as organizations scale, these rituals frequently morph into protracted status updates directed solely at the project manager or technical lead.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "What does the author suggest participants should focus on instead of reciting chronological logs?",
+        "options": [
+          "Future product roadmaps and long-term business strategies",
+          "Exhaustive lists of bugs found during testing phases",
+          "Personal grievances regarding workflow inefficiencies",
+          "Commitments made toward the current sprint goal"
+        ],
+        "correctIndex": 3,
+        "explanation": "The passage states that participants should focus exclusively on commitments made toward the sprint goal rather than reciting exhaustive chronological logs.",
+        "questionType": "detail"
+      },
+      {
+        "prompt": "How should a team handle blockers that threaten to cause deep architectural debates during the meeting?",
+        "options": [
+          "Postpone addressing them until the next sprint planning session",
+          "Spin off a subset of the team into a separate breakout session",
+          "Allow the entire team to debate the architecture until a consensus is reached",
+          "Delegate the final decision entirely to the project manager"
+        ],
+        "correctIndex": 1,
+        "explanation": "The text advises that when blockers are identified, instead of deep architectural debates, a subset of the team should spin off into a separate breakout session.",
+        "questionType": "inference"
+      },
+      {
+        "prompt": "What is the overall tone and objective of the passage regarding the software stand-up?",
+        "options": [
+          "A dismissal of Agile practices as entirely useless in modern workplaces",
+          "A critical analysis of common pitfalls with recommendations for optimization",
+          "A historical retrospective on how software engineering meetings have evolved",
+          "A promotional overview of project management software benefits"
+        ],
+        "correctIndex": 1,
+        "explanation": "The author critiques how stand-ups often fail ('anti-pattern', 'meeting fatigue') and offers actionable advice on how to reclaim their efficacy, fitting a critical analysis with optimization recommendations.",
+        "questionType": "main_idea"
+      }
+    ]
+  },
+  "WRITING-1": {
+    "taskType": "SHORT_MESSAGE",
+    "prompt": "Write a short message to the tour agency to book a city tour for tomorrow morning.",
+    "scenario": "Booking a city tour",
+    "recipient": "Tour Agency",
+    "context": "You are on holiday and want to see the city with a guide.",
+    "wordRange": [
+      30,
+      50
+    ]
+  },
+  "WRITING-2": {
+    "taskType": "SHORT_MESSAGE",
+    "prompt": "Write a short message to the university library. Ask if you can borrow two books for an extra week. Give your name and student ID.",
+    "scenario": "You have exams coming up and need to keep your library books longer.",
+    "recipient": "University Library Staff",
+    "context": "You need more time to read your library books.",
+    "wordRange": [
+      30,
+      50
+    ]
+  },
+  "WRITING-3": {
+    "taskType": "SHORT_MESSAGE",
+    "prompt": "Write a short message to your friend about what you are buying at the supermarket today.",
+    "scenario": "You are at the supermarket and texting a friend to see if they need anything.",
+    "wordRange": [
+      30,
+      50
+    ]
+  },
+  "WRITING-4": {
+    "taskType": "EMAIL",
+    "prompt": "Write an email to your IT support colleague to ask for help setting up your new work laptop.",
+    "scenario": "Setting up a new laptop at work",
+    "recipient": "IT Support",
+    "context": "You received a new laptop today and need help with the initial setup and connecting to the office network.",
+    "wordRange": [
+      50,
+      80
+    ]
+  },
+  "WRITING-5": {
+    "taskType": "EMAIL",
+    "prompt": "Write a short welcome email to your new colleague, Alex. Say hello, offer to help them settle in, and invite them for coffee.",
+    "scenario": "Your team has a new member starting today and you want to make them feel welcome.",
+    "recipient": "Alex",
+    "context": "A new colleague named Alex has just joined your office team.",
+    "wordRange": [
+      50,
+      80
+    ]
+  },
+  "WRITING-6": {
+    "taskType": "EMAIL",
+    "prompt": "Write an email to a customer who asked for help choosing a new phone. Recommend one phone and give two reasons why it is good for them.",
+    "scenario": "A customer sent a message asking for a smartphone recommendation for taking pictures and listening to music.",
+    "wordRange": [
+      50,
+      80
+    ]
+  },
+  "WRITING-7": {
+    "taskType": "EMAIL",
+    "prompt": "Write an email to a local restaurant to order food for a small party of four people. Include the dishes you want, the time you would like to pick up the order, and ask about any vegetarian options available.",
+    "scenario": "Ordering take-out food in advance for a group.",
+    "recipient": "Restaurant Manager",
+    "context": "You are planning a casual dinner at home with friends and want to pre-order food from your favorite local restaurant.",
+    "wordRange": [
+      100,
+      130
+    ]
+  },
+  "WRITING-8": {
+    "taskType": "EMAIL",
+    "prompt": "Write an email to a classmate to ask about joining their study group for the upcoming exams.",
+    "scenario": "You heard that your classmate organizes a weekly study group and you want to know if you can join them.",
+    "recipient": "Classmate",
+    "wordRange": [
+      100,
+      130
+    ]
+  },
+  "WRITING-9": {
+    "taskType": "OPINION",
+    "prompt": "Do you think it is better to consult a doctor online or in person? Write an essay expressing your opinion and supporting it with reasons and examples.",
+    "scenario": "You are writing an opinion essay for your English class about modern healthcare methods.",
+    "recipient": "An English teacher",
+    "context": "Many healthcare services now offer online consultations instead of traditional face-to-face appointments.",
+    "wordRange": [
+      150,
+      180
+    ]
+  },
+  "WRITING-10": {
+    "taskType": "OPINION",
+    "prompt": "Write an opinion essay discussing whether daily software team stand-up meetings are productive or a waste of valuable development time.",
+    "scenario": "Your company is evaluating its agile practices and has asked developers to share their views on daily stand-ups.",
+    "recipient": "Team Lead",
+    "context": "Many technology companies use daily stand-up meetings to sync team members, but opinions vary on their overall effectiveness.",
+    "wordRange": [
+      150,
+      180
+    ]
+  },
+  "WRITING-11": {
+    "taskType": "PROPOSAL",
+    "prompt": "Write a proposal to the office manager outlining a new, cost-effective strategy for ordering office supplies. Analyze current inefficiencies, suggest a reliable vendor, and explain how this will benefit the company budget.",
+    "scenario": "You have been asked to review the current office supply procurement process and propose a streamlined solution to reduce costs.",
+    "recipient": "Office Manager",
+    "context": "Our current office supply expenses have exceeded the quarterly budget due to decentralized purchasing and lack of bulk ordering.",
+    "wordRange": [
+      200,
+      250
+    ]
+  },
+  "WRITING-12": {
+    "taskType": "PROPOSAL",
+    "prompt": "Write a proposal to the management team explaining the need to revise the current customer refund policy to improve client retention and align with modern industry standards.",
+    "scenario": "You are the Head of Customer Experience, and you need to convince the board to approve a more flexible and transparent refund framework.",
+    "recipient": "Management Team",
+    "context": "Our company has seen an increase in customer complaints regarding our strict and ambiguous refund policy, which is negatively impacting our reputation and driving clients to competitors.",
+    "wordRange": [
+      200,
+      250
+    ]
+  },
+  "SPEAKING-1": {
+    "practiceSet": {
+      "title": "Explaining a Refund Policy",
+      "description": "Practice reading aloud key phrases related to customer service and refund policies at the A1 level.",
+      "category": "BUSINESS",
+      "level": "A1"
+    },
+    "exercises": [
+      {
+        "title": "Refund Policy 1",
+        "targetText": "You can return items within fourteen days.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Refund Policy 2",
+        "targetText": "Please bring your original receipt.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Refund Policy 3",
+        "targetText": "Items must be in their original condition.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Refund Policy 4",
+        "targetText": "We offer a full refund or exchange.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Refund Policy 5",
+        "targetText": "Gift cards cannot be refunded for cash.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      }
+    ]
+  },
+  "SPEAKING-2": {
+    "practiceSet": {
+      "title": "Booking a City Tour Practice",
+      "description": "Basic speaking exercises focused on booking a city tour at an A1 level.",
+      "category": "GENERAL",
+      "level": "A1"
+    },
+    "exercises": [
+      {
+        "title": "Tour Booking Question 1",
+        "targetText": "What time does the city tour start?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Tour Booking Question 2",
+        "targetText": "How much does a ticket cost?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Tour Booking Question 3",
+        "targetText": "Can I book a tour for tomorrow?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Tour Booking Question 4",
+        "targetText": "Does the tour include hotel pickup?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Tour Booking Question 5",
+        "targetText": "Where do we meet the tour guide?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      }
+    ]
+  },
+  "SPEAKING-3": {
+    "practiceSet": {
+      "title": "Borrowing Books from the University Library",
+      "description": "A practice set focused on borrowing books and using library services at the university.",
+      "category": "GENERAL",
+      "level": "A1"
+    },
+    "exercises": [
+      {
+        "title": "Exercise 1: Library Hours",
+        "targetText": "Please read aloud: The university library is open from Monday to Friday from eight in the morning until ten at night.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Exercise 2: Student ID",
+        "targetText": "Please read aloud: You must show your student ID card every time you want to borrow a book from the front desk.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Exercise 3: Loan Period",
+        "targetText": "Please read aloud: Students can keep standard textbooks for a maximum of three weeks before returning them.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Exercise 4: Finding Books",
+        "targetText": "Please read aloud: Use the computer search station near the entrance to find the exact shelf location of your book.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Exercise 5: Returning Books",
+        "targetText": "Please read aloud: Drop your finished books into the return box outside the main doors if the library is closed.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      }
+    ]
+  },
+  "SPEAKING-4": {
+    "practiceSet": {
+      "title": "Shopping at the Supermarket Practice Set",
+      "description": "Practice your speaking skills with common questions related to shopping at the supermarket.",
+      "category": "GENERAL",
+      "level": "A2"
+    },
+    "exercises": [
+      {
+        "title": "Supermarket Exercise 1",
+        "targetText": "What is your favorite section of the supermarket and why?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Supermarket Exercise 2",
+        "targetText": "How often do you go grocery shopping?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Supermarket Exercise 3",
+        "targetText": "Do you prefer using a shopping cart or a basket? Explain your choice.",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Supermarket Exercise 4",
+        "targetText": "How do you usually pay for your groceries at the checkout?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Supermarket Exercise 5",
+        "targetText": "What do you do if you cannot find an item you are looking for in the store?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      }
+    ]
+  },
+  "SPEAKING-5": {
+    "practiceSet": {
+      "title": "Setting Up a New Laptop at Work",
+      "description": "Practice essential spoken phrases and instructions for configuring a new workstation laptop in a business environment.",
+      "category": "BUSINESS",
+      "level": "A2"
+    },
+    "exercises": [
+      {
+        "title": "Welcome Screen and Login",
+        "targetText": "Please turn on your new laptop and enter your corporate credentials to access the main system.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Connecting to Office Wi-Fi",
+        "targetText": "Select the secure company wireless network from the list and type in your network password.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Installing Required Software",
+        "targetText": "Open the company software center and install the approved messaging and email applications.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Setting Up Email Sync",
+        "targetText": "Configure your corporate email client to sync your calendar and contacts automatically.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      },
+      {
+        "title": "Finalizing Security Updates",
+        "targetText": "Ensure that the antivirus software is running and restart the device to apply all security patches.",
+        "difficulty": "BEGINNER",
+        "taskType": "READ_ALOUD"
+      }
+    ]
+  },
+  "SPEAKING-6": {
+    "practiceSet": {
+      "title": "Welcoming a New Colleague",
+      "description": "Practice essential speaking skills for greeting and welcoming a new team member in a business environment.",
+      "category": "BUSINESS",
+      "level": "A2"
+    },
+    "exercises": [
+      {
+        "title": "Greeting the Newcomer",
+        "targetText": "Hello and welcome to the team! How was your first morning with us?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Offering Assistance",
+        "targetText": "Let me know if you need help finding your way around the office or setting up your computer.",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Introducing the Team",
+        "targetText": "Would you like me to introduce you to the rest of the department during our lunch break?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Explaining Daily Routine",
+        "targetText": "Usually, we have a quick team sync every morning at nine o'clock. Do you have any questions about our schedule?",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Checking Comfort Level",
+        "targetText": "Is everything clear with your onboarding tasks so far, or is there anything you would like to review again?",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "RESPOND_TO_QUESTION"
+      }
+    ]
+  },
+  "SPEAKING-7": {
+    "practiceSet": {
+      "title": "Helping a Customer Choose a Product",
+      "description": "Practice professional speaking skills for assisting customers in selecting the right product for their needs.",
+      "category": "BUSINESS",
+      "level": "B1"
+    },
+    "exercises": [
+      {
+        "title": "Customer Inquiry on Features",
+        "targetText": "How can I help you choose the best model for your specific business requirements today?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Explaining Product Benefits",
+        "targetText": "Could you tell me a bit more about your budget so I can recommend the most suitable options?",
+        "difficulty": "BEGINNER",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Comparing Two Options",
+        "targetText": "What are the main differences between the standard version and the premium version of this software?",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Addressing Customer Hesitation",
+        "targetText": "Why might a small business owner prefer this product over the competitor's alternative?",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Closing the Recommendation",
+        "targetText": "How would you summarize the key advantages of this product to finalize the customer's decision?",
+        "difficulty": "ADVANCED",
+        "taskType": "RESPOND_TO_QUESTION"
+      }
+    ]
+  },
+  "SPEAKING-8": {
+    "practiceSet": {
+      "title": "Ordering Food at a Restaurant Practice",
+      "description": "Practice expressing your opinions and preferences when ordering food at a restaurant.",
+      "category": "GENERAL",
+      "level": "B1"
+    },
+    "exercises": [
+      {
+        "title": "Favorite Cuisine",
+        "targetText": "Express your opinion on whether spicy food is better than mild food when dining out.",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Restaurant Atmosphere",
+        "targetText": "Discuss why a quiet atmosphere is more important than fast service in a restaurant.",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Tipping Policy",
+        "targetText": "Explain your viewpoint on whether tipping should be included automatically in the restaurant bill.",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Healthy Options",
+        "targetText": "Share your thoughts on whether restaurants should be required to display calorie counts on their menus.",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Dining Alone",
+        "targetText": "Express your opinion about eating alone at a sit-down restaurant compared to eating with a group.",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "EXPRESS_OPINION"
+      }
+    ]
+  },
+  "SPEAKING-9": {
+    "practiceSet": {
+      "title": "Joining a Study Group",
+      "description": "Practice answering questions about participating in and collaborating with academic study groups.",
+      "category": "GENERAL",
+      "level": "B2"
+    },
+    "exercises": [
+      {
+        "title": "Study Group Benefits",
+        "targetText": "Why do you think joining a study group is beneficial for university students?",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Scheduling Conflicts",
+        "targetText": "How would you handle a situation where members of your study group cannot agree on a meeting time?",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Remote vs In-Person",
+        "targetText": "Do you prefer online study groups or in-person meetings, and what are the main reasons for your preference?",
+        "difficulty": "ADVANCED",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Dividing the Workload",
+        "targetText": "What is the best strategy for dividing research tasks and assignments fairly among group members?",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Dealing with Inactive Members",
+        "targetText": "What steps would you take if a member of your study group was not contributing their share of the work?",
+        "difficulty": "ADVANCED",
+        "taskType": "RESPOND_TO_QUESTION"
+      }
+    ]
+  },
+  "SPEAKING-10": {
+    "practiceSet": {
+      "title": "A Visit to the Doctor",
+      "description": "Practice expressing opinions and discussing experiences related to visiting a doctor and managing healthcare.",
+      "category": "GENERAL",
+      "level": "B2"
+    },
+    "exercises": [
+      {
+        "title": "Opinion on Preventive Care",
+        "targetText": "Discuss whether you think annual health check-ups are truly necessary for healthy adults.",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Waiting Times at Clinics",
+        "targetText": "Express your opinion on how public healthcare systems handle long waiting times for appointments.",
+        "difficulty": "ADVANCED",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Alternative Medicine",
+        "targetText": "Share your thoughts on integrating traditional herbal remedies with modern medical treatments.",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Doctor-Patient Communication",
+        "targetText": "Do you believe patients should research their symptoms online before visiting a physician? Explain why.",
+        "difficulty": "INTERMEDIATE",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Telemedicine vs In-Person",
+        "targetText": "Give your opinion on whether virtual doctor consultations can ever fully replace traditional in-person visits.",
+        "difficulty": "ADVANCED",
+        "taskType": "EXPRESS_OPINION"
+      }
+    ]
+  },
+  "SPEAKING-11": {
+    "practiceSet": {
+      "title": "Software Team Stand-Up Meeting Practice",
+      "description": "Advanced speaking exercises focusing on professional communication during software development stand-up meetings.",
+      "category": "BUSINESS",
+      "level": "C1"
+    },
+    "exercises": [
+      {
+        "title": "Blockers Discussion",
+        "targetText": "How would you articulate a critical blocking issue regarding the database migration during a daily stand-up?",
+        "difficulty": "ADVANCED",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Sprint Progress Update",
+        "targetText": "Explain yesterday's progress on the authentication microservice and outline today's primary objectives.",
+        "difficulty": "ADVANCED",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Cross-Team Dependency",
+        "targetText": "What approach would you suggest when an API dependency from the frontend team delays your backend delivery?",
+        "difficulty": "ADVANCED",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Velocity and Capacity",
+        "targetText": "Discuss how you plan to handle the reduced team capacity for the upcoming sprint due to scheduled PTO.",
+        "difficulty": "ADVANCED",
+        "taskType": "RESPOND_TO_QUESTION"
+      },
+      {
+        "title": "Technical Debt Prioritization",
+        "targetText": "How do you propose we allocate time during this sprint to address escalating technical debt in our CI/CD pipeline?",
+        "difficulty": "ADVANCED",
+        "taskType": "RESPOND_TO_QUESTION"
+      }
+    ]
+  },
+  "SPEAKING-12": {
+    "practiceSet": {
+      "title": "Advanced Business Office Supply Ordering",
+      "description": "Practice expressing opinions and discussing strategies for managing and ordering office supplies in a corporate environment.",
+      "category": "BUSINESS",
+      "level": "C1"
+    },
+    "exercises": [
+      {
+        "title": "Expressing Opinion on Supply Budgets",
+        "targetText": "In your opinion, what is the most effective way to balance department budgets while ensuring employees have all necessary office supplies?",
+        "difficulty": "ADVANCED",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Centralized vs Decentralized Ordering",
+        "targetText": "Do you believe that centralized procurement systems for office supplies improve efficiency, or do they create unnecessary bureaucratic delays?",
+        "difficulty": "ADVANCED",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Sustainability in Procurement",
+        "targetText": "How important is it for companies to prioritize eco-friendly and sustainable office supplies, even if they come at a higher cost?",
+        "difficulty": "ADVANCED",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Managing Inventory Overstock",
+        "targetText": "Discuss your perspective on how organizations can prevent overstocking and waste when ordering high-volume administrative consumables.",
+        "difficulty": "ADVANCED",
+        "taskType": "EXPRESS_OPINION"
+      },
+      {
+        "title": "Vendor Management Strategy",
+        "targetText": "To what extent should companies rely on a single preferred vendor for all office supplies versus diversifying their supplier base?",
+        "difficulty": "ADVANCED",
+        "taskType": "EXPRESS_OPINION"
+      }
+    ]
+  }
+}
