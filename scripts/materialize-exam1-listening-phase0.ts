@@ -27,6 +27,7 @@
  *   npx ts-node scripts/materialize-exam1-listening-phase0.ts            # exam set 1
  *   npx ts-node scripts/materialize-exam1-listening-phase0.ts --exam=1
  *   npx ts-node scripts/materialize-exam1-listening-phase0.ts --dry-run
+ *   npx ts-node scripts/materialize-exam1-listening-phase0.ts --key-suffix=v2
  */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
@@ -42,6 +43,14 @@ const examArg = process.argv.find((value) => value.startsWith('--exam='));
 const examSetId = examArg ? Number(examArg.split('=')[1]) : 1;
 const dryRun = process.argv.includes('--dry-run');
 const reuseExisting = process.argv.includes('--reuse-existing');
+// A new suffix (e.g. --key-suffix=v2 after a content rewrite) writes new
+// objects instead of overwriting long-cached ones; the default is unchanged.
+const suffixArg = process.argv.find((value) =>
+  value.startsWith('--key-suffix='),
+);
+const keySuffix = suffixArg ? suffixArg.split('=')[1] : 'phase0';
+if (!/^[a-z0-9-]+$/.test(keySuffix))
+  throw new Error('--key-suffix must be lowercase letters, digits or dashes');
 
 type Report = {
   groupId: number;
@@ -82,7 +91,7 @@ async function main() {
                 [
                   group.id,
                   await r2.objectExists(
-                    `toeic/exams/${examSetId}/groups/${group.id}-phase0.mp3`,
+                    `toeic/exams/${examSetId}/groups/${group.id}-${keySuffix}.mp3`,
                   ),
                 ] as const,
             ),
@@ -109,7 +118,7 @@ async function main() {
       const metadata = (group.mediaMetadata ?? {}) as {
         audio?: { sourceHash?: string };
       };
-      const key = `toeic/exams/${examSetId}/groups/${group.id}-phase0.mp3`;
+      const key = `toeic/exams/${examSetId}/groups/${group.id}-${keySuffix}.mp3`;
       if (group.audioUrl && metadata.audio?.sourceHash === sourceHash) {
         report.push({
           groupId: group.id,
