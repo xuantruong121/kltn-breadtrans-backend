@@ -118,3 +118,33 @@ describe('spokenTextChanged', () => {
     ).toBe(false);
   });
 });
+
+describe('mergeListeningContent with validated DTO segments', () => {
+  it('keeps the voice when the validated segment holds voiceKey: undefined', () => {
+    const merged = mergeListeningContent(
+      {
+        transcriptSegments: [
+          {
+            speaker: 'Mia',
+            text: 'Old.',
+            voiceKey: 'female-01',
+            speakerId: 'mia',
+          },
+        ],
+      },
+      {
+        transcriptSegments: [
+          {
+            speaker: 'Mia',
+            text: 'New.',
+            voiceKey: undefined,
+            speakerId: undefined,
+          },
+        ],
+      },
+    );
+    expect(merged.transcriptSegments).toEqual([
+      { speaker: 'Mia', text: 'New.', voiceKey: 'female-01', speakerId: 'mia' },
+    ]);
+  });
+});

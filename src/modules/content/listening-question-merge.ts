@@ -48,7 +48,12 @@ export function mergeListeningContent(existing: unknown, incoming: Json): Json {
           'pauseMs',
         ].flatMap((k) => (same[k] !== undefined ? [[k, same[k]]] : [])),
       );
-      return { ...carried, ...segment };
+      // A validated DTO instance holds undeclared fields as undefined; they
+      // must not erase what is carried.
+      const given = Object.fromEntries(
+        Object.entries(segment).filter(([, v]) => v !== undefined),
+      );
+      return { ...carried, ...given };
     });
   }
   return merged;
