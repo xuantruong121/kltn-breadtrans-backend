@@ -281,7 +281,7 @@ describe('GateService', () => {
     const { service } = setup();
     const gate = await service.start(7, 'LISTENING');
     await expect(service.submit(8, gate.attemptId, {})).rejects.toThrow(
-      'Không tìm thấy bài mở khoá',
+      'Không tìm thấy bài mở khóa',
     );
   });
 

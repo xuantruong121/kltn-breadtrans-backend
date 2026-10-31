@@ -281,6 +281,18 @@ async function main() {
         viewport: { width: 1440, height: 860 },
       });
       await login(proPage, a);
+      // A plan does not open a level (F7.3): PRO enters only at that level.
+      await prisma.learnerSkillLevel.upsert({
+        where: { userId_skill: { userId: a.userId, skill: 'LISTENING' } },
+        create: {
+          userId: a.userId,
+          skill: 'LISTENING',
+          level: 'ADVANCED',
+          unlockedLevel: 'ADVANCED',
+          ability: 2.35,
+        },
+        update: { level: 'ADVANCED', unlockedLevel: 'ADVANCED' },
+      });
       await proPage.goto(`${FE}/listening/${premium.id}`, {
         waitUntil: 'networkidle',
       });
@@ -288,7 +300,7 @@ async function main() {
       const proDetail = (await proPage.locator('body').innerText()).trim();
       const proEntered =
         new URL(proPage.url()).pathname === `/listening/${premium.id}` &&
-        !/nâng cấp để|cần nâng cấp/i.test(proDetail);
+        !/nâng cấp để|cần nâng cấp|chưa mở mức/i.test(proDetail);
       await proPage.close();
 
       entitlement = {

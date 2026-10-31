@@ -191,7 +191,7 @@ export class QuizController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('gate-attempts/:attemptId/questions/:questionId/audio')
-  @ApiOperation({ summary: 'Phát audio một câu của bài mở khoá đang làm' })
+  @ApiOperation({ summary: 'Phát audio một câu của bài mở khóa đang làm' })
   @ApiResponse({ status: 404, description: 'Câu không thuộc lần làm này' })
   async streamGateQuestionAudio(
     @Param('attemptId', ParseIntPipe) attemptId: number,

@@ -66,9 +66,9 @@ export class LearningPathController {
   @Get('gates/:skill')
   @ApiOperation({
     summary:
-      'Bài mở khoá mức kế tiếp của một kỹ năng: có hay không, chờ tới khi nào',
+      'Bài mở khóa mức kế tiếp của một kỹ năng: có hay không, chờ tới khi nào',
   })
-  @ApiResponse({ status: 200, description: 'Trạng thái bài mở khoá' })
+  @ApiResponse({ status: 200, description: 'Trạng thái bài mở khóa' })
   gateStatus(
     @Request() req: { user: { id: number } },
     @Param('skill', new ParseEnumPipe(PracticeSkill)) skill: PracticeSkill,
@@ -78,12 +78,12 @@ export class LearningPathController {
 
   @Post('gates/:skill/start')
   @ApiOperation({
-    summary: 'Bắt đầu bài mở khoá, hoặc mở lại lần đang làm dở',
+    summary: 'Bắt đầu bài mở khóa, hoặc mở lại lần đang làm dở',
   })
   @ApiResponse({ status: 201, description: 'Câu hỏi, không kèm đáp án' })
   @ApiResponse({
     status: 409,
-    description: 'Không có bài mở khoá, hoặc chưa hết thời gian chờ',
+    description: 'Không có bài mở khóa, hoặc chưa hết thời gian chờ',
   })
   startGate(
     @Request() req: { user: { id: number } },
@@ -94,7 +94,7 @@ export class LearningPathController {
 
   @Post('gates/attempts/:id/submit')
   @ApiOperation({
-    summary: 'Nộp bài mở khoá; đạt thì mở mức. Nộp lại trả kết quả cũ',
+    summary: 'Nộp bài mở khóa; đạt thì mở mức. Nộp lại trả kết quả cũ',
   })
   @ApiResponse({
     status: 201,
@@ -113,7 +113,7 @@ export class LearningPathController {
   @ApiOperation({ summary: 'Lộ trình cho người mất gốc và bước đang tới' })
   @ApiResponse({
     status: 200,
-    description: 'Các bước, đã xong hay chưa, bước nào còn khoá',
+    description: 'Các bước, đã xong hay chưa, bước nào còn khóa',
   })
   starterRoadmap(@Request() req: { user: { id: number } }) {
     return this.roadmap.forUser(req.user.id);

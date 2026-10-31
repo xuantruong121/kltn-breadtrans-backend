@@ -132,12 +132,12 @@ export class GateService {
     const status = await this.status(userId, skill);
     if (!status.available || !status.targetLevel || !isGateSkill(skill))
       throw new ConflictException({
-        message: 'Kỹ năng này chưa có bài mở khoá.',
+        message: 'Kỹ năng này chưa có bài mở khóa.',
         error: { code: 'GATE_UNAVAILABLE', reason: status.reason },
       });
     if (status.retryAt && !status.openAttemptId)
       throw new ConflictException({
-        message: 'Bạn cần chờ tới lượt làm lại bài mở khoá.',
+        message: 'Bạn cần chờ tới lượt làm lại bài mở khóa.',
         error: { code: 'GATE_COOLDOWN', retryAt: status.retryAt },
       });
     const targetLevel = status.targetLevel;
@@ -194,7 +194,7 @@ export class GateService {
       where: { id: attemptId },
     });
     if (!attempt || attempt.userId !== userId || !isGateSkill(attempt.skill))
-      throw new NotFoundException('Không tìm thấy bài mở khoá');
+      throw new NotFoundException('Không tìm thấy bài mở khóa');
     const { skill, level } = attempt;
     const questions = await this.servedQuestions(attempt.questionIds);
     if (attempt.submittedAt) {

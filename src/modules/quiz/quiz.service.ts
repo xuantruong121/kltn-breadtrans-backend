@@ -2709,7 +2709,7 @@ export class QuizService {
       attempt.submittedAt ||
       !(attempt.questionIds as number[]).includes(questionId)
     )
-      throw new NotFoundException('Câu hỏi không thuộc bài mở khoá này');
+      throw new NotFoundException('Câu hỏi không thuộc bài mở khóa này');
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: {
