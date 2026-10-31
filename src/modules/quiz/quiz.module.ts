@@ -8,6 +8,7 @@ import { ListeningAudioAuthoringService } from './listening-audio-authoring.serv
 import { PrismaModule } from '../../prisma/prisma.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { QuizContentAccessService } from './quiz-content-access.service';
+import { LearnerProgressModule } from '../learning-path/learner-progress.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { QuizContentAccessService } from './quiz-content-access.service';
     UploadModule,
     PrismaModule,
     SubscriptionModule,
+    LearnerProgressModule,
   ],
   providers: [
     QuizService,

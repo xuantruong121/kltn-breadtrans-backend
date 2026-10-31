@@ -1229,6 +1229,8 @@ export class QuizService {
         isPremiumContent: accessByQuiz.get(quiz.id)?.isPremiumContent ?? false,
         isLocked: accessByQuiz.get(quiz.id)?.isLocked ?? false,
         requiredPlan: accessByQuiz.get(quiz.id)?.requiredPlan ?? 'FREE',
+        isLevelLocked: accessByQuiz.get(quiz.id)?.isLevelLocked ?? false,
+        practiceLevel: accessByQuiz.get(quiz.id)?.practiceLevel ?? null,
         cefrLevel: accessByQuiz.get(quiz.id)?.cefrLevel ?? null,
       };
     };
@@ -2206,8 +2208,13 @@ export class QuizService {
     }
   }
 
-  async submitQuiz(quizId: number, userId: number, dto: SubmitQuizDto) {
-    const quiz = await this.getQuizById(quizId, true, userId);
+  async submitQuiz(
+    quizId: number,
+    userId: number,
+    dto: SubmitQuizDto,
+    role?: Role,
+  ) {
+    const quiz = await this.getQuizById(quizId, true, userId, role);
 
     // This endpoint grades only Listening and Reading practice, whose answers
     // are validated below (complete, each question once). TOEIC and Writing

@@ -490,7 +490,7 @@ export class QuizController {
     @Body() dto: SubmitQuizDto,
     @Request() req: any,
   ) {
-    return this.quizService.submitQuiz(quizId, req.user.id, dto);
+    return this.quizService.submitQuiz(quizId, req.user.id, dto, req.user.role);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -478,6 +478,8 @@ export class AdaptiveDailyPracticeService {
     const candidates: CandidateInput[] = [];
     for (const quiz of quizzes) {
       const access = accessByQuiz.get(quiz.id);
+      // Never suggest a level the learner has not opened.
+      if (access?.isLevelLocked) continue;
       const metadata = asRecord(quiz.bilingualContent);
       const duration = Number(metadata.durationMinutes);
       const estimatedMinutes =
@@ -543,6 +545,7 @@ export class AdaptiveDailyPracticeService {
     for (const exercise of speakingExercises) {
       if (!exercise.title.trim() || !exercise.targetText.trim()) continue;
       const access = speakingAccess.get(exercise.id);
+      if (access?.isLevelLocked) continue;
       candidates.push({
         skill: 'SPEAKING',
         exerciseId: exercise.id,

@@ -334,6 +334,8 @@ export class SpeakingService {
       isPremiumContent: boolean;
       isLocked: boolean;
       requiredPlan?: string;
+      isLevelLocked?: boolean;
+      practiceLevel?: string | null;
       cefrLevel?: string | null;
     },
   ) {
@@ -361,6 +363,8 @@ export class SpeakingService {
       stimulusId: exercise.stimulusId,
       isPremiumContent: access.isPremiumContent,
       isLocked: access.isLocked,
+      isLevelLocked: access.isLevelLocked ?? false,
+      practiceLevel: access.practiceLevel ?? null,
       requiredPlan: access.requiredPlan ?? 'FREE',
       cefrLevel: access.cefrLevel ?? null,
     };
