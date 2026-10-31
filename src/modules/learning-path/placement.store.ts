@@ -124,7 +124,7 @@ export async function applyDiagnosticPlacement(
  * above the choice still need a gate test or progress.
  */
 export async function applySelfLevel(
-  db: Db,
+  db: Db & Pick<PrismaClient, 'learnerProgressEvent'>,
   userId: number,
   level: PracticeLevel,
 ): Promise<void> {
@@ -133,6 +133,10 @@ export async function applySelfLevel(
       where: { userId_skill: { userId, skill } },
     });
     if (existing?.source === 'DIAGNOSTIC') continue;
+    // Ability earned from graded practice outranks a self-chosen starting point.
+    const practised = await db.learnerProgressEvent.count({
+      where: { userId, skill },
+    });
     await db.learnerSkillLevel.upsert({
       where: { userId_skill: { userId, skill } },
       create: {
@@ -146,7 +150,7 @@ export async function applySelfLevel(
       update: {
         level,
         unlockedLevel: maxLevel(existing?.unlockedLevel ?? level, level),
-        ability: ABILITY_SEED[level],
+        ...(practised ? {} : { ability: ABILITY_SEED[level] }),
         source: 'SELF',
       },
     });

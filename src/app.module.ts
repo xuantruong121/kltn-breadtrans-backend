@@ -27,6 +27,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { PaymentModule } from './modules/payment/payment.module';
 import { DiagnosticModule } from './modules/diagnostic/diagnostic.module';
 import { LearningPathModule } from './modules/learning-path/learning-path.module';
+import { LearnerProgressModule } from './modules/learning-path/learner-progress.module';
 import { SupportModule } from './modules/support/support.module';
 import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { RedisModule } from '@nestjs-modules/ioredis';
@@ -73,6 +74,7 @@ import { SuggestionModule } from './modules/suggestion/suggestion.module';
     PaymentModule,
     DiagnosticModule,
     LearningPathModule,
+    LearnerProgressModule,
     SupportModule,
     JobsModule,
     IssueReportModule,

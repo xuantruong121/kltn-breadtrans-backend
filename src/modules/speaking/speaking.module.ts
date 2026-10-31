@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LearnerProgressModule } from '../learning-path/learner-progress.module';
 import { SpeakingController } from './speaking.controller';
 import { SpeakingCatalogController } from './speaking-catalog.controller';
 import { SpeakingService } from './speaking.service';
@@ -11,7 +12,12 @@ import { SubscriptionModule } from '../subscription/subscription.module';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
 
 @Module({
-  imports: [SpeakingProcessingModule, EventsModule, SubscriptionModule],
+  imports: [
+    SpeakingProcessingModule,
+    EventsModule,
+    SubscriptionModule,
+    LearnerProgressModule,
+  ],
   controllers: [SpeakingCatalogController, SpeakingController],
   providers: [
     SpeakingService,

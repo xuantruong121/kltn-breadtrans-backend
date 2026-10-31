@@ -19,6 +19,11 @@ import {
 } from './recommendation.logic';
 import { PRACTICE_LEVEL_LABEL, PRACTICE_SKILLS } from './placement.logic';
 import { applySelfLevel } from './placement.store';
+import {
+  levelProgress,
+  nextLevel,
+  UNPLACED_UNLOCKED,
+} from './progression.logic';
 
 @Injectable()
 export class LearningPathService {
@@ -134,9 +139,18 @@ export class LearningPathService {
   /** The learner's profile and per-skill levels; defaults before onboarding. */
   async getProfile(userId: number) {
     await this.backfillPlacement(userId);
-    const [profile, levels] = await Promise.all([
+    const [profile, levels, events] = await Promise.all([
       this.prisma.learnerProfile.findUnique({ where: { userId } }),
       this.prisma.learnerSkillLevel.findMany({ where: { userId } }),
+      this.prisma.learnerProgressEvent.findMany({
+        where: { userId },
+        select: {
+          skill: true,
+          level: true,
+          contentId: true,
+          scorePercent: true,
+        },
+      }),
     ]);
     return {
       track: profile?.track ?? 'GENERAL',
@@ -149,11 +163,18 @@ export class LearningPathService {
       onboarded: Boolean(profile?.onboardedAt),
       skills: PRACTICE_SKILLS.map((skill) => {
         const row = levels.find((l) => l.skill === skill);
+        const unlockedLevel = row?.unlockedLevel ?? UNPLACED_UNLOCKED;
         return {
           skill,
           level: row?.level ?? null,
-          unlockedLevel: row?.unlockedLevel ?? null,
+          unlockedLevel,
           source: row?.source ?? 'NONE',
+          nextLevel: nextLevel(unlockedLevel),
+          progress: levelProgress(
+            events.filter(
+              (e) => e.skill === skill && e.level === unlockedLevel,
+            ),
+          ),
         };
       }),
     };

@@ -13,6 +13,7 @@ import { SpeakingPostProcessingService } from './speaking-post-processing.servic
 import { SpeakingQueueService } from './speaking-queue.service';
 import { SpeakingEventPublisherService } from './speaking-event-publisher.service';
 import { GamificationModule } from '../gamification/gamification.module';
+import { LearnerProgressModule } from '../learning-path/learner-progress.module';
 
 /**
  * Narrowly scoped processing module shared between API and standalone Worker.
@@ -28,6 +29,7 @@ import { GamificationModule } from '../gamification/gamification.module';
       url: process.env.REDIS_URL || 'redis://localhost:6379',
     }),
     GamificationModule,
+    LearnerProgressModule,
   ],
   providers: [
     UploadService,

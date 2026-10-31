@@ -289,6 +289,7 @@ export class WritingService {
         userId: input.userId,
         quizId: input.quizId,
         score,
+        scorePercent: score,
         xp: writingCompletionXp(score),
         quizType: input.quizType,
         submissionId: submission.id,

@@ -4,11 +4,22 @@ export function fakeDb() {
   const profiles = new Map<number, any>();
   const levels = new Map<string, any>();
   const unlocks = new Map<string, any>();
+  const progressEvents: Array<{ userId: number; skill: string }> = [];
   const key = (w: any) => `${w.userId_skill.userId}:${w.userId_skill.skill}`;
   return {
     profiles,
     levels,
     unlocks,
+    /** Graded attempts by skill: only applySelfLevel reads this. */
+    progressEvents,
+    learnerProgressEvent: {
+      count: ({ where }: any) =>
+        Promise.resolve(
+          progressEvents.filter(
+            (e) => e.userId === where.userId && e.skill === where.skill,
+          ).length,
+        ),
+    },
     learnerProfile: {
       findUnique: ({ where }: any) =>
         Promise.resolve(profiles.get(where.userId) ?? null),

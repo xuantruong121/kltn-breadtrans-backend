@@ -22,6 +22,7 @@ import {
   getSpeakingWorkerConfig,
 } from './speaking.constants';
 import { SpeakingQueueService } from './speaking-queue.service';
+import { LearnerProgressService } from '../learning-path/learner-progress.service';
 import { SpeakingEventPublisherService } from './speaking-event-publisher.service';
 import { SpeakingPostProcessingService } from './speaking-post-processing.service';
 
@@ -86,6 +87,7 @@ export class SpeakingWorkerService implements OnModuleInit {
     private readonly eventPublisher?: SpeakingEventPublisherService,
     @Optional()
     private readonly postProcessing?: SpeakingPostProcessingService,
+    @Optional() private readonly learnerProgress?: LearnerProgressService,
   ) {}
 
   /**
@@ -520,6 +522,14 @@ export class SpeakingWorkerService implements OnModuleInit {
         traceId,
       });
     }
+
+    // Every scored attempt counts toward level progress; never fails the job.
+    await this.learnerProgress?.recordSpeakingAttempt({
+      userId: submission.userId,
+      exerciseId: submission.exerciseId,
+      submissionId,
+      overallScore,
+    });
 
     // 6. Durable post-processing starts only after score persistence. Keep the
     // old event path for isolated legacy tests/consumers without a queue.

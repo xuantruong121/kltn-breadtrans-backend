@@ -248,6 +248,7 @@ model User {
   skillLevels                     LearnerSkillLevel[]
   levelUnlocks                    LevelUnlock[]
   gateAttempts                    GateAttempt[]
+  learnerProgressEvents           LearnerProgressEvent[]
   learningPlanItems               LearningPlanItem[]
 }
 
@@ -3029,6 +3030,27 @@ model LearnerSkillLevel {
   updatedAt     DateTime        @updatedAt
 
   @@id([userId, skill])
+}
+
+/// One graded practice attempt, counted once. Keeps ability updates idempotent
+/// and is what the path-progress unlock rule reads.
+model LearnerProgressEvent {
+  id           Int                 @id @default(autoincrement())
+  userId       Int
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill        PracticeSkill
+  /// Practice level of the item when it was attempted.
+  level        PracticeLevel
+  contentType  LearningContentType
+  /// Quiz id, or the speaking exercise id (each exercise counts on its own).
+  contentId    Int
+  /// The graded attempt, e.g. "quiz:12", "speaking:34".
+  sourceKey    String
+  scorePercent Int
+  createdAt    DateTime            @default(now())
+
+  @@unique([userId, sourceKey])
+  @@index([userId, skill, level])
 }
 
 /// Audit trail: one row per level opened for a skill.

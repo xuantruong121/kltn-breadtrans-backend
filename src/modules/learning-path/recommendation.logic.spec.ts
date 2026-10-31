@@ -151,12 +151,17 @@ describe('recommend', () => {
     expect(new Set(r.map((x) => x.candidate.skill)).size).toBe(2);
   });
 
-  it('an unplaced skill is practised as Cơ bản and never level-locked', () => {
-    const r = recommend([item('WRITING', 'ADVANCED')], learner(), {
+  it('an unplaced skill is practised as Cơ bản, with higher levels locked', () => {
+    const open = recommend([item('WRITING', 'BASIC')], learner(), {
       limit: 1,
       includeLocked: true,
     });
-    expect(r[0].status).toBe('OPEN');
+    expect(open[0].status).toBe('OPEN');
+    const locked = recommend([item('WRITING', 'INTERMEDIATE')], learner(), {
+      limit: 1,
+      includeLocked: true,
+    });
+    expect(locked[0].status).toBe('LOCKED_LEVEL');
   });
 
   it('fills the day up to the learner minutes, at least one item', () => {

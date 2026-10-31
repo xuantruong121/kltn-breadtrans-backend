@@ -11,6 +11,7 @@ function service() {
     );
   db.$transaction = (fn: (tx: unknown) => unknown) => fn(db);
   db.diagnosticAttempt = { findFirst: () => Promise.resolve(null) };
+  db.learnerProgressEvent.findMany = () => Promise.resolve([]);
   return {
     db,
     svc: new LearningPathService(db, {
@@ -31,6 +32,11 @@ describe('LearningPathService profile', () => {
       onboarded: false,
     });
     expect(p.skills.map((s) => s.level)).toEqual([null, null, null, null]);
+    expect(p.skills[0]).toMatchObject({
+      unlockedLevel: 'BASIC',
+      nextLevel: 'INTERMEDIATE',
+      progress: { done: 0, needed: 3, average: null },
+    });
   });
 
   it('saves onboarding answers and a self-chosen level', async () => {

@@ -24,6 +24,7 @@ import {
   isMissingStorageError,
 } from './speaking.constants';
 import { SpeakingQueueService } from './speaking-queue.service';
+import { LearnerProgressService } from '../learning-path/learner-progress.service';
 import { SpeakingPostProcessingService } from './speaking-post-processing.service';
 import { SpeakingEventPublisherService } from './speaking-event-publisher.service';
 
@@ -54,6 +55,7 @@ export class SpeakingProcessorService implements OnModuleDestroy {
     private readonly postProcessingService?: SpeakingPostProcessingService,
     @Optional()
     private readonly eventPublisher?: SpeakingEventPublisherService,
+    @Optional() private readonly learnerProgress?: LearnerProgressService,
   ) {
     if (this.eventPublisher) {
       this.pubRedis = this.eventPublisher.pubRedis;
@@ -544,6 +546,15 @@ export class SpeakingProcessorService implements OnModuleDestroy {
       traceId,
     });
     const scoreEventPublishMs = Date.now() - tEventPublishStart;
+
+    // Ability and level progress count every scored attempt, a 0 included,
+    // so this sits before the reward path. It never fails the job.
+    await this.learnerProgress?.recordSpeakingAttempt({
+      userId: existing.userId,
+      exerciseId: existing.exerciseId,
+      submissionId,
+      overallScore,
+    });
 
     // 8. Schedule post-processing after the score is durable. The legacy event
     // remains only for unit-test/legacy fallback when no durable queue is wired.

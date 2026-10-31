@@ -26,6 +26,7 @@ import type {
 } from '@prisma/client';
 
 import { fitScore, successProbability } from './ability.logic';
+import { UNPLACED_UNLOCKED } from './progression.logic';
 import {
   ABILITY_SEED,
   levelIndex,
@@ -100,9 +101,9 @@ export const contentKey = (c: { type: LearningContentType; id: number }) =>
 
 const DAY = 24 * 60 * 60 * 1000;
 const UNPLACED: SkillState = {
-  level: 'BASIC',
-  unlockedLevel: 'ADVANCED',
-  ability: ABILITY_SEED.BASIC,
+  level: UNPLACED_UNLOCKED,
+  unlockedLevel: UNPLACED_UNLOCKED,
+  ability: ABILITY_SEED[UNPLACED_UNLOCKED],
 };
 /** A skill is "weakest" only when clearly below the others. */
 const WEAKNESS_MARGIN = 0.2;

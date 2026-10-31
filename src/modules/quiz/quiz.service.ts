@@ -2463,6 +2463,9 @@ export class QuizService {
       userId,
       quizId,
       score: totalScore,
+      scorePercent: quiz.questions.length
+        ? Math.round((totalScore / quiz.questions.length) * 100)
+        : null,
       quizType: quiz.type,
       submissionId: submission.id,
       isFirstSubmission,
