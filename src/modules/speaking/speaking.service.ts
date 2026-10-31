@@ -222,11 +222,11 @@ export const DAILY_EXAM_SPEAKING_LIMIT = 33;
 
 /**
  * The British pass of scripts/speaking-reference-audio.ts covered exercises up
- * to 126 (<id>.en-gb.v1.mp3 beside the US clip), measured against storage on
- * 2026-10-31. Later clips have no twin, and a guessed URL is a 404 the player
- * cannot fall back from.
+ * to 186 (<id>.en-gb.v1.mp3 beside the US clip), measured against storage on
+ * 2026-10-31. Later clips and corrected .v2 clips have no twin, and a guessed
+ * URL is a 404 the player cannot fall back from.
  */
-const LAST_BRITISH_CLIP = 126;
+const LAST_BRITISH_CLIP = 186;
 
 export function britishReferenceUrl(audioUrl: string | null): string | null {
   const id = audioUrl?.match(/\/speaking\/reference\/(\d+)\.v1\.mp3$/)?.[1];
