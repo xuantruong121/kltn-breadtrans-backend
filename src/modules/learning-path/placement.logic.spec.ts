@@ -18,7 +18,7 @@ describe('placement logic', () => {
     expect(levelFromScore(100)).toBe('ADVANCED');
   });
 
-  it('places every skill and takes the median overall', () => {
+  it('places every skill and rounds the mean level for the overall', () => {
     const p = placeFromScores({
       LISTENING: 80,
       READING: 60,
@@ -31,16 +31,36 @@ describe('placement logic', () => {
       SPEAKING: 'BASIC',
       WRITING: 'STARTER',
     });
-    // Even count: the lower median, so the learner is not over-placed.
-    expect(p.overall).toBe('BASIC');
+    // Mean 1.5 rounds up.
+    expect(p.overall).toBe('INTERMEDIATE');
     expect(p.partial).toBe(false);
+  });
+
+  it('does not let two weak skills pull a 4-skill profile to their level', () => {
+    const p = placeFromScores({
+      LISTENING: 80,
+      READING: 70,
+      SPEAKING: 41.3,
+      WRITING: 50,
+    });
+    expect(p.overall).toBe('INTERMEDIATE');
+  });
+
+  it('keeps an even profile at its level', () => {
+    const p = placeFromScores({
+      LISTENING: 40,
+      READING: 40,
+      SPEAKING: 40,
+      WRITING: 40,
+    });
+    expect(p.overall).toBe('BASIC');
   });
 
   it('places only completed skills and flags a partial result', () => {
     const p = placeFromScores({ LISTENING: 70, READING: 50, SPEAKING: null });
     expect(p.skills.SPEAKING).toBeNull();
     expect(p.skills.WRITING).toBeNull();
-    expect(p.overall).toBe('BASIC');
+    expect(p.overall).toBe('INTERMEDIATE');
     expect(p.partial).toBe(true);
   });
 

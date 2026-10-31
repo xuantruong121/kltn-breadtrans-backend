@@ -82,6 +82,13 @@ export type Placement = {
   partial: boolean;
 };
 
+/** Rounded mean of the skill levels, as Aptis and CELPIP report an overall. */
+function overallLevel(levels: PracticeLevel[]): PracticeLevel | null {
+  if (!levels.length) return null;
+  const total = levels.reduce((sum, level) => sum + levelIndex(level), 0);
+  return PRACTICE_LEVELS[Math.round(total / levels.length)];
+}
+
 export function placeFromScores(scores: SkillScores): Placement {
   const skills = Object.fromEntries(
     PRACTICE_SKILLS.map((skill) => {
@@ -94,12 +101,12 @@ export function placeFromScores(scores: SkillScores): Placement {
       ];
     }),
   ) as Record<PracticeSkill, PracticeLevel | null>;
-  const placed = PRACTICE_SKILLS.map((s) => skills[s])
-    .filter((l): l is PracticeLevel => l !== null)
-    .sort((a, b) => levelIndex(a) - levelIndex(b));
+  const placed = PRACTICE_SKILLS.map((s) => skills[s]).filter(
+    (l): l is PracticeLevel => l !== null,
+  );
   return {
     skills,
-    overall: placed.length ? placed[Math.floor((placed.length - 1) / 2)] : null,
+    overall: overallLevel(placed),
     partial: placed.length < PRACTICE_SKILLS.length,
   };
 }
