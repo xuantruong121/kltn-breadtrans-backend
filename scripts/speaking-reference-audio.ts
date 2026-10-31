@@ -28,6 +28,10 @@
  * SPEAKING_REF_SET_IDS=<ids> targets the exercises of those practice sets
  * (hard cap 60) instead of the published standalone exercises.
  *
+ * SPEAKING_REF_VERSION=<n> writes <id>.v<n>.mp3: a clip for corrected text,
+ * since v1 objects are never overwritten. It has no British twin, so the API
+ * offers only this clip.
+ *
  * Usage: npx ts-node --transpile-only scripts/speaking-reference-audio.ts <mode> --target env:DATABASE_URL
  */
 import { createHash } from 'node:crypto';
@@ -50,9 +54,12 @@ import {
 } from '../src/modules/quiz/listening-audio-authoring.service';
 
 const UK = process.env.SPEAKING_REF_ACCENT === 'en-gb';
+const VERSION = process.env.SPEAKING_REF_VERSION ?? '1';
 const OUT = UK
   ? 'artifacts/speaking-reference-audio-en-gb'
-  : 'artifacts/speaking-reference-audio';
+  : VERSION === '1'
+    ? 'artifacts/speaking-reference-audio'
+    : `artifacts/speaking-reference-audio-v${VERSION}`;
 // SPEAKING_REF_SET_IDS=<id,id,...>: the exercises of these practice sets
 // (any publication status, e.g. new DRAFT sets awaiting review) instead of
 // the published standalone exercises.
@@ -86,7 +93,7 @@ function ssmlFor(ex: Exercise) {
 }
 
 function keyFor(ex: Exercise) {
-  const file = `${ex.id}.${UK ? 'en-gb.' : ''}v1.mp3`;
+  const file = `${ex.id}.${UK ? 'en-gb.' : ''}v${VERSION}.mp3`;
   return ex.isPremiumContent
     ? `premium/speaking/reference/${file}`
     : `catalog/speaking/reference/${file}`;

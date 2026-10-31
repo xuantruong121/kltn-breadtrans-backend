@@ -12,9 +12,15 @@
  *
  * Held as DRAFT, because a fix there changes what the audio was made from and
  * needs new Azure audio: quizzes 52, 57, 58 and the A1 library speaking set.
+ *   fix-held      corrects their text (rollback file first) and clears the
+ *                 speaking clips made from the old text.
+ *   publish-held  makes the Listening audio (Azure, needs
+ *                 SKILL_PRACTICE_TTS_AUTHORIZED=generate), publishes it and
+ *                 the content. The speaking clips come first, from
+ *                 scripts/speaking-reference-audio.ts.
  * A non-harness target needs SKILL_PRACTICE_APPLY_AUTHORIZED=apply.
  *
- * Usage: npx ts-node --transpile-only scripts/skill-practice-review.ts <fix|publish> --target <url|env:DATABASE_URL>
+ * Usage: npx ts-node --transpile-only scripts/skill-practice-review.ts <mode> --target <url|env:DATABASE_URL>
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -285,13 +291,156 @@ async function publish(prisma: PrismaClient, harness: boolean) {
   );
 }
 
+/** Turn fixes change the audio's hash, so each one needs a new preview. */
+function fixHeldContent(quizId: number, c: Content) {
+  const turn = (start: string) => {
+    const found = c.transcriptSegments.filter((s: Content) =>
+      s.text.startsWith(start),
+    );
+    if (found.length !== 1) throw new Error(`quiz ${quizId}: turn ${start}`);
+    return found[0] as Content;
+  };
+  if (quizId === 52) {
+    const last = turn('Yes, please. Here it is.');
+    last.text = 'Yes, please. Thank you.';
+    last.translation = 'Vâng, làm ơn. Cảm ơn bạn.';
+    c.audioText = replaceOnce(
+      c.audioText,
+      'Yes, please. Here it is.',
+      'Yes, please. Thank you.',
+    );
+  }
+  if (quizId === 57) {
+    turn('That sounds intense').translation +=
+      ' Nếu có ai đó bị tụt lại phía sau thì sao?';
+    turn('No writing sample needed').translation +=
+      ' Bạn có thể tự cảm nhận không khí của nhóm và quyết định xem có phù hợp không.';
+  }
+  if (quizId === 58) {
+    const order = turn('Understood. Given the clinical');
+    order.translation = replaceOnce(
+      order.translation,
+      'dấu1 viêm',
+      'dấu hiệu viêm',
+    );
+  }
+}
+
+const READ_ALOUD_PREFIX = 'Please read aloud: ';
+
+async function heldSet(prisma: PrismaClient) {
+  const set = await prisma.speakingPracticeSet.findFirstOrThrow({
+    where: { id: { startsWith: HELD_SET_PREFIX } },
+    include: { exercises: true },
+  });
+  if (set.publicationStatus !== QuizPublicationStatus.DRAFT)
+    throw new Error('the held speaking set is not a DRAFT');
+  return set;
+}
+
+async function fixHeld(prisma: PrismaClient, harness: boolean) {
+  const rows = await prisma.question.findMany({
+    where: { quizId: { in: HELD_QUIZZES } },
+    include: { quiz: { select: { publicationStatus: true } } },
+  });
+  if (rows.length !== 15) throw new Error(`${rows.length} questions`);
+  if (rows.some((q) => q.quiz.publicationStatus !== 'DRAFT'))
+    throw new Error('a held quiz is not a DRAFT');
+  const set = await heldSet(prisma);
+  if (set.exercises.length !== 5) throw new Error('5 exercises expected');
+  if (!set.exercises.every((e) => e.targetText.startsWith(READ_ALOUD_PREFIX)))
+    throw new Error('a held exercise has no read aloud prefix');
+
+  const next = rows.map((row) => {
+    const content = structuredClone(row.content) as Content;
+    fixHeldContent(row.quizId, content);
+    return { id: row.id, content };
+  });
+  mkdirSync(DIR, { recursive: true });
+  const rollback = join(
+    DIR,
+    `review-held-rollback-${harness ? 'harness' : 'target'}-${Date.now()}.json`,
+  );
+  writeFileSync(
+    rollback,
+    JSON.stringify(
+      {
+        questions: rows.map((q) => ({ id: q.id, content: q.content })),
+        exercises: set.exercises.map((e) => ({
+          id: e.id,
+          targetText: e.targetText,
+          audioUrl: e.audioUrl,
+        })),
+      },
+      null,
+      1,
+    ),
+  );
+  await prisma.$transaction([
+    ...next.map((q) =>
+      prisma.question.update({
+        where: { id: q.id },
+        data: { content: q.content },
+      }),
+    ),
+    ...set.exercises.map((e) =>
+      prisma.speakingExercise.update({
+        where: { id: e.id },
+        data: {
+          targetText: e.targetText.slice(READ_ALOUD_PREFIX.length),
+          audioUrl: null,
+        },
+      }),
+    ),
+  ]);
+  console.log(
+    `fixed ${next.length} questions, ${set.exercises.length} exercises; rollback ${rollback} set ${set.id}`,
+  );
+}
+
+async function publishHeld(prisma: PrismaClient) {
+  if (process.env.SKILL_PRACTICE_TTS_AUTHORIZED !== 'generate')
+    throw new Error('REFUSED: SKILL_PRACTICE_TTS_AUTHORIZED=generate not set');
+  const audio = new ListeningAudioAuthoringService(
+    prisma,
+    new UploadService(new R2Service()),
+  );
+  const cms = new SkillCmsService(prisma, audio);
+  const set = await heldSet(prisma);
+  if (set.exercises.some((e) => !e.audioUrl))
+    throw new Error('a speaking clip is missing');
+  const check = await cms.validate('speaking', set.id, ADMIN);
+  if (!check.valid) throw new Error(check.errors.join('; '));
+
+  for (const quizId of HELD_QUIZZES) {
+    const artifact = await audio.generatePreview(quizId, ADMIN.id);
+    console.log(
+      `quiz ${quizId}: artifact ${artifact.id} ${artifact.status} ${artifact.durationMs} ms`,
+    );
+    if (artifact.status !== 'PREVIEW_READY')
+      throw new Error(`quiz ${quizId}: ${artifact.status}`);
+    await audio.approve(quizId, artifact.id, ADMIN.id);
+    await audio.publish(quizId, artifact.id, ADMIN.id);
+    await cms.publish(
+      'listening',
+      String(quizId),
+      QuizPublicationStatus.PUBLISHED,
+      ADMIN,
+    );
+  }
+  await cms.publish('speaking', set.id, QuizPublicationStatus.PUBLISHED, ADMIN);
+  console.log(`published ${HELD_QUIZZES.join(', ')} and ${set.id}`);
+}
+
 async function main() {
   const mode = process.argv[2];
   const i = process.argv.indexOf('--target');
   const raw = i > 0 ? process.argv[i + 1] : undefined;
   const url = raw === 'env:DATABASE_URL' ? process.env.DATABASE_URL : raw;
-  if (!url || !['fix', 'publish'].includes(mode))
-    throw new Error('usage: <fix|publish> --target <url|env:DATABASE_URL>');
+  if (!url || !['fix', 'publish', 'fix-held', 'publish-held'].includes(mode))
+    throw new Error(
+      'usage: <fix|publish|fix-held|publish-held> --target <url|env:DATABASE_URL>',
+    );
   const harness = /@127\.0\.0\.1:5460\//.test(url);
   if (!harness && process.env.SKILL_PRACTICE_APPLY_AUTHORIZED !== 'apply')
     throw new Error(
@@ -299,7 +448,10 @@ async function main() {
     );
   const prisma = new PrismaClient({ datasources: { db: { url } } });
   try {
-    await (mode === 'fix' ? fix : publish)(prisma, harness);
+    if (mode === 'fix') await fix(prisma, harness);
+    if (mode === 'publish') await publish(prisma, harness);
+    if (mode === 'fix-held') await fixHeld(prisma, harness);
+    if (mode === 'publish-held') await publishHeld(prisma);
   } finally {
     await prisma.$disconnect();
   }
