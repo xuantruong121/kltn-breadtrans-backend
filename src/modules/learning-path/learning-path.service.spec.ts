@@ -47,7 +47,7 @@ describe('LearningPathService profile', () => {
     expect(p.skills[0]).toMatchObject({
       unlockedLevel: 'BASIC',
       nextLevel: 'INTERMEDIATE',
-      progress: { done: 0, needed: 3, average: null },
+      progress: { done: 0, needed: 3, neededAverage: 70, average: null },
     });
   });
 

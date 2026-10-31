@@ -73,6 +73,7 @@ export function levelProgress(events: ProgressEvent[]) {
   return {
     done,
     needed: PROGRESS_ITEMS,
+    neededAverage: PROGRESS_AVERAGE,
     average: mean === null ? null : Math.round(mean),
   };
 }

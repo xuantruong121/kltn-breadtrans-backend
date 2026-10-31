@@ -25,9 +25,15 @@ describe('level progress', () => {
     expect(levelProgress([event(1, 40), event(1, 80), event(2, 60)])).toEqual({
       done: 2,
       needed: 3,
+      neededAverage: 70,
       average: 70,
     });
-    expect(levelProgress([])).toEqual({ done: 0, needed: 3, average: null });
+    expect(levelProgress([])).toEqual({
+      done: 0,
+      needed: 3,
+      neededAverage: 70,
+      average: null,
+    });
   });
 
   it('averages only the top three items', () => {

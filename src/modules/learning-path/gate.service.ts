@@ -29,6 +29,7 @@ import {
   PRACTICE_LEVEL_LABEL,
 } from './placement.logic';
 import {
+  GATE_COOLDOWN_HOURS,
   GATE_MIN_QUESTIONS,
   GATE_PASS_PERCENT,
   GATE_QUESTIONS,
@@ -88,6 +89,7 @@ export class GateService {
       targetLevel,
       targetLabel: targetLevel ? PRACTICE_LEVEL_LABEL[targetLevel] : null,
       passPercent: GATE_PASS_PERCENT,
+      cooldownHours: GATE_COOLDOWN_HOURS,
     };
     const closed = (
       reason: 'PROGRESS_ONLY' | 'TOP_LEVEL' | 'NO_QUESTIONS',
