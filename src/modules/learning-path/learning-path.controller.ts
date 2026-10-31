@@ -24,6 +24,7 @@ import { UpdateLearnerProfileDto } from './dto/learner-profile.dto';
 import { LearningItemDto } from './dto/learning-item.dto';
 import { LearningPathService } from './learning-path.service';
 import { GateService } from './gate.service';
+import { StarterRoadmapService } from './starter-roadmap.service';
 import { SubmitGateDto } from './dto/submit-gate.dto';
 
 @ApiTags('learning-path')
@@ -34,6 +35,7 @@ export class LearningPathController {
   constructor(
     private readonly learningPath: LearningPathService,
     private readonly gates: GateService,
+    private readonly roadmap: StarterRoadmapService,
   ) {}
 
   @Get('profile')
@@ -105,6 +107,16 @@ export class LearningPathController {
     @Body() dto: SubmitGateDto,
   ) {
     return this.gates.submit(req.user.id, id, dto.answers);
+  }
+
+  @Get('roadmap')
+  @ApiOperation({ summary: 'Lộ trình cho người mất gốc và bước đang tới' })
+  @ApiResponse({
+    status: 200,
+    description: 'Các bước, đã xong hay chưa, bước nào còn khoá',
+  })
+  starterRoadmap(@Request() req: { user: { id: number } }) {
+    return this.roadmap.forUser(req.user.id);
   }
 
   @Get('today')
