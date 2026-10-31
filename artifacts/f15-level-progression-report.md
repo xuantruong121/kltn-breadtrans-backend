@@ -1,7 +1,7 @@
 # F15 level progression: harness report
 
 Date: 2026-10-31. Design: `Project/LEVEL_PROGRESSION_DESIGN.md`.
-Backend `feature/level-gate`, frontend `feature/level-unlock-ui` `756dd84`. Nothing here ran against kltn_db.
+Backend `feature/level-gate`, frontend `feature/level-unlock-ui` `47f5706`. Nothing here ran against kltn_db.
 
 ```
 HARNESS_DB=p3_rehearsal
@@ -102,7 +102,7 @@ FRONTEND_BUILD_WEBPACK=PASS
 
 - The first browser run stalled on the lock screen's gate link. It was a real bug, not a test fault: the exit guard stayed
   active with no exercise loaded and swallowed every link, and that screen returns before the confirm dialog renders.
-  `PlanLockedScreen` had the same fault. Fixed in frontend `756dd84`.
+  `PlanLockedScreen` had the same fault. Fixed in frontend `47f5706`.
 - The first gate audio check returned 500 because the fake bucket was empty, then again because the clip was placed in the
   public bucket while the key is private. The normal audio route gave the same 500 on the empty bucket.
 - `qa-backend` seemed hung because the backend logs almost nothing on start. It needs a poll, not its log.
