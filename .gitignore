@@ -29,6 +29,8 @@ cloudflared.exe
 db-backups/
 .local-backups/
 recovery-inspect.sql
+# Rewritten by every backup: a local receipt, not a source file.
+artifacts/offsite-backup-verification.json
 
 # Local data backups (may contain learner data) - never commit
 /backups/
