@@ -121,12 +121,12 @@ export class SupportService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundException('Không tìm thấy cuộc trò chuyện.');
     }
 
     if (conversation.studentId !== studentId) {
       throw new ForbiddenException(
-        'You do not have permission to view this conversation',
+        'Bạn không có quyền xem cuộc trò chuyện này.',
       );
     }
 
@@ -235,12 +235,12 @@ export class SupportService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundException('Không tìm thấy cuộc trò chuyện.');
     }
 
     if (conversation.studentId !== studentId) {
       throw new ForbiddenException(
-        'You do not have permission to post to this conversation',
+        'Bạn không có quyền gửi tin trong cuộc trò chuyện này.',
       );
     }
 
@@ -570,7 +570,7 @@ export class SupportService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundException('Không tìm thấy cuộc trò chuyện.');
     }
 
     const unreadCount = await this.db.supportMessage.count({
@@ -606,7 +606,7 @@ export class SupportService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundException('Không tìm thấy cuộc trò chuyện.');
     }
 
     const page = Math.max(1, query.page || 1);
@@ -699,7 +699,7 @@ export class SupportService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundException('Không tìm thấy cuộc trò chuyện.');
     }
 
     if (dto.clientMessageId) {
@@ -800,12 +800,12 @@ export class SupportService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundException('Không tìm thấy cuộc trò chuyện.');
     }
 
     if (authUser.role === 'STUDENT' && conversation.studentId !== authUser.id) {
       throw new ForbiddenException(
-        'You do not have permission to modify this conversation',
+        'Bạn không có quyền chỉnh sửa cuộc trò chuyện này.',
       );
     }
 

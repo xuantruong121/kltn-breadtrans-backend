@@ -119,14 +119,17 @@ export class CourseAiAuthoringService {
   ) {}
 
   private admin(user: Admin) {
-    if (user.role !== Role.ADMIN) throw new ForbiddenException('Admin only');
+    if (user.role !== Role.ADMIN)
+      throw new ForbiddenException(
+        'Chỉ quản trị viên được thực hiện thao tác này.',
+      );
   }
 
   private async course(courseId: number) {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
-    if (!course) throw new NotFoundException('Course not found');
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
     if (course.status !== CourseStatus.DRAFT)
       throw new ConflictException(
         'Chỉ Course Draft mới có thể áp dụng nội dung AI',
@@ -246,7 +249,7 @@ export class CourseAiAuthoringService {
         exercises: { select: { slug: true } },
       },
     });
-    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (!lesson) throw new NotFoundException('Không tìm thấy bài học.');
     this.assertLessonDraft(lesson);
     const objectives = this.objectives(lesson.learningObjectives);
     const scope = dto.scope ?? 'FULL';
@@ -370,7 +373,7 @@ export class CourseAiAuthoringService {
       where: { id: sectionId, lesson: { id: lessonId, courseId } },
       include: { lesson: true },
     });
-    if (!section) throw new NotFoundException('Section not found');
+    if (!section) throw new NotFoundException('Không tìm thấy phần học.');
     this.assertLessonDraft(section.lesson);
     const suggestion = await this.ai.suggestCourseSectionRefinement({
       action: dto.action,
@@ -419,7 +422,7 @@ export class CourseAiAuthoringService {
         where: { id: lessonId, courseId },
         include: { sections: true, exercises: true },
       });
-      if (!lesson) throw new NotFoundException('Lesson not found');
+      if (!lesson) throw new NotFoundException('Không tìm thấy bài học.');
       this.assertLessonDraft(lesson);
       const existingIds = new Set(lesson.sections.map((section) => section.id));
       const existingHeadings = new Set(

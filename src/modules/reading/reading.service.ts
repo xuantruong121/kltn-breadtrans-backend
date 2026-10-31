@@ -511,7 +511,7 @@ export class ReadingService {
     });
 
     if (!topic || topic.category !== TopicCategory.BILINGUAL_LEVEL) {
-      throw new NotFoundException('Reading topic not found');
+      throw new NotFoundException('Không tìm thấy chủ đề Đọc.');
     }
     const accessByQuiz = await this.quizContentAccess.resolveMany(
       topic.quizzes,
@@ -559,7 +559,7 @@ export class ReadingService {
       (quiz.publicationStatus !== undefined &&
         quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
-      throw new NotFoundException('Reading quiz not found');
+      throw new NotFoundException('Không tìm thấy bài Đọc.');
     }
     await this.quizContentAccess.assertAccess(quiz, userId, role);
     return quiz;

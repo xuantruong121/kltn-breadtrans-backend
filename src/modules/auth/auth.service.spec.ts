@@ -195,7 +195,7 @@ describe('AuthService', () => {
       (redis.get as jest.Mock).mockResolvedValueOnce(expectedHash);
 
       const result = await service.verifyOtp('test@example.com', testOtp);
-      expect(result).toEqual({ message: 'OTP verified successfully' });
+      expect(result).toEqual({ message: 'Xác thực OTP thành công.' });
       expect(redis.del).toHaveBeenCalledWith('otp:test@example.com');
     });
 

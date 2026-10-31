@@ -104,7 +104,7 @@ describe('PlanCatalogAdminService', () => {
       new SubscriptionService(prisma as never),
     );
     await expect(service.createDraft('FREE', {}, 7)).rejects.toThrow(
-      'FREE plan catalog is protected',
+      'Gói FREE được bảo vệ, không thể thay đổi.',
     );
 
     const subscription = new SubscriptionService(prisma as never);
@@ -180,7 +180,7 @@ describe('PlanCatalogAdminService', () => {
     );
 
     await expect(service.publish(22, 7)).rejects.toThrow(
-      'Published paid versions require a positive priceVnd',
+      'Phiên bản trả phí khi xuất bản phải có giá lớn hơn 0.',
     );
     expect(tx.$queryRaw).not.toHaveBeenCalled();
     expect(tx.planVersion.updateMany).not.toHaveBeenCalled();
@@ -214,7 +214,7 @@ describe('PlanCatalogAdminService', () => {
         7,
       ),
     ).rejects.toThrow(
-      'A PlanVersion referenced by a PlanPurchase or Subscription is immutable',
+      'Phiên bản gói đã có giao dịch hoặc đăng ký nên không thể sửa.',
     );
   });
 });

@@ -104,7 +104,7 @@ export class WritingService {
     });
 
     if (!quiz || !isWritingQuiz(quiz) || quiz.questions.length === 0) {
-      throw new NotFoundException('Writing task not found');
+      throw new NotFoundException('Không tìm thấy bài Viết.');
     }
     if (expectedPart !== 'ANY' && quiz.type !== QuizType.WRITING_EMAIL) {
       throw new BadRequestException('Bài viết không thuộc Writing Part 2/3');
@@ -628,7 +628,7 @@ export class WritingService {
         quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED) ||
       quiz.questions.length === 0
     ) {
-      throw new NotFoundException('Quiz not found');
+      throw new NotFoundException('Không tìm thấy bài tập.');
     }
 
     await this.assertWritingAccess(quiz, userId, role);
@@ -740,7 +740,7 @@ export class WritingService {
       (quiz.publicationStatus !== undefined &&
         quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
-      throw new NotFoundException('Quiz not found');
+      throw new NotFoundException('Không tìm thấy bài tập.');
     }
     await this.assertWritingAccess(quiz, userId, role);
     const submissions = await this.prisma.submission.findMany({
@@ -790,7 +790,7 @@ export class WritingService {
         quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED) ||
       quiz.questions.length === 0
     )
-      throw new NotFoundException('Quiz not found');
+      throw new NotFoundException('Không tìm thấy bài tập.');
 
     await this.assertWritingAccess(quiz, userId, role);
     if (role !== 'ADMIN')

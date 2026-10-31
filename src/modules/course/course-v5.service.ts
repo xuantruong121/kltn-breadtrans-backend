@@ -118,7 +118,8 @@ export class CourseLearningV5Service {
         media: true,
       },
     });
-    if (!lesson) throw new NotFoundException('Course lesson not found');
+    if (!lesson)
+      throw new NotFoundException('Không tìm thấy bài học trong khóa.');
     const allLessons = await this.prisma.courseLesson.findMany({
       where: { courseId, status: CourseLessonStatus.PUBLISHED },
       orderBy: { order: 'asc' },
@@ -214,7 +215,8 @@ export class CourseLearningV5Service {
       },
       include: { questions: { orderBy: { order: 'asc' } } },
     });
-    if (!exercise) throw new NotFoundException('Course exercise not found');
+    if (!exercise)
+      throw new NotFoundException('Không tìm thấy bài tập trong khóa.');
     if (!Array.isArray(dto.answers))
       throw new BadRequestException('Danh sách câu trả lời không hợp lệ');
     const answers = dto.answers;

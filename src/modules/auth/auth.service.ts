@@ -41,7 +41,7 @@ export class AuthService {
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
-    if (existingUser) throw new ConflictException('Email already exists');
+    if (existingUser) throw new ConflictException('Email này đã được đăng ký.');
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await this.prisma.user.create({
       data: {
@@ -141,11 +141,11 @@ export class AuthService {
       include: { profile: true },
     });
     if (!user || !user.password)
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác.');
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid)
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác.');
 
     // Update login count and last login timestamp
     await this.prisma.user.update({
@@ -207,17 +207,23 @@ export class AuthService {
     }
 
     if (tokenPayload?.type !== 'refresh') {
-      throw new UnauthorizedException('Token type must be refresh');
+      throw new UnauthorizedException(
+        'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
+      );
     }
 
     const effectiveUserId = tokenPayload?.sub || userId;
     const effectiveDeviceId = tokenPayload?.deviceId;
 
     if (!effectiveUserId || !effectiveDeviceId) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(
+        'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
+      );
     }
     if (deviceId && deviceId !== effectiveDeviceId) {
-      throw new UnauthorizedException('Refresh token device mismatch');
+      throw new UnauthorizedException(
+        'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
+      );
     }
 
     const redisKey = `user:${effectiveUserId}:device:${effectiveDeviceId}`;
@@ -228,7 +234,7 @@ export class AuthService {
       where: { id: effectiveUserId },
       include: { profile: true },
     });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
 
     // 2. Check token validity only against the per-device Redis session.
     const isValidToken = storedToken === providedRefreshToken;
@@ -238,7 +244,7 @@ export class AuthService {
         await this.redis.del(redisKey);
       }
       throw new UnauthorizedException(
-        'Replay attack detected or token expired. Session revoked.',
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
       );
     }
 
@@ -300,14 +306,14 @@ export class AuthService {
       'EX',
       remainingTtl,
     );
-    return { message: 'Logged out successfully' };
+    return { message: 'Đăng xuất thành công.' };
   }
 
   // ================= HMAC-SHA256 OTP =================
 
   async generateOtp(email: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
 
     // Cryptographically secure 6-digit OTP (100000 to 999999 inclusive)
     const otp = crypto.randomInt(100000, 1000000).toString();
@@ -326,15 +332,16 @@ export class AuthService {
     return {
       message:
         process.env.NODE_ENV === 'production'
-          ? 'OTP sent successfully'
-          : 'OTP sent successfully (check console in DEV)',
+          ? 'Đã gửi mã OTP.'
+          : 'Đã gửi mã OTP (xem console ở môi trường DEV).',
     };
   }
 
   async verifyOtp(email: string, providedOtp: string) {
     const redisKey = `otp:${email}`;
     const storedHash = await this.redis.get(redisKey);
-    if (!storedHash) throw new UnauthorizedException('OTP expired or invalid');
+    if (!storedHash)
+      throw new UnauthorizedException('Mã OTP không hợp lệ hoặc đã hết hạn.');
 
     const secret = getOtpSecret();
     const computedHash = crypto
@@ -343,12 +350,12 @@ export class AuthService {
       .digest('hex');
 
     if (storedHash !== computedHash) {
-      throw new UnauthorizedException('Invalid OTP');
+      throw new UnauthorizedException('Mã OTP không chính xác.');
     }
 
     // Single-use: Destroy OTP
     await this.redis.del(redisKey);
-    return { message: 'OTP verified successfully' };
+    return { message: 'Xác thực OTP thành công.' };
   }
 
   async changePassword(

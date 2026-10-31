@@ -101,7 +101,7 @@ export class GrammarService {
       !topic ||
       (!isStaff && topic.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
-      throw new NotFoundException(`Grammar topic with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy chủ đề ngữ pháp #${id}.`);
     }
 
     let latestAttempt: any = null;
@@ -181,10 +181,10 @@ export class GrammarService {
     });
 
     if (!topic) {
-      throw new NotFoundException(`Topic ${topicId} not found`);
+      throw new NotFoundException(`Không tìm thấy chủ đề #${topicId}.`);
     }
     if (topic.publicationStatus !== QuizPublicationStatus.PUBLISHED) {
-      throw new NotFoundException(`Topic ${topicId} not found`);
+      throw new NotFoundException(`Không tìm thấy chủ đề #${topicId}.`);
     }
 
     let correctCount = 0;
@@ -294,7 +294,7 @@ export class GrammarService {
   async updateTopic(id: number, dto: UpdateGrammarTopicDto) {
     const topic = await this.prisma.grammarTopic.findUnique({ where: { id } });
     if (!topic)
-      throw new NotFoundException(`Grammar topic with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy chủ đề ngữ pháp #${id}.`);
     return this.prisma.grammarTopic.update({
       where: { id },
       data: {
@@ -316,7 +316,7 @@ export class GrammarService {
       include: { questions: true },
     });
     if (!topic)
-      throw new NotFoundException(`Grammar topic with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy chủ đề ngữ pháp #${id}.`);
     if (!topic.questions || topic.questions.length === 0) {
       throw new BadRequestException(
         'Chủ đề ngữ pháp phải có ít nhất 1 câu hỏi trước khi xuất bản',
@@ -339,7 +339,7 @@ export class GrammarService {
   async unpublishTopic(id: number) {
     const topic = await this.prisma.grammarTopic.findUnique({ where: { id } });
     if (!topic)
-      throw new NotFoundException(`Grammar topic with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy chủ đề ngữ pháp #${id}.`);
     return this.prisma.grammarTopic.update({
       where: { id },
       data: { publicationStatus: QuizPublicationStatus.DRAFT },
@@ -349,7 +349,7 @@ export class GrammarService {
   async deleteTopic(id: number) {
     const topic = await this.prisma.grammarTopic.findUnique({ where: { id } });
     if (!topic)
-      throw new NotFoundException(`Grammar topic with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy chủ đề ngữ pháp #${id}.`);
     // History safety guard
     if (await this.learnerAttempts(id)) {
       throw new ConflictException(
@@ -364,7 +364,9 @@ export class GrammarService {
       where: { id: topicId },
     });
     if (!topic)
-      throw new NotFoundException(`Grammar topic with ID ${topicId} not found`);
+      throw new NotFoundException(
+        `Không tìm thấy chủ đề ngữ pháp #${topicId}.`,
+      );
     const problems = questionProblems(dto);
     if (problems.length) throw new BadRequestException(problems.join('; '));
     return this.prisma.grammarQuestion.create({
@@ -382,7 +384,9 @@ export class GrammarService {
       where: { id: topicId },
     });
     if (!topic)
-      throw new NotFoundException(`Grammar topic with ID ${topicId} not found`);
+      throw new NotFoundException(
+        `Không tìm thấy chủ đề ngữ pháp #${topicId}.`,
+      );
     if (!dtos.length) throw new BadRequestException('Chưa có câu hỏi nào');
     const errors = dtos
       .map((dto, index) => ({ index, problems: questionProblems(dto) }))
@@ -515,7 +519,9 @@ export class GrammarService {
       include: { questions: { select: { id: true } } },
     });
     if (!topic)
-      throw new NotFoundException(`Grammar topic with ID ${topicId} not found`);
+      throw new NotFoundException(
+        `Không tìm thấy chủ đề ngữ pháp #${topicId}.`,
+      );
     const existingIds = new Set(topic.questions.map((q) => q.id));
     for (const qid of questionIds) {
       if (!existingIds.has(qid)) {

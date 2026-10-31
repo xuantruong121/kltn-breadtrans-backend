@@ -93,6 +93,6 @@ describe('SkillCmsService.setTracks', () => {
     const { service } = setup();
     await expect(
       service.setTracks('reading', '5', [], { id: 1, role: Role.STUDENT }),
-    ).rejects.toThrow('Admin only');
+    ).rejects.toThrow('Chỉ quản trị viên được thực hiện thao tác này.');
   });
 });

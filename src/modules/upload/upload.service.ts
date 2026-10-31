@@ -38,7 +38,7 @@ export class UploadService {
    */
   async uploadFile(file: Express.Multer.File): Promise<UploadResult> {
     if (!file) {
-      throw new BadRequestException('No file provided');
+      throw new BadRequestException('Chưa chọn tệp.');
     }
 
     const folder = this.resolveFolder(file.mimetype);

@@ -91,19 +91,24 @@ export class SkillCmsService {
   ) {}
 
   private admin(user: Admin) {
-    if (user.role !== Role.ADMIN) throw new ForbiddenException('Admin only');
+    if (user.role !== Role.ADMIN)
+      throw new ForbiddenException(
+        'Chỉ quản trị viên được thực hiện thao tác này.',
+      );
   }
 
   private domain(value: string): Domain {
     if (!['listening', 'reading', 'writing', 'speaking'].includes(value)) {
-      throw new NotFoundException('Skill CMS domain not found');
+      throw new NotFoundException('Không tìm thấy phân hệ nội dung này.');
     }
     return value as Domain;
   }
 
   private quizType(domain: Domain) {
     if (domain === 'speaking')
-      throw new BadRequestException('Speaking uses practice sets');
+      throw new BadRequestException(
+        'Kỹ năng Nói dùng bộ luyện tập, không dùng thao tác này.',
+      );
     return QUIZ_DOMAINS[domain];
   }
 
@@ -310,9 +315,9 @@ export class SkillCmsService {
           },
         },
       });
-      if (!set) throw new NotFoundException('Speaking practice set not found');
+      if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
       if (set.scope === 'EXAM_INTERNAL' && !allowExamInternal)
-        throw new NotFoundException('Speaking practice set not found');
+        throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
       const key = set.exercises[0]?.id;
       return {
         ...set,
@@ -333,7 +338,7 @@ export class SkillCmsService {
         _count: { select: { submissions: true } },
       },
     });
-    if (!quiz) throw new NotFoundException('Skill content not found');
+    if (!quiz) throw new NotFoundException('Không tìm thấy nội dung kỹ năng.');
     return {
       ...quiz,
       passage: quiz.theoryContent,
@@ -463,7 +468,7 @@ export class SkillCmsService {
       const set = await this.prisma.speakingPracticeSet.findUnique({
         where: { id: rawId },
       });
-      if (!set) throw new NotFoundException('Speaking practice set not found');
+      if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
       await this.assertNoSpeakingHistory(rawId);
       const category = dto.category
         ? await this.speakingCategory(dto.category.trim(), 'practiceSet')
@@ -484,7 +489,7 @@ export class SkillCmsService {
     const quiz = await this.prisma.quiz.findFirst({
       where: { id, ...this.contentTypeWhere(domain) },
     });
-    if (!quiz) throw new NotFoundException('Skill content not found');
+    if (!quiz) throw new NotFoundException('Không tìm thấy nội dung kỹ năng.');
     await this.assertNoHistory(id);
     const type =
       domain === 'writing' &&
@@ -518,12 +523,14 @@ export class SkillCmsService {
     this.admin(user);
     const domain = this.domain(rawDomain);
     if (domain === 'speaking')
-      throw new BadRequestException('Speaking questions are exercises');
+      throw new BadRequestException(
+        'Câu hỏi Nói được quản lý dưới dạng bài luyện.',
+      );
     const quizId = this.id(rawId);
     const quiz = await this.prisma.quiz.findFirst({
       where: { id: quizId, ...this.contentTypeWhere(domain) },
     });
-    if (!quiz) throw new NotFoundException('Skill content not found');
+    if (!quiz) throw new NotFoundException('Không tìm thấy nội dung kỹ năng.');
     await this.assertNoHistory(quizId);
     const last = await this.prisma.question.findFirst({
       where: { quizId },
@@ -553,7 +560,7 @@ export class SkillCmsService {
         type: { in: [QuizType.WRITING_EMAIL, QuizType.WRITING_PICTURE] },
       },
     });
-    if (!quiz) throw new NotFoundException('Writing content not found');
+    if (!quiz) throw new NotFoundException('Không tìm thấy nội dung Viết.');
     this.assertWritingTaskType(quiz.type, dto.taskType);
     await this.assertNoHistory(quizId);
     const last = await this.prisma.question.findFirst({
@@ -581,7 +588,7 @@ export class SkillCmsService {
     const quiz = await this.prisma.quiz.findFirst({
       where: { id: quizId, type: QuizType.LISTENING_PRACTICE },
     });
-    if (!quiz) throw new NotFoundException('Listening content not found');
+    if (!quiz) throw new NotFoundException('Không tìm thấy nội dung Nghe.');
     await this.assertNoHistory(quizId);
     const last = await this.prisma.question.findFirst({
       where: { quizId },
@@ -615,9 +622,7 @@ export class SkillCmsService {
       },
     });
     if (!question)
-      throw new NotFoundException(
-        'Question does not belong to Listening content',
-      );
+      throw new NotFoundException('Câu hỏi không thuộc nội dung Nghe này.');
     await this.assertNoHistory(quizId);
     // Same type: merge, so fields the form does not show survive the edit.
     const content =
@@ -664,9 +669,7 @@ export class SkillCmsService {
       include: { quiz: { select: { type: true } } },
     });
     if (!question)
-      throw new NotFoundException(
-        'Question does not belong to Writing content',
-      );
+      throw new NotFoundException('Câu hỏi không thuộc nội dung Viết này.');
     this.assertWritingTaskType(question.quiz?.type, dto.taskType);
     await this.assertNoHistory(quizId);
     return this.prisma.question.update({
@@ -691,7 +694,7 @@ export class SkillCmsService {
     const set = await this.prisma.speakingPracticeSet.findUnique({
       where: { id: rawSetId },
     });
-    if (!set) throw new NotFoundException('Speaking practice set not found');
+    if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
     if (!dto.taskType) {
       throw new BadRequestException('Câu Speaking mới phải có loại bài');
     }
@@ -783,7 +786,7 @@ export class SkillCmsService {
         stimulus: true,
       },
     });
-    if (!exercise) throw new NotFoundException('Speaking exercise not found');
+    if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
     if (dto.order !== undefined) {
       throw new BadRequestException(
         'Dùng API reorder để thay đổi thứ tự câu trong bộ luyện',
@@ -856,12 +859,14 @@ export class SkillCmsService {
   ) {
     this.admin(user);
     if (!this.speakingService || !this.uploadService)
-      throw new ServiceUnavailableException('Speaking audio is unavailable');
+      throw new ServiceUnavailableException(
+        'Âm thanh bài Nói hiện không khả dụng.',
+      );
     const exerciseId = this.id(rawExerciseId);
     const exercise = await this.prisma.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
     });
-    if (!exercise) throw new NotFoundException('Speaking exercise not found');
+    if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
     const text = exercise.targetText.trim();
     if (!text) throw new BadRequestException('Câu luyện chưa có câu mẫu.');
     if (
@@ -869,7 +874,7 @@ export class SkillCmsService {
       !this.uploadService.isPrivateStorageConfigured()
     )
       throw new ServiceUnavailableException(
-        'Protected Speaking media storage is not configured',
+        'Kho lưu trữ âm thanh Nói chưa được cấu hình.',
       );
     const audio = await this.speakingService.generateTts(text, 'US', 1);
     const file = `${exerciseId}.r${Date.now()}.mp3`;
@@ -971,7 +976,7 @@ export class SkillCmsService {
     const exercise = await this.prisma.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
     });
-    if (!exercise) throw new NotFoundException('Speaking exercise not found');
+    if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
     await this.assertNoSpeakingHistory(rawSetId);
     return this.prisma.$transaction(
       async (tx) => {
@@ -1012,7 +1017,7 @@ export class SkillCmsService {
       where: { id: rawSetId },
       select: { id: true, publicationStatus: true },
     });
-    if (!set) throw new NotFoundException('Speaking practice set not found');
+    if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
     if (set.publicationStatus === QuizPublicationStatus.PUBLISHED) {
       throw new ConflictException(
         'Hãy chuyển bộ luyện về bản nháp trước khi sắp xếp lại câu',
@@ -1072,7 +1077,9 @@ export class SkillCmsService {
     this.admin(user);
     const domain = this.domain(rawDomain);
     if (domain === 'speaking')
-      throw new BadRequestException('Speaking questions are exercises');
+      throw new BadRequestException(
+        'Câu hỏi Nói được quản lý dưới dạng bài luyện.',
+      );
     const quizId = this.id(rawId);
     const questionId = this.id(rawQuestionId);
     const question = await this.prisma.question.findFirst({
@@ -1083,9 +1090,7 @@ export class SkillCmsService {
       },
     });
     if (!question)
-      throw new NotFoundException(
-        'Question does not belong to this skill content',
-      );
+      throw new NotFoundException('Câu hỏi không thuộc nội dung kỹ năng này.');
     await this.assertNoHistory(quizId);
     return this.prisma.question.update({
       where: { id: questionId },
@@ -1102,7 +1107,9 @@ export class SkillCmsService {
     this.admin(user);
     const domain = this.domain(rawDomain);
     if (domain === 'speaking')
-      throw new BadRequestException('Speaking questions are exercises');
+      throw new BadRequestException(
+        'Câu hỏi Nói được quản lý dưới dạng bài luyện.',
+      );
     const quizId = this.id(rawId);
     const questionId = this.id(rawQuestionId);
     const question = await this.prisma.question.findFirst({
@@ -1113,9 +1120,7 @@ export class SkillCmsService {
       },
     });
     if (!question)
-      throw new NotFoundException(
-        'Question does not belong to this skill content',
-      );
+      throw new NotFoundException('Câu hỏi không thuộc nội dung kỹ năng này.');
     await this.assertNoHistory(quizId);
     return this.prisma.question.delete({ where: { id: questionId } });
   }
@@ -1276,7 +1281,7 @@ export class SkillCmsService {
         where: { id },
         include: { exercises: true },
       });
-      if (!set) throw new NotFoundException('Speaking practice set not found');
+      if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
       return this.prisma.$transaction(async (tx) => {
         const updated = await tx.speakingPracticeSet.update({
           where: { id },
@@ -1303,7 +1308,7 @@ export class SkillCmsService {
   private id(raw: string) {
     const id = Number(raw);
     if (!Number.isInteger(id) || id < 1)
-      throw new BadRequestException('Invalid content id');
+      throw new BadRequestException('Mã nội dung không hợp lệ.');
     return id;
   }
 
@@ -1358,7 +1363,7 @@ export class SkillCmsService {
   private requireListeningAuthoring() {
     if (!this.listeningAudioAuthoring || !this.quizService)
       throw new ServiceUnavailableException(
-        'Listening authoring is unavailable',
+        'Công cụ soạn bài Nghe hiện không khả dụng.',
       );
     return {
       audio: this.listeningAudioAuthoring,
@@ -1420,7 +1425,7 @@ export class SkillCmsService {
       },
       select: { id: true },
     });
-    if (!question) throw new NotFoundException('Listening question not found');
+    if (!question) throw new NotFoundException('Không tìm thấy câu hỏi Nghe.');
   }
 
   async uploadListeningQuestionAudio(
@@ -1465,7 +1470,7 @@ export class SkillCmsService {
       where: { id: rawId },
       include: { exercises: { include: { stimulus: true } } },
     });
-    if (!set) throw new NotFoundException('Speaking practice set not found');
+    if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
     const errors = [
       !set.title.trim() ? 'Thiếu tiêu đề' : null,
       set.exercises.length === 0 ? 'Cần ít nhất một bài Speaking' : null,

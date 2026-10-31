@@ -139,34 +139,28 @@ export class SubscriptionService {
 
   validatePlanVersionInput(input: PlanVersionValidationInput): void {
     if (!Number.isInteger(input.version) || input.version <= 0) {
-      throw new BadRequestException(
-        'PlanVersion.version must be a positive integer',
-      );
+      throw new BadRequestException('Số phiên bản phải là số nguyên dương.');
     }
     if (
       input.durationDays !== null &&
       input.durationDays !== undefined &&
       (!Number.isInteger(input.durationDays) || input.durationDays <= 0)
     ) {
-      throw new BadRequestException(
-        'PlanVersion.durationDays must be a positive integer',
-      );
+      throw new BadRequestException('Số ngày sử dụng phải là số nguyên dương.');
     }
     if (
       input.priceVnd !== null &&
       input.priceVnd !== undefined &&
       (!Number.isInteger(input.priceVnd) || input.priceVnd < 0)
     ) {
-      throw new BadRequestException(
-        'PlanVersion.priceVnd must be a non-negative integer',
-      );
+      throw new BadRequestException('Giá phải là số nguyên không âm.');
     }
     if (!input.currency.trim()) {
-      throw new BadRequestException('PlanVersion.currency is required');
+      throw new BadRequestException('Thiếu đơn vị tiền tệ.');
     }
     if (input.isCurrent && input.status !== PlanVersionStatus.PUBLISHED) {
       throw new BadRequestException(
-        'Only a published PlanVersion may be current',
+        'Chỉ phiên bản đã xuất bản mới được đặt làm hiện hành.',
       );
     }
   }
@@ -183,7 +177,7 @@ export class SubscriptionService {
       (typeof input.scope !== 'object' || Array.isArray(input.scope))
     ) {
       throw new BadRequestException(
-        'PlanEntitlement.scope must be a JSON object when provided',
+        'Phạm vi quyền lợi phải là đối tượng JSON.',
       );
     }
 
@@ -192,13 +186,13 @@ export class SubscriptionService {
       (!Number.isInteger(input.limitValue) || input.limitValue! < 0)
     ) {
       throw new BadRequestException(
-        'PlanEntitlement.limitValue must be a non-negative integer',
+        'Hạn mức quyền lợi phải là số nguyên không âm.',
       );
     }
     if (!input.enabled) {
       if (hasLimit || hasUnit || hasPeriod || hasScope) {
         throw new BadRequestException(
-          'Disabled entitlements must not carry quota metadata',
+          'Quyền lợi đã tắt không được có hạn mức.',
         );
       }
       return;
@@ -206,7 +200,7 @@ export class SubscriptionService {
     if (input.unit === EntitlementUnit.CONTENT_ACCESS) {
       if (hasLimit || hasPeriod) {
         throw new BadRequestException(
-          'CONTENT_ACCESS cannot carry a numeric limit or period',
+          'Quyền CONTENT_ACCESS không được có hạn mức hoặc chu kỳ.',
         );
       }
       return;
@@ -214,21 +208,19 @@ export class SubscriptionService {
     if (!hasLimit) {
       if (hasUnit || hasPeriod) {
         throw new BadRequestException(
-          'Unlimited entitlements must not carry quota metadata',
+          'Quyền lợi không giới hạn không được có hạn mức.',
         );
       }
       return;
     }
     if (input.limitValue === 0) {
-      throw new BadRequestException(
-        'Finite entitlement limits must be greater than zero',
-      );
+      throw new BadRequestException('Hạn mức của quyền lợi phải lớn hơn 0.');
     }
     if (input.unit === null || input.unit === undefined) {
-      throw new BadRequestException('Finite entitlements require a unit');
+      throw new BadRequestException('Quyền lợi có hạn mức phải có đơn vị.');
     }
     if (input.period === null || input.period === undefined) {
-      throw new BadRequestException('Finite entitlements require a period');
+      throw new BadRequestException('Quyền lợi có hạn mức phải có chu kỳ.');
     }
   }
 
@@ -239,7 +231,7 @@ export class SubscriptionService {
     ]);
     if (subscriptionCount > 0 || purchaseCount > 0) {
       throw new ConflictException(
-        'A PlanVersion referenced by a PlanPurchase or Subscription is immutable',
+        'Phiên bản gói đã có giao dịch hoặc đăng ký nên không thể sửa.',
       );
     }
   }
@@ -261,7 +253,7 @@ export class SubscriptionService {
       include: { plan: true, entitlements: true },
     });
     if (!version) {
-      throw new NotFoundException('PlanVersion not found');
+      throw new NotFoundException('Không tìm thấy phiên bản gói.');
     }
     this.validatePurchasablePlanVersionRecord(version);
     return version;
@@ -294,15 +286,15 @@ export class SubscriptionService {
       isCurrent: version.isCurrent,
     });
     if (!version.durationDays || version.durationDays <= 0) {
-      throw new ConflictException('Purchasable PlanVersion needs a duration');
+      throw new ConflictException('Phiên bản gói đang bán phải có thời hạn.');
     }
     if (!version.priceVnd || version.priceVnd <= 0) {
       throw new ConflictException(
-        'Purchasable PlanVersion needs a positive price',
+        'Phiên bản gói đang bán phải có giá lớn hơn 0.',
       );
     }
     if (version.currency !== 'VND') {
-      throw new ConflictException('Only VND catalog versions are purchasable');
+      throw new ConflictException('Chỉ bán được phiên bản dùng đơn vị VND.');
     }
     for (const entitlement of version.entitlements) {
       this.validatePlanEntitlementInput(entitlement);
@@ -313,14 +305,10 @@ export class SubscriptionService {
     input: SubscriptionValidationInput,
   ): Promise<PlanVersionWithPlan> {
     if (!(input.startsAt instanceof Date) || !(input.endsAt instanceof Date)) {
-      throw new BadRequestException(
-        'Subscription dates must be valid Date values',
-      );
+      throw new BadRequestException('Ngày của gói đăng ký không hợp lệ.');
     }
     if (input.endsAt <= input.startsAt) {
-      throw new BadRequestException(
-        'Subscription.endsAt must be after startsAt',
-      );
+      throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu.');
     }
 
     const planVersion = await this.prisma.planVersion.findUnique({
@@ -328,11 +316,11 @@ export class SubscriptionService {
       include: { plan: true },
     });
     if (!planVersion) {
-      throw new NotFoundException('PlanVersion not found');
+      throw new NotFoundException('Không tìm thấy phiên bản gói.');
     }
     if (planVersion.plan.code === 'FREE') {
       throw new ConflictException(
-        'Paid subscriptions cannot target the FREE plan',
+        'Không thể gán đăng ký trả phí cho gói FREE.',
       );
     }
     if (planVersion.plan.status !== PlanStatus.ACTIVE) {
@@ -351,7 +339,7 @@ export class SubscriptionService {
       planVersion.effectiveFrom > input.startsAt
     ) {
       throw new ConflictException(
-        'Subscription cannot start before its PlanVersion is effective',
+        'Đăng ký không thể bắt đầu trước khi phiên bản gói có hiệu lực.',
       );
     }
 
@@ -378,7 +366,7 @@ export class SubscriptionService {
   ): Promise<EffectiveEntitlement> {
     if (!isPlanFeatureKey(String(featureKey))) {
       throw new ConflictException(
-        `Unknown plan feature key: ${String(featureKey)}`,
+        `Mã tính năng không xác định: ${String(featureKey)}.`,
       );
     }
 
@@ -426,8 +414,8 @@ export class SubscriptionService {
     if (freeVersions.length !== 1) {
       throw new ServiceUnavailableException(
         freeVersions.length === 0
-          ? 'FREE plan catalog is not configured'
-          : 'FREE plan catalog is ambiguous',
+          ? 'Gói FREE chưa được cấu hình.'
+          : 'Có nhiều phiên bản gói FREE đang hiệu lực.',
       );
     }
 

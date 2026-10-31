@@ -82,14 +82,14 @@ export function validateToeicExam(exam: ToeicValidationExam): {
     if (questions.length !== expectedTotal)
       issues.push({
         code: 'TOTAL_COUNT',
-        message: `Expected ${expectedTotal} questions, found ${questions.length}`,
+        message: `Cần ${expectedTotal} câu hỏi, hiện có ${questions.length} câu.`,
       });
     for (const [part, expected] of Object.entries(EXPECTED_PART_COUNTS)) {
       const actual = partCounts[Number(part)] ?? 0;
       if (actual !== expected)
         issues.push({
           code: 'PART_COUNT',
-          message: `Part ${part} expected ${expected}, found ${actual}`,
+          message: `Part ${part} cần ${expected} câu, hiện có ${actual} câu.`,
         });
     }
     const numbers = questions.map((question) => question.questionNumber);
@@ -102,7 +102,8 @@ export function validateToeicExam(exam: ToeicValidationExam): {
     ) {
       issues.push({
         code: 'QUESTION_ORDER',
-        message: 'Full Test question numbers must be unique and cover 1–200',
+        message:
+          'Số câu của Full Test không được trùng và phải đủ từ 1 đến 200.',
       });
     } else if (
       [...uniqueNumbers]
@@ -112,7 +113,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
       issues.push({
         code: 'QUESTION_ORDER',
         message:
-          'Full Test question numbers must cover 1–200 in canonical order',
+          'Số câu của Full Test phải đủ từ 1 đến 200 theo đúng thứ tự chuẩn.',
       });
     }
     const groupsFor = (part: number) =>
@@ -128,7 +129,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
       ) {
         issues.push({
           code: 'LISTENING_GROUP_STRUCTURE',
-          message: `Part ${part} must contain ${expectedGroups} one-question audio groups`,
+          message: `Part ${part} phải có ${expectedGroups} nhóm audio một câu hỏi.`,
         });
       }
     }
@@ -143,7 +144,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
       ) {
         issues.push({
           code: 'GROUP_STRUCTURE',
-          message: `Part ${part} must contain ${expectedGroups} groups of three questions`,
+          message: `Part ${part} phải có ${expectedGroups} nhóm ba câu hỏi.`,
         });
       }
     }
@@ -160,7 +161,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
       issues.push({
         code: 'PART7_STRUCTURE',
         message:
-          'Part 7 must contain 10 single-passage groups (29 questions) and 5 multiple-passage sets (25 questions)',
+          'Part 7 phải có 10 nhóm một đoạn văn (29 câu) và 5 nhóm nhiều đoạn văn (25 câu).',
       });
     }
   }
@@ -169,19 +170,19 @@ export function validateToeicExam(exam: ToeicValidationExam): {
     if (group.part < 1 || group.part > 7)
       issues.push({
         code: 'PART',
-        message: `Invalid Part ${group.part}`,
+        message: `Part ${group.part} không hợp lệ.`,
         groupId: group.id,
       });
     if (group.part === 1 && !isAcceptedContentImageReference(group.imageUrl))
       issues.push({
         code: 'MISSING_IMAGE',
-        message: 'Part 1 group has no image stimulus',
+        message: 'Nhóm Part 1 chưa có hình ảnh.',
         groupId: group.id,
       });
     if (group.part >= 1 && group.part <= 4 && !group.audioUrl)
       issues.push({
         code: 'MISSING_AUDIO',
-        message: 'Listening group has no durable audio asset',
+        message: 'Nhóm Listening chưa có audio đã lưu.',
         groupId: group.id,
       });
     const media = (group.mediaMetadata ?? {}) as {
@@ -204,14 +205,14 @@ export function validateToeicExam(exam: ToeicValidationExam): {
         ) {
           issues.push({
             code: 'STALE_AUDIO',
-            message: 'Generated audio does not match the current spoken script',
+            message: 'Audio đã tạo không khớp với nội dung nghe hiện tại.',
             groupId: group.id,
           });
         }
         if (media.audio?.stale) {
           issues.push({
             code: 'STALE_AUDIO',
-            message: 'Audio was marked stale after spoken content changed',
+            message: 'Audio đã lỗi thời vì nội dung nghe vừa thay đổi.',
             groupId: group.id,
           });
         }
@@ -222,7 +223,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
         ) {
           issues.push({
             code: 'STALE_AUDIO',
-            message: 'Audio does not match the current spoken script',
+            message: 'Audio không khớp với nội dung nghe hiện tại.',
             groupId: group.id,
           });
         }
@@ -236,7 +237,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
         ) {
           issues.push({
             code: 'STALE_AUDIO',
-            message: 'Legacy audio does not match its stored script',
+            message: 'Audio cũ không khớp với nội dung nghe đã lưu.',
             groupId: group.id,
           });
         }
@@ -246,7 +247,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
           message:
             error instanceof Error
               ? error.message
-              : 'Listening audio script is invalid',
+              : 'Nội dung nghe không hợp lệ.',
           groupId: group.id,
         });
       }
@@ -274,7 +275,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
     if ((group.part === 6 || group.part === 7) && !group.passageText?.trim())
       issues.push({
         code: 'MISSING_PASSAGE',
-        message: 'Reading group has no passage',
+        message: 'Nhóm Reading chưa có đoạn văn.',
         groupId: group.id,
       });
     for (const question of group.questions) {
@@ -286,7 +287,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
       )
         issues.push({
           code: 'OPTIONS',
-          message: `Expected ${expectedOptions} non-empty options`,
+          message: `Cần ${expectedOptions} phương án không để trống.`,
           groupId: group.id,
           questionId: question.id,
         });
@@ -297,7 +298,7 @@ export function validateToeicExam(exam: ToeicValidationExam): {
       )
         issues.push({
           code: 'ANSWER_KEY',
-          message: 'Question has no valid answer key',
+          message: 'Câu hỏi chưa có đáp án đúng hợp lệ.',
           groupId: group.id,
           questionId: question.id,
         });

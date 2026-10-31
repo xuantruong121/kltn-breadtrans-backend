@@ -55,11 +55,11 @@ export class PlanPurchaseService {
   ): Promise<PlanPurchaseResponseDto> {
     const key = idempotencyKey.trim();
     if (!key) {
-      throw new BadRequestException('idempotencyKey is required');
+      throw new BadRequestException('Thiếu mã chống trùng của yêu cầu.');
     }
 
     if (this.payos && !this.payos.isEnabled()) {
-      throw new ConflictException('PayOS credentials are not configured');
+      throw new ConflictException('Cổng thanh toán PayOS chưa được cấu hình.');
     }
 
     await this.subscriptionService.assertPurchasablePlanVersion(planVersionId);
@@ -125,7 +125,7 @@ export class PlanPurchaseService {
         include: { plan: true, entitlements: true },
       });
       if (!version) {
-        throw new NotFoundException('PlanVersion not found');
+        throw new NotFoundException('Không tìm thấy phiên bản gói.');
       }
       this.assertPurchasableSnapshot(version);
 
@@ -197,7 +197,7 @@ export class PlanPurchaseService {
     purchaseId: number,
   ): Promise<PlanPurchaseResponseDto> {
     if (this.payos && !this.payos.isEnabled()) {
-      throw new ConflictException('PayOS credentials are not configured');
+      throw new ConflictException('Cổng thanh toán PayOS chưa được cấu hình.');
     }
     const result = await this.prisma.$transaction(async (tx) => {
       const owned = await tx.planPurchase.findFirst({
@@ -205,7 +205,7 @@ export class PlanPurchaseService {
         select: { id: true },
       });
       if (!owned) {
-        throw new NotFoundException('PlanPurchase not found');
+        throw new NotFoundException('Không tìm thấy giao dịch mua gói.');
       }
 
       await this.lockUser(tx, studentId);
@@ -215,7 +215,9 @@ export class PlanPurchaseService {
         include: this.purchaseInclude,
       });
       if (!current.payment) {
-        throw new UnprocessableEntityException('PlanPayment is missing');
+        throw new UnprocessableEntityException(
+          'Giao dịch thiếu thông tin thanh toán.',
+        );
       }
 
       if (current.supersededByPurchaseId) {
@@ -230,12 +232,12 @@ export class PlanPurchaseService {
         current.payment.status === PlanPaymentStatus.CONFIRMED
       ) {
         throw new ConflictException(
-          'A completed plan purchase cannot be replaced',
+          'Không thể thay thế giao dịch mua gói đã hoàn tất.',
         );
       }
       if (current.payment.status === PlanPaymentStatus.REVIEW_REQUIRED) {
         throw new ConflictException(
-          'This payment is under review and cannot be replaced',
+          'Khoản thanh toán đang được xem xét nên không thể thay thế.',
         );
       }
       if (
@@ -243,7 +245,7 @@ export class PlanPurchaseService {
         !this.isActivePaymentIntent(current)
       ) {
         throw new ConflictException(
-          'Only an active payment intent can be replaced',
+          'Chỉ thay thế được yêu cầu thanh toán còn hiệu lực.',
         );
       }
 
@@ -338,7 +340,7 @@ export class PlanPurchaseService {
       include: this.purchaseInclude,
     });
     if (!purchase) {
-      throw new NotFoundException('PlanPurchase not found');
+      throw new NotFoundException('Không tìm thấy giao dịch mua gói.');
     }
     return this.toStudentDtoWithPayos(purchase, studentId);
   }
@@ -353,7 +355,7 @@ export class PlanPurchaseService {
         select: { id: true },
       });
       if (!candidate) {
-        throw new NotFoundException('PlanPurchase not found');
+        throw new NotFoundException('Không tìm thấy giao dịch mua gói.');
       }
       await this.lockPurchaseAndPayment(tx, purchaseId);
       const current = await tx.planPurchase.findUniqueOrThrow({
@@ -361,7 +363,9 @@ export class PlanPurchaseService {
         include: this.purchaseInclude,
       });
       if (!current.payment) {
-        throw new UnprocessableEntityException('PlanPayment is missing');
+        throw new UnprocessableEntityException(
+          'Giao dịch thiếu thông tin thanh toán.',
+        );
       }
       if (current.payment.status === PlanPaymentStatus.REPORTED) {
         return current;
@@ -434,7 +438,7 @@ export class PlanPurchaseService {
       include: this.purchaseInclude,
     });
     if (!purchase) {
-      throw new NotFoundException('PlanPurchase not found');
+      throw new NotFoundException('Không tìm thấy giao dịch mua gói.');
     }
     return this.toAdminDto(purchase);
   }
@@ -485,7 +489,7 @@ export class PlanPurchaseService {
       select: { userId: true },
     });
     if (!hint) {
-      throw new NotFoundException('PlanPurchase not found');
+      throw new NotFoundException('Không tìm thấy giao dịch mua gói.');
     }
     await this.lockUser(tx, hint.userId);
     await this.lockPurchaseAndPayment(tx, purchaseId);
@@ -494,7 +498,9 @@ export class PlanPurchaseService {
       include: this.purchaseInclude,
     });
     if (!current.payment) {
-      throw new UnprocessableEntityException('PlanPayment is missing');
+      throw new UnprocessableEntityException(
+        'Giao dịch thiếu thông tin thanh toán.',
+      );
     }
     if (
       current.payment.planPurchaseId !== current.id ||
@@ -502,7 +508,7 @@ export class PlanPurchaseService {
       current.payment.currency !== current.currency
     ) {
       throw new ConflictException(
-        'PlanPayment financial snapshot does not match PlanPurchase',
+        'Số liệu thanh toán không khớp với giao dịch mua gói.',
       );
     }
     if (
@@ -522,12 +528,12 @@ export class PlanPurchaseService {
         current.payment.status === PlanPaymentStatus.REVIEW_REQUIRED);
     if (!canAutoConfirm && !canAdminConfirm) {
       throw new ConflictException(
-        `Only reported or review-required plan payments can be confirmed (current: ${current.payment.status})`,
+        `Chỉ xác nhận được khoản đã báo chuyển khoản hoặc cần xem xét (hiện tại: ${current.payment.status}).`,
       );
     }
     if (current.status !== PlanPurchaseStatus.PENDING_PAYMENT) {
       throw new ConflictException(
-        `Cannot confirm a ${current.status} purchase`,
+        `Không thể xác nhận giao dịch ở trạng thái ${current.status}.`,
       );
     }
     this.assertFrozenTerms(current);
@@ -619,7 +625,7 @@ export class PlanPurchaseService {
   ): Promise<PlanPurchaseAdminDto> {
     const rejectionReason = reason.trim();
     if (!rejectionReason) {
-      throw new BadRequestException('rejectionReason is required');
+      throw new BadRequestException('Vui lòng nhập lý do từ chối.');
     }
     const purchase = await this.prisma.$transaction(async (tx) => {
       const hint = await tx.planPurchase.findUnique({
@@ -627,7 +633,7 @@ export class PlanPurchaseService {
         select: { userId: true },
       });
       if (!hint) {
-        throw new NotFoundException('PlanPurchase not found');
+        throw new NotFoundException('Không tìm thấy giao dịch mua gói.');
       }
       await this.lockUser(tx, hint.userId);
       await this.lockPurchaseAndPayment(tx, purchaseId);
@@ -636,7 +642,9 @@ export class PlanPurchaseService {
         include: this.purchaseInclude,
       });
       if (!current.payment) {
-        throw new UnprocessableEntityException('PlanPayment is missing');
+        throw new UnprocessableEntityException(
+          'Giao dịch thiếu thông tin thanh toán.',
+        );
       }
       if (
         current.status === PlanPurchaseStatus.REJECTED &&
@@ -646,12 +654,12 @@ export class PlanPurchaseService {
       }
       if (current.payment.status === PlanPaymentStatus.CONFIRMED) {
         throw new ConflictException(
-          'A confirmed plan payment cannot be rejected',
+          'Không thể từ chối khoản thanh toán đã xác nhận.',
         );
       }
       if (current.payment.status !== PlanPaymentStatus.REPORTED) {
         throw new ConflictException(
-          `Only REPORTED plan payments can be rejected (current: ${current.payment.status})`,
+          `Chỉ từ chối được khoản đã báo chuyển khoản (hiện tại: ${current.payment.status}).`,
         );
       }
       await tx.planPayment.update({
@@ -748,7 +756,7 @@ export class PlanPurchaseService {
       Prisma.sql`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`,
     );
     if (rows.length === 0) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Không tìm thấy tài khoản.');
     }
   }
 
@@ -760,13 +768,15 @@ export class PlanPurchaseService {
       Prisma.sql`SELECT "id" FROM "PlanPurchase" WHERE "id" = ${purchaseId} FOR UPDATE`,
     );
     if (purchaseRows.length === 0) {
-      throw new NotFoundException('PlanPurchase not found');
+      throw new NotFoundException('Không tìm thấy giao dịch mua gói.');
     }
     const paymentRows = await tx.$queryRaw<{ id: number }[]>(
       Prisma.sql`SELECT "id" FROM "PlanPayment" WHERE "planPurchaseId" = ${purchaseId} FOR UPDATE`,
     );
     if (paymentRows.length === 0) {
-      throw new UnprocessableEntityException('PlanPayment is missing');
+      throw new UnprocessableEntityException(
+        'Giao dịch thiếu thông tin thanh toán.',
+      );
     }
   }
 
@@ -816,14 +826,16 @@ export class PlanPurchaseService {
         version.status !== PlanVersionStatus.RETIRED)
     ) {
       throw new ConflictException(
-        'Frozen PlanPurchase terms no longer match the purchased PlanVersion',
+        'Điều khoản đã chốt của giao dịch không còn khớp với phiên bản gói đã mua.',
       );
     }
   }
 
   private toStudentDto(purchase: PurchaseWithDetails): PlanPurchaseResponseDto {
     if (!purchase.payment) {
-      throw new UnprocessableEntityException('PlanPayment is missing');
+      throw new UnprocessableEntityException(
+        'Giao dịch thiếu thông tin thanh toán.',
+      );
     }
     return {
       id: purchase.id,
@@ -885,7 +897,9 @@ export class PlanPurchaseService {
     payment: PurchaseWithDetails['payment'],
   ): PlanPurchasePaymentDto {
     if (!payment) {
-      throw new UnprocessableEntityException('PlanPayment is missing');
+      throw new UnprocessableEntityException(
+        'Giao dịch thiếu thông tin thanh toán.',
+      );
     }
     return {
       id: payment.id,
@@ -907,7 +921,9 @@ export class PlanPurchaseService {
     payment: PurchaseWithDetails['payment'],
   ): PlanBankInstructionsDto | null {
     if (!payment) {
-      throw new UnprocessableEntityException('PlanPayment is missing');
+      throw new UnprocessableEntityException(
+        'Giao dịch thiếu thông tin thanh toán.',
+      );
     }
     let bank: ReturnType<typeof getPaymentBankConfig>;
     try {

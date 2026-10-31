@@ -125,7 +125,7 @@ describe('CourseService self-paced business rules', () => {
     });
 
     await expect(service.getCourseById(9, 7, 'STUDENT')).rejects.toThrow(
-      'Course not found',
+      'Không tìm thấy khóa học.',
     );
     expect(prisma.course.findUnique).toHaveBeenCalledTimes(1);
   });

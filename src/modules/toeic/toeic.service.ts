@@ -263,7 +263,7 @@ export class ToeicService {
       !exam ||
       (!isStaff && exam.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
-      throw new NotFoundException('Exam not found');
+      throw new NotFoundException('Không tìm thấy đề thi.');
     }
     const partQuestionCounts = new Map<number, number>();
     for (const group of exam.groups) {
@@ -344,7 +344,7 @@ export class ToeicService {
 
   async getBundle(quizId: number, includeAnswers = false) {
     const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
-    if (!quiz) throw new NotFoundException('TOEIC bundle not found');
+    if (!quiz) throw new NotFoundException('Không tìm thấy gói đề TOEIC.');
     const metadata =
       quiz.bilingualContent &&
       typeof quiz.bilingualContent === 'object' &&
@@ -423,7 +423,8 @@ export class ToeicService {
         },
       },
     });
-    if (!group) throw new NotFoundException('TOEIC question group not found');
+    if (!group)
+      throw new NotFoundException('Không tìm thấy nhóm câu hỏi TOEIC.');
     const attempt = await this.prisma.toeicAttempt.findUnique({
       where: { id: attemptId },
       select: {
@@ -512,9 +513,9 @@ export class ToeicService {
           where: { id: examId },
           include: { groups: { include: { questions: true } } },
         });
-        if (!exam) throw new NotFoundException('Exam not found');
+        if (!exam) throw new NotFoundException('Không tìm thấy đề thi.');
         if (exam.publicationStatus !== QuizPublicationStatus.PUBLISHED) {
-          throw new NotFoundException('Exam not found');
+          throw new NotFoundException('Không tìm thấy đề thi.');
         }
         this.validateDuration(exam.durationSeconds);
         this.validateModeCompatibility(exam.type, mode);
@@ -591,14 +592,14 @@ export class ToeicService {
       const initial = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!initial) throw new NotFoundException('Attempt not found');
+      if (!initial) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       await this.lockTuple(tx, initial.userId, initial.examId, initial.mode);
       await this.lockAttemptRow(tx, attemptId);
       const attempt = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
         include: { exam: true },
       });
-      if (!attempt) throw new NotFoundException('Attempt not found');
+      if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       if (attempt.userId !== userId)
         throw new ForbiddenException('Bạn không có quyền bắt đầu lượt thi này');
       if (attempt.status === AttemptStatus.IN_PROGRESS) return attempt;
@@ -648,7 +649,7 @@ export class ToeicService {
       where: { id: attemptId },
       select: { userId: true, examId: true, status: true, section: true },
     });
-    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
     if (attempt.userId !== userId)
       throw new ForbiddenException('Bạn không có quyền truy cập bài thi này');
     // After submission the recording is replayable in the answer review.
@@ -723,7 +724,7 @@ export class ToeicService {
   openPrivateMedia(key: string, range?: string) {
     if (!this.uploadService)
       throw new ServiceUnavailableException(
-        'Private media storage is unavailable',
+        'Kho lưu trữ riêng tư hiện không khả dụng.',
       );
     return this.uploadService.openPrivateObject(key, range);
   }
@@ -806,7 +807,7 @@ export class ToeicService {
     const attempt = await this.prisma.toeicAttempt.findUnique({
       where: { id: attemptId },
     });
-    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
     if (attempt.userId !== userId)
       throw new ForbiddenException('Bạn không có quyền truy cập bài thi này');
     if (attempt.mode !== AttemptMode.FULL_TEST)
@@ -847,12 +848,12 @@ export class ToeicService {
       const initial = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!initial) throw new NotFoundException('Attempt not found');
+      if (!initial) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       await this.lockAttemptRow(tx, attemptId);
       const attempt = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!attempt) throw new NotFoundException('Attempt not found');
+      if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       if (attempt.userId !== userId)
         throw new ForbiddenException(
           'Bạn không có quyền điều khiển lượt thi này',
@@ -894,7 +895,7 @@ export class ToeicService {
     const attempt = await this.prisma.toeicAttempt.findUnique({
       where: { id: attemptId },
     });
-    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
     if (role !== 'ADMIN' && attempt.userId !== userId)
       throw new ForbiddenException('Bạn không có quyền truy cập bài thi này');
     if (
@@ -960,7 +961,7 @@ export class ToeicService {
         answers: { select: { questionId: true, selectedIndex: true } },
       },
     });
-    if (!current) throw new NotFoundException('Attempt not found');
+    if (!current) throw new NotFoundException('Không tìm thấy lượt làm bài.');
     if (current.status === AttemptStatus.PENDING_START)
       return { ...current, exam: { ...current.exam, groups: [] } };
     return {
@@ -1107,13 +1108,13 @@ export class ToeicService {
       const initial = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!initial) throw new NotFoundException('Attempt not found');
+      if (!initial) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       await this.lockTuple(tx, initial.userId, initial.examId, initial.mode);
       await this.lockAttemptRow(tx, attemptId);
       const attempt = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!attempt) throw new NotFoundException('Attempt not found');
+      if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       if (attempt.userId !== userId)
         throw new ForbiddenException(
           'Bạn không có quyền chỉnh sửa bài thi này',
@@ -1211,7 +1212,7 @@ export class ToeicService {
         answers: { include: { question: { include: { group: true } } } },
       },
     });
-    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
     if (attempt.userId !== userId)
       throw new ForbiddenException('Bạn không có quyền kết thúc lượt thi này');
     if (attempt.status === AttemptStatus.SUBMITTED)
@@ -1279,7 +1280,7 @@ export class ToeicService {
       const initial = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!initial) throw new NotFoundException('Attempt not found');
+      if (!initial) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       await this.lockTuple(tx, initial.userId, initial.examId, initial.mode);
       await this.lockAttemptRow(tx, attemptId);
       const attempt = await tx.toeicAttempt.findUnique({
@@ -1288,7 +1289,7 @@ export class ToeicService {
           answers: { include: { question: { include: { group: true } } } },
         },
       });
-      if (!attempt) throw new NotFoundException('Attempt not found');
+      if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       if (attempt.userId !== userId)
         throw new ForbiddenException('Bạn không có quyền nộp bài thi này');
       if (attempt.status === AttemptStatus.SUBMITTED)
@@ -1544,7 +1545,7 @@ export class ToeicService {
         },
       },
     });
-    if (!attempt) throw new NotFoundException('Review not found');
+    if (!attempt) throw new NotFoundException('Không tìm thấy bài xem lại.');
     if (role !== 'ADMIN' && attempt.userId !== userId)
       throw new ForbiddenException('Bạn không có quyền xem bài review này');
     // Answer keys, transcripts and explanations exist only after submission.
@@ -1641,13 +1642,13 @@ export class ToeicService {
       const initial = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!initial) throw new NotFoundException('Attempt not found');
+      if (!initial) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       await this.lockTuple(tx, initial.userId, initial.examId, initial.mode);
       await this.lockAttemptRow(tx, attemptId);
       const attempt = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!attempt) throw new NotFoundException('Attempt not found');
+      if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       if (attempt.userId !== userId)
         throw new ForbiddenException('Bạn không có quyền hủy lượt thi này');
       if (attempt.status === AttemptStatus.SUBMITTED)
@@ -1668,7 +1669,7 @@ export class ToeicService {
       const initial = await tx.toeicAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!initial) throw new NotFoundException('Attempt not found');
+      if (!initial) throw new NotFoundException('Không tìm thấy lượt làm bài.');
       await this.lockTuple(tx, initial.userId, initial.examId, initial.mode);
       await this.lockAttemptRow(tx, attemptId);
       const attempt = await tx.toeicAttempt.findUnique({
@@ -1708,7 +1709,7 @@ export class ToeicService {
     const attempt = await this.prisma.toeicAttempt.findUnique({
       where: { id: attemptId },
     });
-    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
     if (role !== 'ADMIN' && attempt.userId !== userId)
       throw new ForbiddenException('Bạn không có quyền truy cập bài thi này');
     if (attempt.status !== AttemptStatus.IN_PROGRESS)
@@ -1746,7 +1747,7 @@ export class ToeicService {
     const attempt = await this.prisma.toeicAttempt.findUnique({
       where: { id: attemptId },
     });
-    if (!attempt) throw new NotFoundException('Result not found');
+    if (!attempt) throw new NotFoundException('Không tìm thấy kết quả.');
     if (role !== 'ADMIN' && attempt.userId !== userId)
       throw new ForbiddenException(
         'Bạn không có quyền xem kết quả bài thi này',
@@ -1767,7 +1768,7 @@ export class ToeicService {
           answers: { include: { question: { include: { group: true } } } },
         },
       });
-      if (!current) throw new NotFoundException('Result not found');
+      if (!current) throw new NotFoundException('Không tìm thấy kết quả.');
       return {
         formatted: this.formatResult(
           current,

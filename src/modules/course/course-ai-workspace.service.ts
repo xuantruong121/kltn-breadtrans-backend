@@ -65,7 +65,10 @@ export class CourseAiWorkspaceService {
   ) {}
 
   private admin(user: Admin) {
-    if (user.role !== Role.ADMIN) throw new ForbiddenException('Admin only');
+    if (user.role !== Role.ADMIN)
+      throw new ForbiddenException(
+        'Chỉ quản trị viên được thực hiện thao tác này.',
+      );
   }
 
   private key(id: string) {
@@ -80,7 +83,7 @@ export class CourseAiWorkspaceService {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
-    if (!course) throw new NotFoundException('Course not found');
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
     return course;
   }
 
@@ -126,7 +129,7 @@ export class CourseAiWorkspaceService {
   private async buildAudit(courseId: number) {
     const course = await this.course(courseId);
     const graph = await this.courseGraph(courseId);
-    if (!graph) throw new NotFoundException('Course not found');
+    if (!graph) throw new NotFoundException('Không tìm thấy khóa học.');
     const tasks: WorkspaceTask[] = [];
     const add = (
       type: TaskType,
@@ -354,7 +357,7 @@ export class CourseAiWorkspaceService {
           where: { id: task.target.courseId },
           select: { thumbnail: true },
         });
-        if (!course) throw new NotFoundException('Course not found');
+        if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
         return this.signature({ thumbnail: course.thumbnail });
       }
       return this.signature(await this.courseGraph(task.target.courseId));

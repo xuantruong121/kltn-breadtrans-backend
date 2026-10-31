@@ -256,7 +256,7 @@ export class ArenaGateway
         `[Arena] Connection rejected: Missing auth token (${client.id})`,
       );
       client.emit('arena:error', {
-        message: 'Authentication token required for Arena',
+        message: 'Vui lòng đăng nhập để vào Đấu trường.',
       });
       client.disconnect(true);
       return;
@@ -302,7 +302,7 @@ export class ArenaGateway
         `[Arena] Connection rejected: Invalid auth token (${client.id})`,
       );
       client.emit('arena:error', {
-        message: 'Invalid or expired authentication token',
+        message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
       });
       client.disconnect(true);
       return;

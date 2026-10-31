@@ -174,7 +174,7 @@ export class AuthController {
     const authorization = req.headers.authorization as string | undefined;
     const accessToken = authorization?.replace(/^Bearer\s+/i, '');
     if (!accessToken) {
-      throw new UnauthorizedException('Access token is required.');
+      throw new UnauthorizedException('Vui lòng đăng nhập để tiếp tục.');
     }
     return this.authService.logout(req.user.id, deviceId, accessToken);
   }

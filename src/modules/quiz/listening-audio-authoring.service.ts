@@ -658,7 +658,7 @@ export class ListeningAudioAuthoringService {
       Boolean(r2Url)
     ) {
       throw new ServiceUnavailableException(
-        'Premium Listening artifact must use configured private storage',
+        'Tệp Nghe trả phí phải lưu ở kho riêng tư đã cấu hình.',
       );
     }
   }
@@ -671,7 +671,7 @@ export class ListeningAudioAuthoringService {
     const isPremium = await this.isPremiumListeningQuiz(quizId);
     if (isPremium && !this.uploadService.isPrivateStorageConfigured()) {
       throw new ServiceUnavailableException(
-        'Protected Listening media storage is not configured',
+        'Kho lưu trữ âm thanh Nghe chưa được cấu hình.',
       );
     }
     const startedAt = Date.now();

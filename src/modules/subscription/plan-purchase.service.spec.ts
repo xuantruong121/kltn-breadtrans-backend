@@ -418,10 +418,10 @@ describe('PlanPurchaseService', () => {
     );
 
     await expect(service.getMyPurchase(8, 31)).rejects.toThrow(
-      'PlanPurchase not found',
+      'Không tìm thấy giao dịch mua gói.',
     );
     await expect(service.reportTransfer(8, 31)).rejects.toThrow(
-      'PlanPurchase not found',
+      'Không tìm thấy giao dịch mua gói.',
     );
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
@@ -628,7 +628,7 @@ describe('PlanPurchaseService', () => {
     );
 
     await expect(service.confirmPurchase(31, 99)).rejects.toThrow(
-      'PlanPayment financial snapshot does not match PlanPurchase',
+      'Số liệu thanh toán không khớp với giao dịch mua gói.',
     );
     expect(tx.subscription.findFirst).not.toHaveBeenCalled();
     expect(tx.planPayment.update).not.toHaveBeenCalled();
@@ -655,7 +655,7 @@ describe('PlanPurchaseService', () => {
       new SubscriptionService(prisma as never),
     );
     await expect(service.confirmPurchase(31, 99)).rejects.toThrow(
-      'Only reported or review-required plan payments can be confirmed',
+      'Chỉ xác nhận được khoản đã báo chuyển khoản',
     );
 
     const completed = purchase(
@@ -674,7 +674,7 @@ describe('PlanPurchaseService', () => {
       callback: (value: typeof completedTx) => unknown,
     ) => callback(completedTx)) as never);
     await expect(service.rejectPurchase(31, 99, 'Too late')).rejects.toThrow(
-      'A confirmed plan payment cannot be rejected',
+      'Không thể từ chối khoản thanh toán đã xác nhận.',
     );
   });
 

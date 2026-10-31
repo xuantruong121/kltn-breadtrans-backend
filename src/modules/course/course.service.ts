@@ -233,7 +233,7 @@ export class CourseService {
         },
       },
     });
-    if (!course) throw new NotFoundException('Course not found');
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
 
     if (role === Role.ADMIN) {
       const isV5Admin =
@@ -253,7 +253,7 @@ export class CourseService {
     }
 
     if (course.status !== CourseStatus.PUBLISHED) {
-      throw new NotFoundException('Course not found');
+      throw new NotFoundException('Không tìm thấy khóa học.');
     }
 
     // Learners study the published Course Learning 5.0 lessons. Courses 1 and 8
@@ -315,7 +315,8 @@ export class CourseService {
     const lesson = detail.curriculum.lessons.find(
       (item) => item.id === lessonId,
     );
-    if (!lesson) throw new NotFoundException('Course lesson not found');
+    if (!lesson)
+      throw new NotFoundException('Không tìm thấy bài học trong khóa.');
 
     const progressActivities =
       'progress' in detail ? (detail.progress?.activities ?? []) : [];
@@ -395,7 +396,7 @@ export class CourseService {
         },
       },
     });
-    if (!course) throw new NotFoundException('Course not found');
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
     const curriculum = buildCourseCurriculum(
       course.lessons,
       course.quizzes,
@@ -592,7 +593,7 @@ export class CourseService {
       },
     });
     if (!course || course.status !== CourseStatus.PUBLISHED) {
-      throw new NotFoundException('Course is not learner-ready');
+      throw new NotFoundException('Khóa học chưa sẵn sàng cho học viên.');
     }
     // Course Learning 5.0 is the learner path: publishing already requires a
     // complete V5 lesson, and /learning serves exactly the published V5
@@ -649,7 +650,8 @@ export class CourseService {
     const activity = detail.curriculum.lessons
       .flatMap((lesson) => lesson.activities)
       .find((candidate) => candidate.id === `activity:${activityId}`);
-    if (!activity) throw new NotFoundException('Course activity not found');
+    if (!activity)
+      throw new NotFoundException('Không tìm thấy hoạt động của khóa học.');
     const progressActivity = (
       'progress' in detail ? detail.progress : null
     )?.activities.find((item) => item.id === activity.id);
@@ -668,7 +670,7 @@ export class CourseService {
   ) {
     this.requireAdmin(user.role);
     const course = await this.prisma.course.findUnique({ where: { id } });
-    if (!course) throw new NotFoundException('Course not found');
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
     if (
       course.status === CourseStatus.PUBLISHED &&
       [
@@ -761,7 +763,7 @@ export class CourseService {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
-    if (!course) throw new NotFoundException('Course not found');
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
     const order =
       dto.order ??
       (await this.prisma.lesson.count({ where: { courseId } })) + 1;
@@ -868,7 +870,7 @@ export class CourseService {
       this.prisma.course.findUnique({ where: { id: courseId } }),
       this.prisma.lesson.findUnique({ where: { id: dto.lessonId } }),
     ]);
-    if (!course) throw new NotFoundException('Course not found');
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
     if (!lesson || lesson.courseId !== courseId)
       throw new BadRequestException('Lesson không thuộc course');
     const order =

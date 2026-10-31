@@ -258,7 +258,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Không tìm thấy tài khoản.');
     }
 
     const {
@@ -303,7 +303,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Không tìm thấy tài khoản.');
     }
 
     if (user.shippingProfile) {
@@ -347,7 +347,7 @@ export class UserService {
       include: { profile: true },
     });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Không tìm thấy tài khoản.');
     }
 
     const normPhone = normalizeVietnamPhone(dto.phone);
