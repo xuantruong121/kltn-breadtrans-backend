@@ -1,8 +1,10 @@
 /**
  * Owner access policy for STANDALONE skill practice (Listening, Reading,
  * Speaking, Writing), decided from the content's CEFR level:
- *   A1 / A2  → free for every learner;
- *   B1 and above → PLUS (PRO includes PLUS).
+ *   Reading → free;
+ *   Listening → free, except dictation B1 and above (PLUS);
+ *   Speaking, Writing → A1–A2 free, B1–B2 PLUS, C1 and above PRO.
+ * PRO includes PLUS.
  * Learner-facing groups: Cơ bản (A1–A2), Trung cấp (B1–B2), Nâng cao (C1–C2).
  *
  * Levels come from authored data: a Speaking practice set's `level`, or the

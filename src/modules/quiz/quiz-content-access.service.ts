@@ -23,12 +23,16 @@ export type QuizContentAccessSubject = {
   type: QuizType;
   isPremiumContent: boolean;
   courseId: number | null;
-  /** Present on full rows; carries the authored CEFR tag of practice items. */
+  /**
+   * Carries the authored CEFR tag of practice items. resolve/resolveMany load
+   * it when a caller did not select it, so the plan matrix holds on every
+   * route, not only those that read the full row.
+   */
   title?: string;
   /**
    * Listening practice keeps its mode here (DICTATION is paid from B1).
-   * resolve/resolveMany load it when a caller did not select it; a
-   * Listening item reaching requiredPlan without it counts as dictation.
+   * Loaded like `title`; a Listening item reaching requiredPlan without it
+   * counts as dictation.
    */
   bilingualContent?: unknown;
 };
@@ -57,24 +61,33 @@ export class QuizContentAccessService {
     private readonly prisma: PrismaService,
   ) {}
 
-  /** Fills bilingualContent for Listening quizzes selected without it. */
-  private async withListeningModes<T extends QuizContentAccessSubject>(
+  /** Fills the title and Listening mode of quizzes selected without them. */
+  private async withPolicyFields<T extends QuizContentAccessSubject>(
     quizzes: T[],
   ): Promise<T[]> {
     const missing = quizzes.filter(
       (q) =>
-        this.skillForQuizType(q.type) === 'LISTENING' &&
-        q.bilingualContent === undefined,
+        this.skillForQuizType(q.type) !== null &&
+        (q.title === undefined ||
+          (this.skillForQuizType(q.type) === 'LISTENING' &&
+            q.bilingualContent === undefined)),
     );
     if (!missing.length) return quizzes;
     const rows = await this.prisma.quiz.findMany({
       where: { id: { in: missing.map((q) => q.id) } },
-      select: { id: true, bilingualContent: true },
+      select: { id: true, title: true, bilingualContent: true },
     });
-    const mode = new Map(rows.map((r) => [r.id, r.bilingualContent]));
+    const byId = new Map(rows.map((r) => [r.id, r]));
     return quizzes.map((q) =>
       missing.includes(q)
-        ? { ...q, bilingualContent: mode.get(q.id) ?? null }
+        ? {
+            ...q,
+            title: q.title ?? byId.get(q.id)?.title,
+            bilingualContent:
+              q.bilingualContent !== undefined
+                ? q.bilingualContent
+                : (byId.get(q.id)?.bilingualContent ?? null),
+          }
         : q,
     );
   }
@@ -150,7 +163,7 @@ export class QuizContentAccessService {
     userId?: number,
     role?: Role,
   ): Promise<QuizContentAccess> {
-    const [quiz] = await this.withListeningModes([subject]);
+    const [quiz] = await this.withPolicyFields([subject]);
     const needsPlan = this.isPremium(quiz) && role !== Role.ADMIN && userId;
     const planCode = needsPlan
       ? await this.subscriptionService.effectivePlanCode(userId)
@@ -163,7 +176,7 @@ export class QuizContentAccessService {
     userId?: number,
     role?: Role,
   ): Promise<Map<number, QuizContentAccess>> {
-    const quizzes = await this.withListeningModes(subjects);
+    const quizzes = await this.withPolicyFields(subjects);
     const needsPlan =
       userId &&
       role !== Role.ADMIN &&

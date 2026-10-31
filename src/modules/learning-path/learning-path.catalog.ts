@@ -8,7 +8,8 @@
  *   SpeakingPracticeSet (SKILL_PRACTICE)                      -> SPEAKING_SET,
  *     contentId = the set's first exercise id (sets have string ids; the
  *     learner opens a set at its first exercise)
- * Scores are stored on a 0-10 scale and used here as percentages.
+ * History scores are normalised to 0-100 (percentOfAttempt): each skill
+ * stores its own scale.
  */
 import type {
   LearningContentType,
@@ -24,6 +25,7 @@ import {
   requiredPracticePlan,
 } from '../subscription/practice-level';
 import { itemLevel, seedDifficulty } from './ability.logic';
+import { percentOfAttempt } from './progression.logic';
 import {
   contentKey,
   type Candidate,
@@ -170,7 +172,15 @@ export async function loadLearnerState(
     db.learnerSkillLevel.findMany({ where: { userId } }),
     db.submission.findMany({
       where: { userId },
-      select: { quizId: true, score: true, submittedAt: true },
+      select: {
+        quizId: true,
+        score: true,
+        submittedAt: true,
+        aiFeedback: true,
+        quiz: {
+          select: { type: true, _count: { select: { questions: true } } },
+        },
+      },
     }),
     db.speakingSubmission.findMany({
       where: { userId },
@@ -182,9 +192,8 @@ export async function loadLearnerState(
     }),
   ]);
   const history = new Map<string, HistoryEntry>();
-  const record = (key: string, score: number | null, at: Date) => {
+  const record = (key: string, percent: number | null, at: Date) => {
     const prev = history.get(key);
-    const percent = score === null ? null : score * 10;
     history.set(key, {
       bestScore:
         prev?.bestScore == null
@@ -196,14 +205,31 @@ export async function loadLearnerState(
       attempts: (prev?.attempts ?? 0) + 1,
     });
   };
-  for (const s of submissions)
-    record(contentKey({ type: 'QUIZ', id: s.quizId }), s.score, s.submittedAt);
+  for (const s of submissions) {
+    const skill = QUIZ_SKILL[s.quiz.type];
+    if (!skill) continue;
+    record(
+      contentKey({ type: 'QUIZ', id: s.quizId }),
+      skill === 'WRITING'
+        ? percentOfAttempt({
+            skill,
+            score: s.score,
+            aiFeedback: s.aiFeedback,
+          })
+        : percentOfAttempt({
+            skill,
+            score: s.score,
+            questions: s.quiz._count.questions,
+          }),
+      s.submittedAt,
+    );
+  }
   for (const s of speaking) {
     const first = setKeyOfExercise.get(s.exerciseId);
     if (first !== undefined)
       record(
         contentKey({ type: 'SPEAKING_SET', id: first }),
-        s.overallScore,
+        percentOfAttempt({ skill: 'SPEAKING', score: s.overallScore }),
         s.submittedAt,
       );
   }

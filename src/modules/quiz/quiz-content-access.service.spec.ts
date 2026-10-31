@@ -35,6 +35,56 @@ describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
   const listening = (title: string, mode: object, id = 10) =>
     quiz(QuizType.LISTENING_PRACTICE, title, { id, bilingualContent: mode });
 
+  it('applies the matrix on routes that select no title', async () => {
+    quizRows.findMany.mockResolvedValue([
+      { id: 10, title: 'Writing B2 — Reports', bilingualContent: null },
+    ]);
+    const bare = {
+      id: 10,
+      type: QuizType.WRITING_EMAIL,
+      isPremiumContent: false,
+      courseId: null,
+    };
+    await expect(service.assertAccess(bare, 7)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(quizRows.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: { id: true, title: true, bilingualContent: true },
+      }),
+    );
+  });
+
+  it('applies the dictation rule on routes that select neither field', async () => {
+    quizRows.findMany.mockResolvedValue([
+      {
+        id: 11,
+        title: 'Nghe chép B1 — Công việc',
+        bilingualContent: { mode: 'DICTATION' },
+      },
+    ]);
+    const access = await service.resolve(
+      {
+        id: 11,
+        type: QuizType.LISTENING_PRACTICE,
+        isPremiumContent: false,
+        courseId: null,
+      },
+      7,
+    );
+    expect(access).toMatchObject({ isLocked: true, requiredPlan: 'PLUS' });
+  });
+
+  it('does not query for content outside the four skills', async () => {
+    await service.resolve({
+      id: 12,
+      type: QuizType.TOEIC,
+      isPremiumContent: false,
+      courseId: null,
+    });
+    expect(quizRows.findMany).not.toHaveBeenCalled();
+  });
+
   it('keeps the content feature of each skill for callers that report it', () => {
     expect(service.featureForQuizType(QuizType.WRITING_EMAIL)).toBe(
       PlanFeatureKey.PREMIUM_WRITING_CONTENT,
