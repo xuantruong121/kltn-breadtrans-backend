@@ -26,6 +26,7 @@ import { SpeakingWorkerService } from './speaking-worker.service';
 import { SpeakingQueueService } from './speaking-queue.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import { recordAzureTts, spokenCharacters } from '../ai/azure-usage';
 import * as crypto from 'crypto';
 import { getSpeakingPipelineMode } from './speaking.constants';
 import {
@@ -1628,6 +1629,7 @@ export class SpeakingService {
     }
 
     const audioBuffer = Buffer.from(await response.arrayBuffer());
+    await recordAzureTts(this.redis, spokenCharacters(ssml));
     if (this.redis) {
       try {
         await this.redis.set(

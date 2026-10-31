@@ -24,12 +24,18 @@ import {
 } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
-import { R2Service } from '../upload/r2.service';
+import { R2Service, type StorageUsage } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
 import { CourseService } from '../course/course.service';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
+import { azureTtsKey } from '../ai/azure-usage';
+import {
+  azureSpeechUsage,
+  isGeminiCacheKey,
+  R2_FREE_GB,
+} from './system-costs.logic';
 import {
   CreateVocabTopicDto,
   UpdateVocabTopicDto,
@@ -128,6 +134,8 @@ function fillEmpty(
 
 @Injectable()
 export class AdminService {
+  private storageMeasure: { at: number; usage: StorageUsage } | null = null;
+
   constructor(
     private prisma: PrismaService,
     private r2Service: R2Service,
@@ -1703,6 +1711,8 @@ export class AdminService {
       totalMaterials,
       totalUsers,
       audioDurationThisMonth,
+      diagnosticDurationThisMonth,
+      listeningTtsThisMonth,
     ] = await Promise.all([
       this.prisma.speakingSubmission.count(),
       this.prisma.speakingSubmission.count({
@@ -1717,26 +1727,18 @@ export class AdminService {
         where: { submittedAt: { gte: startOfMonth } },
         _sum: { durationMs: true },
       }),
+      this.prisma.diagnosticSpeakingResponse.aggregate({
+        where: {
+          createdAt: { gte: startOfMonth },
+          provider: { contains: 'azure' },
+        },
+        _sum: { durationMs: true },
+      }),
+      this.prisma.listeningAudioUsage.aggregate({
+        where: { createdAt: { gte: startOfMonth }, success: true },
+        _sum: { characterCount: true },
+      }),
     ]);
-
-    // Azure AI Speech (Pronunciation Assessment) free tier: 5 audio hours /
-    // month, same figure already shown on the card header. Cloudflare R2
-    // free tier: 10 GB storage / month. These are the providers' published
-    // quota constants, not billing estimates — safe to hardcode, unlike
-    // actual cost which this deployment has no real provider billing feed
-    // for.
-    const AZURE_SPEECH_FREE_QUOTA_MINUTES = 5 * 60;
-    const R2_FREE_QUOTA_GB = 10;
-
-    const audioMinutesThisMonth = Math.round(
-      (audioDurationThisMonth._sum.durationMs ?? 0) / 60000,
-    );
-    const azureUsedPercent = Math.min(
-      100,
-      Math.round(
-        (audioMinutesThisMonth / AZURE_SPEECH_FREE_QUOTA_MINUTES) * 100,
-      ),
-    );
 
     let cachedGeminiCount = 0;
     let geminiTotalRequests = 0;
@@ -1744,16 +1746,19 @@ export class AdminService {
     let geminiOutputTokens = 0;
     let geminiCostUsd = 0;
     let geminiCostVnd = 0;
+    let otherTtsCharacters = 0;
 
     if (this.redis) {
       try {
-        const [keys, totalReqs, inTok, outTok] = await Promise.all([
+        const [keys, totalReqs, inTok, outTok, ttsCounted] = await Promise.all([
           this.redis.keys('gemini:*'),
           this.redis.get('gemini:telemetry:total_requests'),
           this.redis.get('gemini:telemetry:input_tokens'),
           this.redis.get('gemini:telemetry:output_tokens'),
+          this.redis.get(azureTtsKey(now)),
         ]);
-        cachedGeminiCount = keys.length;
+        cachedGeminiCount = keys.filter(isGeminiCacheKey).length;
+        otherTtsCharacters = ttsCounted ? parseInt(ttsCounted, 10) : 0;
         let quotaSum = 0;
         const quotaKeys = keys.filter((k) =>
           k.startsWith('gemini:daily_quota:'),
@@ -1783,27 +1788,30 @@ export class AdminService {
       }
     }
 
-    let r2Usage: { totalMb: number } | null = null;
-    try {
-      r2Usage = await this.r2Service.getBucketStorageUsage();
-    } catch {
-      // R2 telemetry is unavailable; do not replace it with an estimate.
-    }
+    const azure = azureSpeechUsage({
+      speakingMs: audioDurationThisMonth._sum.durationMs ?? 0,
+      diagnosticMs: diagnosticDurationThisMonth._sum.durationMs ?? 0,
+      ttsCharacters:
+        (listeningTtsThisMonth._sum.characterCount ?? 0) + otherTtsCharacters,
+    });
+
+    const r2Usage = await this.measuredStorage();
     const activeAudioCount = Math.max(
       0,
       totalSpeakingSubmissions - archivedSpeakingAudio,
     );
-    const measuredStorageMb = r2Usage?.totalMb ?? 0;
+    const measuredStorageMb = r2Usage.totalMb;
     const r2StorageGb = Number((measuredStorageMb / 1024).toFixed(3));
     const r2UsedPercent = Math.min(
       100,
-      Math.round((r2StorageGb / R2_FREE_QUOTA_GB) * 100),
+      Math.round((r2StorageGb / R2_FREE_GB) * 100),
     );
 
     // Azure/R2 overage cost is always 0 while usage stays within their free
     // tiers (no paid tier wired up), so the only real cost component today
     // is Gemini's token-based estimate — surface that in the headline total
     // instead of a hardcoded 0 that contradicts the Gemini card below it.
+    // Its token counters are cumulative, not this month's.
     return {
       summary: {
         totalCostUsd: geminiCostUsd,
@@ -1835,12 +1843,9 @@ export class AdminService {
           name: 'Microsoft Azure AI Speech',
           totalSubmissions: totalSpeakingSubmissions,
           submissionsThisMonth: speakingThisMonth,
-          audioMinutesThisMonth,
-          freeQuotaMinutes: AZURE_SPEECH_FREE_QUOTA_MINUTES,
-          usedPercent: azureUsedPercent,
+          ...azure,
           costUsd: 0,
           costVnd: 0,
-          withinFreeTier: azureUsedPercent < 100,
         },
         cloudflareR2: {
           name: 'Cloudflare R2 Object Storage',
@@ -1849,7 +1854,9 @@ export class AdminService {
           totalMaterials,
           usedStorageMb: measuredStorageMb,
           usedStorageGb: r2StorageGb,
-          freeQuotaGb: R2_FREE_QUOTA_GB,
+          fileCount: r2Usage.fileCount,
+          storageComplete: r2Usage.complete,
+          freeQuotaGb: R2_FREE_GB,
           usedPercent: r2UsedPercent,
           egressCostUsd: 0,
           costUsd: 0,
@@ -1860,17 +1867,26 @@ export class AdminService {
     };
   }
 
+  /**
+   * Listing is a billed R2 operation and the page refreshes every 30 seconds,
+   * so a measurement is reused for 10 minutes. A partial one is not kept.
+   */
+  private async measuredStorage() {
+    const now = Date.now();
+    if (this.storageMeasure && now - this.storageMeasure.at < 10 * 60 * 1000)
+      return this.storageMeasure.usage;
+    const usage = await this.r2Service.getBucketStorageUsage();
+    this.storageMeasure = usage.complete ? { at: now, usage } : null;
+    return usage;
+  }
+
   async purgeAiCache() {
     if (!this.redis) {
       return { success: true, count: 0, message: 'Redis không được kết nối' };
     }
     const allKeys = await this.redis.keys('gemini:*');
     // Preserve operational telemetry keys and daily quota keys during cache purge
-    const cacheKeys = allKeys.filter(
-      (k) =>
-        !k.startsWith('gemini:telemetry:') &&
-        !k.startsWith('gemini:daily_quota:'),
-    );
+    const cacheKeys = allKeys.filter(isGeminiCacheKey);
     if (cacheKeys.length > 0) {
       await this.redis.del(...cacheKeys);
     }

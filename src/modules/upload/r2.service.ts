@@ -50,6 +50,14 @@ export function isPrivatePremiumMediaKey(key: string): boolean {
   return isPrivateListeningMediaKey(key) || isPrivateSpeakingMediaKey(key);
 }
 
+export type StorageUsage = {
+  totalBytes: number;
+  fileCount: number;
+  totalMb: number;
+  /** False when a bucket could not be read: the total is then too low. */
+  complete: boolean;
+};
+
 @Injectable()
 export class R2Service {
   private readonly logger = new Logger(R2Service.name);
@@ -161,34 +169,73 @@ export class R2Service {
   /**
    * Truy vấn dung lượng thực tế đang lưu trên Cloudflare R2 bucket.
    */
-  async getBucketStorageUsage(): Promise<{
-    totalBytes: number;
-    fileCount: number;
-    totalMb: number;
-  }> {
-    try {
-      const localStorage = Boolean(process.env.LOCAL_S3_ENDPOINT);
-      const hasCredentials = localStorage
-        ? Boolean(
-            process.env.LOCAL_S3_ACCESS_KEY_ID &&
-            process.env.LOCAL_S3_SECRET_ACCESS_KEY,
-          )
-        : Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID);
-      if (!hasCredentials) {
-        return { totalBytes: 0, fileCount: 0, totalMb: 0 };
+  async getBucketStorageUsage(): Promise<StorageUsage> {
+    const localStorage = Boolean(process.env.LOCAL_S3_ENDPOINT);
+    const hasCredentials = localStorage
+      ? Boolean(
+          process.env.LOCAL_S3_ACCESS_KEY_ID &&
+          process.env.LOCAL_S3_SECRET_ACCESS_KEY,
+        )
+      : Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID);
+    if (!hasCredentials)
+      return { totalBytes: 0, fileCount: 0, totalMb: 0, complete: false };
+
+    const targets: Array<{ client: S3Client; bucket: string }> = [
+      { client: this.client, bucket: this.bucket },
+    ];
+    if (this.privateClient && this.privateBucket)
+      targets.push({ client: this.privateClient, bucket: this.privateBucket });
+    const backup = this.backupTarget();
+    if (backup) targets.push(backup);
+
+    let totalBytes = 0;
+    let fileCount = 0;
+    let complete = true;
+    for (const { client, bucket } of targets) {
+      try {
+        const usage = await this.measureBucket(client, bucket);
+        totalBytes += usage.bytes;
+        fileCount += usage.files;
+      } catch (err) {
+        complete = false;
+        this.logger.warn(`Could not query R2 bucket ${bucket}: ${err}`);
       }
-      const command = new ListObjectsV2Command({
-        Bucket: this.bucket,
-      });
-      const response = await this.client.send(command);
-      const objects = response.Contents || [];
-      const totalBytes = objects.reduce((sum, obj) => sum + (obj.Size || 0), 0);
-      const totalMb = Number((totalBytes / (1024 * 1024)).toFixed(2));
-      return { totalBytes, fileCount: objects.length, totalMb };
-    } catch (err) {
-      this.logger.warn(`Could not query R2 bucket size: ${err}`);
-      return { totalBytes: 0, fileCount: 0, totalMb: 0 };
     }
+    const totalMb = Number((totalBytes / (1024 * 1024)).toFixed(2));
+    return { totalBytes, fileCount, totalMb, complete };
+  }
+
+  /** Off-site database backups share the account's storage quota. */
+  private backupTarget() {
+    const bucket = process.env.R2_BACKUP_BUCKET_NAME?.trim();
+    const endpoint = process.env.R2_BACKUP_ENDPOINT?.trim();
+    const accessKeyId = process.env.R2_BACKUP_ACCESS_KEY_ID?.trim();
+    const secretAccessKey = process.env.R2_BACKUP_SECRET_ACCESS_KEY?.trim();
+    if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) return null;
+    const client = new S3Client({
+      region: 'auto',
+      endpoint,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+    return { client, bucket };
+  }
+
+  /** A list call returns at most 1,000 objects, so follow every page. */
+  private async measureBucket(client: S3Client, bucket: string) {
+    let bytes = 0;
+    let files = 0;
+    let token: string | undefined;
+    do {
+      const page = await client.send(
+        new ListObjectsV2Command({ Bucket: bucket, ContinuationToken: token }),
+      );
+      for (const object of page.Contents ?? []) {
+        bytes += object.Size ?? 0;
+        files += 1;
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return { bytes, files };
   }
 
   /**

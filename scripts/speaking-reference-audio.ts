@@ -44,9 +44,11 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
+import Redis from 'ioredis';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { parseBuffer } from 'music-metadata';
 
+import { recordAzureTts } from '../src/modules/ai/azure-usage';
 import {
   escapeXml,
   LISTENING_VOICE_REGISTRY,
@@ -55,11 +57,14 @@ import {
 
 const UK = process.env.SPEAKING_REF_ACCENT === 'en-gb';
 const VERSION = process.env.SPEAKING_REF_VERSION ?? '1';
-const OUT = UK
-  ? 'artifacts/speaking-reference-audio-en-gb'
-  : VERSION === '1'
-    ? 'artifacts/speaking-reference-audio'
-    : `artifacts/speaking-reference-audio-v${VERSION}`;
+// SPEAKING_REF_OUT keeps an earlier run's manifest when adding clips.
+const OUT =
+  process.env.SPEAKING_REF_OUT ??
+  (UK
+    ? 'artifacts/speaking-reference-audio-en-gb'
+    : VERSION === '1'
+      ? 'artifacts/speaking-reference-audio'
+      : `artifacts/speaking-reference-audio-v${VERSION}`);
 // SPEAKING_REF_SET_IDS=<id,id,...>: the exercises of these practice sets
 // (any publication status, e.g. new DRAFT sets awaiting review) instead of
 // the published standalone exercises.
@@ -223,9 +228,14 @@ async function main() {
       throw new Error('REFUSED: SPEAKING_REF_TTS_AUTHORIZED=generate not set');
     if (exercises.length > MAX_CALLS) throw new Error('HARD_CAP_EXCEEDED');
     mkdirSync(OUT, { recursive: true });
+    const redis = new Redis(
+      Number(process.env.REDIS_PORT ?? 6379),
+      process.env.REDIS_HOST ?? '127.0.0.1',
+    );
     const clips: unknown[] = [];
     for (const ex of exercises) {
       const audio = await synthesize(ssmlFor(ex));
+      await recordAzureTts(redis, ex.targetText.length);
       const meta = await parseBuffer(audio, { mimeType: 'audio/mpeg' });
       const durationMs = Math.round((meta.format.duration ?? 0) * 1000);
       if (durationMs < 500) throw new Error(`exercise ${ex.id}: empty audio`);
@@ -258,6 +268,7 @@ async function main() {
         2,
       ),
     );
+    redis.disconnect();
     console.log(`TTS calls: ${clips.length}`);
   } else if (mode === 'publish') {
     if (process.env.SPEAKING_REF_AUDIO_PUBLISH_AUTHORIZED !== 'publish')
