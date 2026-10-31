@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
   Request,
   Res,
@@ -37,6 +38,7 @@ import {
   SkillContentDto,
   ListeningQuestionDto,
   SkillPublishDto,
+  SkillTracksDto,
   SkillQuestionDto,
   SpeakingExerciseDto,
   SpeakingExerciseReorderDto,
@@ -79,6 +81,11 @@ export class SkillCmsController {
   })
   @ApiQuery({ name: 'type', required: false })
   @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({
+    name: 'track',
+    required: false,
+    description: 'Ngành, hoặc UNTAGGED cho nội dung chưa gắn ngành',
+  })
   @ApiResponse({
     status: 200,
     description:
@@ -373,6 +380,21 @@ export class SkillCmsController {
   ) {
     return this.service.validate(domain, id, req.user);
   }
+  @Put(':domain/:id/tracks')
+  @ApiOperation({
+    summary: 'Gắn ngành cho nội dung; đề xuất theo ngành đọc từ đây',
+  })
+  @ApiResponse({ status: 200, description: 'Danh sách ngành sau khi lưu' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy nội dung' })
+  setTracks(
+    @Param('domain') domain: string,
+    @Param('id') id: string,
+    @Body() body: SkillTracksDto,
+    @Request() req: any,
+  ) {
+    return this.service.setTracks(domain, id, body.tracks, req.user);
+  }
+
   @Post(':domain/:id/publish') publish(
     @Param('domain') domain: string,
     @Param('id') id: string,

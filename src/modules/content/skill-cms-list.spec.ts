@@ -15,6 +15,49 @@ const quiz = (id: number, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+describe('track filter', () => {
+  const rows = [
+    quiz(1, { tracks: ['IT_SOFTWARE', 'GENERAL'] }),
+    quiz(2, { tracks: [] }),
+    quiz(3),
+  ];
+  const ids = (track: string) =>
+    filterQuizList(rows, { track }).map((row) => row.id);
+
+  it('finds one track, or what still needs tagging', () => {
+    expect(ids('IT_SOFTWARE')).toEqual([1]);
+    expect(ids('UNTAGGED')).toEqual([3, 2]);
+    expect(ids('ALL')).toEqual([3, 2, 1]);
+  });
+
+  it('applies to speaking sets', () => {
+    const set = (id: string, tracks: string[]) => ({
+      id,
+      title: id,
+      exerciseCount: 1,
+      tracks,
+    });
+    expect(
+      filterSpeakingSets([set('a', ['GENERAL']), set('b', [])], {
+        track: 'UNTAGGED',
+      }).map((row) => row.id),
+    ).toEqual(['b']);
+  });
+});
+
+describe('a dialogue with clips instead of one recording', () => {
+  it('is measured by its clips', () => {
+    const dialogue = { bilingualContent: { mode: 'DIALOGUE' } };
+    expect(audioToneOf(quiz(1, { ...dialogue, questionsWithAudio: 3 }))).toBe(
+      'ok',
+    );
+    expect(audioToneOf(quiz(2, { ...dialogue, questionsWithAudio: 1 }))).toBe(
+      'pending',
+    );
+    expect(audioToneOf(quiz(3, dialogue))).toBe('none');
+  });
+});
+
 describe('skill CMS list rules', () => {
   const rows = [
     quiz(1, {

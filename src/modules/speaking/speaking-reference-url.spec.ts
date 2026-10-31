@@ -9,6 +9,7 @@ describe('britishReferenceUrl', () => {
       'https://media.example/catalog/speaking/reference/1.en-gb.v1.mp3',
     );
     expect(britishReferenceUrl(clip(186))).toContain('186.en-gb.v1.mp3');
+    expect(britishReferenceUrl(clip(137, 2))).toContain('137.en-gb.v2.mp3');
     expect(britishReferenceUrl('premium/speaking/reference/30.v1.mp3')).toBe(
       'premium/speaking/reference/30.en-gb.v1.mp3',
     );
@@ -16,7 +17,6 @@ describe('britishReferenceUrl', () => {
 
   it('offers nothing for a clip without a twin, so the US clip plays', () => {
     expect(britishReferenceUrl(clip(187))).toBeNull();
-    expect(britishReferenceUrl(clip(137, 2))).toBeNull();
     expect(britishReferenceUrl('https://media.example/other.mp3')).toBeNull();
     expect(britishReferenceUrl(null)).toBeNull();
   });

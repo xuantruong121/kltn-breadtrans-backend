@@ -30,6 +30,7 @@ const PER_QUESTION_MODES: ListeningMode[] = ['COMPREHENSION', 'DICTATION'];
 
 export type QuizListRow = {
   id: number;
+  tracks?: string[];
   title?: string | null;
   description?: string | null;
   level?: string | null;
@@ -51,17 +52,21 @@ export function listeningModeOf(row: { bilingualContent?: unknown }) {
 
 /**
  * The audio state a card shows: per-question clips for comprehension and
- * dictation, the newest shared recording otherwise.
+ * dictation, the newest shared recording otherwise. A dialogue without one
+ * can still play a clip on each question.
  */
 export function audioToneOf(row: QuizListRow): AudioTone {
   const mode = (row.bilingualContent as { mode?: unknown } | null)?.mode;
-  if (PER_QUESTION_MODES.includes(mode as ListeningMode)) {
+  const withAudio = row.questionsWithAudio ?? 0;
+  const latest = row.listeningAudioArtifacts?.[0];
+  if (
+    PER_QUESTION_MODES.includes(mode as ListeningMode) ||
+    (!latest && withAudio > 0)
+  ) {
     const total = row._count?.questions ?? 0;
-    const withAudio = row.questionsWithAudio ?? 0;
     if (!total || !withAudio) return 'none';
     return withAudio === total ? 'ok' : 'pending';
   }
-  const latest = row.listeningAudioArtifacts?.[0];
   if (!latest) return 'none';
   return AUDIO_TONE[latest.status] ?? 'pending';
 }
@@ -94,6 +99,13 @@ const levelRank = (level: string | null) => {
  * Quizzes after search, status, level, audio, listening mode and writing
  * type filters, in the chosen order (NEWEST by default).
  */
+/** One career track, or `UNTAGGED` for what still needs tagging. */
+function matchesTrack(tracks: string[] | undefined, track?: string) {
+  if (isAll(track)) return true;
+  const tags = tracks ?? [];
+  return track === 'UNTAGGED' ? tags.length === 0 : tags.includes(track!);
+}
+
 export function filterQuizList<T extends QuizListRow>(
   rows: T[],
   query: ListQuery,
@@ -106,7 +118,8 @@ export function filterQuizList<T extends QuizListRow>(
       (isAll(query.level) || contentLevel(row) === query.level) &&
       (isAll(query.audio) || audioToneOf(row) === query.audio) &&
       (isAll(query.mode) || listeningModeOf(row) === query.mode) &&
-      (isAll(query.type) || row.type === query.type),
+      (isAll(query.type) || row.type === query.type) &&
+      matchesTrack(row.tracks, query.track),
   );
   const questions = (row: T) => row._count?.questions ?? 0;
   const order: Record<string, (a: T, b: T) => number> = {
@@ -140,6 +153,7 @@ export function quizListFacets(rows: QuizListRow[]) {
 
 export type SpeakingSetRow = {
   id: string;
+  tracks?: string[];
   title: string;
   description?: string | null;
   category?: string | null;
@@ -170,7 +184,8 @@ export function filterSpeakingSets<T extends SpeakingSetRow>(
       matchesSearch(query.q, row.title, row.description, row.category) &&
       (isAll(query.level) || row.level === query.level) &&
       (isAll(query.category) || row.category === query.category) &&
-      (isAll(query.status) || row.publicationStatus === query.status),
+      (isAll(query.status) || row.publicationStatus === query.status) &&
+      matchesTrack(row.tracks, query.track),
   );
   const updated = (row: T) => new Date(row.updatedAt ?? 0).getTime();
   const order: Record<string, (a: T, b: T) => number> = {

@@ -1,4 +1,5 @@
 import {
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDefined,
@@ -17,7 +18,8 @@ import {
   type ValidationOptions,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { QuizPublicationStatus } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
+import { LearningTrack, QuizPublicationStatus } from '@prisma/client';
 import {
   SPEAKING_EXERCISE_DIFFICULTIES,
   SPEAKING_TASK_TYPES,
@@ -299,6 +301,18 @@ export class WritingQuestionDto {
   @IsInt()
   @Min(0)
   order?: number;
+}
+
+export class SkillTracksDto {
+  @ApiProperty({
+    enum: LearningTrack,
+    isArray: true,
+    description: 'Toàn bộ ngành của nội dung; thay thế danh sách cũ',
+  })
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(LearningTrack, { each: true })
+  tracks!: LearningTrack[];
 }
 
 export class SkillPublishDto {

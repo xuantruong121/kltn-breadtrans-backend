@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
+  type LearningContentType,
+  type LearningTrack,
   Prisma,
   QuizPublicationStatus,
   QuizType,
@@ -187,6 +189,7 @@ export class SkillCmsService {
           orderBy: { updatedAt: 'desc' },
           include,
         });
+      const speakingTracks = await this.tracksByContent('SPEAKING_SET');
       // Light rows decide the page; exercises load for that page only.
       const rows = (
         await this.prisma.speakingPracticeSet.findMany({
@@ -199,12 +202,18 @@ export class SkillCmsService {
             level: true,
             publicationStatus: true,
             updatedAt: true,
+            exercises: {
+              orderBy: [{ order: 'asc' }, { id: 'asc' }],
+              take: 1,
+              select: { id: true },
+            },
             _count: { select: { exercises: true } },
           },
         })
-      ).map(({ _count, ...row }) => ({
+      ).map(({ _count, exercises, ...row }) => ({
         ...row,
         exerciseCount: _count.exercises,
+        tracks: speakingTracks.get(exercises[0]?.id) ?? [],
       }));
       const page = pageOf(filterSpeakingSets(rows, query), query, 12);
       const full = await this.prisma.speakingPracticeSet.findMany({
@@ -214,7 +223,12 @@ export class SkillCmsService {
       const byId = new Map(full.map((set) => [set.id, set]));
       return {
         ...page,
-        items: page.items.map((row) => byId.get(row.id)).filter(Boolean),
+        items: page.items
+          .map((row) => {
+            const set = byId.get(row.id);
+            return set ? { ...set, tracks: row.tracks } : null;
+          })
+          .filter(Boolean),
         facets: speakingSetFacets(rows),
       };
     }
@@ -236,8 +250,15 @@ export class SkillCmsService {
           : {}),
       },
     });
+    const quizTracks = wantsPage(query)
+      ? await this.tracksByContent('QUIZ')
+      : new Map<number, LearningTrack[]>();
+    const tagged = quizzes.map((quiz) => ({
+      ...quiz,
+      tracks: quizTracks.get(quiz.id) ?? [],
+    }));
     if (domain !== 'listening' || !quizzes.length)
-      return this.listPage(quizzes, query);
+      return this.listPage(tagged, query);
     // Comprehension and dictation play one clip per question: count them.
     const withAudio = await this.prisma.question.groupBy({
       by: ['quizId'],
@@ -251,7 +272,7 @@ export class SkillCmsService {
       withAudio.map((row) => [row.quizId, row._count._all]),
     );
     return this.listPage(
-      quizzes.map((quiz) => ({
+      tagged.map((quiz) => ({
         ...quiz,
         questionsWithAudio: counts.get(quiz.id) ?? 0,
       })),
@@ -292,7 +313,11 @@ export class SkillCmsService {
       if (!set) throw new NotFoundException('Speaking practice set not found');
       if (set.scope === 'EXAM_INTERNAL' && !allowExamInternal)
         throw new NotFoundException('Speaking practice set not found');
-      return set;
+      const key = set.exercises[0]?.id;
+      return {
+        ...set,
+        tracks: key ? await this.tracksOf('SPEAKING_SET', key) : [],
+      };
     }
     const id = this.id(rawId);
     const quiz = await this.prisma.quiz.findFirst({
@@ -309,7 +334,67 @@ export class SkillCmsService {
       },
     });
     if (!quiz) throw new NotFoundException('Skill content not found');
-    return { ...quiz, passage: quiz.theoryContent };
+    return {
+      ...quiz,
+      passage: quiz.theoryContent,
+      tracks: await this.tracksOf('QUIZ', quiz.id),
+    };
+  }
+
+  private async tracksByContent(contentType: LearningContentType) {
+    const tags =
+      (await this.prisma.contentTrackTag?.findMany({
+        where: { contentType },
+        select: { contentId: true, track: true },
+      })) ?? [];
+    const byContent = new Map<number, LearningTrack[]>();
+    for (const { contentId, track } of tags)
+      byContent.set(contentId, [...(byContent.get(contentId) ?? []), track]);
+    return byContent;
+  }
+
+  private async tracksOf(contentType: LearningContentType, contentId: number) {
+    const tags =
+      (await this.prisma.contentTrackTag?.findMany({
+        where: { contentType, contentId },
+        select: { track: true },
+      })) ?? [];
+    return tags.map((tag) => tag.track);
+  }
+
+  /**
+   * Replaces an item's career tracks. Recommendations read a quiz by its id
+   * and a speaking set by its first exercise (learning-path.catalog.ts).
+   */
+  async setTracks(
+    rawDomain: string,
+    rawId: string,
+    tracks: LearningTrack[],
+    user: Admin,
+  ) {
+    const item = await this.get(rawDomain, rawId, user);
+    const isSet = this.domain(rawDomain) === 'speaking';
+    const contentType: LearningContentType = isSet ? 'SPEAKING_SET' : 'QUIZ';
+    const contentId = isSet
+      ? (item as { exercises: Array<{ id: number }> }).exercises[0]?.id
+      : (item as { id: number }).id;
+    if (!contentId)
+      throw new BadRequestException('Bộ luyện chưa có bài để gắn ngành');
+    await this.prisma.$transaction([
+      this.prisma.contentTrackTag.deleteMany({
+        where: { contentType, contentId, track: { notIn: tracks } },
+      }),
+      this.prisma.contentTrackTag.createMany({
+        data: tracks.map((track) => ({
+          contentType,
+          contentId,
+          track,
+          createdById: user.id,
+        })),
+        skipDuplicates: true,
+      }),
+    ]);
+    return { tracks: await this.tracksOf(contentType, contentId) };
   }
 
   async create(rawDomain: string, dto: SkillContentDto, user: Admin) {
