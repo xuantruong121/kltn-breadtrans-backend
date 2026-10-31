@@ -64,7 +64,7 @@ export class EventsGateway
       this.logger.warn(
         `[EventsGateway] Connection rejected: Missing auth token (${client.id})`,
       );
-      client.emit('auth:error', { message: 'Authentication token required' });
+      client.emit('auth:error', { message: 'Vui lòng đăng nhập để tiếp tục.' });
       client.disconnect(true);
       return;
     }
@@ -121,7 +121,7 @@ export class EventsGateway
         `[EventsGateway] Connection rejected: Invalid auth token (${client.id})`,
       );
       client.emit('auth:error', {
-        message: 'Invalid or expired authentication token',
+        message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
       });
       client.disconnect(true);
       return;
@@ -293,7 +293,9 @@ export class EventsGateway
       }
     } catch (err: any) {
       this.logger.error(`Error handling chat message: ${err?.message}`);
-      client.emit('chat:error', { message: 'Failed to process message' });
+      client.emit('chat:error', {
+        message: 'Không gửi được tin nhắn. Vui lòng thử lại.',
+      });
     }
   }
 
@@ -397,7 +399,7 @@ export class EventsGateway
   // Broadcast toàn hệ thống khi một Khóa học được duyệt
   broadcastCourseUpdate() {
     this.server.emit('courseUpdated', {
-      message: 'A course status has been updated',
+      message: 'Trạng thái khóa học đã được cập nhật.',
       timestamp: new Date().toISOString(),
     });
   }

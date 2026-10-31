@@ -287,14 +287,14 @@ export class SpeakingService {
       },
     });
     if (!exercise) {
-      throw new NotFoundException(`Speaking exercise #${id} not found`);
+      throw new NotFoundException(`Không tìm thấy bài luyện Nói #${id}.`);
     }
     if (
       role !== Role.ADMIN &&
       exercise.practiceSet?.scope === SpeakingPracticeScope.EXAM_INTERNAL
     ) {
       if (!internalContext)
-        throw new NotFoundException(`Speaking exercise #${id} not found`);
+        throw new NotFoundException(`Không tìm thấy bài luyện Nói #${id}.`);
       const parentComponent =
         await this.prisma.toeicAssessmentAttemptComponent.findFirst({
           where: {
@@ -329,7 +329,7 @@ export class SpeakingService {
           exercise.practiceSet.publicationStatus !==
             QuizPublicationStatus.PUBLISHED))
     ) {
-      throw new NotFoundException(`Speaking exercise #${id} not found`);
+      throw new NotFoundException(`Không tìm thấy bài luyện Nói #${id}.`);
     }
     return exercise;
   }
@@ -622,7 +622,7 @@ export class SpeakingService {
   createExercise(dto: CreateExerciseDto) {
     void dto;
     throw new ConflictException(
-      'Speaking content is managed by the Skill CMS /admin/skill-content/speaking',
+      'Nội dung Nói được quản lý tại Skill CMS: /admin/skill-content/speaking.',
     );
   }
 
@@ -647,9 +647,7 @@ export class SpeakingService {
       typeof idempotencyKey !== 'string' ||
       idempotencyKey.trim().length === 0
     ) {
-      throw new BadRequestException(
-        'Header "Idempotency-Key" is required and must be a valid non-empty string',
-      );
+      throw new BadRequestException('Thiếu header "Idempotency-Key" hợp lệ.');
     }
     const cleanIdempotencyKey = idempotencyKey.trim();
 
@@ -686,7 +684,7 @@ export class SpeakingService {
 
     // 4. Byte-level audio validation
     if (!audioFile || !audioFile.buffer) {
-      throw new BadRequestException('Audio file is empty');
+      throw new BadRequestException('Tệp âm thanh trống.');
     }
     const audioValidation = validateSpeakingAudio(
       audioFile.buffer,
@@ -943,7 +941,7 @@ export class SpeakingService {
 
       if (!isMetadataMatch) {
         throw new ConflictException(
-          'Idempotency key reused with different upload metadata',
+          'Mã chống trùng đã được dùng cho một lần tải lên khác.',
         );
       }
 
@@ -975,7 +973,7 @@ export class SpeakingService {
           status: 'FINALIZING',
           isAlreadyFinalized: false,
           isFinalizing: true,
-          message: 'Upload is currently being finalized',
+          message: 'Bản ghi đang được xử lý.',
         };
       }
 
@@ -1010,7 +1008,7 @@ export class SpeakingService {
 
       // Expired, cancelled, or invalid intent with same key
       throw new ConflictException(
-        'This idempotency key belongs to an expired or failed upload attempt. Please generate a new key.',
+        'Lần tải lên này đã hết hạn hoặc thất bại. Vui lòng thử lại.',
       );
     }
 
@@ -1088,7 +1086,9 @@ export class SpeakingService {
     });
 
     if (!intent) {
-      throw new NotFoundException(`Upload intent ${uploadIntentId} not found`);
+      throw new NotFoundException(
+        `Không tìm thấy phiên tải lên ${uploadIntentId}.`,
+      );
     }
 
     // 2. IDOR defense: Ownership check
@@ -1097,7 +1097,7 @@ export class SpeakingService {
         `IDOR attempt detected: User #${userId} attempted to finalize intent ${uploadIntentId} owned by User #${intent.userId}`,
       );
       throw new ForbiddenException(
-        'You do not have permission to finalize this upload intent',
+        'Bạn không có quyền hoàn tất phiên tải lên này.',
       );
     }
 
@@ -1141,13 +1141,13 @@ export class SpeakingService {
           .catch(() => {});
       }
       throw new BadRequestException(
-        'Upload intent has expired. Please request a new upload intent.',
+        'Phiên tải lên đã hết hạn. Vui lòng thử lại.',
       );
     }
 
     if (intent.status === 'INVALID' || intent.status === 'CANCELLED') {
       throw new BadRequestException(
-        `Upload intent cannot be finalized in status: ${intent.status}`,
+        `Không thể hoàn tất phiên tải lên ở trạng thái ${intent.status}.`,
       );
     }
 
@@ -1217,12 +1217,12 @@ export class SpeakingService {
           }
         }
         throw new ConflictException(
-          'Upload intent is currently being finalized by another request.',
+          'Phiên tải lên đang được xử lý ở một yêu cầu khác.',
         );
       }
 
       throw new BadRequestException(
-        `Upload intent cannot be finalized in status: ${freshIntent?.status || 'UNKNOWN'}`,
+        `Không thể hoàn tất phiên tải lên ở trạng thái ${freshIntent?.status || 'UNKNOWN'}.`,
       );
     }
 
@@ -1240,7 +1240,7 @@ export class SpeakingService {
         })
         .catch(() => {});
       throw new BadRequestException(
-        'Audio file was not found in storage. Direct upload may have failed or not completed.',
+        'Không tìm thấy tệp âm thanh trên kho lưu trữ. Có thể việc tải lên chưa hoàn tất.',
       );
     }
 
@@ -1259,7 +1259,7 @@ export class SpeakingService {
           .catch(() => {});
       }
       throw new BadRequestException(
-        'Uploaded audio size is invalid or exceeds 10MB limit.',
+        'Kích thước âm thanh không hợp lệ hoặc vượt quá 10MB.',
       );
     }
 
@@ -1282,7 +1282,7 @@ export class SpeakingService {
           .catch(() => {});
       }
       throw new BadRequestException(
-        `Uploaded audio size (${head.contentLength} bytes) does not match declared size (${intent.expectedSizeBytes} bytes).`,
+        `Kích thước âm thanh đã tải lên (${head.contentLength} byte) không khớp kích thước khai báo (${intent.expectedSizeBytes} byte).`,
       );
     }
 
@@ -1346,7 +1346,7 @@ export class SpeakingService {
 
         if (updateResult.count === 0) {
           throw new ConflictException(
-            'Finalization token expired or superseded by another worker',
+            'Phiên xử lý đã hết hạn hoặc được tiếp nhận ở nơi khác.',
           );
         }
 
@@ -1383,7 +1383,7 @@ export class SpeakingService {
 
     if (!submission) {
       throw new InternalServerErrorException(
-        'Failed to finalize speaking submission',
+        'Không hoàn tất được bài nộp Nói.',
       );
     }
 
@@ -1438,14 +1438,14 @@ export class SpeakingService {
 
     if (!submission) {
       throw new NotFoundException(
-        `Speaking submission #${submissionId} not found`,
+        `Không tìm thấy bài nộp Nói #${submissionId}.`,
       );
     }
 
     // Ownership check
     if (submission.userId !== currentUser.id && currentUser.role !== 'ADMIN') {
       throw new ForbiddenException(
-        'You do not have permission to access this pronunciation submission',
+        'Bạn không có quyền xem bài nộp phát âm này.',
       );
     }
 
@@ -1513,14 +1513,12 @@ export class SpeakingService {
 
     if (!submission) {
       throw new NotFoundException(
-        `Speaking submission #${submissionId} not found`,
+        `Không tìm thấy bài nộp Nói #${submissionId}.`,
       );
     }
 
     if (submission.userId !== currentUser.id && currentUser.role !== 'ADMIN') {
-      throw new ForbiddenException(
-        'You do not have permission to access this audio',
-      );
+      throw new ForbiddenException('Bạn không có quyền nghe âm thanh này.');
     }
 
     let signedUrl = '';
@@ -1625,7 +1623,9 @@ export class SpeakingService {
     if (!response.ok) {
       const errBody = await response.text();
       this.logger.error(`Azure TTS failed (${response.status}): ${errBody}`);
-      throw new BadRequestException('TTS synthesis failed at provider');
+      throw new BadRequestException(
+        'Không tạo được giọng đọc. Vui lòng thử lại.',
+      );
     }
 
     const audioBuffer = Buffer.from(await response.arrayBuffer());
@@ -1655,25 +1655,23 @@ export class SpeakingService {
     rate: number,
   ): Promise<Buffer> {
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      throw new BadRequestException('Text is required for TTS synthesis');
+      throw new BadRequestException('Cần có nội dung để tạo giọng đọc.');
     }
 
     const trimmedText = text.trim();
     if (trimmedText.length > 500) {
-      throw new BadRequestException(
-        'Text exceeds maximum length of 500 characters',
-      );
+      throw new BadRequestException('Nội dung vượt quá 500 ký tự.');
     }
 
     if (!['US', 'UK'].includes(accent)) {
       throw new BadRequestException(
-        `Invalid accent "${accent}". Allowed accents: US, UK`,
+        `Giọng "${accent}" không hợp lệ. Chỉ nhận US, UK.`,
       );
     }
 
     if (!ALLOWED_TTS_RATES.includes(rate)) {
       throw new BadRequestException(
-        `Invalid playback rate ${rate}. Allowed rates: ${ALLOWED_TTS_RATES.join(', ')}`,
+        `Tốc độ phát ${rate} không hợp lệ. Chỉ nhận: ${ALLOWED_TTS_RATES.join(', ')}.`,
       );
     }
 
@@ -1736,16 +1734,16 @@ export class SpeakingService {
     rate: number,
   ): Promise<Buffer> {
     if (!Array.isArray(segments) || segments.length === 0) {
-      throw new BadRequestException('Dialogue segments are required for TTS');
+      throw new BadRequestException('Cần có lượt thoại để tạo giọng đọc.');
     }
     if (!['US', 'UK'].includes(accent)) {
       throw new BadRequestException(
-        `Invalid accent "${accent}". Allowed accents: US, UK`,
+        `Giọng "${accent}" không hợp lệ. Chỉ nhận US, UK.`,
       );
     }
     if (!ALLOWED_TTS_RATES.includes(rate)) {
       throw new BadRequestException(
-        `Invalid playback rate ${rate}. Allowed rates: ${ALLOWED_TTS_RATES.join(', ')}`,
+        `Tốc độ phát ${rate} không hợp lệ. Chỉ nhận: ${ALLOWED_TTS_RATES.join(', ')}.`,
       );
     }
 
@@ -1764,7 +1762,7 @@ export class SpeakingService {
       0,
     );
     if (cleanSegments.length === 0 || totalCharacters > 4000) {
-      throw new BadRequestException('Dialogue text is empty or too long');
+      throw new BadRequestException('Lời thoại trống hoặc quá dài.');
     }
 
     const source = JSON.stringify({ accent, rate, segments: cleanSegments });

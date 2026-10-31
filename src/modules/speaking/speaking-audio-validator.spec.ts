@@ -10,28 +10,28 @@ describe('SpeakingAudioValidator - Byte-Level WAV Validation', () => {
       BadRequestException,
     );
     expect(() => validateSpeakingAudio(Buffer.alloc(0))).toThrow(
-      'Audio file is empty',
+      'Tệp âm thanh trống.',
     );
   });
 
   it('rejects oversized file (> 10MB)', () => {
     const hugeBuffer = Buffer.alloc(10 * 1024 * 1024 + 1);
     expect(() => validateSpeakingAudio(hugeBuffer)).toThrow(
-      'Audio file exceeds maximum size limit',
+      'Tệp âm thanh vượt quá giới hạn',
     );
   });
 
   it('rejects file smaller than minimum WAV header (< 44 bytes)', () => {
     const tinyBuffer = Buffer.from('RIFF1234WAVEfmt ');
     expect(() => validateSpeakingAudio(tinyBuffer)).toThrow(
-      'incomplete WAV header',
+      'thiếu phần đầu WAV',
     );
   });
 
   it('rejects invalid declared MIME type', () => {
     const validWav = createWavBuffer({ durationSeconds: 1 });
     expect(() => validateSpeakingAudio(validWav, 'audio/mp3')).toThrow(
-      'Unsupported audio MIME type',
+      'không được hỗ trợ',
     );
   });
 
@@ -40,7 +40,7 @@ describe('SpeakingAudioValidator - Byte-Level WAV Validation', () => {
     fakeBuffer.write('FAKE', 0);
     fakeBuffer.write('WAVE', 8);
     expect(() => validateSpeakingAudio(fakeBuffer)).toThrow(
-      'magic bytes must be RIFF/WAVE',
+      'không đúng định dạng WAV',
     );
   });
 
@@ -48,14 +48,14 @@ describe('SpeakingAudioValidator - Byte-Level WAV Validation', () => {
     const wav = createWavBuffer({ durationSeconds: 1 });
     wav.writeUInt16LE(3, 20); // Format tag 3
     expect(() => validateSpeakingAudio(wav)).toThrow(
-      'Audio must be linear PCM',
+      'Âm thanh phải là PCM tuyến tính',
     );
   });
 
   it('rejects non-mono audio (stereo 2 channels)', () => {
     const stereoWav = createWavBuffer({ channels: 2, durationSeconds: 1 });
     expect(() => validateSpeakingAudio(stereoWav)).toThrow(
-      'Audio must be mono (1 channel)',
+      'Âm thanh phải là mono (1 kênh)',
     );
   });
 
@@ -65,7 +65,7 @@ describe('SpeakingAudioValidator - Byte-Level WAV Validation', () => {
       durationSeconds: 1,
     });
     expect(() => validateSpeakingAudio(highRateWav)).toThrow(
-      'Audio sample rate must be exactly 16000 Hz',
+      'Tần số lấy mẫu phải đúng 16000 Hz',
     );
   });
 
@@ -75,22 +75,20 @@ describe('SpeakingAudioValidator - Byte-Level WAV Validation', () => {
       durationSeconds: 1,
     });
     expect(() => validateSpeakingAudio(eightBitWav)).toThrow(
-      'Audio bit depth must be 16-bit PCM',
+      'Độ sâu bit phải là PCM 16-bit',
     );
   });
 
   it('rejects audio longer than 45 seconds', () => {
     const longWav = createWavBuffer({ durationSeconds: 46 });
     expect(() => validateSpeakingAudio(longWav)).toThrow(
-      'exceeds maximum allowed duration of 45 seconds',
+      'vượt mức tối đa 45 giây',
     );
   });
 
   it('rejects audio shorter than 300ms', () => {
     const shortWav = createWavBuffer({ durationSeconds: 0.1 });
-    expect(() => validateSpeakingAudio(shortWav)).toThrow(
-      'Audio duration is too short',
-    );
+    expect(() => validateSpeakingAudio(shortWav)).toThrow('Âm thanh quá ngắn');
   });
 
   it('accepts valid silent audio so it can be recorded as a NO_SPEECH attempt', () => {

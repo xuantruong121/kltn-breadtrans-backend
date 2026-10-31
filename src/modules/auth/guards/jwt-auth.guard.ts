@@ -17,7 +17,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       throw (
         err ||
         new UnauthorizedException(
-          'You are not authorized to access this resource',
+          'Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.',
         )
       );
     }

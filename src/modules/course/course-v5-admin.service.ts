@@ -40,7 +40,10 @@ export class CourseV5AdminService {
   ) {}
 
   private admin(user: Admin) {
-    if (user.role !== Role.ADMIN) throw new ForbiddenException('Admin only');
+    if (user.role !== Role.ADMIN)
+      throw new ForbiddenException(
+        'Chỉ quản trị viên được thực hiện thao tác này.',
+      );
   }
 
   private json(value: unknown): Prisma.InputJsonValue {
@@ -51,7 +54,7 @@ export class CourseV5AdminService {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
-    if (!course) throw new NotFoundException('Course not found');
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
     return course;
   }
 
@@ -265,7 +268,7 @@ export class CourseV5AdminService {
     const section = await this.prisma.courseLessonSection.findFirst({
       where: { id: sectionId, lessonId },
     });
-    if (!section) throw new NotFoundException('Section not found');
+    if (!section) throw new NotFoundException('Không tìm thấy phần học.');
     if (dto.heading !== undefined && !dto.heading.trim())
       throw new BadRequestException('Section cần tiêu đề');
     return this.prisma.courseLessonSection.update({
@@ -291,7 +294,7 @@ export class CourseV5AdminService {
     const section = await this.prisma.courseLessonSection.findFirst({
       where: { id: sectionId, lessonId },
     });
-    if (!section) throw new NotFoundException('Section not found');
+    if (!section) throw new NotFoundException('Không tìm thấy phần học.');
     return this.prisma.courseLessonSection.delete({ where: { id: sectionId } });
   }
 
@@ -357,7 +360,7 @@ export class CourseV5AdminService {
     const media = await this.prisma.courseLessonMedia.findFirst({
       where: { id: mediaId, lessonId },
     });
-    if (!media) throw new NotFoundException('Media not found');
+    if (!media) throw new NotFoundException('Không tìm thấy tệp media.');
     // Relation-only unlink is intentional: shared R2 objects are never deleted here.
     return this.prisma.courseLessonMedia.delete({ where: { id: mediaId } });
   }
@@ -536,7 +539,7 @@ export class CourseV5AdminService {
     const question = await this.prisma.courseLessonQuestion.findFirst({
       where: { id: questionId, exerciseId },
     });
-    if (!question) throw new NotFoundException('Question not found');
+    if (!question) throw new NotFoundException('Không tìm thấy câu hỏi.');
     if (
       await this.prisma.courseLessonExerciseAnswer.count({
         where: { questionId },
@@ -586,7 +589,7 @@ export class CourseV5AdminService {
         where: { id: questionId, exerciseId },
       }))
     )
-      throw new NotFoundException('Question not found');
+      throw new NotFoundException('Không tìm thấy câu hỏi.');
     if (
       await this.prisma.courseLessonExerciseAnswer.count({
         where: { questionId },
@@ -724,7 +727,7 @@ export class CourseV5AdminService {
       where: { id: lessonId },
       include: { sections: true, exercises: { include: { questions: true } } },
     });
-    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (!lesson) throw new NotFoundException('Không tìm thấy bài học.');
     const errors: string[] = [];
     if (!lesson.title.trim()) errors.push('Thiếu tiêu đề');
     if (!lesson.summary.trim()) errors.push('Thiếu tóm tắt');
@@ -751,7 +754,7 @@ export class CourseV5AdminService {
     const row = await this.prisma.courseLesson.findFirst({
       where: { id: lessonId, courseId },
     });
-    if (!row) throw new NotFoundException('Lesson not found');
+    if (!row) throw new NotFoundException('Không tìm thấy bài học.');
     return row;
   }
   private async exercise(
@@ -762,7 +765,7 @@ export class CourseV5AdminService {
     const row = await this.prisma.courseLessonExercise.findFirst({
       where: { id: exerciseId, lessonId, lesson: { courseId } },
     });
-    if (!row) throw new NotFoundException('Exercise not found');
+    if (!row) throw new NotFoundException('Không tìm thấy bài tập.');
     return row;
   }
   private assertSameIds(current: number[], requested: number[]) {

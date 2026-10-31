@@ -188,7 +188,7 @@ describe('SubscriptionService', () => {
 
     await expect(
       service.resolveEntitlement(7, 'UNKNOWN' as PlanFeatureKey, now),
-    ).rejects.toThrow('Unknown plan feature key');
+    ).rejects.toThrow('Mã tính năng không xác định');
   });
 
   it('fails closed when the FREE catalog is missing', async () => {
@@ -198,7 +198,7 @@ describe('SubscriptionService', () => {
 
     await expect(
       new SubscriptionService(prisma as never).resolveEffectivePlan(7, now),
-    ).rejects.toThrow('FREE plan catalog is not configured');
+    ).rejects.toThrow('Gói FREE chưa được cấu hình.');
   });
 
   it('fails closed when more than one current FREE version is returned', async () => {
@@ -211,7 +211,7 @@ describe('SubscriptionService', () => {
 
     await expect(
       new SubscriptionService(prisma as never).resolveEffectivePlan(7, now),
-    ).rejects.toThrow('FREE plan catalog is ambiguous');
+    ).rejects.toThrow('Có nhiều phiên bản gói FREE đang hiệu lực.');
   });
 
   it('normalizes and validates entitlement metadata', () => {
@@ -224,7 +224,7 @@ describe('SubscriptionService', () => {
         unit: EntitlementUnit.REQUEST_COUNT,
         period: EntitlementPeriod.DAY,
       }),
-    ).toThrow('Disabled entitlements');
+    ).toThrow('Quyền lợi đã tắt');
     expect(() =>
       service.validatePlanEntitlementInput({
         enabled: true,
@@ -260,7 +260,7 @@ describe('SubscriptionService', () => {
         unit: EntitlementUnit.REQUEST_COUNT,
         period: EntitlementPeriod.DAY,
       }),
-    ).toThrow('greater than zero');
+    ).toThrow('phải lớn hơn 0');
     expect(() =>
       service.validatePlanEntitlementInput({
         enabled: true,
@@ -284,7 +284,7 @@ describe('SubscriptionService', () => {
 
     await expect(
       service.validateSubscriptionInput(invalidDates),
-    ).rejects.toThrow('endsAt must be after startsAt');
+    ).rejects.toThrow('Ngày kết thúc phải sau ngày bắt đầu');
 
     const version = {
       ...paidVersion(1),
@@ -303,7 +303,7 @@ describe('SubscriptionService', () => {
         startsAt: now,
         endsAt: new Date('2026-11-01T00:00:00.000Z'),
       }),
-    ).rejects.toThrow('cannot target the FREE plan');
+    ).rejects.toThrow('cho gói FREE');
 
     prisma.planVersion.findUnique.mockResolvedValue({
       ...version,
@@ -346,10 +346,10 @@ describe('SubscriptionService', () => {
     const service = new SubscriptionService(prisma as never);
 
     await expect(service.assertPlanVersionMutable(3)).rejects.toThrow(
-      'PlanVersion referenced by a PlanPurchase or Subscription is immutable',
+      'Phiên bản gói đã có giao dịch',
     );
     await expect(service.assertPlanEntitlementMutable(3)).rejects.toThrow(
-      'PlanVersion referenced by a PlanPurchase or Subscription is immutable',
+      'Phiên bản gói đã có giao dịch',
     );
   });
 });

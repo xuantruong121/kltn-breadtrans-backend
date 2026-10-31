@@ -1746,7 +1746,7 @@ describe('QuizService', () => {
       });
 
       await expect(service.streamQuestionAudio(41, 102)).rejects.toThrow(
-        'Premium Listening media is not stored in private storage',
+        'Âm thanh Nghe trả phí chưa được lưu ở kho riêng tư.',
       );
       expect(
         mockUploadService.downloadPrivateFileBuffer,

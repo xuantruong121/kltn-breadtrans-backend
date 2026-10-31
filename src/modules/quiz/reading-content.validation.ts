@@ -39,16 +39,22 @@ export function resolveReadingCorrectOption(
   if (Array.isArray(options) && Number.isInteger(index)) {
     const numericIndex = index as number;
     if (numericIndex < 0 || numericIndex >= options.length) {
-      return { status: 'unavailable', reason: 'correctIndex is out of range' };
+      return {
+        status: 'unavailable',
+        reason: 'Vị trí đáp án đúng nằm ngoài danh sách phương án.',
+      };
     }
     const answer = asNonEmptyString(options[numericIndex]);
     return answer
       ? { status: 'available', answer, index: numericIndex }
-      : { status: 'unavailable', reason: 'correct option is empty' };
+      : { status: 'unavailable', reason: 'Phương án đúng đang trống.' };
   }
 
   if (Array.isArray(options) && index !== undefined) {
-    return { status: 'unavailable', reason: 'correctIndex must be an integer' };
+    return {
+      status: 'unavailable',
+      reason: 'Vị trí đáp án đúng phải là số nguyên.',
+    };
   }
 
   const legacy =
@@ -56,7 +62,10 @@ export function resolveReadingCorrectOption(
     asNonEmptyString(content.correctAnswer);
   return legacy
     ? { status: 'available', answer: legacy, index: -1 }
-    : { status: 'unavailable', reason: 'no valid Reading answer key' };
+    : {
+        status: 'unavailable',
+        reason: 'Chưa có đáp án đúng hợp lệ cho bài Đọc.',
+      };
 }
 
 export function resolveReadingMicroSkillForAuthoring(

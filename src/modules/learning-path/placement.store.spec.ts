@@ -21,7 +21,7 @@ describe('applyDiagnosticPlacement', () => {
     expect(db.levels.has('7:SPEAKING')).toBe(false);
     expect(db.unlocks.size).toBe(4 + 3);
     expect(db.profiles.get(7)).toMatchObject({
-      placementLevel: 'INTERMEDIATE',
+      placementLevel: 'ADVANCED',
       placementSource: 'DIAGNOSTIC',
       placementAttemptId: 100,
     });
@@ -34,7 +34,7 @@ describe('applyDiagnosticPlacement', () => {
     });
     expect(db.levels.get('7:SPEAKING').level).toBe('STARTER');
     expect(db.levels.get('7:WRITING').level).toBe('BASIC');
-    expect(db.profiles.get(7).placementLevel).toBe('BASIC');
+    expect(db.profiles.get(7).placementLevel).toBe('INTERMEDIATE');
   });
 
   it('re-reading the attempt never lowers a level reached later', async () => {

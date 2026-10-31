@@ -41,17 +41,19 @@ export function validateSpeakingAudio(
   maxDurationMs: number = MAX_DURATION_MS,
 ): AudioValidationResult {
   if (!buffer || buffer.length === 0) {
-    throw new BadRequestException('Audio file is empty');
+    throw new BadRequestException('Tệp âm thanh trống.');
   }
 
   if (buffer.length > MAX_AUDIO_BYTES) {
     throw new BadRequestException(
-      `Audio file exceeds maximum size limit of ${MAX_AUDIO_BYTES / (1024 * 1024)}MB`,
+      `Tệp âm thanh vượt quá giới hạn ${MAX_AUDIO_BYTES / (1024 * 1024)}MB.`,
     );
   }
 
   if (buffer.length < 44) {
-    throw new BadRequestException('Invalid audio file: incomplete WAV header');
+    throw new BadRequestException(
+      'Tệp âm thanh không hợp lệ: thiếu phần đầu WAV.',
+    );
   }
 
   // Validate declared MIME if provided
@@ -65,7 +67,7 @@ export function validateSpeakingAudio(
     ];
     if (!validMimes.includes(declaredMimeType.toLowerCase())) {
       throw new BadRequestException(
-        `Unsupported audio MIME type: ${declaredMimeType}. Only 16kHz mono PCM WAV is supported.`,
+        `Định dạng âm thanh ${declaredMimeType} không được hỗ trợ. Chỉ nhận WAV PCM mono 16kHz.`,
       );
     }
   }
@@ -74,9 +76,7 @@ export function validateSpeakingAudio(
   const riff = buffer.toString('ascii', 0, 4);
   const wave = buffer.toString('ascii', 8, 12);
   if (riff !== 'RIFF' || wave !== 'WAVE') {
-    throw new BadRequestException(
-      'Invalid audio file format: magic bytes must be RIFF/WAVE',
-    );
+    throw new BadRequestException('Tệp âm thanh không đúng định dạng WAV.');
   }
 
   // Parse RIFF chunks
@@ -99,7 +99,7 @@ export function validateSpeakingAudio(
     if (chunkId === 'fmt ') {
       hasFmt = true;
       if (chunkSize < 16 || offset + 16 > buffer.length) {
-        throw new BadRequestException('Invalid WAV: malformed fmt chunk');
+        throw new BadRequestException('Tệp WAV không hợp lệ: phần fmt bị lỗi.');
       }
       audioFormat = buffer.readUInt16LE(offset);
       numChannels = buffer.readUInt16LE(offset + 2);
@@ -119,36 +119,36 @@ export function validateSpeakingAudio(
   }
 
   if (!hasFmt) {
-    throw new BadRequestException('Invalid WAV: missing fmt chunk');
+    throw new BadRequestException('Tệp WAV không hợp lệ: thiếu phần fmt.');
   }
 
   if (audioFormat !== 1) {
     throw new BadRequestException(
-      `Audio must be linear PCM (expected format tag 1, received ${audioFormat})`,
+      `Âm thanh phải là PCM tuyến tính (cần format tag 1, nhận ${audioFormat}).`,
     );
   }
 
   if (numChannels !== 1) {
     throw new BadRequestException(
-      `Audio must be mono (1 channel). Received ${numChannels} channels.`,
+      `Âm thanh phải là mono (1 kênh). Tệp hiện có ${numChannels} kênh.`,
     );
   }
 
   if (sampleRate !== 16000) {
     throw new BadRequestException(
-      `Audio sample rate must be exactly 16000 Hz. Received ${sampleRate} Hz.`,
+      `Tần số lấy mẫu phải đúng 16000 Hz. Tệp hiện là ${sampleRate} Hz.`,
     );
   }
 
   if (bitsPerSample !== 16) {
     throw new BadRequestException(
-      `Audio bit depth must be 16-bit PCM. Received ${bitsPerSample}-bit.`,
+      `Độ sâu bit phải là PCM 16-bit. Tệp hiện là ${bitsPerSample}-bit.`,
     );
   }
 
   if (!hasData || dataChunkSize <= 0) {
     throw new BadRequestException(
-      'Invalid WAV: missing or empty audio data chunk',
+      'Tệp WAV không hợp lệ: thiếu dữ liệu âm thanh.',
     );
   }
 
@@ -162,13 +162,13 @@ export function validateSpeakingAudio(
 
   if (durationMs > maxDurationMs) {
     throw new BadRequestException(
-      `Audio duration (${(durationMs / 1000).toFixed(1)}s) exceeds maximum allowed duration of ${Math.round(maxDurationMs / 1000)} seconds`,
+      `Âm thanh dài ${(durationMs / 1000).toFixed(1)} giây, vượt mức tối đa ${Math.round(maxDurationMs / 1000)} giây.`,
     );
   }
 
   if (durationMs < MIN_DURATION_MS) {
     throw new BadRequestException(
-      `Audio duration is too short (${durationMs}ms). Please speak the sentence clearly.`,
+      `Âm thanh quá ngắn (${durationMs}ms). Hãy đọc rõ câu và thử lại.`,
     );
   }
 

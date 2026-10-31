@@ -33,7 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const rawToken = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
     if (!rawToken) {
-      throw new UnauthorizedException('Access token is required.');
+      throw new UnauthorizedException('Vui lòng đăng nhập để tiếp tục.');
     }
 
     const tokenHash = crypto
@@ -67,7 +67,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!user) {
       throw new UnauthorizedException(
-        'Token is invalid or user does not exist',
+        'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
       );
     }
 

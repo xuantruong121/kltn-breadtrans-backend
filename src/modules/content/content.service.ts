@@ -317,7 +317,9 @@ export class ContentService {
         });
 
     if (!topic) {
-      throw new NotFoundException(`Content topic ${identifier} not found`);
+      throw new NotFoundException(
+        `Không tìm thấy chủ đề nội dung ${identifier}.`,
+      );
     }
 
     return {
@@ -433,7 +435,9 @@ export class ContentService {
           where: { topicId: identifier },
         });
     if (!topic)
-      throw new NotFoundException(`Content topic ${identifier} not found`);
+      throw new NotFoundException(
+        `Không tìm thấy chủ đề nội dung ${identifier}.`,
+      );
     return topic;
   }
 

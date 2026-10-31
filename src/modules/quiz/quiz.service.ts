@@ -968,7 +968,7 @@ export class QuizService {
       !this.uploadService.isPrivateStorageConfigured()
     ) {
       throw new ServiceUnavailableException(
-        'Protected Listening media storage is not configured',
+        'Kho lưu trữ âm thanh Nghe chưa được cấu hình.',
       );
     }
     if (dto.type) this.assertGenericAdminOwnership(dto.type);
@@ -984,7 +984,7 @@ export class QuizService {
       where: { id },
       include: { course: true },
     });
-    if (!existing) throw new NotFoundException('Quiz not found');
+    if (!existing) throw new NotFoundException('Không tìm thấy bài tập.');
 
     if (user && user.role !== Role.ADMIN) {
       throw new ForbiddenException(
@@ -1016,7 +1016,7 @@ export class QuizService {
         },
       },
     });
-    if (!quiz) throw new NotFoundException('Quiz not found');
+    if (!quiz) throw new NotFoundException('Không tìm thấy bài tập.');
     this.assertGenericAdminOwnership(quiz.type);
     if (
       status === 'PUBLISHED' &&
@@ -1037,7 +1037,7 @@ export class QuizService {
         } catch (error) {
           if (error instanceof BadRequestException) {
             throw new BadRequestException(
-              `Reading question #${question.id} (order ${question.order}): ${error.message}`,
+              `Câu Đọc #${question.id} (thứ tự ${question.order}): ${error.message}`,
             );
           }
           throw error;
@@ -1069,7 +1069,7 @@ export class QuizService {
       where: { id },
       include: { course: true },
     });
-    if (!existing) throw new NotFoundException('Quiz not found');
+    if (!existing) throw new NotFoundException('Không tìm thấy bài tập.');
 
     if (user && user.role !== Role.ADMIN) {
       throw new ForbiddenException(
@@ -1099,7 +1099,7 @@ export class QuizService {
   private async assertPremiumListeningMediaReady(quizId: number) {
     if (!this.uploadService.isPrivateStorageConfigured()) {
       throw new ServiceUnavailableException(
-        'Protected Listening media storage is not configured',
+        'Kho lưu trữ âm thanh Nghe chưa được cấu hình.',
       );
     }
     const quiz = await this.prisma.quiz.findUnique({
@@ -1469,7 +1469,7 @@ export class QuizService {
         toeicWritingSetItems: { select: { id: true }, take: 1 },
       },
     });
-    if (!accessQuiz) throw new NotFoundException('Quiz not found');
+    if (!accessQuiz) throw new NotFoundException('Không tìm thấy bài tập.');
     // TOEIC exam Writing tasks are exam content: learners read them only
     // inside their assessment attempt (/writing/quizzes/:id with the attempt
     // context). The generic quiz route never serves them to non-admins.
@@ -1477,7 +1477,7 @@ export class QuizService {
       role !== Role.ADMIN &&
       (accessQuiz.toeicWritingSetItems?.length ?? 0) > 0
     )
-      throw new NotFoundException('Quiz not found');
+      throw new NotFoundException('Không tìm thấy bài tập.');
 
     if (
       accessQuiz.type === QuizType.LISTENING_PRACTICE &&
@@ -1509,7 +1509,7 @@ export class QuizService {
         },
       },
     });
-    if (!quiz) throw new NotFoundException('Quiz not found');
+    if (!quiz) throw new NotFoundException('Không tìm thấy bài tập.');
 
     // Deliver artifact timing separately from transcript text. The timeline is
     // authoritative media metadata; it is safe for the player before reveal,
@@ -1935,7 +1935,7 @@ export class QuizService {
       !this.uploadService.isPrivateStorageConfigured()
     ) {
       throw new ServiceUnavailableException(
-        'Protected Listening media storage is not configured',
+        'Kho lưu trữ âm thanh Nghe chưa được cấu hình.',
       );
     }
     const next = await this.prisma.quizAudioAsset.aggregate({
@@ -2008,7 +2008,7 @@ export class QuizService {
       !this.uploadService.isPrivateStorageConfigured()
     ) {
       throw new ServiceUnavailableException(
-        'Protected Listening media storage is not configured',
+        'Kho lưu trữ âm thanh Nghe chưa được cấu hình.',
       );
     }
 
@@ -2118,7 +2118,7 @@ export class QuizService {
       where: { id: questionId },
       include: { quiz: { select: { type: true, publicationStatus: true } } },
     });
-    if (!existing) throw new NotFoundException('Question not found');
+    if (!existing) throw new NotFoundException('Không tìm thấy câu hỏi.');
     this.assertGenericAdminOwnership(existing.quiz.type);
 
     const data = { ...dto };
@@ -2141,7 +2141,7 @@ export class QuizService {
       where: { id: questionId },
       include: { quiz: { select: { type: true } } },
     });
-    if (!existing) throw new NotFoundException('Question not found');
+    if (!existing) throw new NotFoundException('Không tìm thấy câu hỏi.');
     this.assertGenericAdminOwnership(existing.quiz.type);
     return this.prisma.question.delete({
       where: { id: questionId },
@@ -2816,7 +2816,7 @@ export class QuizService {
       return this.uploadService.downloadFileBuffer(activeAsset.key);
     if (activeAsset && question.quiz.isPremiumContent) {
       throw new ServiceUnavailableException(
-        'Premium Listening media is not stored in private storage',
+        'Âm thanh Nghe trả phí chưa được lưu ở kho riêng tư.',
       );
     }
     throw new ServiceUnavailableException(
@@ -2902,7 +2902,7 @@ export class QuizService {
       },
     });
 
-    if (!submission) throw new NotFoundException('Submission not found');
+    if (!submission) throw new NotFoundException('Không tìm thấy bài nộp.');
 
     if (role === Role.STUDENT && submission.userId !== userId) {
       throw new ForbiddenException(

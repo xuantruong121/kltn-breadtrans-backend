@@ -169,7 +169,7 @@ export class VocabService {
       (topic.publicationStatus !== undefined &&
         topic.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
-      throw new NotFoundException('Topic not found');
+      throw new NotFoundException('Không tìm thấy chủ đề.');
     }
 
     const words = (
@@ -250,7 +250,7 @@ export class VocabService {
       (word.topic.publicationStatus !== undefined &&
         word.topic.publicationStatus !== QuizPublicationStatus.PUBLISHED)
     ) {
-      throw new NotFoundException('Vocabulary word not found');
+      throw new NotFoundException('Không tìm thấy từ vựng.');
     }
   }
 
@@ -401,7 +401,7 @@ export class VocabService {
       typeof rawWord !== 'string' ||
       rawWord.trim().length === 0
     ) {
-      throw new BadRequestException('Word is required for dictionary lookup');
+      throw new BadRequestException('Vui lòng nhập từ cần tra.');
     }
 
     // Normalize lowercase and strip surrounding punctuation/symbols
@@ -411,9 +411,7 @@ export class VocabService {
       .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
 
     if (!cleanWord) {
-      throw new BadRequestException(
-        'A valid word is required for dictionary lookup',
-      );
+      throw new BadRequestException('Vui lòng nhập một từ hợp lệ.');
     }
 
     // The dictionary store, flattened to the old word shape.
@@ -474,7 +472,7 @@ export class VocabService {
 
   async lookupExtendedWord(rawWord: string, userId?: number) {
     if (!this.dictionaryLookup) {
-      throw new NotFoundException('Dictionary service is unavailable');
+      throw new NotFoundException('Dịch vụ từ điển hiện không khả dụng.');
     }
     return this.dictionaryLookup.lookupExtended(rawWord, userId);
   }
@@ -502,13 +500,13 @@ export class VocabService {
 
   async saveWord(userId: number, rawWord: string) {
     if (!this.dictionaryLookup) {
-      throw new NotFoundException('Dictionary service is unavailable');
+      throw new NotFoundException('Dịch vụ từ điển hiện không khả dụng.');
     }
     const lookup = await this.dictionaryLookup.lookup(rawWord, userId);
     const local = lookup.matches[0];
     const external = lookup.entries?.[0];
     if (!lookup.canonicalWord || (!local && !external)) {
-      throw new NotFoundException('Word was not found in the dictionary');
+      throw new NotFoundException('Không tìm thấy từ này trong từ điển.');
     }
 
     const canonicalWord = lookup.canonicalWord.toLowerCase();
@@ -554,7 +552,7 @@ export class VocabService {
       where: { id: savedWordId, userId },
     });
     if (deleted.count === 0) {
-      throw new NotFoundException('Saved word not found');
+      throw new NotFoundException('Không tìm thấy từ đã lưu.');
     }
     return { deleted: true };
   }

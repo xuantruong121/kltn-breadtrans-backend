@@ -156,7 +156,7 @@ describe('SpeakingService - Durable Submissions & Security', () => {
         service.submitAudio(1, 10, mockFile, undefined),
       ).rejects.toThrow(BadRequestException);
       await expect(service.submitAudio(1, 10, mockFile, '')).rejects.toThrow(
-        'Header "Idempotency-Key" is required and must be a valid non-empty string',
+        'Thiếu header "Idempotency-Key" hợp lệ.',
       );
     });
 
@@ -364,13 +364,13 @@ describe('SpeakingService - Durable Submissions & Security', () => {
     it('rejects invalid accent', async () => {
       await expect(
         service.generateTts('Hello', 'AU' as any, 1),
-      ).rejects.toThrow('Invalid accent');
+      ).rejects.toThrow('không hợp lệ. Chỉ nhận US, UK');
     });
 
     it('rejects invalid speed rate', async () => {
       await expect(
         service.generateTts('Hello', 'US', 2.0 as any),
-      ).rejects.toThrow('Invalid playback rate');
+      ).rejects.toThrow('Tốc độ phát');
     });
 
     it('rejects empty text or text longer than 500 characters', async () => {
@@ -379,7 +379,7 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       );
       await expect(
         service.generateTts('a'.repeat(501), 'US', 1),
-      ).rejects.toThrow('Text exceeds maximum length of 500 characters');
+      ).rejects.toThrow('Nội dung vượt quá 500 ký tự.');
     });
 
     it('fails closed when Azure TTS credentials are unavailable', async () => {

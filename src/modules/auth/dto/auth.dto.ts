@@ -20,14 +20,14 @@ export const NormalizeEmail = () =>
 
 export class RegisterDto {
   @ApiProperty({ example: 'student@test.com' })
-  @IsEmail({}, { message: 'Invalid email format' })
+  @IsEmail({}, { message: 'Email không đúng định dạng.' })
   @NormalizeEmail()
   email: string;
 
   @ApiProperty({ example: 'password123' })
   @IsString()
   @IsNotEmpty()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự.' })
   password: string;
 
   @ApiProperty({ example: 'John Doe' })
@@ -38,7 +38,7 @@ export class RegisterDto {
 
 export class LoginDto {
   @ApiProperty({ example: 'student@test.com' })
-  @IsEmail({}, { message: 'Invalid email format' })
+  @IsEmail({}, { message: 'Email không đúng định dạng.' })
   @NormalizeEmail()
   email: string;
 
@@ -65,14 +65,14 @@ export class RefreshTokenDto {
 
 export class GenerateOtpDto {
   @ApiProperty({ example: 'student@test.com' })
-  @IsEmail({}, { message: 'Invalid email format' })
+  @IsEmail({}, { message: 'Email không đúng định dạng.' })
   @NormalizeEmail()
   email: string;
 }
 
 export class VerifyOtpDto {
   @ApiProperty({ example: 'student@test.com' })
-  @IsEmail({}, { message: 'Invalid email format' })
+  @IsEmail({}, { message: 'Email không đúng định dạng.' })
   @NormalizeEmail()
   email: string;
 
@@ -84,7 +84,7 @@ export class VerifyOtpDto {
 
 export class ForgotPasswordDto {
   @ApiProperty({ example: 'student@test.com' })
-  @IsEmail({}, { message: 'Invalid email format' })
+  @IsEmail({}, { message: 'Email không đúng định dạng.' })
   @NormalizeEmail()
   email: string;
 }
@@ -98,7 +98,7 @@ export class ResetPasswordDto {
   @ApiProperty({ example: 'NewStrongPassword123!', minLength: 8 })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  @MinLength(8, { message: 'Mật khẩu phải có ít nhất 8 ký tự.' })
   newPassword: string;
 }
 

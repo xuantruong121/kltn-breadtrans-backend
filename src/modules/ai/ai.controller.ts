@@ -202,7 +202,7 @@ export class AiController {
     if (!text) {
       return res
         .status(HttpStatus.BAD_REQUEST)
-        .json({ message: 'Text is required' });
+        .json({ message: 'Vui lòng nhập nội dung.' });
     }
 
     const cleanText = text
@@ -219,7 +219,7 @@ export class AiController {
     if (!audioBuffer) {
       return res
         .status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .json({ message: 'Failed to generate Vietnamese TTS' });
+        .json({ message: 'Không tạo được giọng đọc tiếng Việt.' });
     }
 
     res.setHeader('Content-Type', 'audio/mpeg');

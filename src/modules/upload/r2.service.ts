@@ -268,7 +268,7 @@ export class R2Service {
       return { url, key, contentType: mimeType };
     } catch (err) {
       this.logger.error(`Failed to upload file to R2: ${err}`);
-      throw new BadRequestException('Failed to upload file to storage');
+      throw new BadRequestException('Không tải được tệp lên kho lưu trữ.');
     }
   }
 
@@ -297,7 +297,7 @@ export class R2Service {
   ): Promise<R2UploadResult> {
     if (!isPrivatePremiumMediaKey(key)) {
       throw new BadRequestException(
-        'Protected premium media must use the private key namespace',
+        'Media trả phí phải dùng khóa lưu trữ riêng tư.',
       );
     }
     const { client, bucket } = this.requirePrivateStorage();
@@ -319,11 +319,13 @@ export class R2Service {
   getPublicAssetUrl(key: string): string {
     if (isPrivatePremiumMediaKey(key)) {
       throw new BadRequestException(
-        'Protected premium media cannot be addressed by a public URL',
+        'Media trả phí không được truy cập qua URL công khai.',
       );
     }
     if (!this.publicUrl) {
-      throw new ServiceUnavailableException('Public storage is not configured');
+      throw new ServiceUnavailableException(
+        'Kho lưu trữ công khai chưa được cấu hình.',
+      );
     }
     return `${this.publicUrl}/${key}`;
   }
@@ -335,7 +337,7 @@ export class R2Service {
   private requirePrivateStorage(): { client: S3Client; bucket: string } {
     if (!this.privateClient || !this.privateBucket) {
       throw new ServiceUnavailableException(
-        'Protected Listening media storage is not configured',
+        'Kho lưu trữ âm thanh Nghe chưa được cấu hình.',
       );
     }
     return { client: this.privateClient, bucket: this.privateBucket };
@@ -382,7 +384,7 @@ export class R2Service {
   async privateObjectExists(key: string): Promise<boolean> {
     if (!isPrivatePremiumMediaKey(key)) {
       throw new BadRequestException(
-        'Protected premium media must use the private key namespace',
+        'Media trả phí phải dùng khóa lưu trữ riêng tư.',
       );
     }
     const { client, bucket } = this.requirePrivateStorage();
@@ -415,7 +417,7 @@ export class R2Service {
         return;
       } catch (err) {
         this.logger.error(`Failed to delete private file from R2: ${err}`);
-        throw new BadRequestException('Failed to delete file from storage');
+        throw new BadRequestException('Không xóa được tệp trên kho lưu trữ.');
       }
     }
     try {
@@ -428,7 +430,7 @@ export class R2Service {
       this.logger.log(`Deleted "${key}" from R2`);
     } catch (err) {
       this.logger.error(`Failed to delete file from R2: ${err}`);
-      throw new BadRequestException('Failed to delete file from storage');
+      throw new BadRequestException('Không xóa được tệp trên kho lưu trữ.');
     }
   }
 
@@ -445,9 +447,7 @@ export class R2Service {
     expiresIn: number = 600,
   ): Promise<string> {
     if (isPrivatePremiumMediaKey(key)) {
-      throw new BadRequestException(
-        'Protected premium media requires private storage upload',
-      );
+      throw new BadRequestException('Media trả phí phải tải lên kho riêng tư.');
     }
     const command = new PutObjectCommand({
       Bucket: this.bucket,
@@ -466,9 +466,7 @@ export class R2Service {
     expiresIn = 3600,
   ): Promise<string> {
     if (isPrivatePremiumMediaKey(key)) {
-      throw new BadRequestException(
-        'Protected premium media requires private storage signing',
-      );
+      throw new BadRequestException('Media trả phí phải ký qua kho riêng tư.');
     }
     const command = new GetObjectCommand({
       Bucket: this.bucket,
@@ -485,7 +483,7 @@ export class R2Service {
   ): Promise<string> {
     if (!isPrivatePremiumMediaKey(key)) {
       throw new BadRequestException(
-        'Protected media must use the private key namespace',
+        'Media được bảo vệ phải dùng khóa lưu trữ riêng tư.',
       );
     }
     const { client, bucket } = this.requirePrivateStorage();
@@ -502,7 +500,7 @@ export class R2Service {
   ): Promise<string> {
     if (!isPrivatePremiumMediaKey(key)) {
       throw new BadRequestException(
-        'Protected premium media must use the private key namespace',
+        'Media trả phí phải dùng khóa lưu trữ riêng tư.',
       );
     }
     const { client, bucket } = this.requirePrivateStorage();
@@ -519,7 +517,7 @@ export class R2Service {
   async downloadFileBuffer(key: string): Promise<Buffer> {
     if (isPrivatePremiumMediaKey(key)) {
       throw new BadRequestException(
-        'Protected premium media requires private storage access',
+        'Media trả phí phải truy cập qua kho riêng tư.',
       );
     }
     const command = new GetObjectCommand({
@@ -554,7 +552,7 @@ export class R2Service {
   ): Promise<PrivateObjectStream | null> {
     if (!isPrivatePremiumMediaKey(key)) {
       throw new BadRequestException(
-        'Protected premium media must use the private key namespace',
+        'Media trả phí phải dùng khóa lưu trữ riêng tư.',
       );
     }
     const { client, bucket } = this.requirePrivateStorage();
@@ -588,7 +586,7 @@ export class R2Service {
   async downloadPrivateFileBuffer(key: string): Promise<Buffer> {
     if (!isPrivatePremiumMediaKey(key)) {
       throw new BadRequestException(
-        'Protected premium media must use the private key namespace',
+        'Media trả phí phải dùng khóa lưu trữ riêng tư.',
       );
     }
     const { client, bucket } = this.requirePrivateStorage();

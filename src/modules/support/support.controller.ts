@@ -73,7 +73,7 @@ export class SupportController {
     );
     if (conv.id !== id) {
       throw new ForbiddenException(
-        'You do not have permission to post to this conversation',
+        'Bạn không có quyền gửi tin trong cuộc trò chuyện này.',
       );
     }
     return this.supportService.createAiMessage(

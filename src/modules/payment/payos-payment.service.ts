@@ -56,7 +56,8 @@ export class PayosPaymentService {
       where: { id: planPaymentId, planPurchase: { userId } },
       include: { planPurchase: true },
     });
-    if (!payment) throw new NotFoundException('PlanPayment not found');
+    if (!payment)
+      throw new NotFoundException('Không tìm thấy khoản thanh toán.');
     const existing = await this.prisma.payOSPaymentIntent.findUnique({
       where: { planPaymentId },
       include: { planPayment: true, coursePayment: true },
@@ -84,7 +85,8 @@ export class PayosPaymentService {
       where: { id: intentId, userId },
       include: { planPayment: true, coursePayment: true },
     });
-    if (!intent) throw new NotFoundException('Payment intent not found');
+    if (!intent)
+      throw new NotFoundException('Không tìm thấy yêu cầu thanh toán.');
     return this.toDto(intent);
   }
 
@@ -146,9 +148,10 @@ export class PayosPaymentService {
       where: { id: intentId, userId },
       include: { planPayment: true, coursePayment: true },
     });
-    if (!intent) throw new NotFoundException('Payment intent not found');
+    if (!intent)
+      throw new NotFoundException('Không tìm thấy yêu cầu thanh toán.');
     if (intent.status === PayOSPaymentIntentStatus.PAID) {
-      throw new ConflictException('A paid payment cannot be cancelled');
+      throw new ConflictException('Không thể hủy khoản đã thanh toán.');
     }
     await this.provider.cancelPayment(Number(intent.orderCode), reason);
     const updated = await this.prisma.payOSPaymentIntent.update({
@@ -235,14 +238,16 @@ export class PayosPaymentService {
     description: string;
   }): Promise<IntentWithTarget> {
     if (!this.provider.isConfigured()) {
-      throw new ConflictException('PayOS credentials are not configured');
+      throw new ConflictException('Cổng thanh toán PayOS chưa được cấu hình.');
     }
     const idRow = await this.prisma.$queryRaw<Array<{ id: bigint }>>`
       SELECT nextval('"PayOSPaymentIntent_id_seq"') AS id
     `;
     const id = Number(idRow[0]?.id);
     if (!Number.isSafeInteger(id))
-      throw new ConflictException('Could not allocate PayOS orderCode');
+      throw new ConflictException(
+        'Không tạo được mã đơn PayOS. Vui lòng thử lại.',
+      );
     // PayOS order codes are merchant-global, not local database identifiers.
     // A fixed prefix based on the local sequence can collide with orders that
     // already exist in the merchant account. Keep the local id as a small

@@ -28,7 +28,7 @@ describe('humanizeToeicValidationIssues — Phase C human-readable readiness', (
     const [issue] = humanizeToeicValidationIssues(exam, [
       {
         code: 'MISSING_AUDIO',
-        message: 'Listening group has no durable audio asset',
+        message: 'Nhóm Listening chưa có audio đã lưu.',
         groupId: 128,
       },
     ]);
@@ -47,7 +47,7 @@ describe('humanizeToeicValidationIssues — Phase C human-readable readiness', (
     const [issue] = humanizeToeicValidationIssues(exam, [
       {
         code: 'ANSWER_KEY',
-        message: 'Question has no valid answer key',
+        message: 'Câu hỏi chưa có đáp án đúng hợp lệ.',
         groupId: 128,
         questionId: 501,
       },
@@ -62,7 +62,7 @@ describe('humanizeToeicValidationIssues — Phase C human-readable readiness', (
     const [issue] = humanizeToeicValidationIssues(exam, [
       {
         code: 'MISSING_PASSAGE',
-        message: 'Reading group has no passage',
+        message: 'Nhóm Reading chưa có đoạn văn.',
         groupId: 90,
       },
     ]);
@@ -75,12 +75,12 @@ describe('humanizeToeicValidationIssues — Phase C human-readable readiness', (
     const issues = humanizeToeicValidationIssues(exam, [
       {
         code: 'MISSING_AUDIO',
-        message: 'Listening group has no durable audio asset',
+        message: 'Nhóm Listening chưa có audio đã lưu.',
         groupId: 128,
       },
       {
         code: 'ANSWER_KEY',
-        message: 'Question has no valid answer key',
+        message: 'Câu hỏi chưa có đáp án đúng hợp lệ.',
         groupId: 128,
         questionId: 501,
       },

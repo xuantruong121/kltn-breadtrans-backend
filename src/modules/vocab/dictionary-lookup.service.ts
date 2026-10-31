@@ -256,7 +256,7 @@ export class DictionaryLookupService {
 
   private normalize(rawWord: string): string {
     if (!rawWord || rawWord.trim().length === 0) {
-      throw new BadRequestException('Word is required for dictionary lookup');
+      throw new BadRequestException('Vui lòng nhập từ cần tra.');
     }
     const normalized = rawWord
       .trim()
@@ -268,9 +268,7 @@ export class DictionaryLookupService {
       normalized.length > 80 ||
       !/^[\p{L}\p{N}'-]+$/u.test(normalized)
     ) {
-      throw new BadRequestException(
-        'A valid word is required for dictionary lookup',
-      );
+      throw new BadRequestException('Vui lòng nhập một từ hợp lệ.');
     }
     return normalized;
   }

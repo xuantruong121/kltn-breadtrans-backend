@@ -66,7 +66,7 @@ export class PlanCatalogAdminService {
       },
     });
     if (!plan) {
-      throw new NotFoundException('Plan not found');
+      throw new NotFoundException('Không tìm thấy gói.');
     }
     return {
       id: plan.id,
@@ -209,10 +209,7 @@ export class PlanCatalogAdminService {
       );
       return this.toEntitlementDto(entitlement);
     } catch (error) {
-      this.rethrowUnique(
-        error,
-        'An entitlement for this feature already exists',
-      );
+      this.rethrowUnique(error, 'Tính năng này đã có quyền lợi trong gói.');
       throw error;
     }
   }
@@ -230,7 +227,7 @@ export class PlanCatalogAdminService {
       where: { id: entitlementId, planVersionId: versionId },
     });
     if (!current) {
-      throw new NotFoundException('Plan entitlement not found');
+      throw new NotFoundException('Không tìm thấy quyền lợi của gói.');
     }
     const next = {
       enabled: dto.enabled ?? current.enabled,
@@ -268,7 +265,7 @@ export class PlanCatalogAdminService {
       where: { id: entitlementId, planVersionId: versionId },
     });
     if (!current) {
-      throw new NotFoundException('Plan entitlement not found');
+      throw new NotFoundException('Không tìm thấy quyền lợi của gói.');
     }
     await this.prisma.planEntitlement.delete({ where: { id: entitlementId } });
     this.audit(adminUserId, 'DELETE_ENTITLEMENT', versionId, version.plan.code);
@@ -282,7 +279,7 @@ export class PlanCatalogAdminService {
         include: { plan: true, entitlements: true },
       });
       if (!current) {
-        throw new NotFoundException('PlanVersion not found');
+        throw new NotFoundException('Không tìm thấy phiên bản gói.');
       }
       this.validateForPublish(current);
       await this.lockPlan(tx, current.planId);
@@ -313,14 +310,14 @@ export class PlanCatalogAdminService {
         include: { plan: true, entitlements: true },
       });
       if (!current) {
-        throw new NotFoundException('PlanVersion not found');
+        throw new NotFoundException('Không tìm thấy phiên bản gói.');
       }
       if (current.plan.code === 'FREE') {
-        throw new ConflictException('FREE catalog versions are protected');
+        throw new ConflictException('Không được sửa phiên bản của gói FREE.');
       }
       if (current.isCurrent) {
         throw new ConflictException(
-          'Current PlanVersion must be replaced before retirement',
+          'Phải thay phiên bản hiện hành trước khi ngừng dùng.',
         );
       }
       if (current.status === PlanVersionStatus.RETIRED) {
@@ -344,34 +341,30 @@ export class PlanCatalogAdminService {
       include: { plan: true, entitlements: true },
     });
     if (!version) {
-      throw new NotFoundException('PlanVersion not found');
+      throw new NotFoundException('Không tìm thấy phiên bản gói.');
     }
     return version;
   }
 
   private assertPaidPlan(code?: string, status?: PlanStatus): void {
     if (!code) {
-      throw new NotFoundException('Plan not found');
+      throw new NotFoundException('Không tìm thấy gói.');
     }
     if (code === 'FREE') {
-      throw new ConflictException('FREE plan catalog is protected');
+      throw new ConflictException('Gói FREE được bảo vệ, không thể thay đổi.');
     }
     if (code !== 'PLUS' && code !== 'PRO') {
-      throw new ConflictException(
-        'Only PLUS and PRO plans are manageable here',
-      );
+      throw new ConflictException('Trang này chỉ quản lý gói PLUS và PRO.');
     }
     if (status !== PlanStatus.ACTIVE) {
-      throw new ConflictException('Plan is not active');
+      throw new ConflictException('Gói không còn hoạt động.');
     }
   }
 
   private assertDraftMutable(version: VersionWithDetails): void {
     this.assertPaidPlan(version.plan.code, version.plan.status);
     if (version.status !== PlanVersionStatus.DRAFT || version.isCurrent) {
-      throw new ConflictException(
-        'Only non-current DRAFT versions are editable',
-      );
+      throw new ConflictException('Chỉ sửa được phiên bản nháp chưa áp dụng.');
     }
   }
 
@@ -387,17 +380,17 @@ export class PlanCatalogAdminService {
     });
     if (!version.durationDays || version.durationDays <= 0) {
       throw new ConflictException(
-        'Published paid versions require durationDays',
+        'Phiên bản trả phí khi xuất bản phải có số ngày sử dụng.',
       );
     }
     if (!version.priceVnd || version.priceVnd <= 0) {
       throw new ConflictException(
-        'Published paid versions require a positive priceVnd',
+        'Phiên bản trả phí khi xuất bản phải có giá lớn hơn 0.',
       );
     }
     if (version.currency !== 'VND') {
       throw new ConflictException(
-        'Published paid versions require VND currency',
+        'Phiên bản trả phí khi xuất bản phải dùng đơn vị VND.',
       );
     }
     for (const entitlement of version.entitlements) {

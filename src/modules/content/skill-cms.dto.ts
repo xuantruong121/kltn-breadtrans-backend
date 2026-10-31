@@ -33,7 +33,7 @@ function IsStringOrPlainObject(options?: ValidationOptions) {
       target: target.constructor,
       propertyName,
       options: {
-        message: `${propertyName} must be a string or an object`,
+        message: `${propertyName} phải là chuỗi hoặc đối tượng.`,
         ...options,
       },
       validator: {
@@ -52,7 +52,7 @@ function IsArrayOrPlainObject(options?: ValidationOptions) {
       target: target.constructor,
       propertyName,
       options: {
-        message: `${propertyName} must be an array or an object`,
+        message: `${propertyName} phải là mảng hoặc đối tượng.`,
         ...options,
       },
       validator: {

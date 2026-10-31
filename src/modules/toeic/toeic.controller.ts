@@ -204,7 +204,9 @@ export class ToeicController {
       grant,
     );
     if (!source) {
-      res.status(404).json({ statusCode: 404, message: 'Not found' });
+      res
+        .status(404)
+        .json({ statusCode: 404, message: 'Không tìm thấy dữ liệu.' });
       return;
     }
     res.setHeader('Content-Type', 'audio/mpeg');
@@ -218,7 +220,9 @@ export class ToeicController {
         .openPrivateMedia(source.privateKey, req.headers.range)
         .catch(() => null);
       if (!object) {
-        res.status(404).json({ statusCode: 404, message: 'Not found' });
+        res
+          .status(404)
+          .json({ statusCode: 404, message: 'Không tìm thấy dữ liệu.' });
         return;
       }
       res.status(object.status);
@@ -242,7 +246,9 @@ export class ToeicController {
       !upstream?.body ||
       (upstream.status !== 200 && upstream.status !== 206)
     ) {
-      res.status(404).json({ statusCode: 404, message: 'Not found' });
+      res
+        .status(404)
+        .json({ statusCode: 404, message: 'Không tìm thấy dữ liệu.' });
       return;
     }
     res.status(upstream.status);

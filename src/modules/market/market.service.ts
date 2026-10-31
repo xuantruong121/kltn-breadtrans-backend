@@ -509,7 +509,7 @@ export class MarketService {
       where: { id: orderId },
     });
     if (!order) {
-      throw new NotFoundException(`Order ${orderId} not found`);
+      throw new NotFoundException(`Không tìm thấy đơn hàng #${orderId}.`);
     }
 
     if (status === 'rejected' && !reason?.trim()) {
@@ -644,7 +644,7 @@ export class MarketService {
       where: { id: orderId },
     });
     if (!order) {
-      throw new NotFoundException(`Order ${orderId} not found`);
+      throw new NotFoundException(`Không tìm thấy đơn hàng #${orderId}.`);
     }
     if (order.status !== 'approved' && order.status !== 'completed') {
       throw new BadRequestException(
@@ -1186,7 +1186,7 @@ export class MarketService {
       include: { profile: true },
     });
     if (!user) {
-      throw new NotFoundException(`User with ID ${dto.userId} not found`);
+      throw new NotFoundException(`Không tìm thấy người dùng #${dto.userId}.`);
     }
 
     const studentName =

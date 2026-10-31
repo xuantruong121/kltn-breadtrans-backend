@@ -121,14 +121,17 @@ export class CourseMediaSearchService {
   ) {}
 
   private admin(user: Admin) {
-    if (user.role !== Role.ADMIN) throw new ForbiddenException('Admin only');
+    if (user.role !== Role.ADMIN)
+      throw new ForbiddenException(
+        'Chỉ quản trị viên được thực hiện thao tác này.',
+      );
   }
 
   private async course(courseId: number) {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
-    if (!course) throw new NotFoundException('Course not found');
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học.');
     return course;
   }
 
@@ -136,7 +139,7 @@ export class CourseMediaSearchService {
     const lesson = await this.prisma.courseLesson.findFirst({
       where: { id: lessonId, courseId },
     });
-    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (!lesson) throw new NotFoundException('Không tìm thấy bài học.');
     return lesson;
   }
 

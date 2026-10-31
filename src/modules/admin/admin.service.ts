@@ -1648,14 +1648,14 @@ export class AdminService {
   }) {
     void dto;
     throw new ConflictException(
-      'Speaking content is managed by the Skill CMS /admin/skill-content/speaking',
+      'Nội dung Nói được quản lý tại Skill CMS: /admin/skill-content/speaking.',
     );
   }
 
   deleteSpeakingExercise(id: number) {
     void id;
     throw new ConflictException(
-      'Speaking content is managed by the Skill CMS /admin/skill-content/speaking',
+      'Nội dung Nói được quản lý tại Skill CMS: /admin/skill-content/speaking.',
     );
   }
 

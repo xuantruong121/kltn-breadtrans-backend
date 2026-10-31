@@ -38,6 +38,6 @@ export class CreateUploadIntentDto {
     description: 'Client idempotency key for this attempt',
   })
   @IsString()
-  @IsNotEmpty({ message: 'idempotencyKey is required' })
+  @IsNotEmpty({ message: 'Thiếu mã chống trùng của yêu cầu.' })
   idempotencyKey: string;
 }
