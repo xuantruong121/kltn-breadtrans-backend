@@ -88,9 +88,7 @@ describe('SpeakingAudioValidator - Byte-Level WAV Validation', () => {
 
   it('rejects audio shorter than 300ms', () => {
     const shortWav = createWavBuffer({ durationSeconds: 0.1 });
-    expect(() => validateSpeakingAudio(shortWav)).toThrow(
-      'Âm thanh quá ngắn',
-    );
+    expect(() => validateSpeakingAudio(shortWav)).toThrow('Âm thanh quá ngắn');
   });
 
   it('accepts valid silent audio so it can be recorded as a NO_SPEECH attempt', () => {
