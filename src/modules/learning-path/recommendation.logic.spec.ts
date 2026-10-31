@@ -29,6 +29,7 @@ const item = (
   difficulty: DIFF[level],
   tracks: [],
   planLocked: false,
+  requiredPlan: 'FREE',
   minutes: 10,
   ...extra,
 });

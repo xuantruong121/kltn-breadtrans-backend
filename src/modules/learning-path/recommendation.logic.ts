@@ -61,6 +61,8 @@ export type Candidate = {
   tracks: LearningTrack[];
   /** True when the item needs a plan the learner does not have. */
   planLocked: boolean;
+  /** Lowest plan that opens this item. */
+  requiredPlan: 'FREE' | 'PLUS' | 'PRO';
   /** Minutes one attempt usually takes. */
   minutes: number;
 };

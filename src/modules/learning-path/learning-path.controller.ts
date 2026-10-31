@@ -23,13 +23,18 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UpdateLearnerProfileDto } from './dto/learner-profile.dto';
 import { LearningItemDto } from './dto/learning-item.dto';
 import { LearningPathService } from './learning-path.service';
+import { GateService } from './gate.service';
+import { SubmitGateDto } from './dto/submit-gate.dto';
 
 @ApiTags('learning-path')
 @Controller('learning-path')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class LearningPathController {
-  constructor(private readonly learningPath: LearningPathService) {}
+  constructor(
+    private readonly learningPath: LearningPathService,
+    private readonly gates: GateService,
+  ) {}
 
   @Get('profile')
   @ApiOperation({
@@ -54,6 +59,52 @@ export class LearningPathController {
     @Body() dto: UpdateLearnerProfileDto,
   ) {
     return this.learningPath.updateProfile(req.user.id, dto);
+  }
+
+  @Get('gates/:skill')
+  @ApiOperation({
+    summary:
+      'Bài mở khoá mức kế tiếp của một kỹ năng: có hay không, chờ tới khi nào',
+  })
+  @ApiResponse({ status: 200, description: 'Trạng thái bài mở khoá' })
+  gateStatus(
+    @Request() req: { user: { id: number } },
+    @Param('skill', new ParseEnumPipe(PracticeSkill)) skill: PracticeSkill,
+  ) {
+    return this.gates.status(req.user.id, skill);
+  }
+
+  @Post('gates/:skill/start')
+  @ApiOperation({
+    summary: 'Bắt đầu bài mở khoá, hoặc mở lại lần đang làm dở',
+  })
+  @ApiResponse({ status: 201, description: 'Câu hỏi, không kèm đáp án' })
+  @ApiResponse({
+    status: 409,
+    description: 'Không có bài mở khoá, hoặc chưa hết thời gian chờ',
+  })
+  startGate(
+    @Request() req: { user: { id: number } },
+    @Param('skill', new ParseEnumPipe(PracticeSkill)) skill: PracticeSkill,
+  ) {
+    return this.gates.start(req.user.id, skill);
+  }
+
+  @Post('gates/attempts/:id/submit')
+  @ApiOperation({
+    summary: 'Nộp bài mở khoá; đạt thì mở mức. Nộp lại trả kết quả cũ',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Điểm và đạt hay chưa, không kèm đáp án',
+  })
+  @ApiResponse({ status: 404, description: 'Không phải lần làm của người này' })
+  submitGate(
+    @Request() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SubmitGateDto,
+  ) {
+    return this.gates.submit(req.user.id, id, dto.answers);
   }
 
   @Get('today')

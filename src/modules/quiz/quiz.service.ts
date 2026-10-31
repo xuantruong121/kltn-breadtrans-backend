@@ -2688,7 +2688,52 @@ export class QuizService {
       throw new ForbiddenException('Chỉ hỗ trợ audio cho bài luyện nghe');
     }
     await this.quizContentAccess.assertAccess(question.quiz, userId, role);
+    return this.playQuestionAudio(question, quizId, requestedIdentity);
+  }
 
+  /**
+   * A clip of a level gate. The learner has not opened that level yet: the
+   * attempt grants this one clip, so it serves only questions it was given.
+   */
+  async streamGateQuestionAudio(
+    attemptId: number,
+    questionId: number,
+    userId: number,
+  ) {
+    const attempt = await this.prisma.gateAttempt.findUnique({
+      where: { id: attemptId },
+    });
+    if (
+      !attempt ||
+      attempt.userId !== userId ||
+      attempt.submittedAt ||
+      !(attempt.questionIds as number[]).includes(questionId)
+    )
+      throw new NotFoundException('Câu hỏi không thuộc bài mở khoá này');
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId },
+      include: {
+        quiz: { select: { isPremiumContent: true } },
+        audioAssets: {
+          where: { isActive: true },
+          orderBy: { version: 'desc' },
+          take: 1,
+        },
+      },
+    });
+    if (!question) throw new NotFoundException('Không tìm thấy câu hỏi');
+    return this.playQuestionAudio(question, question.quizId, {});
+  }
+
+  private async playQuestionAudio(
+    question: {
+      content: unknown;
+      quiz: { isPremiumContent: boolean };
+      audioAssets: Array<{ key: string }>;
+    },
+    quizId: number,
+    requestedIdentity: PublishedListeningAudioIdentity,
+  ) {
     const content =
       question.content && typeof question.content === 'object'
         ? (question.content as Record<string, unknown>)

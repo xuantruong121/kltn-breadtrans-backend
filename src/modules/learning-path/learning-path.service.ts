@@ -19,17 +19,15 @@ import {
 } from './recommendation.logic';
 import { PRACTICE_LEVEL_LABEL, PRACTICE_SKILLS } from './placement.logic';
 import { applySelfLevel } from './placement.store';
-import {
-  levelProgress,
-  nextLevel,
-  UNPLACED_UNLOCKED,
-} from './progression.logic';
+import { levelProgress, nextLevel } from './progression.logic';
+import { LevelAccessService } from './level-access.service';
 
 @Injectable()
 export class LearningPathService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptions: SubscriptionService,
+    private readonly levelAccess: LevelAccessService,
   ) {}
 
   private async context(userId: number) {
@@ -40,6 +38,12 @@ export class LearningPathService {
       userId,
       catalog.setKeyOfExercise,
     );
+    // The same open level access uses (empty levels passed over).
+    const unlocked = await this.levelAccess.unlockedLevels(userId);
+    for (const skill of PRACTICE_SKILLS) {
+      const state = learner.skills[skill];
+      if (state) state.unlockedLevel = unlocked[skill];
+    }
     return { catalog, learner };
   }
 
@@ -55,6 +59,8 @@ export class LearningPathService {
       route: c.route,
       minutes: c.minutes,
       status: r.status,
+      requiredPlan: c.requiredPlan,
+      planLocked: c.planLocked,
       reasons: r.reasons,
       predictedSuccess: r.predictedSuccess,
       saved: saved.has(contentKey(c)),
@@ -139,7 +145,7 @@ export class LearningPathService {
   /** The learner's profile and per-skill levels; defaults before onboarding. */
   async getProfile(userId: number) {
     await this.backfillPlacement(userId);
-    const [profile, levels, events] = await Promise.all([
+    const [profile, levels, events, unlocked] = await Promise.all([
       this.prisma.learnerProfile.findUnique({ where: { userId } }),
       this.prisma.learnerSkillLevel.findMany({ where: { userId } }),
       this.prisma.learnerProgressEvent.findMany({
@@ -151,6 +157,7 @@ export class LearningPathService {
           scorePercent: true,
         },
       }),
+      this.levelAccess.unlockedLevels(userId),
     ]);
     return {
       track: profile?.track ?? 'GENERAL',
@@ -163,7 +170,7 @@ export class LearningPathService {
       onboarded: Boolean(profile?.onboardedAt),
       skills: PRACTICE_SKILLS.map((skill) => {
         const row = levels.find((l) => l.skill === skill);
-        const unlockedLevel = row?.unlockedLevel ?? UNPLACED_UNLOCKED;
+        const unlockedLevel = unlocked[skill];
         return {
           skill,
           level: row?.level ?? null,

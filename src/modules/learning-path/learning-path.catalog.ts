@@ -118,6 +118,9 @@ export async function loadCandidates(
     const skill = QUIZ_SKILL[q.type];
     const range = parseCefrRange(q.title);
     if (!skill || skill === 'SPEAKING' || !range) continue;
+    const requiredPlan = requiredPracticePlan(skill, range, {
+      dictation: isDictationContent(q.bilingualContent),
+    });
     out.push({
       type: 'QUIZ',
       id: q.id,
@@ -127,12 +130,8 @@ export async function loadCandidates(
       route: `${ROUTE[skill]}/${q.id}`,
       difficulty: difficultyOf('QUIZ', q.id) ?? seedDifficulty(range),
       tracks: tracksOf('QUIZ', q.id),
-      planLocked: !planSatisfies(
-        planCode,
-        requiredPracticePlan(skill, range, {
-          dictation: isDictationContent(q.bilingualContent),
-        }),
-      ),
+      planLocked: !planSatisfies(planCode, requiredPlan),
+      requiredPlan,
       minutes: MINUTES[skill],
     });
   }
@@ -141,6 +140,7 @@ export async function loadCandidates(
     const first = set.exercises[0];
     if (!range || !first) continue;
     for (const e of set.exercises) setKeyOfExercise.set(e.id, first.id);
+    const requiredPlan = requiredPracticePlan('SPEAKING', range);
     out.push({
       type: 'SPEAKING_SET',
       id: first.id,
@@ -151,10 +151,8 @@ export async function loadCandidates(
       difficulty:
         difficultyOf('SPEAKING_SET', first.id) ?? seedDifficulty(range),
       tracks: tracksOf('SPEAKING_SET', first.id),
-      planLocked: !planSatisfies(
-        planCode,
-        requiredPracticePlan('SPEAKING', range),
-      ),
+      planLocked: !planSatisfies(planCode, requiredPlan),
+      requiredPlan,
       minutes: MINUTES.SPEAKING,
     });
   }

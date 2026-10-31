@@ -14,9 +14,21 @@ function service() {
   db.learnerProgressEvent.findMany = () => Promise.resolve([]);
   return {
     db,
-    svc: new LearningPathService(db, {
-      effectivePlanCode: () => Promise.resolve(null),
-    } as never),
+    svc: new LearningPathService(
+      db,
+      {
+        effectivePlanCode: () => Promise.resolve(null),
+      } as never,
+      {
+        unlockedLevels: () =>
+          Promise.resolve({
+            LISTENING: 'BASIC',
+            READING: 'BASIC',
+            SPEAKING: 'BASIC',
+            WRITING: 'BASIC',
+          }),
+      } as never,
+    ),
   };
 }
 
