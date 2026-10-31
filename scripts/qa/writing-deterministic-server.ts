@@ -31,6 +31,22 @@ function evaluate(score: number) {
   };
 }
 
+/** Deterministic grammar candidates; the answer is always option A. */
+function deterministicGrammarQuestions(count: number) {
+  return Array.from({ length: Math.min(Math.max(count || 3, 1), 5) }, (_, i) => ({
+    question: `Câu kiểm thử ${i + 1}: She ____ to work yesterday.`,
+    options: ['went', 'goes', 'go', 'going'],
+    correctIndex: 0,
+    explanation: 'yesterday là mốc quá khứ nên dùng quá khứ đơn.',
+    optionExplanations: [
+      '',
+      'Hiện tại đơn, không hợp với yesterday.',
+      'Động từ nguyên mẫu, thiếu chia thì.',
+      'Dạng V-ing cần trợ động từ.',
+    ],
+  }));
+}
+
 const provider = {
   generateFeedback: async () => 'Deterministic generic feedback.',
   chat: async () => 'Deterministic chat response.',
@@ -44,6 +60,26 @@ const provider = {
   explainToeicError: async () => 'Deterministic explanation.',
   generateToeicQuestions: async () => [],
   generateDictation: async () => [],
+  // Dictionary lookups: a fixed Vietnamese meaning, so an external result is
+  // complete and the store keeps it for review (F13).
+  enrichDictionaryEntry: async (input: { word: string }) => ({
+    meaningVi: `nghĩa kiểm thử của ${input.word}`,
+  }),
+  // Grammar authoring: fixed candidates with why-wrong notes (F14).
+  suggestGrammarQuestions: async (input: { count: number }) => ({
+    candidates: deterministicGrammarQuestions(input.count),
+  }),
+  suggestGrammarFullDraft: async (input: {
+    topicTitle?: string;
+    level?: string;
+    count: number;
+  }) => ({
+    title: input.topicTitle ?? 'Chủ đề kiểm thử',
+    description: 'Lý thuyết kiểm thử.\nMỗi ý một dòng.',
+    level: input.level ?? 'BEGINNER',
+    keyFormula: 'S + V2/V-ed',
+    questions: deterministicGrammarQuestions(input.count),
+  }),
   evaluateWritingPart1: async () => evaluate(3),
   evaluateWritingPart2: async () => evaluate(4),
   evaluateWritingPart3: async () => evaluate(5),

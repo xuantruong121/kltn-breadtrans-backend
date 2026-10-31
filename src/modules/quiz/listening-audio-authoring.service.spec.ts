@@ -1,4 +1,5 @@
 import {
+  ListeningAudioAuthoringService,
   buildListeningSsml,
   escapeXml,
   resolveListeningVoice,
@@ -360,5 +361,74 @@ describe('ListeningAudioAuthoring primitives', () => {
         'chunk-001:end',
       ),
     ).toBe('Hello there<bookmark mark="chunk-001:end"/>.');
+  });
+});
+
+describe('ListeningAudioAuthoringService.generatePreview', () => {
+  const quizWith = (speakers: Array<[string, string?]>) => ({
+    id: 58,
+    type: 'LISTENING_PRACTICE',
+    questions: [
+      {
+        id: 1,
+        order: 0,
+        content: {
+          transcriptSegments: speakers.map(([speaker, voiceKey], i) => ({
+            speaker,
+            text: `Line ${i + 1}.`,
+            ...(voiceKey ? { voiceKey } : {}),
+          })),
+        },
+      },
+    ],
+  });
+  const service = (quiz: unknown) => {
+    const upload = { isPrivateStorageConfigured: jest.fn() };
+    const prisma = {
+      quiz: { findUnique: jest.fn().mockResolvedValue(quiz) },
+    };
+    return {
+      upload,
+      svc: new ListeningAudioAuthoringService(prisma as never, upload as never),
+    };
+  };
+
+  it('refuses two speakers on one voice before any synthesis', async () => {
+    // "Mark" reads as male and "Sarah" (unlisted) falls to slot 1 = male.
+    const { svc, upload } = service(quizWith([['Mark'], ['Sarah']]));
+    await expect(svc.generatePreview(58, 1)).rejects.toThrow(
+      'giọng đọc khác nhau',
+    );
+    expect(upload.isPrivateStorageConfigured).not.toHaveBeenCalled();
+  });
+
+  it('a dictation quiz may be read by one voice', async () => {
+    const { svc } = service({
+      ...quizWith([['Narrator'], ['Narrator']]),
+      bilingualContent: { mode: 'DICTATION' },
+    });
+    await expect(svc.validateContent(58)).resolves.toMatchObject({
+      speakers: ['Narrator'],
+    });
+  });
+
+  it('a dialogue quiz still needs two speakers', async () => {
+    const { svc } = service({
+      ...quizWith([['Narrator'], ['Narrator']]),
+      bilingualContent: { mode: 'DIALOGUE' },
+    });
+    await expect(svc.validateContent(58)).rejects.toThrow('hai người nói');
+  });
+
+  it('an explicit voiceKey per speaker resolves the clash', async () => {
+    const { svc } = service(
+      quizWith([
+        ['Mark', 'en-us-male-01'],
+        ['Sarah', 'en-us-female-01'],
+      ]),
+    );
+    await expect(svc.validateContent(58)).resolves.toMatchObject({
+      speakers: ['Mark', 'Sarah'],
+    });
   });
 });

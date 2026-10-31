@@ -2,8 +2,10 @@ import {
   cefrSpan,
   levelGroup,
   levelLabel,
+  isDictationContent,
   parseCefrRange,
   practiceRequiresPlus,
+  requiredPracticePlan,
 } from './practice-level';
 
 describe('practice level policy (A1/A2 free, B1+ PLUS)', () => {
@@ -51,5 +53,28 @@ describe('practice level policy (A1/A2 free, B1+ PLUS)', () => {
     expect(cefrSpan(parseCefrRange('Writing B2–C1 — Argument'))).toBe('B2-C1');
     expect(cefrSpan(parseCefrRange('A1-A2'))).toBe('A1-A2');
     expect(cefrSpan(parseCefrRange('Untitled'))).toBeNull();
+  });
+});
+
+describe('plan matrix (owner 2026-10-30)', () => {
+  const r = (v: string) => parseCefrRange(v)!;
+  it.each([
+    ['READING', 'C2', false, 'FREE'],
+    ['LISTENING', 'C1', false, 'FREE'],
+    ['LISTENING', 'A2', true, 'FREE'],
+    ['LISTENING', 'B1', true, 'PLUS'],
+    ['LISTENING', 'C2', true, 'PLUS'],
+    ['SPEAKING', 'A1-A2', false, 'FREE'],
+    ['SPEAKING', 'B1-B2', false, 'PLUS'],
+    ['WRITING', 'B2-C1', false, 'PRO'],
+    ['WRITING', 'C2', false, 'PRO'],
+  ] as const)('%s %s (dictation %s) -> %s', (skill, level, dictation, plan) => {
+    expect(requiredPracticePlan(skill, r(level), { dictation })).toBe(plan);
+  });
+
+  it('recognises dictation only from the stored mode', () => {
+    expect(isDictationContent({ mode: 'DICTATION' })).toBe(true);
+    expect(isDictationContent({ mode: 'DIALOGUE' })).toBe(false);
+    expect(isDictationContent(null)).toBe(false);
   });
 });

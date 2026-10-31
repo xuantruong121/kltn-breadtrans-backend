@@ -26,6 +26,10 @@ describe('AdminVocabCMS (Phase 4)', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      dictionaryEntry: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
       userVocabWordProgress: {
         findFirst: jest.fn(),
       },
@@ -82,7 +86,9 @@ describe('AdminVocabCMS (Phase 4)', () => {
       prisma.vocabTopic.findUnique.mockResolvedValue({
         id: 101,
         title: 'Valid Topic',
-        words: [{ id: 1, word: 'Contract', meaning: 'Hợp đồng' }],
+        words: [
+          { id: 1, entry: { displayWord: 'Contract', meaningVi: 'Hợp đồng' } },
+        ],
       });
       prisma.vocabTopic.update.mockResolvedValue({
         id: 101,
@@ -147,8 +153,15 @@ describe('AdminVocabCMS (Phase 4)', () => {
       prisma.vocabWord.findUnique.mockResolvedValue({
         id: 5,
         topicId: 101,
-        word: 'Abide by',
-        meaning: 'Tuân theo',
+        entryId: 40,
+        entry: {
+          id: 40,
+          headword: 'abide by',
+          displayWord: 'Abide by',
+          pos: 'verb',
+          meaningVi: 'Tuân theo',
+          status: 'APPROVED',
+        },
       });
       prisma.userVocabWordProgress.findFirst.mockResolvedValue({
         id: 88,
@@ -172,8 +185,15 @@ describe('AdminVocabCMS (Phase 4)', () => {
       prisma.vocabWord.findUnique.mockResolvedValue({
         id: 5,
         topicId: 101,
-        word: 'Abide by',
-        meaning: 'Tuân theo',
+        entryId: 40,
+        entry: {
+          id: 40,
+          headword: 'abide by',
+          displayWord: 'Abide by',
+          pos: 'verb',
+          meaningVi: 'Tuân theo',
+          status: 'APPROVED',
+        },
       });
       prisma.userVocabWordProgress.findFirst.mockResolvedValue({
         id: 88,
@@ -181,13 +201,19 @@ describe('AdminVocabCMS (Phase 4)', () => {
       });
       prisma.vocabWord.update.mockResolvedValue({
         id: 5,
-        ipaUs: 'əˈbaɪd baɪ',
+        topicId: 101,
+        entryId: 40,
+        entry: { id: 40, displayWord: 'Abide by', ipaUs: 'əˈbaɪd baɪ' },
       });
 
       const result = await adminService.updateVocabWord(101, 5, {
         ipaUs: 'əˈbaɪd baɪ',
       });
       expect(result.ipaUs).toBe('əˈbaɪd baɪ');
+      expect(prisma.dictionaryEntry.update).toHaveBeenCalledWith({
+        where: { id: 40 },
+        data: { ipaUs: 'əˈbaɪd baɪ' },
+      });
     });
 
     it('blocks word deletion if learner progress exists (409 Conflict)', async () => {

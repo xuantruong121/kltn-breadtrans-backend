@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { GeminiCredentialManager } from '../ai/gemini/gemini-credential-manager.service';
@@ -16,6 +17,7 @@ import {
   DictionaryProvider,
   ProviderDictionaryEntry,
 } from './dictionary-provider';
+import { headwordOf, posOf } from './dictionary-entry';
 
 export type DictionarySource = 'LOCAL' | 'CACHE' | 'EXTERNAL';
 export type DictionaryMatch = {
@@ -124,7 +126,8 @@ export class DictionaryLookupService {
     // v2 invalidated negative entries written before the curated vocabulary
     // seed was populated. Keeping the namespace versioned prevents a stale
     // "not found" response from masking a word that now exists locally.
-    const cacheKey = `dictionary:v3:${canAccessPremium ? 'premium' : 'free'}:en:${query}`;
+    // v4 (F13): local results come from DictionaryEntry, with entry ids.
+    const cacheKey = `dictionary:v4:${canAccessPremium ? 'premium' : 'free'}:en:${query}`;
     // Curated vocabulary always wins over a stale external cache entry.
     const local = await this.lookupLocal(query, candidates, canAccessPremium);
     if (local) {
@@ -180,6 +183,7 @@ export class DictionaryLookupService {
       external,
       external.meaningViStatus === 'UNAVAILABLE' ? 5 * 60 : this.positiveTtl,
     );
+    await this.keepExternalEntries(external);
     return this.attachSaved(external, userId);
   }
 
@@ -192,7 +196,7 @@ export class DictionaryLookupService {
     userId?: number,
   ): Promise<DictionaryLookupResponse> {
     const query = this.normalize(rawWord);
-    const cacheKey = `dictionary:extended:v1:en:${query}`;
+    const cacheKey = `dictionary:extended:v2:en:${query}`;
     const cached = await this.readCache(cacheKey);
     if (cached) {
       return this.attachSaved({ ...cached, source: 'CACHE' }, userId);
@@ -271,32 +275,35 @@ export class DictionaryLookupService {
     return normalized;
   }
 
+  /** The dictionary store (F13): curated entries first, never rejected ones. */
   private async lookupLocal(
     query: string,
     candidates: string[],
     canAccessPremium: boolean,
   ) {
-    const words = [query, ...candidates];
-    const rows = await this.prisma.vocabWord.findMany({
-      where: {
-        word: { in: words, mode: 'insensitive' },
-        ...(canAccessPremium ? {} : { topic: { isPro: false } }),
-      },
+    void canAccessPremium;
+    const headwords = [...new Set([query, ...candidates].map(headwordOf))];
+    const entries = await this.prisma.dictionaryEntry.findMany({
+      where: { headword: { in: headwords }, status: { not: 'REJECTED' } },
+      orderBy: [{ status: 'asc' }, { id: 'asc' }],
       take: 10,
-      select: {
-        id: true,
-        word: true,
-        pos: true,
-        ipaUs: true,
-        ipaUk: true,
-        meaning: true,
-        exampleEn: true,
-        exampleVi: true,
-        audioUs: true,
-        audioUk: true,
-        collocations: true,
-      },
     });
+    const rows = entries.map((entry) => ({
+      id: entry.id,
+      word: entry.displayWord,
+      pos: entry.pos,
+      ipaUs: entry.ipaUs,
+      ipaUk: entry.ipaUk,
+      meaning: entry.meaningVi,
+      definitionEn: entry.definitionEn,
+      exampleEn: entry.exampleEn,
+      exampleVi: entry.exampleVi,
+      audioUs: entry.audioUs,
+      audioUk: entry.audioUk,
+      collocations: entry.collocations,
+      synonyms: entry.synonyms,
+      antonyms: entry.antonyms,
+    }));
     const canonicalRow =
       rows.find((row) => candidates.includes(String(row.word).toLowerCase())) ??
       rows.find((row) => String(row.word).toLowerCase() === query);
@@ -304,6 +311,43 @@ export class DictionaryLookupService {
       ? [canonicalRow, ...rows.filter((row) => row.id !== canonicalRow.id)]
       : rows;
     return this.toLocalResponse(query, orderedRows);
+  }
+
+  /**
+   * External results become store entries awaiting review, so the store grows
+   * and an admin can check them. Curated entries are never overwritten; an
+   * entry without a Vietnamese meaning is not kept. Never fails a lookup.
+   */
+  private async keepExternalEntries(response: DictionaryLookupResponse) {
+    const data = response.entries
+      .filter((entry) => entry.meaningVi?.trim())
+      .map((entry) => ({
+        headword: headwordOf(entry.word),
+        displayWord: entry.word.trim(),
+        pos: posOf(entry.partOfSpeech),
+        ipaUs: entry.ipaUs || null,
+        ipaUk: entry.ipaUk || null,
+        audioUs: entry.audio.us || null,
+        audioUk: entry.audio.uk || null,
+        meaningVi: entry.meaningVi!.trim(),
+        definitionEn: entry.definitions[0]?.definition || null,
+        exampleEn: entry.examples[0] || null,
+        exampleVi: entry.exampleVi || null,
+        collocations: entry.collocations as Prisma.InputJsonValue,
+        synonyms: entry.synonyms,
+        antonyms: entry.antonyms,
+        source: 'EXTERNAL' as const,
+        status: 'PENDING_REVIEW' as const,
+      }));
+    if (!data.length) return;
+    try {
+      await this.prisma.dictionaryEntry.createMany({
+        data,
+        skipDuplicates: true,
+      });
+    } catch (err) {
+      this.logger.warn(`Could not keep external entries: ${String(err)}`);
+    }
   }
 
   // Owner policy: standalone Vocabulary is free, so every curated word is
@@ -334,15 +378,18 @@ export class DictionaryLookupService {
       meaningVi: (row.meaning as string | null) || null,
       definitions: [
         {
-          definition: (row.meaning as string | null) || '',
+          definition:
+            (row.definitionEn as string | null) ||
+            (row.meaning as string | null) ||
+            '',
           meaningVi: (row.meaning as string | null) || null,
           example: (row.exampleEn as string | null) || null,
         },
       ],
       examples: row.exampleEn ? [String(row.exampleEn)] : [],
       collocations: Array.isArray(row.collocations) ? row.collocations : [],
-      synonyms: [],
-      antonyms: [],
+      synonyms: Array.isArray(row.synonyms) ? (row.synonyms as string[]) : [],
+      antonyms: Array.isArray(row.antonyms) ? (row.antonyms as string[]) : [],
       audio: {
         us: (row.audioUs as string | null) || null,
         uk: (row.audioUk as string | null) || null,

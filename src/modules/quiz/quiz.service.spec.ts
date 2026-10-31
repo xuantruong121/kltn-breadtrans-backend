@@ -1533,6 +1533,83 @@ describe('QuizService', () => {
     });
   });
 
+  describe('generateQuestionAudioAsset', () => {
+    const tx = {
+      quizAudioAsset: {
+        updateMany: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 900, version: 1 }),
+      },
+      question: { update: jest.fn() },
+    };
+    beforeEach(() => {
+      (mockPrismaService as any).quizAudioAsset = {
+        aggregate: jest.fn().mockResolvedValue({ _max: { version: null } }),
+      };
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (transaction: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      );
+      mockSpeakingService.generateTts.mockResolvedValue(Buffer.from('mp3'));
+      mockUploadService.uploadRawBuffer.mockResolvedValue({
+        key: 'catalog/listening/practice/audio/quiz-1/question-5/v1/audio.mp3',
+        url: 'https://r2/x.mp3',
+        contentType: 'audio/mpeg',
+      });
+    });
+
+    it('reads a comprehension statement with one voice', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 5,
+        type: 'MULTIPLE_CHOICE',
+        quiz: { id: 1, type: 'LISTENING_PRACTICE', isPremiumContent: false },
+        content: { audioText: 'The bus leaves at nine.', accent: 'UK' },
+      });
+      await service.generateQuestionAudioAsset(5);
+      expect(mockSpeakingService.generateTts).toHaveBeenCalledWith(
+        'The bus leaves at nine.',
+        'UK',
+        1,
+      );
+      expect(mockUploadService.uploadRawBuffer).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        'audio/mpeg',
+        'catalog/listening/practice/audio/quiz-1/question-5/v1',
+        'audio.mp3',
+      );
+      expect(tx.quizAudioAsset.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ questionId: 5, isActive: true }),
+      });
+    });
+
+    it('reads the answer sentence of a dictation item', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 6,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE', isPremiumContent: false },
+        content: { correctAnswer: 'The meeting starts at ten.' },
+      });
+      await service.generateQuestionAudioAsset(6);
+      expect(mockSpeakingService.generateTts).toHaveBeenCalledWith(
+        'The meeting starts at ten.',
+        'US',
+        1,
+      );
+    });
+
+    it('refuses a question with nothing to read', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 7,
+        type: 'MULTIPLE_CHOICE',
+        quiz: { id: 1, type: 'LISTENING_PRACTICE', isPremiumContent: false },
+        content: { text: 'Why?' },
+      });
+      await expect(service.generateQuestionAudioAsset(7)).rejects.toThrow(
+        'chưa có câu để đọc',
+      );
+      expect(mockSpeakingService.generateTts).not.toHaveBeenCalled();
+    });
+  });
+
   describe('listening audio', () => {
     it('does not synthesize student audio from legacy content at request time', async () => {
       mockPrismaService.question.findUnique.mockResolvedValue({
@@ -1554,6 +1631,63 @@ describe('QuizService', () => {
       );
       expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
       expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    });
+
+    it('plays the published conversation for a dialogue question with no own asset', async () => {
+      const audio = Buffer.from('whole-conversation');
+      const artifact = { id: 7, version: 2, checksumSha256: 'c2' };
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 130,
+        quizId: 58,
+        type: 'MULTIPLE_CHOICE',
+        quiz: { id: 58, type: 'LISTENING_PRACTICE' },
+        audioAssets: [],
+        content: {
+          text: 'Why does the patient visit?',
+          transcriptSegments: [
+            { speaker: 'Dr. Vance', text: 'Good morning.' },
+            { speaker: 'Ms. Holloway', text: 'Thank you, Doctor.' },
+          ],
+        },
+      });
+      mockListeningAudioAuthoringService.getCurrentPublishedArtifact.mockResolvedValue(
+        artifact,
+      );
+      mockListeningAudioAuthoringService.getPublishedAudio.mockResolvedValue({
+        artifact,
+        buffer: audio,
+      });
+
+      await expect(service.streamQuestionAudio(58, 130)).resolves.toEqual({
+        artifact,
+        buffer: audio,
+      });
+      expect(
+        mockListeningAudioAuthoringService.getPublishedAudio,
+      ).toHaveBeenCalledWith(58, {});
+    });
+
+    it('still refuses a dialogue question when neither an asset nor a published recording exists', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 131,
+        quizId: 47,
+        type: 'MULTIPLE_CHOICE',
+        quiz: { id: 47, type: 'LISTENING_PRACTICE' },
+        audioAssets: [],
+        content: {
+          transcriptSegments: [
+            { speaker: 'A', text: 'Hi.' },
+            { speaker: 'B', text: 'Hello.' },
+          ],
+        },
+      });
+      mockListeningAudioAuthoringService.getCurrentPublishedArtifact.mockResolvedValue(
+        null,
+      );
+
+      await expect(service.streamQuestionAudio(47, 131)).rejects.toThrow(
+        'Audio bài luyện chưa được quản trị viên tạo và duyệt',
+      );
     });
 
     it('keeps using a static asset for non-dialogue listening questions', async () => {

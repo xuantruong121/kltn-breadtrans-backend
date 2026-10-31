@@ -1,0 +1,1088 @@
+{
+  "examId": 1,
+  "generatedAt": "2026-10-30T04:21:45.652Z",
+  "requests": 7,
+  "groups": [
+    {
+      "groupId": 32,
+      "part": 3,
+      "groupOrder": 32,
+      "questionNumbers": [
+        32,
+        33,
+        34
+      ],
+      "transcript": "W: Mark, do you have a few minutes to talk about the new project schedule? M: Sure, I just finished my morning report. What specific changes do you want to review? W: Well, the deadline for the first phase has been moved up by three days. M: That is a tight turnaround, but our team can manage it. When should we discuss this with the rest of the department? W: How about we meet in the large conference room at four o'clock today? M: That sounds fine with me. I will book the room right away so we have a projector ready.",
+      "words": 96,
+      "questions": [
+        {
+          "text": "What are the speakers mainly discussing?",
+          "options": [
+            "A new project schedule",
+            "A broken printer in the office",
+            "The annual budget report",
+            "An upcoming client presentation"
+          ],
+          "correctIndex": 0,
+          "explanation": "Người phụ nữ nhắc đến việc thảo luận về lịch trình dự án mới trong cuộc họp."
+        },
+        {
+          "text": "When do the speakers agree to meet?",
+          "options": [
+            "At three o'clock",
+            "At four o'clock",
+            "At five o'clock",
+            "At six o'clock"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người đàn ông đề xuất gặp nhau lúc bốn giờ chiều."
+        },
+        {
+          "text": "What does the woman offer to do?",
+          "options": [
+            "Print some documents",
+            "Send an email update",
+            "Book a conference room",
+            "Call the department manager"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người phụ nữ đề nghị đặt phòng họp trước khi cuộc họp diễn ra."
+        }
+      ]
+    },
+    {
+      "groupId": 33,
+      "part": 3,
+      "groupOrder": 33,
+      "questionNumbers": [
+        35,
+        36,
+        37
+      ],
+      "transcript": "M: Hello, is this the facilities help desk? The printer on the third floor is not working properly. W: Hi, yes. We received another complaint about that machine a few minutes ago. The paper feeder seems to be jammed again. M: Oh, I see. Can someone come to fix it soon? I need to print some handouts for a client meeting. W: Our technician is currently busy on the fifth floor. It might take an hour before he can get there. M: That is a bit too late for me. My meeting starts at noon today. W: In that case, you can use the working printer in the second-floor lobby until this one is repaired.",
+      "words": 109,
+      "questions": [
+        {
+          "text": "What problem does the man mention?",
+          "options": [
+            "A delayed shipment",
+            "A malfunctioning machine",
+            "A software update",
+            "A missing employee"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người đàn ông gọi để thông báo rằng máy in ở tầng ba đang bị hỏng."
+        },
+        {
+          "text": "What does the woman suggest doing?",
+          "options": [
+            "Call a repair technician",
+            "Buy a new device",
+            "Use another office floor",
+            "Read the instruction manual"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người phụ nữ khuyên người đàn ông nên sang tầng hai để sử dụng máy in ở đó."
+        },
+        {
+          "text": "When does the man need the documents?",
+          "options": [
+            "By noon",
+            "By two o'clock",
+            "By four o'clock",
+            "By five o'clock"
+          ],
+          "correctIndex": 0,
+          "explanation": "Người đàn ông nói anh ấy cần in tài liệu trước buổi trưa cho cuộc họp."
+        }
+      ]
+    },
+    {
+      "groupId": 34,
+      "part": 3,
+      "groupOrder": 34,
+      "questionNumbers": [
+        38,
+        39,
+        40
+      ],
+      "transcript": "W: Good morning, my name is Sarah Jenkins from Apex Corporation. I am calling to check on the delivery status of our office supplies order. M: Hello Ms. Jenkins. Let me look up your account details in our system. What is your order number? W: It is reference number four zero five nine. We expected it to arrive yesterday. M: Ah, I see it here. Unfortunately, the delivery was delayed due to severe weather conditions in the region. W: Oh, I understand. When can we expect the package to arrive at our office now? M: It has been rescheduled and should reach your building by this Friday afternoon.",
+      "words": 102,
+      "questions": [
+        {
+          "text": "Why is the woman calling?",
+          "options": [
+            "To apply for a job",
+            "To check delivery status",
+            "To schedule an interview",
+            "To request a catalog"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người phụ nữ gọi để kiểm tra trạng thái giao hàng của các thiết bị văn phòng."
+        },
+        {
+          "text": "What caused the problem with the order?",
+          "options": [
+            "A shipping delay",
+            "An incorrect address",
+            "A damaged product",
+            "A payment error"
+          ],
+          "correctIndex": 0,
+          "explanation": "Nhân viên cho biết đơn hàng bị chậm trễ do vấn đề về thời tiết."
+        },
+        {
+          "text": "When will the package arrive?",
+          "options": [
+            "Tomorrow morning",
+            "Tomorrow afternoon",
+            "This Friday",
+            "Next Monday"
+          ],
+          "correctIndex": 2,
+          "explanation": "Nhân viên xác nhận rằng đơn hàng sẽ đến vào thứ Sáu tuần này."
+        }
+      ]
+    },
+    {
+      "groupId": 35,
+      "part": 3,
+      "groupOrder": 35,
+      "questionNumbers": [
+        41,
+        42,
+        43
+      ],
+      "transcript": "M: Maria, have you started organizing the upcoming training seminar for new employees? W: Yes, I have booked the main auditorium and sent out the invitations to staff members. M: That is great progress. Have you finalized the list of guest speakers yet? That is the part I am most worried about. W: Not quite yet. We still need one more expert in digital marketing to lead the afternoon session. M: Do you have anyone specific in mind for that role? W: Actually, I can contact a former colleague from my previous company who might be interested. M: Perfect, please reach out to her today so we can finalize the program by tomorrow.",
+      "words": 106,
+      "questions": [
+        {
+          "text": "What are the speakers discussing?",
+          "options": [
+            "A marketing strategy",
+            "An office renovation",
+            "A training seminar",
+            "A budget proposal"
+          ],
+          "correctIndex": 2,
+          "explanation": "Hai người đang thảo luận về việc tổ chức một buổi hội thảo đào tạo kỹ năng mới."
+        },
+        {
+          "text": "What is the man concerned about?",
+          "options": [
+            "Finding a guest speaker",
+            "Renting a larger room",
+            "Printing more handouts",
+            "Ordering catering service"
+          ],
+          "correctIndex": 0,
+          "explanation": "Người đàn ông lo lắng về việc tìm kiếm một diễn giả khách mời phù hợp."
+        },
+        {
+          "text": "How does the woman suggest solving the issue?",
+          "options": [
+            "By checking online reviews",
+            "By contacting a colleague",
+            "By asking the director",
+            "By reading a magazine"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người phụ nữ gợi ý liên hệ với một đồng nghiệp cũ để tìm diễn giả."
+        }
+      ]
+    },
+    {
+      "groupId": 36,
+      "part": 3,
+      "groupOrder": 36,
+      "questionNumbers": [
+        44,
+        45,
+        46
+      ],
+      "transcript": "M: Excuse me, I would like to submit my travel reimbursement form for last week's business trip. W: Let me check your paperwork, Mr. Davis. Did you attach all the required receipts? M: I believe so. I have the hotel bill, the flight tickets, and my taxi fares right here. W: Thank you. Let me go through them quickly. Hmm, it looks like you are missing the receipt for your business dinner on Thursday. M: Oh, dear. I must have left it on the kitchen counter at home or dropped it somewhere. W: You will need to find it or request a copy from the restaurant before we can process this payment. M: I will check my car right now. Hopefully, it is still inside.",
+      "words": 118,
+      "questions": [
+        {
+          "text": "What is the man inquiring about?",
+          "options": [
+            "A computer upgrade",
+            "A travel reimbursement",
+            "A parking permit",
+            "A software subscription"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người đàn ông đến để nộp một số biên lai xin hoàn tiền chi phí đi lại."
+        },
+        {
+          "text": "What problem does the woman point out?",
+          "options": [
+            "He forgot his password",
+            "He missed the deadline",
+            "He lost a receipt",
+            "He filled out the wrong form"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người phụ nữ nhận thấy một biên lai bữa ăn đã bị mất trong hồ sơ."
+        },
+        {
+          "text": "What does the woman suggest the man do?",
+          "options": [
+            "Submit a new form",
+            "Check his email",
+            "Contact his supervisor",
+            "Look in his car"
+          ],
+          "correctIndex": 3,
+          "explanation": "Người phụ nữ gợi ý anh ấy kiểm tra lại trong xe hoặc túi xách xem có tìm thấy biên lai không."
+        }
+      ]
+    },
+    {
+      "groupId": 37,
+      "part": 3,
+      "groupOrder": 37,
+      "questionNumbers": [
+        47,
+        48,
+        49
+      ],
+      "transcript": "W: Good morning, welcome to Daily Grind Cafe. What can I get for you today? M: I would like to order a large iced caramel latte and a blueberry muffin, please. W: Sure thing. That will be eight dollars and fifty cents. Here is your receipt. M: Thank you. By the way, I noticed that the sign outside says you have a new pastry menu. W: Yes, we introduced artisan croissants this week. Would you like to try one? M: Maybe next time. I am already getting the muffin today. W: Sounds good. Your order will be ready at the counter in just a moment.",
+      "words": 98,
+      "questions": [
+        {
+          "text": "Where are the speakers?",
+          "options": [
+            "At a clothing boutique",
+            "At a coffee shop",
+            "At a grocery store",
+            "At a post office"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người phụ nữ nhắc đến việc gọi một ly cà phê latte và bánh sừng bò, điều này cho thấy họ đang ở quán cà phê."
+        },
+        {
+          "text": "What problem does the man mention?",
+          "options": [
+            "A wrong drink order",
+            "A broken table",
+            "A missing receipt",
+            "A long waiting time"
+          ],
+          "correctIndex": 0,
+          "explanation": "Người nam nói rằng anh ấy yêu cầu một ly cà phê mocha nhưng lại nhận được cà phê latte."
+        },
+        {
+          "text": "What does the woman say she will do?",
+          "options": [
+            "He will offer a refund",
+            "He will bring a new drink",
+            "He will clean the table",
+            "He will give a discount coupon"
+          ],
+          "correctIndex": 1,
+          "explanation": "Nhân viên nữ xin lỗi và nói sẽ mang đúng loại đồ uống ra ngay lập tức."
+        }
+      ]
+    },
+    {
+      "groupId": 38,
+      "part": 3,
+      "groupOrder": 38,
+      "questionNumbers": [
+        50,
+        51,
+        52
+      ],
+      "transcript": "M: Welcome to City Apparel. Are you finding everything okay today? W: Actually, I am looking for a winter jacket in a navy blue color, medium size. M: Let me check our display rack over here. Ah, we have the navy blue, but unfortunately, we are completely sold out of medium sizes. W: Oh, that is unfortunate. I really liked the style of this coat. M: We can check if our downtown branch has it in stock. Would you like me to call them? W: Yes, please do that. I can pick it up there this afternoon if they have it.",
+      "words": 95,
+      "questions": [
+        {
+          "text": "What is the woman looking to buy?",
+          "options": [
+            "A restaurant reservation",
+            "A shoe repair",
+            "A jacket purchase",
+            "A table cleaning"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người phụ nữ muốn mua một chiếc áo khoác màu xanh navy."
+        },
+        {
+          "text": "What problem does the man mention about the item?",
+          "options": [
+            "It is too expensive",
+            "It is out of stock in her size",
+            "It has a damaged zipper",
+            "It is the wrong color"
+          ],
+          "correctIndex": 1,
+          "explanation": "Nhân viên nam cho biết kích cỡ áo mà cô ấy cần hiện đã hết hàng trong kho."
+        },
+        {
+          "text": "What does the man offer to do?",
+          "options": [
+            "Call another store",
+            "Check the online website",
+            "Return next week",
+            "Speak with the manager"
+          ],
+          "correctIndex": 0,
+          "explanation": "Nhân viên nam đề nghị gọi điện đến chi nhánh trung tâm thành phố để kiểm tra xem họ còn hàng hay không."
+        }
+      ]
+    },
+    {
+      "groupId": 39,
+      "part": 3,
+      "groupOrder": 39,
+      "questionNumbers": [
+        53,
+        54,
+        55
+      ],
+      "transcript": "W: Excuse me, server. We ordered our main courses over thirty minutes ago and they still have not arrived. M: I am very sorry about the delay. Our kitchen experienced an unexpected rush of customers tonight. W: I understand it is busy, but we have to leave for a theater show in twenty minutes. M: Let me check directly with the head chef right now. I will make sure your meals are prioritized. W: Thank you. We really appreciate your quick attention to this matter. M: To make up for the wait, I would like to offer your table complimentary dessert after your meal.",
+      "words": 98,
+      "questions": [
+        {
+          "text": "What issue does the woman discuss?",
+          "options": [
+            "A menu is missing",
+            "A table is reserved",
+            "An order is delayed",
+            "A credit card is declined"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người phụ nữ phàn nàn rằng món mì Ý cô ấy gọi đã lâu vẫn chưa được mang ra."
+        },
+        {
+          "text": "Why has the situation occurred?",
+          "options": [
+            "A computer system failure",
+            "A power outage",
+            "An unexpected rush of customers",
+            "A delivery truck breakdown"
+          ],
+          "correctIndex": 2,
+          "explanation": "Nhân viên phục vụ giải thích rằng nhà bếp đang quá tải do lượng khách đông bất ngờ."
+        },
+        {
+          "text": "What does the restaurant offer as compensation?",
+          "options": [
+            "A free dessert",
+            "A parking voucher",
+            "A gift card",
+            "A beverage upgrade"
+          ],
+          "correctIndex": 0,
+          "explanation": "Nhân viên đề nghị tặng món tráng miệng miễn phí như một lời xin lỗi vì sự chậm trễ."
+        }
+      ]
+    },
+    {
+      "groupId": 40,
+      "part": 3,
+      "groupOrder": 40,
+      "questionNumbers": [
+        56,
+        57,
+        58
+      ],
+      "transcript": "M: Hello, this is David calling from the delivery logistics team. I am bringing the organic produce to your supermarket. W: Hi David. We have been expecting the shipment since eight o'clock this morning. Is everything all right? M: Not quite. I am currently stuck in heavy traffic on the north highway due to an accident. W: Oh, I see. How much longer do you think it will take you to get here? M: Traffic is moving very slowly, but I estimate I will arrive at your loading dock in about one hour. W: Please be careful driving and come straight to the back entrance when you get here.",
+      "words": 103,
+      "questions": [
+        {
+          "text": "What is the man's likely occupation?",
+          "options": [
+            "Store manager",
+            "Delivery driver",
+            "Customer service representative",
+            "Inventory accountant"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người nam gọi điện để thông báo việc giao hàng bị kẹt xe trên đường cao tốc."
+        },
+        {
+          "text": "What is causing a delay?",
+          "options": [
+            "Traffic congestion",
+            "Bad weather",
+            "A flat tire",
+            "An incorrect address"
+          ],
+          "correctIndex": 0,
+          "explanation": "Người nam nói anh ấy bị kẹt xe nặng trên đường cao tốc phía bắc."
+        },
+        {
+          "text": "When does the man expect to arrive?",
+          "options": [
+            "In thirty minutes",
+            "In one hour",
+            "By noon",
+            "By evening"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người nam ước tính sẽ đến siêu thị trong khoảng một giờ nữa."
+        }
+      ]
+    },
+    {
+      "groupId": 41,
+      "part": 3,
+      "groupOrder": 41,
+      "questionNumbers": [
+        59,
+        60,
+        61
+      ],
+      "transcript": "W: Hello, I would like to process a return for this blender that I purchased three days ago. M: Certainly, do you have the original receipt and the packaging with you? W: Yes, here is the receipt. The box is in my car, but I can go get it if needed. M: That will not be necessary, the receipt is enough. May I ask why you are returning it? W: The motor stopped working properly during my very first attempt to make a smoothie. M: I am sorry to hear that. Would you like an exchange for a different model or a full refund? W: I would prefer a full refund to my credit card, please.",
+      "words": 109,
+      "questions": [
+        {
+          "text": "Why did the woman visit the store?",
+          "options": [
+            "To apply for a job",
+            "To return a damaged item",
+            "To ask about store hours",
+            "To book a venue"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người phụ nữ đến cửa hàng để trả lại một chiếc máy xay sinh tố bị hỏng."
+        },
+        {
+          "text": "What is wrong with the product?",
+          "options": [
+            "It lacks a warranty card",
+            "It does not work properly",
+            "It is the wrong model",
+            "It has missing parts"
+          ],
+          "correctIndex": 1,
+          "explanation": "Cô ấy giải thích rằng động cơ của máy xay sinh tố không hoạt động sau lần sử dụng đầu tiên."
+        },
+        {
+          "text": "What does the woman request?",
+          "options": [
+            "A full refund",
+            "Store credit",
+            "A free upgrade",
+            "A repair service"
+          ],
+          "correctIndex": 0,
+          "explanation": "Người phụ nữ yêu cầu được hoàn lại toàn bộ tiền mặt vì không muốn đổi sản phẩm mới."
+        }
+      ]
+    },
+    {
+      "groupId": 42,
+      "part": 3,
+      "groupOrder": 42,
+      "questionNumbers": [
+        62,
+        63,
+        64
+      ],
+      "transcript": "M: Hello, I need some help with my travel plans because my flight from Chicago has been delayed by two hours. W: I am sorry to hear that. Will you miss your connecting flight? M: No, I was planning to take the express bus to the downtown office, but at this rate, I will miss the last one. W: That is unfortunate. Since you cannot take the bus, have you considered taking the evening train instead? M: Is there still availability for a ticket to the central station tonight? W: Yes, there are a few seats left on the 8 PM departure. M: That works out well. Please book a ticket for me on that train.",
+      "words": 109,
+      "questions": [
+        {
+          "text": "What problem does the man mention?",
+          "options": [
+            "A) A train cancellation",
+            "B) A delayed flight",
+            "C) A lost luggage claim",
+            "D) A hotel reservation error"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người đàn ông nói rằng chuyến bay của anh ấy đã bị hoãn hai tiếng, khiến anh ấy không thể đến kịp."
+        },
+        {
+          "text": "How does the woman suggest solving the issue?",
+          "options": [
+            "A) By rescheduling a meeting",
+            "B) By renting a car",
+            "C) By taking a later train",
+            "D) By contacting customer service"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người phụ nữ gợi ý rằng anh ấy có thể đặt vé cho chuyến tàu khởi hành muộn hơn vào buổi tối."
+        },
+        {
+          "text": "When will the man likely travel?",
+          "options": [
+            "A) In the morning",
+            "B) At noon",
+            "C) In the evening",
+            "D) Tomorrow morning"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người đàn ông xác nhận anh ấy sẽ đi chuyến tàu buổi tối và cảm ơn người phụ nữ."
+        }
+      ]
+    },
+    {
+      "groupId": 43,
+      "part": 3,
+      "groupOrder": 43,
+      "questionNumbers": [
+        65,
+        66,
+        67
+      ],
+      "transcript": "W: Good morning, I am calling to confirm my reservation for next weekend under the name Sarah Jenkins. M: Let me check our system for you, Ms. Jenkins. Yes, I see your booking for a double room from Friday to Sunday. W: Excellent. I just wanted to make sure that the room has an ocean view as I requested during the online booking. M: Let me verify that. Yes, it is confirmed, you will be staying on the fifth floor facing the ocean. W: Wonderful. Is breakfast included in the room rate? M: Yes, complimentary breakfast is served every morning at the main restaurant from 6:30 AM to 10 AM. W: Thank you for the helpful information.",
+      "words": 110,
+      "questions": [
+        {
+          "text": "What is the purpose of the call?",
+          "options": [
+            "A) Hotel reservation",
+            "B) Rental car pickup",
+            "C) Train ticket booking",
+            "D) Flight upgrade"
+          ],
+          "correctIndex": 0,
+          "explanation": "Người phụ nữ gọi điện để xác nhận lại thông tin đặt phòng khách sạn của mình cho tuần tới."
+        },
+        {
+          "text": "What feature does the room have?",
+          "options": [
+            "A) A standard room",
+            "B) A deluxe suite",
+            "C) A room with an ocean view",
+            "D) A smoking room"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người đàn ông xác nhận rằng phòng của cô ấy có hướng nhìn ra biển như yêu cầu."
+        },
+        {
+          "text": "What is mentioned about the hotel amenities?",
+          "options": [
+            "A) Breakfast is complimentary.",
+            "B) Parking is free.",
+            "C) Check-in is at 2 PM.",
+            "D) Airport shuttle is available."
+          ],
+          "correctIndex": 0,
+          "explanation": "Nhân viên khách sạn thông báo rằng bữa sáng miễn phí được phục vụ tại nhà hàng chính."
+        }
+      ]
+    },
+    {
+      "groupId": 44,
+      "part": 3,
+      "groupOrder": 44,
+      "questionNumbers": [
+        68,
+        69,
+        70
+      ],
+      "transcript": "W: Hello, I am calling from the corporate office to check on the status of package delivery number 405. M: I apologize for the delay, but our delivery van experienced a mechanical breakdown on the highway. W: Oh, I see. When do you think the package will arrive here? M: A mechanic is currently fixing the engine, and we expect the vehicle to be running in about one hour. W: Please make sure it gets delivered before noon because we need those documents for the client presentation. M: Understood. I will personally ensure it is delivered right after the repair is completed.",
+      "words": 96,
+      "questions": [
+        {
+          "text": "Why is the delivery person late?",
+          "options": [
+            "A) Heavy traffic",
+            "B) A vehicle breakdown",
+            "C) A flat tire",
+            "D) Road construction"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người lái xe tải cho biết xe của anh ta gặp trục trặc kỹ thuật nên đến muộn."
+        },
+        {
+          "text": "What does the woman want to know?",
+          "options": [
+            "A) To cancel an order",
+            "B) To check a delivery status",
+            "C) To request a refund",
+            "D) To change a shipping address"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người phụ nữ gọi để kiểm tra tình trạng giao hàng vì cô ấy cần các tài liệu trước buổi họp."
+        },
+        {
+          "text": "When is the issue expected to be resolved?",
+          "options": [
+            "A) In one hour",
+            "B) In two hours",
+            "C) This afternoon",
+            "D) Tomorrow morning"
+          ],
+          "correctIndex": 0,
+          "explanation": "Người đàn ông ước tính rằng thợ cơ khí sẽ sửa xong xe trong vòng một tiếng nữa."
+        }
+      ]
+    },
+    {
+      "groupId": 45,
+      "part": 4,
+      "groupOrder": 45,
+      "questionNumbers": [
+        71,
+        72,
+        73
+      ],
+      "transcript": "Attention all shoppers, we have a very special announcement to make regarding our annual end-of-season clearance event. This coming Saturday, starting at nine in the morning, all winter apparel and home goods will be marked down by fifty percent. As a token of our appreciation for your continued loyalty, the first fifty customers through our doors will receive a complimentary gift bag filled with samples and refreshments. Please note that all sale purchases are final and cannot be returned or exchanged. We encourage everyone to arrive early to secure the best selection. Thank you for shopping with us, and we look forward to seeing you this weekend.",
+      "words": 107,
+      "questions": [
+        {
+          "text": "What is the main purpose of the announcement?",
+          "options": [
+            "To announce a change in store hours",
+            "To introduce a new loyalty program",
+            "To promote an upcoming clearance sale",
+            "To apologize for a temporary closure"
+          ],
+          "correctIndex": 2,
+          "explanation": "Doan doc nhac den viec giam gia 50 phan tram toan bo cua hang, cho thay muc dich la quang ba su kien xa hang sap dien ra."
+        },
+        {
+          "text": "When does the special event begin?",
+          "options": [
+            "Friday",
+            "Saturday",
+            "Sunday",
+            "Monday"
+          ],
+          "correctIndex": 1,
+          "explanation": "Nguoi noi de cap rang su kien bat dau vao thu Bay luc 9 gio sang, dap an dung la Saturday."
+        },
+        {
+          "text": "What will be provided to the first fifty customers?",
+          "options": [
+            "Free parking",
+            "Gift cards",
+            "Refreshments",
+            "Extended warranties"
+          ],
+          "correctIndex": 2,
+          "explanation": "Cuoi bai thong bao, nguoi noi moi khach hang dung thu mien phi va do uong nhe tai khu vuc trung tam."
+        }
+      ]
+    },
+    {
+      "groupId": 46,
+      "part": 4,
+      "groupOrder": 46,
+      "questionNumbers": [
+        74,
+        75,
+        76
+      ],
+      "transcript": "Good morning staff, this is a quick internal announcement regarding our office network. We are currently experiencing unexpected connectivity issues affecting all departments on the third floor. Our IT technicians are already investigating the root cause and are working diligently to restore full service. We expect everything to be fully operational by noon today. In the meantime, please refrain from sending large file attachments via email to prevent further congestion on the backup server. If your specific task requires immediate internet access, please contact the IT helpdesk directly for temporary workarounds. We apologize for any inconvenience this temporary disruption may cause to your morning schedule.",
+      "words": 105,
+      "questions": [
+        {
+          "text": "What problem is being reported?",
+          "options": [
+            "A software update",
+            "A networking issue",
+            "A hardware failure",
+            "A power outage"
+          ],
+          "correctIndex": 1,
+          "explanation": "Nguoi noi giai thich rang he thong dang gap su co ket noi mang khien nhan vien khong the truy cap tai lieu."
+        },
+        {
+          "text": "What are employees advised to do if problems persist?",
+          "options": [
+            "By contacting the IT helpdesk",
+            "By restarting their computers",
+            "By checking their email",
+            "By working from home"
+          ],
+          "correctIndex": 0,
+          "explanation": "Nguoi noi khuyen nhan vien lien he voi bo phan ho tro ky thuat IT neu van de van tiep dien."
+        },
+        {
+          "text": "When is the issue expected to be resolved?",
+          "options": [
+            "In one hour",
+            "By noon",
+            "At three o'clock",
+            "By the end of the day"
+          ],
+          "correctIndex": 1,
+          "explanation": "Nguoi noi du kien doi ngu ky thuat se khac phuc xong su co truoc buoi trua."
+        }
+      ]
+    },
+    {
+      "groupId": 47,
+      "part": 4,
+      "groupOrder": 47,
+      "questionNumbers": [
+        77,
+        78,
+        79
+      ],
+      "transcript": "Hello everyone, thank you for attending this urgent project meeting. As you know, we are rapidly approaching the official launch date for our upcoming line of smart home devices. Today, I want to review our promotional timeline and ensure that every department is aligned with our primary objectives. Before we approve the final advertising campaign, I would like everyone to carefully examine the latest market research data provided by our analytics team. This will help us target our demographic more effectively and avoid unnecessary spending. Let us reconvene next Monday morning to discuss your feedback and make any necessary adjustments to the schedule. Your hard work and dedication to this initiative are greatly appreciated by the executive board.",
+      "words": 118,
+      "questions": [
+        {
+          "text": "What project is the meeting focused on?",
+          "options": [
+            "A marketing strategy",
+            "A budget reduction",
+            "A new product launch",
+            "An office relocation"
+          ],
+          "correctIndex": 2,
+          "explanation": "Nguoi noi nhac den viec chuan bi ra mat dong san pham moi trong quy toi."
+        },
+        {
+          "text": "What does the speaker want to review first?",
+          "options": [
+            "Market research data",
+            "Customer feedback",
+            "Competitor pricing",
+            "Manufacturing costs"
+          ],
+          "correctIndex": 0,
+          "explanation": "Truoc khi tien hanh buoc tiep theo, truong nhom yeu cau xem xet lai du lieu nghien cuu thi truong."
+        },
+        {
+          "text": "When is the next meeting scheduled?",
+          "options": [
+            "Next Tuesday",
+            "Thursday afternoon",
+            "Friday morning",
+            "Next Monday"
+          ],
+          "correctIndex": 3,
+          "explanation": "Cuoc hop tiep theo duoc hen vao thu Hai tuan toi de chot phuong an cuoi cung."
+        }
+      ]
+    },
+    {
+      "groupId": 48,
+      "part": 4,
+      "groupOrder": 48,
+      "questionNumbers": [
+        80,
+        81,
+        82
+      ],
+      "transcript": "Hello, this message is for Sarah in human resources. My name is David Miller, and I am calling to reschedule our initial consultation meeting originally set for tomorrow afternoon. Unfortunately, an unexpected board meeting has been scheduled at the exact same time, creating a conflict in my calendar. I would love to move our appointment to Thursday morning if you have any availability then. Please give me a call back at your earliest convenience before five o'clock today so we can finalize the new time slot. I apologize for any inconvenience this last-minute change might cause to your schedule, and I appreciate your understanding.",
+      "words": 104,
+      "questions": [
+        {
+          "text": "What is the purpose of the phone message?",
+          "options": [
+            "To confirm a flight reservation",
+            "To reschedule a consultation",
+            "To request technical support",
+            "To apply for a job opening"
+          ],
+          "correctIndex": 1,
+          "explanation": "Cuoc goi nham muc dich doi lai lich hen tu van da dat truoc do."
+        },
+        {
+          "text": "Why does the caller need to make a change?",
+          "options": [
+            "A scheduling conflict",
+            "Bad weather conditions",
+            "A vehicle breakdown",
+            "A family emergency"
+          ],
+          "correctIndex": 0,
+          "explanation": "Nguoi goi neu ly do doi lich la do co su trung lap ve thoi gian hop."
+        },
+        {
+          "text": "What does the caller ask the recipient to do?",
+          "options": [
+            "Call back before closing time",
+            "Send an email confirmation",
+            "Visit the website directly",
+            "Leave another voice message"
+          ],
+          "correctIndex": 0,
+          "explanation": "Nguoi goi de nghi nhan vien goi lai truoc khi van phong dong cua de xac nhan thoi gian moi."
+        }
+      ]
+    },
+    {
+      "groupId": 49,
+      "part": 4,
+      "groupOrder": 49,
+      "questionNumbers": [
+        83,
+        84,
+        85
+      ],
+      "transcript": "Welcome, visitors, to our annual open house event at Apex Manufacturing. My name is Robert, and I will be guiding you through our primary production facility today. As we walk through the assembly floor, please make sure to stay strictly behind the yellow safety line at all times, as heavy machinery is constantly in operation. You will notice state-of-the-art robotics being utilized to increase efficiency and precision in our daily output. Our tour will last approximately forty-five minutes and will conclude in the second-floor conference room, where you will have the opportunity to ask questions and pick up informational brochures. Please feel free to take notes, and let me know if you need any assistance along the way.",
+      "words": 118,
+      "questions": [
+        {
+          "text": "Where is the talk taking place?",
+          "options": [
+            "A museum exhibit",
+            "A factory floor",
+            "A botanical garden",
+            "A construction site"
+          ],
+          "correctIndex": 1,
+          "explanation": "Nguoi noi huong dan nhung nguoi tham quan di qua khu vuc xuong san xuat cua nha may."
+        },
+        {
+          "text": "What safety rule does the speaker emphasize?",
+          "options": [
+            "Wear protective eyewear",
+            "Turn off mobile phones",
+            "Stay behind the yellow line",
+            "Do not take photographs"
+          ],
+          "correctIndex": 2,
+          "explanation": "Nguoi noi nhac nho moi nguoi dung phia sau vach vang de dam an toan khi tham quan."
+        },
+        {
+          "text": "Where will the tour conclude?",
+          "options": [
+            "In the cafeteria",
+            "At the main entrance",
+            "In the conference room",
+            "At the gift shop"
+          ],
+          "correctIndex": 2,
+          "explanation": "Buoi tham quan se ket thuc tai phong hoi thao de moi nguoi dat cau hoi va nhan tai lieu."
+        }
+      ]
+    },
+    {
+      "groupId": 50,
+      "part": 4,
+      "groupOrder": 50,
+      "questionNumbers": [
+        86,
+        87,
+        88
+      ],
+      "transcript": "Hello, this is David from the IT department leaving a message for all staff members. Please be advised that we will be performing routine server maintenance tonight starting at 10 PM. During this window, you may experience intermittent connection issues with the internal network and shared drives. To prevent any data loss, we strongly recommend that you save all your ongoing work and properly log out of your terminals before leaving the office today. The system is expected to be fully operational by tomorrow morning at 6 AM. We apologize for any inconvenience this may cause and appreciate your cooperation in helping us maintain our network security and performance. If you encounter any unexpected issues tomorrow, please submit a ticket through the online helpdesk portal. Thank you and have a wonderful evening.",
+      "words": 132,
+      "questions": [
+        {
+          "text": "What is the speaker's probable occupation?",
+          "options": [
+            "A customer service representative",
+            "An IT support technician",
+            "A delivery courier",
+            "An accountant"
+          ],
+          "correctIndex": 1,
+          "explanation": "Nghe đoạn ghi âm cho thấy người gọi đang đề cập đến việc khắc phục sự cố máy chủ và hệ thống mạng, do đó người đó là kỹ thuật viên hỗ trợ CNTT."
+        },
+        {
+          "text": "Why is the speaker calling?",
+          "options": [
+            "The office will close early",
+            "A server maintenance will occur",
+            "A new software must be installed",
+            "The internet bill is overdue"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người gọi thông báo rằng hệ thống sẽ tiến hành bảo trì máy chủ vào tối nay, làm gián đoạn kết nối mạng."
+        },
+        {
+          "text": "What are employees instructed to do?",
+          "options": [
+            "Save their work and log off",
+            "Call the helpdesk immediately",
+            "Restart their computers manually",
+            "Check their email for updates"
+          ],
+          "correctIndex": 0,
+          "explanation": "Người gọi yêu cầu nhân viên lưu lại công việc của họ và đăng xuất trước mười giờ đêm."
+        }
+      ]
+    },
+    {
+      "groupId": 51,
+      "part": 4,
+      "groupOrder": 51,
+      "questionNumbers": [
+        89,
+        90,
+        91
+      ],
+      "transcript": "Hi, this is Sarah calling from Apex Fitness Center with a quick update for our valued members. As a token of our appreciation for your loyalty over the past year, we are excited to offer you a special twenty percent discount on your annual membership renewal. Whether you enjoy our yoga sessions, personal training, or state-of-the-art weight room facilities, now is the perfect time to secure another year of health and wellness. Please note that this exclusive promotion is only valid until the end of this month, so make sure to drop by the front desk or visit our website to claim your savings. If you have any questions regarding your current plan, feel free to give us a call back. We look forward to seeing you at the gym soon.",
+      "words": 131,
+      "questions": [
+        {
+          "text": "What kind of business is calling?",
+          "options": [
+            "A dental clinic",
+            "A travel agency",
+            "A fitness center",
+            "A book publisher"
+          ],
+          "correctIndex": 2,
+          "explanation": "Thông điệp nhắc đến việc gia hạn thẻ thành viên tập luyện và các lớp yoga, thể hình."
+        },
+        {
+          "text": "What is the purpose of the message?",
+          "options": [
+            "To confirm a scheduled appointment",
+            "To offer a special discount on membership",
+            "To request feedback on a recent class",
+            "To announce a change in operating hours"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người gọi thông báo về chương trình ưu đãi giảm giá đặc biệt cho việc gia hạn thẻ thành viên."
+        },
+        {
+          "text": "When does the special offer expire?",
+          "options": [
+            "By Friday",
+            "By the end of the month",
+            "Next Monday",
+            "In two weeks"
+          ],
+          "correctIndex": 1,
+          "explanation": "Ưu đãi đặc biệt chỉ áp dụng cho đến hết tháng này, theo như thông tin trong đoạn ghi âm."
+        }
+      ]
+    },
+    {
+      "groupId": 52,
+      "part": 4,
+      "groupOrder": 52,
+      "questionNumbers": [
+        92,
+        93,
+        94
+      ],
+      "transcript": "Hello, my name is Linda Martinez, and I am calling regarding my recent utility bill for account number 4589-B. I received my statement this morning, and it appears there is a significant discrepancy in the charges for electricity consumption. The total amount is nearly double what I usually pay, even though my household usage has remained consistent. I already checked my meter reading, and it does not match the figures printed on the invoice. Could you please review my account history and compare it with last month's statement to see where the error might be? I would appreciate it if you could return my call at your earliest convenience during regular business hours. My phone number is 555-0143. Thank you for your prompt attention to this matter.",
+      "words": 127,
+      "questions": [
+        {
+          "text": "What problem does the caller mention?",
+          "options": [
+            "A canceled flight",
+            "A delayed package shipment",
+            "A billing discrepancy",
+            "A hotel reservation error"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người gọi đề cập đến việc nhận được hóa đơn có số tiền cao hơn dự kiến cho dịch vụ điện nước."
+        },
+        {
+          "text": "What does the caller suggest comparing?",
+          "options": [
+            "A bank statement",
+            "A meter reading",
+            "An online account profile",
+            "A previous billing statement"
+          ],
+          "correctIndex": 3,
+          "explanation": "Người gọi đề nghị kiểm tra hóa đơn của tháng trước để so sánh và làm rõ vấn đề."
+        },
+        {
+          "text": "What action is requested of the receiver?",
+          "options": [
+            "Send an email",
+            "Visit the local office",
+            "Call back during business hours",
+            "Pay the full amount immediately"
+          ],
+          "correctIndex": 2,
+          "explanation": "Người gọi yêu cầu nhân viên gọi lại cho cô ấy trong giờ hành chính để giải quyết vấn đề."
+        }
+      ]
+    },
+    {
+      "groupId": 53,
+      "part": 4,
+      "groupOrder": 53,
+      "questionNumbers": [
+        95,
+        96,
+        97
+      ],
+      "transcript": "Good afternoon, Mr. Henderson. This is James calling from Apex Car Rental at the downtown branch. I am calling to let you know that we have received your reservation for an intermediate sedan for this weekend. However, due to an unexpected fleet shortage, we have upgraded your vehicle to a full-size SUV at no additional cost to you. Your vehicle is fully serviced, cleaned, and ready for pickup anytime after 2 PM today. When you arrive at our service counter, please remember to bring your valid driver's license and a major credit card so we can quickly process the paperwork and have you on your way. You will just need to sign a revised rental agreement reflecting the vehicle change. If your travel schedule changes, please notify us as soon as possible. Safe travels.",
+      "words": 134,
+      "questions": [
+        {
+          "text": "Where does this message likely take place?",
+          "options": [
+            "At a train station",
+            "At a car rental agency",
+            "At a hotel front desk",
+            "At an airport terminal"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người gọi nhắc đến việc nhận xe ô tô đã đặt trước tại quầy dịch vụ."
+        },
+        {
+          "text": "What type of vehicle is being provided?",
+          "options": [
+            "A standard sedan",
+            "A compact car",
+            "An SUV",
+            "A luxury sports car"
+          ],
+          "correctIndex": 2,
+          "explanation": "Do dòng xe hạng trung khách đặt đã hết, công ty nâng cấp miễn phí lên xe SUV."
+        },
+        {
+          "text": "What must the customer do at the counter?",
+          "options": [
+            "Bring a driver's license",
+            "Sign a revised agreement",
+            "Pay an extra fee",
+            "Inspect the vehicle for damage"
+          ],
+          "correctIndex": 1,
+          "explanation": "Khách hàng được yêu cầu ký lại thỏa thuận thuê xe đã được cập nhật tại quầy."
+        }
+      ]
+    },
+    {
+      "groupId": 54,
+      "part": 4,
+      "groupOrder": 54,
+      "questionNumbers": [
+        98,
+        99,
+        100
+      ],
+      "transcript": "Hi team, this is Robert calling with an important update regarding the upcoming product launch event scheduled for next Thursday. As you know, we have been coordinating with the marketing department to finalize all the promotional displays and media kits. We decided to hold our final coordination meeting off-site at the Grand Horizon Hotel conference room instead of the main office, to give everyone a better feel for the venue layout. The meeting will start promptly at 9 AM and is expected to run until noon. Please review the attached agenda in your emails and confirm your attendance with my assistant by tomorrow at 12 PM so we can arrange adequate seating and catering. Your input and dedication to this project have been fantastic, and I look forward to a successful launch.",
+      "words": 132,
+      "questions": [
+        {
+          "text": "What event is being discussed?",
+          "options": [
+            "A marketing campaign",
+            "A quarterly financial report",
+            "A new office layout",
+            "A product launch event"
+          ],
+          "correctIndex": 3,
+          "explanation": "Đoạn ghi âm thảo luận về việc chuẩn bị cho sự kiện ra mắt sản phẩm sắp tới của công ty."
+        },
+        {
+          "text": "Where will the upcoming meeting take place?",
+          "options": [
+            "A conference room",
+            "A local hotel",
+            "An exhibition center",
+            "A company cafeteria"
+          ],
+          "correctIndex": 1,
+          "explanation": "Cuộc họp chuẩn bị sẽ diễn ra tại một phòng họp của khách sạn địa phương."
+        },
+        {
+          "text": "What are listeners asked to do by tomorrow noon?",
+          "options": [
+            "Review the presentation slides",
+            "Confirm their attendance",
+            "Bring promotional materials",
+            "Submit a budget proposal"
+          ],
+          "correctIndex": 1,
+          "explanation": "Người gọi yêu cầu đồng nghiệp xác nhận sự tham gia của họ trước trưa mai."
+        }
+      ]
+    }
+  ]
+}

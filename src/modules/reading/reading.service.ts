@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { levelFields } from '../learning-path/level-access.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   QuizPublicationStatus,
@@ -357,6 +358,7 @@ export class ReadingService {
           microSkills: resolveReadingExerciseMicroSkills(quiz.questions),
           isPremiumContent: access.isPremiumContent,
           isLocked: access.isLocked,
+          ...levelFields(access),
           requiredPlan: access.requiredPlan ?? 'FREE',
           cefrLevel: 'cefrLevel' in access ? access.cefrLevel : null,
           completionStatus: isComplete
@@ -477,6 +479,7 @@ export class ReadingService {
             questionCount: quiz._count.questions,
             isPremiumContent: access.isPremiumContent,
             isLocked: access.isLocked,
+            ...levelFields(access),
             requiredPlan: access.requiredPlan ?? 'FREE',
           };
         }),
@@ -528,6 +531,7 @@ export class ReadingService {
           ...safeQuiz,
           isPremiumContent: access.isPremiumContent,
           isLocked: access.isLocked,
+          ...levelFields(access),
           requiredPlan: access.requiredPlan ?? 'FREE',
         };
       }),
@@ -774,7 +778,9 @@ export class ReadingService {
       );
       const candidate =
         matchingCandidates.find(
-          (quiz) => !(accessByQuiz.get(quiz.id)?.isLocked ?? false),
+          (quiz) =>
+            !accessByQuiz.get(quiz.id)?.isLocked &&
+            !accessByQuiz.get(quiz.id)?.isLevelLocked,
         ) ?? matchingCandidates[0];
       if (candidate) {
         const access = accessByQuiz.get(candidate.id) ?? {

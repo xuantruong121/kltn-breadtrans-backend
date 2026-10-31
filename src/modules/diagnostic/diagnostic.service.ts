@@ -35,7 +35,10 @@ import {
   resolveEstimatedLevel,
   validateQuestionBank,
 } from './diagnostic.logic';
+import { coursesEnabled } from '../../common/guards/courses-enabled.guard';
 import { buildCourseCurriculum } from '../course/course-curriculum';
+import { placeFromScores } from '../learning-path/placement.logic';
+import { scoresFromOutcome } from '../learning-path/placement.store';
 import {
   FOUR_SKILL_SCORING_VERSION,
   scoreFourSkillPlacementV2,
@@ -199,6 +202,8 @@ export class DiagnosticService {
   }
 
   private async recommendations(level: string, weaknesses: string[]) {
+    // Hidden courses are never recommended.
+    if (!coursesEnabled()) return [];
     const courses = await this.prisma.course.findMany({
       where: { status: 'PUBLISHED', lessons: { some: {} } },
       select: {
@@ -596,6 +601,10 @@ export class DiagnosticService {
       // FOUR_SKILL_PLACEMENT_V2 attempts only: the per-skill profile (primary
       // result) and the secondary overall, null until all four are complete.
       fourSkill,
+      // Internal practice levels ("mức luyện tập đề xuất", F4): not CEFR.
+      practicePlacement: fourSkill
+        ? placeFromScores(scoresFromOutcome(fourSkill.skills))
+        : null,
       speakingResponses: speakingRows.map((row) => {
         const graded = row.status === 'GRADED';
         const meta =

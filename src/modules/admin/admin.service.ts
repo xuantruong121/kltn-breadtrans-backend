@@ -20,21 +20,38 @@ import {
   TopicCategory,
   QuizPublicationStatus,
   QuizType,
+  Prisma,
 } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
-import { R2Service } from '../upload/r2.service';
+import { R2Service, type StorageUsage } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
 import { CourseService } from '../course/course.service';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
+import { azureTtsKey } from '../ai/azure-usage';
+import {
+  azureSpeechUsage,
+  isGeminiCacheKey,
+  R2_FREE_GB,
+} from './system-costs.logic';
 import {
   CreateVocabTopicDto,
   UpdateVocabTopicDto,
   CreateVocabWordDto,
   UpdateVocabWordDto,
 } from '../vocab/dto';
+import {
+  DECK_WORD_INCLUDE,
+  entryDataFromWord,
+  flattenDeckWord,
+  headwordOf,
+  posOf,
+  assertNotANumber,
+} from '../vocab/dictionary-entry';
+import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
+import { deckListFacets, filterDeckList } from './vocab-deck-list';
 
 export const DASHBOARD_RANGES = ['30d', '6m', '12m'] as const;
 export type DashboardRange = (typeof DASHBOARD_RANGES)[number];
@@ -91,8 +108,34 @@ export function buildDashboardBuckets(range: DashboardRange, now = new Date()) {
   });
 }
 
+const SYSTEM_DICTIONARY_CATEGORY = 'SYSTEM_DICTIONARY';
+
+function assertNotSystemCategory(categoryName?: string) {
+  if (categoryName?.trim() === SYSTEM_DICTIONARY_CATEGORY)
+    throw new BadRequestException(
+      'Chuyên mục SYSTEM_DICTIONARY dành cho hệ thống, không dùng cho bộ từ.',
+    );
+}
+
+/** Values for an entry's empty fields only: a reused entry keeps its data. */
+function fillEmpty(
+  entry: Record<string, unknown>,
+  fields: Record<string, unknown>,
+): Prisma.DictionaryEntryUpdateInput {
+  return Object.fromEntries(
+    Object.entries(fields).filter(
+      ([key, value]) =>
+        value !== undefined &&
+        !['headword', 'displayWord', 'pos'].includes(key) &&
+        (entry[key] === null || entry[key] === undefined || entry[key] === ''),
+    ),
+  );
+}
+
 @Injectable()
 export class AdminService {
+  private storageMeasure: { at: number; usage: StorageUsage } | null = null;
+
   constructor(
     private prisma: PrismaService,
     private r2Service: R2Service,
@@ -651,7 +694,11 @@ export class AdminService {
           reviewCount: true,
           nextReviewAt: true,
           lastReviewedAt: true,
-          word: { select: { word: true, meaning: true } },
+          word: {
+            select: {
+              entry: { select: { displayWord: true, meaningVi: true } },
+            },
+          },
         },
       }),
       this.prisma.userVocabWordProgress.count({
@@ -892,8 +939,8 @@ export class AdminService {
         dueCount: vocabDueCount,
         recent: vocabProgress.map((item) => ({
           id: item.id,
-          word: item.word.word,
-          meaning: item.word.meaning,
+          word: item.word.entry.displayWord,
+          meaning: item.word.entry.meaningVi,
           isMastered: item.isMastered,
           reviewCount: item.reviewCount,
           nextReviewAt: item.nextReviewAt,
@@ -1096,13 +1143,21 @@ export class AdminService {
   }
 
   // ============== VOCAB MANAGEMENT (PHASE 4 CMS) ==============
-  async getVocabTopics() {
-    return this.prisma.vocabTopic.findMany({
+  /** All decks, or with `query.page` one filtered page plus header counts. */
+  async getVocabTopics(query: ListQuery = {}) {
+    const decks = await this.prisma.vocabTopic.findMany({
+      // The Speaking lookup dictionary is system data, not a deck to manage.
+      where: { categoryName: { not: SYSTEM_DICTIONARY_CATEGORY } },
       include: {
         _count: { select: { words: true } },
       },
       orderBy: { id: 'asc' },
     });
+    if (!wantsPage(query)) return decks;
+    return {
+      ...pageOf(filterDeckList(decks, query), query),
+      facets: deckListFacets(decks),
+    };
   }
 
   async getVocabTopicDetail(id: number) {
@@ -1110,19 +1165,161 @@ export class AdminService {
       where: { id },
       include: {
         words: {
-          orderBy: { order: 'asc' },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          include: DECK_WORD_INCLUDE,
         },
       },
     });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
-    return topic;
+    return { ...topic, words: topic.words.map(flattenDeckWord) };
+  }
+
+  /** One page of a deck's words, in learner order; `q` searches word and meaning. */
+  async getVocabWordsPage(
+    topicId: number,
+    query: { page?: number; pageSize?: number; q?: string },
+  ) {
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id: topicId },
+    });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    const page = Math.max(1, Math.floor(Number(query.page) || 1));
+    const pageSize = Math.min(
+      100,
+      Math.max(1, Math.floor(Number(query.pageSize) || 20)),
+    );
+    const q = query.q?.trim();
+    const where: Prisma.VocabWordWhereInput = {
+      topicId,
+      ...(q
+        ? {
+            entry: {
+              OR: [
+                { displayWord: { contains: q, mode: 'insensitive' } },
+                { meaningVi: { contains: q, mode: 'insensitive' } },
+              ],
+            },
+          }
+        : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.vocabWord.findMany({
+        where,
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          entry: { include: { _count: { select: { deckWords: true } } } },
+        },
+      }),
+      this.prisma.vocabWord.count({ where }),
+    ]);
+    // usedInDecks tells the editor that an edit reaches other decks too.
+    const items = rows.map((row) => ({
+      ...flattenDeckWord(row),
+      usedInDecks: row.entry._count.deckWords,
+    }));
+    return { items, total, page, pageSize };
+  }
+
+  /** The deck and the counts its publish checklist needs, without the words. */
+  async getVocabTopicSummary(topicId: number) {
+    const topic = await this.prisma.vocabTopic.findUnique({
+      where: { id: topicId },
+    });
+    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+    const filled = (
+      field: 'ipaUs' | 'exampleEn' | 'audioUs',
+    ): Prisma.VocabWordWhereInput => ({
+      topicId,
+      entry: { AND: [{ [field]: { not: null } }, { NOT: { [field]: '' } }] },
+    });
+    const [total, withIpa, withExample, withAudio, meaningRows] =
+      await Promise.all([
+        this.prisma.vocabWord.count({ where: { topicId } }),
+        this.prisma.vocabWord.count({ where: filled('ipaUs') }),
+        this.prisma.vocabWord.count({ where: filled('exampleEn') }),
+        this.prisma.vocabWord.count({ where: filled('audioUs') }),
+        this.prisma.vocabWord.findMany({
+          where: { topicId },
+          select: { entry: { select: { meaningVi: true } } },
+        }),
+      ]);
+    const meanings = [
+      ...new Set(meaningRows.map((row) => row.entry.meaningVi.trim())),
+    ].map((meaning) => ({ meaning }));
+    return {
+      ...topic,
+      stats: {
+        total,
+        withIpa,
+        withExample,
+        withAudio,
+        distinctMeanings: meanings.length,
+        // The quiz-step preview draws distractors from these.
+        sampleMeanings: meanings.slice(0, 12).map((m) => m.meaning),
+      },
+    };
+  }
+
+  /**
+   * Moves a word one place up (-1) or down (1). Swaps with the neighbour;
+   * when orders collide (old decks saved order 0), renumbers the deck first.
+   */
+  async moveVocabWord(topicId: number, wordId: number, direction: -1 | 1) {
+    const current = await this.prisma.vocabWord.findUnique({
+      where: { id: wordId },
+    });
+    if (!current || current.topicId !== topicId)
+      throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
+    const collisions = await this.prisma.vocabWord.count({
+      where: { topicId, order: current.order, NOT: { id: wordId } },
+    });
+    if (collisions > 0) {
+      const ids = (
+        await this.prisma.vocabWord.findMany({
+          where: { topicId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        })
+      ).map((w) => w.id);
+      const index = ids.indexOf(wordId);
+      const target = index + direction;
+      if (target < 0 || target >= ids.length) return { success: true };
+      [ids[index], ids[target]] = [ids[target], ids[index]];
+      return this.reorderVocabWords(topicId, ids);
+    }
+    const neighbour = await this.prisma.vocabWord.findFirst({
+      where: {
+        topicId,
+        order: direction < 0 ? { lt: current.order } : { gt: current.order },
+      },
+      orderBy: { order: direction < 0 ? 'desc' : 'asc' },
+    });
+    if (!neighbour) return { success: true };
+    await this.prisma.$transaction([
+      this.prisma.vocabWord.update({
+        where: { id: current.id },
+        data: { order: neighbour.order },
+      }),
+      this.prisma.vocabWord.update({
+        where: { id: neighbour.id },
+        data: { order: current.order },
+      }),
+    ]);
+    return { success: true };
   }
 
   async createVocabTopic(dto: CreateVocabTopicDto) {
+    assertNotSystemCategory(dto.categoryName);
     return this.prisma.vocabTopic.create({
       data: {
         title: dto.title,
+        description: dto.description?.trim() || null,
+        level: dto.level ?? null,
         categoryName: dto.categoryName || '600 TỪ VỰNG TOEIC',
+        // Counts the words added below; the schema default (12) was wrong.
+        totalWords: 0,
         isPro: dto.isPro ?? false,
         iconUrl: dto.iconUrl,
         publicationStatus: QuizPublicationStatus.DRAFT,
@@ -1131,12 +1328,17 @@ export class AdminService {
   }
 
   async updateVocabTopic(id: number, dto: UpdateVocabTopicDto) {
+    assertNotSystemCategory(dto.categoryName);
     const topic = await this.prisma.vocabTopic.findUnique({ where: { id } });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
     return this.prisma.vocabTopic.update({
       where: { id },
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.description !== undefined && {
+          description: dto.description.trim() || null,
+        }),
+        ...(dto.level !== undefined && { level: dto.level }),
         ...(dto.categoryName !== undefined && {
           categoryName: dto.categoryName,
         }),
@@ -1149,7 +1351,7 @@ export class AdminService {
   async publishVocabTopic(id: number) {
     const topic = await this.prisma.vocabTopic.findUnique({
       where: { id },
-      include: { words: true },
+      include: { words: { include: DECK_WORD_INCLUDE } },
     });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
     if (!topic.words || topic.words.length === 0) {
@@ -1158,7 +1360,7 @@ export class AdminService {
       );
     }
     const invalidWords = topic.words.filter(
-      (w) => !w.word?.trim() || !w.meaning?.trim(),
+      (w) => !w.entry.displayWord?.trim() || !w.entry.meaningVi?.trim(),
     );
     if (invalidWords.length > 0) {
       throw new BadRequestException(
@@ -1209,22 +1411,62 @@ export class AdminService {
       where: { id: topicId },
     });
     if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
-    const word = await this.prisma.vocabWord.create({
+    assertNotANumber(dto.word);
+    // A word added without a position goes last, not to order 0.
+    const last = await this.prisma.vocabWord.aggregate({
+      where: { topicId },
+      _max: { order: true },
+    });
+    // F13: a word added to a deck links the store's entry for (word, part of
+    // speech); a known entry is reused (only its empty fields are filled),
+    // otherwise a curated entry is created.
+    const headword = headwordOf(dto.word);
+    const pos = posOf(dto.pos);
+    const existing = await this.prisma.dictionaryEntry.findUnique({
+      where: { headword_pos: { headword, pos } },
+    });
+    if (existing) {
+      const inDeck = await this.prisma.vocabWord.findFirst({
+        where: { topicId, entryId: existing.id },
+      });
+      if (inDeck)
+        throw new ConflictException(
+          `"${dto.word.trim()}" (${pos}) đã có trong bộ này.`,
+        );
+    }
+    const fields = entryDataFromWord(dto);
+    const entry = existing
+      ? await this.prisma.dictionaryEntry.update({
+          where: { id: existing.id },
+          data: {
+            ...fillEmpty(existing, fields),
+            ...(existing.status !== 'APPROVED' && {
+              status: 'APPROVED',
+              reviewedAt: new Date(),
+            }),
+          },
+        })
+      : await this.prisma.dictionaryEntry.create({
+          data: {
+            ...(fields as Prisma.DictionaryEntryCreateInput),
+            headword,
+            pos,
+            displayWord: dto.word.trim(),
+            meaningVi: dto.meaning.trim(),
+          },
+        });
+    const created = await this.prisma.vocabWord.create({
       data: {
         topicId,
-        word: dto.word,
-        pos: dto.pos || 'noun',
-        ipaUs: dto.ipaUs,
-        ipaUk: dto.ipaUk,
-        meaning: dto.meaning,
-        audioUs: dto.audioUs,
-        audioUk: dto.audioUk,
-        exampleEn: dto.exampleEn,
-        exampleVi: dto.exampleVi,
-        collocations: dto.collocations ?? undefined,
-        order: dto.order ?? 0,
+        entryId: entry.id,
+        order: dto.order ?? (last._max.order ?? 0) + 1,
       },
+      include: DECK_WORD_INCLUDE,
     });
+    const word = {
+      ...flattenDeckWord(created),
+      reusedEntry: Boolean(existing),
+    };
     await this.prisma.vocabTopic.update({
       where: { id: topicId },
       data: { totalWords: { increment: 1 } },
@@ -1239,19 +1481,26 @@ export class AdminService {
   ) {
     const word = await this.prisma.vocabWord.findUnique({
       where: { id: wordId },
+      include: DECK_WORD_INCLUDE,
     });
     if (!word || word.topicId !== topicId) {
       throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
     }
-    // History safety guard: if learner progress exists, block semantic identity change
+    if (dto.word !== undefined) assertNotANumber(dto.word);
+    const entry = word.entry;
+    const nextHeadword =
+      dto.word !== undefined ? headwordOf(dto.word) : entry.headword;
+    const nextPos = dto.pos !== undefined ? posOf(dto.pos) : entry.pos;
     const isWordChanged =
-      dto.word &&
-      dto.word.trim().toLowerCase() !== word.word.trim().toLowerCase();
+      nextHeadword !== entry.headword || nextPos !== entry.pos;
     const isMeaningChanged =
-      dto.meaning && dto.meaning.trim() !== word.meaning.trim();
+      dto.meaning !== undefined &&
+      dto.meaning.trim() !== entry.meaningVi.trim();
+    // History safety guard: what learners studied (the word in this deck, or
+    // the shared meaning anywhere) does not change under them.
     if (isWordChanged || isMeaningChanged) {
       const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
-        where: { wordId },
+        where: isMeaningChanged ? { word: { entryId: entry.id } } : { wordId },
       });
       if (hasProgress) {
         throw new ConflictException(
@@ -1259,24 +1508,75 @@ export class AdminService {
         );
       }
     }
-    return this.prisma.vocabWord.update({
+    const fields = entryDataFromWord(dto);
+    let entryId = entry.id;
+    if (isWordChanged) {
+      // This deck now holds a different word: link that word's entry, or
+      // rename this entry when no other deck uses it, or start a new entry.
+      const target = await this.prisma.dictionaryEntry.findUnique({
+        where: { headword_pos: { headword: nextHeadword, pos: nextPos } },
+      });
+      const sharedElsewhere = await this.prisma.vocabWord.count({
+        where: { entryId: entry.id, NOT: { id: wordId } },
+      });
+      if (target) {
+        const inDeck = await this.prisma.vocabWord.findFirst({
+          where: { topicId, entryId: target.id, NOT: { id: wordId } },
+        });
+        if (inDeck) throw new ConflictException('Từ này đã có trong bộ.');
+        entryId = target.id;
+        await this.prisma.dictionaryEntry.update({
+          where: { id: target.id },
+          data: fillEmpty(target, fields),
+        });
+      } else if (sharedElsewhere === 0) {
+        await this.prisma.dictionaryEntry.update({
+          where: { id: entry.id },
+          data: { ...fields, pos: nextPos },
+        });
+      } else {
+        const fresh = await this.prisma.dictionaryEntry.create({
+          data: {
+            ...(fields as Prisma.DictionaryEntryCreateInput),
+            headword: nextHeadword,
+            displayWord: (dto.word ?? entry.displayWord).trim(),
+            pos: nextPos,
+            meaningVi: (dto.meaning ?? entry.meaningVi).trim(),
+            ipaUs:
+              fields.ipaUs === undefined
+                ? entry.ipaUs
+                : (fields.ipaUs as string | null),
+            ipaUk:
+              fields.ipaUk === undefined
+                ? entry.ipaUk
+                : (fields.ipaUk as string | null),
+          },
+        });
+        entryId = fresh.id;
+      }
+    } else if (Object.keys(fields).length) {
+      // Same word: the shared entry is edited for every deck and lookup.
+      await this.prisma.dictionaryEntry.update({
+        where: { id: entry.id },
+        data: {
+          ...fields,
+          ...(entry.status !== 'APPROVED' && {
+            status: 'APPROVED',
+            source: entry.source,
+            reviewedAt: new Date(),
+          }),
+        },
+      });
+    }
+    const updated = await this.prisma.vocabWord.update({
       where: { id: wordId },
       data: {
-        ...(dto.word !== undefined && { word: dto.word }),
-        ...(dto.meaning !== undefined && { meaning: dto.meaning }),
-        ...(dto.pos !== undefined && { pos: dto.pos }),
-        ...(dto.ipaUs !== undefined && { ipaUs: dto.ipaUs }),
-        ...(dto.ipaUk !== undefined && { ipaUk: dto.ipaUk }),
-        ...(dto.audioUs !== undefined && { audioUs: dto.audioUs }),
-        ...(dto.audioUk !== undefined && { audioUk: dto.audioUk }),
-        ...(dto.exampleEn !== undefined && { exampleEn: dto.exampleEn }),
-        ...(dto.exampleVi !== undefined && { exampleVi: dto.exampleVi }),
-        ...(dto.collocations !== undefined && {
-          collocations: dto.collocations,
-        }),
+        entryId,
         ...(dto.order !== undefined && { order: dto.order }),
       },
+      include: DECK_WORD_INCLUDE,
     });
+    return flattenDeckWord(updated);
   }
 
   async deleteVocabWord(topicId: number, wordId: number) {
@@ -1411,6 +1711,8 @@ export class AdminService {
       totalMaterials,
       totalUsers,
       audioDurationThisMonth,
+      diagnosticDurationThisMonth,
+      listeningTtsThisMonth,
     ] = await Promise.all([
       this.prisma.speakingSubmission.count(),
       this.prisma.speakingSubmission.count({
@@ -1425,26 +1727,18 @@ export class AdminService {
         where: { submittedAt: { gte: startOfMonth } },
         _sum: { durationMs: true },
       }),
+      this.prisma.diagnosticSpeakingResponse.aggregate({
+        where: {
+          createdAt: { gte: startOfMonth },
+          provider: { contains: 'azure' },
+        },
+        _sum: { durationMs: true },
+      }),
+      this.prisma.listeningAudioUsage.aggregate({
+        where: { createdAt: { gte: startOfMonth }, success: true },
+        _sum: { characterCount: true },
+      }),
     ]);
-
-    // Azure AI Speech (Pronunciation Assessment) free tier: 5 audio hours /
-    // month, same figure already shown on the card header. Cloudflare R2
-    // free tier: 10 GB storage / month. These are the providers' published
-    // quota constants, not billing estimates — safe to hardcode, unlike
-    // actual cost which this deployment has no real provider billing feed
-    // for.
-    const AZURE_SPEECH_FREE_QUOTA_MINUTES = 5 * 60;
-    const R2_FREE_QUOTA_GB = 10;
-
-    const audioMinutesThisMonth = Math.round(
-      (audioDurationThisMonth._sum.durationMs ?? 0) / 60000,
-    );
-    const azureUsedPercent = Math.min(
-      100,
-      Math.round(
-        (audioMinutesThisMonth / AZURE_SPEECH_FREE_QUOTA_MINUTES) * 100,
-      ),
-    );
 
     let cachedGeminiCount = 0;
     let geminiTotalRequests = 0;
@@ -1452,16 +1746,19 @@ export class AdminService {
     let geminiOutputTokens = 0;
     let geminiCostUsd = 0;
     let geminiCostVnd = 0;
+    let otherTtsCharacters = 0;
 
     if (this.redis) {
       try {
-        const [keys, totalReqs, inTok, outTok] = await Promise.all([
+        const [keys, totalReqs, inTok, outTok, ttsCounted] = await Promise.all([
           this.redis.keys('gemini:*'),
           this.redis.get('gemini:telemetry:total_requests'),
           this.redis.get('gemini:telemetry:input_tokens'),
           this.redis.get('gemini:telemetry:output_tokens'),
+          this.redis.get(azureTtsKey(now)),
         ]);
-        cachedGeminiCount = keys.length;
+        cachedGeminiCount = keys.filter(isGeminiCacheKey).length;
+        otherTtsCharacters = ttsCounted ? parseInt(ttsCounted, 10) : 0;
         let quotaSum = 0;
         const quotaKeys = keys.filter((k) =>
           k.startsWith('gemini:daily_quota:'),
@@ -1491,27 +1788,30 @@ export class AdminService {
       }
     }
 
-    let r2Usage: { totalMb: number } | null = null;
-    try {
-      r2Usage = await this.r2Service.getBucketStorageUsage();
-    } catch {
-      // R2 telemetry is unavailable; do not replace it with an estimate.
-    }
+    const azure = azureSpeechUsage({
+      speakingMs: audioDurationThisMonth._sum.durationMs ?? 0,
+      diagnosticMs: diagnosticDurationThisMonth._sum.durationMs ?? 0,
+      ttsCharacters:
+        (listeningTtsThisMonth._sum.characterCount ?? 0) + otherTtsCharacters,
+    });
+
+    const r2Usage = await this.measuredStorage();
     const activeAudioCount = Math.max(
       0,
       totalSpeakingSubmissions - archivedSpeakingAudio,
     );
-    const measuredStorageMb = r2Usage?.totalMb ?? 0;
+    const measuredStorageMb = r2Usage.totalMb;
     const r2StorageGb = Number((measuredStorageMb / 1024).toFixed(3));
     const r2UsedPercent = Math.min(
       100,
-      Math.round((r2StorageGb / R2_FREE_QUOTA_GB) * 100),
+      Math.round((r2StorageGb / R2_FREE_GB) * 100),
     );
 
     // Azure/R2 overage cost is always 0 while usage stays within their free
     // tiers (no paid tier wired up), so the only real cost component today
     // is Gemini's token-based estimate — surface that in the headline total
     // instead of a hardcoded 0 that contradicts the Gemini card below it.
+    // Its token counters are cumulative, not this month's.
     return {
       summary: {
         totalCostUsd: geminiCostUsd,
@@ -1543,12 +1843,9 @@ export class AdminService {
           name: 'Microsoft Azure AI Speech',
           totalSubmissions: totalSpeakingSubmissions,
           submissionsThisMonth: speakingThisMonth,
-          audioMinutesThisMonth,
-          freeQuotaMinutes: AZURE_SPEECH_FREE_QUOTA_MINUTES,
-          usedPercent: azureUsedPercent,
+          ...azure,
           costUsd: 0,
           costVnd: 0,
-          withinFreeTier: azureUsedPercent < 100,
         },
         cloudflareR2: {
           name: 'Cloudflare R2 Object Storage',
@@ -1557,7 +1854,9 @@ export class AdminService {
           totalMaterials,
           usedStorageMb: measuredStorageMb,
           usedStorageGb: r2StorageGb,
-          freeQuotaGb: R2_FREE_QUOTA_GB,
+          fileCount: r2Usage.fileCount,
+          storageComplete: r2Usage.complete,
+          freeQuotaGb: R2_FREE_GB,
           usedPercent: r2UsedPercent,
           egressCostUsd: 0,
           costUsd: 0,
@@ -1568,17 +1867,26 @@ export class AdminService {
     };
   }
 
+  /**
+   * Listing is a billed R2 operation and the page refreshes every 30 seconds,
+   * so a measurement is reused for 10 minutes. A partial one is not kept.
+   */
+  private async measuredStorage() {
+    const now = Date.now();
+    if (this.storageMeasure && now - this.storageMeasure.at < 10 * 60 * 1000)
+      return this.storageMeasure.usage;
+    const usage = await this.r2Service.getBucketStorageUsage();
+    this.storageMeasure = usage.complete ? { at: now, usage } : null;
+    return usage;
+  }
+
   async purgeAiCache() {
     if (!this.redis) {
       return { success: true, count: 0, message: 'Redis không được kết nối' };
     }
     const allKeys = await this.redis.keys('gemini:*');
     // Preserve operational telemetry keys and daily quota keys during cache purge
-    const cacheKeys = allKeys.filter(
-      (k) =>
-        !k.startsWith('gemini:telemetry:') &&
-        !k.startsWith('gemini:daily_quota:'),
-    );
+    const cacheKeys = allKeys.filter(isGeminiCacheKey);
     if (cacheKeys.length > 0) {
       await this.redis.del(...cacheKeys);
     }

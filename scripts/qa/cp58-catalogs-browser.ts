@@ -11,7 +11,11 @@ import { check, failureCount } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 
 const CEFR = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-const LABEL = /(Cơ bản|Trung cấp|Nâng cao) · ([ABC][12])(?:–([ABC][12]))?/;
+const LABEL =
+  /(Mất gốc|Cơ bản|Trung cấp|Nâng cao) · ([ABC][12])(?:–([ABC][12]))?/;
+const PAGE_SIZE = 12;
+/** The paged catalog, not the "Đề xuất cho bạn" cards above it. */
+const CARDS = '.grid.xl\\:grid-cols-3.\\32xl\\:grid-cols-4 article';
 
 async function open(page: Page, path: string) {
   await page.goto(`${FE}${path}`, {
@@ -23,7 +27,7 @@ async function open(page: Page, path: string) {
 
 /** Level of each catalog card in display order ([band, min, max]). */
 async function cardLevels(page: Page) {
-  const texts = await page.locator('article').allInnerTexts();
+  const texts = await page.locator(CARDS).allInnerTexts();
   return texts.map((t) => {
     const m = LABEL.exec(t.replace(/\s+/g, ' '));
     return m
@@ -55,7 +59,7 @@ async function checkSkill(page: Page, label: string, path: string) {
           .getByRole('group', { name: 'Lọc theo độ khó' })
           .getByRole('button')
           .allInnerTexts()
-      ).join('|') === 'Tất cả|Cơ bản|Trung cấp|Nâng cao',
+      ).join('|') === 'Tất cả|Mất gốc|Cơ bản|Trung cấp|Nâng cao',
   );
   const levels = await cardLevels(page);
   const known = levels.filter((l) => l !== null);
@@ -65,9 +69,11 @@ async function checkSkill(page: Page, label: string, path: string) {
     levels.length > 0 && known.length === levels.length && ordered,
     levels.map((l) => (l ? `${CEFR[l.min]}-${CEFR[l.max]}` : '?')).join(' '),
   );
+  const total = await shownCount(page);
   check(
-    `${label}: result count = cards shown`,
-    (await shownCount(page)) === levels.length,
+    `${label}: result count covers the whole list, one page shown`,
+    total >= levels.length && levels.length === Math.min(total, PAGE_SIZE),
+    `(${total} total, ${levels.length} shown)`,
   );
   await sort.selectOption('HARD_TO_EASY');
   await page.waitForTimeout(400);
@@ -93,7 +99,7 @@ async function checkSkill(page: Page, label: string, path: string) {
   );
   check(
     `${label}: count follows the filter`,
-    (await shownCount(page)) === mid.length,
+    Math.min(await shownCount(page), PAGE_SIZE) === mid.length,
   );
   await page
     .getByRole('button', { name: 'Đặt lại tất cả bộ lọc về mặc định' })
@@ -101,7 +107,7 @@ async function checkSkill(page: Page, label: string, path: string) {
   await page.waitForTimeout(300);
   check(
     `${label}: reset restores the full list`,
-    (await shownCount(page)) === levels.length,
+    (await shownCount(page)) === total,
   );
   return levels;
 }
@@ -121,6 +127,11 @@ void (async () => {
     await checkSkill(page, 'Writing', '/writing');
 
     // The confirmed defect: Writing B1 email is Trung cấp, with a Vietnamese title.
+    await page
+      .getByRole('group', { name: 'Lọc theo độ khó' })
+      .getByRole('button', { name: 'Trung cấp' })
+      .click();
+    await page.waitForTimeout(400);
     const card = page.locator('article', {
       hasText: 'Viết email công việc (B1)',
     });

@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-10-31T04:47:04.490Z",
+  "calls": 5,
+  "voiceRegistryVersion": "2026-09-21.v1",
+  "clips": [
+    {
+      "id": 137,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-en-gb-v2\\137.en-gb.v2.mp3",
+      "key": "catalog/speaking/reference/137.en-gb.v2.mp3",
+      "voice": "en-gb-male-01",
+      "durationMs": 6048,
+      "bytes": 96768,
+      "audioSha256": "f91f011155f95c7d617cee779cb44d9cd81a3fd5160e1e838f9442a53509b5f8",
+      "textSha256": "b2aec90cc0c2de02532ab586500b07162c61ebcf413d727f04b52f297671121d"
+    },
+    {
+      "id": 138,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-en-gb-v2\\138.en-gb.v2.mp3",
+      "key": "catalog/speaking/reference/138.en-gb.v2.mp3",
+      "voice": "en-gb-female-01",
+      "durationMs": 5364,
+      "bytes": 85824,
+      "audioSha256": "c4b6fc31b8cc40277ffe54f52af665bb9783eed973b7549d0aab38afd94ed51b",
+      "textSha256": "5df5130d8a31683bd8ff495592bf609da9e688344e98bb8a04aa98d01fb39d56"
+    },
+    {
+      "id": 139,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-en-gb-v2\\139.en-gb.v2.mp3",
+      "key": "catalog/speaking/reference/139.en-gb.v2.mp3",
+      "voice": "en-gb-male-01",
+      "durationMs": 5400,
+      "bytes": 86400,
+      "audioSha256": "2e28d732663892160ef7fd0eb4726267be13098d5e6c865199c0987e8565e9f0",
+      "textSha256": "1134f6a7fd2272489c1da213fad6929756553ac5d7ae670e0cdf994729325469"
+    },
+    {
+      "id": 140,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-en-gb-v2\\140.en-gb.v2.mp3",
+      "key": "catalog/speaking/reference/140.en-gb.v2.mp3",
+      "voice": "en-gb-female-01",
+      "durationMs": 5760,
+      "bytes": 92160,
+      "audioSha256": "18b3a82130131baa02d6786c5d7fa8d0e68dc07b688e1feabe94ec483952baf7",
+      "textSha256": "9c5d86c9aa2b9557c31474c32a0a8aec30a8ef8ef5beb6af6065302909ec194e"
+    },
+    {
+      "id": 141,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-en-gb-v2\\141.en-gb.v2.mp3",
+      "key": "catalog/speaking/reference/141.en-gb.v2.mp3",
+      "voice": "en-gb-male-01",
+      "durationMs": 5832,
+      "bytes": 93312,
+      "audioSha256": "01f40412c82f6fd1c308e82c9b6040f05fcb5fdda76d71063f44ed9a2c57d7bd",
+      "textSha256": "57488155b08295b622c30d15f5bbd5cdcb1e12b236b34d9cd6e56c83c2a2c7a3"
+    }
+  ]
+}

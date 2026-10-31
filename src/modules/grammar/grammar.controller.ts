@@ -18,13 +18,19 @@ import {
   UpdateGrammarQuestionDto,
   SubmitGrammarAttemptDto,
   ReorderGrammarQuestionsDto,
+  CreateGrammarQuestionsDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @ApiTags('Grammar')
 @Controller('grammar')
@@ -134,6 +140,25 @@ export class GrammarController {
     @Body() dto: CreateGrammarQuestionDto,
   ) {
     return this.grammarService.createQuestion(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @Post('topics/:id/questions/bulk')
+  @ApiOperation({
+    summary:
+      '[Admin] Thêm nhiều câu hỏi một lần (tất cả hoặc không câu nào), nối sau câu cuối',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Có câu không hợp lệ; errors liệt kê từng câu',
+  })
+  createQuestions(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateGrammarQuestionsDto,
+  ) {
+    return this.grammarService.createQuestions(id, dto.questions);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

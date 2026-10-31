@@ -1,0 +1,658 @@
+{
+  "LISTENING-1": {
+    "translations": [
+      "Quản lý: Chào buổi sáng cả đội. Chúng ta hãy bắt đầu cuộc họp ngắn hàng ngày nhé. Alex, cập nhật tiến độ của bạn thế nào?",
+      "Alex: Chào buổi sáng! Hôm qua, tôi đã sửa xong lỗi đăng nhập. Hôm nay, tôi sẽ kiểm tra trang thanh toán mới.",
+      "Quản lý: Tuyệt vời. Bạn có gặp trở ngại nào không?",
+      "Alex: Không, mọi thứ đều ổn.",
+      "Quản lý: Cảm ơn Alex. Còn Sam thì sao?",
+      "Sam: Tôi đã cập nhật cơ sở dữ liệu người dùng ngày hôm qua. Hôm nay, tôi sẽ viết tài liệu API.",
+      "Quản lý: Quá tuyệt. Hãy cho tôi biết nếu bạn cần giúp gì nhé. Chúc mọi người một ngày tốt lành!"
+    ],
+    "explanations": [
+      "Alex cho biết hôm qua anh ấy đã hoàn thành việc sửa lỗi đăng nhập.",
+      "Alex nói rằng hôm nay anh ấy sẽ kiểm tra trang thanh toán mới.",
+      "Khi được hỏi về trở ngại, Alex đã trả lời là mọi thứ đều ổn.",
+      "Sam chia sẻ rằng hôm qua anh ấy đã cập nhật cơ sở dữ liệu người dùng.",
+      "Sam cho biết kế hoạch hôm nay của anh ấy là viết tài liệu API."
+    ],
+    "evidence": [
+      "Yesterday, I finished fixing the login bug.",
+      "Today, I am going to test the new payment page.",
+      "No, everything is fine.",
+      "I updated the user database yesterday.",
+      "Today, I will write the API documentation."
+    ],
+    "topics": [
+      "Công việc",
+      "Họp nhóm"
+    ]
+  },
+  "LISTENING-2": {
+    "translations": [
+      "Mark: Chào Sarah, tôi có thể giúp gì cho bạn không?",
+      "Sarah: Vâng, Mark. Chúng ta cần đặt mua một số văn phòng phẩm mới.",
+      "Mark: Được thôi, chúng ta cần gì vậy?",
+      "Sarah: Chúng ta cần một hộp bút bi xanh và hai hộp giấy in.",
+      "Mark: Đã rõ. Bút bi xanh và hai hộp giấy in. Còn gì nữa không?",
+      "Sarah: Không, hôm nay chỉ có thế thôi. Cảm ơn bạn!",
+      "Mark: Không có chi. Tôi sẽ đặt mua chúng trực tuyến ngay bây giờ."
+    ],
+    "explanations": [
+      "Sarah nói rằng họ cần đặt mua một hộp bút bi xanh và hai hộp giấy in, tức là bút và giấy.",
+      "Sarah yêu cầu cụ thể hai hộp giấy in trong đoạn hội thoại.",
+      "Sarah đề cập rõ ràng đến loại bút màu xanh trong yêu cầu của mình.",
+      "Mark bắt đầu cuộc trò chuyện bằng cách gọi tên Sarah.",
+      "Mark khẳng định cuối đoạn hội thoại rằng anh ấy sẽ đặt mua các món đồ trực tuyến ngay lập tức."
+    ],
+    "evidence": [
+      "We need a box of blue pens and two boxes of printer paper.",
+      "We need a box of blue pens and two boxes of printer paper.",
+      "We need a box of blue pens and two boxes of printer paper.",
+      "Hi Sarah, can I help you with anything?",
+      "I will order them online right now."
+    ],
+    "topics": [
+      "Văn phòng phẩm",
+      "Công việc hàng ngày"
+    ]
+  },
+  "LISTENING-3": {
+    "translations": [
+      "Xin chào! Tôi có thể giúp gì cho bạn hôm nay?",
+      "Vâng, tôi muốn trả lại chiếc áo này. Nó quá nhỏ.",
+      "Không vấn đề gì. Bạn có giữ hóa đơn không?",
+      "Vâng, nó đây ạ.",
+      "Cảm ơn bạn. Chính sách của chúng tôi cho phép đổi trả trong vòng 30 ngày kèm hóa đơn. Vì bạn mua nó tuần trước, tôi có thể hoàn tiền đầy đủ cho bạn.",
+      "Tuyệt vời. Tiền có được chuyển lại vào thẻ tín dụng của tôi không?",
+      "Vâng, sẽ mất khoảng hai đến ba ngày làm việc."
+    ],
+    "explanations": [
+      "Khách hàng nói rõ mong muốn là muốn trả lại chiếc áo.",
+      "Lý do khách hàng đưa ra là chiếc áo quá nhỏ.",
+      "Khách hàng xác nhận có hóa đơn khi đưa nó cho nhân viên.",
+      "Nhân viên cho biết chính sách cửa hàng cho phép đổi trả trong vòng 30 ngày.",
+      "Nhân viên xác nhận tiền sẽ được chuyển lại vào thẻ tín dụng, tức là phương thức thanh toán ban đầu."
+    ],
+    "evidence": [
+      "Yes, I would like to return this shirt, please.",
+      "It is too small.",
+      "Yes, here it is.",
+      "Our policy allows returns within 30 days with a receipt.",
+      "Will the money go back on my credit card?"
+    ],
+    "topics": [
+      "Mua sắm",
+      "Dịch vụ khách hàng"
+    ]
+  },
+  "LISTENING-4": {
+    "translations": [
+      "Chào buổi sáng! Chào mừng bạn đến trung tâm thông tin du lịch thành phố. Hôm nay tôi có thể giúp gì cho bạn?",
+      "Xin chào, tôi muốn đặt một chuyến tham quan thành phố có hướng dẫn viên.",
+      "Chắc chắn rồi. Chúng tôi có chuyến đi bộ tham quan trung tâm lịch sử rất được yêu thích. Bạn có quan tâm đến chuyến đó không?",
+      "Vâng, nghe tuyệt quá. Nó bắt đầu lúc mấy giờ?",
+      "Chúng tôi còn chỗ vào sáng mai lúc 10 giờ. Chuyến đi kéo dài khoảng hai tiếng.",
+      "Hoàn hảo. Tôi cần hai vé, một cho tôi và một cho vợ tôi.",
+      "Tuyệt vời. Giá vé là 20 euro một vé, tổng cộng là 40 euro.",
+      "Đây là thẻ tín dụng của tôi.",
+      "Cảm ơn bạn. Vui lòng nhập mã PIN vào đây. Và đây là vé cùng bản đồ điểm hẹn của bạn.",
+      "Cảm ơn sự giúp đỡ của bạn rất nhiều. Chúc bạn một ngày tốt lành!"
+    ],
+    "explanations": [
+      "Nhân viên đề xuất chuyến đi bộ tham quan trung tâm lịch sử và khách hàng đã đồng ý.",
+      "Nhân viên thông báo thời gian có sẵn là vào sáng mai lúc 10 giờ.",
+      "Nhân viên cho biết giá vé là 20 euro cho mỗi vé.",
+      "Khách hàng nói rõ rằng cần mua hai vé, một cho bản thân và một cho vợ.",
+      "Khách hàng đã đưa thẻ tín dụng để thanh toán sau khi nghe tổng số tiền."
+    ],
+    "evidence": [
+      "We have a very popular walking tour of the historical center.",
+      "We have availability tomorrow morning at 10:00 AM.",
+      "That will be 20 euros per ticket, so 40 euros in total.",
+      "I need two tickets, please; one for me and one for my wife.",
+      "Here is my credit card."
+    ],
+    "topics": [
+      "Du lịch",
+      "Dịch vụ"
+    ]
+  },
+  "LISTENING-5": {
+    "translations": [
+      "Thủ thư: Chào buổi sáng. Chào mừng bạn đến với thư viện trường đại học. Tôi có thể giúp gì cho bạn hôm nay?",
+      "Sinh viên: Chào buổi sáng. Tôi cần mượn một vài cuốn sách cho một bài luận lịch sử, nhưng tôi không chắc nó hoạt động như thế nào.",
+      "Thủ thư: Không có vấn đề gì cả. Bạn có mang theo thẻ sinh viên không?",
+      "Sinh viên: Có, thẻ của tôi đây.",
+      "Thủ thư: Cảm ơn bạn. Tôi sẽ quét nó để kích hoạt tài khoản thư viện của bạn. Là một sinh viên đại học, bạn có thể mượn tối đa năm cuốn sách cùng một lúc.",
+      "Sinh viên: Nghe tuyệt đấy. Tôi có thể giữ sách trong bao lâu?",
+      "Thủ thư: Thời gian cho mượn tiêu chuẩn là hai tuần. Nếu bạn vẫn cần chúng sau hai tuần, bạn có thể gia hạn chúng trực tuyến hoặc ngay tại quầy lễ tân.",
+      "Sinh viên: Hoàn hảo. Tôi có thể tìm những cuốn sách lịch sử ở đâu?",
+      "Thủ thư: Khu vực lịch sử nằm ở tầng hai, đi xuống lối đi bên trái. Hãy cho tôi biết nếu bạn cần giúp tìm một tựa đề cụ thể.",
+      "Sinh viên: Cảm ơn bạn rất nhiều vì sự giúp đỡ của bạn!"
+    ],
+    "explanations": [
+      "Học sinh nói rõ mục đích khi đến thư viện là muốn mượn vài cuốn sách cho bài luận lịch sử.",
+      "Thủ thư hỏi sinh viên có mang theo thẻ sinh viên không và sinh viên đã đồng ý đưa ra, chứng tỏ đây là vật cần thiết.",
+      "Thủ thư thông báo rõ ràng rằng sinh viên đại học có thể mượn tối đa năm cuốn sách cùng một lúc.",
+      "Thủ thư cho biết thời gian cho mượn tiêu chuẩn đối với sách là đúng hai tuần.",
+      "Thủ thư giải thích rằng học sinh có thể chọn gia hạn trực tuyến hoặc trực tiếp tại quầy lễ tân nếu cần dùng lâu hơn."
+    ],
+    "evidence": [
+      "I need to borrow a few books for a history essay, but I am not sure how it works.",
+      "Do you have your student ID card with you?",
+      "As an undergraduate student, you can borrow up to five books at one time.",
+      "The standard loan period is two weeks.",
+      "If you still need them after two weeks, you can renew them either online or here at the front desk."
+    ],
+    "topics": [
+      "Thư viện trường học",
+      "Mượn sách"
+    ]
+  },
+  "LISTENING-6": {
+    "translations": [
+      "Xin lỗi, bạn có thể cho tôi biết tôi có thể tìm sữa ở đâu không?",
+      "Chắc chắn rồi! Sữa ở lối đi số 4, ngay ở phía sau cửa hàng.",
+      "Cảm ơn bạn. Và bánh mì tươi ở đâu?",
+      "Khu vực tiệm bánh ngay cạnh lối đi số 4. Chúng tôi vừa nướng một ít bánh mì tươi sáng nay.",
+      "Tuyệt vời! Ngoài ra, táo có đang được giảm giá không?",
+      "Có, chúng có giá một đô la rưỡi một pound.",
+      "Tôi sẽ lấy một túi nhỏ vậy. Cảm ơn sự giúp đỡ của bạn.",
+      "Không có gì. Bạn có thể thanh toán tại quầy số 2.",
+      "Bạn đã tìm thấy mọi thứ mình cần hôm nay chưa?",
+      "Vâng, cảm ơn bạn. Tôi có thể thanh toán bằng thẻ tín dụng không?",
+      "Được chứ, chỉ cần chạm thẻ của bạn lên máy. Bạn có muốn lấy hóa đơn không?",
+      "Vâng, làm ơn. Của đây.",
+      "Cảm ơn bạn, chúc bạn có một ngày tuyệt vời!"
+    ],
+    "explanations": [
+      "Khách hàng hỏi tìm sữa và nhân viên đáp rằng sữa ở lối đi số 4.",
+      "Nhân viên xác nhận tiệm bánh vừa mới nướng bánh mì tươi sáng nay.",
+      "Nhân viên cho biết giá táo là một đô la rưỡi một pound.",
+      "Khách hàng hỏi trực tiếp xem có thể trả bằng thẻ tín dụng không và thu ngân xác nhận.",
+      "Thu ngân hỏi khách hàng có muốn lấy hóa đơn không sau khi thanh toán."
+    ],
+    "evidence": [
+      "The milk is in aisle 4, right at the back of the store.",
+      "We just baked some fresh bread this morning.",
+      "Yes, they are one dollar and fifty cents a pound.",
+      "Can I pay with a credit card?",
+      "Would you like a receipt?"
+    ],
+    "topics": [
+      "Mua sắm",
+      "Siêu thị"
+    ]
+  },
+  "LISTENING-7": {
+    "translations": [
+      "Alex: Chào Jamie, bạn có rảnh vài phút không? Tôi vừa mở hộp chiếc máy tính xách tay làm việc mới và tôi không chắc nên bắt đầu thiết lập từ đâu.",
+      "Jamie: Tất nhiên rồi, Alex. Hãy để tôi cấu hình nó cho bạn ngay bây giờ. Đầu tiên, hãy bật máy lên và kết nối với mạng Wi-Fi có tên CorpNet-Secure.",
+      "Alex: Hiểu rồi, đã kết nối. Bây giờ nó đang yêu cầu tôi đăng nhập. Tôi có nên sử dụng tài khoản Microsoft cá nhân của mình không?",
+      "Jamie: Không, chắc chắn hãy sử dụng địa chỉ email công ty và mật khẩu mạng tiêu chuẩn của bạn. Điều đó sẽ đồng bộ hóa tất cả thông tin đăng nhập của công ty.",
+      "Alex: Được rồi, đang đăng nhập đây. Nó nói là đang kiểm tra các bản cập nhật.",
+      "Jamie: Hoàn hảo. Hãy để chúng chạy. Khi các bản cập nhật ban đầu hoàn tất, bạn sẽ cần phải khởi động lại hệ thống nhanh chóng.",
+      "Alex: Sẽ làm vậy. Ngoài ra, làm thế nào để tôi cài đặt phần mềm thiết kế của mình? Tôi không thấy nó trên màn hình nền.",
+      "Jamie: Mở cổng thông tin phần mềm của công ty từ menu bắt đầu. Bạn sẽ tìm thấy tất cả các chương trình đã được phê duyệt được liệt kê ở đó để cài đặt bằng một cú nhấp chuột.",
+      "Alex: Đã tìm thấy. Đang bắt đầu tải xuống. Cảm ơn sự giúp đỡ của bạn, Jamie!",
+      "Jamie: Bất cứ lúc nào, Alex. Hãy cho tôi biết nếu bạn gặp bất kỳ vấn đề nào khác."
+    ],
+    "explanations": [
+      "Alex nhờ giúp đỡ vì anh ấy vừa mở hộp máy tính xách tay làm việc mới và không biết bắt đầu thiết lập từ đâu.",
+      "Bước đầu tiên Jamie yêu cầu Alex làm là bật máy và kết nối vào mạng Wi-Fi có tên CorpNet-Secure.",
+      "Jamie hướng dẫn Alex sử dụng địa chỉ email công ty và mật khẩu mạng tiêu chuẩn để đăng nhập vào máy tính.",
+      "Hệ thống yêu cầu khởi động lại sau khi các bản cập nhật ban đầu được hoàn tất.",
+      "Alex hỏi cách cài đặt phần mềm thiết kế của mình vì anh ấy không thấy nó trên màn hình nền."
+    ],
+    "evidence": [
+      "I just unboxed my new work laptop and I am not sure where to start with the setup.",
+      "First, turn it on and connect to the Wi-Fi network named CorpNet-Secure.",
+      "No, definitely use your company email address and your standard network password.",
+      "Once the initial updates finish, you will need to do a quick system restart.",
+      "Also, how do I get my design software installed?"
+    ],
+    "topics": [
+      "Công nghệ thông tin",
+      "Nơi làm việc"
+    ]
+  },
+  "LISTENING-8": {
+    "translations": [
+      "Sarah: Xin chào! Bạn chắc hẳn là David. Chào mừng bạn đến với đội!",
+      "David: Vâng, đúng vậy. Cảm ơn bạn rất nhiều! Mình thực sự rất vui cuối cùng cũng được ở đây.",
+      "Sarah: Mình nghe nói bạn chuyển đến từ văn phòng Chicago của chúng ta. Việc chuyển đi thế nào?",
+      "David: Thú thực là hơi mệt một chút, nhưng mọi thứ đã được dỡ ra rồi và mình đã sẵn sàng bắt đầu làm việc.",
+      "Sarah: Nghe tuyệt quá. Bạn có muốn đi một vòng tham quan nhanh tầng này trước khi ổn định chỗ ngồi không?",
+      "David: Mình rất thích, cảm ơn bạn. Nhất là nếu bạn có thể chỉ cho mình chỗ pha cà phê ở đâu.",
+      "Sarah: Trạm dừng chân đầu tiên trong chuyến tham quan! Máy pha cà phê là thứ không thể thiếu để sinh tồn ở đây. Đi lối này nhé.",
+      "David: Dẫn đường đi. Nhân tiện, hôm nay mình có cuộc họp nào không hay nên tập trung cài đặt máy tính?",
+      "Sarah: Hôm nay không có cuộc họp chính thức nào cả. Cứ chuẩn bị máy tính xong đi, và vào buổi trưa, vài người trong bọn mình sẽ đưa bạn đi ăn trưa.",
+      "David: Nghe tuyệt quá. Mình thực sự đánh giá cao sự giúp đỡ của bạn hôm nay."
+    ],
+    "explanations": [
+      "Sarah đã chào David ngay từ đầu đoạn hội thoại khi anh mới đến công ty.",
+      "David đã trả lời xác nhận khi Sarah hỏi về việc anh chuyển đến từ văn phòng Chicago.",
+      "Sarah đề nghị dẫn David đi tham quan và anh ấy đã đồng ý, đặc biệt muốn biết chỗ máy cà phê.",
+      "Sarah nói đùa rằng máy pha cà phê là thứ thiết yếu để sinh tồn ở văn phòng này.",
+      "Sarah thông báo rằng vào buổi trưa mọi người sẽ đưa David đi ăn trưa."
+    ],
+    "evidence": [
+      "Hi there! You must be David.",
+      "I heard you transferred from our Chicago office.",
+      "Would you like a quick tour of the floor before you settle in?",
+      "The coffee machine is essential for survival around here.",
+      "and at noon, a few of us are taking you out for lunch."
+    ],
+    "topics": [
+      "Công sở",
+      "Giao tiếp"
+    ]
+  },
+  "LISTENING-9": {
+    "translations": [
+      "Chào buổi chiều! Chào mừng đến với TechWorld. Anh/chị tìm mọi thứ có ổn không, hay đang tìm một món đồ cụ thể nào đó hôm nay?",
+      "Chào anh. Thực ra, tôi đang tìm một chiếc máy tính xách tay mới. Máy hiện tại của tôi thực sự đang gặp khó khăn với khối lượng công việc, và tôi cần nâng cấp.",
+      "Tôi chắc chắn có thể giúp việc đó. Anh/chị thường sử dụng những loại ứng dụng nào? Điều đó sẽ giúp tôi thu hẹp công suất xử lý mà anh/chị cần.",
+      "Tôi làm việc trong lĩnh vực chỉnh sửa video chuyên nghiệp. Tôi thường kết xuất cảnh quay 4K, và máy hiện tại của tôi bị giật lag kinh khủng và đôi khi còn bị sập nguồn.",
+      "À, việc kết xuất 4K chắc chắn là đòi hỏi cao. Anh/chị sẽ cần một card đồ họa rời mạnh mẽ và ít nhất ba mươi hai gigabyte RAM để mọi thứ mượt mà.",
+      "Đó là điều tôi đã đoán. Các anh có sẵn mẫu nào phù hợp với các thông số kỹ thuật đó mà không tốn quá nhiều tiền không?",
+      "Chúng tôi có hai mẫu tuyệt vời. Mẫu đầu tiên là CreatorPro 15, có GPU tốt và ba mươi hai gigabyte RAM. Mẫu thứ hai là CreatorPro 17, có bộ xử lý nhanh hơn và màn hình lớn hơn với giá cao hơn hai trăm đô la.",
+      "Bộ xử lý nhanh hơn đó nghe có vẻ hấp dẫn vì thời gian kết xuất liên tục ảnh hưởng đến thời hạn chót của tôi. Tôi nghĩ nó đáng giá thêm hai trăm đô la.",
+      "Lựa chọn xuất sắc. Để tôi lấy chiếc đó đóng hộp cho anh/chị cùng với một đế cắm USB-C tương thích nếu anh/chị cần.",
+      "Tôi sẽ lấy cả đế cắm luôn. Hãy hoàn tất việc mua hàng này nào."
+    ],
+    "explanations": [
+      "Khách hàng cho biết công việc của họ liên quan đến việc chỉnh sửa video chuyên nghiệp và kết xuất cảnh quay 4K.",
+      "Khách hàng phàn nàn rằng chiếc máy hiện tại của anh ấy bị giật lag kinh khủng và thậm chí đôi khi bị sập nguồn khi làm việc.",
+      "Nhân viên bán hàng nhấn mạnh rằng khách hàng cần một card đồ họa rời mạnh mẽ và ít nhất 32GB RAM để xử lý công việc mượt mà.",
+      "Nhân viên bán hàng nêu rõ mẫu CreatorPro 17 có giá cao hơn hai trăm đô la so với mẫu đầu tiên nhờ bộ xử lý nhanh hơn và màn hình lớn hơn.",
+      "Khách hàng kết luận cuộc trò chuyện bằng cách đồng ý mua mẫu máy nâng cao cùng với đế cắm USB-C và yêu cầu hoàn tất giao dịch."
+    ],
+    "evidence": [
+      "I work in professional video editing.",
+      "My current machine lags terribly and sometimes even crashes.",
+      "You are going to need a robust dedicated graphics card and at least thirty-two gigabytes of RAM to keep things smooth.",
+      "The second is the CreatorPro 17, which features a faster processor and a larger screen for two hundred dollars more.",
+      "Let us get this purchase completed."
+    ],
+    "topics": [
+      "Mua sắm thiết bị",
+      "Công nghệ thông tin"
+    ]
+  },
+  "LISTENING-10": {
+    "translations": [
+      "Phục vụ: Chào buổi tối, thưa ông. Ông đã sẵn sàng gọi món chưa, hay ông muốn có thêm vài phút với thực đơn?",
+      "Khách hàng: Chào buổi tối. Thực sự thì tôi nghĩ mình cần thêm một phút nữa. Có rất nhiều lựa chọn tuyệt vời. Anh có thể gợi ý một món khai vị được không?",
+      "Phục vụ: Chắc chắn rồi! Món salad củ cải đường nướng và phô mai dê với óc chó tẩm đường và nước sốt giấm balsamic rất được ưa chuộng tối nay.",
+      "Khách hàng: Nghe tuyệt quá. Tôi sẽ bắt đầu với món đó. Và cho món chính, tôi đang nghiêng về món bít tết sườn bò.",
+      "Phục vụ: Một lựa chọn tuyệt vời. Ông muốn chuẩn bị món bít tết như thế nào?",
+      "Khách hàng: Chín vừa, làm ơn. Và nó có kèm theo khoai tây nghiền không?",
+      "Phục vụ: Món này được phục vụ kèm khoai tây nghiền tỏi thảo mộc và măng tây.",
+      "Khách hàng: Tuyệt vời. Để uống, tôi rất thích một ly rượu vang Cabernet Sauvignon đậm đà của nhà hàng.",
+      "Phục vụ: Rất tốt. Một món salad củ cải đường, một bít tết chín vừa với các món ăn kèm tiêu chuẩn, và một ly rượu vang Cabernet Sauvignon. Tôi sẽ mang ra ngay cho ông."
+    ],
+    "explanations": [
+      "Khách hàng cho biết họ cần thêm một chút thời gian để xem thực đơn khi được hỏi có sẵn sàng chưa.",
+      "Nhân viên phục vụ gợi ý món salad củ cải đường nướng và phô mai dê là món khai vị rất phổ biến.",
+      "Khách hàng trả lời yêu cầu độ chín của bít tết là chín vừa.",
+      "Khách hàng hỏi xem món ăn có kèm theo khoai tây nghiền không và nhận được xác nhận từ nhân viên phục vụ.",
+      "Khách hàng gọi một ly rượu vang Cabernet Sauvignon đậm đà để uống cùng bữa ăn."
+    ],
+    "evidence": [
+      "I think I need just another minute, actually.",
+      "Our roasted beet and goat cheese salad with candied walnuts and a balsamic reduction has been very popular tonight.",
+      "Medium-rare, please.",
+      "And does it come with mashed potatoes?",
+      "To drink, I would love a glass of your robust Cabernet Sauvignon."
+    ],
+    "topics": [
+      "Nhà hàng",
+      "Gọi món ăn"
+    ]
+  },
+  "LISTENING-11": {
+    "translations": [
+      "Julian: Chào Clara, tôi nghe nói bạn có hứng thú tham gia nhóm nghiên cứu sau đại học của chúng tôi.",
+      "Clara: Vâng, hoàn toàn đúng vậy. Cố vấn của tôi gợi ý tôi nên tìm một buổi hội thảo do đồng nghiệp dẫn dắt để mài giũa phương pháp luận của mình, và danh tiếng của nhóm các bạn thì ai cũng biết.",
+      "Julian: Chà, chúng tôi rất nghiêm túc với các buổi sinh hoạt của mình. Trước khi bạn chính thức tham gia, chúng tôi thường mời các thành viên tiềm năng tham gia một quy trình đánh giá không chính thức chỉ để đảm bảo mọi người đều có chung quan điểm về khối lượng công việc.",
+      "Clara: Tôi đánh giá cao điều đó. Khối lượng bài đọc hàng tuần nặng đến mức nào? Tôi muốn đảm bảo rằng mình có thể cân bằng nó với bản thảo luận văn của mình.",
+      "Julian: Thông thường khoảng hai bài báo khoa học dày đặc hoặc một chương lý thuyết nền tảng mỗi tuần. Hơn nữa, định dạng dựa trên việc thảo luận bàn tròn phê bình các bài báo đã được lưu hành trước, vì vậy việc tham dự một cách thụ động không thực sự khả thi.",
+      "Clara: Nghe có vẻ căng thẳng, nhưng thành thật mà nói, đó chính xác là loại thúc đẩy nghiêm ngặt mà tôi cần lúc này.",
+      "Julian: Chúng tôi có nương tay một chút trong thời gian cao điểm giữa kỳ, tất nhiên rồi. Tuy nhiên, nếu một thành viên liên tục kém hiệu quả hoặc ngừng đóng góp, chúng tôi sẽ nhẹ nhàng yêu cầu họ từ chức để duy trì đà trí tuệ.",
+      "Clara: Điều đó hoàn toàn công bằng. Tôi có thể bắt đầu bằng cách nào? Tôi có nên nộp một mẫu bài viết không?",
+      "Julian: Không cần mẫu bài viết nào lúc này. Tại sao bạn không tham gia cùng chúng tôi vào thứ Năm này với tư cách là một quan sát viên?",
+      "Clara: Nghe có vẻ là một kế hoạch hay. Hãy gửi tài liệu đọc bất cứ khi nào bạn có cơ hội, và hẹn gặp lại bạn vào thứ Năm."
+    ],
+    "explanations": [
+      "Julian đề cập rằng trước khi tham gia, họ có quy trình đánh giá không chính thức để đảm bảo mọi người hiểu rõ khối lượng công việc.",
+      "Clara bày tỏ rằng đây chính xác là sự thúc đẩy nghiêm ngặt mà cô ấy cần để cân bằng với công việc.",
+      "Julian giải thích rằng định dạng của nhóm dựa trên việc thảo luận bàn tròn phê bình các bài báo đã lưu hành trước.",
+      "Julian nêu rõ rằng nếu một thành viên kém hiệu quả kinh niên, họ sẽ nhẹ nhàng yêu cầu người đó rời nhóm.",
+      "Julian đề nghị Clara tham gia buổi họp vào thứ Năm này với tư cách là quan sát viên để tự đánh giá bầu không khí."
+    ],
+    "evidence": [
+      "Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload.",
+      "That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now.",
+      "Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option.",
+      "However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum.",
+      "Why don't you join us this Thursday as an observer?"
+    ],
+    "topics": [
+      "Giáo dục sau đại học",
+      "Thảo luận học thuật"
+    ]
+  },
+  "LISTENING-12": {
+    "translations": [
+      "Bác sĩ Vance: Chào buổi sáng, cô Holloway. Mời cô ngồi. Tôi đã xem qua ghi chú giới thiệu ban đầu của cô, nhưng tôi muốn nghe về sự tiến triển các triệu chứng của cô theo chính lời cô kể.",
+      "Cô Holloway: Cảm ơn bác sĩ. Vâng, mọi thứ bắt đầu âm ỉ từ hơn sáu tháng trước với tình trạng khó chịu chung, nhưng gần đây sự mệt mỏi kéo dài và cứng khớp đã trở nên khá suy nhược, đặc biệt là vào buổi sáng.",
+      "Bác sĩ Vance: Và khi cô bị cứng khớp này, nó khu trú ở các khớp cụ thể, hay lan tỏa hơn? Ngoài ra, cô có nhận thấy bất kỳ vết sưng tấy hoặc ban đỏ nào không?",
+      "Cô Holloway: Chủ yếu ở bàn tay và đầu gối của tôi. Tôi có nhận thấy một số vết sưng nhẹ quanh các khớp ngón tay, mặc dù không có hiện tượng đỏ đáng kể nào để nói đến.",
+      "Bác sĩ Vance: Đã hiểu. Dựa trên biểu hiện lâm sàng, chúng ta cần loại trừ bệnh lý khớp viêm. Tôi sẽ chỉ định một bảng xét nghiệm máu toàn diện để kiểm tra các dấu1 viêm của cô, bên cạnh chụp MRI các khớp bị ảnh hưởng.",
+      "Cô Holloway: Tôi có nên chuẩn bị tinh thần cho một phác đồ điều trị phức tạp một khi có kết quả không?",
+      "Bác sĩ Vance: Đừng vội phỏng đoán kết quả. Khi chúng ta có dữ liệu, chúng ta sẽ điều chỉnh một kế hoạch can thiệp chính xác. Trong thời gian chờ đợi, tôi đặc biệt khuyên cô nên giữ một nhật ký triệu chứng tỉ mỉ và điều chỉnh nhịp độ các hoạt động thể chất hàng ngày."
+    ],
+    "explanations": [
+      "Bệnh nhân đến gặp bác sĩ chuyên khoa do tình trạng mệt mỏi kéo dài và cứng khớp, đặc biệt là vào buổi sáng.",
+      "Bệnh nhân chia sẻ rằng các triệu chứng bắt đầu một cách âm ỉ từ hơn sáu tháng trước.",
+      "Bác sĩ đề nghị thực hiện một bảng xét nghiệm máu toàn diện để kiểm tra các dấu hiệu viêm cùng với chụp MRI các khớp.",
+      "Bác sĩ cho biết các triệu chứng gợi ý cần phải loại trừ bệnh lý khớp viêm thông qua các xét nghiệm.",
+      "Bác sĩ khuyên bệnh nhân nên duy trì việc ghi chép nhật ký triệu chứng và phân phối hợp lý các hoạt động thể chất hàng ngày trong thời gian chờ kết quả."
+    ],
+    "evidence": [
+      "recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings.",
+      "it started subtly over six months ago with a general malaise",
+      "I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints.",
+      "Given the clinical presentation, we need to rule out an inflammatory arthropathy.",
+      "I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities."
+    ],
+    "topics": [
+      "Y tế",
+      "Khám bệnh"
+    ]
+  },
+  "READING-1": {
+    "explanations": [
+      "Bài đọc viết rằng Anna làm việc trong một văn phòng (Anna works in an office).",
+      "Bài đọc cho biết cô ấy thấy có rất ít bút và giấy trong tủ (very few pens and paper).",
+      "Bài đọc liệt kê số lượng cô ấy cần là năm cuốn vở (five notebooks).",
+      "Bài đọc nêu rõ người quản lý đã phê duyệt đơn hàng (The manager approves the order).",
+      "Bài đọc cho biết vật tư mới sẽ đến vào thứ Sáu (arrive on Friday)."
+    ],
+    "passageTypes": [
+      "story",
+      "narrative",
+      "reading comprehension"
+    ]
+  },
+  "READING-2": {
+    "explanations": [
+      "Bài đọc viết 'You can return most items within 30 days of purchase' nên bạn có 30 ngày để trả hàng.",
+      "Bài đọc viết 'You must bring your receipt' để nhận lại tiền hoàn trả đầy đủ.",
+      "Bài đọc viết 'If you do not have a receipt, we can only give you a store credit' nên bạn sẽ nhận được tín dụng cửa hàng.",
+      "Bài đọc viết 'Sale items are final and cannot be returned' nên không thể trả các mặt hàng giảm giá.",
+      "Bài đọc viết 'The item must be in good condition and in its original box' nên sản phẩm phải ở trong hộp ban đầu."
+    ],
+    "passageTypes": [
+      "notice",
+      "store policy",
+      "sign"
+    ]
+  },
+  "READING-3": {
+    "explanations": [
+      "Khách hàng muốn đặt tour thành phố, được trích dẫn từ câu 'I want to book a city tour for tomorrow.'",
+      "Tour xe buýt cổ điển bắt đầu lúc 10 giờ sáng và 2 giờ chiều, theo câu 'Our classic bus tour starts at 10:00 AM and 2:00 PM.'",
+      "Tour kéo dài hai tiếng, dựa trên thông tin 'It takes two hours'.",
+      "Giá tour là 25 euro mỗi người, theo câu 'costs 25 euros per person.'",
+      "Khách hàng có thể thanh toán bằng thẻ tín dụng, xác nhận qua câu 'Can I pay with a credit card? Of course.'"
+    ],
+    "passageTypes": [
+      "dialogue",
+      "conversation",
+      "service encounter"
+    ]
+  },
+  "READING-4": {
+    "explanations": [
+      "Đoạn văn nêu rõ sinh viên có thể mượn sách bằng thẻ sinh viên của mình (All current students can borrow books using their student ID card).",
+      "Bài đọc chỉ rõ mỗi sinh viên có thể mượn tối đa năm cuốn sách cùng một lúc (Each student can borrow up to five books at one time).",
+      "Thời gian mượn tiêu chuẩn được đề cập là ba tuần (The standard borrowing period is three weeks).",
+      "Văn bản hướng dẫn bạn có thể gia hạn trực tuyến trước ngày đến hạn nếu cần mượn lâu hơn (you can renew it online before the due date).",
+      "Bạn cần trả sách đúng hạn để tránh phải trả phí quá hạn như bài viết đã lưu ý (Please return all borrowed books on time to avoid paying late fees)."
+    ],
+    "passageTypes": [
+      "notice",
+      "library guide",
+      "announcement"
+    ]
+  },
+  "READING-5": {
+    "explanations": [
+      "Bài đọc viết rằng Maria đi siêu thị vào mỗi sáng thứ Bảy: Every Saturday morning, Maria goes to the supermarket.",
+      "Đoạn văn nêu rõ cô ấy lấy xe đẩy hàng ở lối vào: she gets a shopping cart near the entrance.",
+      "Cô ấy chọn táo, bông cải xanh và chuối ở lối đi bán sản phẩm tươi: fresh produce aisle to pick out red apples, green broccoli, and ripe bananas.",
+      "Maria luôn kiểm tra danh sách để không quên đồ: Maria always checks her shopping list so she does not forget anything.",
+      "Cô ấy thanh toán bằng thẻ tín dụng: pays for her groceries with a credit card."
+    ],
+    "passageTypes": [
+      "narrative",
+      "short story",
+      "reading comprehension"
+    ]
+  },
+  "READING-6": {
+    "explanations": [
+      "Theo đoạn văn, bước đầu tiên là cắm sạc và bật laptop: 'connect the laptop to the power charger and turn it on'.",
+      "Đoạn văn hướng dẫn kết nối với mạng Wi-Fi bảo mật của văn phòng: 'connect to the secure office Wi-Fi network'.",
+      "Bạn cần nhập mật khẩu nhân viên để đăng nhập: 'enter your employee password to log in'.",
+      "Bạn kiểm tra email công ty qua trình duyệt web: 'open the web browser and check your corporate email'.",
+      "Nếu gặp sự cố, bạn hãy gọi bộ phận hỗ trợ IT: 'call the IT support department for help'."
+    ],
+    "passageTypes": [
+      "instruction",
+      "guide",
+      "workplace notice"
+    ]
+  },
+  "READING-7": {
+    "explanations": [
+      "Sarah mang theo bánh quy tự làm để tạo ấn tượng tốt: \"Sarah brought in some homemade biscuits, which immediately made her popular\".",
+      "David là quản lý văn phòng tổ chức cuộc họp: \"our manager, David, organized a short morning meeting\".",
+      "Đồng nghiệp đưa Sarah ra quán cà phê vào giờ ăn trưa: \"During lunch, a few of us invited her to the local cafe\".",
+      "Sarah cảm thấy hơi lo lắng vào lúc đầu: \"Sarah mentioned that she was a bit nervous at first\".",
+      "Ý chính là tầm quan trọng của việc chào đón đồng nghiệp mới: \"Welcoming a new colleague properly makes a huge difference\"."
+    ],
+    "passageTypes": [
+      "narrative",
+      "story",
+      "anecdote"
+    ]
+  },
+  "READING-8": {
+    "explanations": [
+      "David đến cửa hàng để mua máy ảnh cho chuyến đi Ý ('I need a camera for my upcoming vacation to Italy').",
+      "David tự nhận mình không rành về công nghệ ('I am not very tech-savvy').",
+      "Mẫu máy thứ hai có ưu điểm là ống kính zoom tốt hơn và thời lượng pin dài hơn ('it has a much better zoom lens and a longer battery life').",
+      "David chọn mẫu máy nhẹ có chế độ tự động ('the lightweight model with the automatic mode is the best choice').",
+      "Mark tặng kèm một chiếc vỏ bảo vệ miễn phí ('includes a free protective case with the purchase')."
+    ],
+    "passageTypes": [
+      "dialogue",
+      "story",
+      "customer service"
+    ]
+  },
+  "READING-9": {
+    "explanations": [
+      "Đoạn văn nêu rõ host thường hỏi bạn có đặt bàn trước không: 'ask if you have a reservation'.",
+      "Bài đọc khuyên bạn nên hỏi nhân viên nếu không chắc chắn về nguyên liệu: 'ask your server for clarification'.",
+      "Cụm từ lịch sự được gợi ý khi gọi món là: 'Could I please get the...'.",
+      "Cách yêu cầu thanh toán được đề cập là: 'Could we have the check, please?'.",
+      "Về việc tiền boa, đoạn văn viết: 'typically ranging from fifteen to twenty percent'."
+    ],
+    "passageTypes": [
+      "article",
+      "educational guide",
+      "informative text"
+    ]
+  },
+  "READING-10": {
+    "explanations": [
+      "Bài đọc đề cập rằng việc học nhóm mang lại lợi ích là giúp chia sẻ khối lượng công việc và cung cấp các góc nhìn khác nhau.",
+      "Theo đoạn văn, việc giảng dạy lại các khái niệm cho nhau giúp cải thiện khả năng ghi nhớ kiến thức.",
+      "Các buổi họp định kỳ tạo ra tinh thần trách nhiệm, giúp giảm thiểu sự trì hoãn.",
+      "Tác giả nhấn mạnh rằng một nhóm học tập cần phải có sự tổ chức rõ ràng để thực sự hiệu quả.",
+      "Nhóm học tập quản lý tốt giúp phát triển kỹ năng giao tiếp và làm việc nhóm có giá trị."
+    ],
+    "passageTypes": [
+      "article",
+      "educational essay",
+      "advice column"
+    ]
+  },
+  "READING-11": {
+    "explanations": [
+      "Đoạn văn mở đầu đề cập rằng buổi thăm khám y tế hiện đại ngày càng bị giới hạn bởi thời gian (constrained by time).",
+      "Bài đọc chỉ ra sự căng thẳng giữa trải nghiệm bệnh tật toàn diện của bệnh nhân và sự quy giản y sinh học (biomedical reductionism).",
+      "Từ 'pathognomonic' được dùng trong ngữ cảnh chẩn đoán các chỉ báo đặc trưng của bệnh (characteristically indicative of a disease).",
+      "Đoạn văn nêu rõ việc tích hợp hồ sơ sức khỏe điện tử đôi khi làm chuyển hướng ánh nhìn của bác sĩ khỏi bệnh nhân sang màn hình.",
+      "Phần cuối văn bản gợi ý bệnh nhân hiện đại phải đóng vai trò là người advocate hiệu quả bằng cách sắp xếp các triệu chứng trước khi hẹn."
+    ],
+    "passageTypes": [
+      "academic article",
+      "essay",
+      "medical commentary"
+    ]
+  },
+  "READING-12": {
+    "explanations": [
+      "Bài đọc nêu rõ stand-up được thiết kế nhằm thúc đẩy sự đồng thuận, minh bạch và loại bỏ trở ngại nhanh chóng.",
+      "Khi quy mô tổ chức mở rộng, các buổi họp này thường biến thành báo cáo tiến độ kéo dài hướng tới quản lý.",
+      "Tác giả đề nghị người tham gia tập trung hoàn toàn vào các cam kết hướng tới mục tiêu sprint thay vì kể lể công việc hôm qua.",
+      "Khi phát hiện trở ngại gây tranh cãi kiến trúc sâu, một nhóm nhỏ nên tách ra họp riêng.",
+      "Đoạn văn mang tính chất phân tích các sai lầm phổ biến và đưa ra khuyến nghị để tối ưu hóa."
+    ],
+    "passageTypes": [
+      "article",
+      "opinion piece",
+      "professional commentary"
+    ]
+  },
+  "WRITING-1": {
+    "promptVi": "Viết một tin nhắn ngắn (30-50 từ) bằng tiếng Anh gửi cho công ty du lịch để đặt tour thành phố vào sáng mai.",
+    "requirements": [
+      "State the desire to book a city tour",
+      "Specify the time as tomorrow morning",
+      "Ask about the price of the tour",
+      "Provide contact information or ask how to pay"
+    ],
+    "sampleResponse": "Hello, I want to book a city tour for tomorrow morning. Can you tell me the price? My name is Anna and my phone number is 555-1234. Please let me know how to pay. Thank you!"
+  },
+  "WRITING-2": {
+    "promptVi": "Hãy viết một tin nhắn ngắn gửi thư viện trường đại học từ 30 đến 50 từ. Hãy hỏi xem bạn có thể mượn hai cuốn sách thêm một tuần nữa không, đồng thời cung cấp tên và mã số sinh viên của bạn.",
+    "requirements": [
+      "Ask to borrow two books for an extra week",
+      "Provide your name",
+      "Provide your student ID"
+    ],
+    "sampleResponse": "Dear Library, can I please borrow my two books for an extra week? I am very busy with my exams now. My name is Anna Smith and my student ID is ST12345. Thank you very much for your help!"
+  },
+  "WRITING-3": {
+    "promptVi": "Viết một tin nhắn ngắn từ 30 đến 50 từ cho bạn của bạn về những món đồ bạn đang mua ở siêu thị hôm nay.",
+    "requirements": [
+      "Greet your friend",
+      "Mention two things you are buying",
+      "Say when you will go home"
+    ],
+    "sampleResponse": "Hi Nam! I am at the supermarket now. I am buying some apples and milk for our dinner. I need fresh fruit and cold drinks. See you at home at five o'clock!"
+  },
+  "WRITING-4": {
+    "promptVi": "Viết một email dài từ 50 đến 80 từ gửi cho đồng nghiệp hỗ trợ IT để nhờ giúp cài đặt máy tính xách tay mới của bạn.",
+    "requirements": [
+      "Say hello and mention you got a new work laptop",
+      "Ask for help setting it up",
+      "Suggest a time to meet today or tomorrow"
+    ],
+    "sampleResponse": "Hi Mark, I got my new work laptop today, but I need some help setting it up. Can you please help me install the office software and connect to the printer? Are you free to meet this afternoon or tomorrow morning? Let me know what time is best for you. Thanks, Anna."
+  },
+  "WRITING-5": {
+    "promptVi": "Viết một email ngắn bằng tiếng Anh (50-80 từ) để chào mừng đồng nghiệp mới là Alex. Hãy chào hỏi, đề nghị giúp đỡ họ làm quen với công việc và mời họ đi uống cà phê.",
+    "requirements": [
+      "Say hello to Alex",
+      "Offer to help them settle in",
+      "Invite them for coffee"
+    ],
+    "sampleResponse": "Dear Alex, Welcome to our team! I am very happy to work with you. Please let me know if you need any help to settle in or find things around the office. Would you like to grab a cup of coffee together this afternoon? Let me know what time works for you. Best regards, Sam"
+  },
+  "WRITING-6": {
+    "promptVi": "Viết một email bằng tiếng Anh (50-80 từ) gửi cho khách hàng đã nhờ bạn tư vấn chọn điện thoại mới. Hãy đề xuất một chiếc điện thoại và đưa ra hai lý do tại sao nó phù hợp với họ.",
+    "requirements": [
+      "Greet the customer politely",
+      "Recommend one specific phone model",
+      "Give two clear reasons why this phone is good for them",
+      "Sign off with a polite closing"
+    ],
+    "sampleResponse": "Dear Anna, Thank you for asking for my help. I recommend the Samsung Galaxy A54. First, it has a great camera for taking clear photos. Second, the battery lasts all day, so you do not need to charge it often. It is also a very good price for you. Best wishes, John."
+  },
+  "WRITING-7": {
+    "promptVi": "Viết email từ 100 đến 130 từ cho một nhà hàng địa phương để đặt đồ ăn cho một buổi tiệc nhỏ bốn người. Đề bài yêu cầu bạn nêu rõ các món ăn muốn đặt, thời gian đến lấy hàng và hỏi về các món ăn chay có sẵn.",
+    "requirements": [
+      "Mention the specific dishes you want to order for four people",
+      "State the exact time you would like to pick up the order",
+      "Ask about available vegetarian options",
+      "Keep the length between 100 and 130 words"
+    ],
+    "sampleResponse": "Dear Manager, I am writing to order some food for a small party of four people this Friday evening. We would like to order two large chicken pizzas, one large plate of spaghetti, and four portions of garlic bread. Could you please prepare this order for us to pick up at 6:30 PM? Also, I would like to know if you have any vegetarian options available, as one of my friends does not eat meat. Could you please recommend a vegetarian dish or salad that we can add to our order? Please let me know the total price and if you need any deposit in advance. Thank you very much, and I look forward to hearing from you soon. Best regards, Nam."
+  },
+  "WRITING-8": {
+    "promptVi": "Viết email từ 100 đến 130 từ cho một bạn học cùng lớp để hỏi về việc tham gia nhóm học ôn thi sắp tới của các bạn ấy.",
+    "requirements": [
+      "Greet your classmate and mention the upcoming exams.",
+      "Ask if you can join their study group.",
+      "Ask when and where the group usually meets.",
+      "Thank your classmate and ask for a reply soon."
+    ],
+    "sampleResponse": "Dear Mark, I hope you are doing well. As you know, the final exams are coming up soon and I am a bit nervous about them. I heard that you are organizing a study group with some other classmates. I was wondering if it would be possible for me to join your group to prepare for the tests together. Could you please let me know when and where you usually meet to study? I am very hardworking and I am sure I can contribute to the group discussions. Thank you very much for your help. I look forward to hearing from you soon. Best wishes, Anna"
+  },
+  "WRITING-9": {
+    "promptVi": "Viết một bài luận từ 150-180 từ bày tỏ quan điểm của bạn về việc nên khám bệnh trực tuyến hay trực tiếp, có đưa ra lý do và ví dụ minh họa.",
+    "requirements": [
+      "State your clear opinion on online versus in-person doctor consultations",
+      "Provide at least one major advantage and one limitation of online consultations",
+      "Provide at least one major benefit of visiting a doctor in person",
+      "Include a relevant personal example or general scenario to support your view"
+    ],
+    "sampleResponse": "In today's digital age, healthcare is also evolving, leading to a debate on whether online or in-person doctor visits are better. In my opinion, while online consultations are convenient for minor issues, seeing a doctor in person remains essential for accurate diagnoses. On the one hand, online medical services save time and are ideal for quick advice or prescription renewals. For instance, last month, I consulted a physician online for a mild rash, which avoided a long trip to the clinic. However, video calls cannot replace physical examinations. Doctors cannot check vital signs accurately or perform necessary tests like blood pressure checks or physical palpations through a screen. Furthermore, serious symptoms require the hands-on expertise that only a traditional clinic can provide. In conclusion, although online doctors offer great convenience, in-person visits are still superior and necessary for ensuring comprehensive and safe healthcare."
+  },
+  "WRITING-10": {
+    "promptVi": "Viết một bài luận nêu quan điểm dài 150-180 từ thảo luận về việc liệu các cuộc họp stand-up hàng ngày của nhóm phần mềm có hiệu quả hay là lãng phí thời gian phát triển quý giá.",
+    "requirements": [
+      "State a clear opinion on whether stand-up meetings are productive or a waste of time",
+      "Explain the main benefit of daily stand-ups, such as improving team communication",
+      "Discuss a potential drawback, such as disrupting deep work or focusing on trivial updates",
+      "Conclude with a recommendation on how to make these meetings more efficient"
+    ],
+    "sampleResponse": "In my opinion, daily software team stand-up meetings are mostly productive if they are kept short and focused. On the one hand, these brief sync-ups significantly improve team communication and alignment. By sharing what everyone accomplished yesterday and the plan for today, developers can quickly identify blockers and collaborate to solve them before they escalate. This transparency fosters a strong sense of teamwork and keeps projects moving forward. On the other hand, stand-ups can easily become a waste of valuable development time if they turn into lengthy technical discussions or status reports for management. When meetings drag on, they disrupt the deep focus required for coding. To maximize their value, teams should strictly limit these sessions to fifteen minutes and encourage members to take complex issues offline. In conclusion, while poorly managed stand-ups hinder productivity, well-structured ones are an essential tool for modern software development teams."
+  },
+  "WRITING-11": {
+    "promptVi": "Viết một bản đề xuất (proposal) dài từ 200–250 từ gửi cho quản lý văn phòng nhằm phác thảo chiến lược mới, tiết kiệm chi phí hơn trong việc đặt mua văn phòng phẩm. Bạn cần phân tích những điểm bất cập hiện tại, đề xuất một nhà cung cấp đáng tin cậy và giải thích chiến lược này sẽ mang lại lợi ích gì cho ngân sách công ty.",
+    "requirements": [
+      "Analyze current inefficiencies in office supply procurement",
+      "Suggest a reliable alternative vendor",
+      "Explain the financial benefits for the company budget"
+    ],
+    "sampleResponse": "To: Office Manager\nFrom: Senior Administrative Assistant\nDate: October 24, 2023\nSubject: Proposal for Cost-Effective Office Supply Procurement\n\nI am writing to propose a revised strategy for ordering office supplies that addresses our current inefficiencies and optimizes expenditures. Presently, our procurement process is decentralized, leading to frequent emergency orders at inflated prices and a lack of inventory tracking, which results in unnecessary duplicate purchases.\n\nTo resolve this, I recommend transitioning to OfficePro Solutions as our primary vendor. They offer bulk-order discounts, a user-friendly centralized ordering platform, and guaranteed next-day delivery, which will eliminate the need for costly last-minute rushes.\n\nAdopting this partnership will yield immediate advantages for the company budget. By consolidating our orders and leveraging volume discounts, we project a reduction in overall supply expenditure of approximately 22% annually. Furthermore, the centralized tracking system will ensure greater accountability and prevent inventory waste. Implementing this streamlined approach requires minimal transition time and promises a rapid return on investment. I welcome the opportunity to discuss this further at your earliest convenience."
+  },
+  "WRITING-12": {
+    "promptVi": "Viết một bản đề xuất (proposal) gửi ban quản lý từ 200–250 từ nhằm giải thích sự cần thiết phải sửa đổi chính sách hoàn tiền cho khách hàng hiện tại nhằm nâng cao tỷ lệ giữ chân khách hàng và phù hợp với các tiêu chuẩn ngành hiện đại.",
+    "requirements": [
+      "Analyze the limitations of the current refund policy and how it negatively affects client retention.",
+      "Propose specific modifications to align with modern industry standards and competitor benchmarks.",
+      "Outline the expected long-term financial and reputational benefits for the company."
+    ],
+    "sampleResponse": "Proposal to Management: Revisions to the Customer Refund Policy. As market dynamics evolve, retaining our client base has become increasingly challenging under our current refund framework. This proposal outlines the urgent need to revise our archaic refund policy to better align with contemporary industry standards and enhance overall client retention. Presently, our rigid refund terms frequently alienate dissatisfied customers, driving them directly toward competitors who offer more flexible and customer-centric guarantees. By modernizing our policy—specifically by introducing a 30-no-questions-asked refund window and streamlined digital processing—we can significantly mitigate customer friction and rebuild trust. Industry benchmarks clearly indicate that companies adopting flexible return policies experience a measurable boost in repeat business and brand loyalty. Implementing these changes will require a minor adjustment to our short-term operational workflow; however, the long-term benefits are substantial. Improved client satisfaction will directly translate into higher lifetime value, reduced customer churn, and positive word-of-mouth marketing. Furthermore, a progressive refund structure positions our brand as a trustworthy market leader committed to consumer satisfaction. Therefore, I strongly urge the management team to approve this proposed policy revision to secure our competitive edge and foster sustainable business growth in the coming quarters."
+  }
+}

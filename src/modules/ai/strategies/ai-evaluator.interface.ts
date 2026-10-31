@@ -525,6 +525,8 @@ export interface ContextualGrammarCandidate {
   options: string[];
   correctIndex: number;
   explanation: string;
+  /** Why each wrong option is wrong, aligned with options ("" at the key). */
+  optionExplanations?: string[];
 }
 
 export interface ContextualGrammarSuggestion {
@@ -631,7 +633,10 @@ export interface ContextualListeningQuestionCandidate {
   prompt: string;
   options: string[];
   correctIndex: number;
+  /** Vietnamese. */
   explanation: string;
+  /** The same explanation in English (owner 2026-10-30: bilingual). */
+  explanationEn?: string;
 }
 
 export interface ContextualListeningQuestionsSuggestion {

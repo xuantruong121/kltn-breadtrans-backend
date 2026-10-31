@@ -1,4 +1,8 @@
 import {
+  mergeListeningContent,
+  spokenTextChanged,
+} from './listening-question-merge';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -9,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
+  type LearningContentType,
+  type LearningTrack,
   Prisma,
   QuizPublicationStatus,
   QuizType,
@@ -33,6 +39,15 @@ import { SPEAKING_SET_LEVELS } from '../speaking/speaking-contract';
 import { SpeakingCategoryService } from './speaking-category.service';
 import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
 import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
+import { SpeakingService } from '../speaking/speaking.service';
+import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
+import {
+  filterQuizList,
+  filterSpeakingSets,
+  quizListFacets,
+  speakingSetFacets,
+} from './skill-cms-list';
+import { UploadService } from '../upload/upload.service';
 
 type Domain = 'listening' | 'reading' | 'writing' | 'speaking';
 type Admin = { id: number; role: Role };
@@ -69,6 +84,10 @@ export class SkillCmsService {
     private readonly quizService?: QuizService,
     @Optional()
     private readonly speakingCategoryService?: SpeakingCategoryService,
+    @Optional()
+    private readonly speakingService?: SpeakingService,
+    @Optional()
+    private readonly uploadService?: UploadService,
   ) {}
 
   private admin(user: Admin) {
@@ -144,31 +163,132 @@ export class SkillCmsService {
     );
   }
 
-  async list(rawDomain: string, user: Admin) {
+  /**
+   * The domain's items. Without `query.page` the full array (editors and
+   * composers need it); with it one page plus header counts, filtered and
+   * sorted on the server (see skill-cms-list.ts).
+   */
+  async list(rawDomain: string, user: Admin, query: ListQuery = {}) {
     this.admin(user);
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
-      return this.prisma.speakingPracticeSet.findMany({
-        where: { scope: 'SKILL_PRACTICE' },
-        orderBy: { updatedAt: 'desc' },
-        include: {
-          exercises: {
-            orderBy: [{ order: 'asc' }, { id: 'asc' }],
-            include: {
-              categoryTaxonomy: true,
-              stimulus: true,
-              _count: { select: { submissions: true } },
-            },
+      const include = {
+        exercises: {
+          orderBy: [{ order: 'asc' as const }, { id: 'asc' as const }],
+          include: {
+            categoryTaxonomy: true,
+            stimulus: true,
+            _count: { select: { submissions: true } },
           },
-          categoryTaxonomy: true,
         },
+        categoryTaxonomy: true,
+      };
+      if (!wantsPage(query))
+        return this.prisma.speakingPracticeSet.findMany({
+          where: { scope: 'SKILL_PRACTICE' },
+          orderBy: { updatedAt: 'desc' },
+          include,
+        });
+      const speakingTracks = await this.tracksByContent('SPEAKING_SET');
+      // Light rows decide the page; exercises load for that page only.
+      const rows = (
+        await this.prisma.speakingPracticeSet.findMany({
+          where: { scope: 'SKILL_PRACTICE' },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            category: true,
+            level: true,
+            publicationStatus: true,
+            updatedAt: true,
+            exercises: {
+              orderBy: [{ order: 'asc' }, { id: 'asc' }],
+              take: 1,
+              select: { id: true },
+            },
+            _count: { select: { exercises: true } },
+          },
+        })
+      ).map(({ _count, exercises, ...row }) => ({
+        ...row,
+        exerciseCount: _count.exercises,
+        tracks: speakingTracks.get(exercises[0]?.id) ?? [],
+      }));
+      const page = pageOf(filterSpeakingSets(rows, query), query, 12);
+      const full = await this.prisma.speakingPracticeSet.findMany({
+        where: { id: { in: page.items.map((row) => row.id) } },
+        include,
       });
+      const byId = new Map(full.map((set) => [set.id, set]));
+      return {
+        ...page,
+        items: page.items
+          .map((row) => {
+            const set = byId.get(row.id);
+            return set ? { ...set, tracks: row.tracks } : null;
+          })
+          .filter(Boolean),
+        facets: speakingSetFacets(rows),
+      };
     }
-    return this.prisma.quiz.findMany({
+    const quizzes = await this.prisma.quiz.findMany({
       where: this.contentTypeWhere(domain),
       orderBy: { id: 'desc' },
-      include: { _count: { select: { questions: true, submissions: true } } },
+      include: {
+        _count: { select: { questions: true, submissions: true } },
+        // The list card shows the newest recording's state; whether it still
+        // matches the transcript is decided in the editor.
+        ...(domain === 'listening'
+          ? {
+              listeningAudioArtifacts: {
+                orderBy: { version: 'desc' as const },
+                take: 1,
+                select: { version: true, status: true, durationMs: true },
+              },
+            }
+          : {}),
+      },
     });
+    const quizTracks = wantsPage(query)
+      ? await this.tracksByContent('QUIZ')
+      : new Map<number, LearningTrack[]>();
+    const tagged = quizzes.map((quiz) => ({
+      ...quiz,
+      tracks: quizTracks.get(quiz.id) ?? [],
+    }));
+    if (domain !== 'listening' || !quizzes.length)
+      return this.listPage(tagged, query);
+    // Comprehension and dictation play one clip per question: count them.
+    const withAudio = await this.prisma.question.groupBy({
+      by: ['quizId'],
+      where: {
+        quizId: { in: quizzes.map((quiz) => quiz.id) },
+        audioAssets: { some: { isActive: true } },
+      },
+      _count: { _all: true },
+    });
+    const counts = new Map(
+      withAudio.map((row) => [row.quizId, row._count._all]),
+    );
+    return this.listPage(
+      tagged.map((quiz) => ({
+        ...quiz,
+        questionsWithAudio: counts.get(quiz.id) ?? 0,
+      })),
+      query,
+    );
+  }
+
+  private listPage<T extends Parameters<typeof filterQuizList>[0][number]>(
+    rows: T[],
+    query: ListQuery,
+  ) {
+    if (!wantsPage(query)) return rows;
+    return {
+      ...pageOf(filterQuizList(rows, query), query),
+      facets: quizListFacets(rows),
+    };
   }
 
   async get(
@@ -193,7 +313,11 @@ export class SkillCmsService {
       if (!set) throw new NotFoundException('Speaking practice set not found');
       if (set.scope === 'EXAM_INTERNAL' && !allowExamInternal)
         throw new NotFoundException('Speaking practice set not found');
-      return set;
+      const key = set.exercises[0]?.id;
+      return {
+        ...set,
+        tracks: key ? await this.tracksOf('SPEAKING_SET', key) : [],
+      };
     }
     const id = this.id(rawId);
     const quiz = await this.prisma.quiz.findFirst({
@@ -210,7 +334,67 @@ export class SkillCmsService {
       },
     });
     if (!quiz) throw new NotFoundException('Skill content not found');
-    return { ...quiz, passage: quiz.theoryContent };
+    return {
+      ...quiz,
+      passage: quiz.theoryContent,
+      tracks: await this.tracksOf('QUIZ', quiz.id),
+    };
+  }
+
+  private async tracksByContent(contentType: LearningContentType) {
+    const tags =
+      (await this.prisma.contentTrackTag?.findMany({
+        where: { contentType },
+        select: { contentId: true, track: true },
+      })) ?? [];
+    const byContent = new Map<number, LearningTrack[]>();
+    for (const { contentId, track } of tags)
+      byContent.set(contentId, [...(byContent.get(contentId) ?? []), track]);
+    return byContent;
+  }
+
+  private async tracksOf(contentType: LearningContentType, contentId: number) {
+    const tags =
+      (await this.prisma.contentTrackTag?.findMany({
+        where: { contentType, contentId },
+        select: { track: true },
+      })) ?? [];
+    return tags.map((tag) => tag.track);
+  }
+
+  /**
+   * Replaces an item's career tracks. Recommendations read a quiz by its id
+   * and a speaking set by its first exercise (learning-path.catalog.ts).
+   */
+  async setTracks(
+    rawDomain: string,
+    rawId: string,
+    tracks: LearningTrack[],
+    user: Admin,
+  ) {
+    const item = await this.get(rawDomain, rawId, user);
+    const isSet = this.domain(rawDomain) === 'speaking';
+    const contentType: LearningContentType = isSet ? 'SPEAKING_SET' : 'QUIZ';
+    const contentId = isSet
+      ? (item as { exercises: Array<{ id: number }> }).exercises[0]?.id
+      : (item as { id: number }).id;
+    if (!contentId)
+      throw new BadRequestException('Bộ luyện chưa có bài để gắn ngành');
+    await this.prisma.$transaction([
+      this.prisma.contentTrackTag.deleteMany({
+        where: { contentType, contentId, track: { notIn: tracks } },
+      }),
+      this.prisma.contentTrackTag.createMany({
+        data: tracks.map((track) => ({
+          contentType,
+          contentId,
+          track,
+          createdById: user.id,
+        })),
+        skipDuplicates: true,
+      }),
+    ]);
+    return { tracks: await this.tracksOf(contentType, contentId) };
   }
 
   async create(rawDomain: string, dto: SkillContentDto, user: Admin) {
@@ -435,14 +619,29 @@ export class SkillCmsService {
         'Question does not belong to Listening content',
       );
     await this.assertNoHistory(quizId);
-    return this.prisma.question.update({
+    // Same type: merge, so fields the form does not show survive the edit.
+    const content =
+      dto.type === question.type
+        ? mergeListeningContent(
+            question.content,
+            dto.content as unknown as Record<string, unknown>,
+          )
+        : dto.content;
+    const updated = await this.prisma.question.update({
       where: { id: questionId },
       data: {
         type: dto.type,
-        content: asJson(dto.content),
+        content: asJson(content),
         order: dto.order,
       },
     });
+    // A clip that reads the old sentence is retired; the CMS asks for a new one.
+    if (spokenTextChanged(question.content, content))
+      await this.prisma.quizAudioAsset.updateMany({
+        where: { questionId, isActive: true },
+        data: { isActive: false },
+      });
+    return updated;
   }
 
   async updateWritingQuestion(
@@ -624,7 +823,15 @@ export class SkillCmsService {
         category?.code || exercise.practiceSet?.category || exercise.category,
       difficulty: dto.difficulty,
       imageUrl: dto.imageUrl,
-      audioUrl: dto.audioUrl,
+      // A new sample sentence retires the clip that reads the old one; the
+      // CMS then offers to make a new reference audio.
+      audioUrl:
+        dto.audioUrl !== undefined
+          ? dto.audioUrl
+          : dto.targetText !== undefined &&
+              dto.targetText.trim() !== (exercise.targetText ?? '').trim()
+            ? null
+            : undefined,
       isPremiumContent: dto.isPremiumContent,
       taskType,
       stimulusId: dto.stimulusId === null ? null : stimulus?.id,
@@ -635,6 +842,57 @@ export class SkillCmsService {
     return this.prisma.speakingExercise.update({
       where: { id: exerciseId },
       data,
+    });
+  }
+
+  /**
+   * Reads the sample sentence with Azure TTS and makes it the exercise's
+   * reference audio. A new key per run, so no cache serves the old clip.
+   */
+  async generateSpeakingReferenceAudio(
+    rawSetId: string,
+    rawExerciseId: string,
+    user: Admin,
+  ) {
+    this.admin(user);
+    if (!this.speakingService || !this.uploadService)
+      throw new ServiceUnavailableException('Speaking audio is unavailable');
+    const exerciseId = this.id(rawExerciseId);
+    const exercise = await this.prisma.speakingExercise.findFirst({
+      where: { id: exerciseId, practiceSetId: rawSetId },
+    });
+    if (!exercise) throw new NotFoundException('Speaking exercise not found');
+    const text = exercise.targetText.trim();
+    if (!text) throw new BadRequestException('Câu luyện chưa có câu mẫu.');
+    if (
+      exercise.isPremiumContent &&
+      !this.uploadService.isPrivateStorageConfigured()
+    )
+      throw new ServiceUnavailableException(
+        'Protected Speaking media storage is not configured',
+      );
+    const audio = await this.speakingService.generateTts(text, 'US', 1);
+    const file = `${exerciseId}.r${Date.now()}.mp3`;
+    let audioUrl: string;
+    if (exercise.isPremiumContent) {
+      audioUrl = `premium/speaking/reference/${file}`;
+      await this.uploadService.putPrivateObjectAtKey(
+        audioUrl,
+        audio,
+        'audio/mpeg',
+      );
+    } else {
+      audioUrl = (
+        await this.uploadService.putObjectAtKey(
+          `catalog/speaking/reference/${file}`,
+          audio,
+          'audio/mpeg',
+        )
+      ).url;
+    }
+    return this.prisma.speakingExercise.update({
+      where: { id: exerciseId },
+      data: { audioUrl },
     });
   }
 
@@ -870,7 +1128,11 @@ export class SkillCmsService {
       id: number;
       type?: QuizType;
       title?: string;
-      questions: Array<{ type: string; content: unknown }>;
+      questions: Array<{
+        type: string;
+        content: unknown;
+        audioAssets?: Array<{ isActive: boolean }>;
+      }>;
     };
     const errors: string[] = [];
     if (!quiz.title?.trim()) errors.push('Thiếu tiêu đề');
@@ -971,6 +1233,28 @@ export class SkillCmsService {
         errors.push(
           `Câu ${index + 1}: Dialogue cần ít nhất 2 lượt lời hợp lệ của 2 người nói`,
         );
+    }
+    // A learner hears either the question's own clip or, for questions that
+    // share the conversation, the quiz's published recording.
+    if (domain === 'listening' && quiz.questions.length) {
+      const recording = this.listeningAudioAuthoring
+        ? await this.listeningAudioAuthoring.getCurrentPublishedArtifact(
+            quiz.id,
+          )
+        : null;
+      for (const [index, question] of quiz.questions.entries()) {
+        const content = asRecord(question.content);
+        const ownClip = (question.audioAssets ?? []).some(
+          (asset) => asset.isActive,
+        );
+        const sharesRecording =
+          Boolean(recording) &&
+          (typeof content.targetTurnId === 'string' ||
+            (Array.isArray(content.transcriptSegments) &&
+              content.transcriptSegments.length > 0));
+        if (!ownClip && !sharesRecording)
+          errors.push(`Câu ${index + 1}: chưa có audio cho học viên`);
+      }
     }
     return { valid: errors.length === 0, errors, domain, quizId: quiz.id };
   }
@@ -1161,7 +1445,8 @@ export class SkillCmsService {
   ) {
     this.admin(user);
     await this.assertListeningQuestion(quizId, questionId);
-    await this.assertNoHistory(quizId);
+    // Re-recording the same sentence changes no answer or score, so it is
+    // allowed after learners have taken the quiz.
     return this.requireListeningAuthoring().quiz.generateDialogueAudioAsset(
       questionId,
     );

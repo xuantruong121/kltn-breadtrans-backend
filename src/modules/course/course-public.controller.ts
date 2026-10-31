@@ -9,9 +9,11 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CourseService } from './course.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { CoursesEnabledGuard } from '../../common/guards/courses-enabled.guard';
 
 @ApiTags('public-courses')
 @Controller('public/courses')
+@UseGuards(CoursesEnabledGuard)
 export class CoursePublicController {
   constructor(private readonly courseService: CourseService) {}
 

@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-10-31T03:49:05.618Z",
+  "calls": 5,
+  "voiceRegistryVersion": "2026-09-21.v1",
+  "clips": [
+    {
+      "id": 137,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-v2\\137.v2.mp3",
+      "key": "catalog/speaking/reference/137.v2.mp3",
+      "voice": "en-us-male-01",
+      "durationMs": 5796,
+      "bytes": 92736,
+      "audioSha256": "168d053fcf6b837ba4cb377f821fb400c54b1aff0d359e667f48372826a7ee69",
+      "textSha256": "b2aec90cc0c2de02532ab586500b07162c61ebcf413d727f04b52f297671121d"
+    },
+    {
+      "id": 138,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-v2\\138.v2.mp3",
+      "key": "catalog/speaking/reference/138.v2.mp3",
+      "voice": "en-us-female-01",
+      "durationMs": 5544,
+      "bytes": 88704,
+      "audioSha256": "5898f9b422c1e984f8066cf5695a2bbae3b855b134b9f5b598a195213795c134",
+      "textSha256": "5df5130d8a31683bd8ff495592bf609da9e688344e98bb8a04aa98d01fb39d56"
+    },
+    {
+      "id": 139,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-v2\\139.v2.mp3",
+      "key": "catalog/speaking/reference/139.v2.mp3",
+      "voice": "en-us-male-01",
+      "durationMs": 5472,
+      "bytes": 87552,
+      "audioSha256": "0764873c893877e835be2cd255b1d588100118b6f48e6a0ce8edaa42b61683b7",
+      "textSha256": "1134f6a7fd2272489c1da213fad6929756553ac5d7ae670e0cdf994729325469"
+    },
+    {
+      "id": 140,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-v2\\140.v2.mp3",
+      "key": "catalog/speaking/reference/140.v2.mp3",
+      "voice": "en-us-female-01",
+      "durationMs": 5760,
+      "bytes": 92160,
+      "audioSha256": "e0d84a7f78c57b35ab88daafea1b00277305f8cd17eb09ae674aa61fcdb1ed69",
+      "textSha256": "9c5d86c9aa2b9557c31474c32a0a8aec30a8ef8ef5beb6af6065302909ec194e"
+    },
+    {
+      "id": 141,
+      "taskType": "READ_ALOUD",
+      "premium": false,
+      "file": "artifacts\\speaking-reference-audio-v2\\141.v2.mp3",
+      "key": "catalog/speaking/reference/141.v2.mp3",
+      "voice": "en-us-male-01",
+      "durationMs": 5616,
+      "bytes": 89856,
+      "audioSha256": "09d946730b6a1b2bb8b27e924853b6eeb785708cb4d452d859cefb5b26d8130d",
+      "textSha256": "57488155b08295b622c30d15f5bbd5cdcb1e12b236b34d9cd6e56c83c2a2c7a3"
+    }
+  ]
+}

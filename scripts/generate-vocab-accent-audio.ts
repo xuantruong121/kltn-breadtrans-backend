@@ -227,10 +227,18 @@ async function mapWithConcurrency<T, R>(items: T[], worker: (item: T) => Promise
 async function main(): Promise<void> {
   const args = parseArgs();
   const where = args.wordId ? { id: args.wordId } : undefined;
-  const words = await prisma.vocabWord.findMany({
+  // Audio lives on the dictionary entry; the R2 key keeps the deck word id.
+  // An entry shared by several decks is handled once, through its first deck word.
+  const deckWords = await prisma.vocabWord.findMany({
     where,
     orderBy: { id: 'asc' },
-    select: { id: true, word: true, pos: true, topicId: true, audioUs: true, audioUk: true },
+    select: { id: true, topicId: true, entryId: true, entry: { select: { displayWord: true, pos: true, audioUs: true, audioUk: true } } },
+  });
+  const entryIdByWordId = new Map<number, number>();
+  const words = deckWords.flatMap((row) => {
+    if ([...entryIdByWordId.values()].includes(row.entryId)) return [];
+    entryIdByWordId.set(row.id, row.entryId);
+    return [{ id: row.id, topicId: row.topicId, word: row.entry.displayWord, pos: row.entry.pos, audioUs: row.entry.audioUs, audioUk: row.entry.audioUk }];
   });
   if (!words.length) throw new Error('No canonical VocabWord matched the selection');
   const selectedWords = args.limit ? words.slice(0, args.limit) : words;
@@ -304,7 +312,7 @@ async function main(): Promise<void> {
     if (row.action === 'recover' && !args.force) {
       const head = await headValid(row.key);
       if (!head) throw new Error(`R2 recovery object disappeared: ${row.key}`);
-      await prisma.vocabWord.update({ where: { id: row.vocabWordId }, data: row.accent === 'us' ? { audioUs: row.reference } : { audioUk: row.reference } });
+      await prisma.dictionaryEntry.update({ where: { id: entryIdByWordId.get(row.vocabWordId) }, data: row.accent === 'us' ? { audioUs: row.reference } : { audioUk: row.reference } });
       row.status = 'recovered';
       row.newDbValue = row.reference;
       row.bytes = head.bytes;
@@ -318,7 +326,7 @@ async function main(): Promise<void> {
       await r2.putObjectAtKey(row.key, buffer, format);
       const head = await headValid(row.key);
       if (!head) throw new Error(`Uploaded object failed verification: ${row.key}`);
-      await prisma.vocabWord.update({ where: { id: row.vocabWordId }, data: row.accent === 'us' ? { audioUs: row.reference } : { audioUk: row.reference } });
+      await prisma.dictionaryEntry.update({ where: { id: entryIdByWordId.get(row.vocabWordId) }, data: row.accent === 'us' ? { audioUs: row.reference } : { audioUk: row.reference } });
       row.status = 'generated';
       row.newDbValue = row.reference;
       manifest.push(row);
@@ -332,7 +340,7 @@ async function main(): Promise<void> {
     await writeArtifact('generation-manifest.json', { generatedAt: new Date().toISOString(), provider: policy, outputFormat, rows: manifest });
   }
   await writeArtifact('generation-manifest.json', { generatedAt: new Date().toISOString(), provider: policy, outputFormat, rows: manifest });
-  const postRows = await prisma.vocabWord.findMany({ orderBy: { id: 'asc' }, select: { id: true, word: true, audioUs: true, audioUk: true } });
+  const postRows = await prisma.dictionaryEntry.findMany({ where: { id: { in: [...entryIdByWordId.values()] } }, orderBy: { id: 'asc' }, select: { id: true, displayWord: true, audioUs: true, audioUk: true } });
   await writeArtifact('post-state.json', { generatedAt: new Date().toISOString(), total: postRows.length, rows: postRows });
   await writeArtifact('vocab-audio-after.json', { generatedAt: new Date().toISOString(), total: postRows.length, rows: postRows });
   const failed = manifest.filter((row) => row.status === 'failed');

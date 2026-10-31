@@ -22,6 +22,14 @@ export class UpdateGrammarQuestionDto {
   @IsOptional()
   explanation?: string;
 
+  @ApiPropertyOptional({
+    example: ['', 'Hiện tại đơn, không hợp với "yesterday"', null, null],
+    description: 'Vì sao mỗi đáp án sai là sai, theo thứ tự options',
+  })
+  @IsArray()
+  @IsOptional()
+  optionExplanations?: Array<string | null>;
+
   @ApiPropertyOptional({ example: 1 })
   @IsInt()
   @IsOptional()

@@ -1,0 +1,578 @@
+{
+  "LISTENING-1": {
+    "domain": "listening",
+    "id": 47,
+    "cefr": "A1",
+    "track": "IT_SOFTWARE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 47
+    }
+  },
+  "LISTENING-2": {
+    "domain": "listening",
+    "id": 48,
+    "cefr": "A1",
+    "track": "OFFICE_BUSINESS",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 48
+    }
+  },
+  "LISTENING-3": {
+    "domain": "listening",
+    "id": 49,
+    "cefr": "A1",
+    "track": "SALES_CUSTOMER_SERVICE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 49
+    }
+  },
+  "LISTENING-4": {
+    "domain": "listening",
+    "id": 50,
+    "cefr": "A2",
+    "track": "HOSPITALITY_TOURISM",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 50
+    }
+  },
+  "LISTENING-5": {
+    "domain": "listening",
+    "id": 51,
+    "cefr": "A2",
+    "track": "STUDENT_ACADEMIC",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 51
+    }
+  },
+  "LISTENING-6": {
+    "domain": "listening",
+    "id": 52,
+    "cefr": "A2",
+    "track": "GENERAL",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 52
+    }
+  },
+  "LISTENING-7": {
+    "domain": "listening",
+    "id": 53,
+    "cefr": "B1",
+    "track": "IT_SOFTWARE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 53
+    }
+  },
+  "LISTENING-8": {
+    "domain": "listening",
+    "id": 54,
+    "cefr": "B1",
+    "track": "OFFICE_BUSINESS",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 54
+    }
+  },
+  "LISTENING-9": {
+    "domain": "listening",
+    "id": 55,
+    "cefr": "B2",
+    "track": "SALES_CUSTOMER_SERVICE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 55
+    }
+  },
+  "LISTENING-10": {
+    "domain": "listening",
+    "id": 56,
+    "cefr": "B2",
+    "track": "HOSPITALITY_TOURISM",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 56
+    }
+  },
+  "LISTENING-11": {
+    "domain": "listening",
+    "id": 57,
+    "cefr": "C1",
+    "track": "STUDENT_ACADEMIC",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 57
+    }
+  },
+  "LISTENING-12": {
+    "domain": "listening",
+    "id": 58,
+    "cefr": "C1",
+    "track": "GENERAL",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "listening",
+      "quizId": 58
+    }
+  },
+  "READING-1": {
+    "domain": "reading",
+    "id": 59,
+    "cefr": "A1",
+    "track": "OFFICE_BUSINESS",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 59
+    }
+  },
+  "READING-2": {
+    "domain": "reading",
+    "id": 60,
+    "cefr": "A1",
+    "track": "SALES_CUSTOMER_SERVICE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 60
+    }
+  },
+  "READING-3": {
+    "domain": "reading",
+    "id": 61,
+    "cefr": "A1",
+    "track": "HOSPITALITY_TOURISM",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 61
+    }
+  },
+  "READING-4": {
+    "domain": "reading",
+    "id": 62,
+    "cefr": "A2",
+    "track": "STUDENT_ACADEMIC",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 62
+    }
+  },
+  "READING-5": {
+    "domain": "reading",
+    "id": 63,
+    "cefr": "A2",
+    "track": "GENERAL",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 63
+    }
+  },
+  "READING-6": {
+    "domain": "reading",
+    "id": 64,
+    "cefr": "A2",
+    "track": "IT_SOFTWARE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 64
+    }
+  },
+  "READING-7": {
+    "domain": "reading",
+    "id": 65,
+    "cefr": "B1",
+    "track": "OFFICE_BUSINESS",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 65
+    }
+  },
+  "READING-8": {
+    "domain": "reading",
+    "id": 66,
+    "cefr": "B1",
+    "track": "SALES_CUSTOMER_SERVICE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 66
+    }
+  },
+  "READING-9": {
+    "domain": "reading",
+    "id": 67,
+    "cefr": "B2",
+    "track": "HOSPITALITY_TOURISM",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 67
+    }
+  },
+  "READING-10": {
+    "domain": "reading",
+    "id": 68,
+    "cefr": "B2",
+    "track": "STUDENT_ACADEMIC",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 68
+    }
+  },
+  "READING-11": {
+    "domain": "reading",
+    "id": 69,
+    "cefr": "C1",
+    "track": "GENERAL",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 69
+    }
+  },
+  "READING-12": {
+    "domain": "reading",
+    "id": 70,
+    "cefr": "C1",
+    "track": "IT_SOFTWARE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "reading",
+      "quizId": 70
+    }
+  },
+  "SPEAKING-1": {
+    "domain": "speaking",
+    "id": "speaking-ef26e3ce-b162-4087-9911-4db95657fe28",
+    "cefr": "A1",
+    "track": "SALES_CUSTOMER_SERVICE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-ef26e3ce-b162-4087-9911-4db95657fe28"
+    }
+  },
+  "SPEAKING-2": {
+    "domain": "speaking",
+    "id": "speaking-aa8ab0a3-3329-438c-aed0-8acf45ee2cc4",
+    "cefr": "A1",
+    "track": "HOSPITALITY_TOURISM",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-aa8ab0a3-3329-438c-aed0-8acf45ee2cc4"
+    }
+  },
+  "SPEAKING-3": {
+    "domain": "speaking",
+    "id": "speaking-d611b13e-8c4d-4bca-85f7-8072b5378b49",
+    "cefr": "A1",
+    "track": "STUDENT_ACADEMIC",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-d611b13e-8c4d-4bca-85f7-8072b5378b49"
+    }
+  },
+  "SPEAKING-4": {
+    "domain": "speaking",
+    "id": "speaking-4ff951dc-c58c-4f8a-957b-8c1af450d96b",
+    "cefr": "A2",
+    "track": "GENERAL",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-4ff951dc-c58c-4f8a-957b-8c1af450d96b"
+    }
+  },
+  "SPEAKING-5": {
+    "domain": "speaking",
+    "id": "speaking-472353d0-6498-4434-a745-60e672bc06b9",
+    "cefr": "A2",
+    "track": "IT_SOFTWARE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-472353d0-6498-4434-a745-60e672bc06b9"
+    }
+  },
+  "SPEAKING-6": {
+    "domain": "speaking",
+    "id": "speaking-e28bbe61-796f-447a-89f6-cc55b9820336",
+    "cefr": "A2",
+    "track": "OFFICE_BUSINESS",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-e28bbe61-796f-447a-89f6-cc55b9820336"
+    }
+  },
+  "SPEAKING-7": {
+    "domain": "speaking",
+    "id": "speaking-e18cd96f-79e3-4f12-b8ec-75ef1969fc93",
+    "cefr": "B1",
+    "track": "SALES_CUSTOMER_SERVICE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-e18cd96f-79e3-4f12-b8ec-75ef1969fc93"
+    }
+  },
+  "SPEAKING-8": {
+    "domain": "speaking",
+    "id": "speaking-2fb80c15-47b0-493c-92e3-d24945ddf624",
+    "cefr": "B1",
+    "track": "HOSPITALITY_TOURISM",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-2fb80c15-47b0-493c-92e3-d24945ddf624"
+    }
+  },
+  "SPEAKING-9": {
+    "domain": "speaking",
+    "id": "speaking-b92c14ac-cbea-48ac-9fc0-fd5b2f900de6",
+    "cefr": "B2",
+    "track": "STUDENT_ACADEMIC",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-b92c14ac-cbea-48ac-9fc0-fd5b2f900de6"
+    }
+  },
+  "SPEAKING-10": {
+    "domain": "speaking",
+    "id": "speaking-722e96f8-3df7-469e-9d4c-f67084411620",
+    "cefr": "B2",
+    "track": "GENERAL",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-722e96f8-3df7-469e-9d4c-f67084411620"
+    }
+  },
+  "SPEAKING-11": {
+    "domain": "speaking",
+    "id": "speaking-6acce615-1011-4788-a689-6b477cd773ca",
+    "cefr": "C1",
+    "track": "IT_SOFTWARE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-6acce615-1011-4788-a689-6b477cd773ca"
+    }
+  },
+  "SPEAKING-12": {
+    "domain": "speaking",
+    "id": "speaking-bfc65dc4-53b5-4225-92b0-97120bd434ce",
+    "cefr": "C1",
+    "track": "OFFICE_BUSINESS",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "speaking",
+      "contentId": "speaking-bfc65dc4-53b5-4225-92b0-97120bd434ce"
+    }
+  },
+  "WRITING-1": {
+    "domain": "writing",
+    "id": 71,
+    "cefr": "A1",
+    "track": "HOSPITALITY_TOURISM",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 71
+    }
+  },
+  "WRITING-2": {
+    "domain": "writing",
+    "id": 72,
+    "cefr": "A1",
+    "track": "STUDENT_ACADEMIC",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 72
+    }
+  },
+  "WRITING-3": {
+    "domain": "writing",
+    "id": 73,
+    "cefr": "A1",
+    "track": "GENERAL",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 73
+    }
+  },
+  "WRITING-4": {
+    "domain": "writing",
+    "id": 74,
+    "cefr": "A2",
+    "track": "IT_SOFTWARE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 74
+    }
+  },
+  "WRITING-5": {
+    "domain": "writing",
+    "id": 75,
+    "cefr": "A2",
+    "track": "OFFICE_BUSINESS",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 75
+    }
+  },
+  "WRITING-6": {
+    "domain": "writing",
+    "id": 76,
+    "cefr": "A2",
+    "track": "SALES_CUSTOMER_SERVICE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 76
+    }
+  },
+  "WRITING-7": {
+    "domain": "writing",
+    "id": 77,
+    "cefr": "B1",
+    "track": "HOSPITALITY_TOURISM",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 77
+    }
+  },
+  "WRITING-8": {
+    "domain": "writing",
+    "id": 78,
+    "cefr": "B1",
+    "track": "STUDENT_ACADEMIC",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 78
+    }
+  },
+  "WRITING-9": {
+    "domain": "writing",
+    "id": 79,
+    "cefr": "B2",
+    "track": "GENERAL",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 79
+    }
+  },
+  "WRITING-10": {
+    "domain": "writing",
+    "id": 80,
+    "cefr": "B2",
+    "track": "IT_SOFTWARE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 80
+    }
+  },
+  "WRITING-11": {
+    "domain": "writing",
+    "id": 81,
+    "cefr": "C1",
+    "track": "OFFICE_BUSINESS",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 81
+    }
+  },
+  "WRITING-12": {
+    "domain": "writing",
+    "id": 82,
+    "cefr": "C1",
+    "track": "SALES_CUSTOMER_SERVICE",
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "domain": "writing",
+      "quizId": 82
+    }
+  }
+}

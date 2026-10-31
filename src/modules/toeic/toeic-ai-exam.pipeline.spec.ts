@@ -32,7 +32,10 @@ function batchFor(part: number, groups: PlannedGroup[]) {
       const groupKey = `${part}-${sequence++}-${groupIndex}`;
       return {
         ...(part <= 4
-          ? { transcript: `Speaker: Listening transcript ${groupKey}.` }
+          ? {
+              // Parts 3/4 must be real-test length (toeic-listening-length).
+              transcript: `Speaker: Listening transcript ${groupKey}.${part >= 3 ? ' and more spoken words'.repeat(25) : ''}`,
+            }
           : {}),
         ...(part === 1
           ? { imageBrief: `A realistic office scene ${groupKey}.` }

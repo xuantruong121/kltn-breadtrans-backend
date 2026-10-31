@@ -1,4 +1,5 @@
 import {
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDefined,
@@ -13,13 +14,52 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ValidateNested,
+  registerDecorator,
+  type ValidationOptions,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { QuizPublicationStatus } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
+import { LearningTrack, QuizPublicationStatus } from '@prisma/client';
 import {
   SPEAKING_EXERCISE_DIFFICULTIES,
   SPEAKING_TASK_TYPES,
 } from '../speaking/speaking-contract';
+
+/** Accepts a string or a plain JSON object (never an array). */
+function IsStringOrPlainObject(options?: ValidationOptions) {
+  return (target: object, propertyName: string) =>
+    registerDecorator({
+      name: 'isStringOrPlainObject',
+      target: target.constructor,
+      propertyName,
+      options: {
+        message: `${propertyName} must be a string or an object`,
+        ...options,
+      },
+      validator: {
+        validate: (value: unknown) =>
+          typeof value === 'string' ||
+          (!!value && typeof value === 'object' && !Array.isArray(value)),
+      },
+    });
+}
+
+/** Accepts an array or a plain JSON object. */
+function IsArrayOrPlainObject(options?: ValidationOptions) {
+  return (target: object, propertyName: string) =>
+    registerDecorator({
+      name: 'isArrayOrPlainObject',
+      target: target.constructor,
+      propertyName,
+      options: {
+        message: `${propertyName} must be an array or an object`,
+        ...options,
+      },
+      validator: {
+        validate: (value: unknown) => !!value && typeof value === 'object',
+      },
+    });
+}
 
 export class SkillContentDto {
   @IsString()
@@ -55,9 +95,10 @@ export class SkillContentDto {
   @IsString()
   accent?: string;
 
+  /** Reading: paragraph array. Listening: metadata object { mode, levels, accents, ... }. */
   @IsOptional()
-  @IsArray()
-  bilingualContent?: unknown[];
+  @IsArrayOrPlainObject()
+  bilingualContent?: unknown[] | Record<string, unknown>;
 
   @IsOptional()
   @IsString()
@@ -119,6 +160,20 @@ export class ListeningTranscriptSegmentDto {
   @IsOptional()
   @IsString()
   translation?: string;
+
+  /** Explicit voice for this speaker (e.g. en-us-female-01). */
+  @IsOptional()
+  @IsString()
+  voiceKey?: string;
+
+  /**
+   * Kept so a question that copies the quiz transcript stays identical to it:
+   * the audio builder dedupes blocks on speaker, speakerId, voiceKey, text
+   * and translation.
+   */
+  @IsOptional()
+  @IsString()
+  speakerId?: string;
 }
 
 export class ListeningQuestionContentDto {
@@ -158,9 +213,27 @@ export class ListeningQuestionContentDto {
   @Min(0)
   correctIndex?: number;
 
+  /** Vietnamese text, or { vi, en, evidence } as published content stores it. */
+  @IsOptional()
+  @IsStringOrPlainObject()
+  explanation?: string | Record<string, unknown>;
+
+  @IsOptional()
+  @IsIn(['US', 'UK'])
+  accent?: 'US' | 'UK';
+
   @IsOptional()
   @IsString()
-  explanation?: string;
+  level?: string;
+
+  @IsOptional()
+  @IsIn(['LISTENING'])
+  skill?: 'LISTENING';
+
+  /** Comprehension: an optional picture the question is about. */
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }
 
 export class ListeningQuestionDto {
@@ -228,6 +301,18 @@ export class WritingQuestionDto {
   @IsInt()
   @Min(0)
   order?: number;
+}
+
+export class SkillTracksDto {
+  @ApiProperty({
+    enum: LearningTrack,
+    isArray: true,
+    description: 'Toàn bộ ngành của nội dung; thay thế danh sách cũ',
+  })
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(LearningTrack, { each: true })
+  tracks!: LearningTrack[];
 }
 
 export class SkillPublishDto {

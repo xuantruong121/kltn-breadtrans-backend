@@ -1,0 +1,492 @@
+/**
+ * F8.2 (owner 2026-10-30): about 12 new practice items per skill, spread over
+ * the four practice levels and the career tracks, generated with the same AI
+ * drafts the admin CMS uses and saved as DRAFT through SkillCmsService, so an
+ * admin reviews (and, for Listening, generates the audio) before publishing.
+ *
+ * Modes (files under artifacts/skill-practice-v1/):
+ *   plan      read-only: the 48-item spec and the request count.
+ *   generate  Gemini, one request per item (drafts.json). Needs
+ *             SKILL_PRACTICE_GEMINI_AUTHORIZED=generate.
+ *   balance   spreads Listening/Reading answer keys over A-D in a seeded
+ *             random order (the raw drafts had D in 5 of 120).
+ *   apply     DRAFT content + ContentTrackTag rows on --target, then the CMS
+ *             validation of each item (applied.json). A non-harness target
+ *             needs SKILL_PRACTICE_APPLY_AUTHORIZED=apply.
+ *
+ * Titles carry the CEFR tag the access policy and the recommender read
+ * ("Reading B1 — ...", "Hội thoại A2 — ...", "Writing C1 — ..."; Speaking sets
+ * keep it in their level field). The plan flag follows practice-level.ts.
+ *
+ * Usage: npx ts-node --transpile-only scripts/generate-skill-practice.ts <mode> [--target <url|env:DATABASE_URL>]
+ */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { LearningTrack, PrismaClient } from '@prisma/client';
+
+import { AiService } from '../src/modules/ai/ai.service';
+import { GeminiEvaluatorStrategy } from '../src/modules/ai/strategies/gemini-evaluator.strategy';
+import { SkillCmsService } from '../src/modules/content/skill-cms.service';
+import { SpeakingCategoryService } from '../src/modules/content/speaking-category.service';
+import { keyOrder } from './toeic-rewrite-listening-34';
+import {
+  parseCefrRange,
+  requiredPracticePlan,
+  type PracticeSkill,
+} from '../src/modules/subscription/practice-level';
+
+const DIR = join('artifacts', 'skill-practice-v1');
+const arg = (name: string) => {
+  const i = process.argv.indexOf(`--${name}`);
+  return i > 0 ? process.argv[i + 1] : undefined;
+};
+
+const LEVELS = [
+  'A1',
+  'A1',
+  'A1',
+  'A2',
+  'A2',
+  'A2',
+  'B1',
+  'B1',
+  'B2',
+  'B2',
+  'C1',
+  'C1',
+];
+const TRACKS: LearningTrack[] = [
+  'IT_SOFTWARE',
+  'OFFICE_BUSINESS',
+  'SALES_CUSTOMER_SERVICE',
+  'HOSPITALITY_TOURISM',
+  'STUDENT_ACADEMIC',
+  'GENERAL',
+];
+const TOPICS: Record<LearningTrack, string[]> = {
+  IT_SOFTWARE: [
+    'a software team stand-up meeting',
+    'reporting a bug to a developer',
+    'setting up a new laptop at work',
+    'planning a product release',
+  ],
+  OFFICE_BUSINESS: [
+    'scheduling a meeting with a manager',
+    'ordering office supplies',
+    'preparing a monthly sales report',
+    'welcoming a new colleague',
+  ],
+  SALES_CUSTOMER_SERVICE: [
+    'helping a customer choose a product',
+    'handling a delivery complaint',
+    'explaining a refund policy',
+    'calling a client about an order',
+  ],
+  HOSPITALITY_TOURISM: [
+    'checking in at a hotel',
+    'ordering food at a restaurant',
+    'giving directions to a tourist',
+    'booking a city tour',
+  ],
+  STUDENT_ACADEMIC: [
+    'borrowing books from the university library',
+    'asking a teacher about an assignment',
+    'joining a study group',
+    'presenting a class project',
+  ],
+  GENERAL: [
+    'weekend plans with friends',
+    'shopping at the supermarket',
+    'talking about the weather',
+    'a visit to the doctor',
+  ],
+};
+const SKILLS: PracticeSkill[] = ['LISTENING', 'READING', 'SPEAKING', 'WRITING'];
+
+type SpecItem = {
+  key: string;
+  skill: PracticeSkill;
+  cefr: string;
+  track: LearningTrack;
+  topic: string;
+};
+
+export function buildSpec(): SpecItem[] {
+  return SKILLS.flatMap((skill, s) =>
+    LEVELS.map((cefr, i) => {
+      const track = TRACKS[(i + s) % TRACKS.length];
+      const topic = TOPICS[track][(i + s) % TOPICS[track].length];
+      return { key: `${skill}-${i + 1}`, skill, cefr, track, topic };
+    }),
+  );
+}
+
+const writingTaskType = (cefr: string) =>
+  ({
+    A1: 'SHORT_MESSAGE',
+    A2: 'EMAIL',
+    B1: 'EMAIL',
+    B2: 'OPINION',
+    C1: 'PROPOSAL',
+  })[cefr] ?? 'EMAIL';
+const writingWords = (cefr: string): [number, number] =>
+  (
+    ({
+      A1: [30, 50],
+      A2: [50, 80],
+      B1: [100, 130],
+      B2: [150, 180],
+      C1: [200, 250],
+    }) as Record<string, [number, number]>
+  )[cefr] ?? [100, 130];
+const speakingTask = (cefr: string, i: number) =>
+  cefr.startsWith('A')
+    ? i % 2 === 0
+      ? 'READ_ALOUD'
+      : 'RESPOND_TO_QUESTION'
+    : i % 2 === 0
+      ? 'RESPOND_TO_QUESTION'
+      : 'EXPRESS_OPINION';
+const speakingCategory = (track: LearningTrack) =>
+  ['IT_SOFTWARE', 'OFFICE_BUSINESS', 'SALES_CUSTOMER_SERVICE'].includes(track)
+    ? 'BUSINESS'
+    : 'GENERAL';
+
+function plan() {
+  const spec = buildSpec();
+  for (const skill of SKILLS) {
+    const items = spec.filter((s) => s.skill === skill);
+    console.log(
+      `${skill}: ${items.length} items, levels ${items.map((i) => i.cefr).join(' ')}`,
+    );
+  }
+  console.log(
+    `${spec.length} Gemini requests (one per item), no TTS (Listening audio is generated by the admin during review)`,
+  );
+}
+
+async function generate() {
+  if (process.env.SKILL_PRACTICE_GEMINI_AUTHORIZED !== 'generate')
+    throw new Error(
+      'REFUSED: SKILL_PRACTICE_GEMINI_AUTHORIZED=generate not set',
+    );
+  mkdirSync(DIR, { recursive: true });
+  const file = join(DIR, 'drafts.json');
+  const drafts: Record<string, unknown> = existsSync(file)
+    ? JSON.parse(readFileSync(file, 'utf8'))
+    : {};
+  const ai = new AiService(new GeminiEvaluatorStrategy());
+  let requests = 0;
+  for (const [i, item] of buildSpec().entries()) {
+    if (drafts[item.key]) continue;
+    requests++;
+    try {
+      if (item.skill === 'LISTENING')
+        drafts[item.key] = await ai.suggestListeningFullDraft({
+          topic: item.topic,
+          level: item.cefr,
+          mode: 'DIALOGUE',
+          count: 5,
+        });
+      else if (item.skill === 'READING')
+        drafts[item.key] = await ai.suggestReadingFullDraft({
+          topic: item.topic,
+          level: item.cefr,
+          targetLength: { A1: 90, A2: 130, B1: 180, B2: 230, C1: 280 }[
+            item.cefr
+          ],
+          count: 5,
+        });
+      else if (item.skill === 'SPEAKING') {
+        const category = speakingCategory(item.track);
+        drafts[item.key] = await ai.suggestSpeakingFullDraft({
+          topic: item.topic,
+          level: item.cefr,
+          category,
+          taskType: speakingTask(item.cefr, i),
+          count: 5,
+        });
+      } else
+        drafts[item.key] = await ai.suggestWritingTask({
+          taskType: writingTaskType(item.cefr),
+          level: item.cefr,
+          topic: item.topic,
+          wordMin: writingWords(item.cefr)[0],
+          wordMax: writingWords(item.cefr)[1],
+        });
+      console.log(`ok ${item.key} ${item.cefr} ${item.track}`);
+    } catch (error) {
+      console.log(
+        `FAILED ${item.key}: ${(error as Error).message.slice(0, 160)}`,
+      );
+    }
+    // Saved after every item, so a rerun only asks for what is missing.
+    writeFileSync(file, JSON.stringify(drafts, null, 2));
+  }
+  console.log(
+    `${Object.keys(drafts).length}/48 drafts, ${requests} requests this run`,
+  );
+}
+
+function balance() {
+  const file = join(DIR, 'drafts.json');
+  const drafts = JSON.parse(readFileSync(file, 'utf8'));
+  const questions = buildSpec()
+    .filter((s) => s.skill === 'LISTENING' || s.skill === 'READING')
+    .flatMap((s) => drafts[s.key]?.questions ?? []);
+  const order = keyOrder(questions.length, 20261030);
+  questions.forEach((q: { options: string[]; correctIndex: number }, i) => {
+    const target = order[i];
+    [q.options[target], q.options[q.correctIndex]] = [
+      q.options[q.correctIndex],
+      q.options[target],
+    ];
+    q.correctIndex = target;
+  });
+  writeFileSync(file, JSON.stringify(drafts, null, 2));
+  const counts = [0, 1, 2, 3].map(
+    (k) =>
+      questions.filter((q: { correctIndex: number }) => q.correctIndex === k)
+        .length,
+  );
+  console.log(`keys A/B/C/D: ${counts.join('/')}`);
+}
+
+async function apply() {
+  const target = arg('target');
+  const url = target === 'env:DATABASE_URL' ? process.env.DATABASE_URL : target;
+  if (!url) throw new Error('--target env:DATABASE_URL | <url> is required');
+  const harness = /@127\.0\.0\.1:5460\//.test(url);
+  if (!harness && process.env.SKILL_PRACTICE_APPLY_AUTHORIZED !== 'apply')
+    throw new Error(
+      'REFUSED: non-harness target needs SKILL_PRACTICE_APPLY_AUTHORIZED=apply',
+    );
+  const drafts = JSON.parse(readFileSync(join(DIR, 'drafts.json'), 'utf8'));
+  const prisma = new PrismaClient({ datasources: { db: { url } } });
+  const cms = new SkillCmsService(
+    prisma,
+    undefined,
+    undefined,
+    new SpeakingCategoryService(prisma),
+  );
+  const admin = await prisma.user.findFirst({
+    where: { role: 'ADMIN' },
+    orderBy: { id: 'asc' },
+    select: { id: true, role: true },
+  });
+  if (!admin) throw new Error('no ADMIN user on the target');
+  const user = { id: admin.id, role: admin.role } as never;
+  const appliedFile = join(
+    DIR,
+    `applied-${harness ? 'harness' : 'target'}.json`,
+  );
+  const applied: Record<string, unknown> = existsSync(appliedFile)
+    ? JSON.parse(readFileSync(appliedFile, 'utf8'))
+    : {};
+  const tag = (
+    contentType: 'QUIZ' | 'SPEAKING_SET',
+    contentId: number,
+    track: LearningTrack,
+  ) =>
+    prisma.contentTrackTag.createMany({
+      data: [{ contentType, contentId, track, createdById: admin.id }],
+      skipDuplicates: true,
+    });
+
+  try {
+    for (const item of buildSpec()) {
+      const d = drafts[item.key];
+      if (!d || applied[item.key]) continue;
+      const premium =
+        requiredPracticePlan(item.skill, parseCefrRange(item.cefr)!) !== 'FREE';
+      let domain: string;
+      let id: number | string;
+      if (item.skill === 'LISTENING') {
+        domain = 'listening';
+        const quiz = await cms.create(
+          domain,
+          {
+            title: `Hội thoại ${item.cefr} — ${d.title}`,
+            description: d.description,
+            level: item.cefr,
+            timeLimit: 15,
+            isPremiumContent: premium,
+            bilingualContent: { mode: 'DIALOGUE' },
+          } as never,
+          user,
+        );
+        id = quiz.id;
+        await cms.addListeningQuestion(
+          String(quiz.id),
+          {
+            type: 'DIALOGUE',
+            content: {
+              text: '',
+              prompt: '',
+              transcriptSegments: (d.turns ?? []).map((t: any) => ({
+                speaker: String(t.speaker),
+                text: String(t.text),
+                ...(t.translation
+                  ? { translation: String(t.translation) }
+                  : {}),
+              })),
+            },
+          },
+          user,
+        );
+        for (const q of d.questions ?? [])
+          await cms.addListeningQuestion(
+            String(quiz.id),
+            {
+              type: 'MULTIPLE_CHOICE',
+              content: {
+                text: q.prompt,
+                prompt: q.prompt,
+                explanation: q.explanation,
+                options: q.options,
+                correctIndex: q.correctIndex,
+              },
+            },
+            user,
+          );
+        await tag('QUIZ', Number(quiz.id), item.track);
+      } else if (item.skill === 'READING') {
+        domain = 'reading';
+        const quiz = await cms.create(
+          domain,
+          {
+            title: `Reading ${item.cefr} — ${d.title}`,
+            description: d.description,
+            level: item.cefr,
+            timeLimit: 15,
+            passage: d.passage,
+            isPremiumContent: premium,
+          },
+          user,
+        );
+        id = quiz.id;
+        for (const q of d.questions ?? [])
+          await cms.addQuestion(
+            domain,
+            String(quiz.id),
+            {
+              type: 'MULTIPLE_CHOICE',
+              content: {
+                text: q.prompt,
+                prompt: q.prompt,
+                explanation: q.explanation,
+                passage: d.passage,
+                questionType: q.questionType || 'MAIN_IDEA',
+                options: q.options,
+                correctIndex: q.correctIndex,
+              },
+            },
+            user,
+          );
+        await tag('QUIZ', Number(quiz.id), item.track);
+      } else if (item.skill === 'WRITING') {
+        domain = 'writing';
+        const quiz = await cms.create(
+          domain,
+          {
+            title: `Writing ${item.cefr} — ${item.topic.replace(/^./, (c) => c.toUpperCase())}`,
+            description: d.scenario || d.context || d.prompt.slice(0, 160),
+            level: item.cefr,
+            timeLimit: 20,
+            type: 'WRITING_EMAIL',
+            isPremiumContent: premium,
+          },
+          user,
+        );
+        id = quiz.id;
+        await cms.addWritingQuestion(
+          String(quiz.id),
+          {
+            type: 'WRITING',
+            prompt: d.prompt,
+            taskType: d.taskType || writingTaskType(item.cefr),
+            level: item.cefr,
+            keywords: d.keywords,
+            wordRange: d.wordRange ?? writingWords(item.cefr),
+            sampleSentences: d.sampleSentences,
+          },
+          user,
+        );
+        await tag('QUIZ', Number(quiz.id), item.track);
+      } else {
+        domain = 'speaking';
+        const set = await cms.create(
+          domain,
+          {
+            title: d.practiceSet.title,
+            description: d.practiceSet.description,
+            level: item.cefr,
+            category: speakingCategory(item.track),
+          },
+          user,
+        );
+        id = set.id;
+        for (const e of d.exercises ?? [])
+          await cms.addSpeakingExercise(
+            domain,
+            String(set.id),
+            {
+              title: e.title,
+              targetText: e.targetText,
+              taskType: e.taskType,
+              difficulty: item.cefr.startsWith('A')
+                ? 'BEGINNER'
+                : item.cefr.startsWith('B')
+                  ? 'INTERMEDIATE'
+                  : 'ADVANCED',
+              isPremiumContent: premium,
+            },
+            user,
+          );
+        const first = await prisma.speakingExercise.findFirst({
+          where: { practiceSetId: String(set.id) },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        });
+        if (first) await tag('SPEAKING_SET', first.id, item.track);
+      }
+      let validation: unknown;
+      try {
+        validation = await cms.validate(domain, String(id), user);
+      } catch (error) {
+        validation = { error: (error as Error).message };
+      }
+      applied[item.key] = {
+        domain,
+        id,
+        cefr: item.cefr,
+        track: item.track,
+        validation,
+      };
+      writeFileSync(appliedFile, JSON.stringify(applied, null, 2));
+      console.log(`draft ${item.key} -> ${domain}/${id}`);
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
+  console.log(
+    `${Object.keys(applied).length} items applied as DRAFT (${harness ? 'harness' : 'AUTHORIZED target'})`,
+  );
+}
+
+async function main() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('dotenv').config({ quiet: true });
+  const mode = process.argv[2];
+  if (mode === 'plan') plan();
+  else if (mode === 'generate') await generate();
+  else if (mode === 'balance') balance();
+  else if (mode === 'apply') await apply();
+  else throw new Error('mode: plan | generate | balance | apply');
+}
+
+if (require.main === module)
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });

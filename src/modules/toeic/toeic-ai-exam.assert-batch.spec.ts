@@ -6,6 +6,9 @@ import { ToeicAiExamService } from './toeic-ai-exam.service';
  * compose valid audio for them (confirmed live on Exam 69: 6 groups had
  * question.text === null and were permanently blocked).
  */
+// Parts 3/4 must be real-test length (toeic-listening-length).
+const LONG = ' Then we can talk it over.'.repeat(20);
+
 describe('ToeicAiExamService.assertBatch — Part 3/4 requires spoken question text', () => {
   let service: any;
 
@@ -25,7 +28,7 @@ describe('ToeicAiExamService.assertBatch — Part 3/4 requires spoken question t
       service.assertBatch(3, [{ questionCount: 1 }], {
         groups: [
           {
-            transcript: 'Woman: Shall we move the meeting?',
+            transcript: `Woman: Shall we move the meeting?${LONG}`,
             questions: [validQuestion(null)],
           },
         ],
@@ -38,7 +41,7 @@ describe('ToeicAiExamService.assertBatch — Part 3/4 requires spoken question t
       service.assertBatch(4, [{ questionCount: 1 }], {
         groups: [
           {
-            transcript: 'Please note the office will close early.',
+            transcript: `Please note the office will close early.${LONG}`,
             questions: [validQuestion('   ')],
           },
         ],
@@ -51,7 +54,7 @@ describe('ToeicAiExamService.assertBatch — Part 3/4 requires spoken question t
       service.assertBatch(3, [{ questionCount: 1 }], {
         groups: [
           {
-            transcript: 'Woman: Shall we move the meeting?',
+            transcript: `Woman: Shall we move the meeting?${LONG}`,
             questions: [validQuestion('What do the speakers discuss?')],
           },
         ],

@@ -3,18 +3,23 @@ import { PlanFeatureKey, QuizType, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { QuizContentAccessService } from './quiz-content-access.service';
 
-describe('QuizContentAccessService (owner matrix 2026-10-28)', () => {
+describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
   const subscriptions = { effectivePlanCode: jest.fn() };
+  const quizRows = { findMany: jest.fn() };
   let service: QuizContentAccessService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     subscriptions.effectivePlanCode.mockResolvedValue('FREE');
+    quizRows.findMany.mockResolvedValue([]);
     service = new QuizContentAccessService(
       subscriptions as unknown as SubscriptionService,
+      { quiz: quizRows } as never,
     );
   });
 
+  const DICTATION = { mode: 'DICTATION' };
+  const COMPREHENSION = { mode: 'COMPREHENSION' };
   const quiz = (
     type: QuizType,
     title: string,
@@ -26,6 +31,58 @@ describe('QuizContentAccessService (owner matrix 2026-10-28)', () => {
     isPremiumContent: false,
     courseId: null,
     ...overrides,
+  });
+  const listening = (title: string, mode: object, id = 10) =>
+    quiz(QuizType.LISTENING_PRACTICE, title, { id, bilingualContent: mode });
+
+  it('applies the matrix on routes that select no title', async () => {
+    quizRows.findMany.mockResolvedValue([
+      { id: 10, title: 'Writing B2 — Reports', bilingualContent: null },
+    ]);
+    const bare = {
+      id: 10,
+      type: QuizType.WRITING_EMAIL,
+      isPremiumContent: false,
+      courseId: null,
+    };
+    await expect(service.assertAccess(bare, 7)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(quizRows.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: { id: true, title: true, bilingualContent: true },
+      }),
+    );
+  });
+
+  it('applies the dictation rule on routes that select neither field', async () => {
+    quizRows.findMany.mockResolvedValue([
+      {
+        id: 11,
+        title: 'Nghe chép B1 — Công việc',
+        bilingualContent: { mode: 'DICTATION' },
+      },
+    ]);
+    const access = await service.resolve(
+      {
+        id: 11,
+        type: QuizType.LISTENING_PRACTICE,
+        isPremiumContent: false,
+        courseId: null,
+      },
+      7,
+    );
+    expect(access).toMatchObject({ isLocked: true, requiredPlan: 'PLUS' });
+  });
+
+  it('does not query for content outside the four skills', async () => {
+    await service.resolve({
+      id: 12,
+      type: QuizType.TOEIC,
+      isPremiumContent: false,
+      courseId: null,
+    });
+    expect(quizRows.findMany).not.toHaveBeenCalled();
   });
 
   it('keeps the content feature of each skill for callers that report it', () => {
@@ -39,23 +96,62 @@ describe('QuizContentAccessService (owner matrix 2026-10-28)', () => {
   });
 
   it.each([
-    [QuizType.LISTENING_PRACTICE, 'Listening A2 — Travel', 'FREE'],
-    [QuizType.LISTENING_PRACTICE, 'Listening B1 — Work', 'PLUS'],
-    [QuizType.BILINGUAL_READING, 'Reading C1 — Analysis', 'PLUS'],
+    ['Listening A2 — Travel', COMPREHENSION, 'FREE'],
+    ['Listening B2 — Inference', COMPREHENSION, 'FREE'],
+    ['Nghe chép A2 — Du lịch', DICTATION, 'FREE'],
+    ['Nghe chép B1 — Công việc', DICTATION, 'PLUS'],
+    ['Nghe chép C1 — Thời sự', DICTATION, 'PLUS'],
+  ])('Listening "%s" (%o) requires %s', (title, mode, required) => {
+    expect(service.requiredPlan(listening(title, mode))).toBe(required);
+  });
+
+  it.each([
+    [QuizType.BILINGUAL_READING, 'Reading C1 — Analysis', 'FREE'],
     [QuizType.WRITING_EMAIL, 'Writing A2 — Messages', 'FREE'],
-    [QuizType.WRITING_EMAIL, 'Writing B1 — Professional', 'PRO'],
-    [QuizType.WRITING_PICTURE, 'Writing B2 — Pictures', 'PRO'],
+    [QuizType.WRITING_EMAIL, 'Writing B1 — Professional', 'PLUS'],
+    [QuizType.WRITING_PICTURE, 'Writing B2 — Pictures', 'PLUS'],
+    [QuizType.WRITING_EMAIL, 'Writing C1 — Reports', 'PRO'],
+    [QuizType.WRITING_EMAIL, 'Writing B2–C1 — Essays', 'PRO'],
   ])('%s "%s" requires %s', (type, title, required) => {
     expect(service.requiredPlan(quiz(type, title))).toBe(required);
   });
 
+  it('a Listening item checked without its mode counts as dictation', () => {
+    expect(
+      service.requiredPlan(
+        quiz(QuizType.LISTENING_PRACTICE, 'Listening B1 — Work'),
+      ),
+    ).toBe('PLUS');
+  });
+
+  it('resolve loads the Listening mode the caller did not select', async () => {
+    quizRows.findMany.mockResolvedValue([
+      { id: 10, bilingualContent: DICTATION },
+    ]);
+    const dictation = await service.resolve(
+      quiz(QuizType.LISTENING_PRACTICE, 'Nghe chép B1 — Công việc'),
+      7,
+    );
+    expect(dictation).toMatchObject({ isLocked: true, requiredPlan: 'PLUS' });
+    quizRows.findMany.mockResolvedValue([
+      { id: 10, bilingualContent: COMPREHENSION },
+    ]);
+    const comprehension = await service.resolve(
+      quiz(QuizType.LISTENING_PRACTICE, 'Listening B1 — Work'),
+      7,
+    );
+    expect(comprehension).toMatchObject({
+      isLocked: false,
+      requiredPlan: 'FREE',
+    });
+  });
+
   it('exposes the CEFR level the plan was decided from', async () => {
-    // Writing quiz 4 has no content level; its title tag is the authority.
     const access = await service.resolve(
       quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional Email'),
       7,
     );
-    expect(access).toMatchObject({ cefrLevel: 'B1', requiredPlan: 'PRO' });
+    expect(access).toMatchObject({ cefrLevel: 'B1', requiredPlan: 'PLUS' });
     const course = await service.resolve(
       quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Course', { courseId: 3 }),
       7,
@@ -63,74 +159,75 @@ describe('QuizContentAccessService (owner matrix 2026-10-28)', () => {
     expect(course.cefrLevel).toBeNull();
   });
 
-  it('an untagged item never opens just because its tag is missing', () => {
-    expect(
-      service.requiredPlan(
-        quiz(QuizType.WRITING_EMAIL, 'Untitled', { isPremiumContent: true }),
-      ),
-    ).toBe('PRO');
-    expect(
-      service.requiredPlan(
-        quiz(QuizType.LISTENING_PRACTICE, 'Untitled', {
-          isPremiumContent: true,
-        }),
-      ),
-    ).toBe('PLUS');
+  it('an untagged premium item opens nothing its skill may charge for', () => {
+    const untagged = (type: QuizType) =>
+      service.requiredPlan(quiz(type, 'Untitled', { isPremiumContent: true }));
+    expect(untagged(QuizType.WRITING_EMAIL)).toBe('PRO');
+    expect(untagged(QuizType.LISTENING_PRACTICE)).toBe('PLUS');
+    expect(untagged(QuizType.BILINGUAL_READING)).toBe('FREE');
   });
 
   it.each([
-    ['FREE', 'Listening B1 — Work', true],
-    ['PLUS', 'Listening B1 — Work', false],
-    ['PLUS', 'Writing B1 — Professional', true],
-    ['PRO', 'Writing B1 — Professional', false],
-    ['PRO', 'Listening B1 — Work', false],
+    ['FREE', 'Writing B1 — Professional', true],
+    ['PLUS', 'Writing B1 — Professional', false],
+    ['PLUS', 'Writing C1 — Reports', true],
+    ['PRO', 'Writing C1 — Reports', false],
   ])('a %s learner on "%s": locked = %s', async (plan, title, locked) => {
     subscriptions.effectivePlanCode.mockResolvedValue(plan);
-    const type = title.startsWith('Writing')
-      ? QuizType.WRITING_EMAIL
-      : QuizType.LISTENING_PRACTICE;
-    const access = await service.resolve(quiz(type, title), 7);
+    const access = await service.resolve(
+      quiz(QuizType.WRITING_EMAIL, title),
+      7,
+    );
     expect(access.isLocked).toBe(locked);
   });
+
+  it.each([
+    ['FREE', COMPREHENSION, false],
+    ['FREE', DICTATION, true],
+    ['PLUS', DICTATION, false],
+  ])(
+    'a %s learner on B1 Listening (%o): locked = %s',
+    async (plan, mode, locked) => {
+      subscriptions.effectivePlanCode.mockResolvedValue(plan);
+      const access = await service.resolve(
+        listening('Nghe B1 — Work', mode),
+        7,
+      );
+      expect(access.isLocked).toBe(locked);
+    },
+  );
 
   it('an unknown plan code ranks as FREE (fail closed)', async () => {
     subscriptions.effectivePlanCode.mockResolvedValue('LEGACY_GOLD');
     const access = await service.resolve(
-      quiz(QuizType.LISTENING_PRACTICE, 'Listening B1 — Work'),
+      quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional'),
       7,
     );
     expect(access.isLocked).toBe(true);
   });
 
-  it('a PLUS learner on B1 Writing is refused with PRO as the required plan', async () => {
+  it('a PLUS learner on C1 Writing is refused with PRO as the required plan', async () => {
     subscriptions.effectivePlanCode.mockResolvedValue('PLUS');
-    await expect(
-      service.assertAccess(
-        quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional'),
-        7,
-      ),
-    ).rejects.toMatchObject({
+    const c1 = quiz(QuizType.WRITING_EMAIL, 'Writing C1 — Reports');
+    await expect(service.assertAccess(c1, 7)).rejects.toMatchObject({
       response: { error: { requiredPlan: 'PRO' } },
     });
-    await expect(
-      service.assertAccess(
-        quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional'),
-        7,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.assertAccess(c1, 7)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('a guest is asked to sign in for premium content', async () => {
     await expect(
       service.assertAccess(
-        quiz(QuizType.BILINGUAL_READING, 'Reading B1 — Documents'),
+        quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional'),
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('free content and admins never resolve a plan', async () => {
     await service.resolve(
-      quiz(QuizType.LISTENING_PRACTICE, 'Listening A2 — Travel'),
+      quiz(QuizType.BILINGUAL_READING, 'Reading C1 — Analysis'),
       7,
     );
     await service.resolve(
@@ -145,8 +242,8 @@ describe('QuizContentAccessService (owner matrix 2026-10-28)', () => {
     subscriptions.effectivePlanCode.mockResolvedValue('PLUS');
     const map = await service.resolveMany(
       [
-        quiz(QuizType.LISTENING_PRACTICE, 'Listening B1 — Work', { id: 1 }),
-        quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Professional', { id: 2 }),
+        listening('Nghe chép B1 — Work', DICTATION, 1),
+        quiz(QuizType.WRITING_EMAIL, 'Writing C1 — Reports', { id: 2 }),
         quiz(QuizType.WRITING_EMAIL, 'Writing A2 — Messages', { id: 3 }),
       ],
       7,

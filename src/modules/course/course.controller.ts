@@ -29,6 +29,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CoursesEnabledGuard } from '../../common/guards/courses-enabled.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, CourseStatus } from '@prisma/client';
 import { CourseLearningV5Service } from './course-v5.service';
@@ -36,6 +37,7 @@ import { SubmitCourseLessonExerciseDto } from './course-v5.dto';
 
 @ApiTags('courses')
 @Controller('courses')
+@UseGuards(CoursesEnabledGuard)
 export class CourseController {
   constructor(
     private readonly courseService: CourseService,

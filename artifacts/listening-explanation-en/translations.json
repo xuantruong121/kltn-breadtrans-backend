@@ -1,0 +1,837 @@
+{
+  "1": {
+    "quizId": 1,
+    "vi": "Người nói cho biết nha sĩ có thể khám vào lúc 2:30 chiều thứ Năm. Vì vậy đáp án đúng là C — Thursday at 2:30 P.M.",
+    "en": "The speaker states that the dentist is available at 2:30 P.M. on Thursday. Therefore, the correct time is Thursday at 2:30 P.M."
+  },
+  "2": {
+    "quizId": 1,
+    "vi": "Chiếc áo len có giá 20 đô la nhưng hôm nay được giảm giá 10%. Do đó, chiếc áo đang được giảm giá (It is discounted).",
+    "en": "The sweater costs twenty dollars and has a ten percent discount today. Consequently, the sweater is currently discounted."
+  },
+  "3": {
+    "quizId": 1,
+    "vi": "Chuyến xe buýt tiếp theo đi vào trung tâm thành phố khởi hành từ trạm số 4. Hành khách cần đợi tại trạm số 4 (At stop four).",
+    "en": "The next bus to downtown departs from stop number four. Passengers need to wait at stop four."
+  },
+  "4": {
+    "quizId": 1,
+    "vi": "Người nói thông báo quán cà phê đóng cửa lúc 6 giờ vào Chủ nhật. Vì vậy đáp án đúng là 6 P.M.",
+    "en": "The speaker announces that the café closes at six on Sundays. Thus, the correct time is 6 P.M."
+  },
+  "5": {
+    "quizId": 1,
+    "vi": "Dự báo thời tiết cho biết trời có thể mưa sau bữa trưa, nên người nghe được dặn mang theo ô. Do đó đáp án là trời sắp có mưa (Rain is expected).",
+    "en": "The weather forecast indicates it might rain after lunch, so the listener is advised to bring an umbrella. Therefore, rain is expected."
+  },
+  "6": {
+    "quizId": 1,
+    "vi": "Bưu kiện đã được giao vào sáng nay và có thể nhận tại quầy lễ tân (At the front desk).",
+    "en": "The parcel was delivered this morning and can be picked up at the front desk."
+  },
+  "17": {
+    "quizId": 5,
+    "vi": "Sau khi nghe thông báo lô hàng dời sang thứ Tư, người nam nói 'I’ll update the warehouse team', nghĩa là sẽ báo lại cho đội kho (Inform the warehouse team).",
+    "en": "After hearing that the shipment is delayed until Wednesday, the man states that he will update the warehouse team."
+  },
+  "18": {
+    "quizId": 5,
+    "vi": "Người nữ nói không thể mở bảng tính ngân sách được gửi ('can't open the budget spreadsheet'), tức là cô ấy không thể truy cập tệp tin (She cannot access a file).",
+    "en": "The woman states that she cannot open the budget spreadsheet she was sent, meaning she is unable to access a file."
+  },
+  "19": {
+    "quizId": 5,
+    "vi": "Khách hàng yêu cầu dời cuộc họp từ 10:00 sang 11:30 ('move it to eleven thirty'), vì vậy điều thay đổi là thời gian họp (The meeting time).",
+    "en": "The client requested to move the schedule to eleven thirty, which means the meeting time has changed."
+  },
+  "27": {
+    "quizId": 9,
+    "vi": "Người nói cho biết cửa hàng mở cửa vào lúc 9 giờ. Do đó đáp án chính xác là D — At 9:00.",
+    "en": "The speaker states that the shop opens at 9 o'clock. Therefore, the correct answer is 9:00."
+  },
+  "28": {
+    "quizId": 9,
+    "vi": "Người nói yêu cầu đặt những cuốn sách lên chiếc bàn cạnh cửa sổ. Đáp án đúng là B — On the table by the window.",
+    "en": "The speaker asks to place the books on the table by the window. The correct answer is On the table by the window."
+  },
+  "29": {
+    "quizId": 9,
+    "vi": "Người nói gọi hai chai nước suối ('two bottles of water'). Vì vậy đáp án đúng là A — Two bottles of water.",
+    "en": "The speaker orders two bottles of water. Thus, the correct answer is Two bottles of water."
+  },
+  "30": {
+    "quizId": 9,
+    "vi": "Người nói thông báo xe buýt của mình sẽ đến trong 5 phút nữa. Phương tiện sắp đến là xe buýt (A bus).",
+    "en": "The speaker announces that their bus will arrive in five minutes. The upcoming means of transport is a bus."
+  },
+  "31": {
+    "quizId": 9,
+    "vi": "Nhà vệ sinh nằm ở tầng 1, ngay cạnh thang máy ('next to the elevator'). Đáp án đúng là B — Next to the elevator.",
+    "en": "The restroom is located on the first floor, right next to the elevator. The correct answer is Next to the elevator."
+  },
+  "32": {
+    "quizId": 9,
+    "vi": "Người nói thường ăn trưa vào lúc 12:30 ('twelve thirty'). Đáp án đúng là B — 12:30.",
+    "en": "The speaker usually has lunch at twelve thirty. The correct answer is 12:30."
+  },
+  "33": {
+    "quizId": 9,
+    "vi": "Thời tiết hôm nay nhiều mây ('cloudy') nhưng không mưa. Do đó tình trạng thời tiết là nhiều mây (Cloudy).",
+    "en": "Today's weather is cloudy, though it is not raining. Therefore, the weather condition is Cloudy."
+  },
+  "34": {
+    "quizId": 9,
+    "vi": "Người nói đề nghị gọi lại sau bữa tối ('after dinner'). Đáp án đúng là C — After dinner.",
+    "en": "The speaker suggests calling back after dinner. The correct answer is After dinner."
+  },
+  "35": {
+    "quizId": 10,
+    "vi": "Tàu đi Bristol chuyển sang khởi hành tại sân ga số 3 thay vì số 5. Thay đổi ở đây là sân ga khởi hành (The departure platform).",
+    "en": "The Bristol train now departs from platform three instead of platform five. Therefore, the change is the departure platform."
+  },
+  "36": {
+    "quizId": 10,
+    "vi": "Nhân viên khách sạn cho biết bữa sáng đã được bao gồm trong giá phòng ('breakfast is included'). Đáp án đúng là D — Breakfast.",
+    "en": "The hotel staff states that breakfast is already included in the room price."
+  },
+  "37": {
+    "quizId": 10,
+    "vi": "Người nghe được yêu cầu xuất trình hộ chiếu và thẻ lên máy bay (A passport and boarding pass).",
+    "en": "The listener is asked to show a passport and boarding pass."
+  },
+  "38": {
+    "quizId": 10,
+    "vi": "Tối nay khách sạn đã kín phòng nhưng ngày mai sẽ có phòng trống ('a room is available tomorrow'). Đáp án đúng là B — Tomorrow.",
+    "en": "The hotel is fully booked tonight, but a room is available tomorrow."
+  },
+  "39": {
+    "quizId": 10,
+    "vi": "Vé vào bảo tàng đã bao gồm chuyến tham quan có hướng dẫn viên lúc 2 giờ ('a guided tour'). Đáp án đúng là C — A guided tour.",
+    "en": "The museum ticket includes a guided tour at two o'clock."
+  },
+  "40": {
+    "quizId": 10,
+    "vi": "Khách hàng được yêu cầu trả xe thuê với bình xăng đã được đổ đầy ('full tank of fuel'), tức là cần đổ đầy xăng (Fill the fuel tank).",
+    "en": "The customer must fill the fuel tank before returning the rental car."
+  },
+  "41": {
+    "quizId": 10,
+    "vi": "Chuyến bay bị hoãn 40 phút do gió mạnh ('because of strong winds'). Vì vậy lý do chậm chuyến là gió lớn (Strong winds).",
+    "en": "The flight is delayed by forty minutes because of strong winds."
+  },
+  "42": {
+    "quizId": 10,
+    "vi": "Hành khách có thể nhận lại hành lý tại băng chuyền số 6 ('carousel six'). Đáp án đúng là C — Carousel six.",
+    "en": "The listener should go to collect their luggage from carousel six."
+  },
+  "43": {
+    "quizId": 11,
+    "vi": "Lịch họp tuần được dời sang thứ Năm vì giám đốc kinh doanh sẽ đến thăm vào thứ Tư ('the sales director will be visiting on Wednesday').",
+    "en": "The meeting was moved to Thursday because the sales director will be visiting on Wednesday."
+  },
+  "44": {
+    "quizId": 11,
+    "vi": "Hợp đồng cần được xem xét trước bữa trưa để người nói kịp gửi cho khách hàng vào chiều nay (It needs to be sent later today).",
+    "en": "The contract needs to be reviewed before lunch so it can be sent to the client this afternoon."
+  },
+  "45": {
+    "quizId": 11,
+    "vi": "Kỹ thuật viên đã sửa xong lỗi mạng, nhưng việc còn lại cần làm là khởi động lại toàn bộ máy tính phòng họp (Restart the meeting-room computers).",
+    "en": "The network issue has been fixed, but all of the meeting-room computers still need to be restarted."
+  },
+  "46": {
+    "quizId": 11,
+    "vi": "Trong số 120 hồ sơ nộp, bộ phận tuyển dụng đã chọn ra 12 ứng viên để phỏng vấn ('selected twelve people for interviews'). Đáp án đúng là B — 12.",
+    "en": "Out of all the applications, twelve people were selected for interviews next week."
+  },
+  "47": {
+    "quizId": 11,
+    "vi": "Người nói có thể hoàn thành báo cáo nếu kế toán gửi số liệu chi phí cuối cùng trước 3 giờ. Thứ người nói cần là số liệu chi phí (Final expense figures).",
+    "en": "The speaker needs the final expense figures from accounting to finish the report by three o'clock."
+  },
+  "48": {
+    "quizId": 11,
+    "vi": "Nhà cung cấp sẽ chiết khấu 5% với điều kiện đơn hàng phải tăng lên 500 sản phẩm ('increase the order to five hundred units').",
+    "en": "A discount will be applied on the condition that the order is increased to five hundred units."
+  },
+  "49": {
+    "quizId": 11,
+    "vi": "Buổi học chuyên đề thứ Sáu đã kín chỗ ('Friday’s workshop is full'), do đó ban tổ chức mở thêm một buổi vào sáng thứ Hai tới.",
+    "en": "Another session was added because Friday's workshop is full."
+  },
+  "50": {
+    "quizId": 11,
+    "vi": "Người nói yêu cầu cập nhật danh sách và xoá những khách hàng đã huỷ gói đăng ký ('canceled their subscription'). Đáp án đúng là C — Customers who canceled.",
+    "en": "Customers who have already canceled their subscription should be removed from the list."
+  },
+  "51": {
+    "quizId": 12,
+    "vi": "Người nói thà hoãn buổi thuyết trình còn hơn trình bày sản phẩm mẫu chưa hoàn thiện ('I’d rather delay the presentation'). Vì vậy người nói sẽ hoãn buổi thuyết trình (Postpone the presentation).",
+    "en": "The speaker would rather delay the presentation than show an unfinished prototype. Therefore, the speaker will postpone the presentation."
+  },
+  "52": {
+    "quizId": 12,
+    "vi": "Vì văn phòng mới có diện tích gấp đôi với chi phí tương đương giá thuê mới, người nói đề xuất nên đi khảo sát văn phòng đó trước khi quyết định (Inspect another office).",
+    "en": "Since the new office offers double the space for a similar rent, the speaker suggests inspecting that office before making a decision."
+  },
+  "53": {
+    "quizId": 12,
+    "vi": "Tỷ lệ phản hồi khảo sát chỉ đạt 30% ('only thirty percent'), quá thấp nên người nói mới đề xuất cách tiếp cận mới. Đáp án đúng là có quá ít người phản hồi (Too few people responded).",
+    "en": "The survey response rate is only thirty percent, which is too low. As a result, the correct answer is that too few people responded."
+  },
+  "54": {
+    "quizId": 12,
+    "vi": "Tàu chiều đến sát giờ hội nghị chỉ 20 phút và bất kỳ sự cố trễ nào cũng có thể khiến họ bị muộn ('could make us late'). Nỗi lo của người nói là đến muộn hội nghị (Arriving late to the conference).",
+    "en": "The afternoon train arrives only twenty minutes before the conference, meaning any delay could cause them to be late. The speaker's concern is arriving late to the conference."
+  },
+  "55": {
+    "quizId": 12,
+    "vi": "Khách hàng yêu cầu dự toán chi phí rõ ràng hơn trước khi ký kết ('asked for clearer cost estimates'). Trở ngại hiện tại là dự toán chi phí cần được làm rõ (The cost estimates need clarification).",
+    "en": "The client requested clearer cost estimates before signing the agreement. Therefore, the current obstacle is that the cost estimates need clarification."
+  },
+  "56": {
+    "quizId": 12,
+    "vi": "Lượng yêu cầu hỗ trợ giảm đi kể từ khi phát hành video hướng dẫn ('fewer support tickets'). Người nói suy ra rằng các video giúp giảm số lượng yêu cầu hỗ trợ (They reduce support requests).",
+    "en": "There have been fewer support tickets since the tutorial videos were published. The speaker infers that these videos reduce support requests."
+  },
+  "57": {
+    "quizId": 12,
+    "vi": "Người nói nhận định máy in đắt hơn nhưng có độ bền và giá trị sử dụng lâu dài tốt hơn ('the more expensive model may be better value over time'). Do đó người nói ưu tiên máy in đắt hơn (The more expensive printer).",
+    "en": "The speaker notes that the more expensive printer offers better long-term durability and value. Consequently, the speaker favors the more expensive printer."
+  },
+  "58": {
+    "quizId": 12,
+    "vi": "Nếu lùi đến thứ Ba, tất cả nhân viên mới đều có thể tham gia cùng một buổi ('everyone can attend the same session') mà không cần dạy lại. Đáp án đúng là B — All new employees can attend.",
+    "en": "Waiting until Tuesday ensures that all new employees can attend the same session without needing separate training. Therefore, all new employees can attend."
+  },
+  "115": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "116": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "117": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "118": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "119": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "120": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "121": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "122": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "123": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "124": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "125": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "126": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "127": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "128": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "129": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "130": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "131": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "132": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "133": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "134": {
+    "quizId": 23,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the turn in the conversation to accurately transcribe this sentence."
+  },
+  "135": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "136": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "137": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "138": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "139": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "140": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "141": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "142": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "143": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "144": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "145": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "146": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "147": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "148": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "149": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "150": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "151": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "152": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "153": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "154": {
+    "quizId": 24,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen to the conversational turn to accurately transcribe this sentence."
+  },
+  "155": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "156": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "157": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "158": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "159": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "160": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "161": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "162": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "163": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "164": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "165": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "166": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "167": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "168": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "169": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "170": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "171": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "172": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "173": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "174": {
+    "quizId": 25,
+    "vi": "Lắng nghe lượt lời trong mạch hội thoại để chép lại chính xác câu này.",
+    "en": "Listen closely to this turn in the conversation to accurately transcribe this sentence."
+  },
+  "175": {
+    "quizId": 26,
+    "vi": "Khách hàng trả lời “Iced, please”, nên chọn B.",
+    "en": "The customer requests an iced latte, so the correct option is the iced one."
+  },
+  "176": {
+    "quizId": 26,
+    "vi": "Nhân viên nói tổng cộng là tám đô, nên chọn C.",
+    "en": "The staff states that the total cost is eight dollars."
+  },
+  "177": {
+    "quizId": 27,
+    "vi": "Mark nói rõ khách hàng đã chuyển cuộc họp, nên chọn B.",
+    "en": "Mark clearly states that the client moved the meeting to a different time."
+  },
+  "178": {
+    "quizId": 27,
+    "vi": "Mark nói sẽ cập nhật tiến độ và gửi cho mọi người, nên chọn C.",
+    "en": "Mark mentions that he will update the timeline and share it with everyone."
+  },
+  "179": {
+    "quizId": 28,
+    "vi": "Nhân viên nói giao hàng chậm do thời tiết xấu, nên chọn B.",
+    "en": "The support agent stated that the delivery was delayed due to severe weather."
+  },
+  "180": {
+    "quizId": 28,
+    "vi": "Nhân viên nói đã gửi email xác nhận, nên chọn C.",
+    "en": "The support agent mentioned that they had sent a confirmation email."
+  },
+  "208": {
+    "quizId": 47,
+    "vi": "Alex cho biết hôm qua anh ấy đã hoàn thành việc sửa lỗi đăng nhập.",
+    "en": "Alex stated that yesterday he finished fixing the login bug."
+  },
+  "209": {
+    "quizId": 47,
+    "vi": "Alex nói rằng hôm nay anh ấy sẽ kiểm tra trang thanh toán mới.",
+    "en": "Alex said that today he is going to test the new payment page."
+  },
+  "210": {
+    "quizId": 47,
+    "vi": "Khi được hỏi về trở ngại, Alex đã trả lời là mọi thứ đều ổn.",
+    "en": "When asked about blockers, Alex replied that everything is fine."
+  },
+  "211": {
+    "quizId": 47,
+    "vi": "Sam chia sẻ rằng hôm qua anh ấy đã cập nhật cơ sở dữ liệu người dùng.",
+    "en": "Sam shared that yesterday he updated the user database."
+  },
+  "212": {
+    "quizId": 47,
+    "vi": "Sam cho biết kế hoạch hôm nay của anh ấy là viết tài liệu API.",
+    "en": "Sam indicated that his plan for today is to write the API documentation."
+  },
+  "214": {
+    "quizId": 48,
+    "vi": "Sarah nói rằng họ cần đặt mua một hộp bút bi xanh và hai hộp giấy in, tức là bút và giấy.",
+    "en": "Sarah says that they need to order a box of blue pens and two boxes of printer paper, which means pens and paper."
+  },
+  "215": {
+    "quizId": 48,
+    "vi": "Sarah yêu cầu cụ thể hai hộp giấy in trong đoạn hội thoại.",
+    "en": "Sarah specifically requests two boxes of printer paper in the conversation."
+  },
+  "216": {
+    "quizId": 48,
+    "vi": "Sarah đề cập rõ ràng đến loại bút màu xanh trong yêu cầu của mình.",
+    "en": "Sarah clearly mentions the blue color for the pens in her request."
+  },
+  "217": {
+    "quizId": 48,
+    "vi": "Mark bắt đầu cuộc trò chuyện bằng cách gọi tên Sarah.",
+    "en": "Mark begins the conversation by addressing Sarah by name."
+  },
+  "218": {
+    "quizId": 48,
+    "vi": "Mark khẳng định cuối đoạn hội thoại rằng anh ấy sẽ đặt mua các món đồ trực tuyến ngay lập tức.",
+    "en": "Mark confirms at the end of the conversation that he will order the items online right away."
+  },
+  "220": {
+    "quizId": 49,
+    "vi": "Khách hàng nói rõ mong muốn là muốn trả lại chiếc áo.",
+    "en": "The customer clearly states her desire to return the shirt."
+  },
+  "221": {
+    "quizId": 49,
+    "vi": "Lý do khách hàng đưa ra là chiếc áo quá nhỏ.",
+    "en": "The reason given by the customer is that the shirt is too small."
+  },
+  "222": {
+    "quizId": 49,
+    "vi": "Khách hàng xác nhận có hóa đơn khi đưa nó cho nhân viên.",
+    "en": "The customer confirms she has the receipt by handing it over."
+  },
+  "223": {
+    "quizId": 49,
+    "vi": "Nhân viên cho biết chính sách cửa hàng cho phép đổi trả trong vòng 30 ngày.",
+    "en": "The clerk states that the store policy allows returns within 30 days."
+  },
+  "224": {
+    "quizId": 49,
+    "vi": "Nhân viên xác nhận tiền sẽ được chuyển lại vào thẻ tín dụng, tức là phương thức thanh toán ban đầu.",
+    "en": "The clerk confirms that the money will be sent back to the credit card, which is the original payment method."
+  },
+  "226": {
+    "quizId": 50,
+    "vi": "Nhân viên đề xuất chuyến đi bộ tham quan trung tâm lịch sử và khách hàng đã đồng ý.",
+    "en": "The agent suggested a walking tour of the historical center, and the customer agreed."
+  },
+  "227": {
+    "quizId": 50,
+    "vi": "Nhân viên thông báo thời gian có sẵn là vào sáng mai lúc 10 giờ.",
+    "en": "The agent stated that the available time is tomorrow morning at 10:00."
+  },
+  "228": {
+    "quizId": 50,
+    "vi": "Nhân viên cho biết giá vé là 20 euro cho mỗi vé.",
+    "en": "The agent mentioned that the price is 20 euros per ticket."
+  },
+  "229": {
+    "quizId": 50,
+    "vi": "Khách hàng nói rõ rằng cần mua hai vé, một cho bản thân và một cho vợ.",
+    "en": "The customer clearly stated that he needs two tickets, one for himself and one for his wife."
+  },
+  "230": {
+    "quizId": 50,
+    "vi": "Khách hàng đã đưa thẻ tín dụng để thanh toán sau khi nghe tổng số tiền.",
+    "en": "The customer handed over his credit card to make the payment after hearing the total amount."
+  },
+  "232": {
+    "quizId": 51,
+    "vi": "Học sinh nói rõ mục đích khi đến thư viện là muốn mượn vài cuốn sách cho bài luận lịch sử.",
+    "en": "The student clearly states their purpose for visiting the library is to borrow a few books for a history essay."
+  },
+  "233": {
+    "quizId": 51,
+    "vi": "Thủ thư hỏi sinh viên có mang theo thẻ sinh viên không và sinh viên đã đồng ý đưa ra, chứng tỏ đây là vật cần thiết.",
+    "en": "The librarian asks if the student has a student ID card, and the student provides it, showing it is the required item."
+  },
+  "234": {
+    "quizId": 51,
+    "vi": "Thủ thư thông báo rõ ràng rằng sinh viên đại học có thể mượn tối đa năm cuốn sách cùng một lúc.",
+    "en": "The librarian explicitly informs the undergraduate student that they can borrow a maximum of five books at the same time."
+  },
+  "235": {
+    "quizId": 51,
+    "vi": "Thủ thư cho biết thời gian cho mượn tiêu chuẩn đối với sách là đúng hai tuần.",
+    "en": "The librarian states that the standard loan period for borrowing books is exactly two weeks."
+  },
+  "236": {
+    "quizId": 51,
+    "vi": "Thủ thư giải thích rằng học sinh có thể chọn gia hạn trực tuyến hoặc trực tiếp tại quầy lễ tân nếu cần dùng lâu hơn.",
+    "en": "The librarian explains that the student can choose to renew the books either online or directly at the front desk if they need them longer."
+  },
+  "238": {
+    "quizId": 52,
+    "vi": "Khách hàng hỏi tìm sữa và nhân viên đáp rằng sữa ở lối đi số 4.",
+    "en": "The customer asks to find the milk, and the clerk replies that the milk is in aisle 4."
+  },
+  "239": {
+    "quizId": 52,
+    "vi": "Nhân viên xác nhận tiệm bánh vừa mới nướng bánh mì tươi sáng nay.",
+    "en": "The clerk confirms that the bakery section just baked some fresh bread this morning."
+  },
+  "240": {
+    "quizId": 52,
+    "vi": "Nhân viên cho biết giá táo là một đô la rưỡi một pound.",
+    "en": "The clerk states that the apples cost one dollar and fifty cents a pound."
+  },
+  "241": {
+    "quizId": 52,
+    "vi": "Khách hàng hỏi trực tiếp xem có thể trả bằng thẻ tín dụng không và thu ngân xác nhận.",
+    "en": "The customer directly asks if they can pay with a credit card, and the cashier confirms."
+  },
+  "242": {
+    "quizId": 52,
+    "vi": "Thu ngân hỏi khách hàng có muốn lấy hóa đơn không sau khi thanh toán.",
+    "en": "The cashier asks the customer if they would like a receipt after the payment."
+  },
+  "244": {
+    "quizId": 53,
+    "vi": "Alex nhờ giúp đỡ vì anh ấy vừa mở hộp máy tính xách tay làm việc mới và không biết bắt đầu thiết lập từ đâu.",
+    "en": "Alex asks for help because he just unboxed his new work laptop and does not know where to start setting it up."
+  },
+  "245": {
+    "quizId": 53,
+    "vi": "Bước đầu tiên Jamie yêu cầu Alex làm là bật máy và kết nối vào mạng Wi-Fi có tên CorpNet-Secure.",
+    "en": "The first step Jamie asks Alex to do is turn on the computer and connect to the Wi-Fi network named CorpNet-Secure."
+  },
+  "246": {
+    "quizId": 53,
+    "vi": "Jamie hướng dẫn Alex sử dụng địa chỉ email công ty và mật khẩu mạng tiêu chuẩn để đăng nhập vào máy tính.",
+    "en": "Jamie instructs Alex to use his company email address and standard network password to log into the laptop."
+  },
+  "247": {
+    "quizId": 53,
+    "vi": "Hệ thống yêu cầu khởi động lại sau khi các bản cập nhật ban đầu được hoàn tất.",
+    "en": "A quick system restart is needed after the initial updates finish."
+  },
+  "248": {
+    "quizId": 53,
+    "vi": "Alex hỏi cách cài đặt phần mềm thiết kế của mình vì anh ấy không thấy nó trên màn hình nền.",
+    "en": "Alex asks how to install his design software because he does not see it on the desktop."
+  },
+  "250": {
+    "quizId": 54,
+    "vi": "Sarah đã chào David ngay từ đầu đoạn hội thoại khi anh mới đến công ty.",
+    "en": "Sarah greeted David right at the beginning of the conversation when he first arrived at the company."
+  },
+  "251": {
+    "quizId": 54,
+    "vi": "David đã trả lời xác nhận khi Sarah hỏi về việc anh chuyển đến từ văn phòng Chicago.",
+    "en": "David confirmed that he transferred from the company's Chicago office when Sarah asked about it."
+  },
+  "252": {
+    "quizId": 54,
+    "vi": "Sarah đề nghị dẫn David đi tham quan và anh ấy đã đồng ý, đặc biệt muốn biết chỗ máy cà phê.",
+    "en": "Sarah offered to give David a tour, and he gladly accepted, specifically asking to see where the coffee was."
+  },
+  "253": {
+    "quizId": 54,
+    "vi": "Sarah nói đùa rằng máy pha cà phê là thứ thiết yếu để sinh tồn ở văn phòng này.",
+    "en": "Sarah joked that the coffee machine is an essential item needed for survival around the office."
+  },
+  "254": {
+    "quizId": 54,
+    "vi": "Sarah thông báo rằng vào buổi trưa mọi người sẽ đưa David đi ăn trưa.",
+    "en": "Sarah informed David that a few colleagues are taking him out for lunch at noon."
+  },
+  "256": {
+    "quizId": 55,
+    "vi": "Khách hàng cho biết công việc của họ liên quan đến việc chỉnh sửa video chuyên nghiệp và kết xuất cảnh quay 4K.",
+    "en": "The customer states that their work involves professional video editing and rendering 4K footage."
+  },
+  "257": {
+    "quizId": 55,
+    "vi": "Khách hàng phàn nàn rằng chiếc máy hiện tại của anh ấy bị giật lag kinh khủng và thậm chí đôi khi bị sập nguồn khi làm việc.",
+    "en": "The customer complains that his current machine lags terribly and sometimes even crashes during work."
+  },
+  "258": {
+    "quizId": 55,
+    "vi": "Nhân viên bán hàng nhấn mạnh rằng khách hàng cần một card đồ họa rời mạnh mẽ và ít nhất 32GB RAM để xử lý công việc mượt mà.",
+    "en": "The sales representative emphasizes that the customer needs a robust dedicated graphics card and at least thirty-two gigabytes of RAM to keep things smooth."
+  },
+  "259": {
+    "quizId": 55,
+    "vi": "Nhân viên bán hàng nêu rõ mẫu CreatorPro 17 có giá cao hơn hai trăm đô la so với mẫu đầu tiên nhờ bộ xử lý nhanh hơn và màn hình lớn hơn.",
+    "en": "The sales representative specifies that the second model costs two hundred dollars more than the first one due to a faster processor and a larger screen."
+  },
+  "260": {
+    "quizId": 55,
+    "vi": "Khách hàng kết luận cuộc trò chuyện bằng cách đồng ý mua mẫu máy nâng cao cùng với đế cắm USB-C và yêu cầu hoàn tất giao dịch.",
+    "en": "The customer concludes the conversation by agreeing to purchase the upgraded laptop model along with a USB-C docking station and requests to complete the transaction."
+  },
+  "262": {
+    "quizId": 56,
+    "vi": "Khách hàng cho biết họ cần thêm một chút thời gian để xem thực đơn khi được hỏi có sẵn sàng chưa.",
+    "en": "The customer states that they need just another minute to look over the menu when asked if they are ready."
+  },
+  "263": {
+    "quizId": 56,
+    "vi": "Nhân viên phục vụ gợi ý món salad củ cải đường nướng và phô mai dê là món khai vị rất phổ biến.",
+    "en": "The waiter recommends the roasted beet and goat cheese salad as a very popular starter option."
+  },
+  "264": {
+    "quizId": 56,
+    "vi": "Khách hàng trả lời yêu cầu độ chín của bít tết là chín vừa.",
+    "en": "The customer requests their steak to be prepared medium-rare."
+  },
+  "265": {
+    "quizId": 56,
+    "vi": "Khách hàng hỏi xem món ăn có kèm theo khoai tây nghiền không và nhận được xác nhận từ nhân viên phục vụ.",
+    "en": "The customer asks if the dish comes with mashed potatoes and receives confirmation from the waiter."
+  },
+  "266": {
+    "quizId": 56,
+    "vi": "Khách hàng gọi một ly rượu vang Cabernet Sauvignon đậm đà để uống cùng bữa ăn.",
+    "en": "The customer orders a glass of robust Cabernet Sauvignon to accompany the meal."
+  },
+  "268": {
+    "quizId": 57,
+    "vi": "Julian đề cập rằng trước khi tham gia, họ có quy trình đánh giá không chính thức để đảm bảo mọi người hiểu rõ khối lượng công việc.",
+    "en": "Julian mentions that before joining, they hold an informal vetting process to ensure everyone understands the workload."
+  },
+  "269": {
+    "quizId": 57,
+    "vi": "Clara bày tỏ rằng đây chính xác là sự thúc đẩy nghiêm ngặt mà cô ấy cần để cân bằng với công việc.",
+    "en": "Clara expresses that this is precisely the rigorous push she needs right now."
+  },
+  "270": {
+    "quizId": 57,
+    "vi": "Julian giải thích rằng định dạng của nhóm dựa trên việc thảo luận bàn tròn phê bình các bài báo đã lưu hành trước.",
+    "en": "Julian explains that the group format relies on roundtable critiques of pre-circulated papers."
+  },
+  "271": {
+    "quizId": 57,
+    "vi": "Julian nêu rõ rằng nếu một thành viên kém hiệu quả kinh niên, họ sẽ nhẹ nhàng yêu cầu người đó rời nhóm.",
+    "en": "Julian states that if a member chronically underperforms, they are gently asked to step down."
+  },
+  "272": {
+    "quizId": 57,
+    "vi": "Julian đề nghị Clara tham gia buổi họp vào thứ Năm này với tư cách là quan sát viên để tự đánh giá bầu không khí.",
+    "en": "Julian suggests that Clara join the meeting this Thursday as an observer to assess the dynamic."
+  },
+  "274": {
+    "quizId": 58,
+    "vi": "Bệnh nhân đến gặp bác sĩ chuyên khoa do tình trạng mệt mỏi kéo dài và cứng khớp, đặc biệt là vào buổi sáng.",
+    "en": "The patient visits the specialist due to ongoing fatigue and joint stiffness, particularly during the mornings."
+  },
+  "275": {
+    "quizId": 58,
+    "vi": "Bệnh nhân chia sẻ rằng các triệu chứng bắt đầu một cách âm ỉ từ hơn sáu tháng trước.",
+    "en": "The patient shares that the symptoms began subtly over a period of more than six months."
+  },
+  "276": {
+    "quizId": 58,
+    "vi": "Bác sĩ đề nghị thực hiện một bảng xét nghiệm máu toàn diện để kiểm tra các dấu hiệu viêm cùng với chụp MRI các khớp.",
+    "en": "The doctor recommends conducting a comprehensive blood panel to check for inflammatory markers along with an MRI of the joints."
+  },
+  "277": {
+    "quizId": 58,
+    "vi": "Bác sĩ cho biết các triệu chứng gợi ý cần phải loại trừ bệnh lý khớp viêm thông qua các xét nghiệm.",
+    "en": "The doctor states that the symptoms suggest the need to rule out an inflammatory arthropathy through further testing."
+  },
+  "278": {
+    "quizId": 58,
+    "vi": "Bác sĩ khuyên bệnh nhân nên duy trì việc ghi chép nhật ký triệu chứng và phân phối hợp lý các hoạt động thể chất hàng ngày trong thời gian chờ kết quả.",
+    "en": "The doctor advises the patient to keep a detailed symptom diary and pace daily physical activities while waiting for the results."
+  }
+}

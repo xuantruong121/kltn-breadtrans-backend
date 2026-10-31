@@ -102,7 +102,7 @@ export class NotificationsCronService {
           wordId: true,
           word: {
             select: {
-              word: true,
+              entry: { select: { displayWord: true } },
               topic: {
                 select: { id: true, title: true },
               },
@@ -149,7 +149,7 @@ export class NotificationsCronService {
       const notificationErrors: unknown[] = [];
       for (const [userId, items] of userItemsMap.entries()) {
         const count = items.length;
-        const firstWord = items[0]?.word?.word || 'từ mới';
+        const firstWord = items[0]?.word?.entry?.displayWord || 'từ mới';
         const topicId = items[0]?.word?.topic?.id;
         const topicTitle = items[0]?.word?.topic?.title || 'Từ vựng';
 

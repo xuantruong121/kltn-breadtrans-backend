@@ -44,6 +44,7 @@ import type {
   ToeicPart1CandidateAnalysis,
   ToeicPart1QuestionCandidate,
 } from '../ai/strategies/ai-evaluator.interface';
+import { listeningScriptLengthIssue } from './toeic-listening-length';
 
 const TOEIC_AI_QUEUE = 'breadtrans-toeic-ai-exam';
 const PRACTICE_DISCLAIMER =
@@ -1587,6 +1588,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException(
           `Nhóm Listening ${index + 1} thiếu nội dung cần nghe`,
         );
+      const lengthIssue = listeningScriptLengthIssue(part, group.transcript);
+      if (lengthIssue)
+        throw new BadRequestException(`Nhóm ${index + 1}: ${lengthIssue}`);
       if ([6, 7].includes(part) && !String(group.passageText ?? '').trim())
         throw new BadRequestException(
           `Nhóm Reading ${index + 1} thiếu passage`,

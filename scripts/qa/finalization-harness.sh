@@ -16,7 +16,8 @@
 #                       harness-pg as <db>, dropping a previous <db>; flush harness Redis
 #   fakes             : fake S3 on :9460 (public + private buckets under $WORK)
 #   qa-backend <db>   : deterministic-AI backend (scripts/qa/writing-deterministic-server.ts)
-#                       on :3101 against harness database <db>
+#                       on :3101 against harness database <db>; QA_DICTIONARY_URL points
+#                       dictionary lookups at a local stand-in
 #   qa-frontend <dir> : frontend dev server on :3100 from <dir> (use a worktree, not
 #                       the owner's checkout; build dir .next-harness, webpack)
 #   stop              : stop :3100, :3101 and :9460 (containers keep running)
@@ -180,6 +181,7 @@ case "${1:-}" in
         R2_PUBLIC_URL="${QA_R2_PUBLIC_URL:-}" TOEIC_LISTENING_MASTER_BASE_URL="${QA_MASTER_BASE_URL:-}" \
         JWT_SECRET=harness-only-jwt-secret POSTGRES_BACKUP_DIR="$WORK/backups" \
         WRITING_QA_COUNTER_FILE="$WORK/grader-calls.json" $EXTERNAL_BLANKS \
+        ${QA_DICTIONARY_URL:+DICTIONARY_API_BASE_URL=$QA_DICTIONARY_URL} \
         nohup npx ts-node --transpile-only scripts/qa/writing-deterministic-server.ts \
         > "$WORK/qa-backend.log" 2>&1 < /dev/null &)
     wait_http http://localhost:3101/writing/topics 200

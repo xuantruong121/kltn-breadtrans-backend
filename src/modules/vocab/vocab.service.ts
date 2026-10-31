@@ -10,6 +10,7 @@ import { DictionaryLookupService } from './dictionary-lookup.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { DECK_WORD_INCLUDE, flattenDeckWord } from './dictionary-entry';
 
 @Injectable()
 export class VocabService {
@@ -115,6 +116,8 @@ export class VocabService {
       categoriesMap[cat].push({
         id: t.id,
         title: t.title,
+        description: t.description,
+        level: t.level,
         categoryName: t.categoryName,
         totalWords: t.totalWords,
         learnedCount: prog.mastered,
@@ -139,6 +142,8 @@ export class VocabService {
       return {
         id: t.id,
         title: t.title,
+        description: t.description,
+        level: t.level,
         categoryName: t.categoryName,
         totalWords: t.totalWords,
         learnedCount: prog.mastered,
@@ -167,10 +172,13 @@ export class VocabService {
       throw new NotFoundException('Topic not found');
     }
 
-    const words = await this.prisma.vocabWord.findMany({
-      where: { topicId },
-      orderBy: { order: 'asc' },
-    });
+    const words = (
+      await this.prisma.vocabWord.findMany({
+        where: { topicId },
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        include: DECK_WORD_INCLUDE,
+      })
+    ).map(flattenDeckWord);
 
     const userProgressMap: Record<
       number,
@@ -408,26 +416,29 @@ export class VocabService {
       );
     }
 
-    const selectFields = {
-      id: true,
-      word: true,
-      pos: true,
-      ipaUs: true,
-      ipaUk: true,
-      meaning: true,
-      exampleEn: true,
-      exampleVi: true,
-      audioUs: true,
-      audioUk: true,
-      collocations: true,
-    };
+    // The dictionary store, flattened to the old word shape.
+    const findEntries = async (headwords: string[]) =>
+      (
+        (await this.prisma.dictionaryEntry.findMany({
+          where: { headword: { in: headwords }, status: { not: 'REJECTED' } },
+          orderBy: [{ status: 'asc' }, { id: 'asc' }],
+          take: 5,
+        })) ?? []
+      ).map((entry) => ({
+        id: entry.id,
+        word: entry.displayWord,
+        pos: entry.pos,
+        ipaUs: entry.ipaUs,
+        ipaUk: entry.ipaUk,
+        meaning: entry.meaningVi,
+        exampleEn: entry.exampleEn,
+        exampleVi: entry.exampleVi,
+        audioUs: entry.audioUs,
+        audioUk: entry.audioUk,
+        collocations: entry.collocations,
+      }));
     // 1. Try exact word match first
-    const exactMatches =
-      (await this.prisma.vocabWord.findMany({
-        where: { word: { equals: cleanWord, mode: 'insensitive' } },
-        take: 5,
-        select: selectFields,
-      })) ?? [];
+    const exactMatches = await findEntries([cleanWord]);
 
     if (exactMatches.length > 0) {
       return {
@@ -441,12 +452,7 @@ export class VocabService {
     // 2. Try common English inflections (plural, past tense, continuous, adverbs)
     const candidates = this.generateInflectionCandidates(cleanWord);
     if (candidates.length > 0) {
-      const inflectionMatches =
-        (await this.prisma.vocabWord.findMany({
-          where: { word: { in: candidates, mode: 'insensitive' } },
-          take: 5,
-          select: selectFields,
-        })) ?? [];
+      const inflectionMatches = await findEntries(candidates);
 
       if (inflectionMatches.length > 0) {
         return {

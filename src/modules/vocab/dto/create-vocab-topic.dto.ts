@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsBoolean,
+  IsIn,
+  MaxLength,
+} from 'class-validator';
+
+export const VOCAB_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateVocabTopicDto {
@@ -21,4 +30,14 @@ export class CreateVocabTopicDto {
   @IsString()
   @IsOptional()
   iconUrl?: string;
+  @ApiPropertyOptional({ example: 'Từ vựng khi họp và trao đổi công việc' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  description?: string;
+
+  @ApiPropertyOptional({ example: 'B1', enum: VOCAB_LEVELS })
+  @IsIn(VOCAB_LEVELS)
+  @IsOptional()
+  level?: string;
 }

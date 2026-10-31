@@ -26,6 +26,7 @@ import { SpeakingWorkerService } from './speaking-worker.service';
 import { SpeakingQueueService } from './speaking-queue.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import { recordAzureTts, spokenCharacters } from '../ai/azure-usage';
 import * as crypto from 'crypto';
 import { getSpeakingPipelineMode } from './speaking.constants';
 import {
@@ -220,12 +221,17 @@ export const DAILY_PRACTICE_SPEAKING_LIMIT = 10;
 export const DAILY_EXAM_SPEAKING_LIMIT = 33;
 
 /**
- * Reference clips made by scripts/speaking-reference-audio.ts have a British
- * English twin beside the US one (<id>.en-gb.v1.mp3). Other media has none.
+ * The British pass of scripts/speaking-reference-audio.ts covered exercises up
+ * to 186 (<id>.en-gb.v<n>.mp3 beside the US clip), measured against storage on
+ * 2026-10-31. Later clips have no twin, and a guessed URL is a 404 the player
+ * cannot fall back from.
  */
+const LAST_BRITISH_CLIP = 186;
+
 export function britishReferenceUrl(audioUrl: string | null): string | null {
-  return audioUrl && /\/speaking\/reference\/\d+\.v1\.mp3$/.test(audioUrl)
-    ? audioUrl.replace(/\.v1\.mp3$/, '.en-gb.v1.mp3')
+  const id = audioUrl?.match(/\/speaking\/reference\/(\d+)\.v\d+\.mp3$/)?.[1];
+  return audioUrl && id && Number(id) <= LAST_BRITISH_CLIP
+    ? audioUrl.replace(/\.(v\d+)\.mp3$/, '.en-gb.$1.mp3')
     : null;
 }
 
@@ -334,6 +340,8 @@ export class SpeakingService {
       isPremiumContent: boolean;
       isLocked: boolean;
       requiredPlan?: string;
+      isLevelLocked?: boolean;
+      practiceLevel?: string | null;
       cefrLevel?: string | null;
     },
   ) {
@@ -361,6 +369,8 @@ export class SpeakingService {
       stimulusId: exercise.stimulusId,
       isPremiumContent: access.isPremiumContent,
       isLocked: access.isLocked,
+      isLevelLocked: access.isLevelLocked ?? false,
+      practiceLevel: access.practiceLevel ?? null,
       requiredPlan: access.requiredPlan ?? 'FREE',
       cefrLevel: access.cefrLevel ?? null,
     };
@@ -1619,6 +1629,7 @@ export class SpeakingService {
     }
 
     const audioBuffer = Buffer.from(await response.arrayBuffer());
+    await recordAzureTts(this.redis, spokenCharacters(ssml));
     if (this.redis) {
       try {
         await this.redis.set(
@@ -1668,10 +1679,13 @@ export class SpeakingService {
 
     // 1. Prefer stored audioUs/audioUk for exact single vocabulary words if rate == 1
     if (rate === 1.0 && !trimmedText.includes(' ')) {
-      const vocabWord = await this.prisma.vocabWord.findFirst({
+      // The dictionary store; reviewed entries first, a stable pick.
+      const vocabWord = await this.prisma.dictionaryEntry.findFirst({
         where: {
-          word: { equals: trimmedText.toLowerCase(), mode: 'insensitive' },
+          headword: trimmedText.toLowerCase(),
+          status: { not: 'REJECTED' },
         },
+        orderBy: [{ status: 'asc' }, { id: 'asc' }],
         select: { audioUs: true, audioUk: true },
       });
       const storedUrl =

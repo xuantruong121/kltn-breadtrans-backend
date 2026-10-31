@@ -1,0 +1,1141 @@
+{
+ "questions": [
+  {
+   "id": 238,
+   "content": {
+    "text": "Where can the customer find the milk?",
+    "level": "A2",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "Aisle 3",
+     "Aisle 5",
+     "Aisle 4",
+     "Aisle 6"
+    ],
+    "audioText": "Excuse me, could you tell me where I can find the milk? Of course! The milk is in aisle 4, right at the back of the store. Thank you. And where is the fresh bread? The bakery section is right next to aisle 4. We just baked some fresh bread this morning. Great! Also, are the apples on sale? Yes, they are one dollar and fifty cents a pound. I will take a small bag of them then. Thanks for your help. You're welcome. You can check out at register number 2. Did you find everything you needed today? Yes, thank you. Can I pay with a credit card? Yes, just tap your card on the machine. Would you like a receipt? Yes, please. Here it is. Thank you, have a wonderful day!",
+    "explanation": {
+     "en": "The customer asks to find the milk, and the clerk replies that the milk is in aisle 4.",
+     "vi": "Khách hàng hỏi tìm sữa và nhân viên đáp rằng sữa ở lối đi số 4.",
+     "evidence": "The milk is in aisle 4, right at the back of the store."
+    },
+    "correctIndex": 2,
+    "transcriptSegments": [
+     {
+      "text": "Excuse me, could you tell me where I can find the milk?",
+      "speaker": "Customer",
+      "translation": "Xin lỗi, bạn có thể cho tôi biết tôi có thể tìm sữa ở đâu không?"
+     },
+     {
+      "text": "Of course! The milk is in aisle 4, right at the back of the store.",
+      "speaker": "Clerk",
+      "translation": "Chắc chắn rồi! Sữa ở lối đi số 4, ngay ở phía sau cửa hàng."
+     },
+     {
+      "text": "Thank you. And where is the fresh bread?",
+      "speaker": "Customer",
+      "translation": "Cảm ơn bạn. Và bánh mì tươi ở đâu?"
+     },
+     {
+      "text": "The bakery section is right next to aisle 4. We just baked some fresh bread this morning.",
+      "speaker": "Clerk",
+      "translation": "Khu vực tiệm bánh ngay cạnh lối đi số 4. Chúng tôi vừa nướng một ít bánh mì tươi sáng nay."
+     },
+     {
+      "text": "Great! Also, are the apples on sale?",
+      "speaker": "Customer",
+      "translation": "Tuyệt vời! Ngoài ra, táo có đang được giảm giá không?"
+     },
+     {
+      "text": "Yes, they are one dollar and fifty cents a pound.",
+      "speaker": "Clerk",
+      "translation": "Có, chúng có giá một đô la rưỡi một pound."
+     },
+     {
+      "text": "I will take a small bag of them then. Thanks for your help.",
+      "speaker": "Customer",
+      "translation": "Tôi sẽ lấy một túi nhỏ vậy. Cảm ơn sự giúp đỡ của bạn."
+     },
+     {
+      "text": "You're welcome. You can check out at register number 2.",
+      "speaker": "Clerk",
+      "translation": "Không có gì. Bạn có thể thanh toán tại quầy số 2."
+     },
+     {
+      "text": "Did you find everything you needed today?",
+      "speaker": "Cashier",
+      "translation": "Bạn đã tìm thấy mọi thứ mình cần hôm nay chưa?"
+     },
+     {
+      "text": "Yes, thank you. Can I pay with a credit card?",
+      "speaker": "Customer",
+      "translation": "Vâng, cảm ơn bạn. Tôi có thể thanh toán bằng thẻ tín dụng không?"
+     },
+     {
+      "text": "Yes, just tap your card on the machine. Would you like a receipt?",
+      "speaker": "Cashier",
+      "translation": "Được chứ, chỉ cần chạm thẻ của bạn lên máy. Bạn có muốn lấy hóa đơn không?"
+     },
+     {
+      "text": "Yes, please. Here it is.",
+      "speaker": "Customer",
+      "translation": "Vâng, làm ơn. Của đây."
+     },
+     {
+      "text": "Thank you, have a wonderful day!",
+      "speaker": "Cashier",
+      "translation": "Cảm ơn bạn, chúc bạn có một ngày tuyệt vời!"
+     }
+    ]
+   }
+  },
+  {
+   "id": 268,
+   "content": {
+    "text": "What is the primary prerequisite for joining the study group mentioned by Julian?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "Going through an informal vetting process",
+     "Submitting a comprehensive research proposal",
+     "Having a high GPA in undergraduate courses",
+     "Paying a small monthly membership fee"
+    ],
+    "audioText": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group. Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it. Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload. I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft. Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option. That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind? We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum. That is completely fair. How can I get started? Should I submit a writing sample? No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit. That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+    "explanation": {
+     "en": "Julian mentions that before joining, they hold an informal vetting process to ensure everyone understands the workload.",
+     "vi": "Julian đề cập rằng trước khi tham gia, họ có quy trình đánh giá không chính thức để đảm bảo mọi người hiểu rõ khối lượng công việc.",
+     "evidence": "Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload."
+    },
+    "correctIndex": 0,
+    "transcriptSegments": [
+     {
+      "text": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group.",
+      "speaker": "Julian",
+      "translation": "Chào Clara, tôi nghe nói bạn có hứng thú tham gia nhóm nghiên cứu sau đại học của chúng tôi."
+     },
+     {
+      "text": "Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it.",
+      "speaker": "Clara",
+      "translation": "Vâng, hoàn toàn đúng vậy. Cố vấn của tôi gợi ý tôi nên tìm một buổi hội thảo do đồng nghiệp dẫn dắt để mài giũa phương pháp luận của mình, và danh tiếng của nhóm các bạn thì ai cũng biết."
+     },
+     {
+      "text": "Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload.",
+      "speaker": "Julian",
+      "translation": "Chà, chúng tôi rất nghiêm túc với các buổi sinh hoạt của mình. Trước khi bạn chính thức tham gia, chúng tôi thường mời các thành viên tiềm năng tham gia một quy trình đánh giá không chính thức chỉ để đảm bảo mọi người đều có chung quan điểm về khối lượng công việc."
+     },
+     {
+      "text": "I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft.",
+      "speaker": "Clara",
+      "translation": "Tôi đánh giá cao điều đó. Khối lượng bài đọc hàng tuần nặng đến mức nào? Tôi muốn đảm bảo rằng mình có thể cân bằng nó với bản thảo luận văn của mình."
+     },
+     {
+      "text": "Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option.",
+      "speaker": "Julian",
+      "translation": "Thông thường khoảng hai bài báo khoa học dày đặc hoặc một chương lý thuyết nền tảng mỗi tuần. Hơn nữa, định dạng dựa trên việc thảo luận bàn tròn phê bình các bài báo đã được lưu hành trước, vì vậy việc tham dự một cách thụ động không thực sự khả thi."
+     },
+     {
+      "text": "That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind?",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ căng thẳng, nhưng thành thật mà nói, đó chính xác là loại thúc đẩy nghiêm ngặt mà tôi cần lúc này."
+     },
+     {
+      "text": "We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum.",
+      "speaker": "Julian",
+      "translation": "Chúng tôi có nương tay một chút trong thời gian cao điểm giữa kỳ, tất nhiên rồi. Tuy nhiên, nếu một thành viên liên tục kém hiệu quả hoặc ngừng đóng góp, chúng tôi sẽ nhẹ nhàng yêu cầu họ từ chức để duy trì đà trí tuệ."
+     },
+     {
+      "text": "That is completely fair. How can I get started? Should I submit a writing sample?",
+      "speaker": "Clara",
+      "translation": "Điều đó hoàn toàn công bằng. Tôi có thể bắt đầu bằng cách nào? Tôi có nên nộp một mẫu bài viết không?"
+     },
+     {
+      "text": "No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit.",
+      "speaker": "Julian",
+      "translation": "Không cần mẫu bài viết nào lúc này. Tại sao bạn không tham gia cùng chúng tôi vào thứ Năm này với tư cách là một quan sát viên?"
+     },
+     {
+      "text": "That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ là một kế hoạch hay. Hãy gửi tài liệu đọc bất cứ khi nào bạn có cơ hội, và hẹn gặp lại bạn vào thứ Năm."
+     }
+    ]
+   }
+  },
+  {
+   "id": 272,
+   "content": {
+    "text": "What is Clara's next immediate step regarding the study group?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "To attend this Thursday's meeting as an observer",
+     "To submit her application form by midnight",
+     "To present her dissertation outline to Julian",
+     "To purchase the mandatory reading materials"
+    ],
+    "audioText": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group. Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it. Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload. I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft. Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option. That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind? We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum. That is completely fair. How can I get started? Should I submit a writing sample? No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit. That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+    "explanation": {
+     "en": "Julian suggests that Clara join the meeting this Thursday as an observer to assess the dynamic.",
+     "vi": "Julian đề nghị Clara tham gia buổi họp vào thứ Năm này với tư cách là quan sát viên để tự đánh giá bầu không khí.",
+     "evidence": "Why don't you join us this Thursday as an observer?"
+    },
+    "correctIndex": 0,
+    "transcriptSegments": [
+     {
+      "text": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group.",
+      "speaker": "Julian",
+      "translation": "Chào Clara, tôi nghe nói bạn có hứng thú tham gia nhóm nghiên cứu sau đại học của chúng tôi."
+     },
+     {
+      "text": "Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it.",
+      "speaker": "Clara",
+      "translation": "Vâng, hoàn toàn đúng vậy. Cố vấn của tôi gợi ý tôi nên tìm một buổi hội thảo do đồng nghiệp dẫn dắt để mài giũa phương pháp luận của mình, và danh tiếng của nhóm các bạn thì ai cũng biết."
+     },
+     {
+      "text": "Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload.",
+      "speaker": "Julian",
+      "translation": "Chà, chúng tôi rất nghiêm túc với các buổi sinh hoạt của mình. Trước khi bạn chính thức tham gia, chúng tôi thường mời các thành viên tiềm năng tham gia một quy trình đánh giá không chính thức chỉ để đảm bảo mọi người đều có chung quan điểm về khối lượng công việc."
+     },
+     {
+      "text": "I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft.",
+      "speaker": "Clara",
+      "translation": "Tôi đánh giá cao điều đó. Khối lượng bài đọc hàng tuần nặng đến mức nào? Tôi muốn đảm bảo rằng mình có thể cân bằng nó với bản thảo luận văn của mình."
+     },
+     {
+      "text": "Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option.",
+      "speaker": "Julian",
+      "translation": "Thông thường khoảng hai bài báo khoa học dày đặc hoặc một chương lý thuyết nền tảng mỗi tuần. Hơn nữa, định dạng dựa trên việc thảo luận bàn tròn phê bình các bài báo đã được lưu hành trước, vì vậy việc tham dự một cách thụ động không thực sự khả thi."
+     },
+     {
+      "text": "That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind?",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ căng thẳng, nhưng thành thật mà nói, đó chính xác là loại thúc đẩy nghiêm ngặt mà tôi cần lúc này."
+     },
+     {
+      "text": "We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum.",
+      "speaker": "Julian",
+      "translation": "Chúng tôi có nương tay một chút trong thời gian cao điểm giữa kỳ, tất nhiên rồi. Tuy nhiên, nếu một thành viên liên tục kém hiệu quả hoặc ngừng đóng góp, chúng tôi sẽ nhẹ nhàng yêu cầu họ từ chức để duy trì đà trí tuệ."
+     },
+     {
+      "text": "That is completely fair. How can I get started? Should I submit a writing sample?",
+      "speaker": "Clara",
+      "translation": "Điều đó hoàn toàn công bằng. Tôi có thể bắt đầu bằng cách nào? Tôi có nên nộp một mẫu bài viết không?"
+     },
+     {
+      "text": "No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit.",
+      "speaker": "Julian",
+      "translation": "Không cần mẫu bài viết nào lúc này. Tại sao bạn không tham gia cùng chúng tôi vào thứ Năm này với tư cách là một quan sát viên?"
+     },
+     {
+      "text": "That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ là một kế hoạch hay. Hãy gửi tài liệu đọc bất cứ khi nào bạn có cơ hội, và hẹn gặp lại bạn vào thứ Năm."
+     }
+    ]
+   }
+  },
+  {
+   "id": 274,
+   "content": {
+    "text": "What primary symptom brings the patient to the specialist?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "Intermittent acute migraines",
+     "Persistent fatigue and joint stiffness",
+     "Chronic respiratory congestion",
+     "Gastrointestinal discomfort"
+    ],
+    "audioText": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words. Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings. And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema? It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of. Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints. Should I be preparing myself for a complex treatment regimen once the results come in? Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+    "explanation": {
+     "en": "The patient visits the specialist due to ongoing fatigue and joint stiffness, particularly during the mornings.",
+     "vi": "Bệnh nhân đến gặp bác sĩ chuyên khoa do tình trạng mệt mỏi kéo dài và cứng khớp, đặc biệt là vào buổi sáng.",
+     "evidence": "recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings."
+    },
+    "correctIndex": 1,
+    "transcriptSegments": [
+     {
+      "text": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words.",
+      "speaker": "Dr. Vance",
+      "translation": "Chào buổi sáng, cô Holloway. Mời cô ngồi. Tôi đã xem qua ghi chú giới thiệu ban đầu của cô, nhưng tôi muốn nghe về sự tiến triển các triệu chứng của cô theo chính lời cô kể."
+     },
+     {
+      "text": "Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings.",
+      "speaker": "Ms. Holloway",
+      "translation": "Cảm ơn bác sĩ. Vâng, mọi thứ bắt đầu âm ỉ từ hơn sáu tháng trước với tình trạng khó chịu chung, nhưng gần đây sự mệt mỏi kéo dài và cứng khớp đã trở nên khá suy nhược, đặc biệt là vào buổi sáng."
+     },
+     {
+      "text": "And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema?",
+      "speaker": "Dr. Vance",
+      "translation": "Và khi cô bị cứng khớp này, nó khu trú ở các khớp cụ thể, hay lan tỏa hơn? Ngoài ra, cô có nhận thấy bất kỳ vết sưng tấy hoặc ban đỏ nào không?"
+     },
+     {
+      "text": "It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of.",
+      "speaker": "Ms. Holloway",
+      "translation": "Chủ yếu ở bàn tay và đầu gối của tôi. Tôi có nhận thấy một số vết sưng nhẹ quanh các khớp ngón tay, mặc dù không có hiện tượng đỏ đáng kể nào để nói đến."
+     },
+     {
+      "text": "Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints.",
+      "speaker": "Dr. Vance",
+      "translation": "Đã hiểu. Dựa trên biểu hiện lâm sàng, chúng ta cần loại trừ bệnh lý khớp viêm. Tôi sẽ chỉ định một bảng xét nghiệm máu toàn diện để kiểm tra các dấu1 viêm của cô, bên cạnh chụp MRI các khớp bị ảnh hưởng."
+     },
+     {
+      "text": "Should I be preparing myself for a complex treatment regimen once the results come in?",
+      "speaker": "Ms. Holloway",
+      "translation": "Tôi có nên chuẩn bị tinh thần cho một phác đồ điều trị phức tạp một khi có kết quả không?"
+     },
+     {
+      "text": "Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+      "speaker": "Dr. Vance",
+      "translation": "Đừng vội phỏng đoán kết quả. Khi chúng ta có dữ liệu, chúng ta sẽ điều chỉnh một kế hoạch can thiệp chính xác. Trong thời gian chờ đợi, tôi đặc biệt khuyên cô nên giữ một nhật ký triệu chứng tỉ mỉ và điều chỉnh nhịp độ các hoạt động thể chất hàng ngày."
+     }
+    ]
+   }
+  },
+  {
+   "id": 271,
+   "content": {
+    "text": "What consequence does Julian outline for members who consistently fail to contribute?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "They are politely asked to step down to preserve the group's momentum.",
+     "They are required to host the next three meetings.",
+     "They are permanently banned from the university library.",
+     "They must pay a fine to the group's coffee fund."
+    ],
+    "audioText": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group. Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it. Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload. I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft. Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option. That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind? We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum. That is completely fair. How can I get started? Should I submit a writing sample? No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit. That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+    "explanation": {
+     "en": "Julian states that if a member chronically underperforms, they are gently asked to step down.",
+     "vi": "Julian nêu rõ rằng nếu một thành viên kém hiệu quả kinh niên, họ sẽ nhẹ nhàng yêu cầu người đó rời nhóm.",
+     "evidence": "However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum."
+    },
+    "correctIndex": 0,
+    "transcriptSegments": [
+     {
+      "text": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group.",
+      "speaker": "Julian",
+      "translation": "Chào Clara, tôi nghe nói bạn có hứng thú tham gia nhóm nghiên cứu sau đại học của chúng tôi."
+     },
+     {
+      "text": "Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it.",
+      "speaker": "Clara",
+      "translation": "Vâng, hoàn toàn đúng vậy. Cố vấn của tôi gợi ý tôi nên tìm một buổi hội thảo do đồng nghiệp dẫn dắt để mài giũa phương pháp luận của mình, và danh tiếng của nhóm các bạn thì ai cũng biết."
+     },
+     {
+      "text": "Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload.",
+      "speaker": "Julian",
+      "translation": "Chà, chúng tôi rất nghiêm túc với các buổi sinh hoạt của mình. Trước khi bạn chính thức tham gia, chúng tôi thường mời các thành viên tiềm năng tham gia một quy trình đánh giá không chính thức chỉ để đảm bảo mọi người đều có chung quan điểm về khối lượng công việc."
+     },
+     {
+      "text": "I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft.",
+      "speaker": "Clara",
+      "translation": "Tôi đánh giá cao điều đó. Khối lượng bài đọc hàng tuần nặng đến mức nào? Tôi muốn đảm bảo rằng mình có thể cân bằng nó với bản thảo luận văn của mình."
+     },
+     {
+      "text": "Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option.",
+      "speaker": "Julian",
+      "translation": "Thông thường khoảng hai bài báo khoa học dày đặc hoặc một chương lý thuyết nền tảng mỗi tuần. Hơn nữa, định dạng dựa trên việc thảo luận bàn tròn phê bình các bài báo đã được lưu hành trước, vì vậy việc tham dự một cách thụ động không thực sự khả thi."
+     },
+     {
+      "text": "That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind?",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ căng thẳng, nhưng thành thật mà nói, đó chính xác là loại thúc đẩy nghiêm ngặt mà tôi cần lúc này."
+     },
+     {
+      "text": "We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum.",
+      "speaker": "Julian",
+      "translation": "Chúng tôi có nương tay một chút trong thời gian cao điểm giữa kỳ, tất nhiên rồi. Tuy nhiên, nếu một thành viên liên tục kém hiệu quả hoặc ngừng đóng góp, chúng tôi sẽ nhẹ nhàng yêu cầu họ từ chức để duy trì đà trí tuệ."
+     },
+     {
+      "text": "That is completely fair. How can I get started? Should I submit a writing sample?",
+      "speaker": "Clara",
+      "translation": "Điều đó hoàn toàn công bằng. Tôi có thể bắt đầu bằng cách nào? Tôi có nên nộp một mẫu bài viết không?"
+     },
+     {
+      "text": "No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit.",
+      "speaker": "Julian",
+      "translation": "Không cần mẫu bài viết nào lúc này. Tại sao bạn không tham gia cùng chúng tôi vào thứ Năm này với tư cách là một quan sát viên?"
+     },
+     {
+      "text": "That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ là một kế hoạch hay. Hãy gửi tài liệu đọc bất cứ khi nào bạn có cơ hội, và hẹn gặp lại bạn vào thứ Năm."
+     }
+    ]
+   }
+  },
+  {
+   "id": 269,
+   "content": {
+    "text": "How does Clara feel about the heavy reading workload?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "She is hesitant and thinks it might be excessively demanding alongside her thesis.",
+     "She feels the reading list is outdated and irrelevant to modern academia.",
+     "She welcomes the challenge and believes it will complement her current research.",
+     "She has already read most of the literature on the syllabus."
+    ],
+    "audioText": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group. Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it. Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload. I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft. Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option. That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind? We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum. That is completely fair. How can I get started? Should I submit a writing sample? No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit. That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+    "explanation": {
+     "en": "Clara expresses that this is precisely the rigorous push she needs right now.",
+     "vi": "Clara bày tỏ rằng đây chính xác là sự thúc đẩy nghiêm ngặt mà cô ấy cần để cân bằng với công việc.",
+     "evidence": "That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now."
+    },
+    "correctIndex": 2,
+    "transcriptSegments": [
+     {
+      "text": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group.",
+      "speaker": "Julian",
+      "translation": "Chào Clara, tôi nghe nói bạn có hứng thú tham gia nhóm nghiên cứu sau đại học của chúng tôi."
+     },
+     {
+      "text": "Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it.",
+      "speaker": "Clara",
+      "translation": "Vâng, hoàn toàn đúng vậy. Cố vấn của tôi gợi ý tôi nên tìm một buổi hội thảo do đồng nghiệp dẫn dắt để mài giũa phương pháp luận của mình, và danh tiếng của nhóm các bạn thì ai cũng biết."
+     },
+     {
+      "text": "Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload.",
+      "speaker": "Julian",
+      "translation": "Chà, chúng tôi rất nghiêm túc với các buổi sinh hoạt của mình. Trước khi bạn chính thức tham gia, chúng tôi thường mời các thành viên tiềm năng tham gia một quy trình đánh giá không chính thức chỉ để đảm bảo mọi người đều có chung quan điểm về khối lượng công việc."
+     },
+     {
+      "text": "I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft.",
+      "speaker": "Clara",
+      "translation": "Tôi đánh giá cao điều đó. Khối lượng bài đọc hàng tuần nặng đến mức nào? Tôi muốn đảm bảo rằng mình có thể cân bằng nó với bản thảo luận văn của mình."
+     },
+     {
+      "text": "Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option.",
+      "speaker": "Julian",
+      "translation": "Thông thường khoảng hai bài báo khoa học dày đặc hoặc một chương lý thuyết nền tảng mỗi tuần. Hơn nữa, định dạng dựa trên việc thảo luận bàn tròn phê bình các bài báo đã được lưu hành trước, vì vậy việc tham dự một cách thụ động không thực sự khả thi."
+     },
+     {
+      "text": "That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind?",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ căng thẳng, nhưng thành thật mà nói, đó chính xác là loại thúc đẩy nghiêm ngặt mà tôi cần lúc này."
+     },
+     {
+      "text": "We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum.",
+      "speaker": "Julian",
+      "translation": "Chúng tôi có nương tay một chút trong thời gian cao điểm giữa kỳ, tất nhiên rồi. Tuy nhiên, nếu một thành viên liên tục kém hiệu quả hoặc ngừng đóng góp, chúng tôi sẽ nhẹ nhàng yêu cầu họ từ chức để duy trì đà trí tuệ."
+     },
+     {
+      "text": "That is completely fair. How can I get started? Should I submit a writing sample?",
+      "speaker": "Clara",
+      "translation": "Điều đó hoàn toàn công bằng. Tôi có thể bắt đầu bằng cách nào? Tôi có nên nộp một mẫu bài viết không?"
+     },
+     {
+      "text": "No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit.",
+      "speaker": "Julian",
+      "translation": "Không cần mẫu bài viết nào lúc này. Tại sao bạn không tham gia cùng chúng tôi vào thứ Năm này với tư cách là một quan sát viên?"
+     },
+     {
+      "text": "That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ là một kế hoạch hay. Hãy gửi tài liệu đọc bất cứ khi nào bạn có cơ hội, và hẹn gặp lại bạn vào thứ Năm."
+     }
+    ]
+   }
+  },
+  {
+   "id": 270,
+   "content": {
+    "text": "What specific format does the group use for their weekly sessions?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "Lectures given by visiting professors",
+     "Open-ended debates on contemporary philosophical issues",
+     "Roundtable critiques of pre-circulated draft papers",
+     "Collaborative textbook reading aloud"
+    ],
+    "audioText": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group. Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it. Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload. I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft. Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option. That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind? We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum. That is completely fair. How can I get started? Should I submit a writing sample? No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit. That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+    "explanation": {
+     "en": "Julian explains that the group format relies on roundtable critiques of pre-circulated papers.",
+     "vi": "Julian giải thích rằng định dạng của nhóm dựa trên việc thảo luận bàn tròn phê bình các bài báo đã lưu hành trước.",
+     "evidence": "Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option."
+    },
+    "correctIndex": 2,
+    "transcriptSegments": [
+     {
+      "text": "Hi Clara, I heard you were interested in sitting in on our postgraduate study group.",
+      "speaker": "Julian",
+      "translation": "Chào Clara, tôi nghe nói bạn có hứng thú tham gia nhóm nghiên cứu sau đại học của chúng tôi."
+     },
+     {
+      "text": "Yes, absolutely. My advisor suggested I look for a peer-led seminar to sharpen my methodology, and your group's reputation precedes it.",
+      "speaker": "Clara",
+      "translation": "Vâng, hoàn toàn đúng vậy. Cố vấn của tôi gợi ý tôi nên tìm một buổi hội thảo do đồng nghiệp dẫn dắt để mài giũa phương pháp luận của mình, và danh tiếng của nhóm các bạn thì ai cũng biết."
+     },
+     {
+      "text": "Well, we certainly take our sessions seriously. Before you officially jump in, we usually invite prospective members to an informal vetting process just to make sure everyone is on the same page regarding the workload.",
+      "speaker": "Julian",
+      "translation": "Chà, chúng tôi rất nghiêm túc với các buổi sinh hoạt của mình. Trước khi bạn chính thức tham gia, chúng tôi thường mời các thành viên tiềm năng tham gia một quy trình đánh giá không chính thức chỉ để đảm bảo mọi người đều có chung quan điểm về khối lượng công việc."
+     },
+     {
+      "text": "I appreciate that. How heavy is the reading load on a weekly basis? I want to make sure I can balance it with my thesis draft.",
+      "speaker": "Clara",
+      "translation": "Tôi đánh giá cao điều đó. Khối lượng bài đọc hàng tuần nặng đến mức nào? Tôi muốn đảm bảo rằng mình có thể cân bằng nó với bản thảo luận văn của mình."
+     },
+     {
+      "text": "Typically around two dense journal articles or a chapter of foundational theory per week. Furthermore, the format relies on roundtable critiques of pre-circulated papers, so passive attendance isn't really an option.",
+      "speaker": "Julian",
+      "translation": "Thông thường khoảng hai bài báo khoa học dày đặc hoặc một chương lý thuyết nền tảng mỗi tuần. Hơn nữa, định dạng dựa trên việc thảo luận bàn tròn phê bình các bài báo đã được lưu hành trước, vì vậy việc tham dự một cách thụ động không thực sự khả thi."
+     },
+     {
+      "text": "That sounds intense, but honestly, it is precisely the kind of rigorous push I need right now. What happens if someone falls behind?",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ căng thẳng, nhưng thành thật mà nói, đó chính xác là loại thúc đẩy nghiêm ngặt mà tôi cần lúc này."
+     },
+     {
+      "text": "We offer a bit of grace during midterm crunch times, of course. However, if a member chronically underperforms or stops contributing, we gently ask them to step down to preserve the intellectual momentum.",
+      "speaker": "Julian",
+      "translation": "Chúng tôi có nương tay một chút trong thời gian cao điểm giữa kỳ, tất nhiên rồi. Tuy nhiên, nếu một thành viên liên tục kém hiệu quả hoặc ngừng đóng góp, chúng tôi sẽ nhẹ nhàng yêu cầu họ từ chức để duy trì đà trí tuệ."
+     },
+     {
+      "text": "That is completely fair. How can I get started? Should I submit a writing sample?",
+      "speaker": "Clara",
+      "translation": "Điều đó hoàn toàn công bằng. Tôi có thể bắt đầu bằng cách nào? Tôi có nên nộp một mẫu bài viết không?"
+     },
+     {
+      "text": "No writing sample needed for now. Why don't you join us this Thursday as an observer? You can gauge the dynamic yourself and decide if it's a good fit.",
+      "speaker": "Julian",
+      "translation": "Không cần mẫu bài viết nào lúc này. Tại sao bạn không tham gia cùng chúng tôi vào thứ Năm này với tư cách là một quan sát viên?"
+     },
+     {
+      "text": "That sounds like a plan. Please send over the reading material whenever you have a chance, and I'll see you on Thursday.",
+      "speaker": "Clara",
+      "translation": "Nghe có vẻ là một kế hoạch hay. Hãy gửi tài liệu đọc bất cứ khi nào bạn có cơ hội, và hẹn gặp lại bạn vào thứ Năm."
+     }
+    ]
+   }
+  },
+  {
+   "id": 275,
+   "content": {
+    "text": "How long has the patient been experiencing these symptoms?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "Roughly three weeks",
+     "Over six months",
+     "Just under two months",
+     "More than a year"
+    ],
+    "audioText": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words. Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings. And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema? It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of. Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints. Should I be preparing myself for a complex treatment regimen once the results come in? Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+    "explanation": {
+     "en": "The patient shares that the symptoms began subtly over a period of more than six months.",
+     "vi": "Bệnh nhân chia sẻ rằng các triệu chứng bắt đầu một cách âm ỉ từ hơn sáu tháng trước.",
+     "evidence": "it started subtly over six months ago with a general malaise"
+    },
+    "correctIndex": 1,
+    "transcriptSegments": [
+     {
+      "text": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words.",
+      "speaker": "Dr. Vance",
+      "translation": "Chào buổi sáng, cô Holloway. Mời cô ngồi. Tôi đã xem qua ghi chú giới thiệu ban đầu của cô, nhưng tôi muốn nghe về sự tiến triển các triệu chứng của cô theo chính lời cô kể."
+     },
+     {
+      "text": "Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings.",
+      "speaker": "Ms. Holloway",
+      "translation": "Cảm ơn bác sĩ. Vâng, mọi thứ bắt đầu âm ỉ từ hơn sáu tháng trước với tình trạng khó chịu chung, nhưng gần đây sự mệt mỏi kéo dài và cứng khớp đã trở nên khá suy nhược, đặc biệt là vào buổi sáng."
+     },
+     {
+      "text": "And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema?",
+      "speaker": "Dr. Vance",
+      "translation": "Và khi cô bị cứng khớp này, nó khu trú ở các khớp cụ thể, hay lan tỏa hơn? Ngoài ra, cô có nhận thấy bất kỳ vết sưng tấy hoặc ban đỏ nào không?"
+     },
+     {
+      "text": "It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of.",
+      "speaker": "Ms. Holloway",
+      "translation": "Chủ yếu ở bàn tay và đầu gối của tôi. Tôi có nhận thấy một số vết sưng nhẹ quanh các khớp ngón tay, mặc dù không có hiện tượng đỏ đáng kể nào để nói đến."
+     },
+     {
+      "text": "Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints.",
+      "speaker": "Dr. Vance",
+      "translation": "Đã hiểu. Dựa trên biểu hiện lâm sàng, chúng ta cần loại trừ bệnh lý khớp viêm. Tôi sẽ chỉ định một bảng xét nghiệm máu toàn diện để kiểm tra các dấu1 viêm của cô, bên cạnh chụp MRI các khớp bị ảnh hưởng."
+     },
+     {
+      "text": "Should I be preparing myself for a complex treatment regimen once the results come in?",
+      "speaker": "Ms. Holloway",
+      "translation": "Tôi có nên chuẩn bị tinh thần cho một phác đồ điều trị phức tạp một khi có kết quả không?"
+     },
+     {
+      "text": "Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+      "speaker": "Dr. Vance",
+      "translation": "Đừng vội phỏng đoán kết quả. Khi chúng ta có dữ liệu, chúng ta sẽ điều chỉnh một kế hoạch can thiệp chính xác. Trong thời gian chờ đợi, tôi đặc biệt khuyên cô nên giữ một nhật ký triệu chứng tỉ mỉ và điều chỉnh nhịp độ các hoạt động thể chất hàng ngày."
+     }
+    ]
+   }
+  },
+  {
+   "id": 276,
+   "content": {
+    "text": "What initial diagnostic step does the doctor recommend?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "A comprehensive blood panel and an MRI",
+     "Immediate exploratory surgery",
+     "A strict elimination diet",
+     "Physical therapy sessions only"
+    ],
+    "audioText": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words. Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings. And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema? It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of. Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints. Should I be preparing myself for a complex treatment regimen once the results come in? Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+    "explanation": {
+     "en": "The doctor recommends conducting a comprehensive blood panel to check for inflammatory markers along with an MRI of the joints.",
+     "vi": "Bác sĩ đề nghị thực hiện một bảng xét nghiệm máu toàn diện để kiểm tra các dấu hiệu viêm cùng với chụp MRI các khớp.",
+     "evidence": "I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints."
+    },
+    "correctIndex": 0,
+    "transcriptSegments": [
+     {
+      "text": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words.",
+      "speaker": "Dr. Vance",
+      "translation": "Chào buổi sáng, cô Holloway. Mời cô ngồi. Tôi đã xem qua ghi chú giới thiệu ban đầu của cô, nhưng tôi muốn nghe về sự tiến triển các triệu chứng của cô theo chính lời cô kể."
+     },
+     {
+      "text": "Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings.",
+      "speaker": "Ms. Holloway",
+      "translation": "Cảm ơn bác sĩ. Vâng, mọi thứ bắt đầu âm ỉ từ hơn sáu tháng trước với tình trạng khó chịu chung, nhưng gần đây sự mệt mỏi kéo dài và cứng khớp đã trở nên khá suy nhược, đặc biệt là vào buổi sáng."
+     },
+     {
+      "text": "And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema?",
+      "speaker": "Dr. Vance",
+      "translation": "Và khi cô bị cứng khớp này, nó khu trú ở các khớp cụ thể, hay lan tỏa hơn? Ngoài ra, cô có nhận thấy bất kỳ vết sưng tấy hoặc ban đỏ nào không?"
+     },
+     {
+      "text": "It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of.",
+      "speaker": "Ms. Holloway",
+      "translation": "Chủ yếu ở bàn tay và đầu gối của tôi. Tôi có nhận thấy một số vết sưng nhẹ quanh các khớp ngón tay, mặc dù không có hiện tượng đỏ đáng kể nào để nói đến."
+     },
+     {
+      "text": "Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints.",
+      "speaker": "Dr. Vance",
+      "translation": "Đã hiểu. Dựa trên biểu hiện lâm sàng, chúng ta cần loại trừ bệnh lý khớp viêm. Tôi sẽ chỉ định một bảng xét nghiệm máu toàn diện để kiểm tra các dấu1 viêm của cô, bên cạnh chụp MRI các khớp bị ảnh hưởng."
+     },
+     {
+      "text": "Should I be preparing myself for a complex treatment regimen once the results come in?",
+      "speaker": "Ms. Holloway",
+      "translation": "Tôi có nên chuẩn bị tinh thần cho một phác đồ điều trị phức tạp một khi có kết quả không?"
+     },
+     {
+      "text": "Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+      "speaker": "Dr. Vance",
+      "translation": "Đừng vội phỏng đoán kết quả. Khi chúng ta có dữ liệu, chúng ta sẽ điều chỉnh một kế hoạch can thiệp chính xác. Trong thời gian chờ đợi, tôi đặc biệt khuyên cô nên giữ một nhật ký triệu chứng tỉ mỉ và điều chỉnh nhịp độ các hoạt động thể chất hàng ngày."
+     }
+    ]
+   }
+  },
+  {
+   "id": 277,
+   "content": {
+    "text": "What does the doctor say about the preliminary differential diagnosis?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "It points toward an inflammatory arthropathy, but requires confirmation",
+     "It is likely just stress-related exhaustion",
+     "It is definitively an autoimmune disorder",
+     "It indicates a rare neurological condition"
+    ],
+    "audioText": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words. Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings. And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema? It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of. Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints. Should I be preparing myself for a complex treatment regimen once the results come in? Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+    "explanation": {
+     "en": "The doctor states that the symptoms suggest the need to rule out an inflammatory arthropathy through further testing.",
+     "vi": "Bác sĩ cho biết các triệu chứng gợi ý cần phải loại trừ bệnh lý khớp viêm thông qua các xét nghiệm.",
+     "evidence": "Given the clinical presentation, we need to rule out an inflammatory arthropathy."
+    },
+    "correctIndex": 0,
+    "transcriptSegments": [
+     {
+      "text": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words.",
+      "speaker": "Dr. Vance",
+      "translation": "Chào buổi sáng, cô Holloway. Mời cô ngồi. Tôi đã xem qua ghi chú giới thiệu ban đầu của cô, nhưng tôi muốn nghe về sự tiến triển các triệu chứng của cô theo chính lời cô kể."
+     },
+     {
+      "text": "Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings.",
+      "speaker": "Ms. Holloway",
+      "translation": "Cảm ơn bác sĩ. Vâng, mọi thứ bắt đầu âm ỉ từ hơn sáu tháng trước với tình trạng khó chịu chung, nhưng gần đây sự mệt mỏi kéo dài và cứng khớp đã trở nên khá suy nhược, đặc biệt là vào buổi sáng."
+     },
+     {
+      "text": "And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema?",
+      "speaker": "Dr. Vance",
+      "translation": "Và khi cô bị cứng khớp này, nó khu trú ở các khớp cụ thể, hay lan tỏa hơn? Ngoài ra, cô có nhận thấy bất kỳ vết sưng tấy hoặc ban đỏ nào không?"
+     },
+     {
+      "text": "It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of.",
+      "speaker": "Ms. Holloway",
+      "translation": "Chủ yếu ở bàn tay và đầu gối của tôi. Tôi có nhận thấy một số vết sưng nhẹ quanh các khớp ngón tay, mặc dù không có hiện tượng đỏ đáng kể nào để nói đến."
+     },
+     {
+      "text": "Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints.",
+      "speaker": "Dr. Vance",
+      "translation": "Đã hiểu. Dựa trên biểu hiện lâm sàng, chúng ta cần loại trừ bệnh lý khớp viêm. Tôi sẽ chỉ định một bảng xét nghiệm máu toàn diện để kiểm tra các dấu1 viêm của cô, bên cạnh chụp MRI các khớp bị ảnh hưởng."
+     },
+     {
+      "text": "Should I be preparing myself for a complex treatment regimen once the results come in?",
+      "speaker": "Ms. Holloway",
+      "translation": "Tôi có nên chuẩn bị tinh thần cho một phác đồ điều trị phức tạp một khi có kết quả không?"
+     },
+     {
+      "text": "Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+      "speaker": "Dr. Vance",
+      "translation": "Đừng vội phỏng đoán kết quả. Khi chúng ta có dữ liệu, chúng ta sẽ điều chỉnh một kế hoạch can thiệp chính xác. Trong thời gian chờ đợi, tôi đặc biệt khuyên cô nên giữ một nhật ký triệu chứng tỉ mỉ và điều chỉnh nhịp độ các hoạt động thể chất hàng ngày."
+     }
+    ]
+   }
+  },
+  {
+   "id": 278,
+   "content": {
+    "text": "What advice does the doctor give the patient regarding lifestyle adjustments in the interim?",
+    "level": "C1",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "To cease all physical activity immediately",
+     "To maintain a symptom diary and pace physical activities",
+     "To double their daily caffeine intake",
+     "To begin high-intensity interval training"
+    ],
+    "audioText": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words. Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings. And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema? It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of. Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints. Should I be preparing myself for a complex treatment regimen once the results come in? Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+    "explanation": {
+     "en": "The doctor advises the patient to keep a detailed symptom diary and pace daily physical activities while waiting for the results.",
+     "vi": "Bác sĩ khuyên bệnh nhân nên duy trì việc ghi chép nhật ký triệu chứng và phân phối hợp lý các hoạt động thể chất hàng ngày trong thời gian chờ kết quả.",
+     "evidence": "I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities."
+    },
+    "correctIndex": 1,
+    "transcriptSegments": [
+     {
+      "text": "Good morning, Ms. Holloway. Please, take a seat. I've had a chance to look over your initial referral notes, but I'd prefer to hear about the progression of your symptoms in your own words.",
+      "speaker": "Dr. Vance",
+      "translation": "Chào buổi sáng, cô Holloway. Mời cô ngồi. Tôi đã xem qua ghi chú giới thiệu ban đầu của cô, nhưng tôi muốn nghe về sự tiến triển các triệu chứng của cô theo chính lời cô kể."
+     },
+     {
+      "text": "Thank you, Doctor. Well, it started subtly over six months ago with a general malaise, but recently the persistent fatigue and joint stiffness have become quite debilitating, especially in the mornings.",
+      "speaker": "Ms. Holloway",
+      "translation": "Cảm ơn bác sĩ. Vâng, mọi thứ bắt đầu âm ỉ từ hơn sáu tháng trước với tình trạng khó chịu chung, nhưng gần đây sự mệt mỏi kéo dài và cứng khớp đã trở nên khá suy nhược, đặc biệt là vào buổi sáng."
+     },
+     {
+      "text": "And when you experience this stiffness, is it localized to specific joints, or is it more generalized? Also, do you notice any visible swelling or erythema?",
+      "speaker": "Dr. Vance",
+      "translation": "Và khi cô bị cứng khớp này, nó khu trú ở các khớp cụ thể, hay lan tỏa hơn? Ngoài ra, cô có nhận thấy bất kỳ vết sưng tấy hoặc ban đỏ nào không?"
+     },
+     {
+      "text": "It's predominantly in my hands and knees. I have noticed some mild swelling around the knuckles, though no significant redness to speak of.",
+      "speaker": "Ms. Holloway",
+      "translation": "Chủ yếu ở bàn tay và đầu gối của tôi. Tôi có nhận thấy một số vết sưng nhẹ quanh các khớp ngón tay, mặc dù không có hiện tượng đỏ đáng kể nào để nói đến."
+     },
+     {
+      "text": "Understood. Given the clinical presentation, we need to rule out an inflammatory arthropathy. I am going to order a comprehensive blood panel to check your inflammatory markers, alongside an MRI of the affected joints.",
+      "speaker": "Dr. Vance",
+      "translation": "Đã hiểu. Dựa trên biểu hiện lâm sàng, chúng ta cần loại trừ bệnh lý khớp viêm. Tôi sẽ chỉ định một bảng xét nghiệm máu toàn diện để kiểm tra các dấu1 viêm của cô, bên cạnh chụp MRI các khớp bị ảnh hưởng."
+     },
+     {
+      "text": "Should I be preparing myself for a complex treatment regimen once the results come in?",
+      "speaker": "Ms. Holloway",
+      "translation": "Tôi có nên chuẩn bị tinh thần cho một phác đồ điều trị phức tạp một khi có kết quả không?"
+     },
+     {
+      "text": "Let's not preempt the results. Once we have the data, we will tailor a precise intervention plan. In the meantime, I strongly advise keeping a meticulous symptom diary and pacing your daily physical activities.",
+      "speaker": "Dr. Vance",
+      "translation": "Đừng vội phỏng đoán kết quả. Khi chúng ta có dữ liệu, chúng ta sẽ điều chỉnh một kế hoạch can thiệp chính xác. Trong thời gian chờ đợi, tôi đặc biệt khuyên cô nên giữ một nhật ký triệu chứng tỉ mỉ và điều chỉnh nhịp độ các hoạt động thể chất hàng ngày."
+     }
+    ]
+   }
+  },
+  {
+   "id": 239,
+   "content": {
+    "text": "Does the store have fresh bread available?",
+    "level": "A2",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "Yes, but it is sold out.",
+     "No, the bakery is closed.",
+     "No, they only have frozen bread.",
+     "Yes, just baked this morning."
+    ],
+    "audioText": "Excuse me, could you tell me where I can find the milk? Of course! The milk is in aisle 4, right at the back of the store. Thank you. And where is the fresh bread? The bakery section is right next to aisle 4. We just baked some fresh bread this morning. Great! Also, are the apples on sale? Yes, they are one dollar and fifty cents a pound. I will take a small bag of them then. Thanks for your help. You're welcome. You can check out at register number 2. Did you find everything you needed today? Yes, thank you. Can I pay with a credit card? Yes, just tap your card on the machine. Would you like a receipt? Yes, please. Here it is. Thank you, have a wonderful day!",
+    "explanation": {
+     "en": "The clerk confirms that the bakery section just baked some fresh bread this morning.",
+     "vi": "Nhân viên xác nhận tiệm bánh vừa mới nướng bánh mì tươi sáng nay.",
+     "evidence": "We just baked some fresh bread this morning."
+    },
+    "correctIndex": 3,
+    "transcriptSegments": [
+     {
+      "text": "Excuse me, could you tell me where I can find the milk?",
+      "speaker": "Customer",
+      "translation": "Xin lỗi, bạn có thể cho tôi biết tôi có thể tìm sữa ở đâu không?"
+     },
+     {
+      "text": "Of course! The milk is in aisle 4, right at the back of the store.",
+      "speaker": "Clerk",
+      "translation": "Chắc chắn rồi! Sữa ở lối đi số 4, ngay ở phía sau cửa hàng."
+     },
+     {
+      "text": "Thank you. And where is the fresh bread?",
+      "speaker": "Customer",
+      "translation": "Cảm ơn bạn. Và bánh mì tươi ở đâu?"
+     },
+     {
+      "text": "The bakery section is right next to aisle 4. We just baked some fresh bread this morning.",
+      "speaker": "Clerk",
+      "translation": "Khu vực tiệm bánh ngay cạnh lối đi số 4. Chúng tôi vừa nướng một ít bánh mì tươi sáng nay."
+     },
+     {
+      "text": "Great! Also, are the apples on sale?",
+      "speaker": "Customer",
+      "translation": "Tuyệt vời! Ngoài ra, táo có đang được giảm giá không?"
+     },
+     {
+      "text": "Yes, they are one dollar and fifty cents a pound.",
+      "speaker": "Clerk",
+      "translation": "Có, chúng có giá một đô la rưỡi một pound."
+     },
+     {
+      "text": "I will take a small bag of them then. Thanks for your help.",
+      "speaker": "Customer",
+      "translation": "Tôi sẽ lấy một túi nhỏ vậy. Cảm ơn sự giúp đỡ của bạn."
+     },
+     {
+      "text": "You're welcome. You can check out at register number 2.",
+      "speaker": "Clerk",
+      "translation": "Không có gì. Bạn có thể thanh toán tại quầy số 2."
+     },
+     {
+      "text": "Did you find everything you needed today?",
+      "speaker": "Cashier",
+      "translation": "Bạn đã tìm thấy mọi thứ mình cần hôm nay chưa?"
+     },
+     {
+      "text": "Yes, thank you. Can I pay with a credit card?",
+      "speaker": "Customer",
+      "translation": "Vâng, cảm ơn bạn. Tôi có thể thanh toán bằng thẻ tín dụng không?"
+     },
+     {
+      "text": "Yes, just tap your card on the machine. Would you like a receipt?",
+      "speaker": "Cashier",
+      "translation": "Được chứ, chỉ cần chạm thẻ của bạn lên máy. Bạn có muốn lấy hóa đơn không?"
+     },
+     {
+      "text": "Yes, please. Here it is.",
+      "speaker": "Customer",
+      "translation": "Vâng, làm ơn. Của đây."
+     },
+     {
+      "text": "Thank you, have a wonderful day!",
+      "speaker": "Cashier",
+      "translation": "Cảm ơn bạn, chúc bạn có một ngày tuyệt vời!"
+     }
+    ]
+   }
+  },
+  {
+   "id": 240,
+   "content": {
+    "text": "How much do the apples cost per pound?",
+    "level": "A2",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "Two dollars",
+     "One dollar and fifty cents",
+     "Two dollars and fifty cents",
+     "Three dollars"
+    ],
+    "audioText": "Excuse me, could you tell me where I can find the milk? Of course! The milk is in aisle 4, right at the back of the store. Thank you. And where is the fresh bread? The bakery section is right next to aisle 4. We just baked some fresh bread this morning. Great! Also, are the apples on sale? Yes, they are one dollar and fifty cents a pound. I will take a small bag of them then. Thanks for your help. You're welcome. You can check out at register number 2. Did you find everything you needed today? Yes, thank you. Can I pay with a credit card? Yes, just tap your card on the machine. Would you like a receipt? Yes, please. Here it is. Thank you, have a wonderful day!",
+    "explanation": {
+     "en": "The clerk states that the apples cost one dollar and fifty cents a pound.",
+     "vi": "Nhân viên cho biết giá táo là một đô la rưỡi một pound.",
+     "evidence": "Yes, they are one dollar and fifty cents a pound."
+    },
+    "correctIndex": 1,
+    "transcriptSegments": [
+     {
+      "text": "Excuse me, could you tell me where I can find the milk?",
+      "speaker": "Customer",
+      "translation": "Xin lỗi, bạn có thể cho tôi biết tôi có thể tìm sữa ở đâu không?"
+     },
+     {
+      "text": "Of course! The milk is in aisle 4, right at the back of the store.",
+      "speaker": "Clerk",
+      "translation": "Chắc chắn rồi! Sữa ở lối đi số 4, ngay ở phía sau cửa hàng."
+     },
+     {
+      "text": "Thank you. And where is the fresh bread?",
+      "speaker": "Customer",
+      "translation": "Cảm ơn bạn. Và bánh mì tươi ở đâu?"
+     },
+     {
+      "text": "The bakery section is right next to aisle 4. We just baked some fresh bread this morning.",
+      "speaker": "Clerk",
+      "translation": "Khu vực tiệm bánh ngay cạnh lối đi số 4. Chúng tôi vừa nướng một ít bánh mì tươi sáng nay."
+     },
+     {
+      "text": "Great! Also, are the apples on sale?",
+      "speaker": "Customer",
+      "translation": "Tuyệt vời! Ngoài ra, táo có đang được giảm giá không?"
+     },
+     {
+      "text": "Yes, they are one dollar and fifty cents a pound.",
+      "speaker": "Clerk",
+      "translation": "Có, chúng có giá một đô la rưỡi một pound."
+     },
+     {
+      "text": "I will take a small bag of them then. Thanks for your help.",
+      "speaker": "Customer",
+      "translation": "Tôi sẽ lấy một túi nhỏ vậy. Cảm ơn sự giúp đỡ của bạn."
+     },
+     {
+      "text": "You're welcome. You can check out at register number 2.",
+      "speaker": "Clerk",
+      "translation": "Không có gì. Bạn có thể thanh toán tại quầy số 2."
+     },
+     {
+      "text": "Did you find everything you needed today?",
+      "speaker": "Cashier",
+      "translation": "Bạn đã tìm thấy mọi thứ mình cần hôm nay chưa?"
+     },
+     {
+      "text": "Yes, thank you. Can I pay with a credit card?",
+      "speaker": "Customer",
+      "translation": "Vâng, cảm ơn bạn. Tôi có thể thanh toán bằng thẻ tín dụng không?"
+     },
+     {
+      "text": "Yes, just tap your card on the machine. Would you like a receipt?",
+      "speaker": "Cashier",
+      "translation": "Được chứ, chỉ cần chạm thẻ của bạn lên máy. Bạn có muốn lấy hóa đơn không?"
+     },
+     {
+      "text": "Yes, please. Here it is.",
+      "speaker": "Customer",
+      "translation": "Vâng, làm ơn. Của đây."
+     },
+     {
+      "text": "Thank you, have a wonderful day!",
+      "speaker": "Cashier",
+      "translation": "Cảm ơn bạn, chúc bạn có một ngày tuyệt vời!"
+     }
+    ]
+   }
+  },
+  {
+   "id": 241,
+   "content": {
+    "text": "How does the customer pay for the groceries?",
+    "level": "A2",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "With cash",
+     "With a check",
+     "With a credit card",
+     "With a gift card"
+    ],
+    "audioText": "Excuse me, could you tell me where I can find the milk? Of course! The milk is in aisle 4, right at the back of the store. Thank you. And where is the fresh bread? The bakery section is right next to aisle 4. We just baked some fresh bread this morning. Great! Also, are the apples on sale? Yes, they are one dollar and fifty cents a pound. I will take a small bag of them then. Thanks for your help. You're welcome. You can check out at register number 2. Did you find everything you needed today? Yes, thank you. Can I pay with a credit card? Yes, just tap your card on the machine. Would you like a receipt? Yes, please. Here it is. Thank you, have a wonderful day!",
+    "explanation": {
+     "en": "The customer directly asks if they can pay with a credit card, and the cashier confirms.",
+     "vi": "Khách hàng hỏi trực tiếp xem có thể trả bằng thẻ tín dụng không và thu ngân xác nhận.",
+     "evidence": "Can I pay with a credit card?"
+    },
+    "correctIndex": 2,
+    "transcriptSegments": [
+     {
+      "text": "Excuse me, could you tell me where I can find the milk?",
+      "speaker": "Customer",
+      "translation": "Xin lỗi, bạn có thể cho tôi biết tôi có thể tìm sữa ở đâu không?"
+     },
+     {
+      "text": "Of course! The milk is in aisle 4, right at the back of the store.",
+      "speaker": "Clerk",
+      "translation": "Chắc chắn rồi! Sữa ở lối đi số 4, ngay ở phía sau cửa hàng."
+     },
+     {
+      "text": "Thank you. And where is the fresh bread?",
+      "speaker": "Customer",
+      "translation": "Cảm ơn bạn. Và bánh mì tươi ở đâu?"
+     },
+     {
+      "text": "The bakery section is right next to aisle 4. We just baked some fresh bread this morning.",
+      "speaker": "Clerk",
+      "translation": "Khu vực tiệm bánh ngay cạnh lối đi số 4. Chúng tôi vừa nướng một ít bánh mì tươi sáng nay."
+     },
+     {
+      "text": "Great! Also, are the apples on sale?",
+      "speaker": "Customer",
+      "translation": "Tuyệt vời! Ngoài ra, táo có đang được giảm giá không?"
+     },
+     {
+      "text": "Yes, they are one dollar and fifty cents a pound.",
+      "speaker": "Clerk",
+      "translation": "Có, chúng có giá một đô la rưỡi một pound."
+     },
+     {
+      "text": "I will take a small bag of them then. Thanks for your help.",
+      "speaker": "Customer",
+      "translation": "Tôi sẽ lấy một túi nhỏ vậy. Cảm ơn sự giúp đỡ của bạn."
+     },
+     {
+      "text": "You're welcome. You can check out at register number 2.",
+      "speaker": "Clerk",
+      "translation": "Không có gì. Bạn có thể thanh toán tại quầy số 2."
+     },
+     {
+      "text": "Did you find everything you needed today?",
+      "speaker": "Cashier",
+      "translation": "Bạn đã tìm thấy mọi thứ mình cần hôm nay chưa?"
+     },
+     {
+      "text": "Yes, thank you. Can I pay with a credit card?",
+      "speaker": "Customer",
+      "translation": "Vâng, cảm ơn bạn. Tôi có thể thanh toán bằng thẻ tín dụng không?"
+     },
+     {
+      "text": "Yes, just tap your card on the machine. Would you like a receipt?",
+      "speaker": "Cashier",
+      "translation": "Được chứ, chỉ cần chạm thẻ của bạn lên máy. Bạn có muốn lấy hóa đơn không?"
+     },
+     {
+      "text": "Yes, please. Here it is.",
+      "speaker": "Customer",
+      "translation": "Vâng, làm ơn. Của đây."
+     },
+     {
+      "text": "Thank you, have a wonderful day!",
+      "speaker": "Cashier",
+      "translation": "Cảm ơn bạn, chúc bạn có một ngày tuyệt vời!"
+     }
+    ]
+   }
+  },
+  {
+   "id": 242,
+   "content": {
+    "text": "What does the cashier ask for at the end of the transaction?",
+    "level": "A2",
+    "skill": "LISTENING",
+    "accent": "US",
+    "options": [
+     "If the customer wants a plastic bag",
+     "If the customer needs a receipt",
+     "If the customer has a loyalty card",
+     "If the customer needs help carrying the bags"
+    ],
+    "audioText": "Excuse me, could you tell me where I can find the milk? Of course! The milk is in aisle 4, right at the back of the store. Thank you. And where is the fresh bread? The bakery section is right next to aisle 4. We just baked some fresh bread this morning. Great! Also, are the apples on sale? Yes, they are one dollar and fifty cents a pound. I will take a small bag of them then. Thanks for your help. You're welcome. You can check out at register number 2. Did you find everything you needed today? Yes, thank you. Can I pay with a credit card? Yes, just tap your card on the machine. Would you like a receipt? Yes, please. Here it is. Thank you, have a wonderful day!",
+    "explanation": {
+     "en": "The cashier asks the customer if they would like a receipt after the payment.",
+     "vi": "Thu ngân hỏi khách hàng có muốn lấy hóa đơn không sau khi thanh toán.",
+     "evidence": "Would you like a receipt?"
+    },
+    "correctIndex": 1,
+    "transcriptSegments": [
+     {
+      "text": "Excuse me, could you tell me where I can find the milk?",
+      "speaker": "Customer",
+      "translation": "Xin lỗi, bạn có thể cho tôi biết tôi có thể tìm sữa ở đâu không?"
+     },
+     {
+      "text": "Of course! The milk is in aisle 4, right at the back of the store.",
+      "speaker": "Clerk",
+      "translation": "Chắc chắn rồi! Sữa ở lối đi số 4, ngay ở phía sau cửa hàng."
+     },
+     {
+      "text": "Thank you. And where is the fresh bread?",
+      "speaker": "Customer",
+      "translation": "Cảm ơn bạn. Và bánh mì tươi ở đâu?"
+     },
+     {
+      "text": "The bakery section is right next to aisle 4. We just baked some fresh bread this morning.",
+      "speaker": "Clerk",
+      "translation": "Khu vực tiệm bánh ngay cạnh lối đi số 4. Chúng tôi vừa nướng một ít bánh mì tươi sáng nay."
+     },
+     {
+      "text": "Great! Also, are the apples on sale?",
+      "speaker": "Customer",
+      "translation": "Tuyệt vời! Ngoài ra, táo có đang được giảm giá không?"
+     },
+     {
+      "text": "Yes, they are one dollar and fifty cents a pound.",
+      "speaker": "Clerk",
+      "translation": "Có, chúng có giá một đô la rưỡi một pound."
+     },
+     {
+      "text": "I will take a small bag of them then. Thanks for your help.",
+      "speaker": "Customer",
+      "translation": "Tôi sẽ lấy một túi nhỏ vậy. Cảm ơn sự giúp đỡ của bạn."
+     },
+     {
+      "text": "You're welcome. You can check out at register number 2.",
+      "speaker": "Clerk",
+      "translation": "Không có gì. Bạn có thể thanh toán tại quầy số 2."
+     },
+     {
+      "text": "Did you find everything you needed today?",
+      "speaker": "Cashier",
+      "translation": "Bạn đã tìm thấy mọi thứ mình cần hôm nay chưa?"
+     },
+     {
+      "text": "Yes, thank you. Can I pay with a credit card?",
+      "speaker": "Customer",
+      "translation": "Vâng, cảm ơn bạn. Tôi có thể thanh toán bằng thẻ tín dụng không?"
+     },
+     {
+      "text": "Yes, just tap your card on the machine. Would you like a receipt?",
+      "speaker": "Cashier",
+      "translation": "Được chứ, chỉ cần chạm thẻ của bạn lên máy. Bạn có muốn lấy hóa đơn không?"
+     },
+     {
+      "text": "Yes, please. Here it is.",
+      "speaker": "Customer",
+      "translation": "Vâng, làm ơn. Của đây."
+     },
+     {
+      "text": "Thank you, have a wonderful day!",
+      "speaker": "Cashier",
+      "translation": "Cảm ơn bạn, chúc bạn có một ngày tuyệt vời!"
+     }
+    ]
+   }
+  }
+ ],
+ "exercises": [
+  {
+   "id": 137,
+   "targetText": "Please read aloud: The university library is open from Monday to Friday from eight in the morning until ten at night.",
+   "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/speaking/reference/137.v1.mp3"
+  },
+  {
+   "id": 138,
+   "targetText": "Please read aloud: You must show your student ID card every time you want to borrow a book from the front desk.",
+   "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/speaking/reference/138.v1.mp3"
+  },
+  {
+   "id": 139,
+   "targetText": "Please read aloud: Students can keep standard textbooks for a maximum of three weeks before returning them.",
+   "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/speaking/reference/139.v1.mp3"
+  },
+  {
+   "id": 140,
+   "targetText": "Please read aloud: Use the computer search station near the entrance to find the exact shelf location of your book.",
+   "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/speaking/reference/140.v1.mp3"
+  },
+  {
+   "id": 141,
+   "targetText": "Please read aloud: Drop your finished books into the return box outside the main doors if the library is closed.",
+   "audioUrl": "https://pub-ecd236c9754a4b7cb22ab82189e6ded2.r2.dev/catalog/speaking/reference/141.v1.mp3"
+  }
+ ]
+}

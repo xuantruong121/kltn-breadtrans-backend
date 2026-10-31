@@ -1,3 +1,4 @@
+import { recordAzureTts, spokenCharacters } from './azure-usage';
 import {
   Injectable,
   Inject,
@@ -354,6 +355,7 @@ export class AiService {
         return null;
       }
 
+      await recordAzureTts(this.redis, spokenCharacters(ssml));
       const arrayBuffer = await response.arrayBuffer();
       return Buffer.from(arrayBuffer);
     } catch (e) {
@@ -372,6 +374,7 @@ export class AiService {
       throw new Error('AZURE_SPEECH_KEY or AZURE_SPEECH_REGION is missing');
     }
     try {
+      const ssml = buildToeicListeningSsml(transcript);
       const response = await fetch(
         `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,
         {
@@ -382,10 +385,12 @@ export class AiService {
             'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
             'User-Agent': 'BreadTransToeicAuthoring',
           },
-          body: buildToeicListeningSsml(transcript),
+          body: ssml,
         },
       );
-      return normalizeAzureSpeechResponse(response);
+      const audio = await normalizeAzureSpeechResponse(response);
+      await recordAzureTts(this.redis, spokenCharacters(ssml));
+      return audio;
     } catch (error) {
       this.logger.error('Không thể tạo TOEIC Listening audio', error);
       throw error instanceof Error ? error : new Error(String(error));
@@ -429,6 +434,7 @@ export class AiService {
         return null;
       }
 
+      await recordAzureTts(this.redis, spokenCharacters(ssml));
       const arrayBuffer = await response.arrayBuffer();
       return Buffer.from(arrayBuffer);
     } catch (e) {

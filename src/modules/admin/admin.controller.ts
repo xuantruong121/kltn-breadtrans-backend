@@ -9,14 +9,26 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  Request,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { AdminDictionaryService } from './admin-dictionary.service';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, TopicCategory } from '@prisma/client';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
+import {
+  CreateDictionaryEntryDto,
+  UpdateDictionaryEntryDto,
+} from './dto/admin-dictionary.dto';
 import {
   CreateVocabTopicDto,
   UpdateVocabTopicDto,
@@ -31,7 +43,10 @@ import {
 @Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly dictionaryService: AdminDictionaryService,
+  ) {}
 
   @Get('dashboard-stats')
   @ApiOperation({ summary: 'Lay thong ke tong quan cho Admin Dashboard' })
@@ -140,11 +155,170 @@ export class AdminController {
     return this.adminService.adminReviewCourse(courseId, dto.action);
   }
 
+  // ============== DICTIONARY STORE (F13) ==============
+  @Get('dictionary')
+  @ApiOperation({
+    summary:
+      'Admin: Kho tu dien, phan trang, loc theo trang thai/nguon/tu loai/thieu truong',
+  })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'pageSize', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['APPROVED', 'PENDING_REVIEW', 'REJECTED'],
+  })
+  @ApiQuery({
+    name: 'source',
+    required: false,
+    enum: ['CURATED', 'EXTERNAL', 'AI'],
+  })
+  @ApiQuery({ name: 'pos', required: false })
+  @ApiQuery({
+    name: 'missing',
+    required: false,
+    enum: ['ipa', 'audio', 'example'],
+  })
+  @ApiResponse({ status: 200, description: 'items, total, statusCounts' })
+  listDictionary(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('q') q?: string,
+    @Query('status') status?: string,
+    @Query('source') source?: string,
+    @Query('pos') pos?: string,
+    @Query('missing') missing?: string,
+  ) {
+    return this.dictionaryService.list({
+      page: Number(page),
+      pageSize: Number(pageSize),
+      q,
+      status,
+      source,
+      pos,
+      missing,
+    });
+  }
+
+  @Get('dictionary/:id')
+  @ApiOperation({ summary: 'Admin: Mot muc tu dien va cac bo dang dung no' })
+  @ApiResponse({ status: 404, description: 'Khong co muc nay' })
+  getDictionaryEntry(@Param('id', ParseIntPipe) id: number) {
+    return this.dictionaryService.get(id);
+  }
+
+  @Post('dictionary')
+  @ApiOperation({ summary: 'Admin: Them muc tu dien (da duyet)' })
+  @ApiResponse({ status: 409, description: 'Tu va tu loai da co trong kho' })
+  createDictionaryEntry(
+    @Body() dto: CreateDictionaryEntryDto,
+    @Request() req: { user: { id: number } },
+  ) {
+    return this.dictionaryService.create(dto, req.user.id);
+  }
+
+  @Patch('dictionary/:id')
+  @ApiOperation({
+    summary: 'Admin: Sua muc tu dien (ap dung cho moi bo va moi lan tra)',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Trung tu/tu loai, hoac hoc vien da hoc tu nay',
+  })
+  updateDictionaryEntry(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateDictionaryEntryDto,
+  ) {
+    return this.dictionaryService.update(id, dto);
+  }
+
+  @Post('dictionary/:id/approve')
+  @ApiOperation({ summary: 'Admin: Duyet muc tu dien' })
+  approveDictionaryEntry(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: { user: { id: number } },
+  ) {
+    return this.dictionaryService.approve(id, req.user.id);
+  }
+
+  @Post('dictionary/:id/reject')
+  @ApiOperation({ summary: 'Admin: Loai muc tu dien (khong dung khi tra)' })
+  @ApiResponse({ status: 409, description: 'Muc dang nam trong bo flashcard' })
+  rejectDictionaryEntry(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: { user: { id: number } },
+  ) {
+    return this.dictionaryService.reject(id, req.user.id);
+  }
+
+  @Delete('dictionary/:id')
+  @ApiOperation({ summary: 'Admin: Xoa muc tu dien chua bo nao dung' })
+  @ApiResponse({ status: 409, description: 'Muc dang nam trong bo flashcard' })
+  deleteDictionaryEntry(@Param('id', ParseIntPipe) id: number) {
+    return this.dictionaryService.remove(id);
+  }
+
   // ============== VOCAB MANAGEMENT (PHASE 4 CMS) ==============
   @Get('vocab/topics')
-  @ApiOperation({ summary: 'Admin: Lay danh sach chu de tu vung' })
-  getVocabTopics() {
-    return this.adminService.getVocabTopics();
+  @ApiOperation({
+    summary: 'Admin: Danh sach bo tu vung; gui page de nhan mot trang da loc',
+  })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'pageSize', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'level', required: false, description: 'A1..C2 hoac NONE' })
+  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'PUBLISHED'] })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    enum: ['NEWEST', 'TITLE', 'LEVEL', 'FEWEST'],
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Mang (khong co page) hoac { items, total, page, pageSize, facets }',
+  })
+  getVocabTopics(@Query() query: Record<string, string | undefined>) {
+    return this.adminService.getVocabTopics(query);
+  }
+
+  @Get('vocab/topics/:id/summary')
+  @ApiOperation({
+    summary: 'Admin: Chu de tu vung kem so lieu cho checklist (khong kem tu)',
+  })
+  getVocabTopicSummary(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.getVocabTopicSummary(id);
+  }
+
+  @Get('vocab/topics/:id/words')
+  @ApiOperation({ summary: 'Admin: Danh sach tu cua chu de, phan trang' })
+  getVocabWordsPage(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('q') q?: string,
+  ) {
+    return this.adminService.getVocabWordsPage(id, {
+      page: Number(page),
+      pageSize: Number(pageSize),
+      q,
+    });
+  }
+
+  @Post('vocab/topics/:topicId/words/:wordId/move')
+  @ApiOperation({ summary: 'Admin: Doi vi tri mot tu len (-1) hoac xuong (1)' })
+  moveVocabWord(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Param('wordId', ParseIntPipe) wordId: number,
+    @Body('direction') direction: number,
+  ) {
+    return this.adminService.moveVocabWord(
+      topicId,
+      wordId,
+      direction < 0 ? -1 : 1,
+    );
   }
 
   @Get('vocab/topics/:id')

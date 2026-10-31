@@ -1,4 +1,5 @@
 import { hasVietnameseDiacritics } from '../diagnostic/diagnostic-productive';
+import { levelFields } from '../learning-path/level-access.service';
 import {
   completedWritingQuizIds,
   loadWritingExerciseProgress,
@@ -289,6 +290,7 @@ export class WritingService {
         userId: input.userId,
         quizId: input.quizId,
         score,
+        scorePercent: score,
         xp: writingCompletionXp(score),
         quizType: input.quizType,
         submissionId: submission.id,
@@ -577,6 +579,7 @@ export class WritingService {
             : {}),
           isPremiumContent: access.isPremiumContent,
           isLocked: access.isLocked,
+          ...levelFields(access),
           requiredPlan: access.requiredPlan ?? 'FREE',
           cefrLevel: 'cefrLevel' in access ? access.cefrLevel : null,
         };

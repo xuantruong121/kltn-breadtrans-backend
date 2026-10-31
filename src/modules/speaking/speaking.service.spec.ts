@@ -22,7 +22,7 @@ type MockPrisma = {
     count: MockFn;
     create: MockFn;
   };
-  vocabWord: { findFirst: MockFn };
+  dictionaryEntry: { findFirst: MockFn };
 };
 
 describe('SpeakingService - Durable Submissions & Security', () => {
@@ -56,7 +56,7 @@ describe('SpeakingService - Durable Submissions & Security', () => {
         count: jest.fn(),
         create: jest.fn(),
       },
-      vocabWord: {
+      dictionaryEntry: {
         findFirst: jest.fn(),
       },
     };
@@ -392,6 +392,13 @@ describe('SpeakingService - Durable Submissions & Security', () => {
         await expect(service.generateTts('Hello', 'US', 1)).rejects.toThrow(
           ServiceUnavailableException,
         );
+        // Stored audio comes from the store, approved entries first, in a
+        // stable order, never a rejected one.
+        expect(mockPrisma.dictionaryEntry.findFirst).toHaveBeenCalledWith({
+          where: { headword: 'hello', status: { not: 'REJECTED' } },
+          orderBy: [{ status: 'asc' }, { id: 'asc' }],
+          select: { audioUs: true, audioUk: true },
+        });
       } finally {
         if (previousKey) process.env.AZURE_SPEECH_KEY = previousKey;
         if (previousRegion) process.env.AZURE_SPEECH_REGION = previousRegion;

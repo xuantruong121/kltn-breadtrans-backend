@@ -1,8 +1,9 @@
 /**
- * Checkpoint 58 owner matrix, through the real API on the harness:
- *   Listening/Reading A1/A2 FREE, B1+ PLUS; Speaking/Writing A1/A2 FREE,
- *   B1+ PRO; flashcards/vocabulary/grammar FREE; courses PRO; expired paid
- *   plans fall back to FREE. Mock graders only.
+ * Plan matrix (F11.3), through the real API on the harness: Reading free;
+ * Listening free except dictation B1+ (PLUS); Speaking and Writing A1-A2
+ * free, B1-B2 PLUS, C1+ PRO; flashcards, vocabulary and grammar free; expired
+ * paid plans fall back to FREE. Level locks apply on top of any plan (F7.3)
+ * and courses stay hidden (F1). Mock graders only.
  * Usage: npx ts-node --transpile-only scripts/qa/cp58-entitlements-api.ts <10s.wav>
  */
 import { randomUUID } from 'node:crypto';
@@ -39,6 +40,13 @@ async function grant(admin: string, userId: number, code: 'PLUS' | 'PRO') {
 const expire = (userId: number) =>
   harnessExec(
     `update "Subscription" set "startsAt" = now() - interval '31 days', "endsAt" = now() - interval '1 minute' where "userId" = ${userId} and "endsAt" > now()`,
+  );
+
+const openAllLevels = (userId: number) =>
+  ['LISTENING', 'READING', 'SPEAKING', 'WRITING'].forEach((skill) =>
+    harnessExec(
+      `insert into "LearnerSkillLevel" ("userId", skill, level, "unlockedLevel", ability, "updatedAt") values (${userId}, '${skill}', 'ADVANCED', 'ADVANCED', 2.35, now()) on conflict ("userId", skill) do update set level = 'ADVANCED', "unlockedLevel" = 'ADVANCED'`,
+    ),
   );
 
 const firstInSet = (set: string) =>
@@ -83,49 +91,60 @@ void (async () => {
   const free = await newStudent('cp58-free');
   const plus = await newStudent('cp58-plus');
   const pro = await newStudent('cp58-pro');
+  const lowLevel = await newStudent('cp58-pro-basic');
   await grant(admin.token, plus.userId, 'PLUS');
   await grant(admin.token, pro.userId, 'PRO');
+  await grant(admin.token, lowLevel.userId, 'PRO');
+  // The plan matrix is read with every level open; levels have their own block.
+  for (const a of [free, plus, pro]) openAllLevels(a.userId);
   const spkA2 = firstInSet('practice-question-response-a2');
   const spkB1 = firstInSet('practice-pronunciation-b1');
   const spkC1 = firstInSet('practice-opinion-c1');
 
-  console.log('\n== Listening / Reading (B1+ PLUS)');
+  console.log('\n== Listening / Reading (free; dictation B1+ PLUS)');
   check('A2 Listening: FREE opens', (await quizStatus(free, 10)) === 200);
-  const deny = await call('GET', '/quizzes/11', free.token);
+  check('B1 Listening: FREE opens', (await quizStatus(free, 11)) === 200);
+  check('B1 Reading: FREE opens', (await quizStatus(free, 6)) === 200);
+  check('C1 Reading: FREE opens', (await quizStatus(free, 16)) === 200);
+  const dictation = await call('GET', '/quizzes/25', free.token);
   check(
-    'B1 Listening: FREE refused with PLUS as the required plan',
-    deny.status === 403 && JSON.stringify(deny).includes('PLUS'),
-    `(${deny.status} ${JSON.stringify(deny.message).slice(0, 80)})`,
+    'B1 dictation: FREE refused with PLUS as the required plan',
+    dictation.status === 403 && JSON.stringify(dictation).includes('PLUS'),
+    `(${dictation.status} ${JSON.stringify(dictation.message).slice(0, 80)})`,
   );
-  check('B1 Listening: PLUS opens', (await quizStatus(plus, 11)) === 200);
-  check('B1 Reading: PLUS opens', (await quizStatus(plus, 6)) === 200);
-  check('C1 Reading: PRO opens', (await quizStatus(pro, 16)) === 200);
+  check('B1 dictation: PLUS opens', (await quizStatus(plus, 25)) === 200);
 
-  console.log('\n== Speaking (B1+ PRO)');
+  console.log('\n== Speaking (A1-A2 free, B1-B2 PLUS, C1+ PRO)');
   check('A2 Speaking: FREE submits', (await speak(free, spkA2)) < 300);
-  const plusB1 = await speakingDetail(plus, spkB1);
+  const freeB1 = await speakingDetail(free, spkB1);
   check(
-    'B1 Speaking: PLUS refused with PRO as the required plan',
-    plusB1.status === 403 && JSON.stringify(plusB1).includes('PRO'),
-    `(${plusB1.status})`,
+    'B1 Speaking: FREE refused with PLUS as the required plan',
+    freeB1.status === 403 && JSON.stringify(freeB1).includes('PLUS'),
+    `(${freeB1.status})`,
   );
   check(
-    'B1 Speaking: PLUS submission refused',
-    (await speak(plus, spkB1)) === 403,
+    'B1 Speaking: FREE submission refused',
+    (await speak(free, spkB1)) === 403,
   );
   check(
-    'B1 Speaking: PRO opens',
-    (await speakingDetail(pro, spkB1)).status === 200,
+    'B1 Speaking: PLUS opens',
+    (await speakingDetail(plus, spkB1)).status === 200,
+  );
+  const plusC1 = await speakingDetail(plus, spkC1);
+  check(
+    'C1 Speaking: PLUS refused with PRO as the required plan',
+    plusC1.status === 403 && JSON.stringify(plusC1).includes('PRO'),
+    `(${plusC1.status})`,
   );
   check('C1 Speaking: PRO submits', (await speak(pro, spkC1)) < 300);
-  const catalog = (await call('GET', '/speaking/exercises', plus.token))
+  const catalog = (await call('GET', '/speaking/exercises', free.token))
     .data as any[];
   const b1Row = catalog.find((e) => e.id === spkB1);
   const a2Row = catalog.find((e) => e.id === spkA2);
   check(
-    'Speaking catalog for PLUS: B1 locked with requiredPlan PRO, A2 open',
+    'Speaking catalog for FREE: B1 locked with requiredPlan PLUS, A2 open',
     b1Row?.isLocked === true &&
-      b1Row?.requiredPlan === 'PRO' &&
+      b1Row?.requiredPlan === 'PLUS' &&
       a2Row?.isLocked === false,
     JSON.stringify({
       b1: [b1Row?.isLocked, b1Row?.requiredPlan],
@@ -133,34 +152,42 @@ void (async () => {
     }),
   );
 
-  console.log('\n== Writing (B1+ PRO)');
+  console.log('\n== Writing (A1-A2 free, B1-B2 PLUS, C1+ PRO)');
   check('A2 Writing: FREE grades', (await writeSubmit(free, 17)) < 300);
   check(
-    'B1 Writing: PLUS grading refused',
-    (await writeSubmit(plus, 18)) === 403,
+    'B1 Writing: FREE grading refused',
+    (await writeSubmit(free, 18)) === 403,
   );
-  check('B1 Writing: PRO grades', (await writeSubmit(pro, 18)) < 300);
+  check('B1 Writing: PLUS grades', (await writeSubmit(plus, 18)) < 300);
   const wcat =
-    (await call('GET', '/writing/topics', plus.token)).data?.quizzes ?? [];
+    (await call('GET', '/writing/topics', free.token)).data?.quizzes ?? [];
   const w18 = wcat.find((q: any) => q.id === 18);
-  const w4 = wcat.find((q: any) => q.id === 4);
   check(
-    'Writing catalog for PLUS: B1 items locked with requiredPlan PRO',
-    w18?.isLocked === true &&
-      w18?.requiredPlan === 'PRO' &&
-      w4?.requiredPlan === 'PRO',
+    'Writing catalog for FREE: B1 locked with requiredPlan PLUS',
+    w18?.isLocked === true && w18?.requiredPlan === 'PLUS',
     JSON.stringify([w18?.isLocked, w18?.requiredPlan]),
   );
-  const lcat =
-    (await call('GET', '/quizzes/listening-practice', free.token)).data ?? [];
-  const l11 = lcat.find((q: any) => q.id === 11);
+
+  console.log('\n== Level locks hold whatever the plan');
+  const lowB1 = await call('GET', '/quizzes/6', lowLevel.token);
   check(
-    'Listening catalog for FREE: B1 shows requiredPlan PLUS',
-    l11?.isLocked === true && l11?.requiredPlan === 'PLUS',
-    JSON.stringify([l11?.isLocked, l11?.requiredPlan]),
+    'PRO at Cơ bản: B1 Reading refused as LEVEL_LOCKED',
+    lowB1.status === 403 && JSON.stringify(lowB1).includes('LEVEL_LOCKED'),
+    `(${lowB1.status})`,
+  );
+  const lowSpeaking = await speakingDetail(lowLevel, spkB1);
+  check(
+    'PRO at Cơ bản: B1 Speaking refused as LEVEL_LOCKED',
+    lowSpeaking.status === 403 &&
+      JSON.stringify(lowSpeaking).includes('LEVEL_LOCKED'),
+    `(${lowSpeaking.status})`,
+  );
+  check(
+    'PRO at Cơ bản: A2 Reading opens',
+    (await quizStatus(lowLevel, 2)) === 200,
   );
 
-  console.log('\n== Free modules and courses');
+  console.log('\n== Free modules, hidden courses');
   const topics = (await call('GET', '/vocab/topics', free.token)).data;
   const all = [
     ...(topics?.topics ?? []),
@@ -174,19 +201,16 @@ void (async () => {
     'Grammar: FREE opens a topic',
     (await call('GET', '/grammar/topics/12', free.token)).status === 200,
   );
-  const course = async (a: Acct) =>
-    (await call('GET', '/courses/1/learning', a.token)).status;
   check(
-    'Courses: PLUS refused, PRO opens',
-    (await course(plus)) === 403 && (await course(pro)) === 200,
+    'Courses are hidden from every plan (COURSES_ENABLED off)',
+    (await call('GET', '/courses/1/learning', pro.token)).status === 404,
   );
 
   console.log('\n== Expiry');
   expire(pro.userId);
   check(
-    'expired PRO: B1 Speaking and courses closed again',
-    (await speakingDetail(pro, spkB1)).status === 403 &&
-      (await course(pro)) === 403,
+    'expired PRO: C1 Speaking closed again',
+    (await speakingDetail(pro, spkC1)).status === 403,
   );
   check(
     'expired PRO: A2 content still open',
@@ -210,9 +234,8 @@ void (async () => {
   expire(plus.userId);
   await grant(admin.token, plus.userId, 'PRO');
   check(
-    'PLUS → PRO opens B1 Speaking and B1 Writing grading',
-    (await speakingDetail(plus, spkB1)).status === 200 &&
-      (await writeSubmit(plus, 18)) < 300,
+    'PLUS → PRO opens C1 Speaking',
+    (await speakingDetail(plus, spkC1)).status === 200,
   );
   check(
     'earlier PLUS history is kept after the upgrade',

@@ -37,6 +37,8 @@ import {
   SpeakingExerciseReorderDto,
 } from '../content/skill-cms.dto';
 import { SpeakingStimulusDto } from '../content/speaking-stimulus.dto';
+import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
+import { examListFacets, filterExamList } from './exam-admin-list';
 
 type ProductRecord = any;
 
@@ -451,14 +453,26 @@ export class GenericExamService {
     };
   }
 
-  async listAdmin() {
+  /**
+   * All exams, or with `query.page` one filtered page plus header counts.
+   * Audio playback URLs are signed only for the exams returned.
+   */
+  async listAdmin(query: ListQuery = {}) {
     const exams = await this.prisma.exam.findMany({
       include: this.include,
       orderBy: { updatedAt: 'desc' },
     });
-    return Promise.all(
-      exams.map((exam) => this.withAdminPlayback(this.project(exam))),
-    );
+    const projected = exams.map((exam) => this.project(exam));
+    if (!wantsPage(query))
+      return Promise.all(projected.map((exam) => this.withAdminPlayback(exam)));
+    const page = pageOf(filterExamList(projected, query), query, 12);
+    return {
+      ...page,
+      items: await Promise.all(
+        page.items.map((exam) => this.withAdminPlayback(exam)),
+      ),
+      facets: examListFacets(projected),
+    };
   }
 
   /**

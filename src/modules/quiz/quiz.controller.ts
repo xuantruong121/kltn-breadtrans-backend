@@ -35,6 +35,7 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiConsumes,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -183,6 +184,25 @@ export class QuizController {
       this.parseAudioIdentity(artifactId, version, checksumSha256),
       req.user?.id,
       req.user?.role,
+    );
+    return this.sendListeningAudio(res, req, result);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('gate-attempts/:attemptId/questions/:questionId/audio')
+  @ApiOperation({ summary: 'Phát audio một câu của bài mở khóa đang làm' })
+  @ApiResponse({ status: 404, description: 'Câu không thuộc lần làm này' })
+  async streamGateQuestionAudio(
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
+    const result = await this.quizService.streamGateQuestionAudio(
+      attemptId,
+      questionId,
+      req.user.id,
     );
     return this.sendListeningAudio(res, req, result);
   }
@@ -490,7 +510,7 @@ export class QuizController {
     @Body() dto: SubmitQuizDto,
     @Request() req: any,
   ) {
-    return this.quizService.submitQuiz(quizId, req.user.id, dto);
+    return this.quizService.submitQuiz(quizId, req.user.id, dto, req.user.role);
   }
 
   @UseGuards(JwtAuthGuard)

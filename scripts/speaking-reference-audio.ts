@@ -25,6 +25,13 @@
  * <id>.en-gb.v1.mp3 beside it. Publish only uploads; no database field
  * changes, the API derives the UK URL from the US one.
  *
+ * SPEAKING_REF_SET_IDS=<ids> targets the exercises of those practice sets
+ * (hard cap 60) instead of the published standalone exercises.
+ *
+ * SPEAKING_REF_VERSION=<n> writes <id>.v<n>.mp3: a clip for corrected text,
+ * since v1 objects are never overwritten. It has no British twin, so the API
+ * offers only this clip.
+ *
  * Usage: npx ts-node --transpile-only scripts/speaking-reference-audio.ts <mode> --target env:DATABASE_URL
  */
 import { createHash } from 'node:crypto';
@@ -37,9 +44,11 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
+import Redis from 'ioredis';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { parseBuffer } from 'music-metadata';
 
+import { recordAzureTts } from '../src/modules/ai/azure-usage';
 import {
   escapeXml,
   LISTENING_VOICE_REGISTRY,
@@ -47,10 +56,23 @@ import {
 } from '../src/modules/quiz/listening-audio-authoring.service';
 
 const UK = process.env.SPEAKING_REF_ACCENT === 'en-gb';
-const OUT = UK
-  ? 'artifacts/speaking-reference-audio-en-gb'
-  : 'artifacts/speaking-reference-audio';
-const MAX_CALLS = 30;
+const VERSION = process.env.SPEAKING_REF_VERSION ?? '1';
+// SPEAKING_REF_OUT keeps an earlier run's manifest when adding clips.
+const OUT =
+  process.env.SPEAKING_REF_OUT ??
+  (UK
+    ? 'artifacts/speaking-reference-audio-en-gb'
+    : VERSION === '1'
+      ? 'artifacts/speaking-reference-audio'
+      : `artifacts/speaking-reference-audio-v${VERSION}`);
+// SPEAKING_REF_SET_IDS=<id,id,...>: the exercises of these practice sets
+// (any publication status, e.g. new DRAFT sets awaiting review) instead of
+// the published standalone exercises.
+const SET_IDS = (process.env.SPEAKING_REF_SET_IDS ?? '')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean);
+const MAX_CALLS = SET_IDS.length ? 60 : 30;
 const READ_TASKS = new Set(['READ_ALOUD', 'PRONUNCIATION_DRILL']);
 const sha256 = (v: string | Buffer) =>
   createHash('sha256').update(v).digest('hex');
@@ -76,7 +98,7 @@ function ssmlFor(ex: Exercise) {
 }
 
 function keyFor(ex: Exercise) {
-  const file = `${ex.id}.${UK ? 'en-gb.' : ''}v1.mp3`;
+  const file = `${ex.id}.${UK ? 'en-gb.' : ''}v${VERSION}.mp3`;
   return ex.isPremiumContent
     ? `premium/speaking/reference/${file}`
     : `catalog/speaking/reference/${file}`;
@@ -85,8 +107,9 @@ function keyFor(ex: Exercise) {
 async function load(prisma: PrismaClient): Promise<Exercise[]> {
   return prisma.speakingExercise.findMany({
     where: {
-      practiceSetId: null,
-      publicationStatus: 'PUBLISHED',
+      ...(SET_IDS.length
+        ? { practiceSetId: { in: SET_IDS } }
+        : { practiceSetId: null, publicationStatus: 'PUBLISHED' }),
       // The UK pass covers exactly the exercises whose US clip this tool made.
       audioUrl: UK ? { contains: '/speaking/reference/' } : null,
     },
@@ -205,9 +228,14 @@ async function main() {
       throw new Error('REFUSED: SPEAKING_REF_TTS_AUTHORIZED=generate not set');
     if (exercises.length > MAX_CALLS) throw new Error('HARD_CAP_EXCEEDED');
     mkdirSync(OUT, { recursive: true });
+    const redis = new Redis(
+      Number(process.env.REDIS_PORT ?? 6379),
+      process.env.REDIS_HOST ?? '127.0.0.1',
+    );
     const clips: unknown[] = [];
     for (const ex of exercises) {
       const audio = await synthesize(ssmlFor(ex));
+      await recordAzureTts(redis, ex.targetText.length);
       const meta = await parseBuffer(audio, { mimeType: 'audio/mpeg' });
       const durationMs = Math.round((meta.format.duration ?? 0) * 1000);
       if (durationMs < 500) throw new Error(`exercise ${ex.id}: empty audio`);
@@ -240,6 +268,7 @@ async function main() {
         2,
       ),
     );
+    redis.disconnect();
     console.log(`TTS calls: ${clips.length}`);
   } else if (mode === 'publish') {
     if (process.env.SPEAKING_REF_AUDIO_PUBLISH_AUTHORIZED !== 'publish')
@@ -292,7 +321,11 @@ async function main() {
     await prisma.$transaction(async (tx) => {
       for (const [id, audioUrl] of values) {
         const changed = await tx.speakingExercise.updateMany({
-          where: { id, audioUrl: null, practiceSetId: null },
+          where: {
+            id,
+            audioUrl: null,
+            practiceSetId: SET_IDS.length ? { in: SET_IDS } : null,
+          },
           data: { audioUrl },
         });
         if (changed.count !== 1)

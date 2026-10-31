@@ -108,7 +108,7 @@ describe('ToeicService private exam media', () => {
       privateKey: privateListeningMasterKey(master),
     });
     expect(privateListeningMasterKey(master)).toBe(
-      'premium/listening/toeic/exam-1/listening-master/55065e0dfc19f3e5.v1.mp3',
+      `premium/listening/toeic/exam-1/listening-master/${master.sha256.slice(0, 16)}.v1.mp3`,
     );
     expect(service.isPublished).not.toHaveBeenCalled();
   });

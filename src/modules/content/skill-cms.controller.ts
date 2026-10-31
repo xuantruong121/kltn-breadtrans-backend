@@ -6,14 +6,22 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
   Request,
   Res,
   UploadedFile,
   ParseIntPipe,
+  Query,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,6 +38,7 @@ import {
   SkillContentDto,
   ListeningQuestionDto,
   SkillPublishDto,
+  SkillTracksDto,
   SkillQuestionDto,
   SpeakingExerciseDto,
   SpeakingExerciseReorderDto,
@@ -45,8 +54,49 @@ import { SpeakingStimulusDto } from './speaking-stimulus.dto';
 export class SkillCmsController {
   constructor(private readonly service: SkillCmsService) {}
 
-  @Get(':domain') list(@Param('domain') domain: string, @Request() req: any) {
-    return this.service.list(domain, req.user);
+  @Get(':domain')
+  @ApiOperation({
+    summary:
+      'Admin: danh sách nội dung kỹ năng; gửi page để nhận một trang đã lọc',
+  })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'pageSize', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'PUBLISHED'] })
+  @ApiQuery({ name: 'level', required: false })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    enum: ['NEWEST', 'OLDEST', 'TITLE', 'LEVEL', 'FEWEST'],
+  })
+  @ApiQuery({
+    name: 'audio',
+    required: false,
+    enum: ['ok', 'pending', 'error', 'none'],
+  })
+  @ApiQuery({
+    name: 'mode',
+    required: false,
+    enum: ['COMPREHENSION', 'DICTATION', 'DIALOGUE'],
+  })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({
+    name: 'track',
+    required: false,
+    description: 'Ngành, hoặc UNTAGGED cho nội dung chưa gắn ngành',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Mảng (không có page) hoặc { items, total, page, pageSize, facets }',
+  })
+  list(
+    @Param('domain') domain: string,
+    @Request() req: any,
+    @Query() query: Record<string, string | undefined>,
+  ) {
+    return this.service.list(domain, req.user, query);
   }
 
   @Get('speaking/stimuli') listSpeakingStimuli(@Request() req: any) {
@@ -228,6 +278,45 @@ export class SkillCmsController {
     );
   }
 
+  @ApiOperation({
+    summary:
+      'Synthesize a Listening question clip (turns, comprehension audioText or dictation sentence)',
+  })
+  @ApiResponse({ status: 201, description: 'The new active audio asset' })
+  @Post('listening/:id/questions/:questionId/audio-assets/generate')
+  generateListeningQuestionAudio(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Request() req: any,
+  ) {
+    return this.service.generateListeningDialogueAudio(
+      id,
+      questionId,
+      req.user,
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      'Synthesize the reference audio of a Speaking exercise (Azure TTS)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'The exercise with its new audioUrl',
+  })
+  @Post('speaking/:setId/exercises/:exerciseId/reference-audio')
+  generateSpeakingReferenceAudio(
+    @Param('setId') setId: string,
+    @Param('exerciseId') exerciseId: string,
+    @Request() req: any,
+  ) {
+    return this.service.generateSpeakingReferenceAudio(
+      setId,
+      exerciseId,
+      req.user,
+    );
+  }
+
   @Post('listening/:id/questions/:questionId/audio-assets/generate-dialogue')
   generateListeningDialogueAudio(
     @Param('id', ParseIntPipe) id: number,
@@ -291,6 +380,21 @@ export class SkillCmsController {
   ) {
     return this.service.validate(domain, id, req.user);
   }
+  @Put(':domain/:id/tracks')
+  @ApiOperation({
+    summary: 'Gắn ngành cho nội dung; đề xuất theo ngành đọc từ đây',
+  })
+  @ApiResponse({ status: 200, description: 'Danh sách ngành sau khi lưu' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy nội dung' })
+  setTracks(
+    @Param('domain') domain: string,
+    @Param('id') id: string,
+    @Body() body: SkillTracksDto,
+    @Request() req: any,
+  ) {
+    return this.service.setTracks(domain, id, body.tracks, req.user);
+  }
+
   @Post(':domain/:id/publish') publish(
     @Param('domain') domain: string,
     @Param('id') id: string,

@@ -12,10 +12,13 @@
  *   build      ffmpeg: intro + per-Part directions + cues + clips + response
  *              gaps -> master.mp3 (mono 24 kHz 64 kb/s CBR, loudness
  *              normalized) and timeline.json (segment offsets per group).
+ *   registry   writes src/modules/toeic/listening-master/exam-<id>.ts from
+ *              timeline.json.
  *   publish    upload master.mp3 + timeline.json to an S3-compatible bucket
  *              under a content-hashed key, refusing to overwrite a different
  *              object. --bucket harness (local fake S3) needs nothing else;
- *              --bucket r2 needs TOEIC_MASTER_PUBLISH_AUTHORIZED=publish.
+ *              --bucket r2 needs TOEIC_MASTER_PUBLISH_AUTHORIZED=publish;
+ *              --bucket r2-private (the P05 location) needs it too.
  *
  * Usage:
  *   npx ts-node --transpile-only scripts/toeic-listening-master.ts <mode> --exam 1 --target env:DATABASE_URL
@@ -43,6 +46,14 @@ import {
   escapeXml,
   LISTENING_VOICE_REGISTRY,
 } from '../src/modules/quiz/listening-audio-authoring.service';
+import {
+  isPrivateListeningMediaKey,
+  R2Service,
+} from '../src/modules/upload/r2.service';
+import {
+  type ListeningMaster,
+  privateListeningMasterKey,
+} from '../src/modules/toeic/toeic-listening-master';
 
 const arg = (name: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -62,10 +73,14 @@ const RESPONSE_GAP: Record<number, number> = { 1: 5, 2: 5, 3: 8, 4: 8 };
  * direction per Part) without reproducing any official test's wording.
  */
 export const NARRATION = {
+  // Short sentences (owner 2026-10-30): no brand name in the audio; the four
+  // parts named as they are; no "A, B, C, or D" here because Part 2 has only
+  // three choices (each Part's directions give its own letters). The
+  // "not an official TOEIC test" line stays (docs/toeic-product-contract.md).
   intro:
-    'Welcome to the BreadTrans TOEIC-style Listening practice test. This practice test was written by BreadTrans and is not an official TOEIC test. ' +
-    'In this section, you will hear a range of short recordings in English: statements, questions, conversations, and talks. ' +
-    'The section has one hundred questions in four parts. For each question, choose the best answer and mark A, B, C, or D. Listen carefully. We will now begin with Part One.',
+    'Welcome to the TOEIC Listening practice test. This is a practice test, not an official TOEIC test. ' +
+    'The Listening section has four parts: photographs, questions and responses, conversations, and talks. ' +
+    'There are one hundred questions, and the section takes about forty-five minutes. Choose the best answer to each question. Listen carefully. Part One will begin now.',
   part1:
     'Part One. Photographs. Questions one to six. For each question, look at the photograph on your page. You will hear four short statements about it. The statements are not printed. Choose the statement that best describes what you see.',
   part2:
@@ -76,6 +91,34 @@ export const NARRATION = {
     'Part Four. Talks. Questions seventy-one to one hundred. You will hear short talks by one speaker, such as announcements, messages, or broadcasts. After each talk, you will hear three questions. The questions and answer choices are printed on your page.',
   end: 'This is the end of the Listening section. You may now continue with the Reading section.',
 } as const;
+
+/** Pause after a sentence, after a colon, and between answer letters. */
+export const NARRATION_BREAKS = { sentence: 200, colon: 350, letter: 300 };
+
+/**
+ * Narration text as SSML. The voice spells an all-caps word letter by letter
+ * ("T O E I C"), so brand and test names get a pronunciation. The voice's
+ * own pauses were about 0.2 s inside lists and "A, B, C, or D", which ran the
+ * letters together, so explicit breaks are added.
+ */
+export function narrationSsml(text: string): string {
+  const b = (ms: number) => `<break time="${ms}ms"/>`;
+  return (
+    escapeXml(text)
+      .replace(
+        /\bTOEIC\b/g,
+        '<phoneme alphabet="ipa" ph="ˈtoʊ.ɪk">TOEIC</phoneme>',
+      )
+      .replace(/\bBreadTrans\b/g, '<sub alias="Bread Trans">BreadTrans</sub>')
+      // "A, B, C, or D" / "A, B, and C": each letter on its own
+      .replace(
+        /\b([A-D]), (?=(?:and |or )?[A-D]\b)/g,
+        `$1,${b(NARRATION_BREAKS.letter)} `,
+      )
+      .replace(/: /g, `:${b(NARRATION_BREAKS.colon)} `)
+      .replace(/([.?!]) (?=\S)/g, `$1${b(NARRATION_BREAKS.sentence)} `)
+  );
+}
 
 const numberWords = (n: number): string => {
   const ones = [
@@ -188,6 +231,7 @@ async function inventory(examId: number, dir: string) {
   await prisma.$disconnect();
   mkdirSync(join(dir, 'clips'), { recursive: true });
   const clips: InventoryClip[] = [];
+  let r2: R2Service | undefined;
   for (const g of groups) {
     if (!g.audioUrl)
       throw new Error(`group ${g.id} (Part ${g.part}) has no audioUrl`);
@@ -197,9 +241,15 @@ async function inventory(examId: number, dir: string) {
       `${String(g.part)}-${String(g.groupOrder).padStart(3, '0')}-g${g.id}.mp3`,
     );
     if (!existsSync(file)) {
-      const res = await fetch(g.audioUrl);
-      if (!res.ok) throw new Error(`GET ${g.audioUrl} -> ${res.status}`);
-      writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+      // Since P05 a group stores a private key; older rows hold a public URL.
+      if (isPrivateListeningMediaKey(g.audioUrl)) {
+        r2 ??= new R2Service();
+        writeFileSync(file, await r2.downloadPrivateFileBuffer(g.audioUrl));
+      } else {
+        const res = await fetch(g.audioUrl);
+        if (!res.ok) throw new Error(`GET ${g.audioUrl} -> ${res.status}`);
+        writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+      }
     }
     const buf = readFileSync(file);
     clips.push({
@@ -279,10 +329,10 @@ async function narration(examId: number, dir: string) {
   const body = segments
     .map(
       (s) =>
-        `${escapeXml(s.text)}<bookmark mark="${s.id}"/><break time="1200ms"/>`,
+        `${narrationSsml(s.text)}<bookmark mark="${s.id}"/><break time="1200ms"/>`,
     )
     .join('');
-  const ssml = `<speak version="1.0" xml:lang="en-US" xmlns="http://www.w3.org/2001/10/synthesis"><voice name="${voice}"><prosody rate="-4%">${body}</prosody></voice></speak>`;
+  const ssml = `<speak version="1.0" xml:lang="en-US" xmlns="http://www.w3.org/2001/10/synthesis"><voice name="${voice}"><prosody rate="-8%">${body}</prosody></voice></speak>`;
   const chars = segments.reduce((n, s) => n + s.text.length, 0);
   console.log(
     `narration: ${segments.length} segments, ${chars} characters, 1 TTS request, voice ${voice}`,
@@ -483,8 +533,13 @@ function build(examId: number, dir: string) {
       });
     t += seconds;
   };
+  // Lead-in silence: a browser starting playback can drop the first
+  // ~100-300 ms while the decoder spins up, which cut "Wel-" off "Welcome"
+  // (owner 2026-10-30). Part of the INTRO segment so seeking to it plays it.
   const intro = seg('intro');
+  push(silence(dir, 1.5), 1.5);
   push(intro.file, intro.seconds, { kind: 'INTRO' });
+  timeline[timeline.length - 1].start = 0;
   push(silence(dir, 2), 2);
   for (const part of [1, 2, 3, 4]) {
     const d = seg(`part${part}`);
@@ -593,6 +648,31 @@ async function publish(examId: number, dir: string) {
   const bucket = arg('bucket');
   const tl = JSON.parse(readFileSync(join(dir, 'timeline.json'), 'utf8'));
   const prefix = `catalog/toeic/exam-${examId}/listening-master/${tl.sha256.slice(0, 16)}`;
+  if (bucket === 'r2-private') {
+    // Since P05 exam audio lives only in the private bucket, under the
+    // registry key's file name (privateListeningMasterKey).
+    if (process.env.TOEIC_MASTER_PUBLISH_AUTHORIZED !== 'publish')
+      throw new Error(
+        'REFUSED: TOEIC_MASTER_PUBLISH_AUTHORIZED=publish not set',
+      );
+    const key = privateListeningMasterKey({
+      examId,
+      key: `${prefix}.v1.mp3`,
+    } as ListeningMaster);
+    const body = readFileSync(join(dir, 'master.mp3'));
+    const r2 = new R2Service();
+    if (await r2.privateObjectExists(key)) {
+      if (sha256(await r2.downloadPrivateFileBuffer(key)) !== tl.sha256)
+        throw new Error(`REFUSED: ${key} exists with other content`);
+      console.log(`exists (same sha256), skipped: ${key}`);
+      return;
+    }
+    await r2.putPrivateObjectAtKey(key, body, 'audio/mpeg');
+    if (sha256(await r2.downloadPrivateFileBuffer(key)) !== tl.sha256)
+      throw new Error(`${key}: sha256 mismatch after write`);
+    console.log(`uploaded ${key} (${body.length} bytes) to the private bucket`);
+    return;
+  }
   let client: S3Client;
   let name: string;
   if (bucket === 'harness') {
@@ -619,7 +699,7 @@ async function publish(examId: number, dir: string) {
       },
     });
     name = process.env.R2_BUCKET_NAME!;
-  } else throw new Error('--bucket harness | r2');
+  } else throw new Error('--bucket harness | r2 | r2-private');
   const timeline = Buffer.from(
     JSON.stringify({ ...tl, file: `${prefix}.v1.mp3` }, null, 2),
   );
@@ -654,6 +734,42 @@ async function publish(examId: number, dir: string) {
   }
 }
 
+/** Writes the registry module the API reads (src/modules/toeic/listening-master). */
+function registry(examId: number, dir: string) {
+  const tl = JSON.parse(readFileSync(join(dir, 'timeline.json'), 'utf8'));
+  const master: ListeningMaster = {
+    examId,
+    key: `catalog/toeic/exam-${examId}/listening-master/${tl.sha256.slice(0, 16)}.v1.mp3`,
+    sha256: tl.sha256,
+    bytes: tl.bytes,
+    durationSeconds: tl.durationSeconds,
+    format: tl.format,
+    responseGapSeconds: tl.responseGapSeconds,
+    timeline: tl.timeline,
+  };
+  const file = join(
+    'src',
+    'modules',
+    'toeic',
+    'listening-master',
+    `exam-${examId}.ts`,
+  );
+  writeFileSync(
+    file,
+    `/**
+ * Generated by scripts/toeic-listening-master.ts (registry) for exam set ${examId}.
+ * Do not edit by hand: rebuild the master and regenerate this file.
+ */
+import type { ListeningMaster } from '../toeic-listening-master';
+
+export const EXAM_${examId}_LISTENING_MASTER: ListeningMaster = ${JSON.stringify(master, null, 2)};
+`,
+  );
+  console.log(
+    `wrote ${file}: ${(master.durationSeconds / 60).toFixed(2)} min, sha ${master.sha256.slice(0, 16)}`,
+  );
+}
+
 async function main() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('dotenv').config({ quiet: true });
@@ -665,10 +781,13 @@ async function main() {
   else if (mode === 'narration') await narration(examId, dir);
   else if (mode === 'build') build(examId, dir);
   else if (mode === 'publish') await publish(examId, dir);
-  else throw new Error('mode: inventory | narration | build | publish');
+  else if (mode === 'registry') registry(examId, dir);
+  else
+    throw new Error('mode: inventory | narration | build | publish | registry');
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (require.main === module)
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
