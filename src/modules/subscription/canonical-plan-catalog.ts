@@ -29,7 +29,8 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'PLUS',
     displayName: 'BreadTrans Plus',
-    description: 'Mở Nói, Viết Trung cấp và Nghe chép từ B1 trong 30 ngày.',
+    description:
+      'Mở Nói, Viết Trung cấp và Nghe chép Trung cấp trở lên trong 30 ngày.',
     versionName: 'BreadTrans Plus — 30 ngày',
     durationDays: 30,
     priceVnd: 69_000,
