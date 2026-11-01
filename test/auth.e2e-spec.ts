@@ -62,9 +62,33 @@ describe('AuthModule (e2e)', () => {
         })
         .expect(409);
     });
+
+    it('should treat a different letter case as the same account', () => {
+      return request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: ' Test_E2E@BreadTrans.COM ',
+          password: 'password123',
+          fullName: 'Test E2E User',
+        })
+        .expect(409);
+    });
   });
 
   describe('/auth/login (POST)', () => {
+    it('should login with a different letter case', () => {
+      return request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: ' Test_E2E@BreadTrans.COM ',
+          password: 'password123',
+        })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.user.email).toEqual('test_e2e@breadtrans.com');
+        });
+    });
+
     it('should login and return access_token', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
