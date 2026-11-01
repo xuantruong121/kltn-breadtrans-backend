@@ -384,7 +384,7 @@ describe('SkillCmsService', () => {
 
     it('saves the title of the practice', async () => {
       const { prisma, service } = build();
-      await service.update('reading', '4', { title: 'Đã sửa' } as any, admin);
+      await service.update('reading', '4', { title: 'Đã sửa' }, admin);
       expect(prisma.quiz.update).toHaveBeenCalled();
     });
 

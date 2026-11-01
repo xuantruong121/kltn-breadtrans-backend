@@ -90,10 +90,7 @@ describe('SubscriptionAdminService', () => {
     };
 
     notifications = { createNotification: jest.fn().mockResolvedValue({}) };
-    service = new SubscriptionAdminService(
-      prismaMock,
-      notifications as never,
-    );
+    service = new SubscriptionAdminService(prismaMock, notifications as never);
     subscriptionService = new SubscriptionService(prismaMock);
   });
 

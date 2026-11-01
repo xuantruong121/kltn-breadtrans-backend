@@ -4,7 +4,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { GamificationService } from '../gamification/gamification.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  ConflictException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 
 const mockNotificationsService = {
   createNotification: jest.fn().mockResolvedValue({}),
@@ -1004,7 +1007,9 @@ describe('MarketService', () => {
 
         await service.reviewOrder(10, 'approved', 'Admin');
 
-        expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+        expect(
+          mockNotificationsService.createNotification,
+        ).toHaveBeenCalledWith(
           expect.objectContaining({
             userId: 1,
             type: 'MARKET_ORDER_RESULT',

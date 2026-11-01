@@ -7,7 +7,12 @@ import { EventsModule } from '../events/events.module';
 import { GamificationModule } from '../gamification/gamification.module';
 
 @Module({
-  imports: [PrismaModule, EventsModule, GamificationModule, NotificationsModule],
+  imports: [
+    PrismaModule,
+    EventsModule,
+    GamificationModule,
+    NotificationsModule,
+  ],
   controllers: [MarketController],
   providers: [MarketService],
   exports: [MarketService],

@@ -510,9 +510,7 @@ export class SubscriptionAdminService {
     try {
       await this.notifications.createNotification({ userId, ...notice });
     } catch (error) {
-      this.logger.warn(
-        `Could not notify learner ${userId}: ${String(error)}`,
-      );
+      this.logger.warn(`Could not notify learner ${userId}: ${String(error)}`);
     }
   }
 
