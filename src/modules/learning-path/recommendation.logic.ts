@@ -9,6 +9,7 @@
  *             is all plan-locked still has open practice
  *   track     0.6 when the item is tagged with the learner's career track
  *   goal      0.4 when the skill serves the learner's goal
+ *   focus     0.5 when the item trains the weakest diagnostic criterion
  *   weakness  0.6 for the skill with the lowest ability
  *   novelty   0.5 when never attempted
  *   review    0.6 when the best score is under 60 % and two days have passed
@@ -28,6 +29,7 @@ import type {
 } from '@prisma/client';
 
 import { fitScore, successProbability } from './ability.logic';
+import { focusOf, type WeakFocus } from './weak-focus.logic';
 import { UNPLACED_UNLOCKED } from './progression.logic';
 import {
   ABILITY_SEED,
@@ -61,6 +63,8 @@ export type Candidate = {
   route: string;
   difficulty: number;
   tracks: LearningTrack[];
+  /** Speaking task types or the writing quiz type of the item. */
+  kinds: string[];
   /** True when the item needs a plan the learner does not have. */
   planLocked: boolean;
   /** Lowest plan that opens this item. */
@@ -88,6 +92,7 @@ export type LearnerState = {
   skills: Partial<Record<PracticeSkill, SkillState>>;
   history: Map<string, HistoryEntry>;
   saved: Set<string>;
+  weakFocus: WeakFocus[];
   now: Date;
 };
 
@@ -178,6 +183,11 @@ export function scoreCandidate(
   if (learner.track !== 'GENERAL' && c.tracks.includes(learner.track)) {
     score += 0.6;
     reasons.push(`Chủ đề ${TRACK_LABEL[learner.track]}`);
+  }
+  const focus = focusOf(c, learner.weakFocus);
+  if (focus) {
+    score += 0.5;
+    reasons.push(`Đúng điểm cần cải thiện: ${focus.label}`);
   }
   if (GOAL_SKILLS[learner.goal].includes(c.skill)) {
     score += 0.4;

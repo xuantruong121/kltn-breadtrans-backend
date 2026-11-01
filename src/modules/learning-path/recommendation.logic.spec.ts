@@ -29,6 +29,7 @@ const item = (
   route: `/x/${nextId}`,
   difficulty: DIFF[level],
   tracks: [],
+  kinds: [],
   planLocked: false,
   requiredPlan: 'FREE',
   minutes: 10,
@@ -43,6 +44,7 @@ const learner = (extra: Partial<LearnerState> = {}): LearnerState => ({
   },
   history: new Map(),
   saved: new Set(),
+  weakFocus: [],
   now: NOW,
   ...extra,
 });
@@ -200,6 +202,20 @@ describe('recommend', () => {
     expect(top.reasons).toContain('Hợp mục tiêu: Du lịch');
     expect(other.reasons.join()).not.toContain('Hợp mục tiêu');
     expect(top.score - other.score).toBeCloseTo(0.4);
+  });
+
+  it('moves items that train the weak criterion up and says why', () => {
+    const r = learner({
+      weakFocus: [
+        { skill: 'LISTENING', label: 'phát âm', kinds: ['READ_ALOUD'] },
+      ],
+    });
+    const trains = item('LISTENING', 'BASIC', { kinds: ['READ_ALOUD'] });
+    const other = item('LISTENING', 'BASIC', { kinds: ['EXPRESS_OPINION'] });
+    const [top, next] = recommend([other, trains], r, { limit: 2 });
+    expect(top.candidate.id).toBe(trains.id);
+    expect(top.reasons).toContain('Đúng điểm cần cải thiện: phát âm');
+    expect(top.score - next.score).toBeCloseTo(0.5);
   });
 
   it('favours no skill for the general goal', () => {
