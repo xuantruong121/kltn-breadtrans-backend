@@ -10,8 +10,6 @@
  *
  * Audio is separate: scripts/generate-vocab-accent-audio.ts.
  */
-import { createHash } from 'node:crypto';
-
 import { PrismaClient } from '@prisma/client';
 
 import { questionProblems } from '../src/modules/grammar/grammar-question.logic';
@@ -19,6 +17,7 @@ import { GrammarService } from '../src/modules/grammar/grammar.service';
 import {
   EXTRA_QUESTIONS,
   NEW_TOPICS,
+  prepare,
   type RawQuestion,
 } from './content/grammar-f23.data';
 import {
@@ -29,24 +28,6 @@ import {
 
 const QUESTIONS_PER_TOPIC = 10;
 const WORDS_PER_DECK = 12;
-
-/** Stable shuffle: the key position depends on the question, not on run order. */
-function prepare(raw: RawQuestion) {
-  const rows = [
-    { text: raw.a, note: null as string | null },
-    ...raw.w.map((text, i) => ({ text, note: raw.n[i] })),
-  ];
-  const rank = (text: string) =>
-    createHash('sha256').update(`${raw.q}|${text}`).digest('hex');
-  rows.sort((x, y) => (rank(x.text) < rank(y.text) ? -1 : 1));
-  return {
-    question: raw.q,
-    options: rows.map((r) => r.text),
-    correctIndex: rows.findIndex((r) => r.text === raw.a),
-    explanation: raw.e,
-    optionExplanations: rows.map((r) => r.note),
-  };
-}
 
 function checkContent() {
   const errors: string[] = [];

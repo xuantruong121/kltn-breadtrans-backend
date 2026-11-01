@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 /**
  * F23A grammar content: nine new tense topics and five more questions for each
  * published topic, so every topic has ten. Written by hand, original material.
@@ -28,6 +30,24 @@ const q = (
   n: [string, string, string],
 ): RawQuestion => ({ q: question, a, w, e, n });
 
+/** Stable shuffle: the key position depends on the question, not on run order. */
+export function prepare(raw: RawQuestion) {
+  const rows = [
+    { text: raw.a, note: null as string | null },
+    ...raw.w.map((text, i) => ({ text, note: raw.n[i] })),
+  ];
+  const rank = (text: string) =>
+    createHash('sha256').update(`${raw.q}|${text}`).digest('hex');
+  rows.sort((x, y) => (rank(x.text) < rank(y.text) ? -1 : 1));
+  return {
+    question: raw.q,
+    options: rows.map((r) => r.text),
+    correctIndex: rows.findIndex((r) => r.text === raw.a),
+    explanation: raw.e,
+    optionExplanations: rows.map((r) => r.note),
+  };
+}
+
 export const NEW_TOPICS: RawTopic[] = [
   {
     title: 'Present Continuous',
@@ -39,7 +59,7 @@ export const NEW_TOPICS: RawTopic[] = [
       q('Please be quiet. The baby ______ right now.', 'is sleeping', ['sleeps', 'slept', 'has slept'], '"Right now" cho biết việc đang diễn ra, dùng is + V-ing.', ['Hiện tại đơn dùng cho thói quen, không cho việc đang diễn ra.', 'Quá khứ đơn không hợp với "right now".', 'Hiện tại hoàn thành không hợp với "right now".']),
       q('Look! It ______ outside.', 'is raining', ['rains', 'rained', 'has rained'], '"Look!" báo hiệu việc đang xảy ra trước mắt.', ['Hiện tại đơn nói về sự thật chung, không phải việc đang thấy.', 'Quá khứ đơn nói về việc đã xong.', 'Hiện tại hoàn thành không hợp với lời gọi chú ý "Look!".']),
       q('I ______ for the bus at the moment, so I will call you later.', 'am waiting', ['wait', 'waited', 'have waited'], '"At the moment" đi với thì hiện tại tiếp diễn.', ['Thiếu dạng am + V-ing.', 'Quá khứ đơn không hợp với "at the moment".', 'Hiện tại hoàn thành không hợp với "at the moment".']),
-      q('They ______ a new office this month.', 'are building', ['builds', 'built', 'has built'], 'Việc đang tiến hành trong giai đoạn hiện tại, chủ ngữ số nhiều dùng are + V-ing.', ['"Builds" chia cho chủ ngữ số ít.', '"This month" chưa kết thúc nên không dùng quá khứ đơn ở đây.', '"Has" chia cho chủ ngữ số ít.']),
+      q('They ______ a new office this month.', 'are building', ['builds', 'were built', 'has built'], 'Việc đang tiến hành trong giai đoạn hiện tại, chủ ngữ số nhiều dùng are + V-ing.', ['"Builds" chia cho chủ ngữ số ít.', 'Dạng bị động không dùng được vì câu còn tân ngữ "a new office".', '"Has" chia cho chủ ngữ số ít.']),
       q('______ you listening to me now?', 'Are', ['Do', 'Did', 'Have'], 'Câu hỏi hiện tại tiếp diễn: Are + chủ ngữ + V-ing.', ['"Do" đi với động từ nguyên mẫu.', '"Did" đi với động từ nguyên mẫu.', '"Have" đi với V3 hoặc been + V-ing.']),
       q('She ______ not working today; she is at home.', 'is', ['does', 'did', 'do'], 'Phủ định hiện tại tiếp diễn: is not + V-ing.', ['"Does not" đi với động từ nguyên mẫu.', '"Did not" đi với động từ nguyên mẫu.', '"Do" không chia cho "she".']),
       q('Which sentence is correct?', 'He knows the answer.', ['He is knowing the answer.', 'He knowing the answer.', 'He are knowing the answer.'], '"Know" là động từ chỉ trạng thái, không dùng dạng tiếp diễn.', ['"Know" không dùng ở dạng V-ing trong nghĩa này.', 'Thiếu trợ động từ và "know" không dùng dạng tiếp diễn.', '"Are" sai với chủ ngữ "he".']),
@@ -77,7 +97,7 @@ export const NEW_TOPICS: RawTopic[] = [
       q('Don\'t worry, I ______ you with your homework.', 'will help', ['helped', 'have helped', 'helping'], 'Lời hứa hoặc đề nghị giúp đỡ dùng will + V.', ['Quá khứ đơn không hợp với lời hứa.', 'Hiện tại hoàn thành nói về việc đã xảy ra.', 'V-ing không đứng một mình làm động từ chính.']),
       q('I think it ______ tomorrow.', 'will rain', ['rained', 'raining', 'has rained'], 'Dự đoán sau "I think" dùng will + V.', ['Quá khứ đơn không hợp với "tomorrow".', 'V-ing không đứng một mình làm động từ chính.', 'Hiện tại hoàn thành không hợp với "tomorrow".']),
       q('She ______ not come to the party tomorrow.', 'will', ['did', 'has', 'was'], 'Phủ định tương lai đơn: will not + V.', ['"Did" không hợp với "tomorrow".', '"Has not" cần V3.', '"Was not" cần V-ing hoặc tính từ.']),
-      q('______ you call me tonight?', 'Will', ['Did', 'Were', 'Have'], 'Câu hỏi tương lai đơn: Will + chủ ngữ + V.', ['"Did" không hợp với "tonight" sắp tới.', '"Were" cần V-ing.', '"Have" cần V3.']),
+      q('______ you call me tonight?', 'Will', ['Are', 'Were', 'Have'], 'Câu hỏi tương lai đơn: Will + chủ ngữ + V.', ['"Are" cần V-ing.', '"Were" cần V-ing.', '"Have" cần V3.']),
       q('The phone is ringing. — I ______ it!', 'will answer', ['answered', 'have answered', 'answering'], 'Quyết định ngay lúc nói dùng will.', ['Quá khứ đơn nói về việc đã xong.', 'Hiện tại hoàn thành nói về việc đã xong.', 'V-ing không đứng một mình làm động từ chính.']),
       q('I promise I ______ late again.', 'won\'t be', ['wasn\'t', 'weren\'t', 'haven\'t been'], 'Lời hứa về tương lai dùng won\'t + V.', ['Quá khứ đơn không hợp với lời hứa.', '"Weren\'t" sai với chủ ngữ "I".', 'Hiện tại hoàn thành không hợp với lời hứa.']),
       q('Perhaps they ______ the project next month.', 'will finish', ['finished', 'have finished', 'finishing'], '"Perhaps" và "next month" chỉ dự đoán tương lai.', ['Quá khứ đơn không hợp với "next month".', 'Hiện tại hoàn thành không hợp với "next month".', 'V-ing không đứng một mình làm động từ chính.']),
@@ -93,7 +113,7 @@ export const NEW_TOPICS: RawTopic[] = [
     keyFormula: 'have/has been + V-ing; for, since, how long, all day',
     description: 'Việc bắt đầu trong quá khứ, kéo dài tới hiện tại và nhấn mạnh quá trình.',
     questions: [
-      q('I ______ for you for two hours.', 'have been waiting', ['wait', 'am waiting', 'was waiting'], '"For two hours" tới hiện tại: have been + V-ing.', ['Hiện tại đơn không đi với khoảng thời gian tới hiện tại.', 'Hiện tại tiếp diễn không đi với "for two hours".', 'Quá khứ tiếp diễn không nối tới hiện tại.']),
+      q('I ______ for you for two hours, and you are still not here.', 'have been waiting', ['wait', 'am waiting', 'was waiting'], '"For two hours" tới hiện tại: have been + V-ing.', ['Hiện tại đơn không đi với khoảng thời gian tới hiện tại.', 'Hiện tại tiếp diễn không đi với "for two hours".', 'Quá khứ tiếp diễn không nối tới hiện tại.']),
       q('She ______ here since 2020.', 'has been working', ['works', 'is working', 'was working'], '"Since" với mốc bắt đầu trong quá khứ.', ['Hiện tại đơn không đi với "since".', 'Hiện tại tiếp diễn không đi với "since".', 'Quá khứ tiếp diễn không đi với "since 2020" ở đây.']),
       q('How long ______ you been studying English?', 'have', ['do', 'are', 'did'], 'Câu hỏi: How long + have + chủ ngữ + been + V-ing.', ['"Do" không đi với "been".', '"Are" không đi với "been".', '"Did" không đi với "been".']),
       q('He is tired because he ______ all morning.', 'has been running', ['runs', 'is run', 'was run'], 'Việc vừa kéo dài và để lại kết quả ở hiện tại.', ['Hiện tại đơn nói về thói quen, không giải thích sự mệt lúc này.', '"Is run" là bị động.', '"Was run" là bị động.']),
@@ -133,14 +153,14 @@ export const NEW_TOPICS: RawTopic[] = [
     questions: [
       q('At 9 a.m. tomorrow, I ______ on the plane.', 'will be sitting', ['sit', 'sat', 'have sat'], 'Mốc giờ cụ thể trong tương lai: will be + V-ing.', ['Hiện tại đơn không hợp với mốc này.', 'Quá khứ đơn không hợp với "tomorrow".', 'Hiện tại hoàn thành không hợp với "tomorrow".']),
       q('This time next week, we ______ on the beach.', 'will be lying', ['lay', 'lie', 'have lain'], '"This time next week" đi với tương lai tiếp diễn.', ['"Lay" là quá khứ của "lie" và không hợp với "next week".', 'Hiện tại đơn không hợp với mốc này.', 'Hiện tại hoàn thành không hợp với "next week".']),
-      q('Don\'t call at 8; I ______ dinner then.', 'will be having', ['have', 'had', 'have had'], 'Lúc 8 giờ việc ăn tối sẽ đang diễn ra.', ['Hiện tại đơn không nói được việc đang diễn ra lúc đó.', 'Quá khứ đơn không hợp với lời dặn cho tương lai.', 'Hiện tại hoàn thành không hợp với "then" ở tương lai.']),
+      q('Don\'t call at 8; I ______ dinner then.', 'will be having', ['was having', 'had', 'have had'], 'Lúc 8 giờ việc ăn tối sẽ đang diễn ra.', ['Quá khứ tiếp diễn không hợp với lời dặn cho tương lai.', 'Quá khứ đơn không hợp với lời dặn cho tương lai.', 'Hiện tại hoàn thành không hợp với "then" ở tương lai.']),
       q('______ you be using the meeting room this afternoon?', 'Will', ['Do', 'Did', 'Have'], 'Câu hỏi: Will + chủ ngữ + be + V-ing.', ['"Do" không đi với "be using".', '"Did" không đi với "be using".', '"Have" không đi với "be using".']),
-      q('At noon tomorrow, she ______ the clients.', 'will be meeting', ['meets', 'met', 'has met'], 'Việc sẽ đang diễn ra lúc trưa mai.', ['Hiện tại đơn không hợp với mốc này.', 'Quá khứ đơn không hợp với "tomorrow".', 'Hiện tại hoàn thành không hợp với "tomorrow".']),
+      q('At noon tomorrow, she ______ the clients.', 'will be meeting', ['was meeting', 'met', 'has met'], 'Việc sẽ đang diễn ra lúc trưa mai.', ['Quá khứ tiếp diễn không hợp với "tomorrow".', 'Quá khứ đơn không hợp với "tomorrow".', 'Hiện tại hoàn thành không hợp với "tomorrow".']),
       q('They ______ not be working next Monday because it is a holiday.', 'will', ['did', 'have', 'were'], 'Phủ định: will not be + V-ing.', ['"Did" không đi với "be working".', '"Have" không đi với "be working".', '"Were" không đi với "be working".']),
       q('When you arrive, I ______ at the gate.', 'will be waiting', ['wait', 'waited', 'have waited'], 'Việc sẽ đang diễn ra lúc bạn tới.', ['Hiện tại đơn không nói được việc đang diễn ra lúc đó.', 'Quá khứ đơn không hợp với mệnh đề tương lai.', 'Hiện tại hoàn thành không hợp ở đây.']),
       q('This time tomorrow, the team ______ the new system.', 'will be testing', ['tests', 'tested', 'has tested'], '"This time tomorrow" đi với tương lai tiếp diễn.', ['Hiện tại đơn không hợp với mốc này.', 'Quá khứ đơn không hợp với "tomorrow".', 'Hiện tại hoàn thành không hợp với "tomorrow".']),
       q('What ______ you be doing at this time next year?', 'will', ['do', 'did', 'have'], 'Câu hỏi: What + will + chủ ngữ + be + V-ing.', ['"Do" không đi với "be doing".', '"Did" không đi với "be doing".', '"Have" không đi với "be doing".']),
-      q('From 2 to 4 p.m. tomorrow, the manager ______ interviews.', 'will be conducting', ['conducts', 'conducted', 'has conducted'], 'Khoảng thời gian cụ thể trong tương lai.', ['Hiện tại đơn không hợp với mốc này.', 'Quá khứ đơn không hợp với "tomorrow".', 'Hiện tại hoàn thành không hợp với "tomorrow".']),
+      q('From 2 to 4 p.m. tomorrow, the manager ______ interviews.', 'will be conducting', ['was conducting', 'conducted', 'has conducted'], 'Khoảng thời gian cụ thể trong tương lai.', ['Quá khứ tiếp diễn không hợp với "tomorrow".', 'Quá khứ đơn không hợp với "tomorrow".', 'Hiện tại hoàn thành không hợp với "tomorrow".']),
     ],
   },
   {
@@ -178,7 +198,7 @@ export const NEW_TOPICS: RawTopic[] = [
       q('By the end of this year, they ______ 500 units.', 'will have sold', ['sell', 'sold', 'are selling'], '"By the end of this year": tổng kết tới mốc tương lai.', ['Hiện tại đơn không hợp với mốc này.', 'Quá khứ đơn không hợp với mốc chưa tới.', 'Hiện tại tiếp diễn không nói được tổng đã đạt.']),
       q('I ______ all my exams by July.', 'will have taken', ['take', 'took', 'am taking'], 'Xong trước tháng Bảy.', ['Hiện tại đơn không hợp với "by July".', 'Quá khứ đơn không hợp với mốc tương lai.', 'Hiện tại tiếp diễn không hợp với "by July".']),
       q('By the time he retires, he ______ over 200 students.', 'will have taught', ['teaches', 'taught', 'is teaching'], 'Tổng kết tới lúc nghỉ hưu trong tương lai.', ['Hiện tại đơn không hợp với "by the time".', 'Quá khứ đơn không hợp với "retires".', 'Hiện tại tiếp diễn không nói được tổng đã đạt.']),
-      q('In two hours, the team ______ the update.', 'will have deployed', ['deploys', 'deployed', 'is deploying'], 'Trong vòng hai giờ tới việc sẽ xong.', ['Hiện tại đơn không nói được ý xong trước mốc.', 'Quá khứ đơn không hợp với mốc tương lai.', 'Hiện tại tiếp diễn nói việc đang làm, không phải đã xong.']),
+      q('By this evening, the team ______ the update.', 'will have deployed', ['deploys', 'deployed', 'is deploying'], '"By this evening": xong trước mốc tương lai.', ['Hiện tại đơn không nói được ý xong trước mốc.', 'Quá khứ đơn không hợp với mốc tương lai.', 'Hiện tại tiếp diễn nói việc đang làm, không phải đã xong.']),
     ],
   },
   {
@@ -227,7 +247,7 @@ export const EXTRA_QUESTIONS: Record<string, RawQuestion[]> = {
   ],
   'Future Forms': [
     q('Look at those clouds! It ______ rain.', 'is going to', ['goes to', 'going', 'went to'], 'Dự đoán dựa trên dấu hiệu trước mắt: be going to.', ['"Goes to" có nghĩa đi tới một nơi.', 'Thiếu "is" và "to".', 'Quá khứ không hợp với dấu hiệu hiện tại.']),
-    q('We ______ to Singapore next week; the tickets are booked.', 'are flying', ['flew', 'have flown', 'flying'], 'Kế hoạch đã sắp xếp dùng hiện tại tiếp diễn.', ['Quá khứ đơn không hợp với "next week".', 'Hiện tại hoàn thành không hợp với "next week".', 'Thiếu trợ động từ "are".']),
+    q('We ______ to Da Nang on Saturday; the hotel is booked.', 'are flying', ['flew', 'have flown', 'flying'], 'Kế hoạch đã sắp xếp dùng hiện tại tiếp diễn.', ['Quá khứ đơn không hợp với kế hoạch sắp tới.', 'Hiện tại hoàn thành không hợp với kế hoạch sắp tới.', 'Thiếu trợ động từ "are".']),
     q('The train ______ at 7:30 tomorrow morning, according to the timetable.', 'leaves', ['left', 'has left', 'leaving'], 'Lịch trình cố định dùng hiện tại đơn.', ['Quá khứ đơn không hợp với "tomorrow".', 'Hiện tại hoàn thành không hợp với "tomorrow".', 'V-ing không đứng một mình làm động từ chính.']),
     q('I\'ve decided: I ______ study abroad next year.', 'am going to', ['went to', 'have gone to', 'going to'], 'Dự định đã quyết từ trước: be going to.', ['Quá khứ không hợp với "next year".', 'Hiện tại hoàn thành không hợp với "next year".', 'Thiếu "am".']),
     q('I\'ll call you when I ______ home.', 'get', ['will get', 'got', 'getting'], 'Sau "when" nói về tương lai dùng hiện tại đơn.', ['Không dùng "will" trong mệnh đề thời gian này.', 'Quá khứ không hợp với "I\'ll call".', 'V-ing không đứng một mình làm động từ chính.']),
