@@ -212,7 +212,7 @@ describe('PlanCatalogAdminService', () => {
                 enabled: true,
                 limitValue: null,
                 unit: 'CONTENT_ACCESS',
-                period: 'BILLING_CYCLE',
+                period: null,
               },
             ],
           }),
