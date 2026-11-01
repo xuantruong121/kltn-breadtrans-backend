@@ -137,6 +137,16 @@ export class LearningPathController {
     return this.learningPath.week(req.user.id);
   }
 
+  @Get('progress')
+  @ApiOperation({ summary: 'Tiến bộ từng kỹ năng so với lúc xếp mức' })
+  @ApiResponse({
+    status: 200,
+    description: 'Chỉ số luyện tập nội bộ, không phải kết quả năng lực.',
+  })
+  progress(@Request() req: { user: { id: number } }) {
+    return this.learningPath.progress(req.user.id);
+  }
+
   @Get('today')
   @ApiOperation({
     summary: 'Nhiệm vụ hôm nay: bài luyện đề xuất vừa thời gian mỗi ngày',

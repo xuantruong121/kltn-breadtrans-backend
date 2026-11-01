@@ -12,7 +12,8 @@ import { itemLevel } from './ability.logic';
 import { PRACTICE_LEVEL_LABEL, levelIndex } from './placement.logic';
 import { PROGRESS_AVERAGE } from './progression.logic';
 
-export type FoundationKind = 'VOCAB_REVIEW' | 'GRAMMAR' | 'VOCAB_DECK';
+export type FoundationKind =
+  'VOCAB_REVIEW' | 'READING_REVIEW' | 'GRAMMAR' | 'VOCAB_DECK';
 
 export type FoundationItem = {
   kind: FoundationKind;
@@ -131,6 +132,8 @@ export function foundationPlan(
   input: {
     learner: PracticeLevel;
     dueWords: number;
+    /** A Reading attempt scored under the pass mark. */
+    readingToReview: boolean;
     grammar: GrammarInput[];
     decks: DeckInput[];
   },
@@ -145,6 +148,15 @@ export function foundationPlan(
       route: '/vocabulary/study',
       minutes: Math.max(1, Math.ceil(input.dueWords / WORDS_PER_MINUTE)),
       reason: 'Ôn đúng lúc để không quên',
+    });
+  if (input.readingToReview)
+    plan.push({
+      kind: 'READING_REVIEW',
+      id: null,
+      title: 'Xem lại câu Đọc đã sai',
+      route: '/reading/mistakes',
+      minutes: ITEM_MINUTES,
+      reason: 'Hiểu vì sao sai để không lặp lại',
     });
   const grammar = grammarToStudy(input.grammar, input.learner);
   const decks = decksToLearn(input.decks, input.learner);

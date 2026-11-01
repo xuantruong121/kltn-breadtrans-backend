@@ -94,6 +94,7 @@ describe('foundationPlan', () => {
   const input = {
     learner: 'BASIC' as const,
     dueWords: 0,
+    readingToReview: false,
     grammar: [topic({ id: 1 }), topic({ id: 2 }), topic({ id: 3 })],
     decks: [deck({ id: 7 }), deck({ id: 8 })],
   };
@@ -114,6 +115,19 @@ describe('foundationPlan', () => {
     expect(first.title).toBe('Ôn 7 từ đến hạn');
     expect(first.minutes).toBe(4);
     expect(first.route).toBe('/vocabulary/study');
+  });
+
+  it('adds the Reading review after due words', () => {
+    const plan = foundationPlan(
+      { ...input, dueWords: 2, readingToReview: true },
+      3,
+    );
+    expect(plan.map((i) => i.kind)).toEqual([
+      'VOCAB_REVIEW',
+      'READING_REVIEW',
+      'GRAMMAR',
+    ]);
+    expect(plan[1].route).toBe('/reading/mistakes');
   });
 
   it('never goes past the limit and handles nothing to do', () => {

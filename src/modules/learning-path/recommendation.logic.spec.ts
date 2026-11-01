@@ -207,11 +207,11 @@ describe('recommend', () => {
   it('moves items that train the weak criterion up and says why', () => {
     const r = learner({
       weakFocus: [
-        { skill: 'LISTENING', label: 'phát âm', kinds: ['READ_ALOUD'] },
+        { skill: 'SPEAKING', label: 'phát âm', kinds: ['READ_ALOUD'] },
       ],
     });
-    const trains = item('LISTENING', 'BASIC', { kinds: ['READ_ALOUD'] });
-    const other = item('LISTENING', 'BASIC', { kinds: ['EXPRESS_OPINION'] });
+    const trains = item('SPEAKING', 'BASIC', { kinds: ['READ_ALOUD'] });
+    const other = item('SPEAKING', 'BASIC', { kinds: ['EXPRESS_OPINION'] });
     const [top, next] = recommend([other, trains], r, { limit: 2 });
     expect(top.candidate.id).toBe(trains.id);
     expect(top.reasons).toContain('Đúng điểm cần cải thiện: phát âm');
