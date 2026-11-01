@@ -36,6 +36,7 @@ const item = (
 });
 const learner = (extra: Partial<LearnerState> = {}): LearnerState => ({
   track: 'GENERAL',
+  goal: 'GENERAL',
   skills: {
     LISTENING: { level: 'BASIC', unlockedLevel: 'BASIC', ability: -0.9 },
     READING: { level: 'BASIC', unlockedLevel: 'INTERMEDIATE', ability: -0.2 },
@@ -178,6 +179,50 @@ describe('recommend', () => {
     );
     expect(dailyPlan(ranked, 20)).toHaveLength(2);
     expect(dailyPlan(ranked, 5)).toHaveLength(1);
+  });
+
+  it('moves skills that serve the goal up and says why', () => {
+    const level = {
+      level: 'BASIC',
+      unlockedLevel: 'BASIC',
+      ability: 0,
+    } as const;
+    const even = learner({
+      goal: 'TRAVEL',
+      skills: { LISTENING: level, READING: level, SPEAKING: level },
+    });
+    const listening = item('LISTENING', 'BASIC');
+    const reading = item('READING', 'BASIC');
+    const [top, other] = recommend([reading, listening], even, {
+      limit: 2,
+    });
+    expect(top.candidate.skill).toBe('LISTENING');
+    expect(top.reasons).toContain('Hợp mục tiêu: Du lịch');
+    expect(other.reasons.join()).not.toContain('Hợp mục tiêu');
+    expect(top.score - other.score).toBeCloseTo(0.4);
+  });
+
+  it('favours no skill for the general goal', () => {
+    const r = recommend([item('LISTENING', 'BASIC')], learner(), { limit: 1 });
+    expect(r[0].reasons.join()).not.toContain('Hợp mục tiêu');
+  });
+
+  it('keeps the weakest skill ahead of a goal skill', () => {
+    const weakLearner = learner({
+      goal: 'TRAVEL',
+      skills: {
+        LISTENING: { level: 'BASIC', unlockedLevel: 'BASIC', ability: 0.25 },
+        WRITING: { level: 'BASIC', unlockedLevel: 'BASIC', ability: -0.2 },
+      },
+    });
+    // Same predicted success, so only the two bonuses differ.
+    const listening = { ...item('LISTENING', 'BASIC'), difficulty: -0.5 };
+    const writing = { ...item('WRITING', 'BASIC'), difficulty: -0.95 };
+    const [top, other] = recommend([listening, writing], weakLearner, {
+      limit: 2,
+    });
+    expect(top.candidate.skill).toBe('WRITING');
+    expect(top.score - other.score).toBeCloseTo(0.2);
   });
 
   it('offers other open items beside the daily plan', () => {

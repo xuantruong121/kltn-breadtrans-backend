@@ -8,6 +8,7 @@
  *             below -1 ("Ôn nền tảng"): kept so a learner whose own level
  *             is all plan-locked still has open practice
  *   track     0.6 when the item is tagged with the learner's career track
+ *   goal      0.4 when the skill serves the learner's goal
  *   weakness  0.6 for the skill with the lowest ability
  *   novelty   0.5 when never attempted
  *   review    0.6 when the best score is under 60 % and two days have passed
@@ -20,6 +21,7 @@
  */
 import type {
   LearningContentType,
+  LearningGoal,
   LearningTrack,
   PracticeLevel,
   PracticeSkill,
@@ -81,6 +83,7 @@ export type HistoryEntry = {
 
 export type LearnerState = {
   track: LearningTrack;
+  goal: LearningGoal;
   /** Missing skill = not placed yet: practised as BASIC, no level lock. */
   skills: Partial<Record<PracticeSkill, SkillState>>;
   history: Map<string, HistoryEntry>;
@@ -107,6 +110,22 @@ const UNPLACED: SkillState = {
   unlockedLevel: UNPLACED_UNLOCKED,
   ability: ABILITY_SEED[UNPLACED_UNLOCKED],
 };
+/** Skills that serve each goal. GENERAL favours none. */
+export const GOAL_SKILLS: Record<LearningGoal, PracticeSkill[]> = {
+  GENERAL: [],
+  TOEIC_SCORE: ['LISTENING', 'READING'],
+  WORK_COMMUNICATION: ['SPEAKING', 'LISTENING'],
+  STUDY: ['READING', 'WRITING'],
+  TRAVEL: ['LISTENING', 'SPEAKING'],
+};
+const GOAL_LABEL: Record<LearningGoal, string> = {
+  GENERAL: 'Tiếng Anh tổng quát',
+  TOEIC_SCORE: 'Luyện TOEIC',
+  WORK_COMMUNICATION: 'Giao tiếp công việc',
+  STUDY: 'Học tập',
+  TRAVEL: 'Du lịch',
+};
+
 /** A skill is "weakest" only when clearly below the others. */
 const WEAKNESS_MARGIN = 0.2;
 
@@ -159,6 +178,10 @@ export function scoreCandidate(
   if (learner.track !== 'GENERAL' && c.tracks.includes(learner.track)) {
     score += 0.6;
     reasons.push(`Chủ đề ${TRACK_LABEL[learner.track]}`);
+  }
+  if (GOAL_SKILLS[learner.goal].includes(c.skill)) {
+    score += 0.4;
+    reasons.push(`Hợp mục tiêu: ${GOAL_LABEL[learner.goal]}`);
   }
   if (weakest === c.skill) {
     score += 0.6;

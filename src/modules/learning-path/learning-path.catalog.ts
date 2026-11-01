@@ -240,6 +240,7 @@ export async function loadLearnerState(
     };
   return {
     track: profile?.track ?? 'GENERAL',
+    goal: profile?.goal ?? 'GENERAL',
     minutesPerDay: profile?.minutesPerDay ?? 15,
     skills,
     history,
