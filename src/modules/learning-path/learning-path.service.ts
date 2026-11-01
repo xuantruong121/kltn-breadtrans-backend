@@ -11,12 +11,22 @@ import { refreshFourSkillResult } from '../diagnostic/diagnostic-four-skill.stor
 import { SubscriptionService } from '../subscription/subscription.service';
 import { UpdateLearnerProfileDto } from './dto/learner-profile.dto';
 import { foundationPlan } from './foundation.logic';
+import {
+  estimateNextLevels,
+  itemsToNextLevel,
+  nextLevelLabel,
+  skillWeights,
+  weekStart,
+  weeklyTargets,
+} from './week.logic';
 import { loadCandidates, loadLearnerState } from './learning-path.catalog';
 import {
+  GOAL_SKILLS,
   contentKey,
   dailyPlan,
   moreChoices,
   recommend,
+  weakestSkill,
   type Recommendation,
 } from './recommendation.logic';
 import { PRACTICE_LEVEL_LABEL, PRACTICE_SKILLS } from './placement.logic';
@@ -155,6 +165,58 @@ export class LearningPathService {
       },
       FOUNDATION_ITEMS,
     );
+  }
+
+  /** "Tuần này": weekly targets per skill and a rough date for the next levels. */
+  async week(userId: number) {
+    const now = new Date();
+    const { learner } = await this.context(userId);
+    const start = weekStart(now);
+    const [profile, events] = await Promise.all([
+      this.prisma.learnerProfile.findUnique({ where: { userId } }),
+      this.prisma.learnerProgressEvent.findMany({
+        where: { userId },
+        select: {
+          skill: true,
+          level: true,
+          contentId: true,
+          scorePercent: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+    const unlocked = await this.levelAccess.unlockedLevels(userId);
+    const targets = weeklyTargets(
+      learner.minutesPerDay,
+      skillWeights(GOAL_SKILLS[learner.goal], weakestSkill(learner)),
+    );
+    const skills = PRACTICE_SKILLS.map((skill) => {
+      const own = events.filter((e) => e.skill === skill);
+      const atLevel = own.filter((e) => e.level === unlocked[skill]);
+      const progress = {
+        skill,
+        unlockedLevel: unlocked[skill],
+        done: levelProgress(atLevel).done,
+      };
+      return {
+        ...progress,
+        doneThisWeek: own.filter((e) => e.createdAt >= start).length,
+        target: targets[skill],
+        remaining: itemsToNextLevel(progress),
+        nextLevelLabel: nextLevelLabel(unlocked[skill]),
+      };
+    });
+    return {
+      minutesPerDay: learner.minutesPerDay,
+      weekStart: start,
+      skills,
+      estimate: estimateNextLevels({
+        skills,
+        minutesPerDay: learner.minutesPerDay,
+        targetDate: profile?.targetDate ?? null,
+        now,
+      }),
+    };
   }
 
   /** "Đề xuất cho bạn" on a skill page, locked items included with reasons. */

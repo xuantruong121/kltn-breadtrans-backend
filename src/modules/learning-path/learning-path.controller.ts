@@ -119,6 +119,18 @@ export class LearningPathController {
     return this.roadmap.forUser(req.user.id);
   }
 
+  @Get('week')
+  @ApiOperation({
+    summary: 'Kế hoạch tuần này và ngày dự kiến lên mức kế tiếp',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Mục tiêu tuần từng kỹ năng và ước tính, không phải cam kết.',
+  })
+  week(@Request() req: { user: { id: number } }) {
+    return this.learningPath.week(req.user.id);
+  }
+
   @Get('today')
   @ApiOperation({
     summary: 'Nhiệm vụ hôm nay: bài luyện đề xuất vừa thời gian mỗi ngày',
