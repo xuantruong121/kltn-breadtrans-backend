@@ -56,7 +56,6 @@ const reading = (title: string, overrides: Record<string, unknown> = {}) => ({
   type: QuizType.BILINGUAL_READING,
   title,
   isPremiumContent: false,
-  courseId: null,
   ...overrides,
 });
 
@@ -132,14 +131,7 @@ describe('quiz access with level locks', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('leaves course quizzes to the course', async () => {
-    const { quizAccess } = setup();
-    await expect(
-      quizAccess.assertAccess(reading('Reading C1 — d', { courseId: 3 }), 7),
-    ).resolves.toBeUndefined();
-  });
-
-  it('leaves quizzes linked to an exam or a course activity alone', async () => {
+  it('leaves quizzes linked to an exam alone', async () => {
     const { quizAccess, prisma } = setup();
     prisma.exemptQuizzes = [{ id: 10 }];
     await expect(
@@ -196,14 +188,6 @@ describe('speaking access with level locks', () => {
         }),
         7,
       ),
-    ).resolves.toBeUndefined();
-  });
-
-  it('leaves course sets alone', async () => {
-    const { speakingAccess, prisma } = setup();
-    prisma.speakingExercise.findMany.mockResolvedValue([{ id: 20 }]);
-    await expect(
-      speakingAccess.assertAccess(exercise('C1'), 7),
     ).resolves.toBeUndefined();
   });
 });

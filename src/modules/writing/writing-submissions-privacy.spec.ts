@@ -30,7 +30,6 @@ describe('Writing submissions list (privacy)', () => {
           type: QuizType.WRITING_PICTURE,
           publicationStatus: 'PUBLISHED',
           isPremiumContent: false,
-          courseId: null,
           practiceTopic: { category: TopicCategory.WRITING_PART1 },
         }),
       },

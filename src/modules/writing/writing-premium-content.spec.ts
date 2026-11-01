@@ -12,7 +12,6 @@ describe('Writing premium content boundary', () => {
     description: 'Premium description',
     type: QuizType.WRITING_EMAIL,
     isPremiumContent: true,
-    courseId: null,
     practiceTopicId: 3,
     practiceTopic: {
       id: 3,

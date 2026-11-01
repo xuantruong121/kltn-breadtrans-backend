@@ -70,7 +70,6 @@ const prisma = {
               type: QuizType.WRITING_PICTURE,
               publicationStatus: 'PUBLISHED',
               isPremiumContent: false,
-              courseId: null,
               practiceTopic: { category: TopicCategory.WRITING_PART1 },
             }
           : null,

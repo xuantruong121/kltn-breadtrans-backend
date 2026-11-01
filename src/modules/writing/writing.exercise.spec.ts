@@ -14,7 +14,6 @@ const quiz = {
   description: null,
   type: QuizType.WRITING_PICTURE,
   isPremiumContent: false,
-  courseId: null,
   publicationStatus: 'PUBLISHED',
   practiceTopic: { category: TopicCategory.WRITING_PART1, name: 'Câu' },
   toeicWritingSetItems: [],

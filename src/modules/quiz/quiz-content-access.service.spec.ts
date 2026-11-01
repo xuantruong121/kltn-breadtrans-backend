@@ -148,11 +148,6 @@ describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
       7,
     );
     expect(access).toMatchObject({ cefrLevel: 'B1', requiredPlan: 'PLUS' });
-    const course = await service.resolve(
-      quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Course', { courseId: 3 }),
-      7,
-    );
-    expect(course.cefrLevel).toBeNull();
   });
 
   it('an untagged premium item opens nothing its skill may charge for', () => {
