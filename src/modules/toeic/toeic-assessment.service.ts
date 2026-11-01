@@ -587,12 +587,15 @@ export class ToeicAssessmentService {
     return assessment;
   }
 
-  /** An attempt already started may finish after its exam stops being offered. */
+  /**
+   * An attempt already started may finish after its exam, or the L&R part it
+   * reuses, stops being offered. Only new attempts need a publishable exam.
+   */
   private async getAssessmentOfAttempt(id: number) {
     const assessment = await this.findAssessment(id);
-    if (assessment.publicationStatus === QuizPublicationStatus.ARCHIVED)
-      return assessment;
-    return this.getPublishedAssessment(id);
+    if (assessment.publicationStatus === QuizPublicationStatus.DRAFT)
+      throw new NotFoundException('Bài đánh giá chưa được xuất bản');
+    return assessment;
   }
 
   private async getOwnedAttempt(id: number, userId: number) {
