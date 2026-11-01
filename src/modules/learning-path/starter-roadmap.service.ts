@@ -61,7 +61,6 @@ export class StarterRoadmapService {
         where: {
           title: { in: titlesOf('QUIZ') },
           publicationStatus: 'PUBLISHED',
-          courseId: null,
         },
         select: {
           id: true,

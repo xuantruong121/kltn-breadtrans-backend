@@ -3,7 +3,6 @@ import { AdminService } from './admin.service';
 
 const emptyTrackingPrisma = () => ({
   user: { findUnique: jest.fn() },
-  courseLesson: { findMany: jest.fn().mockResolvedValue([]) },
   submission: { findMany: jest.fn().mockResolvedValue([]) },
   listeningPracticeAttempt: { findMany: jest.fn().mockResolvedValue([]) },
   speakingSubmission: { findMany: jest.fn().mockResolvedValue([]) },
@@ -17,7 +16,7 @@ const emptyTrackingPrisma = () => ({
 });
 
 const createService = (prisma: any) =>
-  new AdminService(prisma, {} as any, {} as any, {} as any, undefined);
+  new AdminService(prisma, {} as any, {} as any, undefined);
 
 const learner = (overrides: any = {}) => ({
   id: 7,
@@ -29,7 +28,6 @@ const learner = (overrides: any = {}) => ({
   stats: { totalBanhRan: 12, streakCount: 3 },
   leaderboard: { totalPoints: 80, weeklyExp: 20, tier: 'Đồng' },
   pet: { level: 2, exp: 15 },
-  enrollments: [],
   ...overrides,
 });
 
@@ -41,7 +39,6 @@ describe('AdminService learner tracking composition', () => {
     await expect(
       createService(prisma).getLearnerLearningTracking(999),
     ).rejects.toThrow(NotFoundException);
-    expect(prisma.courseLesson.findMany).not.toHaveBeenCalled();
   });
 
   it('returns safe empty states when a learner has no learning history', async () => {
@@ -51,13 +48,8 @@ describe('AdminService learner tracking composition', () => {
     const result = await createService(prisma).getLearnerLearningTracking(7);
 
     expect(result.overview).toMatchObject({
-      courseCount: 0,
-      completedCourseLessons: 0,
-      totalCourseLessons: 0,
-      courseProgressPercent: null,
       recentActivityCount: 0,
     });
-    expect(result.courses).toEqual([]);
     expect(result.skills.speaking.recent).toEqual([]);
     expect(result.recentActivity).toEqual([]);
     expect(result.gamification).toMatchObject({
@@ -79,24 +71,6 @@ describe('AdminService learner tracking composition', () => {
         ],
       }),
     );
-    prisma.courseLesson.findMany.mockResolvedValue([
-      {
-        id: 101,
-        title: 'Lesson 1',
-        order: 1,
-        course: { id: 10, title: 'General English', level: 'B1' },
-        exercises: [{ id: 1001, minimumScore: 80 }],
-        attempts: [
-          {
-            exerciseId: 1001,
-            score: 8,
-            maxScore: 10,
-            submittedAt: new Date('2026-02-01T00:00:00.000Z'),
-            createdAt: new Date('2026-02-01T00:00:00.000Z'),
-          },
-        ],
-      },
-    ]);
     prisma.speakingSubmission.findMany.mockResolvedValue([
       {
         id: 501,
@@ -120,11 +94,6 @@ describe('AdminService learner tracking composition', () => {
 
     const result = await createService(prisma).getLearnerLearningTracking(7);
 
-    expect(result.courses[0]).toMatchObject({
-      completedLessons: 1,
-      totalLessons: 1,
-      progressPercent: 100,
-    });
     expect(result.skills.speaking.recent[0]).toMatchObject({
       accuracy: 82,
       fluency: 79,

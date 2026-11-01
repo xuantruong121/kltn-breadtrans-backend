@@ -24,9 +24,6 @@ import { PrismaClient } from '@prisma/client';
 import { assertDatabaseSafety } from './db-safety-guard';
 import { resyncSequences } from './db-resync-sequences';
 
-/** Offering names the seed owns; anything else would be deleted by it. */
-const SEEDED_OFFERING_NAMES = ['Grammar & Vocabulary — Open Practice'];
-
 function refuse(lines: string[]): never {
   console.error('');
   console.error('==================================================');
@@ -50,25 +47,17 @@ async function main() {
   const prisma = new PrismaClient();
   try {
     // 2. Measure what the seed's destructive cleanup would remove.
-    const foreignClasses = await prisma.class.count({
-      where: { name: { notIn: SEEDED_OFFERING_NAMES } },
-    });
     const exams = await prisma.exam.count();
     const assessments = await prisma.toeicAssessment.count();
     const attempts = await prisma.toeicAttempt.count();
     const submissions = await prisma.speakingSubmission.count();
 
     const risky =
-      foreignClasses > 0 ||
-      exams > 0 ||
-      assessments > 0 ||
-      attempts > 0 ||
-      submissions > 0;
+      exams > 0 || assessments > 0 || attempts > 0 || submissions > 0;
 
     console.log(
       'Seed pre-flight (rows the canonical seed may destroy or shadow):',
     );
-    console.log(`  Class rows not owned by the seed : ${foreignClasses}`);
     console.log(`  Exam rows (runtime-created)      : ${exams}`);
     console.log(`  ToeicAssessment rows             : ${assessments}`);
     console.log(`  ToeicAttempt rows                : ${attempts}`);

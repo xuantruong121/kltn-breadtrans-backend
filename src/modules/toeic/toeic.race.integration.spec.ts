@@ -1,11 +1,4 @@
-import {
-  AttemptMode,
-  AttemptStatus,
-  ClassStatus,
-  CourseStatus,
-  EnrollmentStatus,
-  ExamType,
-} from '@prisma/client';
+import { AttemptMode, AttemptStatus, ExamType } from '@prisma/client';
 import { GamificationListener } from '../gamification/gamification.listener';
 import { RewardEligibilityService } from '../gamification/reward-eligibility';
 import { GamificationService } from '../gamification/gamification.service';
@@ -22,7 +15,6 @@ describeWithIsolatedDatabase(
     let eventEmitter: { emitAsync: jest.Mock };
     let userId: number;
     let firstQuestionId: number;
-    let courseId: number;
     let createdTestFixture = false;
     const attemptIds: number[] = [];
 
@@ -33,9 +25,6 @@ describeWithIsolatedDatabase(
       // fixture setup deterministic without changing any application data.
       for (const table of [
         'User',
-        'Course',
-        'Class',
-        'Enrollment',
         'ToeicAttempt',
         'UserToeicReward',
         'BanhTransaction',
@@ -97,29 +86,6 @@ describeWithIsolatedDatabase(
         question = { id: createdQuestion.id };
       }
       firstQuestionId = question.id;
-
-      const course = await prisma.course.create({
-        data: {
-          title: `TOEIC isolation ${suffix}`,
-          status: CourseStatus.PUBLISHED,
-        },
-      });
-      courseId = course.id;
-      const lessonClass = await prisma.class.create({
-        data: {
-          courseId,
-          name: `TOEIC isolation ${suffix}`,
-          status: ClassStatus.ONGOING,
-        },
-      });
-      await prisma.enrollment.create({
-        data: {
-          userId,
-          classId: lessonClass.id,
-          status: EnrollmentStatus.ACTIVE,
-          progress: 37,
-        },
-      });
     });
 
     afterAll(async () => {
@@ -133,8 +99,6 @@ describeWithIsolatedDatabase(
       }
       if (userId)
         await prisma.user.delete({ where: { id: userId } }).catch(() => {});
-      if (courseId)
-        await prisma.course.delete({ where: { id: courseId } }).catch(() => {});
       if (createdTestFixture) {
         await prisma.toeicQuestion
           .deleteMany({ where: { group: { examId: 1 } } })
@@ -321,20 +285,6 @@ describeWithIsolatedDatabase(
         prisma.contentAttempt.count({ where: { userId } }),
       ]);
       expect(after).toEqual(before);
-    });
-
-    it('TOEIC completion does not affect an unrelated course progress row', async () => {
-      const before = await prisma.enrollment.findFirstOrThrow({
-        where: { userId, class: { courseId } },
-        select: { progress: true },
-      });
-      const attempt = await createLiveAttempt();
-      await service.submitAttempt(attempt.id, userId);
-      const after = await prisma.enrollment.findFirstOrThrow({
-        where: { userId, class: { courseId } },
-        select: { progress: true },
-      });
-      expect(after.progress).toBe(before.progress);
     });
 
     it('Exam 1 remains learner-ready with all durable Listening media', async () => {

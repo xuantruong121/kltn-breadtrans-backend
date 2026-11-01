@@ -8,10 +8,6 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   Role,
-  CourseStatus,
-  CourseLessonAttemptStatus,
-  CourseLessonStatus,
-  EnrollmentStatus,
   PlanPaymentStatus,
   PlanPurchaseStatus,
   SubscriptionStatus,
@@ -27,7 +23,6 @@ import Redis from 'ioredis';
 import { R2Service, type StorageUsage } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
-import { CourseService } from '../course/course.service';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
 import { azureTtsKey } from '../ai/azure-usage';
@@ -140,7 +135,6 @@ export class AdminService {
     private prisma: PrismaService,
     private r2Service: R2Service,
     private r2CleanupService: R2CleanupService,
-    private courseService: CourseService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
   ) {}
 
@@ -152,17 +146,11 @@ export class AdminService {
     const [
       totalStudents,
       activeStudents,
-      totalCourses,
-      pendingCourses,
-      totalEnrollments,
-      activeEnrollments,
       pendingPayments,
-      recentEnrollments,
       totalVocabTopics,
       totalGrammarTopics,
       totalQuizzes,
       totalSpeaking,
-      totalAssignments,
       totalContentTopics,
       marketOrdersCount,
       approvedOrdersCount,
@@ -192,11 +180,6 @@ export class AdminService {
               },
             },
             {
-              assignmentSubmissions: {
-                some: { submittedAt: { gte: rangeStart } },
-              },
-            },
-            {
               diagnosticAttempts: {
                 some: { submittedAt: { gte: rangeStart } },
               },
@@ -213,12 +196,6 @@ export class AdminService {
           ],
         },
       }),
-      this.prisma.course.count({ where: { status: CourseStatus.PUBLISHED } }),
-      this.prisma.course.count({ where: { status: CourseStatus.DRAFT } }),
-      this.prisma.enrollment.count(),
-      this.prisma.enrollment.count({
-        where: { status: EnrollmentStatus.ACTIVE },
-      }),
       this.prisma.planPayment.count({
         where: {
           status: {
@@ -226,32 +203,10 @@ export class AdminService {
           },
         },
       }),
-      this.prisma.enrollment.findMany({
-        take: 8,
-        where: { joinedAt: { gte: rangeStart } },
-        orderBy: { joinedAt: 'desc' },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              profile: { select: { fullName: true, avatar: true } },
-            },
-          },
-          class: {
-            select: {
-              id: true,
-              name: true,
-              course: { select: { id: true, title: true } },
-            },
-          },
-        },
-      }),
       this.prisma.vocabTopic.count(),
       this.prisma.grammarTopic.count(),
       this.prisma.quiz.count(),
       this.prisma.speakingExercise.count(),
-      this.prisma.assignment.count(),
       this.prisma.contentTopic.count(),
       this.prisma.marketOrder.count(),
       this.prisma.marketOrder.count({ where: { status: 'approved' } }),
@@ -285,39 +240,26 @@ export class AdminService {
       }),
     ]);
 
-    const recentActivity = recentEnrollments.map((e) => ({
-      id: e.id,
-      type: 'enrollment',
-      message: `${e.user.profile?.fullName || e.user.email} vừa được cấp quyền truy cập "${e.class.course.title}"`,
-      avatar: e.user.profile?.avatar || null,
-      createdAt: e.joinedAt,
-    }));
-
     const monthlyTrends = await Promise.all(
       buckets.map(async ({ label, start, end }) => {
-        const [enrollmentCount, submissionCount, speakingCount, revenueAgg] =
-          await Promise.all([
-            this.prisma.enrollment.count({
-              where: { joinedAt: { gte: start, lte: end } },
-            }),
-            this.prisma.submission.count({
-              where: { submittedAt: { gte: start, lte: end } },
-            }),
-            this.prisma.speakingSubmission.count({
-              where: { submittedAt: { gte: start, lte: end } },
-            }),
-            this.prisma.planPurchase.aggregate({
-              where: {
-                status: PlanPurchaseStatus.COMPLETED,
-                completedAt: { gte: start, lte: end },
-              },
-              _sum: { amountVnd: true },
-            }),
-          ]);
+        const [submissionCount, speakingCount, revenueAgg] = await Promise.all([
+          this.prisma.submission.count({
+            where: { submittedAt: { gte: start, lte: end } },
+          }),
+          this.prisma.speakingSubmission.count({
+            where: { submittedAt: { gte: start, lte: end } },
+          }),
+          this.prisma.planPurchase.aggregate({
+            where: {
+              status: PlanPurchaseStatus.COMPLETED,
+              completedAt: { gte: start, lte: end },
+            },
+            _sum: { amountVnd: true },
+          }),
+        ]);
 
         return {
           month: label,
-          enrollments: enrollmentCount,
           activityCount: submissionCount + speakingCount,
           revenueVnd: revenueAgg._sum.amountVnd ?? 0,
         };
@@ -329,7 +271,7 @@ export class AdminService {
       grammar: totalGrammarTopics,
       quizzes: totalQuizzes,
       speaking: totalSpeaking,
-      media: totalContentTopics + totalAssignments,
+      media: totalContentTopics,
     };
 
     const gamification = {
@@ -350,10 +292,6 @@ export class AdminService {
       stats: {
         totalStudents,
         activeStudents,
-        totalCourses,
-        pendingCourses,
-        totalEnrollments,
-        activeEnrollments,
         pendingPayments,
         unreadSupportMessages,
         pendingSuggestions,
@@ -363,7 +301,6 @@ export class AdminService {
       monthlyTrends,
       contentBreakdown,
       gamification,
-      recentActivity,
     };
   }
 
@@ -470,11 +407,6 @@ export class AdminService {
           take: 1,
           select: { submittedAt: true },
         },
-        assignmentSubmissions: {
-          orderBy: { submittedAt: 'desc' },
-          take: 1,
-          select: { submittedAt: true },
-        },
         diagnosticAttempts: {
           orderBy: { submittedAt: 'desc' },
           take: 1,
@@ -505,7 +437,6 @@ export class AdminService {
         user.learningActivities[0]?.occurredAt,
         user.submissions[0]?.submittedAt,
         user.speakingSubmissions[0]?.submittedAt,
-        user.assignmentSubmissions[0]?.submittedAt,
         user.diagnosticAttempts[0]?.submittedAt,
         user.contentAttempts[0]?.submittedAt,
         user.grammarAttempts[0]?.createdAt,
@@ -562,7 +493,6 @@ export class AdminService {
     if (!user) throw new NotFoundException('Không tìm thấy học viên');
 
     const [
-      courseLessons,
       listeningSubmissions,
       listeningAttempts,
       speakingSubmissions,
@@ -575,35 +505,6 @@ export class AdminService {
       toeicAttempts,
       recentActivity,
     ] = await Promise.all([
-      this.prisma.courseLesson.findMany({
-        // Self-paced courses: a learner's courses are the ones they studied.
-        where: {
-          status: CourseLessonStatus.PUBLISHED,
-          attempts: { some: { userId } },
-        },
-        orderBy: [{ courseId: 'asc' }, { order: 'asc' }],
-        select: {
-          id: true,
-          title: true,
-          order: true,
-          course: { select: { id: true, title: true, level: true } },
-          exercises: {
-            where: { required: true },
-            select: { id: true, minimumScore: true },
-          },
-          attempts: {
-            where: { userId, status: CourseLessonAttemptStatus.SUBMITTED },
-            orderBy: { createdAt: 'desc' },
-            select: {
-              exerciseId: true,
-              score: true,
-              maxScore: true,
-              submittedAt: true,
-              createdAt: true,
-            },
-          },
-        },
-      }),
       this.prisma.submission.findMany({
         where: { userId, quiz: { type: QuizType.LISTENING_PRACTICE } },
         orderBy: { submittedAt: 'desc' },
@@ -757,59 +658,6 @@ export class AdminService {
       }),
     ]);
 
-    const isSuccessful = (
-      score: number | null,
-      maxScore: number | null,
-      minimumScore: number | null,
-    ) =>
-      score !== null &&
-      maxScore !== null &&
-      maxScore > 0 &&
-      (minimumScore !== null
-        ? (score / maxScore) * 100 >= minimumScore
-        : score === maxScore);
-
-    const coursesById = new Map<number, any>();
-    for (const lesson of courseLessons) {
-      const latestByExercise = new Map<
-        number,
-        (typeof lesson.attempts)[number]
-      >();
-      for (const attempt of lesson.attempts) {
-        if (!latestByExercise.has(attempt.exerciseId)) {
-          latestByExercise.set(attempt.exerciseId, attempt);
-        }
-      }
-      const completed = lesson.exercises.every((exercise) => {
-        const attempt = latestByExercise.get(exercise.id);
-        return Boolean(
-          attempt &&
-          isSuccessful(attempt.score, attempt.maxScore, exercise.minimumScore),
-        );
-      });
-      const course = coursesById.get(lesson.course.id) ?? {
-        id: lesson.course.id,
-        title: lesson.course.title,
-        level: lesson.course.level,
-        completedLessons: 0,
-        totalLessons: 0,
-        lessons: [],
-      };
-      course.totalLessons += 1;
-      if (completed) course.completedLessons += 1;
-      course.lessons.push({
-        id: lesson.id,
-        title: lesson.title,
-        order: lesson.order,
-        completed,
-        lastActivityAt:
-          lesson.attempts[0]?.submittedAt ??
-          lesson.attempts[0]?.createdAt ??
-          null,
-      });
-      coursesById.set(course.id, course);
-    }
-
     const asFiniteScore = (value: unknown) =>
       typeof value === 'number' && Number.isFinite(value) ? value : null;
     const feedbackScore = (feedback: unknown, keys: string[]) => {
@@ -835,15 +683,6 @@ export class AdminService {
         : normalized;
     };
 
-    const totalCourseLessons = [...coursesById.values()].reduce(
-      (sum, course) => sum + course.totalLessons,
-      0,
-    );
-    const completedCourseLessons = [...coursesById.values()].reduce(
-      (sum, course) => sum + course.completedLessons,
-      0,
-    );
-
     return {
       learner: {
         id: user.id,
@@ -854,24 +693,12 @@ export class AdminService {
         profile: user.profile,
       },
       overview: {
-        courseCount: coursesById.size,
-        completedCourseLessons,
-        totalCourseLessons,
-        courseProgressPercent: totalCourseLessons
-          ? Math.round((completedCourseLessons / totalCourseLessons) * 100)
-          : null,
         recentActivityCount: recentActivity.length,
         vocabularyStudied: vocabProgress.length,
         vocabularyMastered: vocabMasteredCount,
         grammarAttempts: grammarAttempts.length,
         examAttempts: toeicAttempts.length,
       },
-      courses: [...coursesById.values()].map((course) => ({
-        ...course,
-        progressPercent: course.totalLessons
-          ? Math.round((course.completedLessons / course.totalLessons) * 100)
-          : null,
-      })),
       skills: {
         listening: {
           attemptCount: listeningAttempts.length,
@@ -1081,11 +908,7 @@ export class AdminService {
         throw new NotFoundException('Người dùng không tồn tại');
       }
 
-      const paymentCount = await tx.payment.count({
-        where: {
-          OR: [{ enrollment: { userId } }, { reviewedById: userId }],
-        },
-      });
+      const paymentCount = await tx.planPurchase.count({ where: { userId } });
 
       if (paymentCount > 0) {
         throw new ConflictException(
@@ -1097,53 +920,6 @@ export class AdminService {
     });
   }
 
-  async getAdminCourses() {
-    return this.prisma.course.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async adminCreateCourse(dto: {
-    title: string;
-    description?: string;
-    thumbnail?: string;
-    level?: string;
-  }) {
-    return this.courseService.createCourse(dto, { id: 0, role: Role.ADMIN });
-  }
-
-  async adminUpdateCourse(
-    courseId: number,
-    dto: {
-      title?: string;
-      description?: string;
-      thumbnail?: string;
-      level?: string;
-      status?: any;
-    },
-  ) {
-    return this.courseService.updateCourse(courseId, dto, {
-      id: 0,
-      role: Role.ADMIN,
-    });
-  }
-
-  async adminDeleteCourse(courseId: number) {
-    return this.courseService.deleteCourse(courseId, {
-      id: 0,
-      role: Role.ADMIN,
-    });
-  }
-
-  async adminReviewCourse(courseId: number, action: 'APPROVE' | 'REJECT') {
-    return this.courseService.reviewCourse(courseId, action, {
-      id: 0,
-      role: Role.ADMIN,
-    });
-  }
-
-  // ============== VOCAB MANAGEMENT (PHASE 4 CMS) ==============
-  /** All decks, or with `query.page` one filtered page plus header counts. */
   async getVocabTopics(query: ListQuery = {}) {
     const decks = await this.prisma.vocabTopic.findMany({
       // The Speaking lookup dictionary is system data, not a deck to manage.
@@ -1708,7 +1484,6 @@ export class AdminService {
       totalSpeakingSubmissions,
       speakingThisMonth,
       archivedSpeakingAudio,
-      totalMaterials,
       totalUsers,
       audioDurationThisMonth,
       diagnosticDurationThisMonth,
@@ -1721,7 +1496,6 @@ export class AdminService {
       this.prisma.speakingSubmission.count({
         where: { audioUrl: { contains: 'archived' } },
       }),
-      this.prisma.material.count(),
       this.prisma.user.count(),
       this.prisma.speakingSubmission.aggregate({
         where: { submittedAt: { gte: startOfMonth } },
@@ -1851,7 +1625,6 @@ export class AdminService {
           name: 'Cloudflare R2 Object Storage',
           activeAudioFiles: activeAudioCount,
           archivedAudioFiles: archivedSpeakingAudio,
-          totalMaterials,
           usedStorageMb: measuredStorageMb,
           usedStorageGb: r2StorageGb,
           fileCount: r2Usage.fileCount,

@@ -29,7 +29,6 @@ export type QuizContentAccessSubject = {
   id: number;
   type: QuizType;
   isPremiumContent: boolean;
-  courseId: number | null;
   /**
    * Carries the authored CEFR tag of practice items. resolve/resolveMany load
    * it when a caller did not select it, so the plan matrix holds on every
@@ -123,7 +122,7 @@ export class QuizContentAccessService {
 
   /**
    * Lowest plan for this quiz. Standalone practice with an authored CEFR tag
-   * follows the owner matrix; other quizzes (courses, TOEIC sets, untagged
+   * follows the owner matrix; other quizzes (TOEIC sets, untagged
    * content) keep their stored flag, which then needs the skill's advanced
    * plan. An untagged item is never opened just because its tag is missing.
    */
@@ -143,7 +142,7 @@ export class QuizContentAccessService {
 
   /** CEFR range of standalone skill practice; null for anything else. */
   cefrRange(quiz: QuizContentAccessSubject): CefrRange | null {
-    if (!this.skillForQuizType(quiz.type) || quiz.courseId != null) return null;
+    if (!this.skillForQuizType(quiz.type)) return null;
     return parseCefrRange(quiz.title);
   }
 
@@ -195,7 +194,7 @@ export class QuizContentAccessService {
     return exempt ? { ...level, isLevelLocked: false } : level;
   }
 
-  /** Quizzes the level lock would hold that an exam or course keeps open. */
+  /** Quizzes the level lock would hold that an exam keeps open. */
   private async levelExemptIds(
     quizzes: QuizContentAccessSubject[],
     unlocked: UnlockedLevels | null,

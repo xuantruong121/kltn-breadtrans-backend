@@ -1,7 +1,6 @@
 import {
   buildSkillProfiles,
   buildStrengthsAndWeaknesses,
-  rankCourseRecommendations,
   getQuestionMeta,
   resolvePlacementLevel,
   resolveEstimatedLevel,
@@ -72,41 +71,6 @@ describe('diagnostic logic', () => {
     expect(buildStrengthsAndWeaknesses(profiles).weaknesses).toEqual([]);
   });
 
-  it('ranks published, ready general-English courses from metadata', () => {
-    const result = rankCourseRecommendations(
-      [
-        {
-          id: 1,
-          title: 'Foundations',
-          description: 'Grammar and vocabulary',
-          level: 'BEGINNER',
-          status: 'PUBLISHED',
-          lessonCount: 8,
-        },
-        {
-          id: 2,
-          title: 'TOEIC 450',
-          description: 'Listening',
-          level: 'INTERMEDIATE',
-          status: 'PUBLISHED',
-          lessonCount: 8,
-        },
-        {
-          id: 3,
-          title: 'Draft',
-          description: 'General English',
-          level: 'BEGINNER',
-          status: 'DRAFT',
-          lessonCount: 8,
-        },
-      ],
-      'Starter',
-      ['Grammar'],
-    );
-    expect(result.map((item) => item.courseId)).toEqual([1]);
-    expect(result[0].reason).toContain('Starter');
-  });
-
   it('reports malformed question banks', () => {
     expect(
       validateQuestionBank([{ ...questions[0], correctIndex: 9 }]),
@@ -131,25 +95,6 @@ describe('diagnostic logic', () => {
         },
       ]),
     ).toContain('missing listening audio 1');
-  });
-
-  it('does not recommend a published course whose four-skill roadmap is incomplete', () => {
-    const result = rankCourseRecommendations(
-      [
-        {
-          id: 4,
-          title: 'Partial roadmap',
-          description: 'General English',
-          level: 'BEGINNER',
-          status: 'PUBLISHED',
-          lessonCount: 8,
-          curriculumReady: false,
-        },
-      ],
-      'Starter',
-      [],
-    );
-    expect(result).toEqual([]);
   });
 
   it('reads v2 metadata without exposing answer-bearing fields', () => {

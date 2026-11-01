@@ -166,18 +166,18 @@ async function main() {
 
   console.log('\n== Scripts stop before any write');
   const harnessBefore = harnessUsers('harness_clone');
-  const a = runScript('scripts/qa/global-browser-phase.ts', clean(), ['A']);
+  const a = runScript('scripts/qa/global-security-phase.ts', clean(), ['A']);
   check(
-    'global-browser-phase without targets exits at import',
+    'global-security-phase without targets exits at import',
     a.status !== 0 && /QA_TARGET=isolated is required/.test(a.out),
   );
   const b = runScript(
-    'scripts/qa/global-browser-phase.ts',
+    'scripts/qa/global-security-phase.ts',
     withEnv({ QA_BACKEND_URL: 'http://localhost:3001' }),
     ['A'],
   );
   check(
-    'global-browser-phase with the owner backend exits at import',
+    'global-security-phase with the owner backend exits at import',
     b.status !== 0 && /owner app \(port 3001\)/.test(b.out),
   );
   const fx = runScript(
@@ -217,7 +217,7 @@ async function main() {
   // first learner and that learner removed.
   const mismatchBefore = harnessUsers('cp601_rehearsal');
   const m = runScript(
-    'scripts/qa/global-browser-phase.ts',
+    'scripts/qa/global-security-phase.ts',
     withEnv({
       QA_DATABASE_URL:
         'postgresql://harness:harness-disposable@127.0.0.1:5460/cp601_rehearsal',

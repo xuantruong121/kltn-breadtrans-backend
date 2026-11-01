@@ -20,9 +20,6 @@ import type {
   ContextualReadingPassageSuggestion,
   ContextualReadingQuestionsSuggestion,
   ContextualToeicPart5Suggestion,
-  ContextualCourseCurriculumSuggestion,
-  ContextualCourseLessonContentSuggestion,
-  ContextualCourseLessonSectionSuggestion,
   ContextualListeningContentSuggestion,
   ContextualListeningQuestionsSuggestion,
   ContextualWritingTaskSuggestion,
@@ -578,83 +575,6 @@ export class AiService {
       );
     }
     return this.aiEvaluator.suggestToeicPart5(input);
-  }
-
-  async suggestCourseCurriculum(input: {
-    courseTitle: string;
-    level?: string;
-    description?: string;
-    targetLessonCount: number;
-    existingLessonTitles?: string[];
-  }): Promise<ContextualCourseCurriculumSuggestion> {
-    await this.checkAndIncrementDailyQuota();
-    if (!this.aiEvaluator.suggestCourseCurriculum) {
-      throw new BadRequestException(
-        'Chiến lược AI hiện tại không hỗ trợ gợi ý chương trình học',
-      );
-    }
-    return this.aiEvaluator.suggestCourseCurriculum(input);
-  }
-
-  async suggestCourseLessonContent(input: {
-    courseTitle: string;
-    courseDescription?: string;
-    courseLevel?: string;
-    lessonTitle: string;
-    lessonSummary: string;
-    objectives: string[];
-    existingSectionHeadings?: string[];
-    existingExerciseSlugs?: string[];
-    previousLessons?: Array<{
-      title: string;
-      summary?: string;
-      objectives?: string[];
-    }>;
-    nextLessonTitle?: string;
-    existingSections?: Array<{
-      type: string;
-      heading: string;
-      text?: string;
-      bullets?: string[];
-      examples?: string[];
-    }>;
-    mode?: 'CREATE' | 'IMPROVE';
-  }): Promise<ContextualCourseLessonContentSuggestion> {
-    await this.checkAndIncrementDailyQuota();
-    if (!this.aiEvaluator.suggestCourseLessonContent) {
-      throw new BadRequestException(
-        'Chiến lược AI hiện tại không hỗ trợ soạn nội dung bài học',
-      );
-    }
-    return this.aiEvaluator.suggestCourseLessonContent(input);
-  }
-
-  async suggestCourseSectionRefinement(input: {
-    action: 'EXPAND' | 'SIMPLIFY' | 'ADD_EXAMPLES' | 'KEY_POINTS';
-    courseTitle: string;
-    courseLevel?: string;
-    lessonTitle: string;
-    objectives: string[];
-    section: {
-      type: string;
-      heading: string;
-      text?: string;
-      paragraphs?: string[];
-      bullets?: string[];
-      examples?: Array<{
-        text: string;
-        translation?: string;
-        explanation?: string;
-      }>;
-    };
-  }): Promise<ContextualCourseLessonSectionSuggestion> {
-    await this.checkAndIncrementDailyQuota();
-    if (!this.aiEvaluator.suggestCourseSectionRefinement) {
-      throw new BadRequestException(
-        'Chiến lược AI hiện tại không hỗ trợ tinh chỉnh mục nội dung',
-      );
-    }
-    return this.aiEvaluator.suggestCourseSectionRefinement(input);
   }
 
   async suggestListeningContent(input: {

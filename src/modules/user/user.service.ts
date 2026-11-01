@@ -252,7 +252,6 @@ export class UserService {
         stats: true,
         leaderboard: true,
         pet: true,
-        billing: true,
         shippingProfile: true,
       },
     });

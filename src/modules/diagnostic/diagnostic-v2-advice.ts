@@ -22,11 +22,7 @@ import type { FourSkillKey, FourSkillResult } from './diagnostic-four-skill';
 export const ADVICE_VERSION = 'D1_ADVICE_V1';
 
 export type ResourceKind =
-  | 'LISTENING_QUIZ'
-  | 'READING_QUIZ'
-  | 'WRITING_QUIZ'
-  | 'SPEAKING_EXERCISE'
-  | 'COURSE';
+  'LISTENING_QUIZ' | 'READING_QUIZ' | 'WRITING_QUIZ' | 'SPEAKING_EXERCISE';
 
 export type ResourceRef = { kind: ResourceKind; id: number };
 
@@ -126,7 +122,7 @@ const OBJECTIVE_AREAS: Record<
         why: 'Nghĩa của một từ hay "it/they/this" phụ thuộc vào câu xung quanh, không phải nghĩa quen thuộc nhất.',
         action:
           'Khi gặp từ hoặc đại từ được hỏi, đọc lại câu trước và câu sau, thay thử từng lựa chọn vào câu để kiểm tra.',
-        resources: [quiz('READING_QUIZ', 6), quiz('COURSE', 8)],
+        resources: [quiz('READING_QUIZ', 6)],
       },
     },
     {
@@ -150,7 +146,7 @@ const OBJECTIVE_AREAS: Record<
         why: 'Một số câu ngữ pháp trong phần bổ trợ chưa đúng; phần này không tính vào điểm tổng nhưng ảnh hưởng tới Nói và Viết.',
         action:
           'Xem lại giải thích của các câu sai ở phần đối chiếu đáp án, rồi học bài ngữ pháp tương ứng.',
-        resources: [quiz('COURSE', 8)],
+        resources: [],
       },
     },
     {
@@ -161,7 +157,7 @@ const OBJECTIVE_AREAS: Record<
         why: 'Một số câu từ vựng trong phần bổ trợ chưa đúng; phần này không tính vào điểm tổng.',
         action:
           'Ghi lại các từ trong câu sai cùng câu ví dụ, rồi ôn theo chủ đề.',
-        resources: [quiz('COURSE', 8)],
+        resources: [],
       },
     },
   ],
@@ -187,7 +183,7 @@ const CRITERION_AREAS: Record<
       why: 'Khi một số từ khó nghe rõ, người nghe phải đoán ý và câu trả lời mất điểm dù nội dung đúng.',
       action:
         'Luyện các âm cuối và trọng âm từ, ghi âm lại và so sánh với mẫu.',
-      resources: [quiz('COURSE', 12), quiz('SPEAKING_EXERCISE', 11)],
+      resources: [quiz('SPEAKING_EXERCISE', 11)],
     },
     fluency: {
       key: 'SPEAKING_FLUENCY',
@@ -203,7 +199,7 @@ const CRITERION_AREAS: Record<
       why: 'Lỗi ngữ pháp hoặc vốn từ hạn chế làm ý bạn muốn nói kém chính xác.',
       action:
         'Ôn các cấu trúc câu cơ bản và luyện dùng chúng trong câu trả lời ngắn có lý do.',
-      resources: [quiz('SPEAKING_EXERCISE', 16), quiz('COURSE', 8)],
+      resources: [quiz('SPEAKING_EXERCISE', 16)],
     },
   },
   WRITING: {
@@ -229,7 +225,7 @@ const CRITERION_AREAS: Record<
       why: 'Lặp từ hoặc dùng từ chưa đúng nghĩa làm bài viết kém rõ ràng.',
       action:
         'Sau khi viết, đánh dấu các từ lặp lại và thay bằng từ cụ thể hơn; ghi lại các cụm từ hay gặp theo chủ đề.',
-      resources: [quiz('COURSE', 8), quiz('WRITING_QUIZ', 17)],
+      resources: [quiz('WRITING_QUIZ', 17)],
     },
     grammar: {
       key: 'WRITING_GRAMMAR',
@@ -237,7 +233,7 @@ const CRITERION_AREAS: Record<
       why: 'Lỗi chia động từ, thì hoặc cấu trúc câu làm giảm độ rõ ràng và độ tin cậy của bài viết.',
       action:
         'Đọc lại bài, kiểm tra riêng từng loại lỗi: thì của động từ, chủ ngữ – động từ, mạo từ.',
-      resources: [quiz('COURSE', 8), quiz('WRITING_QUIZ', 17)],
+      resources: [quiz('WRITING_QUIZ', 17)],
     },
   },
 };

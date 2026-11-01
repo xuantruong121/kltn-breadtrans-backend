@@ -288,62 +288,6 @@ export interface IAIEvaluator {
     count: number;
   }): Promise<ContextualToeicPart5Suggestion>;
 
-  /** Phase 5B: Course curriculum candidates only. */
-  suggestCourseCurriculum?(input: {
-    courseTitle: string;
-    level?: string;
-    description?: string;
-    targetLessonCount: number;
-    existingLessonTitles?: string[];
-  }): Promise<ContextualCourseCurriculumSuggestion>;
-
-  /** Phase 8.15: bounded candidate for one selected Course V5 lesson only. */
-  suggestCourseLessonContent?(input: {
-    courseTitle: string;
-    courseDescription?: string;
-    courseLevel?: string;
-    lessonTitle: string;
-    lessonSummary: string;
-    objectives: string[];
-    existingSectionHeadings?: string[];
-    existingExerciseSlugs?: string[];
-    previousLessons?: Array<{
-      title: string;
-      summary?: string;
-      objectives?: string[];
-    }>;
-    nextLessonTitle?: string;
-    existingSections?: Array<{
-      type: string;
-      heading: string;
-      text?: string;
-      bullets?: string[];
-      examples?: string[];
-    }>;
-    mode?: 'CREATE' | 'IMPROVE';
-  }): Promise<ContextualCourseLessonContentSuggestion>;
-
-  /** Phase 8.16: candidate-only refinement of one existing lesson section. */
-  suggestCourseSectionRefinement?(input: {
-    action: 'EXPAND' | 'SIMPLIFY' | 'ADD_EXAMPLES' | 'KEY_POINTS';
-    courseTitle: string;
-    courseLevel?: string;
-    lessonTitle: string;
-    objectives: string[];
-    section: {
-      type: string;
-      heading: string;
-      text?: string;
-      paragraphs?: string[];
-      bullets?: string[];
-      examples?: Array<{
-        text: string;
-        translation?: string;
-        explanation?: string;
-      }>;
-    };
-  }): Promise<ContextualCourseLessonSectionSuggestion>;
-
   /** Phase 5B: Listening transcript/turn candidates only. */
   suggestListeningContent?(input: {
     mode: 'DIALOGUE' | 'DICTATION';
@@ -562,61 +506,6 @@ export interface ContextualToeicPart5Candidate {
 export interface ContextualToeicPart5Suggestion {
   candidates: ContextualToeicPart5Candidate[];
 }
-export interface ContextualCourseLessonCandidate {
-  title: string;
-  summary: string;
-  objectives: string[];
-  sections?: Array<{
-    type: string;
-    heading: string;
-    content: string;
-  }>;
-}
-export interface ContextualCourseCurriculumSuggestion {
-  candidates: ContextualCourseLessonCandidate[];
-}
-
-export interface ContextualCourseLessonSectionSuggestion {
-  type: string;
-  heading: string;
-  content: string;
-  paragraphs?: string[];
-  bullets?: string[];
-  examples?: Array<{
-    text: string;
-    translation?: string;
-    explanation?: string;
-  }>;
-}
-
-/** Candidate-only generation plan. Guides review; never persisted to Course. */
-export interface ContextualCoursePedagogyPlan {
-  keyConcepts: string[];
-  realWorldContexts: string[];
-  commonMistakes: string[];
-  practiceCoverage: string[];
-}
-
-export interface ContextualCourseLessonContentSuggestion {
-  sections: ContextualCourseLessonSectionSuggestion[];
-  guidedPractice: ContextualCourseLessonExerciseSuggestion;
-  finalCheck: ContextualCourseLessonExerciseSuggestion;
-  pedagogyPlan?: ContextualCoursePedagogyPlan;
-}
-
-export interface ContextualCourseLessonExerciseSuggestion {
-  type: string;
-  title: string;
-  prompt: string;
-  instructions?: string;
-  questions: Array<{
-    prompt: string;
-    options?: string[];
-    correctAnswer: string;
-    explanation: string;
-  }>;
-}
-
 export interface ContextualListeningTurn {
   speaker: string;
   text: string;

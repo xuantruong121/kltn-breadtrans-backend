@@ -370,7 +370,6 @@ export class WritingService {
       id: number;
       type: QuizType;
       isPremiumContent: boolean;
-      courseId: number | null;
     },
     userId?: number,
     role?: import('@prisma/client').Role,
@@ -427,7 +426,6 @@ export class WritingService {
       id: number;
       type: QuizType;
       isPremiumContent: boolean;
-      courseId: number | null;
       /** Carries the authored CEFR tag the access policy reads. */
       title?: string;
     }>,
@@ -730,7 +728,6 @@ export class WritingService {
         type: true,
         publicationStatus: true,
         isPremiumContent: true,
-        courseId: true,
         practiceTopic: { select: { category: true } },
       },
     });

@@ -21,7 +21,6 @@ import {
   SuggestReadingPassageDto,
   SuggestReadingQuestionsDto,
   SuggestToeicPart5Dto,
-  SuggestCourseCurriculumDto,
   SuggestListeningContentDto,
   SuggestListeningQuestionsDto,
   SuggestWritingTaskDto,
@@ -174,26 +173,6 @@ export class AdminContextualAiController {
       this.logger.warn(`AI TOEIC Part 5 Suggestion failed: ${msg}`);
       throw new BadGatewayException(
         'Không thể tạo câu hỏi TOEIC Part 5 từ AI lúc này. Vui lòng thử lại sau.',
-      );
-    }
-  }
-
-  @Post('courses/ai/suggest-curriculum')
-  @ApiOperation({ summary: 'Gợi ý chương trình học nháp cho Course Studio' })
-  async suggestCourseCurriculum(@Body() dto: SuggestCourseCurriculumDto) {
-    try {
-      return await this.aiService.suggestCourseCurriculum({
-        courseTitle: dto.courseTitle,
-        level: dto.level,
-        description: dto.description,
-        targetLessonCount: dto.targetLessonCount || 5,
-        existingLessonTitles: dto.existingLessonTitles,
-      });
-    } catch (error: any) {
-      if (error instanceof BadRequestException) throw error;
-      this.logger.warn(`AI Course Curriculum failed: ${error?.message || ''}`);
-      throw new BadGatewayException(
-        'Không thể gợi ý chương trình học từ AI lúc này. Vui lòng thử lại sau.',
       );
     }
   }

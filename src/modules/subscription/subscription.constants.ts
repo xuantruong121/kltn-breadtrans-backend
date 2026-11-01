@@ -11,7 +11,6 @@ export const PLAN_FEATURE_KEYS: readonly string[] = Object.freeze([
   PlanFeatureKey.PREMIUM_SPEAKING_CONTENT,
   PlanFeatureKey.PREMIUM_WRITING_CONTENT,
   // Generated Prisma client is refreshed separately; the database enum is durable.
-  'COURSE_LIBRARY_ACCESS',
 ]);
 
 export function isPlanFeatureKey(value: string): value is PlanFeatureKey {

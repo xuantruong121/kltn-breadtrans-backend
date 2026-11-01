@@ -3,7 +3,6 @@ import { AdminService } from './admin.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { R2Service } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
-import { CourseService } from '../course/course.service';
 import { EmailService } from '../../common/email/email.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
@@ -42,7 +41,6 @@ describe('AdminService - Enrollment Count Semantics (R1)', () => {
 
   const mockR2Service = {};
   const mockR2CleanupService = {};
-  const mockCourseService = {};
   const mockEmailService = {};
 
   beforeEach(async () => {
@@ -54,23 +52,11 @@ describe('AdminService - Enrollment Count Semantics (R1)', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: R2Service, useValue: mockR2Service },
         { provide: R2CleanupService, useValue: mockR2CleanupService },
-        { provide: CourseService, useValue: mockCourseService },
         { provide: EmailService, useValue: mockEmailService },
       ],
     }).compile();
 
     service = module.get<AdminService>(AdminService);
-  });
-
-  describe('getAdminCourses (self-paced, no classes)', () => {
-    it('lists courses without classes, enrollments or tuition', async () => {
-      mockPrisma.course.findMany.mockResolvedValue([{ id: 1, title: 'A' }]);
-      await expect(service.getAdminCourses()).resolves.toEqual([
-        { id: 1, title: 'A' },
-      ]);
-      const query = mockPrisma.course.findMany.mock.calls[0][0];
-      expect(JSON.stringify(query)).not.toMatch(/classes|enrollments/);
-    });
   });
 
   describe('Phase 3C-1 financial-history delete guards', () => {

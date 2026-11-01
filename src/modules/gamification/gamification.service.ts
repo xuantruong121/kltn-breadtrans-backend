@@ -278,8 +278,6 @@ function getQuestAction(type: string): {
     case 'DO_SPEAKING':
     case 'PRACTICE_SPEAKING':
       return { actionLabel: 'Luyện nói', actionUrl: '/speaking' };
-    case 'COMPLETE_LESSON':
-      return { actionLabel: 'Mở bài học', actionUrl: '/my-courses' };
     default:
       return { actionLabel: 'Tiếp tục học', actionUrl: '/dashboard' };
   }

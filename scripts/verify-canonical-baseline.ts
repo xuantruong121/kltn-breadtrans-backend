@@ -154,8 +154,6 @@ async function main() {
     // --------------------------------------------------------------- counts
     const counts = {
       User: await prisma.user.count(),
-      Course: await prisma.course.count(),
-      Lesson: await prisma.lesson.count(),
       Exam: await prisma.exam.count(),
       ToeicExamSet: await prisma.toeicExamSet.count(),
       ToeicQuestionGroup: await prisma.toeicQuestionGroup.count(),

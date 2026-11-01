@@ -397,10 +397,4 @@ export class EventsGateway
   }
 
   // Broadcast toàn hệ thống khi một Khóa học được duyệt
-  broadcastCourseUpdate() {
-    this.server.emit('courseUpdated', {
-      message: 'Trạng thái khóa học đã được cập nhật.',
-      timestamp: new Date().toISOString(),
-    });
-  }
 }

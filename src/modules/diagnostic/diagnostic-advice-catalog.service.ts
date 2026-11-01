@@ -6,9 +6,8 @@
  * requirement, never silently opened. Nothing here enrols the learner.
  */
 import { Injectable, Optional } from '@nestjs/common';
-import { PlanFeatureKey, QuizType } from '@prisma/client';
+import { QuizType } from '@prisma/client';
 
-import { coursesEnabled } from '../../common/guards/courses-enabled.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
@@ -64,7 +63,6 @@ function practicePlanFor(
     });
   return isPremiumContent ? advancedPracticePlan(skill) : 'FREE';
 }
-const COURSE_REQUIREMENT = 'Cần gói PRO';
 
 @Injectable()
 export class DiagnosticAdviceCatalogService {
@@ -81,7 +79,7 @@ export class DiagnosticAdviceCatalogService {
       ['LISTENING_QUIZ', 'READING_QUIZ', 'WRITING_QUIZ'] as const
     ).flatMap(ids);
 
-    const [quizzes, exercises, courses] = await Promise.all([
+    const [quizzes, exercises] = await Promise.all([
       this.prisma.quiz.findMany({
         where: {
           id: { in: quizIds },
@@ -123,25 +121,7 @@ export class DiagnosticAdviceCatalogService {
           practiceSet: { select: { level: true } },
         },
       }),
-      coursesEnabled()
-        ? this.prisma.course.findMany({
-            where: { id: { in: ids('COURSE') }, status: 'PUBLISHED' },
-            select: { id: true, title: true },
-          })
-        : Promise.resolve<{ id: number; title: string }[]>([]),
     ]);
-
-    const features = new Map<PlanFeatureKey, boolean>();
-    const has = async (feature: PlanFeatureKey) => {
-      if (!features.has(feature))
-        features.set(
-          feature,
-          this.subscriptionService
-            ? await this.subscriptionService.hasFeature(userId, feature)
-            : false,
-        );
-      return features.get(feature) as boolean;
-    };
 
     let code: string | null | undefined;
     const planCode = async () => {
@@ -194,19 +174,6 @@ export class DiagnosticAdviceCatalogService {
           cefrLevel: exercise.practiceSet?.level ?? null,
           access: locked ? 'LOCKED' : 'OPEN',
           requirement: locked ? `Cần gói ${required}` : null,
-        });
-      } else if (ref.kind === 'COURSE') {
-        // Hidden courses are never offered as advice.
-        if (!coursesEnabled()) continue;
-        const course = courses.find((c) => c.id === ref.id);
-        if (!course) continue;
-        const locked = !(await has(PlanFeatureKey.COURSE_LIBRARY_ACCESS));
-        resolved.set(key, {
-          ...ref,
-          title: course.title,
-          route: `/courses/${course.id}`,
-          access: locked ? 'LOCKED' : 'OPEN',
-          requirement: locked ? COURSE_REQUIREMENT : null,
         });
       }
     }

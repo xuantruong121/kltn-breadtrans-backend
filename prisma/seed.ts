@@ -2,8 +2,6 @@ import {
   AttemptMode,
   AttemptStatus,
   AuthProvider,
-  Course,
-  CourseStatus,
   DictionaryEntrySource,
   DictionaryEntryStatus,
   ExamType,
@@ -1327,389 +1325,6 @@ async function main() {
     },
   });
 
-  const courseDefinitions = [
-    {
-      id: 1,
-      title: 'English Foundations A1–A2',
-      level: 'BEGINNER',
-      status: 'PUBLISHED',
-      description:
-        'Lộ trình nền tảng cho người mới: phát âm, nghe câu ngắn, giao tiếp hằng ngày, đọc thông báo và viết tin nhắn cơ bản.',
-      thumbnail: null,
-    },
-    {
-      id: 8,
-      title: 'Grammar & Vocabulary Builder',
-      level: 'BEGINNER',
-      status: 'PUBLISHED',
-      description:
-        'Củng cố ngữ pháp cốt lõi và vốn từ thông dụng/TOEIC theo chủ đề để hỗ trợ cả bốn kỹ năng.',
-      thumbnail: null,
-    },
-  ].map((item) => ({
-    ...item,
-    status:
-      item.status === 'PUBLISHED' ? CourseStatus.PUBLISHED : CourseStatus.DRAFT,
-  }));
-  const courses: Course[] = [];
-  for (const definition of courseDefinitions) {
-    const { id, ...courseData } = definition;
-    courses.push(
-      await prisma.course.upsert({
-        where: { id },
-        update: courseData,
-        create: { id, ...courseData },
-      }),
-    );
-  }
-
-  const courseLessonCatalog: Record<
-    number,
-    Array<{ title: string; description: string }>
-  > = {
-    1: [
-      {
-        title: 'Sound & Spelling Basics',
-        description:
-          'Làm quen âm cơ bản, trọng âm từ và cách dùng công cụ nghe mẫu US/UK.',
-      },
-      {
-        title: 'Introducing Yourself',
-        description:
-          'Nghe và nói các mẫu giới thiệu tên, quê quán, nghề nghiệp và sở thích.',
-      },
-      {
-        title: 'Daily Routines',
-        description: 'Từ vựng và Present Simple cho thói quen hằng ngày.',
-      },
-      {
-        title: 'Time, Dates & Schedules',
-        description: 'Nghe giờ, ngày tháng và đọc lịch trình đơn giản.',
-      },
-      {
-        title: 'Shopping & Prices',
-        description: 'Hỏi giá, số lượng, kích cỡ và hiểu hóa đơn ngắn.',
-      },
-      {
-        title: 'Travel & Directions',
-        description: 'Hỏi đường, phương tiện và đọc biển báo cơ bản.',
-      },
-      {
-        title: 'Short Messages & Emails',
-        description: 'Đọc và viết tin nhắn/email ngắn, lịch sự.',
-      },
-      {
-        title: 'Foundation Review',
-        description: 'Ôn bốn kỹ năng qua bài tổng hợp A1–A2.',
-      },
-    ],
-    2: [
-      {
-        title: 'Listening for Main Ideas',
-        description: 'Nghe đoạn hội thoại B1 và xác định mục đích, ý chính.',
-      },
-      {
-        title: 'Listening for Details',
-        description:
-          'Bắt thông tin số, thời gian, địa điểm và hành động tiếp theo.',
-      },
-      {
-        title: 'Speaking: Clear Responses',
-        description: 'Phản hồi câu hỏi tự nhiên, đủ ý và đúng ngữ cảnh.',
-      },
-      {
-        title: 'Speaking: Describe & Explain',
-        description: 'Mô tả tình huống và giải thích lựa chọn bằng câu nối.',
-      },
-      {
-        title: 'Reading Emails & Notices',
-        description: 'Đọc email, thông báo và suy luận từ ngữ cảnh.',
-      },
-      {
-        title: 'Reading Longer Texts',
-        description: 'Đọc bài 150–250 từ, tìm ý chính và chi tiết hỗ trợ.',
-      },
-      {
-        title: 'Writing Messages & Paragraphs',
-        description: 'Viết email và đoạn văn B1 có bố cục rõ.',
-      },
-      {
-        title: 'Four-Skills Project',
-        description:
-          'Bài tổng hợp nghe–nói–đọc–viết theo một tình huống thực tế.',
-      },
-    ],
-    3: [
-      {
-        title: 'TOEIC Part 1 — Photographs',
-        description:
-          'Nhận diện hành động, vị trí và mô tả phù hợp với hình ảnh.',
-      },
-      {
-        title: 'TOEIC Part 2 — Question–Response',
-        description: 'Nhận biết dạng câu hỏi và chọn phản hồi tự nhiên.',
-      },
-      {
-        title: 'TOEIC Part 3 — Conversations',
-        description:
-          'Theo dõi hội thoại, mục đích, chi tiết và bước tiếp theo.',
-      },
-      {
-        title: 'TOEIC Part 4 — Talks',
-        description:
-          'Nghe thông báo, voicemail và bài nói ngắn trong bối cảnh công việc.',
-      },
-      {
-        title: 'TOEIC Part 5 — Incomplete Sentences',
-        description: 'Ôn từ loại, thì, giới từ, liên từ và collocation.',
-      },
-      {
-        title: 'TOEIC Part 6 — Text Completion',
-        description:
-          'Hoàn thành email/thông báo dựa trên ngữ pháp và mạch văn.',
-      },
-      {
-        title: 'TOEIC Part 7 — Reading Comprehension',
-        description: 'Đọc single/multiple passages và kết nối thông tin.',
-      },
-      {
-        title: 'Chiến lược làm đề TOEIC Listening & Reading',
-        description:
-          'Chiến thuật phân bổ 45 phút Listening và 75 phút Reading.',
-      },
-    ],
-    4: [
-      {
-        title: 'Advanced Listening Inference',
-        description:
-          'Suy luận thái độ, mục đích và hàm ý trong hội thoại nhanh.',
-      },
-      {
-        title: 'Multi-Speaker Conversations',
-        description: 'Theo dõi ba người nói, tham chiếu và thay đổi kế hoạch.',
-      },
-      {
-        title: 'Advanced Talks & Announcements',
-        description: 'Xử lý bài nói dài và câu hỏi liên kết thông tin.',
-      },
-      {
-        title: 'Part 5 High-Frequency Traps',
-        description: 'Phân biệt collocation, từ loại và cấu trúc dễ nhầm.',
-      },
-      {
-        title: 'Part 6 Coherence',
-        description: 'Dùng ngữ pháp và logic đoạn văn để hoàn thành văn bản.',
-      },
-      {
-        title: 'Part 7 Single Passages',
-        description: 'Đọc nhanh email, quảng cáo, bài báo và memo.',
-      },
-      {
-        title: 'Part 7 Multiple Passages',
-        description: 'Đối chiếu thông tin giữa 2–3 văn bản.',
-      },
-      {
-        title: 'Luyện đề 850+ & Chữa chi tiết',
-        description: 'Thi thử và phân tích lỗi theo Part/khả năng.',
-      },
-    ],
-    5: [
-      {
-        title: 'Speaking Q1–2: Read Aloud',
-        description: 'Đọc thành tiếng với phát âm, ngữ điệu và nhịp câu rõ.',
-      },
-      {
-        title: 'Speaking Q3–4: Describe a Picture',
-        description: 'Tổ chức câu mô tả người, vật, hành động và không gian.',
-      },
-      {
-        title: 'Speaking Q5–7: Respond to Questions',
-        description: 'Trả lời nhanh câu hỏi đời sống/công việc.',
-      },
-      {
-        title: 'Speaking Q8–10: Use Information',
-        description: 'Đọc bảng thông tin rồi phản hồi chính xác.',
-      },
-      {
-        title: 'Speaking Q11: Express an Opinion',
-        description: 'Nêu quan điểm, lý do và ví dụ trong 60 giây.',
-      },
-      {
-        title: 'Writing Q1–5: Picture Sentences',
-        description: 'Viết câu đúng ngữ pháp từ hai từ/cụm từ bắt buộc.',
-      },
-      {
-        title: 'Writing Q6–7: Email Response',
-        description:
-          'Trả lời yêu cầu bằng email đầy đủ, lịch sự và đúng nhiệm vụ.',
-      },
-      {
-        title: 'Writing Q8: Opinion Essay',
-        description: 'Viết bài luận có luận điểm, lý do, ví dụ và kết luận.',
-      },
-    ],
-    6: [
-      {
-        title: '4-Skill Diagnostic',
-        description:
-          'Đánh giá điểm mạnh/yếu ban đầu ở Listening, Speaking, Reading, Writing.',
-      },
-      {
-        title: 'Listening Intensive',
-        description: 'Luyện Part 1–4 và kỹ năng nghe thông tin công việc.',
-      },
-      {
-        title: 'Reading Intensive',
-        description: 'Luyện Part 5–7 và tốc độ đọc văn bản thực tế.',
-      },
-      {
-        title: 'Speaking Intensive',
-        description: 'Luyện 11 nhiệm vụ Speaking theo trình tự bài thi.',
-      },
-      {
-        title: 'Writing Intensive',
-        description: 'Luyện 8 nhiệm vụ Writing và phản hồi AI.',
-      },
-      {
-        title: 'Integrated Workplace Scenario',
-        description: 'Một tình huống được khai thác bằng đủ bốn kỹ năng.',
-      },
-      {
-        title: 'Chuẩn bị đề thi tổng hợp',
-        description:
-          'Quản lý thời gian, thiết bị và chiến lược trước khi thi thử.',
-      },
-      {
-        title: '4-Skill Capstone',
-        description: 'Hoàn thành bộ đề 4 kỹ năng và tổng hợp kết quả.',
-      },
-    ],
-    7: [
-      {
-        title: 'Professional Introductions',
-        description:
-          'Giới thiệu bản thân, vai trò và mục tiêu trong môi trường công sở.',
-      },
-      {
-        title: 'Meetings & Scheduling',
-        description: 'Đặt lịch, đổi lịch, xác nhận và tham gia cuộc họp.',
-      },
-      {
-        title: 'Phone & Video Calls',
-        description:
-          'Mở đầu, làm rõ, ghi nhận và kết thúc cuộc gọi chuyên nghiệp.',
-      },
-      {
-        title: 'Customer Service',
-        description: 'Tiếp nhận yêu cầu, xin lỗi và đưa giải pháp.',
-      },
-      {
-        title: 'Business Emails',
-        description:
-          'Viết subject, request, update, follow-up và closing phù hợp.',
-      },
-      {
-        title: 'Reports & Data',
-        description: 'Mô tả xu hướng, số liệu và tiến độ dự án.',
-      },
-      {
-        title: 'Presentations',
-        description: 'Cấu trúc mở đầu, chuyển ý và trả lời câu hỏi.',
-      },
-      {
-        title: 'Problem Solving',
-        description: 'Thảo luận lựa chọn, rủi ro và khuyến nghị.',
-      },
-    ],
-    8: [
-      {
-        title: 'Present & Past Tenses',
-        description: 'Ôn hiện tại/quá khứ qua ngữ cảnh bốn kỹ năng.',
-      },
-      {
-        title: 'Future & Perfect Forms',
-        description: 'Diễn tả kế hoạch, dự đoán và trải nghiệm.',
-      },
-      {
-        title: 'Parts of Speech',
-        description: 'Nhận diện danh từ, động từ, tính từ, trạng từ.',
-      },
-      {
-        title: 'Modals & Requests',
-        description: 'Khả năng, nghĩa vụ, lời khuyên và yêu cầu lịch sự.',
-      },
-      {
-        title: 'Passive Voice',
-        description: 'Câu bị động trong thông báo, quy trình và báo cáo.',
-      },
-      {
-        title: 'Conditionals',
-        description: 'Điều kiện thật/giả định và kết quả.',
-      },
-      {
-        title: 'Relative Clauses & Connectors',
-        description: 'Nối ý, mô tả danh từ và tạo văn bản mạch lạc.',
-      },
-      {
-        title: 'Vocabulary Review',
-        description: 'Ôn 80 từ theo chủ đề bằng ngữ cảnh thực tế.',
-      },
-    ],
-  };
-
-  let lessonId = 1;
-  for (const course of courses) {
-    const lessons = courseLessonCatalog[course.id] ?? [];
-    for (let order = 1; order <= lessons.length; order += 1) {
-      const item = lessons[order - 1];
-      const lesson = await prisma.lesson.upsert({
-        where: { id: lessonId },
-        update: {
-          courseId: course.id,
-          title: item.title,
-          description: item.description,
-          order,
-          videoUrl: null,
-        },
-        create: {
-          id: lessonId,
-          courseId: course.id,
-          title: item.title,
-          description: item.description,
-          order,
-          videoUrl: null,
-        },
-      });
-      await prisma.material.upsert({
-        where: { id: lessonId },
-        update: {
-          lessonId: lesson.id,
-          title: `Tài nguyên tham khảo — ${item.title}`,
-          fileUrl:
-            course.id >= 3 && course.id <= 6
-              ? 'https://www.ets.org/toeic/test-takers/prepare.html'
-              : course.id === 7
-                ? 'https://learnenglish.britishcouncil.org/free-resources/business'
-                : 'https://learnenglish.britishcouncil.org/free-resources',
-          fileType: 'LINK',
-        },
-        create: {
-          id: lessonId,
-          lessonId: lesson.id,
-          title: `Tài nguyên tham khảo — ${item.title}`,
-          fileUrl:
-            course.id >= 3 && course.id <= 6
-              ? 'https://www.ets.org/toeic/test-takers/prepare.html'
-              : course.id === 7
-                ? 'https://learnenglish.britishcouncil.org/free-resources/business'
-                : 'https://learnenglish.britishcouncil.org/free-resources',
-          fileType: 'LINK',
-        },
-      });
-      lessonId += 1;
-    }
-  }
-
   const practiceTopicSeedRows: Array<
     [string, string, keyof typeof TopicCategory]
   > = [
@@ -2584,7 +2199,6 @@ async function main() {
         'Bài mini test nguyên bản mô phỏng dạng câu hỏi TOEIC Listening & Reading.',
       timeLimit: 25,
       // TOEIC practice is an independent product, not a Course enrollment.
-      courseId: null,
       questions: [
         {
           type: 'MULTIPLE_CHOICE',
@@ -3307,7 +2921,6 @@ async function main() {
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
         timeLimit: definition.timeLimit,
-        courseId: definition.courseId,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
           listeningCatalogMetadataByQuizId[definition.id] ??
@@ -3320,7 +2933,6 @@ async function main() {
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
         timeLimit: definition.timeLimit,
-        courseId: definition.courseId,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
           listeningCatalogMetadataByQuizId[definition.id] ??
@@ -5088,7 +4700,6 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 2 Skills: Speaking & Writing gồm 11 task Speaking và 8 task Writing. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
-      courseId: null,
       timeLimit: 80,
       bilingualContent: {
         examFormat: 'TOEIC_SW',
@@ -5119,7 +4730,6 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 2 Skills: Speaking & Writing gồm 11 task Speaking và 8 task Writing. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
-      courseId: null,
       timeLimit: 80,
       bilingualContent: {
         examFormat: 'TOEIC_SW',
@@ -5526,7 +5136,6 @@ async function main() {
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
         timeLimit: definition.timeLimit,
-        courseId: definition.courseId,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
           listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
@@ -5537,7 +5146,6 @@ async function main() {
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
         timeLimit: definition.timeLimit,
-        courseId: definition.courseId,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
           listeningCatalogMetadataByQuizId[definition.id] ?? Prisma.DbNull,
@@ -5681,17 +5289,13 @@ async function main() {
       id: true,
       quizId: true,
       content: true,
-      quiz: { select: { title: true, courseId: true } },
+      quiz: { select: { title: true } },
     },
   });
   const premiumListeningQuizIds = new Set<number>();
   for (const question of seededListeningQuestions) {
     const range = parseCefrRange(question.quiz.title);
-    if (
-      question.quiz.courseId == null &&
-      range &&
-      practiceRequiresPlus(range)
-    ) {
+    if (range && practiceRequiresPlus(range)) {
       premiumListeningQuizIds.add(question.quizId);
     }
   }
@@ -11273,7 +10877,6 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 2 Skills: Listening & Reading gồm 100 câu Listening và 100 câu Reading, bao quát Part 1–7. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
-      courseId: null,
       timeLimit: 120,
       bilingualContent: {
         examFormat: 'TOEIC_LR',
@@ -11295,7 +10898,6 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 2 Skills: Listening & Reading gồm 100 câu Listening và 100 câu Reading, bao quát Part 1–7. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC,
-      courseId: null,
       timeLimit: 120,
       bilingualContent: {
         examFormat: 'TOEIC_LR',
@@ -11320,7 +10922,6 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 4 Skills kết hợp Listening, Reading, Speaking và Writing trong một sản phẩm luyện tập. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC_FOUR_SKILL,
-      courseId: null,
       timeLimit: 200,
       bilingualContent: {
         examFormat: 'TOEIC_4_SKILLS',
@@ -11344,7 +10945,6 @@ async function main() {
       description:
         'Đề luyện tập TOEIC 4 Skills kết hợp Listening, Reading, Speaking và Writing trong một sản phẩm luyện tập. Nội dung do BreadTrans biên soạn để rèn luyện theo format TOEIC; không phải đề thi chính thức của ETS.',
       type: QuizType.TOEIC_FOUR_SKILL,
-      courseId: null,
       timeLimit: 200,
       bilingualContent: {
         examFormat: 'TOEIC_4_SKILLS',
@@ -12218,7 +11818,6 @@ async function main() {
   // B1+ PLUS). Course-embedded quizzes keep their own flag: courses are PRO.
   const standalonePracticeQuizzes = await prisma.quiz.findMany({
     where: {
-      courseId: null,
       type: {
         in: [
           QuizType.LISTENING_PRACTICE,
@@ -12284,7 +11883,7 @@ async function main() {
   }
 
   console.log(
-    `Seed complete: 1 admin, ${students.length} students, ${courses.length} courses, ${lessonId - 1} lessons, vocabulary/grammar/TOEIC/gamification data.`,
+    `Seed complete: 1 admin, ${students.length} students, vocabulary/grammar/TOEIC/gamification data.`,
   );
 }
 
