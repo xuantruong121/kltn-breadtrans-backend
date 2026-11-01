@@ -3,7 +3,12 @@ import { MarketService } from './market.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { GamificationService } from '../gamification/gamification.service';
-import { UnprocessableEntityException } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
+
+const mockNotificationsService = {
+  createNotification: jest.fn().mockResolvedValue({}),
+};
 
 const mockPrismaService = {
   marketProduct: {
@@ -108,6 +113,10 @@ describe('MarketService', () => {
         {
           provide: GamificationService,
           useValue: mockGamificationService,
+        },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
         },
       ],
     }).compile();
@@ -964,6 +973,60 @@ describe('MarketService', () => {
         const result = await service.adminDeleteProduct(2);
         expect(result.success).toBe(true);
         expect(result.isActive).toBe(false);
+      });
+    });
+
+    describe('reviewOrder — only a pending order', () => {
+      it.each(['approved', 'completed', 'rejected', 'refunded'])(
+        'refuses to reject an order that is already %s',
+        async (status) => {
+          mockPrismaService.marketOrder.findUnique.mockResolvedValue({
+            id: 10,
+            userId: 1,
+            status,
+          });
+
+          await expect(
+            service.reviewOrder(10, 'rejected', 'Admin', 'Lý do'),
+          ).rejects.toBeInstanceOf(ConflictException);
+          expect(mockPrismaService.marketOrder.update).not.toHaveBeenCalled();
+          expect(mockGamificationService.awardBanh).not.toHaveBeenCalled();
+        },
+      );
+
+      it('tells the learner an order was approved', async () => {
+        const order = { id: 10, userId: 1, totalBanh: 500, status: 'pending' };
+        mockPrismaService.marketOrder.findUnique.mockResolvedValue(order);
+        mockPrismaService.marketOrder.update.mockResolvedValue({
+          ...order,
+          status: 'approved',
+        });
+
+        await service.reviewOrder(10, 'approved', 'Admin');
+
+        expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userId: 1,
+            type: 'MARKET_ORDER_RESULT',
+            title: 'Yêu cầu đổi quà đã được duyệt',
+          }),
+        );
+      });
+
+      it('keeps the review when the notification fails', async () => {
+        const order = { id: 10, userId: 1, totalBanh: 500, status: 'pending' };
+        mockPrismaService.marketOrder.findUnique.mockResolvedValue(order);
+        mockPrismaService.marketOrder.update.mockResolvedValue({
+          ...order,
+          status: 'approved',
+        });
+        mockNotificationsService.createNotification.mockRejectedValueOnce(
+          new Error('down'),
+        );
+
+        await expect(
+          service.reviewOrder(10, 'approved', 'Admin'),
+        ).resolves.toMatchObject({ status: 'approved' });
       });
     });
 

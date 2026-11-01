@@ -24,7 +24,9 @@ describeWithIsolatedDatabase(
     beforeAll(async () => {
       prisma = new PrismaService();
       await prisma.$connect();
-      service = new SubscriptionAdminService(prisma);
+      service = new SubscriptionAdminService(prisma, {
+        createNotification: jest.fn().mockResolvedValue({}),
+      } as never);
 
       const suffix = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 
