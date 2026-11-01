@@ -396,5 +396,4 @@ export class EventsGateway
     });
   }
 
-  // Broadcast toàn hệ thống khi một Khóa học được duyệt
 }

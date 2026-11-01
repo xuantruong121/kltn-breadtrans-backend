@@ -6,6 +6,15 @@ DELETE FROM "PlanEntitlement" WHERE "featureKey" = 'COURSE_LIBRARY_ACCESS';
 
 -- AlterEnum
 BEGIN;
+CREATE TYPE "IssueReportArea_new" AS ENUM ('LISTENING', 'SPEAKING', 'READING', 'WRITING', 'VOCABULARY', 'GRAMMAR', 'TOEIC', 'DASHBOARD', 'MARKET', 'PET', 'AUTH', 'ADMIN', 'OTHER');
+ALTER TABLE "IssueReport" ALTER COLUMN "area" TYPE "IssueReportArea_new" USING ("area"::text::"IssueReportArea_new");
+ALTER TYPE "IssueReportArea" RENAME TO "IssueReportArea_old";
+ALTER TYPE "IssueReportArea_new" RENAME TO "IssueReportArea";
+DROP TYPE "IssueReportArea_old";
+COMMIT;
+
+-- AlterEnum
+BEGIN;
 CREATE TYPE "PayOSPaymentIntentType_new" AS ENUM ('PLAN');
 ALTER TABLE "PayOSPaymentIntent" ALTER COLUMN "type" TYPE "PayOSPaymentIntentType_new" USING ("type"::text::"PayOSPaymentIntentType_new");
 ALTER TYPE "PayOSPaymentIntentType" RENAME TO "PayOSPaymentIntentType_old";

@@ -2252,7 +2252,6 @@ enum IssueReportArea {
   VOCABULARY
   GRAMMAR
   TOEIC
-  COURSE
   DASHBOARD
   MARKET
   PET

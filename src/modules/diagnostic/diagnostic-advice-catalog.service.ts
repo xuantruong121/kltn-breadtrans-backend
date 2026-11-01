@@ -1,9 +1,9 @@
 /**
  * Resolves the learning resources D1 advice may cite against the live
  * catalog and the learner's plan. A reference is returned only when the
- * content exists and is published right now; one that is premium or a course
+ * content exists and is published right now; one that is premium
  * the learner's plan does not cover is returned as LOCKED with the existing
- * requirement, never silently opened. Nothing here enrols the learner.
+ * requirement, never silently opened.
  */
 import { Injectable, Optional } from '@nestjs/common';
 import { QuizType } from '@prisma/client';
