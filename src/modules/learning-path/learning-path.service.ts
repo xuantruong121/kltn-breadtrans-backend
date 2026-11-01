@@ -10,6 +10,7 @@ import { FOUR_SKILL_SCORING_VERSION } from '../diagnostic/diagnostic-four-skill'
 import { refreshFourSkillResult } from '../diagnostic/diagnostic-four-skill.store';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { UpdateLearnerProfileDto } from './dto/learner-profile.dto';
+import { foundationPlan } from './foundation.logic';
 import { loadCandidates, loadLearnerState } from './learning-path.catalog';
 import {
   contentKey,
@@ -25,6 +26,8 @@ import { LevelAccessService } from './level-access.service';
 
 /** Extra open items offered beside the daily plan. */
 const MORE_CHOICES = 12;
+/** Vocabulary and grammar items offered beside the daily plan. */
+const FOUNDATION_ITEMS = 6;
 
 @Injectable()
 export class LearningPathService {
@@ -85,7 +88,73 @@ export class LearningPathService {
       more: moreChoices(ranked, plan, MORE_CHOICES).map((r) =>
         this.view(r, learner.saved),
       ),
+      foundation: await this.foundation(userId),
     };
+  }
+
+  /** Vocabulary and grammar to study next, from the learner's own progress. */
+  private async foundation(userId: number) {
+    const now = new Date();
+    const [profile, topics, attempts, decks, progress] = await Promise.all([
+      this.prisma.learnerProfile.findUnique({ where: { userId } }),
+      this.prisma.grammarTopic.findMany({
+        where: { publicationStatus: 'PUBLISHED' },
+        orderBy: { order: 'asc' },
+        select: { id: true, title: true, level: true },
+      }),
+      this.prisma.grammarAttempt.findMany({
+        where: { userId },
+        select: { topicId: true, score: true },
+      }),
+      this.prisma.vocabTopic.findMany({
+        where: {
+          publicationStatus: 'PUBLISHED',
+          categoryName: { not: 'SYSTEM_DICTIONARY' },
+        },
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          level: true,
+          _count: { select: { words: true } },
+        },
+      }),
+      this.prisma.userVocabWordProgress.findMany({
+        where: { userId },
+        select: {
+          isMastered: true,
+          nextReviewAt: true,
+          word: { select: { topicId: true } },
+        },
+      }),
+    ]);
+    const best = new Map<number, number>();
+    for (const a of attempts)
+      best.set(a.topicId, Math.max(best.get(a.topicId) ?? 0, a.score));
+    const mastered = new Map<number, number>();
+    for (const p of progress)
+      if (p.isMastered)
+        mastered.set(p.word.topicId, (mastered.get(p.word.topicId) ?? 0) + 1);
+    return foundationPlan(
+      {
+        learner:
+          (profile?.placementSource === 'DIAGNOSTIC'
+            ? profile.placementLevel
+            : profile?.selfLevel) ?? 'BASIC',
+        dueWords: progress.filter(
+          (p) => !p.isMastered && p.nextReviewAt && p.nextReviewAt <= now,
+        ).length,
+        grammar: topics.map((t) => ({ ...t, best: best.get(t.id) ?? null })),
+        decks: decks.map((d) => ({
+          id: d.id,
+          title: d.title,
+          level: d.level,
+          total: d._count.words,
+          mastered: mastered.get(d.id) ?? 0,
+        })),
+      },
+      FOUNDATION_ITEMS,
+    );
   }
 
   /** "Đề xuất cho bạn" on a skill page, locked items included with reasons. */
