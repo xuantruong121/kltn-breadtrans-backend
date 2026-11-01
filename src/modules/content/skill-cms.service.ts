@@ -1,3 +1,4 @@
+import { historyEditProblem } from './edit-with-history';
 import {
   mergeListeningContent,
   spokenTextChanged,
@@ -73,6 +74,9 @@ function asRecord(value: unknown): Record<string, unknown> {
     ? (value as Record<string, unknown>)
     : {};
 }
+
+const EXAM_CONTENT_LOCKED =
+  'Nội dung thuộc đề TOEIC đã có lượt làm; hãy nhân bản đề để sửa.';
 
 @Injectable()
 export class SkillCmsService {
@@ -469,7 +473,7 @@ export class SkillCmsService {
         where: { id: rawId },
       });
       if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
-      await this.assertNoSpeakingHistory(rawId);
+      await this.assertSpeakingEditable(rawId);
       const category = dto.category
         ? await this.speakingCategory(dto.category.trim(), 'practiceSet')
         : undefined;
@@ -490,7 +494,7 @@ export class SkillCmsService {
       where: { id, ...this.contentTypeWhere(domain) },
     });
     if (!quiz) throw new NotFoundException('Không tìm thấy nội dung kỹ năng.');
-    await this.assertNoHistory(id);
+    const lock = await this.assertContentEditable(id);
     const type =
       domain === 'writing' &&
       (dto.type === 'WRITING_PICTURE' || dto.type === 'WRITING_EMAIL')
@@ -498,6 +502,10 @@ export class SkillCmsService {
           ? QuizType.WRITING_PICTURE
           : QuizType.WRITING_EMAIL
         : undefined;
+    if (lock === 'PRACTICE' && type && type !== quiz.type)
+      throw new ConflictException(
+        'Nội dung đã có lịch sử làm bài; không thể đổi loại bài.',
+      );
     return this.prisma.quiz.update({
       where: { id },
       data: {
@@ -623,7 +631,6 @@ export class SkillCmsService {
     });
     if (!question)
       throw new NotFoundException('Câu hỏi không thuộc nội dung Nghe này.');
-    await this.assertNoHistory(quizId);
     // Same type: merge, so fields the form does not show survive the edit.
     const content =
       dto.type === question.type
@@ -632,6 +639,10 @@ export class SkillCmsService {
             dto.content as unknown as Record<string, unknown>,
           )
         : dto.content;
+    await this.assertQuestionEditable(quizId, question, {
+      type: dto.type,
+      content,
+    });
     const updated = await this.prisma.question.update({
       where: { id: questionId },
       data: {
@@ -671,12 +682,16 @@ export class SkillCmsService {
     if (!question)
       throw new NotFoundException('Câu hỏi không thuộc nội dung Viết này.');
     this.assertWritingTaskType(question.quiz?.type, dto.taskType);
-    await this.assertNoHistory(quizId);
+    const content = this.writingContent(dto);
+    await this.assertQuestionEditable(quizId, question, {
+      type: dto.type,
+      content,
+    });
     return this.prisma.question.update({
       where: { id: questionId },
       data: {
         type: dto.type,
-        content: this.writingContent(dto),
+        content,
         order: dto.order,
       },
     });
@@ -792,8 +807,12 @@ export class SkillCmsService {
         'Dùng API reorder để thay đổi thứ tự câu trong bộ luyện',
       );
     }
-    await this.assertNoSpeakingHistory(rawSetId);
+    const hasHistory = await this.assertSpeakingEditable(rawSetId);
     const taskType = dto.taskType ?? exercise.taskType;
+    if (hasHistory && taskType !== exercise.taskType)
+      throw new ConflictException(
+        'Nội dung Speaking đã có lịch sử làm bài; không thể đổi loại câu.',
+      );
     const stimulus = dto.stimulusId
       ? await this.prisma.speakingStimulus.findUnique({
           where: { id: dto.stimulusId },
@@ -1091,7 +1110,7 @@ export class SkillCmsService {
     });
     if (!question)
       throw new NotFoundException('Câu hỏi không thuộc nội dung kỹ năng này.');
-    await this.assertNoHistory(quizId);
+    await this.assertQuestionEditable(quizId, question, dto);
     return this.prisma.question.update({
       where: { id: questionId },
       data: { type: dto.type, content: asJson(dto.content), order: dto.order },
@@ -1378,7 +1397,7 @@ export class SkillCmsService {
 
   async generateListeningAudioPreview(quizId: number, user: Admin) {
     this.admin(user);
-    await this.assertNoHistory(quizId);
+    await this.assertContentEditable(quizId);
     return this.requireListeningAuthoring().audio.generatePreview(
       quizId,
       user.id,
@@ -1436,7 +1455,7 @@ export class SkillCmsService {
   ) {
     this.admin(user);
     await this.assertListeningQuestion(quizId, questionId);
-    await this.assertNoHistory(quizId);
+    await this.assertContentEditable(quizId);
     return this.requireListeningAuthoring().quiz.createAudioAsset(
       questionId,
       file,
@@ -1461,8 +1480,32 @@ export class SkillCmsService {
     const count = await this.prisma.submission.count({ where: { quizId } });
     if (count > 0)
       throw new ConflictException(
-        'Nội dung đã có lịch sử làm bài; tạo phiên bản mới thay vì sửa trực tiếp',
+        'Nội dung đã có lịch sử làm bài; không thể thêm hoặc xoá câu.',
       );
+  }
+
+  /**
+   * Practice with attempts can be edited in place. A TOEIC exam task cannot:
+   * its attempts must keep matching the exam, so the exam is duplicated instead.
+   */
+  private async assertContentEditable(quizId: number) {
+    const count = await this.prisma.submission.count({ where: { quizId } });
+    if (count === 0) return 'NONE' as const;
+    const examItems = await this.prisma.toeicWritingSetItem.count({
+      where: { writingQuizId: quizId },
+    });
+    if (examItems > 0) throw new ConflictException(EXAM_CONTENT_LOCKED);
+    return 'PRACTICE' as const;
+  }
+
+  private async assertQuestionEditable(
+    quizId: number,
+    before: { type?: string | null; content?: unknown },
+    after: { type?: string | null; content?: unknown },
+  ) {
+    const lock = await this.assertContentEditable(quizId);
+    const problem = lock === 'PRACTICE' && historyEditProblem(before, after);
+    if (problem) throw new ConflictException(problem);
   }
 
   private async validateSpeaking(rawId: string) {
@@ -1506,7 +1549,20 @@ export class SkillCmsService {
     });
     if (count > 0)
       throw new ConflictException(
-        'Nội dung Speaking đã có lịch sử làm bài; tạo phiên bản mới thay vì sửa trực tiếp',
+        'Nội dung Speaking đã có lịch sử làm bài; không thể xoá hoặc sắp xếp lại câu.',
       );
+  }
+
+  /** True when the set has attempts. Exam sets with attempts stay locked. */
+  private async assertSpeakingEditable(setId: string) {
+    const count = await this.prisma.speakingSubmission.count({
+      where: { exercise: { practiceSetId: setId } },
+    });
+    if (count === 0) return false;
+    const examParts = await this.prisma.toeicAssessmentComponent.count({
+      where: { speakingPracticeSetId: setId },
+    });
+    if (examParts > 0) throw new ConflictException(EXAM_CONTENT_LOCKED);
+    return true;
   }
 }
