@@ -78,6 +78,7 @@ export class AdminController {
   @ApiOperation({
     summary: 'Admin tạo tài khoản mới (Học viên hoặc Quản trị viên)',
   })
+  @ApiResponse({ status: 409, description: 'Email đã tồn tại.' })
   createUser(@Body() dto: CreateUserDto) {
     return this.adminService.createUser(dto);
   }

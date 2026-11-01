@@ -817,21 +817,28 @@ export class AdminService {
       throw new BadRequestException('Vai trò người dùng không hợp lệ.');
     }
     const hashed = await bcrypt.hash(dto.password, 10);
-    return this.prisma.user.create({
-      data: {
-        email: dto.email,
-        password: hashed,
-        role: dto.role,
-        profile: { create: { fullName: dto.fullName, phone: dto.phone } },
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        profile: { select: { fullName: true, phone: true } },
-      },
-    });
+    try {
+      return await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          password: hashed,
+          role: dto.role,
+          profile: { create: { fullName: dto.fullName, phone: dto.phone } },
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          profile: { select: { fullName: true, phone: true } },
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new ConflictException('Email đã tồn tại.');
+      }
+      throw error;
+    }
   }
 
   async updateUser(userId: number, dto: UpdateUserDto) {
