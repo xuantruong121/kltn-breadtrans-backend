@@ -96,6 +96,81 @@ describe('PlanCatalogAdminService', () => {
     );
   });
 
+  it('starts a draft from what the current version grants', async () => {
+    const prisma = makePrisma();
+    const entitlement = {
+      featureKey: 'PREMIUM_LISTENING',
+      enabled: true,
+      limitValue: null,
+      unit: 'CONTENT_ACCESS',
+      period: 'BILLING_CYCLE',
+      scope: null,
+    };
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      planVersion: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce({ version: 3 })
+          .mockResolvedValueOnce({
+            displayName: 'Plus',
+            description: 'Gói Plus',
+            entitlements: [{ id: 9, planVersionId: 1, ...entitlement }],
+          }),
+        create: jest.fn().mockResolvedValue(draft({ version: 4 })),
+      },
+    };
+    prisma.plan.findUnique.mockResolvedValue(plan);
+    prisma.$transaction.mockImplementation((fn: any) => fn(tx));
+    const service = new PlanCatalogAdminService(
+      prisma as never,
+      new SubscriptionService(prisma as never),
+    );
+
+    await service.createDraft('plus', { priceVnd: 79000, durationDays: 30 }, 7);
+
+    expect(tx.planVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          displayName: 'Plus',
+          description: 'Gói Plus',
+          entitlements: {
+            create: [
+              expect.objectContaining({
+                ...entitlement,
+                scope: expect.anything(),
+              }),
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  it('refuses to publish a paid version that grants nothing', async () => {
+    const prisma = makePrisma();
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      planVersion: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            draft({ entitlements: [], priceVnd: 79000, durationDays: 30 }),
+          ),
+        updateMany: jest.fn(),
+        update: jest.fn(),
+      },
+    };
+    prisma.$transaction.mockImplementation((fn: any) => fn(tx));
+    const service = new PlanCatalogAdminService(
+      prisma as never,
+      new SubscriptionService(prisma as never),
+    );
+
+    await expect(service.publish(1, 7)).rejects.toThrow('quyền lợi');
+    expect(tx.planVersion.update).not.toHaveBeenCalled();
+  });
+
   it('protects FREE and rejects invalid entitlement combinations', async () => {
     const prisma = makePrisma();
     prisma.plan.findUnique.mockResolvedValue({ ...plan, code: 'FREE' });
@@ -129,7 +204,19 @@ describe('PlanCatalogAdminService', () => {
     const tx = {
       $queryRaw: jest.fn(),
       planVersion: {
-        findUnique: jest.fn().mockResolvedValue(draft()),
+        findUnique: jest.fn().mockResolvedValue(
+          draft({
+            entitlements: [
+              {
+                featureKey: 'PREMIUM_LISTENING',
+                enabled: true,
+                limitValue: null,
+                unit: 'CONTENT_ACCESS',
+                period: 'BILLING_CYCLE',
+              },
+            ],
+          }),
+        ),
         updateMany: jest.fn(),
         update: jest.fn().mockResolvedValue(published),
       },
