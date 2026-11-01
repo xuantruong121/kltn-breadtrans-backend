@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   PayOS,
+  WebhookError,
   type CreatePaymentLinkResponse,
   type Webhook,
   type WebhookData,
@@ -111,7 +113,17 @@ export class PayosProvider {
     return this.getClient().paymentRequests.cancel(orderCode, reason);
   }
 
-  verifyWebhook(payload: unknown): Promise<WebhookData> {
-    return this.getClient().webhooks.verify(payload as Webhook);
+  async verifyWebhook(payload: unknown): Promise<WebhookData> {
+    const client = this.getClient();
+    if (!payload || typeof payload !== 'object') {
+      throw new BadRequestException('PayOS webhook không hợp lệ');
+    }
+    try {
+      return await client.webhooks.verify(payload as Webhook);
+    } catch (error) {
+      if (!(error instanceof WebhookError)) throw error;
+      this.logger.warn(`Rejected PayOS webhook: ${error.message}`);
+      throw new BadRequestException('PayOS webhook không hợp lệ');
+    }
   }
 }
