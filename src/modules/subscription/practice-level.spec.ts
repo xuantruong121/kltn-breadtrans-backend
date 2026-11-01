@@ -4,9 +4,53 @@ import {
   levelLabel,
   isDictationContent,
   parseCefrRange,
+  titleWithLevel,
   practiceRequiresPlus,
   requiredPracticePlan,
 } from './practice-level';
+
+describe('titleWithLevel', () => {
+  it('adds the tag access reads to an untagged title', () => {
+    const title = titleWithLevel('Ordering office supplies', 'C1', 'Writing');
+    expect(title).toBe('Writing C1 — Ordering office supplies');
+    expect(parseCefrRange(title)).toEqual({ min: 'C1', max: 'C1' });
+  });
+
+  it('replaces the tag when another level is picked', () => {
+    expect(titleWithLevel('Reading A2 — Notices', 'B2', 'Reading')).toBe(
+      'Reading B2 — Notices',
+    );
+  });
+
+  it('keeps a title already at that level', () => {
+    expect(titleWithLevel('Nghe chép A2 — Du lịch', 'A2', 'Listening')).toBe(
+      'Nghe chép A2 — Du lịch',
+    );
+  });
+
+  it('never shrinks a range the picked level sits inside', () => {
+    expect(titleWithLevel('Reading A1–A2 — Everyday', 'A1', 'Reading')).toBe(
+      'Reading A1–A2 — Everyday',
+    );
+  });
+
+  it('replaces a range when the level is outside it', () => {
+    expect(titleWithLevel('Reading A1–A2 — Everyday', 'C1', 'Reading')).toBe(
+      'Reading C1 — Everyday',
+    );
+  });
+
+  it('does not read a level out of the name of the lesson', () => {
+    expect(titleWithLevel('Road to B2 fluency', 'A2', 'Reading')).toBe(
+      'Reading A2 — Road to B2 fluency',
+    );
+  });
+
+  it('leaves the title alone without a known level', () => {
+    expect(titleWithLevel(' Bài đọc ', '', 'Reading')).toBe('Bài đọc');
+    expect(titleWithLevel('Bài đọc', 'ALL', 'Reading')).toBe('Bài đọc');
+  });
+});
 
 describe('practice level policy (A1/A2 free, B1+ PLUS)', () => {
   it('reads only the explicit CEFR tag at the head of a title or level', () => {

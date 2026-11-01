@@ -1,4 +1,5 @@
 import { historyEditProblem } from './edit-with-history';
+import { parseCefrRange, titleWithLevel } from '../subscription/practice-level';
 import {
   mergeListeningContent,
   spokenTextChanged,
@@ -74,6 +75,12 @@ function asRecord(value: unknown): Record<string, unknown> {
     ? (value as Record<string, unknown>)
     : {};
 }
+
+const SKILL_TITLE_LABEL: Record<string, string> = {
+  listening: 'Listening',
+  reading: 'Reading',
+  writing: 'Writing',
+};
 
 const EXAM_CONTENT_LOCKED =
   'Nội dung thuộc đề TOEIC đã có lượt làm; hãy nhân bản đề để sửa.';
@@ -444,7 +451,7 @@ export class SkillCmsService {
     );
     return this.prisma.quiz.create({
       data: {
-        title: dto.title.trim(),
+        title: titleWithLevel(dto.title, dto.level, SKILL_TITLE_LABEL[domain]),
         description: dto.description?.trim(),
         theoryContent: dto.passage,
         bilingualContent: dto.bilingualContent
@@ -506,10 +513,19 @@ export class SkillCmsService {
       throw new ConflictException(
         'Nội dung đã có lịch sử làm bài; không thể đổi loại bài.',
       );
+    // An exam task carries no level: the exam sets who can open it.
+    const title =
+      dto.level && !(await this.isExamTask(id))
+        ? titleWithLevel(
+            dto.title ?? quiz.title,
+            dto.level,
+            SKILL_TITLE_LABEL[domain],
+          )
+        : dto.title?.trim();
     return this.prisma.quiz.update({
       where: { id },
       data: {
-        title: dto.title?.trim(),
+        title,
         description: dto.description?.trim(),
         theoryContent: dto.passage,
         bilingualContent: dto.bilingualContent
@@ -1161,6 +1177,8 @@ export class SkillCmsService {
     const errors: string[] = [];
     if (!quiz.title?.trim()) errors.push('Thiếu tiêu đề');
     if (!quiz.questions.length) errors.push('Cần ít nhất một câu hỏi');
+    if (!parseCefrRange(quiz.title) && !(await this.isExamTask(quiz.id)))
+      errors.push('Chưa có trình độ: chọn trình độ rồi lưu lại');
     if (
       domain === 'listening' &&
       quiz.questions.length &&
@@ -1491,11 +1509,16 @@ export class SkillCmsService {
   private async assertContentEditable(quizId: number) {
     const count = await this.prisma.submission.count({ where: { quizId } });
     if (count === 0) return 'NONE' as const;
-    const examItems = await this.prisma.toeicWritingSetItem.count({
+    if (await this.isExamTask(quizId))
+      throw new ConflictException(EXAM_CONTENT_LOCKED);
+    return 'PRACTICE' as const;
+  }
+
+  private async isExamTask(quizId: number) {
+    const items = await this.prisma.toeicWritingSetItem.count({
       where: { writingQuizId: quizId },
     });
-    if (examItems > 0) throw new ConflictException(EXAM_CONTENT_LOCKED);
-    return 'PRACTICE' as const;
+    return items > 0;
   }
 
   private async assertQuestionEditable(

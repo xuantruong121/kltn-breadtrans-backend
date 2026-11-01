@@ -44,7 +44,7 @@ describe('SkillCmsService', () => {
       quiz: {
         findFirst: jest.fn().mockResolvedValue({
           id: 12,
-          title: 'Reading',
+          title: 'Reading A2 — Notices',
           theoryContent: 'Passage',
           questions: [
             {
