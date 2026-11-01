@@ -41,5 +41,4 @@ describe('PayosWebhookController', () => {
     await expect(controller.receive({})).resolves.toEqual({ success: true });
     expect(plans.confirmPurchaseFromWebhook).not.toHaveBeenCalled();
   });
-
 });

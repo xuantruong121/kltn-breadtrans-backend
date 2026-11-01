@@ -403,10 +403,7 @@ export interface ToeicPart1CandidateAnalysis {
 }
 
 export type AiImageSemanticValidationInput = {
-  taskType:
-    | 'TOEIC_PART1'
-    | 'SPEAKING_DESCRIBE_PICTURE'
-    | 'WRITING_PICTURE';
+  taskType: 'TOEIC_PART1' | 'SPEAKING_DESCRIBE_PICTURE' | 'WRITING_PICTURE';
   imageBuffer: Buffer;
   mimeType: string;
   imageBrief: string;

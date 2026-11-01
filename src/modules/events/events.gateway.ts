@@ -395,5 +395,4 @@ export class EventsGateway
       timestamp: new Date().toISOString(),
     });
   }
-
 }
