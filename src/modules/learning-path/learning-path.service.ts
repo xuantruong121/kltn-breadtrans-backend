@@ -11,6 +11,7 @@ import { refreshFourSkillResult } from '../diagnostic/diagnostic-four-skill.stor
 import { SubscriptionService } from '../subscription/subscription.service';
 import { UpdateLearnerProfileDto } from './dto/learner-profile.dto';
 import { foundationPlan } from './foundation.logic';
+import { buildLevelRoadmap } from './level-roadmap.logic';
 import {
   estimateNextLevels,
   itemsToNextLevel,
@@ -98,12 +99,41 @@ export class LearningPathService {
       more: moreChoices(ranked, plan, MORE_CHOICES).map((r) =>
         this.view(r, learner.saved),
       ),
-      foundation: await this.foundation(userId),
+      foundation: foundationPlan(
+        await this.foundationInput(userId),
+        FOUNDATION_ITEMS,
+      ),
     };
   }
 
-  /** Vocabulary and grammar to study next, from the learner's own progress. */
-  private async foundation(userId: number) {
+  /** The path of a learner past Mất gốc; null for a Mất gốc learner. */
+  async levelRoadmap(userId: number) {
+    const input = await this.foundationInput(userId);
+    if (input.learner === 'STARTER') return null;
+    const [{ catalog, learner }, profile] = await Promise.all([
+      this.context(userId),
+      this.getProfile(userId),
+    ]);
+    return buildLevelRoadmap({
+      level: input.learner,
+      grammar: input.grammar,
+      decks: input.decks,
+      skills: profile.skills.map((s) => ({
+        skill: s.skill,
+        unlockedLevel: s.unlockedLevel,
+        done: s.progress.done,
+        average: s.progress.average,
+        nextRoute:
+          recommend(catalog.candidates, learner, {
+            limit: 1,
+            skill: s.skill,
+          })[0]?.candidate.route ?? null,
+      })),
+    });
+  }
+
+  /** Vocabulary and grammar progress, from the learner's own records. */
+  private async foundationInput(userId: number) {
     const now = new Date();
     const [profile, topics, attempts, decks, progress] = await Promise.all([
       this.prisma.learnerProfile.findUnique({ where: { userId } }),
@@ -145,26 +175,23 @@ export class LearningPathService {
     for (const p of progress)
       if (p.isMastered)
         mastered.set(p.word.topicId, (mastered.get(p.word.topicId) ?? 0) + 1);
-    return foundationPlan(
-      {
-        learner:
-          (profile?.placementSource === 'DIAGNOSTIC'
-            ? profile.placementLevel
-            : profile?.selfLevel) ?? 'BASIC',
-        dueWords: progress.filter(
-          (p) => !p.isMastered && p.nextReviewAt && p.nextReviewAt <= now,
-        ).length,
-        grammar: topics.map((t) => ({ ...t, best: best.get(t.id) ?? null })),
-        decks: decks.map((d) => ({
-          id: d.id,
-          title: d.title,
-          level: d.level,
-          total: d._count.words,
-          mastered: mastered.get(d.id) ?? 0,
-        })),
-      },
-      FOUNDATION_ITEMS,
-    );
+    return {
+      learner:
+        (profile?.placementSource === 'DIAGNOSTIC'
+          ? profile.placementLevel
+          : profile?.selfLevel) ?? 'BASIC',
+      dueWords: progress.filter(
+        (p) => !p.isMastered && p.nextReviewAt && p.nextReviewAt <= now,
+      ).length,
+      grammar: topics.map((t) => ({ ...t, best: best.get(t.id) ?? null })),
+      decks: decks.map((d) => ({
+        id: d.id,
+        title: d.title,
+        level: d.level,
+        total: d._count.words,
+        mastered: mastered.get(d.id) ?? 0,
+      })),
+    };
   }
 
   /** "Tuần này": weekly targets per skill and a rough date for the next levels. */
