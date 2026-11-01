@@ -54,7 +54,6 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
       PlanFeatureKey.PREMIUM_LISTENING,
       PlanFeatureKey.PREMIUM_SPEAKING_CONTENT,
       PlanFeatureKey.PREMIUM_WRITING_CONTENT,
-      PlanFeatureKey.COURSE_LIBRARY_ACCESS,
     ],
   },
 ] as const;

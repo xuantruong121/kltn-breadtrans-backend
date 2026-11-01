@@ -19,7 +19,6 @@ import type { SpeakingTaskType } from '../../speaking/speaking-contract';
 
 const CONTENT_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
 const GRAMMAR_LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
-const COURSE_LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
 
 export class SuggestVocabWordDto {
   @IsNotEmpty({ message: 'Từ vựng không được để trống' })
@@ -33,7 +32,7 @@ export class SuggestVocabWordDto {
   context?: string;
 
   @IsOptional()
-  @IsIn(COURSE_LEVELS, { message: 'Cấp độ ngữ cảnh từ vựng không hợp lệ' })
+  @IsIn(GRAMMAR_LEVELS, { message: 'Cấp độ ngữ cảnh từ vựng không hợp lệ' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
 }
@@ -137,36 +136,6 @@ export class SuggestToeicPart5Dto {
   @Max(10, { message: 'Số lượng câu hỏi tối đa là 10' })
   @Transform(({ value }) => (value !== undefined ? Number(value) : 5))
   count?: number = 5;
-}
-
-export class SuggestCourseCurriculumDto {
-  @IsNotEmpty({ message: 'Tên khóa học không được để trống' })
-  @IsString()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  courseTitle: string;
-
-  @IsOptional()
-  @IsIn(COURSE_LEVELS, { message: 'Cấp độ khóa học không hợp lệ' })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  level?: string;
-
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  description?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(12)
-  @Transform(({ value }) => (value !== undefined ? Number(value) : 5))
-  targetLessonCount?: number = 5;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(50)
-  @IsString({ each: true })
-  existingLessonTitles?: string[];
 }
 
 export class ListeningTurnContextDto {
@@ -410,7 +379,7 @@ export class SuggestVocabFullDraftDto {
   topic: string;
 
   @IsOptional()
-  @IsIn(COURSE_LEVELS)
+  @IsIn(GRAMMAR_LEVELS)
   level?: string;
 
   @IsOptional()

@@ -4,11 +4,10 @@ import { AdminService } from './admin.service';
 import { AdminDictionaryService } from './admin-dictionary.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { UploadModule } from '../upload/upload.module';
-import { CourseModule } from '../course/course.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PrismaModule, UploadModule, CourseModule, AuthModule],
+  imports: [PrismaModule, UploadModule, AuthModule],
   controllers: [AdminController],
   providers: [AdminService, AdminDictionaryService],
 })

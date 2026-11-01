@@ -29,7 +29,6 @@ describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
     type,
     title,
     isPremiumContent: false,
-    courseId: null,
     ...overrides,
   });
   const listening = (title: string, mode: object, id = 10) =>
@@ -43,7 +42,6 @@ describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
       id: 10,
       type: QuizType.WRITING_EMAIL,
       isPremiumContent: false,
-      courseId: null,
     };
     await expect(service.assertAccess(bare, 7)).rejects.toThrow(
       ForbiddenException,
@@ -68,7 +66,6 @@ describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
         id: 11,
         type: QuizType.LISTENING_PRACTICE,
         isPremiumContent: false,
-        courseId: null,
       },
       7,
     );
@@ -80,7 +77,6 @@ describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
       id: 12,
       type: QuizType.TOEIC,
       isPremiumContent: false,
-      courseId: null,
     });
     expect(quizRows.findMany).not.toHaveBeenCalled();
   });
@@ -152,11 +148,6 @@ describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
       7,
     );
     expect(access).toMatchObject({ cefrLevel: 'B1', requiredPlan: 'PLUS' });
-    const course = await service.resolve(
-      quiz(QuizType.WRITING_EMAIL, 'Writing B1 — Course', { courseId: 3 }),
-      7,
-    );
-    expect(course.cefrLevel).toBeNull();
   });
 
   it('an untagged premium item opens nothing its skill may charge for', () => {

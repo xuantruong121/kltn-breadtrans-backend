@@ -379,7 +379,6 @@ export class AdaptiveDailyPracticeService {
         type: true,
         description: true,
         isPremiumContent: true,
-        courseId: true,
         practiceTopicId: true,
         practiceTopic: { select: { name: true, category: true } },
         bilingualContent: true,

@@ -76,9 +76,7 @@ function setup(overrides: { skillRow?: Record<string, unknown> | null } = {}) {
     type: 'BILINGUAL_READING',
     title,
     practiceTopicId: null,
-    courseId: null,
     toeicWritingSetItems: [],
-    courseActivities: [],
   });
   const prisma: any = {
     ...tx,
@@ -176,9 +174,7 @@ describe('LearnerProgressService', () => {
   });
 
   it.each([
-    ['a course quiz', { courseId: 3 }],
     ['an exam writing item', { toeicWritingSetItems: [{ id: 1 }] }],
-    ['a course activity', { courseActivities: [{ id: 1 }] }],
     ['an item with no level tag', { title: 'Untagged practice' }],
   ])('ignores %s', async (_name, facts) => {
     const t = setup();
@@ -216,7 +212,6 @@ describe('LearnerProgressService', () => {
       practiceSet: {
         level: 'A2',
         scope: 'SKILL_PRACTICE',
-        courseActivities: [],
       },
       ...overrides,
     });
@@ -267,7 +262,6 @@ describe('LearnerProgressService', () => {
           practiceSet: {
             level: 'A2',
             scope: 'EXAM_INTERNAL',
-            courseActivities: [],
           },
         }),
       );

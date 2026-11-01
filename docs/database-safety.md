@@ -151,6 +151,34 @@ Compare a restored copy against the live database:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-restore-drill.ps1 -ExpectCounts "User=2;ToeicExamSet=2"
 ```
 
+## After a real restore: grading queues
+
+A restored database and the Redis queues no longer describe the same moment.
+**Do not flush Redis to fix this.** It also holds sessions and rate limits, and
+the application recovers on its own:
+
+| Row after the restore | What happens | When |
+|---|---|---|
+| Diagnostic Writing `QUEUED`, no live job | New run, graded again | Start, then every 5 min, for rows over 5 min old |
+| Diagnostic Speaking `QUEUED`, no live job | Queued again for the same recording | Same |
+| Diagnostic Writing or Speaking `GRADING`, no live job | `GRADING_FAILED` with `GRADING_LOST`, the learner can retry | Same |
+| Speaking Practice `PENDING` or expired `PROCESSING` | Queued again by the reconciliation scheduler (BullMQ mode) | Every 30 s |
+| A job left from before the restore | Cannot claim a row: the run number or `audioKey` no longer matches | When it runs |
+
+After the restore, restart the API and the speaking worker, wait five minutes,
+then check that nothing old is stuck:
+
+```sql
+select status, count(*) from "DiagnosticWritingResponse"
+where status in ('QUEUED', 'GRADING') group by 1;
+select status, count(*) from "DiagnosticSpeakingResponse"
+where status in ('QUEUED', 'GRADING') group by 1;
+```
+
+Rehearsed 2026-11-01 on the harness: rows set to `QUEUED` and `GRADING` with no
+job, four stale jobs left in Redis. No row stayed unfinished, and the stale jobs
+changed nothing.
+
 ## Rehearse a reseed before doing it for real
 
 ```bash

@@ -13,7 +13,6 @@ import {
   SuggestReadingPassageDto,
   SuggestReadingQuestionsDto,
   SuggestToeicPart5Dto,
-  SuggestCourseCurriculumDto,
   SuggestListeningContentDto,
   SuggestListeningQuestionsDto,
   SuggestWritingTaskDto,
@@ -33,7 +32,6 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       suggestReadingPassage: jest.fn(),
       suggestReadingQuestions: jest.fn(),
       suggestToeicPart5: jest.fn(),
-      suggestCourseCurriculum: jest.fn(),
       suggestListeningContent: jest.fn(),
       suggestListeningQuestions: jest.fn(),
       suggestWritingTask: jest.fn(),
@@ -128,16 +126,6 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
     });
 
     it('rejects contextual requests outside Phase 5B boundaries', async () => {
-      const curriculumErrors = await validate(
-        plainToInstance(SuggestCourseCurriculumDto, { targetLessonCount: 20 }),
-      );
-      expect(curriculumErrors.some((e) => e.property === 'courseTitle')).toBe(
-        true,
-      );
-      expect(
-        curriculumErrors.some((e) => e.property === 'targetLessonCount'),
-      ).toBe(true);
-
       const listeningErrors = await validate(
         plainToInstance(SuggestListeningContentDto, { mode: 'VIDEO' }),
       );
@@ -317,32 +305,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
     });
   });
 
-  describe('5B. Course, Listening and Writing Contextual Architecture', () => {
-    it('passes current Course Studio context to the AI service without persistence', async () => {
-      const resultValue = {
-        candidates: [
-          {
-            title: 'Lesson 1',
-            summary: 'Basics',
-            objectives: ['Use greetings'],
-          },
-        ],
-      };
-      mockAiService.suggestCourseCurriculum!.mockResolvedValue(resultValue);
-      const result = await controller.suggestCourseCurriculum({
-        courseTitle: 'English A2',
-        targetLessonCount: 1,
-      });
-      expect(result).toEqual(resultValue);
-      expect(mockAiService.suggestCourseCurriculum).toHaveBeenCalledWith({
-        courseTitle: 'English A2',
-        level: undefined,
-        description: undefined,
-        targetLessonCount: 1,
-        existingLessonTitles: undefined,
-      });
-    });
-
+  describe('5B. Listening and Writing Contextual Architecture', () => {
     it('uses Listening current editor source and keeps Writing suggestion text-only', async () => {
       const contentResult = {
         mode: 'DIALOGUE',
@@ -541,9 +504,6 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         candidates: [],
       });
       mockAiService.suggestToeicPart5!.mockResolvedValue({ candidates: [] });
-      mockAiService.suggestCourseCurriculum!.mockResolvedValue({
-        candidates: [],
-      });
       mockAiService.suggestListeningContent!.mockResolvedValue({
         mode: 'DICTATION',
         text: 'text',
@@ -574,10 +534,6 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await controller.suggestReadingPassage({ topic: 't', level: 'A1' });
       await controller.suggestReadingQuestions({ passage: 'p', count: 1 });
       await controller.suggestToeicPart5({ count: 1 });
-      await controller.suggestCourseCurriculum({
-        courseTitle: 't',
-        targetLessonCount: 1,
-      });
       await controller.suggestListeningContent({ mode: 'DICTATION' });
       await controller.suggestListeningQuestions({
         mode: 'DICTATION',

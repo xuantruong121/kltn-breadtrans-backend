@@ -39,7 +39,7 @@ describe('Diagnostic Writing stranded QUEUED recovery', () => {
     expect(
       prisma.diagnosticWritingResponse.findMany.mock.calls[0][0].where,
     ).toEqual({
-      status: 'QUEUED',
+      status: { in: ['QUEUED', 'GRADING'] },
       submittedAt: { lt: new Date(NOW - 5 * 60_000) },
     });
   });
@@ -75,6 +75,36 @@ describe('Diagnostic Writing stranded QUEUED recovery', () => {
       expect(service.queue.add).not.toHaveBeenCalled();
     },
   );
+
+  it('a GRADING row with no live job fails so the learner can retry', async () => {
+    const { service, prisma } = make(null);
+    prisma.diagnosticWritingResponse.findMany.mockResolvedValue([
+      { id: 7, gradingAttempts: 2, status: 'GRADING' },
+    ]);
+    expect(await service.recoverStrandedQueued(NOW)).toBe(1);
+    expect(service.queue.add).not.toHaveBeenCalled();
+    expect(prisma.diagnosticWritingResponse.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 7,
+        gradingAttempts: 2,
+        status: { in: ['QUEUED', 'GRADING'] },
+      },
+      data: {
+        status: 'GRADING_FAILED',
+        score: null,
+        failureReason: 'GRADING_LOST',
+      },
+    });
+  });
+
+  it('a GRADING row with a live job is left alone', async () => {
+    const { service, prisma } = make('active');
+    prisma.diagnosticWritingResponse.findMany.mockResolvedValue([
+      { id: 7, gradingAttempts: 2, status: 'GRADING' },
+    ]);
+    expect(await service.recoverStrandedQueued(NOW)).toBe(0);
+    expect(prisma.diagnosticWritingResponse.updateMany).not.toHaveBeenCalled();
+  });
 
   it('a row that changed meanwhile (retry, grading) is not requeued', async () => {
     const { service } = make('completed', 0);

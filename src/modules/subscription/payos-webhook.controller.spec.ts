@@ -41,25 +41,4 @@ describe('PayosWebhookController', () => {
     await expect(controller.receive({})).resolves.toEqual({ success: true });
     expect(plans.confirmPurchaseFromWebhook).not.toHaveBeenCalled();
   });
-
-  it('grants nothing for a retired classroom tuition intent', async () => {
-    const payos = {
-      resolveWebhook: jest.fn().mockResolvedValue({
-        id: 92,
-        type: 'COURSE',
-        planPayment: null,
-        coursePayment: { id: 3, amountVnd: 500000 },
-      }),
-      markWebhookFulfilled: jest.fn(),
-    };
-    const plans = { confirmPurchaseFromWebhook: jest.fn() };
-    const controller = new PayosWebhookController(
-      payos as never,
-      plans as never,
-    );
-
-    await expect(controller.receive({})).resolves.toEqual({ success: true });
-    expect(plans.confirmPurchaseFromWebhook).not.toHaveBeenCalled();
-    expect(payos.markWebhookFulfilled).not.toHaveBeenCalled();
-  });
 });

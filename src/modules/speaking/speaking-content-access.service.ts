@@ -88,7 +88,6 @@ export class SpeakingContentAccessService {
     planCode: string | null,
     role: Role | undefined,
     unlocked: UnlockedLevels | null,
-    exempt: boolean,
   ): SpeakingContentAccess {
     const requiredPlan = this.requiredPlan(exercise);
     const premium = requiredPlan !== 'FREE';
@@ -101,7 +100,7 @@ export class SpeakingContentAccessService {
       featureKey: this.featureKey,
       requiredPlan,
       cefrLevel: cefrSpan(this.cefrRange(exercise)),
-      ...this.levelOf(exercise, role, unlocked, exempt),
+      ...this.levelOf(exercise, role, unlocked),
     };
   }
 
@@ -109,7 +108,6 @@ export class SpeakingContentAccessService {
     exercise: SpeakingContentAccessSubject,
     role: Role | undefined,
     unlocked: UnlockedLevels | null,
-    exempt: boolean,
   ) {
     if (!this.levelAccess || !unlocked)
       return {
@@ -117,26 +115,11 @@ export class SpeakingContentAccessService {
         unlockedLevel: UNPLACED_UNLOCKED,
         isLevelLocked: false,
       };
-    const level = this.levelAccess.check(
+    return this.levelAccess.check(
       'SPEAKING',
       this.cefrRange(exercise),
       unlocked,
       role,
-    );
-    return exempt ? { ...level, isLevelLocked: false } : level;
-  }
-
-  /** Exercises the level lock would hold that a course keeps open. */
-  private async levelExemptIds(
-    exercises: SpeakingContentAccessSubject[],
-    unlocked: UnlockedLevels | null,
-    role?: Role,
-  ) {
-    if (!this.levelAccess || !unlocked) return new Set<number>();
-    return this.levelAccess.exemptExerciseIds(
-      exercises
-        .filter((e) => this.levelOf(e, role, unlocked, false).isLevelLocked)
-        .map((e) => e.id),
     );
   }
 
@@ -150,14 +133,7 @@ export class SpeakingContentAccessService {
         ? await this.subscriptionService.effectivePlanCode(userId)
         : null;
     const unlocked = (await this.levelAccess?.unlockedLevels(userId)) ?? null;
-    const exempt = await this.levelExemptIds([exercise], unlocked, role);
-    return this.access(
-      exercise,
-      planCode,
-      role,
-      unlocked,
-      exempt.has(exercise.id),
-    );
+    return this.access(exercise, planCode, role, unlocked);
   }
 
   async resolveMany(
@@ -172,17 +148,10 @@ export class SpeakingContentAccessService {
         ? await this.subscriptionService.effectivePlanCode(userId)
         : null;
     const unlocked = (await this.levelAccess?.unlockedLevels(userId)) ?? null;
-    const exempt = await this.levelExemptIds(exercises, unlocked, role);
     return new Map(
       exercises.map((exercise) => [
         exercise.id,
-        this.access(
-          exercise,
-          planCode,
-          role,
-          unlocked,
-          exempt.has(exercise.id),
-        ),
+        this.access(exercise, planCode, role, unlocked),
       ]),
     );
   }

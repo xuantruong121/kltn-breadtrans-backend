@@ -982,7 +982,6 @@ export class QuizService {
   ) {
     const existing = await this.prisma.quiz.findUnique({
       where: { id },
-      include: { course: true },
     });
     if (!existing) throw new NotFoundException('Không tìm thấy bài tập.');
 
@@ -1067,7 +1066,6 @@ export class QuizService {
   async deleteQuiz(id: number, user?: { id: number; role: Role }) {
     const existing = await this.prisma.quiz.findUnique({
       where: { id },
-      include: { course: true },
     });
     if (!existing) throw new NotFoundException('Không tìm thấy bài tập.');
 
@@ -1166,7 +1164,6 @@ export class QuizService {
       },
       select: {
         id: true,
-        courseId: true,
         practiceTopicId: true,
         title: true,
         description: true,
@@ -1202,7 +1199,6 @@ export class QuizService {
 
       return {
         id: quiz.id,
-        courseId: quiz.courseId,
         practiceTopicId: quiz.practiceTopicId,
         title: quiz.title,
         description: quiz.description,
@@ -1264,7 +1260,6 @@ export class QuizService {
         id: true,
         type: true,
         isPremiumContent: true,
-        courseId: true,
       },
     });
     if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
@@ -1464,7 +1459,6 @@ export class QuizService {
         id: true,
         type: true,
         isPremiumContent: true,
-        courseId: true,
         publicationStatus: true,
         toeicWritingSetItems: { select: { id: true }, take: 1 },
       },
@@ -1694,7 +1688,6 @@ export class QuizService {
         id: true,
         type: true,
         isPremiumContent: true,
-        courseId: true,
         publicationStatus: true,
       },
     });
@@ -1873,7 +1866,6 @@ export class QuizService {
         id: true,
         type: true,
         isPremiumContent: true,
-        courseId: true,
         publicationStatus: true,
       },
     });
@@ -2499,7 +2491,6 @@ export class QuizService {
             id: true,
             type: true,
             isPremiumContent: true,
-            courseId: true,
           },
         },
         audioAssets: {
@@ -2671,7 +2662,6 @@ export class QuizService {
             id: true,
             type: true,
             isPremiumContent: true,
-            courseId: true,
           },
         },
         audioAssets: {

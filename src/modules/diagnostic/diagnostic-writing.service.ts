@@ -138,6 +138,7 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
    * again is a silent no-op and the row would wait forever; retry() only
    * accepts GRADING_FAILED. A QUEUED row whose job is not waiting or running
    * gets a new run, exactly as retry() would, and any old job of it is stale.
+   * A GRADING row with no live job lost its worker: it fails, so retry() works.
    */
   @Interval(STRANDED_QUEUED_AFTER_MS)
   async recoverStrandedQueued(now = Date.now()): Promise<number> {
@@ -145,10 +146,10 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
     try {
       const rows = await this.prisma.diagnosticWritingResponse.findMany({
         where: {
-          status: 'QUEUED',
+          status: { in: ['QUEUED', 'GRADING'] },
           submittedAt: { lt: new Date(now - STRANDED_QUEUED_AFTER_MS) },
         },
-        select: { id: true, gradingAttempts: true },
+        select: { id: true, gradingAttempts: true, status: true },
         take: 50,
       });
       let requeued = 0;
@@ -158,6 +159,14 @@ export class DiagnosticWritingService implements OnModuleInit, OnModuleDestroy {
         );
         const state = job ? await job.getState() : 'missing';
         if (LIVE_JOB_STATES.has(state)) continue;
+        if (row.status === 'GRADING') {
+          await this.markRunFailed(
+            { responseId: row.id, run: row.gradingAttempts },
+            'GRADING_LOST',
+          );
+          requeued += 1;
+          continue;
+        }
         const nextRun = row.gradingAttempts + 1;
         const moved = await this.prisma.diagnosticWritingResponse.updateMany({
           where: {

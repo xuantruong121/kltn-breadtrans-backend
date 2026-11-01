@@ -41,8 +41,7 @@ const QUIZ_TYPES: Array<[string, PracticeSkill]> = [
 
 /**
  * Which practice levels a learner has open. A practice item needs its plan
- * and its level; this is the level half. Exam and course content is never
- * level-locked: that is read from server data here, so no caller can forget.
+ * and its level; this is the level half. Exam content is never level-locked: that is read from server data here, so no caller can forget.
  */
 @Injectable()
 export class LevelAccessService {
@@ -96,7 +95,6 @@ export class LevelAccessService {
         where: {
           type: { in: QUIZ_TYPES.map(([type]) => type) as never },
           publicationStatus: 'PUBLISHED',
-          courseId: null,
         },
         select: { type: true, title: true },
       }),
@@ -130,28 +128,13 @@ export class LevelAccessService {
     };
   }
 
-  /** Quizzes that also sit in an exam or a course keep their own access. */
+  /** Quizzes that also sit in an exam keep their own access. */
   async exemptQuizIds(ids: number[]): Promise<Set<number>> {
     if (!ids.length || !this.prisma) return new Set();
     const rows = await this.prisma.quiz.findMany({
       where: {
         id: { in: ids },
-        OR: [
-          { toeicWritingSetItems: { some: {} } },
-          { courseActivities: { some: {} } },
-        ],
-      },
-      select: { id: true },
-    });
-    return new Set(rows.map((r) => r.id));
-  }
-
-  async exemptExerciseIds(ids: number[]): Promise<Set<number>> {
-    if (!ids.length || !this.prisma) return new Set();
-    const rows = await this.prisma.speakingExercise.findMany({
-      where: {
-        id: { in: ids },
-        practiceSet: { courseActivities: { some: {} } },
+        toeicWritingSetItems: { some: {} },
       },
       select: { id: true },
     });

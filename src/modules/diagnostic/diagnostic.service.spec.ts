@@ -231,7 +231,6 @@ describe('DiagnosticService', () => {
       totalCount: 3,
       percentage: 100,
     });
-    expect(result.recommendations).toEqual([]);
   });
 
   it('does not expose answer keys in the pre-submit assessment payload', async () => {

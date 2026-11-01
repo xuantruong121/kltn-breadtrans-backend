@@ -286,28 +286,6 @@ export type DiagnosticSkillProfile = {
   evidence: 'SUFFICIENT' | 'INSUFFICIENT';
 };
 
-export type DiagnosticCourseCandidate = {
-  id: number;
-  title: string;
-  description: string | null;
-  level: string | null;
-  status: string;
-  lessonCount: number;
-  /** Only curriculum-ready courses may be recommended by production code. */
-  curriculumReady?: boolean;
-};
-
-export type DiagnosticRecommendation = {
-  courseId: number;
-  title: string;
-  level: string | null;
-  rank: number;
-  relevance: number;
-  reason: string;
-  recommendedLesson?: { id: number; title: string } | null;
-  advisoryOnly?: boolean;
-};
-
 export type DiagnosticTaskKind = 'OBJECTIVE' | 'SPEAKING' | 'WRITING';
 
 /**
@@ -913,98 +891,6 @@ export function buildPracticeRecommendations(
   }
 
   return recommendations.slice(0, 5);
-}
-
-function courseBand(
-  level: string | null,
-): 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | null {
-  if (!level) return null;
-  const normalized = level.toUpperCase();
-  if (
-    normalized.includes('BEGINNER') ||
-    normalized.includes('A1') ||
-    normalized.includes('A2')
-  )
-    return 'BEGINNER';
-  if (
-    normalized.includes('INTERMEDIATE') ||
-    normalized.includes('B1') ||
-    normalized.includes('B2')
-  )
-    return 'INTERMEDIATE';
-  if (
-    normalized.includes('ADVANCED') ||
-    normalized.includes('C1') ||
-    normalized.includes('C2')
-  )
-    return 'ADVANCED';
-  return null;
-}
-
-function expectedBand(level: string): 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' {
-  const normalized = level.toUpperCase();
-  if (
-    normalized.includes('B2') ||
-    normalized.includes('C1') ||
-    normalized.includes('C2')
-  )
-    return 'ADVANCED';
-  if (normalized.includes('B1') || normalized.includes('INTERMEDIATE'))
-    return 'INTERMEDIATE';
-  return 'BEGINNER';
-}
-
-function courseFocus(course: DiagnosticCourseCandidate): string[] {
-  const text = `${course.title} ${course.description ?? ''}`.toLowerCase();
-  const focus: string[] = [];
-  if (/listening|nghe/.test(text)) focus.push('Listening');
-  if (/speaking|nói|phát âm/.test(text)) focus.push('Speaking');
-  if (/reading|đọc/.test(text)) focus.push('Reading');
-  if (/writing|viết/.test(text)) focus.push('Writing');
-  if (/grammar|ngữ pháp/.test(text)) focus.push('Grammar');
-  if (/vocabulary|từ vựng/.test(text)) focus.push('Vocabulary');
-  return focus;
-}
-
-export function rankCourseRecommendations(
-  candidates: DiagnosticCourseCandidate[],
-  level: string,
-  weaknesses: string[],
-): DiagnosticRecommendation[] {
-  const target = expectedBand(level);
-  return candidates
-    .filter(
-      (course) =>
-        course.status === 'PUBLISHED' &&
-        course.lessonCount > 0 &&
-        course.curriculumReady !== false,
-    )
-    .filter(
-      (course) => !/toeic/i.test(`${course.title} ${course.description ?? ''}`),
-    )
-    .map((course) => {
-      const band = courseBand(course.level);
-      const levelScore = band === target ? 60 : band ? 25 : 10;
-      const coveredWeaknesses = weaknesses.filter((skill) =>
-        courseFocus(course).includes(skill),
-      );
-      const relevance =
-        levelScore + Math.min(20, coveredWeaknesses.length * 10) + 20;
-      const reason = coveredWeaknesses.length
-        ? `Phù hợp với mức khởi điểm ${level} và tập trung vào ${coveredWeaknesses.join(', ')} — miền bạn cần củng cố.`
-        : `Phù hợp với mức khởi điểm ${level} theo dữ liệu khóa học đã xuất bản.`;
-      return { course, relevance, reason };
-    })
-    .sort((a, b) => b.relevance - a.relevance || a.course.id - b.course.id)
-    .slice(0, 3)
-    .map((item, index) => ({
-      courseId: item.course.id,
-      title: item.course.title,
-      level: item.course.level,
-      rank: index + 1,
-      relevance: item.relevance,
-      reason: item.reason,
-    }));
 }
 
 /**

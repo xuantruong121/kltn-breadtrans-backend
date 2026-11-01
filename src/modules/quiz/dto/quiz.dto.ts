@@ -15,11 +15,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { QuizType } from '@prisma/client';
 
 export class CreateQuizDto {
-  @ApiPropertyOptional({ example: 1 })
-  @IsNumber()
-  @IsOptional()
-  courseId?: number;
-
   @ApiProperty({ example: 'Midterm Test' })
   @IsString()
   @IsNotEmpty()

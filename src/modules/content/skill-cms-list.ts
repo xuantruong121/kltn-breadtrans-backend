@@ -163,7 +163,7 @@ export type SpeakingSetRow = {
   exerciseCount: number;
 };
 
-/** Speaking levels are CEFR or the course scale; unknown ones sort last. */
+/** Speaking levels are CEFR or the three-step scale; unknown ones sort last. */
 function speakingLevelRank(level?: string | null) {
   const cefr = /([ABC][12])/.exec(String(level ?? '').toUpperCase())?.[1];
   if (cefr) return CMS_LEVELS.indexOf(cefr);

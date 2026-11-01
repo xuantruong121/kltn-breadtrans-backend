@@ -7,9 +7,7 @@ const quiz = (over: Partial<Parameters<typeof isRewardableQuiz>[0]>) =>
   isRewardableQuiz({
     type: 'LISTENING_PRACTICE',
     practiceTopicId: null,
-    courseId: null,
     inToeicWritingSet: false,
-    inCourseActivity: false,
     ...over,
   });
 
@@ -34,41 +32,25 @@ describe('owner reward policy: who earns XP and Bánh mì', () => {
     ).toBe(false);
   });
 
-  it('course quizzes and course-linked practice are never rewarded', () => {
-    expect(quiz({ courseId: 3 })).toBe(false);
-    expect(quiz({ type: 'BILINGUAL_READING', inCourseActivity: true })).toBe(
-      false,
-    );
-  });
-
   it('other quiz types (TOEIC, four-skill, grammar...) are not rewarded', () => {
     for (const type of ['TOEIC', 'TOEIC_FOUR_SKILL', 'GRAMMAR', 'VOCABULARY'])
       expect(quiz({ type })).toBe(false);
   });
 
-  it('Speaking: standalone practice yes; exam sets and course sets no', () => {
+  it('Speaking: standalone practice yes; exam sets no', () => {
     expect(
       isRewardableSpeakingExercise({
         practiceSetScope: null,
-        inCourseActivity: false,
       }),
     ).toBe(true);
     expect(
       isRewardableSpeakingExercise({
         practiceSetScope: 'SKILL_PRACTICE',
-        inCourseActivity: false,
       }),
     ).toBe(true);
     expect(
       isRewardableSpeakingExercise({
         practiceSetScope: 'EXAM_INTERNAL',
-        inCourseActivity: false,
-      }),
-    ).toBe(false);
-    expect(
-      isRewardableSpeakingExercise({
-        practiceSetScope: 'SKILL_PRACTICE',
-        inCourseActivity: true,
       }),
     ).toBe(false);
   });

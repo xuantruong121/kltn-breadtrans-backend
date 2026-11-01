@@ -30,13 +30,10 @@ import {
   isOpenDiagnosticQuestion,
   LEARNER_PERMUTATION_SCHEME,
   resolveAuthoredOptionIndex,
-  rankCourseRecommendations,
   resolvePlacementLevel,
   resolveEstimatedLevel,
   validateQuestionBank,
 } from './diagnostic.logic';
-import { coursesEnabled } from '../../common/guards/courses-enabled.guard';
-import { buildCourseCurriculum } from '../course/course-curriculum';
 import { placeFromScores } from '../learning-path/placement.logic';
 import { scoresFromOutcome } from '../learning-path/placement.store';
 import {
@@ -199,120 +196,6 @@ export class DiagnosticService {
       productive,
       order: question.order,
     };
-  }
-
-  private async recommendations(level: string, weaknesses: string[]) {
-    // Hidden courses are never recommended.
-    if (!coursesEnabled()) return [];
-    const courses = await this.prisma.course.findMany({
-      where: { status: 'PUBLISHED', lessons: { some: {} } },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        level: true,
-        status: true,
-        curriculumType: true,
-        // Lessons live in `Lesson` for GENERAL_ENGLISH courses but in
-        // `CourseLesson` for authored curricula such as
-        // PRONUNCIATION_FOUNDATION, so both relations must be counted.
-        // Counting only `lessons` reported lessonCount = 0 for the IPA course
-        // and, because rankCourseRecommendations requires lessonCount > 0,
-        // silently dropped it from every recommendation.
-        _count: { select: { lessons: true, courseLessons: true } },
-        lessons: {
-          orderBy: { order: 'asc' },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            order: true,
-            materials: {
-              select: {
-                id: true,
-                title: true,
-                fileUrl: true,
-                fileType: true,
-                objective: true,
-                contentText: true,
-              },
-            },
-          },
-        },
-        quizzes: {
-          where: { publicationStatus: 'PUBLISHED' },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            type: true,
-            publicationStatus: true,
-            isPremiumContent: true,
-            _count: { select: { questions: true } },
-          },
-        },
-        activities: {
-          include: {
-            quiz: {
-              include: { _count: { select: { questions: true } } },
-            },
-            speakingPracticeSet: {
-              include: { exercises: { select: { id: true } } },
-            },
-          },
-          orderBy: { order: 'asc' },
-        },
-      },
-    });
-    const ranked = rankCourseRecommendations(
-      courses.map((course) => ({
-        id: course.id,
-        title: course.title,
-        description: course.description,
-        level: course.level,
-        status: course.status,
-        lessonCount: course._count.lessons + course._count.courseLessons,
-        curriculumReady:
-          buildCourseCurriculum(
-            course.lessons ?? [],
-            course.quizzes ?? [],
-            course.activities ?? [],
-            course.curriculumType,
-          ).readiness === 'READY',
-      })),
-      level,
-      weaknesses,
-    );
-    return ranked.map((recommendation) => {
-      const course = courses.find(
-        (candidate) => candidate.id === recommendation.courseId,
-      );
-      const lesson =
-        course?.lessons.find((candidate) => {
-          const text =
-            `${candidate.title} ${candidate.description ?? ''} ${candidate.materials.map((material) => `${material.title} ${material.objective ?? ''}`).join(' ')}`.toLowerCase();
-          return (
-            weaknesses.some((weakness) =>
-              text.includes(weakness.toLowerCase()),
-            ) ||
-            weaknesses.some(
-              (weakness) =>
-                weakness === 'Grammar' && /grammar|ngữ pháp/.test(text),
-            ) ||
-            weaknesses.some(
-              (weakness) =>
-                weakness === 'Vocabulary' && /vocabulary|từ vựng/.test(text),
-            )
-          );
-        }) ?? course?.lessons[0];
-      return {
-        ...recommendation,
-        recommendedLesson: lesson
-          ? { id: lesson.id, title: lesson.title }
-          : null,
-        advisoryOnly: true,
-      };
-    });
   }
 
   private async toResult(
@@ -640,9 +523,6 @@ export class DiagnosticService {
       strengths: advice ? [] : strengths,
       weaknesses: advice ? [] : weaknesses,
       practiceRecommendations: advice ? [] : practiceRecommendations,
-      recommendations: advice
-        ? []
-        : await this.recommendations(referenceLevel, weaknesses),
       advice,
       questionsResult,
     };

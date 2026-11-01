@@ -55,9 +55,7 @@ export class GateService {
       where: {
         type: GATE_QUIZ_TYPE[skill],
         publicationStatus: 'PUBLISHED',
-        courseId: null,
         toeicWritingSetItems: { none: {} },
-        courseActivities: { none: {} },
       },
       select: {
         title: true,

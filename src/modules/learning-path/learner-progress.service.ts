@@ -85,9 +85,7 @@ export class LearnerProgressService {
           type: true,
           title: true,
           practiceTopicId: true,
-          courseId: true,
           toeicWritingSetItems: { select: { id: true }, take: 1 },
-          courseActivities: { select: { id: true }, take: 1 },
         },
       });
       if (!quiz) return null;
@@ -96,9 +94,7 @@ export class LearnerProgressService {
       const standalone = isRewardableQuiz({
         type: quiz.type,
         practiceTopicId: quiz.practiceTopicId,
-        courseId: quiz.courseId,
         inToeicWritingSet: quiz.toeicWritingSetItems.length > 0,
-        inCourseActivity: quiz.courseActivities.length > 0,
       });
       if (!skill || !range || !standalone) return null;
       return await this.record({
@@ -135,13 +131,7 @@ export class LearnerProgressService {
           id: true,
           title: true,
           practiceSetId: true,
-          practiceSet: {
-            select: {
-              level: true,
-              scope: true,
-              courseActivities: { select: { id: true }, take: 1 },
-            },
-          },
+          practiceSet: { select: { level: true, scope: true } },
         },
       });
       if (!exercise) return null;
@@ -150,8 +140,6 @@ export class LearnerProgressService {
         parseCefrRange(exercise.title);
       const standalone = isRewardableSpeakingExercise({
         practiceSetScope: exercise.practiceSet?.scope ?? null,
-        inCourseActivity:
-          (exercise.practiceSet?.courseActivities.length ?? 0) > 0,
       });
       if (!range || !standalone) return null;
       // The catalog keys a set by its first exercise.

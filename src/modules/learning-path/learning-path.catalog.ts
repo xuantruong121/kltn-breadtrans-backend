@@ -82,7 +82,6 @@ export async function loadCandidates(
       where: {
         type: { in: Object.keys(QUIZ_SKILL) as QuizType[] },
         publicationStatus: 'PUBLISHED',
-        courseId: null,
         // A Writing task inside a TOEIC exam set is not standalone practice.
         toeicWritingSetItems: {
           none: { writingSet: { assessmentComponents: { some: {} } } },

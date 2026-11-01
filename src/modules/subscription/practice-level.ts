@@ -96,7 +96,7 @@ const PLAN_RANK: Record<PracticePlan, number> = { FREE: 0, PLUS: 1, PRO: 2 };
  *   Speaking / Writing A1-A2     FREE
  *   Speaking / Writing B1-B2     PLUS
  *   Speaking / Writing C1-C2     PRO (any part of the range at C1+)
- * Courses, TOEIC and the Entry Diagnostic have their own rules.
+ * TOEIC and the Entry Diagnostic have their own rules.
  */
 export function requiredPracticePlan(
   skill: PracticeSkill,

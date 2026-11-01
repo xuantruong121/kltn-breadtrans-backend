@@ -29,7 +29,7 @@ const deckRow = (
 
 describe('AdminService vocab decks', () => {
   const build = (prisma: unknown) =>
-    new AdminService(prisma as any, {} as any, {} as any, {} as any, undefined);
+    new AdminService(prisma as any, {} as any, {} as any, undefined);
 
   const addPrisma = (existing: unknown = null, inDeck: unknown = null) => ({
     vocabTopic: {
@@ -166,7 +166,7 @@ describe('AdminService vocab decks', () => {
 
 describe('AdminService vocab word edits on a shared entry', () => {
   const build = (prisma: unknown) =>
-    new AdminService(prisma as any, {} as any, {} as any, {} as any, undefined);
+    new AdminService(prisma as any, {} as any, {} as any, undefined);
 
   const editPrisma = (progress: unknown = null) => ({
     vocabWord: {
@@ -231,7 +231,7 @@ describe('AdminService vocab word edits on a shared entry', () => {
 
 describe('AdminService vocab paging and moves', () => {
   const build = (prisma: unknown) =>
-    new AdminService(prisma as any, {} as any, {} as any, {} as any, undefined);
+    new AdminService(prisma as any, {} as any, {} as any, undefined);
 
   it('pages the words of a deck in order, with an optional search', async () => {
     const prisma = {
@@ -349,7 +349,7 @@ describe('AdminService vocab paging and moves', () => {
 
 describe('AdminService keeps the Speaking lookup dictionary out of the CMS', () => {
   const build = (prisma: unknown) =>
-    new AdminService(prisma as any, {} as any, {} as any, {} as any, undefined);
+    new AdminService(prisma as any, {} as any, {} as any, undefined);
 
   it('lists decks without the system dictionary', async () => {
     const prisma = {

@@ -246,7 +246,7 @@ export class GamificationListener {
       `Handling speaking.submitted event for user ${payload.userId} with score ${payload.overallScore} (submissionId: ${payload.submissionId})`,
     );
 
-    // Exam and course recordings are graded but never rewarded.
+    // Exam recordings are graded but never rewarded.
     if (!(await this.eligibility?.speakingExercise(payload.exerciseId))) {
       this.logger.log(
         `speaking.submitted for exercise ${payload.exerciseId}: not a rewarded activity, no reward`,

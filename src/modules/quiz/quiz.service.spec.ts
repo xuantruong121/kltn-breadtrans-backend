@@ -408,7 +408,6 @@ describe('QuizService', () => {
         id: 28,
         type: 'LISTENING_PRACTICE',
         isPremiumContent: false,
-        courseId: null,
         publicationStatus: 'PUBLISHED',
       });
       mockPrismaService.question.findMany.mockResolvedValue([
@@ -452,7 +451,6 @@ describe('QuizService', () => {
         id: 28,
         type: 'LISTENING_PRACTICE',
         isPremiumContent: false,
-        courseId: null,
         publicationStatus: 'PUBLISHED',
       });
       mockPrismaService.question.findMany.mockResolvedValue([
@@ -1456,7 +1454,6 @@ describe('QuizService', () => {
       mockPrismaService.quiz.findMany.mockResolvedValue([
         {
           id: 41,
-          courseId: null,
           practiceTopicId: 3,
           title: 'Premium dialogue',
           description: 'Metadata only',
@@ -1497,7 +1494,6 @@ describe('QuizService', () => {
           id: 42,
           type: 'LISTENING_PRACTICE',
           isPremiumContent: true,
-          courseId: null,
           publicationStatus: 'PUBLISHED',
         })
         .mockResolvedValueOnce({

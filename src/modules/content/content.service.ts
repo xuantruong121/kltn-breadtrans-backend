@@ -378,8 +378,7 @@ export class ContentService {
     ).length;
     const totalCount = exercises.length;
     const score = Math.round((correctCount / totalCount) * 100);
-    // Owner policy (gamification/reward-eligibility.ts): course and lesson
-    // content earns no Bánh mì or XP; the attempt and score are still stored.
+    // Owner policy (gamification/reward-eligibility.ts): this content earns no Bánh mì or XP; the attempt and score are still stored.
     const rewardBanh = 0;
 
     const attempt = await this.prisma.$transaction(async (tx) => {

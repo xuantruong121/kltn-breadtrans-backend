@@ -30,7 +30,7 @@ export type PayosIntentDto = {
 };
 
 type IntentWithTarget = Prisma.PayOSPaymentIntentGetPayload<{
-  include: { planPayment: true; coursePayment: true };
+  include: { planPayment: true };
 }>;
 
 @Injectable()
@@ -60,7 +60,7 @@ export class PayosPaymentService {
       throw new NotFoundException('Không tìm thấy khoản thanh toán.');
     const existing = await this.prisma.payOSPaymentIntent.findUnique({
       where: { planPaymentId },
-      include: { planPayment: true, coursePayment: true },
+      include: { planPayment: true },
     });
     if (existing?.checkoutUrl && existing.qrCode) return this.toDto(existing);
     const intent =
@@ -83,7 +83,7 @@ export class PayosPaymentService {
   ): Promise<PayosIntentDto> {
     const intent = await this.prisma.payOSPaymentIntent.findFirst({
       where: { id: intentId, userId },
-      include: { planPayment: true, coursePayment: true },
+      include: { planPayment: true },
     });
     if (!intent)
       throw new NotFoundException('Không tìm thấy yêu cầu thanh toán.');
@@ -134,7 +134,7 @@ export class PayosPaymentService {
             ? (intent.paidAt ?? new Date())
             : intent.paidAt,
       },
-      include: { planPayment: true, coursePayment: true },
+      include: { planPayment: true },
     });
     return this.toDto(updated);
   }
@@ -146,7 +146,7 @@ export class PayosPaymentService {
   ) {
     const intent = await this.prisma.payOSPaymentIntent.findFirst({
       where: { id: intentId, userId },
-      include: { planPayment: true, coursePayment: true },
+      include: { planPayment: true },
     });
     if (!intent)
       throw new NotFoundException('Không tìm thấy yêu cầu thanh toán.');
@@ -160,7 +160,7 @@ export class PayosPaymentService {
         status: PayOSPaymentIntentStatus.CANCELLED,
         providerStatus: 'CANCELLED',
       },
-      include: { planPayment: true, coursePayment: true },
+      include: { planPayment: true },
     });
     return this.toDto(updated);
   }
@@ -169,7 +169,7 @@ export class PayosPaymentService {
     const data = await this.provider.verifyWebhook(payload);
     const intent = await this.prisma.payOSPaymentIntent.findUnique({
       where: { orderCode: BigInt(data.orderCode) },
-      include: { planPayment: true, coursePayment: true },
+      include: { planPayment: true },
     });
     // PayOS's confirm-webhook probe uses a signed sample orderCode that is not
     // one of our orders. The signature has already been verified, so it is
@@ -223,7 +223,7 @@ export class PayosPaymentService {
   async findByOrderCode(orderCode: number): Promise<IntentWithTarget> {
     const intent = await this.prisma.payOSPaymentIntent.findUnique({
       where: { orderCode: BigInt(orderCode) },
-      include: { planPayment: true, coursePayment: true },
+      include: { planPayment: true },
     });
     if (!intent) throw new NotFoundException('PayOS orderCode is not mapped');
     return intent;
@@ -233,7 +233,6 @@ export class PayosPaymentService {
     userId: number;
     type: PayOSPaymentIntentType;
     planPaymentId?: number;
-    coursePaymentId?: number;
     amountVnd: number;
     description: string;
   }): Promise<IntentWithTarget> {
@@ -260,11 +259,10 @@ export class PayosPaymentService {
         type: data.type,
         orderCode: BigInt(orderCode),
         planPaymentId: data.planPaymentId,
-        coursePaymentId: data.coursePaymentId,
         amountVnd: data.amountVnd,
         description: data.description.slice(0, 25),
       },
-      include: { planPayment: true, coursePayment: true },
+      include: { planPayment: true },
     });
   }
 
@@ -296,7 +294,7 @@ export class PayosPaymentService {
         status: this.mapStatus(result.status),
         expiresAt: result.expiresAt,
       },
-      include: { planPayment: true, coursePayment: true },
+      include: { planPayment: true },
     });
     return this.toDto(updated);
   }
@@ -370,13 +368,6 @@ export class PayosPaymentService {
       });
       await plans.confirmPurchaseFromWebhook(intent.planPayment.planPurchaseId);
       return;
-    }
-    if (intent.type === PayOSPaymentIntentType.COURSE) {
-      // Classroom tuition is retired: a historical course intent is never
-      // turned into a class Enrollment. Courses are unlocked by PRO.
-      this.logger.warn(
-        `PayOS intent ${intent.id} is a retired classroom tuition payment; not fulfilled`,
-      );
     }
   }
 }

@@ -38,13 +38,7 @@ describe('AdminVocabCMS (Phase 4)', () => {
       ),
     };
 
-    adminService = new AdminService(
-      prisma,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-    );
+    adminService = new AdminService(prisma, {} as any, {} as any, {} as any);
   });
 
   describe('Topic Lifecycle & Draft Safety', () => {

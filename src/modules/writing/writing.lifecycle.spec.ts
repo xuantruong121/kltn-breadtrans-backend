@@ -9,7 +9,6 @@ describe('Writing Part 2/3 durable lifecycle', () => {
     description: 'Write a response to the email.',
     type: QuizType.WRITING_EMAIL,
     isPremiumContent: false,
-    courseId: null,
     practiceTopic: { category: TopicCategory.WRITING_PART2 },
     questions: [
       { id: 240, content: { prompt: 'Canonical prompt', taskType: 'EMAIL' } },

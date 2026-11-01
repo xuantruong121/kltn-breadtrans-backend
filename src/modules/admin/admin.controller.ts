@@ -100,61 +100,6 @@ export class AdminController {
     return this.adminService.deleteUser(id);
   }
 
-  // ============== COURSE MANAGEMENT ==============
-
-  @Get('courses')
-  @ApiOperation({ summary: 'Admin: Lay toan bo danh sach khoa hoc' })
-  getAdminCourses() {
-    return this.adminService.getAdminCourses();
-  }
-
-  @Post('courses')
-  @ApiOperation({ summary: 'Admin: Tao khoa hoc moi' })
-  adminCreateCourse(
-    @Body()
-    dto: {
-      title: string;
-      description?: string;
-      thumbnail?: string;
-      level?: string;
-    },
-  ) {
-    return this.adminService.adminCreateCourse(dto);
-  }
-
-  @Post('courses/:courseId/update')
-  @ApiOperation({ summary: 'Admin: Cap nhat khoa hoc' })
-  adminUpdateCourse(
-    @Param('courseId', ParseIntPipe) courseId: number,
-    @Body()
-    dto: {
-      title?: string;
-      description?: string;
-      thumbnail?: string;
-      level?: string;
-      status?: string;
-    },
-  ) {
-    return this.adminService.adminUpdateCourse(courseId, dto);
-  }
-
-  @Delete('courses/:courseId')
-  @ApiOperation({ summary: 'Admin: Xoa khoa hoc' })
-  adminDeleteCourse(@Param('courseId', ParseIntPipe) courseId: number) {
-    return this.adminService.adminDeleteCourse(courseId);
-  }
-
-  @Post('courses/:courseId/review')
-  @ApiOperation({
-    summary: 'Admin: Duyet hoac tu choi khoa hoc (APPROVE / REJECT)',
-  })
-  adminReviewCourse(
-    @Param('courseId', ParseIntPipe) courseId: number,
-    @Body() dto: { action: 'APPROVE' | 'REJECT' },
-  ) {
-    return this.adminService.adminReviewCourse(courseId, dto.action);
-  }
-
   // ============== DICTIONARY STORE (F13) ==============
   @Get('dictionary')
   @ApiOperation({
