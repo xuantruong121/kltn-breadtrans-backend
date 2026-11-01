@@ -16,6 +16,7 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { Job, Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
@@ -58,6 +59,9 @@ const GRADER_VERSION = 'diagnostic-speaking-v2-rubric';
  * row once a newer recording has replaced it.
  */
 type DiagnosticSpeakingJob = { responseId: number; audioKey: string };
+
+/** An unfinished row older than this whose job is not live is stranded. */
+const STRANDED_AFTER_MS = 5 * 60_000;
 
 const DURATION_MESSAGES: Record<string, string> = {
   TOO_SHORT: 'Bản ghi quá ngắn',
@@ -119,6 +123,62 @@ export class DiagnosticSpeakingService
       if (job)
         void this.markRunFailed(job.data, `WORKER_FAILED: ${error.message}`);
     });
+    void this.recoverStrandedQueued();
+  }
+
+  /**
+   * After a database restore or a Redis loss a row can wait for a job that no
+   * longer exists, and retry() only accepts GRADING_FAILED. A QUEUED row is
+   * queued again for the same recording: the claim in the grading job is
+   * conditional, so a duplicate does nothing. A GRADING row lost its worker,
+   * so it fails and the learner can retry.
+   */
+  @Interval(STRANDED_AFTER_MS)
+  async recoverStrandedQueued(now = Date.now()): Promise<number> {
+    if (!this.queue) return 0;
+    try {
+      const rows = await this.prisma.diagnosticSpeakingResponse.findMany({
+        where: {
+          status: { in: ['QUEUED', 'GRADING'] },
+          audioKey: { not: null },
+          confirmedAt: { lt: new Date(now - STRANDED_AFTER_MS) },
+        },
+        take: 50,
+      });
+      if (!rows.length) return 0;
+      const jobs = await this.queue.getJobs([
+        'waiting',
+        'active',
+        'delayed',
+        'prioritized',
+      ]);
+      const live = new Set(
+        jobs.flatMap((job) =>
+          job ? [`${job.data.responseId}:${job.data.audioKey}`] : [],
+        ),
+      );
+      let recovered = 0;
+      for (const row of rows) {
+        const audioKey = row.audioKey as string;
+        if (live.has(`${row.id}:${audioKey}`)) continue;
+        if (row.status === 'GRADING')
+          await this.markRunFailed(
+            { responseId: row.id, audioKey },
+            'GRADING_LOST',
+          );
+        else await this.enqueue(row, audioKey);
+        recovered += 1;
+        this.logger.warn(
+          `Speaking response ${row.id} was ${row.status} with no live job`,
+        );
+      }
+      return recovered;
+    } catch (error) {
+      this.logger.warn(
+        `Stranded Speaking queue check failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 0;
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
