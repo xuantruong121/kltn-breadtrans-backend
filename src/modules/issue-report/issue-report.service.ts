@@ -4,17 +4,30 @@ import {
   NotFoundException,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { IssueReportStatus, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateIssueReportDto } from './dto/create-issue-report.dto';
 import { IssueReportQueryDto } from './dto/issue-report-query.dto';
 import { UpdateIssueReportDto } from './dto/update-issue-report.dto';
+import {
+  adminHrefFromRoute,
+  closureNotice,
+  isClosedStatus,
+  quizAdminHref,
+} from './issue-report.logic';
 
 @Injectable()
 export class IssueReportService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(IssueReportService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private code() {
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -176,7 +189,41 @@ export class IssueReportService {
       },
     });
     if (!report) throw new NotFoundException('Không tìm thấy báo lỗi.');
-    return report;
+    return { ...report, adminHref: await this.adminHref(report) };
+  }
+
+  /** The CMS screen that fixes the reported content, when one can be found. */
+  private async adminHref(report: {
+    route: string | null;
+    sourceType: string | null;
+    sourceId: string | null;
+  }) {
+    const id = Number(report.sourceId);
+    if (report.sourceId && Number.isInteger(id) && id > 0) {
+      if (report.sourceType === 'QUIZ') {
+        const quiz = await this.prisma.quiz.findUnique({
+          where: { id },
+          select: { type: true },
+        });
+        if (quiz) return quizAdminHref(quiz.type, id);
+      }
+      if (report.sourceType === 'SPEAKING_EXERCISE') {
+        const exercise = await this.prisma.speakingExercise.findUnique({
+          where: { id },
+          select: { practiceSetId: true },
+        });
+        if (exercise?.practiceSetId)
+          return `/admin/speaking/${exercise.practiceSetId}`;
+      }
+      if (report.sourceType === 'VOCAB_WORD') {
+        const word = await this.prisma.vocabWord.findUnique({
+          where: { id },
+          select: { topicId: true },
+        });
+        if (word) return `/admin/vocab/${word.topicId}`;
+      }
+    }
+    return adminHrefFromRoute(report.route);
   }
 
   async update(id: number, adminId: number, dto: UpdateIssueReportDto) {
@@ -192,27 +239,50 @@ export class IssueReportService {
     }
     const status = dto.status ?? current.status;
     const resolutionNote = dto.resolutionNote?.trim() || current.resolutionNote;
-    if (
-      (status === IssueReportStatus.RESOLVED ||
-        status === IssueReportStatus.REJECTED) &&
-      !resolutionNote
-    ) {
+    const closing = isClosedStatus(status);
+    if (closing && !resolutionNote) {
       throw new BadRequestException(
         'Cần ghi chú xử lý trước khi đóng báo lỗi.',
       );
     }
-    return this.prisma.issueReport.update({
+    const updated = await this.prisma.issueReport.update({
       where: { id },
       data: {
         status,
         resolutionNote,
         assignedAdminId:
           dto.assignedAdminId ?? current.assignedAdminId ?? adminId,
-        resolvedAt:
-          status === IssueReportStatus.RESOLVED
-            ? new Date()
-            : current.resolvedAt,
+        resolvedAt: closing ? new Date() : current.resolvedAt,
       },
     });
+    if (closing && !isClosedStatus(current.status) && resolutionNote) {
+      await this.notifyReporter(
+        current.reporterId,
+        status,
+        current.reportCode,
+        resolutionNote,
+      );
+    }
+    return updated;
+  }
+
+  /** The report is already closed, so a failed notification only gets logged. */
+  private async notifyReporter(
+    userId: number,
+    status: IssueReportStatus,
+    reportCode: string,
+    note: string,
+  ) {
+    try {
+      await this.notifications.createNotification({
+        userId,
+        type: 'ISSUE_REPORT_RESULT',
+        ...closureNotice(status, reportCode, note),
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not notify the reporter of ${reportCode}: ${String(error)}`,
+      );
+    }
   }
 }
