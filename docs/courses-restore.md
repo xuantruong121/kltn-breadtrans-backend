@@ -14,13 +14,13 @@ Courses, classes and tuition were removed on 2026-11-01 because the thesis super
 | Schema before removal | `schema-before-removal.prisma` |
 | SQL that recreates the structure | `docs/courses-restore.sql` in this repo, same as `restore-schema.sql` |
 | Data of the 20 tables | `courses-data.dump` (`pg_dump -Fc --data-only`) |
-| Whole database before removal | `kltn_db_PRE_COURSES_REMOVAL_PROTECTED_*.dump` |
+| Whole database before removal | `kltn_db_PRE_COURSES_REMOVAL_PROTECTED_*.dump`, `kltn_db_PRE_COURSES_MIGRATION_PROTECTED_*.dump` (taken just before the migration) |
 | Row counts | `row-counts.txt` |
 | PRO entitlement row | `plan-entitlement.txt` |
 | File list on R2 | `r2-files.txt`: 3 course covers, 16 lesson media, 16 materials. The files stay on R2 |
 | Checksums | `SHA256SUMS.txt` |
 
-Files without a repo path are in `D:\Study\KLTN\.local-backups\courses-removal\`. They are not in git. If that folder is gone, the code and structure still restore from the tag, but the data does not.
+Files without a repo path are in `D:\Study\courses-removal\`. They are not in git. If that folder is gone, the code and structure still restore from the tag, but the data does not.
 
 ## What was removed
 
@@ -50,6 +50,8 @@ Backend, oldest first: `8ce53f4`, `7a05317`, `64e3c7c`, `4162173`. Keep the comm
 
 Frontend: `e7e8c68`.
 
+The migration ran on `kltn_db` on 2026-11-01.
+
 ## Steps
 
 Run them in this order, on a harness clone first.
@@ -57,7 +59,7 @@ Run them in this order, on a harness clone first.
 ### 1. Check the kit
 
 ```bash
-cd D:/Study/KLTN/.local-backups/courses-removal
+cd D:/Study/courses-removal
 sha256sum -c SHA256SUMS.txt
 git bundle verify backend-before-removal.bundle
 git bundle verify frontend-before-removal.bundle
@@ -70,7 +72,7 @@ Work on a new branch in each repo. Use `git revert --no-edit` on the removal com
 If the tag is missing, get it from the bundle:
 
 ```bash
-git fetch D:/Study/KLTN/.local-backups/courses-removal/backend-before-removal.bundle archive/courses-before-removal:refs/tags/archive/courses-before-removal
+git fetch D:/Study/courses-removal/backend-before-removal.bundle archive/courses-before-removal:refs/tags/archive/courses-before-removal
 ```
 
 Keep the migration folder `20261101120000_remove_courses`: the database has already applied it. If a revert deleted it, put it back:
