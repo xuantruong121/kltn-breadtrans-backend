@@ -71,7 +71,6 @@ const ADMIN = [
   '/admin/payments',
   '/admin/plan-purchases',
   '/admin/practice',
-  '/admin/quizzes',
   '/admin/reading',
   '/admin/speaking',
   '/admin/suggestions',
