@@ -230,6 +230,18 @@ export function recommend(
   return picked;
 }
 
+/** Open items beyond the daily plan, so the learner can pick something else. */
+export function moreChoices(
+  ranked: Recommendation[],
+  plan: Recommendation[],
+  max: number,
+): Recommendation[] {
+  const planned = new Set(plan.map((r) => contentKey(r.candidate)));
+  return ranked
+    .filter((r) => r.status === 'OPEN' && !planned.has(contentKey(r.candidate)))
+    .slice(0, max);
+}
+
 /** Fills a daily list up to the learner's minutes (at least one item). */
 export function dailyPlan(
   ranked: Recommendation[],

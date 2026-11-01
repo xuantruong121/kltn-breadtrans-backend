@@ -14,6 +14,7 @@ import { loadCandidates, loadLearnerState } from './learning-path.catalog';
 import {
   contentKey,
   dailyPlan,
+  moreChoices,
   recommend,
   type Recommendation,
 } from './recommendation.logic';
@@ -21,6 +22,9 @@ import { PRACTICE_LEVEL_LABEL, PRACTICE_SKILLS } from './placement.logic';
 import { applySelfLevel } from './placement.store';
 import { levelProgress, nextLevel } from './progression.logic';
 import { LevelAccessService } from './level-access.service';
+
+/** Extra open items offered beside the daily plan. */
+const MORE_CHOICES = 12;
 
 @Injectable()
 export class LearningPathService {
@@ -67,13 +71,18 @@ export class LearningPathService {
     };
   }
 
-  /** "Nhiệm vụ hôm nay": open items filling the learner's daily minutes. */
+  /**
+   * "Nhiệm vụ hôm nay": open items filling the learner's daily minutes, plus
+   * other open items to choose from.
+   */
   async today(userId: number) {
     const { catalog, learner } = await this.context(userId);
-    const ranked = recommend(catalog.candidates, learner, { limit: 12 });
+    const ranked = recommend(catalog.candidates, learner, { limit: 24 });
+    const plan = dailyPlan(ranked, learner.minutesPerDay);
     return {
       minutesPerDay: learner.minutesPerDay,
-      items: dailyPlan(ranked, learner.minutesPerDay).map((r) =>
+      items: plan.map((r) => this.view(r, learner.saved)),
+      more: moreChoices(ranked, plan, MORE_CHOICES).map((r) =>
         this.view(r, learner.saved),
       ),
     };

@@ -2,6 +2,7 @@ import type { PracticeLevel, PracticeSkill } from '@prisma/client';
 
 import {
   dailyPlan,
+  moreChoices,
   recommend,
   type Candidate,
   type LearnerState,
@@ -177,6 +178,21 @@ describe('recommend', () => {
     );
     expect(dailyPlan(ranked, 20)).toHaveLength(2);
     expect(dailyPlan(ranked, 5)).toHaveLength(1);
+  });
+
+  it('offers other open items beside the daily plan', () => {
+    const open = [1, 2, 3, 4].map(() => item('LISTENING', 'BASIC'));
+    const locked = item('LISTENING', 'ADVANCED');
+    const ranked = recommend([...open, locked], learner(), {
+      limit: 5,
+      includeLocked: true,
+    });
+    const plan = dailyPlan(ranked, 10);
+    const more = moreChoices(ranked, plan, 2);
+    expect(plan).toHaveLength(1);
+    expect(more).toHaveLength(2);
+    expect(more.every((r) => r.status === 'OPEN')).toBe(true);
+    expect(more.map((r) => r.candidate.id)).not.toContain(plan[0].candidate.id);
   });
 
   it('names no weakest skill when skills are level', () => {
