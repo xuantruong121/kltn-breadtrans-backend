@@ -931,16 +931,48 @@ export class GenericExamService {
   async unpublish(id: number) {
     const exam = await this.findExam(id);
     await this.assertExamCanReturnToDraft(exam);
+    await this.setPublicationStatus(exam, QuizPublicationStatus.DRAFT);
+    return this.getAdmin(id);
+  }
+
+  /**
+   * Stops new attempts on an exam. Unlike unpublish it is allowed after
+   * learners have attempted it: their attempts finish and stay reviewable.
+   */
+  async retire(id: number) {
+    const exam = await this.findExam(id);
+    if (exam.publicationStatus !== QuizPublicationStatus.PUBLISHED) {
+      throw new ConflictException(
+        'Chỉ đề đang xuất bản mới có thể ngừng phát hành.',
+      );
+    }
+    await this.setPublicationStatus(exam, QuizPublicationStatus.ARCHIVED);
+    return this.getAdmin(id);
+  }
+
+  async restore(id: number) {
+    const exam = await this.findExam(id);
+    if (exam.publicationStatus !== QuizPublicationStatus.ARCHIVED) {
+      throw new ConflictException('Đề này không ở trạng thái ngừng phát hành.');
+    }
+    await this.setPublicationStatus(exam, QuizPublicationStatus.PUBLISHED);
+    return this.getAdmin(id);
+  }
+
+  private async setPublicationStatus(
+    exam: ProductRecord,
+    publicationStatus: QuizPublicationStatus,
+  ) {
     await this.prisma.$transaction([
       this.prisma.exam.update({
-        where: { id },
-        data: { publicationStatus: QuizPublicationStatus.DRAFT },
+        where: { id: exam.id },
+        data: { publicationStatus },
       }),
       ...(exam.toeicExamSet && this.lrSource(exam)?.id === exam.toeicExamSet.id
         ? [
             this.prisma.toeicExamSet.update({
               where: { id: exam.toeicExamSet.id },
-              data: { publicationStatus: QuizPublicationStatus.DRAFT },
+              data: { publicationStatus },
             }),
           ]
         : []),
@@ -948,12 +980,11 @@ export class GenericExamService {
         ? [
             this.prisma.toeicAssessment.update({
               where: { id: exam.toeicAssessment.id },
-              data: { publicationStatus: QuizPublicationStatus.DRAFT },
+              data: { publicationStatus },
             }),
           ]
         : []),
     ]);
-    return this.getAdmin(id);
   }
 
   async delete(id: number) {

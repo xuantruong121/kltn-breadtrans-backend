@@ -393,6 +393,23 @@ export class AdminExamController {
     return this.genericExamService.unpublish(id);
   }
 
+  @Post(':id/retire')
+  @ApiOperation({
+    summary:
+      'Admin: Ngừng phát hành đề; lượt đang làm và lượt đã làm không đổi',
+  })
+  @ApiResponse({ status: 409, description: 'Đề không ở trạng thái xuất bản.' })
+  retireExam(@Param('id', ParseIntPipe) id: number) {
+    return this.genericExamService.retire(id);
+  }
+
+  @Post(':id/restore')
+  @ApiOperation({ summary: 'Admin: Phát hành lại đề đã ngừng phát hành' })
+  @ApiResponse({ status: 409, description: 'Đề chưa ngừng phát hành.' })
+  restoreExam(@Param('id', ParseIntPipe) id: number) {
+    return this.genericExamService.restore(id);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Admin: Xóa đề thi (bảo vệ lịch sử thi)' })
   deleteExam(@Param('id', ParseIntPipe) id: number) {

@@ -412,7 +412,7 @@ export class ToeicAssessmentService {
       where: { id: componentId },
     });
     if (!component) throw new NotFoundException('Không tìm thấy component');
-    const assessment = await this.getPublishedAssessment(attempt.assessmentId);
+    const assessment = await this.getAssessmentOfAttempt(attempt.assessmentId);
     await this.assertLearnerEntitlements(assessment, userId);
 
     await this.db.$transaction(async (tx) => {
@@ -435,10 +435,7 @@ export class ToeicAssessmentService {
         const source = await tx.toeicExamSet.findUnique({
           where: { id: component.lrExamSetId! },
         });
-        if (
-          !source ||
-          source.publicationStatus !== QuizPublicationStatus.PUBLISHED
-        )
+        if (!source || source.publicationStatus === QuizPublicationStatus.DRAFT)
           throw new BadRequestException('Nguồn L&R chưa sẵn sàng');
         const child = await tx.toeicAttempt.create({
           data: {
@@ -588,6 +585,14 @@ export class ToeicAssessmentService {
       throw new NotFoundException('Bài đánh giá chưa được xuất bản');
     await this.assertPublishable(assessment);
     return assessment;
+  }
+
+  /** An attempt already started may finish after its exam stops being offered. */
+  private async getAssessmentOfAttempt(id: number) {
+    const assessment = await this.findAssessment(id);
+    if (assessment.publicationStatus === QuizPublicationStatus.ARCHIVED)
+      return assessment;
+    return this.getPublishedAssessment(id);
   }
 
   private async getOwnedAttempt(id: number, userId: number) {

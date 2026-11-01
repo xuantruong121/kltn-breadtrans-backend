@@ -65,6 +65,72 @@ describe('GenericExamService — attempt-aware unpublish/delete guard (P1-01)', 
     expect(prisma.$transaction).toHaveBeenCalled();
   });
 
+  it('retire() hides an exam that already has attempts and keeps them', async () => {
+    prisma.exam.findUnique.mockResolvedValue({
+      id: 5,
+      publicationStatus: QuizPublicationStatus.PUBLISHED,
+      toeicExamSet: { id: 105 },
+      toeicAssessment: { id: 55 },
+    });
+    prisma.toeicAttempt.findFirst.mockResolvedValue({ id: 9 });
+    jest.spyOn(service as any, 'lrSource').mockReturnValue({ id: 105 });
+
+    await service.retire(5);
+
+    const archived = { publicationStatus: QuizPublicationStatus.ARCHIVED };
+    expect(prisma.exam.update).toHaveBeenCalledWith({
+      where: { id: 5 },
+      data: archived,
+    });
+    expect(prisma.toeicExamSet.update).toHaveBeenCalledWith({
+      where: { id: 105 },
+      data: archived,
+    });
+    expect(prisma.toeicAssessment.update).toHaveBeenCalledWith({
+      where: { id: 55 },
+      data: archived,
+    });
+  });
+
+  it('retire() refuses a draft', async () => {
+    prisma.exam.findUnique.mockResolvedValue({
+      id: 6,
+      publicationStatus: QuizPublicationStatus.DRAFT,
+      toeicExamSet: null,
+      toeicAssessment: null,
+    });
+
+    await expect(service.retire(6)).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.exam.update).not.toHaveBeenCalled();
+  });
+
+  it('restore() publishes a retired exam again', async () => {
+    prisma.exam.findUnique.mockResolvedValue({
+      id: 7,
+      publicationStatus: QuizPublicationStatus.ARCHIVED,
+      toeicExamSet: null,
+      toeicAssessment: null,
+    });
+
+    await service.restore(7);
+
+    expect(prisma.exam.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { publicationStatus: QuizPublicationStatus.PUBLISHED },
+    });
+  });
+
+  it('restore() refuses an exam that is not retired', async () => {
+    prisma.exam.findUnique.mockResolvedValue({
+      id: 8,
+      publicationStatus: QuizPublicationStatus.PUBLISHED,
+      toeicExamSet: null,
+      toeicAssessment: null,
+    });
+
+    await expect(service.restore(8)).rejects.toBeInstanceOf(ConflictException);
+  });
+
   it('delete() keeps blocking an exam with attempts (regression, now sharing hasLearnerAttempts)', async () => {
     prisma.exam.findUnique.mockResolvedValue({
       id: 4,
