@@ -25,6 +25,7 @@ import {
   requiredPracticePlan,
 } from '../subscription/practice-level';
 import { itemLevel, seedDifficulty } from './ability.logic';
+import { weakFocus } from './weak-focus.logic';
 import { percentOfAttempt } from './progression.logic';
 import {
   contentKey,
@@ -63,6 +64,7 @@ type Db = Pick<
   | 'learnerProfile'
   | 'learnerSkillLevel'
   | 'learningPlanItem'
+  | 'diagnosticAttempt'
 >;
 
 export type Catalog = {
@@ -97,7 +99,7 @@ export async function loadCandidates(
         exercises: {
           where: { publicationStatus: 'PUBLISHED' },
           orderBy: [{ order: 'asc' }, { id: 'asc' }],
-          select: { id: true },
+          select: { id: true, taskType: true },
         },
       },
     }),
@@ -130,6 +132,7 @@ export async function loadCandidates(
       route: `${ROUTE[skill]}/${q.id}`,
       difficulty: difficultyOf('QUIZ', q.id) ?? seedDifficulty(range),
       tracks: tracksOf('QUIZ', q.id),
+      kinds: [q.type],
       planLocked: !planSatisfies(planCode, requiredPlan),
       requiredPlan,
       minutes: MINUTES[skill],
@@ -151,6 +154,7 @@ export async function loadCandidates(
       difficulty:
         difficultyOf('SPEAKING_SET', first.id) ?? seedDifficulty(range),
       tracks: tracksOf('SPEAKING_SET', first.id),
+      kinds: [...new Set(set.exercises.map((e) => String(e.taskType)))],
       planLocked: !planSatisfies(planCode, requiredPlan),
       requiredPlan,
       minutes: MINUTES.SPEAKING,
@@ -165,30 +169,47 @@ export async function loadLearnerState(
   setKeyOfExercise: Map<number, number>,
   now = new Date(),
 ): Promise<LearnerState & { minutesPerDay: number }> {
-  const [profile, levels, submissions, speaking, saved] = await Promise.all([
-    db.learnerProfile.findUnique({ where: { userId } }),
-    db.learnerSkillLevel.findMany({ where: { userId } }),
-    db.submission.findMany({
-      where: { userId },
-      select: {
-        quizId: true,
-        score: true,
-        submittedAt: true,
-        aiFeedback: true,
-        quiz: {
-          select: { type: true, _count: { select: { questions: true } } },
+  const [profile, levels, submissions, speaking, saved, diagnostic] =
+    await Promise.all([
+      db.learnerProfile.findUnique({ where: { userId } }),
+      db.learnerSkillLevel.findMany({ where: { userId } }),
+      db.submission.findMany({
+        where: { userId },
+        select: {
+          quizId: true,
+          score: true,
+          submittedAt: true,
+          aiFeedback: true,
+          quiz: {
+            select: { type: true, _count: { select: { questions: true } } },
+          },
         },
-      },
-    }),
-    db.speakingSubmission.findMany({
-      where: { userId },
-      select: { exerciseId: true, overallScore: true, submittedAt: true },
-    }),
-    db.learningPlanItem.findMany({
-      where: { userId, status: 'SAVED' },
-      select: { contentType: true, contentId: true },
-    }),
-  ]);
+      }),
+      db.speakingSubmission.findMany({
+        where: { userId },
+        select: { exerciseId: true, overallScore: true, submittedAt: true },
+      }),
+      db.learningPlanItem.findMany({
+        where: { userId, status: 'SAVED' },
+        select: { contentType: true, contentId: true },
+      }),
+      db.diagnosticAttempt.findFirst({
+        where: { userId, status: 'COMPLETED' },
+        orderBy: { id: 'desc' },
+        select: {
+          speakingResponses: {
+            where: { status: 'GRADED' },
+            select: { scoreMetadata: true },
+          },
+          writingResponses: {
+            where: { status: 'GRADED' },
+            select: { scoreMetadata: true },
+          },
+        },
+      }),
+    ]);
+  const criteriaOf = (meta: unknown) =>
+    (meta as { criteria?: Record<string, number | null> } | null)?.criteria;
   const history = new Map<string, HistoryEntry>();
   const record = (key: string, percent: number | null, at: Date) => {
     const prev = history.get(key);
@@ -240,6 +261,17 @@ export async function loadLearnerState(
     };
   return {
     track: profile?.track ?? 'GENERAL',
+    goal: profile?.goal ?? 'GENERAL',
+    weakFocus: weakFocus([
+      ...(diagnostic?.speakingResponses ?? []).map((r) => ({
+        skill: 'SPEAKING' as const,
+        criteria: criteriaOf(r.scoreMetadata),
+      })),
+      ...(diagnostic?.writingResponses ?? []).map((r) => ({
+        skill: 'WRITING' as const,
+        criteria: criteriaOf(r.scoreMetadata),
+      })),
+    ]),
     minutesPerDay: profile?.minutesPerDay ?? 15,
     skills,
     history,

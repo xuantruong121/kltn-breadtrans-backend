@@ -8,6 +8,8 @@
  *             below -1 ("Ôn nền tảng"): kept so a learner whose own level
  *             is all plan-locked still has open practice
  *   track     0.6 when the item is tagged with the learner's career track
+ *   goal      0.4 when the skill serves the learner's goal
+ *   focus     0.5 when the item trains the weakest diagnostic criterion
  *   weakness  0.6 for the skill with the lowest ability
  *   novelty   0.5 when never attempted
  *   review    0.6 when the best score is under 60 % and two days have passed
@@ -20,12 +22,14 @@
  */
 import type {
   LearningContentType,
+  LearningGoal,
   LearningTrack,
   PracticeLevel,
   PracticeSkill,
 } from '@prisma/client';
 
 import { fitScore, successProbability } from './ability.logic';
+import { focusOf, type WeakFocus } from './weak-focus.logic';
 import { UNPLACED_UNLOCKED } from './progression.logic';
 import {
   ABILITY_SEED,
@@ -59,6 +63,8 @@ export type Candidate = {
   route: string;
   difficulty: number;
   tracks: LearningTrack[];
+  /** Speaking task types or the writing quiz type of the item. */
+  kinds: string[];
   /** True when the item needs a plan the learner does not have. */
   planLocked: boolean;
   /** Lowest plan that opens this item. */
@@ -81,10 +87,12 @@ export type HistoryEntry = {
 
 export type LearnerState = {
   track: LearningTrack;
+  goal: LearningGoal;
   /** Missing skill = not placed yet: practised as BASIC, no level lock. */
   skills: Partial<Record<PracticeSkill, SkillState>>;
   history: Map<string, HistoryEntry>;
   saved: Set<string>;
+  weakFocus: WeakFocus[];
   now: Date;
 };
 
@@ -107,6 +115,22 @@ const UNPLACED: SkillState = {
   unlockedLevel: UNPLACED_UNLOCKED,
   ability: ABILITY_SEED[UNPLACED_UNLOCKED],
 };
+/** Skills that serve each goal. GENERAL favours none. */
+export const GOAL_SKILLS: Record<LearningGoal, PracticeSkill[]> = {
+  GENERAL: [],
+  TOEIC_SCORE: ['LISTENING', 'READING'],
+  WORK_COMMUNICATION: ['SPEAKING', 'LISTENING'],
+  STUDY: ['READING', 'WRITING'],
+  TRAVEL: ['LISTENING', 'SPEAKING'],
+};
+const GOAL_LABEL: Record<LearningGoal, string> = {
+  GENERAL: 'Tiếng Anh tổng quát',
+  TOEIC_SCORE: 'Luyện TOEIC',
+  WORK_COMMUNICATION: 'Giao tiếp công việc',
+  STUDY: 'Học tập',
+  TRAVEL: 'Du lịch',
+};
+
 /** A skill is "weakest" only when clearly below the others. */
 const WEAKNESS_MARGIN = 0.2;
 
@@ -159,6 +183,15 @@ export function scoreCandidate(
   if (learner.track !== 'GENERAL' && c.tracks.includes(learner.track)) {
     score += 0.6;
     reasons.push(`Chủ đề ${TRACK_LABEL[learner.track]}`);
+  }
+  const focus = focusOf(c, learner.weakFocus);
+  if (focus) {
+    score += 0.5;
+    reasons.push(`Đúng điểm cần cải thiện: ${focus.label}`);
+  }
+  if (GOAL_SKILLS[learner.goal].includes(c.skill)) {
+    score += 0.4;
+    reasons.push(`Hợp mục tiêu: ${GOAL_LABEL[learner.goal]}`);
   }
   if (weakest === c.skill) {
     score += 0.6;
@@ -228,6 +261,18 @@ export function recommend(
     perSkill.set(r.candidate.skill, (perSkill.get(r.candidate.skill) ?? 0) + 1);
   }
   return picked;
+}
+
+/** Open items beyond the daily plan, so the learner can pick something else. */
+export function moreChoices(
+  ranked: Recommendation[],
+  plan: Recommendation[],
+  max: number,
+): Recommendation[] {
+  const planned = new Set(plan.map((r) => contentKey(r.candidate)));
+  return ranked
+    .filter((r) => r.status === 'OPEN' && !planned.has(contentKey(r.candidate)))
+    .slice(0, max);
 }
 
 /** Fills a daily list up to the learner's minutes (at least one item). */

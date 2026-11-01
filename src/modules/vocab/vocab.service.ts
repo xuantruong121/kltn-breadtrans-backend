@@ -12,6 +12,9 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { DECK_WORD_INCLUDE, flattenDeckWord } from './dictionary-entry';
 
+/** Days until the next review, by how many correct reviews a word has had. */
+const REVIEW_DAYS = [1, 3, 7, 14, 30, 60];
+
 @Injectable()
 export class VocabService {
   private readonly logger = new Logger(VocabService.name);
@@ -279,13 +282,8 @@ export class VocabService {
     if (!isCorrect) {
       return new Date(now + 10 * 60 * 1000); // 10 minutes
     }
-    if (reviewCount <= 1) {
-      return new Date(now + 24 * 60 * 60 * 1000); // 1 day
-    }
-    if (reviewCount === 2) {
-      return new Date(now + 3 * 24 * 60 * 60 * 1000); // 3 days
-    }
-    return new Date(now + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const days = REVIEW_DAYS[Math.max(0, reviewCount - 1)] ?? 60;
+    return new Date(now + days * 24 * 60 * 60 * 1000);
   }
 
   async setMastered(userId: number, wordId: number, isMastered: boolean) {

@@ -3,24 +3,55 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { LearningContentType, PracticeSkill } from '@prisma/client';
+import type {
+  LearningContentType,
+  PracticeLevel,
+  PracticeSkill,
+} from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { FOUR_SKILL_SCORING_VERSION } from '../diagnostic/diagnostic-four-skill';
 import { refreshFourSkillResult } from '../diagnostic/diagnostic-four-skill.store';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { UpdateLearnerProfileDto } from './dto/learner-profile.dto';
+import { foundationPlan } from './foundation.logic';
+import { buildLevelRoadmap } from './level-roadmap.logic';
+import { progressReport } from './progress-report.logic';
+import {
+  estimateNextLevels,
+  itemsToNextLevel,
+  nextLevelLabel,
+  skillWeights,
+  weekStart,
+  weeklyTargets,
+} from './week.logic';
 import { loadCandidates, loadLearnerState } from './learning-path.catalog';
 import {
+  GOAL_SKILLS,
   contentKey,
   dailyPlan,
+  moreChoices,
   recommend,
+  weakestSkill,
   type Recommendation,
 } from './recommendation.logic';
-import { PRACTICE_LEVEL_LABEL, PRACTICE_SKILLS } from './placement.logic';
+import {
+  PRACTICE_LEVEL_LABEL,
+  PRACTICE_SKILLS,
+  levelIndex,
+} from './placement.logic';
 import { applySelfLevel } from './placement.store';
-import { levelProgress, nextLevel } from './progression.logic';
+import {
+  PROGRESS_AVERAGE,
+  levelProgress,
+  nextLevel,
+} from './progression.logic';
 import { LevelAccessService } from './level-access.service';
+
+/** Extra open items offered beside the daily plan. */
+const MORE_CHOICES = 12;
+/** Vocabulary and grammar items offered beside the daily plan. */
+const FOUNDATION_ITEMS = 6;
 
 @Injectable()
 export class LearningPathService {
@@ -67,16 +98,196 @@ export class LearningPathService {
     };
   }
 
-  /** "Nhiệm vụ hôm nay": open items filling the learner's daily minutes. */
+  /**
+   * "Nhiệm vụ hôm nay": open items filling the learner's daily minutes, plus
+   * other open items to choose from.
+   */
   async today(userId: number) {
     const { catalog, learner } = await this.context(userId);
-    const ranked = recommend(catalog.candidates, learner, { limit: 12 });
+    const ranked = recommend(catalog.candidates, learner, { limit: 24 });
+    const plan = dailyPlan(ranked, learner.minutesPerDay);
     return {
       minutesPerDay: learner.minutesPerDay,
-      items: dailyPlan(ranked, learner.minutesPerDay).map((r) =>
+      items: plan.map((r) => this.view(r, learner.saved)),
+      more: moreChoices(ranked, plan, MORE_CHOICES).map((r) =>
         this.view(r, learner.saved),
       ),
+      foundation: foundationPlan(
+        await this.foundationInput(userId),
+        FOUNDATION_ITEMS,
+      ),
     };
+  }
+
+  /** The path of a learner past Mất gốc; null for a Mất gốc learner. */
+  async levelRoadmap(userId: number) {
+    const input = await this.foundationInput(userId);
+    if (input.learner === 'STARTER') return null;
+    const [{ catalog, learner }, profile] = await Promise.all([
+      this.context(userId),
+      this.getProfile(userId),
+    ]);
+    return buildLevelRoadmap({
+      level: input.learner,
+      grammar: input.grammar,
+      decks: input.decks,
+      skills: profile.skills.map((s) => ({
+        skill: s.skill,
+        unlockedLevel: s.unlockedLevel,
+        done: s.progress.done,
+        average: s.progress.average,
+        nextRoute:
+          recommend(catalog.candidates, learner, {
+            limit: 1,
+            skill: s.skill,
+          })[0]?.candidate.route ?? null,
+      })),
+    });
+  }
+
+  /** Vocabulary and grammar progress, from the learner's own records. */
+  private async foundationInput(userId: number) {
+    const now = new Date();
+    const [profile, topics, attempts, decks, progress, weakReading] =
+      await Promise.all([
+        this.prisma.learnerProfile.findUnique({ where: { userId } }),
+        this.prisma.grammarTopic.findMany({
+          where: { publicationStatus: 'PUBLISHED' },
+          orderBy: { order: 'asc' },
+          select: { id: true, title: true, level: true },
+        }),
+        this.prisma.grammarAttempt.findMany({
+          where: { userId },
+          select: { topicId: true, score: true },
+        }),
+        this.prisma.vocabTopic.findMany({
+          where: {
+            publicationStatus: 'PUBLISHED',
+            categoryName: { not: 'SYSTEM_DICTIONARY' },
+          },
+          orderBy: { id: 'asc' },
+          select: {
+            id: true,
+            title: true,
+            level: true,
+            _count: { select: { words: true } },
+          },
+        }),
+        this.prisma.userVocabWordProgress.findMany({
+          where: { userId },
+          select: {
+            isMastered: true,
+            nextReviewAt: true,
+            word: { select: { topicId: true } },
+          },
+        }),
+        this.prisma.learnerProgressEvent.findFirst({
+          where: {
+            userId,
+            skill: 'READING',
+            scorePercent: { lt: PROGRESS_AVERAGE },
+          },
+          select: { id: true },
+        }),
+      ]);
+    const best = new Map<number, number>();
+    for (const a of attempts)
+      best.set(a.topicId, Math.max(best.get(a.topicId) ?? 0, a.score));
+    const mastered = new Map<number, number>();
+    for (const p of progress)
+      if (p.isMastered)
+        mastered.set(p.word.topicId, (mastered.get(p.word.topicId) ?? 0) + 1);
+    return {
+      learner:
+        (profile?.placementSource === 'DIAGNOSTIC'
+          ? profile.placementLevel
+          : profile?.selfLevel) ?? 'BASIC',
+      dueWords: progress.filter((p) => p.nextReviewAt && p.nextReviewAt <= now)
+        .length,
+      readingToReview: weakReading !== null,
+      grammar: topics.map((t) => ({ ...t, best: best.get(t.id) ?? null })),
+      decks: decks.map((d) => ({
+        id: d.id,
+        title: d.title,
+        level: d.level,
+        total: d._count.words,
+        mastered: mastered.get(d.id) ?? 0,
+      })),
+    };
+  }
+
+  /** "Tuần này": weekly targets per skill and a rough date for the next levels. */
+  async week(userId: number) {
+    const now = new Date();
+    const { learner } = await this.context(userId);
+    const start = weekStart(now);
+    const [profile, events] = await Promise.all([
+      this.prisma.learnerProfile.findUnique({ where: { userId } }),
+      this.prisma.learnerProgressEvent.findMany({
+        where: { userId },
+        select: {
+          skill: true,
+          level: true,
+          contentId: true,
+          scorePercent: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+    const unlocked = await this.levelAccess.unlockedLevels(userId);
+    const targets = weeklyTargets(
+      learner.minutesPerDay,
+      skillWeights(GOAL_SKILLS[learner.goal], weakestSkill(learner)),
+    );
+    const skills = PRACTICE_SKILLS.map((skill) => {
+      const own = events.filter((e) => e.skill === skill);
+      const atLevel = own.filter((e) => e.level === unlocked[skill]);
+      const progress = {
+        skill,
+        unlockedLevel: unlocked[skill],
+        done: levelProgress(atLevel).done,
+      };
+      return {
+        ...progress,
+        doneThisWeek: own.filter((e) => e.createdAt >= start).length,
+        target: targets[skill],
+        remaining: itemsToNextLevel(progress),
+        nextLevelLabel: nextLevelLabel(unlocked[skill]),
+      };
+    });
+    return {
+      minutesPerDay: learner.minutesPerDay,
+      weekStart: start,
+      skills,
+      estimate: estimateNextLevels({
+        skills,
+        minutesPerDay: learner.minutesPerDay,
+        targetDate: profile?.targetDate ?? null,
+        now,
+      }),
+    };
+  }
+
+  /** "Tiến bộ của bạn": attempts, averages and levels gained per skill. */
+  async progress(userId: number) {
+    const [events, placed, currentLevels] = await Promise.all([
+      this.prisma.learnerProgressEvent.findMany({
+        where: { userId },
+        select: { skill: true, scorePercent: true, createdAt: true },
+      }),
+      this.prisma.levelUnlock.findMany({
+        where: { userId, method: { in: ['PLACEMENT', 'SELF_CHOICE'] } },
+        select: { skill: true, level: true },
+      }),
+      this.levelAccess.unlockedLevels(userId),
+    ]);
+    const startLevels: Partial<Record<PracticeSkill, PracticeLevel>> = {};
+    for (const row of placed) {
+      const known = startLevels[row.skill];
+      if (!known || levelIndex(row.level) > levelIndex(known))
+        startLevels[row.skill] = row.level;
+    }
+    return progressReport({ events, startLevels, currentLevels });
   }
 
   /** "Đề xuất cho bạn" on a skill page, locked items included with reasons. */

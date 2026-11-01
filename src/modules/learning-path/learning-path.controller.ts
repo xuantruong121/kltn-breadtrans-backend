@@ -110,13 +110,41 @@ export class LearningPathController {
   }
 
   @Get('roadmap')
-  @ApiOperation({ summary: 'Lộ trình cho người mất gốc và bước đang tới' })
+  @ApiOperation({ summary: 'Lộ trình theo mức hiện tại và bước đang tới' })
   @ApiResponse({
     status: 200,
     description: 'Các bước, đã xong hay chưa, bước nào còn khóa',
   })
-  starterRoadmap(@Request() req: { user: { id: number } }) {
-    return this.roadmap.forUser(req.user.id);
+  async starterRoadmap(@Request() req: { user: { id: number } }) {
+    const roadmap = await this.learningPath.levelRoadmap(req.user.id);
+    if (roadmap) return roadmap;
+    return {
+      ...(await this.roadmap.forUser(req.user.id)),
+      level: 'STARTER',
+      title: 'Lộ trình cho người mất gốc',
+    };
+  }
+
+  @Get('week')
+  @ApiOperation({
+    summary: 'Kế hoạch tuần này và ngày dự kiến lên mức kế tiếp',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Mục tiêu tuần từng kỹ năng và ước tính, không phải cam kết.',
+  })
+  week(@Request() req: { user: { id: number } }) {
+    return this.learningPath.week(req.user.id);
+  }
+
+  @Get('progress')
+  @ApiOperation({ summary: 'Tiến bộ từng kỹ năng so với lúc xếp mức' })
+  @ApiResponse({
+    status: 200,
+    description: 'Chỉ số luyện tập nội bộ, không phải kết quả năng lực.',
+  })
+  progress(@Request() req: { user: { id: number } }) {
+    return this.learningPath.progress(req.user.id);
   }
 
   @Get('today')

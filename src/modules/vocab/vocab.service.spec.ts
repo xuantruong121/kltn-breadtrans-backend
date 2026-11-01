@@ -250,5 +250,28 @@ describe('VocabService', () => {
         (res.nextReviewAt!.getTime() - before) / (24 * 60 * 60 * 1000);
       expect(Math.round(diffDays)).toBe(1);
     });
+
+    it('spaces correct reviews further apart, up to 60 days', async () => {
+      const prisma = (service as any).prisma;
+      const after = async (reviewCount: number) => {
+        prisma.userVocabWordProgress = {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ id: 1, reviewCount, isMastered: false }),
+          update: jest
+            .fn()
+            .mockImplementation(({ data }) => Promise.resolve(data)),
+        };
+        const before = Date.now();
+        const res = await service.submitReview(1, 10, true);
+        return Math.round(
+          (res.nextReviewAt!.getTime() - before) / (24 * 60 * 60 * 1000),
+        );
+      };
+      expect(await after(1)).toBe(3);
+      expect(await after(3)).toBe(14);
+      expect(await after(5)).toBe(60);
+      expect(await after(20)).toBe(60);
+    });
   });
 });
