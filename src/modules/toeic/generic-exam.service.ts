@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { ToeicListeningMasterService } from './toeic-listening-master.service';
 import {
   AiGenerationJobStatus,
   Prisma,
@@ -57,6 +58,9 @@ export function lrSourceIsLive(
     lr?.publicationStatus === QuizPublicationStatus.DRAFT && lr.id === ownSetId
   );
 }
+
+const EXAM_NOT_DRAFT =
+  'Đề không ở trạng thái bản nháp. Hãy chuyển đề về bản nháp rồi mới sửa.';
 
 /**
  * What a learner receives for one question: Parts 1 and 2 are audio only, so
@@ -111,6 +115,7 @@ export class GenericExamService {
     private readonly prisma: PrismaService,
     private readonly skillCms: SkillCmsService,
     @Optional() private readonly uploadService?: UploadService,
+    @Optional() private readonly listeningMaster?: ToeicListeningMasterService,
   ) {}
 
   listTemplates() {
@@ -649,7 +654,59 @@ export class GenericExamService {
       sharedLrExams: await this.examsSharingLr(exam),
       // Once applied, the AI draft has nothing left to review.
       aiReviewPending: job?.status === AiGenerationJobStatus.GENERATED,
+      listeningMaster: await this.listeningMasterView(exam),
     };
+  }
+
+  /** What the Listening tab shows about the one continuous recording. */
+  private async listeningMasterView(exam: ProductRecord) {
+    const lr = this.lrSource(exam);
+    if (!lr || !this.listeningMaster) return null;
+    const status = await this.listeningMaster.state(lr.id);
+    const playback =
+      status.state === 'READY'
+        ? await this.listeningMaster.adminPlaybackUrl(lr.id).catch(() => null)
+        : null;
+    return { ...status, url: playback?.url ?? null };
+  }
+
+  /** Builds the recording now, so an admin can hear it before publishing. */
+  async buildListeningMaster(id: number) {
+    const exam = await this.findExam(id);
+    this.assertDraftExam(exam);
+    await this.ensureListeningMaster(exam);
+    return this.getAdmin(id);
+  }
+
+  /**
+   * Learners get one continuous recording, never a section cut into clips, so
+   * an exam that cannot produce one does not go live.
+   */
+  private async ensureListeningMaster(exam: ProductRecord) {
+    const lr = this.lrSource(exam);
+    if (!lr || !this.listeningMaster) return;
+    if (process.env.TOEIC_MASTER_ON_PUBLISH === 'skip') return;
+    try {
+      await this.listeningMaster.ensure(lr.id);
+    } catch (error) {
+      throw new BadRequestException(
+        `Không dựng được audio liền mạch: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /** Content changes only while the exam is a draft, whatever else it has. */
+  private assertDraftExam(exam: { publicationStatus: QuizPublicationStatus }) {
+    if (exam.publicationStatus !== QuizPublicationStatus.DRAFT)
+      throw new ConflictException(EXAM_NOT_DRAFT);
+  }
+
+  private async assertDraftExamById(id: number) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id },
+      select: { publicationStatus: true },
+    });
+    if (exam) this.assertDraftExam(exam);
   }
 
   /**
@@ -723,6 +780,12 @@ export class GenericExamService {
       examId: exam.id,
       title: exam.title,
       preview: true,
+      master:
+        lrSet && this.listeningMaster
+          ? await this.listeningMaster
+              .adminPlaybackUrl(lrSet.id)
+              .catch(() => null)
+          : null,
       lr,
       speaking: speaking ?? null,
       writing: writing ?? null,
@@ -778,6 +841,7 @@ export class GenericExamService {
     dto: SpeakingStimulusDto,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     await this.speakingContext(id);
     return this.skillCms.createSpeakingStimulus(dto, user);
   }
@@ -787,6 +851,7 @@ export class GenericExamService {
     dto: SpeakingExerciseDto,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
     return this.skillCms.addSpeakingExercise('speaking', setId, dto, user);
   }
@@ -797,6 +862,7 @@ export class GenericExamService {
     dto: SpeakingExerciseDto,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
     return this.skillCms.updateSpeakingExercise(
       'speaking',
@@ -812,6 +878,7 @@ export class GenericExamService {
     dto: SpeakingExerciseReorderDto,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
     return this.skillCms.reorderSpeakingExercises('speaking', setId, dto, user);
   }
@@ -821,6 +888,7 @@ export class GenericExamService {
     exerciseId: number,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
     return this.skillCms.deleteSpeakingExercise(
       'speaking',
@@ -980,6 +1048,7 @@ export class GenericExamService {
 
   async update(id: number, dto: UpdateGenericExamDto) {
     const exam = await this.findExam(id);
+    this.assertDraftExam(exam);
     const child = exam.toeicExamSet;
     const updated = await this.prisma.exam.update({
       where: { id },
@@ -1046,6 +1115,7 @@ export class GenericExamService {
         readiness: readiness.readiness,
       });
     }
+    await this.ensureListeningMaster(exam);
     await this.prisma.$transaction(async (tx) => {
       await tx.exam.update({
         where: { id },
@@ -1061,15 +1131,16 @@ export class GenericExamService {
           where: { id: exam.toeicAssessment.id },
           data: { publicationStatus: QuizPublicationStatus.PUBLISHED },
         });
-      await this.publishInternalSources(tx, exam);
+      await this.setInternalSources(tx, exam, QuizPublicationStatus.PUBLISHED);
     });
     return this.getAdmin(id);
   }
 
-  /** Speaking and Writing belong to the exam, so they go live with it. */
-  private async publishInternalSources(
+  /** Speaking and Writing belong to the exam, so they follow its status. */
+  private async setInternalSources(
     tx: Prisma.TransactionClient,
     exam: ProductRecord,
+    publicationStatus: QuizPublicationStatus,
   ) {
     const components: any[] = exam.toeicAssessment?.components ?? [];
     const speaking = components.find(
@@ -1078,7 +1149,7 @@ export class GenericExamService {
     const writing = components.find(
       (component) => component.kind === 'WRITING',
     )?.writingSet;
-    const data = { publicationStatus: QuizPublicationStatus.PUBLISHED };
+    const data = { publicationStatus };
     if (speaking) {
       await tx.speakingPracticeSet.update({
         where: { id: speaking.id },
@@ -1104,6 +1175,9 @@ export class GenericExamService {
     const exam = await this.findExam(id);
     await this.assertExamCanReturnToDraft(exam);
     await this.setPublicationStatus(exam, QuizPublicationStatus.DRAFT);
+    await this.prisma.$transaction((tx) =>
+      this.setInternalSources(tx, exam, QuizPublicationStatus.DRAFT),
+    );
     return this.getAdmin(id);
   }
 

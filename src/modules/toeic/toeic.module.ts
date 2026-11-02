@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ToeicListeningMasterService } from './toeic-listening-master.service';
 import { ToeicService } from './toeic.service';
 import { ToeicController } from './toeic.controller';
 import { AdminExamService } from './admin-exam.service';
@@ -38,6 +39,7 @@ import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-s
     GenericExamService,
     ExamWritingService,
     ToeicAiExamService,
+    ToeicListeningMasterService,
     PixabayImageSearchProvider,
     OpenverseImageSearchProvider,
     WikimediaCommonsImageSearchProvider,

@@ -1,15 +1,12 @@
 /**
  * Continuous Listening recordings ("masters") for TOEIC L&R exam sets.
  *
- * A master is one MP3 built offline by scripts/toeic-listening-master.ts from
- * the exam's approved group clips plus original BreadTrans narration, with a
- * timeline of where each group starts and ends. It is used only by flexible
- * PRACTICE attempts (play, pause, seek, replay); strict FULL_TEST attempts
- * keep the server-enforced one-pass group audio.
+ * A master is one MP3 of the exam's approved group clips plus original
+ * BreadTrans narration, with a timeline of where each group starts and ends.
+ * Exam 1 was built by scripts/toeic-listening-master.ts and is registered here;
+ * every other exam gets one from ToeicListeningMasterService when it publishes.
  *
- * A master is offered only while its timeline still matches the exam's
- * current Listening groups in order; any content change makes it stale and
- * the learner falls back to per-group audio.
+ * A master is offered only while it still matches the exam's Listening clips.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 

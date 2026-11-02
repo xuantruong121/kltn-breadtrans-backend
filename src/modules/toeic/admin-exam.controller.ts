@@ -233,6 +233,17 @@ export class AdminExamController {
     return this.toeicAiExamService.regeneratePartCandidate(id, part, dto.topic);
   }
 
+  @Post(':id/listening-master')
+  @ApiOperation({
+    summary:
+      'Admin: dựng audio liền mạch của phần Listening (xuất bản cũng tự dựng)',
+  })
+  @ApiResponse({ status: 201, description: 'Chi tiết đề sau khi dựng' })
+  @ApiResponse({ status: 409, description: 'Đề không còn là bản nháp.' })
+  buildListeningMaster(@Param('id', ParseIntPipe) id: number) {
+    return this.genericExamService.buildListeningMaster(id);
+  }
+
   @Post(':id/ai/images/fill-missing')
   @ApiOperation({
     summary:
