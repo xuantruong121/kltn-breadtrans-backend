@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 export const TOEIC_LISTENING_AUDIO_SCRIPT_VERSION = 'toeic-listening-audio-v1';
 
 export type ToeicListeningAudioQuestion = {
+  questionNumber?: number;
   text?: string | null;
   options: unknown;
   correctIndex: number;
@@ -113,7 +114,12 @@ export function buildToeicListeningAudioScript(
       throw new ToeicListeningAudioScriptError(
         `Part ${group.part} requires its question prompts to be spoken after the ${group.part === 3 ? 'conversation' : 'talk'}`,
       );
-    const prompts = group.questions.map((question) => {
+    // Rows come back in storage order, which changes when one is edited; the
+    // audio hash would then differ with nothing actually changed.
+    const inOrder = [...group.questions].sort(
+      (a, b) => (a.questionNumber ?? 0) - (b.questionNumber ?? 0),
+    );
+    const prompts = inOrder.map((question) => {
       const text = question.text?.trim();
       if (!text)
         throw new ToeicListeningAudioScriptError(
