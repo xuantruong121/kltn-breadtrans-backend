@@ -13,7 +13,6 @@ import {
   SubscriptionStatus,
   SuggestionStatus,
   IssueReportStatus,
-  TopicCategory,
   QuizPublicationStatus,
   QuizType,
   Prisma,
@@ -1371,42 +1370,6 @@ export class AdminService {
     throw new ConflictException(
       'Nội dung Nói được quản lý tại Skill CMS: /admin/skill-content/speaking.',
     );
-  }
-
-  // ============== PRACTICE TOPICS MANAGEMENT ==============
-  async getPracticeTopics() {
-    return this.prisma.practiceTopic.findMany({
-      orderBy: { order: 'asc' },
-      include: {
-        _count: { select: { quizzes: true } },
-      },
-    });
-  }
-
-  async createPracticeTopic(dto: {
-    name: string;
-    vietnameseName?: string;
-    category?: TopicCategory;
-    iconUrl?: string;
-    order?: number;
-  }) {
-    const category = dto.category ?? TopicCategory.BILINGUAL_LEVEL;
-    if (!Object.values(TopicCategory).includes(category)) {
-      throw new BadRequestException('Danh mục chủ đề luyện tập không hợp lệ');
-    }
-    return this.prisma.practiceTopic.create({
-      data: {
-        name: dto.name,
-        vietnameseName: dto.vietnameseName,
-        category,
-        iconUrl: dto.iconUrl || 'target',
-        order: dto.order || 1,
-      },
-    });
-  }
-
-  async deletePracticeTopic(id: number) {
-    return this.prisma.practiceTopic.delete({ where: { id } });
   }
 
   // ============== CLOUD RESOURCES & COST MANAGEMENT (FINOPS) ==============

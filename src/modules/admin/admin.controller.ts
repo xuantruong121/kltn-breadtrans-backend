@@ -368,34 +368,6 @@ export class AdminController {
     return this.adminService.deleteSpeakingExercise(id);
   }
 
-  // ============== PRACTICE TOPICS MANAGEMENT ==============
-  @Get('practice-topics')
-  @ApiOperation({ summary: 'Admin: Lay danh sach chu de luyen tap' })
-  getPracticeTopics() {
-    return this.adminService.getPracticeTopics();
-  }
-
-  @Post('practice-topics')
-  @ApiOperation({ summary: 'Admin: Tao chu de luyen tap moi' })
-  createPracticeTopic(
-    @Body()
-    dto: {
-      name: string;
-      vietnameseName?: string;
-      category?: TopicCategory;
-      iconUrl?: string;
-      order?: number;
-    },
-  ) {
-    return this.adminService.createPracticeTopic(dto);
-  }
-
-  @Delete('practice-topics/:id')
-  @ApiOperation({ summary: 'Admin: Xoa chu de luyen tap' })
-  deletePracticeTopic(@Param('id', ParseIntPipe) id: number) {
-    return this.adminService.deletePracticeTopic(id);
-  }
-
   // ============== CLOUD RESOURCES & COST MANAGEMENT (FINOPS) ==============
 
   @Get('system-costs')
