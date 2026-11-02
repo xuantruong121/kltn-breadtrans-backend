@@ -1,6 +1,10 @@
 import { ToeicAiExamService } from './toeic-ai-exam.service';
 
 describe('exam images', () => {
+  afterEach(() => {
+    delete process.env.GEMINI_IMAGE_GENERATION;
+  });
+
   const candidate = {
     provider: 'OPENVERSE',
     providerAssetId: 'a1',
@@ -49,8 +53,37 @@ describe('exam images', () => {
     });
   });
 
+  it('downloads photos one at a time and at most three', async () => {
+    const service = build(true, [candidate, candidate, candidate, candidate]);
+    let running = 0;
+    let peak = 0;
+    service.imageSearch.download.mockImplementation(async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await Promise.resolve();
+      running -= 1;
+      return { buffer: png, mimeType: 'image/png' };
+    });
+
+    await service.sourceExamImage('s', 'a woman at a desk', 1);
+
+    expect(peak).toBe(1);
+    expect(service.imageSearch.download).toHaveBeenCalledTimes(3);
+  });
+
+  it('never calls the paid generator unless it is switched on', async () => {
+    const service = build(false);
+    delete process.env.GEMINI_IMAGE_GENERATION;
+
+    await expect(
+      service.sourceExamImage('s', 'a woman at a desk', 1),
+    ).rejects.toThrow('no suitable library photo');
+    expect(service.ai.generateToeicExamImage).not.toHaveBeenCalled();
+  });
+
   it('falls back to the generator when no photo is suitable', async () => {
     const service = build(false);
+    process.env.GEMINI_IMAGE_GENERATION = 'enabled';
 
     const image = await service.sourceExamImage('s', 'a woman at a desk', 1);
 
@@ -60,6 +93,7 @@ describe('exam images', () => {
 
   it('falls back when every library fails', async () => {
     const service = build(true);
+    process.env.GEMINI_IMAGE_GENERATION = 'enabled';
     service.imageSearch.search.mockRejectedValue(new Error('down'));
 
     await service.sourceExamImage('s', 'a woman at a desk', 1);

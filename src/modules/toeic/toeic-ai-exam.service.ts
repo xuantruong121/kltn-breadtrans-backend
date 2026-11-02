@@ -104,6 +104,8 @@ type ToeicAiDraftSnapshot = {
 const sha256 = (value: string | Buffer) =>
   createHash('sha256').update(value).digest('hex');
 
+const MAX_IMAGE_PREVIEWS = 3;
+
 /** The prompt printed for Parts whose AI items carry no question of their own. */
 function fixedPromptOfPart(part: number) {
   if (part === 1)
@@ -2202,6 +2204,10 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
   private async sourceExamImage(scope: string, brief: string, part: number) {
     const library = await this.imageFromLibrary(scope, brief);
     if (library) return library;
+    // Gemini image models have no free tier: without this switch every miss
+    // would spend a failed call on each key.
+    if (process.env.GEMINI_IMAGE_GENERATION !== 'enabled')
+      throw new Error('Image provider unavailable: no suitable library photo');
     const image = await this.ai.generateToeicExamImage({ brief, part });
     this.assertImage(image.buffer, image.mimeType);
     const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
@@ -2238,18 +2244,22 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Image search failed for ${scope}: ${String(error)}`);
       return null;
     }
-    const previews = (
-      await Promise.all(
-        candidates.map(async (candidate, index) => {
-          try {
-            const image = await this.imageSearch.download(candidate);
-            return { candidate, candidateId: String(index), image };
-          } catch {
-            return null;
-          }
-        }),
-      )
-    ).filter((row) => row !== null);
+    const previews: Array<{
+      candidate: ImageSearchCandidate;
+      candidateId: string;
+      image: Awaited<ReturnType<typeof this.imageSearch.download>>;
+    }> = [];
+    // One at a time: parallel downloads draw a 429 from Pixabay, and the chain
+    // then skips Pixabay search for a minute.
+    for (const [index, candidate] of candidates.entries()) {
+      if (previews.length === MAX_IMAGE_PREVIEWS) break;
+      try {
+        const image = await this.imageSearch.download(candidate);
+        previews.push({ candidate, candidateId: String(index), image });
+      } catch {
+        continue;
+      }
+    }
     if (!previews.length) return null;
     const analyses = await this.ai.analyzeToeicPart1Candidates({
       candidates: previews.map((row) => ({
