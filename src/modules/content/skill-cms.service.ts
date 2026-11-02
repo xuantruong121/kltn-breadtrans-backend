@@ -46,6 +46,7 @@ import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
 import {
   filterQuizList,
   filterSpeakingSets,
+  firstImageByQuiz,
   quizListFacets,
   speakingSetFacets,
 } from './skill-cms-list';
@@ -273,9 +274,14 @@ export class SkillCmsService {
     const quizTracks = wantsPage(query)
       ? await this.tracksByContent('QUIZ')
       : new Map<number, LearningTrack[]>();
+    const thumbnails = await this.quizThumbnails(
+      domain,
+      quizzes.map((quiz) => quiz.id),
+    );
     const tagged = quizzes.map((quiz) => ({
       ...quiz,
       tracks: quizTracks.get(quiz.id) ?? [],
+      thumbnailUrl: thumbnails.get(quiz.id) ?? null,
     }));
     if (domain !== 'listening' || !quizzes.length)
       return this.listPage(tagged, query);
@@ -298,6 +304,21 @@ export class SkillCmsService {
       })),
       query,
     );
+  }
+
+  /** Only the questions holding an image are read, not every question body. */
+  private async quizThumbnails(domain: string, quizIds: number[]) {
+    if (!['listening', 'writing'].includes(domain) || !quizIds.length)
+      return new Map<number, string>();
+    const rows = await this.prisma.question.findMany({
+      where: {
+        quizId: { in: quizIds },
+        content: { path: ['imageUrl'], string_starts_with: 'http' },
+      },
+      orderBy: { order: 'asc' },
+      select: { quizId: true, content: true },
+    });
+    return firstImageByQuiz(rows);
   }
 
   private listPage<T extends Parameters<typeof filterQuizList>[0][number]>(
