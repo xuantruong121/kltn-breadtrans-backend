@@ -39,6 +39,7 @@ import { TOEIC_SPEAKING_TASK_SEQUENCE } from '../speaking/toeic-speaking-contrac
 import { TOEIC_WRITING_SLOT_CONTRACT } from '../writing/toeic-writing-set.contract';
 import { ImageSearchCandidate } from './pixabay-image-search.provider';
 import { ImageSearchProviderChain } from './image-search.provider-chain';
+import { bestImageCandidate, imageSearchQuery } from './exam-image-query';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
 import type {
   ToeicPart1CandidateAnalysis,
@@ -1827,23 +1828,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       const metadata = (group.mediaMetadata as any) ?? {};
       if (group.part === 1) {
         let imageResult:
-          { url: string; key: string; mimeType: string } | undefined;
+          | { url: string; key: string; metadata: Record<string, unknown> }
+          | undefined;
         try {
-          const image = await this.ai.generateToeicExamImage({
-            brief: group.imageBrief || 'natural workplace scene',
-            part: 1,
-          });
-          this.assertImage(image.buffer, image.mimeType);
-          const uploaded = await this.r2.putObjectAtKey(
-            `ai/toeic-exams/exam-${examSetId}/groups/${group.id}/image.${image.mimeType === 'image/png' ? 'png' : 'jpg'}`,
-            image.buffer,
-            image.mimeType,
+          imageResult = await this.sourceExamImage(
+            `exam-${examSetId}/groups/${group.id}/image`,
+            group.imageBrief || 'natural workplace scene',
+            1,
           );
-          if (!(await this.r2.objectExists(uploaded.key)))
-            throw new BadRequestException(
-              'R2 chưa xác nhận ảnh AI vừa tải lên',
-            );
-          imageResult = { ...uploaded, mimeType: image.mimeType };
         } catch (error) {
           const failedMetadata = withMediaFailure(
             metadata,
@@ -1867,12 +1859,13 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         }
         if (imageResult) {
           metadata.image = {
-            source: 'AI_GENERATED',
+            ...imageResult.metadata,
             status: 'READY',
             r2Key: imageResult.key,
             generatedAt: new Date().toISOString(),
             briefHash: toeicMediaHash(group.imageBrief),
           };
+          await this.matchPart1QuestionToImage(group, metadata, imageResult);
           await this.prisma.toeicQuestionGroup.update({
             where: { id: group.id },
             data: {
@@ -2018,32 +2011,150 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
 
   private async generatedImageUrl(scope: string, brief: string, part: number) {
     try {
-      const image = await this.ai.generateToeicExamImage({ brief, part });
-      this.assertImage(image.buffer, image.mimeType);
-      const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
-      const uploaded = await this.r2.putObjectAtKey(
-        `ai/toeic-exams/${scope}.${extension}`,
-        image.buffer,
-        image.mimeType,
-      );
-      if (!(await this.r2.objectExists(uploaded.key)))
-        throw new BadRequestException('R2 chưa xác nhận ảnh AI vừa tải lên');
+      const image = await this.sourceExamImage(scope, brief, part);
       return {
-        url: uploaded.url,
+        url: image.url,
         metadata: {
-          source: 'AI_GENERATED',
-          r2Key: uploaded.key,
+          ...image.metadata,
+          r2Key: image.key,
           generatedAt: new Date().toISOString(),
           briefHash: sha256(brief),
         },
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`AI image unavailable for ${scope}: ${message}`);
+      this.logger.warn(`Exam image unavailable for ${scope}: ${message}`);
       return {
         url: null,
         metadata: withMediaFailure({}, 'image', error, sha256(brief)),
       };
+    }
+  }
+
+  /**
+   * Photo libraries come first: the free Gemini tier has no image model, so
+   * the image generator is only the last resort for a paid key.
+   */
+  private async sourceExamImage(scope: string, brief: string, part: number) {
+    const library = await this.imageFromLibrary(scope, brief);
+    if (library) return library;
+    const image = await this.ai.generateToeicExamImage({ brief, part });
+    this.assertImage(image.buffer, image.mimeType);
+    const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
+    const uploaded = await this.r2.putObjectAtKey(
+      `ai/toeic-exams/${scope}.${extension}`,
+      image.buffer,
+      image.mimeType,
+    );
+    if (!(await this.r2.objectExists(uploaded.key)))
+      throw new BadRequestException('R2 chưa xác nhận ảnh AI vừa tải lên');
+    return {
+      url: uploaded.url,
+      key: uploaded.key,
+      buffer: image.buffer,
+      mimeType: image.mimeType,
+      metadata: { source: 'AI_GENERATED' } as Record<string, unknown>,
+    };
+  }
+
+  /** Null when no library has a suitable image; the caller then falls back. */
+  private async imageFromLibrary(scope: string, brief: string) {
+    const query = imageSearchQuery(brief);
+    if (!query) return null;
+    let candidates: ImageSearchCandidate[];
+    try {
+      candidates = await this.imageSearch.search(query, { limit: 5 });
+    } catch (error) {
+      this.logger.warn(`Image search failed for ${scope}: ${String(error)}`);
+      return null;
+    }
+    const previews = (
+      await Promise.all(
+        candidates.map(async (candidate, index) => {
+          try {
+            const image = await this.imageSearch.download(candidate);
+            return { candidate, candidateId: String(index), image };
+          } catch {
+            return null;
+          }
+        }),
+      )
+    ).filter((row) => row !== null);
+    if (!previews.length) return null;
+    const analyses = await this.ai.analyzeToeicPart1Candidates({
+      candidates: previews.map((row) => ({
+        candidateId: row.candidateId,
+        imageBuffer: row.image.buffer,
+        mimeType: row.image.mimeType,
+      })),
+    });
+    const bestId = bestImageCandidate(analyses);
+    const best = previews.find((row) => row.candidateId === bestId);
+    if (!best) return null;
+    const { candidate, image } = best;
+    const uploaded = await this.r2.putObjectAtKey(
+      `ai/toeic-exams/${scope}.${image.mimeType === 'image/png' ? 'png' : 'jpg'}`,
+      image.buffer,
+      image.mimeType,
+    );
+    if (!(await this.r2.objectExists(uploaded.key)))
+      throw new BadRequestException('R2 chưa xác nhận ảnh vừa tải lên');
+    return {
+      url: uploaded.url,
+      key: uploaded.key,
+      buffer: image.buffer,
+      mimeType: image.mimeType,
+      metadata: {
+        source: candidate.provider,
+        provenance: 'EXTERNAL_LIBRARY',
+        provider: candidate.provider,
+        providerAssetId: candidate.providerAssetId,
+        sourcePageUrl: candidate.sourcePageUrl,
+        author: candidate.author,
+        authorUrl: candidate.authorUrl,
+        license: candidate.license,
+        licenseVersion: candidate.licenseVersion,
+        licenseUrl: candidate.licenseUrl,
+        attribution: candidate.attribution,
+      } as Record<string, unknown>,
+    };
+  }
+
+  /** A library photo is not the scene the question was written for. */
+  private async matchPart1QuestionToImage(
+    group: { questions: Array<{ id: number }> },
+    metadata: { image?: Record<string, unknown> },
+    image: { buffer?: Buffer; mimeType?: string; metadata: object },
+  ) {
+    const fromLibrary =
+      (image.metadata as { provenance?: string }).provenance ===
+      'EXTERNAL_LIBRARY';
+    if (!fromLibrary || !image.buffer || !image.mimeType) return;
+    const question = group.questions[0];
+    try {
+      const vision = await this.ai.generateToeicPart1FromImage({
+        imageBuffer: image.buffer,
+        mimeType: image.mimeType,
+      });
+      this.assertPart1QuestionCandidate(vision);
+      if (question)
+        await this.prisma.toeicQuestion.update({
+          where: { id: question.id },
+          data: {
+            text: null,
+            options: vision.statements,
+            correctIndex: vision.correctIndex,
+            explanation: vision.explanation,
+          },
+        });
+      metadata.image = {
+        ...metadata.image,
+        questionStatus: 'READY_FOR_REVIEW',
+        sceneSummary: vision.sceneSummary,
+      };
+    } catch (error) {
+      this.logger.warn(`Part 1 question not matched: ${String(error)}`);
+      metadata.image = { ...metadata.image, questionStatus: 'FAILED' };
     }
   }
 
