@@ -7,7 +7,8 @@ import {
 import { ToeicAssessmentService } from './toeic-assessment.service';
 
 describe('ToeicAssessmentService', () => {
-  const service = () => new ToeicAssessmentService({} as any, {} as any, {} as any);
+  const service = () =>
+    new ToeicAssessmentService({} as any, {} as any, {} as any);
 
   it('requires the exact component contract for every product family', () => {
     const instance = service() as any;

@@ -27,7 +27,11 @@ const stored = (over: Record<string, unknown> = {}) => ({
 function setup() {
   const claim = jest.fn().mockResolvedValue({ count: 1 });
   const prisma: any = {
-    submission: { findUnique: jest.fn(), findMany: jest.fn(), updateMany: claim },
+    submission: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      updateMany: claim,
+    },
     result: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     learningActivity: { create: jest.fn().mockResolvedValue({ id: 1 }) },
     userQuizReward: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },

@@ -174,14 +174,19 @@ describe('TOEIC assessment exam room', () => {
   it('closes Speaking with nothing recorded, so the clock can always end it', async () => {
     const { service, tx } = setup([speaking(), writing()], 'SPEAKING', 20);
 
-    await expect(service.completeComponent(1, 20, 7, {})).resolves.toBeDefined();
+    await expect(
+      service.completeComponent(1, 20, 7, {}),
+    ).resolves.toBeDefined();
 
     expect(tx.toeicAssessmentAttemptComponent.update).toHaveBeenCalled();
   });
 
   it('stores written answers before grading, skipping blank and foreign tasks', async () => {
     const { service, tx, writingService } = setup(
-      [speaking({ status: 'COMPLETED' }), writing({ status: 'IN_PROGRESS', startedAt: STARTED })],
+      [
+        speaking({ status: 'COMPLETED' }),
+        writing({ status: 'IN_PROGRESS', startedAt: STARTED }),
+      ],
       'WRITING',
       21,
     );
@@ -208,10 +213,12 @@ describe('TOEIC assessment exam room', () => {
         },
       }),
     );
-    expect(tx.toeicAssessmentWritingSubmission.createMany).toHaveBeenCalledWith({
-      data: [{ attemptComponentId: 11, submissionId: 70 }],
-      skipDuplicates: true,
-    });
+    expect(tx.toeicAssessmentWritingSubmission.createMany).toHaveBeenCalledWith(
+      {
+        data: [{ attemptComponentId: 11, submissionId: 70 }],
+        skipDuplicates: true,
+      },
+    );
     expect(writingService.gradeExamSubmissions).toHaveBeenCalledWith([70]);
   });
 

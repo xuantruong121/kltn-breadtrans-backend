@@ -1125,8 +1125,12 @@ Task: ${instructions}`
       );
     }
 
-    const { evaluation, validatedEvaluation, detail } =
-      await this.gradeAnswer(quiz, content, answer, practiceTask);
+    const { evaluation, validatedEvaluation, detail } = await this.gradeAnswer(
+      quiz,
+      content,
+      answer,
+      practiceTask,
+    );
     const submission = await this.persistAssessment({
       detail,
       exercise,
