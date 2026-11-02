@@ -159,12 +159,18 @@ export class GenericExamService {
               },
             },
             speakingPracticeSet: {
-              include: { exercises: { include: { stimulus: true } } },
+              include: {
+                exercises: {
+                  include: { stimulus: true },
+                  orderBy: { order: 'asc' },
+                },
+              },
             },
             writingSet: {
               include: {
                 items: {
                   include: { writingQuiz: { include: { questions: true } } },
+                  orderBy: { order: 'asc' },
                 },
               },
             },
