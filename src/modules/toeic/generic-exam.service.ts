@@ -545,8 +545,21 @@ export class GenericExamService {
       .filter((exam) => exam.learnerReady);
   }
 
+  /** Other exams that would disappear with this exam's L&R part. */
+  private async examsSharingLr(exam: ProductRecord) {
+    const set = exam.toeicExamSet;
+    if (!set) return 0;
+    return this.prisma.toeicAssessmentComponent.count({
+      where: { lrExamSetId: set.id, assessment: { examId: { not: exam.id } } },
+    });
+  }
+
   async getAdmin(id: number) {
-    return this.withAdminPlayback(this.project(await this.findExam(id)));
+    const exam = await this.findExam(id);
+    return {
+      ...(await this.withAdminPlayback(this.project(exam))),
+      sharedLrExams: await this.examsSharingLr(exam),
+    };
   }
 
   /**
@@ -1031,20 +1044,24 @@ export class GenericExamService {
         },
       });
 
-      if (exam.toeicExamSet) {
+      // A 4-skill exam may read its L&R from another exam; the copy owns its own.
+      const lrSource = this.lrSource(exam);
+      let newLrId: number | null = null;
+      if (lrSource) {
         const newLr = await tx.toeicExamSet.create({
           data: {
-            title: `${exam.toeicExamSet.title} — Bản mới`,
-            description: exam.toeicExamSet.description,
-            type: exam.toeicExamSet.type,
-            difficulty: exam.toeicExamSet.difficulty,
-            durationSeconds: exam.toeicExamSet.durationSeconds,
+            title: `${lrSource.title} — Bản mới`,
+            description: lrSource.description,
+            type: lrSource.type,
+            difficulty: lrSource.difficulty,
+            durationSeconds: lrSource.durationSeconds,
             createdBy: adminId,
             examId: newExam.id,
             publicationStatus: QuizPublicationStatus.DRAFT,
           },
         });
-        for (const group of exam.toeicExamSet.groups as any[]) {
+        newLrId = newLr.id;
+        for (const group of lrSource.groups as any[]) {
           await tx.toeicQuestionGroup.create({
             data: {
               examId: newLr.id,
@@ -1083,6 +1100,17 @@ export class GenericExamService {
           },
         });
         for (const component of exam.toeicAssessment.components as any[]) {
+          if (component.kind === 'LISTENING_READING' && newLrId) {
+            await tx.toeicAssessmentComponent.create({
+              data: {
+                assessmentId: newAssessment.id,
+                kind: 'LISTENING_READING',
+                order: component.order,
+                required: component.required,
+                lrExamSetId: newLrId,
+              },
+            });
+          }
           if (component.kind === 'SPEAKING' && component.speakingPracticeSet) {
             const source = component.speakingPracticeSet;
             const newSpeaking = await tx.speakingPracticeSet.create({

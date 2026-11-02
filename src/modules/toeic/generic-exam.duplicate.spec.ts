@@ -118,6 +118,42 @@ describe('GenericExamService.duplicate — Phase H new version/clone', () => {
     );
   });
 
+  it('gives a 4-skill copy its own L&R, even when the source shares one', async () => {
+    const shared = { ...sourceExam.toeicExamSet, id: 500, groups: [] };
+    jest.spyOn(service as any, 'findExam').mockResolvedValue({
+      ...sourceExam,
+      variantCode: 'TOEIC_4_SKILLS',
+      toeicExamSet: null,
+      toeicAssessment: {
+        title: 'A',
+        components: [
+          {
+            kind: 'LISTENING_READING',
+            order: 1,
+            required: true,
+            lrExamSet: shared,
+          },
+        ],
+      },
+    });
+    prisma.toeicAssessment.create.mockResolvedValue({ id: 70 });
+
+    await service.duplicate(4, 7);
+
+    expect(prisma.toeicExamSet.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ examId: 999 }),
+    });
+    expect(prisma.toeicAssessmentComponent.create).toHaveBeenCalledWith({
+      data: {
+        assessmentId: 70,
+        kind: 'LISTENING_READING',
+        order: 1,
+        required: true,
+        lrExamSetId: 909,
+      },
+    });
+  });
+
   it('never creates an attempt, never reads attempt tables', async () => {
     await service.duplicate(1, 7);
     expect(prisma.toeicAttempt).toBeUndefined();
