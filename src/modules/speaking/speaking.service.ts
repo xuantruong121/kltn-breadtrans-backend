@@ -217,6 +217,8 @@ function difficultyLabel(values: string[]) {
 
 /** Daily Speaking grading allowance per learner (see dailySpeakingQuotaError). */
 export const DAILY_PRACTICE_SPEAKING_LIMIT = 10;
+/** A recording plus one retake; the exam room shows the same limit. */
+export const MAX_EXAM_TAKES_PER_QUESTION = 2;
 /** Three full 11-task TOEIC speaking sections per day. */
 export const DAILY_EXAM_SPEAKING_LIMIT = 33;
 
@@ -681,6 +683,8 @@ export class SpeakingService {
       internalContext ? { userId, ...internalContext } : undefined,
     );
     await this.assertSpeakingContentAccess(exercise, userId, role);
+    if (internalContext)
+      await this.assertExamTakeLeft(exerciseId, userId, internalContext);
 
     // 4. Byte-level audio validation
     if (!audioFile || !audioFile.buffer) {
@@ -858,6 +862,34 @@ export class SpeakingService {
     return null;
   }
 
+  /** One recording and one retake per question of an open exam section. */
+  private async assertExamTakeLeft(
+    exerciseId: number,
+    userId: number,
+    context: { attemptId: number; componentId: number },
+  ) {
+    const section = await this.prisma.toeicAssessmentAttemptComponent.findFirst(
+      {
+        where: {
+          assessmentAttemptId: context.attemptId,
+          assessmentComponentId: context.componentId,
+        },
+        select: { startedAt: true },
+      },
+    );
+    if (!section?.startedAt) return;
+    const takes = await this.prisma.speakingSubmission.count({
+      where: {
+        userId,
+        exerciseId,
+        status: { not: 'FAILED' },
+        submittedAt: { gte: section.startedAt },
+      },
+    });
+    if (takes >= MAX_EXAM_TAKES_PER_QUESTION)
+      throw new BadRequestException('Câu này đã hết lượt thu lại.');
+  }
+
   async createUploadIntent(
     exerciseId: number,
     userId: number,
@@ -1011,6 +1043,9 @@ export class SpeakingService {
         'Lần tải lên này đã hết hạn hoặc thất bại. Vui lòng thử lại.',
       );
     }
+
+    if (internalContext)
+      await this.assertExamTakeLeft(exerciseId, userId, internalContext);
 
     // 6. Generate secure server-side object key & clamped TTL (Correction D)
     const rawTtl = Number(
