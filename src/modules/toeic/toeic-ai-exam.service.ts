@@ -21,6 +21,7 @@ import { Job, Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
+import type { ToeicExamBatchRequest } from '../ai/strategies/ai-evaluator.interface';
 import { R2Service } from '../upload/r2.service';
 import { GenericExamService } from './generic-exam.service';
 import { CreateToeicAiExamDto } from './toeic-ai-exam.dto';
@@ -40,7 +41,12 @@ import { TOEIC_WRITING_SLOT_CONTRACT } from '../writing/toeic-writing-set.contra
 import { ImageSearchCandidate } from './pixabay-image-search.provider';
 import { ImageSearchProviderChain } from './image-search.provider-chain';
 import { bestImageCandidate, imageSearchQuery } from './exam-image-query';
-import { questionsToAvoid } from './toeic-ai-batch.logic';
+import {
+  prepareGeneratedBatch,
+  questionFingerprint,
+  questionsToAvoid,
+  readingGroupIssue,
+} from './toeic-ai-batch.logic';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
 import type {
   ToeicPart1CandidateAnalysis,
@@ -95,6 +101,21 @@ type ToeicAiDraftSnapshot = {
 
 const sha256 = (value: string | Buffer) =>
   createHash('sha256').update(value).digest('hex');
+
+/** The prompt printed for Parts whose AI items carry no question of their own. */
+function fixedPromptOfPart(part: number) {
+  if (part === 1)
+    return 'Choose the sentence that best describes the photograph.';
+  if (part === 2) return 'Choose the best response.';
+  return null;
+}
+
+function firstQuestionOfPart(part: number) {
+  let number = 1;
+  for (let earlier = 1; earlier < part; earlier += 1)
+    for (const group of planFor(earlier)) number += group.questionCount;
+  return number;
+}
 
 function planFor(part: number): PlannedGroup[] {
   switch (part) {
@@ -712,22 +733,30 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     for (const batch of lrBatches) {
       if (Number(batch.part) !== part) continue;
       const groups = batch.candidate?.groups ?? [];
+      let firstQuestionNumber = Number(batch.questionNumber);
       for (let index = 0; index < groups.length; index += 1) {
-        if (Number(batch.groupOrder) + index !== groupOrder) continue;
-        found = true;
         const questionCount = groups[index].questions?.length ?? 1;
-        const regenerated = await this.ai.generateToeicExamBatch({
-          part,
-          topic: request.topic,
-          difficulty: request.difficulty,
-          groups: [{ questionCount }],
-        });
-        this.assertBatch(part, [{ questionCount }], regenerated);
-        groups[index] = regenerated.groups[0];
+        if (Number(batch.groupOrder) + index === groupOrder) {
+          found = true;
+          const regenerated = await this.draftBatch(
+            {
+              part,
+              topic: request.topic,
+              difficulty: request.difficulty,
+              groups: [{ questionCount }],
+              avoidQuestions: questionsToAvoid(lrBatches, part),
+            },
+            firstQuestionNumber,
+          );
+          this.assertBatch(part, [{ questionCount }], regenerated);
+          groups[index] = regenerated.groups[0];
+        }
+        firstQuestionNumber += questionCount;
       }
     }
     if (!found)
       throw new NotFoundException('Không tìm thấy candidate item này');
+    this.assertNoDuplicateBatches(lrBatches);
 
     await this.prisma.aiGenerationJob.update({
       where: { id: jobId },
@@ -762,17 +791,24 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     for (const batch of lrBatches) {
       if (Number(batch.part) !== part) continue;
       const groups = batch.candidate?.groups ?? [];
+      let firstQuestionNumber = Number(batch.questionNumber);
       for (let index = 0; index < groups.length; index += 1) {
         const groupOrder = Number(batch.groupOrder) + index;
         const candidateKey = `LR:P${part}:G${groupOrder}`;
-        if (appliedCandidateKeys.includes(candidateKey)) continue;
         const questionCount = groups[index].questions?.length ?? 1;
-        const regenerated = await this.ai.generateToeicExamBatch({
-          part,
-          topic: request.topic,
-          difficulty: request.difficulty,
-          groups: [{ questionCount }],
-        });
+        const first = firstQuestionNumber;
+        firstQuestionNumber += questionCount;
+        if (appliedCandidateKeys.includes(candidateKey)) continue;
+        const regenerated = await this.draftBatch(
+          {
+            part,
+            topic: request.topic,
+            difficulty: request.difficulty,
+            groups: [{ questionCount }],
+            avoidQuestions: questionsToAvoid(lrBatches, part),
+          },
+          first,
+        );
         this.assertBatch(part, [{ questionCount }], regenerated);
         groups[index] = regenerated.groups[0];
       }
@@ -1080,12 +1116,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
     if (!group?.questions[0])
       throw new NotFoundException('Không tìm thấy câu hỏi trong Draft');
-    const candidate = await this.ai.generateToeicExamBatch({
-      part: group.part,
-      topic,
-      difficulty: exam.toeicExamSet!.difficulty as 'easy' | 'medium' | 'hard',
-      groups: [{ questionCount: 1 }],
-    });
+    const candidate = await this.draftBatch(
+      {
+        part: group.part,
+        topic,
+        difficulty: exam.toeicExamSet!.difficulty as 'easy' | 'medium' | 'hard',
+        groups: [{ questionCount: 1 }],
+      },
+      group.questions[0].questionNumber,
+    );
     this.assertBatch(group.part, [{ questionCount: 1 }], candidate);
     return {
       mode: 'CANDIDATE_ONLY',
@@ -1106,12 +1145,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
     if (!group) throw new NotFoundException('Không tìm thấy nhóm trong Draft');
     const plan: PlannedGroup[] = [{ questionCount: group.questions.length }];
-    const candidate = await this.ai.generateToeicExamBatch({
-      part: group.part,
-      topic,
-      difficulty: exam.toeicExamSet!.difficulty as 'easy' | 'medium' | 'hard',
-      groups: plan,
-    });
+    const candidate = await this.draftBatch(
+      {
+        part: group.part,
+        topic,
+        difficulty: exam.toeicExamSet!.difficulty as 'easy' | 'medium' | 'hard',
+        groups: plan,
+      },
+      Math.min(...group.questions.map((question) => question.questionNumber)),
+    );
     this.assertBatch(group.part, plan, candidate);
     return { mode: 'CANDIDATE_ONLY', groupId, candidate: candidate.groups[0] };
   }
@@ -1120,16 +1162,25 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const exam = await this.editableDraft(examId);
     const plan = planFor(part);
     const batches: unknown[] = [];
+    let firstQuestionNumber = firstQuestionOfPart(part);
     for (let offset = 0; offset < plan.length; offset += 3) {
       const slice = plan.slice(offset, offset + 3);
-      const candidate = await this.ai.generateToeicExamBatch({
-        part,
-        topic,
-        difficulty: exam.toeicExamSet!.difficulty as 'easy' | 'medium' | 'hard',
-        groups: slice,
-      });
+      const candidate = await this.draftBatch(
+        {
+          part,
+          topic,
+          difficulty: exam.toeicExamSet!.difficulty as
+            'easy' | 'medium' | 'hard',
+          groups: slice,
+        },
+        firstQuestionNumber,
+      );
       this.assertBatch(part, slice, candidate);
       batches.push(...candidate.groups);
+      firstQuestionNumber += slice.reduce(
+        (total, item) => total + item.questionCount,
+        0,
+      );
     }
     return {
       mode: 'CANDIDATE_ONLY',
@@ -1573,6 +1624,18 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /** Every generated batch passes here, so no path can keep the model's key order. */
+  private async draftBatch(
+    input: ToeicExamBatchRequest,
+    firstQuestionNumber: number,
+  ) {
+    return prepareGeneratedBatch(
+      input.part,
+      await this.ai.generateToeicExamBatch(input),
+      firstQuestionNumber,
+    );
+  }
+
   private assertBatch(part: number, expected: PlannedGroup[], candidate: any) {
     if (
       !Array.isArray(candidate?.groups) ||
@@ -1601,6 +1664,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException(
           `Nhóm Part 1 ${index + 1} thiếu mô tả ảnh`,
         );
+      const readingIssue = readingGroupIssue(part, group);
+      if (readingIssue)
+        throw new BadRequestException(`Nhóm ${index + 1}: ${readingIssue}`);
       group.questions.forEach((question: any) => {
         const options: string[] = Array.isArray(question.options)
           ? question.options.map((value: unknown) => String(value ?? '').trim())
@@ -1630,11 +1696,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           throw new BadRequestException(
             'AI trả về câu hỏi Part 3/4 thiếu nội dung câu hỏi để đọc trong audio',
           );
-        const fingerprint =
-          `${String(question.text ?? '')} ${options.join('|')}`
-            .replace(/\s+/g, ' ')
-            .trim()
-            .toLowerCase();
+        const fingerprint = questionFingerprint({ ...question, options });
         if (seen.has(fingerprint))
           throw new BadRequestException(
             'AI trả về câu hỏi trùng lặp trong batch',
@@ -1665,11 +1727,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     for (const batch of batches) {
       for (const group of batch.candidate?.groups ?? []) {
         for (const question of group.questions ?? []) {
-          const fingerprint =
-            `${String(question.text ?? '')} ${(question.options ?? []).join('|')}`
-              .replace(/\s+/g, ' ')
-              .trim()
-              .toLowerCase();
+          const fingerprint = questionFingerprint(question);
           if (seen.has(fingerprint))
             throw new BadRequestException(
               'AI trả về câu hỏi trùng lặp giữa các batch',
@@ -1727,7 +1785,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         questions: {
           create: group.questions.map((question: any) => ({
             questionNumber: questionNumber++,
-            text: question.text?.trim() || null,
+            text: question.text?.trim() || fixedPromptOfPart(part),
             options: question.options.map((option: unknown) =>
               String(option).trim(),
             ),
@@ -2382,13 +2440,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             continue;
           }
           activeScope = { kind: 'batch', part, offset };
-          const candidate = await this.ai.generateToeicExamBatch({
-            part,
-            topic: request.topic,
-            difficulty: request.difficulty,
-            groups: slice,
-            avoidQuestions: questionsToAvoid(generatedBatches, part),
-          });
+          const candidate = await this.draftBatch(
+            {
+              part,
+              topic: request.topic,
+              difficulty: request.difficulty,
+              groups: slice,
+              avoidQuestions: questionsToAvoid(generatedBatches, part),
+            },
+            firstQuestionNumber,
+          );
           const generatedBatch = {
             batchKey,
             part,

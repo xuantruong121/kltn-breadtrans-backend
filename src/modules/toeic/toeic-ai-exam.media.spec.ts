@@ -156,7 +156,7 @@ describe('ToeicAiExamService partial media materialization', () => {
           {
             questions: [
               {
-                text: 'Please submit the report by Friday.',
+                text: 'Please submit the _____ by Friday.',
                 options: ['report', 'reports', 'reporting', 'reported'],
                 correctIndex: 0,
                 explanation:

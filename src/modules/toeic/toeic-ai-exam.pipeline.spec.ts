@@ -40,11 +40,15 @@ function batchFor(part: number, groups: PlannedGroup[]) {
         ...(part === 1
           ? { imageBrief: `A realistic office scene ${groupKey}.` }
           : {}),
-        ...(part >= 6 ? { passageText: `Reading passage ${groupKey}.` } : {}),
+        ...(part >= 6
+          ? {
+              passageText: `Reading passage ${groupKey}.${part === 6 ? ' _____'.repeat(plan.questionCount) : ''}`,
+            }
+          : {}),
         questions: Array.from(
           { length: plan.questionCount },
           (_, questionIndex) => ({
-            text: `Question ${groupKey}-${questionIndex + 1}`,
+            text: `Question ${groupKey}-${questionIndex + 1}${part === 5 ? ' _____' : ''}`,
             options: Array.from(
               { length: part === 2 ? 3 : 4 },
               (_, optionIndex) =>
