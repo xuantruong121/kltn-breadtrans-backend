@@ -57,6 +57,15 @@ export function lrSourceIsLive(
   );
 }
 
+/**
+ * Internal sources of a draft exam stay drafts until publish() takes them live,
+ * so readiness judges their content. Once the exam is live they must be too.
+ */
+function sourceCounts(status: unknown, draftExam: boolean) {
+  if (status === QuizPublicationStatus.PUBLISHED) return true;
+  return draftExam && status === QuizPublicationStatus.DRAFT;
+}
+
 @Injectable()
 export class GenericExamService {
   constructor(
@@ -196,7 +205,11 @@ export class GenericExamService {
     throw new NotFoundException(`Đề TOEIC với ID ${id} không tồn tại`);
   }
 
-  private speakingReady(source: any, template: ExamTemplate) {
+  private speakingReady(
+    source: any,
+    template: ExamTemplate,
+    draftExam = false,
+  ) {
     const tasks =
       template.sections.find((section) => section.code === 'SPEAKING')?.tasks ??
       TOEIC_SPEAKING_TASK_SEQUENCE;
@@ -206,30 +219,29 @@ export class GenericExamService {
     if (
       !source ||
       source.scope !== SpeakingPracticeScope.EXAM_INTERNAL ||
-      source.publicationStatus !== QuizPublicationStatus.PUBLISHED ||
+      !sourceCounts(source.publicationStatus, draftExam) ||
       exercises.length !== 11
     )
       return false;
     return (
       exercises.every(
         (exercise, index) =>
-          exercise.publicationStatus === QuizPublicationStatus.PUBLISHED &&
+          sourceCounts(exercise.publicationStatus, draftExam) &&
           exercise.taskType === tasks[index],
       ) && toeicSpeakingContractErrors(source).length === 0
     );
   }
 
-  private writingReady(source: any) {
+  private writingReady(source: any, draftExam = false) {
     if (
       !source ||
-      source.publicationStatus !== QuizPublicationStatus.PUBLISHED ||
+      !sourceCounts(source.publicationStatus, draftExam) ||
       source.items?.length !== 8
     )
       return false;
     return source.items.every((item: any) => {
       const quiz = item.writingQuiz;
-      if (quiz?.publicationStatus !== QuizPublicationStatus.PUBLISHED)
-        return false;
+      if (!sourceCounts(quiz?.publicationStatus, draftExam)) return false;
       if (item.taskKind !== 'PICTURE_SENTENCE') return true;
       const content = quiz.questions?.[0]?.content as
         { imageUrl?: unknown } | undefined;
@@ -285,14 +297,15 @@ export class GenericExamService {
       template.variantCode === 'TOEIC_SW' ||
       template.variantCode === 'TOEIC_4_SKILLS';
     const hasWriting = hasSpeaking;
+    const draftExam = exam.publicationStatus === QuizPublicationStatus.DRAFT;
     const readiness = {
       listeningReading: hasLr
         ? lrValidation.learnerReady && lrSourceIsLive(lr, exam.toeicExamSet?.id)
         : undefined,
       speaking: hasSpeaking
-        ? this.speakingReady(speaking, template)
+        ? this.speakingReady(speaking, template, draftExam)
         : undefined,
-      writing: hasWriting ? this.writingReady(writing) : undefined,
+      writing: hasWriting ? this.writingReady(writing, draftExam) : undefined,
     };
     const learnerReady = Object.values(readiness).every(
       (value) => value !== false,
@@ -424,6 +437,8 @@ export class GenericExamService {
         child?.durationSeconds ??
         (exam.variantCode === 'TOEIC_SW' ? 4800 : undefined),
       groups: child?.groups ?? [],
+      // A 4-skill exam may read another exam's L&R, which it cannot edit.
+      lrEditable: Boolean(exam.toeicExamSet),
       totalGroups: child?.groups?.length ?? 0,
       totalQuestions,
       questionsCount: totalQuestions,
@@ -586,9 +601,10 @@ export class GenericExamService {
   async getLearnerPreview(id: number) {
     const exam = await this.findExam(id);
 
-    const lr = exam.toeicExamSet
+    const lrSet = this.lrSource(exam);
+    const lr = lrSet
       ? {
-          groups: exam.toeicExamSet.groups.map((group: any) => ({
+          groups: lrSet.groups.map((group: any) => ({
             part: group.part,
             groupOrder: group.groupOrder,
             imageUrl: group.imageUrl,
@@ -951,8 +967,43 @@ export class GenericExamService {
           where: { id: exam.toeicAssessment.id },
           data: { publicationStatus: QuizPublicationStatus.PUBLISHED },
         });
+      await this.publishInternalSources(tx, exam);
     });
     return this.getAdmin(id);
+  }
+
+  /** Speaking and Writing belong to the exam, so they go live with it. */
+  private async publishInternalSources(
+    tx: Prisma.TransactionClient,
+    exam: ProductRecord,
+  ) {
+    const components: any[] = exam.toeicAssessment?.components ?? [];
+    const speaking = components.find(
+      (component) => component.kind === 'SPEAKING',
+    )?.speakingPracticeSet;
+    const writing = components.find(
+      (component) => component.kind === 'WRITING',
+    )?.writingSet;
+    const data = { publicationStatus: QuizPublicationStatus.PUBLISHED };
+    if (speaking) {
+      await tx.speakingPracticeSet.update({
+        where: { id: speaking.id },
+        data,
+      });
+      await tx.speakingExercise.updateMany({
+        where: { practiceSetId: speaking.id },
+        data,
+      });
+    }
+    if (writing) {
+      await tx.quiz.updateMany({
+        where: {
+          id: { in: writing.items.map((item: any) => item.writingQuizId) },
+        },
+        data,
+      });
+      await tx.toeicWritingSet.update({ where: { id: writing.id }, data });
+    }
   }
 
   async unpublish(id: number) {

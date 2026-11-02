@@ -96,6 +96,74 @@ describe('GenericExamService Writing readiness', () => {
   });
 });
 
+describe('GenericExamService internal sources', () => {
+  const quiz = (publicationStatus: QuizPublicationStatus) => ({
+    publicationStatus,
+    questions: [],
+  });
+  const source = (publicationStatus: QuizPublicationStatus) => ({
+    publicationStatus,
+    items: Array.from({ length: 8 }, () => ({
+      taskKind: 'WRITTEN_REQUEST',
+      writingQuiz: quiz(publicationStatus),
+    })),
+  });
+
+  it('judges a draft exam by its content, not its source status', () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    expect(
+      service.writingReady(source(QuizPublicationStatus.DRAFT), true),
+    ).toBe(true);
+  });
+
+  it('never counts a draft source once the exam is live', () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    expect(
+      service.writingReady(source(QuizPublicationStatus.DRAFT), false),
+    ).toBe(false);
+  });
+
+  it('publishes Speaking and Writing with the exam', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    const tx = {
+      speakingPracticeSet: { update: jest.fn() },
+      speakingExercise: { updateMany: jest.fn() },
+      quiz: { updateMany: jest.fn() },
+      toeicWritingSet: { update: jest.fn() },
+    };
+
+    await service.publishInternalSources(tx, {
+      toeicAssessment: {
+        components: [
+          { kind: 'SPEAKING', speakingPracticeSet: { id: 7 } },
+          {
+            kind: 'WRITING',
+            writingSet: { id: 8, items: [{ writingQuizId: 41 }] },
+          },
+        ],
+      },
+    });
+
+    const data = { publicationStatus: QuizPublicationStatus.PUBLISHED };
+    expect(tx.speakingPracticeSet.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data,
+    });
+    expect(tx.speakingExercise.updateMany).toHaveBeenCalledWith({
+      where: { practiceSetId: 7 },
+      data,
+    });
+    expect(tx.quiz.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [41] } },
+      data,
+    });
+    expect(tx.toeicWritingSet.update).toHaveBeenCalledWith({
+      where: { id: 8 },
+      data,
+    });
+  });
+});
+
 describe('lrSourceIsLive', () => {
   const draft = { id: 3, publicationStatus: QuizPublicationStatus.DRAFT };
   const live = { id: 1, publicationStatus: QuizPublicationStatus.PUBLISHED };
