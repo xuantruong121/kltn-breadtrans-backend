@@ -92,6 +92,7 @@ function setup(components: unknown[], kind: string, componentId: number) {
     ...tx,
     toeicAssessmentAttempt: {
       findUnique: jest.fn().mockResolvedValue(attemptRow(components)),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     toeicAssessmentComponent: {
       findUnique: jest.fn().mockResolvedValue({
@@ -247,5 +248,101 @@ describe('TOEIC assessment exam room', () => {
     await expect(service.startComponent(1, 21, 7)).rejects.toThrow(
       ConflictException,
     );
+  });
+});
+
+describe('TOEIC assessment sessions', () => {
+  const fiveMinutesAgo = () => new Date(Date.now() - 5 * 60 * 1000);
+  const openSession = (id: number, startedAt: Date) => ({
+    id,
+    startedAt,
+    components: [
+      {
+        status: 'IN_PROGRESS',
+        startedAt,
+        assessmentComponent: { kind: 'SPEAKING' },
+      },
+    ],
+  });
+
+  it('opens a new session on Start and leaves the unfinished one alone', async () => {
+    const { service, db, tx } = setup([speaking()], 'SPEAKING', 20);
+    jest
+      .spyOn(service as any, 'getPublishedAssessment')
+      .mockResolvedValue({ components: [{ id: 20 }] });
+    jest
+      .spyOn(service as any, 'assertLearnerEntitlements')
+      .mockResolvedValue(undefined);
+    tx.$executeRaw = jest.fn().mockResolvedValue(1);
+    tx.toeicAssessmentAttempt.findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 1, status: 'IN_PROGRESS' });
+    tx.toeicAssessmentAttempt.create = jest.fn().mockResolvedValue({ id: 2 });
+
+    await service.startAttempt(8, 7);
+
+    expect(tx.toeicAssessmentAttempt.create).toHaveBeenCalledTimes(1);
+    expect(tx.toeicAssessmentAttempt.update).not.toHaveBeenCalled();
+    expect(db.toeicAssessmentAttempt.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 2 } }),
+    );
+  });
+
+  it('one press sent twice opens one session', async () => {
+    const { service, tx } = setup([speaking()], 'SPEAKING', 20);
+    jest
+      .spyOn(service as any, 'getPublishedAssessment')
+      .mockResolvedValue({ components: [{ id: 20 }] });
+    jest
+      .spyOn(service as any, 'assertLearnerEntitlements')
+      .mockResolvedValue(undefined);
+    tx.$executeRaw = jest.fn().mockResolvedValue(1);
+    tx.toeicAssessmentAttempt.findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 1 });
+    tx.toeicAssessmentAttempt.create = jest.fn();
+
+    await service.startAttempt(8, 7, 'press-1');
+
+    expect(tx.toeicAssessmentAttempt.create).not.toHaveBeenCalled();
+  });
+
+  it('offers the newest unfinished session that still has time', async () => {
+    const { service, db } = setup([speaking()], 'SPEAKING', 20);
+    const expired = openSession(5, new Date(Date.now() - 21 * 60 * 1000));
+    const live = openSession(4, fiveMinutesAgo());
+    db.toeicAssessmentAttempt.findMany.mockResolvedValue([expired, live]);
+
+    const attempt = await service.getAttempt(1, 7);
+
+    expect(attempt.previousSession?.id).toBe(4);
+    expect(attempt.previousSession?.sectionKind).toBe('SPEAKING');
+  });
+
+  it('offers nothing once every other session ran out', async () => {
+    const { service, db } = setup([speaking()], 'SPEAKING', 20);
+    db.toeicAssessmentAttempt.findMany.mockResolvedValue([
+      openSession(5, new Date(Date.now() - 21 * 60 * 1000)),
+    ]);
+
+    expect((await service.getAttempt(1, 7)).previousSession).toBeNull();
+  });
+
+  it('leaves a run-out session out of the history', async () => {
+    const { service, db } = setup([speaking()], 'SPEAKING', 20);
+    const old = new Date(Date.now() - 21 * 60 * 1000);
+    db.toeicAssessmentAttempt.findMany.mockResolvedValue([
+      attemptRow([speaking({ startedAt: old })]),
+      { ...attemptRow([speaking({ startedAt: new Date() })]), id: 2 },
+      {
+        ...attemptRow([speaking({ startedAt: old, status: 'COMPLETED' })]),
+        id: 3,
+        status: 'COMPLETED',
+      },
+    ]);
+
+    const history = await service.history(7);
+
+    expect(history.map((attempt) => attempt.id)).toEqual([2, 3]);
   });
 });

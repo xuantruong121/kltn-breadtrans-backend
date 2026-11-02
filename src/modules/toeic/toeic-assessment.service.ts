@@ -7,6 +7,12 @@ import {
 } from '@nestjs/common';
 import { summarizeAssessmentSkills } from './toeic-assessment-result';
 import {
+  COMPONENT_SECONDS,
+  canContinueSession,
+  openSection,
+  sessionDeadline,
+} from './toeic-assessment-session';
+import {
   reviewSpeakingTasks,
   reviewWritingTasks,
 } from './toeic-assessment-review';
@@ -45,15 +51,6 @@ const FAMILY_KINDS: Record<
     ToeicAssessmentComponentKind.SPEAKING,
     ToeicAssessmentComponentKind.WRITING,
   ],
-};
-
-/**
- * One clock per section, as on the Speaking and Writing tests. Listening &
- * Reading keeps its own deadline on the child attempt.
- */
-const COMPONENT_SECONDS: Partial<Record<string, number>> = {
-  SPEAKING: 20 * 60,
-  WRITING: 60 * 60,
 };
 
 type ComponentInput = SetToeicAssessmentComponentsDto['components'][number];
@@ -255,15 +252,8 @@ export class ToeicAssessmentService {
         });
         if (sameKey) return sameKey.id;
       }
-      const active = await tx.toeicAssessmentAttempt.findFirst({
-        where: {
-          assessmentId,
-          userId,
-          status: ToeicAssessmentAttemptStatus.IN_PROGRESS,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (active) return active.id;
+      // Start is always a new session. An unfinished one stays as it is, and
+      // the room offers to go back to it; see previousSession.
       const created = await tx.toeicAssessmentAttempt.create({
         data: {
           assessmentId,
@@ -343,7 +333,53 @@ export class ToeicAssessmentService {
         ),
       ];
     }
-    return projected;
+    return {
+      ...projected,
+      previousSession: await this.previousSession(attempt),
+    };
+  }
+
+  /**
+   * The newest other unfinished session of this exam that still has time, for
+   * the Khôi phục button inside the room.
+   */
+  private async previousSession(attempt: {
+    id: number;
+    assessmentId: number;
+    userId: number;
+    status: string;
+  }) {
+    if (attempt.status !== ToeicAssessmentAttemptStatus.IN_PROGRESS)
+      return null;
+    const others = await this.db.toeicAssessmentAttempt.findMany({
+      where: {
+        assessmentId: attempt.assessmentId,
+        userId: attempt.userId,
+        status: ToeicAssessmentAttemptStatus.IN_PROGRESS,
+        id: { not: attempt.id },
+      },
+      orderBy: { id: 'desc' },
+      // A session older than these has run out if they have.
+      take: 5,
+      include: {
+        components: {
+          orderBy: { assessmentComponent: { order: 'asc' as const } },
+          include: { assessmentComponent: true, toeicAttempt: true },
+        },
+      },
+    });
+    const now = new Date();
+    const other = others.find((item) =>
+      canContinueSession(item.components, now),
+    );
+    if (!other) return null;
+    return {
+      id: other.id,
+      startedAt: other.startedAt,
+      sectionKind:
+        openSection(other.components)?.assessmentComponent.kind ?? null,
+      deadlineAt: sessionDeadline(other.components),
+    };
   }
 
   /**
@@ -561,7 +597,15 @@ export class ToeicAssessmentService {
       orderBy: { startedAt: 'desc' },
       include: this.attemptInclude(),
     });
-    return attempts.map((attempt) => this.projectAttempt(attempt));
+    // A session left behind that ran out can never be continued or finished.
+    const now = new Date();
+    return attempts
+      .filter(
+        (attempt) =>
+          attempt.status === ToeicAssessmentAttemptStatus.COMPLETED ||
+          canContinueSession(attempt.components, now),
+      )
+      .map((attempt) => this.projectAttempt(attempt));
   }
 
   private componentInclude(): Prisma.ToeicAssessmentInclude {

@@ -1,9 +1,10 @@
 /**
  * The continuous TOEIC exam room in Chromium on the disposable harness.
  *
- *  - S&W: Start, Speaking intro, record, retake, reload keeps the clock and the
- *    takes, submit with questions missing, Writing, leave and come back with
- *    the draft kept, submit, result with grades arriving.
+ *  - S&W: Start, fullscreen, record, retake, marks, reload keeps the clock and
+ *    the takes, submit with questions missing, Writing, save and restore, leave,
+ *    Start opens a new session, Khôi phục returns to the old one with its draft,
+ *    submit, result with grades arriving.
  *  - The clock: each section closes itself at zero and the next one opens.
  *  - 4 Skills: Listening & Reading hands over to Speaking, then Writing.
  *  - Phone width.
@@ -19,6 +20,7 @@ import { harnessExec, harnessQuery } from './harness-db';
 
 const SHOTS = `${process.env.TEMP ?? '.'}/breadtrans-harness/shots/room`;
 const SW_EXAM = 3;
+const LR_EXAM = 2;
 const FOUR_SKILLS_EXAM = 5;
 
 const micArgs = (wav: string) => [
@@ -29,6 +31,8 @@ const micArgs = (wav: string) => [
 ];
 
 const body = (page: Page) => page.locator('body').innerText();
+const fullscreen = (page: Page) =>
+  page.evaluate(() => Boolean(document.fullscreenElement));
 const clock = async (page: Page) => {
   const text = await page
     .getByRole('timer', { name: 'Thời gian còn lại' })
@@ -76,9 +80,7 @@ async function speakingAndWriting(wav: string) {
   });
 
   await startExam(page, SW_EXAM);
-  await page
-    .getByRole('tab', { name: 'Câu 1–2' })
-    .waitFor({ timeout: 60_000 });
+  await page.getByRole('tab', { name: 'Câu 1–2' }).waitFor({ timeout: 60_000 });
   check('one click opens the first question', true);
   check(
     'no section picker is shown',
@@ -114,6 +116,27 @@ async function speakingAndWriting(wav: string) {
         .count()) === 0,
   );
   await record(page, 2, 4);
+  check('the exam opens in fullscreen', await fullscreen(page));
+  check(
+    'the panel matches Listening & Reading',
+    /Thời gian còn lại[\s\S]*Nộp bài[\s\S]*Khôi phục[\s\S]*Lưu bài làm[\s\S]*đánh dấu review[\s\S]*Câu 1–2/i.test(
+      await page.locator('aside').first().innerText(),
+    ),
+  );
+  check(
+    'Khôi phục waits while there is nothing to go back to',
+    await page.getByRole('button', { name: 'Khôi phục' }).first().isDisabled(),
+  );
+  await page
+    .getByRole('button', { name: 'Câu 2. Bấm để đánh dấu review' })
+    .click();
+  check(
+    'clicking a question number marks it in the panel',
+    (await page
+      .getByRole('button', { name: 'Câu 2, đã trả lời, đánh dấu review' })
+      .count()) === 1,
+  );
+  await page.screenshot({ path: `${SHOTS}/3b-speaking-marked.png` });
 
   await page.getByRole('tab', { name: 'Câu 3–4' }).click();
   await page.waitForTimeout(800);
@@ -142,32 +165,55 @@ async function speakingAndWriting(wav: string) {
       'hết lượt thu lại',
     ),
   );
+  check(
+    'reloading keeps the marks',
+    (await page
+      .getByRole('button', { name: 'Câu 2, đã trả lời, đánh dấu review' })
+      .count()) === 1,
+  );
+  check(
+    'a reload drops fullscreen and offers it back',
+    (await page.getByRole('button', { name: 'Vào toàn màn hình' }).count()) ===
+      1,
+  );
+  await page.getByRole('button', { name: 'Vào toàn màn hình' }).click();
+  await page.waitForTimeout(400);
+  check('one click returns to fullscreen', await fullscreen(page));
 
   await page.getByRole('button', { name: 'Nộp bài' }).first().click();
   const dialog = page.getByRole('dialog');
   check(
-    'submit names how many questions are missing',
-    (await dialog.innerText()).includes('Còn 9 câu chưa làm'),
+    'submit counts answered, missing and marked questions',
+    /2\s*Đã trả lời\s*9\s*Chưa trả lời\s*1\s*Đánh dấu review/.test(
+      await dialog.innerText(),
+    ),
   );
   await page.screenshot({ path: `${SHOTS}/6-speaking-submit.png` });
   await dialog.getByRole('button', { name: 'Xác nhận nộp bài' }).click();
-  await page
-    .getByRole('tab', { name: 'Câu 1–5' })
-    .waitFor({ timeout: 40_000 });
+  await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 40_000 });
   check(
-    'the Writing intro follows Speaking',
-    (await body(page)).includes('Đã nộp phần Speaking'),
+    'Writing follows Speaking, still fullscreen',
+    (await body(page)).includes('Đã nộp phần Speaking') &&
+      (await fullscreen(page)),
   );
 
   const links = harnessQuery(
     `select count(*) from "ToeicAssessmentSpeakingSubmission" l join "SpeakingSubmission" s on s.id = l."speakingSubmissionId" where s."userId" = ${account.userId}`,
   )[0]?.[0];
-  check('Speaking keeps one recording per answered question', links === '2', links);
+  check(
+    'Speaking keeps one recording per answered question',
+    links === '2',
+    links,
+  );
 
   await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 60_000 });
   await page.waitForTimeout(1500);
   const writingClock = await clock(page);
-  check('Writing clock starts near 60:00', writingClock > 3570, String(writingClock));
+  check(
+    'Writing clock starts near 60:00',
+    writingClock > 3570,
+    String(writingClock),
+  );
   await page.screenshot({ path: `${SHOTS}/8-writing-pictures.png` });
   await page
     .getByLabel('Bài viết câu 1')
@@ -181,35 +227,100 @@ async function speakingAndWriting(wav: string) {
   await page.screenshot({ path: `${SHOTS}/9-writing-email.png` });
   await page
     .getByLabel('Bài viết câu 6')
-    .fill('Dear team, I can attend the meeting on Friday and will bring the slides.');
+    .fill(
+      'Dear team, I can attend the meeting on Friday and will bring the slides.',
+    );
   await page.waitForTimeout(700);
 
+  // Lưu bài làm keeps a copy that Khôi phục brings back.
+  await page.getByRole('button', { name: 'Lưu bài làm' }).first().click();
+  await page
+    .getByText(/Bản lưu lúc .* trên máy này/)
+    .first()
+    .waitFor({ timeout: 10_000 });
+  await page.getByLabel('Bài viết câu 6').fill('changed after the save');
+  await page.getByRole('button', { name: 'Khôi phục' }).first().click();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${SHOTS}/9b-restore-save.png` });
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Khôi phục' })
+    .click();
+  check(
+    'Khôi phục returns the saved text',
+    (await page.getByLabel('Bài viết câu 6').inputValue()).startsWith(
+      'Dear team',
+    ),
+  );
+  await page.waitForTimeout(700);
+
+  const firstSession = page.url();
   await page.getByRole('button', { name: 'Thoát' }).first().click();
   await page.getByRole('dialog').getByRole('button', { name: 'Thoát' }).click();
   await page.waitForURL(/\/exams\/3/, { timeout: 30_000 });
-  await page
-    .getByRole('button', { name: 'Tiếp tục làm bài' })
-    .click({ timeout: 40_000 });
-  await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 60_000 });
+  await page.waitForTimeout(500);
+  check('leaving the room leaves fullscreen', !(await fullscreen(page)));
   check(
-    'leaving and returning opens the same section with the draft',
-    (await page.getByLabel('Bài viết câu 1').inputValue()).startsWith(
-      'The two colleagues',
-    ),
+    'the exam page only offers a start',
+    (await page.getByRole('button', { name: 'Tiếp tục làm bài' }).count()) ===
+      0,
   );
-  await page.getByRole('button', { name: 'Câu 8, chưa làm' }).click();
+  await page
+    .getByRole('button', { name: 'Bắt đầu làm bài' })
+    .click({ timeout: 40_000 });
+  await page.getByRole('tab', { name: 'Câu 1–2' }).waitFor({ timeout: 60_000 });
+  await page.waitForTimeout(1500);
+  check(
+    'Start opens a new session from Speaking at a full clock',
+    page.url() !== firstSession && (await clock(page)) > 1170,
+    page.url(),
+  );
+  check(
+    'the new session has no recordings of the old one',
+    !(await page.locator('#question-1').innerText()).includes('Đã lưu bản ghi'),
+  );
+  check('the new session is fullscreen too', await fullscreen(page));
+  await page.getByRole('button', { name: 'Khôi phục' }).first().click();
+  await page.waitForTimeout(300);
+  const offer = await page.getByRole('dialog').innerText();
+  check(
+    'Khôi phục offers the unfinished session and its section',
+    offer.includes('Phiên làm dở') &&
+      /phần Writing, còn khoảng (5\d|60) phút/.test(offer),
+    offer,
+  );
+  await page.screenshot({ path: `${SHOTS}/9c-restore-session.png` });
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Khôi phục' })
+    .click();
+  await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 60_000 });
+  await page.waitForTimeout(800);
+  check(
+    'going back opens the old session with its drafts, clock and fullscreen',
+    page.url() === firstSession &&
+      (await page.getByLabel('Bài viết câu 1').inputValue()).startsWith(
+        'The two colleagues',
+      ) &&
+      (await clock(page)) < 3600 &&
+      (await fullscreen(page)),
+    page.url(),
+  );
+  await page.getByRole('button', { name: 'Câu 8, chưa trả lời' }).click();
   await page.waitForTimeout(600);
-  await page.getByLabel('Bài viết câu 8').fill(
-    Array(60)
-      .fill('Working in a team helps people learn from each other every day.')
-      .join(' '),
-  );
+  await page
+    .getByLabel('Bài viết câu 8')
+    .fill(
+      Array(60)
+        .fill('Working in a team helps people learn from each other every day.')
+        .join(' '),
+    );
   await page.screenshot({ path: `${SHOTS}/10-writing-essay.png` });
   await page.getByRole('button', { name: 'Nộp bài' }).first().click();
   const submitWriting = page.getByRole('dialog');
   check(
-    'Writing submit names the 5 missing',
-    (await submitWriting.innerText()).includes('Còn 5 câu chưa làm'),
+    'Writing submit counts the 5 missing',
+    /3\s*Đã trả lời\s*5\s*Chưa trả lời/.test(await submitWriting.innerText()),
   );
   await submitWriting.getByRole('button', { name: 'Xác nhận nộp bài' }).click();
   await page.waitForURL(/\/result$/, { timeout: 40_000 });
@@ -228,13 +339,20 @@ async function speakingAndWriting(wav: string) {
   await page.reload();
   await page.getByRole('tab', { name: 'Writing' }).click({ timeout: 30_000 });
   await page.waitForTimeout(1200);
-  await page.screenshot({ path: `${SHOTS}/12-result-writing.png`, fullPage: true });
+  await page.screenshot({
+    path: `${SHOTS}/12-result-writing.png`,
+    fullPage: true,
+  });
   await page.goto(`${FE}/exams/${SW_EXAM}`);
   await page
     .getByRole('button', { name: 'Bắt đầu làm bài' })
     .waitFor({ timeout: 40_000 });
   check('a finished exam can be started again from its page', true);
-  check('no page error in the S&W run', errors.length === 0, errors.join(' | '));
+  check(
+    'no page error in the S&W run',
+    errors.length === 0,
+    errors.join(' | '),
+  );
   await browser.close();
 }
 
@@ -251,9 +369,7 @@ async function clockRunsOut(wav: string) {
     `update "ToeicAssessmentAttemptComponent" c set "startedAt" = now() - interval '19 minutes 54 seconds' from "ToeicAssessmentAttempt" a where a.id = c."assessmentAttemptId" and a."userId" = ${account.userId} and c.status = 'IN_PROGRESS'`,
   );
   await page.reload();
-  await page
-    .getByRole('tab', { name: 'Câu 1–5' })
-    .waitFor({ timeout: 40_000 });
+  await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 40_000 });
   check('Speaking closes itself at zero with nothing recorded', true);
   await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 60_000 });
   await page.getByLabel('Bài viết câu 1').fill('A man is reading a report.');
@@ -266,7 +382,11 @@ async function clockRunsOut(wav: string) {
   const stored = harnessQuery(
     `select count(*) from "ToeicAssessmentWritingSubmission" l join "Submission" s on s.id = l."submissionId" where s."userId" = ${account.userId}`,
   )[0]?.[0];
-  check('Writing closes itself at zero and keeps the draft', stored === '1', stored);
+  check(
+    'Writing closes itself at zero and keeps the draft',
+    stored === '1',
+    stored,
+  );
   await browser.close();
 }
 
@@ -279,30 +399,75 @@ async function fourSkills(wav: string) {
   );
   await startExam(page, FOUR_SKILLS_EXAM);
   await page.waitForURL(/\/toeic\/attempts\//, { timeout: 60_000 });
-  await page.getByRole('tab', { name: 'Part 1', exact: true }).waitFor({ timeout: 60_000 });
-  check('Listening & Reading opens in its own room', true);
+  await page
+    .getByRole('tab', { name: 'Part 1', exact: true })
+    .waitFor({ timeout: 60_000 });
+  check(
+    'Listening & Reading opens in its own room, in fullscreen',
+    await fullscreen(page),
+  );
   await page.getByRole('button', { name: 'Nộp bài' }).first().click();
   await page.getByRole('button', { name: 'Xác nhận nộp bài' }).click();
-  await page
-    .getByRole('tab', { name: 'Câu 1–2' })
-    .waitFor({ timeout: 60_000 });
+  await page.getByRole('tab', { name: 'Câu 1–2' }).waitFor({ timeout: 60_000 });
   const text = await body(page);
   check(
     'Speaking follows Listening & Reading with no result page between',
-    text.includes('Đã nộp phần Listening & Reading') && page.url().includes('/toeic/assessments/'),
+    text.includes('Đã nộp phần Listening & Reading') &&
+      page.url().includes('/toeic/assessments/'),
+  );
+  check(
+    'fullscreen carries over from the paper to Speaking',
+    await fullscreen(page),
   );
   await page.screenshot({ path: `${SHOTS}/21-after-lr.png` });
 
-  // The same hand-over when the clock ends the paper.
-  const { browser: second, page: late, account: lateAccount } = await studentPage(
-    'room-4s-late',
-    1366,
-    true,
-    micArgs(wav),
+  // A new session opens on the paper, and Khôi phục there reaches the old one.
+  const oldSession = page.url();
+  await page.getByRole('button', { name: 'Thoát' }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Thoát' }).click();
+  await page.waitForURL(/\/exams\//, { timeout: 30_000 });
+  await startExam(page, FOUR_SKILLS_EXAM);
+  await page.waitForURL(/\/toeic\/attempts\//, { timeout: 60_000 });
+  await page
+    .getByRole('tab', { name: 'Part 1', exact: true })
+    .waitFor({ timeout: 60_000 });
+  check('Start opens a new paper, in fullscreen', await fullscreen(page));
+  await page
+    .getByRole('button', { name: 'Khôi phục' })
+    .first()
+    .click({ timeout: 30_000 });
+  await page.waitForTimeout(300);
+  const offer = await page.getByRole('dialog').innerText();
+  check(
+    'the paper offers the unfinished session',
+    offer.includes('Phiên làm dở') &&
+      /phần Speaking, còn khoảng ([1-9]|1\d|20) phút/.test(offer),
+    offer,
   );
+  await page.screenshot({ path: `${SHOTS}/21b-restore-from-paper.png` });
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Khôi phục' })
+    .click();
+  await page.getByRole('tab', { name: 'Câu 1–2' }).waitFor({ timeout: 60_000 });
+  await page.waitForTimeout(800);
+  check(
+    'going back reopens its Speaking section, still fullscreen',
+    page.url() === oldSession && (await fullscreen(page)),
+    page.url(),
+  );
+
+  // The same hand-over when the clock ends the paper.
+  const {
+    browser: second,
+    page: late,
+    account: lateAccount,
+  } = await studentPage('room-4s-late', 1366, true, micArgs(wav));
   await startExam(late, FOUR_SKILLS_EXAM);
   await late.waitForURL(/\/toeic\/attempts\//, { timeout: 60_000 });
-  await late.getByRole('tab', { name: 'Part 1', exact: true }).waitFor({ timeout: 60_000 });
+  await late
+    .getByRole('tab', { name: 'Part 1', exact: true })
+    .waitFor({ timeout: 60_000 });
   await hurry(
     `update "ToeicAttempt" set deadline = now() + interval '4 seconds' where "userId" = ${lateAccount.userId} and status = 'IN_PROGRESS'`,
   );
@@ -318,6 +483,58 @@ async function fourSkills(wav: string) {
   check('the Listening & Reading clock hands over to Speaking', true);
   await second.close();
   void account;
+  await browser.close();
+}
+
+/** The stand-alone Listening & Reading paper shares its panel with the room. */
+async function listeningReading() {
+  const { browser, page } = await studentPage('room-lr', 1366);
+  await page.goto(`${FE}/exams/${LR_EXAM}`, {
+    waitUntil: 'networkidle',
+    timeout: 90_000,
+  });
+  await hidePet(page);
+  await page.locator('input[name="toeic-mode"][value="FULL_TEST"]').check();
+  await page.getByRole('button', { name: /chế độ toàn màn hình/ }).click();
+  await page.waitForURL(/\/toeic\/attempts\/\d+/, { timeout: 60_000 });
+  await page
+    .locator('article[data-question-id]')
+    .first()
+    .waitFor({ timeout: 60_000 });
+  await page.waitForTimeout(1500);
+  check('the paper opens in fullscreen', await fullscreen(page));
+  const aside = page.locator('aside').first();
+  check(
+    'the shared panel keeps its order and its Parts',
+    /Thời gian còn lại[\s\S]*Nộp bài[\s\S]*Khôi phục[\s\S]*Lưu bài làm[\s\S]*đánh dấu review[\s\S]*Part 1[\s\S]*Part 7/i.test(
+      await aside.innerText(),
+    ),
+  );
+  check(
+    'Khôi phục waits for a save',
+    await aside.getByRole('button', { name: 'Khôi phục' }).isDisabled(),
+  );
+  await page.locator('#q-1 input[type="radio"]').nth(0).check();
+  await page.waitForTimeout(1000);
+  await aside.getByRole('button', { name: 'Lưu bài làm' }).click();
+  await aside.getByText(/Bản lưu lúc/).waitFor({ timeout: 15_000 });
+  await page.locator('#q-1 input[type="radio"]').nth(2).check();
+  await page.waitForTimeout(1000);
+  await aside.getByRole('button', { name: 'Khôi phục' }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Khôi phục' })
+    .click();
+  await page.waitForTimeout(1000);
+  check(
+    'Khôi phục brings back the saved answer',
+    await page.locator('#q-1 input[type="radio"]').nth(0).isChecked(),
+  );
+  await aside.getByRole('button', { name: 'Nộp bài' }).click();
+  await page.getByRole('button', { name: 'Xác nhận nộp bài' }).click();
+  await page.waitForURL(/\/toeic\/results\//, { timeout: 60_000 });
+  await page.waitForTimeout(800);
+  check('the result page is not fullscreen', !(await fullscreen(page)));
   await browser.close();
 }
 
@@ -339,7 +556,7 @@ async function phone(wav: string) {
   await page.getByRole('button', { name: 'Mở bảng câu hỏi' }).click();
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${SHOTS}/31-phone-drawer.png` });
-  await page.getByRole('button', { name: 'Câu 9, chưa làm' }).click();
+  await page.getByRole('button', { name: 'Câu 9, chưa trả lời' }).click();
   await page.waitForTimeout(600);
   check(
     'a number in the drawer opens its tab',
@@ -350,22 +567,42 @@ async function phone(wav: string) {
 }
 
 async function preview(wav: string) {
-  const { browser, account } = await studentPage('room-preview', 1366, false, micArgs(wav));
+  const { browser, account } = await studentPage(
+    'room-preview',
+    1366,
+    false,
+    micArgs(wav),
+  );
   harnessExec(`update "User" set role = 'ADMIN' where id = ${account.userId}`);
-  const page = await (await browser.newContext({ viewport: { width: 1366, height: 900 } })).newPage();
-  await page.goto(`${FE}/login`, { waitUntil: 'networkidle', timeout: 120_000 });
+  const page = await (
+    await browser.newContext({ viewport: { width: 1366, height: 900 } })
+  ).newPage();
+  await page.goto(`${FE}/login`, {
+    waitUntil: 'networkidle',
+    timeout: 120_000,
+  });
   await page.click('button[aria-controls="email-login-panel"]');
   await page.fill('input[name="email"]', account.email);
   await page.fill('input[name="password"]', account.password);
   await page.click('#email-login-panel button[type="submit"]');
-  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 60_000, waitUntil: 'commit' });
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'), {
+    timeout: 60_000,
+    waitUntil: 'commit',
+  });
   await page.goto(`${FE}/admin/exams/${SW_EXAM}/learner-preview`);
   await page.getByRole('tab', { name: 'Câu 1–2' }).waitFor({ timeout: 60_000 });
   await page.getByRole('tab', { name: 'Câu 8–10' }).click();
   await page.waitForTimeout(600);
-  check('admin preview uses the learner paper', (await page.locator('[id^="question-"]').count()) === 3);
+  check(
+    'admin preview uses the learner paper',
+    (await page.locator('[id^="question-"]').count()) === 3,
+  );
   await page.screenshot({ path: `${SHOTS}/40-preview-speaking.png` });
-  await page.getByRole('button', { name: 'Writing' }).or(page.getByRole('tab', { name: 'Writing' })).first().click();
+  await page
+    .getByRole('button', { name: 'Writing' })
+    .or(page.getByRole('tab', { name: 'Writing' }))
+    .first()
+    .click();
   await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 30_000 });
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${SHOTS}/41-preview-writing.png` });
@@ -387,6 +624,7 @@ async function main() {
   await run('sw', speakingAndWriting);
   await run('clock', clockRunsOut);
   await run('four', fourSkills);
+  await run('lr', listeningReading);
   await run('phone', phone);
   await run('preview', preview);
   console.log(`failures: ${failureCount()}`);
