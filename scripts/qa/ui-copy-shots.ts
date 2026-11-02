@@ -18,8 +18,6 @@ const LEARNER = [
   '/speaking',
 ];
 const ADMIN = [
-  '/admin/toeic/assessments',
-  '/admin/toeic/writing-sets',
   '/admin/grammar',
 ];
 

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Patch,
   Delete,
   Body,
@@ -24,13 +25,18 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { AdminExamService } from './admin-exam.service';
+import { ExamWritingService } from './exam-writing.service';
 import { GenericExamService } from './generic-exam.service';
 import { ToeicAiExamService } from './toeic-ai-exam.service';
 import {
   CreateToeicAiExamDto,
   RegenerateToeicAiUnitDto,
 } from './toeic-ai-exam.dto';
-import { CreateGenericExamDto, UpdateGenericExamDto } from './generic-exam.dto';
+import {
+  ExamWritingSlotDto,
+  CreateGenericExamDto,
+  UpdateGenericExamDto,
+} from './generic-exam.dto';
 import {
   SpeakingExerciseDto,
   SpeakingExerciseReorderDto,
@@ -53,6 +59,7 @@ export class AdminExamController {
   constructor(
     private readonly adminExamService: AdminExamService,
     private readonly genericExamService: GenericExamService,
+    private readonly examWritingService: ExamWritingService,
     private readonly toeicAiExamService: ToeicAiExamService,
   ) {}
 
@@ -341,6 +348,30 @@ export class AdminExamController {
       exerciseId,
       req.user,
     );
+  }
+
+  @Get(':id/writing')
+  @ApiOperation({ summary: 'Admin: 8 câu Writing của đề' })
+  getWriting(@Param('id', ParseIntPipe) id: number) {
+    return this.examWritingService.get(id);
+  }
+
+  @Put(':id/writing/slots/:order')
+  @ApiOperation({ summary: 'Admin: tạo hoặc sửa một câu Writing của đề' })
+  @ApiResponse({ status: 409, description: 'Đề không còn là bản nháp.' })
+  saveWritingSlot(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('order', ParseIntPipe) order: number,
+    @Body() dto: ExamWritingSlotDto,
+  ) {
+    return this.examWritingService.saveSlot(id, order, dto);
+  }
+
+  @Post(':id/writing/publish')
+  @ApiOperation({ summary: 'Admin: hoàn tất phần Writing của đề' })
+  @ApiResponse({ status: 400, description: 'Chưa đủ 8 câu đúng dạng.' })
+  publishWriting(@Param('id', ParseIntPipe) id: number) {
+    return this.examWritingService.publish(id);
   }
 
   @Post(':id/speaking/publish')

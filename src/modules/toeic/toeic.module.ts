@@ -10,6 +10,7 @@ import {
   AdminToeicAssessmentController,
   ToeicAssessmentController,
 } from './toeic-assessment.controller';
+import { ExamWritingService } from './exam-writing.service';
 import { GenericExamService } from './generic-exam.service';
 import { GenericExamController } from './generic-exam.controller';
 import { SkillCmsModule } from '../content/skill-cms.module';
@@ -35,6 +36,7 @@ import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-s
     AdminExamService,
     ToeicAssessmentService,
     GenericExamService,
+    ExamWritingService,
     ToeicAiExamService,
     PixabayImageSearchProvider,
     OpenverseImageSearchProvider,
@@ -46,6 +48,7 @@ import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-s
     AdminExamService,
     ToeicAssessmentService,
     GenericExamService,
+    ExamWritingService,
     ToeicAiExamService,
   ],
 })

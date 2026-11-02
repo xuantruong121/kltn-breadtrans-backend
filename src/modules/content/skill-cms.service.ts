@@ -249,7 +249,11 @@ export class SkillCmsService {
       };
     }
     const quizzes = await this.prisma.quiz.findMany({
-      where: this.contentTypeWhere(domain),
+      // Writing tasks of a TOEIC exam are edited in the exam, not listed here.
+      where: {
+        ...this.contentTypeWhere(domain),
+        ...(domain === 'writing' ? { toeicWritingSetItems: { none: {} } } : {}),
+      },
       orderBy: { id: 'desc' },
       include: {
         _count: { select: { questions: true, submissions: true } },
