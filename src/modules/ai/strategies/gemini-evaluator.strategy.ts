@@ -989,7 +989,7 @@ Trả về JSON duy nhất: {"clarity":"Excellent|Good|Fair|Poor","feedback":"2-
         contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
-          responseSchema: request.schema as any,
+          responseSchema: request.schema,
           temperature: request.temperature,
         },
       }),
@@ -1298,7 +1298,7 @@ Use only visible facts. Reject images that are blurry, abstract, text-heavy, bra
         contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
-          responseSchema: request.schema as any,
+          responseSchema: request.schema,
           temperature: request.temperature,
         },
       }),

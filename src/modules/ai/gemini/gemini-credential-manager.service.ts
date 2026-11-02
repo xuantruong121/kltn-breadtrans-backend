@@ -101,10 +101,16 @@ export function classifyGeminiError(error: any): GeminiErrorClass {
  */
 export function isGeminiOutage(error: unknown) {
   return (
-    ['RATE_LIMIT', 'AUTH', 'MODEL_NOT_FOUND', 'PROVIDER_TRANSIENT', 'TIMEOUT'].includes(
-      classifyGeminiError(error),
-    ) ||
-    /fetch failed|GEMINI_API_KEY/i.test(String((error as Error)?.message ?? error))
+    [
+      'RATE_LIMIT',
+      'AUTH',
+      'MODEL_NOT_FOUND',
+      'PROVIDER_TRANSIENT',
+      'TIMEOUT',
+    ].includes(classifyGeminiError(error)) ||
+    /fetch failed|GEMINI_API_KEY/i.test(
+      String((error as Error)?.message ?? error),
+    )
   );
 }
 
