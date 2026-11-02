@@ -28,6 +28,8 @@ import type {
   ContextualSpeakingFullDraftSuggestion,
   ContextualListeningFullDraftSuggestion,
   ContextualReadingFullDraftSuggestion,
+  ContextualDictationSuggestion,
+  ContextualVocabDecksSuggestion,
   ContextualVocabFullDraftSuggestion,
   ContextualGrammarFullDraftSuggestion,
   ToeicExamBatch,
@@ -613,6 +615,7 @@ export class AiService {
   }
 
   async suggestWritingTask(input: {
+    sourceText?: string;
     taskType: string;
     level?: string;
     topic?: string;
@@ -668,6 +671,7 @@ export class AiService {
   }
 
   async suggestSpeakingFullDraft(input: {
+    sourceText?: string;
     topic: string;
     level: string;
     category: string;
@@ -686,6 +690,7 @@ export class AiService {
   }
 
   async suggestListeningFullDraft(input: {
+    sourceText?: string;
     topic: string;
     level?: string;
     mode: 'DIALOGUE' | 'DICTATION';
@@ -701,6 +706,7 @@ export class AiService {
   }
 
   async suggestReadingFullDraft(input: {
+    sourceText?: string;
     topic: string;
     level: string;
     targetLength?: number;
@@ -731,7 +737,38 @@ export class AiService {
     return this.aiEvaluator.suggestVocabFullDraft(input);
   }
 
+  async suggestVocabDecksFromDocument(input: {
+    text: string;
+    level?: string;
+    maxDecks: number;
+    maxWordsPerDeck: number;
+  }): Promise<ContextualVocabDecksSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestVocabDecksFromDocument) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ tạo bộ từ từ tài liệu',
+      );
+    }
+    return this.aiEvaluator.suggestVocabDecksFromDocument(input);
+  }
+
+  async suggestDictationLines(input: {
+    topic: string;
+    level?: string;
+    count: number;
+    sourceText?: string;
+  }): Promise<ContextualDictationSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestDictationLines) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ soạn câu chép chính tả',
+      );
+    }
+    return this.aiEvaluator.suggestDictationLines(input);
+  }
+
   async suggestGrammarFullDraft(input: {
+    sourceText?: string;
     topicTitle: string;
     level: string;
     objective?: string;

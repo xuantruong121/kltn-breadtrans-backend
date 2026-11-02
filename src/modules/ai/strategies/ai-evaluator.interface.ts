@@ -311,6 +311,7 @@ export interface IAIEvaluator {
 
   /** Phase 5B: Writing task candidates only, without media fabrication. */
   suggestWritingTask?(input: {
+    sourceText?: string;
     taskType: string;
     level?: string;
     topic?: string;
@@ -344,6 +345,7 @@ export interface IAIEvaluator {
   }): Promise<ContextualSpeakingExercisesSuggestion>;
 
   suggestSpeakingFullDraft?(input: {
+    sourceText?: string;
     topic: string;
     level: string;
     category: string;
@@ -362,6 +364,7 @@ export interface IAIEvaluator {
   }): Promise<ToeicSpeakingWritingDraft>;
 
   suggestListeningFullDraft?(input: {
+    sourceText?: string;
     topic: string;
     level?: string;
     mode: 'DIALOGUE' | 'DICTATION';
@@ -369,6 +372,7 @@ export interface IAIEvaluator {
   }): Promise<ContextualListeningFullDraftSuggestion>;
 
   suggestReadingFullDraft?(input: {
+    sourceText?: string;
     topic: string;
     level: string;
     targetLength?: number;
@@ -383,7 +387,22 @@ export interface IAIEvaluator {
     count: number;
   }): Promise<ContextualVocabFullDraftSuggestion>;
 
+  suggestVocabDecksFromDocument?(input: {
+    text: string;
+    level?: string;
+    maxDecks: number;
+    maxWordsPerDeck: number;
+  }): Promise<ContextualVocabDecksSuggestion>;
+
+  suggestDictationLines?(input: {
+    topic: string;
+    level?: string;
+    count: number;
+    sourceText?: string;
+  }): Promise<ContextualDictationSuggestion>;
+
   suggestGrammarFullDraft?(input: {
+    sourceText?: string;
     topicTitle: string;
     level: string;
     objective?: string;
@@ -607,6 +626,27 @@ export interface ContextualReadingFullDraftSuggestion {
   level: string;
   passage: string;
   questions: ContextualReadingCandidate[];
+}
+
+export interface ContextualVocabDecksSuggestion {
+  decks: Array<{
+    title: string;
+    description?: string;
+    level?: string;
+    words: Array<{
+      word: string;
+      pos?: string;
+      meaning: string;
+      exampleEn?: string;
+      exampleVi?: string;
+    }>;
+  }>;
+}
+
+export interface ContextualDictationSuggestion {
+  title: string;
+  description?: string;
+  sentences: string[];
 }
 
 export interface ContextualVocabFullDraftSuggestion {
