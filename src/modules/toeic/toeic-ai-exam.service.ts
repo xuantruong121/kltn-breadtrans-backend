@@ -40,6 +40,7 @@ import { TOEIC_WRITING_SLOT_CONTRACT } from '../writing/toeic-writing-set.contra
 import { ImageSearchCandidate } from './pixabay-image-search.provider';
 import { ImageSearchProviderChain } from './image-search.provider-chain';
 import { bestImageCandidate, imageSearchQuery } from './exam-image-query';
+import { questionsToAvoid } from './toeic-ai-batch.logic';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
 import type {
   ToeicPart1CandidateAnalysis,
@@ -2386,6 +2387,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             topic: request.topic,
             difficulty: request.difficulty,
             groups: slice,
+            avoidQuestions: questionsToAvoid(generatedBatches, part),
           });
           const generatedBatch = {
             batchKey,

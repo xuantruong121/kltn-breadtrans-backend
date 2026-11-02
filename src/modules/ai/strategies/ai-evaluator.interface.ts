@@ -449,6 +449,8 @@ export type ToeicExamBatchGroup = {
 
 export type ToeicExamBatchRequest = {
   part: number;
+  /** Questions this Part already holds; the batch must not repeat them. */
+  avoidQuestions?: string[];
   topic?: string;
   difficulty: 'easy' | 'medium' | 'hard';
   groups: Array<{ questionCount: number; kind?: 'SINGLE' | 'MULTIPLE' }>;
