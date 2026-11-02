@@ -44,7 +44,7 @@ import {
   SuggestDictationLinesDto,
   VocabDecksFromDocumentDto,
 } from './dto/contextual-ai.dto';
-import { AiGeneratorService } from './ai-generator.service';
+import { DocumentTextService } from './document-text.service';
 import {
   DOCUMENT_MAX_BYTES,
   DOCUMENT_MAX_DECKS,
@@ -66,7 +66,7 @@ export class AdminContextualAiController {
 
   constructor(
     private readonly aiService: AiService,
-    private readonly documents: AiGeneratorService,
+    private readonly documents: DocumentTextService,
     private readonly prisma: PrismaService,
     @Optional()
     private readonly speakingCategoryService?: SpeakingCategoryService,

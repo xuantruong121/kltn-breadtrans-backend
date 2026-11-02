@@ -318,10 +318,6 @@ export class AiService {
     return this.aiEvaluator.generateToeicSpeakingWritingDraft(input);
   }
 
-  async generateDictation(topic: string, count: number): Promise<any[]> {
-    return this.aiEvaluator.generateDictation(topic, count);
-  }
-
   async generateTtsAudio(text: string): Promise<Buffer | null> {
     const azureKey = process.env.AZURE_SPEECH_KEY;
     const azureRegion = process.env.AZURE_SPEECH_REGION;
@@ -475,32 +471,6 @@ export class AiService {
     return this.aiEvaluator.evaluateSpeakingPart3To5(
       promptText,
       studentResponse,
-    );
-  }
-
-  async importEtsPdf(
-    pdfBuffer: Buffer,
-    pdfMimeType: string,
-    audioBuffer?: Buffer,
-    audioMimeType?: string,
-    audioUrl?: string,
-  ): Promise<any[]> {
-    return this.aiEvaluator.importEtsPdf(
-      pdfBuffer,
-      pdfMimeType,
-      audioBuffer,
-      audioMimeType,
-      audioUrl,
-    );
-  }
-
-  async generateSmartContentFromDocument(
-    documentText: string,
-    options?: { quizCount?: number; flashcardCount?: number },
-  ) {
-    return this.aiEvaluator.generateSmartContentFromDocument(
-      documentText,
-      options,
     );
   }
 

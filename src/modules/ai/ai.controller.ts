@@ -6,35 +6,20 @@ import {
   Res,
   Body,
   UseGuards,
-  UseInterceptors,
-  UploadedFiles,
   BadRequestException,
   HttpStatus,
-  GoneException,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { AiService } from './ai.service';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
   ApiProperty,
-  ApiConsumes,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { Role } from '@prisma/client';
 import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
-import {
-  IsString,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsArray,
-  Min,
-} from 'class-validator';
+import { IsString, IsOptional, IsArray } from 'class-validator';
 
 export class ChatDto {
   @ApiProperty({
@@ -54,36 +39,6 @@ export class ChatDto {
   @IsOptional()
   @IsArray()
   messages?: Array<{ role: string; content: string }>;
-}
-
-export class GenerateToeicDto {
-  @ApiProperty({ example: 'Office Equipment' })
-  @IsString()
-  @IsNotEmpty()
-  topic: string;
-
-  @ApiProperty({ example: 5 })
-  part: number;
-
-  @ApiProperty({ example: 5 })
-  count: number;
-}
-
-export class GenerateDictationDto {
-  @ApiProperty({ example: 'Daily conversation at the restaurant' })
-  @IsString()
-  @IsNotEmpty()
-  topic: string;
-
-  @ApiProperty({
-    example: 20,
-    minimum: 20,
-    description: 'Minimum 20 sentences per dictation exercise',
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  @Min(20)
-  count: number;
 }
 
 @ApiTags('ai')
@@ -116,32 +71,6 @@ export class AiController {
     return { reply, answer: reply };
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard, AiRateLimitGuard)
-  @Roles(Role.ADMIN)
-  @ApiBearerAuth()
-  @Post('generate-dictation')
-  @ApiOperation({ summary: 'AI tự động sinh bài Luyện Nghe (Chép chính tả)' })
-  generateDictation(@Body() dto: GenerateDictationDto) {
-    void dto;
-    throw new GoneException(
-      'Đường dẫn legacy đã được đóng để bảo vệ quy trình AI soạn bài. Hãy dùng Admin AI Generator để tạo bản nháp, xem duyệt và xuất bản.',
-    );
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard, AiRateLimitGuard)
-  @Roles(Role.ADMIN)
-  @ApiBearerAuth()
-  @Post('generate-toeic-quiz')
-  @ApiOperation({ summary: 'Sinh bộ câu hỏi TOEIC tự động theo chủ đề' })
-  async generateToeicQuiz(@Body() dto: GenerateToeicDto) {
-    const questions = await this.aiService.generateToeicQuestions(
-      dto.topic,
-      dto.part,
-      dto.count,
-    );
-    return { success: true, questions };
-  }
-
   @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
   @Post('explain-toeic-error/:questionId')
@@ -162,36 +91,6 @@ export class AiController {
       body.correctAnswer,
     );
     return { success: true, explanation };
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Post('import-ets-pdf')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiBearerAuth()
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'pdfFile', maxCount: 1 },
-      { name: 'audioFile', maxCount: 1 },
-    ]),
-  )
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({
-    summary:
-      'AI tự động đọc PDF + Audio đề ETS và trích xuất vào DB (Chỉ ADMIN)',
-  })
-  importEtsPdf(
-    @UploadedFiles()
-    files: {
-      pdfFile?: Express.Multer.File[];
-      audioFile?: Express.Multer.File[];
-    },
-  ) {
-    throw new GoneException(
-      'Đường dẫn import legacy đã được đóng. Hãy dùng Admin AI Generator có job bền vững và bước xem duyệt.',
-    );
-    void files;
   }
 
   @Get('tts/vietnamese')

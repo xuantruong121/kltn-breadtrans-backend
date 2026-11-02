@@ -178,7 +178,6 @@ export interface IAIEvaluator {
    * @param topic Chủ đề
    * @param count Số lượng câu
    */
-  generateDictation(topic: string, count: number): Promise<any[]>;
 
   /**
    * Đánh giá TOEIC Writing Part 1
@@ -230,23 +229,12 @@ export interface IAIEvaluator {
    * @param audioMimeType MimeType của file Audio (Tùy chọn)
    * @param audioUrl URL của Audio đã upload để gắn vào JSON
    */
-  importEtsPdf(
-    pdfBuffer: Buffer,
-    pdfMimeType: string,
-    audioBuffer?: Buffer,
-    audioMimeType?: string,
-    audioUrl?: string,
-  ): Promise<any[]>;
 
   /**
    * Sinh câu hỏi trắc nghiệm, Flashcard và bài tập từ văn bản tài liệu đã trích xuất
    * @param documentText Nội dung tài liệu
    * @param options Tùy chọn số lượng câu hỏi và flashcard
    */
-  generateSmartContentFromDocument(
-    documentText: string,
-    options?: { quizCount?: number; flashcardCount?: number },
-  ): Promise<SmartGeneratedContent>;
 
   /** Phase 5A: Gợi ý nội dung từ vựng theo chuẩn VocabWord */
   suggestVocabWord?(input: {
