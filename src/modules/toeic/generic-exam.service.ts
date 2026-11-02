@@ -42,6 +42,21 @@ import { examListFacets, filterExamList } from './exam-admin-list';
 
 type ProductRecord = any;
 
+/**
+ * An exam's own draft L&R goes live inside publish(), so requiring it to be
+ * published first would make the exam impossible to publish. Only a source
+ * borrowed from another exam must already be live.
+ */
+export function lrSourceIsLive(
+  lr: { id: number; publicationStatus: string } | null | undefined,
+  ownSetId: number | undefined,
+) {
+  if (lr?.publicationStatus === QuizPublicationStatus.PUBLISHED) return true;
+  return (
+    lr?.publicationStatus === QuizPublicationStatus.DRAFT && lr.id === ownSetId
+  );
+}
+
 @Injectable()
 export class GenericExamService {
   constructor(
@@ -272,8 +287,7 @@ export class GenericExamService {
     const hasWriting = hasSpeaking;
     const readiness = {
       listeningReading: hasLr
-        ? lrValidation.learnerReady &&
-          lr?.publicationStatus === QuizPublicationStatus.PUBLISHED
+        ? lrValidation.learnerReady && lrSourceIsLive(lr, exam.toeicExamSet?.id)
         : undefined,
       speaking: hasSpeaking
         ? this.speakingReady(speaking, template)

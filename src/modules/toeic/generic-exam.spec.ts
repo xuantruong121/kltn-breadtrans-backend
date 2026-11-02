@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { QuizPublicationStatus } from '@prisma/client';
-import { GenericExamService } from './generic-exam.service';
+import { GenericExamService, lrSourceIsLive } from './generic-exam.service';
 
 describe('GenericExamService Writing readiness', () => {
   const service: any = Object.create(GenericExamService.prototype);
@@ -93,6 +93,30 @@ describe('GenericExamService Writing readiness', () => {
     const projected = service.project(exam);
     expect(projected.totalQuestions).toBe(19);
     expect(projected.durationSeconds).toBe(4800);
+  });
+});
+
+describe('lrSourceIsLive', () => {
+  const draft = { id: 3, publicationStatus: QuizPublicationStatus.DRAFT };
+  const live = { id: 1, publicationStatus: QuizPublicationStatus.PUBLISHED };
+
+  it('lets a draft exam publish together with its own L&R', () => {
+    expect(lrSourceIsLive(draft, 3)).toBe(true);
+  });
+
+  it('refuses a borrowed L&R that is still a draft', () => {
+    expect(lrSourceIsLive(draft, 9)).toBe(false);
+  });
+
+  it('accepts a live source and refuses a missing or retired one', () => {
+    expect(lrSourceIsLive(live, 9)).toBe(true);
+    expect(lrSourceIsLive(null, 9)).toBe(false);
+    expect(
+      lrSourceIsLive(
+        { id: 3, publicationStatus: QuizPublicationStatus.ARCHIVED },
+        3,
+      ),
+    ).toBe(false);
   });
 });
 
