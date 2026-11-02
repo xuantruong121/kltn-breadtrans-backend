@@ -98,7 +98,7 @@ export class GenericExamService {
     toeicExamSet: {
       include: {
         groups: {
-          include: { questions: true },
+          include: { questions: { orderBy: { questionNumber: 'asc' } } },
           orderBy: { groupOrder: 'asc' },
         },
         _count: { select: { attempts: true } },
@@ -110,7 +110,14 @@ export class GenericExamService {
           orderBy: { order: 'asc' },
           include: {
             lrExamSet: {
-              include: { groups: { include: { questions: true } } },
+              include: {
+                groups: {
+                  include: {
+                    questions: { orderBy: { questionNumber: 'asc' } },
+                  },
+                  orderBy: { groupOrder: 'asc' },
+                },
+              },
             },
             speakingPracticeSet: {
               include: { exercises: { include: { stimulus: true } } },
