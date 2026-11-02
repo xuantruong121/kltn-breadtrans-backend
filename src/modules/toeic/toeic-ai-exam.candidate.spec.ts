@@ -95,7 +95,7 @@ describe('ToeicAiExamService.getCandidate — Phase E candidate-first review', (
     expect(result.flaggedCount).toBe(1);
   });
 
-  it('flags a Listening group (Part 1-4) missing transcript/audio', async () => {
+  it('flags a Listening group (Part 2-4) missing its script', async () => {
     prisma.aiGenerationJob.findUnique.mockResolvedValue({
       createdByAdminId: 7,
       draftSnapshot: {
@@ -112,7 +112,29 @@ describe('ToeicAiExamService.getCandidate — Phase E candidate-first review', (
     });
 
     const result = await service.getCandidate('job-1', 7);
-    expect(result.lrGroups[0].issues).toContain('Chưa có transcript/audio');
+    expect(result.lrGroups[0].issues).toContain('Chưa có lời thoại');
+  });
+
+  it('expects no script from Part 1, which reads its four statements', async () => {
+    prisma.aiGenerationJob.findUnique.mockResolvedValue({
+      createdByAdminId: 7,
+      draftSnapshot: {
+        version: 1,
+        lrBatches: [
+          {
+            part: 1,
+            groupOrder: 1,
+            questionNumber: 1,
+            candidate: {
+              groups: [{ imageBrief: 'A desk.', questions: [] }],
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await service.getCandidate('job-1', 7);
+    expect(result.lrGroups[0].issues).toEqual([]);
   });
 
   it('exposes real Speaking/Writing task content with deterministic flags', async () => {
