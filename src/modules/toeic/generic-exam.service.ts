@@ -939,7 +939,35 @@ export class GenericExamService {
         },
       });
     }
+    if (dto.title !== undefined) await this.renameSources(exam, dto.title);
     return this.project(updated);
+  }
+
+  /** Learners read the assessment's title, not the exam's. */
+  private async renameSources(exam: ProductRecord, title: string) {
+    const assessment = exam.toeicAssessment;
+    if (!assessment) return;
+    await this.prisma.toeicAssessment.update({
+      where: { id: assessment.id },
+      data: { title },
+    });
+    const components: any[] = assessment.components ?? [];
+    const speaking = components.find(
+      (component) => component.kind === 'SPEAKING',
+    )?.speakingPracticeSet;
+    const writing = components.find(
+      (component) => component.kind === 'WRITING',
+    )?.writingSet;
+    if (speaking)
+      await this.prisma.speakingPracticeSet.update({
+        where: { id: speaking.id },
+        data: { title: `${title} — Speaking` },
+      });
+    if (writing)
+      await this.prisma.toeicWritingSet.update({
+        where: { id: writing.id },
+        data: { title: `${title} — Writing` },
+      });
   }
 
   async publish(id: number) {

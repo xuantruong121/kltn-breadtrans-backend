@@ -164,6 +164,44 @@ describe('GenericExamService internal sources', () => {
   });
 });
 
+describe('GenericExamService.update title', () => {
+  it('renames what learners read, not only the exam row', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    const update = () => jest.fn().mockResolvedValue({});
+    service.prisma = {
+      exam: { update: update() },
+      toeicAssessment: { update: update() },
+      speakingPracticeSet: { update: update() },
+      toeicWritingSet: { update: update() },
+    };
+    service.project = jest.fn();
+    service.findExam = jest.fn().mockResolvedValue({
+      toeicAssessment: {
+        id: 3,
+        components: [
+          { kind: 'SPEAKING', speakingPracticeSet: { id: 7 } },
+          { kind: 'WRITING', writingSet: { id: 8 } },
+        ],
+      },
+    });
+
+    await service.update(5, { title: 'Đề 02' });
+
+    expect(service.prisma.toeicAssessment.update).toHaveBeenCalledWith({
+      where: { id: 3 },
+      data: { title: 'Đề 02' },
+    });
+    expect(service.prisma.speakingPracticeSet.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { title: 'Đề 02 — Speaking' },
+    });
+    expect(service.prisma.toeicWritingSet.update).toHaveBeenCalledWith({
+      where: { id: 8 },
+      data: { title: 'Đề 02 — Writing' },
+    });
+  });
+});
+
 describe('lrSourceIsLive', () => {
   const draft = { id: 3, publicationStatus: QuizPublicationStatus.DRAFT };
   const live = { id: 1, publicationStatus: QuizPublicationStatus.PUBLISHED };
