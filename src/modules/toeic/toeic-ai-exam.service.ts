@@ -40,7 +40,7 @@ import { TOEIC_SPEAKING_TASK_SEQUENCE } from '../speaking/toeic-speaking-contrac
 import { TOEIC_WRITING_SLOT_CONTRACT } from '../writing/toeic-writing-set.contract';
 import { ImageSearchCandidate } from './pixabay-image-search.provider';
 import { ImageSearchProviderChain } from './image-search.provider-chain';
-import { bestImageCandidate, imageSearchQuery } from './exam-image-query';
+import { bestImageCandidate, imageSearchQueries } from './exam-image-query';
 import {
   isVietnameseExplanation,
   prepareGeneratedBatch,
@@ -1191,11 +1191,113 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * Apply leaves a slot empty when no library answered, and Speaking and
+   * Writing have no per-item retry, so this fills only the empty slots.
+   */
+  async fillMissingImages(examId: number) {
+    const exam = await this.editableDraft(examId);
+    const setId = exam.toeicExamSet!.id;
+    const filled: string[] = [];
+    const missing: string[] = [];
+    const attempt = async (slot: string, fill: () => Promise<boolean>) => {
+      const done = await fill().catch((error) => {
+        this.logger.warn(`Exam image still missing ${slot}: ${String(error)}`);
+        return false;
+      });
+      (done ? filled : missing).push(slot);
+    };
+
+    const groups = await this.prisma.toeicQuestionGroup.findMany({
+      where: { examId: setId, part: 1, imageUrl: null },
+      orderBy: { groupOrder: 'asc' },
+    });
+    for (const group of groups)
+      await attempt(`Part 1 nhóm ${group.groupOrder}`, async () => {
+        await this.regenerateMedia(examId, group.id, 'image');
+        return true;
+      });
+
+    const owner = await this.prisma.exam.findUnique({
+      where: { id: examId },
+      include: { toeicAssessment: { include: { components: true } } },
+    });
+    const job = owner?.aiGenerationJobId
+      ? await this.prisma.aiGenerationJob.findUnique({
+          where: { id: owner.aiGenerationJobId },
+        })
+      : null;
+    const draft = (job?.draftSnapshot as any)?.speakingWriting;
+    const components: any[] = owner?.toeicAssessment?.components ?? [];
+    const speakingSetId = components.find(
+      (component) => component.kind === 'SPEAKING',
+    )?.speakingPracticeSetId;
+    const writingSetId = components.find(
+      (component) => component.kind === 'WRITING',
+    )?.writingSetId;
+
+    if (draft && speakingSetId) {
+      const exercises = await this.prisma.speakingExercise.findMany({
+        where: { practiceSetId: speakingSetId, imageUrl: null },
+        orderBy: { order: 'asc' },
+      });
+      for (const exercise of exercises) {
+        const brief = draft.speaking?.[(exercise.order ?? 0) - 1]?.imageBrief;
+        if (!brief) continue;
+        await attempt(`Speaking câu ${exercise.order}`, async () => {
+          const image = await this.sourceExamImage(
+            `exam-${examId}/speaking/${exercise.order}`,
+            brief,
+            1,
+          );
+          await this.prisma.speakingExercise.update({
+            where: { id: exercise.id },
+            data: { imageUrl: image.url },
+          });
+          return true;
+        });
+      }
+    }
+
+    if (draft && writingSetId) {
+      const items = await this.prisma.toeicWritingSetItem.findMany({
+        where: { writingSetId },
+        include: { writingQuiz: { include: { questions: true } } },
+        orderBy: { order: 'asc' },
+      });
+      for (const item of items) {
+        const brief = draft.writing?.[item.order - 1]?.imageBrief;
+        const question = item.writingQuiz.questions[0];
+        const content = (question?.content ?? {}) as Record<string, unknown>;
+        if (!brief || !question || content.imageUrl) continue;
+        await attempt(`Writing câu ${item.order}`, async () => {
+          const image = await this.sourceExamImage(
+            `exam-${examId}/writing/${item.order}`,
+            brief,
+            1,
+          );
+          await this.prisma.question.update({
+            where: { id: question.id },
+            data: {
+              content: {
+                ...content,
+                imageUrl: image.url,
+                aiMedia: image.metadata,
+              } as Prisma.InputJsonValue,
+            },
+          });
+          return true;
+        });
+      }
+    }
+    return { filled, missing };
+  }
+
   async regenerateMedia(
     examId: number,
     groupId: number,
     kind: 'image' | 'audio',
-  ) {
+  ): Promise<unknown> {
     const exam = await this.editableDraft(examId);
     const group = await this.prisma.toeicQuestionGroup.findFirst({
       where: { id: groupId, examId: exam.toeicExamSet!.id },
@@ -1208,34 +1310,31 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException(
           'Chỉ Part 1 có thể tạo lại ảnh từ mô tả hiện tại',
         );
-      let image: Awaited<ReturnType<AiService['generateToeicExamImage']>>;
       try {
-        image = await this.ai.generateToeicExamImage({
-          brief: group.imageBrief,
-          part: 1,
-        });
-        this.assertImage(image.buffer, image.mimeType);
-        const uploaded = await this.r2.putObjectAtKey(
-          `ai/toeic-exams/exam-${exam.toeicExamSet!.id}/groups/${group.id}/image-regenerated.${image.mimeType === 'image/png' ? 'png' : 'jpg'}`,
-          image.buffer,
-          image.mimeType,
+        const image = await this.sourceExamImage(
+          `exam-${exam.toeicExamSet!.id}/groups/${group.id}/image-regenerated`,
+          group.imageBrief,
+          1,
         );
-        if (!(await this.r2.objectExists(uploaded.key)))
-          throw new BadRequestException('R2 chưa xác nhận ảnh tạo lại');
         metadata.image = {
-          source: 'AI_GENERATED',
+          ...image.metadata,
           status: 'READY',
-          r2Key: uploaded.key,
+          r2Key: image.key,
           generatedAt: new Date().toISOString(),
           briefHash: toeicMediaHash(group.imageBrief),
         };
-        return this.prisma.toeicQuestionGroup.update({
+        await this.matchPart1QuestionToImage(group, metadata, image);
+        const updated = await this.prisma.toeicQuestionGroup.update({
           where: { id: group.id },
           data: {
-            imageUrl: uploaded.url,
+            imageUrl: image.url,
             mediaMetadata: metadata as Prisma.InputJsonValue,
           },
         });
+        // Part 1 audio reads the statements, which the photo just replaced.
+        return metadata.image.questionStatus === 'READY_FOR_REVIEW'
+          ? await this.regenerateMedia(examId, groupId, 'audio')
+          : updated;
       } catch {
         throw new BadRequestException(mediaRetryMessage('image'));
       }
@@ -2123,8 +2222,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
 
   /** Null when no library has a suitable image; the caller then falls back. */
   private async imageFromLibrary(scope: string, brief: string) {
-    const query = imageSearchQuery(brief);
-    if (!query) return null;
+    for (const query of imageSearchQueries(brief)) {
+      const image = await this.imageForQuery(scope, query);
+      if (image) return image;
+    }
+    return null;
+  }
+
+  private async imageForQuery(scope: string, query: string) {
     let candidates: ImageSearchCandidate[];
     try {
       candidates = await this.imageSearch.search(query, { limit: 5 });
@@ -2186,7 +2291,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
 
   /** A library photo is not the scene the question was written for. */
   private async matchPart1QuestionToImage(
-    group: { questions: Array<{ id: number }> },
+    group: { questions: Array<{ id: number; options?: unknown }> },
     metadata: { image?: Record<string, unknown> },
     image: { buffer?: Buffer; mimeType?: string; metadata: object },
   ) {
@@ -2201,7 +2306,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         mimeType: image.mimeType,
       });
       this.assertPart1QuestionCandidate(vision);
-      if (question)
+      if (question) {
         await this.prisma.toeicQuestion.update({
           where: { id: question.id },
           data: {
@@ -2211,6 +2316,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             explanation: vision.explanation,
           },
         });
+        // The audio is built from this same object right after.
+        question.options = vision.statements;
+      }
       metadata.image = {
         ...metadata.image,
         questionStatus: 'READY_FOR_REVIEW',

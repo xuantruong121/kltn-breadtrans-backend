@@ -233,6 +233,19 @@ export class AdminExamController {
     return this.toeicAiExamService.regeneratePartCandidate(id, part, dto.topic);
   }
 
+  @Post(':id/ai/images/fill-missing')
+  @ApiOperation({
+    summary:
+      'Admin: tìm ảnh cho các ô còn thiếu của Draft (Part 1, Speaking, Writing)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Danh sách ô đã có ảnh và còn thiếu',
+  })
+  fillMissingExamImages(@Param('id', ParseIntPipe) id: number) {
+    return this.toeicAiExamService.fillMissingImages(id);
+  }
+
   @Post(':id/ai/groups/:groupId/media/:kind/regenerate')
   regenerateAiMedia(
     @Param('id', ParseIntPipe) id: number,

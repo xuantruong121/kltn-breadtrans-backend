@@ -67,6 +67,24 @@ describe('exam images', () => {
     expect(service.ai.generateToeicExamImage).toHaveBeenCalled();
   });
 
+  it('shortens the query when the full one finds nothing', async () => {
+    const service = build(true);
+    service.imageSearch.search
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([candidate]);
+
+    const image = await service.sourceExamImage(
+      's',
+      'A person sitting at a desk typing on a laptop computer',
+      1,
+    );
+
+    expect(
+      service.imageSearch.search.mock.calls.map((call: any) => call[0]),
+    ).toEqual(['person sitting desk typing laptop', 'person sitting desk']);
+    expect(image.metadata).toMatchObject({ provider: 'OPENVERSE' });
+  });
+
   it('rewrites a Part 1 question to match a library photo', async () => {
     const service = build(true);
     const update = jest.fn();
@@ -79,21 +97,117 @@ describe('exam images', () => {
     });
     service.assertPart1QuestionCandidate = jest.fn();
     const metadata: { image?: Record<string, unknown> } = { image: {} };
+    const group = { questions: [{ id: 7, options: ['old'] }] };
 
-    await service.matchPart1QuestionToImage(
-      { questions: [{ id: 7 }] },
-      metadata,
-      {
-        buffer: png,
-        mimeType: 'image/png',
-        metadata: { provenance: 'EXTERNAL_LIBRARY' },
-      },
-    );
+    await service.matchPart1QuestionToImage(group, metadata, {
+      buffer: png,
+      mimeType: 'image/png',
+      metadata: { provenance: 'EXTERNAL_LIBRARY' },
+    });
 
     expect(update).toHaveBeenCalledWith({
       where: { id: 7 },
       data: expect.objectContaining({ correctIndex: 1 }),
     });
     expect(metadata.image?.questionStatus).toBe('READY_FOR_REVIEW');
+    // Audio is scripted from this object straight after the match.
+    expect(group.questions[0].options).toEqual(['A', 'B', 'C', 'D']);
+  });
+
+  describe('fillMissingImages', () => {
+    const fixture = () => {
+      const service = build(true);
+      service.editableDraft = jest
+        .fn()
+        .mockResolvedValue({ toeicExamSet: { id: 3 } });
+      service.regenerateMedia = jest.fn().mockResolvedValue({});
+      service.prisma = {
+        toeicQuestionGroup: {
+          findMany: jest.fn().mockResolvedValue([{ id: 8, groupOrder: 1 }]),
+        },
+        exam: {
+          findUnique: jest.fn().mockResolvedValue({
+            aiGenerationJobId: 'job',
+            toeicAssessment: {
+              components: [
+                { kind: 'SPEAKING', speakingPracticeSetId: 11 },
+                { kind: 'WRITING', writingSetId: 22 },
+              ],
+            },
+          }),
+        },
+        aiGenerationJob: {
+          findUnique: jest.fn().mockResolvedValue({
+            draftSnapshot: {
+              speakingWriting: {
+                speaking: [{}, {}, { imageBrief: 'team meeting' }],
+                writing: [{ imageBrief: 'office desk' }, {}],
+              },
+            },
+          }),
+        },
+        speakingExercise: {
+          findMany: jest.fn().mockResolvedValue([
+            { id: 31, order: 3 },
+            { id: 32, order: 5 },
+          ]),
+          update: jest.fn(),
+        },
+        toeicWritingSetItem: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              order: 1,
+              writingQuiz: {
+                questions: [{ id: 41, content: { prompt: 'Viết' } }],
+              },
+            },
+            {
+              order: 2,
+              writingQuiz: {
+                questions: [{ id: 42, content: { prompt: 'Email' } }],
+              },
+            },
+          ]),
+        },
+        question: { update: jest.fn() },
+      };
+      return service;
+    };
+
+    it('fills empty slots and skips tasks with no image brief', async () => {
+      const service = fixture();
+
+      const result = await service.fillMissingImages(5);
+
+      expect(result).toEqual({
+        filled: ['Part 1 nhóm 1', 'Speaking câu 3', 'Writing câu 1'],
+        missing: [],
+      });
+      expect(service.prisma.speakingExercise.update).toHaveBeenCalledWith({
+        where: { id: 31 },
+        data: { imageUrl: 'https://r2.test/a.png' },
+      });
+      expect(service.prisma.question.update).toHaveBeenCalledTimes(1);
+      expect(
+        service.prisma.question.update.mock.calls[0][0].data.content,
+      ).toMatchObject({ prompt: 'Viết', imageUrl: 'https://r2.test/a.png' });
+    });
+
+    it('reports a slot it could not fill and carries on', async () => {
+      const service = fixture();
+      service.regenerateMedia.mockRejectedValue(new Error('down'));
+
+      const result = await service.fillMissingImages(5);
+
+      expect(result.missing).toEqual(['Part 1 nhóm 1']);
+      expect(result.filled).toContain('Writing câu 1');
+    });
+
+    it('refuses an exam that is not an editable Draft', async () => {
+      const service = fixture();
+      service.editableDraft.mockRejectedValue(new Error('Chỉ Draft'));
+
+      await expect(service.fillMissingImages(5)).rejects.toThrow('Chỉ Draft');
+    });
   });
 });
