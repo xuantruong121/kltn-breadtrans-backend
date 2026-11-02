@@ -1,3 +1,4 @@
+import { withoutMediaFailure } from './toeic-media';
 import {
   isVietnameseExplanation,
   prepareGeneratedBatch,
@@ -219,5 +220,18 @@ describe('questionsToAvoid on Part 6', () => {
     expect(questionsToAvoid([batch], 6)).toEqual([
       'The branch closes on Friday.',
     ]);
+  });
+});
+
+describe('withoutMediaFailure', () => {
+  it('drops the failure marks and keeps the rest', () => {
+    expect(
+      withoutMediaFailure({
+        status: 'FAILED',
+        errorCode: 'PROVIDER_UNAVAILABLE',
+        failedAt: 'now',
+      }),
+    ).toEqual({ status: 'FAILED' });
+    expect(withoutMediaFailure(undefined)).toEqual({});
   });
 });

@@ -30,6 +30,7 @@ import {
   mediaRetryMessage,
   toeicMediaHash,
   withMediaFailure,
+  withoutMediaFailure,
 } from './toeic-media';
 import {
   buildToeicListeningAudioScript,
@@ -1508,8 +1509,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       if (!exists)
         throw new BadRequestException('R2 chưa xác nhận ảnh vừa tải lên');
       const current = (group.mediaMetadata as any) ?? {};
-      const imageMetadata = {
-        ...(current.image ?? {}),
+      const imageBrief = stored.query || group.imageBrief;
+      const imageMetadata: Record<string, any> = {
+        ...withoutMediaFailure(current.image),
+        // The brief changes to the search words, so the hash must follow it.
+        briefHash: toeicMediaHash(imageBrief),
         source: stored.candidate.provider,
         provenance: 'EXTERNAL_LIBRARY',
         provider: stored.candidate.provider,
@@ -1535,7 +1539,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         where: { id: group.id },
         data: {
           imageUrl: uploaded.url,
-          imageBrief: stored.query || group.imageBrief,
+          imageBrief,
           mediaMetadata: mediaMetadata as Prisma.InputJsonValue,
         },
       });
