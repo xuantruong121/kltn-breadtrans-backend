@@ -1,3 +1,5 @@
+import { keywordsOf } from '../writing/writing.service';
+import { levelFromTitle, pictureCardHiddenReason } from './skill-cms-list';
 import { historyEditProblem } from './edit-with-history';
 import { parseCefrRange, titleWithLevel } from '../subscription/practice-level';
 import {
@@ -303,6 +305,63 @@ export class SkillCmsService {
         questionsWithAudio: counts.get(quiz.id) ?? 0,
       })),
       query,
+    );
+  }
+
+  /**
+   * One card per picture, the way learners see them. Exam tasks stay out: they
+   * belong to their exam, like every other Writing list here.
+   */
+  async listWritingPictures(user: Admin) {
+    this.admin(user);
+    const quizzes = await this.prisma.quiz.findMany({
+      where: {
+        type: QuizType.WRITING_PICTURE,
+        toeicWritingSetItems: { none: {} },
+      },
+      orderBy: { id: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        isPremiumContent: true,
+        publicationStatus: true,
+        practiceTopicId: true,
+        questions: {
+          select: { id: true, content: true },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        },
+      },
+    });
+    return quizzes.flatMap((quiz) =>
+      quiz.questions
+        .filter(
+          (question) =>
+            (question.content as { taskType?: unknown } | null)?.taskType ===
+            'PICTURE_SENTENCE',
+        )
+        .map((question, index, tasks) => {
+          const content = question.content as Record<string, unknown>;
+          const imageUrl =
+            typeof content.imageUrl === 'string' ? content.imageUrl : null;
+          const keywords = keywordsOf(content);
+          return {
+            quizId: quiz.id,
+            title: quiz.title,
+            questionId: question.id,
+            position: index + 1,
+            total: tasks.length,
+            imageUrl,
+            keywords,
+            isPremiumContent: quiz.isPremiumContent,
+            level: levelFromTitle(quiz.title) || null,
+            hiddenReason: pictureCardHiddenReason({
+              publicationStatus: quiz.publicationStatus,
+              hasPracticeTopic: quiz.practiceTopicId !== null,
+              imageUrl,
+              keywords,
+            }),
+          };
+        }),
     );
   }
 

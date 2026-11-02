@@ -6,6 +6,7 @@ import { UploadService } from '../upload/upload.service';
 import { R2Service } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import { AiService } from '../ai/ai.service';
+import { CloudflareWorkersAiClient } from '../ai/cloudflare-workers-ai.client';
 import { GeminiEvaluatorStrategy } from '../ai/strategies/gemini-evaluator.strategy';
 import { AI_EVALUATOR_TOKEN } from '../ai/strategies/ai-evaluator.interface';
 import { SpeakingProcessorService } from './speaking-processor.service';
@@ -36,6 +37,7 @@ import { LearnerProgressModule } from '../learning-path/learner-progress.module'
     R2Service,
     R2CleanupService,
     AiService,
+    CloudflareWorkersAiClient,
     {
       provide: AI_EVALUATOR_TOKEN,
       useClass: GeminiEvaluatorStrategy,

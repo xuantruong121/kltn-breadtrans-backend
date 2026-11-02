@@ -237,3 +237,17 @@ export function firstImageByQuiz(
   }
   return images;
 }
+
+/** Why a picture card is missing from learners' Writing page, if it is. */
+export function pictureCardHiddenReason(card: {
+  publicationStatus?: string | null;
+  hasPracticeTopic: boolean;
+  imageUrl: string | null;
+  keywords: string[];
+}) {
+  if (card.publicationStatus !== 'PUBLISHED') return 'bài chưa xuất bản';
+  if (!card.hasPracticeTopic) return 'bài chưa thuộc chủ đề luyện viết';
+  if (!card.imageUrl) return 'chưa có ảnh';
+  if (card.keywords.length !== 2) return 'cần đúng 2 từ khoá';
+  return null;
+}

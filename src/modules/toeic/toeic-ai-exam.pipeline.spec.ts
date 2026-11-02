@@ -41,7 +41,10 @@ function batchFor(part: number, groups: PlannedGroup[]) {
           ? { imageBrief: `A realistic office scene ${groupKey}.` }
           : {}),
         ...((plan as any).graphic
-          ? { passageText: 'GRAPHIC: Schedule\n9:00 | Open\n10:00 | Talk\n11:00 | Close' }
+          ? {
+              passageText:
+                'GRAPHIC: Schedule\n9:00 | Open\n10:00 | Talk\n11:00 | Close',
+            }
           : {}),
         ...(part >= 6
           ? {

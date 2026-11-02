@@ -1,3 +1,4 @@
+import { learnerPassage } from './toeic-ai-batch.logic';
 import {
   BadRequestException,
   ConflictException,
@@ -771,7 +772,7 @@ export class GenericExamService {
             groupOrder: group.groupOrder,
             imageUrl: group.imageUrl,
             // Listening scripts stay hidden, exactly as in a real attempt.
-            passageText: group.part <= 4 ? null : group.passageText,
+            passageText: learnerPassage(group.part, group.passageText),
             hasAudio: !!group.audioUrl,
             audioSrc: group.audioPlaybackUrl ?? group.audioUrl ?? null,
             questions: group.questions.map((question: any) =>

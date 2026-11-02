@@ -3,7 +3,7 @@ import { isGeminiOutage } from './gemini/gemini-credential-manager.service';
 
 const DEFAULT_TEXT_MODEL = '@cf/openai/gpt-oss-120b';
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const TEXT_TIMEOUT_MS = 120_000;
+const TEXT_TIMEOUT_MS = 180_000;
 const IMAGE_TIMEOUT_MS = 60_000;
 
 export const CLOUDFLARE_UNAVAILABLE = 'CLOUDFLARE_UNAVAILABLE';
@@ -71,8 +71,7 @@ export class CloudflareWorkersAiClient {
     }
     const payload: any = await response.json().catch(() => null);
     if (!response.ok || payload?.success === false) {
-      const reason =
-        payload?.errors?.[0]?.message ?? `HTTP ${response.status}`;
+      const reason = payload?.errors?.[0]?.message ?? `HTTP ${response.status}`;
       this.logger.warn(`cloudflare_ai_failed model=${model}: ${reason}`);
       throw unavailable(String(reason));
     }

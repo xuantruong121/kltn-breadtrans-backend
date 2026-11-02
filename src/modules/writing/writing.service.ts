@@ -41,7 +41,7 @@ import {
 } from './exam-writing-grading';
 
 /** A task's cue words, from either authored field. */
-function keywordsOf(c: any): string[] {
+export function keywordsOf(c: any): string[] {
   return Array.isArray(c?.keywords)
     ? c.keywords
     : Array.isArray(c?.requiredKeywords)

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { AiService } from './ai.service';
 import {
   CloudflareWorkersAiClient,
@@ -127,6 +129,23 @@ describe('the Cloudflare stand-in', () => {
     expect(isAiOutage({ status: 503 })).toBe(true);
     expect(isAiOutage({ code: 'CLOUDFLARE_UNAVAILABLE' })).toBe(true);
     expect(isAiOutage(new SyntaxError('Unexpected token'))).toBe(false);
+  });
+});
+
+describe('every AiService', () => {
+  // The exam module gets the copy from SpeakingProcessingModule. Loading that
+  // module here would open Redis, so its provider list is read as text.
+  it('can reach the stand-in in each module that provides one', () => {
+    for (const file of [
+      'ai.module.ts',
+      '../speaking/speaking-processing.module.ts',
+    ]) {
+      const providers = readFileSync(join(__dirname, file), 'utf8').split(
+        'providers:',
+      )[1];
+      expect(providers).toContain('AiService,');
+      expect(providers).toContain('CloudflareWorkersAiClient,');
+    }
   });
 });
 

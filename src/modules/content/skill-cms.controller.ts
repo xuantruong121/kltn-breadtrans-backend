@@ -99,6 +99,14 @@ export class SkillCmsController {
     return this.service.list(domain, req.user, query);
   }
 
+  @Get('writing/pictures')
+  @ApiOperation({
+    summary: 'Mỗi tranh Viết theo tranh một thẻ, như học viên thấy',
+  })
+  listWritingPictures(@Request() req: any) {
+    return this.service.listWritingPictures(req.user);
+  }
+
   @Get('speaking/stimuli') listSpeakingStimuli(@Request() req: any) {
     return this.service.listSpeakingStimuli(req.user);
   }

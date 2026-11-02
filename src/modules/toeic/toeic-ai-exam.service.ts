@@ -189,10 +189,10 @@ function planFor(part: number): PlannedGroup[] {
         })),
         { questionCount: 2, kind: 'SINGLE' as const },
         // Two double and three triple passages.
-        ...Array.from({ length: 5 }, (_, index) => ({
+        ...Array.from({ length: 5 }, (_, index): PlannedGroup => ({
           questionCount: 5,
           kind: 'MULTIPLE' as const,
-          documents: (index < 2 ? 2 : 3) as 2 | 3,
+          documents: index < 2 ? 2 : 3,
         })),
       ];
     default:
@@ -209,9 +209,7 @@ function plannedGroupOf(
 ): PlannedGroup {
   const offset = Number(String(batch.batchKey ?? '').split(':')[1]);
   const planned = request.plan?.[Number(batch.part)]?.[offset + index];
-  return planned?.questionCount === questionCount
-    ? planned
-    : { questionCount };
+  return planned?.questionCount === questionCount ? planned : { questionCount };
 }
 
 function isPng(buffer: Buffer) {
@@ -569,8 +567,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             };
           });
           const groupIssues: string[] = [];
-          if (batch.part >= 1 && batch.part <= 4 && !group.transcript?.trim())
-            groupIssues.push('Chưa có transcript/audio');
+          if (batch.part >= 2 && batch.part <= 4 && !group.transcript?.trim())
+            groupIssues.push('Chưa có lời thoại');
           if (
             (batch.part === 6 || batch.part === 7) &&
             !group.passageText?.trim()
@@ -1832,7 +1830,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     input: ToeicExamBatchRequest,
     firstQuestionNumber: number,
     slice: PlannedGroup[],
-    earlierBatches: Parameters<ToeicAiExamService['assertNoDuplicateBatches']>[0],
+    earlierBatches: Parameters<
+      ToeicAiExamService['assertNoDuplicateBatches']
+    >[0],
     identity: { batchKey: string; groupOrder: number },
   ) {
     let refusal = '';

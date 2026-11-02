@@ -7,6 +7,7 @@ import { HttpExceptionFilter } from '../../src/common/filters/http-exception.fil
 import { TransformInterceptor } from '../../src/common/interceptors/transform.interceptor';
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { createServer } from 'node:http';
 
 const mode =
   process.env.WRITING_QA_PROVIDER_MODE === 'failure' ? 'failure' : 'success';
@@ -50,8 +51,194 @@ function deterministicGrammarQuestions(count: number) {
   );
 }
 
+// ---- deterministic TOEIC exam author, for the exam AI browser run
+let examSerial = 0;
+const words = (count: number, seed: number) =>
+  Array.from({ length: count }, (_, i) => `word${seed}x${i}`).join(' ');
+
+function examBatch(input: {
+  part: number;
+  groups: Array<{
+    questionCount: number;
+    kind?: string;
+    documents?: number;
+    threeSpeakers?: boolean;
+    graphic?: boolean;
+  }>;
+}) {
+  const { part } = input;
+  return {
+    groups: input.groups.map((plan) => {
+      const id = ++examSerial;
+      const script =
+        part === 3
+          ? `M: ${words(60, id)}\nW1: ${words(50, id + 1000)}${plan.threeSpeakers ? `\nW2: ${words(10, id + 2000)}` : ''}`
+          : part === 4
+            ? `Speaker: ${words(130, id)}`
+            : `Speaker: Prompt number ${id}.`;
+      const passage = plan.documents
+        ? Array.from(
+            { length: plan.documents },
+            (_, i) => `DOCUMENT ${i + 1}\nDocument body ${id}-${i}.`,
+          ).join('\n\n')
+        : part === 6
+          ? `Passage ${id} _____ then _____ next _____ last _____ end.`
+          : `Passage number ${id}.`;
+      return {
+        ...(part >= 2 && part <= 4 ? { transcript: script } : {}),
+        ...(part === 1
+          ? { imageBrief: `Two people at a desk, scene ${id}.` }
+          : {}),
+        ...(part >= 6 ? { passageText: passage } : {}),
+        ...(plan.graphic
+          ? {
+              passageText: `GRAPHIC: Schedule ${id}\nTime | Room\n9:00 | A1\n10:00 | B2\n11:00 | C3`,
+            }
+          : {}),
+        questions: Array.from({ length: plan.questionCount }, (_, q) => ({
+          text:
+            part === 5
+              ? `Sentence ${id} needs a word _____ here.`
+              : plan.graphic && q === plan.questionCount - 1
+                ? `Look at the graphic. Which room is used ${id}?`
+                : `What is asked in item ${id}-${q}?`,
+          options: Array.from({ length: part === 2 ? 3 : 4 }, (_, o) =>
+            part === 6 && q === 0
+              ? `This is a whole sentence choice ${id}${o}.`
+              : `Choice ${id}-${q}-${o}`,
+          ),
+          correctIndex: 0,
+          explanation: `Giải thích tiếng Việt có dấu cho câu ${id}-${q}.`,
+        })),
+      };
+    }),
+  };
+}
+
+function examSpeakingWriting() {
+  const speakingTypes = [
+    'READ_ALOUD',
+    'READ_ALOUD',
+    'DESCRIBE_PICTURE',
+    'DESCRIBE_PICTURE',
+    'RESPOND_TO_QUESTION',
+    'RESPOND_TO_QUESTION',
+    'RESPOND_TO_QUESTION',
+    'RESPOND_USING_INFORMATION',
+    'RESPOND_USING_INFORMATION',
+    'RESPOND_USING_INFORMATION',
+    'EXPRESS_OPINION',
+  ];
+  const kinds = [
+    'PICTURE_SENTENCE',
+    'PICTURE_SENTENCE',
+    'PICTURE_SENTENCE',
+    'PICTURE_SENTENCE',
+    'PICTURE_SENTENCE',
+    'WRITTEN_REQUEST',
+    'WRITTEN_REQUEST',
+    'OPINION_ESSAY',
+  ];
+  return {
+    speaking: speakingTypes.map((taskType, index) => ({
+      taskType,
+      title: `Speaking ${index + 1}`,
+      targetText: `Speaking prompt number ${index + 1}.`,
+      ...(index === 2 || index === 3
+        ? { imageBrief: `A busy shop, view ${index}.` }
+        : {}),
+      ...(index >= 7 && index <= 9
+        ? { informationStimulus: '9:00 Opening | 10:00 Workshop' }
+        : {}),
+    })),
+    writing: kinds.map((taskKind, index) => ({
+      taskKind,
+      title: `Writing ${index + 1}`,
+      prompt: `Writing task number ${index + 1}.`,
+      ...(taskKind === 'PICTURE_SENTENCE'
+        ? {
+            imageBrief: `A man carrying boxes, view ${index}.`,
+            keywords: ['carry', 'box'],
+          }
+        : {}),
+      ...(taskKind === 'WRITTEN_REQUEST'
+        ? {
+            email:
+              'From: Linh Tran\nSubject: Meeting\nCould you confirm Friday at ten for the review?',
+          }
+        : {}),
+      ...(taskKind === 'OPINION_ESSAY' ? { wordRange: [300, 500] } : {}),
+    })),
+  };
+}
+
+const examModeFile = process.env.QA_EXAM_MODE_FILE;
+const examMode = () => {
+  try {
+    return examModeFile ? readFileSync(examModeFile, 'utf8').trim() : '';
+  } catch {
+    return '';
+  }
+};
+/** Writes the same content when Gemini is "out of quota", as Cloudflare would. */
+function startFakeCloudflare() {
+  const port = Number(process.env.QA_FAKE_CLOUDFLARE_PORT ?? 0);
+  if (!port) return;
+  createServer((request, response) => {
+    let body = '';
+    request.on('data', (chunk) => (body += chunk));
+    request.on('end', () => {
+      const prompt: string =
+        JSON.parse(body || '{}').messages?.[1]?.content ?? '';
+      const part = Number(/TOEIC-style Part (\d)/.exec(prompt)?.[1] ?? 0);
+      const groups = [
+        ...prompt.matchAll(/Group \d+: (\d+) questions(?: \(([^)]*)\))?/g),
+      ].map((m) => ({
+        questionCount: Number(m[1]),
+        documents:
+          Number(/exactly (\d) documents/.exec(m[2] ?? '')?.[1] ?? 0) ||
+          undefined,
+        threeSpeakers: /three speakers/.test(m[2] ?? ''),
+        graphic: /with a graphic/.test(m[2] ?? ''),
+      }));
+      response.setHeader('content-type', 'application/json');
+      response.end(
+        JSON.stringify({
+          success: true,
+          result: {
+            response: JSON.stringify(
+              part ? examBatch({ part, groups }) : examSpeakingWriting(),
+            ),
+          },
+        }),
+      );
+    });
+  }).listen(port, '127.0.0.1');
+}
+
 const provider = {
   generateFeedback: async () => 'Deterministic generic feedback.',
+  generateToeicExamBatch: async (input: any) => {
+    const mode = examMode();
+    if (mode === 'quota')
+      throw Object.assign(new Error('quota exhausted'), { status: 429 });
+    if (mode === 'broken-part-5' && input.part === 5)
+      return { groups: [{ questions: [] }] };
+    return examBatch(input);
+  },
+  generateToeicSpeakingWritingDraft: async () => examSpeakingWriting(),
+  suggestVocabFullDraft: async (input: { count: number; topic: string }) => ({
+    title: input.topic,
+    description: 'Bộ từ soạn cho kiểm thử.',
+    categoryName: 'QA',
+    words: Array.from({ length: input.count }, (_, i) => ({
+      word: `qaword${i}`,
+      pos: 'noun',
+      meaning: `nghĩa ${i}`,
+      exampleEn: `Example ${i}.`,
+      exampleVi: `Ví dụ ${i}.`,
+    })),
+  }),
   chat: async () => 'Deterministic chat response.',
   assessPronunciation: async () => ({
     overallScore: 0,
@@ -252,6 +439,7 @@ async function bootstrap() {
   process.once('SIGTERM', shutdown);
 }
 
+startFakeCloudflare();
 bootstrap().catch((error) => {
   console.error(error);
   process.exit(1);
