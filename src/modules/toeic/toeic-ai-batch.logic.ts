@@ -5,6 +5,7 @@ type BatchQuestion = {
   explanation?: unknown;
 };
 type BatchGroup = {
+  transcript?: unknown;
   passageText?: unknown;
   imageBrief?: unknown;
   questions?: BatchQuestion[];
@@ -37,10 +38,12 @@ export function questionsToAvoid(
     .filter((batch) => batch.part === part)
     .flatMap((batch) => batch.candidate?.groups ?? []);
   const texts = groups.flatMap((group) => {
-    // Part 6 prompts only say "blank [131]" and Part 1 has none, so what
-    // repeats there is the passage or the scene.
+    // Parts whose question text says little repeat in what surrounds it: the
+    // passage, the scene, or the spoken script.
     if (part === 6) return [String(group.passageText ?? '').slice(0, 160)];
     if (part === 1) return [String(group.imageBrief ?? '')];
+    if ([2, 3, 4].includes(part))
+      return [String(group.transcript ?? '').slice(0, 160)];
     return (group.questions ?? []).map((question) =>
       part === 5 ? testedSentence(question) : String(question.text ?? ''),
     );
@@ -97,13 +100,20 @@ export function shuffleOptions(question: BatchQuestion, random = Math.random) {
     correctIndex: moved(Number(question.correctIndex)),
     explanation: String(question.explanation ?? '')
       .normalize('NFC')
-      .replace(NAMED_OPTION, (_, lead: string, letters: string) => {
-        const renamed = letters.replace(/[A-D]/g, (letter) => {
-          const to = moved(LETTERS.indexOf(letter));
-          return to < 0 ? letter : LETTERS[to];
-        });
-        return `${lead}${renamed}`;
-      }),
+      .replace(
+        NAMED_OPTION,
+        (match: string, lead: string, letters: string, offset: number, all) => {
+          // "đáp án A temporary disruption": the A belongs to the option.
+          const after = all.slice(offset + lead.length);
+          if (options.some((option) => after.startsWith(option.slice(0, 12))))
+            return match;
+          const renamed = letters.replace(/[A-D]/g, (letter) => {
+            const to = moved(LETTERS.indexOf(letter));
+            return to < 0 ? letter : LETTERS[to];
+          });
+          return `${lead}${renamed}`;
+        },
+      ),
   };
 }
 
@@ -173,6 +183,13 @@ export function prepareGeneratedBatch<T>(
 /** Explanations are read by Vietnamese learners; unmarked text is unreadable. */
 export function isVietnameseExplanation(text: unknown) {
   return /[à-ỹ]/i.test(String(text ?? ''));
+}
+
+/** Options are shuffled, so a position in an explanation points at nothing. */
+export function explanationNamesPosition(text: unknown) {
+  return /(lựa chọn|đáp án|phương án|câu trả lời)\s+(thứ\s+(nhất|hai|ba|tư)|đầu tiên|cuối cùng)/i.test(
+    String(text ?? '').normalize('NFC'),
+  );
 }
 
 /** What makes a Reading item unanswerable even when its shape is valid. */

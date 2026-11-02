@@ -43,6 +43,7 @@ import { ImageSearchCandidate } from './pixabay-image-search.provider';
 import { ImageSearchProviderChain } from './image-search.provider-chain';
 import { bestImageCandidate, imageSearchQueries } from './exam-image-query';
 import {
+  explanationNamesPosition,
   isVietnameseExplanation,
   prepareGeneratedBatch,
   questionFingerprint,
@@ -113,6 +114,25 @@ function fixedPromptOfPart(part: number) {
     return 'Choose the sentence that best describes the photograph.';
   if (part === 2) return 'Choose the best response.';
   return null;
+}
+
+/** Every path that writes a Part 1 item from a photo shares this shape. */
+function part1QuestionData(vision: {
+  statements: string[];
+  correctIndex: number;
+  explanation: string;
+}) {
+  const shuffled = shuffleOptions({
+    options: vision.statements,
+    correctIndex: vision.correctIndex,
+    explanation: vision.explanation,
+  });
+  return {
+    text: fixedPromptOfPart(1),
+    options: shuffled.options,
+    correctIndex: shuffled.correctIndex,
+    explanation: shuffled.explanation,
+  };
 }
 
 function firstQuestionOfPart(part: number) {
@@ -353,7 +373,10 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         : dto.variantCode === 'TOEIC_SW'
           ? 'Speaking & Writing'
           : '4 Skills';
-    const title = `TOEIC ${label} — Practice Test ${new Date().toISOString().slice(0, 10)}`;
+    const sameVariant = await this.prisma.exam.count({
+      where: { variantCode: dto.variantCode },
+    });
+    const title = `TOEIC ${label} — Đề luyện tập ${String(sameVariant + 1).padStart(2, '0')}`;
     const draft = await this.genericExam.createDraft(
       {
         familyCode: 'TOEIC',
@@ -1563,26 +1586,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       }
       if (vision) {
         const question = group.questions[0];
+        const data = part1QuestionData(vision);
         if (question) {
           await this.prisma.toeicQuestion.update({
             where: { id: question.id },
-            data: {
-              text: null,
-              options: vision.statements,
-              correctIndex: vision.correctIndex,
-              explanation: vision.explanation,
-            },
+            data,
           });
         } else {
           await this.prisma.toeicQuestion.create({
-            data: {
-              groupId: group.id,
-              questionNumber: 1,
-              text: null,
-              options: vision.statements,
-              correctIndex: vision.correctIndex,
-              explanation: vision.explanation,
-            },
+            data: { ...data, groupId: group.id, questionNumber: 1 },
           });
         }
         imageMetadata.questionStatus = 'READY_FOR_REVIEW';
@@ -1650,26 +1662,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const current = (group.mediaMetadata as any) ?? {};
     const imageHash = sha256(image.buffer);
     const question = group.questions[0];
+    const data = part1QuestionData(vision);
     if (question)
       await this.prisma.toeicQuestion.update({
         where: { id: question.id },
-        data: {
-          text: null,
-          options: vision.statements,
-          correctIndex: vision.correctIndex,
-          explanation: vision.explanation,
-        },
+        data,
       });
     else
       await this.prisma.toeicQuestion.create({
-        data: {
-          groupId: group.id,
-          questionNumber: 1,
-          text: null,
-          options: vision.statements,
-          correctIndex: vision.correctIndex,
-          explanation: vision.explanation,
-        },
+        data: { ...data, groupId: group.id, questionNumber: 1 },
       });
     await this.prisma.toeicQuestionGroup.update({
       where: { id: group.id },
@@ -1799,6 +1800,10 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         if (!isVietnameseExplanation(question.explanation))
           throw new BadRequestException(
             'AI trả về giải thích không phải tiếng Việt có dấu',
+          );
+        if (explanationNamesPosition(question.explanation))
+          throw new BadRequestException(
+            'AI trả về giải thích gọi đáp án theo vị trí',
           );
         // Part 3/4 question prompts are spoken after the conversation/talk
         // (toeic-listening-audio.ts); without this text the audio script
@@ -2322,22 +2327,13 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       });
       this.assertPart1QuestionCandidate(vision);
       if (question) {
-        const shuffled = shuffleOptions({
-          options: vision.statements,
-          correctIndex: vision.correctIndex,
-          explanation: vision.explanation,
-        });
+        const data = part1QuestionData(vision);
         await this.prisma.toeicQuestion.update({
           where: { id: question.id },
-          data: {
-            text: null,
-            options: shuffled.options,
-            correctIndex: shuffled.correctIndex,
-            explanation: shuffled.explanation,
-          },
+          data,
         });
         // The audio is built from this same object right after.
-        question.options = shuffled.options;
+        question.options = data.options;
       }
       metadata.image = {
         ...metadata.image,

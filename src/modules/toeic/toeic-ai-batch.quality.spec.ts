@@ -1,5 +1,6 @@
 import { withoutMediaFailure } from './toeic-media';
 import {
+  explanationNamesPosition,
   isVietnameseExplanation,
   prepareGeneratedBatch,
   questionsToAvoid,
@@ -48,6 +49,18 @@ describe('shuffleOptions', () => {
     expect(
       shuffleOptions(question({ explanation }), reversing()).explanation,
     ).toBe(explanation);
+  });
+
+  it('leaves an option that starts with the word A alone', () => {
+    const explanation = 'Vì vậy đáp án A temporary closure là chính xác.';
+    const shuffled = shuffleOptions(
+      question({
+        options: ['A temporary closure', 'A new office', 'Two chairs', 'Lunch'],
+        explanation,
+      }),
+      reversing(),
+    );
+    expect(shuffled.explanation).toBe(explanation);
   });
 
   it('spreads the answer key evenly over the positions', () => {
@@ -184,7 +197,29 @@ describe('isVietnameseExplanation', () => {
   });
 });
 
+describe('explanationNamesPosition', () => {
+  it('finds a position and ignores ordinary words', () => {
+    expect(explanationNamesPosition('Lựa chọn thứ hai đưa ra địa điểm.')).toBe(
+      true,
+    );
+    expect(explanationNamesPosition('Đáp án đầu tiên là đúng.')).toBe(true);
+    expect(
+      explanationNamesPosition('Lịch bắt đầu vào ngày đầu tiên của tháng.'),
+    ).toBe(false);
+  });
+});
+
 describe('questionsToAvoid per Part', () => {
+  it('lists spoken scripts for Parts 2 to 4', () => {
+    const batch = {
+      part: 3,
+      candidate: {
+        groups: [{ transcript: 'W: Hello.', questions: [question()] }],
+      },
+    };
+    expect(questionsToAvoid([batch], 3)).toEqual(['W: Hello.']);
+  });
+
   it('names the tested answer for Part 5', () => {
     const batch = {
       part: 5,
