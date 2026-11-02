@@ -19,7 +19,7 @@ import { harnessExec, harnessQuery } from './harness-db';
 
 const SHOTS = `${process.env.TEMP ?? '.'}/breadtrans-harness/shots/room`;
 const SW_EXAM = 3;
-const FOUR_SKILLS_EXAM = 4;
+const FOUR_SKILLS_EXAM = 5;
 
 const micArgs = (wav: string) => [
   '--use-fake-ui-for-media-stream',
@@ -77,16 +77,14 @@ async function speakingAndWriting(wav: string) {
 
   await startExam(page, SW_EXAM);
   await page
-    .getByRole('heading', { name: 'Phần Speaking' })
+    .getByRole('tab', { name: 'Câu 1–2' })
     .waitFor({ timeout: 60_000 });
-  check('start opens the Speaking intro, not a section picker', true);
+  check('one click opens the first question', true);
   check(
     'no section picker is shown',
     !(await body(page)).includes('Mở phần này'),
   );
-  await page.screenshot({ path: `${SHOTS}/1-speaking-intro.png` });
 
-  await page.getByRole('button', { name: 'Bắt đầu phần Speaking' }).click();
   await page.getByRole('tab', { name: 'Câu 1–2' }).waitFor({ timeout: 60_000 });
   await page.waitForTimeout(1500);
   const opening = await clock(page);
@@ -154,20 +152,18 @@ async function speakingAndWriting(wav: string) {
   await page.screenshot({ path: `${SHOTS}/6-speaking-submit.png` });
   await dialog.getByRole('button', { name: 'Xác nhận nộp bài' }).click();
   await page
-    .getByRole('heading', { name: 'Phần Writing' })
+    .getByRole('tab', { name: 'Câu 1–5' })
     .waitFor({ timeout: 40_000 });
   check(
     'the Writing intro follows Speaking',
     (await body(page)).includes('Đã nộp phần Speaking'),
   );
-  await page.screenshot({ path: `${SHOTS}/7-writing-intro.png` });
 
   const links = harnessQuery(
     `select count(*) from "ToeicAssessmentSpeakingSubmission" l join "SpeakingSubmission" s on s.id = l."speakingSubmissionId" where s."userId" = ${account.userId}`,
   )[0]?.[0];
   check('Speaking keeps one recording per answered question', links === '2', links);
 
-  await page.getByRole('button', { name: 'Bắt đầu phần Writing' }).click();
   await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 60_000 });
   await page.waitForTimeout(1500);
   const writingClock = await clock(page);
@@ -235,10 +231,9 @@ async function speakingAndWriting(wav: string) {
   await page.screenshot({ path: `${SHOTS}/12-result-writing.png`, fullPage: true });
   await page.goto(`${FE}/exams/${SW_EXAM}`);
   await page
-    .getByRole('button', { name: 'Xem kết quả' })
-    .click({ timeout: 40_000 });
-  await page.waitForURL(/\/result$/, { timeout: 30_000 });
-  check('a finished exam opens its result from the exam page', true);
+    .getByRole('button', { name: 'Bắt đầu làm bài' })
+    .waitFor({ timeout: 40_000 });
+  check('a finished exam can be started again from its page', true);
   check('no page error in the S&W run', errors.length === 0, errors.join(' | '));
   await browser.close();
 }
@@ -251,17 +246,15 @@ async function clockRunsOut(wav: string) {
     micArgs(wav),
   );
   await startExam(page, SW_EXAM);
-  await page.getByRole('button', { name: 'Bắt đầu phần Speaking' }).click({ timeout: 60_000 });
   await page.getByRole('tab', { name: 'Câu 1–2' }).waitFor({ timeout: 60_000 });
   await hurry(
     `update "ToeicAssessmentAttemptComponent" c set "startedAt" = now() - interval '19 minutes 54 seconds' from "ToeicAssessmentAttempt" a where a.id = c."assessmentAttemptId" and a."userId" = ${account.userId} and c.status = 'IN_PROGRESS'`,
   );
   await page.reload();
   await page
-    .getByRole('heading', { name: 'Phần Writing' })
+    .getByRole('tab', { name: 'Câu 1–5' })
     .waitFor({ timeout: 40_000 });
   check('Speaking closes itself at zero with nothing recorded', true);
-  await page.getByRole('button', { name: 'Bắt đầu phần Writing' }).click();
   await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 60_000 });
   await page.getByLabel('Bài viết câu 1').fill('A man is reading a report.');
   await page.waitForTimeout(700);
@@ -285,18 +278,13 @@ async function fourSkills(wav: string) {
     micArgs(wav),
   );
   await startExam(page, FOUR_SKILLS_EXAM);
-  await page
-    .getByRole('heading', { name: 'Phần Listening & Reading' })
-    .waitFor({ timeout: 60_000 });
-  await page.screenshot({ path: `${SHOTS}/20-lr-intro.png` });
-  await page.getByRole('button', { name: 'Bắt đầu phần Listening & Reading' }).click();
   await page.waitForURL(/\/toeic\/attempts\//, { timeout: 60_000 });
   await page.getByRole('tab', { name: 'Part 1', exact: true }).waitFor({ timeout: 60_000 });
   check('Listening & Reading opens in its own room', true);
   await page.getByRole('button', { name: 'Nộp bài' }).first().click();
   await page.getByRole('button', { name: 'Xác nhận nộp bài' }).click();
   await page
-    .getByRole('heading', { name: 'Phần Speaking' })
+    .getByRole('tab', { name: 'Câu 1–2' })
     .waitFor({ timeout: 60_000 });
   const text = await body(page);
   check(
@@ -313,9 +301,6 @@ async function fourSkills(wav: string) {
     micArgs(wav),
   );
   await startExam(late, FOUR_SKILLS_EXAM);
-  await late
-    .getByRole('button', { name: 'Bắt đầu phần Listening & Reading' })
-    .click({ timeout: 60_000 });
   await late.waitForURL(/\/toeic\/attempts\//, { timeout: 60_000 });
   await late.getByRole('tab', { name: 'Part 1', exact: true }).waitFor({ timeout: 60_000 });
   await hurry(
@@ -323,7 +308,7 @@ async function fourSkills(wav: string) {
   );
   await late.reload();
   await late
-    .getByRole('heading', { name: 'Phần Speaking' })
+    .getByRole('tab', { name: 'Câu 1–2' })
     .waitFor({ timeout: 40_000 })
     .catch(async (error) => {
       await late.screenshot({ path: `${SHOTS}/22-clock-stuck.png` });
@@ -344,7 +329,6 @@ async function phone(wav: string) {
     micArgs(wav),
   );
   await startExam(page, SW_EXAM);
-  await page.getByRole('button', { name: 'Bắt đầu phần Speaking' }).click({ timeout: 60_000 });
   await page.getByRole('tab', { name: 'Câu 1–2' }).waitFor({ timeout: 60_000 });
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${SHOTS}/30-phone-room.png` });

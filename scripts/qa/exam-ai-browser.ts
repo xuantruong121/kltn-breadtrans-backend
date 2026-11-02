@@ -356,7 +356,7 @@ async function retake() {
   await page.screenshot({ path: `${SHOTS}/13-retake.png` });
   await start.click();
   await page
-    .getByRole('heading', { name: 'Phần Speaking' })
+    .getByRole('tab', { name: 'Câu 1–2' })
     .waitFor({ timeout: 60_000 });
   check(
     'taking it again opens a new attempt',
