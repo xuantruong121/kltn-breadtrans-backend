@@ -1,3 +1,4 @@
+import { WritingModule } from '../writing/writing.module';
 import { Module } from '@nestjs/common';
 import { ToeicListeningMasterService } from './toeic-listening-master.service';
 import { ToeicService } from './toeic.service';
@@ -24,7 +25,14 @@ import { ImageSearchProviderChain } from './image-search.provider-chain';
 import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-search.provider';
 
 @Module({
-  imports: [SpeakingModule, QuizModule, SkillCmsModule, AiModule, UploadModule],
+  imports: [
+    SpeakingModule,
+    QuizModule,
+    SkillCmsModule,
+    AiModule,
+    UploadModule,
+    WritingModule,
+  ],
   controllers: [
     ToeicController,
     AdminExamController,

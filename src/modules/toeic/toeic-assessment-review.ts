@@ -11,6 +11,8 @@
  *  - NO_SPEECH      graded, but no speech was recognized (Speaking only)
  *  - GRADED         a stored practice score exists
  */
+import { examWritingGaveUp } from '../writing/exam-writing-grading';
+
 export type AssessmentTaskStatus =
   'NOT_SUBMITTED' | 'PENDING' | 'FAILED' | 'NO_SPEECH' | 'GRADED';
 
@@ -116,6 +118,7 @@ export function reviewWritingTasks(
     writingQuiz: { title: string } | null;
   }>,
   submissions: WritingRow[],
+  now = new Date(),
 ) {
   return items.map((item, index) => {
     const row = latest(
@@ -137,9 +140,11 @@ export function reviewWritingTasks(
       title: item.writingQuiz?.title ?? `Câu ${index + 1}`,
       status: !row
         ? 'NOT_SUBMITTED'
-        : row.score === null
-          ? 'PENDING'
-          : 'GRADED',
+        : row.score !== null
+          ? 'GRADED'
+          : examWritingGaveUp(row, now)
+            ? 'FAILED'
+            : 'PENDING',
       submission: row
         ? {
             id: row.id,

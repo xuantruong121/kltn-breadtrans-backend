@@ -21,6 +21,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
   Optional,
@@ -32,6 +33,12 @@ import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
 import { cefrSpan } from '../subscription/practice-level';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
+import {
+  EXAM_WRITING_GIVE_UP_AFTER_MS,
+  EXAM_WRITING_RETRY_AFTER_MS,
+  examWritingGaveUp,
+  examWritingTries,
+} from './exam-writing-grading';
 
 /** A task's cue words, from either authored field. */
 function keywordsOf(c: any): string[] {
@@ -76,6 +83,10 @@ function isWritingQuiz(quiz: {
 
 @Injectable()
 export class WritingService {
+  private readonly logger = new Logger(WritingService.name);
+  /** Keeps the job from grading an answer the first pass is still on. */
+  private readonly gradingNow = new Set<number>();
+
   constructor(
     private prisma: PrismaService,
     private aiService: AiService,
@@ -224,6 +235,8 @@ export class WritingService {
     detail?: PracticeWritingResult;
     /** Catalog exercises: every task must be graded before the exercise counts. */
     exercise?: { questionIds: number[]; position: number };
+    /** An exam answer stored earlier: its grade is written onto that row. */
+    pendingSubmissionId?: number;
   }) {
     const feedback = JSON.stringify({
       ...(input.detail ?? {}),
@@ -235,24 +248,38 @@ export class WritingService {
     });
     try {
       const submission = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.submission.create({
-          data: {
-            quizId: input.quizId,
-            userId: input.userId,
-            clientAttemptId: input.clientAttemptId,
-            score: input.evaluation.score,
-            aiFeedback: feedback,
-            results: {
-              create: [
-                {
-                  questionId: input.questionId,
-                  answer: input.answer,
-                  score: input.evaluation.score,
-                },
-              ],
+        let created: { id: number };
+        if (input.pendingSubmissionId) {
+          const claimed = await tx.submission.updateMany({
+            where: { id: input.pendingSubmissionId, score: null },
+            data: { score: input.evaluation.score, aiFeedback: feedback },
+          });
+          if (claimed.count === 0) return null;
+          await tx.result.updateMany({
+            where: { submissionId: input.pendingSubmissionId },
+            data: { score: input.evaluation.score },
+          });
+          created = { id: input.pendingSubmissionId };
+        } else {
+          created = await tx.submission.create({
+            data: {
+              quizId: input.quizId,
+              userId: input.userId,
+              clientAttemptId: input.clientAttemptId,
+              score: input.evaluation.score,
+              aiFeedback: feedback,
+              results: {
+                create: [
+                  {
+                    questionId: input.questionId,
+                    answer: input.answer,
+                    score: input.evaluation.score,
+                  },
+                ],
+              },
             },
-          },
-        });
+          });
+        }
         await tx.learningActivity.create({
           data: {
             userId: input.userId,
@@ -268,6 +295,8 @@ export class WritingService {
         });
         return created;
       });
+      // Another pass already stored this grade, and its reward.
+      if (!submission) return { id: input.pendingSubmissionId as number };
 
       // A multi-task exercise is rewarded once, when its last task is graded,
       // with the exercise score; earlier tasks earn nothing on their own.
@@ -307,6 +336,104 @@ export class WritingService {
         if (existing) return existing;
       }
       throw error;
+    }
+  }
+
+  /** Grades stored exam answers one at a time. Never throws for a bad grade. */
+  async gradeExamSubmissions(submissionIds: number[]) {
+    for (const id of submissionIds) await this.gradeExamSubmission(id);
+  }
+
+  /** The system job: picks up answers whose first grading did not finish. */
+  async retryUngradedExamWriting(now = new Date()) {
+    const rows = await this.prisma.submission.findMany({
+      where: {
+        score: null,
+        assessmentLinks: { some: {} },
+        submittedAt: {
+          gte: new Date(now.getTime() - EXAM_WRITING_GIVE_UP_AFTER_MS),
+          lte: new Date(now.getTime() - EXAM_WRITING_RETRY_AFTER_MS),
+        },
+      },
+      select: { id: true, aiFeedback: true, submittedAt: true },
+      orderBy: { id: 'asc' },
+      take: 24,
+    });
+    await this.gradeExamSubmissions(
+      rows.filter((row) => !examWritingGaveUp(row, now)).map((row) => row.id),
+    );
+    return { attempted: rows.length };
+  }
+
+  private async gradeExamSubmission(id: number) {
+    if (this.gradingNow.has(id)) return;
+    this.gradingNow.add(id);
+    try {
+      const submission = await this.prisma.submission.findUnique({
+        where: { id },
+        include: {
+          results: { take: 1 },
+          quiz: {
+            include: {
+              practiceTopic: true,
+              questions: {
+                select: { id: true, content: true },
+                orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                take: 1,
+              },
+            },
+          },
+        },
+      });
+      const answer = submission?.results[0]?.answer;
+      const question = submission?.quiz.questions[0];
+      if (
+        !submission ||
+        submission.score !== null ||
+        typeof answer !== 'string' ||
+        !question
+      )
+        return;
+      const quiz = submission.quiz;
+      const content = question.content as any;
+      try {
+        const { evaluation, validatedEvaluation, detail } =
+          await this.gradeAnswer(
+            quiz,
+            content,
+            answer,
+            quiz.practiceTopic
+              ? practiceWritingTask(content ?? {}, quiz.title)
+              : null,
+          );
+        await this.persistAssessment({
+          detail,
+          quizId: quiz.id,
+          quizTitle: quiz.title,
+          quizType: quiz.type,
+          questionId: question.id,
+          userId: submission.userId,
+          answer,
+          clientAttemptId: submission.clientAttemptId ?? '',
+          evaluation: validatedEvaluation,
+          maxScore: evaluation.maxScore,
+          pendingSubmissionId: id,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `exam_writing_grading_failed submissionId=${id}: ${(error as Error).message}`,
+        );
+        await this.prisma.submission.updateMany({
+          where: { id, score: null },
+          data: {
+            aiFeedback: JSON.stringify({
+              gradingTries: examWritingTries(submission.aiFeedback) + 1,
+            }),
+          },
+        });
+      }
+    } finally {
+      this.gradingNow.delete(id);
     }
   }
 
@@ -755,6 +882,132 @@ export class WritingService {
     }));
   }
 
+  /** Calls the provider and validates the grade. Stores nothing. */
+  private async gradeAnswer(
+    quiz: {
+      type: QuizType;
+      title: string;
+      description?: string | null;
+    },
+    content: any,
+    answer: string,
+    practiceTask: ReturnType<typeof practiceWritingTask> | null,
+  ) {
+    let evaluation: {
+      score: number;
+      maxScore: number;
+      feedback: string;
+      suggestions: string[];
+    };
+    let detail: PracticeWritingResult | undefined;
+    try {
+      if (practiceTask) {
+        const request = buildPracticeWritingRequest(practiceTask, answer);
+        let reason = 'NO_ATTEMPT';
+        for (
+          let attempt = 1;
+          attempt <= PRACTICE_GRADE_ATTEMPTS && !detail;
+          attempt += 1
+        ) {
+          const out = await this.aiService.generateStructuredJson({
+            systemInstruction: request.systemInstruction,
+            prompt: request.prompt,
+            responseSchema: request.responseSchema,
+            temperature: 0.2,
+            timeoutMs: PRACTICE_GRADE_TIMEOUT_MS,
+            failoverOnTimeout: false,
+          });
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(out.text);
+          } catch {
+            reason = 'INVALID_JSON';
+            continue;
+          }
+          const verdict = validatePracticeWritingResult(
+            parsed,
+            practiceTask,
+            answer,
+            request.facts,
+          );
+          if (verdict.ok) detail = verdict.value;
+          else reason = verdict.reason;
+        }
+        if (!detail)
+          throw new Error(`PRACTICE_WRITING_GRADE_INVALID: ${reason}`);
+        evaluation = {
+          score: detail.score,
+          maxScore: detail.maxScore,
+          feedback: detail.feedback,
+          suggestions: detail.suggestions,
+        };
+      } else if (quiz.type === QuizType.WRITING_PICTURE) {
+        const result = content.imageUrl
+          ? await this.aiService.evaluateWritingPart1(
+              content.imageUrl,
+              Array.isArray(content.keywords)
+                ? content.keywords
+                : Array.isArray(content.requiredKeywords)
+                  ? content.requiredKeywords
+                  : [],
+              answer,
+            )
+          : await this.aiService.evaluateWritingPart2(
+              content.prompt ?? quiz.description ?? quiz.title,
+              answer,
+            );
+        evaluation = {
+          score: result.score,
+          maxScore: content.imageUrl ? 3 : 4,
+          feedback: result.feedback,
+          suggestions:
+            'suggestions' in result && Array.isArray(result.suggestions)
+              ? result.suggestions.map(String)
+              : [],
+        };
+      } else if (
+        ['PROPOSAL', 'OPINION', 'ESSAY', 'OPINION_ESSAY'].includes(
+          content.taskType,
+        )
+      ) {
+        const result = await this.aiService.evaluateWritingPart3(
+          content.prompt ?? quiz.description ?? quiz.title,
+          answer,
+        );
+        evaluation = { ...result, maxScore: 5 };
+      } else {
+        // A written request is graded against the e-mail it answers.
+        const instructions = content.prompt ?? quiz.description ?? quiz.title;
+        const result = await this.aiService.evaluateWritingPart2(
+          content.email
+            ? `${content.email}
+
+Task: ${instructions}`
+            : instructions,
+          answer,
+        );
+        evaluation = { ...result, maxScore: 4 };
+      }
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'Dịch vụ chấm bài hiện không khả dụng. Bài viết của bạn chưa được lưu điểm; vui lòng thử lại sau.',
+        { cause: error as Error },
+      );
+    }
+
+    // Unaccented Vietnamese feedback is unreadable; refuse it like any other
+    // unusable grade (the learner can submit again; nothing is stored).
+    if (!hasVietnameseDiacritics(evaluation.feedback))
+      throw new ServiceUnavailableException(
+        'Dịch vụ chấm bài trả về nhận xét không hợp lệ. Bài viết chưa được lưu điểm; vui lòng thử lại.',
+      );
+    const validatedEvaluation = this.validateEvaluation(
+      evaluation,
+      evaluation.maxScore,
+    );
+    return { evaluation, validatedEvaluation, detail };
+  }
+
   async submitWriting(
     quizId: number,
     userId: number,
@@ -861,129 +1114,19 @@ export class WritingService {
       );
     }
 
-    let evaluation: {
-      score: number;
-      maxScore: number;
-      feedback: string;
-      suggestions: string[];
-    };
     // Catalog practice tasks are graded with their own authored rubric; TOEIC
     // exam writing tasks (no practice topic) keep their exam graders.
     const practiceTask = quiz.practiceTopic
       ? practiceWritingTask(content ?? {}, quiz.title)
       : null;
-    let detail: PracticeWritingResult | undefined;
     if (exceedsPictureWordLimit(practiceTask, answer)) {
       throw new BadRequestException(
         `Câu trả lời cho bài viết theo tranh tối đa ${PICTURE_SENTENCE_MAX_WORDS} từ.`,
       );
     }
 
-    try {
-      if (practiceTask) {
-        const request = buildPracticeWritingRequest(practiceTask, answer);
-        let reason = 'NO_ATTEMPT';
-        for (
-          let attempt = 1;
-          attempt <= PRACTICE_GRADE_ATTEMPTS && !detail;
-          attempt += 1
-        ) {
-          const out = await this.aiService.generateStructuredJson({
-            systemInstruction: request.systemInstruction,
-            prompt: request.prompt,
-            responseSchema: request.responseSchema,
-            temperature: 0.2,
-            timeoutMs: PRACTICE_GRADE_TIMEOUT_MS,
-            failoverOnTimeout: false,
-          });
-          let parsed: unknown;
-          try {
-            parsed = JSON.parse(out.text);
-          } catch {
-            reason = 'INVALID_JSON';
-            continue;
-          }
-          const verdict = validatePracticeWritingResult(
-            parsed,
-            practiceTask,
-            answer,
-            request.facts,
-          );
-          if (verdict.ok) detail = verdict.value;
-          else reason = verdict.reason;
-        }
-        if (!detail)
-          throw new Error(`PRACTICE_WRITING_GRADE_INVALID: ${reason}`);
-        evaluation = {
-          score: detail.score,
-          maxScore: detail.maxScore,
-          feedback: detail.feedback,
-          suggestions: detail.suggestions,
-        };
-      } else if (quiz.type === QuizType.WRITING_PICTURE) {
-        const result = content.imageUrl
-          ? await this.aiService.evaluateWritingPart1(
-              content.imageUrl,
-              Array.isArray(content.keywords)
-                ? content.keywords
-                : Array.isArray(content.requiredKeywords)
-                  ? content.requiredKeywords
-                  : [],
-              answer,
-            )
-          : await this.aiService.evaluateWritingPart2(
-              content.prompt ?? quiz.description ?? quiz.title,
-              answer,
-            );
-        evaluation = {
-          score: result.score,
-          maxScore: content.imageUrl ? 3 : 4,
-          feedback: result.feedback,
-          suggestions:
-            'suggestions' in result && Array.isArray(result.suggestions)
-              ? result.suggestions.map(String)
-              : [],
-        };
-      } else if (
-        ['PROPOSAL', 'OPINION', 'ESSAY', 'OPINION_ESSAY'].includes(
-          content.taskType,
-        )
-      ) {
-        const result = await this.aiService.evaluateWritingPart3(
-          content.prompt ?? quiz.description ?? quiz.title,
-          answer,
-        );
-        evaluation = { ...result, maxScore: 5 };
-      } else {
-        // A written request is graded against the e-mail it answers.
-        const instructions = content.prompt ?? quiz.description ?? quiz.title;
-        const result = await this.aiService.evaluateWritingPart2(
-          content.email
-            ? `${content.email}
-
-Task: ${instructions}`
-            : instructions,
-          answer,
-        );
-        evaluation = { ...result, maxScore: 4 };
-      }
-    } catch (error) {
-      throw new ServiceUnavailableException(
-        'Dịch vụ chấm bài hiện không khả dụng. Bài viết của bạn chưa được lưu điểm; vui lòng thử lại sau.',
-        { cause: error as Error },
-      );
-    }
-
-    // Unaccented Vietnamese feedback is unreadable; refuse it like any other
-    // unusable grade (the learner can submit again; nothing is stored).
-    if (!hasVietnameseDiacritics(evaluation.feedback))
-      throw new ServiceUnavailableException(
-        'Dịch vụ chấm bài trả về nhận xét không hợp lệ. Bài viết chưa được lưu điểm; vui lòng thử lại.',
-      );
-    const validatedEvaluation = this.validateEvaluation(
-      evaluation,
-      evaluation.maxScore,
-    );
+    const { evaluation, validatedEvaluation, detail } =
+      await this.gradeAnswer(quiz, content, answer, practiceTask);
     const submission = await this.persistAssessment({
       detail,
       exercise,

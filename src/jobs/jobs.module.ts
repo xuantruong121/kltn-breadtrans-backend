@@ -2,12 +2,18 @@ import { Module } from '@nestjs/common';
 import { GamificationModule } from '../modules/gamification/gamification.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { UploadModule } from '../modules/upload/upload.module';
+import { WritingModule } from '../modules/writing/writing.module';
 import { SystemJobsScheduler } from './system-jobs.scheduler';
 import { SystemJobsService } from './system-jobs.service';
 import { DatabaseBackupR2SyncService } from './database-backup-r2-sync.service';
 
 @Module({
-  imports: [GamificationModule, NotificationsModule, UploadModule],
+  imports: [
+    GamificationModule,
+    NotificationsModule,
+    UploadModule,
+    WritingModule,
+  ],
   providers: [
     SystemJobsService,
     SystemJobsScheduler,

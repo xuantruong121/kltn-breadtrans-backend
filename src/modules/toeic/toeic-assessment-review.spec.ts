@@ -129,6 +129,7 @@ describe('TOEIC assessment task review', () => {
         },
         { id: 6, quizId: 41, score: null, aiFeedback: null, submittedAt: at },
       ],
+      at,
     );
     expect(tasks[0]).toMatchObject({
       status: 'GRADED',
@@ -139,5 +140,22 @@ describe('TOEIC assessment task review', () => {
       },
     });
     expect(tasks[1].status).toBe('PENDING');
+  });
+
+  it('reports a written answer as failed once grading has given up', () => {
+    const [task] = reviewWritingTasks(
+      [{ writingQuizId: 41, taskKind: 'x', writingQuiz: { title: 'Câu 8' } }],
+      [
+        {
+          id: 6,
+          quizId: 41,
+          score: null,
+          aiFeedback: JSON.stringify({ gradingTries: 5 }),
+          submittedAt: at,
+        },
+      ],
+      at,
+    );
+    expect(task.status).toBe('FAILED');
   });
 });
