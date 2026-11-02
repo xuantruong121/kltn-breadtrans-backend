@@ -131,7 +131,7 @@ describe('ToeicAiExamService.getCandidate — Phase E candidate-first review', (
     const result = await service.getCandidate('job-1', 7);
     expect(result.speaking[0]).toMatchObject({ taskNumber: 1, issues: [] });
     expect(result.writing[0].issues).toEqual(
-      expect.arrayContaining(['Chưa có đề bài', 'Chưa có hình ảnh']),
+      expect.arrayContaining(['Chưa có đề bài', 'Chưa có mô tả hình ảnh']),
     );
     expect(result.flaggedCount).toBe(1);
   });

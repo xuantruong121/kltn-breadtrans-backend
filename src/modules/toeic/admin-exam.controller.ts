@@ -406,6 +406,12 @@ export class AdminExamController {
     return this.genericExamService.publishSpeakingSource(id, req.user);
   }
 
+  @Get('authoring-options')
+  @ApiOperation({ summary: 'Các loại đề tạo được, cấu trúc và tên gợi ý' })
+  authoringOptions() {
+    return this.genericExamService.authoringOptions();
+  }
+
   @Post()
   @ApiOperation({ summary: 'Admin: Tạo bộ đề thi mới (DRAFT)' })
   createExam(@Body() dto: CreateGenericExamDto, @Req() req: any) {

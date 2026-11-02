@@ -89,6 +89,7 @@ describe('ToeicAiExamService.apply — selective candidate apply', () => {
     (service as any).prisma = prisma;
     (service as any).genericExam = {
       hasLearnerAttempts: jest.fn().mockResolvedValue(false),
+      missingImages: jest.fn().mockResolvedValue([]),
     };
     (service as any).materializeMedia = jest.fn().mockResolvedValue(undefined);
     (service as any).materializeSpeakingWriting = jest

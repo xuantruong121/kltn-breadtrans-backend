@@ -1,6 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { TOEIC_SPEAKING_TASK_SEQUENCE } from '../speaking/toeic-speaking-contract';
 
+export const PRACTICE_DISCLAIMER =
+  'Lưu ý: Đây là đề luyện tập tham khảo được xây dựng nhằm mô phỏng cấu trúc TOEIC. Nội dung không phải đề thi chính thức do ETS phát hành và không thay thế bài thi TOEIC chính thức.';
+
 export type ExamTemplate = {
   key: string;
   familyCode: string;
@@ -11,6 +14,8 @@ export type ExamTemplate = {
     code: string;
     label: string;
     count: number;
+    /** Set on the sections a learner sits; Parts sit inside them. */
+    minutes?: number;
     tasks?: readonly string[];
     includes?: readonly string[];
   }[];
@@ -24,8 +29,8 @@ export const EXAM_TEMPLATES: readonly ExamTemplate[] = [
     displayName: 'TOEIC Listening & Reading',
     authoringEnabled: true,
     sections: [
-      { code: 'LISTENING', label: 'Listening', count: 100 },
-      { code: 'READING', label: 'Reading', count: 100 },
+      { code: 'LISTENING', label: 'Listening', count: 100, minutes: 45 },
+      { code: 'READING', label: 'Reading', count: 100, minutes: 75 },
       { code: 'PART_1', label: 'Part 1', count: 6 },
       { code: 'PART_2', label: 'Part 2', count: 25 },
       { code: 'PART_3', label: 'Part 3', count: 39 },
@@ -46,12 +51,14 @@ export const EXAM_TEMPLATES: readonly ExamTemplate[] = [
         code: 'SPEAKING',
         label: 'Speaking',
         count: 11,
+        minutes: 20,
         tasks: TOEIC_SPEAKING_TASK_SEQUENCE,
       },
       {
         code: 'WRITING',
         label: 'Writing',
         count: 8,
+        minutes: 60,
         tasks: ['PICTURE_SENTENCE', 'WRITTEN_REQUEST', 'OPINION_ESSAY'],
       },
     ],
@@ -67,18 +74,21 @@ export const EXAM_TEMPLATES: readonly ExamTemplate[] = [
         code: 'LISTENING_READING',
         label: 'Listening & Reading',
         count: 200,
+        minutes: 120,
         includes: ['TOEIC_LR_V1'],
       },
       {
         code: 'SPEAKING',
         label: 'Speaking',
         count: 11,
+        minutes: 20,
         includes: ['TOEIC_SW_V1'],
       },
       {
         code: 'WRITING',
         label: 'Writing',
         count: 8,
+        minutes: 60,
         includes: ['TOEIC_SW_V1'],
       },
     ],

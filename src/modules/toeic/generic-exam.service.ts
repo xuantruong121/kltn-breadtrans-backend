@@ -25,6 +25,7 @@ import {
 import {
   EXAM_TEMPLATES,
   ExamTemplate,
+  PRACTICE_DISCLAIMER,
   resolveExamTemplate,
   resolveTemplateByKey,
 } from './exam-template.registry';
@@ -77,7 +78,22 @@ function learnerPreviewQuestion(part: number, question: any) {
 }
 
 /** Slots that need a picture and have none; the exam page offers to fill them. */
-function countMissingImages(exam: ProductRecord, lr: ProductRecord) {
+export type MissingExamImage = {
+  section: 'LR' | 'SPEAKING' | 'WRITING';
+  /** Where it goes, as an admin reads it. */
+  label: string;
+  /** What the picture should show. */
+  brief: string | null;
+  groupId?: number;
+  questionNumber?: number;
+};
+
+/** Every picture a draft still lacks; a question without one stays complete. */
+function listMissingImages(
+  exam: ProductRecord,
+  lr: ProductRecord,
+  briefs?: { speaking?: any[]; writing?: any[] },
+): MissingExamImage[] {
   const components: any[] = exam.toeicAssessment?.components ?? [];
   const groups: any[] = lr?.groups ?? [];
   const exercises: any[] =
@@ -86,18 +102,41 @@ function countMissingImages(exam: ProductRecord, lr: ProductRecord) {
   const items: any[] =
     components.find((component) => component.kind === 'WRITING')?.writingSet
       ?.items ?? [];
-  return (
-    groups.filter((group) => group.part === 1 && !group.imageUrl).length +
-    exercises.filter(
-      (exercise) =>
-        exercise.taskType === 'DESCRIBE_PICTURE' && !exercise.imageUrl,
-    ).length +
-    items.filter(
-      (item) =>
-        item.taskKind === 'PICTURE_SENTENCE' &&
-        !item.writingQuiz?.questions?.[0]?.content?.imageUrl,
-    ).length
-  );
+  return [
+    ...groups
+      .filter((group) => group.part === 1 && !group.imageUrl)
+      .map((group) => {
+        const questionNumber = group.questions?.[0]?.questionNumber;
+        return {
+          section: 'LR' as const,
+          label: `Part 1 câu ${questionNumber ?? group.groupOrder}`,
+          brief: group.imageBrief ?? null,
+          groupId: group.id,
+          questionNumber,
+        };
+      }),
+    ...exercises
+      .filter(
+        (exercise) =>
+          exercise.taskType === 'DESCRIBE_PICTURE' && !exercise.imageUrl,
+      )
+      .map((exercise) => ({
+        section: 'SPEAKING' as const,
+        label: `Speaking câu ${exercise.order}`,
+        brief: briefs?.speaking?.[exercise.order - 1]?.imageBrief ?? null,
+      })),
+    ...items
+      .filter(
+        (item) =>
+          item.taskKind === 'PICTURE_SENTENCE' &&
+          !item.writingQuiz?.questions?.[0]?.content?.imageUrl,
+      )
+      .map((item) => ({
+        section: 'WRITING' as const,
+        label: `Writing câu ${item.order}`,
+        brief: briefs?.writing?.[item.order - 1]?.imageBrief ?? null,
+      })),
+  ];
 }
 
 /**
@@ -496,7 +535,7 @@ export class GenericExamService {
       groups: child?.groups ?? [],
       // A 4-skill exam may read another exam's L&R, which it cannot edit.
       lrEditable: Boolean(exam.toeicExamSet),
-      missingImageCount: countMissingImages(exam, child),
+      missingImageCount: listMissingImages(exam, child).length,
       totalGroups: child?.groups?.length ?? 0,
       totalQuestions,
       questionsCount: totalQuestions,
@@ -655,6 +694,7 @@ export class GenericExamService {
       // Once applied, the AI draft has nothing left to review.
       aiReviewPending: job?.status === AiGenerationJobStatus.GENERATED,
       listeningMaster: await this.listeningMasterView(exam),
+      missingImages: await this.missingImages(id),
     };
   }
 
@@ -920,16 +960,75 @@ export class GenericExamService {
     return projected;
   }
 
+  /** The AI draft's picture briefs say what a missing Speaking or Writing picture shows. */
+  private async imageBriefs(exam: ProductRecord) {
+    if (!exam.aiGenerationJobId) return undefined;
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: exam.aiGenerationJobId },
+      select: { draftSnapshot: true },
+    });
+    return (job?.draftSnapshot as any)?.speakingWriting ?? undefined;
+  }
+
+  async missingImages(id: number) {
+    const exam = await this.findExam(id);
+    return listMissingImages(
+      exam,
+      this.lrSource(exam),
+      await this.imageBriefs(exam),
+    );
+  }
+
+  /** "TOEIC Speaking & Writing — Đề luyện tập 03": the next one of its kind. */
+  async nextExamTitle(variantCode: string) {
+    const label =
+      variantCode === 'TOEIC_LR'
+        ? 'Listening & Reading'
+        : variantCode === 'TOEIC_SW'
+          ? 'Speaking & Writing'
+          : '4 Skills';
+    const sameVariant = await this.prisma.exam.count({
+      where: { variantCode },
+    });
+    return `TOEIC ${label} — Đề luyện tập ${String(sameVariant + 1).padStart(2, '0')}`;
+  }
+
+  /** What the new-exam form offers: each kind, its structure, its next name. */
+  async authoringOptions() {
+    const templates = EXAM_TEMPLATES.filter(
+      (template) => template.authoringEnabled,
+    );
+    return Promise.all(
+      templates.map(async (template) => ({
+        variantCode: template.variantCode,
+        displayName: template.displayName,
+        nextTitle: await this.nextExamTitle(template.variantCode),
+        sections: template.sections
+          .filter((section) => section.minutes)
+          .map(({ code, label, count, minutes }) => ({
+            code,
+            label,
+            count,
+            minutes,
+          })),
+        parts: template.sections
+          .filter((section) => section.code.startsWith('PART_'))
+          .map(({ label, count }) => ({ label, count })),
+      })),
+    );
+  }
+
   async createDraft(dto: CreateGenericExamDto, createdBy?: number) {
     const { familyCode, variantCode } = this.resolveRequestedVariant(dto);
     const template = resolveExamTemplate(familyCode, variantCode);
     const title = dto.title.trim();
+    const description = dto.description?.trim() || PRACTICE_DISCLAIMER;
 
     return this.prisma.$transaction(async (tx) => {
       const exam = await tx.exam.create({
         data: {
           title,
-          description: dto.description,
+          description,
           familyCode,
           variantCode,
           templateKey: template.key,
@@ -945,7 +1044,7 @@ export class GenericExamService {
         lr = await tx.toeicExamSet.create({
           data: {
             title,
-            description: dto.description,
+            description,
             type: dto.type === 'FULL_TEST' ? 'FULL_TEST' : 'PRACTICE_BY_PART',
             difficulty: dto.difficulty ?? 'medium',
             durationSeconds: dto.durationSeconds ?? 7200,
@@ -1017,7 +1116,7 @@ export class GenericExamService {
         const assessment = await tx.toeicAssessment.create({
           data: {
             title,
-            description: dto.description,
+            description,
             productFamily:
               variantCode === 'TOEIC_SW' ? 'TOEIC_SW' : 'TOEIC_4_SKILLS',
             createdBy,

@@ -1,3 +1,4 @@
+import { NotificationsModule } from '../notifications/notifications.module';
 import { WritingModule } from '../writing/writing.module';
 import { Module } from '@nestjs/common';
 import { ToeicListeningMasterService } from './toeic-listening-master.service';
@@ -32,6 +33,7 @@ import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-s
     AiModule,
     UploadModule,
     WritingModule,
+    NotificationsModule,
   ],
   controllers: [
     ToeicController,

@@ -34,25 +34,37 @@ function batchFor(part: number, groups: PlannedGroup[]) {
         ...(part <= 4
           ? {
               // Parts 3/4 must be real-test length (toeic-listening-length).
-              transcript: `Speaker: Listening transcript ${groupKey}.${part >= 3 ? ' and more spoken words'.repeat(25) : ''}`,
+              transcript: `${(plan as any).threeSpeakers ? 'W2: Good morning.\nW1: Hello.\n' : ''}Speaker: Listening transcript ${groupKey}.${part >= 3 ? ' and more spoken words'.repeat(25) : ''}`,
             }
           : {}),
         ...(part === 1
           ? { imageBrief: `A realistic office scene ${groupKey}.` }
           : {}),
+        ...((plan as any).graphic
+          ? { passageText: 'GRAPHIC: Schedule\n9:00 | Open\n10:00 | Talk\n11:00 | Close' }
+          : {}),
         ...(part >= 6
           ? {
-              passageText: `Reading passage ${groupKey}.${part === 6 ? ' _____'.repeat(plan.questionCount) : ''}`,
+              passageText: `${
+                (plan as any).documents
+                  ? Array.from(
+                      { length: (plan as any).documents },
+                      (_, index) => `DOCUMENT ${index + 1}\nText.\n\n`,
+                    ).join('')
+                  : ''
+              }Reading passage ${groupKey}.${part === 6 ? ' _____'.repeat(plan.questionCount) : ''}`,
             }
           : {}),
         questions: Array.from(
           { length: plan.questionCount },
           (_, questionIndex) => ({
-            text: `Question ${groupKey}-${questionIndex + 1}${part === 5 ? ' _____' : ''}`,
+            text: `${(plan as any).graphic && questionIndex === plan.questionCount - 1 ? 'Look at the graphic. ' : ''}Question ${groupKey}-${questionIndex + 1}${part === 5 ? ' _____' : ''}`,
             options: Array.from(
               { length: part === 2 ? 3 : 4 },
               (_, optionIndex) =>
-                `Option ${groupKey}-${questionIndex + 1}-${optionIndex + 1}`,
+                part === 6 && questionIndex === 0
+                  ? `This is sentence option ${groupKey}-${optionIndex + 1}.`
+                  : `Option ${groupKey}-${questionIndex + 1}-${optionIndex + 1}`,
             ),
             correctIndex: 0,
             explanation: `Giải thích hợp lệ và nhất quán cho ${groupKey}-${questionIndex + 1}.`,
@@ -84,8 +96,18 @@ function speakingWritingDraft() {
       title: `Writing ${index + 1}`,
       prompt: `Write a complete response for task ${index + 1}.`,
       ...(taskKind === 'PICTURE_SENTENCE'
-        ? { imageBrief: `Writing image ${index + 1}` }
+        ? {
+            imageBrief: `Writing image ${index + 1}`,
+            keywords: ['desk', 'report'],
+          }
         : {}),
+      ...(taskKind === 'WRITTEN_REQUEST'
+        ? {
+            email:
+              'From: Linh\nSubject: Meeting\nCould you confirm the time for Friday?',
+          }
+        : {}),
+      ...(taskKind === 'OPINION_ESSAY' ? { wordRange: [300, 500] } : {}),
     })),
   };
 }
@@ -304,11 +326,11 @@ describe('ToeicAiExamService controlled template pipeline', () => {
       1: Array.from({ length: 4 }, () => ({ questionCount: 1 })),
     });
     const harness = fixture(request);
-    let invalidFirstUnit = true;
+    let invalidCalls = 3;
     harness.ai.generateToeicExamBatch.mockImplementation((input: any) => {
       const candidate = batchFor(input.part, input.groups);
-      if (invalidFirstUnit) {
-        invalidFirstUnit = false;
+      if (invalidCalls > 0) {
+        invalidCalls -= 1;
         candidate.groups[0].questions[0].options.pop();
       }
       return candidate;
@@ -331,7 +353,10 @@ describe('ToeicAiExamService controlled template pipeline', () => {
       harness.ai.generateToeicExamBatch.mock.calls.map(
         (call: any[]) => call[0].groups.length,
       ),
-    ).toEqual([3, 1]);
+    ).toEqual([3, 3, 3, 1]);
+    expect(harness.ai.generateToeicExamBatch.mock.calls[2][0].retryNote).toBe(
+      'AI trả về phương án không hợp lệ',
+    );
 
     await harness.service.retry('qa-job', 1);
     await harness.service.process({ data: { jobId: 'qa-job' } });
@@ -349,7 +374,7 @@ describe('ToeicAiExamService controlled template pipeline', () => {
       harness.ai.generateToeicExamBatch.mock.calls.map(
         (call: any[]) => call[0].groups.length,
       ),
-    ).toEqual([3, 1, 3]);
+    ).toEqual([3, 3, 3, 1, 3]);
     expect(harness.prisma.toeicQuestionGroup.create).not.toHaveBeenCalled();
   });
 

@@ -26,6 +26,8 @@ describe('exam images', () => {
       analyzeToeicPart1Candidates: jest
         .fn()
         .mockResolvedValue([{ candidateId: '0', suitable, score: 80 }]),
+      canGenerateExamImage: () =>
+        process.env.GEMINI_IMAGE_GENERATION === 'enabled',
       generateToeicExamImage: jest
         .fn()
         .mockResolvedValue({ buffer: png, mimeType: 'image/png' }),

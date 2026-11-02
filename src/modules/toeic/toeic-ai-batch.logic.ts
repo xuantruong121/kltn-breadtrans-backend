@@ -193,6 +193,55 @@ export function explanationNamesPosition(text: unknown) {
 }
 
 /** What makes a Reading item unanswerable even when its shape is valid. */
+function isFullSentence(text: string) {
+  const trimmed = text.trim();
+  return trimmed.split(/\s+/).length >= 4 && /[.!?]$/.test(trimmed);
+}
+
+/** What the plan promised for one group beyond its question count. */
+export type PlannedTraits = {
+  documents?: 2 | 3;
+  threeSpeakers?: boolean;
+  graphic?: boolean;
+};
+
+export function plannedGroupIssue(planned: PlannedTraits, group: BatchGroup) {
+  const transcript = String(group.transcript ?? '');
+  const passage = String(group.passageText ?? '');
+  if (planned.threeSpeakers) {
+    const speakers = new Set(
+      [...transcript.matchAll(/^\s*([A-Z][A-Za-z]*(?: ?\d)?):/gm)].map(
+        (match) => match[1],
+      ),
+    );
+    if (speakers.size < 3)
+      return `Hội thoại cần 3 người nói, hiện có ${speakers.size}`;
+  }
+  if (planned.graphic) {
+    const rows = passage.split(/\r?\n/).filter((line) => line.trim()).length;
+    if (!isListeningGraphic(passage) || rows < 4)
+      return 'Thiếu hình đi kèm dạng GRAPHIC với ít nhất 3 dòng';
+    const last = group.questions?.[group.questions.length - 1];
+    if (!/look at the graphic/i.test(String(last?.text ?? '')))
+      return 'Câu cuối phải hỏi dựa vào hình (Look at the graphic)';
+  }
+  if (planned.documents) {
+    const documents = passage.match(/^DOCUMENT\s+\d+/gim)?.length ?? 0;
+    if (documents !== planned.documents)
+      return `Cần ${planned.documents} văn bản DOCUMENT, hiện có ${documents}`;
+  }
+  return null;
+}
+
+export function isListeningGraphic(text: string | null | undefined) {
+  return /^GRAPHIC:/i.test(String(text ?? '').trim());
+}
+
+/** Listening passages stay hidden, except a graphic meant to be seen. */
+export function learnerPassage(part: number, text: string | null) {
+  return part > 4 || isListeningGraphic(text) ? text : null;
+}
+
 export function readingGroupIssue(part: number, group: BatchGroup) {
   const questions = group.questions ?? [];
   const texts = questions.map((question) => String(question.text ?? '').trim());
@@ -201,6 +250,13 @@ export function readingGroupIssue(part: number, group: BatchGroup) {
   if (part === 7 && texts.some((text) => !text))
     return 'Part 7: câu hỏi thiếu nội dung câu hỏi';
   if (part === 6) {
+    const sentenceBlanks = questions.filter(
+      (question) =>
+        Array.isArray(question.options) &&
+        question.options.every((option) => isFullSentence(String(option))),
+    ).length;
+    if (questions.length === 4 && sentenceBlanks !== 1)
+      return `Part 6: mỗi đoạn cần đúng 1 câu chèn nguyên câu, hiện có ${sentenceBlanks}`;
     const blanks = String(group.passageText ?? '').match(/_{3,}/g) ?? [];
     if (blanks.length !== questions.length)
       return `Part 6: đoạn văn có ${blanks.length} chỗ trống cho ${questions.length} câu hỏi`;

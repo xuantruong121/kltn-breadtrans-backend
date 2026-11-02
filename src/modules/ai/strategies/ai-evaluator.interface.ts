@@ -349,6 +349,7 @@ export interface IAIEvaluator {
     difficulty: 'easy' | 'medium' | 'hard';
     includeSpeaking: boolean;
     includeWriting: boolean;
+    retryNote?: string;
   }): Promise<ToeicSpeakingWritingDraft>;
 
   suggestListeningFullDraft?(input: {
@@ -453,10 +454,25 @@ export type ToeicExamBatchRequest = {
   avoidQuestions?: string[];
   topic?: string;
   difficulty: 'easy' | 'medium' | 'hard';
-  groups: Array<{ questionCount: number; kind?: 'SINGLE' | 'MULTIPLE' }>;
+  groups: Array<{
+    questionCount: number;
+    kind?: 'SINGLE' | 'MULTIPLE';
+    /** Part 7: how many related documents a MULTIPLE group holds. */
+    documents?: 2 | 3;
+    /** Part 3: a conversation between three people. */
+    threeSpeakers?: boolean;
+    /** Parts 3 and 4: the group comes with a small table to read. */
+    graphic?: boolean;
+  }>;
+  /** Why the last draft of this batch was refused. */
+  retryNote?: string;
 };
 
-export type ToeicExamBatch = { groups: ToeicExamBatchGroup[] };
+export type ToeicExamBatch = {
+  groups: ToeicExamBatchGroup[];
+  /** Set when the stand-in wrote it instead of the main provider. */
+  provider?: 'CLOUDFLARE';
+};
 
 export interface ContextualVocabSuggestion {
   word: string;
@@ -590,6 +606,8 @@ export interface ToeicWritingDraftTask {
   title: string;
   taskKind: 'PICTURE_SENTENCE' | 'WRITTEN_REQUEST' | 'OPINION_ESSAY';
   prompt: string;
+  /** The e-mail a WRITTEN_REQUEST answers. */
+  email?: string;
   imageBrief?: string;
   keywords?: string[];
   wordRange?: [number, number];

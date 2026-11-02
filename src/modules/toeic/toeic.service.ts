@@ -1,3 +1,4 @@
+import { learnerPassage } from './toeic-ai-batch.logic';
 import {
   BadRequestException,
   ConflictException,
@@ -988,7 +989,7 @@ export class ToeicService {
           )
           .map((group) => ({
             ...group,
-            passageText: group.part <= 4 ? null : group.passageText,
+            passageText: learnerPassage(group.part, group.passageText),
             questions: group.questions.map((question) => {
               // Part 1 and Part 2 prompts/options are audio-only in every mode:
               // the printed options are the spoken answers, so sending them
@@ -1597,7 +1598,7 @@ export class ToeicService {
           questionNumber: question.questionNumber,
           part: group.part,
           groupId: group.id,
-          passageText: group.part <= 4 ? null : group.passageText,
+          passageText: learnerPassage(group.part, group.passageText),
           imageUrl: group.imageUrl,
           transcript: transcriptOf(group),
           questionText: question.text,

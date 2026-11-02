@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
+import { CloudflareWorkersAiClient } from './cloudflare-workers-ai.client';
 import { DocumentTextService } from './document-text.service';
 import { AdminContextualAiController } from './admin-contextual-ai.controller';
 import { GeminiEvaluatorStrategy } from './strategies/gemini-evaluator.strategy';
@@ -22,6 +23,7 @@ import { SpeakingCategoryService } from '../content/speaking-category.service';
     GeminiModelRouter,
     GeminiCredentialManager,
     AiImageSemanticValidator,
+    CloudflareWorkersAiClient,
     {
       provide: AI_EVALUATOR_TOKEN,
       useClass: GeminiEvaluatorStrategy,

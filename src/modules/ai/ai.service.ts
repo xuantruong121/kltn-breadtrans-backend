@@ -10,6 +10,15 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import type { SpeakingTaskType } from '../speaking/speaking-contract';
 import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
+import { CloudflareWorkersAiClient } from './cloudflare-workers-ai.client';
+import { isGeminiOutage } from './gemini/gemini-credential-manager.service';
+import {
+  assertToeicBatchShape,
+  assertToeicSpeakingWritingShape,
+  toeicBatchRequest,
+  toeicExamImagePrompt,
+  toeicSpeakingWritingRequest,
+} from './toeic-exam-prompt';
 import type {
   IAIEvaluator,
   PronunciationFeedback,
@@ -129,8 +138,25 @@ export class AiService {
     @Inject(AI_EVALUATOR_TOKEN)
     private readonly aiEvaluator: IAIEvaluator,
     @Optional() @InjectRedis() private readonly redis?: Redis,
+    @Optional() private readonly cloudflare?: CloudflareWorkersAiClient,
   ) {
     this.logger.log('AiService initialized with Strategy Pattern');
+  }
+
+  /** Runs on Cloudflare only when Gemini itself is unavailable. */
+  private async withStandIn<T extends object>(
+    primary: () => Promise<T>,
+    standIn: (cloudflare: CloudflareWorkersAiClient) => Promise<T>,
+  ): Promise<T & { provider?: 'CLOUDFLARE' }> {
+    try {
+      return await primary();
+    } catch (error) {
+      if (!this.cloudflare?.configured() || !isGeminiOutage(error)) throw error;
+      this.logger.warn(
+        `exam_generation_stand_in reason=${error instanceof Error ? error.message.slice(0, 160) : 'unknown'}`,
+      );
+      return { ...(await standIn(this.cloudflare)), provider: 'CLOUDFLARE' };
+    }
   }
 
   private getTodayUtcKey(): string {
@@ -241,7 +267,16 @@ export class AiService {
         'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo batch đề TOEIC',
       );
     }
-    return this.aiEvaluator.generateToeicExamBatch(input);
+    return this.withStandIn(
+      () => this.aiEvaluator.generateToeicExamBatch!(input),
+      async (cloudflare) =>
+        assertToeicBatchShape(
+          await cloudflare.generateJson<ToeicExamBatch>(
+            toeicBatchRequest(input),
+          ),
+          input,
+        ),
+    );
   }
 
   async generateToeicExamImage(input: {
@@ -249,12 +284,30 @@ export class AiService {
     part: number;
   }): Promise<{ buffer: Buffer; mimeType: string }> {
     await this.checkAndIncrementDailyQuota();
-    if (!this.aiEvaluator.generateToeicExamImage) {
+    const gemini =
+      process.env.GEMINI_IMAGE_GENERATION === 'enabled' &&
+      this.aiEvaluator.generateToeicExamImage;
+    if (this.cloudflare?.configured()) {
+      try {
+        return await this.cloudflare.generateImage(toeicExamImagePrompt(input));
+      } catch (error) {
+        if (!gemini) throw error;
+      }
+    }
+    if (!gemini) {
       throw new BadRequestException(
         'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo ảnh đề TOEIC',
       );
     }
-    return this.aiEvaluator.generateToeicExamImage(input);
+    return this.aiEvaluator.generateToeicExamImage!(input);
+  }
+
+  /** Gemini images have no free tier, so they stay behind their switch. */
+  canGenerateExamImage() {
+    return (
+      Boolean(this.cloudflare?.configured()) ||
+      process.env.GEMINI_IMAGE_GENERATION === 'enabled'
+    );
   }
 
   async analyzeToeicPart1Candidates(input: {
@@ -308,14 +361,24 @@ export class AiService {
     difficulty: 'easy' | 'medium' | 'hard';
     includeSpeaking: boolean;
     includeWriting: boolean;
-  }): Promise<ToeicSpeakingWritingDraft> {
+    retryNote?: string;
+  }) {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.generateToeicSpeakingWritingDraft) {
       throw new BadRequestException(
-        'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo đề TOEIC Speaking/Writing',
+        'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo draft TOEIC Speaking/Writing',
       );
     }
-    return this.aiEvaluator.generateToeicSpeakingWritingDraft(input);
+    return this.withStandIn(
+      () => this.aiEvaluator.generateToeicSpeakingWritingDraft!(input),
+      async (cloudflare) =>
+        assertToeicSpeakingWritingShape(
+          await cloudflare.generateJson<ToeicSpeakingWritingDraft>(
+            toeicSpeakingWritingRequest(input),
+          ),
+          input,
+        ),
+    );
   }
 
   async generateTtsAudio(text: string): Promise<Buffer | null> {

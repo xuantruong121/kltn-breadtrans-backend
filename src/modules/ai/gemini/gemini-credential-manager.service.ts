@@ -95,6 +95,19 @@ export function classifyGeminiError(error: any): GeminiErrorClass {
   return 'UNKNOWN';
 }
 
+/**
+ * True when the provider itself failed, on every key. A wrong answer is not an
+ * outage: that is for a retry, and a stand-in provider would not fix it.
+ */
+export function isGeminiOutage(error: unknown) {
+  return (
+    ['RATE_LIMIT', 'AUTH', 'MODEL_NOT_FOUND', 'PROVIDER_TRANSIENT', 'TIMEOUT'].includes(
+      classifyGeminiError(error),
+    ) ||
+    /fetch failed|GEMINI_API_KEY/i.test(String((error as Error)?.message ?? error))
+  );
+}
+
 @Injectable()
 export class GeminiCredentialManager {
   private readonly logger = new Logger(GeminiCredentialManager.name);
