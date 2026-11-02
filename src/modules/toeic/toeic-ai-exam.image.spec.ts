@@ -105,13 +105,11 @@ describe('exam images', () => {
       metadata: { provenance: 'EXTERNAL_LIBRARY' },
     });
 
-    expect(update).toHaveBeenCalledWith({
-      where: { id: 7 },
-      data: expect.objectContaining({ correctIndex: 1 }),
-    });
+    const saved = update.mock.calls[0][0].data;
+    expect(saved.options[saved.correctIndex]).toBe('B');
     expect(metadata.image?.questionStatus).toBe('READY_FOR_REVIEW');
     // Audio is scripted from this object straight after the match.
-    expect(group.questions[0].options).toEqual(['A', 'B', 'C', 'D']);
+    expect(group.questions[0].options).toEqual(saved.options);
   });
 
   describe('fillMissingImages', () => {

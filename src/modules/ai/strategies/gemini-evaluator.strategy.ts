@@ -1318,7 +1318,7 @@ Use only visible facts. Reject images that are blurry, abstract, text-heavy, bra
       },
       required: ['sceneSummary', 'statements', 'correctIndex', 'explanation'],
     };
-    const prompt = `Create one original TOEIC Part 1 practice item from this image. Return exactly four grammatically valid English statements and exactly one clearly correct statement. The other three must be plausible but visibly false. Use only visible facts: no hidden intentions, assumed job titles or relationships, emotions, off-image objects, future actions, brands, or text that cannot be read clearly. Keep the explanation concise and explain only visible evidence. Do not mention Pixabay, Gemini, or image metadata.`;
+    const prompt = `Create one original TOEIC Part 1 practice item from this image. Return exactly four grammatically valid English statements and exactly one clearly correct statement. Write the explanation in Vietnamese with full diacritics, naming the correct statement by its wording, never by a letter or position. The other three must be plausible but visibly false. Use only visible facts: no hidden intentions, assumed job titles or relationships, emotions, off-image objects, future actions, brands, or text that cannot be read clearly. Keep the explanation concise and explain only visible evidence. Do not mention Pixabay, Gemini, or image metadata.`;
     const result = await this.executeWithRotation(
       (model) =>
         model.generateContent({

@@ -47,6 +47,7 @@ import {
   questionFingerprint,
   questionsToAvoid,
   readingGroupIssue,
+  shuffleOptions,
 } from './toeic-ai-batch.logic';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
 import type {
@@ -2307,17 +2308,22 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       });
       this.assertPart1QuestionCandidate(vision);
       if (question) {
+        const shuffled = shuffleOptions({
+          options: vision.statements,
+          correctIndex: vision.correctIndex,
+          explanation: vision.explanation,
+        });
         await this.prisma.toeicQuestion.update({
           where: { id: question.id },
           data: {
             text: null,
-            options: vision.statements,
-            correctIndex: vision.correctIndex,
-            explanation: vision.explanation,
+            options: shuffled.options,
+            correctIndex: shuffled.correctIndex,
+            explanation: shuffled.explanation,
           },
         });
         // The audio is built from this same object right after.
-        question.options = vision.statements;
+        question.options = shuffled.options;
       }
       metadata.image = {
         ...metadata.image,
