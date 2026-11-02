@@ -4,11 +4,24 @@ type BatchQuestion = {
   correctIndex?: unknown;
   explanation?: unknown;
 };
-type BatchGroup = { passageText?: unknown; questions?: BatchQuestion[] };
+type BatchGroup = {
+  passageText?: unknown;
+  imageBrief?: unknown;
+  questions?: BatchQuestion[];
+};
 type GeneratedBatch = {
   part: number;
   candidate?: { groups?: BatchGroup[] };
 };
+
+/** A new sentence around the same answer still tests the same word. */
+function testedSentence(question: BatchQuestion) {
+  const text = String(question.text ?? '');
+  const answer = Array.isArray(question.options)
+    ? question.options[Number(question.correctIndex)]
+    : undefined;
+  return text && answer ? `${text} (tests: ${String(answer)})` : text;
+}
 
 /**
  * Each batch is generated on its own and the model has no memory of the last
@@ -23,13 +36,15 @@ export function questionsToAvoid(
   const groups = batches
     .filter((batch) => batch.part === part)
     .flatMap((batch) => batch.candidate?.groups ?? []);
-  // Part 6 prompts only say "blank [131]"; its passages are what repeats.
-  const texts =
-    part === 6
-      ? groups.map((group) => String(group.passageText ?? '').slice(0, 160))
-      : groups
-          .flatMap((group) => group.questions ?? [])
-          .map((question) => String(question.text ?? ''));
+  const texts = groups.flatMap((group) => {
+    // Part 6 prompts only say "blank [131]" and Part 1 has none, so what
+    // repeats there is the passage or the scene.
+    if (part === 6) return [String(group.passageText ?? '').slice(0, 160)];
+    if (part === 1) return [String(group.imageBrief ?? '')];
+    return (group.questions ?? []).map((question) =>
+      part === 5 ? testedSentence(question) : String(question.text ?? ''),
+    );
+  });
   return texts
     .map((text) => text.trim())
     .filter(Boolean)
@@ -51,7 +66,8 @@ const LETTERS = 'ABCD';
 const OPTION_LABEL = /^\(?([A-D])[).:]\s+(.+)$/s;
 const NAMED_OPTION =
   /((?:[Đđ]áp án|[Pp]hương án|[Ll]ựa chọn|[Oo]ption|[Cc]hoice)\s+)(\(?[A-D]\)?(?:\s*(?:,|và|hoặc|and|or)\s*\(?[A-D]\)?)*)(?![\p{L}\p{N}])/gu;
-const BLANK = /(?:\[\d+\]\s*)?_{3,}/g;
+// The model sometimes numbers a blank after it, as "_____ [1]".
+const BLANK = /(?:\[\d+\]\s*)?_{3,}(?:\s*\[\d+\])?/g;
 
 /** The UI prints its own A/B/C/D; a label from the model would show twice. */
 export function stripOptionLabels(options: string[]) {
@@ -152,6 +168,11 @@ export function prepareGeneratedBatch<T>(
     return part === 6 ? numberPassageBlanks(next, first) : next;
   });
   return { ...candidate, groups: prepared };
+}
+
+/** Explanations are read by Vietnamese learners; unmarked text is unreadable. */
+export function isVietnameseExplanation(text: unknown) {
+  return /[à-ỹ]/i.test(String(text ?? ''));
 }
 
 /** What makes a Reading item unanswerable even when its shape is valid. */

@@ -1,4 +1,5 @@
 import {
+  isVietnameseExplanation,
   prepareGeneratedBatch,
   questionsToAvoid,
   readingGroupIssue,
@@ -100,6 +101,24 @@ describe('prepareGeneratedBatch', () => {
     ]);
   });
 
+  it('drops a number the model put after the blank', () => {
+    const prepared = prepareGeneratedBatch(
+      6,
+      {
+        groups: [
+          {
+            ...group,
+            passageText: 'Staff _____ [1] Monday. Visitors _____ [2].',
+          },
+        ],
+      },
+      135,
+    );
+    expect(prepared.groups[0].passageText).toBe(
+      'Staff [135] _____ Monday. Visitors [136] _____.',
+    );
+  });
+
   it('continues numbering across the groups of a batch', () => {
     const prepared = prepareGeneratedBatch(6, { groups: [group, group] }, 131);
     expect(prepared.groups[1].passageText).toContain('[133] _____');
@@ -147,6 +166,40 @@ describe('readingGroupIssue', () => {
     expect(
       readingGroupIssue(7, { questions: [question({ text: ' ' })] }),
     ).toMatch(/Part 7/);
+  });
+});
+
+describe('isVietnameseExplanation', () => {
+  it('accepts marked Vietnamese and refuses English or unmarked text', () => {
+    expect(isVietnameseExplanation('Trạng từ bổ nghĩa cho động từ.')).toBe(
+      true,
+    );
+    expect(isVietnameseExplanation('The adverb modifies the verb.')).toBe(
+      false,
+    );
+    expect(isVietnameseExplanation('Thong bao chi ra rang cuoi thang.')).toBe(
+      false,
+    );
+  });
+});
+
+describe('questionsToAvoid per Part', () => {
+  it('names the tested answer for Part 5', () => {
+    const batch = {
+      part: 5,
+      candidate: { groups: [{ questions: [question()] }] },
+    };
+    expect(questionsToAvoid([batch], 5)).toEqual([
+      'The office is closed _____ Monday. (tests: on)',
+    ]);
+  });
+
+  it('lists scenes for Part 1, which has no question text', () => {
+    const batch = {
+      part: 1,
+      candidate: { groups: [{ imageBrief: 'A man typing.', questions: [] }] },
+    };
+    expect(questionsToAvoid([batch], 1)).toEqual(['A man typing.']);
   });
 });
 

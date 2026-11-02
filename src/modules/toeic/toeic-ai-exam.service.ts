@@ -42,6 +42,7 @@ import { ImageSearchCandidate } from './pixabay-image-search.provider';
 import { ImageSearchProviderChain } from './image-search.provider-chain';
 import { bestImageCandidate, imageSearchQuery } from './exam-image-query';
 import {
+  isVietnameseExplanation,
   prepareGeneratedBatch,
   questionFingerprint,
   questionsToAvoid,
@@ -1688,6 +1689,10 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         if (String(question.explanation ?? '').trim().length < 20)
           throw new BadRequestException(
             'AI trả về giải thích không đủ chất lượng',
+          );
+        if (!isVietnameseExplanation(question.explanation))
+          throw new BadRequestException(
+            'AI trả về giải thích không phải tiếng Việt có dấu',
           );
         // Part 3/4 question prompts are spoken after the conversation/talk
         // (toeic-listening-audio.ts); without this text the audio script
