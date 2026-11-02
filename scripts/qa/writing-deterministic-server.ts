@@ -33,18 +33,21 @@ function evaluate(score: number) {
 
 /** Deterministic grammar candidates; the answer is always option A. */
 function deterministicGrammarQuestions(count: number) {
-  return Array.from({ length: Math.min(Math.max(count || 3, 1), 5) }, (_, i) => ({
-    question: `Câu kiểm thử ${i + 1}: She ____ to work yesterday.`,
-    options: ['went', 'goes', 'go', 'going'],
-    correctIndex: 0,
-    explanation: 'yesterday là mốc quá khứ nên dùng quá khứ đơn.',
-    optionExplanations: [
-      '',
-      'Hiện tại đơn, không hợp với yesterday.',
-      'Động từ nguyên mẫu, thiếu chia thì.',
-      'Dạng V-ing cần trợ động từ.',
-    ],
-  }));
+  return Array.from(
+    { length: Math.min(Math.max(count || 3, 1), 5) },
+    (_, i) => ({
+      question: `Câu kiểm thử ${i + 1}: She ____ to work yesterday.`,
+      options: ['went', 'goes', 'go', 'going'],
+      correctIndex: 0,
+      explanation: 'yesterday là mốc quá khứ nên dùng quá khứ đơn.',
+      optionExplanations: [
+        '',
+        'Hiện tại đơn, không hợp với yesterday.',
+        'Động từ nguyên mẫu, thiếu chia thì.',
+        'Dạng V-ing cần trợ động từ.',
+      ],
+    }),
+  );
 }
 
 const provider = {
@@ -59,7 +62,62 @@ const provider = {
   }),
   explainToeicError: async () => 'Deterministic explanation.',
   generateToeicQuestions: async () => [],
-  generateDictation: async () => [],
+  // CMS drafts from a document: two decks that repeat a word, so review tests
+  // see the de-duplication; dictation lines are fixed sentences.
+  suggestVocabDecksFromDocument: async () => ({
+    decks: [
+      {
+        title: 'Hoá đơn',
+        description: 'Từ về hoá đơn',
+        level: 'B1',
+        words: [
+          {
+            word: 'invoice',
+            pos: 'noun',
+            meaning: 'hoá đơn',
+            exampleEn: 'Send the invoice.',
+            exampleVi: 'Gửi hoá đơn.',
+          },
+          {
+            word: 'budget',
+            pos: 'noun',
+            meaning: 'ngân sách',
+            exampleEn: 'Check the budget.',
+            exampleVi: 'Xem ngân sách.',
+          },
+        ],
+      },
+      {
+        title: 'Vận chuyển',
+        description: 'Từ về vận chuyển',
+        level: 'B1',
+        words: [
+          {
+            word: 'Budget',
+            pos: 'noun',
+            meaning: 'ngân sách',
+            exampleEn: 'A small budget.',
+            exampleVi: 'Ngân sách nhỏ.',
+          },
+          {
+            word: 'shipment',
+            pos: 'noun',
+            meaning: 'lô hàng',
+            exampleEn: 'The shipment arrived.',
+            exampleVi: 'Lô hàng đã đến.',
+          },
+        ],
+      },
+    ],
+  }),
+  suggestDictationLines: async (input: { count: number }) => ({
+    title: 'Chép chính tả kiểm thử',
+    description: 'Bản nháp kiểm thử.',
+    sentences: Array.from(
+      { length: input.count },
+      (_, i) => `This is test sentence number ${i + 1} for dictation.`,
+    ),
+  }),
   // Dictionary lookups: a fixed Vietnamese meaning, so an external result is
   // complete and the store keeps it for review (F13).
   enrichDictionaryEntry: async (input: { word: string }) => ({
