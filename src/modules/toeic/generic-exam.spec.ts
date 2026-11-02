@@ -202,6 +202,27 @@ describe('GenericExamService.update title', () => {
   });
 });
 
+describe('GenericExamService.getAdmin AI review', () => {
+  const build = (status: string) => {
+    const service: any = Object.create(GenericExamService.prototype);
+    service.findExam = jest.fn().mockResolvedValue({ aiGenerationJobId: 'j' });
+    service.project = jest.fn().mockReturnValue({ id: 5 });
+    service.withAdminPlayback = jest.fn((value: unknown) => value);
+    service.examsSharingLr = jest.fn().mockResolvedValue(0);
+    service.prisma = {
+      aiGenerationJob: {
+        findUnique: jest.fn().mockResolvedValue({ status }),
+      },
+    };
+    return service;
+  };
+
+  it('offers the AI draft only while it waits for review', async () => {
+    expect((await build('GENERATED').getAdmin(5)).aiReviewPending).toBe(true);
+    expect((await build('APPROVED').getAdmin(5)).aiReviewPending).toBe(false);
+  });
+});
+
 describe('lrSourceIsLive', () => {
   const draft = { id: 3, publicationStatus: QuizPublicationStatus.DRAFT };
   const live = { id: 1, publicationStatus: QuizPublicationStatus.PUBLISHED };

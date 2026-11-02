@@ -6,6 +6,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import {
+  AiGenerationJobStatus,
   Prisma,
   QuizPublicationStatus,
   SpeakingPracticeScope,
@@ -54,6 +55,44 @@ export function lrSourceIsLive(
   if (lr?.publicationStatus === QuizPublicationStatus.PUBLISHED) return true;
   return (
     lr?.publicationStatus === QuizPublicationStatus.DRAFT && lr.id === ownSetId
+  );
+}
+
+/**
+ * What a learner receives for one question: Parts 1 and 2 are audio only, so
+ * printing their options would give the spoken answers away.
+ */
+function learnerPreviewQuestion(part: number, question: any) {
+  const audioOnly = part <= 2;
+  return {
+    id: question.id,
+    questionNumber: question.questionNumber,
+    text: audioOnly ? null : question.text,
+    options: audioOnly ? question.options.map(() => '') : question.options,
+  };
+}
+
+/** Slots that need a picture and have none; the exam page offers to fill them. */
+function countMissingImages(exam: ProductRecord, lr: ProductRecord) {
+  const components: any[] = exam.toeicAssessment?.components ?? [];
+  const groups: any[] = lr?.groups ?? [];
+  const exercises: any[] =
+    components.find((component) => component.kind === 'SPEAKING')
+      ?.speakingPracticeSet?.exercises ?? [];
+  const items: any[] =
+    components.find((component) => component.kind === 'WRITING')?.writingSet
+      ?.items ?? [];
+  return (
+    groups.filter((group) => group.part === 1 && !group.imageUrl).length +
+    exercises.filter(
+      (exercise) =>
+        exercise.taskType === 'DESCRIBE_PICTURE' && !exercise.imageUrl,
+    ).length +
+    items.filter(
+      (item) =>
+        item.taskKind === 'PICTURE_SENTENCE' &&
+        !item.writingQuiz?.questions?.[0]?.content?.imageUrl,
+    ).length
   );
 }
 
@@ -446,6 +485,7 @@ export class GenericExamService {
       groups: child?.groups ?? [],
       // A 4-skill exam may read another exam's L&R, which it cannot edit.
       lrEditable: Boolean(exam.toeicExamSet),
+      missingImageCount: countMissingImages(exam, child),
       totalGroups: child?.groups?.length ?? 0,
       totalQuestions,
       questionsCount: totalQuestions,
@@ -592,9 +632,17 @@ export class GenericExamService {
 
   async getAdmin(id: number) {
     const exam = await this.findExam(id);
+    const job = exam.aiGenerationJobId
+      ? await this.prisma.aiGenerationJob.findUnique({
+          where: { id: exam.aiGenerationJobId },
+          select: { status: true },
+        })
+      : null;
     return {
       ...(await this.withAdminPlayback(this.project(exam))),
       sharedLrExams: await this.examsSharingLr(exam),
+      // Once applied, the AI draft has nothing left to review.
+      aiReviewPending: job?.status === AiGenerationJobStatus.GENERATED,
     };
   }
 
@@ -609,20 +657,23 @@ export class GenericExamService {
     const exam = await this.findExam(id);
 
     const lrSet = this.lrSource(exam);
-    const lr = lrSet
+    const playable = lrSet
+      ? await this.withAdminPlayback({ groups: lrSet.groups })
+      : null;
+    const lr = playable
       ? {
-          groups: lrSet.groups.map((group: any) => ({
+          groups: (playable.groups as any[]).map((group) => ({
+            id: group.id,
             part: group.part,
             groupOrder: group.groupOrder,
             imageUrl: group.imageUrl,
-            passageText: group.passageText,
+            // Listening scripts stay hidden, exactly as in a real attempt.
+            passageText: group.part <= 4 ? null : group.passageText,
             hasAudio: !!group.audioUrl,
-            questions: group.questions.map((question: any) => ({
-              id: question.id,
-              questionNumber: question.questionNumber,
-              text: question.text,
-              options: question.options,
-            })),
+            audioSrc: group.audioPlaybackUrl ?? group.audioUrl ?? null,
+            questions: group.questions.map((question: any) =>
+              learnerPreviewQuestion(group.part, question),
+            ),
           })),
         }
       : null;
@@ -634,8 +685,10 @@ export class GenericExamService {
         order: exercise.order,
         title: exercise.title,
         targetText: exercise.targetText,
+        taskType: exercise.taskType,
         imageUrl: exercise.imageUrl,
         audioUrl: exercise.audioUrl,
+        stimulusText: exercise.stimulus?.content ?? null,
       }));
 
     const writing = exam.toeicAssessment?.components

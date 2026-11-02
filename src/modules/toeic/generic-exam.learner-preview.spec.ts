@@ -96,3 +96,55 @@ describe('GenericExamService.getLearnerPreview', () => {
     expect(prisma.toeicAssessmentAttempt.create).not.toHaveBeenCalled();
   });
 });
+
+describe('GenericExamService.getLearnerPreview audio Parts', () => {
+  it('hides Part 1 and 2 wording and gives a playable source', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    service.prisma = {
+      exam: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 5,
+          title: 'Đề 02',
+          toeicExamSet: {
+            id: 3,
+            groups: [
+              {
+                id: 8,
+                part: 2,
+                groupOrder: 7,
+                imageUrl: null,
+                passageText: 'AUDIO PROMPT: secret',
+                audioUrl: 'https://cdn.test/a.mp3',
+                questions: [
+                  {
+                    id: 1,
+                    questionNumber: 7,
+                    text: 'Choose the best response.',
+                    options: ['Yes.', 'No.', 'Maybe.'],
+                    correctIndex: 1,
+                  },
+                ],
+              },
+            ],
+          },
+          toeicAssessment: null,
+        }),
+      },
+    };
+
+    const preview = await service.getLearnerPreview(5);
+
+    const group = preview.lr.groups[0];
+    expect(group).toMatchObject({
+      id: 8,
+      passageText: null,
+      audioSrc: 'https://cdn.test/a.mp3',
+    });
+    expect(group.questions[0]).toEqual({
+      id: 1,
+      questionNumber: 7,
+      text: null,
+      options: ['', '', ''],
+    });
+  });
+});
