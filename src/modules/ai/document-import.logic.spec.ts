@@ -26,6 +26,10 @@ describe('document import logic', () => {
     expect(limitDocumentText('abc', 4).truncated).toBe(false);
   });
 
+  it('treats a PDF with only page markers as empty', () => {
+    expect(limitDocumentText('\n\n-- 1 of 1 --\n\n').text).toBe('');
+  });
+
   describe('normalizeVocabDecks', () => {
     const word = (name: string, meaning = 'nghĩa') => ({ word: name, meaning });
 

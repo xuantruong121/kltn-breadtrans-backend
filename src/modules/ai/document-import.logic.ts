@@ -11,7 +11,11 @@ export const isReadableDocument = (filename: string) =>
 
 /** Long documents are cut, and the admin is told how much the AI will read. */
 export function limitDocumentText(raw: string, limit = DOCUMENT_MAX_CHARS) {
-  const text = raw.replace(/\r\n/g, '\n').trim();
+  // The PDF reader adds a "-- 1 of 3 --" line per page; it is not document text.
+  const text = raw
+    .replace(/\r\n/g, '\n')
+    .replace(/^-- \d+ of \d+ --$/gm, '')
+    .trim();
   return {
     text: text.slice(0, limit),
     totalChars: text.length,

@@ -398,8 +398,12 @@ export class AdminContextualAiController {
       file.mimetype,
       file.originalname,
     );
-    if (!raw.trim()) throw new BadRequestException('Tệp không có chữ để đọc.');
-    return limitDocumentText(raw);
+    const document = limitDocumentText(raw);
+    if (!document.text)
+      throw new BadRequestException(
+        'Tệp không có chữ để đọc. Tệp scan cần được chuyển thành chữ trước.',
+      );
+    return document;
   }
 
   @Post('vocab/ai/from-document')
