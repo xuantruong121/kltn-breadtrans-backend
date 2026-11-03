@@ -2004,8 +2004,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
   > {
     let refusal = review?.initialRefusal ?? '';
     let code: FailedLrBatch['code'] = 'CONTENT_CONTRACT_FAILURE';
+    // Every draft of this batch and why it was refused, kept on the batch.
+    const drafts: Array<{
+      attempt: number;
+      outcome: 'CONTENT_CONTRACT' | 'REVIEW_REJECTED' | 'ACCEPTED';
+      reason?: string;
+      verdictCounts?: Record<string, number>;
+      refused?: unknown[];
+    }> = [];
     for (let attempt = 0; attempt <= BATCH_RETRIES; attempt += 1) {
-      let batch: StoredLrBatch;
+      let batch: StoredLrBatch & { drafts?: typeof drafts };
       try {
         const candidate = await this.draftBatch(
           { ...input, ...(refusal ? { retryNote: refusal } : {}) },
@@ -2017,27 +2025,83 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           part: input.part,
           questionNumber: firstQuestionNumber,
           candidate,
+          drafts,
         };
         this.assertNoDuplicateBatches([...earlierBatches, batch]);
       } catch (error) {
         if (isAiOutage(error)) throw error;
         refusal = (error as Error)?.message || 'Nội dung AI không hợp lệ';
         code = 'CONTENT_CONTRACT_FAILURE';
+        drafts.push({
+          attempt,
+          outcome: 'CONTENT_CONTRACT',
+          reason: refusal.slice(0, 300),
+        });
         continue;
       }
       // Part 1 is checked on the Draft, once its photo exists.
-      if (!review || input.part === 1) return { batch, stored: false };
+      if (!review || input.part === 1) {
+        drafts.push({ attempt, outcome: 'ACCEPTED' });
+        return { batch, stored: false };
+      }
       await review.store(batch);
       // A reviewer outage propagates here: the batch stays stored and the
       // resumed job only runs the missing review step.
       const verdict = await this.reviewBatch(batch, review.persist);
-      if (verdict.accepted) return { batch, stored: true };
+      if (verdict.accepted) {
+        drafts.push({ attempt, outcome: 'ACCEPTED' });
+        await review.persist();
+        return { batch, stored: true };
+      }
       refusal = verdict.refusal;
       code = 'ANSWER_REVIEW_FAILED';
+      drafts.push({
+        attempt,
+        outcome: 'REVIEW_REJECTED',
+        reason: refusal.slice(0, 300),
+        ...this.refusedDraftRecord(batch),
+      });
       // The last refused draft stays so the admin can see and fix it.
       if (attempt < BATCH_RETRIES) await review.unstore(identity.batchKey);
     }
     return { refusal, code };
+  }
+
+  /**
+   * What a refused draft held, kept after it is redrafted: verdict counts of
+   * every question and the refused questions themselves, so the refusal can
+   * be audited later.
+   */
+  private refusedDraftRecord(batch: StoredLrBatch) {
+    const part = Number(batch.part);
+    const verdictCounts: Record<string, number> = {};
+    const refused: unknown[] = [];
+    for (const { group, firstQuestionNumber } of this.groupsWithNumbers(
+      batch,
+    )) {
+      for (const row of (group.review?.verdicts ?? []) as QuestionReview[]) {
+        verdictCounts[row.verdict] = (verdictCounts[row.verdict] ?? 0) + 1;
+        if (row.verdict === 'AGREE') continue;
+        const question =
+          group.questions?.[row.questionNumber - firstQuestionNumber];
+        refused.push({
+          questionNumber: row.questionNumber,
+          verdict: row.verdict,
+          stimulus: groupStimulus(part, group)?.slice(0, 2500) ?? null,
+          question: question
+            ? {
+                text: question.text ?? null,
+                options: question.options,
+                correctIndex: question.correctIndex,
+                explanation: question.explanation,
+              }
+            : null,
+          solve: row.solve ?? null,
+          explanation: row.explanation ?? null,
+        });
+      }
+    }
+    return { verdictCounts, refused };
   }
 
   private reviewer(): AnswerReviewService {
