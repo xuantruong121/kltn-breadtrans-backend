@@ -2,6 +2,7 @@ import { AiGenerationJobStatus } from '@prisma/client';
 import { ToeicAiExamService } from './toeic-ai-exam.service';
 import { TOEIC_SPEAKING_TASK_SEQUENCE } from '../speaking/toeic-speaking-contract';
 import { TOEIC_WRITING_SLOT_CONTRACT } from '../writing/toeic-writing-set.contract';
+import { withAgreeingReview } from './toeic-answer-review.fixtures-spec';
 
 type PlannedGroup = { questionCount: number; kind?: 'SINGLE' | 'MULTIPLE' };
 
@@ -180,6 +181,7 @@ function fixture(
     getJob: jest.fn().mockResolvedValue(null),
     add: jest.fn().mockResolvedValue(undefined),
   };
+  withAgreeingReview(service);
   return { service, ai, prisma, runtimeJob, updates, queue: service.queue };
 }
 
@@ -493,6 +495,7 @@ describe('ToeicAiExamService controlled template pipeline', () => {
         batchFor(input.part, input.groups),
       ),
     };
+    withAgreeingReview(service);
     const candidate = await service.regeneratePartCandidate(814, 5, 'meetings');
     expect(candidate).toMatchObject({
       mode: 'CANDIDATE_ONLY',

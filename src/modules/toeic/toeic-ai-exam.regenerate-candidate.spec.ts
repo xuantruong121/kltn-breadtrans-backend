@@ -1,4 +1,5 @@
 import { ToeicAiExamService } from './toeic-ai-exam.service';
+import { withAgreeingReview } from './toeic-answer-review.fixtures-spec';
 
 /**
  * Phase A polish — targeted "Tạo lại nhóm/Part" must regenerate only the
@@ -81,6 +82,7 @@ describe('ToeicAiExamService — targeted candidate regeneration', () => {
     (service as any).prisma = prisma;
     (service as any).ai = ai;
     (service as any).assertBatch = jest.fn();
+    withAgreeingReview(service);
   });
 
   it('regenerates only the targeted group, leaves the sibling group untouched', async () => {

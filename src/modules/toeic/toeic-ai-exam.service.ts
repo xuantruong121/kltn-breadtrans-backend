@@ -63,6 +63,48 @@ import { listeningScriptLengthIssue } from './toeic-listening-length';
 import { isAiOutage } from '../ai/cloudflare-workers-ai.client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PRACTICE_DISCLAIMER } from './exam-template.registry';
+import { AnswerReviewService } from '../ai/review/answer-review.service';
+import {
+  ReviewerUnavailableError,
+  isReviewerUnavailable,
+} from '../ai/review/answer-reviewer';
+import {
+  explanationPrompt,
+  part1VisionPrompt,
+  solvePrompt,
+} from '../ai/toeic-answer-review-prompt';
+import {
+  canApply,
+  canonicalGroupHash,
+  combinedVerdict,
+  confirmReview,
+  confirmationRefusal,
+  diffGroup,
+  emptyReview,
+  explanationRequestOf,
+  groupStimulus,
+  invalidateReview,
+  judgeExplanation,
+  judgePart1Vision,
+  judgeSolve,
+  optionCountOf,
+  part1DraftHash,
+  pendingStep,
+  reviewItemId,
+  reviewRejection,
+  settleStatus,
+  solveRequestOf,
+  validateExplanationOutput,
+  validatePart1VisionOutput,
+  validateSolveOutput,
+  type ApplyDecision,
+} from './toeic-answer-review.logic';
+import type {
+  ConfirmationMethod,
+  GroupReview,
+  QuestionReview,
+  QuestionVerdict,
+} from './toeic-answer-review.types';
 
 const TOEIC_AI_QUEUE = 'breadtrans-toeic-ai-exam';
 /** Tries per batch: the first draft plus these, each told why it was refused. */
@@ -93,10 +135,21 @@ type FailedLrBatch = {
   groupOrder: number;
   questionNumber: number;
   groups: PlannedGroup[];
-  code: 'CONTENT_CONTRACT_FAILURE';
+  /** ANSWER_REVIEW_FAILED keeps the last refused batch for the admin to fix. */
+  code: 'CONTENT_CONTRACT_FAILURE' | 'ANSWER_REVIEW_FAILED';
   message: string;
   attempts: number;
 };
+
+type StoredLrBatch = {
+  batchKey?: string;
+  part: number;
+  groupOrder: number;
+  questionNumber: number;
+  candidate: any;
+};
+
+const isLrKey = (key: string) => /^LR:P\d+:G\d+$/.test(key);
 
 type ToeicAiDraftSnapshot = {
   version: 1;
@@ -329,6 +382,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     private readonly r2: R2Service,
     private readonly imageSearch: ImageSearchProviderChain,
     @Optional() private readonly notifications?: NotificationsService,
+    @Optional() private readonly answerReview?: AnswerReviewService,
   ) {}
 
   onModuleInit() {
@@ -479,6 +533,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     offset: number,
     message: string,
     previous?: FailedLrBatch,
+    code: FailedLrBatch['code'] = 'CONTENT_CONTRACT_FAILURE',
   ): FailedLrBatch {
     const coordinates = this.batchCoordinates(request, part, offset);
     return {
@@ -488,7 +543,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       groupOrder: coordinates.groupOrder,
       questionNumber: coordinates.questionNumber,
       groups: coordinates.groups,
-      code: 'CONTENT_CONTRACT_FAILURE',
+      code,
       message: message.slice(0, 1000),
       attempts: (previous?.attempts ?? 0) + 1,
     };
@@ -525,6 +580,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const failedUnits: FailedLrBatch[] = Array.isArray(candidate.failedUnits)
       ? candidate.failedUnits
       : [];
+    const request = job.requestSnapshot as unknown as RequestSnapshot;
     let flaggedCount = failedUnits.length;
     const lrGroups = (
       Array.isArray(candidate.lrBatches) ? candidate.lrBatches : []
@@ -578,6 +634,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             groupIssues.push('Chưa có mô tả hình ảnh');
           if (groupIssues.length) flaggedCount += 1;
           const groupOrder = batch.groupOrder + index;
+          const decision = this.lrApplyDecision(request, batch, index, group);
           return {
             candidateKey: `LR:P${batch.part}:G${groupOrder}`,
             part: batch.part,
@@ -588,6 +645,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             imageBrief: group.imageBrief ?? null,
             issues: groupIssues,
             questions,
+            // Part 1 is reviewed on the Draft, once its photo exists.
+            reviewStatus:
+              batch.part === 1
+                ? null
+                : ((group.review as GroupReview | undefined)?.status ??
+                  'UNREVIEWED'),
+            review: group.review ?? null,
+            contentHash: decision.currentHash,
+            applyDecision: { ok: decision.ok, reason: decision.reason },
           };
         },
       );
@@ -696,6 +762,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             continue;
           }
           found = true;
+          const before = JSON.parse(
+            JSON.stringify({
+              transcript: group.transcript,
+              passageText: group.passageText,
+              imageBrief: group.imageBrief,
+              questions: group.questions,
+            }),
+          );
           if (typeof patch.transcript === 'string')
             group.transcript = patch.transcript;
           if (typeof patch.passageText === 'string')
@@ -721,10 +795,12 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
                 question.explanation = qPatch.explanation;
             }
           }
+          this.recordCandidateEdit(part, group, before, adminId);
         }
       }
       if (!found)
         throw new NotFoundException('Không tìm thấy candidate item này');
+      this.resolveReviewFailures(candidate);
     } else if (taskMatch) {
       const skill = taskMatch[1];
       const taskIndex = Number(taskMatch[2]) - 1;
@@ -815,6 +891,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             firstQuestionNumber,
           );
           this.assertBatch(part, [planned], regenerated);
+          await this.reviewRegenerated(part, firstQuestionNumber, regenerated);
           groups[index] = regenerated.groups[0];
         }
         firstQuestionNumber += questionCount;
@@ -823,6 +900,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     if (!found)
       throw new NotFoundException('Không tìm thấy candidate item này');
     this.assertNoDuplicateBatches(lrBatches);
+    this.resolveReviewFailures(candidate);
 
     await this.prisma.aiGenerationJob.update({
       where: { id: jobId },
@@ -877,9 +955,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           first,
         );
         this.assertBatch(part, [planned], regenerated);
+        await this.reviewRegenerated(part, first, regenerated);
         groups[index] = regenerated.groups[0];
       }
     }
+    this.resolveReviewFailures(candidate);
 
     await this.prisma.aiGenerationJob.update({
       where: { id: jobId },
@@ -1067,7 +1147,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     // Keys actually eligible to be (re)written this call: requested, known
     // to exist in the candidate, and not already applied (idempotent no-op
     // on repeat — re-applying an applied key must never duplicate content).
-    const toApply = isSelective
+    const requested = isSelective
       ? selectedCandidateKeys.filter(
           (k) => availableKeys.includes(k) && !previouslyApplied.includes(k),
         )
@@ -1076,8 +1156,31 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         // must be rewritten, not just the ones never applied before.
         availableKeys;
 
+    // Answer review gate: hash and structure come from the current content.
+    const request = job.requestSnapshot as unknown as RequestSnapshot;
+    const decisions = new Map<string, ApplyDecision>();
+    for (const batch of (candidate.lrBatches ?? []) as StoredLrBatch[])
+      (batch.candidate?.groups ?? []).forEach((group: any, index: number) =>
+        decisions.set(
+          `LR:P${batch.part}:G${Number(batch.groupOrder) + index}`,
+          this.lrApplyDecision(request, batch, index, group),
+        ),
+      );
+    const skipped = requested
+      .filter((key) => isLrKey(key) && !decisions.get(key)?.ok)
+      .map((key) => ({
+        candidateKey: key,
+        reason: decisions.get(key)?.reason ?? 'UNREVIEWED',
+      }));
+    const toApply = requested.filter(
+      (key) => !isLrKey(key) || decisions.get(key)?.ok,
+    );
+
     const lrGroups = this.flattenLrCandidateGroups(candidate);
-    if (exam.toeicExamSet && (!isSelective || toApply.length)) {
+    // Apply-all replaces the L&R set only when it has groups to write: a run
+    // whose groups were all held back must not wipe the Draft.
+    const wipesLr = !isSelective && toApply.some(isLrKey);
+    if (exam.toeicExamSet && (isSelective ? toApply.length : wipesLr)) {
       const groupsToWrite = lrGroups.filter((g) =>
         toApply.includes(g.candidateKey),
       );
@@ -1127,11 +1230,18 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       });
       validation = validateToeicExam(complete);
     }
+    // Apply-all wiped the whole L&R set, so only what it wrote is applied.
     const appliedCandidateKeys = Array.from(
-      new Set([...previouslyApplied, ...toApply]),
+      new Set([
+        ...(wipesLr
+          ? previouslyApplied.filter((key) => !isLrKey(key))
+          : previouslyApplied),
+        ...toApply,
+      ]),
     );
     const fullyApplied =
       availableKeys.every((k) => appliedCandidateKeys.includes(k)) &&
+      !skipped.length &&
       !(candidate.failedUnits ?? []).length;
     const snapshot = (job.resultSnapshot as any) ?? {};
     const missingMedia = await this.genericExam.missingImages(exam.id);
@@ -1152,6 +1262,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           stage: fullyApplied ? 'APPLIED_TO_DRAFT' : 'PARTIALLY_APPLIED',
           validation,
           missingMedia,
+          skipped,
         } as Prisma.InputJsonValue,
       },
     });
@@ -1165,7 +1276,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           url: `/admin/exams?exam=${exam.id}`,
         })
         .catch(() => undefined);
-    return this.status(jobId);
+    return { ...(await this.status(jobId)), skipped };
   }
 
   private async editableDraft(examId: number) {
@@ -1209,6 +1320,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       group.questions[0].questionNumber,
     );
     this.assertBatch(group.part, [{ questionCount: 1 }], candidate);
+    await this.reviewRegenerated(
+      group.part,
+      group.questions[0].questionNumber,
+      candidate,
+    );
     return {
       mode: 'CANDIDATE_ONLY',
       questionId,
@@ -1250,6 +1366,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       Math.min(...group.questions.map((question) => question.questionNumber)),
     );
     this.assertBatch(group.part, plan, candidate);
+    await this.reviewRegenerated(
+      group.part,
+      Math.min(...group.questions.map((question) => question.questionNumber)),
+      candidate,
+    );
     return { mode: 'CANDIDATE_ONLY', groupId, candidate: candidate.groups[0] };
   }
 
@@ -1271,6 +1392,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         firstQuestionNumber,
       );
       this.assertBatch(part, slice, candidate);
+      await this.reviewRegenerated(part, firstQuestionNumber, candidate);
       batches.push(...candidate.groups);
       firstQuestionNumber += slice.reduce(
         (total, item) => total + item.questionCount,
@@ -1416,8 +1538,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           r2Key: image.key,
           generatedAt: new Date().toISOString(),
           briefHash: toeicMediaHash(group.imageBrief),
+          // Kept so the new photo's review files the old one as history.
+          ...(metadata.image?.review ? { review: metadata.image.review } : {}),
         };
         await this.matchPart1QuestionToImage(group, metadata, image);
+        await this.reviewPart1DraftGroup(
+          group,
+          metadata.image,
+          image,
+          image.url,
+        );
         const updated = await this.prisma.toeicQuestionGroup.update({
           where: { id: group.id },
           data: {
@@ -1667,9 +1797,25 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         imageMetadata.questionStatus = 'READY_FOR_REVIEW';
         imageMetadata.questionImageHash = imageHash;
         imageMetadata.sceneSummary = vision.sceneSummary;
+        await this.reviewPart1DraftGroup(
+          {
+            ...group,
+            imageBrief,
+            questions: [{ ...(question ?? { questionNumber: 1 }), ...data }],
+          },
+          imageMetadata,
+          image,
+          uploaded.url,
+        );
       } else {
         imageMetadata.questionStatus = 'FAILED';
         imageMetadata.visionError = visionError;
+        await this.reviewPart1DraftGroup(
+          { ...group, imageBrief },
+          imageMetadata,
+          image,
+          uploaded.url,
+        );
       }
       await this.prisma.toeicQuestionGroup.update({
         where: { id: group.id },
@@ -1739,22 +1885,33 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       await this.prisma.toeicQuestion.create({
         data: { ...data, groupId: group.id, questionNumber: 1 },
       });
+    const imageMeta: Record<string, any> = {
+      ...(current.image ?? {}),
+      status: 'READY',
+      questionStatus: 'READY_FOR_REVIEW',
+      visionReviewFailed: false,
+      questionImageHash: imageHash,
+      sceneSummary: vision.sceneSummary,
+    };
+    await this.reviewPart1DraftGroup(
+      {
+        ...group,
+        questions: [{ ...(question ?? { questionNumber: 1 }), ...data }],
+      },
+      imageMeta,
+      image,
+      group.imageUrl,
+    );
     await this.prisma.toeicQuestionGroup.update({
       where: { id: group.id },
       data: {
         mediaMetadata: {
           ...current,
-          image: {
-            ...(current.image ?? {}),
-            status: 'READY',
-            questionStatus: 'READY_FOR_REVIEW',
-            questionImageHash: imageHash,
-            sceneSummary: vision.sceneSummary,
-          },
+          image: imageMeta,
         } as Prisma.InputJsonValue,
       },
     });
-    return { question: vision };
+    return { question: vision, review: imageMeta.review ?? null };
   }
 
   private assertPart1QuestionCandidate(candidate: ToeicPart1QuestionCandidate) {
@@ -1834,29 +1991,429 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       ToeicAiExamService['assertNoDuplicateBatches']
     >[0],
     identity: { batchKey: string; groupOrder: number },
-  ) {
-    let refusal = '';
+    review?: {
+      /** Saves the batch before the reviewer runs, so a crash can resume it. */
+      store: (batch: StoredLrBatch) => Promise<void>;
+      unstore: (batchKey: string) => Promise<void>;
+      persist: () => Promise<void>;
+      initialRefusal?: string;
+    },
+  ): Promise<
+    | { batch: StoredLrBatch; stored: boolean }
+    | { batch?: undefined; refusal: string; code: FailedLrBatch['code'] }
+  > {
+    let refusal = review?.initialRefusal ?? '';
+    let code: FailedLrBatch['code'] = 'CONTENT_CONTRACT_FAILURE';
     for (let attempt = 0; attempt <= BATCH_RETRIES; attempt += 1) {
+      let batch: StoredLrBatch;
       try {
         const candidate = await this.draftBatch(
           { ...input, ...(refusal ? { retryNote: refusal } : {}) },
           firstQuestionNumber,
         );
         this.assertBatch(input.part, slice, candidate);
-        const batch = {
+        batch = {
           ...identity,
           part: input.part,
           questionNumber: firstQuestionNumber,
           candidate,
         };
         this.assertNoDuplicateBatches([...earlierBatches, batch]);
-        return { batch };
       } catch (error) {
         if (isAiOutage(error)) throw error;
         refusal = (error as Error)?.message || 'Nội dung AI không hợp lệ';
+        code = 'CONTENT_CONTRACT_FAILURE';
+        continue;
       }
+      // Part 1 is checked on the Draft, once its photo exists.
+      if (!review || input.part === 1) return { batch, stored: false };
+      await review.store(batch);
+      // A reviewer outage propagates here: the batch stays stored and the
+      // resumed job only runs the missing review step.
+      const verdict = await this.reviewBatch(batch, review.persist);
+      if (verdict.accepted) return { batch, stored: true };
+      refusal = verdict.refusal;
+      code = 'ANSWER_REVIEW_FAILED';
+      // The last refused draft stays so the admin can see and fix it.
+      if (attempt < BATCH_RETRIES) await review.unstore(identity.batchKey);
     }
-    return { refusal };
+    return { refusal, code };
+  }
+
+  private reviewer(): AnswerReviewService {
+    if (!this.answerReview)
+      throw new ReviewerUnavailableError(
+        'Chưa cấu hình dịch vụ kiểm định đáp án AI',
+      );
+    return this.answerReview;
+  }
+
+  private groupsWithNumbers(batch: StoredLrBatch) {
+    let questionNumber = Number(batch.questionNumber);
+    return (batch.candidate?.groups ?? []).map((group: any) => {
+      const row = { group, firstQuestionNumber: questionNumber };
+      questionNumber += group.questions?.length ?? 0;
+      return row;
+    });
+  }
+
+  private static adminSettled(review?: GroupReview) {
+    return (
+      review?.status === 'EDITED_BY_ADMIN' ||
+      review?.status === 'ADMIN_CONFIRMED'
+    );
+  }
+
+  /** A stored Part 2-7 batch whose review has not finished. */
+  private batchNeedsReview(batch: StoredLrBatch) {
+    if (Number(batch.part) === 1) return false;
+    return (batch.candidate?.groups ?? []).some(
+      (group: any) =>
+        !ToeicAiExamService.adminSettled(group.review) &&
+        (!group.review ||
+          group.review.contentHash !==
+            canonicalGroupHash(Number(batch.part), group) ||
+          pendingStep(group.review) !== null),
+    );
+  }
+
+  /**
+   * Runs the review steps a Part 2-7 batch still lacks: independent solve,
+   * then the explanation check. Each finished step is saved at once. A
+   * provider outage throws ReviewerUnavailableError after saving, so a resumed
+   * job continues from that step and never redrafts saved content.
+   */
+  private async reviewBatch(
+    batch: StoredLrBatch,
+    persist: () => Promise<void>,
+  ): Promise<{ accepted: boolean; refusal: string }> {
+    const part = Number(batch.part);
+    const rows = this.groupsWithNumbers(batch).filter(
+      ({ group }: { group: any }) =>
+        !ToeicAiExamService.adminSettled(group.review),
+    );
+    for (const { group } of rows) {
+      const hash = canonicalGroupHash(part, group);
+      if (!group.review) group.review = emptyReview(hash);
+      else if (group.review.contentHash !== hash)
+        group.review = invalidateReview(group.review, hash, 'CONTENT_CHANGED');
+    }
+    if (!rows.length) return { accepted: true, refusal: '' };
+    const reviewer = this.reviewer();
+    const generatorVendor = reviewer.generatorVendor(rows[0].group.provider);
+    const refused = () =>
+      rows.some(({ group }: { group: any }) =>
+        group.review.verdicts.some(
+          (row: QuestionReview) => row.verdict !== 'AGREE',
+        ),
+      );
+    const pendingOf = () =>
+      rows
+        .map(({ group }: { group: any }) => pendingStep(group.review))
+        .find(Boolean) ?? null;
+    const expected = rows.flatMap(({ group, firstQuestionNumber }: any) =>
+      group.questions.map((_: unknown, index: number) => ({
+        id: reviewItemId(firstQuestionNumber + index),
+        optionCount: optionCountOf(part),
+        part,
+      })),
+    );
+
+    let pending = pendingOf();
+    while (pending && !refused()) {
+      if (pending === 'independentSolve') {
+        const run = await reviewer.run({
+          stepName: 'independentSolve',
+          chain: reviewer.solveChain(),
+          prompt: solvePrompt(solveRequestOf(part, rows)),
+          generatorVendor,
+          validate: (data) => validateSolveOutput(expected, data),
+        });
+        for (const { group, firstQuestionNumber } of rows) {
+          const review: GroupReview = group.review;
+          review.steps = { ...review.steps, independentSolve: run.step };
+          if (run.step.status === 'OK') {
+            review.verdicts = group.questions.map(
+              (question: any, index: number) => {
+                const questionNumber = firstQuestionNumber + index;
+                const answer = run.answers!.get(reviewItemId(questionNumber))!;
+                const judged = judgeSolve({
+                  part,
+                  stimulus: groupStimulus(part, group),
+                  questionText: question.text,
+                  key: question.correctIndex,
+                  answer,
+                });
+                return {
+                  questionNumber,
+                  verdict: judged.verdict,
+                  solve: {
+                    ...judged,
+                    choice: answer.choice,
+                    alsoCorrect: answer.alsoCorrect,
+                    evidence: answer.evidence,
+                    reasoning: answer.reasoning,
+                  },
+                };
+              },
+            );
+          } else if (run.step.status === 'INVALID') {
+            review.verdicts = this.invalidVerdicts(
+              group,
+              firstQuestionNumber,
+              'solve',
+              run.step.tried,
+            );
+          }
+          group.review = settleStatus(part, review);
+        }
+        await persist();
+        if (run.step.status === 'UNAVAILABLE')
+          throw new ReviewerUnavailableError(
+            `Kiểm định đáp án tạm thời không khả dụng (${this.triedSummary(run.step.tried)})`,
+          );
+      } else {
+        const run = await reviewer.run({
+          stepName: 'explanationCheck',
+          chain: reviewer.explanationChain(),
+          prompt: explanationPrompt(explanationRequestOf(part, rows)),
+          generatorVendor,
+          validate: (data) => validateExplanationOutput(expected, data),
+        });
+        for (const { group, firstQuestionNumber } of rows) {
+          const review: GroupReview = group.review;
+          review.steps = { ...review.steps, explanationCheck: run.step };
+          if (run.step.status !== 'UNAVAILABLE') {
+            review.verdicts = review.verdicts.map((row) => {
+              const question =
+                group.questions[row.questionNumber - firstQuestionNumber];
+              const explanation =
+                run.step.status === 'OK'
+                  ? (() => {
+                      const answer = run.answers!.get(
+                        reviewItemId(row.questionNumber),
+                      )!;
+                      return {
+                        ...judgeExplanation(question.correctIndex, answer),
+                        claimedChoice: answer.claimedChoice,
+                        reasoning: answer.reasoning,
+                      };
+                    })()
+                  : {
+                      verdict: 'REVIEW_INVALID' as QuestionVerdict,
+                      detail: `Kiểm tra giải thích trả kết quả không hợp lệ (${this.triedSummary(run.step.tried)})`,
+                    };
+              const next: QuestionReview = { ...row, explanation };
+              next.verdict = combinedVerdict(next);
+              return next;
+            });
+          }
+          group.review = settleStatus(part, review);
+        }
+        await persist();
+        if (run.step.status === 'UNAVAILABLE')
+          throw new ReviewerUnavailableError(
+            `Kiểm tra giải thích tạm thời không khả dụng (${this.triedSummary(run.step.tried)})`,
+          );
+      }
+      pending = pendingOf();
+    }
+    const accepted = rows.every(({ group }: { group: any }) =>
+      ['REVIEWED_INDEPENDENT', 'REVIEWED_DEGRADED'].includes(
+        group.review.status,
+      ),
+    );
+    return {
+      accepted,
+      refusal: accepted
+        ? ''
+        : reviewRejection(
+            rows.flatMap(({ group }: { group: any }) => group.review.verdicts),
+          ) || 'Kiểm định đáp án chưa hoàn tất',
+    };
+  }
+
+  private invalidVerdicts(
+    group: any,
+    firstQuestionNumber: number,
+    step: 'solve',
+    tried: Array<{ provider: string; reason: string }>,
+  ): QuestionReview[] {
+    const detail = `Người giải độc lập trả kết quả không hợp lệ (${this.triedSummary(tried)})`;
+    return group.questions.map((_: unknown, index: number) => ({
+      questionNumber: firstQuestionNumber + index,
+      verdict: 'REVIEW_INVALID' as QuestionVerdict,
+      [step]: { verdict: 'REVIEW_INVALID' as QuestionVerdict, detail },
+    }));
+  }
+
+  private triedSummary(tried: Array<{ provider: string; reason: string }>) {
+    return (
+      tried
+        .map((row) => `${row.provider}: ${row.reason}`)
+        .join('; ')
+        .slice(0, 400) || 'không có nhà cung cấp'
+    );
+  }
+
+  /** Reviews a freshly regenerated candidate group; 400 when refused. */
+  private async reviewRegenerated(
+    part: number,
+    firstQuestionNumber: number,
+    candidate: any,
+  ) {
+    if (part === 1) return;
+    try {
+      const verdict = await this.reviewBatch(
+        { part, groupOrder: 0, questionNumber: firstQuestionNumber, candidate },
+        () => Promise.resolve(),
+      );
+      if (!verdict.accepted) throw new BadRequestException(verdict.refusal);
+    } catch (error) {
+      if (isReviewerUnavailable(error))
+        throw new ServiceUnavailableException((error as Error).message);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply decision of one candidate group from its current content: the
+   * structure checks run again and the hash is recomputed, never trusted.
+   */
+  private lrApplyDecision(
+    request: RequestSnapshot,
+    batch: StoredLrBatch,
+    index: number,
+    group: any,
+  ): ApplyDecision & { currentHash: string } {
+    const part = Number(batch.part);
+    let structureOk = true;
+    let structureIssue = '';
+    try {
+      const planned = plannedGroupOf(
+        request,
+        batch,
+        index,
+        group?.questions?.length ?? 1,
+      );
+      this.assertBatch(part, [planned], { groups: [group] });
+    } catch (error) {
+      structureOk = false;
+      structureIssue = (error as Error)?.message ?? '';
+    }
+    const currentHash = canonicalGroupHash(part, group ?? {});
+    const decision = canApply({
+      part,
+      review: group?.review,
+      currentHash,
+      structureOk,
+    });
+    return {
+      ...decision,
+      reason:
+        !structureOk && structureIssue
+          ? `STRUCTURE_INVALID: ${structureIssue}`
+          : decision.reason,
+      currentHash,
+    };
+  }
+
+  /**
+   * Admin confirmation of a Part 2-7 candidate group, bound to its current
+   * content hash. Part 1 is confirmed on the Draft, once its photo exists.
+   */
+  async confirmCandidate(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+    method: ConfirmationMethod,
+  ) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job || job.createdByAdminId !== adminId)
+      throw new NotFoundException('Không tìm thấy candidate tạo đề TOEIC AI');
+    const candidate = (job.draftSnapshot as any) ?? null;
+    if (!candidate)
+      throw new ConflictException('Candidate AI chưa sẵn sàng để xác nhận');
+    const located = this.flattenLrCandidateGroups(candidate).find(
+      (row) => row.candidateKey === candidateKey,
+    );
+    if (!located)
+      throw new NotFoundException('Không tìm thấy candidate item này');
+    if (located.part === 1)
+      throw new ConflictException(
+        'Nhóm Part 1 được xác nhận trên Draft sau khi Apply, khi đã có ảnh.',
+      );
+    const group = located.group;
+    const currentHash = canonicalGroupHash(located.part, group);
+    // A legacy group never reviewed starts its record at the current content.
+    const review: GroupReview = group.review ?? emptyReview(currentHash);
+    const refusal = confirmationRefusal({
+      part: located.part,
+      review,
+      method,
+      currentHash,
+    });
+    if (refusal) throw new ConflictException(refusal);
+    group.review = confirmReview(review, {
+      by: adminId,
+      at: new Date().toISOString(),
+      method,
+    });
+    await this.prisma.aiGenerationJob.update({
+      where: { id: jobId },
+      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
+    });
+    return this.getCandidate(jobId, adminId);
+  }
+
+  /** Records an admin edit and retires the review of the old content. */
+  private recordCandidateEdit(
+    part: number,
+    group: any,
+    before: any,
+    adminId: number,
+  ) {
+    const changes = diffGroup(before, group);
+    if (!changes.length) return;
+    const hashBefore = canonicalGroupHash(part, before);
+    const hashAfter = canonicalGroupHash(part, group);
+    const review = invalidateReview(
+      (group.review as GroupReview | undefined) ?? emptyReview(hashBefore),
+      hashAfter,
+      'ADMIN_EDIT',
+    );
+    review.status = 'EDITED_BY_ADMIN';
+    review.edits = [
+      ...review.edits,
+      {
+        by: adminId,
+        at: new Date().toISOString(),
+        contentHashBefore: hashBefore,
+        contentHashAfter: hashAfter,
+        changes,
+      },
+    ];
+    group.review = review;
+  }
+
+  /** Clears ANSWER_REVIEW_FAILED once no group of that batch is refused. */
+  private resolveReviewFailures(candidate: any) {
+    if (!Array.isArray(candidate.failedUnits)) return;
+    candidate.failedUnits = candidate.failedUnits.filter(
+      (unit: FailedLrBatch) => {
+        if (unit.code !== 'ANSWER_REVIEW_FAILED') return true;
+        const batch = (candidate.lrBatches ?? []).find(
+          (row: StoredLrBatch) => row.batchKey === unit.batchKey,
+        );
+        if (!batch) return true;
+        return (batch.candidate?.groups ?? []).some(
+          (group: any) => !group.review || group.review.status === 'REJECTED',
+        );
+      },
+    );
+    candidate.partial = candidate.failedUnits.length > 0;
   }
 
   private assertBatch(part: number, expected: PlannedGroup[], candidate: any) {
@@ -2120,7 +2677,13 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       const metadata = (group.mediaMetadata as any) ?? {};
       if (group.part === 1) {
         let imageResult:
-          | { url: string; key: string; metadata: Record<string, unknown> }
+          | {
+              url: string;
+              key: string;
+              metadata: Record<string, unknown>;
+              buffer?: Buffer;
+              mimeType?: string;
+            }
           | undefined;
         try {
           imageResult = await this.sourceExamImage(
@@ -2158,6 +2721,12 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             briefHash: toeicMediaHash(group.imageBrief),
           };
           await this.matchPart1QuestionToImage(group, metadata, imageResult);
+          await this.reviewPart1DraftGroup(
+            group,
+            metadata.image,
+            imageResult,
+            imageResult.url,
+          );
           await this.prisma.toeicQuestionGroup.update({
             where: { id: group.id },
             data: {
@@ -2450,6 +3019,216 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * Part 1 answer review on the Draft: Vision looks at the photo and the four
+   * statements (never the key) and picks one. A different pick marks the
+   * question FAILED. Any earlier review moves to history, tied to its hash.
+   * Never throws: a reviewer outage leaves the group UNREVIEWED.
+   */
+  private async reviewPart1DraftGroup(
+    group: {
+      transcriptText?: string | null;
+      passageText?: string | null;
+      imageBrief?: string | null;
+      questions: any[];
+    },
+    imageMeta: Record<string, any>,
+    image: { buffer?: Buffer; mimeType?: string } | undefined,
+    url: string | null,
+  ) {
+    if (!image?.buffer || !image.mimeType) return;
+    const imageSha256 = sha256(image.buffer);
+    imageMeta.imageHash = imageSha256;
+    const hash = part1DraftHash(group, {
+      r2Key: imageMeta.r2Key,
+      url,
+      sha256: imageSha256,
+    });
+    const previous = imageMeta.review as GroupReview | undefined;
+    let review = previous
+      ? invalidateReview(previous, hash, 'IMAGE_OR_QUESTION_CHANGED')
+      : emptyReview(hash);
+    const question = group.questions[0];
+    if (!question || imageMeta.questionStatus === 'FAILED') {
+      // The question was not written from this photo: nothing to confirm.
+      imageMeta.review = { ...review, status: 'REJECTED' };
+      return;
+    }
+    if (!this.answerReview) {
+      imageMeta.review = review;
+      return;
+    }
+    try {
+      const run = await this.answerReview.run({
+        stepName: 'part1VisionReview',
+        chain: this.answerReview.visionChain(),
+        prompt: part1VisionPrompt(
+          (question.options ?? []).map((option: unknown) => String(option)),
+        ),
+        generatorVendor: 'google',
+        image: { buffer: image.buffer, mimeType: image.mimeType },
+        validate: (data) => validatePart1VisionOutput(data),
+      });
+      review.steps = { ...review.steps, part1VisionReview: run.step };
+      if (run.step.status === 'OK') {
+        const answer = run.answers!.get('q')!;
+        const judged = judgePart1Vision(question.correctIndex, answer);
+        review.verdicts = [
+          {
+            questionNumber: question.questionNumber ?? 1,
+            verdict: judged.verdict,
+            vision: {
+              ...judged,
+              choice: answer.choice,
+              reasoning: answer.reasoning,
+            },
+          },
+        ];
+        if (judged.verdict !== 'AGREE') {
+          imageMeta.questionStatus = 'FAILED';
+          imageMeta.visionReviewFailed = true;
+        }
+      }
+      review = settleStatus(1, review);
+    } catch (error) {
+      this.logger.warn(`Part 1 vision review failed: ${String(error)}`);
+    }
+    imageMeta.review = review;
+  }
+
+  /** Reads the stored Part 1 photo back from BreadTrans's public R2. */
+  private async storedPart1Image(imageUrl: string) {
+    const publicStorageUrl = this.r2.getPublicUrl();
+    if (
+      !publicStorageUrl ||
+      !imageUrl.startsWith(`${publicStorageUrl.replace(/\/$/, '')}/`)
+    )
+      throw new BadRequestException(
+        'Chỉ ảnh đã lưu trong R2 của BreadTrans mới được phân tích',
+      );
+    const response = await fetch(imageUrl, {
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok)
+      throw new BadRequestException('Không thể đọc ảnh đã tải lên');
+    return this.imageSearch.validateBuffer(
+      Buffer.from(await response.arrayBuffer()),
+      response.headers.get('content-type'),
+    );
+  }
+
+  private async part1DraftGroup(examId: number, groupId: number) {
+    const exam = await this.editableDraft(examId);
+    const group = await this.prisma.toeicQuestionGroup.findFirst({
+      where: { id: groupId, examId: exam.toeicExamSet!.id },
+      include: { questions: { orderBy: { questionNumber: 'asc' } } },
+    });
+    if (!group || group.part !== 1)
+      throw new NotFoundException('Không tìm thấy nhóm Part 1 trong Draft');
+    return group;
+  }
+
+  /**
+   * Re-reads the stored photo, checks its bytes and either keeps the review
+   * (same content) or retires it. A question FAILED by Vision stops being
+   * FAILED once the admin changed that question or its photo.
+   */
+  private async currentPart1Review(group: any) {
+    const metadata = group.mediaMetadata ?? {};
+    const image = { ...(metadata.image ?? {}) };
+    if (!group.imageUrl)
+      throw new ConflictException('Nhóm Part 1 chưa có ảnh để xác nhận');
+    const stored = await this.storedPart1Image(group.imageUrl).catch(() => {
+      throw new ConflictException(
+        'Không đọc được ảnh hiện tại nên không xác định được phiên bản ảnh (IMAGE_VERSION_UNKNOWN).',
+      );
+    });
+    const bytesSha = sha256(stored.buffer);
+    const imageChanged = image.imageHash !== bytesSha;
+    image.imageHash = bytesSha;
+    const currentHash = part1DraftHash(group, {
+      r2Key: image.r2Key,
+      url: group.imageUrl,
+      sha256: bytesSha,
+    });
+    let review: GroupReview = image.review ?? emptyReview(currentHash);
+    let changed = false;
+    if (review.contentHash !== currentHash || imageChanged) {
+      review = invalidateReview(
+        review,
+        currentHash,
+        imageChanged ? 'IMAGE_CHANGED' : 'CONTENT_CHANGED',
+      );
+      if (image.questionStatus === 'FAILED' && image.visionReviewFailed) {
+        image.questionStatus = 'READY_FOR_REVIEW';
+        image.visionReviewFailed = false;
+      }
+      changed = true;
+    }
+    image.review = review;
+    return { metadata, image, stored, currentHash, review, changed };
+  }
+
+  /** Runs the Part 1 Vision review again on the current question and photo. */
+  async reviewPart1Draft(examId: number, groupId: number) {
+    const group = await this.part1DraftGroup(examId, groupId);
+    const { metadata, image, stored } = await this.currentPart1Review(group);
+    await this.reviewPart1DraftGroup(group, image, stored, group.imageUrl);
+    await this.prisma.toeicQuestionGroup.update({
+      where: { id: group.id },
+      data: {
+        mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
+      },
+    });
+    return { groupId: group.id, image };
+  }
+
+  /**
+   * Admin confirmation of a Part 1 Draft group, bound to the hash of its
+   * current question and photo bytes. Publishing requires it.
+   */
+  async confirmPart1Draft(
+    examId: number,
+    groupId: number,
+    adminId: number,
+    method: ConfirmationMethod,
+  ) {
+    const group = await this.part1DraftGroup(examId, groupId);
+    const { metadata, image, review, currentHash, changed } =
+      await this.currentPart1Review(group);
+    if (changed) {
+      await this.prisma.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
+        },
+      });
+      throw new ConflictException(
+        'Nội dung hoặc ảnh đã thay đổi sau lần kiểm định; kết quả cũ đã chuyển vào lịch sử. Hãy chạy lại kiểm tra Vision hoặc xác nhận thủ công.',
+      );
+    }
+    const refusal = confirmationRefusal({
+      part: 1,
+      review,
+      method,
+      currentHash,
+      anyQuestionFailed: ['FAILED', 'STALE'].includes(image.questionStatus),
+    });
+    if (refusal) throw new ConflictException(refusal);
+    image.review = confirmReview(review, {
+      by: adminId,
+      at: new Date().toISOString(),
+      method,
+    });
+    await this.prisma.toeicQuestionGroup.update({
+      where: { id: group.id },
+      data: {
+        mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
+      },
+    });
+    return { groupId: group.id, image };
+  }
+
   /** A library photo is not the scene the question was written for. */
   private async matchPart1QuestionToImage(
     group: { questions: Array<{ id: number; options?: unknown }> },
@@ -2473,8 +3252,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           where: { id: question.id },
           data,
         });
-        // The audio is built from this same object right after.
-        question.options = data.options;
+        // The audio and the answer review read this same object right after.
+        Object.assign(question, data);
       }
       metadata.image = {
         ...metadata.image,
@@ -2702,13 +3481,51 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             (total, item) => total + item.questionCount,
             0,
           );
-          if (generatedBatches.some((batch) => batch.batchKey === batchKey)) {
-            await this.checkpoint(jobId, 'GENERATING_TEXT', part, {
-              completedGroups: Math.min(offset + slice.length, plan.length),
-              totalGroups: plan.length,
-              stage: 'GENERATING_TEXT',
-            });
-            continue;
+          const dropStored = (key: string) => {
+            const index = generatedBatches.findIndex(
+              (batch) => batch.batchKey === key,
+            );
+            if (index >= 0) generatedBatches.splice(index, 1);
+          };
+          let initialRefusal: string | undefined;
+          const stored = generatedBatches.find(
+            (batch) => batch.batchKey === batchKey,
+          );
+          if (stored) {
+            const refusedUnit = failedUnits.find(
+              (unit) =>
+                unit.batchKey === batchKey &&
+                unit.code === 'ANSWER_REVIEW_FAILED',
+            );
+            let redraft = false;
+            if (refusedUnit) {
+              // A retry redrafts the refused batch the admin did not fix.
+              redraft = (stored.candidate?.groups ?? []).some(
+                (group: any) => group.review?.status === 'REJECTED',
+              );
+              initialRefusal = refusedUnit.message;
+            } else if (this.batchNeedsReview(stored)) {
+              activeScope = { kind: 'batch', part, offset };
+              const verdict = await this.reviewBatch(
+                stored,
+                persistPartialCandidate,
+              );
+              redraft = !verdict.accepted;
+              initialRefusal = verdict.refusal;
+            }
+            if (!redraft) {
+              failedUnits = failedUnits.filter(
+                (unit) => unit.batchKey !== batchKey,
+              );
+              await this.checkpoint(jobId, 'GENERATING_TEXT', part, {
+                completedGroups: Math.min(offset + slice.length, plan.length),
+                totalGroups: plan.length,
+                stage: 'GENERATING_TEXT',
+              });
+              continue;
+            }
+            dropStored(batchKey);
+            await persistPartialCandidate();
           }
           activeScope = { kind: 'batch', part, offset };
           const outcome = await this.draftCheckedBatch(
@@ -2723,6 +3540,19 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             slice,
             generatedBatches,
             { batchKey, groupOrder: firstGroupOrder },
+            {
+              initialRefusal,
+              persist: persistPartialCandidate,
+              store: async (batch) => {
+                dropStored(batch.batchKey!);
+                generatedBatches.push(batch);
+                await persistPartialCandidate();
+              },
+              unstore: async (key) => {
+                dropStored(key);
+                await persistPartialCandidate();
+              },
+            },
           );
           if (!outcome.batch) {
             const message = outcome.refusal;
@@ -2731,7 +3561,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             );
             failedUnits = [
               ...failedUnits.filter((unit) => unit.batchKey !== batchKey),
-              this.failedBatch(request, part, offset, message, previous),
+              this.failedBatch(
+                request,
+                part,
+                offset,
+                message,
+                previous,
+                outcome.code,
+              ),
             ];
             await persistPartialCandidate();
             await this.checkpoint(jobId, 'GENERATING_TEXT', part, {
@@ -2748,7 +3585,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             continue;
           }
           const generatedBatch = outcome.batch;
-          generatedBatches.push(generatedBatch);
+          if (!outcome.stored) generatedBatches.push(generatedBatch);
           failedUnits = failedUnits.filter(
             (unit) => unit.batchKey !== batchKey,
           );

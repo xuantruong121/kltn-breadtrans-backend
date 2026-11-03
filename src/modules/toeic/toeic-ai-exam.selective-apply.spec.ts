@@ -25,14 +25,21 @@ describe('ToeicAiExamService.apply — selective candidate apply', () => {
         questionNumber: 1,
         candidate: {
           groups: [
+            // Apply re-runs the structure checks, so the fixture is real content.
             {
               imageBrief: 'A man at a desk',
               questions: [
                 {
                   text: 'Q1',
-                  options: ['A', 'B', 'C', 'D'],
+                  options: [
+                    'He is typing on a keyboard.',
+                    'He is closing a window.',
+                    'He is carrying a box.',
+                    'He is watering a plant.',
+                  ],
                   correctIndex: 0,
-                  explanation: 'x',
+                  explanation:
+                    'Người đàn ông đang gõ bàn phím tại bàn làm việc trong ảnh.',
                 },
               ],
             },
@@ -41,9 +48,15 @@ describe('ToeicAiExamService.apply — selective candidate apply', () => {
               questions: [
                 {
                   text: 'Q2',
-                  options: ['A', 'B', 'C', 'D'],
+                  options: [
+                    'She is sitting on a bench.',
+                    'She is walking along a path.',
+                    'She is reading a newspaper.',
+                    'She is opening a door.',
+                  ],
                   correctIndex: 1,
-                  explanation: 'y',
+                  explanation:
+                    'Người phụ nữ đang đi bộ dọc theo lối đi trong công viên.',
                 },
               ],
             },
