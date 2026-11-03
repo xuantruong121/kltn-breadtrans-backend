@@ -162,6 +162,110 @@ describe('judgeSolve', () => {
     expect(judge({})).toBe('AGREE');
   });
 
+  // Cases seen in the live run of 2026-11-03, where the old rule refused
+  // answers the solver had got right.
+  it('accepts a Part 2 quote of the chosen response', () => {
+    expect(
+      judgeSolve({
+        part: 2,
+        stimulus: 'Where should I drop off the updated marketing report?',
+        questionText: '',
+        options: [
+          'Yes, I already signed it.',
+          'It is on the third floor.',
+          "At two o'clock in the afternoon.",
+        ],
+        key: 1,
+        answer: answer({
+          choice: 1,
+          evidence: [
+            'Where should I drop off the updated marketing report?',
+            '"It is on the third floor."',
+          ],
+        }),
+      }).verdict,
+    ).toBe('AGREE');
+  });
+
+  it('still refuses evidence quoted only from the options', () => {
+    expect(
+      judgeSolve({
+        part: 7,
+        stimulus: 'Boost your local business visibility today.',
+        questionText: 'Who is the intended audience?',
+        options: [
+          'Investors',
+          'Local small business owners',
+          'Designers',
+          'Engineers',
+        ],
+        key: 1,
+        answer: answer({
+          choice: 1,
+          evidence: ['Local small business owners'],
+        }),
+      }).verdict,
+    ).toBe('EVIDENCE_NOT_FOUND');
+  });
+
+  it('ignores blank markers and non-breaking hyphens when matching', () => {
+    expect(
+      quoteFound(
+        'make our online portal _____ than before',
+        'We will make our online portal [131] _____ than before.',
+      ),
+    ).toBe(true);
+    expect(
+      quoteFound(
+        'shift my check‑in to October 15',
+        'Please let me shift my check-in to October 15 for the same room.',
+      ),
+    ).toBe(true);
+  });
+
+  it('finds a quote that repeats the speaker label of the turn', () => {
+    expect(
+      quoteFound(
+        'W: I am afraid we are all out of those in a large.',
+        'W: Certainly, let me check our inventory. I am afraid we are all out of those in a large.',
+      ),
+    ).toBe(true);
+  });
+
+  it('a NOT question needs no quote of what the text never says', () => {
+    const notQuestion = (support: boolean) =>
+      judgeSolve({
+        part: 7,
+        stimulus: 'The water supply was restored ahead of schedule.',
+        questionText:
+          'Which of the following is NOT true according to the documents?',
+        options: ['a', 'b', 'Doors must stay closed.', 'd'],
+        key: 2,
+        answer: answer({
+          choice: 2,
+          evidence: ['No such instruction appears in either document.'],
+          evidenceSupportsAnswer: support,
+        }),
+      }).verdict;
+    expect(notQuestion(true)).toBe('AGREE');
+    expect(notQuestion(false)).toBe('EVIDENCE_INSUFFICIENT');
+  });
+
+  it('Part 5 has no stimulus, so evidence support is not required', () => {
+    expect(
+      judgeSolve({
+        part: 5,
+        questionText: 'Reports must be submitted _____ Friday afternoon.',
+        key: 3,
+        answer: answer({
+          choice: 3,
+          evidence: [],
+          evidenceSupportsAnswer: false,
+        }),
+      }).verdict,
+    ).toBe('AGREE');
+  });
+
   it('matches quotes despite case, curly quotes and an ellipsis', () => {
     expect(
       quoteFound('“The PRINTER … is broken”', part3Group().transcript),

@@ -251,14 +251,20 @@ export function validateExplanationOutput(
 
 /** Lower case, straight quotes, single spaces: only for quote matching. */
 export function normalizeForMatch(value: string) {
-  return value
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[‘’‚‛]/g, "'")
-    .replace(/[“”„‟]/g, '"')
-    .replace(/[–—]/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    value
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[‘’‚‛]/g, "'")
+      .replace(/[“”„‟]/g, '"')
+      .replace(/[‐-―−]/g, '-')
+      .replace(/­/g, '')
+      // Blank markers such as "[131]" sit inside the passage, not in quotes.
+      .replace(/\[\d{1,3}\]/g, ' ')
+      .replace(/_{2,}/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 /**
@@ -267,7 +273,10 @@ export function normalizeForMatch(value: string) {
  */
 export function quoteFound(quote: string, source: string) {
   const haystack = normalizeForMatch(source);
+  // A quote may start with the speaker label ("W: ..."), which the
+  // transcript prints once per turn, not before every sentence.
   const fragments = normalizeForMatch(quote)
+    .replace(/^["']?\s*[a-z][a-z0-9]{0,3}:\s+/, '')
     .split(/\.{3}|…/)
     .map((fragment) =>
       fragment.replace(/^["'\s.,;:!?-]+|["'\s.,;:!?-]+$/g, '').trim(),
@@ -280,6 +289,8 @@ export function judgeSolve(input: {
   part: number;
   stimulus?: string;
   questionText?: string | null;
+  /** A quote may repeat an option (Part 2 responses, Part 7 choices). */
+  options?: string[];
   key: number;
   answer: SolveAnswer;
 }): { verdict: QuestionVerdict; detail: string } {
@@ -309,19 +320,38 @@ export function judgeSolve(input: {
       verdict: 'DISAGREE',
       detail: `Người giải độc lập chọn ${String.fromCharCode(65 + answer.choice)}, đáp án đánh dấu là ${String.fromCharCode(65 + key)}.`,
     };
-  if (EVIDENCE_PARTS.has(input.part)) {
-    const source = [input.stimulus, input.questionText]
-      .filter(Boolean)
-      .join('\n');
-    const missing = answer.evidence.filter(
-      (quote) => !quoteFound(quote, source),
-    );
-    if (missing.length)
-      return {
-        verdict: 'EVIDENCE_NOT_FOUND',
-        detail: `Trích dẫn không có trong ngữ liệu: "${missing[0].slice(0, 160)}".`,
-      };
-  }
+  if (!EVIDENCE_PARTS.has(input.part))
+    // Part 5 has no stimulus to quote: grammar decides, nothing to support.
+    return { verdict: 'AGREE', detail: 'Khớp đáp án đánh dấu.' };
+  // A "NOT true" key is the statement the text never makes: absence cannot
+  // be quoted, so only the solver's own support judgement counts.
+  if (/\bNOT\b/.test(input.questionText ?? ''))
+    return answer.evidenceSupportsAnswer
+      ? { verdict: 'AGREE', detail: 'Khớp đáp án đánh dấu.' }
+      : {
+          verdict: 'EVIDENCE_INSUFFICIENT',
+          detail:
+            'Người giải không chắc ngữ liệu loại trừ được các phương án khác.',
+        };
+  const source = [input.stimulus, input.questionText, ...(input.options ?? [])]
+    .filter(Boolean)
+    .join('\n');
+  const missing = answer.evidence.filter((quote) => !quoteFound(quote, source));
+  if (missing.length)
+    return {
+      verdict: 'EVIDENCE_NOT_FOUND',
+      detail: `Trích dẫn không có trong ngữ liệu: "${missing[0].slice(0, 160)}".`,
+    };
+  // With a long stimulus, repeating the options proves nothing: one quote must
+  // come from it. A Part 2 prompt is one line, so its response may stand alone.
+  if (
+    input.part !== 2 &&
+    !answer.evidence.some((quote) => quoteFound(quote, input.stimulus ?? ''))
+  )
+    return {
+      verdict: 'EVIDENCE_NOT_FOUND',
+      detail: 'Không có trích dẫn nào lấy từ ngữ liệu nghe hoặc đọc.',
+    };
   if (!answer.evidenceSupportsAnswer)
     return {
       verdict: 'EVIDENCE_INSUFFICIENT',

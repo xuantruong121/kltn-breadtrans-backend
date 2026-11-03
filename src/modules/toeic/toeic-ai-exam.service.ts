@@ -2205,6 +2205,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
                   part,
                   stimulus: groupStimulus(part, group),
                   questionText: question.text,
+                  options: (question.options ?? []).map(String),
                   key: question.correctIndex,
                   answer,
                 });
@@ -2215,7 +2216,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
                     ...judged,
                     choice: answer.choice,
                     alsoCorrect: answer.alsoCorrect,
+                    answerable: answer.answerable,
                     evidence: answer.evidence,
+                    evidenceSupportsAnswer: answer.evidenceSupportsAnswer,
                     reasoning: answer.reasoning,
                   },
                 };

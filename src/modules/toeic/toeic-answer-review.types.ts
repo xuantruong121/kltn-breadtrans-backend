@@ -57,7 +57,9 @@ export type QuestionReview = {
     detail: string;
     choice?: number;
     alsoCorrect?: number[];
+    answerable?: boolean;
     evidence?: string[];
+    evidenceSupportsAnswer?: boolean;
     reasoning?: string;
   };
   explanation?: {
