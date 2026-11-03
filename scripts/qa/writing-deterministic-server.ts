@@ -8,6 +8,9 @@ import { TransformInterceptor } from '../../src/common/interceptors/transform.in
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createServer } from 'node:http';
+import { AnswerReviewService } from '../../src/modules/ai/review/answer-review.service';
+import type { AnswerReviewer } from '../../src/modules/ai/review/answer-reviewer';
+import { CLOUDFLARE_UNAVAILABLE } from '../../src/modules/ai/cloudflare-workers-ai.client';
 
 const mode =
   process.env.WRITING_QA_PROVIDER_MODE === 'failure' ? 'failure' : 'success';
@@ -419,11 +422,99 @@ const provider = {
   }),
 } as unknown as IAIEvaluator;
 
+/**
+ * Deterministic answer reviewer. examBatch marks its key as the option whose
+ * last character (before a final ".") is "0", so the solver can find it after
+ * the options were shuffled. QA modes in QA_EXAM_MODE_FILE:
+ *   review-disagree-part-5  the solver picks another option for Part 5
+ *   review-cloudflare-down  Cloudflare is unreachable, Gemini answers
+ *   review-outage           every reviewer is unreachable
+ */
+function deterministicReviewer(
+  name: 'cloudflare' | 'gemini',
+): AnswerReviewer {
+  const isKey = (option: string) => /0$/.test(option.trim().replace(/\.$/, ''));
+  return {
+    name,
+    supportsImages: name === 'gemini',
+    configured: () => true,
+    model: () =>
+      name === 'cloudflare' ? '@cf/openai/gpt-oss-120b' : 'gemini-qa',
+    vendor: () => (name === 'cloudflare' ? 'openai' : 'google'),
+    reviewJson: async (prompt) => {
+      const qaMode = examMode();
+      if (
+        qaMode === 'review-outage' ||
+        (qaMode === 'review-cloudflare-down' && name === 'cloudflare')
+      )
+        throw Object.assign(new Error('reviewer unreachable'), {
+          code: CLOUDFLARE_UNAVAILABLE,
+        });
+      const data = JSON.parse(prompt.prompt.split('DATA:\n')[1] ?? '{}');
+      const model = name === 'cloudflare' ? '@cf/openai/gpt-oss-120b' : 'gemini-qa';
+      if (Array.isArray(data.statements)) {
+        const key = data.statements.findIndex(isKey);
+        return {
+          model,
+          data: {
+            choice: key >= 0 ? key : 0,
+            alsoCorrect: [],
+            answerable: true,
+            reasoning: 'deterministic vision',
+          },
+        };
+      }
+      const explaining = 'checks' in ((prompt.schema as any).properties ?? {});
+      const rows = (data.groups ?? []).flatMap((group: any) =>
+        group.questions.map((question: any) => ({ group, question })),
+      );
+      const disagree =
+        qaMode === 'review-disagree-part-5' && data.part === 5 && !explaining;
+      const pick = (options: string[]) => {
+        const key = Math.max(0, options.findIndex(isKey));
+        return disagree ? (key + 1) % options.length : key;
+      };
+      return {
+        model,
+        data: explaining
+          ? {
+              checks: rows.map(({ question }: any) => ({
+                id: question.id,
+                claimedChoice: pick(question.options),
+                supportsClaim: true,
+                containsContradiction: false,
+                reasoning: 'deterministic explanation check',
+              })),
+            }
+          : {
+              answers: rows.map(({ group, question }: any) => ({
+                id: question.id,
+                choice: pick(question.options),
+                alsoCorrect: [],
+                answerable: true,
+                evidence: group.stimulus
+                  ? [String(group.stimulus).trim().slice(0, 24)]
+                  : [],
+                reasoning: 'deterministic solve',
+                evidenceSupportsAnswer: true,
+              })),
+            },
+      };
+    },
+  };
+}
+
 async function bootstrap() {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(AI_EVALUATOR_TOKEN)
     .useValue(provider)
     .compile();
+  moduleRef
+    .get(AnswerReviewService)
+    .useReviewers([
+      deterministicReviewer('cloudflare'),
+      deterministicReviewer('gemini'),
+    ]);
   const app = moduleRef.createNestApplication({ rawBody: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
