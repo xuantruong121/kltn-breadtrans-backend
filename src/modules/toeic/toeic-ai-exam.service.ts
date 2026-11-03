@@ -49,6 +49,7 @@ import {
   prepareGeneratedBatch,
   questionFingerprint,
   plannedGroupIssue,
+  questionContentIssue,
   type PlannedTraits,
   questionsToAvoid,
   readingGroupIssue,
@@ -2513,7 +2514,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         );
       const readingIssue =
         readingGroupIssue(part, group) ??
-        plannedGroupIssue(expected[index], group);
+        plannedGroupIssue(expected[index], group) ??
+        questionContentIssue(part, group);
       if (readingIssue)
         throw new BadRequestException(`Nhóm ${index + 1}: ${readingIssue}`);
       group.questions.forEach((question: any) => {

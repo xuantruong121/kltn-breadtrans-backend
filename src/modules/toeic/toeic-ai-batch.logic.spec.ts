@@ -1,4 +1,105 @@
-import { questionsToAvoid } from './toeic-ai-batch.logic';
+import { questionContentIssue, questionsToAvoid } from './toeic-ai-batch.logic';
+
+describe('questionContentIssue', () => {
+  const group = (fields: Record<string, string>, ...texts: string[]) => ({
+    ...fields,
+    questions: texts.map((text) => ({ text })),
+  });
+
+  // Live run 2026-11-03, q194: the passage says "restricted", never "limited".
+  const elevators =
+    'DOCUMENT 2\nRepair Schedule: Monday to Wednesday. Access to upper floors via elevators will be restricted.';
+
+  it('refuses a vocabulary question about a word the passage lacks', () => {
+    expect(
+      questionContentIssue(
+        7,
+        group(
+          { passageText: elevators },
+          'The word "limited" in DOCUMENT 2, paragraph 1, line 1, is closest in meaning to?',
+        ),
+      ),
+    ).toBe('Câu 1 hỏi nghĩa của "limited" nhưng từ này không có trong bài');
+  });
+
+  it('accepts it when the word is in the passage, in any case or quote style', () => {
+    expect(
+      questionContentIssue(
+        7,
+        group(
+          { passageText: elevators },
+          'What is the purpose of the notice?',
+          'The word “Restricted” in DOCUMENT 2, paragraph 1, line 2, is closest in meaning to',
+        ),
+      ),
+    ).toBeNull();
+  });
+
+  it('matches whole words only, across a line break', () => {
+    const passage = 'The team will cover\nthe costs. Coverage is limitless.';
+    expect(
+      questionContentIssue(
+        7,
+        group(
+          { passageText: passage },
+          'The word "limit" is closest in meaning to',
+        ),
+      ),
+    ).toMatch(/không có trong bài/);
+    expect(
+      questionContentIssue(
+        7,
+        group(
+          { passageText: passage },
+          'The phrase "cover the costs" is closest in meaning to',
+        ),
+      ),
+    ).toBeNull();
+  });
+
+  it('refuses a vocabulary question that does not quote its word', () => {
+    expect(
+      questionContentIssue(
+        7,
+        group(
+          { passageText: elevators },
+          'Which word is closest in meaning to restricted?',
+        ),
+      ),
+    ).toMatch(/không ghi từ cần hỏi/);
+  });
+
+  // Live run 2026-11-03, q88: a talk asked about a graphic it never had.
+  it('refuses a graphic question in a group without a graphic', () => {
+    expect(
+      questionContentIssue(
+        4,
+        group(
+          { transcript: 'Are you concerned about the safety of your home?' },
+          'What is being advertised?',
+          'Look at the graphic. How much does the recommended package cost per month?',
+        ),
+      ),
+    ).toBe(
+      'Câu 2 hỏi theo hình (Look at the graphic) nhưng nhóm không có hình GRAPHIC',
+    );
+  });
+
+  it('accepts a graphic question when the group has its graphic', () => {
+    expect(
+      questionContentIssue(
+        3,
+        group(
+          {
+            transcript: 'M: Which room? W: The large one.',
+            passageText: 'GRAPHIC: Rooms\nRoom | Seats\nA | 10\nB | 20',
+          },
+          'Look at the graphic. Which room will they use?',
+        ),
+      ),
+    ).toBeNull();
+  });
+});
 
 describe('questionsToAvoid', () => {
   const batch = (part: number, ...texts: string[]) => ({

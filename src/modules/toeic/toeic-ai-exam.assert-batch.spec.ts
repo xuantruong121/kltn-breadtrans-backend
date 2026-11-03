@@ -74,4 +74,36 @@ describe('ToeicAiExamService.assertBatch — Part 3/4 requires spoken question t
       }),
     ).not.toThrow();
   });
+
+  it('rejects a Part 4 graphic question when the talk has no graphic', () => {
+    expect(() =>
+      service.assertBatch(4, [{ questionCount: 1 }], {
+        groups: [
+          {
+            transcript: `Visit our store for the new security plans.${LONG}`,
+            questions: [
+              validQuestion('Look at the graphic. What does the plan cost?'),
+            ],
+          },
+        ],
+      }),
+    ).toThrow(/Nhóm 1: Câu 1 hỏi theo hình/);
+  });
+
+  it('rejects a Part 7 vocabulary question about a word the passage lacks', () => {
+    expect(() =>
+      service.assertBatch(7, [{ questionCount: 1 }], {
+        groups: [
+          {
+            passageText: 'Access to the upper floors will be restricted.',
+            questions: [
+              validQuestion(
+                'The word "limited" in paragraph 1, line 1, is closest in meaning to',
+              ),
+            ],
+          },
+        ],
+      }),
+    ).toThrow(/Nhóm 1: Câu 1 hỏi nghĩa của "limited"/);
+  });
 });
