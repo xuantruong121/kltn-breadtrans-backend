@@ -94,6 +94,25 @@ describe('GenericExamService Writing readiness', () => {
     expect(projected.totalQuestions).toBe(19);
     expect(projected.durationSeconds).toBe(4800);
   });
+
+  it('gives a 4-skill exam 200 minutes: its L&R paper plus Speaking 20 and Writing 60', () => {
+    const exam: any = {
+      id: 2,
+      title: 'TOEIC 4 kỹ năng',
+      familyCode: 'TOEIC',
+      variantCode: 'TOEIC_4_SKILLS',
+      templateKey: 'TOEIC_4_SKILLS_V1',
+      toeicExamSet: {
+        id: 9,
+        type: 'FULL_TEST',
+        durationSeconds: 7200,
+        groups: [],
+      },
+      toeicAssessment: { components: [] },
+    };
+
+    expect(service.project(exam).durationSeconds).toBe(12000);
+  });
 });
 
 describe('GenericExamService internal sources', () => {

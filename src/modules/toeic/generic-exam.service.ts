@@ -27,9 +27,15 @@ import {
   EXAM_TEMPLATES,
   ExamTemplate,
   PRACTICE_DISCLAIMER,
+  lrPaperSeconds,
   resolveExamTemplate,
   resolveTemplateByKey,
 } from './exam-template.registry';
+import { COMPONENT_SECONDS } from './toeic-assessment-session';
+
+/** Speaking 20 + Writing 60 minutes. */
+const SPEAKING_WRITING_SECONDS =
+  (COMPONENT_SECONDS.SPEAKING ?? 0) + (COMPONENT_SECONDS.WRITING ?? 0);
 import { CreateGenericExamDto, UpdateGenericExamDto } from './generic-exam.dto';
 import {
   TOEIC_SPEAKING_TASK_SEQUENCE,
@@ -530,9 +536,13 @@ export class GenericExamService {
       runtimeId: child?.id ?? assessment?.id ?? null,
       type: child?.type,
       difficulty: child?.difficulty,
+      // Whole exam: L&R paper plus Speaking 20 and Writing 60 minutes.
       durationSeconds:
-        child?.durationSeconds ??
-        (exam.variantCode === 'TOEIC_SW' ? 4800 : undefined),
+        exam.variantCode === 'TOEIC_SW'
+          ? SPEAKING_WRITING_SECONDS
+          : exam.variantCode === 'TOEIC_4_SKILLS'
+            ? (child?.durationSeconds ?? 7200) + SPEAKING_WRITING_SECONDS
+            : child?.durationSeconds,
       groups: child?.groups ?? [],
       // A 4-skill exam may read another exam's L&R, which it cannot edit.
       lrEditable: Boolean(exam.toeicExamSet),
@@ -1048,7 +1058,11 @@ export class GenericExamService {
             description,
             type: dto.type === 'FULL_TEST' ? 'FULL_TEST' : 'PRACTICE_BY_PART',
             difficulty: dto.difficulty ?? 'medium',
-            durationSeconds: dto.durationSeconds ?? 7200,
+            durationSeconds: lrPaperSeconds(
+              variantCode,
+              dto.type === 'FULL_TEST' ? 'FULL_TEST' : 'PRACTICE_BY_PART',
+              dto.durationSeconds,
+            ),
             createdBy,
             examId: exam.id,
             publicationStatus: QuizPublicationStatus.DRAFT,
@@ -1150,6 +1164,15 @@ export class GenericExamService {
     const exam = await this.findExam(id);
     this.assertDraftExam(exam);
     const child = exam.toeicExamSet;
+    // A full test keeps the ETS length; only part practice takes a new one.
+    const durationSeconds =
+      child && (dto.type !== undefined || dto.durationSeconds !== undefined)
+        ? lrPaperSeconds(
+            exam.variantCode,
+            dto.type ?? child.type,
+            dto.durationSeconds ?? child.durationSeconds,
+          )
+        : undefined;
     const updated = await this.prisma.exam.update({
       where: { id },
       data: {
@@ -1168,9 +1191,7 @@ export class GenericExamService {
           }),
           ...(dto.type !== undefined && { type: dto.type as any }),
           ...(dto.difficulty !== undefined && { difficulty: dto.difficulty }),
-          ...(dto.durationSeconds !== undefined && {
-            durationSeconds: dto.durationSeconds,
-          }),
+          ...(durationSeconds !== undefined && { durationSeconds }),
         },
       });
     }
