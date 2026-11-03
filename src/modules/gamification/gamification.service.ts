@@ -16,6 +16,7 @@ import {
   getPreviousBusinessDayKey,
   getBusinessWeekKey,
 } from '../../common/time/business-time.util';
+import { questsForDay, type DailyQuestDefinition } from './daily-quest-catalog';
 
 export function getTodayDateKey(timeZone = 'Asia/Ho_Chi_Minh'): string {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -269,6 +270,12 @@ function getQuestAction(type: string): {
     case 'DO_VOCAB':
       return { actionLabel: 'Học từ vựng', actionUrl: '/flashcard' };
     case 'DO_LISTENING':
+      return { actionLabel: 'Luyện nghe', actionUrl: '/listening' };
+    case 'DO_READING':
+      return { actionLabel: 'Luyện đọc', actionUrl: '/reading' };
+    case 'DO_WRITING':
+      return { actionLabel: 'Luyện viết', actionUrl: '/writing' };
+    case 'PERFECT_QUIZ':
       return { actionLabel: 'Luyện nghe', actionUrl: '/listening' };
     // Advances only on standalone Listening, Reading or Writing practice
     // (reward-eligibility.ts); a TOEIC exam never counts, so never link there.
@@ -1812,11 +1819,7 @@ export class GamificationService {
   async getDashboardToday(userId: number) {
     const dateKey = getTodayDateKey('Asia/Ho_Chi_Minh');
 
-    const activeQuests = await this.prisma.dailyQuest.findMany({
-      where: { isActive: true },
-      take: 4,
-      orderBy: { id: 'asc' },
-    });
+    const activeQuests = await this.assignedQuests(userId, dateKey);
 
     const progressRows = await this.prisma.userQuestProgress.findMany({
       where: {
@@ -1903,14 +1906,48 @@ export class GamificationService {
     };
   }
 
+  /**
+   * Today's quests for this learner (daily-quest-catalog.ts), each with the id
+   * of the DailyQuest row that anchors its progress. The catalog decides the
+   * title, target and reward; a missing anchor row is created.
+   */
+  async assignedQuests(userId: number, dateKey: string) {
+    const definitions = questsForDay(userId, dateKey);
+    const rows = await this.prisma.dailyQuest.findMany({
+      where: { type: { in: definitions.map((quest) => quest.type) } },
+      orderBy: { id: 'asc' },
+    });
+    const assigned: Array<
+      DailyQuestDefinition & { id: number; isActive: boolean }
+    > = [];
+    for (const definition of definitions) {
+      const row =
+        rows.find((candidate) => candidate.type === definition.type) ??
+        (await this.prisma.dailyQuest.create({
+          data: { ...definition, isActive: true },
+        }));
+      assigned.push({ ...definition, id: row.id, isActive: true });
+    }
+    return assigned;
+  }
+
+  /** Advances the learner's quests of these types that are assigned today. */
+  async advanceAssignedQuests(
+    userId: number,
+    types: readonly string[],
+    today: string,
+  ) {
+    if (!types.length) return;
+    for (const quest of await this.assignedQuests(userId, today)) {
+      if (!types.includes(quest.type)) continue;
+      await this.advanceDailyQuestAndGrantRewardsTx(userId, quest, 1, today);
+    }
+  }
+
   async getMyDailyQuests(userId: number) {
     const today = getTodayDateKey('Asia/Ho_Chi_Minh');
 
-    const activeQuests = await this.prisma.dailyQuest.findMany({
-      where: { isActive: true },
-      take: 4,
-      orderBy: { id: 'asc' },
-    });
+    const activeQuests = await this.assignedQuests(userId, today);
 
     const progressRows = await this.prisma.userQuestProgress.findMany({
       where: {

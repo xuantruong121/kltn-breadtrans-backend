@@ -1,3 +1,4 @@
+import { DAILY_QUEST_POOL, questsForDay } from './daily-quest-catalog';
 import {
   GamificationService,
   getTodayDateKey,
@@ -80,76 +81,32 @@ describe('GamificationService weekly cron hardening', () => {
     });
   });
 
-  it('uses completed quest count for dashboard summary percentage', async () => {
-    const quests = [
-      {
-        id: 1,
-        type: 'LEARN_VOCAB',
-        title: 'Học 10 từ vựng',
-        description: 'Học từ mới',
-        targetValue: 10,
-        rewardXP: 15,
-        rewardBanh: 5,
-      },
-      {
-        id: 2,
-        type: 'COMPLETE_QUIZ',
-        title: 'Làm 1 bài luyện nghe',
-        description: 'Hoàn thành bài nghe',
-        targetValue: 1,
-        rewardXP: 20,
-        rewardBanh: 8,
-      },
-      {
-        id: 3,
-        type: 'DO_SPEAKING',
-        title: 'Luyện Speaking',
-        description: 'Nộp bài nói',
-        targetValue: 1,
-        rewardXP: 25,
-        rewardBanh: 10,
-      },
-      {
-        id: 4,
-        type: 'COMPLETE_LESSON',
-        title: 'Hoàn thành bài học',
-        description: 'Xem xong lesson',
-        targetValue: 1,
-        rewardXP: 20,
-        rewardBanh: 8,
-      },
-    ];
+  it('shows the three quests assigned today, from the catalog, with their progress', async () => {
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+    const assigned = questsForDay(1, today);
+    // One anchor row per pool type; the stored title and reward are stale.
+    const rows = DAILY_QUEST_POOL.map((quest, index) => ({
+      id: index + 1,
+      type: quest.type,
+      title: 'old title',
+      targetValue: 99,
+      rewardXP: 1,
+      rewardBanh: 1,
+      isActive: true,
+    }));
+    const firstRow = rows.find((row) => row.type === assigned[0].type)!;
     const prisma: any = {
-      dailyQuest: { findMany: jest.fn().mockResolvedValue(quests) },
+      dailyQuest: {
+        findMany: jest.fn().mockResolvedValue(rows),
+        create: jest.fn(),
+      },
       userQuestProgress: {
         findMany: jest.fn().mockResolvedValue([
           {
             id: 101,
-            questId: 1,
-            currentValue: 10,
+            questId: firstRow.id,
+            currentValue: assigned[0].targetValue,
             isCompleted: true,
-            quest: quests[0],
-          },
-          {
-            id: 102,
-            questId: 2,
-            currentValue: 0,
-            isCompleted: false,
-            quest: quests[1],
-          },
-          {
-            id: 103,
-            questId: 3,
-            currentValue: 0,
-            isCompleted: false,
-            quest: quests[2],
-          },
-          {
-            id: 104,
-            questId: 4,
-            currentValue: 0,
-            isCompleted: false,
-            quest: quests[3],
           },
         ]),
       },
@@ -163,22 +120,53 @@ describe('GamificationService weekly cron hardening', () => {
 
     const result = await service.getDashboardToday(1);
 
+    expect(prisma.dailyQuest.create).not.toHaveBeenCalled();
+    expect(result.quests.map((quest: any) => quest.type)).toEqual(
+      assigned.map((quest) => quest.type),
+    );
+    expect(result.quests[0]).toEqual(
+      expect.objectContaining({
+        title: assigned[0].title,
+        targetValue: assigned[0].targetValue,
+        rewardBanh: assigned[0].rewardBanh,
+        progressPercent: 100,
+      }),
+    );
+    // A skill-practice button never opens the exam list.
+    for (const quest of result.quests as any[])
+      expect(quest.actionUrl).not.toMatch(/^\/(exams|toeic)/);
     expect(result.summary).toEqual(
       expect.objectContaining({
         completedCount: 1,
-        totalCount: 4,
-        progressPercent: 25,
+        totalCount: 3,
+        progressPercent: 33,
       }),
     );
-    expect(result.quests[0].progressPercent).toBe(100);
-    // COMPLETE_QUIZ counts standalone Listening/Reading/Writing practice; a
-    // TOEIC exam never advances it, so its button must not open the exams.
-    expect(result.quests[1]).toEqual(
-      expect.objectContaining({
-        actionLabel: 'Luyện kỹ năng',
-        actionUrl: '/listening',
-      }),
+  });
+
+  it('creates the anchor row of a pool quest that has none yet', async () => {
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+    const assigned = questsForDay(2, today);
+    let nextId = 50;
+    const prisma: any = {
+      dailyQuest: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(({ data }) => ({ id: nextId++, ...data })),
+      },
+    };
+    const service = new GamificationService(
+      prisma,
+      {} as any,
+      { set: jest.fn() } as any,
     );
+
+    const quests = await service.assignedQuests(2, today);
+
+    expect(prisma.dailyQuest.create).toHaveBeenCalledTimes(3);
+    expect(quests.map((quest) => quest.type)).toEqual(
+      assigned.map((quest) => quest.type),
+    );
+    expect(quests.map((quest) => quest.id)).toEqual([50, 51, 52]);
   });
 
   describe('awardBanh & daily cap & idempotency', () => {

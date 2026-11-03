@@ -12,6 +12,7 @@ describe('GamificationListener', () => {
     pointHistory: { findFirst: jest.Mock };
     dailyBanhEarning: { findUnique: jest.Mock; upsert: jest.Mock };
     speakingRewardLedger: { createMany: jest.Mock };
+    speakingExercise: { findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
   let gamificationServiceMock: {
@@ -22,6 +23,8 @@ describe('GamificationListener', () => {
     awardToeicReward: jest.Mock;
     awardBadgeIfEarned: jest.Mock;
     advanceDailyQuestAndGrantRewardsTx: jest.Mock;
+    advanceAssignedQuests: jest.Mock;
+    assignedQuests: jest.Mock;
   };
   let eligibilityMock: { quiz: jest.Mock; speakingExercise: jest.Mock };
   let listener: GamificationListener;
@@ -62,6 +65,11 @@ describe('GamificationListener', () => {
       speakingRewardLedger: {
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      speakingExercise: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ taskType: 'RESPOND_TO_QUESTION' }),
+      },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
 
@@ -78,6 +86,8 @@ describe('GamificationListener', () => {
         completedNow: true,
         currentValue: 10,
       }),
+      advanceAssignedQuests: jest.fn().mockResolvedValue(undefined),
+      assignedQuests: jest.fn().mockResolvedValue([]),
     };
 
     // These tests cover the rewarded activities (standalone practice);
@@ -186,13 +196,8 @@ describe('GamificationListener', () => {
         expect.objectContaining({ isCapped: true }),
       );
       expect(
-        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
-      ).toHaveBeenCalledWith(
-        12,
-        expect.objectContaining({ id: 5 }),
-        1,
-        expect.any(String),
-      );
+        gamificationServiceMock.advanceAssignedQuests,
+      ).toHaveBeenCalledWith(12, expect.any(Array), expect.any(String));
     });
 
     it('a Writing exercise passes its XP explicitly; Bánh mì still comes from the score', async () => {
@@ -285,82 +290,69 @@ describe('GamificationListener', () => {
       expect(gamificationServiceMock.awardBanh).not.toHaveBeenCalled();
     });
 
-    it('allows Reading to advance generic and perfect quests but not Listening quests', async () => {
-      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([
-        { id: 1, type: 'COMPLETE_QUIZ', targetValue: 1 },
-        { id: 2, type: 'DO_LISTENING', targetValue: 1 },
-        { id: 3, type: 'PERFECT_QUIZ', targetValue: 1 },
-      ]);
+    const questTypesOf = () =>
+      gamificationServiceMock.advanceAssignedQuests.mock.calls.at(-1)?.[1];
 
+    it('a perfect Reading practice advances the reading and the perfect quests', async () => {
       await listener.handleQuizSubmittedEvent({
         userId: 12,
         quizId: 44,
-        score: 100,
+        score: 6,
+        scorePercent: 100,
         quizType: 'BILINGUAL_READING',
         isFirstSubmission: false,
       });
-
-      expect(
-        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
-      ).toHaveBeenCalledTimes(2);
-      expect(
-        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx.mock.calls.map(
-          (call) => (call[1] as { type: string }).type,
-        ),
-      ).toEqual(['COMPLETE_QUIZ', 'PERFECT_QUIZ']);
+      expect(questTypesOf()).toEqual(['DO_READING', 'PERFECT_QUIZ']);
     });
 
-    it('allows Listening to advance DO_LISTENING', async () => {
-      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([
-        { id: 4, type: 'DO_LISTENING', targetValue: 1 },
-      ]);
-
+    // `score` counts correct answers; 100 of them is not 100 percent.
+    it('the perfect quest reads the percent, not the count of correct answers', async () => {
       await listener.handleQuizSubmittedEvent({
         userId: 12,
         quizId: 45,
-        score: 80,
+        score: 100,
+        scorePercent: 80,
         quizType: 'LISTENING_PRACTICE',
         isFirstSubmission: false,
       });
+      expect(questTypesOf()).toEqual(['DO_LISTENING']);
+    });
 
-      expect(
-        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
-      ).toHaveBeenCalledWith(
-        12,
-        expect.objectContaining({ type: 'DO_LISTENING' }),
-        1,
-        expect.any(String),
-      );
+    it('a Writing practice advances the writing quest only', async () => {
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 17,
+        score: 100,
+        scorePercent: 100,
+        xp: 100,
+        quizType: 'WRITING_EMAIL',
+        isFirstSubmission: false,
+      });
+      expect(questTypesOf()).toEqual(['DO_WRITING']);
     });
 
     it('does not assume an event without quiz type is Listening', async () => {
-      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([
-        { id: 5, type: 'DO_LISTENING', targetValue: 1 },
-      ]);
-
       await listener.handleQuizSubmittedEvent({
         userId: 12,
         quizId: 46,
         score: 100,
+        scorePercent: 100,
         isFirstSubmission: false,
       });
-
-      expect(
-        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx,
-      ).not.toHaveBeenCalled();
+      expect(questTypesOf()).toEqual([]);
     });
   });
 
   describe('handleSpeakingSubmittedEvent', () => {
     it('awards speaking Bánh Mì with submissionId and advances quest', async () => {
-      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([
+      gamificationServiceMock.assignedQuests.mockResolvedValueOnce([
         {
           id: 9,
           type: 'DO_SPEAKING',
           targetValue: 1,
-          rewardXP: 10,
-          rewardBanh: 5,
-          title: 'Luyện nói AI',
+          rewardXP: 25,
+          rewardBanh: 10,
+          title: 'Luyện Speaking',
         },
       ]);
 
@@ -388,6 +380,30 @@ describe('GamificationListener', () => {
         expect.any(String),
         expect.anything(),
       );
+    });
+
+    it('a read-aloud advances only the pronunciation quest', async () => {
+      prismaMock.speakingExercise.findUnique.mockResolvedValueOnce({
+        taskType: 'READ_ALOUD',
+      });
+      gamificationServiceMock.assignedQuests.mockResolvedValueOnce([
+        { id: 9, type: 'DO_SPEAKING', targetValue: 1 },
+        { id: 10, type: 'PRACTICE_SPEAKING', targetValue: 3 },
+      ]);
+
+      await listener.handleSpeakingSubmittedEvent({
+        userId: 15,
+        submissionId: 120,
+        exerciseId: 1,
+        overallScore: 85,
+        isSilentOrNoSpeech: false,
+      });
+
+      const advanced =
+        gamificationServiceMock.advanceDailyQuestAndGrantRewardsTx.mock.calls.map(
+          (call) => (call[1] as { id: number }).id,
+        );
+      expect(advanced).toEqual([10]);
     });
 
     it('treats a repeated speaking settlement as a ledger NOOP without duplicate side effects', async () => {

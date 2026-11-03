@@ -11003,11 +11003,51 @@ async function main() {
         8,
       ],
       // As configured on the development database (owner-approved quest set).
-      ['Thực hành phát âm', null, 'PRACTICE_SPEAKING', 5, 25, 15],
+      [
+        'Thực hành phát âm',
+        'Hoàn thành 3 bài đọc to hoặc luyện phát âm',
+        'PRACTICE_SPEAKING',
+        3,
+        25,
+        10,
+      ],
+      // The rest of the daily pool (gamification/daily-quest-catalog.ts, the
+      // source of truth for titles, targets and rewards; these rows only
+      // anchor progress, and the app creates any that are missing).
+      [
+        'Luyện nghe 1 bài',
+        'Hoàn thành một bài luyện Nghe',
+        'DO_LISTENING',
+        1,
+        20,
+        8,
+      ],
+      [
+        'Luyện đọc 1 bài',
+        'Hoàn thành một bài luyện Đọc',
+        'DO_READING',
+        1,
+        20,
+        8,
+      ],
+      ['Luyện viết 1 bài', 'Nộp một bài luyện Viết', 'DO_WRITING', 1, 20, 8],
+      [
+        'Làm đúng 100% một bài',
+        'Đạt điểm tuyệt đối ở một bài luyện Nghe hoặc Đọc',
+        'PERFECT_QUIZ',
+        1,
+        30,
+        12,
+      ],
     ];
   // Flashcard vocabulary and lessons earn no rewards (owner policy), so their
-  // quests can never complete and are kept inactive.
-  const inactiveQuestTypes = new Set(['LEARN_VOCAB', 'COMPLETE_LESSON']);
+  // quests can never complete and are kept inactive. COMPLETE_QUIZ left the
+  // daily pool on 2026-11-03 (one quest per skill instead).
+  const inactiveQuestTypes = new Set([
+    'LEARN_VOCAB',
+    'COMPLETE_LESSON',
+    'COMPLETE_QUIZ',
+  ]);
   for (let index = 0; index < quests.length; index += 1) {
     const isActive = !inactiveQuestTypes.has(quests[index][2]);
     const quest = await prisma.dailyQuest.upsert({
