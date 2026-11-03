@@ -7,6 +7,12 @@ import {
 } from '@nestjs/common';
 import { summarizeAssessmentSkills } from './toeic-assessment-result';
 import {
+  COMPONENT_SECONDS,
+  canContinueSession,
+  openSection,
+  sessionDeadline,
+} from './toeic-assessment-session';
+import {
   reviewSpeakingTasks,
   reviewWritingTasks,
 } from './toeic-assessment-review';
@@ -22,10 +28,12 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
+import { WritingService } from '../writing/writing.service';
 import {
   CompleteToeicAssessmentComponentDto,
   CreateToeicAssessmentDto,
   SetToeicAssessmentComponentsDto,
+  ToeicWritingAnswerDto,
   UpdateToeicAssessmentDto,
 } from './toeic-assessment.dto';
 
@@ -52,6 +60,7 @@ export class ToeicAssessmentService {
   constructor(
     private readonly db: PrismaService,
     private readonly quizAccess: QuizContentAccessService,
+    private readonly writing: WritingService,
   ) {}
 
   async listAdmin() {
@@ -243,15 +252,8 @@ export class ToeicAssessmentService {
         });
         if (sameKey) return sameKey.id;
       }
-      const active = await tx.toeicAssessmentAttempt.findFirst({
-        where: {
-          assessmentId,
-          userId,
-          status: ToeicAssessmentAttemptStatus.IN_PROGRESS,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (active) return active.id;
+      // Start is always a new session. An unfinished one stays as it is, and
+      // the room offers to go back to it; see previousSession.
       const created = await tx.toeicAssessmentAttempt.create({
         data: {
           assessmentId,
@@ -281,18 +283,33 @@ export class ToeicAssessmentService {
         'Bạn không có quyền truy cập lượt làm bài này',
       );
     const projected = this.projectAttempt(attempt);
-    // Writing submissions are linked only when the section completes, so while
-    // it is open "written" is derived the same way completion selects them:
-    // this learner's graded submissions of the set's quizzes since the start.
+    // Submissions are linked only when the section completes, so while it is
+    // open the work done is read the same way completion selects it: this
+    // learner's submissions of the section's tasks since it started.
     for (const component of projected.components) {
-      if (
-        component.kind !== 'WRITING' ||
-        component.status === 'COMPLETED' ||
-        component.writingQuizIds.length === 0
-      )
-        continue;
+      if (component.status === 'COMPLETED') continue;
       const row = attempt.components.find((c: any) => c.id === component.id);
       const since = row?.startedAt ?? attempt.startedAt;
+      if (component.kind === 'SPEAKING') {
+        const takes = await this.db.speakingSubmission.findMany({
+          where: {
+            userId,
+            exerciseId: { in: component.speakingExerciseIds },
+            status: { not: 'FAILED' },
+            submittedAt: { gte: since },
+          },
+          select: { exerciseId: true },
+        });
+        component.speakingTakes = component.speakingExerciseIds
+          .map((exerciseId: number) => ({
+            exerciseId,
+            takes: takes.filter((take) => take.exerciseId === exerciseId)
+              .length,
+          }))
+          .filter((item: { takes: number }) => item.takes > 0);
+      }
+      if (component.kind !== 'WRITING' || component.writingQuizIds.length === 0)
+        continue;
       const submissions = await this.db.submission.findMany({
         where: {
           userId,
@@ -316,7 +333,53 @@ export class ToeicAssessmentService {
         ),
       ];
     }
-    return projected;
+    return {
+      ...projected,
+      previousSession: await this.previousSession(attempt),
+    };
+  }
+
+  /**
+   * The newest other unfinished session of this exam that still has time, for
+   * the Khôi phục button inside the room.
+   */
+  private async previousSession(attempt: {
+    id: number;
+    assessmentId: number;
+    userId: number;
+    status: string;
+  }) {
+    if (attempt.status !== ToeicAssessmentAttemptStatus.IN_PROGRESS)
+      return null;
+    const others = await this.db.toeicAssessmentAttempt.findMany({
+      where: {
+        assessmentId: attempt.assessmentId,
+        userId: attempt.userId,
+        status: ToeicAssessmentAttemptStatus.IN_PROGRESS,
+        id: { not: attempt.id },
+      },
+      orderBy: { id: 'desc' },
+      // A session older than these has run out if they have.
+      take: 5,
+      include: {
+        components: {
+          orderBy: { assessmentComponent: { order: 'asc' as const } },
+          include: { assessmentComponent: true, toeicAttempt: true },
+        },
+      },
+    });
+    const now = new Date();
+    const other = others.find((item) =>
+      canContinueSession(item.components, now),
+    );
+    if (!other) return null;
+    return {
+      id: other.id,
+      startedAt: other.startedAt,
+      sectionKind:
+        openSection(other.components)?.assessmentComponent.kind ?? null,
+      deadlineAt: sessionDeadline(other.components),
+    };
   }
 
   /**
@@ -412,7 +475,16 @@ export class ToeicAssessmentService {
       where: { id: componentId },
     });
     if (!component) throw new NotFoundException('Không tìm thấy component');
-    const assessment = await this.getPublishedAssessment(attempt.assessmentId);
+    // An exam runs in order: a section opens only after the ones before it.
+    if (
+      attempt.components.some(
+        (item) =>
+          item.assessmentComponent.order < component.order &&
+          item.status !== ToeicAssessmentAttemptComponentStatus.COMPLETED,
+      )
+    )
+      throw new ConflictException('Cần nộp phần trước khi sang phần này');
+    const assessment = await this.getAssessmentOfAttempt(attempt.assessmentId);
     await this.assertLearnerEntitlements(assessment, userId);
 
     await this.db.$transaction(async (tx) => {
@@ -435,10 +507,7 @@ export class ToeicAssessmentService {
         const source = await tx.toeicExamSet.findUnique({
           where: { id: component.lrExamSetId! },
         });
-        if (
-          !source ||
-          source.publicationStatus !== QuizPublicationStatus.PUBLISHED
-        )
+        if (!source || source.publicationStatus === QuizPublicationStatus.DRAFT)
           throw new BadRequestException('Nguồn L&R chưa sẵn sàng');
         const child = await tx.toeicAttempt.create({
           data: {
@@ -478,6 +547,7 @@ export class ToeicAssessmentService {
     });
     if (!component) throw new NotFoundException('Không tìm thấy component');
 
+    let ungraded: number[] = [];
     await this.db.$transaction(async (tx) => {
       if (component.kind === ToeicAssessmentComponentKind.LISTENING_READING) {
         if (!state.toeicAttemptId)
@@ -493,16 +563,15 @@ export class ToeicAssessmentService {
           state.id,
           component.speakingPracticeSetId!,
           userId,
-          dto.speakingSubmissionIds ?? [],
           state.startedAt ?? attempt.startedAt,
         );
       } else {
-        await this.attachWritingSubmissions(
+        ungraded = await this.attachWritingAnswers(
           tx,
           state.id,
           component.writingSetId!,
           userId,
-          dto.writingSubmissionIds ?? [],
+          dto.writingAnswers ?? [],
           state.startedAt ?? attempt.startedAt,
         );
       }
@@ -516,6 +585,9 @@ export class ToeicAssessmentService {
       });
       await this.completeParentIfReady(tx, attemptId);
     });
+    // The answers are safe in the database; the learner does not wait for the
+    // grades, and the system job retries any that fail here.
+    void this.writing.gradeExamSubmissions(ungraded).catch(() => undefined);
     return this.getAttempt(attemptId, userId);
   }
 
@@ -525,7 +597,15 @@ export class ToeicAssessmentService {
       orderBy: { startedAt: 'desc' },
       include: this.attemptInclude(),
     });
-    return attempts.map((attempt) => this.projectAttempt(attempt));
+    // A session left behind that ran out can never be continued or finished.
+    const now = new Date();
+    return attempts
+      .filter(
+        (attempt) =>
+          attempt.status === ToeicAssessmentAttemptStatus.COMPLETED ||
+          canContinueSession(attempt.components, now),
+      )
+      .map((attempt) => this.projectAttempt(attempt));
   }
 
   private componentInclude(): Prisma.ToeicAssessmentInclude {
@@ -587,6 +667,17 @@ export class ToeicAssessmentService {
     if (assessment.publicationStatus !== QuizPublicationStatus.PUBLISHED)
       throw new NotFoundException('Bài đánh giá chưa được xuất bản');
     await this.assertPublishable(assessment);
+    return assessment;
+  }
+
+  /**
+   * An attempt already started may finish after its exam, or the L&R part it
+   * reuses, stops being offered. Only new attempts need a publishable exam.
+   */
+  private async getAssessmentOfAttempt(id: number) {
+    const assessment = await this.findAssessment(id);
+    if (assessment.publicationStatus === QuizPublicationStatus.DRAFT)
+      throw new NotFoundException('Bài đánh giá chưa được xuất bản');
     return assessment;
   }
 
@@ -969,12 +1060,18 @@ export class ToeicAssessmentService {
       const source = assessmentSources.find(
         (candidate: any) => candidate.id === component.assessmentComponentId,
       );
+      const seconds = COMPONENT_SECONDS[component.assessmentComponent.kind];
       return {
         id: component.id,
         assessmentComponentId: component.assessmentComponentId,
         kind: component.assessmentComponent.kind,
         order: component.assessmentComponent.order,
         status: component.status,
+        timeLimitSeconds: seconds ?? null,
+        deadlineAt:
+          seconds && component.startedAt
+            ? new Date(component.startedAt.getTime() + seconds * 1000)
+            : null,
         sourceId:
           source?.lrExamSetId ??
           source?.speakingPracticeSetId ??
@@ -987,6 +1084,9 @@ export class ToeicAssessmentService {
           source?.writingSet?.items?.map((item: any) => item.writingQuizId) ??
           [],
         childAttemptId: component.toeicAttemptId ?? null,
+        childStatus: component.toeicAttempt?.status ?? null,
+        // Recordings kept per task while the section is open; see getAttempt.
+        speakingTakes: [] as Array<{ exerciseId: number; takes: number }>,
         linkedSpeakingSubmissionIds:
           component.speakingSubmissions?.map(
             (link: any) => link.speakingSubmissionId,
@@ -1064,132 +1164,119 @@ export class ToeicAssessmentService {
     }
   }
 
+  /**
+   * Links the newest recording of each task. A task with no recording stays
+   * unanswered, and a recording still being graded keeps its status in review.
+   */
   private async attachSpeakingSubmissions(
     tx: Prisma.TransactionClient,
     attemptComponentId: number,
     practiceSetId: string,
     userId: number,
-    submissionIds: number[],
     startedAt: Date,
   ) {
-    const uniqueIds = [...new Set(submissionIds)];
-    const [exercises, submissions] = await Promise.all([
-      tx.speakingExercise.findMany({
-        where: {
-          practiceSetId,
-          publicationStatus: QuizPublicationStatus.PUBLISHED,
-        },
-        select: { id: true },
-      }),
-      tx.speakingSubmission.findMany({
-        where: {
-          ...(uniqueIds.length > 0 ? { id: { in: uniqueIds } } : {}),
-          exercise: {
-            practiceSetId,
-            publicationStatus: QuizPublicationStatus.PUBLISHED,
-          },
-          userId,
-          status: 'COMPLETED',
-          submittedAt: { gte: startedAt },
-        },
-        orderBy: { submittedAt: 'desc' },
-        select: { id: true, exerciseId: true },
-      }),
-    ]);
-    const latestByExercise = new Map<
-      number,
-      { id: number; exerciseId: number }
-    >();
+    const submissions = await tx.speakingSubmission.findMany({
+      where: {
+        userId,
+        submittedAt: { gte: startedAt },
+        exercise: { practiceSetId },
+      },
+      orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, exerciseId: true },
+    });
+    const newest = new Map<number, number>();
     for (const submission of submissions)
-      if (!latestByExercise.has(submission.exerciseId))
-        latestByExercise.set(submission.exerciseId, submission);
-    const selectedSubmissions = [...latestByExercise.values()];
-    if (
-      exercises.length === 0 ||
-      (uniqueIds.length > 0 &&
-        selectedSubmissions.length !== uniqueIds.length) ||
-      selectedSubmissions.length !== exercises.length ||
-      !exercises.every((exercise) =>
-        selectedSubmissions.some(
-          (submission) => submission.exerciseId === exercise.id,
-        ),
-      )
-    )
-      throw new BadRequestException(
-        'Speaking component chưa có đủ submission hoàn tất',
-      );
+      if (!newest.has(submission.exerciseId))
+        newest.set(submission.exerciseId, submission.id);
     await tx.toeicAssessmentSpeakingSubmission.createMany({
-      data: selectedSubmissions.map((submission) => ({
+      data: [...newest.values()].map((speakingSubmissionId) => ({
         attemptComponentId,
-        speakingSubmissionId: submission.id,
+        speakingSubmissionId,
       })),
       skipDuplicates: true,
     });
   }
 
-  private async attachWritingSubmissions(
+  /**
+   * Stores each written answer ungraded and links the newest submission of
+   * each task. Returns the ones still waiting for a grade. The key is fixed
+   * per section and task, so a repeated request cannot store an answer twice.
+   */
+  private async attachWritingAnswers(
     tx: Prisma.TransactionClient,
     attemptComponentId: number,
     writingSetId: number,
     userId: number,
-    submissionIds: number[],
+    answers: ToeicWritingAnswerDto[],
     startedAt: Date,
   ) {
-    const uniqueIds = [...new Set(submissionIds)];
     const set = await tx.toeicWritingSet.findUnique({
       where: { id: writingSetId },
-      include: { items: { select: { writingQuizId: true } } },
-    });
-    const submissions = await tx.submission.findMany({
-      where: { id: { in: uniqueIds }, userId, submittedAt: { gte: startedAt } },
-      include: { results: true },
-    });
-    const candidateSubmissions = uniqueIds.length
-      ? submissions
-      : await tx.submission.findMany({
-          where: {
-            userId,
-            submittedAt: { gte: startedAt },
-            quizId: {
-              in: set?.items.map((item: any) => item.writingQuizId) ?? [],
+      include: {
+        items: {
+          select: {
+            writingQuizId: true,
+            writingQuiz: {
+              select: {
+                questions: {
+                  select: { id: true },
+                  orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                  take: 1,
+                },
+              },
             },
           },
-          orderBy: { submittedAt: 'desc' },
-          include: { results: true },
-        });
-    const byQuiz = new Map<number, any>();
-    for (const submission of candidateSubmissions)
-      if (
-        !byQuiz.has(submission.quizId) &&
-        (submission.score !== null ||
-          submission.results.some((result: any) => result.score !== null))
-      )
-        byQuiz.set(submission.quizId, submission);
-    const selectedSubmissions = set
-      ? set.items
-          .map((item: any) => byQuiz.get(item.writingQuizId))
-          .filter(Boolean)
-      : [];
-    const valid = Boolean(
-      set &&
-      set.items.length === 8 &&
-      (uniqueIds.length === 0 || uniqueIds.length === 8) &&
-      set.items.every((item) => {
-        const submission = byQuiz.get(item.writingQuizId);
-        return Boolean(submission);
-      }),
+        },
+      },
+    });
+    const questionOf = new Map(
+      (set?.items ?? []).map((item) => [
+        item.writingQuizId,
+        item.writingQuiz.questions[0]?.id,
+      ]),
     );
-    if (!valid)
-      throw new BadRequestException(
-        'Writing component cần đủ 8 bài đã được chấm',
-      );
+    for (const { quizId, text } of answers) {
+      const answer = text.trim();
+      const questionId = questionOf.get(quizId);
+      if (!answer || !questionId) continue;
+      const clientAttemptId = `assessment-${attemptComponentId}-${quizId}`;
+      await tx.submission.upsert({
+        where: {
+          userId_quizId_clientAttemptId: { userId, quizId, clientAttemptId },
+        },
+        update: {},
+        create: {
+          userId,
+          quizId,
+          clientAttemptId,
+          results: { create: [{ questionId, answer }] },
+        },
+      });
+    }
+    const submissions = await tx.submission.findMany({
+      where: {
+        userId,
+        submittedAt: { gte: startedAt },
+        quizId: { in: [...questionOf.keys()] },
+      },
+      orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, quizId: true, score: true },
+    });
+    const newest = new Map<number, (typeof submissions)[number]>();
+    for (const submission of submissions)
+      if (!newest.has(submission.quizId))
+        newest.set(submission.quizId, submission);
+    const selected = [...newest.values()];
     await tx.toeicAssessmentWritingSubmission.createMany({
-      data: selectedSubmissions.map((submission) => ({
+      data: selected.map((submission) => ({
         attemptComponentId,
         submissionId: submission.id,
       })),
       skipDuplicates: true,
     });
+    return selected
+      .filter((submission) => submission.score === null)
+      .map((submission) => submission.id);
   }
 
   private async completeParentIfReady(

@@ -153,3 +153,25 @@ describe('TOEIC Listening audio script builder', () => {
     ).toThrow('spoken prompt');
   });
 });
+
+describe('Part 3/4 prompt order', () => {
+  it('speaks prompts by question number, whatever order the rows return in', () => {
+    const question = (questionNumber: number, text: string) => ({
+      questionNumber,
+      text,
+      options: ['a', 'b', 'c', 'd'],
+      correctIndex: 0,
+    });
+    const group = (questions: ReturnType<typeof question>[]) => ({
+      part: 3,
+      transcriptText: 'M: Hello.',
+      questions,
+    });
+    const first = question(32, 'First?');
+    const second = question(33, 'Second?');
+
+    expect(toeicListeningAudioFingerprint(group([second, first]))).toBe(
+      toeicListeningAudioFingerprint(group([first, second])),
+    );
+  });
+});

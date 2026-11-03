@@ -1,4 +1,7 @@
+import { NotificationsModule } from '../notifications/notifications.module';
+import { WritingModule } from '../writing/writing.module';
 import { Module } from '@nestjs/common';
+import { ToeicListeningMasterService } from './toeic-listening-master.service';
 import { ToeicService } from './toeic.service';
 import { ToeicController } from './toeic.controller';
 import { AdminExamService } from './admin-exam.service';
@@ -10,6 +13,7 @@ import {
   AdminToeicAssessmentController,
   ToeicAssessmentController,
 } from './toeic-assessment.controller';
+import { ExamWritingService } from './exam-writing.service';
 import { GenericExamService } from './generic-exam.service';
 import { GenericExamController } from './generic-exam.controller';
 import { SkillCmsModule } from '../content/skill-cms.module';
@@ -22,7 +26,15 @@ import { ImageSearchProviderChain } from './image-search.provider-chain';
 import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-search.provider';
 
 @Module({
-  imports: [SpeakingModule, QuizModule, SkillCmsModule, AiModule, UploadModule],
+  imports: [
+    SpeakingModule,
+    QuizModule,
+    SkillCmsModule,
+    AiModule,
+    UploadModule,
+    WritingModule,
+    NotificationsModule,
+  ],
   controllers: [
     ToeicController,
     AdminExamController,
@@ -35,7 +47,9 @@ import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-s
     AdminExamService,
     ToeicAssessmentService,
     GenericExamService,
+    ExamWritingService,
     ToeicAiExamService,
+    ToeicListeningMasterService,
     PixabayImageSearchProvider,
     OpenverseImageSearchProvider,
     WikimediaCommonsImageSearchProvider,
@@ -46,6 +60,7 @@ import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-s
     AdminExamService,
     ToeicAssessmentService,
     GenericExamService,
+    ExamWritingService,
     ToeicAiExamService,
   ],
 })

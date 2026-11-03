@@ -319,9 +319,20 @@ describe('AdminExamService (Phase 4)', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
+    it('refuses to change a published exam', async () => {
+      prisma.toeicExamSet.findUnique.mockResolvedValue({
+        publicationStatus: 'PUBLISHED',
+      });
+
+      await expect(
+        adminExamService.updateQuestion(301, 1, 2, { explanation: 'x' }),
+      ).rejects.toThrow('chuyển đề về bản nháp');
+    });
+
     it('rejects group reorder if forged cross-exam group IDs are submitted', async () => {
       prisma.toeicExamSet.findUnique.mockResolvedValue({
         id: 301,
+        publicationStatus: 'DRAFT',
         groups: [{ id: 1 }, { id: 2 }],
       });
 

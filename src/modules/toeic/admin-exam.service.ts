@@ -212,8 +212,21 @@ export class AdminExamService {
     return this.prisma.toeicExamSet.delete({ where: { id } });
   }
 
+  /** Exam content changes only while the exam is a draft. */
+  private async assertDraftSet(examId: number) {
+    const set = await this.prisma.toeicExamSet.findUnique({
+      where: { id: examId },
+      select: { publicationStatus: true },
+    });
+    if (set && set.publicationStatus !== QuizPublicationStatus.DRAFT)
+      throw new ConflictException(
+        'Đề không ở trạng thái bản nháp. Hãy chuyển đề về bản nháp rồi mới sửa.',
+      );
+  }
+
   // ============== GROUP MANAGEMENT ==============
   async addGroup(examId: number, dto: CreateExamGroupDto) {
+    await this.assertDraftSet(examId);
     const exam = await this.prisma.toeicExamSet.findUnique({
       where: { id: examId },
     });
@@ -261,6 +274,7 @@ export class AdminExamService {
   }
 
   async updateGroup(examId: number, groupId: number, dto: UpdateExamGroupDto) {
+    await this.assertDraftSet(examId);
     const group = await this.prisma.toeicQuestionGroup.findUnique({
       where: { id: groupId },
       include: { questions: { orderBy: { questionNumber: 'asc' } } },
@@ -403,6 +417,7 @@ export class AdminExamService {
   }
 
   async deleteGroup(examId: number, groupId: number) {
+    await this.assertDraftSet(examId);
     const group = await this.prisma.toeicQuestionGroup.findUnique({
       where: { id: groupId },
     });
@@ -426,6 +441,7 @@ export class AdminExamService {
   }
 
   async reorderGroups(examId: number, groupIds: number[]) {
+    await this.assertDraftSet(examId);
     const exam = await this.prisma.toeicExamSet.findUnique({
       where: { id: examId },
       include: { groups: { select: { id: true } } },
@@ -459,6 +475,7 @@ export class AdminExamService {
     groupId: number,
     dto: CreateExamQuestionDto,
   ) {
+    await this.assertDraftSet(examId);
     const group = await this.prisma.toeicQuestionGroup.findUnique({
       where: { id: groupId },
     });
@@ -524,6 +541,7 @@ export class AdminExamService {
     questionId: number,
     dto: UpdateExamQuestionDto,
   ) {
+    await this.assertDraftSet(examId);
     const question = await this.prisma.toeicQuestion.findUnique({
       where: { id: questionId },
       include: { group: true },
@@ -595,6 +613,7 @@ export class AdminExamService {
   }
 
   async deleteQuestion(examId: number, groupId: number, questionId: number) {
+    await this.assertDraftSet(examId);
     const question = await this.prisma.toeicQuestion.findUnique({
       where: { id: questionId },
       include: { group: true },

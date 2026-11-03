@@ -1,6 +1,7 @@
 import {
   IsNotEmpty,
   IsString,
+  MaxLength,
   IsOptional,
   IsInt,
   IsIn,
@@ -197,6 +198,11 @@ export class SuggestListeningQuestionsDto {
 }
 
 export class SuggestWritingTaskDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  sourceText?: string;
+
   @IsNotEmpty({ message: 'Loại bài Writing không được để trống' })
   @IsString()
   taskType: string;
@@ -299,6 +305,11 @@ export class SuggestSpeakingExercisesDto {
 }
 
 export class SuggestSpeakingFullDraftDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  sourceText?: string;
+
   @IsNotEmpty()
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
@@ -327,6 +338,11 @@ export class SuggestSpeakingFullDraftDto {
 }
 
 export class SuggestListeningFullDraftDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  sourceText?: string;
+
   @IsNotEmpty()
   @IsString()
   topic: string;
@@ -347,6 +363,11 @@ export class SuggestListeningFullDraftDto {
 }
 
 export class SuggestReadingFullDraftDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  sourceText?: string;
+
   @IsNotEmpty()
   @IsString()
   topic: string;
@@ -395,6 +416,11 @@ export class SuggestVocabFullDraftDto {
 }
 
 export class SuggestGrammarFullDraftDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  sourceText?: string;
+
   @IsNotEmpty()
   @IsString()
   topicTitle: string;
@@ -413,4 +439,37 @@ export class SuggestGrammarFullDraftDto {
   @Max(20)
   @Transform(({ value }) => (value !== undefined ? Number(value) : 10))
   count?: number = 10;
+}
+
+export class VocabDecksFromDocumentDto {
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(20000)
+  text: string;
+
+  @IsOptional()
+  @IsIn(GRAMMAR_LEVELS)
+  level?: string;
+}
+
+export class SuggestDictationLinesDto {
+  @IsNotEmpty()
+  @IsString()
+  topic: string;
+
+  @IsOptional()
+  @IsIn(CONTENT_LEVELS)
+  level?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(20)
+  @Max(40)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 20))
+  count?: number = 20;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  sourceText?: string;
 }

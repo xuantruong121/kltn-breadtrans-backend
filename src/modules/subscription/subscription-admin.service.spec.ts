@@ -12,6 +12,7 @@ import { SubscriptionService } from './subscription.service';
 
 describe('SubscriptionAdminService', () => {
   let service: SubscriptionAdminService;
+  let notifications: { createNotification: jest.Mock };
   let subscriptionService: SubscriptionService;
   let prismaMock: any;
 
@@ -88,7 +89,8 @@ describe('SubscriptionAdminService', () => {
       $queryRaw: jest.fn().mockResolvedValue([{ id: studentId }]),
     };
 
-    service = new SubscriptionAdminService(prismaMock);
+    notifications = { createNotification: jest.fn().mockResolvedValue({}) };
+    service = new SubscriptionAdminService(prismaMock, notifications as never);
     subscriptionService = new SubscriptionService(prismaMock);
   });
 
@@ -210,6 +212,10 @@ describe('SubscriptionAdminService', () => {
       expect(result.source).toBe('ADMIN_GRANT');
       expect(result.sourceLabel).toBe('Admin tặng');
       expect(result.planPurchaseId).toBeNull();
+      expect(notifications.createNotification).toHaveBeenCalledTimes(1);
+      expect(notifications.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'SUBSCRIPTION_GRANTED' }),
+      );
     });
 
     it('rejects grant if learner already has an active subscription with required message', async () => {

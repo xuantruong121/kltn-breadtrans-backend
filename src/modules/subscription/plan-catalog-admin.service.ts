@@ -103,6 +103,12 @@ export class PlanCatalogAdminService {
         select: { version: true },
       });
       const version = (latest?.version ?? 0) + 1;
+      // A new price must not lose what the plan grants: start from the
+      // current version, and the admin changes only what differs.
+      const current = await tx.planVersion.findFirst({
+        where: { planId: plan!.id, isCurrent: true },
+        include: { entitlements: true },
+      });
       this.subscriptionService.validatePlanVersionInput({
         version,
         durationDays: dto.durationDays,
@@ -115,13 +121,23 @@ export class PlanCatalogAdminService {
         data: {
           planId: plan!.id,
           version,
-          displayName: dto.displayName,
-          description: dto.description,
+          displayName: dto.displayName ?? current?.displayName,
+          description: dto.description ?? current?.description,
           durationDays: dto.durationDays,
           priceVnd: dto.priceVnd,
           currency: dto.currency ?? 'VND',
           status: PlanVersionStatus.DRAFT,
           isCurrent: false,
+          entitlements: {
+            create: (current?.entitlements ?? []).map((entitlement) => ({
+              featureKey: entitlement.featureKey,
+              enabled: entitlement.enabled,
+              limitValue: entitlement.limitValue,
+              unit: entitlement.unit,
+              period: entitlement.period,
+              scope: entitlement.scope ?? Prisma.JsonNull,
+            })),
+          },
         },
         include: { plan: true, entitlements: true },
       });
@@ -391,6 +407,11 @@ export class PlanCatalogAdminService {
     if (version.currency !== 'VND') {
       throw new ConflictException(
         'Phiên bản trả phí khi xuất bản phải dùng đơn vị VND.',
+      );
+    }
+    if (!version.entitlements.length) {
+      throw new ConflictException(
+        'Phiên bản trả phí khi xuất bản phải có quyền lợi.',
       );
     }
     for (const entitlement of version.entitlements) {

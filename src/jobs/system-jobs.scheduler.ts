@@ -50,6 +50,11 @@ export class SystemJobsScheduler implements OnModuleInit {
     await this.jobs.enqueueVocabularyReview(getBusinessFiveMinuteKey());
   }
 
+  @Cron('*/5 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  async enqueueExamWritingGrading(): Promise<void> {
+    await this.jobs.enqueueExamWritingGrading(getBusinessFiveMinuteKey());
+  }
+
   @Cron('0 0 * * 0', { timeZone: BUSINESS_TIMEZONE })
   async enqueueR2Cleanup(): Promise<void> {
     await this.jobs.enqueueR2Cleanup(getBusinessWeekKey());

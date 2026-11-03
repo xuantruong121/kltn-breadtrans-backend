@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
@@ -19,6 +20,7 @@ import {
 import { isValidVietnamPhone } from '../../common/utils/vietnam-phone.util';
 import { randomUUID } from 'crypto';
 import { GamificationService } from '../gamification/gamification.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 function slugify(text: string): string {
   return text
@@ -34,10 +36,13 @@ function slugify(text: string): string {
 
 @Injectable()
 export class MarketService {
+  private readonly logger = new Logger(MarketService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventsGateway: EventsGateway,
     private readonly gamificationService: GamificationService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async getProducts(): Promise<MarketProductDto[]> {
@@ -515,6 +520,13 @@ export class MarketService {
     if (status === 'rejected' && !reason?.trim()) {
       throw new BadRequestException('Vui lòng nhập lý do từ chối đơn hàng');
     }
+    // Only a pending order can be reviewed. Rejecting any other order would
+    // change its status without the refund, so stop it here.
+    if (order.status !== 'pending') {
+      throw new ConflictException(
+        'Đơn đổi quà đã được xử lý, vui lòng tải lại trang.',
+      );
+    }
 
     let updatedOrder = order;
 
@@ -619,6 +631,18 @@ export class MarketService {
       totalBanh: order.totalBanh,
       reviewerName,
     });
+    await this.notifyLearner(
+      order.userId,
+      status === 'rejected'
+        ? {
+            title: 'Yêu cầu đổi quà bị từ chối',
+            body: `Đã hoàn ${order.totalBanh} Bánh Mì. Lý do: ${reason?.trim() ?? ''}`,
+          }
+        : {
+            title: 'Yêu cầu đổi quà đã được duyệt',
+            body: 'Quản trị viên đã duyệt yêu cầu đổi quà của bạn.',
+          },
+    );
 
     return {
       ...updatedOrder,
@@ -725,11 +749,33 @@ export class MarketService {
       totalBanh: order.totalBanh,
       reviewerName: adminName,
     });
+    await this.notifyLearner(order.userId, {
+      title: 'Không giao được quà của bạn',
+      body: `Đã hoàn ${order.totalBanh} Bánh Mì. Lý do: ${reason.trim()}`,
+    });
 
     return {
       ...updatedOrder!,
       reason: (updatedOrder?.bankSnapshot as any)?.reason || reason,
     };
+  }
+
+  /** The order is already settled, so a failed notification only gets logged. */
+  private async notifyLearner(
+    userId: number,
+    notice: { title: string; body: string },
+  ) {
+    try {
+      await this.notifications.createNotification({
+        userId,
+        type: 'MARKET_ORDER_RESULT',
+        title: notice.title,
+        body: notice.body.slice(0, 200),
+        url: '/market',
+      });
+    } catch (error) {
+      this.logger.warn(`Could not notify learner ${userId}: ${String(error)}`);
+    }
   }
 
   // --- Admin Catalog Management ---

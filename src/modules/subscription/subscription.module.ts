@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { SubscriptionController } from './subscription.controller';
 import { SubscriptionService } from './subscription.service';
 import { SubscriptionAdminController } from './subscription-admin.controller';
@@ -19,7 +20,7 @@ import { PaymentModule } from '../payment/payment.module';
 import { PayosWebhookController } from './payos-webhook.controller';
 
 @Module({
-  imports: [PrismaModule, PaymentModule],
+  imports: [PrismaModule, PaymentModule, NotificationsModule],
   controllers: [
     SubscriptionController,
     SubscriptionAdminController,

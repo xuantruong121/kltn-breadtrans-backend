@@ -5,6 +5,7 @@ import { R2Service } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import { EmailService } from '../../common/email/email.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { Role } from '@prisma/client';
 
 describe('AdminService user deletion guards', () => {
   let service: AdminService;
@@ -35,7 +36,7 @@ describe('AdminService user deletion guards', () => {
       deleteMany: jest.fn(),
     },
     planPurchase: { count: jest.fn() },
-    user: { delete: jest.fn() },
+    user: { create: jest.fn(), delete: jest.fn() },
   };
   mockPrismaRef = mockPrisma; // wire after construction — no TDZ
 
@@ -57,6 +58,30 @@ describe('AdminService user deletion guards', () => {
     }).compile();
 
     service = module.get<AdminService>(AdminService);
+  });
+
+  describe('createUser', () => {
+    const dto = {
+      email: 'dup@breadtrans.test',
+      password: 'Password1!',
+      role: Role.STUDENT,
+      fullName: 'Trùng Email',
+    } as never;
+
+    it('answers 409 when the email is already registered', async () => {
+      mockPrisma.user.create.mockRejectedValue({ code: 'P2002' });
+
+      await expect(service.createUser(dto)).rejects.toThrow(
+        new ConflictException('Email đã tồn tại.'),
+      );
+    });
+
+    it('does not disguise any other database failure as a conflict', async () => {
+      const failure = new Error('connection lost');
+      mockPrisma.user.create.mockRejectedValue(failure);
+
+      await expect(service.createUser(dto)).rejects.toBe(failure);
+    });
   });
 
   describe('Phase 3C-1 financial-history delete guards', () => {

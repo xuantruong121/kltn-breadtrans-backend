@@ -64,3 +64,11 @@ export function mediaRetryMessage(kind: ToeicMediaKind) {
     ? 'Dịch vụ tạo ảnh AI hiện chưa khả dụng. Bạn có thể thử lại riêng ảnh này hoặc tải ảnh lên thủ công.'
     : 'Dịch vụ tạo audio AI hiện chưa khả dụng. Bạn có thể thử lại riêng audio này hoặc tải tệp lên thủ công.';
 }
+
+/** A later success must not keep reporting the failure it replaced. */
+export function withoutMediaFailure(image: Record<string, unknown> = {}) {
+  const rest = { ...image };
+  delete rest.errorCode;
+  delete rest.failedAt;
+  return rest;
+}

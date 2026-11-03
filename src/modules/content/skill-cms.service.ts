@@ -1,3 +1,7 @@
+import { keywordsOf } from '../writing/writing.service';
+import { levelFromTitle, pictureCardHiddenReason } from './skill-cms-list';
+import { historyEditProblem } from './edit-with-history';
+import { parseCefrRange, titleWithLevel } from '../subscription/practice-level';
 import {
   mergeListeningContent,
   spokenTextChanged,
@@ -44,6 +48,7 @@ import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
 import {
   filterQuizList,
   filterSpeakingSets,
+  firstImageByQuiz,
   quizListFacets,
   speakingSetFacets,
 } from './skill-cms-list';
@@ -73,6 +78,15 @@ function asRecord(value: unknown): Record<string, unknown> {
     ? (value as Record<string, unknown>)
     : {};
 }
+
+const SKILL_TITLE_LABEL: Record<string, string> = {
+  listening: 'Listening',
+  reading: 'Reading',
+  writing: 'Writing',
+};
+
+const EXAM_CONTENT_LOCKED =
+  'Nội dung thuộc đề TOEIC đã có lượt làm; hãy nhân bản đề để sửa.';
 
 @Injectable()
 export class SkillCmsService {
@@ -238,7 +252,11 @@ export class SkillCmsService {
       };
     }
     const quizzes = await this.prisma.quiz.findMany({
-      where: this.contentTypeWhere(domain),
+      // Writing tasks of a TOEIC exam are edited in the exam, not listed here.
+      where: {
+        ...this.contentTypeWhere(domain),
+        ...(domain === 'writing' ? { toeicWritingSetItems: { none: {} } } : {}),
+      },
       orderBy: { id: 'desc' },
       include: {
         _count: { select: { questions: true, submissions: true } },
@@ -258,9 +276,14 @@ export class SkillCmsService {
     const quizTracks = wantsPage(query)
       ? await this.tracksByContent('QUIZ')
       : new Map<number, LearningTrack[]>();
+    const thumbnails = await this.quizThumbnails(
+      domain,
+      quizzes.map((quiz) => quiz.id),
+    );
     const tagged = quizzes.map((quiz) => ({
       ...quiz,
       tracks: quizTracks.get(quiz.id) ?? [],
+      thumbnailUrl: thumbnails.get(quiz.id) ?? null,
     }));
     if (domain !== 'listening' || !quizzes.length)
       return this.listPage(tagged, query);
@@ -283,6 +306,78 @@ export class SkillCmsService {
       })),
       query,
     );
+  }
+
+  /**
+   * One card per picture, the way learners see them. Exam tasks stay out: they
+   * belong to their exam, like every other Writing list here.
+   */
+  async listWritingPictures(user: Admin) {
+    this.admin(user);
+    const quizzes = await this.prisma.quiz.findMany({
+      where: {
+        type: QuizType.WRITING_PICTURE,
+        toeicWritingSetItems: { none: {} },
+      },
+      orderBy: { id: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        isPremiumContent: true,
+        publicationStatus: true,
+        practiceTopicId: true,
+        questions: {
+          select: { id: true, content: true },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        },
+      },
+    });
+    return quizzes.flatMap((quiz) =>
+      quiz.questions
+        .filter(
+          (question) =>
+            (question.content as { taskType?: unknown } | null)?.taskType ===
+            'PICTURE_SENTENCE',
+        )
+        .map((question, index, tasks) => {
+          const content = question.content as Record<string, unknown>;
+          const imageUrl =
+            typeof content.imageUrl === 'string' ? content.imageUrl : null;
+          const keywords = keywordsOf(content);
+          return {
+            quizId: quiz.id,
+            title: quiz.title,
+            questionId: question.id,
+            position: index + 1,
+            total: tasks.length,
+            imageUrl,
+            keywords,
+            isPremiumContent: quiz.isPremiumContent,
+            level: levelFromTitle(quiz.title) || null,
+            hiddenReason: pictureCardHiddenReason({
+              publicationStatus: quiz.publicationStatus,
+              hasPracticeTopic: quiz.practiceTopicId !== null,
+              imageUrl,
+              keywords,
+            }),
+          };
+        }),
+    );
+  }
+
+  /** Only the questions holding an image are read, not every question body. */
+  private async quizThumbnails(domain: string, quizIds: number[]) {
+    if (!['listening', 'writing'].includes(domain) || !quizIds.length)
+      return new Map<number, string>();
+    const rows = await this.prisma.question.findMany({
+      where: {
+        quizId: { in: quizIds },
+        content: { path: ['imageUrl'], string_starts_with: 'http' },
+      },
+      orderBy: { order: 'asc' },
+      select: { quizId: true, content: true },
+    });
+    return firstImageByQuiz(rows);
   }
 
   private listPage<T extends Parameters<typeof filterQuizList>[0][number]>(
@@ -440,7 +535,7 @@ export class SkillCmsService {
     );
     return this.prisma.quiz.create({
       data: {
-        title: dto.title.trim(),
+        title: titleWithLevel(dto.title, dto.level, SKILL_TITLE_LABEL[domain]),
         description: dto.description?.trim(),
         theoryContent: dto.passage,
         bilingualContent: dto.bilingualContent
@@ -469,7 +564,7 @@ export class SkillCmsService {
         where: { id: rawId },
       });
       if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
-      await this.assertNoSpeakingHistory(rawId);
+      await this.assertSpeakingEditable(rawId);
       const category = dto.category
         ? await this.speakingCategory(dto.category.trim(), 'practiceSet')
         : undefined;
@@ -490,7 +585,7 @@ export class SkillCmsService {
       where: { id, ...this.contentTypeWhere(domain) },
     });
     if (!quiz) throw new NotFoundException('Không tìm thấy nội dung kỹ năng.');
-    await this.assertNoHistory(id);
+    const lock = await this.assertContentEditable(id);
     const type =
       domain === 'writing' &&
       (dto.type === 'WRITING_PICTURE' || dto.type === 'WRITING_EMAIL')
@@ -498,10 +593,23 @@ export class SkillCmsService {
           ? QuizType.WRITING_PICTURE
           : QuizType.WRITING_EMAIL
         : undefined;
+    if (lock === 'PRACTICE' && type && type !== quiz.type)
+      throw new ConflictException(
+        'Nội dung đã có lịch sử làm bài; không thể đổi loại bài.',
+      );
+    // An exam task carries no level: the exam sets who can open it.
+    const title =
+      dto.level && !(await this.isExamTask(id))
+        ? titleWithLevel(
+            dto.title ?? quiz.title,
+            dto.level,
+            SKILL_TITLE_LABEL[domain],
+          )
+        : dto.title?.trim();
     return this.prisma.quiz.update({
       where: { id },
       data: {
-        title: dto.title?.trim(),
+        title,
         description: dto.description?.trim(),
         theoryContent: dto.passage,
         bilingualContent: dto.bilingualContent
@@ -623,7 +731,6 @@ export class SkillCmsService {
     });
     if (!question)
       throw new NotFoundException('Câu hỏi không thuộc nội dung Nghe này.');
-    await this.assertNoHistory(quizId);
     // Same type: merge, so fields the form does not show survive the edit.
     const content =
       dto.type === question.type
@@ -632,6 +739,10 @@ export class SkillCmsService {
             dto.content as unknown as Record<string, unknown>,
           )
         : dto.content;
+    await this.assertQuestionEditable(quizId, question, {
+      type: dto.type,
+      content,
+    });
     const updated = await this.prisma.question.update({
       where: { id: questionId },
       data: {
@@ -671,12 +782,16 @@ export class SkillCmsService {
     if (!question)
       throw new NotFoundException('Câu hỏi không thuộc nội dung Viết này.');
     this.assertWritingTaskType(question.quiz?.type, dto.taskType);
-    await this.assertNoHistory(quizId);
+    const content = this.writingContent(dto);
+    await this.assertQuestionEditable(quizId, question, {
+      type: dto.type,
+      content,
+    });
     return this.prisma.question.update({
       where: { id: questionId },
       data: {
         type: dto.type,
-        content: this.writingContent(dto),
+        content,
         order: dto.order,
       },
     });
@@ -792,8 +907,12 @@ export class SkillCmsService {
         'Dùng API reorder để thay đổi thứ tự câu trong bộ luyện',
       );
     }
-    await this.assertNoSpeakingHistory(rawSetId);
+    const hasHistory = await this.assertSpeakingEditable(rawSetId);
     const taskType = dto.taskType ?? exercise.taskType;
+    if (hasHistory && taskType !== exercise.taskType)
+      throw new ConflictException(
+        'Nội dung Speaking đã có lịch sử làm bài; không thể đổi loại câu.',
+      );
     const stimulus = dto.stimulusId
       ? await this.prisma.speakingStimulus.findUnique({
           where: { id: dto.stimulusId },
@@ -1091,7 +1210,7 @@ export class SkillCmsService {
     });
     if (!question)
       throw new NotFoundException('Câu hỏi không thuộc nội dung kỹ năng này.');
-    await this.assertNoHistory(quizId);
+    await this.assertQuestionEditable(quizId, question, dto);
     return this.prisma.question.update({
       where: { id: questionId },
       data: { type: dto.type, content: asJson(dto.content), order: dto.order },
@@ -1142,6 +1261,8 @@ export class SkillCmsService {
     const errors: string[] = [];
     if (!quiz.title?.trim()) errors.push('Thiếu tiêu đề');
     if (!quiz.questions.length) errors.push('Cần ít nhất một câu hỏi');
+    if (!parseCefrRange(quiz.title) && !(await this.isExamTask(quiz.id)))
+      errors.push('Chưa có trình độ: chọn trình độ rồi lưu lại');
     if (
       domain === 'listening' &&
       quiz.questions.length &&
@@ -1378,7 +1499,7 @@ export class SkillCmsService {
 
   async generateListeningAudioPreview(quizId: number, user: Admin) {
     this.admin(user);
-    await this.assertNoHistory(quizId);
+    await this.assertContentEditable(quizId);
     return this.requireListeningAuthoring().audio.generatePreview(
       quizId,
       user.id,
@@ -1436,7 +1557,7 @@ export class SkillCmsService {
   ) {
     this.admin(user);
     await this.assertListeningQuestion(quizId, questionId);
-    await this.assertNoHistory(quizId);
+    await this.assertContentEditable(quizId);
     return this.requireListeningAuthoring().quiz.createAudioAsset(
       questionId,
       file,
@@ -1461,8 +1582,37 @@ export class SkillCmsService {
     const count = await this.prisma.submission.count({ where: { quizId } });
     if (count > 0)
       throw new ConflictException(
-        'Nội dung đã có lịch sử làm bài; tạo phiên bản mới thay vì sửa trực tiếp',
+        'Nội dung đã có lịch sử làm bài; không thể thêm hoặc xoá câu.',
       );
+  }
+
+  /**
+   * Practice with attempts can be edited in place. A TOEIC exam task cannot:
+   * its attempts must keep matching the exam, so the exam is duplicated instead.
+   */
+  private async assertContentEditable(quizId: number) {
+    const count = await this.prisma.submission.count({ where: { quizId } });
+    if (count === 0) return 'NONE' as const;
+    if (await this.isExamTask(quizId))
+      throw new ConflictException(EXAM_CONTENT_LOCKED);
+    return 'PRACTICE' as const;
+  }
+
+  private async isExamTask(quizId: number) {
+    const items = await this.prisma.toeicWritingSetItem.count({
+      where: { writingQuizId: quizId },
+    });
+    return items > 0;
+  }
+
+  private async assertQuestionEditable(
+    quizId: number,
+    before: { type?: string | null; content?: unknown },
+    after: { type?: string | null; content?: unknown },
+  ) {
+    const lock = await this.assertContentEditable(quizId);
+    const problem = lock === 'PRACTICE' && historyEditProblem(before, after);
+    if (problem) throw new ConflictException(problem);
   }
 
   private async validateSpeaking(rawId: string) {
@@ -1506,7 +1656,20 @@ export class SkillCmsService {
     });
     if (count > 0)
       throw new ConflictException(
-        'Nội dung Speaking đã có lịch sử làm bài; tạo phiên bản mới thay vì sửa trực tiếp',
+        'Nội dung Speaking đã có lịch sử làm bài; không thể xoá hoặc sắp xếp lại câu.',
       );
+  }
+
+  /** True when the set has attempts. Exam sets with attempts stay locked. */
+  private async assertSpeakingEditable(setId: string) {
+    const count = await this.prisma.speakingSubmission.count({
+      where: { exercise: { practiceSetId: setId } },
+    });
+    if (count === 0) return false;
+    const examParts = await this.prisma.toeicAssessmentComponent.count({
+      where: { speakingPracticeSetId: setId },
+    });
+    if (examParts > 0) throw new ConflictException(EXAM_CONTENT_LOCKED);
+    return true;
   }
 }

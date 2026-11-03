@@ -5,6 +5,7 @@ import {
   filterSpeakingSets,
   quizListFacets,
   speakingSetFacets,
+  firstImageByQuiz,
 } from './skill-cms-list';
 
 const quiz = (id: number, extra: Record<string, unknown> = {}) => ({
@@ -171,5 +172,29 @@ describe('speaking set list rules', () => {
       published: 1,
       levels: ['A1', 'B2'],
     });
+  });
+});
+
+describe('firstImageByQuiz', () => {
+  it('keeps the first image of each quiz and skips rows without one', () => {
+    const images = firstImageByQuiz([
+      { quizId: 1, content: { imageUrl: '' } },
+      { quizId: 1, content: { imageUrl: 'https://a' } },
+      { quizId: 1, content: { imageUrl: 'https://b' } },
+      { quizId: 2, content: { prompt: 'no image' } },
+      { quizId: null, content: { imageUrl: 'https://c' } },
+    ]);
+    expect([...images]).toEqual([[1, 'https://a']]);
+  });
+});
+
+describe('search by Vietnamese title', () => {
+  it('keeps rows the frontend matched by id', () => {
+    const rows = [
+      quiz(1, { title: 'Writing A2' }),
+      quiz(2, { title: 'Other' }),
+    ];
+    const found = filterQuizList(rows as any, { q: 'viết câu', titleIds: '1' });
+    expect(found.map((row) => row.id)).toEqual([1]);
   });
 });

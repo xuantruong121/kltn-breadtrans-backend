@@ -54,12 +54,6 @@ export class AdminController {
     return this.adminService.getDashboardStats(range);
   }
 
-  @Get('listening-analytics')
-  @ApiOperation({ summary: 'Thống kê thực tế các bài luyện nghe' })
-  getListeningAnalytics() {
-    return this.adminService.getListeningAnalytics();
-  }
-
   @Get('users')
   @ApiOperation({ summary: 'Lay danh sach tat ca nguoi dung' })
   getAllUsers(@Query('role') role?: string) {
@@ -78,6 +72,7 @@ export class AdminController {
   @ApiOperation({
     summary: 'Admin tạo tài khoản mới (Học viên hoặc Quản trị viên)',
   })
+  @ApiResponse({ status: 409, description: 'Email đã tồn tại.' })
   createUser(@Body() dto: CreateUserDto) {
     return this.adminService.createUser(dto);
   }
@@ -371,34 +366,6 @@ export class AdminController {
   @ApiOperation({ summary: 'Admin: Xoa bai tap phat am' })
   deleteSpeakingExercise(@Param('id', ParseIntPipe) id: number) {
     return this.adminService.deleteSpeakingExercise(id);
-  }
-
-  // ============== PRACTICE TOPICS MANAGEMENT ==============
-  @Get('practice-topics')
-  @ApiOperation({ summary: 'Admin: Lay danh sach chu de luyen tap' })
-  getPracticeTopics() {
-    return this.adminService.getPracticeTopics();
-  }
-
-  @Post('practice-topics')
-  @ApiOperation({ summary: 'Admin: Tao chu de luyen tap moi' })
-  createPracticeTopic(
-    @Body()
-    dto: {
-      name: string;
-      vietnameseName?: string;
-      category?: TopicCategory;
-      iconUrl?: string;
-      order?: number;
-    },
-  ) {
-    return this.adminService.createPracticeTopic(dto);
-  }
-
-  @Delete('practice-topics/:id')
-  @ApiOperation({ summary: 'Admin: Xoa chu de luyen tap' })
-  deletePracticeTopic(@Param('id', ParseIntPipe) id: number) {
-    return this.adminService.deletePracticeTopic(id);
   }
 
   // ============== CLOUD RESOURCES & COST MANAGEMENT (FINOPS) ==============

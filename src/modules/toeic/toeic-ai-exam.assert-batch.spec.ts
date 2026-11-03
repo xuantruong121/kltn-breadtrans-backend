@@ -20,7 +20,7 @@ describe('ToeicAiExamService.assertBatch — Part 3/4 requires spoken question t
     text,
     options: ['a', 'b', 'c', 'd'],
     correctIndex: 0,
-    explanation: 'This is a sufficiently long explanation for the answer.',
+    explanation: 'Đây là phần giải thích đủ dài cho đáp án của câu.',
   });
 
   it('rejects a Part 3 question with no spoken prompt text', () => {

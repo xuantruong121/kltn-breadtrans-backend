@@ -1,3 +1,4 @@
+import { learnerPassage } from './toeic-ai-batch.logic';
 import {
   BadRequestException,
   ConflictException,
@@ -39,6 +40,7 @@ import {
   signListeningMasterGrant,
   masterMatchesGroups,
 } from './toeic-listening-master';
+import { ToeicListeningMasterService } from './toeic-listening-master.service';
 
 const MIN_DURATION = 60;
 const MAX_DURATION = 21600;
@@ -63,7 +65,16 @@ export class ToeicService {
     private readonly speakingService: SpeakingService,
     @Optional() private readonly eventEmitter?: EventEmitter2,
     @Optional() private readonly uploadService?: UploadService,
+    @Optional() private readonly listeningMasters?: ToeicListeningMasterService,
   ) {}
+
+  /** A recording built on publish, or a registered one. */
+  private async masterOf(examId: number) {
+    return (
+      (await this.listeningMasters?.current(examId)) ??
+      listeningMasterFor(examId)
+    );
+  }
 
   private lockKey(userId: number, examId: number, mode: AttemptMode) {
     return `toeic_attempt:${userId}:${examId}:${mode}`;
@@ -659,7 +670,7 @@ export class ToeicService {
       return { available: false as const, reason: 'STRICT_MODE' };
     if (attempt.status !== AttemptStatus.IN_PROGRESS && !submitted)
       return { available: false as const, reason: 'NOT_IN_PROGRESS' };
-    const master = listeningMasterFor(attempt.examId);
+    const master = await this.masterOf(attempt.examId);
     if (!master) return { available: false as const, reason: 'NO_MASTER' };
     const groupIds = await this.getListeningManifestGroupIds(attempt.examId);
     if (!masterMatchesGroups(master, groupIds))
@@ -692,7 +703,7 @@ export class ToeicService {
   > {
     const file = this.localMasterFile(examId);
     if (file) return { file };
-    const master = listeningMasterFor(examId);
+    const master = await this.masterOf(examId);
     if (!master) return null;
     const privateKey = privateListeningMasterKey(master);
     if (await this.isPrivatelyStored(privateKey)) return { privateKey };
@@ -978,7 +989,7 @@ export class ToeicService {
           )
           .map((group) => ({
             ...group,
-            passageText: group.part <= 4 ? null : group.passageText,
+            passageText: learnerPassage(group.part, group.passageText),
             questions: group.questions.map((question) => {
               // Part 1 and Part 2 prompts/options are audio-only in every mode:
               // the printed options are the spoken answers, so sending them
@@ -1587,7 +1598,7 @@ export class ToeicService {
           questionNumber: question.questionNumber,
           part: group.part,
           groupId: group.id,
-          passageText: group.part <= 4 ? null : group.passageText,
+          passageText: learnerPassage(group.part, group.passageText),
           imageUrl: group.imageUrl,
           transcript: transcriptOf(group),
           questionText: question.text,

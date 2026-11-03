@@ -143,6 +143,56 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       idempotencyKey: 'idemp-intent-001',
     };
 
+    describe('inside an exam section', () => {
+      const section = { attemptId: 1, componentId: 20 };
+
+      beforeEach(() => {
+        mockPrisma.toeicAssessmentAttemptComponent = {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ startedAt: new Date('2026-11-02T08:00:00Z') }),
+        };
+      });
+
+      it('allows a retake', async () => {
+        mockPrisma.speakingSubmission.count.mockResolvedValue(1);
+
+        await expect(
+          service.createUploadIntent(
+            1,
+            10,
+            validDto,
+            undefined,
+            undefined,
+            section,
+          ),
+        ).resolves.toBeDefined();
+      });
+
+      it('refuses a third recording of the same question', async () => {
+        mockPrisma.speakingSubmission.count.mockResolvedValue(2);
+
+        await expect(
+          service.createUploadIntent(
+            1,
+            10,
+            validDto,
+            undefined,
+            undefined,
+            section,
+          ),
+        ).rejects.toThrow('hết lượt thu lại');
+        expect(mockPrisma.speakingSubmission.count).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              exerciseId: 1,
+              status: { not: 'FAILED' },
+            }),
+          }),
+        );
+      });
+    });
+
     it('creates an upload intent and returns presigned PUT URL with server-generated key', async () => {
       const result = await service.createUploadIntent(1, 10, validDto);
 

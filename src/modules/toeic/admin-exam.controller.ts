@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Patch,
   Delete,
   Body,
@@ -24,13 +25,18 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { AdminExamService } from './admin-exam.service';
+import { ExamWritingService } from './exam-writing.service';
 import { GenericExamService } from './generic-exam.service';
 import { ToeicAiExamService } from './toeic-ai-exam.service';
 import {
   CreateToeicAiExamDto,
   RegenerateToeicAiUnitDto,
 } from './toeic-ai-exam.dto';
-import { CreateGenericExamDto, UpdateGenericExamDto } from './generic-exam.dto';
+import {
+  ExamWritingSlotDto,
+  CreateGenericExamDto,
+  UpdateGenericExamDto,
+} from './generic-exam.dto';
 import {
   SpeakingExerciseDto,
   SpeakingExerciseReorderDto,
@@ -53,6 +59,7 @@ export class AdminExamController {
   constructor(
     private readonly adminExamService: AdminExamService,
     private readonly genericExamService: GenericExamService,
+    private readonly examWritingService: ExamWritingService,
     private readonly toeicAiExamService: ToeicAiExamService,
   ) {}
 
@@ -226,6 +233,30 @@ export class AdminExamController {
     return this.toeicAiExamService.regeneratePartCandidate(id, part, dto.topic);
   }
 
+  @Post(':id/listening-master')
+  @ApiOperation({
+    summary:
+      'Admin: dựng audio liền mạch của phần Listening (xuất bản cũng tự dựng)',
+  })
+  @ApiResponse({ status: 201, description: 'Chi tiết đề sau khi dựng' })
+  @ApiResponse({ status: 409, description: 'Đề không còn là bản nháp.' })
+  buildListeningMaster(@Param('id', ParseIntPipe) id: number) {
+    return this.genericExamService.buildListeningMaster(id);
+  }
+
+  @Post(':id/ai/images/fill-missing')
+  @ApiOperation({
+    summary:
+      'Admin: tìm ảnh cho các ô còn thiếu của Draft (Part 1, Speaking, Writing)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Danh sách ô đã có ảnh và còn thiếu',
+  })
+  fillMissingExamImages(@Param('id', ParseIntPipe) id: number) {
+    return this.toeicAiExamService.fillMissingImages(id);
+  }
+
   @Post(':id/ai/groups/:groupId/media/:kind/regenerate')
   regenerateAiMedia(
     @Param('id', ParseIntPipe) id: number,
@@ -343,12 +374,42 @@ export class AdminExamController {
     );
   }
 
+  @Get(':id/writing')
+  @ApiOperation({ summary: 'Admin: 8 câu Writing của đề' })
+  getWriting(@Param('id', ParseIntPipe) id: number) {
+    return this.examWritingService.get(id);
+  }
+
+  @Put(':id/writing/slots/:order')
+  @ApiOperation({ summary: 'Admin: tạo hoặc sửa một câu Writing của đề' })
+  @ApiResponse({ status: 409, description: 'Đề không còn là bản nháp.' })
+  saveWritingSlot(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('order', ParseIntPipe) order: number,
+    @Body() dto: ExamWritingSlotDto,
+  ) {
+    return this.examWritingService.saveSlot(id, order, dto);
+  }
+
+  @Post(':id/writing/publish')
+  @ApiOperation({ summary: 'Admin: hoàn tất phần Writing của đề' })
+  @ApiResponse({ status: 400, description: 'Chưa đủ 8 câu đúng dạng.' })
+  publishWriting(@Param('id', ParseIntPipe) id: number) {
+    return this.examWritingService.publish(id);
+  }
+
   @Post(':id/speaking/publish')
   publishSpeakingSource(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: any,
   ) {
     return this.genericExamService.publishSpeakingSource(id, req.user);
+  }
+
+  @Get('authoring-options')
+  @ApiOperation({ summary: 'Các loại đề tạo được, cấu trúc và tên gợi ý' })
+  authoringOptions() {
+    return this.genericExamService.authoringOptions();
   }
 
   @Post()
@@ -391,6 +452,23 @@ export class AdminExamController {
   @ApiOperation({ summary: 'Admin: Gỡ xuất bản đề thi (chuyển về DRAFT)' })
   unpublishExam(@Param('id', ParseIntPipe) id: number) {
     return this.genericExamService.unpublish(id);
+  }
+
+  @Post(':id/retire')
+  @ApiOperation({
+    summary:
+      'Admin: Ngừng phát hành đề; lượt đang làm và lượt đã làm không đổi',
+  })
+  @ApiResponse({ status: 409, description: 'Đề không ở trạng thái xuất bản.' })
+  retireExam(@Param('id', ParseIntPipe) id: number) {
+    return this.genericExamService.retire(id);
+  }
+
+  @Post(':id/restore')
+  @ApiOperation({ summary: 'Admin: Phát hành lại đề đã ngừng phát hành' })
+  @ApiResponse({ status: 409, description: 'Đề chưa ngừng phát hành.' })
+  restoreExam(@Param('id', ParseIntPipe) id: number) {
+    return this.genericExamService.restore(id);
   }
 
   @Delete(':id')

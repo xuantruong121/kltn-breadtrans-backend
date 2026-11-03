@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Logger,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,6 +12,12 @@ import {
   SubscriptionStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
+  extendedNotice,
+  grantedNotice,
+  revokedNotice,
+} from './admin-subscription-notice';
 import {
   AdminActivePlanDto,
   AdminExtendSubscriptionDto,
@@ -40,7 +47,12 @@ type SubscriptionWithRelations = Prisma.SubscriptionGetPayload<{
 
 @Injectable()
 export class SubscriptionAdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SubscriptionAdminService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private readonly subscriptionInclude = {
     user: {
@@ -158,6 +170,7 @@ export class SubscriptionAdminService {
       }
     }
 
+    let granted = false;
     const created = await this.prisma.$transaction(async (tx) => {
       await this.lockUser(tx, dto.studentId);
 
@@ -250,12 +263,19 @@ export class SubscriptionAdminService {
         },
       });
 
+      granted = true;
       return tx.subscription.findUniqueOrThrow({
         where: { id: subscription.id },
         include: this.subscriptionInclude,
       });
     });
 
+    if (granted) {
+      await this.notifyLearner(
+        created.userId,
+        grantedNotice(this.planName(created), created.endsAt),
+      );
+    }
     return this.toItemDto(created);
   }
 
@@ -290,6 +310,7 @@ export class SubscriptionAdminService {
       }
     }
 
+    let extended = false;
     const updated = await this.prisma.$transaction(async (tx) => {
       const target = await tx.subscription.findUnique({
         where: { id: subscriptionId },
@@ -358,9 +379,16 @@ export class SubscriptionAdminService {
         },
       });
 
+      extended = true;
       return saved;
     });
 
+    if (extended) {
+      await this.notifyLearner(
+        updated.userId,
+        extendedNotice(this.planName(updated), updated.endsAt),
+      );
+    }
     return this.toItemDto(updated);
   }
 
@@ -392,6 +420,7 @@ export class SubscriptionAdminService {
       }
     }
 
+    let revoked = false;
     const updated = await this.prisma.$transaction(async (tx) => {
       const target = await tx.subscription.findUnique({
         where: { id: subscriptionId },
@@ -454,10 +483,35 @@ export class SubscriptionAdminService {
         },
       });
 
+      revoked = true;
       return saved;
     });
 
+    if (revoked) {
+      await this.notifyLearner(
+        updated.userId,
+        revokedNotice(this.planName(updated)),
+      );
+    }
     return this.toItemDto(updated);
+  }
+
+  private planName(sub: {
+    planVersion: { displayName: string | null; plan: { displayName: string } };
+  }) {
+    return sub.planVersion.displayName ?? sub.planVersion.plan.displayName;
+  }
+
+  /** The plan change is committed, so a failed notification only gets logged. */
+  private async notifyLearner(
+    userId: number,
+    notice: { type: string; title: string; body: string; url: string },
+  ) {
+    try {
+      await this.notifications.createNotification({ userId, ...notice });
+    } catch (error) {
+      this.logger.warn(`Could not notify learner ${userId}: ${String(error)}`);
+    }
   }
 
   async getSubscriptionHistory(

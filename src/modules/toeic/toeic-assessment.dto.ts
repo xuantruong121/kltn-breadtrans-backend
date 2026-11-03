@@ -1,10 +1,13 @@
 import { PartialType } from '@nestjs/mapped-types';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -69,14 +72,22 @@ export class StartToeicAssessmentAttemptDto {
   idempotencyKey?: string;
 }
 
-export class CompleteToeicAssessmentComponentDto {
-  @IsOptional()
-  @IsInt({ each: true })
-  @Min(1, { each: true })
-  speakingSubmissionIds?: number[];
+export class ToeicWritingAnswerDto {
+  @IsInt()
+  @Min(1)
+  quizId!: number;
 
+  @IsString()
+  @MaxLength(10000)
+  text!: string;
+}
+
+export class CompleteToeicAssessmentComponentDto {
+  /** What the learner wrote; a task with no text simply stays unanswered. */
   @IsOptional()
-  @IsInt({ each: true })
-  @Min(1, { each: true })
-  writingSubmissionIds?: number[];
+  @IsArray()
+  @ArrayMaxSize(8)
+  @ValidateNested({ each: true })
+  @Type(() => ToeicWritingAnswerDto)
+  writingAnswers?: ToeicWritingAnswerDto[];
 }

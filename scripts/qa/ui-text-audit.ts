@@ -56,7 +56,6 @@ const LEARNER = [
 ];
 const ADMIN = [
   '/admin',
-  '/admin/ai-tools',
   '/admin/assignments',
   '/admin/costs',
   '/admin/courses',
@@ -71,12 +70,9 @@ const ADMIN = [
   '/admin/payments',
   '/admin/plan-purchases',
   '/admin/practice',
-  '/admin/quizzes',
   '/admin/reading',
   '/admin/speaking',
   '/admin/suggestions',
-  '/admin/toeic/assessments',
-  '/admin/toeic/writing-sets',
   '/admin/users',
   '/admin/vocab',
   '/admin/writing',

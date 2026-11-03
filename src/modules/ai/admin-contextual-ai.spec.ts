@@ -51,6 +51,8 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
     };
     controller = new AdminContextualAiController(
       mockAiService as any,
+      {} as any,
+      {} as any,
       mockSpeakingCategoryService as any,
     );
   });

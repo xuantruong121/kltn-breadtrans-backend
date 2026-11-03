@@ -44,7 +44,7 @@ describe('SkillCmsService', () => {
       quiz: {
         findFirst: jest.fn().mockResolvedValue({
           id: 12,
-          title: 'Reading',
+          title: 'Reading A2 — Notices',
           theoryContent: 'Passage',
           questions: [
             {
@@ -325,17 +325,104 @@ describe('SkillCmsService', () => {
     );
   });
 
-  it('blocks Speaking edits after learner history exists', async () => {
+  it('keeps Speaking in a TOEIC exam locked after learner history exists', async () => {
     const prisma = {
       speakingPracticeSet: {
         findUnique: jest.fn().mockResolvedValue({ id: 'speaking-used' }),
       },
       speakingSubmission: { count: jest.fn().mockResolvedValue(1) },
+      toeicAssessmentComponent: { count: jest.fn().mockResolvedValue(1) },
     };
     const service = new SkillCmsService(prisma as any);
     await expect(
       service.update('speaking', 'speaking-used', { title: 'Changed' }, admin),
-    ).rejects.toThrow('lịch sử làm bài');
+    ).rejects.toThrow('nhân bản đề');
+  });
+
+  describe('editing practice that has attempts', () => {
+    const question = {
+      id: 8,
+      quizId: 4,
+      type: 'MULTIPLE_CHOICE',
+      content: { options: ['A', 'B'], correctAnswer: 'A' },
+    };
+    const build = (examItems = 0) => {
+      const prisma = {
+        question: {
+          findFirst: jest.fn().mockResolvedValue(question),
+          update: jest.fn().mockResolvedValue(question),
+          delete: jest.fn(),
+          create: jest.fn(),
+          count: jest.fn().mockResolvedValue(1),
+        },
+        quiz: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 4,
+            type: QuizType.BILINGUAL_READING,
+          }),
+          update: jest.fn().mockResolvedValue({ id: 4 }),
+        },
+        submission: { count: jest.fn().mockResolvedValue(1) },
+        toeicWritingSetItem: { count: jest.fn().mockResolvedValue(examItems) },
+      };
+      return { prisma, service: new SkillCmsService(prisma as any) };
+    };
+    const dto = (content: Record<string, unknown>) =>
+      ({ type: 'MULTIPLE_CHOICE', content }) as any;
+
+    it('saves new wording and a new answer', async () => {
+      const { prisma, service } = build();
+      await service.updateQuestion(
+        'reading',
+        '4',
+        '8',
+        dto({ options: ['A', 'B'], correctAnswer: 'B' }),
+        admin,
+      );
+      expect(prisma.question.update).toHaveBeenCalled();
+    });
+
+    it('saves the title of the practice', async () => {
+      const { prisma, service } = build();
+      await service.update('reading', '4', { title: 'Đã sửa' }, admin);
+      expect(prisma.quiz.update).toHaveBeenCalled();
+    });
+
+    it('refuses to add an option', async () => {
+      const { prisma, service } = build();
+      await expect(
+        service.updateQuestion(
+          'reading',
+          '4',
+          '8',
+          dto({ options: ['A', 'B', 'C'], correctAnswer: 'A' }),
+          admin,
+        ),
+      ).rejects.toThrow('lựa chọn');
+      expect(prisma.question.update).not.toHaveBeenCalled();
+    });
+
+    it('still refuses to delete a question', async () => {
+      const { prisma, service } = build();
+      await expect(
+        service.deleteQuestion('reading', '4', '8', admin),
+      ).rejects.toThrow('lịch sử làm bài');
+      expect(prisma.question.delete).not.toHaveBeenCalled();
+    });
+
+    it('keeps a task that belongs to a TOEIC exam locked', async () => {
+      const { prisma, service } = build(1);
+      await expect(
+        service.updateQuestion(
+          'reading',
+          '4',
+          '8',
+          dto({ options: ['A', 'B'], correctAnswer: 'B' }),
+          admin,
+        ),
+      ).rejects.toThrow('nhân bản đề');
+      expect(prisma.question.update).not.toHaveBeenCalled();
+    });
   });
 
   it('rejects duplicate or foreign ids in Speaking reorder requests', async () => {
@@ -570,23 +657,22 @@ describe('SkillCmsService', () => {
     expect(quiz.createAudioAsset).toHaveBeenCalledWith(8, file);
   });
 
-  it('blocks Listening media mutation after learner history exists', async () => {
+  it('lets Listening audio follow an edited sentence after learner history exists', async () => {
     const prisma = {
       question: { findFirst: jest.fn().mockResolvedValue({ id: 8 }) },
       submission: { count: jest.fn().mockResolvedValue(1) },
+      toeicWritingSetItem: { count: jest.fn().mockResolvedValue(0) },
     };
-    const quiz = { createAudioAsset: jest.fn() };
+    const quiz = { createAudioAsset: jest.fn().mockResolvedValue({}) };
     const service = new SkillCmsService(prisma as any, {} as any, quiz as any);
 
-    await expect(
-      service.uploadListeningQuestionAudio(
-        4,
-        8,
-        { buffer: Buffer.from('audio'), mimetype: 'audio/mpeg' } as any,
-        admin,
-      ),
-    ).rejects.toThrow('lịch sử làm bài');
-    expect(quiz.createAudioAsset).not.toHaveBeenCalled();
+    await service.uploadListeningQuestionAudio(
+      4,
+      8,
+      { buffer: Buffer.from('audio'), mimetype: 'audio/mpeg' } as any,
+      admin,
+    );
+    expect(quiz.createAudioAsset).toHaveBeenCalled();
   });
 });
 

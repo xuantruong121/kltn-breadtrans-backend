@@ -18,10 +18,7 @@ const LEARNER = [
   '/speaking',
 ];
 const ADMIN = [
-  '/admin/toeic/assessments',
-  '/admin/toeic/writing-sets',
   '/admin/grammar',
-  '/admin/quizzes',
 ];
 
 async function login(page: Page, email: string, password: string) {

@@ -13,10 +13,7 @@ import {
 } from './image-search-error';
 
 export type ImageSearchCandidate = {
-  /** PEXELS is a known candidate type (its adapter stays dormant/unwired in
-   * ImageSearchProviderChain — see that file's doc comment) and never
-   * reaches this chain in practice today. */
-  provider: 'PEXELS' | 'PIXABAY' | 'OPENVERSE' | 'WIKIMEDIA_COMMONS';
+  provider: 'PIXABAY' | 'OPENVERSE' | 'WIKIMEDIA_COMMONS';
   providerAssetId: string;
   previewUrl: string;
   downloadUrl: string;

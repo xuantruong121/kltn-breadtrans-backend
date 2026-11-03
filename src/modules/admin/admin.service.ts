@@ -13,7 +13,6 @@ import {
   SubscriptionStatus,
   SuggestionStatus,
   IssueReportStatus,
-  TopicCategory,
   QuizPublicationStatus,
   QuizType,
   Prisma,
@@ -301,75 +300,6 @@ export class AdminService {
       monthlyTrends,
       contentBreakdown,
       gamification,
-    };
-  }
-
-  async getListeningAnalytics() {
-    const quizzes = await this.prisma.quiz.findMany({
-      where: { type: 'LISTENING_PRACTICE' },
-      select: {
-        id: true,
-        title: true,
-        publicationStatus: true,
-        questions: { select: { id: true, type: true, content: true } },
-      },
-      orderBy: { id: 'desc' },
-    });
-    const quizIds = quizzes.map((quiz) => quiz.id);
-    const [attempts, submissions] = await Promise.all([
-      this.prisma.listeningPracticeAttempt.findMany({
-        where: { quizId: { in: quizIds } },
-        select: { quizId: true, status: true },
-      }),
-      this.prisma.submission.findMany({
-        where: { quizId: { in: quizIds } },
-        select: { quizId: true, score: true },
-      }),
-    ]);
-    const byQuiz = (id: number) => ({
-      attempts: attempts.filter((item) => item.quizId === id),
-      submissions: submissions.filter((item) => item.quizId === id),
-    });
-    const items = quizzes.map((quiz) => {
-      const stats = byQuiz(quiz.id);
-      const scored = stats.submissions
-        .map((item) => item.score)
-        .filter((score): score is number => typeof score === 'number');
-      const dictationCount = quiz.questions.filter((question) => {
-        const content = question.content as Record<string, unknown>;
-        return (
-          question.type === 'DICTATION' || content.practiceKind === 'DICTATION'
-        );
-      }).length;
-      return {
-        quizId: quiz.id,
-        title: quiz.title,
-        publicationStatus: quiz.publicationStatus,
-        questionCount: quiz.questions.length,
-        dictationCount,
-        attemptCount: stats.attempts.length,
-        completedAttemptCount: stats.attempts.filter(
-          (item) => item.status === 'COMPLETED',
-        ).length,
-        submissionCount: stats.submissions.length,
-        averageScore: scored.length
-          ? Number(
-              (
-                scored.reduce((sum, score) => sum + score, 0) / scored.length
-              ).toFixed(2),
-            )
-          : null,
-      };
-    });
-    return {
-      generatedAt: new Date().toISOString(),
-      totals: {
-        quizzes: items.length,
-        questions: items.reduce((sum, item) => sum + item.questionCount, 0),
-        attempts: items.reduce((sum, item) => sum + item.attemptCount, 0),
-        submissions: items.reduce((sum, item) => sum + item.submissionCount, 0),
-      },
-      items,
     };
   }
 
@@ -817,21 +747,28 @@ export class AdminService {
       throw new BadRequestException('Vai trò người dùng không hợp lệ.');
     }
     const hashed = await bcrypt.hash(dto.password, 10);
-    return this.prisma.user.create({
-      data: {
-        email: dto.email,
-        password: hashed,
-        role: dto.role,
-        profile: { create: { fullName: dto.fullName, phone: dto.phone } },
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        profile: { select: { fullName: true, phone: true } },
-      },
-    });
+    try {
+      return await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          password: hashed,
+          role: dto.role,
+          profile: { create: { fullName: dto.fullName, phone: dto.phone } },
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          profile: { select: { fullName: true, phone: true } },
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new ConflictException('Email đã tồn tại.');
+      }
+      throw error;
+    }
   }
 
   async updateUser(userId: number, dto: UpdateUserDto) {
@@ -1433,42 +1370,6 @@ export class AdminService {
     throw new ConflictException(
       'Nội dung Nói được quản lý tại Skill CMS: /admin/skill-content/speaking.',
     );
-  }
-
-  // ============== PRACTICE TOPICS MANAGEMENT ==============
-  async getPracticeTopics() {
-    return this.prisma.practiceTopic.findMany({
-      orderBy: { order: 'asc' },
-      include: {
-        _count: { select: { quizzes: true } },
-      },
-    });
-  }
-
-  async createPracticeTopic(dto: {
-    name: string;
-    vietnameseName?: string;
-    category?: TopicCategory;
-    iconUrl?: string;
-    order?: number;
-  }) {
-    const category = dto.category ?? TopicCategory.BILINGUAL_LEVEL;
-    if (!Object.values(TopicCategory).includes(category)) {
-      throw new BadRequestException('Danh mục chủ đề luyện tập không hợp lệ');
-    }
-    return this.prisma.practiceTopic.create({
-      data: {
-        name: dto.name,
-        vietnameseName: dto.vietnameseName,
-        category,
-        iconUrl: dto.iconUrl || 'target',
-        order: dto.order || 1,
-      },
-    });
-  }
-
-  async deletePracticeTopic(id: number) {
-    return this.prisma.practiceTopic.delete({ where: { id } });
   }
 
   // ============== CLOUD RESOURCES & COST MANAGEMENT (FINOPS) ==============

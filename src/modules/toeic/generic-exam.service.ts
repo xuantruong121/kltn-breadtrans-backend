@@ -1,3 +1,4 @@
+import { learnerPassage } from './toeic-ai-batch.logic';
 import {
   BadRequestException,
   ConflictException,
@@ -5,7 +6,9 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { ToeicListeningMasterService } from './toeic-listening-master.service';
 import {
+  AiGenerationJobStatus,
   Prisma,
   QuizPublicationStatus,
   SpeakingPracticeScope,
@@ -23,6 +26,7 @@ import {
 import {
   EXAM_TEMPLATES,
   ExamTemplate,
+  PRACTICE_DISCLAIMER,
   resolveExamTemplate,
   resolveTemplateByKey,
 } from './exam-template.registry';
@@ -42,12 +46,116 @@ import { examListFacets, filterExamList } from './exam-admin-list';
 
 type ProductRecord = any;
 
+/**
+ * An exam's own draft L&R goes live inside publish(), so requiring it to be
+ * published first would make the exam impossible to publish. Only a source
+ * borrowed from another exam must already be live.
+ */
+export function lrSourceIsLive(
+  lr: { id: number; publicationStatus: string } | null | undefined,
+  ownSetId: number | undefined,
+) {
+  if (lr?.publicationStatus === QuizPublicationStatus.PUBLISHED) return true;
+  return (
+    lr?.publicationStatus === QuizPublicationStatus.DRAFT && lr.id === ownSetId
+  );
+}
+
+const EXAM_NOT_DRAFT =
+  'Đề không ở trạng thái bản nháp. Hãy chuyển đề về bản nháp rồi mới sửa.';
+
+/**
+ * What a learner receives for one question: Parts 1 and 2 are audio only, so
+ * printing their options would give the spoken answers away.
+ */
+function learnerPreviewQuestion(part: number, question: any) {
+  const audioOnly = part <= 2;
+  return {
+    id: question.id,
+    questionNumber: question.questionNumber,
+    text: audioOnly ? null : question.text,
+    options: audioOnly ? question.options.map(() => '') : question.options,
+  };
+}
+
+/** Slots that need a picture and have none; the exam page offers to fill them. */
+export type MissingExamImage = {
+  section: 'LR' | 'SPEAKING' | 'WRITING';
+  /** Where it goes, as an admin reads it. */
+  label: string;
+  /** What the picture should show. */
+  brief: string | null;
+  groupId?: number;
+  questionNumber?: number;
+};
+
+/** Every picture a draft still lacks; a question without one stays complete. */
+function listMissingImages(
+  exam: ProductRecord,
+  lr: ProductRecord,
+  briefs?: { speaking?: any[]; writing?: any[] },
+): MissingExamImage[] {
+  const components: any[] = exam.toeicAssessment?.components ?? [];
+  const groups: any[] = lr?.groups ?? [];
+  const exercises: any[] =
+    components.find((component) => component.kind === 'SPEAKING')
+      ?.speakingPracticeSet?.exercises ?? [];
+  const items: any[] =
+    components.find((component) => component.kind === 'WRITING')?.writingSet
+      ?.items ?? [];
+  return [
+    ...groups
+      .filter((group) => group.part === 1 && !group.imageUrl)
+      .map((group) => {
+        const questionNumber = group.questions?.[0]?.questionNumber;
+        return {
+          section: 'LR' as const,
+          label: `Part 1 câu ${questionNumber ?? group.groupOrder}`,
+          brief: group.imageBrief ?? null,
+          groupId: group.id,
+          questionNumber,
+        };
+      }),
+    ...exercises
+      .filter(
+        (exercise) =>
+          exercise.taskType === 'DESCRIBE_PICTURE' && !exercise.imageUrl,
+      )
+      .map((exercise) => ({
+        section: 'SPEAKING' as const,
+        label: `Speaking câu ${exercise.order}`,
+        brief: briefs?.speaking?.[exercise.order - 1]?.imageBrief ?? null,
+      })),
+    ...items
+      .filter(
+        (item) =>
+          item.taskKind === 'PICTURE_SENTENCE' &&
+          !item.writingQuiz?.questions?.[0]?.content?.imageUrl,
+      )
+      .map((item) => ({
+        section: 'WRITING' as const,
+        label: `Writing câu ${item.order}`,
+        brief: briefs?.writing?.[item.order - 1]?.imageBrief ?? null,
+      })),
+  ];
+}
+
+/**
+ * Internal sources of a draft exam stay drafts until publish() takes them live,
+ * so readiness judges their content. Once the exam is live they must be too.
+ */
+function sourceCounts(status: unknown, draftExam: boolean) {
+  if (status === QuizPublicationStatus.PUBLISHED) return true;
+  return draftExam && status === QuizPublicationStatus.DRAFT;
+}
+
 @Injectable()
 export class GenericExamService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly skillCms: SkillCmsService,
     @Optional() private readonly uploadService?: UploadService,
+    @Optional() private readonly listeningMaster?: ToeicListeningMasterService,
   ) {}
 
   listTemplates() {
@@ -74,7 +182,7 @@ export class GenericExamService {
     toeicExamSet: {
       include: {
         groups: {
-          include: { questions: true },
+          include: { questions: { orderBy: { questionNumber: 'asc' } } },
           orderBy: { groupOrder: 'asc' },
         },
         _count: { select: { attempts: true } },
@@ -86,15 +194,28 @@ export class GenericExamService {
           orderBy: { order: 'asc' },
           include: {
             lrExamSet: {
-              include: { groups: { include: { questions: true } } },
+              include: {
+                groups: {
+                  include: {
+                    questions: { orderBy: { questionNumber: 'asc' } },
+                  },
+                  orderBy: { groupOrder: 'asc' },
+                },
+              },
             },
             speakingPracticeSet: {
-              include: { exercises: { include: { stimulus: true } } },
+              include: {
+                exercises: {
+                  include: { stimulus: true },
+                  orderBy: { order: 'asc' },
+                },
+              },
             },
             writingSet: {
               include: {
                 items: {
                   include: { writingQuiz: { include: { questions: true } } },
+                  orderBy: { order: 'asc' },
                 },
               },
             },
@@ -181,7 +302,11 @@ export class GenericExamService {
     throw new NotFoundException(`Đề TOEIC với ID ${id} không tồn tại`);
   }
 
-  private speakingReady(source: any, template: ExamTemplate) {
+  private speakingReady(
+    source: any,
+    template: ExamTemplate,
+    draftExam = false,
+  ) {
     const tasks =
       template.sections.find((section) => section.code === 'SPEAKING')?.tasks ??
       TOEIC_SPEAKING_TASK_SEQUENCE;
@@ -191,30 +316,29 @@ export class GenericExamService {
     if (
       !source ||
       source.scope !== SpeakingPracticeScope.EXAM_INTERNAL ||
-      source.publicationStatus !== QuizPublicationStatus.PUBLISHED ||
+      !sourceCounts(source.publicationStatus, draftExam) ||
       exercises.length !== 11
     )
       return false;
     return (
       exercises.every(
         (exercise, index) =>
-          exercise.publicationStatus === QuizPublicationStatus.PUBLISHED &&
+          sourceCounts(exercise.publicationStatus, draftExam) &&
           exercise.taskType === tasks[index],
       ) && toeicSpeakingContractErrors(source).length === 0
     );
   }
 
-  private writingReady(source: any) {
+  private writingReady(source: any, draftExam = false) {
     if (
       !source ||
-      source.publicationStatus !== QuizPublicationStatus.PUBLISHED ||
+      !sourceCounts(source.publicationStatus, draftExam) ||
       source.items?.length !== 8
     )
       return false;
     return source.items.every((item: any) => {
       const quiz = item.writingQuiz;
-      if (quiz?.publicationStatus !== QuizPublicationStatus.PUBLISHED)
-        return false;
+      if (!sourceCounts(quiz?.publicationStatus, draftExam)) return false;
       if (item.taskKind !== 'PICTURE_SENTENCE') return true;
       const content = quiz.questions?.[0]?.content as
         { imageUrl?: unknown } | undefined;
@@ -270,15 +394,15 @@ export class GenericExamService {
       template.variantCode === 'TOEIC_SW' ||
       template.variantCode === 'TOEIC_4_SKILLS';
     const hasWriting = hasSpeaking;
+    const draftExam = exam.publicationStatus === QuizPublicationStatus.DRAFT;
     const readiness = {
       listeningReading: hasLr
-        ? lrValidation.learnerReady &&
-          lr?.publicationStatus === QuizPublicationStatus.PUBLISHED
+        ? lrValidation.learnerReady && lrSourceIsLive(lr, exam.toeicExamSet?.id)
         : undefined,
       speaking: hasSpeaking
-        ? this.speakingReady(speaking, template)
+        ? this.speakingReady(speaking, template, draftExam)
         : undefined,
-      writing: hasWriting ? this.writingReady(writing) : undefined,
+      writing: hasWriting ? this.writingReady(writing, draftExam) : undefined,
     };
     const learnerReady = Object.values(readiness).every(
       (value) => value !== false,
@@ -410,6 +534,9 @@ export class GenericExamService {
         child?.durationSeconds ??
         (exam.variantCode === 'TOEIC_SW' ? 4800 : undefined),
       groups: child?.groups ?? [],
+      // A 4-skill exam may read another exam's L&R, which it cannot edit.
+      lrEditable: Boolean(exam.toeicExamSet),
+      missingImageCount: listMissingImages(exam, child).length,
       totalGroups: child?.groups?.length ?? 0,
       totalQuestions,
       questionsCount: totalQuestions,
@@ -545,8 +672,82 @@ export class GenericExamService {
       .filter((exam) => exam.learnerReady);
   }
 
+  /** Other exams that would disappear with this exam's L&R part. */
+  private async examsSharingLr(exam: ProductRecord) {
+    const set = exam.toeicExamSet;
+    if (!set) return 0;
+    return this.prisma.toeicAssessmentComponent.count({
+      where: { lrExamSetId: set.id, assessment: { examId: { not: exam.id } } },
+    });
+  }
+
   async getAdmin(id: number) {
-    return this.withAdminPlayback(this.project(await this.findExam(id)));
+    const exam = await this.findExam(id);
+    const job = exam.aiGenerationJobId
+      ? await this.prisma.aiGenerationJob.findUnique({
+          where: { id: exam.aiGenerationJobId },
+          select: { status: true },
+        })
+      : null;
+    return {
+      ...(await this.withAdminPlayback(this.project(exam))),
+      sharedLrExams: await this.examsSharingLr(exam),
+      // Once applied, the AI draft has nothing left to review.
+      aiReviewPending: job?.status === AiGenerationJobStatus.GENERATED,
+      listeningMaster: await this.listeningMasterView(exam),
+      missingImages: await this.missingImages(id),
+    };
+  }
+
+  /** What the Listening tab shows about the one continuous recording. */
+  private async listeningMasterView(exam: ProductRecord) {
+    const lr = this.lrSource(exam);
+    if (!lr || !this.listeningMaster) return null;
+    const status = await this.listeningMaster.state(lr.id);
+    const playback =
+      status.state === 'READY'
+        ? await this.listeningMaster.adminPlaybackUrl(lr.id).catch(() => null)
+        : null;
+    return { ...status, url: playback?.url ?? null };
+  }
+
+  /** Builds the recording now, so an admin can hear it before publishing. */
+  async buildListeningMaster(id: number) {
+    const exam = await this.findExam(id);
+    this.assertDraftExam(exam);
+    await this.ensureListeningMaster(exam);
+    return this.getAdmin(id);
+  }
+
+  /**
+   * Learners get one continuous recording, never a section cut into clips, so
+   * an exam that cannot produce one does not go live.
+   */
+  private async ensureListeningMaster(exam: ProductRecord) {
+    const lr = this.lrSource(exam);
+    if (!lr || !this.listeningMaster) return;
+    if (process.env.TOEIC_MASTER_ON_PUBLISH === 'skip') return;
+    try {
+      await this.listeningMaster.ensure(lr.id);
+    } catch (error) {
+      throw new BadRequestException(
+        `Không dựng được audio liền mạch: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /** Content changes only while the exam is a draft, whatever else it has. */
+  private assertDraftExam(exam: { publicationStatus: QuizPublicationStatus }) {
+    if (exam.publicationStatus !== QuizPublicationStatus.DRAFT)
+      throw new ConflictException(EXAM_NOT_DRAFT);
+  }
+
+  private async assertDraftExamById(id: number) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id },
+      select: { publicationStatus: true },
+    });
+    if (exam) this.assertDraftExam(exam);
   }
 
   /**
@@ -559,20 +760,24 @@ export class GenericExamService {
   async getLearnerPreview(id: number) {
     const exam = await this.findExam(id);
 
-    const lr = exam.toeicExamSet
+    const lrSet = this.lrSource(exam);
+    const playable = lrSet
+      ? await this.withAdminPlayback({ groups: lrSet.groups })
+      : null;
+    const lr = playable
       ? {
-          groups: exam.toeicExamSet.groups.map((group: any) => ({
+          groups: (playable.groups as any[]).map((group) => ({
+            id: group.id,
             part: group.part,
             groupOrder: group.groupOrder,
             imageUrl: group.imageUrl,
-            passageText: group.passageText,
+            // Listening scripts stay hidden, exactly as in a real attempt.
+            passageText: learnerPassage(group.part, group.passageText),
             hasAudio: !!group.audioUrl,
-            questions: group.questions.map((question: any) => ({
-              id: question.id,
-              questionNumber: question.questionNumber,
-              text: question.text,
-              options: question.options,
-            })),
+            audioSrc: group.audioPlaybackUrl ?? group.audioUrl ?? null,
+            questions: group.questions.map((question: any) =>
+              learnerPreviewQuestion(group.part, question),
+            ),
           })),
         }
       : null;
@@ -584,8 +789,10 @@ export class GenericExamService {
         order: exercise.order,
         title: exercise.title,
         targetText: exercise.targetText,
+        taskType: exercise.taskType,
         imageUrl: exercise.imageUrl,
         audioUrl: exercise.audioUrl,
+        stimulusText: exercise.stimulus?.content ?? null,
       }));
 
     const writing = exam.toeicAssessment?.components
@@ -614,6 +821,12 @@ export class GenericExamService {
       examId: exam.id,
       title: exam.title,
       preview: true,
+      master:
+        lrSet && this.listeningMaster
+          ? await this.listeningMaster
+              .adminPlaybackUrl(lrSet.id)
+              .catch(() => null)
+          : null,
       lr,
       speaking: speaking ?? null,
       writing: writing ?? null,
@@ -669,6 +882,7 @@ export class GenericExamService {
     dto: SpeakingStimulusDto,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     await this.speakingContext(id);
     return this.skillCms.createSpeakingStimulus(dto, user);
   }
@@ -678,6 +892,7 @@ export class GenericExamService {
     dto: SpeakingExerciseDto,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
     return this.skillCms.addSpeakingExercise('speaking', setId, dto, user);
   }
@@ -688,6 +903,7 @@ export class GenericExamService {
     dto: SpeakingExerciseDto,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
     return this.skillCms.updateSpeakingExercise(
       'speaking',
@@ -703,6 +919,7 @@ export class GenericExamService {
     dto: SpeakingExerciseReorderDto,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
     return this.skillCms.reorderSpeakingExercises('speaking', setId, dto, user);
   }
@@ -712,6 +929,7 @@ export class GenericExamService {
     exerciseId: number,
     user: { id: number; role: any },
   ) {
+    await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
     return this.skillCms.deleteSpeakingExercise(
       'speaking',
@@ -743,16 +961,75 @@ export class GenericExamService {
     return projected;
   }
 
+  /** The AI draft's picture briefs say what a missing Speaking or Writing picture shows. */
+  private async imageBriefs(exam: ProductRecord) {
+    if (!exam.aiGenerationJobId) return undefined;
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: exam.aiGenerationJobId },
+      select: { draftSnapshot: true },
+    });
+    return (job?.draftSnapshot as any)?.speakingWriting ?? undefined;
+  }
+
+  async missingImages(id: number) {
+    const exam = await this.findExam(id);
+    return listMissingImages(
+      exam,
+      this.lrSource(exam),
+      await this.imageBriefs(exam),
+    );
+  }
+
+  /** "TOEIC Speaking & Writing — Đề luyện tập 03": the next one of its kind. */
+  async nextExamTitle(variantCode: string) {
+    const label =
+      variantCode === 'TOEIC_LR'
+        ? 'Listening & Reading'
+        : variantCode === 'TOEIC_SW'
+          ? 'Speaking & Writing'
+          : '4 Skills';
+    const sameVariant = await this.prisma.exam.count({
+      where: { variantCode },
+    });
+    return `TOEIC ${label} — Đề luyện tập ${String(sameVariant + 1).padStart(2, '0')}`;
+  }
+
+  /** What the new-exam form offers: each kind, its structure, its next name. */
+  async authoringOptions() {
+    const templates = EXAM_TEMPLATES.filter(
+      (template) => template.authoringEnabled,
+    );
+    return Promise.all(
+      templates.map(async (template) => ({
+        variantCode: template.variantCode,
+        displayName: template.displayName,
+        nextTitle: await this.nextExamTitle(template.variantCode),
+        sections: template.sections
+          .filter((section) => section.minutes)
+          .map(({ code, label, count, minutes }) => ({
+            code,
+            label,
+            count,
+            minutes,
+          })),
+        parts: template.sections
+          .filter((section) => section.code.startsWith('PART_'))
+          .map(({ label, count }) => ({ label, count })),
+      })),
+    );
+  }
+
   async createDraft(dto: CreateGenericExamDto, createdBy?: number) {
     const { familyCode, variantCode } = this.resolveRequestedVariant(dto);
     const template = resolveExamTemplate(familyCode, variantCode);
     const title = dto.title.trim();
+    const description = dto.description?.trim() || PRACTICE_DISCLAIMER;
 
     return this.prisma.$transaction(async (tx) => {
       const exam = await tx.exam.create({
         data: {
           title,
-          description: dto.description,
+          description,
           familyCode,
           variantCode,
           templateKey: template.key,
@@ -768,7 +1045,7 @@ export class GenericExamService {
         lr = await tx.toeicExamSet.create({
           data: {
             title,
-            description: dto.description,
+            description,
             type: dto.type === 'FULL_TEST' ? 'FULL_TEST' : 'PRACTICE_BY_PART',
             difficulty: dto.difficulty ?? 'medium',
             durationSeconds: dto.durationSeconds ?? 7200,
@@ -840,7 +1117,7 @@ export class GenericExamService {
         const assessment = await tx.toeicAssessment.create({
           data: {
             title,
-            description: dto.description,
+            description,
             productFamily:
               variantCode === 'TOEIC_SW' ? 'TOEIC_SW' : 'TOEIC_4_SKILLS',
             createdBy,
@@ -871,6 +1148,7 @@ export class GenericExamService {
 
   async update(id: number, dto: UpdateGenericExamDto) {
     const exam = await this.findExam(id);
+    this.assertDraftExam(exam);
     const child = exam.toeicExamSet;
     const updated = await this.prisma.exam.update({
       where: { id },
@@ -896,7 +1174,35 @@ export class GenericExamService {
         },
       });
     }
+    if (dto.title !== undefined) await this.renameSources(exam, dto.title);
     return this.project(updated);
+  }
+
+  /** Learners read the assessment's title, not the exam's. */
+  private async renameSources(exam: ProductRecord, title: string) {
+    const assessment = exam.toeicAssessment;
+    if (!assessment) return;
+    await this.prisma.toeicAssessment.update({
+      where: { id: assessment.id },
+      data: { title },
+    });
+    const components: any[] = assessment.components ?? [];
+    const speaking = components.find(
+      (component) => component.kind === 'SPEAKING',
+    )?.speakingPracticeSet;
+    const writing = components.find(
+      (component) => component.kind === 'WRITING',
+    )?.writingSet;
+    if (speaking)
+      await this.prisma.speakingPracticeSet.update({
+        where: { id: speaking.id },
+        data: { title: `${title} — Speaking` },
+      });
+    if (writing)
+      await this.prisma.toeicWritingSet.update({
+        where: { id: writing.id },
+        data: { title: `${title} — Writing` },
+      });
   }
 
   async publish(id: number) {
@@ -909,6 +1215,7 @@ export class GenericExamService {
         readiness: readiness.readiness,
       });
     }
+    await this.ensureListeningMaster(exam);
     await this.prisma.$transaction(async (tx) => {
       await tx.exam.update({
         where: { id },
@@ -924,23 +1231,94 @@ export class GenericExamService {
           where: { id: exam.toeicAssessment.id },
           data: { publicationStatus: QuizPublicationStatus.PUBLISHED },
         });
+      await this.setInternalSources(tx, exam, QuizPublicationStatus.PUBLISHED);
     });
     return this.getAdmin(id);
+  }
+
+  /** Speaking and Writing belong to the exam, so they follow its status. */
+  private async setInternalSources(
+    tx: Prisma.TransactionClient,
+    exam: ProductRecord,
+    publicationStatus: QuizPublicationStatus,
+  ) {
+    const components: any[] = exam.toeicAssessment?.components ?? [];
+    const speaking = components.find(
+      (component) => component.kind === 'SPEAKING',
+    )?.speakingPracticeSet;
+    const writing = components.find(
+      (component) => component.kind === 'WRITING',
+    )?.writingSet;
+    const data = { publicationStatus };
+    if (speaking) {
+      await tx.speakingPracticeSet.update({
+        where: { id: speaking.id },
+        data,
+      });
+      await tx.speakingExercise.updateMany({
+        where: { practiceSetId: speaking.id },
+        data,
+      });
+    }
+    if (writing) {
+      await tx.quiz.updateMany({
+        where: {
+          id: { in: writing.items.map((item: any) => item.writingQuizId) },
+        },
+        data,
+      });
+      await tx.toeicWritingSet.update({ where: { id: writing.id }, data });
+    }
   }
 
   async unpublish(id: number) {
     const exam = await this.findExam(id);
     await this.assertExamCanReturnToDraft(exam);
+    await this.setPublicationStatus(exam, QuizPublicationStatus.DRAFT);
+    await this.prisma.$transaction((tx) =>
+      this.setInternalSources(tx, exam, QuizPublicationStatus.DRAFT),
+    );
+    return this.getAdmin(id);
+  }
+
+  /**
+   * Stops new attempts on an exam. Unlike unpublish it is allowed after
+   * learners have attempted it: their attempts finish and stay reviewable.
+   */
+  async retire(id: number) {
+    const exam = await this.findExam(id);
+    if (exam.publicationStatus !== QuizPublicationStatus.PUBLISHED) {
+      throw new ConflictException(
+        'Chỉ đề đang xuất bản mới có thể ngừng phát hành.',
+      );
+    }
+    await this.setPublicationStatus(exam, QuizPublicationStatus.ARCHIVED);
+    return this.getAdmin(id);
+  }
+
+  async restore(id: number) {
+    const exam = await this.findExam(id);
+    if (exam.publicationStatus !== QuizPublicationStatus.ARCHIVED) {
+      throw new ConflictException('Đề này không ở trạng thái ngừng phát hành.');
+    }
+    await this.setPublicationStatus(exam, QuizPublicationStatus.PUBLISHED);
+    return this.getAdmin(id);
+  }
+
+  private async setPublicationStatus(
+    exam: ProductRecord,
+    publicationStatus: QuizPublicationStatus,
+  ) {
     await this.prisma.$transaction([
       this.prisma.exam.update({
-        where: { id },
-        data: { publicationStatus: QuizPublicationStatus.DRAFT },
+        where: { id: exam.id },
+        data: { publicationStatus },
       }),
       ...(exam.toeicExamSet && this.lrSource(exam)?.id === exam.toeicExamSet.id
         ? [
             this.prisma.toeicExamSet.update({
               where: { id: exam.toeicExamSet.id },
-              data: { publicationStatus: QuizPublicationStatus.DRAFT },
+              data: { publicationStatus },
             }),
           ]
         : []),
@@ -948,12 +1326,11 @@ export class GenericExamService {
         ? [
             this.prisma.toeicAssessment.update({
               where: { id: exam.toeicAssessment.id },
-              data: { publicationStatus: QuizPublicationStatus.DRAFT },
+              data: { publicationStatus },
             }),
           ]
         : []),
     ]);
-    return this.getAdmin(id);
   }
 
   async delete(id: number) {
@@ -1000,20 +1377,24 @@ export class GenericExamService {
         },
       });
 
-      if (exam.toeicExamSet) {
+      // A 4-skill exam may read its L&R from another exam; the copy owns its own.
+      const lrSource = this.lrSource(exam);
+      let newLrId: number | null = null;
+      if (lrSource) {
         const newLr = await tx.toeicExamSet.create({
           data: {
-            title: `${exam.toeicExamSet.title} — Bản mới`,
-            description: exam.toeicExamSet.description,
-            type: exam.toeicExamSet.type,
-            difficulty: exam.toeicExamSet.difficulty,
-            durationSeconds: exam.toeicExamSet.durationSeconds,
+            title: `${lrSource.title} — Bản mới`,
+            description: lrSource.description,
+            type: lrSource.type,
+            difficulty: lrSource.difficulty,
+            durationSeconds: lrSource.durationSeconds,
             createdBy: adminId,
             examId: newExam.id,
             publicationStatus: QuizPublicationStatus.DRAFT,
           },
         });
-        for (const group of exam.toeicExamSet.groups as any[]) {
+        newLrId = newLr.id;
+        for (const group of lrSource.groups as any[]) {
           await tx.toeicQuestionGroup.create({
             data: {
               examId: newLr.id,
@@ -1052,6 +1433,17 @@ export class GenericExamService {
           },
         });
         for (const component of exam.toeicAssessment.components as any[]) {
+          if (component.kind === 'LISTENING_READING' && newLrId) {
+            await tx.toeicAssessmentComponent.create({
+              data: {
+                assessmentId: newAssessment.id,
+                kind: 'LISTENING_READING',
+                order: component.order,
+                required: component.required,
+                lrExamSetId: newLrId,
+              },
+            });
+          }
           if (component.kind === 'SPEAKING' && component.speakingPracticeSet) {
             const source = component.speakingPracticeSet;
             const newSpeaking = await tx.speakingPracticeSet.create({

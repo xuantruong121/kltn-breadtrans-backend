@@ -64,11 +64,8 @@ export class ImageSearchProviderChain implements ImageSearchProvider {
    * so a configured-but-unhealthy Pixabay must not delay every search).
    * Flickr was removed entirely (onboarding its API key was not practically
    * usable for this project) — Cloudflare AI generation and manual upload
-   * are the first-class fallbacks when this chain finds nothing. Pexels is
-   * intentionally NOT wired into this chain (API-key issuance is paused; its
-   * adapter stays dormant in source for possible future reuse without adding
-   * runtime cost or noisy NOT_CONFIGURED attempts). Only providers that are
-   * actually configured AND not currently cooling down are queried — never
+   * are the first-class fallbacks when this chain finds nothing. Only
+   * providers that are actually configured AND not currently cooling down are queried — never
    * all of them in parallel, only as many as needed. Never throws: callers
    * distinguish "found nothing" from "every configured provider was
    * unavailable" via `attempted`. Results are deduplicated by

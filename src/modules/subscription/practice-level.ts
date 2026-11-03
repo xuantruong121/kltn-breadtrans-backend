@@ -37,6 +37,30 @@ export function parseCefrRange(
 }
 
 /**
+ * The title a skill practice is stored with, so the level the admin picks is
+ * the one access reads. A title already tagged inside that level keeps its
+ * tag: the form shows one level, and "A1–A2" must not shrink to "A1".
+ */
+export function titleWithLevel(
+  title: string,
+  level: string | null | undefined,
+  skillLabel: string,
+): string {
+  const clean = title.trim();
+  const picked = level?.trim().toUpperCase() as Cefr | undefined;
+  if (!picked || !CEFR_LEVELS.includes(picked)) return clean;
+  const head = clean.includes(' — ') ? clean.split(' — ')[0] : '';
+  const range = parseCefrRange(head);
+  if (!range) return `${skillLabel} ${picked} — ${clean}`;
+  if (rank(picked) >= rank(range.min) && rank(picked) <= rank(range.max))
+    return clean;
+  return clean.replace(
+    head,
+    head.replace(/\b[ABC][12](?:\s*[–-]\s*[ABC][12])?\b/i, picked),
+  );
+}
+
+/**
  * The one level string every practice catalog exposes ("B1", "B2-C1"), from
  * the same range the access policy reads. Null when the item has no tag.
  */

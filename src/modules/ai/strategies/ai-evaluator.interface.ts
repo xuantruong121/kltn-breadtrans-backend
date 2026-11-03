@@ -178,7 +178,6 @@ export interface IAIEvaluator {
    * @param topic Chủ đề
    * @param count Số lượng câu
    */
-  generateDictation(topic: string, count: number): Promise<any[]>;
 
   /**
    * Đánh giá TOEIC Writing Part 1
@@ -230,23 +229,12 @@ export interface IAIEvaluator {
    * @param audioMimeType MimeType của file Audio (Tùy chọn)
    * @param audioUrl URL của Audio đã upload để gắn vào JSON
    */
-  importEtsPdf(
-    pdfBuffer: Buffer,
-    pdfMimeType: string,
-    audioBuffer?: Buffer,
-    audioMimeType?: string,
-    audioUrl?: string,
-  ): Promise<any[]>;
 
   /**
    * Sinh câu hỏi trắc nghiệm, Flashcard và bài tập từ văn bản tài liệu đã trích xuất
    * @param documentText Nội dung tài liệu
    * @param options Tùy chọn số lượng câu hỏi và flashcard
    */
-  generateSmartContentFromDocument(
-    documentText: string,
-    options?: { quizCount?: number; flashcardCount?: number },
-  ): Promise<SmartGeneratedContent>;
 
   /** Phase 5A: Gợi ý nội dung từ vựng theo chuẩn VocabWord */
   suggestVocabWord?(input: {
@@ -311,6 +299,7 @@ export interface IAIEvaluator {
 
   /** Phase 5B: Writing task candidates only, without media fabrication. */
   suggestWritingTask?(input: {
+    sourceText?: string;
     taskType: string;
     level?: string;
     topic?: string;
@@ -344,6 +333,7 @@ export interface IAIEvaluator {
   }): Promise<ContextualSpeakingExercisesSuggestion>;
 
   suggestSpeakingFullDraft?(input: {
+    sourceText?: string;
     topic: string;
     level: string;
     category: string;
@@ -359,9 +349,11 @@ export interface IAIEvaluator {
     difficulty: 'easy' | 'medium' | 'hard';
     includeSpeaking: boolean;
     includeWriting: boolean;
+    retryNote?: string;
   }): Promise<ToeicSpeakingWritingDraft>;
 
   suggestListeningFullDraft?(input: {
+    sourceText?: string;
     topic: string;
     level?: string;
     mode: 'DIALOGUE' | 'DICTATION';
@@ -369,6 +361,7 @@ export interface IAIEvaluator {
   }): Promise<ContextualListeningFullDraftSuggestion>;
 
   suggestReadingFullDraft?(input: {
+    sourceText?: string;
     topic: string;
     level: string;
     targetLength?: number;
@@ -383,7 +376,22 @@ export interface IAIEvaluator {
     count: number;
   }): Promise<ContextualVocabFullDraftSuggestion>;
 
+  suggestVocabDecksFromDocument?(input: {
+    text: string;
+    level?: string;
+    maxDecks: number;
+    maxWordsPerDeck: number;
+  }): Promise<ContextualVocabDecksSuggestion>;
+
+  suggestDictationLines?(input: {
+    topic: string;
+    level?: string;
+    count: number;
+    sourceText?: string;
+  }): Promise<ContextualDictationSuggestion>;
+
   suggestGrammarFullDraft?(input: {
+    sourceText?: string;
     topicTitle: string;
     level: string;
     objective?: string;
@@ -442,12 +450,29 @@ export type ToeicExamBatchGroup = {
 
 export type ToeicExamBatchRequest = {
   part: number;
+  /** Questions this Part already holds; the batch must not repeat them. */
+  avoidQuestions?: string[];
   topic?: string;
   difficulty: 'easy' | 'medium' | 'hard';
-  groups: Array<{ questionCount: number; kind?: 'SINGLE' | 'MULTIPLE' }>;
+  groups: Array<{
+    questionCount: number;
+    kind?: 'SINGLE' | 'MULTIPLE';
+    /** Part 7: how many related documents a MULTIPLE group holds. */
+    documents?: 2 | 3;
+    /** Part 3: a conversation between three people. */
+    threeSpeakers?: boolean;
+    /** Parts 3 and 4: the group comes with a small table to read. */
+    graphic?: boolean;
+  }>;
+  /** Why the last draft of this batch was refused. */
+  retryNote?: string;
 };
 
-export type ToeicExamBatch = { groups: ToeicExamBatchGroup[] };
+export type ToeicExamBatch = {
+  groups: ToeicExamBatchGroup[];
+  /** Set when the stand-in wrote it instead of the main provider. */
+  provider?: 'CLOUDFLARE';
+};
 
 export interface ContextualVocabSuggestion {
   word: string;
@@ -581,6 +606,8 @@ export interface ToeicWritingDraftTask {
   title: string;
   taskKind: 'PICTURE_SENTENCE' | 'WRITTEN_REQUEST' | 'OPINION_ESSAY';
   prompt: string;
+  /** The e-mail a WRITTEN_REQUEST answers. */
+  email?: string;
   imageBrief?: string;
   keywords?: string[];
   wordRange?: [number, number];
@@ -607,6 +634,27 @@ export interface ContextualReadingFullDraftSuggestion {
   level: string;
   passage: string;
   questions: ContextualReadingCandidate[];
+}
+
+export interface ContextualVocabDecksSuggestion {
+  decks: Array<{
+    title: string;
+    description?: string;
+    level?: string;
+    words: Array<{
+      word: string;
+      pos?: string;
+      meaning: string;
+      exampleEn?: string;
+      exampleVi?: string;
+    }>;
+  }>;
+}
+
+export interface ContextualDictationSuggestion {
+  title: string;
+  description?: string;
+  sentences: string[];
 }
 
 export interface ContextualVocabFullDraftSuggestion {

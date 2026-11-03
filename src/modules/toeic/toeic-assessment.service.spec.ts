@@ -7,7 +7,8 @@ import {
 import { ToeicAssessmentService } from './toeic-assessment.service';
 
 describe('ToeicAssessmentService', () => {
-  const service = () => new ToeicAssessmentService({} as any, {} as any);
+  const service = () =>
+    new ToeicAssessmentService({} as any, {} as any, {} as any);
 
   it('requires the exact component contract for every product family', () => {
     const instance = service() as any;
@@ -44,6 +45,7 @@ describe('ToeicAssessmentService', () => {
   it('does not treat the current incomplete Speaking source as TOEIC-ready', async () => {
     const instance = new ToeicAssessmentService(
       { speakingPracticeSet: { findUnique: jest.fn() } } as any,
+      {} as any,
       {} as any,
     ) as any;
     instance.db.speakingPracticeSet.findUnique.mockResolvedValue({

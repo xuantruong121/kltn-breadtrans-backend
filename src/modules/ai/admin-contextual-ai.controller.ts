@@ -3,16 +3,26 @@ import {
   Post,
   Body,
   UseGuards,
+  UploadedFile,
+  UseInterceptors,
   Logger,
   BadGatewayException,
   BadRequestException,
   Optional,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from './ai.service';
 import { SpeakingCategoryService } from '../content/speaking-category.service';
 import {
@@ -31,7 +41,20 @@ import {
   SuggestReadingFullDraftDto,
   SuggestVocabFullDraftDto,
   SuggestGrammarFullDraftDto,
+  SuggestDictationLinesDto,
+  VocabDecksFromDocumentDto,
 } from './dto/contextual-ai.dto';
+import { DocumentTextService } from './document-text.service';
+import {
+  DOCUMENT_MAX_BYTES,
+  DOCUMENT_MAX_DECKS,
+  DOCUMENT_MAX_WORDS_PER_DECK,
+  deckHeadwords,
+  isReadableDocument,
+  limitDocumentText,
+  normalizeDictationSentences,
+  normalizeVocabDecks,
+} from './document-import.logic';
 
 @ApiTags('Admin Contextual AI')
 @Controller('admin')
@@ -43,6 +66,8 @@ export class AdminContextualAiController {
 
   constructor(
     private readonly aiService: AiService,
+    private readonly documents: DocumentTextService,
+    private readonly prisma: PrismaService,
     @Optional()
     private readonly speakingCategoryService?: SpeakingCategoryService,
   ) {}
@@ -229,6 +254,7 @@ export class AdminContextualAiController {
         currentPrompt: dto.currentPrompt,
         wordMin: dto.wordMin,
         wordMax: dto.wordMax,
+        sourceText: dto.sourceText,
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
@@ -299,6 +325,7 @@ export class AdminContextualAiController {
         objective: dto.objective,
         taskType: dto.taskType,
         count: dto.count || 5,
+        sourceText: dto.sourceText,
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
@@ -320,6 +347,7 @@ export class AdminContextualAiController {
         level: dto.level,
         mode: dto.mode,
         count: dto.count || 5,
+        sourceText: dto.sourceText,
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
@@ -340,11 +368,91 @@ export class AdminContextualAiController {
         targetLength: dto.targetLength,
         microSkill: dto.microSkill,
         count: dto.count || 5,
+        sourceText: dto.sourceText,
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI Reading full draft failed: ${error?.message || ''}`);
       throw new BadGatewayException('Không thể soạn bài Reading lúc này.');
+    }
+  }
+
+  @Post('ai/document-text')
+  @ApiOperation({
+    summary: 'Đọc chữ từ tệp PDF, DOCX, TXT; không gọi AI, không lưu tệp',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({
+    status: 400,
+    description: 'Tệp không đọc được hoặc không có chữ.',
+  })
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: DOCUMENT_MAX_BYTES } }),
+  )
+  async readDocument(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Vui lòng chọn tệp.');
+    if (!isReadableDocument(file.originalname))
+      throw new BadRequestException('Chỉ đọc được tệp PDF, DOCX hoặc TXT.');
+    const raw = await this.documents.extractTextFromBuffer(
+      file.buffer,
+      file.mimetype,
+      file.originalname,
+    );
+    const document = limitDocumentText(raw);
+    if (!document.text)
+      throw new BadRequestException(
+        'Tệp không có chữ để đọc. Tệp scan cần được chuyển thành chữ trước.',
+      );
+    return document;
+  }
+
+  @Post('vocab/ai/from-document')
+  @ApiOperation({ summary: 'Gợi ý các bộ từ từ tài liệu, chờ admin duyệt' })
+  async suggestVocabDecks(@Body() dto: VocabDecksFromDocumentDto) {
+    try {
+      const { decks } = await this.aiService.suggestVocabDecksFromDocument({
+        text: dto.text,
+        level: dto.level,
+        maxDecks: DOCUMENT_MAX_DECKS,
+        maxWordsPerDeck: DOCUMENT_MAX_WORDS_PER_DECK,
+      });
+      const known = await this.prisma.dictionaryEntry.findMany({
+        where: { headword: { in: deckHeadwords(decks) } },
+        select: { headword: true },
+      });
+      return {
+        decks: normalizeVocabDecks(
+          decks,
+          new Set(known.map((row) => row.headword.toLowerCase())),
+        ),
+      };
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.warn(`AI vocab decks failed: ${error?.message || ''}`);
+      throw new BadGatewayException('Không thể tạo bộ từ từ tài liệu lúc này.');
+    }
+  }
+
+  @Post('listening/ai/dictation-lines')
+  @ApiOperation({ summary: 'Soạn các câu chép chính tả nháp' })
+  async suggestDictationLines(@Body() dto: SuggestDictationLinesDto) {
+    try {
+      const draft = await this.aiService.suggestDictationLines({
+        topic: dto.topic,
+        level: dto.level,
+        count: dto.count || 20,
+        sourceText: dto.sourceText,
+      });
+      return {
+        ...draft,
+        sentences: normalizeDictationSentences(draft.sentences),
+      };
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.warn(`AI dictation failed: ${error?.message || ''}`);
+      throw new BadGatewayException(
+        'Không thể soạn câu chép chính tả lúc này.',
+      );
     }
   }
 
@@ -378,6 +486,7 @@ export class AdminContextualAiController {
         level: dto.level,
         objective: dto.objective,
         count: dto.count || 10,
+        sourceText: dto.sourceText,
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;

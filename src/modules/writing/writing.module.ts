@@ -18,5 +18,6 @@ import { ToeicWritingSetService } from './toeic-writing-set.service';
     ToeicWritingSetController,
   ],
   providers: [WritingService, ToeicWritingSetService],
+  exports: [WritingService],
 })
 export class WritingModule {}

@@ -10,6 +10,15 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import type { SpeakingTaskType } from '../speaking/speaking-contract';
 import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
+import { CloudflareWorkersAiClient } from './cloudflare-workers-ai.client';
+import { isGeminiOutage } from './gemini/gemini-credential-manager.service';
+import {
+  assertToeicBatchShape,
+  assertToeicSpeakingWritingShape,
+  toeicBatchRequest,
+  toeicExamImagePrompt,
+  toeicSpeakingWritingRequest,
+} from './toeic-exam-prompt';
 import type {
   IAIEvaluator,
   PronunciationFeedback,
@@ -28,6 +37,8 @@ import type {
   ContextualSpeakingFullDraftSuggestion,
   ContextualListeningFullDraftSuggestion,
   ContextualReadingFullDraftSuggestion,
+  ContextualDictationSuggestion,
+  ContextualVocabDecksSuggestion,
   ContextualVocabFullDraftSuggestion,
   ContextualGrammarFullDraftSuggestion,
   ToeicExamBatch,
@@ -127,8 +138,25 @@ export class AiService {
     @Inject(AI_EVALUATOR_TOKEN)
     private readonly aiEvaluator: IAIEvaluator,
     @Optional() @InjectRedis() private readonly redis?: Redis,
+    @Optional() private readonly cloudflare?: CloudflareWorkersAiClient,
   ) {
     this.logger.log('AiService initialized with Strategy Pattern');
+  }
+
+  /** Runs on Cloudflare only when Gemini itself is unavailable. */
+  private async withStandIn<T extends object>(
+    primary: () => Promise<T>,
+    standIn: (cloudflare: CloudflareWorkersAiClient) => Promise<T>,
+  ): Promise<T & { provider?: 'CLOUDFLARE' }> {
+    try {
+      return await primary();
+    } catch (error) {
+      if (!this.cloudflare?.configured() || !isGeminiOutage(error)) throw error;
+      this.logger.warn(
+        `exam_generation_stand_in reason=${error instanceof Error ? error.message.slice(0, 160) : 'unknown'}`,
+      );
+      return { ...(await standIn(this.cloudflare)), provider: 'CLOUDFLARE' };
+    }
   }
 
   private getTodayUtcKey(): string {
@@ -239,7 +267,16 @@ export class AiService {
         'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo batch đề TOEIC',
       );
     }
-    return this.aiEvaluator.generateToeicExamBatch(input);
+    return this.withStandIn(
+      () => this.aiEvaluator.generateToeicExamBatch!(input),
+      async (cloudflare) =>
+        assertToeicBatchShape(
+          await cloudflare.generateJson<ToeicExamBatch>(
+            toeicBatchRequest(input),
+          ),
+          input,
+        ),
+    );
   }
 
   async generateToeicExamImage(input: {
@@ -247,12 +284,30 @@ export class AiService {
     part: number;
   }): Promise<{ buffer: Buffer; mimeType: string }> {
     await this.checkAndIncrementDailyQuota();
-    if (!this.aiEvaluator.generateToeicExamImage) {
+    const gemini =
+      process.env.GEMINI_IMAGE_GENERATION === 'enabled' &&
+      this.aiEvaluator.generateToeicExamImage;
+    if (this.cloudflare?.configured()) {
+      try {
+        return await this.cloudflare.generateImage(toeicExamImagePrompt(input));
+      } catch (error) {
+        if (!gemini) throw error;
+      }
+    }
+    if (!gemini) {
       throw new BadRequestException(
         'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo ảnh đề TOEIC',
       );
     }
-    return this.aiEvaluator.generateToeicExamImage(input);
+    return this.aiEvaluator.generateToeicExamImage!(input);
+  }
+
+  /** Gemini images have no free tier, so they stay behind their switch. */
+  canGenerateExamImage() {
+    return (
+      Boolean(this.cloudflare?.configured()) ||
+      process.env.GEMINI_IMAGE_GENERATION === 'enabled'
+    );
   }
 
   async analyzeToeicPart1Candidates(input: {
@@ -306,18 +361,24 @@ export class AiService {
     difficulty: 'easy' | 'medium' | 'hard';
     includeSpeaking: boolean;
     includeWriting: boolean;
-  }): Promise<ToeicSpeakingWritingDraft> {
+    retryNote?: string;
+  }) {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.generateToeicSpeakingWritingDraft) {
       throw new BadRequestException(
-        'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo đề TOEIC Speaking/Writing',
+        'Nhà cung cấp AI hiện tại chưa hỗ trợ tạo draft TOEIC Speaking/Writing',
       );
     }
-    return this.aiEvaluator.generateToeicSpeakingWritingDraft(input);
-  }
-
-  async generateDictation(topic: string, count: number): Promise<any[]> {
-    return this.aiEvaluator.generateDictation(topic, count);
+    return this.withStandIn(
+      () => this.aiEvaluator.generateToeicSpeakingWritingDraft!(input),
+      async (cloudflare) =>
+        assertToeicSpeakingWritingShape(
+          await cloudflare.generateJson<ToeicSpeakingWritingDraft>(
+            toeicSpeakingWritingRequest(input),
+          ),
+          input,
+        ),
+    );
   }
 
   async generateTtsAudio(text: string): Promise<Buffer | null> {
@@ -476,32 +537,6 @@ export class AiService {
     );
   }
 
-  async importEtsPdf(
-    pdfBuffer: Buffer,
-    pdfMimeType: string,
-    audioBuffer?: Buffer,
-    audioMimeType?: string,
-    audioUrl?: string,
-  ): Promise<any[]> {
-    return this.aiEvaluator.importEtsPdf(
-      pdfBuffer,
-      pdfMimeType,
-      audioBuffer,
-      audioMimeType,
-      audioUrl,
-    );
-  }
-
-  async generateSmartContentFromDocument(
-    documentText: string,
-    options?: { quizCount?: number; flashcardCount?: number },
-  ) {
-    return this.aiEvaluator.generateSmartContentFromDocument(
-      documentText,
-      options,
-    );
-  }
-
   async suggestVocabWord(input: {
     word: string;
     context?: string;
@@ -613,6 +648,7 @@ export class AiService {
   }
 
   async suggestWritingTask(input: {
+    sourceText?: string;
     taskType: string;
     level?: string;
     topic?: string;
@@ -668,6 +704,7 @@ export class AiService {
   }
 
   async suggestSpeakingFullDraft(input: {
+    sourceText?: string;
     topic: string;
     level: string;
     category: string;
@@ -686,6 +723,7 @@ export class AiService {
   }
 
   async suggestListeningFullDraft(input: {
+    sourceText?: string;
     topic: string;
     level?: string;
     mode: 'DIALOGUE' | 'DICTATION';
@@ -701,6 +739,7 @@ export class AiService {
   }
 
   async suggestReadingFullDraft(input: {
+    sourceText?: string;
     topic: string;
     level: string;
     targetLength?: number;
@@ -731,7 +770,38 @@ export class AiService {
     return this.aiEvaluator.suggestVocabFullDraft(input);
   }
 
+  async suggestVocabDecksFromDocument(input: {
+    text: string;
+    level?: string;
+    maxDecks: number;
+    maxWordsPerDeck: number;
+  }): Promise<ContextualVocabDecksSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestVocabDecksFromDocument) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ tạo bộ từ từ tài liệu',
+      );
+    }
+    return this.aiEvaluator.suggestVocabDecksFromDocument(input);
+  }
+
+  async suggestDictationLines(input: {
+    topic: string;
+    level?: string;
+    count: number;
+    sourceText?: string;
+  }): Promise<ContextualDictationSuggestion> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestDictationLines) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ soạn câu chép chính tả',
+      );
+    }
+    return this.aiEvaluator.suggestDictationLines(input);
+  }
+
   async suggestGrammarFullDraft(input: {
+    sourceText?: string;
     topicTitle: string;
     level: string;
     objective?: string;

@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { QuizPublicationStatus } from '@prisma/client';
-import { GenericExamService } from './generic-exam.service';
+import { GenericExamService, lrSourceIsLive } from './generic-exam.service';
 
 describe('GenericExamService Writing readiness', () => {
   const service: any = Object.create(GenericExamService.prototype);
@@ -93,6 +93,251 @@ describe('GenericExamService Writing readiness', () => {
     const projected = service.project(exam);
     expect(projected.totalQuestions).toBe(19);
     expect(projected.durationSeconds).toBe(4800);
+  });
+});
+
+describe('GenericExamService internal sources', () => {
+  const quiz = (publicationStatus: QuizPublicationStatus) => ({
+    publicationStatus,
+    questions: [],
+  });
+  const source = (publicationStatus: QuizPublicationStatus) => ({
+    publicationStatus,
+    items: Array.from({ length: 8 }, () => ({
+      taskKind: 'WRITTEN_REQUEST',
+      writingQuiz: quiz(publicationStatus),
+    })),
+  });
+
+  it('judges a draft exam by its content, not its source status', () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    expect(
+      service.writingReady(source(QuizPublicationStatus.DRAFT), true),
+    ).toBe(true);
+  });
+
+  it('never counts a draft source once the exam is live', () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    expect(
+      service.writingReady(source(QuizPublicationStatus.DRAFT), false),
+    ).toBe(false);
+  });
+
+  it('publishes Speaking and Writing with the exam', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    const tx = {
+      speakingPracticeSet: { update: jest.fn() },
+      speakingExercise: { updateMany: jest.fn() },
+      quiz: { updateMany: jest.fn() },
+      toeicWritingSet: { update: jest.fn() },
+    };
+
+    await service.setInternalSources(
+      tx,
+      {
+        toeicAssessment: {
+          components: [
+            { kind: 'SPEAKING', speakingPracticeSet: { id: 7 } },
+            {
+              kind: 'WRITING',
+              writingSet: { id: 8, items: [{ writingQuizId: 41 }] },
+            },
+          ],
+        },
+      },
+      QuizPublicationStatus.PUBLISHED,
+    );
+
+    const data = { publicationStatus: QuizPublicationStatus.PUBLISHED };
+    expect(tx.speakingPracticeSet.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data,
+    });
+    expect(tx.speakingExercise.updateMany).toHaveBeenCalledWith({
+      where: { practiceSetId: 7 },
+      data,
+    });
+    expect(tx.quiz.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [41] } },
+      data,
+    });
+    expect(tx.toeicWritingSet.update).toHaveBeenCalledWith({
+      where: { id: 8 },
+      data,
+    });
+  });
+});
+
+describe('GenericExamService.update title', () => {
+  it('renames what learners read, not only the exam row', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    const update = () => jest.fn().mockResolvedValue({});
+    service.prisma = {
+      exam: { update: update() },
+      toeicAssessment: { update: update() },
+      speakingPracticeSet: { update: update() },
+      toeicWritingSet: { update: update() },
+    };
+    service.project = jest.fn();
+    service.findExam = jest.fn().mockResolvedValue({
+      publicationStatus: QuizPublicationStatus.DRAFT,
+      toeicAssessment: {
+        id: 3,
+        components: [
+          { kind: 'SPEAKING', speakingPracticeSet: { id: 7 } },
+          { kind: 'WRITING', writingSet: { id: 8 } },
+        ],
+      },
+    });
+
+    await service.update(5, { title: 'Đề 02' });
+
+    expect(service.prisma.toeicAssessment.update).toHaveBeenCalledWith({
+      where: { id: 3 },
+      data: { title: 'Đề 02' },
+    });
+    expect(service.prisma.speakingPracticeSet.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { title: 'Đề 02 — Speaking' },
+    });
+    expect(service.prisma.toeicWritingSet.update).toHaveBeenCalledWith({
+      where: { id: 8 },
+      data: { title: 'Đề 02 — Writing' },
+    });
+  });
+});
+
+describe('GenericExamService.getAdmin AI review', () => {
+  const build = (status: string) => {
+    const service: any = Object.create(GenericExamService.prototype);
+    service.findExam = jest.fn().mockResolvedValue({ aiGenerationJobId: 'j' });
+    service.project = jest.fn().mockReturnValue({ id: 5 });
+    service.withAdminPlayback = jest.fn((value: unknown) => value);
+    service.examsSharingLr = jest.fn().mockResolvedValue(0);
+    service.prisma = {
+      aiGenerationJob: {
+        findUnique: jest.fn().mockResolvedValue({ status }),
+      },
+    };
+    return service;
+  };
+
+  it('offers the AI draft only while it waits for review', async () => {
+    expect((await build('GENERATED').getAdmin(5)).aiReviewPending).toBe(true);
+    expect((await build('APPROVED').getAdmin(5)).aiReviewPending).toBe(false);
+  });
+});
+
+describe('GenericExamService draft-only editing', () => {
+  it('refuses to change a published exam', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    service.findExam = jest.fn().mockResolvedValue({
+      publicationStatus: QuizPublicationStatus.PUBLISHED,
+    });
+    await expect(service.update(5, { title: 'x' })).rejects.toThrow(
+      'chuyển đề về bản nháp',
+    );
+  });
+
+  it('refuses a Speaking change on a published exam', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    service.prisma = {
+      exam: {
+        findUnique: jest.fn().mockResolvedValue({
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
+        }),
+      },
+    };
+    service.speakingContext = jest.fn();
+    await expect(
+      service.updateSpeakingExercise(5, 1, {}, { id: 1, role: 'ADMIN' }),
+    ).rejects.toThrow('chuyển đề về bản nháp');
+    expect(service.speakingContext).not.toHaveBeenCalled();
+  });
+
+  it('returns Speaking and Writing to draft with the exam', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    const exam = { toeicAssessment: { components: [] } };
+    service.findExam = jest.fn().mockResolvedValue(exam);
+    service.assertExamCanReturnToDraft = jest.fn();
+    service.setPublicationStatus = jest.fn();
+    service.setInternalSources = jest.fn();
+    service.getAdmin = jest.fn();
+    service.prisma = { $transaction: jest.fn((run: any) => run('tx')) };
+
+    await service.unpublish(5);
+
+    expect(service.setInternalSources).toHaveBeenCalledWith(
+      'tx',
+      exam,
+      QuizPublicationStatus.DRAFT,
+    );
+  });
+});
+
+describe('GenericExamService publish builds the recording', () => {
+  const draft = {
+    publicationStatus: QuizPublicationStatus.DRAFT,
+    toeicExamSet: { id: 3 },
+    toeicAssessment: null,
+  };
+  const build = (ensure: jest.Mock) => {
+    const service: any = Object.create(GenericExamService.prototype);
+    service.findExam = jest.fn().mockResolvedValue(draft);
+    service.productReadiness = jest
+      .fn()
+      .mockReturnValue({ learnerReady: true });
+    service.lrSource = jest.fn().mockReturnValue({ id: 3 });
+    service.listeningMaster = { ensure };
+    service.getAdmin = jest.fn();
+    service.setInternalSources = jest.fn();
+    service.prisma = {
+      $transaction: jest.fn(),
+    };
+    return service;
+  };
+
+  it('builds before anything goes live', async () => {
+    const ensure = jest.fn().mockResolvedValue({ examId: 3 });
+    const service = build(ensure);
+    await service.publish(5);
+    expect(ensure).toHaveBeenCalledWith(3);
+    expect(service.prisma.$transaction).toHaveBeenCalled();
+    expect(ensure.mock.invocationCallOrder[0]).toBeLessThan(
+      service.prisma.$transaction.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('keeps the exam a draft when the recording cannot be built', async () => {
+    const service = build(jest.fn().mockRejectedValue(new Error('Azure down')));
+    await expect(service.publish(5)).rejects.toThrow(
+      'Không dựng được audio liền mạch: Azure down',
+    );
+    expect(service.prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('lrSourceIsLive', () => {
+  const draft = { id: 3, publicationStatus: QuizPublicationStatus.DRAFT };
+  const live = { id: 1, publicationStatus: QuizPublicationStatus.PUBLISHED };
+
+  it('lets a draft exam publish together with its own L&R', () => {
+    expect(lrSourceIsLive(draft, 3)).toBe(true);
+  });
+
+  it('refuses a borrowed L&R that is still a draft', () => {
+    expect(lrSourceIsLive(draft, 9)).toBe(false);
+  });
+
+  it('accepts a live source and refuses a missing or retired one', () => {
+    expect(lrSourceIsLive(live, 9)).toBe(true);
+    expect(lrSourceIsLive(null, 9)).toBe(false);
+    expect(
+      lrSourceIsLive(
+        { id: 3, publicationStatus: QuizPublicationStatus.ARCHIVED },
+        3,
+      ),
+    ).toBe(false);
   });
 });
 

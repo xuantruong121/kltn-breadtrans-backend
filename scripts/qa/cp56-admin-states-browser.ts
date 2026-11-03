@@ -145,8 +145,6 @@ void (async () => {
 
   for (const route of [
     '/admin/exams',
-    '/admin/toeic/assessments',
-    '/admin/toeic/writing-sets',
   ]) {
     await page.goto(FE + route, { waitUntil: 'networkidle', timeout: 120_000 });
     await page.waitForTimeout(2000);

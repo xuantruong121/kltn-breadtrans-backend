@@ -106,13 +106,26 @@ function matchesTrack(tracks: string[] | undefined, track?: string) {
   return track === 'UNTAGGED' ? tags.length === 0 : tags.includes(track!);
 }
 
+/** Vietnamese titles live in the frontend, which sends the ids they match. */
+const hasTitleId = (query: ListQuery, id: string | number) =>
+  String(query.titleIds ?? '')
+    .split(',')
+    .includes(String(id));
+
 export function filterQuizList<T extends QuizListRow>(
   rows: T[],
   query: ListQuery,
 ): T[] {
   const visible = rows.filter(
     (row) =>
-      matchesSearch(query.q, row.title, row.description, row.level, row.type) &&
+      (matchesSearch(
+        query.q,
+        row.title,
+        row.description,
+        row.level,
+        row.type,
+      ) ||
+        hasTitleId(query, row.id)) &&
       (isAll(query.status) ||
         (row.publicationStatus || 'DRAFT') === query.status) &&
       (isAll(query.level) || contentLevel(row) === query.level) &&
@@ -181,7 +194,8 @@ export function filterSpeakingSets<T extends SpeakingSetRow>(
 ): T[] {
   const visible = rows.filter(
     (row) =>
-      matchesSearch(query.q, row.title, row.description, row.category) &&
+      (matchesSearch(query.q, row.title, row.description, row.category) ||
+        hasTitleId(query, row.id)) &&
       (isAll(query.level) || row.level === query.level) &&
       (isAll(query.category) || row.category === query.category) &&
       (isAll(query.status) || row.publicationStatus === query.status) &&
@@ -209,4 +223,31 @@ export function speakingSetFacets(rows: SpeakingSetRow[]) {
       ...new Set(rows.map((row) => row.level).filter(Boolean) as string[]),
     ].sort(),
   };
+}
+
+/** The first image of each quiz, from rows already sorted by question order. */
+export function firstImageByQuiz(
+  rows: Array<{ quizId: number | null; content: unknown }>,
+) {
+  const images = new Map<number, string>();
+  for (const { quizId, content } of rows) {
+    const imageUrl = (content as { imageUrl?: unknown } | null)?.imageUrl;
+    if (quizId == null || images.has(quizId)) continue;
+    if (typeof imageUrl === 'string' && imageUrl) images.set(quizId, imageUrl);
+  }
+  return images;
+}
+
+/** Why a picture card is missing from learners' Writing page, if it is. */
+export function pictureCardHiddenReason(card: {
+  publicationStatus?: string | null;
+  hasPracticeTopic: boolean;
+  imageUrl: string | null;
+  keywords: string[];
+}) {
+  if (card.publicationStatus !== 'PUBLISHED') return 'bài chưa xuất bản';
+  if (!card.hasPracticeTopic) return 'bài chưa thuộc chủ đề luyện viết';
+  if (!card.imageUrl) return 'chưa có ảnh';
+  if (card.keywords.length !== 2) return 'cần đúng 2 từ khoá';
+  return null;
 }

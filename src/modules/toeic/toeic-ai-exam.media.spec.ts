@@ -5,6 +5,7 @@ describe('ToeicAiExamService partial media materialization', () => {
     const service: any = Object.create(ToeicAiExamService.prototype);
     service.logger = { warn: jest.fn() };
     service.ai = {
+      canGenerateExamImage: () => true,
       generateToeicExamImage: jest
         .fn()
         .mockRejectedValue(new Error('provider timeout')),
@@ -77,6 +78,7 @@ describe('ToeicAiExamService partial media materialization', () => {
       },
     };
     service.ai = {
+      canGenerateExamImage: () => true,
       generateToeicExamImage: jest
         .fn()
         .mockRejectedValue(new Error('429 quota exceeded')),
@@ -156,7 +158,7 @@ describe('ToeicAiExamService partial media materialization', () => {
           {
             questions: [
               {
-                text: 'Please submit the report by Friday.',
+                text: 'Please submit the _____ by Friday.',
                 options: ['report', 'reports', 'reporting', 'reported'],
                 correctIndex: 0,
                 explanation:
