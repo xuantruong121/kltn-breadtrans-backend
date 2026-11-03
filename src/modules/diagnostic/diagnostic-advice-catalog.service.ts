@@ -1,15 +1,19 @@
 /**
  * Resolves the learning resources D1 advice may cite against the live
- * catalog and the learner's plan. A reference is returned only when the
- * content exists and is published right now; one that is premium
- * the learner's plan does not cover is returned as LOCKED with the existing
- * requirement, never silently opened.
+ * catalog, the learner's plan and the learner's opened practice levels. A
+ * reference is returned only when the content exists and is published right
+ * now; one the learner cannot open (plan or level) is returned as LOCKED with
+ * the reason, never shown as open.
  */
 import { Injectable, Optional } from '@nestjs/common';
 import { QuizType } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
+import { SpeakingContentAccessService } from '../speaking/speaking-content-access.service';
+import { PRACTICE_LEVEL_LABEL } from '../learning-path/placement.logic';
+import type { PracticeLevel } from '@prisma/client';
 import {
   allAdviceResourceRefs,
   type ResolvedResource,
@@ -64,11 +68,33 @@ function practicePlanFor(
   return isPremiumContent ? advancedPracticePlan(skill) : 'FREE';
 }
 
+/**
+ * The reason a learner cannot open an item, as the access services decide it:
+ * an unopened level comes first, because the item page refuses it first.
+ */
+export function adviceLock(access: {
+  isLocked: boolean;
+  requiredPlan: string;
+  isLevelLocked: boolean;
+  practiceLevel: PracticeLevel | null;
+}): { access: 'OPEN' | 'LOCKED'; requirement: string | null } {
+  if (access.isLevelLocked && access.practiceLevel)
+    return {
+      access: 'LOCKED',
+      requirement: `Cần mở mức ${PRACTICE_LEVEL_LABEL[access.practiceLevel]}`,
+    };
+  if (access.isLocked)
+    return { access: 'LOCKED', requirement: `Cần gói ${access.requiredPlan}` };
+  return { access: 'OPEN', requirement: null };
+}
+
 @Injectable()
 export class DiagnosticAdviceCatalogService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly subscriptionService?: SubscriptionService,
+    @Optional() private readonly quizAccess?: QuizContentAccessService,
+    @Optional() private readonly speakingAccess?: SpeakingContentAccessService,
   ) {}
 
   async resolverFor(userId: number): Promise<ResourceResolver> {
@@ -118,9 +144,14 @@ export class DiagnosticAdviceCatalogService {
           title: true,
           isPremiumContent: true,
           practiceSetId: true,
-          practiceSet: { select: { level: true } },
+          practiceSet: { select: { level: true, scope: true } },
         },
       }),
+    ]);
+    // The same decision the item pages make: plan and opened level.
+    const [quizAccess, speakingAccess] = await Promise.all([
+      this.quizAccess?.resolveMany(quizzes, userId),
+      this.speakingAccess?.resolveMany(exercises, userId),
     ]);
 
     let code: string | null | undefined;
@@ -141,39 +172,55 @@ export class DiagnosticAdviceCatalogService {
           (q) => q.id === ref.id && quizKind.types.includes(q.type),
         );
         if (!quiz) continue;
-        const required = practicePlanFor(
-          quizKind.skill,
-          quiz.title,
-          quiz.isPremiumContent,
-          quiz.bilingualContent,
-        );
-        const locked =
-          required !== 'FREE' && !planSatisfies(await planCode(), required);
+        const decided = quizAccess?.get(quiz.id);
+        let lock: ReturnType<typeof adviceLock>;
+        if (decided) lock = adviceLock(decided);
+        else {
+          const required = practicePlanFor(
+            quizKind.skill,
+            quiz.title,
+            quiz.isPremiumContent,
+            quiz.bilingualContent,
+          );
+          const locked =
+            required !== 'FREE' && !planSatisfies(await planCode(), required);
+          lock = {
+            access: locked ? 'LOCKED' : 'OPEN',
+            requirement: locked ? `Cần gói ${required}` : null,
+          };
+        }
         resolved.set(key, {
           ...ref,
           title: quiz.title,
           route: `${quizKind.route}/${quiz.id}`,
-          access: locked ? 'LOCKED' : 'OPEN',
-          requirement: locked ? `Cần gói ${required}` : null,
+          ...lock,
         });
       } else if (ref.kind === 'SPEAKING_EXERCISE') {
         const exercise = exercises.find((e) => e.id === ref.id);
         if (!exercise) continue;
-        const required = practicePlanFor(
-          'SPEAKING',
-          exercise.title,
-          exercise.isPremiumContent,
-        );
-        const locked =
-          required !== 'FREE' && !planSatisfies(await planCode(), required);
+        const decided = speakingAccess?.get(exercise.id);
+        let lock: ReturnType<typeof adviceLock>;
+        if (decided) lock = adviceLock(decided);
+        else {
+          const required = practicePlanFor(
+            'SPEAKING',
+            exercise.title,
+            exercise.isPremiumContent,
+          );
+          const locked =
+            required !== 'FREE' && !planSatisfies(await planCode(), required);
+          lock = {
+            access: locked ? 'LOCKED' : 'OPEN',
+            requirement: locked ? `Cần gói ${required}` : null,
+          };
+        }
         resolved.set(key, {
           ...ref,
           title: exercise.title,
           route: `/speaking/${exercise.id}`,
           setKey: exercise.practiceSetId,
           cefrLevel: exercise.practiceSet?.level ?? null,
-          access: locked ? 'LOCKED' : 'OPEN',
-          requirement: locked ? `Cần gói ${required}` : null,
+          ...lock,
         });
       }
     }
