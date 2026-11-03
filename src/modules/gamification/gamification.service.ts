@@ -270,11 +270,10 @@ function getQuestAction(type: string): {
       return { actionLabel: 'Học từ vựng', actionUrl: '/flashcard' };
     case 'DO_LISTENING':
       return { actionLabel: 'Luyện nghe', actionUrl: '/listening' };
+    // Advances only on standalone Listening, Reading or Writing practice
+    // (reward-eligibility.ts); a TOEIC exam never counts, so never link there.
     case 'COMPLETE_QUIZ':
-      return {
-        actionLabel: 'Làm bài kiểm tra',
-        actionUrl: '/exams',
-      };
+      return { actionLabel: 'Luyện kỹ năng', actionUrl: '/listening' };
     case 'DO_SPEAKING':
     case 'PRACTICE_SPEAKING':
       return { actionLabel: 'Luyện nói', actionUrl: '/speaking' };

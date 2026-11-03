@@ -171,6 +171,14 @@ describe('GamificationService weekly cron hardening', () => {
       }),
     );
     expect(result.quests[0].progressPercent).toBe(100);
+    // COMPLETE_QUIZ counts standalone Listening/Reading/Writing practice; a
+    // TOEIC exam never advances it, so its button must not open the exams.
+    expect(result.quests[1]).toEqual(
+      expect.objectContaining({
+        actionLabel: 'Luyện kỹ năng',
+        actionUrl: '/listening',
+      }),
+    );
   });
 
   describe('awardBanh & daily cap & idempotency', () => {
