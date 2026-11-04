@@ -16,6 +16,13 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { isPlanFeatureKey, PLAN_FEATURE_KEYS } from './subscription.constants';
+import {
+  daysLeft,
+  lockedAfterExpiry,
+  type LockedGroup,
+  type PracticedItem,
+} from './expiry-summary.logic';
+import { isDictationContent, type PracticeSkill } from './practice-level';
 
 type PlanVersionWithDetails = Prisma.PlanVersionGetPayload<{
   include: { plan: true; entitlements: true };
@@ -84,6 +91,24 @@ export interface EffectivePlan {
   entitlements: EffectivePlanEntitlement[];
 }
 
+export interface ExpirySummary {
+  isPaid: boolean;
+  planCode: string;
+  planName: string;
+  endsAt: string | null;
+  daysLeft: number | null;
+  queuedRenewal: { planCode: string; startsAt: string; endsAt: string } | null;
+  lockedAfterExpiry: LockedGroup[];
+}
+
+/** Standalone practice quiz types and their skill (Speaking is counted from sets). */
+const SUMMARY_QUIZ_SKILL: Partial<Record<string, PracticeSkill>> = {
+  LISTENING_PRACTICE: 'LISTENING',
+  BILINGUAL_READING: 'READING',
+  WRITING_PICTURE: 'WRITING',
+  WRITING_EMAIL: 'WRITING',
+};
+
 export interface EffectiveEntitlement {
   featureKey: PlanFeatureKey;
   enabled: boolean;
@@ -135,6 +160,88 @@ export class SubscriptionService {
     }
 
     return this.resolveFreePlan(now);
+  }
+
+  /**
+   * What the running paid plan gives that FREE does not, for the screen shown
+   * before it ends: days left, a queued renewal if any, and the paid practice
+   * the learner used in this plan (distinct items, standalone practice only).
+   */
+  async getExpirySummary(
+    userId: number,
+    now = new Date(),
+  ): Promise<ExpirySummary> {
+    const effective = await this.resolveEffectivePlan(userId, now);
+    if (!effective.isPaid || !effective.subscription) {
+      return {
+        isPaid: false,
+        planCode: effective.plan.code,
+        planName: effective.plan.displayName,
+        endsAt: null,
+        daysLeft: null,
+        queuedRenewal: null,
+        lockedAfterExpiry: [],
+      };
+    }
+    const running = effective.subscription;
+    const [queued, quizzes, speaking] = await Promise.all([
+      this.prisma.subscription.findFirst({
+        where: {
+          userId,
+          status: SubscriptionStatus.ACTIVE,
+          startsAt: { gte: running.endsAt },
+          planVersion: { plan: { code: { not: 'FREE' } } },
+        },
+        include: { planVersion: { include: { plan: true } } },
+        orderBy: { startsAt: 'asc' },
+      }),
+      this.prisma.submission.findMany({
+        where: { userId, submittedAt: { gte: running.startsAt } },
+        distinct: ['quizId'],
+        select: {
+          quiz: { select: { type: true, title: true, bilingualContent: true } },
+        },
+      }),
+      this.prisma.speakingSubmission.findMany({
+        where: { userId, submittedAt: { gte: running.startsAt } },
+        distinct: ['exerciseId'],
+        select: {
+          exercise: {
+            select: { practiceSet: { select: { level: true, scope: true } } },
+          },
+        },
+      }),
+    ]);
+    const items: PracticedItem[] = [];
+    for (const { quiz } of quizzes) {
+      const skill = SUMMARY_QUIZ_SKILL[quiz.type];
+      if (skill)
+        items.push({
+          skill,
+          levelSource: quiz.title,
+          dictation: isDictationContent(quiz.bilingualContent),
+        });
+    }
+    for (const { exercise } of speaking) {
+      const set = exercise.practiceSet;
+      if (set?.scope === 'SKILL_PRACTICE')
+        items.push({ skill: 'SPEAKING', levelSource: set.level });
+    }
+    return {
+      isPaid: true,
+      planCode: effective.plan.code,
+      planName: effective.plan.displayName,
+      endsAt: running.endsAt.toISOString(),
+      daysLeft: daysLeft(running.endsAt, now),
+      queuedRenewal: queued
+        ? {
+            planCode: queued.planVersion.plan.code,
+            startsAt: queued.startsAt.toISOString(),
+            endsAt: queued.endsAt.toISOString(),
+          }
+        : null,
+      lockedAfterExpiry: lockedAfterExpiry(items),
+    };
   }
 
   validatePlanVersionInput(input: PlanVersionValidationInput): void {

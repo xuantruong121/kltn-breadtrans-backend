@@ -12,7 +12,7 @@
  */
 import { call, check, failureCount, newAdmin, onboard } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
-import { harnessQuery } from './harness-db';
+import { harnessExec, harnessQuery } from './harness-db';
 
 const one = (sql: string) => harnessQuery(sql)[0]?.[0];
 
@@ -120,6 +120,65 @@ async function main() {
   );
   check('390 px: no horizontal overflow', overflow <= 1, `(${overflow}px)`);
   await p.browser.close();
+
+  console.log('\n== Last days of PLUS: the expiry banner');
+  const e = await studentPage('renew-ui-expiring', 1366);
+  await onboard(e.account.token);
+  await grant(admin.token, e.account.userId, 'PLUS');
+  harnessExec(
+    `update "Subscription" set "startsAt" = now() - interval '27 days', "endsAt" = now() + interval '2 days 12 hours' where "userId" = ${e.account.userId}`,
+  );
+  // One Writing B1 task done in this plan: PLUS content FREE locks again.
+  const writingB1 = one(
+    `select id from "Quiz" where title like 'Writing B1 %' and "publicationStatus" = 'PUBLISHED' order by id limit 1`,
+  );
+  harnessExec(
+    `insert into "Submission" ("quizId", "userId", score, "submittedAt") values (${writingB1}, ${e.account.userId}, 3, now() - interval '1 day')`,
+  );
+  const summary = await call(
+    'GET',
+    '/subscriptions/me/expiry-summary',
+    e.account.token,
+  );
+  check(
+    'API: 3 days left, nothing queued, Writing Trung cấp used once',
+    summary.data?.daysLeft === 3 &&
+      summary.data?.queuedRenewal === null &&
+      summary.data?.lockedAfterExpiry?.[0]?.label === 'Viết Trung cấp' &&
+      summary.data?.lockedAfterExpiry?.[0]?.count === 1,
+    JSON.stringify(summary.data),
+  );
+  await hidePet(e.page);
+  await e.page.goto(`${FE}/dashboard`, {
+    waitUntil: 'networkidle',
+    timeout: 120_000,
+  });
+  const banner = e.page.getByRole('region', {
+    name: 'Gói dịch vụ sắp hết hạn',
+  });
+  await banner.waitFor({ timeout: 60_000 }).catch(() => undefined);
+  const bannerText = (await banner.innerText().catch(() => '')).replace(
+    /\s+/g,
+    ' ',
+  );
+  check(
+    'dashboard: banner with days left, what locks again, and a renew link',
+    /Gói Plus còn 3 ngày/.test(bannerText) &&
+      /Viết Trung cấp · 1 bài/.test(bannerText) &&
+      (await banner.getByRole('link', { name: 'Gia hạn ngay' }).count()) === 1,
+    bannerText,
+  );
+  await e.page.goto(`${FE}/plans`, {
+    waitUntil: 'networkidle',
+    timeout: 120_000,
+  });
+  await banner.waitFor({ timeout: 60_000 }).catch(() => undefined);
+  check(
+    '/plans: the same banner without its own link (the cards renew)',
+    (await banner.count()) === 1 &&
+      (await banner.getByRole('link', { name: 'Gia hạn ngay' }).count()) === 0,
+  );
+  await e.browser.close();
 
   console.log(`\nPLAN_RENEWAL_BROWSER_FAILURES=${failureCount()}`);
   process.exit(failureCount() ? 1 : 0);
