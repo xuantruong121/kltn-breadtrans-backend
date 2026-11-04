@@ -27,8 +27,10 @@ import {
   PlanPurchasePaymentDto,
   PlanPurchaseQueryDto,
   PlanPurchaseResponseDto,
+  RenewalPreviewDto,
 } from './dto/plan-purchase.dto';
 import { SubscriptionService } from './subscription.service';
+import { decideRenewal, type PaidTerm } from './renewal.logic';
 import { PayosPaymentService } from '../payment/payos-payment.service';
 
 type PurchaseWithDetails = Prisma.PlanPurchaseGetPayload<{
@@ -106,20 +108,6 @@ export class PlanPurchaseService {
         }
       }
 
-      const paidSubscription = await tx.subscription.findFirst({
-        where: {
-          userId: studentId,
-          status: SubscriptionStatus.ACTIVE,
-          endsAt: { gt: new Date() },
-          planVersion: { plan: { code: { not: 'FREE' } } },
-        },
-      });
-      if (paidSubscription) {
-        throw new ConflictException(
-          'An effective or scheduled paid Subscription already exists',
-        );
-      }
-
       const version = await tx.planVersion.findUnique({
         where: { id: planVersionId },
         include: { plan: true, entitlements: true },
@@ -128,6 +116,22 @@ export class PlanPurchaseService {
         throw new NotFoundException('Không tìm thấy phiên bản gói.');
       }
       this.assertPurchasableSnapshot(version);
+
+      // A learner with a running plan may renew (queued after it) or move up
+      // (PRO now, PLUS days converted); renewal.logic decides, and refuses a
+      // downgrade or a second queued plan before any payment is asked for.
+      const decision = decideRenewal({
+        now: new Date(),
+        purchase: {
+          planCode: version.plan.code,
+          priceVnd: version.priceVnd!,
+          durationDays: version.durationDays!,
+        },
+        paid: await this.paidTerms(tx, studentId, new Date()),
+      });
+      if (decision.kind === 'REFUSED') {
+        throw new ConflictException(decision.message);
+      }
 
       const created = await tx.planPurchase.create({
         data: {
@@ -538,10 +542,30 @@ export class PlanPurchaseService {
     }
     this.assertFrozenTerms(current);
 
-    const startsAt = new Date();
-    const endsAt = new Date(
-      startsAt.getTime() + current.durationDays * 24 * 60 * 60 * 1000,
-    );
+    // Decided again at confirmation: the plans may have changed since the
+    // purchase was created (another payment confirmed, a plan ended).
+    const confirmedAt = new Date();
+    const decision = decideRenewal({
+      now: confirmedAt,
+      purchase: {
+        planCode: current.planVersion.plan.code,
+        // List price, so a future discount never changes the conversion rate.
+        priceVnd: current.planVersion.priceVnd ?? current.amountVnd,
+        durationDays: current.durationDays,
+      },
+      paid: await this.paidTerms(tx, current.userId, confirmedAt),
+    });
+    if (decision.kind === 'REFUSED') {
+      throw new ConflictException(decision.message);
+    }
+    if (decision.kind === 'UPGRADE') {
+      // The lower plan ends now; its remaining days are already in endsAt.
+      await tx.subscription.update({
+        where: { id: decision.endSubscriptionId },
+        data: { endsAt: confirmedAt },
+      });
+    }
+    const { startsAt, endsAt } = decision;
     const existingSubscription = await tx.subscription.findFirst({
       where: {
         userId: current.userId,
@@ -583,6 +607,19 @@ export class PlanPurchaseService {
             planPurchaseId: current.id,
             paymentId: current.payment.id,
             source: options.source,
+            placement: decision.kind,
+            ...(decision.kind === 'RENEW'
+              ? { queuedAfterSubscriptionId: decision.afterSubscriptionId }
+              : {}),
+            ...(decision.kind === 'UPGRADE'
+              ? {
+                  upgradedFromSubscriptionId: decision.endSubscriptionId,
+                  upgradedFromPreviousEndsAt:
+                    decision.previousEndsAt.toISOString(),
+                  convertedDays:
+                    Math.round((decision.convertedMs / 86_400_000) * 100) / 100,
+                }
+              : {}),
           },
         },
       });
@@ -591,7 +628,7 @@ export class PlanPurchaseService {
       where: { id: current.payment.id },
       data: {
         status: PlanPaymentStatus.CONFIRMED,
-        confirmedAt: startsAt,
+        confirmedAt,
         confirmedById: options.actorId ?? null,
         confirmationSource: options.source,
       },
@@ -609,7 +646,7 @@ export class PlanPurchaseService {
       where: { id: current.id },
       data: {
         status: PlanPurchaseStatus.COMPLETED,
-        completedAt: startsAt,
+        completedAt: confirmedAt,
       },
     });
     return tx.planPurchase.findUniqueOrThrow({
@@ -746,6 +783,76 @@ export class PlanPurchaseService {
       where: { id: purchaseId },
       data: { status: PlanPurchaseStatus.EXPIRED },
     });
+  }
+
+  /** What buying this plan version now would do, shown before payment. */
+  async previewRenewal(
+    studentId: number,
+    planVersionId: number,
+  ): Promise<RenewalPreviewDto> {
+    const version = await this.prisma.planVersion.findUnique({
+      where: { id: planVersionId },
+      include: { plan: true, entitlements: true },
+    });
+    if (!version) {
+      throw new NotFoundException('Không tìm thấy phiên bản gói.');
+    }
+    this.assertPurchasableSnapshot(version);
+    const now = new Date();
+    const decision = decideRenewal({
+      now,
+      purchase: {
+        planCode: version.plan.code,
+        priceVnd: version.priceVnd!,
+        durationDays: version.durationDays!,
+      },
+      paid: await this.paidTerms(this.prisma, studentId, now),
+    });
+    if (decision.kind === 'REFUSED') {
+      return {
+        kind: 'REFUSED',
+        startsAt: null,
+        endsAt: null,
+        convertedDays: 0,
+        message: decision.message,
+      };
+    }
+    return {
+      kind: decision.kind,
+      startsAt: decision.startsAt.toISOString(),
+      endsAt: decision.endsAt.toISOString(),
+      convertedDays:
+        decision.kind === 'UPGRADE'
+          ? Math.round((decision.convertedMs / 86_400_000) * 100) / 100
+          : 0,
+      message: null,
+    };
+  }
+
+  /** Paid ACTIVE plans not yet ended (running and queued), for renewal.logic. */
+  private async paidTerms(
+    tx: Prisma.TransactionClient,
+    userId: number,
+    now: Date,
+  ): Promise<PaidTerm[]> {
+    const rows = await tx.subscription.findMany({
+      where: {
+        userId,
+        status: SubscriptionStatus.ACTIVE,
+        endsAt: { gt: now },
+        planVersion: { plan: { code: { not: 'FREE' } } },
+      },
+      include: { planVersion: { include: { plan: true } } },
+      orderBy: { startsAt: 'asc' },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      planCode: row.planVersion.plan.code,
+      startsAt: row.startsAt,
+      endsAt: row.endsAt,
+      priceVnd: row.planVersion.priceVnd,
+      durationDays: row.planVersion.durationDays,
+    }));
   }
 
   private async lockUser(

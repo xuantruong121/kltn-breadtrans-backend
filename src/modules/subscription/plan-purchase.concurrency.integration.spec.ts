@@ -134,7 +134,7 @@ describeWithIsolatedDatabase(
       ).toBe(1);
     });
 
-    it('serializes two different purchases for the same user and rejects overlap', async () => {
+    it('serializes two different purchases for the same user: the second is queued after the first, never overlapping', async () => {
       const firstId = await createReportedPurchase('different-first');
       const secondId = await createReportedPurchase(
         'different-second',
@@ -152,14 +152,17 @@ describeWithIsolatedDatabase(
         },
       });
 
+      // Same rank (both TEST_PLUS_*): whichever confirms second is a renewal,
+      // queued to start exactly when the first ends (renewal.logic).
       expect(outcomes).toHaveLength(2);
       expect(
         outcomes.filter((outcome) => outcome.status === 'fulfilled'),
-      ).toHaveLength(1);
-      expect(
-        outcomes.filter((outcome) => outcome.status === 'rejected'),
-      ).toHaveLength(1);
-      expect(subscriptions).toHaveLength(1);
+      ).toHaveLength(2);
+      expect(subscriptions).toHaveLength(2);
+      const [earlier, later] = [...subscriptions].sort(
+        (a, b) => a.startsAt.getTime() - b.startsAt.getTime(),
+      );
+      expect(later.startsAt.getTime()).toBe(earlier.endsAt.getTime());
       expect(
         await prisma.planPurchase.count({
           where: {
@@ -167,7 +170,7 @@ describeWithIsolatedDatabase(
             status: PlanPurchaseStatus.COMPLETED,
           },
         }),
-      ).toBe(1);
+      ).toBe(2);
     });
 
     async function createReportedPurchase(

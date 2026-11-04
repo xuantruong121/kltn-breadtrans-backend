@@ -100,7 +100,11 @@ describe('PlanPurchaseService', () => {
       update: jest.fn(),
     },
     planPayment: { create: jest.fn(), update: jest.fn() },
-    subscription: { findFirst: jest.fn(), create: jest.fn() },
+    subscription: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
     $transaction: jest.fn(),
   });
 
@@ -125,7 +129,10 @@ describe('PlanPurchaseService', () => {
       },
       planPayment: { create: jest.fn(), update: jest.fn() },
       planVersion: { findUnique: jest.fn().mockResolvedValue(version()) },
-      subscription: { findFirst: jest.fn().mockResolvedValue(null) },
+      subscription: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     };
     prisma.planVersion.findUnique.mockResolvedValue(version());
     prisma.$transaction.mockImplementation(((
@@ -264,7 +271,10 @@ describe('PlanPurchaseService', () => {
         update: jest.fn(),
       },
       planPayment: { create: jest.fn(), update: jest.fn() },
-      subscription: { findFirst: jest.fn() },
+      subscription: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn(),
+      },
       planVersion: { findUnique: jest.fn() },
     };
     prisma.planVersion.findUnique.mockResolvedValue(version());
@@ -382,7 +392,10 @@ describe('PlanPurchaseService', () => {
       },
       planPayment: { create: jest.fn(), update: jest.fn() },
       planVersion: { findUnique: jest.fn().mockResolvedValue(version()) },
-      subscription: { findFirst: jest.fn().mockResolvedValue(null) },
+      subscription: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     };
     prisma.planVersion.findUnique.mockResolvedValue(version());
     prisma.$transaction.mockImplementation(((
@@ -491,6 +504,7 @@ describe('PlanPurchaseService', () => {
       planPayment: { update: jest.fn() },
       planVersion: { findUnique: jest.fn() },
       subscription: {
+        findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
       },
@@ -523,6 +537,113 @@ describe('PlanPurchaseService', () => {
     });
   });
 
+  describe('a learner who already has a paid plan', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const confirmWith = async (
+      paidPlan: { code: string; priceVnd: number },
+      endsInDays: number,
+      purchasedCode = 'PLUS',
+    ) => {
+      const prisma = makePrisma();
+      const current = purchase(
+        PlanPurchaseStatus.PENDING_PAYMENT,
+        PlanPaymentStatus.REPORTED,
+      );
+      current.planVersion = {
+        ...current.planVersion,
+        plan: { ...current.planVersion.plan, code: purchasedCode },
+      };
+      const completed = purchase(
+        PlanPurchaseStatus.COMPLETED,
+        PlanPaymentStatus.CONFIRMED,
+        { id: 44 },
+      );
+      const running = {
+        id: 40,
+        startsAt: new Date(Date.now() - 20 * DAY),
+        endsAt: new Date(Date.now() + endsInDays * DAY),
+        planVersion: {
+          priceVnd: paidPlan.priceVnd,
+          durationDays: 30,
+          plan: { code: paidPlan.code },
+        },
+      };
+      const tx = {
+        $queryRaw: jest.fn().mockResolvedValue([{ id: 7 }]),
+        planPurchase: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValueOnce({ userId: 7 })
+            .mockResolvedValueOnce(completed),
+          findUniqueOrThrow: jest
+            .fn()
+            .mockResolvedValueOnce(current)
+            .mockResolvedValueOnce(completed),
+          update: jest.fn(),
+        },
+        planPayment: { update: jest.fn() },
+        planVersion: { findUnique: jest.fn() },
+        subscription: {
+          findMany: jest.fn().mockResolvedValue([running]),
+          findFirst: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({ id: 45 }),
+          update: jest.fn(),
+        },
+        subscriptionEvent: { create: jest.fn() },
+      };
+      prisma.$transaction.mockImplementation(((
+        callback: (value: typeof tx) => unknown,
+      ) => callback(tx)) as never);
+      const service = new PlanPurchaseService(
+        prisma as never,
+        new SubscriptionService(prisma as never),
+      );
+      await service.confirmPurchase(31, 99);
+      return { tx, running };
+    };
+
+    it('renewing the same plan queues it to start exactly when the running one ends', async () => {
+      const { tx, running } = await confirmWith(
+        { code: plan.code, priceVnd: 99000 },
+        10,
+      );
+      const data = tx.subscription.create.mock.calls[0][0].data;
+      expect(data.startsAt).toEqual(running.endsAt);
+      expect(data.endsAt).toEqual(
+        new Date(running.endsAt.getTime() + 30 * DAY),
+      );
+      expect(tx.subscription.update).not.toHaveBeenCalled();
+      expect(
+        tx.subscriptionEvent.create.mock.calls[0][0].data.metadata,
+      ).toMatchObject({ placement: 'RENEW', queuedAfterSubscriptionId: 40 });
+    });
+
+    it('moving up ends the lower plan now and adds its converted days', async () => {
+      // PLUS at 69,000 VND / 30 days is running; PRO (here 99,000 VND / 30 days) is bought.
+      const { tx } = await confirmWith(
+        { code: 'PLUS', priceVnd: 69000 },
+        9,
+        'PRO',
+      );
+      const ended = tx.subscription.update.mock.calls[0][0];
+      expect(ended.where).toEqual({ id: 40 });
+      const data = tx.subscription.create.mock.calls[0][0].data;
+      const lengthMs = data.endsAt.getTime() - data.startsAt.getTime();
+      expect(ended.data.endsAt).toEqual(data.startsAt);
+      // 9 PLUS days at 2,300 VND/day are worth 6.27 PRO days at 3,300 VND/day.
+      expect(lengthMs / DAY).toBeCloseTo(30 + (9 * 2300) / 3300, 2);
+      expect(
+        tx.subscriptionEvent.create.mock.calls[0][0].data.metadata,
+      ).toMatchObject({ placement: 'UPGRADE', upgradedFromSubscriptionId: 40 });
+    });
+
+    it('a lower plan is refused while a higher one runs, before anything is written', async () => {
+      await expect(
+        confirmWith({ code: 'PRO', priceVnd: 149000 }, 10),
+      ).rejects.toThrow('Có thể mua gói');
+    });
+  });
+
   it('accepts a frozen purchase after its version becomes RETIRED', async () => {
     const prisma = makePrisma();
     const current = purchase(
@@ -551,6 +672,7 @@ describe('PlanPurchaseService', () => {
       },
       planPayment: { update: jest.fn() },
       subscription: {
+        findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
       },
@@ -579,7 +701,10 @@ describe('PlanPurchaseService', () => {
         findUnique: jest.fn().mockResolvedValueOnce({ userId: 7 }),
         findUniqueOrThrow: jest.fn().mockResolvedValue(current),
       },
-      subscription: { findFirst: jest.fn().mockResolvedValue({ id: 55 }) },
+      subscription: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue({ id: 55 }),
+      },
       planPayment: { update: jest.fn() },
       planPurchaseUpdate: jest.fn(),
     };
@@ -616,7 +741,11 @@ describe('PlanPurchaseService', () => {
         findUnique: jest.fn().mockResolvedValueOnce({ userId: 7 }),
         findUniqueOrThrow: jest.fn().mockResolvedValue(current),
       },
-      subscription: { findFirst: jest.fn(), create: jest.fn() },
+      subscription: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn(),
+        create: jest.fn(),
+      },
       planPayment: { update: jest.fn() },
     };
     prisma.$transaction.mockImplementation(((

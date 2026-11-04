@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   CreatePlanPurchaseDto,
   PlanPurchaseResponseDto,
+  RenewalPreviewDto,
 } from './dto/plan-purchase.dto';
 import { PlanPurchaseService } from './plan-purchase.service';
 
@@ -57,6 +58,23 @@ export class PlanPurchaseController {
     @Request() request: StudentRequest,
   ): Promise<PlanPurchaseResponseDto[]> {
     return this.purchaseService.getMyPurchases(request.user.id);
+  }
+
+  @Get('renewal-preview/:planVersionId')
+  @ApiOperation({
+    summary:
+      'Where a purchase of this plan version would sit: now, queued after the running plan, or as an upgrade with converted days',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: RenewalPreviewDto })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Unknown plan version',
+  })
+  renewalPreview(
+    @Param('planVersionId', ParseIntPipe) planVersionId: number,
+    @Request() request: StudentRequest,
+  ): Promise<RenewalPreviewDto> {
+    return this.purchaseService.previewRenewal(request.user.id, planVersionId);
   }
 
   @Get(':id')

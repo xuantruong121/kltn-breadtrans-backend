@@ -397,8 +397,7 @@ async function main() {
   );
   check(
     'expired PRO: back to FREE, PRO writing task refused',
-    (await planCode(q.token)) === 'FREE' &&
-      (await proAccess(q.token)) === 403,
+    (await planCode(q.token)) === 'FREE' && (await proAccess(q.token)) === 403,
     `(${await proAccess(q.token)})`,
   );
 
@@ -424,6 +423,103 @@ async function main() {
       (await planCode(c.token)) === 'FREE',
     `(${cancel.status}, ${lateWebhook})`,
   );
+
+  console.log('\n== Renewing early, moving up, never down');
+  {
+    const DAY = 24 * 60 * 60 * 1000;
+    const pay = async (token: string, code: 'PLUS' | 'PRO') => {
+      const bought = await buy(token, code);
+      const status = await postWebhook(
+        webhookData(bought.orderCode, versions[code].price, bought.linkId),
+      );
+      return { ...bought, webhook: status };
+    };
+    const rows = (userId: number) =>
+      harnessQuery(
+        `select s.id, extract(epoch from s."startsAt") * 1000, extract(epoch from s."endsAt") * 1000, p.code from "Subscription" s join "PlanVersion" pv on pv.id = s."planVersionId" join "Plan" p on p.id = pv."planId" where s."userId" = ${userId} and p.code <> 'FREE' order by s.id`,
+      ).map(([id, start, end, code]) => ({
+        id: Number(id),
+        startsAt: Number(start),
+        endsAt: Number(end),
+        code,
+      }));
+
+    const r = await newStudent('sub-renew');
+    await pay(r.token, 'PLUS');
+    const first = rows(r.userId)[0];
+    const preview = await call(
+      'GET',
+      `/plan-purchases/renewal-preview/${versions.PLUS.id}`,
+      r.token,
+    );
+    check(
+      'preview: renewing PLUS while PLUS runs is queued after it',
+      preview.status === 200 &&
+        preview.data?.kind === 'RENEW' &&
+        Math.abs(Date.parse(preview.data.startsAt) - first.endsAt) < 1000,
+      JSON.stringify(preview.data),
+    );
+    const renewed = await pay(r.token, 'PLUS');
+    const afterRenew = rows(r.userId);
+    check(
+      'renewing early: the new PLUS starts exactly when the running one ends, the learner keeps PLUS now',
+      renewed.status < 300 &&
+        renewed.webhook < 300 &&
+        afterRenew.length === 2 &&
+        Math.abs(afterRenew[1].startsAt - afterRenew[0].endsAt) < 1000 &&
+        Math.abs(afterRenew[1].endsAt - afterRenew[1].startsAt - 30 * DAY) <
+          1000 &&
+        (await planCode(r.token)) === 'PLUS',
+      JSON.stringify(afterRenew),
+    );
+    const third = await buy(r.token, 'PLUS');
+    check(
+      'a second queued plan is refused before any payment link is made',
+      third.status === 409,
+      `(${third.status})`,
+    );
+
+    const u = await newStudent('sub-upgrade');
+    await pay(u.token, 'PLUS');
+    // 10 PLUS days left.
+    harnessExec(
+      `update "Subscription" set "startsAt" = now() - interval '20 days', "endsAt" = now() + interval '10 days' where "userId" = ${u.userId}`,
+    );
+    const upgradePreview = await call(
+      'GET',
+      `/plan-purchases/renewal-preview/${versions.PRO.id}`,
+      u.token,
+    );
+    const expectedDays =
+      (10 * (versions.PLUS.price / 30)) / (versions.PRO.price / 30);
+    check(
+      'preview: PLUS to PRO starts now with the PLUS days left converted',
+      upgradePreview.data?.kind === 'UPGRADE' &&
+        Math.abs(upgradePreview.data.convertedDays - expectedDays) < 0.02,
+      JSON.stringify(upgradePreview.data),
+    );
+    const before = Date.now();
+    await pay(u.token, 'PRO');
+    const afterUpgrade = rows(u.userId);
+    const plusRow = afterUpgrade.find((row) => row.code === 'PLUS')!;
+    const proRow = afterUpgrade.find((row) => row.code === 'PRO')!;
+    check(
+      'moving up: PRO is in effect now, PLUS ended now, PRO runs 30 days plus the converted days',
+      (await planCode(u.token)) === 'PRO' &&
+        plusRow.endsAt <= Date.now() &&
+        plusRow.endsAt >= before - 5000 &&
+        Math.abs(
+          (proRow.endsAt - proRow.startsAt) / DAY - (30 + expectedDays),
+        ) < 0.02,
+      JSON.stringify(afterUpgrade),
+    );
+    const down = await buy(u.token, 'PLUS');
+    check(
+      'PLUS while PRO runs is refused before any payment link is made',
+      down.status === 409,
+      `(${down.status})`,
+    );
+  }
 
   const calls: Array<{ authorized: boolean }> = await (
     await fetch(`${FAKE}/__mock/requests`)

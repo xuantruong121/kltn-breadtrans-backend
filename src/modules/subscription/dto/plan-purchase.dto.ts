@@ -208,3 +208,31 @@ export class PaginatedPlanPurchasesDto {
   @ApiProperty()
   totalPages!: number;
 }
+
+export class RenewalPreviewDto {
+  @ApiProperty({
+    enum: ['NEW', 'RENEW', 'UPGRADE', 'REFUSED'],
+    description:
+      'NEW: starts now. RENEW: queued after the running plan. UPGRADE: starts now, the running plan ends and its days are converted. REFUSED: cannot be bought now.',
+  })
+  kind!: 'NEW' | 'RENEW' | 'UPGRADE' | 'REFUSED';
+
+  @ApiPropertyOptional({ nullable: true, type: String, format: 'date-time' })
+  startsAt!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String, format: 'date-time' })
+  endsAt!: string | null;
+
+  @ApiProperty({
+    description:
+      'Days of the running plan converted into the new one (UPGRADE only).',
+  })
+  convertedDays!: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    description: 'Why the plan cannot be bought now (REFUSED only).',
+  })
+  message!: string | null;
+}
