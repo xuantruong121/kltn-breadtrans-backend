@@ -22,6 +22,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { QuizService } from './quiz.service';
+import { asMissingQuestionAudio } from './question-audio-errors';
 import {
   CreateQuizDto,
   CreateQuestionDto,
@@ -169,6 +170,10 @@ export class QuizController {
   @ApiBearerAuth()
   @Get(':quizId/questions/:questionId/audio')
   @ApiOperation({ summary: 'Phát audio cho một câu luyện nghe' })
+  @ApiResponse({
+    status: 404,
+    description: 'Chưa có tệp audio cho câu hỏi này',
+  })
   async streamQuestionAudio(
     @Param('quizId', ParseIntPipe) quizId: number,
     @Param('questionId', ParseIntPipe) questionId: number,
@@ -178,13 +183,17 @@ export class QuizController {
     @Req() req: any,
     @Res() res: Response,
   ) {
-    const result = await this.quizService.streamQuestionAudio(
-      quizId,
-      questionId,
-      this.parseAudioIdentity(artifactId, version, checksumSha256),
-      req.user?.id,
-      req.user?.role,
-    );
+    const result = await this.quizService
+      .streamQuestionAudio(
+        quizId,
+        questionId,
+        this.parseAudioIdentity(artifactId, version, checksumSha256),
+        req.user?.id,
+        req.user?.role,
+      )
+      .catch((error: unknown) => {
+        throw asMissingQuestionAudio(error);
+      });
     return this.sendListeningAudio(res, req, result);
   }
 
@@ -199,11 +208,11 @@ export class QuizController {
     @Req() req: any,
     @Res() res: Response,
   ) {
-    const result = await this.quizService.streamGateQuestionAudio(
-      attemptId,
-      questionId,
-      req.user.id,
-    );
+    const result = await this.quizService
+      .streamGateQuestionAudio(attemptId, questionId, req.user.id)
+      .catch((error: unknown) => {
+        throw asMissingQuestionAudio(error);
+      });
     return this.sendListeningAudio(res, req, result);
   }
 
