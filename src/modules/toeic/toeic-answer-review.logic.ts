@@ -285,6 +285,23 @@ export function quoteFound(quote: string, source: string) {
   return fragments.length > 0 && fragments.every((f) => haystack.includes(f));
 }
 
+/**
+ * A Part 6 blank filled with a whole sentence ("Choose the sentence that best
+ * completes blank [n]"): the chosen sentence is not in the passage yet, so
+ * the solver may quote the option alone, as for a Part 2 response.
+ */
+export function isSentenceInsertion(
+  part: number,
+  questionText: string | null | undefined,
+) {
+  return part === 6 && /choose the sentence/i.test(questionText ?? '');
+}
+
+/** A quote that is only a blank marker ("[146] _____") names no text. */
+function quotesText(quote: string) {
+  return normalizeForMatch(quote).replace(/[_\s.,;:!?"'-]/g, '').length >= 3;
+}
+
 export function judgeSolve(input: {
   part: number;
   stimulus?: string;
@@ -336,16 +353,22 @@ export function judgeSolve(input: {
   const source = [input.stimulus, input.questionText, ...(input.options ?? [])]
     .filter(Boolean)
     .join('\n');
-  const missing = answer.evidence.filter((quote) => !quoteFound(quote, source));
+  const insertion = isSentenceInsertion(input.part, input.questionText);
+  const quotes = insertion
+    ? answer.evidence.filter(quotesText)
+    : answer.evidence;
+  const missing = quotes.filter((quote) => !quoteFound(quote, source));
   if (missing.length)
     return {
       verdict: 'EVIDENCE_NOT_FOUND',
       detail: `Trích dẫn không có trong ngữ liệu: "${missing[0].slice(0, 160)}".`,
     };
   // With a long stimulus, repeating the options proves nothing: one quote must
-  // come from it. A Part 2 prompt is one line, so its response may stand alone.
+  // come from it. A Part 2 prompt is one line, so its response may stand alone,
+  // and a sentence to insert into Part 6 is not in the passage yet.
   if (
     input.part !== 2 &&
+    !insertion &&
     !answer.evidence.some((quote) => quoteFound(quote, input.stimulus ?? ''))
   )
     return {

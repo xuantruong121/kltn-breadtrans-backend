@@ -1,4 +1,8 @@
-import { questionContentIssue, questionsToAvoid } from './toeic-ai-batch.logic';
+import {
+  languageIssue,
+  questionContentIssue,
+  questionsToAvoid,
+} from './toeic-ai-batch.logic';
 
 describe('questionContentIssue', () => {
   const group = (fields: Record<string, string>, ...texts: string[]) => ({
@@ -124,5 +128,54 @@ describe('questionsToAvoid', () => {
       'B',
       'C',
     ]);
+  });
+});
+
+describe('languageIssue', () => {
+  // Live rerun 2026-11-04: a whole Part 6 batch came back in Vietnamese.
+  it('refuses a passage written in Vietnamese', () => {
+    expect(
+      languageIssue({
+        passageText:
+          'Kính gửi toàn thể nhân viên, công ty chúng tôi sẽ [131] _____ một khóa đào tạo kỹ năng mềm vào tháng tới.',
+        questions: [
+          {
+            text: 'Choose the best option for blank [131].',
+            options: ['tăng cường', 'cung cấp', 'yêu cầu', 'loại bỏ'],
+          },
+        ],
+      }),
+    ).toMatch(/passage đang viết bằng tiếng Việt/);
+  });
+
+  it('refuses Vietnamese options under an English passage', () => {
+    expect(
+      languageIssue({
+        passageText:
+          'Our company will [131] _____ a training course next month.',
+        questions: [
+          {
+            text: 'Choose the best option for blank [131].',
+            options: ['tăng cường', 'cung cấp', 'yêu cầu', 'loại bỏ'],
+          },
+        ],
+      }),
+    ).toMatch(/phương án câu 1/);
+  });
+
+  it('accepts English with a Vietnamese name, loanwords and Vietnamese explanations', () => {
+    expect(
+      languageIssue({
+        transcript:
+          'M: Ms. Nguyễn left her résumé at the café near the office.',
+        questions: [
+          {
+            text: 'Where did Ms. Nguyễn leave her résumé?',
+            options: ['At the café', 'At home', 'At the bank', 'On the train'],
+            explanation: 'Người đàn ông nói cô ấy để quên hồ sơ ở quán cà phê.',
+          },
+        ],
+      }),
+    ).toBeNull();
   });
 });

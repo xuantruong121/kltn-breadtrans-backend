@@ -233,6 +233,38 @@ export function plannedGroupIssue(planned: PlannedTraits, group: BatchGroup) {
   return null;
 }
 
+// Letters only Vietnamese writes; French or Spanish loanwords ("café",
+// "résumé") use none of them.
+const VIETNAMESE_LETTERS =
+  /[ăđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/giu;
+const vietnameseLetters = (text: unknown) =>
+  String(text ?? '').match(VIETNAMESE_LETTERS)?.length ?? 0;
+
+/**
+ * Learner-facing exam text is English; only the explanations are Vietnamese.
+ * The live rerun of 2026-11-04 drew a Part 6 batch written in Vietnamese.
+ * A stray Vietnamese name ("Ms. Nguyễn") is one or two letters, so a field is
+ * refused from three.
+ */
+export function languageIssue(group: BatchGroup) {
+  const fields: Array<[string, unknown]> = [
+    ['transcript', group.transcript],
+    ['passage', group.passageText],
+    ['image brief', group.imageBrief],
+    ...(group.questions ?? []).flatMap((question, index) => [
+      [`câu ${index + 1}`, question.text] as [string, unknown],
+      [
+        `phương án câu ${index + 1}`,
+        Array.isArray(question.options) ? question.options.join(' ') : '',
+      ] as [string, unknown],
+    ]),
+  ];
+  const vietnamese = fields.find(([, text]) => vietnameseLetters(text) >= 3);
+  return vietnamese
+    ? `Nội dung đề phải bằng tiếng Anh (chỉ phần giải thích bằng tiếng Việt): ${vietnamese[0]} đang viết bằng tiếng Việt`
+    : null;
+}
+
 // 'The word "covered" in paragraph 2, line 3, is closest in meaning to'
 const CLOSEST_IN_MEANING = /closest in meaning/i;
 const QUOTED_TARGET =
