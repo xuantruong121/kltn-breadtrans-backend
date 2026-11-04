@@ -68,6 +68,17 @@ enum SubscriptionEventType {
   ADMIN_GRANTED
   ADMIN_EXTENDED
   ADMIN_REVOKED
+  TRIAL_GRANTED
+  REFERRAL_REWARD
+}
+
+/// Where a subscription came from. TRIAL is the free 3-day PLUS after the
+/// entry diagnostic and is not a paid term; REFERRAL is a referral reward.
+enum SubscriptionSource {
+  PURCHASE
+  ADMIN
+  TRIAL
+  REFERRAL
 }
 
 enum PlanPurchaseStatus {
@@ -187,6 +198,11 @@ model User {
   subscriptions                   Subscription[]
   subscriptionEventsActed         SubscriptionEvent[]              @relation("SubscriptionEventActor")
   planPurchases                   PlanPurchase[]
+  promoCodes                      PromoCode[]
+  promoRedemptions                PromoRedemption[]
+  referralCode                    ReferralCode?
+  referralsMade                   Referral[]                       @relation("ReferralsMade")
+  referredBy                      Referral?                        @relation("ReferralInvitee")
   payosPaymentIntents             PayOSPaymentIntent[]
   confirmedPlanPayments           PlanPayment[]                    @relation("PlanPaymentConfirmer")
   rejectedPlanPayments            PlanPayment[]                    @relation("PlanPaymentRejecter")
@@ -335,6 +351,7 @@ model Subscription {
   status         SubscriptionStatus @default(ACTIVE)
   startsAt       DateTime
   endsAt         DateTime
+  source         SubscriptionSource @default(PURCHASE)
   planPurchaseId Int?               @unique
   planPurchase   PlanPurchase?      @relation(fields: [planPurchaseId], references: [id], onDelete: Restrict)
   createdAt      DateTime           @default(now())
@@ -374,6 +391,12 @@ model PlanPurchase {
   amountVnd              Int
   currency               String             @default("VND")
   durationDays           Int
+  /// Price of the plan version when the purchase was made.
+  listPriceVnd           Int
+  /// Promo discount; amountVnd = listPriceVnd - discountVnd.
+  discountVnd            Int                @default(0)
+  promoCodeId            Int?
+  promoCode              PromoCode?         @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
   idempotencyKey         String
   completedAt            DateTime?
   supersededAt           DateTime?
@@ -2166,9 +2189,9 @@ model GrammarTopic {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @default(now()) @updatedAt
 
-  questions        GrammarQuestion[]
-  attempts         GrammarAttempt[]
-  rewards          UserGrammarReward[]
+  questions GrammarQuestion[]
+  attempts  GrammarAttempt[]
+  rewards   UserGrammarReward[]
 }
 
 model GrammarQuestion {
@@ -2684,4 +2707,81 @@ model LearningPlanItem {
 
   @@unique([userId, contentType, contentId])
   @@index([userId, status])
+}
+
+enum PromoCodeSource {
+  ADMIN
+  WINBACK
+}
+
+/// A discount code on a paid plan. A personal code (userId set) works for its
+/// owner only; WINBACK codes are made by the win-back job.
+model PromoCode {
+  id             Int               @id @default(autoincrement())
+  /// Stored upper-case.
+  code           String            @unique
+  percentOff     Int
+  validFrom      DateTime?
+  validTo        DateTime?
+  /// Plan codes it applies to; empty = every paid plan.
+  planCodes      String[]
+  maxRedemptions Int?
+  perUserOnce    Boolean           @default(true)
+  source         PromoCodeSource   @default(ADMIN)
+  userId         Int?
+  user           User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  active         Boolean           @default(true)
+  note           String?
+  createdById    Int?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  redemptions    PromoRedemption[]
+  purchases      PlanPurchase[]
+
+  @@index([userId])
+  @@index([source, createdAt])
+}
+
+/// One paid purchase that used a code; written when the payment completes.
+model PromoRedemption {
+  id             Int       @id @default(autoincrement())
+  promoCodeId    Int
+  promoCode      PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
+  userId         Int
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planPurchaseId Int       @unique
+  discountVnd    Int
+  createdAt      DateTime  @default(now())
+
+  @@index([promoCodeId])
+  @@index([userId, promoCodeId])
+}
+
+/// A learner's own invite code (made on first request).
+model ReferralCode {
+  userId    Int      @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String   @unique
+  createdAt DateTime @default(now())
+}
+
+enum ReferralStatus {
+  PENDING
+  REWARDED
+}
+
+/// One invited learner. Both sides get 7 days when the invitee's first
+/// payment completes; an invitee can be referred once.
+model Referral {
+  id               Int            @id @default(autoincrement())
+  referrerId       Int
+  referrer         User           @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  inviteeId        Int            @unique
+  invitee          User           @relation("ReferralInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+  status           ReferralStatus @default(PENDING)
+  rewardPurchaseId Int?
+  rewardedAt       DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([referrerId, status])
 }

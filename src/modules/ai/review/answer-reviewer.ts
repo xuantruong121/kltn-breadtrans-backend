@@ -3,10 +3,17 @@ import type { ReviewPrompt } from '../toeic-answer-review-prompt';
 
 export type ReviewerImage = { buffer: Buffer; mimeType: string };
 
+/** What a provider reports for one call; Cloudflare also bills Neurons. */
+export type ReviewUsage = {
+  inputTokens?: number;
+  outputTokens?: number;
+  neurons?: number;
+};
+
 export type ReviewerReply = {
   data: unknown;
   model: string;
-  usage?: { inputTokens?: number; outputTokens?: number };
+  usage?: ReviewUsage;
 };
 
 /** One provider able to answer a review prompt with JSON. */
@@ -38,9 +45,11 @@ export function isReviewerUnavailable(error: unknown) {
 export class ReviewerOutputError extends Error {}
 
 /**
- * Network failure, timeout, 429, 5xx or missing credentials: the provider
- * could not be used. Anything else (a reply that is not JSON, a refusal) is an
- * invalid answer, which a retry of the content may fix.
+ * Network failure, timeout, 429, 413, 5xx or missing credentials: the provider
+ * could not be used. 413 is a request larger than the provider's per-minute
+ * token limit (Groq), which no change of content fixes. Anything else (a reply
+ * that is not JSON, a refusal) is an invalid answer, which a retry of the
+ * content may fix.
  */
 export function isProviderOutage(error: unknown) {
   if (error instanceof ReviewerOutputError) return false;
@@ -48,7 +57,13 @@ export function isProviderOutage(error: unknown) {
   const status = Number(
     (error as any)?.status ?? (error as any)?.statusCode ?? NaN,
   );
-  if (status === 429 || status === 401 || status === 403 || status >= 500)
+  if (
+    status === 429 ||
+    status === 413 ||
+    status === 401 ||
+    status === 403 ||
+    status >= 500
+  )
     return true;
   const text = String((error as Error)?.message ?? error).toLowerCase();
   return (

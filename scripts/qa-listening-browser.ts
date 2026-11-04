@@ -20,7 +20,7 @@ async function main() {
     const user = await prisma.user.create({ data: { email, password: await bcrypt.hash(password, 10), role: Role.STUDENT, emailVerifiedAt: new Date(), profile: { create: { fullName: 'QA Listening Browser' } } } });
     userId = user.id;
     const plusVersion = await prisma.planVersion.findFirst({
-      where: { isCurrent: true, status: 'PUBLISHED', plan: { code: 'PLUS', status: 'ACTIVE' } },
+      where: { isCurrent: true, durationDays: 30, status: 'PUBLISHED', plan: { code: 'PLUS', status: 'ACTIVE' } },
       select: { id: true },
     });
     if (!plusVersion) throw new Error('CURRENT_PLUS_PLAN_VERSION_NOT_FOUND');

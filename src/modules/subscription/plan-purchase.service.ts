@@ -14,6 +14,7 @@ import {
   PlanVersionStatus,
   Prisma,
   SubscriptionEventType,
+  SubscriptionSource,
   SubscriptionStatus,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -27,9 +28,18 @@ import {
   PlanPurchasePaymentDto,
   PlanPurchaseQueryDto,
   PlanPurchaseResponseDto,
+  PromoPreviewDto,
+  RenewalPreviewDto,
 } from './dto/plan-purchase.dto';
 import { SubscriptionService } from './subscription.service';
+import { decideRenewal, type PaidTerm } from './renewal.logic';
+import {
+  evaluatePromo,
+  frozenPriceHolds,
+  normalizePromoCode,
+} from './promo.logic';
 import { PayosPaymentService } from '../payment/payos-payment.service';
+import { ReferralService } from './referral.service';
 
 type PurchaseWithDetails = Prisma.PlanPurchaseGetPayload<{
   include: {
@@ -37,6 +47,7 @@ type PurchaseWithDetails = Prisma.PlanPurchaseGetPayload<{
     planVersion: { include: { plan: true; entitlements: true } };
     payment: { include: { payosIntent: true } };
     subscription: true;
+    promoCode: true;
   };
 }>;
 
@@ -46,13 +57,16 @@ export class PlanPurchaseService {
     private readonly prisma: PrismaService,
     private readonly subscriptionService: SubscriptionService,
     @Optional() private readonly payos?: PayosPaymentService,
+    @Optional() private readonly referrals?: ReferralService,
   ) {}
 
   async createPurchase(
     studentId: number,
     planVersionId: number,
     idempotencyKey: string,
+    promoCode?: string | null,
   ): Promise<PlanPurchaseResponseDto> {
+    const wantedCode = promoCode?.trim() ? normalizePromoCode(promoCode) : null;
     const key = idempotencyKey.trim();
     if (!key) {
       throw new BadRequestException('Thiếu mã chống trùng của yêu cầu.');
@@ -93,7 +107,12 @@ export class PlanPurchaseService {
       const activePurchase = openPurchases.find((candidate) =>
         this.isActivePaymentIntent(candidate),
       );
-      if (activePurchase) {
+      // The open payment is reused only for the same code (or none): a learner
+      // who adds or changes a code gets a new payment at the new price.
+      if (
+        activePurchase &&
+        (activePurchase.promoCode?.code ?? null) === wantedCode
+      ) {
         return activePurchase;
       }
       for (const stalePurchase of openPurchases) {
@@ -106,20 +125,6 @@ export class PlanPurchaseService {
         }
       }
 
-      const paidSubscription = await tx.subscription.findFirst({
-        where: {
-          userId: studentId,
-          status: SubscriptionStatus.ACTIVE,
-          endsAt: { gt: new Date() },
-          planVersion: { plan: { code: { not: 'FREE' } } },
-        },
-      });
-      if (paidSubscription) {
-        throw new ConflictException(
-          'An effective or scheduled paid Subscription already exists',
-        );
-      }
-
       const version = await tx.planVersion.findUnique({
         where: { id: planVersionId },
         include: { plan: true, entitlements: true },
@@ -129,11 +134,39 @@ export class PlanPurchaseService {
       }
       this.assertPurchasableSnapshot(version);
 
+      // A learner with a running plan may renew (queued after it) or move up
+      // (PRO now, PLUS days converted); renewal.logic decides, and refuses a
+      // downgrade or a second queued plan before any payment is asked for.
+      const decision = decideRenewal({
+        now: new Date(),
+        purchase: {
+          planCode: version.plan.code,
+          priceVnd: version.priceVnd!,
+          durationDays: version.durationDays!,
+        },
+        paid: await this.paidTerms(tx, studentId, new Date()),
+      });
+      if (decision.kind === 'REFUSED') {
+        throw new ConflictException(decision.message);
+      }
+
+      const price = await this.priceFor(tx, {
+        studentId,
+        version,
+        code: wantedCode,
+      });
+      if (price.refusal) {
+        throw new BadRequestException(price.refusal);
+      }
+
       const created = await tx.planPurchase.create({
         data: {
           userId: studentId,
           planVersionId: version.id,
-          amountVnd: version.priceVnd!,
+          listPriceVnd: price.listPriceVnd,
+          discountVnd: price.discountVnd,
+          promoCodeId: price.promoCodeId,
+          amountVnd: price.amountVnd,
           currency: version.currency,
           durationDays: version.durationDays!,
           idempotencyKey: key,
@@ -252,6 +285,8 @@ export class PlanPurchaseService {
       const currentVersion = await tx.planVersion.findFirst({
         where: {
           planId: current.planVersion.planId,
+          // A plan sells one current version per term: keep the same term.
+          durationDays: current.planVersion.durationDays,
           isCurrent: true,
           status: PlanVersionStatus.PUBLISHED,
         },
@@ -279,11 +314,21 @@ export class PlanPurchaseService {
         },
       });
 
+      // The code carries over while it is still valid for this learner;
+      // otherwise the replacement is at the full current price.
+      const price = await this.priceFor(tx, {
+        studentId,
+        version: currentVersion,
+        promoCodeId: current.promoCodeId,
+      });
       const created = await tx.planPurchase.create({
         data: {
           userId: studentId,
           planVersionId: currentVersion.id,
-          amountVnd: currentVersion.priceVnd!,
+          listPriceVnd: price.listPriceVnd,
+          discountVnd: price.discountVnd,
+          promoCodeId: price.promoCodeId,
+          amountVnd: price.amountVnd,
           currency: currentVersion.currency,
           durationDays: currentVersion.durationDays!,
           idempotencyKey: `replace:${purchaseId}:${randomUUID()}`,
@@ -538,10 +583,40 @@ export class PlanPurchaseService {
     }
     this.assertFrozenTerms(current);
 
-    const startsAt = new Date();
-    const endsAt = new Date(
-      startsAt.getTime() + current.durationDays * 24 * 60 * 60 * 1000,
-    );
+    // Decided again at confirmation: the plans may have changed since the
+    // purchase was created (another payment confirmed, a plan ended).
+    const confirmedAt = new Date();
+    const decision = decideRenewal({
+      now: confirmedAt,
+      purchase: {
+        planCode: current.planVersion.plan.code,
+        // List price, so a discount never changes the conversion rate.
+        priceVnd: current.listPriceVnd,
+        durationDays: current.durationDays,
+      },
+      paid: await this.paidTerms(tx, current.userId, confirmedAt),
+    });
+    if (decision.kind === 'REFUSED') {
+      throw new ConflictException(decision.message);
+    }
+    if (decision.kind === 'UPGRADE') {
+      // The lower plan ends now; its remaining days are already in endsAt.
+      await tx.subscription.update({
+        where: { id: decision.endSubscriptionId },
+        data: { endsAt: confirmedAt },
+      });
+    }
+    const { startsAt, endsAt } = decision;
+    // A running free trial ends when a real plan is paid for.
+    await tx.subscription.updateMany({
+      where: {
+        userId: current.userId,
+        source: SubscriptionSource.TRIAL,
+        status: SubscriptionStatus.ACTIVE,
+        endsAt: { gt: confirmedAt },
+      },
+      data: { endsAt: confirmedAt },
+    });
     const existingSubscription = await tx.subscription.findFirst({
       where: {
         userId: current.userId,
@@ -567,6 +642,21 @@ export class PlanPurchaseService {
         endsAt,
       },
     });
+    await this.referrals?.rewardOnFirstPayment(tx, current, confirmedAt);
+    if (current.promoCodeId !== null && current.promoCodeId !== undefined) {
+      // A paid purchase is honoured even if the code ran out meanwhile; the
+      // redemption is what later counts toward the code's limits.
+      await tx.promoRedemption.upsert({
+        where: { planPurchaseId: current.id },
+        create: {
+          promoCodeId: current.promoCodeId,
+          userId: current.userId,
+          planPurchaseId: current.id,
+          discountVnd: current.discountVnd,
+        },
+        update: {},
+      });
+    }
     if (tx.subscriptionEvent?.create) {
       await tx.subscriptionEvent.create({
         data: {
@@ -583,6 +673,19 @@ export class PlanPurchaseService {
             planPurchaseId: current.id,
             paymentId: current.payment.id,
             source: options.source,
+            placement: decision.kind,
+            ...(decision.kind === 'RENEW'
+              ? { queuedAfterSubscriptionId: decision.afterSubscriptionId }
+              : {}),
+            ...(decision.kind === 'UPGRADE'
+              ? {
+                  upgradedFromSubscriptionId: decision.endSubscriptionId,
+                  upgradedFromPreviousEndsAt:
+                    decision.previousEndsAt.toISOString(),
+                  convertedDays:
+                    Math.round((decision.convertedMs / 86_400_000) * 100) / 100,
+                }
+              : {}),
           },
         },
       });
@@ -591,7 +694,7 @@ export class PlanPurchaseService {
       where: { id: current.payment.id },
       data: {
         status: PlanPaymentStatus.CONFIRMED,
-        confirmedAt: startsAt,
+        confirmedAt,
         confirmedById: options.actorId ?? null,
         confirmationSource: options.source,
       },
@@ -609,7 +712,7 @@ export class PlanPurchaseService {
       where: { id: current.id },
       data: {
         status: PlanPurchaseStatus.COMPLETED,
-        completedAt: startsAt,
+        completedAt: confirmedAt,
       },
     });
     return tx.planPurchase.findUniqueOrThrow({
@@ -688,6 +791,7 @@ export class PlanPurchaseService {
     planVersion: { include: { plan: true, entitlements: true } },
     payment: { include: { payosIntent: true } },
     subscription: true,
+    promoCode: true,
   } as const;
 
   private readonly paymentIntentTtlMs =
@@ -746,6 +850,78 @@ export class PlanPurchaseService {
       where: { id: purchaseId },
       data: { status: PlanPurchaseStatus.EXPIRED },
     });
+  }
+
+  /** What buying this plan version now would do, shown before payment. */
+  async previewRenewal(
+    studentId: number,
+    planVersionId: number,
+  ): Promise<RenewalPreviewDto> {
+    const version = await this.prisma.planVersion.findUnique({
+      where: { id: planVersionId },
+      include: { plan: true, entitlements: true },
+    });
+    if (!version) {
+      throw new NotFoundException('Không tìm thấy phiên bản gói.');
+    }
+    this.assertPurchasableSnapshot(version);
+    const now = new Date();
+    const decision = decideRenewal({
+      now,
+      purchase: {
+        planCode: version.plan.code,
+        priceVnd: version.priceVnd!,
+        durationDays: version.durationDays!,
+      },
+      paid: await this.paidTerms(this.prisma, studentId, now),
+    });
+    if (decision.kind === 'REFUSED') {
+      return {
+        kind: 'REFUSED',
+        startsAt: null,
+        endsAt: null,
+        convertedDays: 0,
+        message: decision.message,
+      };
+    }
+    return {
+      kind: decision.kind,
+      startsAt: decision.startsAt.toISOString(),
+      endsAt: decision.endsAt.toISOString(),
+      convertedDays:
+        decision.kind === 'UPGRADE'
+          ? Math.round((decision.convertedMs / 86_400_000) * 100) / 100
+          : 0,
+      message: null,
+    };
+  }
+
+  /** Paid ACTIVE plans not yet ended (running and queued), for renewal.logic. */
+  private async paidTerms(
+    tx: Prisma.TransactionClient,
+    userId: number,
+    now: Date,
+  ): Promise<PaidTerm[]> {
+    const rows = await tx.subscription.findMany({
+      where: {
+        userId,
+        status: SubscriptionStatus.ACTIVE,
+        endsAt: { gt: now },
+        // A free trial is not a paid plan: buying during it starts now.
+        source: { not: SubscriptionSource.TRIAL },
+        planVersion: { plan: { code: { not: 'FREE' } } },
+      },
+      include: { planVersion: { include: { plan: true } } },
+      orderBy: { startsAt: 'asc' },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      planCode: row.planVersion.plan.code,
+      startsAt: row.startsAt,
+      endsAt: row.endsAt,
+      priceVnd: row.planVersion.priceVnd,
+      durationDays: row.planVersion.durationDays,
+    }));
   }
 
   private async lockUser(
@@ -811,12 +987,126 @@ export class PlanPurchaseService {
     }
   }
 
+  /**
+   * What the learner pays for `version`, with a promo code when given (by
+   * code on a new purchase, by id on a replacement). The counts are taken
+   * under a per-code lock, so the last use of a limited code is sold once.
+   * A refused code leaves the full price and says why.
+   */
+  private async priceFor(
+    tx: Prisma.TransactionClient,
+    input: {
+      studentId: number;
+      version: { priceVnd: number | null; plan: { code: string } };
+      code?: string | null;
+      promoCodeId?: number | null;
+    },
+  ): Promise<{
+    listPriceVnd: number;
+    discountVnd: number;
+    amountVnd: number;
+    promoCodeId: number | null;
+    percentOff: number | null;
+    refusal: string | null;
+  }> {
+    const listPriceVnd = input.version.priceVnd!;
+    const full = {
+      listPriceVnd,
+      discountVnd: 0,
+      amountVnd: listPriceVnd,
+      promoCodeId: null,
+      percentOff: null,
+      refusal: null,
+    };
+    if (!input.code && !input.promoCodeId) return full;
+    const promo = input.code
+      ? await tx.promoCode.findUnique({ where: { code: input.code } })
+      : await tx.promoCode.findUnique({ where: { id: input.promoCodeId! } });
+    let usedByUser = 0;
+    let usedTotal = 0;
+    if (promo) {
+      const lockKey = `promo:${promo.id}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      const [mine, redeemed, openByOthers] = await Promise.all([
+        tx.promoRedemption.count({
+          where: { promoCodeId: promo.id, userId: input.studentId },
+        }),
+        tx.promoRedemption.count({ where: { promoCodeId: promo.id } }),
+        tx.planPurchase.count({
+          where: {
+            promoCodeId: promo.id,
+            status: PlanPurchaseStatus.PENDING_PAYMENT,
+            userId: { not: input.studentId },
+          },
+        }),
+      ]);
+      usedByUser = mine;
+      usedTotal = redeemed + openByOthers;
+    }
+    const decision = evaluatePromo({
+      promo,
+      now: new Date(),
+      planCode: input.version.plan.code,
+      userId: input.studentId,
+      listPriceVnd,
+      usedByUser,
+      usedTotal,
+    });
+    if (!decision.ok) return { ...full, refusal: decision.message };
+    return {
+      listPriceVnd,
+      discountVnd: decision.discountVnd,
+      amountVnd: decision.amountVnd,
+      promoCodeId: decision.promoCodeId,
+      percentOff: decision.percentOff,
+      refusal: null,
+    };
+  }
+
+  /** The price of a plan version with a code, without buying anything. */
+  async previewPromo(
+    studentId: number,
+    planVersionId: number,
+    code: string,
+  ): Promise<PromoPreviewDto> {
+    const version = await this.prisma.planVersion.findUnique({
+      where: { id: planVersionId },
+      include: { plan: true },
+    });
+    if (!version || !version.priceVnd) {
+      throw new NotFoundException('Không tìm thấy phiên bản gói.');
+    }
+    const normalized = normalizePromoCode(code);
+    const price = await this.prisma.$transaction((tx) =>
+      this.priceFor(tx, {
+        studentId,
+        version,
+        code: normalized || null,
+      }),
+    );
+    return {
+      valid: !price.refusal && price.promoCodeId !== null,
+      message: price.refusal,
+      code: normalized,
+      percentOff: price.percentOff,
+      listPriceVnd: price.listPriceVnd,
+      discountVnd: price.discountVnd,
+      amountVnd: price.amountVnd,
+    };
+  }
+
   private assertFrozenTerms(purchase: PurchaseWithDetails): void {
     const version = purchase.planVersion;
     if (
       version.plan.code === 'FREE' ||
       purchase.currency !== version.currency ||
-      purchase.amountVnd !== version.priceVnd ||
+      !frozenPriceHolds({
+        versionPriceVnd: version.priceVnd,
+        listPriceVnd: purchase.listPriceVnd,
+        discountVnd: purchase.discountVnd,
+        amountVnd: purchase.amountVnd,
+        promoCodeId: purchase.promoCodeId ?? null,
+      }) ||
       purchase.durationDays !== version.durationDays ||
       !version.priceVnd ||
       version.priceVnd <= 0 ||
@@ -847,6 +1137,9 @@ export class PlanPurchaseService {
       version: purchase.planVersion.version,
       status: purchase.status,
       amountVnd: purchase.amountVnd,
+      listPriceVnd: purchase.listPriceVnd ?? purchase.amountVnd,
+      discountVnd: purchase.discountVnd ?? 0,
+      promoCode: purchase.promoCode?.code ?? null,
       currency: purchase.currency,
       durationDays: purchase.durationDays,
       createdAt: purchase.createdAt,

@@ -18,7 +18,7 @@ async function main() {
   const plans = await prisma.plan.findMany({
     where: { code: { in: ['PLUS', 'PRO'] } },
     include: {
-      versions: { where: { status: 'PUBLISHED', isCurrent: true }, take: 1 },
+      versions: { where: { status: 'PUBLISHED', isCurrent: true, durationDays: 30 }, take: 1 },
     },
   });
   const byCode = new Map(plans.map((plan) => [plan.code, plan.versions[0]]));

@@ -9,6 +9,7 @@ import {
   ReviewerOutputError,
   ReviewerReply,
 } from './answer-reviewer';
+import { strictJsonSchema } from './strict-json-schema';
 
 const OPENAI_COMPAT_TIMEOUT_MS = 180_000;
 const GEMINI_REVIEW_TIMEOUT_MS = 60_000;
@@ -152,6 +153,12 @@ export class OpenAiCompatibleReviewer implements AnswerReviewer {
       .trim()
       .replace(/\/$/, '');
     const key = process.env.AI_COMPAT_API_KEY?.trim();
+    // Strict structured output never returns schema-invalid JSON (Groq);
+    // AI_COMPAT_STRICT_SCHEMA=false falls back to best effort for servers
+    // without it.
+    const strict = process.env.AI_COMPAT_STRICT_SCHEMA?.trim() !== 'false';
+    const effort = process.env.AI_COMPAT_REASONING_EFFORT?.trim();
+    const includeReasoning = process.env.AI_COMPAT_INCLUDE_REASONING?.trim();
     const response = await this.fetchImpl(`${base}/v1/chat/completions`, {
       method: 'POST',
       headers: {
@@ -167,16 +174,29 @@ export class OpenAiCompatibleReviewer implements AnswerReviewer {
         temperature: prompt.temperature,
         response_format: {
           type: 'json_schema',
-          json_schema: { name: 'review', schema: prompt.schema },
+          json_schema: strict
+            ? {
+                name: 'review',
+                strict: true,
+                schema: strictJsonSchema(prompt.schema),
+              }
+            : { name: 'review', schema: prompt.schema },
         },
+        ...(effort ? { reasoning_effort: effort } : {}),
+        ...(includeReasoning === 'false' ? { include_reasoning: false } : {}),
       }),
       signal: AbortSignal.timeout(OPENAI_COMPAT_TIMEOUT_MS),
     });
     if (!response.ok) {
       const error = new Error(
         `OpenAI-compatible endpoint HTTP ${response.status}`,
-      );
-      (error as Error & { status?: number }).status = response.status;
+      ) as Error & { status?: number; retryAfterSeconds?: number };
+      error.status = response.status;
+      // Only a present header counts: Number(null) would read as "retry now".
+      const header = response.headers?.get?.('retry-after')?.trim();
+      const retryAfter = header ? Number(header) : NaN;
+      if (Number.isFinite(retryAfter) && retryAfter >= 0)
+        error.retryAfterSeconds = retryAfter;
       throw error;
     }
     const payload: any = await response.json().catch(() => null);

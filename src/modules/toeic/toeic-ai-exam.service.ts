@@ -18,7 +18,7 @@ import {
   SpeakingStimulusKind,
 } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
-import { Job, Queue, Worker } from 'bullmq';
+import { DelayedError, Job, Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
@@ -63,6 +63,8 @@ import type {
 } from '../ai/strategies/ai-evaluator.interface';
 import { listeningScriptLengthIssue } from './toeic-listening-length';
 import { isAiOutage } from '../ai/cloudflare-workers-ai.client';
+import { exhaustedUntil } from '../ai/review/provider-exhaustion';
+import { quotaWaitResumeAt } from './ai-job-quota-wait.logic';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PRACTICE_DISCLAIMER } from './exam-template.registry';
 import { AnswerReviewService } from '../ai/review/answer-review.service';
@@ -390,7 +392,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.worker = new Worker<JobPayload, unknown, 'generate'>(
       TOEIC_AI_QUEUE,
-      async (job) => this.process(job),
+      async (job, token) => this.process(job, token),
       { connection: this.connection, concurrency: 1 },
     );
     this.worker.on('failed', (job, error) =>
@@ -985,6 +987,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       id: job.id,
       status: job.status,
       stage: (job.resultSnapshot as any)?.stage ?? 'QUEUED',
+      // Set while the job waits for an AI quota reset (stage WAITING_QUOTA).
+      resumeAt: (job.resultSnapshot as any)?.resumeAt ?? null,
       progress: (job.resultSnapshot as any)?.parts ?? {},
       error: job.errorSummary ?? undefined,
       missingMedia: (job.resultSnapshot as any)?.missingMedia ?? [],
@@ -1020,6 +1024,23 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
     if (!job || job.createdByAdminId !== adminId)
       throw new NotFoundException('Không tìm thấy job tạo đề TOEIC AI');
+    // Waiting for an AI quota reset: "run now" resumes the delayed job from
+    // its checkpoint instead of waiting for resumeAt.
+    const waiting = job.resultSnapshot as Record<string, unknown> | null;
+    if (waiting?.stage === 'WAITING_QUOTA') {
+      await this.prisma.aiGenerationJob.update({
+        where: { id: jobId },
+        data: {
+          errorSummary: null,
+          resultSnapshot: { ...waiting, stage: 'QUEUED', resumeAt: null },
+        },
+      });
+      const delayed = await this.queue.getJob(jobId);
+      if (delayed && (await delayed.isDelayed())) await delayed.promote();
+      else if (!delayed)
+        await this.queue.add('generate', { version: 1, jobId }, { jobId });
+      return this.status(jobId);
+    }
     const request = job.requestSnapshot as RequestSnapshot;
     const existingCandidate =
       (job.draftSnapshot as ToeicAiDraftSnapshot | null) ?? null;
@@ -3450,7 +3471,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     await this.checkpoint(jobId, 'VALIDATING_MEDIA');
   }
 
-  private async process(queueJob: Job<JobPayload>) {
+  private async process(queueJob: Job<JobPayload>, token?: string) {
     const jobId = queueJob.data.jobId;
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
@@ -3727,6 +3748,56 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // Every provider out (quota spent or down): wait for the reset and
+      // resume from the checkpoint rather than failing (ai-job-quota-wait).
+      const latest = await this.prisma.aiGenerationJob.findUnique({
+        where: { id: jobId },
+        select: { resultSnapshot: true },
+      });
+      const snapshot =
+        (latest?.resultSnapshot as Record<string, unknown>) ?? {};
+      const waitsSoFar = Number(snapshot.quotaWaits ?? 0) || 0;
+      const resumeAt = token
+        ? quotaWaitResumeAt({
+            isOutage: isAiOutage(error) || isReviewerUnavailable(error),
+            spentUntil: await Promise.all(
+              (['cloudflare', 'openai-compatible', 'gemini'] as const).map(
+                (provider) => exhaustedUntil(this.connection, provider),
+              ),
+            ),
+            waitsSoFar,
+            now: new Date(),
+          })
+        : null;
+      if (resumeAt && token) {
+        await this.prisma.aiGenerationJob.update({
+          where: { id: jobId },
+          data: {
+            status: AiGenerationJobStatus.QUEUED,
+            errorSummary: message.slice(0, 1000),
+            resultSnapshot: {
+              ...snapshot,
+              stage: 'WAITING_QUOTA',
+              resumeAt: resumeAt.toISOString(),
+              quotaWaits: waitsSoFar + 1,
+              failedScope: activeScope,
+            },
+            failureHistory: [
+              ...(Array.isArray(job.failureHistory) ? job.failureHistory : []),
+              {
+                at: new Date().toISOString(),
+                message: message.slice(0, 1000),
+                waitingUntil: resumeAt.toISOString(),
+              },
+            ] as Prisma.InputJsonValue,
+          },
+        });
+        this.logger.warn(
+          `toeic_ai_job_waiting_quota jobId=${jobId} resumeAt=${resumeAt.toISOString()} wait=${waitsSoFar + 1}`,
+        );
+        await queueJob.moveToDelayed(resumeAt.getTime(), token);
+        throw new DelayedError();
+      }
       await this.prisma.aiGenerationJob.update({
         where: { id: jobId },
         data: {

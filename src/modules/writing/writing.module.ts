@@ -4,6 +4,7 @@ import { WritingService } from './writing.service';
 import { AiModule } from '../ai/ai.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { QuizModule } from '../quiz/quiz.module';
+import { SubscriptionModule } from '../subscription/subscription.module';
 import {
   AdminToeicWritingSetController,
   ToeicWritingSetController,
@@ -11,7 +12,7 @@ import {
 import { ToeicWritingSetService } from './toeic-writing-set.service';
 
 @Module({
-  imports: [AiModule, PrismaModule, QuizModule],
+  imports: [AiModule, PrismaModule, QuizModule, SubscriptionModule],
   controllers: [
     WritingController,
     AdminToeicWritingSetController,

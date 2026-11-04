@@ -38,8 +38,19 @@ export class PublicPlanDto {
   })
   purchasable!: boolean;
 
-  @ApiPropertyOptional({ type: PublicPlanVersionDto, nullable: true })
+  @ApiPropertyOptional({
+    type: PublicPlanVersionDto,
+    nullable: true,
+    description:
+      'The shortest sale-safe term (30 days), kept for older clients',
+  })
   currentVersion!: PublicPlanVersionDto | null;
+
+  @ApiProperty({
+    type: [PublicPlanVersionDto],
+    description: 'Every sale-safe term (30, 90, 180 days), shortest first',
+  })
+  versions!: PublicPlanVersionDto[];
 }
 
 export class PublicPlanCatalogDto {

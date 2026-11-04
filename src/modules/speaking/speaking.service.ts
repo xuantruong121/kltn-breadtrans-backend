@@ -37,6 +37,7 @@ import {
 } from '@prisma/client';
 import type { SpeakingSubmission } from '@prisma/client';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
+import { TrialService } from '../subscription/trial.service';
 import { resolveSpeakingPracticeSet } from './speaking-practice-set';
 import {
   levelGroup,
@@ -265,6 +266,7 @@ export class SpeakingService {
     @Optional() private readonly r2Service?: R2Service,
     @Optional()
     private readonly speakingContentAccess?: SpeakingContentAccessService,
+    @Optional() private readonly trial?: TrialService,
   ) {}
 
   private getStorage() {
@@ -685,6 +687,11 @@ export class SpeakingService {
     await this.assertSpeakingContentAccess(exercise, userId, role);
     if (internalContext)
       await this.assertExamTakeLeft(exerciseId, userId, internalContext);
+    // A free PLUS trial grades at most 5 paid-level Speaking answers.
+    const trialCounted =
+      !internalContext &&
+      (this.speakingContentAccess?.isPremium(exercise) ?? false);
+    if (trialCounted) await this.trial?.assertGradingLeft(userId, 'SPEAKING');
 
     // 4. Byte-level audio validation
     if (!audioFile || !audioFile.buffer) {
@@ -758,6 +765,8 @@ export class SpeakingService {
       }
       throw error;
     }
+
+    if (trialCounted) await this.trial?.recordGrading(userId, 'SPEAKING');
 
     // 8. Pipeline dispatch: BullMQ queue vs legacy DB-polling fallback
     const pipelineMode = getSpeakingPipelineMode();
@@ -909,6 +918,8 @@ export class SpeakingService {
       internalContext ? { userId, ...internalContext } : undefined,
     );
     await this.assertSpeakingContentAccess(exercise, userId, role);
+    if (!internalContext && this.speakingContentAccess?.isPremium(exercise))
+      await this.trial?.assertGradingLeft(userId, 'SPEAKING');
 
     // 2. Validate declared MIME type, size, duration
     const validMimes = ['audio/wav', 'audio/x-wav'];
@@ -1163,6 +1174,10 @@ export class SpeakingService {
     }
 
     await this.assertSpeakingContentAccess(exercise, userId, role);
+    // A free PLUS trial grades at most 5 paid-level Speaking answers.
+    const trialCounted =
+      this.speakingContentAccess?.isPremium(exercise) ?? false;
+    if (trialCounted) await this.trial?.assertGradingLeft(userId, 'SPEAKING');
 
     // 4. Reject expired or cancelled intents
     const now = new Date();
@@ -1421,6 +1436,7 @@ export class SpeakingService {
         'Không hoàn tất được bài nộp Nói.',
       );
     }
+    if (trialCounted) await this.trial?.recordGrading(userId, 'SPEAKING');
 
     // 8. Enqueue BullMQ job only AFTER transaction commits
     const pipelineMode = getSpeakingPipelineMode();

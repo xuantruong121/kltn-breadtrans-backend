@@ -40,6 +40,21 @@ export class SystemJobsScheduler implements OnModuleInit {
     await this.jobs.enqueueWeekly(getBusinessWeekKey());
   }
 
+  @Cron('0 9 * * *', { timeZone: BUSINESS_TIMEZONE })
+  async enqueuePlanExpiryReminder(): Promise<void> {
+    await this.jobs.enqueuePlanExpiryReminder(getBusinessDayKey());
+  }
+
+  @Cron('0 8 * * 1', { timeZone: BUSINESS_TIMEZONE })
+  async enqueueWeeklyReport(): Promise<void> {
+    await this.jobs.enqueueWeeklyReport(getBusinessDayKey());
+  }
+
+  @Cron('30 9 * * *', { timeZone: BUSINESS_TIMEZONE })
+  async enqueueWinback(): Promise<void> {
+    await this.jobs.enqueueWinback(getBusinessDayKey());
+  }
+
   @Cron('0 20 * * *', { timeZone: BUSINESS_TIMEZONE })
   async enqueueStreakReminder(): Promise<void> {
     await this.jobs.enqueueStreakReminder(getBusinessDayKey());

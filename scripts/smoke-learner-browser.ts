@@ -20,7 +20,7 @@ async function main() {
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
     const pro = await prisma.planVersion.findFirstOrThrow({
-      where: { isCurrent: true, status: 'PUBLISHED', plan: { code: 'PRO' } },
+      where: { isCurrent: true, durationDays: 30, status: 'PUBLISHED', plan: { code: 'PRO' } },
       select: { id: true },
     });
     const user = await prisma.user.create({

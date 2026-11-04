@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/require-await */
 import { AnswerReviewService } from './answer-review.service';
-import { AnswerReviewer, ReviewerOutputError } from './answer-reviewer';
+import {
+  AnswerReviewer,
+  ReviewerOutputError,
+  isProviderOutage,
+} from './answer-reviewer';
 import { OpenAiCompatibleReviewer } from './reviewers';
 import { solvePrompt } from '../toeic-answer-review-prompt';
 import { validateSolveOutput } from '../../toeic/toeic-answer-review.logic';
@@ -80,6 +84,50 @@ describe('AnswerReviewService provider chain', () => {
       reviewKind: 'INDEPENDENT',
     });
     expect(gemini.reviewJson).not.toHaveBeenCalled();
+  });
+
+  it('a spent daily allocation is recorded, and the next step skips Cloudflare without calling it', async () => {
+    const store = new Map<string, string>();
+    const redis = {
+      get: jest.fn(async (key: string) => store.get(key) ?? null),
+      set: jest.fn(async (key: string, value: string) => {
+        store.set(key, value);
+        return 'OK';
+      }),
+      pipeline: () => ({
+        hincrby: jest.fn(),
+        expire: jest.fn(),
+        exec: jest.fn(async () => []),
+      }),
+    };
+    const spent = Object.assign(
+      new Error(
+        'Cloudflare Workers AI: you have used up your daily free allocation of 10,000 neurons',
+      ),
+      { code: CLOUDFLARE_UNAVAILABLE },
+    );
+    const cloudflare = fake('cloudflare', () => Promise.reject(spent));
+    const gemini = fake('gemini', async () => goodReply());
+    const subject = new AnswerReviewService(
+      { textModel: () => '@cf/openai/gpt-oss-120b' } as any,
+      {} as any,
+      {} as any,
+      redis as any,
+    );
+    subject.useReviewers([cloudflare, gemini]);
+
+    expect((await run(subject)).step.provider).toBe('gemini');
+    expect(store.get('ai:provider-exhausted:cloudflare')).toBeDefined();
+
+    const second = await run(subject);
+    expect(second.step.provider).toBe('gemini');
+    expect(cloudflare.reviewJson).toHaveBeenCalledTimes(1);
+    expect(second.step.tried).toEqual([
+      expect.objectContaining({
+        provider: 'cloudflare',
+        reason: expect.stringContaining('quota spent until'),
+      }),
+    ]);
   });
 
   it('a Cloudflare outage falls back to Gemini, recorded as same-provider', async () => {
@@ -267,5 +315,82 @@ describe('OpenAiCompatibleReviewer', () => {
     ).rejects.toMatchObject({
       status: 503,
     });
+  });
+
+  const okFetch = () =>
+    jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify(goodReply()) } }],
+      }),
+    });
+
+  it('asks for strict structured output, and sends reasoning options only when set', async () => {
+    process.env.AI_COMPAT_BASE_URL = 'https://api.groq.com/openai';
+    process.env.AI_COMPAT_MODEL = 'openai/gpt-oss-120b';
+    delete process.env.AI_COMPAT_STRICT_SCHEMA;
+    delete process.env.AI_COMPAT_REASONING_EFFORT;
+    delete process.env.AI_COMPAT_INCLUDE_REASONING;
+    const plain = okFetch();
+    await new OpenAiCompatibleReviewer(plain as any).reviewJson(
+      solvePrompt({ part: 5, groups: [] }),
+    );
+    const body = JSON.parse(plain.mock.calls[0][1].body);
+    expect(body.response_format.json_schema.strict).toBe(true);
+    expect(
+      body.response_format.json_schema.schema.properties.answers.items
+        .additionalProperties,
+    ).toBe(false);
+    expect(body).not.toHaveProperty('reasoning_effort');
+    expect(body).not.toHaveProperty('include_reasoning');
+
+    process.env.AI_COMPAT_REASONING_EFFORT = 'low';
+    process.env.AI_COMPAT_INCLUDE_REASONING = 'false';
+    const tuned = okFetch();
+    await new OpenAiCompatibleReviewer(tuned as any).reviewJson(
+      solvePrompt({ part: 5, groups: [] }),
+    );
+    expect(JSON.parse(tuned.mock.calls[0][1].body)).toMatchObject({
+      reasoning_effort: 'low',
+      include_reasoning: false,
+    });
+
+    process.env.AI_COMPAT_STRICT_SCHEMA = 'false';
+    const loose = okFetch();
+    await new OpenAiCompatibleReviewer(loose as any).reviewJson(
+      solvePrompt({ part: 5, groups: [] }),
+    );
+    const looseSchema = JSON.parse(loose.mock.calls[0][1].body).response_format
+      .json_schema;
+    expect(looseSchema.strict).toBeUndefined();
+    expect(JSON.stringify(looseSchema.schema)).not.toContain(
+      'additionalProperties',
+    );
+  });
+
+  it('429 and 413 are outages with the retry-after hint, 400 is an invalid reply', async () => {
+    process.env.AI_COMPAT_BASE_URL = 'https://api.groq.com/openai';
+    process.env.AI_COMPAT_MODEL = 'openai/gpt-oss-120b';
+    const failing = (status: number, retryAfter?: string) =>
+      new OpenAiCompatibleReviewer(
+        jest.fn().mockResolvedValue({
+          ok: false,
+          status,
+          headers: {
+            get: (name: string) =>
+              name === 'retry-after' ? (retryAfter ?? null) : null,
+          },
+        }) as any,
+      ).reviewJson(solvePrompt({ part: 5, groups: [] }));
+
+    const limited = await failing(429, '3600').catch((error) => error);
+    expect(limited).toMatchObject({ status: 429, retryAfterSeconds: 3600 });
+    expect(isProviderOutage(limited)).toBe(true);
+    const tooLarge = await failing(413).catch((error) => error);
+    expect(tooLarge.retryAfterSeconds).toBeUndefined();
+    expect(isProviderOutage(tooLarge)).toBe(true);
+    expect(isProviderOutage(await failing(400).catch((error) => error))).toBe(
+      false,
+    );
   });
 });

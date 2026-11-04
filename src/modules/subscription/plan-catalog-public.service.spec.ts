@@ -218,6 +218,42 @@ describe('PlanCatalogPublicService', () => {
     expect(result.plans[0].purchasable).toBe(false);
   });
 
+  it('offers every term of a plan, shortest first, and keeps 30 days as currentVersion', async () => {
+    const { prisma, service } = makeService();
+    const plus = plan('PLUS');
+    plus.versions = [
+      version('PLUS', { id: 31, durationDays: 180, priceVnd: 331000 }),
+      version('PLUS', { id: 30, durationDays: 30, priceVnd: 69000 }),
+      version('PLUS', { id: 32, durationDays: 90, priceVnd: 186000 }),
+    ];
+    prisma.plan.findMany.mockResolvedValue([plus]);
+
+    const [result] = (await service.getCatalog()).plans;
+
+    expect(result.purchasable).toBe(true);
+    expect(result.currentVersion?.id).toBe(30);
+    expect(result.versions.map((v) => [v.durationDays, v.priceVnd])).toEqual([
+      [30, 69000],
+      [90, 186000],
+      [180, 331000],
+    ]);
+  });
+
+  it('drops a term with two current versions but keeps the other terms', async () => {
+    const { prisma, service } = makeService();
+    const plus = plan('PLUS');
+    plus.versions = [
+      version('PLUS', { id: 1, durationDays: 90 }),
+      version('PLUS', { id: 2, durationDays: 90 }),
+      version('PLUS', { id: 3, durationDays: 30 }),
+    ];
+    prisma.plan.findMany.mockResolvedValue([plus]);
+
+    const [result] = (await service.getCatalog()).plans;
+
+    expect(result.versions.map((v) => v.id)).toEqual([3]);
+  });
+
   it('omits inactive plans even if a broken data source returns one', async () => {
     const { prisma, service } = makeService();
     const inactive = plan('PLUS', PlanStatus.INACTIVE);

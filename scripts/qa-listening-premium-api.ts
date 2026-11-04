@@ -42,7 +42,7 @@ async function createSession(tier: Session['tier'], marker: string): Promise<Ses
     if (tier !== 'FREE') {
       const version = await prisma.planVersion.findFirst({
       where: {
-        isCurrent: true,
+        isCurrent: true, durationDays: 30,
         status: 'PUBLISHED',
         plan: { code: tier, status: 'ACTIVE' },
       },

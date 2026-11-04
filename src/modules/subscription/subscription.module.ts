@@ -19,6 +19,12 @@ import { SepayTransactionProvider } from './sepay-transaction.provider';
 import { PaymentModule } from '../payment/payment.module';
 import { PayosWebhookController } from './payos-webhook.controller';
 
+import { PromoCodeAdminController } from './promo-code-admin.controller';
+import { ReferralController } from './referral.controller';
+import { ReferralService } from './referral.service';
+import { TrialService } from './trial.service';
+import { PromoCodeAdminService } from './promo-code-admin.service';
+
 @Module({
   imports: [PrismaModule, PaymentModule, NotificationsModule],
   controllers: [
@@ -30,6 +36,8 @@ import { PayosWebhookController } from './payos-webhook.controller';
     PlanCatalogPublicController,
     PaymentWebhookController,
     PayosWebhookController,
+    PromoCodeAdminController,
+    ReferralController,
   ],
   providers: [
     SubscriptionService,
@@ -37,11 +45,14 @@ import { PayosWebhookController } from './payos-webhook.controller';
     PlanCatalogAdminService,
     PlanPurchaseService,
     PlanCatalogPublicService,
+    PromoCodeAdminService,
+    ReferralService,
+    TrialService,
     SepayTransactionProvider,
     PaymentReconciliationService,
     PaymentReconciliationScheduler,
     { provide: 'PlanPurchaseService', useExisting: PlanPurchaseService },
   ],
-  exports: [SubscriptionService, SubscriptionAdminService],
+  exports: [SubscriptionService, SubscriptionAdminService, TrialService],
 })
 export class SubscriptionModule {}

@@ -99,6 +99,7 @@ describe('Plan purchase ownership and admin review (e2e)', () => {
         userId: studentId,
         planVersionId: plan.versions[0].id,
         amountVnd: 69_000,
+        listPriceVnd: 69_000,
         durationDays: 30,
         idempotencyKey: `qa-plan-purchase-${suffix}`,
         payment: {

@@ -27,6 +27,7 @@ import {
   scoreFourSkillPlacementV2,
 } from './diagnostic-four-skill';
 import { applyDiagnosticPlacement } from '../learning-path/placement.store';
+import { grantPlusTrialOnce } from '../subscription/trial.service';
 
 type Db = Pick<
   PrismaClient,
@@ -90,6 +91,8 @@ export async function refreshFourSkillResult(
       scoringVersion: true,
       answers: true,
       skillResults: true,
+      submittedAt: true,
+      completedAt: true,
     },
   });
   if (
@@ -206,6 +209,26 @@ export async function refreshFourSkillResult(
     logger.error(
       `placement for diagnostic attempt ${attemptId} failed: ${(error as Error).message}`,
     );
+  }
+  // The free 3-day PLUS trial starts once the learner has been placed; it is
+  // given once per account, and only for a diagnostic finished in the last
+  // day, so reopening an old result never starts a trial. Only the full
+  // client can run it (unit fakes pass a narrower one), and a failure never
+  // hides the result.
+  const finishedAt = attempt.completedAt ?? attempt.submittedAt;
+  const recent =
+    !!finishedAt && Date.now() - finishedAt.getTime() <= 24 * 60 * 60 * 1000;
+  if (
+    recent &&
+    typeof (db as Partial<PrismaClient>).$transaction === 'function'
+  ) {
+    try {
+      await grantPlusTrialOnce(db as PrismaClient, attempt.userId);
+    } catch (error) {
+      logger.error(
+        `trial for diagnostic attempt ${attemptId} failed: ${(error as Error).message}`,
+      );
+    }
   }
   return result;
 }

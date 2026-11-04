@@ -56,7 +56,7 @@ async function main() {
   const password = `R2-${randomUUID()}-Aa1!`;
   const passwordHash = await bcrypt.hash(password, 10);
   const versions = await prisma.planVersion.findMany({
-    where: { isCurrent: true, status: 'PUBLISHED', plan: { code: { in: ['PLUS', 'PRO'] } } },
+    where: { isCurrent: true, durationDays: 30, status: 'PUBLISHED', plan: { code: { in: ['PLUS', 'PRO'] } } },
     include: { plan: { select: { code: true } } },
   });
   const versionByCode = new Map(versions.map((item) => [item.plan.code, item]));

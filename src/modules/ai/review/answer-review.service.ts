@@ -21,6 +21,7 @@ import type {
 import {
   AnswerReviewer,
   ReviewerImage,
+  ReviewUsage,
   isProviderOutage,
 } from './answer-reviewer';
 import {
@@ -28,6 +29,7 @@ import {
   GeminiReviewer,
   OpenAiCompatibleReviewer,
 } from './reviewers';
+import { exhaustedUntil, markExhausted } from './provider-exhaustion';
 
 export type ReviewRun<T> = {
   step: ReviewStep;
@@ -115,6 +117,16 @@ export class AnswerReviewService {
         });
         continue;
       }
+      // A provider whose quota is spent is skipped until it resets.
+      const spentUntil = await exhaustedUntil(this.redis, reviewer.name);
+      if (spentUntil) {
+        tried.push({
+          provider: reviewer.name,
+          model,
+          reason: `unavailable: quota spent until ${spentUntil.toISOString()}`,
+        });
+        continue;
+      }
       const startedAt = Date.now();
       try {
         const reply = await reviewer.reviewJson(input.prompt, input.image);
@@ -161,6 +173,7 @@ export class AnswerReviewService {
       } catch (error) {
         const outage = isProviderOutage(error);
         if (!outage) sawInvalid = true;
+        else await markExhausted(this.redis, reviewer.name, error);
         const reason = redactGeminiError((error as Error)?.message ?? error);
         tried.push({
           provider: reviewer.name,
@@ -201,7 +214,7 @@ export class AnswerReviewService {
     provider: string,
     model: string,
     outcome: 'ok' | 'invalid' | 'unavailable',
-    usage: { inputTokens?: number; outputTokens?: number } | undefined,
+    usage: ReviewUsage | undefined,
     startedAt: number,
   ) {
     if (!this.redis) return;
@@ -216,6 +229,8 @@ export class AnswerReviewService {
         pipeline.hincrby(key, `${field}|input_tokens`, usage.inputTokens);
       if (usage?.outputTokens)
         pipeline.hincrby(key, `${field}|output_tokens`, usage.outputTokens);
+      if (usage?.neurons)
+        pipeline.hincrbyfloat(key, `${field}|neurons`, usage.neurons);
       pipeline.expire(key, 60 * 86400);
       await pipeline.exec();
     } catch (error) {

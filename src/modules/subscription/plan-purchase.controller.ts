@@ -7,6 +7,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +24,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   CreatePlanPurchaseDto,
   PlanPurchaseResponseDto,
+  PromoPreviewDto,
+  PromoPreviewQueryDto,
+  RenewalPreviewDto,
 } from './dto/plan-purchase.dto';
 import { PlanPurchaseService } from './plan-purchase.service';
 
@@ -47,6 +51,27 @@ export class PlanPurchaseController {
       request.user.id,
       dto.planVersionId,
       dto.idempotencyKey,
+      dto.promoCode,
+    );
+  }
+
+  @Get('promo-preview')
+  @ApiOperation({
+    summary: 'Price of a plan version with a promo code, without buying',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: PromoPreviewDto })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Unknown plan version',
+  })
+  promoPreview(
+    @Query() query: PromoPreviewQueryDto,
+    @Request() request: StudentRequest,
+  ): Promise<PromoPreviewDto> {
+    return this.purchaseService.previewPromo(
+      request.user.id,
+      query.planVersionId,
+      query.code,
     );
   }
 
@@ -57,6 +82,23 @@ export class PlanPurchaseController {
     @Request() request: StudentRequest,
   ): Promise<PlanPurchaseResponseDto[]> {
     return this.purchaseService.getMyPurchases(request.user.id);
+  }
+
+  @Get('renewal-preview/:planVersionId')
+  @ApiOperation({
+    summary:
+      'Where a purchase of this plan version would sit: now, queued after the running plan, or as an upgrade with converted days',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: RenewalPreviewDto })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Unknown plan version',
+  })
+  renewalPreview(
+    @Param('planVersionId', ParseIntPipe) planVersionId: number,
+    @Request() request: StudentRequest,
+  ): Promise<RenewalPreviewDto> {
+    return this.purchaseService.previewRenewal(request.user.id, planVersionId);
   }
 
   @Get(':id')

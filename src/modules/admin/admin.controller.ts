@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminDictionaryService } from './admin-dictionary.service';
+import { RetentionMetricsService } from './retention-metrics.service';
+import { AiReviewCostsService } from './ai-review-costs.service';
 import {
   ApiTags,
   ApiOperation,
@@ -46,12 +48,25 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly dictionaryService: AdminDictionaryService,
+    private readonly retentionMetrics: RetentionMetricsService,
+    private readonly aiReviewCosts: AiReviewCostsService,
   ) {}
 
   @Get('dashboard-stats')
   @ApiOperation({ summary: 'Lay thong ke tong quan cho Admin Dashboard' })
   getDashboardStats(@Query('range') range?: string) {
     return this.adminService.getDashboardStats(range);
+  }
+
+  @Get('retention-metrics')
+  @ApiOperation({
+    summary:
+      'Chi so giu chan theo tuan: D1/D7/D30 theo dot dang ky, ti le chuoi >= 7 ngay, gia han va quay lai',
+  })
+  @ApiQuery({ name: 'weeks', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Bang chi so theo tuan' })
+  getRetentionMetrics(@Query('weeks') weeks?: string) {
+    return this.retentionMetrics.getMetrics(weeks ? Number(weeks) : undefined);
   }
 
   @Get('users')
@@ -374,6 +389,20 @@ export class AdminController {
   @ApiOperation({ summary: 'Lay bao cao tong quan chi phi & tai nguyen Cloud' })
   getSystemCosts() {
     return this.adminService.getSystemCostsOverview();
+  }
+
+  @Get('system-costs/ai-review')
+  @ApiOperation({
+    summary:
+      'Token va chi phi uoc tinh cua buoc AI kiem dinh dap an, theo nha cung cap va model',
+  })
+  @ApiQuery({ name: 'days', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Bang token, luot goi, chi phi uoc tinh',
+  })
+  getAiReviewCosts(@Query('days') days?: string) {
+    return this.aiReviewCosts.getCosts(days ? Number(days) : undefined);
   }
 
   @Post('system-costs/purge-ai-cache')

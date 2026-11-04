@@ -35,7 +35,7 @@ type Acct = Awaited<ReturnType<typeof newStudent>>;
 async function grant(admin: string, userId: number, code: 'PLUS' | 'PRO') {
   const planVersionId = Number(
     one(
-      `select pv.id from "PlanVersion" pv join "Plan" p on p.id = pv."planId" where pv."isCurrent" and p.code = '${code}'`,
+      `select pv.id from "PlanVersion" pv join "Plan" p on p.id = pv."planId" where pv."isCurrent" and coalesce(pv."durationDays", 30) = 30 and p.code = '${code}'`,
     ),
   );
   const r = await call('POST', '/admin/subscriptions/grant', admin, {
