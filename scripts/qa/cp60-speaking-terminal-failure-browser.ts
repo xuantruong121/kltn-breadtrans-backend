@@ -75,7 +75,14 @@ async function main() {
       if (r?.[1] === 'FAILED') break;
       await sleep(1000);
     }
-    await sleep(3000);
+    // The page checks a slow grading every 30 s once the fast phase is over,
+    // so the failure can take up to that long to appear after the row does.
+    await s.page
+      .getByText(/chưa thành công|không thành công|thử lại|kéo dài hơn dự kiến/i)
+      .first()
+      .waitFor({ timeout: 45_000 })
+      .catch(() => undefined);
+    await sleep(1000);
     const text = (await s.page.locator('body').innerText()).replace(
       /\s+/g,
       ' ',
