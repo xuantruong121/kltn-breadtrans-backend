@@ -331,6 +331,37 @@ describe('GamificationListener', () => {
       expect(questTypesOf()).toEqual(['DO_WRITING']);
     });
 
+    // "Học Bá" compared `score` (a count of correct answers) with 100, so an
+    // 8/8 practice never earned it.
+    it('awards "Học Bá" for a perfect percent, even on a retake', async () => {
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 9,
+        score: 8,
+        scorePercent: 100,
+        quizType: 'LISTENING_PRACTICE',
+        isFirstSubmission: false,
+      });
+      expect(gamificationServiceMock.awardBadgeIfEarned).toHaveBeenCalledWith(
+        12,
+        'Học Bá',
+      );
+    });
+
+    it('does not award "Học Bá" below 100 percent, whatever the count', async () => {
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 50,
+        score: 100,
+        scorePercent: 99,
+        quizType: 'LISTENING_PRACTICE',
+        isFirstSubmission: true,
+      });
+      expect(
+        gamificationServiceMock.awardBadgeIfEarned,
+      ).not.toHaveBeenCalledWith(12, 'Học Bá');
+    });
+
     it('does not assume an event without quiz type is Listening', async () => {
       await listener.handleQuizSubmittedEvent({
         userId: 12,

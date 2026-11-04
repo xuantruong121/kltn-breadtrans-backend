@@ -104,14 +104,16 @@ export class GamificationListener {
             );
           }
         }
+      }
 
-        // Badge: perfect score
-        if (payload.score === 100) {
-          await this.gamificationService.awardBadgeIfEarned(
-            payload.userId,
-            'Học Bá',
-          );
-        }
+      // Badge "Học Bá" ("Đạt điểm tối đa"): a perfect rewarded practice, first
+      // try or not. `score` counts correct answers, so the percent decides;
+      // awardBadgeIfEarned grants it once.
+      if (Number(payload.scorePercent) >= 100) {
+        await this.gamificationService.awardBadgeIfEarned(
+          payload.userId,
+          'Học Bá',
+        );
       }
 
       // Daily quest progress: only the quests assigned to this learner today
