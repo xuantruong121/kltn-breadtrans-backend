@@ -61,6 +61,8 @@ export class GamificationListener {
           xpEarned,
           'Hoàn thành bài thi (Quiz)',
         );
+        // The pet grows with study, on the same first completion as the XP.
+        await this.gamificationService.awardPetStudyExp(payload.userId);
 
         // Banh only for first submission (idempotent via quizId)
         if (payload.quizId && payload.isFirstSubmission !== false) {
@@ -296,6 +298,21 @@ export class GamificationListener {
               payload.overallScore,
               { tx },
             );
+          },
+        );
+      }
+
+      // 2b. Pet EXP for the practice, once per submission
+      if (payload.submissionId) {
+        await this.executeRewardEffect(
+          payload.submissionId,
+          payload.userId,
+          'PET',
+          `pet:speaking:${payload.submissionId}`,
+          async (tx) => {
+            await this.gamificationService.awardPetStudyExp(payload.userId, {
+              tx,
+            });
           },
         );
       }

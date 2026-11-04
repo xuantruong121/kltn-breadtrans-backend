@@ -25,6 +25,7 @@ describe('GamificationListener', () => {
     advanceDailyQuestAndGrantRewardsTx: jest.Mock;
     advanceAssignedQuests: jest.Mock;
     assignedQuests: jest.Mock;
+    awardPetStudyExp: jest.Mock;
   };
   let eligibilityMock: { quiz: jest.Mock; speakingExercise: jest.Mock };
   let listener: GamificationListener;
@@ -88,6 +89,7 @@ describe('GamificationListener', () => {
       }),
       advanceAssignedQuests: jest.fn().mockResolvedValue(undefined),
       assignedQuests: jest.fn().mockResolvedValue([]),
+      awardPetStudyExp: jest.fn().mockResolvedValue(10),
     };
 
     // These tests cover the rewarded activities (standalone practice);
@@ -439,9 +441,12 @@ describe('GamificationListener', () => {
 
     it('treats a repeated speaking settlement as a ledger NOOP without duplicate side effects', async () => {
       prismaMock.dailyQuest.findMany.mockResolvedValue([]);
+      // First settlement records XP, Bánh mì and pet EXP; the replay records none.
       prismaMock.speakingRewardLedger.createMany
         .mockResolvedValueOnce({ count: 1 })
         .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 })
         .mockResolvedValueOnce({ count: 0 })
         .mockResolvedValueOnce({ count: 0 });
 
@@ -457,9 +462,10 @@ describe('GamificationListener', () => {
       await listener.handleSpeakingSubmittedEvent(payload);
 
       expect(prismaMock.speakingRewardLedger.createMany).toHaveBeenCalledTimes(
-        4,
+        6,
       );
       expect(gamificationServiceMock.awardXp).toHaveBeenCalledTimes(1);
+      expect(gamificationServiceMock.awardPetStudyExp).toHaveBeenCalledTimes(1);
       expect(gamificationServiceMock.awardSpeakingReward).toHaveBeenCalledTimes(
         1,
       );

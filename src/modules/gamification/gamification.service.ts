@@ -245,6 +245,9 @@ export function reconcilePetDecay(
 
 /** A pet gains a level every 1,000 EXP and never loses one. */
 export const PET_EXP_PER_LEVEL = 1000;
+/** Pet EXP for each rewarded practice, and the most it earns a day that way. */
+export const PET_STUDY_EXP_PER_PRACTICE = 10;
+export const PET_STUDY_EXP_DAILY_CAP = 50;
 
 export function petLevelAfterExp(
   currentLevel: number | null | undefined,
@@ -1607,6 +1610,61 @@ export class GamificationService {
     }
 
     return this.withPetFeedStatus(pet, activePetData);
+  }
+
+  /**
+   * Pet EXP for a rewarded practice (owner decision 2026-11-04): +10 to the
+   * active pet, at most 50 a day, so a learner who studies steadily sees a
+   * level every two or three weeks. Feeding still gives its own +5. The day's
+   * count lives in the species entry of the roster; the level never drops.
+   * Returns the EXP granted (0 without a pet or past the daily cap).
+   */
+  async awardPetStudyExp(
+    userId: number,
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<number> {
+    const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+    const now = new Date();
+    const run = async (tx: Prisma.TransactionClient) => {
+      // Same lock as feeding: both rewrite the active pet entry.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pet_feed:${userId}`}))`;
+      const pet = await tx.userPet.findUnique({ where: { userId } });
+      if (!pet) return { granted: 0, level: 0 };
+      const species = this.normalizeSpeciesKey(pet.name);
+      const roster = ((pet as any).roster as Record<string, any>) || {};
+      const entry =
+        roster[species] || (species === 'mimi' ? roster['meo'] : undefined);
+      const state = normalizeSpeciesPetState(entry, pet, now);
+      const used =
+        state.dailyStudyExpDateKey === today
+          ? Math.max(0, Math.floor(Number(state.dailyStudyExp) || 0))
+          : 0;
+      const granted = Math.min(
+        PET_STUDY_EXP_PER_PRACTICE,
+        PET_STUDY_EXP_DAILY_CAP - used,
+      );
+      if (granted <= 0) return { granted: 0, level: state.level };
+      const exp = state.exp + granted;
+      const level = petLevelAfterExp(state.level, exp);
+      roster[species] = {
+        ...state,
+        exp,
+        level,
+        dailyStudyExpDateKey: today,
+        dailyStudyExp: used + granted,
+      };
+      await tx.userPet.update({
+        where: { userId },
+        data: { level, exp, roster: roster as any } as any,
+      });
+      return { granted, level };
+    };
+    const result = options?.tx
+      ? await run(options.tx)
+      : await this.prisma.$transaction(run);
+    if (result.granted && result.level >= 2)
+      await this.awardBadgeIfEarned(userId, 'Chuyên Gia Nuôi Thú', options);
+    return result.granted;
   }
 
   async feedPet(userId: number) {
