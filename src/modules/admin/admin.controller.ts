@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminDictionaryService } from './admin-dictionary.service';
+import { RetentionMetricsService } from './retention-metrics.service';
 import {
   ApiTags,
   ApiOperation,
@@ -46,12 +47,24 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly dictionaryService: AdminDictionaryService,
+    private readonly retentionMetrics: RetentionMetricsService,
   ) {}
 
   @Get('dashboard-stats')
   @ApiOperation({ summary: 'Lay thong ke tong quan cho Admin Dashboard' })
   getDashboardStats(@Query('range') range?: string) {
     return this.adminService.getDashboardStats(range);
+  }
+
+  @Get('retention-metrics')
+  @ApiOperation({
+    summary:
+      'Chi so giu chan theo tuan: D1/D7/D30 theo dot dang ky, ti le chuoi >= 7 ngay, gia han va quay lai',
+  })
+  @ApiQuery({ name: 'weeks', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Bang chi so theo tuan' })
+  getRetentionMetrics(@Query('weeks') weeks?: string) {
+    return this.retentionMetrics.getMetrics(weeks ? Number(weeks) : undefined);
   }
 
   @Get('users')
