@@ -21,6 +21,7 @@ import type {
 import {
   AnswerReviewer,
   ReviewerImage,
+  ReviewUsage,
   isProviderOutage,
 } from './answer-reviewer';
 import {
@@ -213,7 +214,7 @@ export class AnswerReviewService {
     provider: string,
     model: string,
     outcome: 'ok' | 'invalid' | 'unavailable',
-    usage: { inputTokens?: number; outputTokens?: number } | undefined,
+    usage: ReviewUsage | undefined,
     startedAt: number,
   ) {
     if (!this.redis) return;
@@ -228,6 +229,8 @@ export class AnswerReviewService {
         pipeline.hincrby(key, `${field}|input_tokens`, usage.inputTokens);
       if (usage?.outputTokens)
         pipeline.hincrby(key, `${field}|output_tokens`, usage.outputTokens);
+      if (usage?.neurons)
+        pipeline.hincrbyfloat(key, `${field}|neurons`, usage.neurons);
       pipeline.expire(key, 60 * 86400);
       await pipeline.exec();
     } catch (error) {

@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { isGeminiOutage } from './gemini/gemini-credential-manager.service';
+import type { ReviewUsage } from './review/answer-reviewer';
+import { strictJsonSchema } from './review/strict-json-schema';
 
 const DEFAULT_TEXT_MODEL = '@cf/openai/gpt-oss-120b';
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -31,22 +33,51 @@ export function cloudflareAnswerText(result: any): string {
 }
 
 /**
- * Token counts from a Workers AI result. Chat-completion replies name them
- * prompt_tokens / completion_tokens and Responses-format replies
- * input_tokens / output_tokens; either may sit on `usage`.
+ * Text of a Responses-format result: the `output_text` part of the message
+ * item (the reasoning item comes first and is skipped).
  */
-export function cloudflareUsage(
-  result: any,
-): { inputTokens?: number; outputTokens?: number } | undefined {
+export function cloudflareResponsesText(result: any): string {
+  if (typeof result?.output_text === 'string') return result.output_text;
+  for (const item of result?.output ?? [])
+    for (const part of item?.content ?? [])
+      if (part?.type === 'output_text' && typeof part.text === 'string')
+        return part.text;
+  throw new Error('Cloudflare trả về câu trả lời rỗng');
+}
+
+/**
+ * Token counts and Neurons from a Workers AI result. Chat-completion replies
+ * name tokens prompt_tokens / completion_tokens, Responses-format replies
+ * input_tokens / output_tokens; both carry the billed `neurons` (seen live on
+ * 2026-11-04 for @cf/openai/gpt-oss-120b).
+ */
+export function cloudflareUsage(result: any): ReviewUsage | undefined {
   const usage = result?.usage;
   if (!usage || typeof usage !== 'object') return undefined;
   const inputTokens =
     Number(usage.prompt_tokens ?? usage.input_tokens) || undefined;
   const outputTokens =
     Number(usage.completion_tokens ?? usage.output_tokens) || undefined;
-  return inputTokens || outputTokens
-    ? { inputTokens, outputTokens }
+  const neurons = Number(usage.neurons) || undefined;
+  return inputTokens || outputTokens || neurons
+    ? { inputTokens, outputTokens, ...(neurons ? { neurons } : {}) }
     : undefined;
+}
+
+const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;
+
+/**
+ * CLOUDFLARE_AI_REASONING_EFFORT, when set to low|medium|high. Workers AI
+ * takes a reasoning effort only in the Responses format, so setting it also
+ * switches the request to that format. Unset keeps the chat format.
+ */
+export function cloudflareReasoningEffort():
+  (typeof REASONING_EFFORTS)[number] | null {
+  const value =
+    process.env.CLOUDFLARE_AI_REASONING_EFFORT?.trim().toLowerCase();
+  return (REASONING_EFFORTS as readonly string[]).includes(value ?? '')
+    ? (value as (typeof REASONING_EFFORTS)[number])
+    : null;
 }
 
 /**
@@ -138,26 +169,47 @@ export class CloudflareWorkersAiClient {
   }): Promise<{
     data: unknown;
     model: string;
-    usage?: { inputTokens?: number; outputTokens?: number };
+    usage?: ReviewUsage;
   }> {
     const model = this.textModel();
+    const effort = cloudflareReasoningEffort();
+    const messages = [
+      { role: 'system', content: input.systemInstruction },
+      { role: 'user', content: input.prompt },
+    ];
     const result = await this.run(
       model,
-      {
-        messages: [
-          { role: 'system', content: input.systemInstruction },
-          { role: 'user', content: input.prompt },
-        ],
-        response_format: { type: 'json_schema', json_schema: input.schema },
-        temperature: input.temperature,
-        max_tokens: input.maxTokens ?? 8000,
-      },
+      effort
+        ? {
+            input: messages,
+            reasoning: { effort },
+            text: {
+              format: {
+                type: 'json_schema',
+                name: 'review',
+                strict: true,
+                schema: strictJsonSchema(
+                  input.schema as Record<string, unknown>,
+                ),
+              },
+            },
+            temperature: input.temperature,
+            max_output_tokens: input.maxTokens ?? 8000,
+          }
+        : {
+            messages,
+            response_format: { type: 'json_schema', json_schema: input.schema },
+            temperature: input.temperature,
+            max_tokens: input.maxTokens ?? 8000,
+          },
       TEXT_TIMEOUT_MS,
     );
     const usage = cloudflareUsage(result);
     let data: unknown;
     try {
-      data = JSON.parse(cloudflareAnswerText(result));
+      data = JSON.parse(
+        effort ? cloudflareResponsesText(result) : cloudflareAnswerText(result),
+      );
     } catch {
       throw new Error('Cloudflare reply is not valid JSON');
     }

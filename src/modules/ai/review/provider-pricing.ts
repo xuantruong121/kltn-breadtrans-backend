@@ -78,6 +78,8 @@ export type UsageRow = {
   inputTokens: number;
   outputTokens: number;
   latencyMs: number;
+  /** Neurons Cloudflare reported itself (usage.neurons); 0 when none. */
+  measuredNeurons: number;
 };
 
 const METRICS: Record<string, keyof UsageRow> = {
@@ -88,6 +90,7 @@ const METRICS: Record<string, keyof UsageRow> = {
   input_tokens: 'inputTokens',
   output_tokens: 'outputTokens',
   latency_ms: 'latencyMs',
+  neurons: 'measuredNeurons',
 };
 
 /**
@@ -118,6 +121,7 @@ export function sumTelemetry(
         inputTokens: 0,
         outputTokens: 0,
         latencyMs: 0,
+        measuredNeurons: 0,
       };
       (row[metric] as number) += Number(raw) || 0;
       rows.set(key, row);
@@ -130,8 +134,9 @@ export type CostRow = UsageRow & {
   label: string | null;
   /** Null when the model has no price entry. */
   costUsd: number | null;
-  /** Cloudflare only. */
+  /** Cloudflare only: measured when Cloudflare reported it, else estimated. */
   neurons: number | null;
+  neuronsMeasured: boolean;
   /** Answers came back but the provider reported no token counts. */
   tokensMissing: boolean;
 };
@@ -140,26 +145,31 @@ export function costRow(row: UsageRow): CostRow {
   const price = MODEL_PRICES[`${row.provider}|${row.model}`];
   const tokensMissing =
     row.ok + row.invalid > 0 && row.inputTokens + row.outputTokens === 0;
+  const estimatedNeurons =
+    !tokensMissing &&
+    price?.neuronsPerMInput !== undefined &&
+    price.neuronsPerMOutput !== undefined
+      ? (row.inputTokens * price.neuronsPerMInput +
+          row.outputTokens * price.neuronsPerMOutput) /
+        1_000_000
+      : null;
+  // Cloudflare's own Neurons count beats the token-based estimate.
+  const neurons =
+    row.measuredNeurons > 0 ? row.measuredNeurons : estimatedNeurons;
   return {
     ...row,
     label: price?.label ?? null,
     // Without token counts a cost of zero would be a claim, not a measure.
     costUsd:
-      price && !tokensMissing
-        ? (row.inputTokens * price.inputUsdPerM +
-            row.outputTokens * price.outputUsdPerM) /
-          1_000_000
-        : null,
-    neurons:
-      !tokensMissing &&
-      price?.neuronsPerMInput !== undefined &&
-      price.neuronsPerMOutput !== undefined
-        ? Math.round(
-            (row.inputTokens * price.neuronsPerMInput +
-              row.outputTokens * price.neuronsPerMOutput) /
-              1_000_000,
-          )
-        : null,
+      neurons !== null && price?.neuronsPerMInput !== undefined
+        ? (neurons / 1000) * CLOUDFLARE_USD_PER_K_NEURONS
+        : price && !tokensMissing
+          ? (row.inputTokens * price.inputUsdPerM +
+              row.outputTokens * price.outputUsdPerM) /
+            1_000_000
+          : null,
+    neurons: neurons === null ? null : Math.round(neurons),
+    neuronsMeasured: row.measuredNeurons > 0,
     tokensMissing,
   };
 }

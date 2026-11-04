@@ -3,10 +3,17 @@ import type { ReviewPrompt } from '../toeic-answer-review-prompt';
 
 export type ReviewerImage = { buffer: Buffer; mimeType: string };
 
+/** What a provider reports for one call; Cloudflare also bills Neurons. */
+export type ReviewUsage = {
+  inputTokens?: number;
+  outputTokens?: number;
+  neurons?: number;
+};
+
 export type ReviewerReply = {
   data: unknown;
   model: string;
-  usage?: { inputTokens?: number; outputTokens?: number };
+  usage?: ReviewUsage;
 };
 
 /** One provider able to answer a review prompt with JSON. */

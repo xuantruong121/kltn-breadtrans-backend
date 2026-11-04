@@ -32,6 +32,7 @@ describe('sumTelemetry', () => {
         inputTokens: 1000,
         outputTokens: 500,
         latencyMs: 900,
+        measuredNeurons: 0,
       },
     ]);
   });
@@ -63,6 +64,7 @@ describe('costRow', () => {
     invalid: 0,
     unavailable: 0,
     latencyMs: 0,
+    measuredNeurons: 0,
   };
 
   it('prices Groq gpt-oss-120b at 0.15 / 0.60 USD per million tokens', () => {
@@ -88,6 +90,21 @@ describe('costRow', () => {
     // 3,181.8 + 6,818.2 = 10,000 Neurons, at 0.011 USD per 1,000.
     expect(row.neurons).toBe(10_000);
     expect(row.costUsd).toBeCloseTo(0.11);
+  });
+
+  it('prefers the Neurons Cloudflare reported over the estimate', () => {
+    const [summed] = sumTelemetry([
+      {
+        'cloudflare|@cf/openai/gpt-oss-120b|ok': '2',
+        'cloudflare|@cf/openai/gpt-oss-120b|input_tokens': '706',
+        'cloudflare|@cf/openai/gpt-oss-120b|output_tokens': '602',
+        'cloudflare|@cf/openai/gpt-oss-120b|neurons': '62.49',
+      },
+    ]);
+    const row = costRow(summed);
+    expect(row.neurons).toBe(62);
+    expect(row.neuronsMeasured).toBe(true);
+    expect(row.costUsd).toBeCloseTo((62.49 / 1000) * 0.011);
   });
 
   it('leaves the cost empty for a model with no price', () => {

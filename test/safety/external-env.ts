@@ -28,6 +28,7 @@ export const EXTERNAL_ENV_NAMES = [
   'GEMINI_IMAGE_MODEL_NAME',
   'CLOUDFLARE_ACCOUNT_ID',
   'CLOUDFLARE_AI_API_TOKEN',
+  'CLOUDFLARE_AI_REASONING_EFFORT',
   // OpenAI-compatible answer reviewer (Groq) and the review chains that pick it
   'AI_COMPAT_BASE_URL',
   'AI_COMPAT_MODEL',

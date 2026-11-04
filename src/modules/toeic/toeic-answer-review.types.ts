@@ -42,7 +42,7 @@ export type ReviewStep = {
   at: string;
   /** Every provider asked, in order, and why it was passed over. */
   tried: Array<{ provider: string; model: string; reason: string }>;
-  usage?: { inputTokens?: number; outputTokens?: number };
+  usage?: { inputTokens?: number; outputTokens?: number; neurons?: number };
 };
 
 export type ExplanationCause =
