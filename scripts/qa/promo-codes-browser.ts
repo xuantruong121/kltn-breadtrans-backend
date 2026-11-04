@@ -45,6 +45,27 @@ async function main() {
   await page
     .getByRole('heading', { name: 'Mã giảm giá' })
     .waitFor({ timeout: 60_000 });
+  const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+  check(
+    'the expiry date cannot be set before today',
+    (await page.getByLabel('Hết hạn (hết ngày)').getAttribute('min')) === today,
+  );
+  await page.getByLabel('Lượt tối đa').fill('-1');
+  check(
+    'a negative use count cannot be typed',
+    (await page.getByLabel('Lượt tối đa').inputValue()) === '1',
+  );
+  await page.getByLabel('Lượt tối đa').fill('');
+  const past = await call('POST', '/admin/promo-codes', admin.token, {
+    code: `PAST-${code.slice(3)}`,
+    percentOff: 10,
+    validTo: new Date(Date.now() - 86_400_000).toISOString(),
+  });
+  check(
+    'the API refuses an expiry date that has passed',
+    past.status === 400,
+    `(${past.status})`,
+  );
   await page.getByLabel('Mã', { exact: true }).fill(code.toLowerCase());
   await page.getByLabel('Gói áp dụng').selectOption('PLUS');
   await page.getByRole('button', { name: 'Tạo mã' }).click();
@@ -83,7 +104,9 @@ async function main() {
     );
     check(
       `${width}px: the link fills and applies the code`,
-      (await p.getByRole('textbox', { name: 'Mã giảm giá' }).inputValue()).toUpperCase() === code,
+      (
+        await p.getByRole('textbox', { name: 'Mã giảm giá' }).inputValue()
+      ).toUpperCase() === code,
     );
     check(
       `${width}px: PLUS shows 56.000 ₫ and the struck 69.000 ₫`,

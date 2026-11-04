@@ -33,6 +33,11 @@ export class PromoCodeAdminService {
     const code = normalizePromoCode(dto.code);
     const validFrom = dto.validFrom ? new Date(dto.validFrom) : null;
     const validTo = dto.validTo ? new Date(dto.validTo) : null;
+    if (validTo && validTo.getTime() <= Date.now()) {
+      throw new BadRequestException(
+        'Ngày hết hạn đã qua: mã sẽ không dùng được. Chọn hôm nay hoặc một ngày sau.',
+      );
+    }
     if (validFrom && validTo && validTo <= validFrom) {
       throw new BadRequestException(
         'Ngày hết hạn phải sau ngày bắt đầu của mã.',
