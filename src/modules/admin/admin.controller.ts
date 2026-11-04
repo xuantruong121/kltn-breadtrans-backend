@@ -14,6 +14,7 @@ import {
 import { AdminService } from './admin.service';
 import { AdminDictionaryService } from './admin-dictionary.service';
 import { RetentionMetricsService } from './retention-metrics.service';
+import { AiReviewCostsService } from './ai-review-costs.service';
 import {
   ApiTags,
   ApiOperation,
@@ -48,6 +49,7 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly dictionaryService: AdminDictionaryService,
     private readonly retentionMetrics: RetentionMetricsService,
+    private readonly aiReviewCosts: AiReviewCostsService,
   ) {}
 
   @Get('dashboard-stats')
@@ -387,6 +389,20 @@ export class AdminController {
   @ApiOperation({ summary: 'Lay bao cao tong quan chi phi & tai nguyen Cloud' })
   getSystemCosts() {
     return this.adminService.getSystemCostsOverview();
+  }
+
+  @Get('system-costs/ai-review')
+  @ApiOperation({
+    summary:
+      'Token va chi phi uoc tinh cua buoc AI kiem dinh dap an, theo nha cung cap va model',
+  })
+  @ApiQuery({ name: 'days', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Bang token, luot goi, chi phi uoc tinh',
+  })
+  getAiReviewCosts(@Query('days') days?: string) {
+    return this.aiReviewCosts.getCosts(days ? Number(days) : undefined);
   }
 
   @Post('system-costs/purge-ai-cache')

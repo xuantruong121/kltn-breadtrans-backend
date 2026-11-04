@@ -31,6 +31,25 @@ export function cloudflareAnswerText(result: any): string {
 }
 
 /**
+ * Token counts from a Workers AI result. Chat-completion replies name them
+ * prompt_tokens / completion_tokens and Responses-format replies
+ * input_tokens / output_tokens; either may sit on `usage`.
+ */
+export function cloudflareUsage(
+  result: any,
+): { inputTokens?: number; outputTokens?: number } | undefined {
+  const usage = result?.usage;
+  if (!usage || typeof usage !== 'object') return undefined;
+  const inputTokens =
+    Number(usage.prompt_tokens ?? usage.input_tokens) || undefined;
+  const outputTokens =
+    Number(usage.completion_tokens ?? usage.output_tokens) || undefined;
+  return inputTokens || outputTokens
+    ? { inputTokens, outputTokens }
+    : undefined;
+}
+
+/**
  * The stand-in when Gemini is out of quota or down. Called over REST so it adds
  * no dependency. Nothing it returns is trusted more than Gemini output: the
  * same contract checks run on it afterwards.
@@ -135,12 +154,7 @@ export class CloudflareWorkersAiClient {
       },
       TEXT_TIMEOUT_MS,
     );
-    const usage = result?.usage
-      ? {
-          inputTokens: Number(result.usage.prompt_tokens) || undefined,
-          outputTokens: Number(result.usage.completion_tokens) || undefined,
-        }
-      : undefined;
+    const usage = cloudflareUsage(result);
     let data: unknown;
     try {
       data = JSON.parse(cloudflareAnswerText(result));
