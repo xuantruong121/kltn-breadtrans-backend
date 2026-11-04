@@ -1,5 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { SubscriptionStatus } from '@prisma/client';
+import { Role, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../common/email/email.service';
 import { NotificationsService } from './notifications.service';
@@ -12,6 +12,20 @@ import {
   getBusinessDayKey,
   getBusinessDayStart,
 } from '../../common/time/business-time.util';
+import {
+  daysUntil,
+  summarizeWeeks,
+  weeklyReportMessage,
+  weeklyReportType,
+} from './weekly-report.logic';
+import {
+  skillWeights,
+  weekStart,
+  weeklyTargets,
+} from '../learning-path/week.logic';
+import { GOAL_SKILLS } from '../learning-path/recommendation.logic';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class NotificationsCronService {
@@ -123,6 +137,89 @@ export class NotificationsCronService {
       `[Queue] plan expiry reminders day=${dayKey} candidates=${plans.length} sent=${sent}`,
     );
     return { candidates: plans.length, sent };
+  }
+
+  /**
+   * Queue worker entry point (Monday 08:00 Vietnam time): last week's practice
+   * report for every learner who practised in the past four weeks. One report
+   * per learner and week (Notification.type), so a rerun sends nothing new.
+   */
+  async runWeeklyReport(dayKey = getBusinessDayKey()) {
+    const thisWeek = weekStart(getBusinessDayStart(dayKey));
+    const weekKey = getBusinessDayKey(thisWeek);
+    const type = weeklyReportType(weekKey);
+    const activeSince = new Date(thisWeek.getTime() - 28 * DAY_MS);
+    const active = await this.prisma.learnerProgressEvent.groupBy({
+      by: ['userId'],
+      where: { createdAt: { gte: activeSince, lt: thisWeek } },
+    });
+    const learners = await this.prisma.user.findMany({
+      where: {
+        id: { in: active.map((a) => a.userId) },
+        role: Role.STUDENT,
+        notifications: { none: { type } },
+      },
+      select: {
+        id: true,
+        learnerProfile: {
+          select: { goal: true, minutesPerDay: true, targetDate: true },
+        },
+      },
+    });
+    const events = learners.length
+      ? await this.prisma.learnerProgressEvent.findMany({
+          where: {
+            userId: { in: learners.map((l) => l.id) },
+            createdAt: {
+              gte: new Date(thisWeek.getTime() - 14 * DAY_MS),
+              lt: thisWeek,
+            },
+          },
+          select: {
+            userId: true,
+            skill: true,
+            scorePercent: true,
+            createdAt: true,
+          },
+        })
+      : [];
+
+    const now = new Date();
+    let sent = 0;
+    for (const learner of learners) {
+      const profile = learner.learnerProfile;
+      const targets = weeklyTargets(
+        profile?.minutesPerDay ?? 15,
+        skillWeights(GOAL_SKILLS[profile?.goal ?? 'GENERAL'], null),
+      );
+      const message = weeklyReportMessage({
+        weekStart: thisWeek,
+        skills: summarizeWeeks({
+          events: events.filter((e) => e.userId === learner.id),
+          weekStart: thisWeek,
+          targets,
+        }),
+        daysToExam: daysUntil(profile?.targetDate ?? null, now),
+      });
+      await this.notificationsService.createNotification({
+        userId: learner.id,
+        type,
+        title: message.title,
+        body: message.body,
+        url: message.url,
+      });
+      await this.notificationsService.sendPushToUser(learner.id, {
+        title: message.title,
+        body: message.body,
+        icon: '/icons/icon-192.png',
+        url: message.url,
+      });
+      sent += 1;
+    }
+    this.logger.log(
+      `[Queue] weekly report week=${weekKey} active=${active.length} sent=${sent}`,
+    );
+    return { week: weekKey, active: active.length, sent };
   }
 
   // Queue worker entry point: nhắc nhở giữ chuỗi lúc 20:00 (Giờ Việt Nam).
