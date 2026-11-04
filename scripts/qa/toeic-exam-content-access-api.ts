@@ -11,6 +11,7 @@ import {
   call,
   check,
   failureCount,
+  fourSkillsAssessment,
   newAdmin,
   newStudent,
 } from './harness-api';
@@ -155,7 +156,7 @@ async function main() {
     '/toeic/stats/listening-reading',
     '/toeic/bundles/22',
     '/toeic/assessments',
-    '/toeic/assessments/2',
+    `/toeic/assessments/${fourSkillsAssessment().id}`,
     '/toeic/assessments/history',
   ]) {
     const r = await call('GET', path, a.token);

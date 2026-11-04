@@ -54,7 +54,10 @@ async function listening() {
     list.status === 200 && list.data.length > 0,
     `(${list.data?.length})`,
   );
-  const free = list.data.find((q: any) => !q.isLocked && !q.isPremiumContent);
+  // A level the fresh learner has opened, so the level lock does not refuse it.
+  const free = list.data.find(
+    (q: any) => !q.isLocked && !q.isLevelLocked && !q.isPremiumContent,
+  );
   const premium = list.data.find((q: any) => q.isLocked);
   check('catalog marks locked premium items for a free learner', !!premium);
 

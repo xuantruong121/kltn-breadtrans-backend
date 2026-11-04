@@ -6,15 +6,36 @@
  * signed here with the documented algorithm (sorted key=value&…, HMAC-SHA256
  * with the checksum key). Nothing reaches payOS and no money moves; this does
  * NOT prove production PayOS connectivity.
+ *
+ * Start the backend with: QA_PAYOS=fake finalization-harness.sh qa-backend <db>
+ * Plan access follows the matrix of 2026-10-30: Writing B1 (quiz 18) opens
+ * from PLUS, Writing B2–C1 (quiz 19) from PRO. Courses were removed on
+ * 2026-11-01. Each learner has every practice level opened, so a refusal is
+ * the plan's, not the level lock's.
  */
 import { createHmac, randomUUID } from 'node:crypto';
 
-import { BE, call, check, failureCount, newStudent } from './harness-api';
+import {
+  BE,
+  call,
+  check,
+  failureCount,
+  newStudent as newLearner,
+  unlockAllLevels,
+} from './harness-api';
 import { harnessExec, harnessQuery } from './harness-db';
 
 const CHECKSUM = 'mock-checksum-key';
 const FAKE = 'http://127.0.0.1:9470';
 const one = (sql: string) => harnessQuery(sql)[0]?.[0];
+const PLUS_QUIZ = 18;
+const PRO_QUIZ = 19;
+
+async function newStudent(name: string) {
+  const a = await newLearner(name);
+  unlockAllLevels(a.userId);
+  return a;
+}
 
 /** payOS webhook signature, written from the docs (not the SDK). */
 function sign(data: Record<string, unknown>, key = CHECKSUM) {
@@ -126,31 +147,21 @@ async function main() {
     (await planCode(free.token)) === 'FREE',
     JSON.stringify(await plan(free.token)).slice(0, 120),
   );
-  const premiumQuiz = Number(
-    one(
-      `select id from "Quiz" where "isPremiumContent" and type = 'BILINGUAL_READING' order by id limit 1`,
-    ),
-  );
-  const proCourse = Number(
-    one(
-      `select id from "Course" where status = 'PUBLISHED' order by id limit 1`,
-    ),
-  );
   const quizAccess = async (t: string) =>
-    (await call('GET', `/quizzes/${premiumQuiz}`, t)).status;
-  const courseAccess = async (t: string) =>
-    (await call('GET', `/courses/${proCourse}/learning`, t)).status;
+    (await call('GET', `/quizzes/${PLUS_QUIZ}`, t)).status;
+  const proAccess = async (t: string) =>
+    (await call('GET', `/quizzes/${PRO_QUIZ}`, t)).status;
   const fq = await quizAccess(free.token);
-  const fc = await courseAccess(free.token);
+  const fc = await proAccess(free.token);
   check(
-    'FREE: premium reading quiz refused by the server',
+    'FREE: PLUS writing task refused by the server',
     fq === 403,
-    `(quiz ${premiumQuiz}: ${fq})`,
+    `(quiz ${PLUS_QUIZ}: ${fq})`,
   );
   check(
-    'FREE: course library refused by the server',
+    'FREE: PRO writing task refused by the server',
     fc === 403,
-    `(course ${proCourse}: ${fc})`,
+    `(quiz ${PRO_QUIZ}: ${fc})`,
   );
 
   console.log('\n== PLUS purchase through the mock provider');
@@ -287,14 +298,14 @@ async function main() {
     (await planCode(free.token)) === 'FREE',
   );
   check(
-    'PLUS: premium reading quiz opens',
+    'PLUS: PLUS writing task opens',
     (await quizAccess(p.token)) === 200,
     `(${await quizAccess(p.token)})`,
   );
   check(
-    'PLUS: course library still refused (PRO only)',
-    (await courseAccess(p.token)) === 403,
-    `(${await courseAccess(p.token)})`,
+    'PLUS: PRO writing task still refused',
+    (await proAccess(p.token)) === 403,
+    `(${await proAccess(p.token)})`,
   );
 
   console.log('\n== PRO, five identical webhooks at once');
@@ -314,9 +325,9 @@ async function main() {
     `(statuses ${statuses.join(',')}; subs ${sq.length}; events ${events})`,
   );
   check(
-    'PRO: course library opens',
-    (await courseAccess(q.token)) === 200,
-    `(${await courseAccess(q.token)})`,
+    'PRO: PRO writing task opens',
+    (await proAccess(q.token)) === 200,
+    `(${await proAccess(q.token)})`,
   );
 
   console.log('\n== Provider sync (signed provider record)');
@@ -385,10 +396,10 @@ async function main() {
     `update "Subscription" set "startsAt" = now() - interval '31 days', "endsAt" = now() - interval '1 minute' where "userId" = ${q.userId}`,
   );
   check(
-    'expired PRO: back to FREE, course refused',
+    'expired PRO: back to FREE, PRO writing task refused',
     (await planCode(q.token)) === 'FREE' &&
-      (await courseAccess(q.token)) === 403,
-    `(${await courseAccess(q.token)})`,
+      (await proAccess(q.token)) === 403,
+    `(${await proAccess(q.token)})`,
   );
 
   console.log('\n== Cancellation');
