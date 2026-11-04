@@ -1,5 +1,6 @@
 import {
   languageIssue,
+  plannedGroupIssue,
   questionContentIssue,
   questionsToAvoid,
 } from './toeic-ai-batch.logic';
@@ -177,5 +178,29 @@ describe('languageIssue', () => {
         ],
       }),
     ).toBeNull();
+  });
+});
+
+describe('plannedGroupIssue for a three-speaker dialogue', () => {
+  // Live runs of 2026-11-03/04: every turn on one line, counted as one speaker.
+  it('counts speakers written on one line', () => {
+    expect(
+      plannedGroupIssue(
+        { threeSpeakers: true },
+        {
+          transcript:
+            'M: Shall we start the review? W1: Yes, I have the sales figures. W2: And I brought the new slides. M: Great, let us begin.',
+        },
+      ),
+    ).toBeNull();
+  });
+
+  it('still refuses two speakers', () => {
+    expect(
+      plannedGroupIssue(
+        { threeSpeakers: true },
+        { transcript: 'M: Shall we start? W: Yes. M: Good.' },
+      ),
+    ).toBe('Hội thoại cần 3 người nói, hiện có 2');
   });
 });

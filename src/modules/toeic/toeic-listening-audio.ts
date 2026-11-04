@@ -65,6 +65,34 @@ const assertOptions = (
   return options;
 };
 
+// A speaker label opening a turn: at the start of the text or after the end
+// of a sentence ("… today. W: Yes, …"). "2:00" has no letters before the
+// colon, so a time never matches.
+const TURN_LABEL = /(^|[.!?…"”'’)]\s+)([A-Z][A-Za-z]{0,11}(?: ?\d)?):[ \t]+/g;
+const STANDARD_LABEL = /^(?:M|W|Man|Woman|Speaker)(?: ?\d)?$/;
+
+/**
+ * One speaker turn per line. Generated dialogues often run every turn on one
+ * line ("M: … W: … M: …"); the TTS gives each line one voice, so such a
+ * dialogue was read by a single voice, labels included, and the three-speaker
+ * check counted one speaker. A label counts when it is a standard one (M, W,
+ * W1, Man…) or opens at least two turns; the words of the turns are kept.
+ */
+export function splitSpeakerTurns(text: string): string {
+  const counts = new Map<string, number>();
+  for (const match of text.matchAll(TURN_LABEL))
+    counts.set(match[2], (counts.get(match[2]) ?? 0) + 1);
+  const labels = new Set(
+    [...counts]
+      .filter(([label, count]) => STANDARD_LABEL.test(label) || count >= 2)
+      .map(([label]) => label),
+  );
+  if (!labels.size) return text;
+  return text.replace(TURN_LABEL, (all, lead: string, label: string) =>
+    lead && labels.has(label) ? `${lead.trimEnd()}\n${label}: ` : all,
+  );
+}
+
 const spokenPrompt = (group: ToeicListeningAudioGroup) =>
   (group.transcriptText?.trim() || group.passageText?.trim() || '')
     .replace(/^\s*AUDIO\s+PROMPT\s*:\s*/i, '')

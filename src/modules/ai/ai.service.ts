@@ -1,4 +1,5 @@
 import { recordAzureTts, spokenCharacters } from './azure-usage';
+import { splitSpeakerTurns } from '../toeic/toeic-listening-audio';
 import {
   Injectable,
   Inject,
@@ -83,7 +84,9 @@ export function buildToeicListeningSsml(transcript: string): string {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
-  const turns = transcript
+  // A dialogue written on one line gets one turn per speaker first; without
+  // it a single voice read every turn, labels included.
+  const turns = splitSpeakerTurns(transcript)
     .split(/\r?\n/)
     .map((line) => {
       const match = /^\s*([^:]{1,40}):\s*(.+)$/.exec(line);

@@ -1,5 +1,6 @@
 import {
   buildToeicListeningAudioScript,
+  splitSpeakerTurns,
   toeicListeningAudioFingerprint,
 } from './toeic-listening-audio';
 
@@ -173,5 +174,42 @@ describe('Part 3/4 prompt order', () => {
     expect(toeicListeningAudioFingerprint(group([second, first]))).toBe(
       toeicListeningAudioFingerprint(group([first, second])),
     );
+  });
+});
+
+describe('splitSpeakerTurns', () => {
+  // Exam 1 Part 3 as stored: every turn on one line, a time inside a turn.
+  const oneLine =
+    'W: Good morning, I am calling to confirm my reservation. M: Let me check our system for you, Ms. Jenkins. W: Is breakfast included? M: Yes, it is served from 6:30 AM to 10 AM. W: Thank you.';
+
+  it('puts each turn on its own line and keeps every word', () => {
+    const split = splitSpeakerTurns(oneLine);
+    expect(split.split('\n')).toEqual([
+      'W: Good morning, I am calling to confirm my reservation.',
+      'M: Let me check our system for you, Ms. Jenkins.',
+      'W: Is breakfast included?',
+      'M: Yes, it is served from 6:30 AM to 10 AM.',
+      'W: Thank you.',
+    ]);
+    expect(split.replace(/\s+/g, ' ')).toBe(oneLine.replace(/\s+/g, ' '));
+  });
+
+  it('separates three speakers and is idempotent', () => {
+    const three =
+      'M: Shall we start? W1: Yes, I have the figures. W2: And I brought the slides. M: Great.';
+    const split = splitSpeakerTurns(three);
+    expect(split.split('\n').map((line) => line.split(':')[0])).toEqual([
+      'M',
+      'W1',
+      'W2',
+      'M',
+    ]);
+    expect(splitSpeakerTurns(split)).toBe(split);
+  });
+
+  it('leaves a monologue and a stray colon alone', () => {
+    const talk =
+      'Attention, passengers. Note: the 2:15 train to Boston is delayed. Thank you.';
+    expect(splitSpeakerTurns(talk)).toBe(talk);
   });
 });

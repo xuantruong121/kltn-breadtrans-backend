@@ -1,3 +1,5 @@
+import { splitSpeakerTurns } from './toeic-listening-audio';
+
 type BatchQuestion = {
   text?: unknown;
   options?: unknown;
@@ -175,6 +177,9 @@ export function prepareGeneratedBatch<T>(
     const first = questionNumber;
     questionNumber += questions.length;
     const next = { ...group, questions };
+    // One speaker turn per line, so each speaker gets a voice and is counted.
+    if (part === 3 && typeof group.transcript === 'string')
+      next.transcript = splitSpeakerTurns(group.transcript);
     return part === 6 ? numberPassageBlanks(next, first) : next;
   });
   return { ...candidate, groups: prepared };
@@ -206,7 +211,8 @@ export type PlannedTraits = {
 };
 
 export function plannedGroupIssue(planned: PlannedTraits, group: BatchGroup) {
-  const transcript = String(group.transcript ?? '');
+  // Labels are counted turn by turn, wherever the model put its line breaks.
+  const transcript = splitSpeakerTurns(String(group.transcript ?? ''));
   const passage = String(group.passageText ?? '');
   if (planned.threeSpeakers) {
     const speakers = new Set(
