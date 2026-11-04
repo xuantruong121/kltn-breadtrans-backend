@@ -187,10 +187,12 @@ async function inventory(examId: number, dir: string) {
   for (const g of groups) {
     if (!g.audioUrl)
       throw new Error(`group ${g.id} (Part ${g.part}) has no audioUrl`);
+    // The cache name carries the stored key: a group whose clip was rebuilt
+    // under a new key must download the new clip, not reuse the old one.
     const file = join(
       dir,
       'clips',
-      `${String(g.part)}-${String(g.groupOrder).padStart(3, '0')}-g${g.id}.mp3`,
+      `${String(g.part)}-${String(g.groupOrder).padStart(3, '0')}-g${g.id}-${sha256(g.audioUrl).slice(0, 12)}.mp3`,
     );
     if (!existsSync(file)) {
       // Since P05 a group stores a private key; older rows hold a public URL.
@@ -444,8 +446,14 @@ function build(examId: number, dir: string) {
   };
   mkdirSync(join(dir, 'build'), { recursive: true });
   // Normalize each approved clip to the same format first (no content change).
+  // The cache name carries the clip's hash: a rebuilt clip must never reuse
+  // the normalized copy of the clip it replaced.
   const norm = (c: InventoryClip) => {
-    const file = join(dir, 'build', `clip-g${c.groupId}.wav`);
+    const file = join(
+      dir,
+      'build',
+      `clip-g${c.groupId}-${c.sha256.slice(0, 16)}.wav`,
+    );
     if (!existsSync(file))
       execFileSync(FFMPEG, [
         '-y',
