@@ -385,7 +385,7 @@
     "status": "DESIGN_HYPOTHESIS_NOT_CALIBRATED",
     "purpose": "An authoring-side relative difficulty scale for ITEMS. It exists so content can carry a deliberate progression without borrowing a proficiency vocabulary. It is not a proficiency scale, is not calibrated against any learner data, and is never shown to a learner.",
     "notCefr": "D1-D4 are NOT CEFR levels and are not derived from any CEFR conversion. They were assigned from the intended relative progression of the previous draft, not by translating A2/B1/B2.",
-    "notResultBands": "Deliberately separate from the result bands (Starter/Foundation/Intermediate/Upper). Result bands describe a learner OUTCOME; D1-D4 describe an ITEM. No mapping between the two exists or should be inferred.",
+    "notResultBands": "Deliberately separate from any learner outcome. D1-D4 describe an ITEM. Update 2026-11-04: FOUR_SKILL_PLACEMENT_V2 places a learner on the four internal practice levels of placement.logic.ts (STARTER, BASIC, INTERMEDIATE, ADVANCED; owner decision 2026-10-30) and assigns no result band; the four result bands this blueprint once named (Starter/Foundation/Intermediate/Upper) are not used, and the three V1 bands of resolveEstimatedLevel belong to the inactive OBJECTIVE_POOLED_V1 form only. No mapping from D1-D4 to a practice level exists or should be inferred.",
     "tiers": [
       {
         "tier": "D1",
