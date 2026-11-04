@@ -96,6 +96,14 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  async enqueuePlanExpiryReminder(dayKey: string): Promise<void> {
+    await this.enqueue(
+      JOB_NAMES.PLAN_EXPIRY_REMINDER,
+      { version: 1, dayKey },
+      { jobId: `plan-expiry-reminder-${dayKey}` },
+    );
+  }
+
   async enqueueVocabularyReview(bucketKey: string): Promise<void> {
     await this.enqueue(
       JOB_NAMES.VOCABULARY_REVIEW,
@@ -170,6 +178,8 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
         return this.gamification.triggerWeeklyCron(false, job.data.weekKey);
       case JOB_NAMES.STREAK_REMINDER:
         return this.notifications.runDailyStreakReminder(job.data.dayKey);
+      case JOB_NAMES.PLAN_EXPIRY_REMINDER:
+        return this.notifications.runPlanExpiryReminder(job.data.dayKey);
       case JOB_NAMES.VOCABULARY_REVIEW:
         return this.notifications.runVocabSpacedReview();
       case JOB_NAMES.R2_AUDIO_CLEANUP:

@@ -1,6 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../../common/email/email.service';
 import { NotificationsService } from './notifications.service';
+import {
+  expiryMilestone,
+  planExpiryMessage,
+  planExpiryType,
+} from './plan-expiry-message';
 import {
   getBusinessDayKey,
   getBusinessDayStart,
@@ -13,7 +20,110 @@ export class NotificationsCronService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    @Optional() private readonly email?: EmailService,
   ) {}
+
+  /**
+   * Queue worker entry point (09:00 Vietnam time): remind learners 7, 3 and
+   * 1 days before a paid plan ends and on its last day. Nothing is sent for a
+   * plan already followed by a queued renewal, and each plan/milestone is
+   * sent once (Notification.type), so a rerun of the day sends nothing new.
+   */
+  async runPlanExpiryReminder(dayKey = getBusinessDayKey()) {
+    const dayStart = getBusinessDayStart(dayKey);
+    const now = new Date();
+    const windowEnd = new Date(dayStart.getTime() + 9 * 24 * 60 * 60 * 1000);
+    const plans = await this.prisma.subscription.findMany({
+      where: {
+        status: SubscriptionStatus.ACTIVE,
+        startsAt: { lte: now },
+        endsAt: { gt: now, lt: windowEnd },
+        planVersion: { plan: { code: { not: 'FREE' } } },
+      },
+      include: {
+        planVersion: { include: { plan: true } },
+        user: {
+          select: { email: true, profile: { select: { fullName: true } } },
+        },
+      },
+    });
+    let sent = 0;
+    for (const plan of plans) {
+      const milestone = expiryMilestone(plan.endsAt, dayStart);
+      if (milestone === null) continue;
+      const renewed = await this.prisma.subscription.count({
+        where: {
+          userId: plan.userId,
+          status: SubscriptionStatus.ACTIVE,
+          startsAt: { gte: plan.endsAt },
+          planVersion: { plan: { code: { not: 'FREE' } } },
+        },
+      });
+      if (renewed > 0) continue;
+      const type = planExpiryType(plan.id, milestone);
+      const already = await this.prisma.notification.findFirst({
+        where: { userId: plan.userId, type },
+        select: { id: true },
+      });
+      if (already) continue;
+
+      const [quizzes, speaking, stats] = await Promise.all([
+        this.prisma.submission.count({
+          where: { userId: plan.userId, submittedAt: { gte: plan.startsAt } },
+        }),
+        this.prisma.speakingSubmission.count({
+          where: { userId: plan.userId, submittedAt: { gte: plan.startsAt } },
+        }),
+        this.prisma.userStats.findUnique({
+          where: { userId: plan.userId },
+          select: { streakCount: true },
+        }),
+      ]);
+      const message = planExpiryMessage({
+        planName: plan.planVersion.plan.displayName.replace(
+          /^BreadTrans\s+/,
+          '',
+        ),
+        milestone,
+        endsAt: plan.endsAt,
+        practicedCount: quizzes + speaking,
+        streak: stats?.streakCount ?? 0,
+        learnerName: plan.user.profile?.fullName,
+      });
+      await this.notificationsService.createNotification({
+        userId: plan.userId,
+        type,
+        title: message.title,
+        body: message.body,
+        url: message.url,
+      });
+      await this.notificationsService.sendPushToUser(plan.userId, {
+        title: message.title,
+        body: message.body,
+        icon: '/icons/icon-192.png',
+        url: message.url,
+      });
+      if (this.email && plan.user.email) {
+        // Email is extra: a mail failure must not stop the other reminders.
+        await this.email
+          .sendPlanExpiryReminder(
+            plan.user.email,
+            message.emailSubject,
+            message.emailHtml,
+          )
+          .catch((error: unknown) =>
+            this.logger.warn(
+              `plan_expiry_email_failed subscription=${plan.id}: ${String(error).slice(0, 160)}`,
+            ),
+          );
+      }
+      sent += 1;
+    }
+    this.logger.log(
+      `[Queue] plan expiry reminders day=${dayKey} candidates=${plans.length} sent=${sent}`,
+    );
+    return { candidates: plans.length, sent };
+  }
 
   // Queue worker entry point: nhắc nhở giữ chuỗi lúc 20:00 (Giờ Việt Nam).
   async runDailyStreakReminder(dayKey = getBusinessDayKey()) {

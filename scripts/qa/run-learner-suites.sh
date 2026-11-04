@@ -87,6 +87,7 @@ backend QA_PAYOS=fake
 run plans-api ts scripts/qa/finalization-plans-api.ts
 run subscription-payos ts scripts/qa/finalization-subscription-payos.ts
 run plan-renewal-browser ts scripts/qa/plan-renewal-browser.ts
+run plan-expiry-reminder ts scripts/qa/plan-expiry-reminder-api.ts
 
 echo "== writing grader refusing"
 backend WRITING_QA_PROVIDER_MODE=failure

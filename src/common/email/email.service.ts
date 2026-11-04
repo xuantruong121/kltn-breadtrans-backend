@@ -36,6 +36,15 @@ export class EmailService {
     await this.transporter.sendMail({ from, to, subject, html });
   }
 
+  /** Reminder that a paid plan is about to end; the HTML is escaped by the caller. */
+  sendPlanExpiryReminder(
+    to: string,
+    subject: string,
+    html: string,
+  ): Promise<void> {
+    return this.send(to, subject, html);
+  }
+
   sendRegistrationOtp(to: string, otp: string): Promise<void> {
     return this.send(
       to,
