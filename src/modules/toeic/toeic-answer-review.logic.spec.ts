@@ -162,6 +162,61 @@ describe('judgeSolve', () => {
     expect(judge({})).toBe('AGREE');
   });
 
+  // Live rerun 2026-11-04: six Part 6 sentence-insertion items were refused
+  // although the solver chose the key, because it quoted only the option.
+  describe('a Part 6 sentence to insert', () => {
+    const passage =
+      'Notice to Employees, In order to improve work flexibility, our human resources department has updated the remote work [139] _____. Please submit your requests [141] _____ to avoid delays. [142] _____';
+    const options = [
+      'Feel free to ask your manager for further assistance.',
+      'The cafeteria is closed on weekends.',
+      'Our new logo was unveiled last week.',
+      'Parking fees will rise next year.',
+    ];
+    const insert = (
+      evidence: string[],
+      questionText = 'Choose the sentence that best completes blank [142].',
+    ) =>
+      judgeSolve({
+        part: 6,
+        stimulus: passage,
+        questionText,
+        options,
+        key: 0,
+        answer: answer({ evidence }),
+      }).verdict;
+
+    it('may quote the option sentence alone', () => {
+      expect(
+        insert(['Feel free to ask your manager for further assistance.']),
+      ).toBe('AGREE');
+    });
+
+    it('ignores a quote that is only the blank marker', () => {
+      expect(
+        insert([
+          '[142] _____',
+          'Feel free to ask your manager for further assistance.',
+        ]),
+      ).toBe('AGREE');
+    });
+
+    it('still refuses an invented quote', () => {
+      expect(insert(['Employees may work from home on Fridays.'])).toBe(
+        'EVIDENCE_NOT_FOUND',
+      );
+    });
+
+    it('a word blank in Part 6 still needs a quote from the passage', () => {
+      expect(
+        insert(
+          ['Feel free to ask your manager for further assistance.'],
+          'Choose the best option for blank [141].',
+        ),
+      ).toBe('EVIDENCE_NOT_FOUND');
+    });
+  });
+
   // Cases seen in the live run of 2026-11-03, where the old rule refused
   // answers the solver had got right.
   it('accepts a Part 2 quote of the chosen response', () => {

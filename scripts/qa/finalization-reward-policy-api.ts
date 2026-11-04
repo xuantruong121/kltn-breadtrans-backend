@@ -7,8 +7,9 @@
  * Quest = UserQuestProgress rows advanced today
  *
  * Rewarded: standalone Listening, Reading, Speaking, Writing practice.
- * Not rewarded: Diagnostic, TOEIC L&R / S&W / 4 Skills, course-linked quiz,
- * grammar, lesson content, flashcard vocabulary.
+ * Not rewarded: Diagnostic, TOEIC L&R / S&W / 4 Skills, grammar, lesson
+ * content, flashcard vocabulary. (The course-linked quiz case went with the
+ * courses on 2026-11-01.)
  * Arena is rewarded in the arena gateway (not exercised here; see report).
  *
  * Usage: npx ts-node --transpile-only scripts/qa/finalization-reward-policy-api.ts <10s.wav> <34s.wav>
@@ -22,8 +23,10 @@ import {
   call,
   check,
   failureCount,
+  fourSkillsAssessment,
   newProStudent,
   newStudent,
+  unlockAllLevels,
 } from './harness-api';
 import { harnessExec, harnessQuery } from './harness-db';
 
@@ -68,6 +71,9 @@ async function expectDelta(
   const learner = await (pro ? newProStudent : newStudent)(
     `rw-${label.replace(/\W+/g, '').slice(0, 12)}`,
   );
+  // Content above the starting level is refused by the level lock, which is
+  // not what this suite measures; every level is opened first.
+  unlockAllLevels(learner.userId);
   const before = balance(learner.userId);
   await act(learner);
   await settle();
@@ -129,11 +135,6 @@ async function main() {
   const listeningQuiz = Number(
     harnessQuery(
       `select id from "Quiz" where type::text = 'LISTENING_PRACTICE' and "isPremiumContent" = false and "publicationStatus"::text = 'PUBLISHED' order by id limit 1`,
-    )[0][0],
-  );
-  const courseQuiz = Number(
-    harnessQuery(
-      `select id from "Quiz" where type::text = 'LISTENING_PRACTICE' and "isPremiumContent" = false and "publicationStatus"::text = 'PUBLISHED' and id <> ${listeningQuiz} order by id limit 1`,
     )[0][0],
   );
   const readingQuiz = Number(
@@ -228,7 +229,7 @@ async function main() {
       sub.data?.status,
     );
   });
-  for (const assessment of [1, 2])
+  for (const assessment of [1, fourSkillsAssessment().id])
     await expectDelta(
       `TOEIC assessment ${assessment} (${assessment === 1 ? 'S&W' : '4 Skills'}) full lifecycle`,
       false,
@@ -264,24 +265,10 @@ async function main() {
         );
       },
     );
-  await expectDelta('course-linked Listening quiz', false, async (l) => {
-    const lesson = harnessQuery(
-      `select id, "courseId" from "Lesson" order by id limit 1`,
-    )[0];
-    harnessExec(
-      `insert into "CourseActivity" ("courseId", "lessonId", "order", kind, "quizId", "updatedAt") values (${lesson[1]}, ${lesson[0]}, 9001, 'QUIZ', ${courseQuiz}, now())`,
-    );
-    try {
-      await submitQuiz(l, courseQuiz, true);
-    } finally {
-      harnessExec(
-        `delete from "CourseActivity" where "lessonId" = ${lesson[0]} and "order" = 9001 and "quizId" = ${courseQuiz}`,
-      );
-    }
-  });
   await expectDelta('grammar topic', false, async (l) => {
     const topic = harnessQuery(
-      `select t.id from "GrammarTopic" t where exists (select 1 from "GrammarQuestion" q where q."topicId" = t.id) order by t.id limit 1`,
+      // Learners see published topics only; a draft answers 404.
+      `select t.id from "GrammarTopic" t where t."publicationStatus" = 'PUBLISHED' and exists (select 1 from "GrammarQuestion" q where q."topicId" = t.id) order by t.id limit 1`,
     )[0]?.[0];
     const qs = harnessQuery(
       `select id from "GrammarQuestion" where "topicId" = ${topic}`,

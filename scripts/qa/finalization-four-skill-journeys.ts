@@ -1,11 +1,14 @@
 /**
  * Four-skill learner journeys per plan on the disposable harness (:3101):
  * open → (listening attempt) → submit → persisted result, for
- *   FREE: A1/A2 Listening, Reading, Writing, Speaking; B1+ refused on detail,
- *         submit, question audio and grading (direct API, no UI);
- *   PLUS: B1/B2 Listening and Reading; Speaking/Writing B1+ refused with PRO
- *         named (owner matrix 2026-10-28); Courses still refused;
- *   PRO:  B1-C1 in all four skills, the C1 Speaking set, all three courses.
+ *   FREE: A1/A2 in all four skills; B1+ Reading and Listening open; dictation
+ *         B1+ and Speaking/Writing B1+ refused on detail, submit, question
+ *         audio and grading (direct API, no UI);
+ *   PLUS: B1/B2 in all four skills; Speaking/Writing C1 refused with PRO named
+ *         (owner matrix 2026-10-30);
+ *   PRO:  B1-C1 in all four skills, the C1 Speaking set.
+ * Every learner has all practice levels opened first, so a refusal here is the
+ * plan's, not the level lock's. Courses were removed on 2026-11-01.
  * Graders are MOCKS (deterministic writing grader, MOCK_AZURE_SPEECH); no
  * Gemini or Azure call is made, so scores prove persistence, not quality.
  * Expected objective scores come from the clone's answer keys, not the API.
@@ -23,6 +26,7 @@ import {
   failureCount,
   newAdmin,
   newStudent,
+  unlockAllLevels,
 } from './harness-api';
 import { harnessQuery } from './harness-db';
 
@@ -184,6 +188,7 @@ async function main() {
   const pro = await newStudent('fsj-pro');
   await grant(admin.token, plus.userId, 'PLUS');
   await grant(admin.token, pro.userId, 'PRO');
+  for (const learner of [free, plus, pro]) unlockAllLevels(learner.userId);
   const spk = {
     a1a2: firstInSet('practice-read-aloud-a1-a2'),
     a2: firstInSet('practice-question-response-a2'),
@@ -206,24 +211,28 @@ async function main() {
     ],
   });
 
-  console.log('\n== FREE B1+ refused (direct API, media, grading)');
-  for (const id of [11, 12, 27, 6, 16, 18]) {
+  // Owner matrix 2026-10-30: Reading and Listening are free at every level
+  // except dictation B1+ (PLUS); Speaking and Writing B1-B2 need PLUS, C1 PRO.
+  console.log('\n== FREE: B1+ reading and listening open, the rest refused');
+  for (const id of [11, 12, 27, 6, 16]) {
+    const d = await call('GET', `/quizzes/${id}`, free.token);
+    check(`FREE opens free quiz ${id}`, d.status === 200, `(${d.status})`);
+  }
+  for (const id of [25, 18]) {
     const d = await call('GET', `/quizzes/${id}`, free.token);
     check(`FREE detail quiz ${id} refused`, d.status === 403, `(${d.status})`);
   }
-  for (const id of [11, 6]) {
+  {
+    const id = 25;
     const qs = harnessQuery(
       `select id from "Question" where "quizId" = ${id} order by id`,
     ).map((r) => Number(r[0]));
     const type = one(`select type::text from "Quiz" where id = ${id}`);
     const s = await call('POST', `/quizzes/${id}/submit`, free.token, {
       answers: qs.map((q) => ({ questionId: q, answer: keyFor(type, q) })),
-      ...(type === 'BILINGUAL_READING'
-        ? { clientAttemptId: randomUUID() }
-        : {}),
     });
     check(
-      `FREE direct submit with correct keys to quiz ${id} refused, nothing stored`,
+      `FREE direct submit with correct keys to dictation B1 quiz ${id} refused, nothing stored`,
       s.status === 403 &&
         one(
           `select count(*) from "Submission" where "userId" = ${free.userId} and "quizId" = ${id}`,
@@ -233,15 +242,15 @@ async function main() {
   }
   const premiumQ = Number(
     one(
-      `select x.id from "Question" x join "QuizAudioAsset" a on a."questionId" = x.id and a."isActive" where x."quizId" = 11 order by x.id limit 1`,
+      `select x.id from "Question" x where x."quizId" = 25 order by x.id limit 1`,
     ),
   );
-  const media = await fetch(`${BE}/quizzes/11/questions/${premiumQ}/audio`, {
+  const media = await fetch(`${BE}/quizzes/25/questions/${premiumQ}/audio`, {
     headers: { authorization: `Bearer ${free.token}` },
     redirect: 'manual',
   });
   check(
-    'FREE question audio stream for B1 quiz 11 refused',
+    'FREE question audio stream for dictation B1 quiz 25 refused',
     media.status === 403,
     `(${media.status})`,
   );
@@ -265,35 +274,34 @@ async function main() {
       ['Listening B1', 11],
       ['Listening B2', 12],
       ['Conversation B1 (private audio)', 27],
+      ['Dictation B1', 25],
       ['Reading B1', 6],
       ['Reading B2', 15],
     ],
-    writing: [],
-    speaking: [],
+    writing: [
+      ['Writing B1', 18],
+      ['Writing B2', 7],
+    ],
+    speaking: [
+      ['Speaking Pronunciation B1', spk.b1],
+      ['Speaking Information Response B1–B2', spk.b1b2],
+    ],
   });
-  // Owner matrix 2026-10-28: Speaking and Writing B1+ need PRO.
-  for (const id of [18, 7]) {
-    const w = await writing(plus, id);
+  // C1 Speaking and Writing need PRO.
+  {
+    const w = await writing(plus, 19);
     check(
-      `PLUS Writing quiz ${id} grading refused (PRO), nothing stored`,
+      'PLUS Writing B2–C1 quiz 19 grading refused (PRO), nothing stored',
       w.status === 403 && !w.persisted,
       JSON.stringify(w),
     );
-  }
-  for (const id of [spk.b1, spk.b1b2]) {
-    const s = await speaking(plus, id);
+    const s = await speaking(plus, spk.c1);
     check(
-      `PLUS Speaking exercise ${id} submit refused (PRO), nothing stored`,
+      `PLUS Speaking C1 exercise ${spk.c1} submit refused (PRO), nothing stored`,
       s.status === 403 && !s.final,
       JSON.stringify(s),
     );
   }
-  const plusCourse = await call('GET', '/courses/1/learning', plus.token);
-  check(
-    'PLUS course learning refused',
-    plusCourse.status === 403,
-    `(${plusCourse.status})`,
-  );
 
   await journeys('PRO', pro, {
     objective: [
@@ -321,12 +329,6 @@ async function main() {
     c1.length === 5 && c1.every((e) => !e.isLocked),
     `(${c1.length})`,
   );
-  for (const id of harnessQuery(
-    `select id from "Course" where status = 'PUBLISHED' order by id`,
-  ).map((r) => Number(r[0]))) {
-    const r = await call('GET', `/courses/${id}/learning`, pro.token);
-    check(`PRO opens course ${id} learning`, r.status === 200, `(${r.status})`);
-  }
 
   console.log('\n== FREE learning modules (actions persist)');
   const proTopic = Number(

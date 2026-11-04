@@ -9,10 +9,11 @@
  *
  * Usage: npx ts-node --transpile-only scripts/qa/finalization-learner-crawl.ts [out.json]
  */
-import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
 import { chromium, type Page } from 'playwright';
+
+import { newStudent, onboard } from './harness-api';
 
 const FE = 'http://localhost:3100';
 const BE = 'http://localhost:3101';
@@ -24,13 +25,10 @@ const STATIC_ROUTES = [
   '/help',
   '/privacy',
   '/terms',
-  '/courses',
   '/dashboard',
   '/student-home',
   '/hub',
-  '/learn',
   '/diagnostic',
-  '/my-courses',
   '/listening',
   '/reading',
   '/reading/mistakes',
@@ -44,7 +42,6 @@ const STATIC_ROUTES = [
   '/vocabulary/saved',
   '/vocabulary/study',
   '/arena',
-  '/classes',
   '/market',
   '/messages',
   '/notifications',
@@ -54,7 +51,6 @@ const STATIC_ROUTES = [
 ];
 /** Catalog page -> first detail link to follow. */
 const DETAIL_FROM: Array<[string, RegExp]> = [
-  ['/courses', /^\/courses\/\d+$/],
   ['/listening', /^\/listening\/\d+$/],
   ['/reading', /^\/reading\/\d+$/],
   ['/speaking', /^\/speaking\/\d+$/],
@@ -62,7 +58,6 @@ const DETAIL_FROM: Array<[string, RegExp]> = [
   ['/exams', /^\/exams\/\d+$/],
   ['/toeic/assessments', /^\/toeic\/assessments\/\d+$/],
   ['/flashcard', /^\/flashcard\/\d+$/],
-  ['/classes', /^\/classes\/\d+$/],
 ];
 const ERROR_COPY =
   /Đã xảy ra lỗi|Something went wrong|Application error|Không thể tải|Lỗi tải|Unhandled Runtime Error|404 \| This page could not be found/i;
@@ -133,15 +128,10 @@ async function visit(page: Page, route: string): Promise<PageReport> {
 }
 
 async function main() {
-  const email = `crawl-${randomUUID().slice(0, 8)}@harness.local`;
-  const password = `Harness-${randomUUID().slice(0, 8)}-Aa1!`;
-  const reg = await fetch(`${BE}/auth/register`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password, fullName: 'Crawl Learner' }),
-  });
-  if (!reg.ok)
-    throw new Error(`register failed ${reg.status} ${await reg.text()}`);
+  // Onboarded first: an account without a learning profile is sent to
+  // /onboarding from every learner route, which would hide them all.
+  const { email, password, token } = await newStudent('crawl');
+  await onboard(token);
 
   const browser = await chromium.launch();
   const page = await browser.newPage({

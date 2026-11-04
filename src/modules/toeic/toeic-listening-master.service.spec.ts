@@ -83,53 +83,53 @@ describe('ToeicListeningMasterService', () => {
         .fn()
         .mockResolvedValue(Buffer.from(JSON.stringify(stored ?? {}))),
     };
-    service.build = jest.fn().mockResolvedValue({ examId: 3, built: true });
+    service.build = jest.fn().mockResolvedValue({ examId: 4, built: true });
     return { service, groups };
   };
 
   it('builds when no recording exists', async () => {
     const { service } = build(null);
-    await expect(service.ensure(3)).resolves.toMatchObject({ built: true });
+    await expect(service.ensure(4)).resolves.toMatchObject({ built: true });
     expect(service.build).toHaveBeenCalledTimes(1);
   });
 
   it('reuses a recording that still matches the clips', async () => {
     const stored = {
-      examId: 3,
+      examId: 4,
       sourceHash: listeningSourceHash(fullSection()),
     };
     const { service } = build(stored);
-    await expect(service.ensure(3)).resolves.toMatchObject({ examId: 3 });
+    await expect(service.ensure(4)).resolves.toMatchObject({ examId: 4 });
     expect(service.build).not.toHaveBeenCalled();
-    await expect(service.state(3)).resolves.toMatchObject({ state: 'READY' });
+    await expect(service.state(4)).resolves.toMatchObject({ state: 'READY' });
   });
 
   it('rebuilds and reports stale once a clip changed', async () => {
-    const { service } = build({ examId: 3, sourceHash: 'old' });
-    await expect(service.state(3)).resolves.toMatchObject({ state: 'STALE' });
-    await expect(service.current(3)).resolves.toBeNull();
-    await service.ensure(3);
+    const { service } = build({ examId: 4, sourceHash: 'old' });
+    await expect(service.state(4)).resolves.toMatchObject({ state: 'STALE' });
+    await expect(service.current(4)).resolves.toBeNull();
+    await service.ensure(4);
     expect(service.build).toHaveBeenCalledTimes(1);
   });
 
   it('refuses when a group has no audio', async () => {
     const { service, groups } = build(null);
     (groups[0] as { audioUrl: string | null }).audioUrl = null;
-    await expect(service.ensure(3)).rejects.toThrow('chưa có audio');
+    await expect(service.ensure(4)).rejects.toThrow('chưa có audio');
     expect(service.build).not.toHaveBeenCalled();
   });
 
   it('builds once when two publishes arrive together', async () => {
     const { service } = build(null);
-    await Promise.all([service.ensure(3), service.ensure(3)]);
+    await Promise.all([service.ensure(4), service.ensure(4)]);
     expect(service.build).toHaveBeenCalledTimes(1);
   });
 
   it('skips an exam without a full Listening section', async () => {
     const { service } = build(null);
     service.prisma.toeicQuestionGroup.findMany.mockResolvedValue([]);
-    await expect(service.ensure(3)).resolves.toBeNull();
-    await expect(service.state(3)).resolves.toEqual({ state: 'NOT_NEEDED' });
+    await expect(service.ensure(4)).resolves.toBeNull();
+    await expect(service.state(4)).resolves.toEqual({ state: 'NOT_NEEDED' });
   });
 
   it('never builds for an exam with a registered recording', async () => {

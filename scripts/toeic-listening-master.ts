@@ -22,10 +22,11 @@
  *
  * Usage:
  *   npx ts-node --transpile-only scripts/toeic-listening-master.ts <mode> --exam 1 --target env:DATABASE_URL
- *   (FFMPEG / FFPROBE env vars point at the binaries.)
+ *   (FFMPEG / FFPROBE env vars point at the binaries. Without ffprobe,
+ *   durations come from ffmpeg decoding to PCM and counting the samples.)
  */
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -84,6 +85,56 @@ type InventoryClip = {
 };
 
 function probe(file: string) {
+  try {
+    return probeWithFfprobe(file);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    return probeWithFfmpeg(file);
+  }
+}
+
+/**
+ * Without ffprobe: decode the first audio stream to 16-bit PCM at its own
+ * rate and channel count, and count the samples (exact for WAV, and for MP3
+ * after the decoder trims encoder delay and padding).
+ */
+function probeWithFfmpeg(file: string) {
+  const run = spawnSync(
+    FFMPEG,
+    [
+      '-hide_banner',
+      '-nostdin',
+      '-i',
+      file,
+      '-map',
+      '0:a:0',
+      '-f',
+      's16le',
+      '-acodec',
+      'pcm_s16le',
+      '-',
+    ],
+    { maxBuffer: 1 << 30 },
+  );
+  const info = run.stderr?.toString() ?? '';
+  const m =
+    /Stream #\d+:\d+[^:]*: Audio: (\w+)[^,]*, (\d+) Hz, (mono|stereo|(\d+) channels)/.exec(
+      info,
+    );
+  if (run.error) throw run.error;
+  if (run.status !== 0 || !m)
+    throw new Error(`ffmpeg could not read ${file}: ${info.slice(-300)}`);
+  const sampleRate = Number(m[2]);
+  const channels = m[3] === 'mono' ? 1 : m[3] === 'stereo' ? 2 : Number(m[4]);
+  return {
+    durationSeconds: run.stdout.length / (2 * channels * sampleRate),
+    codec: m[1],
+    sampleRate,
+    channels,
+  };
+}
+
+function probeWithFfprobe(file: string) {
   const out = JSON.parse(
     execFileSync(
       FFPROBE,
@@ -136,10 +187,12 @@ async function inventory(examId: number, dir: string) {
   for (const g of groups) {
     if (!g.audioUrl)
       throw new Error(`group ${g.id} (Part ${g.part}) has no audioUrl`);
+    // The cache name carries the stored key: a group whose clip was rebuilt
+    // under a new key must download the new clip, not reuse the old one.
     const file = join(
       dir,
       'clips',
-      `${String(g.part)}-${String(g.groupOrder).padStart(3, '0')}-g${g.id}.mp3`,
+      `${String(g.part)}-${String(g.groupOrder).padStart(3, '0')}-g${g.id}-${sha256(g.audioUrl).slice(0, 12)}.mp3`,
     );
     if (!existsSync(file)) {
       // Since P05 a group stores a private key; older rows hold a public URL.
@@ -393,8 +446,14 @@ function build(examId: number, dir: string) {
   };
   mkdirSync(join(dir, 'build'), { recursive: true });
   // Normalize each approved clip to the same format first (no content change).
+  // The cache name carries the clip's hash: a rebuilt clip must never reuse
+  // the normalized copy of the clip it replaced.
   const norm = (c: InventoryClip) => {
-    const file = join(dir, 'build', `clip-g${c.groupId}.wav`);
+    const file = join(
+      dir,
+      'build',
+      `clip-g${c.groupId}-${c.sha256.slice(0, 16)}.wav`,
+    );
     if (!existsSync(file))
       execFileSync(FFMPEG, [
         '-y',

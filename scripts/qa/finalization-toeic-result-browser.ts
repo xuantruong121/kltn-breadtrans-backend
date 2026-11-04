@@ -21,7 +21,14 @@ import { readFileSync } from 'node:fs';
 
 import type { Page } from 'playwright';
 
-import { BE, call, check, failureCount, newStudent } from './harness-api';
+import {
+  BE,
+  call,
+  check,
+  failureCount,
+  fourSkillsAssessment,
+  newStudent,
+} from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessExec, harnessQuery } from './harness-db';
 
@@ -242,8 +249,10 @@ async function main() {
     JSON.stringify(master.data).slice(0, 80),
   );
 
-  // 4 Skills: L&R child + 11 recordings + 8 writing answers.
-  const fs = await call('POST', '/toeic/assessments/2/attempts', token, {
+  // 4 Skills: L&R child + 11 recordings + 8 writing answers. Assessment 2
+  // was archived on 2026-11-02; the published one is read from the clone.
+  const four = fourSkillsAssessment();
+  const fs = await call('POST', `/toeic/assessments/${four.id}/attempts`, token, {
     idempotencyKey: randomUUID(),
   });
   const fsId = fs.data.id as number;
@@ -259,7 +268,7 @@ async function main() {
   const childId = comp(lrStart.data, 'LISTENING_READING')
     .childAttemptId as number;
   await call('POST', `/toeic/attempts/${childId}/begin`, token, {});
-  const k = keys(1);
+  const k = keys(four.lrExamId);
   await call('PATCH', `/toeic/attempts/${childId}/answers`, token, {
     answers: Object.fromEntries(
       [1, 2, 3, 150, 151].map((n) => [k.get(n)!.id, k.get(n)!.key]),
@@ -637,11 +646,12 @@ async function main() {
   await page.screenshot({ path: `${SHOTS}/toeic-review-partial-1366.png` });
 
   console.log('\n== 4 Skills result');
-  await page.goto(`${FE}/toeic/assessments/2/attempts/${fsId}`, {
+  await page.goto(`${FE}/toeic/assessments/${four.id}/attempts/${fsId}`, {
     waitUntil: 'networkidle',
     timeout: 90_000,
   });
-  await page.getByRole('link', { name: 'Xem kết quả chi tiết' }).click();
+  // A finished attempt goes straight to its result page (no link since
+  // the S&W and 4 Skills room change of 2026-11-03).
   await page.waitForURL(/\/result$/, { timeout: 60_000 });
   await page
     .getByRole('heading', { name: /Kết quả thi:/ })
@@ -795,7 +805,7 @@ async function main() {
   await page.setViewportSize({ width: 390, height: 860 });
   for (const url of [
     `/toeic/results/${full.id}`,
-    `/toeic/assessments/2/attempts/${fsId}/result`,
+    `/toeic/assessments/${four.id}/attempts/${fsId}/result`,
     `/toeic/review/${partial.id}`,
   ]) {
     await page.goto(`${FE}${url}`, {

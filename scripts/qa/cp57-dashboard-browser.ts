@@ -3,7 +3,7 @@
  * the ledger holds, after a rewarded Listening practice (harness).
  * Usage: npx ts-node --transpile-only scripts/qa/cp57-dashboard-browser.ts
  */
-import { call, check, failureCount } from './harness-api';
+import { call, check, failureCount, onboard } from './harness-api';
 import { FE, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
@@ -16,6 +16,8 @@ void (async () => {
     password: account.password,
   });
   const token = login.data?.accessToken ?? login.data?.access_token;
+  // A learner who has not onboarded is sent to /onboarding first.
+  await onboard(token);
   // Earn a reward: complete the FREE A1 listening quiz 9 with every key.
   const qs = harnessQuery(
     `select id, content::text from "Question" where "quizId" = 9 order by "order", id`,
@@ -90,7 +92,8 @@ void (async () => {
     check(
       `@${width} recent activity names the exercise and its result`,
       at >= 0 &&
-        recent.includes('Tiếng Anh thiết yếu hằng ngày (A1)') &&
+        // Titles no longer carry a CEFR tag.
+        recent.includes('Tiếng Anh thiết yếu hằng ngày') &&
         recent.includes('Luyện nghe hiểu · 8/8 câu đúng'),
       recent.slice(0, 200),
     );

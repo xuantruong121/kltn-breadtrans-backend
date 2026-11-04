@@ -50,6 +50,7 @@ import {
   questionFingerprint,
   plannedGroupIssue,
   questionContentIssue,
+  languageIssue,
   type PlannedTraits,
   questionsToAvoid,
   readingGroupIssue,
@@ -2513,6 +2514,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           `Nhóm Part 1 ${index + 1} thiếu mô tả ảnh`,
         );
       const readingIssue =
+        languageIssue(group) ??
         readingGroupIssue(part, group) ??
         plannedGroupIssue(expected[index], group) ??
         questionContentIssue(part, group);

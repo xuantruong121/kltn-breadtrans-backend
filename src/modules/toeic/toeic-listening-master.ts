@@ -11,6 +11,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { EXAM_1_LISTENING_MASTER } from './listening-master/exam-1';
+import { EXAM_3_LISTENING_MASTER } from './listening-master/exam-3';
 
 export type ListeningMasterSegment = {
   kind: 'INTRO' | 'DIRECTIONS' | 'GROUP' | 'END';
@@ -34,6 +35,7 @@ export type ListeningMaster = {
 
 const REGISTRY: Record<number, ListeningMaster> = {
   [EXAM_1_LISTENING_MASTER.examId]: EXAM_1_LISTENING_MASTER,
+  [EXAM_3_LISTENING_MASTER.examId]: EXAM_3_LISTENING_MASTER,
 };
 
 export function listeningMasterFor(examId: number): ListeningMaster | null {

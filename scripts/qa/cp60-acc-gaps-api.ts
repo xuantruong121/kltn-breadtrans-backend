@@ -289,11 +289,25 @@ async function mockPhase() {
           ),
       ),
     );
+    // Since the level lock (2026-10-30) an item above the learner's opened
+    // level is reported first as "Cần mở mức …", whatever the plan
+    // (adviceLock). The plan comparison counts plan locks only; the level
+    // locks must match, as the three learners answered the same way.
+    const planLocks = (x: { locked: any[] }) =>
+      x.locked.filter((r: any) => String(r.requirement).startsWith('Cần gói'));
+    const levelLocks = (x: { locked: any[] }) =>
+      x.locked.length - planLocks(x).length;
     check(
-      'a higher plan never sees more locks; PRO sees none',
-      f.locked.length >= p.locked.length &&
-        p.locked.length >= o.locked.length &&
-        o.locked.length === 0,
+      'a higher plan never sees more plan locks; PRO sees none',
+      planLocks(f).length >= planLocks(p).length &&
+        planLocks(p).length >= planLocks(o).length &&
+        planLocks(o).length === 0,
+      `(plan locks ${[f, p, o].map((x) => planLocks(x).length).join('/')})`,
+    );
+    check(
+      'level locks do not depend on the plan',
+      levelLocks(f) === levelLocks(p) && levelLocks(p) === levelLocks(o),
+      `(level locks ${[f, p, o].map(levelLocks).join('/')})`,
     );
     check(
       'every lock names its plan',

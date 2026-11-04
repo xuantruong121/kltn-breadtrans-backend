@@ -191,3 +191,60 @@ false rejections above roughly doubled the generation calls.
 4. Sentence-insertion items ([1]-[4]) confuse the solver about marker position;
    expect some false rejections there until the prompt says markers precede the
    sentence.
+
+## Rerun with the fixed rule, 2026-11-04
+
+Same setup (harness `nx_qa` cloned from `kltn_db` that morning, live server on
+:3101 with real Gemini and Cloudflare, generation only, no Apply). Job
+`66a851f4-618b-43be-8074-41c3862a8891`, 901 s. Data:
+`%TEMP%/breadtrans-harness/live-review-2.json`.
+
+| Measure | 2026-11-03 (old rule) | 2026-11-04 (fixed rule) |
+|---|---|---|
+| Time | 1,502 s | 901 s |
+| Questions generated | 152 / 200 | 170 / 200 |
+| Failed units (content contract) | 6 | 6 (Part 3 "3 speakers") |
+| Refused items, all drafts | 128 | 28 |
+| Refusals where the solver chose the key (rule false rejection) | 87 | 6 |
+| Solve steps | 81 Cloudflare | 78 Cloudflare INDEPENDENT, 9 Gemini fallback (SAME_PROVIDER) |
+| Explanation steps | 40 Gemini | 83 Gemini |
+| Final groups | — | P2 25, P3 4, P4 9, P5 27 + 3 degraded, P6 4 REJECTED, P7 9 + 6 degraded, P1 6 (Draft gate) |
+| Cloudflare usage | 68 req, 43,182 in / 83,561 out tok, ~7,071 neurons | 43 req, 24,387 in / 44,746 out tok, ~3,827 neurons (ESTIMATE) |
+
+Verdicts over all drafts: AGREE 186, EVIDENCE_NOT_FOUND 17, DISAGREE 6,
+UNANSWERABLE 3, EXPLANATION_MISMATCH 1, REVIEW_INVALID 1.
+
+**Triage of the 28 refusals (AI_TRIAGE, not human-verified):**
+
+- **12 true generator defects, whole batch:** one Part 6 batch was written
+  entirely in Vietnamese (passage, options and questions, e.g. "Kính gửi
+  toàn thể nhân viên…"). The content contract does not check the language.
+- **5 other true defects:** P2 q8 (key "Tea or coffee…" to a room question),
+  P3 q43 (key not in the talk), P5 q118 (`while` and `although` both fit),
+  P6 q145 twice (key `Therefore` where `However` fits; key `quickly` where
+  `quicker … than` is required).
+- **6 rule false rejections:** Part 6 sentence-insertion blanks. The solver
+  chose the key but quoted only the option sentence, which is not in the
+  passage, and the rule still asks a Part 6 quote to come from the passage.
+- **2 reviewer errors:** P5 q108 (`herself` is right; the solver chose `her`)
+  and P5 q112 (`because` is right; the solver chose `although`).
+- **3 unclear:** P2 q8 (second draft) and q10 (indirect answers), P2 q28
+  (explanation names no option).
+
+**Agreed sample (15, seed 20261103):** 14 sound, 1 flawed (P6 q144: the
+inserted sentence does not lead into "Because of this milestone…"); the
+same rate as 2026-11-03, again in a Part 6 sentence-insertion item.
+
+```
+LIVE_RERUN=RUN (2026-11-04, 901 s)
+RULE_FALSE_REJECTIONS=6 (was 87)
+REFUSALS_TRUE_DEFECTS=17 (AI_TRIAGE)
+REVIEWER_ERRORS=2 (AI_TRIAGE)
+AGREED_SAMPLE_SOUND=14/15 (AI_TRIAGE)
+CLOUDFLARE_NEURONS=3827 (ESTIMATE, dashboard NOT_VERIFIED)
+HUMAN_VERIFIED=0
+```
+
+Open: the content contract lets a non-English Part 6 batch through, and the
+evidence rule still refuses Part 6 sentence-insertion items whose solver
+quotes only the option.

@@ -173,16 +173,37 @@ case "${1:-}" in
     require_harness_db "$db"
     mkdir -p "$WORK"
     kill_port 3101
+    # QA_GRADER_MODE=off (any value but mock) leaves the diagnostic grader
+    # unavailable, for the honest-failure phases.
+    # QA_PAYOS=fake starts the local PayOS stand-in on :9470 and points the
+    # backend at it with mock credentials; nothing reaches payOS.
+    payos_env=""
+    if [ "${QA_PAYOS:-}" = "fake" ]; then
+      kill_port 9470
+      (cd "$ROOT" && nohup npx ts-node --transpile-only scripts/qa/harness-fake-payos.ts 9470 \
+          mock-client-id mock-api-key mock-checksum-key > "$WORK/fake-payos.log" 2>&1 < /dev/null &)
+      payos_env="PAYOS_CLIENT_ID=mock-client-id PAYOS_API_KEY=mock-api-key PAYOS_CHECKSUM_KEY=mock-checksum-key PAYOS_BASE_URL=http://127.0.0.1:9470"
+    fi
+    # QA_FAKE_AZURE=<scenario.json> runs speaking-live-azure-server.ts instead:
+    # the Azure REST call is answered from that file inside the process and
+    # every other outbound host is refused (it accepts harness_clone or
+    # diag_clone only). LIVE_GEMINI_FAKE_JSON passes through unchanged.
+    server=scripts/qa/writing-deterministic-server.ts
+    azure_env="AZURE_SPEECH_KEY= AZURE_SPEECH_REGION= MOCK_AZURE_SPEECH=true"
+    if [ -n "${QA_FAKE_AZURE:-}" ]; then
+      server=scripts/qa/speaking-live-azure-server.ts
+      azure_env="AZURE_SPEECH_KEY=harness-fake-key AZURE_SPEECH_REGION=southeastasia MOCK_AZURE_SPEECH= LIVE_AZURE_FAKE_FILE=$QA_FAKE_AZURE LIVE_AZURE_LOG=$WORK/fake-azure.jsonl"
+    fi
     # shellcheck disable=SC2086
     (cd "$ROOT" && env NODE_ENV=development PORT=3101 DATABASE_URL="$(harness_db_url "$db")" \
         SHADOW_DATABASE_URL="$SHADOW_SENTINEL" REDIS_URL=redis://127.0.0.1:6392 REDIS_HOST=127.0.0.1 REDIS_PORT=6392 \
-        GEMINI_API_KEYS= GEMINI_API_KEY= AZURE_SPEECH_KEY= AZURE_SPEECH_REGION= MOCK_AZURE_SPEECH=true \
-        DIAGNOSTIC_GRADER_MODE=mock FRONTEND_URL=http://localhost:3100 \
+        GEMINI_API_KEYS= GEMINI_API_KEY= $azure_env \
+        DIAGNOSTIC_GRADER_MODE="${QA_GRADER_MODE:-mock}" FRONTEND_URL=http://localhost:3100 \
         R2_PUBLIC_URL="${QA_R2_PUBLIC_URL:-}" TOEIC_LISTENING_MASTER_BASE_URL="${QA_MASTER_BASE_URL:-}" \
         JWT_SECRET=harness-only-jwt-secret POSTGRES_BACKUP_DIR="$WORK/backups" \
-        WRITING_QA_COUNTER_FILE="$WORK/grader-calls.json" $EXTERNAL_BLANKS \
+        WRITING_QA_COUNTER_FILE="$WORK/grader-calls.json" $EXTERNAL_BLANKS $payos_env \
         ${QA_DICTIONARY_URL:+DICTIONARY_API_BASE_URL=$QA_DICTIONARY_URL} \
-        nohup npx ts-node --transpile-only scripts/qa/writing-deterministic-server.ts \
+        nohup npx ts-node --transpile-only "$server" \
         > "$WORK/qa-backend.log" 2>&1 < /dev/null &)
     wait_http http://localhost:3101/writing/topics 200
     echo "qa backend :3101 on $db (log $WORK/qa-backend.log)"

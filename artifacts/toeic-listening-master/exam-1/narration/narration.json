@@ -2,19 +2,19 @@
   "voice": "en-US-JennyNeural",
   "characters": 3439,
   "requests": 1,
-  "audioSha256": "ce17e6270af6ebe7af142e9d31b7c5f8dd2de647cc5e61fdc94779402c131378",
+  "audioSha256": "5912e985281eb60eb6868cebb712beaecc49c7298557e0dc5182d1d896e3ccc4",
   "segments": [
     {
       "id": "intro",
       "text": "Welcome to the TOEIC Listening practice test. This is a practice test, not an official TOEIC test. The Listening section has four parts: photographs, questions and responses, conversations, and talks. There are one hundred questions, and the section takes about forty-five minutes. Choose the best answer to each question. Listen carefully. Part One will begin now.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\intro.wav",
-      "seconds": 29.319708
+      "seconds": 29.319708333333335
     },
     {
       "id": "part1",
       "text": "Part One. Photographs. Questions one to six. For each question, look at the photograph on your page. You will hear four short statements about it. The statements are not printed. Choose the statement that best describes what you see.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\part1.wav",
-      "seconds": 19.780708
+      "seconds": 19.780708333333333
     },
     {
       "id": "cue-1",
@@ -26,13 +26,13 @@
       "id": "cue-2",
       "text": "Number two.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-2.wav",
-      "seconds": 0.778792
+      "seconds": 0.7787916666666667
     },
     {
       "id": "cue-3",
       "text": "Number three.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-3.wav",
-      "seconds": 0.785708
+      "seconds": 0.7857083333333333
     },
     {
       "id": "cue-4",
@@ -44,7 +44,7 @@
       "id": "cue-5",
       "text": "Number five.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-5.wav",
-      "seconds": 0.896083
+      "seconds": 0.8960833333333333
     },
     {
       "id": "cue-6",
@@ -62,31 +62,31 @@
       "id": "cue-7",
       "text": "Number seven.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-7.wav",
-      "seconds": 0.852542
+      "seconds": 0.8525416666666666
     },
     {
       "id": "cue-8",
       "text": "Number eight.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-8.wav",
-      "seconds": 0.739333
+      "seconds": 0.7393333333333333
     },
     {
       "id": "cue-9",
       "text": "Number nine.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-9.wav",
-      "seconds": 0.800042
+      "seconds": 0.8000416666666667
     },
     {
       "id": "cue-10",
       "text": "Number ten.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-10.wav",
-      "seconds": 0.809083
+      "seconds": 0.8090833333333334
     },
     {
       "id": "cue-11",
       "text": "Number eleven.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-11.wav",
-      "seconds": 0.855917
+      "seconds": 0.8559166666666667
     },
     {
       "id": "cue-12",
@@ -98,7 +98,7 @@
       "id": "cue-13",
       "text": "Number thirteen.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-13.wav",
-      "seconds": 1.037542
+      "seconds": 1.0375416666666666
     },
     {
       "id": "cue-14",
@@ -110,19 +110,19 @@
       "id": "cue-15",
       "text": "Number fifteen.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-15.wav",
-      "seconds": 1.009333
+      "seconds": 1.0093333333333334
     },
     {
       "id": "cue-16",
       "text": "Number sixteen.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-16.wav",
-      "seconds": 1.071542
+      "seconds": 1.0715416666666666
     },
     {
       "id": "cue-17",
       "text": "Number seventeen.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-17.wav",
-      "seconds": 1.118708
+      "seconds": 1.1187083333333334
     },
     {
       "id": "cue-18",
@@ -140,19 +140,19 @@
       "id": "cue-20",
       "text": "Number twenty.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-20.wav",
-      "seconds": 0.829417
+      "seconds": 0.8294166666666667
     },
     {
       "id": "cue-21",
       "text": "Number twenty-one.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-21.wav",
-      "seconds": 1.035167
+      "seconds": 1.0351666666666666
     },
     {
       "id": "cue-22",
       "text": "Number twenty-two.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-22.wav",
-      "seconds": 1.081292
+      "seconds": 1.0812916666666668
     },
     {
       "id": "cue-23",
@@ -164,79 +164,79 @@
       "id": "cue-24",
       "text": "Number twenty-four.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-24.wav",
-      "seconds": 1.102417
+      "seconds": 1.1024166666666666
     },
     {
       "id": "cue-25",
       "text": "Number twenty-five.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-25.wav",
-      "seconds": 1.079708
+      "seconds": 1.0797083333333333
     },
     {
       "id": "cue-26",
       "text": "Number twenty-six.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-26.wav",
-      "seconds": 1.150208
+      "seconds": 1.1502083333333333
     },
     {
       "id": "cue-27",
       "text": "Number twenty-seven.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-27.wav",
-      "seconds": 1.131167
+      "seconds": 1.1311666666666667
     },
     {
       "id": "cue-28",
       "text": "Number twenty-eight.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-28.wav",
-      "seconds": 1.032583
+      "seconds": 1.0325833333333334
     },
     {
       "id": "cue-29",
       "text": "Number twenty-nine.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-29.wav",
-      "seconds": 1.072792
+      "seconds": 1.0727916666666666
     },
     {
       "id": "cue-30",
       "text": "Number thirty.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-30.wav",
-      "seconds": 0.809833
+      "seconds": 0.8098333333333333
     },
     {
       "id": "cue-31",
       "text": "Number thirty-one.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-31.wav",
-      "seconds": 1.041208
+      "seconds": 1.0412083333333333
     },
     {
       "id": "part3",
       "text": "Part Three. Conversations. Questions thirty-two to seventy. You will hear short conversations between two or more people. After each conversation, you will hear three questions. The questions and answer choices are printed on your page.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\part3.wav",
-      "seconds": 19.243792
+      "seconds": 19.243791666666667
     },
     {
       "id": "cue-32",
       "text": "Questions thirty-two to thirty-four refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-32.wav",
-      "seconds": 3.797583
+      "seconds": 3.7975833333333333
     },
     {
       "id": "cue-33",
       "text": "Questions thirty-five to thirty-seven refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-33.wav",
-      "seconds": 3.943333
+      "seconds": 3.9433333333333334
     },
     {
       "id": "cue-34",
       "text": "Questions thirty-eight to forty refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-34.wav",
-      "seconds": 3.467833
+      "seconds": 3.4678333333333335
     },
     {
       "id": "cue-35",
       "text": "Questions forty-one to forty-three refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-35.wav",
-      "seconds": 3.769292
+      "seconds": 3.7692916666666667
     },
     {
       "id": "cue-36",
@@ -254,37 +254,37 @@
       "id": "cue-38",
       "text": "Questions fifty to fifty-two refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-38.wav",
-      "seconds": 3.612542
+      "seconds": 3.6125416666666665
     },
     {
       "id": "cue-39",
       "text": "Questions fifty-three to fifty-five refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-39.wav",
-      "seconds": 3.901167
+      "seconds": 3.9011666666666667
     },
     {
       "id": "cue-40",
       "text": "Questions fifty-six to fifty-eight refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-40.wav",
-      "seconds": 3.851208
+      "seconds": 3.851208333333333
     },
     {
       "id": "cue-41",
       "text": "Questions fifty-nine to sixty-one refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-41.wav",
-      "seconds": 3.870583
+      "seconds": 3.8705833333333333
     },
     {
       "id": "cue-42",
       "text": "Questions sixty-two to sixty-four refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-42.wav",
-      "seconds": 3.836083
+      "seconds": 3.8360833333333333
     },
     {
       "id": "cue-43",
       "text": "Questions sixty-five to sixty-seven refer to the following conversation.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-43.wav",
-      "seconds": 4.045333
+      "seconds": 4.045333333333334
     },
     {
       "id": "cue-44",
@@ -302,7 +302,7 @@
       "id": "cue-45",
       "text": "Questions seventy-one to seventy-three refer to the following talk.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-45.wav",
-      "seconds": 3.534042
+      "seconds": 3.5340416666666665
     },
     {
       "id": "cue-46",
@@ -314,49 +314,49 @@
       "id": "cue-47",
       "text": "Questions seventy-seven to seventy-nine refer to the following talk.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-47.wav",
-      "seconds": 3.691583
+      "seconds": 3.6915833333333334
     },
     {
       "id": "cue-48",
       "text": "Questions eighty to eighty-two refer to the following talk.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-48.wav",
-      "seconds": 3.108542
+      "seconds": 3.1085416666666665
     },
     {
       "id": "cue-49",
       "text": "Questions eighty-three to eighty-five refer to the following talk.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-49.wav",
-      "seconds": 3.272583
+      "seconds": 3.2725833333333334
     },
     {
       "id": "cue-50",
       "text": "Questions eighty-six to eighty-eight refer to the following talk.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-50.wav",
-      "seconds": 3.322042
+      "seconds": 3.322041666666667
     },
     {
       "id": "cue-51",
       "text": "Questions eighty-nine to ninety-one refer to the following talk.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-51.wav",
-      "seconds": 3.251708
+      "seconds": 3.251708333333333
     },
     {
       "id": "cue-52",
       "text": "Questions ninety-two to ninety-four refer to the following talk.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-52.wav",
-      "seconds": 3.428458
+      "seconds": 3.4284583333333334
     },
     {
       "id": "cue-53",
       "text": "Questions ninety-five to ninety-seven refer to the following talk.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-53.wav",
-      "seconds": 3.550958
+      "seconds": 3.5509583333333334
     },
     {
       "id": "cue-54",
       "text": "Questions ninety-eight to one hundred refer to the following talk.",
       "file": "artifacts\\toeic-listening-master\\exam-1\\narration\\cue-54.wav",
-      "seconds": 3.300542
+      "seconds": 3.3005416666666667
     },
     {
       "id": "end",

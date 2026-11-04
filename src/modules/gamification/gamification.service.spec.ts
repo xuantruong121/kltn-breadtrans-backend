@@ -1239,3 +1239,71 @@ describe('petLevelAfterExp', () => {
     expect(petLevelAfterExp(4, 65)).toBe(4);
   });
 });
+
+describe('awardPetStudyExp', () => {
+  const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+  const serviceWith = (pet: any) => {
+    const update = jest.fn().mockResolvedValue({});
+    const tx: any = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      userPet: { findUnique: jest.fn().mockResolvedValue(pet), update },
+    };
+    const prisma: any = { $transaction: jest.fn((run: any) => run(tx)) };
+    const service = new GamificationService(prisma, {} as any, {} as any);
+    jest.spyOn(service, 'awardBadgeIfEarned').mockResolvedValue(false);
+    return { service, update };
+  };
+  const pet = (entry: Record<string, unknown>) => ({
+    userId: 7,
+    name: 'Bread',
+    level: 1,
+    exp: 0,
+    health: 100,
+    happiness: 100,
+    roster: { bready: { level: 1, exp: 0, ...entry } },
+  });
+
+  it('gives the active pet 10 EXP for a practice', async () => {
+    const { service, update } = serviceWith(pet({ exp: 120 }));
+    await expect(service.awardPetStudyExp(7)).resolves.toBe(10);
+    const data = update.mock.calls[0][0].data;
+    expect(data.exp).toBe(130);
+    expect(data.roster.bready).toEqual(
+      expect.objectContaining({
+        dailyStudyExpDateKey: today,
+        dailyStudyExp: 10,
+      }),
+    );
+  });
+
+  it('stops at 50 EXP a day and starts again the next day', async () => {
+    const capped = serviceWith(
+      pet({ dailyStudyExpDateKey: today, dailyStudyExp: 45 }),
+    );
+    await expect(capped.service.awardPetStudyExp(7)).resolves.toBe(5);
+    const full = serviceWith(
+      pet({ dailyStudyExpDateKey: today, dailyStudyExp: 50 }),
+    );
+    await expect(full.service.awardPetStudyExp(7)).resolves.toBe(0);
+    expect(full.update).not.toHaveBeenCalled();
+    const nextDay = serviceWith(
+      pet({ dailyStudyExpDateKey: '2000-01-01', dailyStudyExp: 50 }),
+    );
+    await expect(nextDay.service.awardPetStudyExp(7)).resolves.toBe(10);
+  });
+
+  it('levels up at 1,000 EXP and never drops a level', async () => {
+    const up = serviceWith(pet({ exp: 995 }));
+    await up.service.awardPetStudyExp(7);
+    expect(up.update.mock.calls[0][0].data.level).toBe(2);
+    const ahead = serviceWith(pet({ level: 4, exp: 60 }));
+    await ahead.service.awardPetStudyExp(7);
+    expect(ahead.update.mock.calls[0][0].data.level).toBe(4);
+  });
+
+  it('does nothing for a learner without a pet', async () => {
+    const { service, update } = serviceWith(null);
+    await expect(service.awardPetStudyExp(7)).resolves.toBe(0);
+    expect(update).not.toHaveBeenCalled();
+  });
+});

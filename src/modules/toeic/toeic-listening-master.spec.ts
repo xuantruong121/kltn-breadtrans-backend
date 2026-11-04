@@ -26,6 +26,23 @@ describe('TOEIC Listening master registry', () => {
     expect(master.timeline[0].kind).toBe('INTRO');
   });
 
+  // A timeline planned from stale narration once ran 11 s past the audio
+  // (2026-11-04), so both ends are checked, for every registered exam.
+  it.each([1, 3])(
+    'exam %i: questions 1-100 once, in order, timeline ends with the audio',
+    (examId) => {
+      const m = listeningMasterFor(examId)!;
+      const groups = m.timeline.filter((s) => s.kind === 'GROUP');
+      expect(groups.flatMap((s) => s.questionNumbers!)).toEqual(
+        Array.from({ length: 100 }, (_, i) => i + 1),
+      );
+      expect(groups).toHaveLength(54);
+      expect(
+        Math.abs(m.timeline.at(-1)!.end - m.durationSeconds),
+      ).toBeLessThanOrEqual(1);
+    },
+  );
+
   it('is offered only while it matches the exam groups exactly, in order', () => {
     expect(masterMatchesGroups(master, groupIds)).toBe(true);
     expect(masterMatchesGroups(master, [...groupIds].reverse())).toBe(false);

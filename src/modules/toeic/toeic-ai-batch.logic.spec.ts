@@ -1,4 +1,9 @@
-import { questionContentIssue, questionsToAvoid } from './toeic-ai-batch.logic';
+import {
+  languageIssue,
+  plannedGroupIssue,
+  questionContentIssue,
+  questionsToAvoid,
+} from './toeic-ai-batch.logic';
 
 describe('questionContentIssue', () => {
   const group = (fields: Record<string, string>, ...texts: string[]) => ({
@@ -124,5 +129,78 @@ describe('questionsToAvoid', () => {
       'B',
       'C',
     ]);
+  });
+});
+
+describe('languageIssue', () => {
+  // Live rerun 2026-11-04: a whole Part 6 batch came back in Vietnamese.
+  it('refuses a passage written in Vietnamese', () => {
+    expect(
+      languageIssue({
+        passageText:
+          'Kính gửi toàn thể nhân viên, công ty chúng tôi sẽ [131] _____ một khóa đào tạo kỹ năng mềm vào tháng tới.',
+        questions: [
+          {
+            text: 'Choose the best option for blank [131].',
+            options: ['tăng cường', 'cung cấp', 'yêu cầu', 'loại bỏ'],
+          },
+        ],
+      }),
+    ).toMatch(/passage đang viết bằng tiếng Việt/);
+  });
+
+  it('refuses Vietnamese options under an English passage', () => {
+    expect(
+      languageIssue({
+        passageText:
+          'Our company will [131] _____ a training course next month.',
+        questions: [
+          {
+            text: 'Choose the best option for blank [131].',
+            options: ['tăng cường', 'cung cấp', 'yêu cầu', 'loại bỏ'],
+          },
+        ],
+      }),
+    ).toMatch(/phương án câu 1/);
+  });
+
+  it('accepts English with a Vietnamese name, loanwords and Vietnamese explanations', () => {
+    expect(
+      languageIssue({
+        transcript:
+          'M: Ms. Nguyễn left her résumé at the café near the office.',
+        questions: [
+          {
+            text: 'Where did Ms. Nguyễn leave her résumé?',
+            options: ['At the café', 'At home', 'At the bank', 'On the train'],
+            explanation: 'Người đàn ông nói cô ấy để quên hồ sơ ở quán cà phê.',
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('plannedGroupIssue for a three-speaker dialogue', () => {
+  // Live runs of 2026-11-03/04: every turn on one line, counted as one speaker.
+  it('counts speakers written on one line', () => {
+    expect(
+      plannedGroupIssue(
+        { threeSpeakers: true },
+        {
+          transcript:
+            'M: Shall we start the review? W1: Yes, I have the sales figures. W2: And I brought the new slides. M: Great, let us begin.',
+        },
+      ),
+    ).toBeNull();
+  });
+
+  it('still refuses two speakers', () => {
+    expect(
+      plannedGroupIssue(
+        { threeSpeakers: true },
+        { transcript: 'M: Shall we start? W: Yes. M: Good.' },
+      ),
+    ).toBe('Hội thoại cần 3 người nói, hiện có 2');
   });
 });

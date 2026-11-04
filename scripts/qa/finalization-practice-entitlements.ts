@@ -1,8 +1,11 @@
 /**
  * Owner access matrix on the disposable harness, after
  * scripts/practice-level-normalization.ts (apply, media, ready):
- *   standalone Listening/Reading/Speaking/Writing: A1/A2 FREE, B1+ PLUS
- *   (PRO includes PLUS); Vocabulary/Flashcard/Grammar FREE; Courses PRO.
+ *   owner matrix 2026-10-30: Reading and Listening FREE at every level,
+ *   except dictation B1+ (PLUS); Speaking/Writing A1-A2 FREE, B1-B2 PLUS,
+ *   C1+ PRO (PRO includes PLUS); Vocabulary/Flashcard/Grammar FREE.
+ *   Courses were removed on 2026-11-01. Every learner has all practice
+ *   levels opened, so a refusal here is the plan's, not the level lock's.
  * API checks call the real endpoints directly (lock bypass attempts
  * included); Chromium checks the /speaking catalog and lock states.
  * No real provider: mock Speaking evaluator, deterministic writing grader.
@@ -19,6 +22,7 @@ import {
   failureCount,
   newAdmin,
   newStudent,
+  unlockAllLevels,
 } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessExec, harnessQuery } from './harness-db';
@@ -76,6 +80,8 @@ async function main() {
     readingC1: 16,
     writingA2: 17,
     writingB1: 18,
+    writingC1: 19,
+    dictationB1: 25,
     speakingA2: Number(
       one(
         `select id from "SpeakingExercise" where "practiceSetId" = 'practice-question-response-a2' order by "order" limit 1`,
@@ -97,11 +103,6 @@ async function main() {
         `select id from "GrammarTopic" where "publicationStatus" = 'PUBLISHED' order by id limit 1`,
       ),
     ),
-    course: Number(
-      one(
-        `select id from "Course" where status = 'PUBLISHED' order by id limit 1`,
-      ),
-    ),
   };
   console.log(JSON.stringify(ids));
   const admin = await newAdmin('ent-admin');
@@ -110,6 +111,7 @@ async function main() {
   const pro = await newStudent('ent-pro');
   await grant(admin.token, plus.userId, 'PLUS');
   await grant(admin.token, pro.userId, 'PRO');
+  for (const learner of [free, plus, pro]) unlockAllLevels(learner.userId);
 
   const quiz = async (a: Acct, id: number) =>
     (await call('GET', `/quizzes/${id}`, a.token)).status;
@@ -117,19 +119,18 @@ async function main() {
     const r = await call('GET', `/speaking/exercises/${id}`, a.token);
     return { status: r.status, ...(r.data ?? {}) };
   };
-  const course = async (a: Acct) =>
-    (await call('GET', `/courses/${ids.course}/learning`, a.token)).status;
 
   console.log('\n== Quiz-backed practice: direct detail requests');
-  // CP58 matrix: Listening/Reading B1+ need PLUS, Writing B1+ needs PRO.
   for (const [label, id, minPlan] of [
-    ['Listening A2 (was PLUS)', ids.listeningA2, 'FREE'],
-    ['Listening B1 (was FREE)', ids.listeningB1, 'PLUS'],
+    ['Listening A2', ids.listeningA2, 'FREE'],
+    ['Conversation B1', ids.listeningB1, 'FREE'],
+    ['Dictation B1', ids.dictationB1, 'PLUS'],
     ['Reading A1–A2', ids.readingA, 'FREE'],
-    ['Reading B1 (was FREE)', ids.readingB1, 'PLUS'],
-    ['Reading C1', ids.readingC1, 'PLUS'],
+    ['Reading B1', ids.readingB1, 'FREE'],
+    ['Reading C1', ids.readingC1, 'FREE'],
     ['Writing A2', ids.writingA2, 'FREE'],
-    ['Writing B1', ids.writingB1, 'PRO'],
+    ['Writing B1', ids.writingB1, 'PLUS'],
+    ['Writing B2–C1', ids.writingC1, 'PRO'],
   ] as const) {
     const [f, p, r] = [
       await quiz(free, id),
@@ -155,13 +156,14 @@ async function main() {
     /X-Amz/.test(assetUrl ?? ''),
     `(object in harness fake S3: ${audio?.status})`,
   );
-  const l27 = await call('GET', `/quizzes/${ids.listeningB1}`, plus.token);
-  const premiumUrl = l27.data?.questions?.find(
+  const d25 = await call('GET', `/quizzes/${ids.dictationB1}`, plus.token);
+  const premiumUrl = d25.data?.questions?.find(
     (q: any) => q.audioAssets?.length,
   )?.audioAssets?.[0]?.url;
   check(
-    'PLUS gets the newly premium B1 audio as a signed private URL',
-    /X-Amz/.test(premiumUrl ?? '') && (await fetch(premiumUrl)).status === 200,
+    // As above: the object itself lives only in the real private bucket.
+    'PLUS gets the dictation B1 audio as a signed private URL',
+    /X-Amz/.test(premiumUrl ?? ''),
   );
   const wr = await call(
     'POST',
@@ -180,30 +182,26 @@ async function main() {
   );
 
   console.log('\n== Speaking: detail and submission');
-  for (const [label, id, freeOk] of [
-    ['Speaking A2', ids.speakingA2, true],
-    ['Speaking B1 pronunciation (was FREE)', ids.speakingB1, false],
-    ['Speaking C1 (new)', ids.speakingC1, false],
+  for (const [label, id, minPlan] of [
+    ['Speaking A2', ids.speakingA2, 'FREE'],
+    ['Speaking B1 pronunciation', ids.speakingB1, 'PLUS'],
+    ['Speaking C1', ids.speakingC1, 'PRO'],
   ] as const) {
     const d = [
       await speakingDetail(free, id),
       await speakingDetail(plus, id),
       await speakingDetail(pro, id),
     ];
-    // CP58 matrix: Speaking B1+ needs PRO, so PLUS is refused like FREE.
+    const open = (x: { status: number; isLocked?: boolean }) =>
+      x.status === 200 && x.isLocked === false;
     check(
-      `${label}: ${freeOk ? 'open to every plan' : 'PRO only'}`,
-      (freeOk
-        ? d[0].status === 200 &&
-          d[0].isLocked === false &&
-          d[1].status === 200 &&
-          d[1].isLocked === false
-        : d[0].status === 403 && d[1].status === 403) &&
-        d[2].status === 200 &&
-        d[2].isLocked === false,
+      `${label}: opens from ${minPlan}`,
+      (minPlan === 'FREE' ? open(d[0]) : d[0].status === 403) &&
+        (minPlan === 'PRO' ? d[1].status === 403 : open(d[1])) &&
+        open(d[2]),
       `(${d.map((x) => x.status).join('/')})`,
     );
-    if (!freeOk)
+    if (minPlan !== 'FREE')
       check(
         `${label}: FREE detail request returns no prompt or audio`,
         !d[0]?.targetText && !d[0]?.audioUrl,
@@ -238,9 +236,14 @@ async function main() {
   const sets = new Map<string, any>();
   for (const e of list) sets.set(e.practiceSet.key, e.practiceSet);
   const labels = [...sets.values()].map((s) => s.difficultyLabel);
+  const publishedSets = Number(
+    one(
+      `select count(*) from "SpeakingPracticeSet" where scope = 'SKILL_PRACTICE' and "publicationStatus" = 'PUBLISHED'`,
+    ),
+  );
   check(
-    'catalog = 9 practice sets, each with one level label',
-    sets.size === 9 &&
+    `catalog = the ${publishedSets} published practice sets, each with one level label`,
+    sets.size === publishedSets &&
       labels.every((l) =>
         /^(Cơ bản|Trung cấp|Nâng cao) · [ABC][12](–[ABC][12])?$/.test(l),
       ),
@@ -278,44 +281,41 @@ async function main() {
   const g = await call('GET', `/grammar/topics/${ids.grammar}`, free.token);
   check('FREE opens a grammar topic', g.status === 200, `(${g.status})`);
 
-  console.log('\n== Courses');
-  check(
-    'Courses: FREE and PLUS refused, PRO opens',
-    [403, 401].includes(await course(free)) &&
-      [403, 401].includes(await course(plus)) &&
-      (await course(pro)) === 200,
-  );
-
   console.log('\n== Transitions');
+  // Writing B1 needs PLUS, Writing B2–C1 needs PRO (matrix 2026-10-30).
   const up = await newStudent('ent-up');
+  unlockAllLevels(up.userId);
   await grant(admin.token, up.userId, 'PLUS');
   check(
-    'FREE → PLUS opens B1, course still refused',
-    (await quiz(up, ids.readingB1)) === 200 && (await course(up)) === 403,
+    'FREE → PLUS opens B1 writing, C1 writing still refused',
+    (await quiz(up, ids.writingB1)) === 200 &&
+      (await quiz(up, ids.writingC1)) === 403,
   );
   expire(up.userId);
   check(
-    'PLUS expired → FREE: B1 refused again, A2 still open',
+    'PLUS expired → FREE: B1 writing refused again, A2 still open',
     (await planCode(up.token)) === 'FREE' &&
-      (await quiz(up, ids.readingB1)) === 403 &&
-      (await quiz(up, ids.readingA)) === 200,
+      (await quiz(up, ids.writingB1)) === 403 &&
+      (await quiz(up, ids.writingA2)) === 200,
   );
   await grant(admin.token, up.userId, 'PRO');
   check(
-    '→ PRO: B1 and course open',
-    (await quiz(up, ids.readingB1)) === 200 && (await course(up)) === 200,
+    '→ PRO: B1 and C1 writing open',
+    (await quiz(up, ids.writingB1)) === 200 &&
+      (await quiz(up, ids.writingC1)) === 200,
   );
   expire(up.userId);
   await grant(admin.token, up.userId, 'PLUS');
   check(
-    'PRO → PLUS: course refused, B1 open',
-    (await course(up)) === 403 && (await quiz(up, ids.readingB1)) === 200,
+    'PRO → PLUS: C1 writing refused, B1 open',
+    (await quiz(up, ids.writingC1)) === 403 &&
+      (await quiz(up, ids.writingB1)) === 200,
   );
   expire(up.userId);
   check(
     '→ expired: FREE again',
     (await planCode(up.token)) === 'FREE' &&
-      (await quiz(up, ids.readingB1)) === 403,
+      (await quiz(up, ids.writingB1)) === 403,
   );
 
   console.log('\n== Chromium /speaking');
@@ -324,6 +324,7 @@ async function main() {
     ['pro', 'PRO'],
   ] as const) {
     const s = await studentPage(`ent-ui-${who}`, who === 'free' ? 1366 : 390);
+    unlockAllLevels(s.account.userId);
     await hidePet(s.page);
     if (grantCode) await grant(admin.token, s.account.userId, grantCode);
     await s.page.goto(`${FE}/speaking`, {
@@ -331,44 +332,67 @@ async function main() {
       timeout: 120_000,
     });
     await s.page.waitForTimeout(2500);
-    const body = (await s.page.locator('body').innerText()).replace(
-      /\s+/g,
-      ' ',
+    // Matrix 2026-10-30: B1-B2 sets unlock with PLUS, C1 sets with PRO. The
+    // catalog pages its cards, so each level filter is checked on its own.
+    const levelView = async (name: string) => {
+      await s.page.getByRole('button', { name, exact: true }).first().click();
+      await s.page.waitForTimeout(800);
+      return {
+        text: (await s.page.locator('body').innerText()).replace(/\s+/g, ' '),
+        plus: await s.page.getByText('Mở khóa với PLUS').count(),
+        pro: await s.page.getByText('Mở khóa với PRO').count(),
+      };
+    };
+    const c1Sets = Number(
+      one(
+        `select count(*) from "SpeakingPracticeSet" where scope = 'SKILL_PRACTICE' and "publicationStatus" = 'PUBLISHED' and level = 'C1'`,
+      ),
     );
-    const locks = await s.page.getByText('Mở khóa với PRO').count();
+    // The catalog list starts after "N bộ luyện nói"; the recommendations above
+    // it are not filtered by level, so only the list is read.
+    const catalog = (text: string) => {
+      const m = /(\d+) bộ luyện nói/.exec(text);
+      return {
+        count: m ? Number(m[1]) : -1,
+        list: m ? text.slice(m.index) : '',
+      };
+    };
+    const onlyAdvanced = (text: string) => {
+      const c = catalog(text);
+      return (
+        c.count === c1Sets &&
+        c.list.includes('· Nâng cao ·') &&
+        !/· (Mất gốc|Cơ bản|Trung cấp) ·/.test(c.list)
+      );
+    };
+    const basic = await levelView('Cơ bản');
+    const middle = await levelView('Trung cấp');
+    const advanced = await levelView('Nâng cao');
     if (who === 'free') {
       check(
-        'FREE /speaking: basic sets open, B1+ sets show "Mở khóa với PRO"',
-        locks >= 6 &&
-          body.includes('Cơ bản · A1–A2') &&
-          body.includes('Cơ bản · A2'),
-        `(${locks} locks)`,
+        'FREE /speaking: Cơ bản open, Trung cấp shows PLUS, Nâng cao shows PRO',
+        basic.plus + basic.pro === 0 &&
+          middle.plus > 0 &&
+          middle.pro === 0 &&
+          advanced.pro > 0 &&
+          advanced.plus === 0,
+        `(basic ${basic.plus}/${basic.pro}, middle ${middle.plus}/${middle.pro}, advanced ${advanced.plus}/${advanced.pro})`,
+      );
+      check(
+        'filter "Nâng cao" lists only the C1 sets',
+        onlyAdvanced(advanced.text),
+        `(${catalog(advanced.text).count} shown, ${c1Sets} C1 sets)`,
       );
       await s.page.screenshot({
         path: `${SHOTS}/practice-speaking-free-1366.png`,
         fullPage: true,
       });
-      await s.page
-        .getByRole('button', { name: 'Nâng cao', exact: true })
-        .first()
-        .click();
-      await s.page.waitForTimeout(800);
-      const adv = (await s.page.locator('body').innerText()).replace(
-        /\s+/g,
-        ' ',
-      );
-      check(
-        'filter "Nâng cao" shows only the C1 set',
-        adv.includes('Bảo vệ quan điểm về vấn đề xã hội') &&
-          !adv.includes('Cơ bản ·') &&
-          !adv.includes('Trung cấp ·'),
-        adv.slice(0, 300),
-      );
     } else {
       check(
-        'PRO /speaking at 390 px: no PRO lock anywhere',
-        locks === 0 && body.includes('Nâng cao · C1'),
-        `(${locks})`,
+        'PRO /speaking at 390 px: no plan lock at any level',
+        [basic, middle, advanced].every((v) => v.plus + v.pro === 0) &&
+          onlyAdvanced(advanced.text),
+        `(${[basic, middle, advanced].map((v) => v.plus + v.pro).join('/')})`,
       );
       await s.page.screenshot({
         path: `${SHOTS}/practice-speaking-pro-390.png`,

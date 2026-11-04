@@ -504,11 +504,17 @@ async function main() {
   );
   check(
     'no CEFR or official-score claim',
-    // The disclaimer itself says the result is not converted to CEFR.
+    // The disclaimers themselves deny CEFR: "không quy đổi sang trình độ
+    // CEFR" (observed result) and "không phải trình độ CEFR" (practice level).
     !/CEFR|TOEIC|IELTS|\bETS\b/.test(
-      resultText.replace('không quy đổi sang trình độ CEFR', ''),
+      resultText.replace(
+        /không (quy đổi sang|phải) trình độ CEFR/g,
+        '',
+      ),
     ),
-    `(${resultText.match(/.{20}(CEFR|TOEIC|IELTS|\bETS\b).{20}/)?.[0]})`,
+    `(${resultText
+      .replace(/không (quy đổi sang|phải) trình độ CEFR/g, '')
+      .match(/.{20}(CEFR|TOEIC|IELTS|\bETS\b).{20}/)?.[0]})`,
   );
   await page.screenshot({
     path: `${EVIDENCE}/diag-v2-result-desktop.png`,
@@ -560,8 +566,9 @@ async function main() {
   check(
     'D1 advice is returned (V1 lists are not)',
     advice?.basis === 'D1_ADVISORY_SCORES_ONLY' &&
-      res.data?.practiceRecommendations?.length === 0 &&
-      res.data?.recommendations?.length === 0,
+      (res.data?.practiceRecommendations ?? []).length === 0 &&
+      (res.data?.recommendations ?? []).length === 0,
+    `(basis ${advice?.basis}; practice ${res.data?.practiceRecommendations?.length}; v1 ${res.data?.recommendations?.length})`,
   );
   const allResources = [
     ...(advice?.priorities ?? []),
@@ -571,7 +578,7 @@ async function main() {
     'every cited resource has a real learner route',
     allResources.length > 0 &&
       allResources.every((r: any) =>
-        /^\/(listening|reading|writing|speaking|courses)\/\d+$/.test(r.route),
+        /^\/(listening|reading|writing|speaking)\/\d+$/.test(r.route),
       ),
     `(${allResources.map((r: any) => r.route).join(' ')})`,
   );

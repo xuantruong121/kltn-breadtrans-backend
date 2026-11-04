@@ -105,3 +105,46 @@ export async function newProStudent(label = 'pro') {
     throw new Error(`grant ${grant.status} ${JSON.stringify(grant.message)}`);
   return { ...s, admin };
 }
+
+/**
+ * Opens every practice level for a harness learner (fixture only). Suites
+ * written before the level lock pick B1-C1 content for a fresh learner, which
+ * the lock now refuses by design; they open the levels first.
+ */
+export function unlockAllLevels(userId: number) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { harnessExec } = require('./harness-db');
+  harnessExec(
+    `insert into "LearnerSkillLevel" ("userId", skill, level, "unlockedLevel", source, "updatedAt")
+     select ${Number(userId)}, s::"PracticeSkill", 'ADVANCED', 'ADVANCED', 'SELF', now()
+     from unnest(array['LISTENING','READING','SPEAKING','WRITING']) s
+     on conflict ("userId", skill) do update set level = 'ADVANCED', "unlockedLevel" = 'ADVANCED', "updatedAt" = now()`,
+  );
+}
+
+/**
+ * The published TOEIC 4 Skills assessment and the L&R exam it uses. Suites
+ * once hard-coded assessment 2, which was archived on 2026-11-02.
+ */
+export function fourSkillsAssessment(): { id: number; lrExamId: number } {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { harnessQuery } = require('./harness-db');
+  const row = harnessQuery(
+    `select a.id, c."lrExamSetId" from "ToeicAssessment" a
+     join "ToeicAssessmentComponent" c on c."assessmentId" = a.id and c.kind = 'LISTENING_READING'
+     where a."productFamily" = 'TOEIC_4_SKILLS' and a."publicationStatus" = 'PUBLISHED'
+     order by a.id desc limit 1`,
+  )[0];
+  if (!row) throw new Error('no published TOEIC 4 Skills assessment');
+  return { id: Number(row[0]), lrExamId: Number(row[1]) };
+}
+
+/** A harness learner who has finished onboarding, so /dashboard opens. */
+export async function onboard(token: string) {
+  return call('PUT', '/learning-path/profile', token, {
+    onboarded: true,
+    goal: 'GENERAL',
+    track: 'GENERAL',
+    minutesPerDay: 15,
+  });
+}

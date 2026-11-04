@@ -1,16 +1,30 @@
 /**
  * Plan purchase by bank transfer over HTTP, disposable harness only
  * (PayOS credentials are blanked there; no payment provider is contacted).
+ * Courses were removed on 2026-11-01, so access is proven on Writing B2–C1
+ * (quiz 19), which needs PRO under the matrix of 2026-10-30. Both learners
+ * have every practice level opened, so a refusal is the plan's.
  */
 import { randomUUID } from 'node:crypto';
 
-import { call, check, failureCount, newAdmin, newStudent } from './harness-api';
+import {
+  call,
+  check,
+  failureCount,
+  newAdmin,
+  newStudent,
+  unlockAllLevels,
+} from './harness-api';
+
+const PRO_QUIZ = 19;
 
 async function main() {
   console.log('\n== Plans');
   const admin = await newAdmin('plan-admin');
   const a = await newStudent('plan-a');
   const b = await newStudent('plan-b');
+  unlockAllLevels(a.userId);
+  unlockAllLevels(b.userId);
   const catalog = await call('GET', '/plans/catalog');
   const plans: any[] = Array.isArray(catalog.data)
     ? catalog.data
@@ -28,10 +42,11 @@ async function main() {
     pro?.versions?.[0]?.id ??
     1;
 
-  const beforeCourse = await call('POST', '/courses/1/start', a.token);
+  const before = await call('GET', `/quizzes/${PRO_QUIZ}`, a.token);
   check(
-    'before purchase, the PRO course is refused',
-    beforeCourse.status === 403,
+    'before purchase, the PRO writing task is refused',
+    before.status === 403,
+    `(status ${before.status})`,
   );
 
   const key = randomUUID();
@@ -110,11 +125,11 @@ async function main() {
     JSON.stringify(sub.data).includes('PRO'),
     `(${JSON.stringify(sub.data).slice(0, 160)})`,
   );
-  const afterCourse = await call('POST', '/courses/1/start', a.token);
+  const after = await call('GET', `/quizzes/${PRO_QUIZ}`, a.token);
   check(
-    'the PRO course now starts',
-    afterCourse.status < 300,
-    `(status ${afterCourse.status})`,
+    'the PRO writing task now opens',
+    after.status === 200,
+    `(status ${after.status})`,
   );
 
   const keyB = randomUUID();
@@ -135,8 +150,12 @@ async function main() {
     reject.status < 300,
     `(status ${reject.status} ${JSON.stringify(reject.message)})`,
   );
-  const bCourse = await call('POST', '/courses/1/start', b.token);
-  check('a rejected purchase grants no access', bCourse.status === 403);
+  const bQuiz = await call('GET', `/quizzes/${PRO_QUIZ}`, b.token);
+  check(
+    'a rejected purchase grants no access',
+    bQuiz.status === 403,
+    `(status ${bQuiz.status})`,
+  );
 
   console.log(`\nPLANS_API_FAILURES=${failureCount()}`);
   process.exit(failureCount() ? 1 : 0);

@@ -4,10 +4,16 @@
  * gets an honest "not graded" message, no score is stored, and the text is
  * still in the editor. Real grading is BLOCKED_EXTERNAL (needs authorized
  * Gemini calls).
+ *
+ * Start the backend with WRITING_QA_PROVIDER_MODE=failure
+ * finalization-harness.sh qa-backend <db>, so the grader refuses.
  */
 import { check, failureCount } from './harness-api';
 import { FE, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
+
+const NOT_GRADED =
+  /Chưa chấm được bài|không khả dụng|chưa được (lưu điểm|hoàn tất)/i;
 
 async function main() {
   console.log('\n== Writing (browser, grader unavailable)');
@@ -29,16 +35,23 @@ async function main() {
   await editor.fill(text);
   await page.waitForTimeout(500);
   await page.getByRole('button', { name: /Gửi đánh giá bài viết/ }).click();
-  await page.waitForTimeout(5000);
+  // The message is a toast that closes after a few seconds, so it is read
+  // as soon as it appears rather than after a fixed wait.
+  const notice = await page
+    .getByText(NOT_GRADED)
+    .first()
+    .innerText({ timeout: 20_000 })
+    .catch(() => '');
+  await page.waitForTimeout(1000);
   check(
     'the grading request failed as unavailable (503), not with a fake score',
     statuses.includes(503),
     `(${statuses.join(',')})`,
   );
-  const body = await page.locator('body').innerText();
   check(
     'the learner sees that the essay was not graded',
-    /không khả dụng|chưa được (lưu điểm|hoàn tất)|thử lại/i.test(body),
+    notice.length > 0,
+    `(${notice})`,
   );
   check(
     'the essay text is still in the editor',
