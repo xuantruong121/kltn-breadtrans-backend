@@ -96,3 +96,50 @@ FE_CI=PASS (802 tests, lint 0 errors, tsc, next build --webpack)
   Speaking exercise. Keep, or restrict it to pronunciation tasks?
 - A missing private object answers 500 rather than 404. On the real bucket no
   object is missing today, so this is robustness only.
+
+## Follow-up, 2026-11-04: speaking buttons, rotating quests, dashboard clicks
+
+The owner found both "Luyện nói ngay" quest buttons opening `/speaking/49`
+("Không tìm thấy bài tập phát âm", API 404).
+
+**What the first audit missed, and why.** The daily plan
+(`adaptive-daily-practice.service.ts`) listed every `SpeakingExercise`,
+including the 33 inside TOEIC exam sets; outside its exam such an exercise
+answers 404 and earns nothing. The first `learner-cta-truth.ts` only checked
+that a button's link had the form `/speaking/<id>`; it never opened the page.
+Its first run had even accepted `/speaking/33`, an exam exercise. It also
+used fresh accounts only, whose plan differs from a real learner's.
+
+**Fixed:**
+
+| # | Defect | Fix |
+|---|---|---|
+| 4 | The daily plan suggested exam-set Speaking exercises (404), Writing tasks of TOEIC writing sets or without a practice topic (404 or never rewarded), and routed Reading to `/reading/quizzes/:id`, which is not a learner page. | Speaking uses the learner list's filter; quizzes must pass `isRewardableQuiz`; Reading routes to `/reading/:id`; each item carries its `taskType`. |
+| 5 | Daily quests were not random: the first four active rows, the same three every day. Any speaking submission counted for both "Luyện Speaking" and "Thực hành phát âm". | `daily-quest-catalog.ts`: three quests a day per learner from a pool of six, at most one speaking quest; free speech counts for "Luyện Speaking" (1, +10), read-aloud and drills for "Thực hành phát âm" (3, +10). Owner decision 2026-11-03. |
+| 6 | The perfect-score quest compared `score` with 100, but `score` counts correct answers, so it almost never fired. | The quest reads `scorePercent`. The "Học Bá" badge has the same comparison and is left as it was (not in this scope). |
+| 7 | The plan-locked period filter's upgrade dialog did not close with Escape. | Escape closes it; period buttons expose `aria-pressed`. |
+
+**Checks (harness, clone of `kltn_db` taken 2026-11-03, learner accounts only):**
+
+| Check | Result |
+|---|---|
+| `daily-practice-reachability.ts`: every planned item of every learner opens (detail API 200) and counts | 38 learners, 114/114 |
+| `learner-dashboard-clicks.ts`: every link and button on `/dashboard`, 7 accounts (new FREE, self-placed Cơ bản, PRO, 4 real), 1366 and 390 px; links opened, buttons clicked (dialog, navigation, ARIA change or request) | 635/635 |
+| `learner-cta-truth.ts`: 8 learners covering all six quests; each button's page loads, doing its activity completes that quest and leaves the others unchanged; filter links | 129/129 |
+| Payouts in the ledger | Speaking +10, phát âm +10 (3 tasks), Nghe/Đọc/Viết +8, 100% +12 |
+
+```
+DEFECT_PLAN_EXAM_EXERCISES=FIXED
+DEFECT_QUEST_ROTATION=FIXED
+DEFECT_SPEAKING_DOUBLE_COUNT=FIXED
+DEFECT_PERFECT_QUIZ_SCORE=FIXED
+DASHBOARD_CLICKS_LEARNERS=PASS (635/635)
+QUEST_BUTTONS_OPEN_AND_COUNT=PASS (129/129)
+ADMIN_DASHBOARD=NOT_RUN (owner: learner side only)
+MEDIA_PLAYBACK_ON_REAL_APP=NOT_RUN
+```
+
+Expected, not defects: the Listening page probes `/quizzes/:id/transcript`
+and handles the 403 "not unlocked yet" itself; practice audio fails on the
+harness because its private bucket is an empty fake (all keys exist on the
+real bucket, checked 2026-11-03).
