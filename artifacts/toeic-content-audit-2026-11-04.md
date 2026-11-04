@@ -28,6 +28,23 @@ EXPOSURE: Part 1-2 không gửi chữ câu hỏi/lựa chọn khi làm bài; Par
 | 4 | L&R 1 | 19, 22 | Giải thích nói "The first response…" nhưng đáp án là C. | Sửa câu giải thích (đi cùng mục 3). |
 | 5 | L&R 3 | 161 | Giải thích viết "đáp án A software demonstration" — "A" là mạo từ, đáp án đúng là B; dễ hiểu nhầm. | "đáp án B (A software demonstration)". |
 
+### Đã sửa trên `kltn_db` (2026-11-04, chủ dự án đồng ý)
+
+```
+BACKUP=kltn_db_20261104_091043.dump (sha256 khớp sau khi tải lại)
+REHEARSAL=harness qa_suites: 135/135 câu lệnh; chạy lại lần 2 bị chặn ở câu đầu (điều kiện giá trị cũ), không ghi gì
+APPLIED=135 câu lệnh trong 1 transaction, mỗi câu kèm điều kiện giá trị cũ và kiểm ROW_COUNT = 1
+  mục 1: đề 3 câu 96, phương án B "Free delivery" -> "A 20 percent discount on selected items", giải thích mới
+         (Part 4 không đọc các phương án, nên audio không đổi)
+  mục 2: exam-3-speaking câu 9 -> "I heard the writing review is in the morning. Is that right?" (đáp: 15:00, B2, Mr. Khoa)
+  mục 3+4: 131 lời giải thích tiếng Việt cho đề 1 (câu 1-31, 101-200); không câu nào nêu sai chữ cái đáp án (kiểm bằng script)
+  mục 5: đề 3 câu 161, giải thích ghi rõ "đáp án B (A software demonstration)"
+SPEAKING_PROMPT_AUDIO=8 đoạn Azure TTS mới (690 ký tự), lên kho public catalog/speaking/exam-prompt/:
+  câu 9 mới của S&W, và câu 5-11 của exam-5-speaking (4 Skills) trước đó KHÔNG có audio đọc câu hỏi
+VERIFY: kiểm cấu trúc chạy lại: 0 giải thích tiếng Anh; plan audio: 0 câu thiếu audio; audio câu 9 GET 200
+ARCHIVED_SET exam-4-speaking giữ câu 9 cũ (bài đã lưu trữ, học viên không thấy)
+```
+
 ## Lệch so với cấu trúc TOEIC thật (không sai đáp án)
 
 - **Part 3 (cả hai đề):** toàn hội thoại 2 người; không có hội thoại 3 người, không có câu hỏi kèm biểu đồ, không có câu hỏi hàm ý ("What does the man mean when he says…").
