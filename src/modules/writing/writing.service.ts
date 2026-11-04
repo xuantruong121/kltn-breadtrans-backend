@@ -30,6 +30,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { QuizPublicationStatus, QuizType, TopicCategory } from '@prisma/client';
 import { AiService } from '../ai/ai.service';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
+import { TrialService } from '../subscription/trial.service';
 import { cefrSpan } from '../subscription/practice-level';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
@@ -92,6 +93,7 @@ export class WritingService {
     private aiService: AiService,
     @Optional() private readonly quizContentAccess?: QuizContentAccessService,
     @Optional() private readonly eventEmitter?: EventEmitter2,
+    @Optional() private readonly trial?: TrialService,
   ) {}
 
   private async resolveCanonicalTask(
@@ -1125,12 +1127,18 @@ Task: ${instructions}`
       );
     }
 
+    // A free PLUS trial grades at most 3 paid-level Writing answers.
+    const trialCounted =
+      !context && (this.quizContentAccess?.isPremium(quiz) ?? false);
+    if (trialCounted) await this.trial?.assertGradingLeft(userId, 'WRITING');
+
     const { evaluation, validatedEvaluation, detail } = await this.gradeAnswer(
       quiz,
       content,
       answer,
       practiceTask,
     );
+    if (trialCounted) await this.trial?.recordGrading(userId, 'WRITING');
     const submission = await this.persistAssessment({
       detail,
       exercise,

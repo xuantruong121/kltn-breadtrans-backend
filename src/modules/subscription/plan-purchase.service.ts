@@ -14,6 +14,7 @@ import {
   PlanVersionStatus,
   Prisma,
   SubscriptionEventType,
+  SubscriptionSource,
   SubscriptionStatus,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -38,6 +39,7 @@ import {
   normalizePromoCode,
 } from './promo.logic';
 import { PayosPaymentService } from '../payment/payos-payment.service';
+import { ReferralService } from './referral.service';
 
 type PurchaseWithDetails = Prisma.PlanPurchaseGetPayload<{
   include: {
@@ -55,6 +57,7 @@ export class PlanPurchaseService {
     private readonly prisma: PrismaService,
     private readonly subscriptionService: SubscriptionService,
     @Optional() private readonly payos?: PayosPaymentService,
+    @Optional() private readonly referrals?: ReferralService,
   ) {}
 
   async createPurchase(
@@ -604,6 +607,16 @@ export class PlanPurchaseService {
       });
     }
     const { startsAt, endsAt } = decision;
+    // A running free trial ends when a real plan is paid for.
+    await tx.subscription.updateMany({
+      where: {
+        userId: current.userId,
+        source: SubscriptionSource.TRIAL,
+        status: SubscriptionStatus.ACTIVE,
+        endsAt: { gt: confirmedAt },
+      },
+      data: { endsAt: confirmedAt },
+    });
     const existingSubscription = await tx.subscription.findFirst({
       where: {
         userId: current.userId,
@@ -629,6 +642,7 @@ export class PlanPurchaseService {
         endsAt,
       },
     });
+    await this.referrals?.rewardOnFirstPayment(tx, current, confirmedAt);
     if (current.promoCodeId !== null && current.promoCodeId !== undefined) {
       // A paid purchase is honoured even if the code ran out meanwhile; the
       // redemption is what later counts toward the code's limits.
@@ -893,6 +907,8 @@ export class PlanPurchaseService {
         userId,
         status: SubscriptionStatus.ACTIVE,
         endsAt: { gt: now },
+        // A free trial is not a paid plan: buying during it starts now.
+        source: { not: SubscriptionSource.TRIAL },
         planVersion: { plan: { code: { not: 'FREE' } } },
       },
       include: { planVersion: { include: { plan: true } } },

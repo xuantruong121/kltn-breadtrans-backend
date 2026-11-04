@@ -105,6 +105,7 @@ describe('PlanPurchaseService', () => {
     },
     planPayment: { create: jest.fn(), update: jest.fn() },
     subscription: {
+      updateMany: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
       create: jest.fn(),
@@ -134,6 +135,7 @@ describe('PlanPurchaseService', () => {
       planPayment: { create: jest.fn(), update: jest.fn() },
       planVersion: { findUnique: jest.fn().mockResolvedValue(version()) },
       subscription: {
+        updateMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
       },
@@ -276,6 +278,7 @@ describe('PlanPurchaseService', () => {
       },
       planPayment: { create: jest.fn(), update: jest.fn() },
       subscription: {
+        updateMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
       },
@@ -397,6 +400,7 @@ describe('PlanPurchaseService', () => {
       planPayment: { create: jest.fn(), update: jest.fn() },
       planVersion: { findUnique: jest.fn().mockResolvedValue(version()) },
       subscription: {
+        updateMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
       },
@@ -508,6 +512,7 @@ describe('PlanPurchaseService', () => {
       planPayment: { update: jest.fn() },
       planVersion: { findUnique: jest.fn() },
       subscription: {
+        updateMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
@@ -588,6 +593,7 @@ describe('PlanPurchaseService', () => {
         planPayment: { update: jest.fn() },
         planVersion: { findUnique: jest.fn() },
         subscription: {
+          updateMany: jest.fn(),
           findMany: jest.fn().mockResolvedValue([running]),
           findFirst: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockResolvedValue({ id: 45 }),
@@ -676,6 +682,7 @@ describe('PlanPurchaseService', () => {
       },
       planPayment: { update: jest.fn() },
       subscription: {
+        updateMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
@@ -706,6 +713,7 @@ describe('PlanPurchaseService', () => {
         findUniqueOrThrow: jest.fn().mockResolvedValue(current),
       },
       subscription: {
+        updateMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue({ id: 55 }),
       },
@@ -746,6 +754,7 @@ describe('PlanPurchaseService', () => {
         findUniqueOrThrow: jest.fn().mockResolvedValue(current),
       },
       subscription: {
+        updateMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
         create: jest.fn(),

@@ -68,6 +68,17 @@ enum SubscriptionEventType {
   ADMIN_GRANTED
   ADMIN_EXTENDED
   ADMIN_REVOKED
+  TRIAL_GRANTED
+  REFERRAL_REWARD
+}
+
+/// Where a subscription came from. TRIAL is the free 3-day PLUS after the
+/// entry diagnostic and is not a paid term; REFERRAL is a referral reward.
+enum SubscriptionSource {
+  PURCHASE
+  ADMIN
+  TRIAL
+  REFERRAL
 }
 
 enum PlanPurchaseStatus {
@@ -189,6 +200,9 @@ model User {
   planPurchases                   PlanPurchase[]
   promoCodes                      PromoCode[]
   promoRedemptions                PromoRedemption[]
+  referralCode                    ReferralCode?
+  referralsMade                   Referral[]                       @relation("ReferralsMade")
+  referredBy                      Referral?                        @relation("ReferralInvitee")
   payosPaymentIntents             PayOSPaymentIntent[]
   confirmedPlanPayments           PlanPayment[]                    @relation("PlanPaymentConfirmer")
   rejectedPlanPayments            PlanPayment[]                    @relation("PlanPaymentRejecter")
@@ -337,6 +351,7 @@ model Subscription {
   status         SubscriptionStatus @default(ACTIVE)
   startsAt       DateTime
   endsAt         DateTime
+  source         SubscriptionSource @default(PURCHASE)
   planPurchaseId Int?               @unique
   planPurchase   PlanPurchase?      @relation(fields: [planPurchaseId], references: [id], onDelete: Restrict)
   createdAt      DateTime           @default(now())
@@ -2740,4 +2755,33 @@ model PromoRedemption {
 
   @@index([promoCodeId])
   @@index([userId, promoCodeId])
+}
+
+/// A learner's own invite code (made on first request).
+model ReferralCode {
+  userId    Int      @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String   @unique
+  createdAt DateTime @default(now())
+}
+
+enum ReferralStatus {
+  PENDING
+  REWARDED
+}
+
+/// One invited learner. Both sides get 7 days when the invitee's first
+/// payment completes; an invitee can be referred once.
+model Referral {
+  id               Int            @id @default(autoincrement())
+  referrerId       Int
+  referrer         User           @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  inviteeId        Int            @unique
+  invitee          User           @relation("ReferralInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+  status           ReferralStatus @default(PENDING)
+  rewardPurchaseId Int?
+  rewardedAt       DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([referrerId, status])
 }
