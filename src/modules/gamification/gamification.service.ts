@@ -243,6 +243,17 @@ export function reconcilePetDecay(
   return { state: updated, changed };
 }
 
+/** A pet gains a level every 1,000 EXP and never loses one. */
+export const PET_EXP_PER_LEVEL = 1000;
+
+export function petLevelAfterExp(
+  currentLevel: number | null | undefined,
+  exp: number,
+): number {
+  const fromExp = Math.floor(Math.max(0, exp) / PET_EXP_PER_LEVEL) + 1;
+  return Math.max(Math.floor(Number(currentLevel) || 1), fromExp);
+}
+
 export function normalizeDailyCounters(
   state: SpeciesPetState,
   today = getTodayDateKey('Asia/Ho_Chi_Minh'),
@@ -1696,7 +1707,9 @@ export class GamificationService {
       const newHealth = Math.min(100, activePetData.health + 10);
       const newHappiness = Math.min(100, activePetData.happiness + 5);
       const newPetExp = (activePetData.exp || 0) + EXP_PER_FEED;
-      const newLevel = Math.floor(newPetExp / 1000) + 1;
+      // A level is never taken away: data whose level ran ahead of its EXP
+      // (old demo pets: Cấp 4 at 60 EXP) used to drop to Cấp 1 when fed.
+      const newLevel = petLevelAfterExp(activePetData.level, newPetExp);
 
       activePetData.satiety = newSatiety;
       activePetData.health = newHealth;

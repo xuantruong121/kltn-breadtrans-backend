@@ -6,6 +6,7 @@ import {
   reconcilePetDecay,
   normalizeSpeciesPetState,
   normalizeDailyCounters,
+  petLevelAfterExp,
   SATIETY_DECAY_INTERVAL_HOURS,
   SATIETY_DECAY_AMOUNT,
   HAPPINESS_DECAY_INTERVAL_HOURS,
@@ -1223,5 +1224,18 @@ describe('GamificationService weekly cron hardening', () => {
         }),
       });
     });
+  });
+});
+
+describe('petLevelAfterExp', () => {
+  it('gains a level every 1,000 EXP', () => {
+    expect(petLevelAfterExp(1, 995)).toBe(1);
+    expect(petLevelAfterExp(1, 1000)).toBe(2);
+    expect(petLevelAfterExp(2, 2005)).toBe(3);
+  });
+
+  // Old demo pets were stored at Cấp 4 with 60 EXP; feeding them set Cấp 1.
+  it('never takes a level away when the stored level ran ahead of EXP', () => {
+    expect(petLevelAfterExp(4, 65)).toBe(4);
   });
 });

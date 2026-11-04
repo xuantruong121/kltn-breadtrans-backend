@@ -1278,18 +1278,21 @@ async function main() {
         },
       });
     }
+    // Level follows EXP as the app applies it: floor(exp / 1000) + 1.
+    const petLevel = 1 + (index % 4);
+    const petExp = (petLevel - 1) * 1000 + index * 20;
     await prisma.userPet.upsert({
       where: { userId: student.id },
       update: {
         name: index % 2 ? 'Bread' : 'Bun',
-        level: 1 + (index % 4),
-        exp: index * 20,
+        level: petLevel,
+        exp: petExp,
       },
       create: {
         userId: student.id,
         name: index % 2 ? 'Bread' : 'Bun',
-        level: 1 + (index % 4),
-        exp: index * 20,
+        level: petLevel,
+        exp: petExp,
       },
     });
     await prisma.leaderboard.upsert({
