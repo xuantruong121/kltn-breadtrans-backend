@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
 import { SpeakingContentAccessService } from '../speaking/speaking-content-access.service';
 import { UserService } from './user.service';
+import { isRewardableQuiz } from '../gamification/reward-eligibility';
 import {
   DailyPracticeItem,
   DailyPracticeReasonCode,
@@ -32,6 +33,8 @@ export type DailyPracticeCandidate = {
   isLocked: boolean;
   isCompleted: boolean;
   practicedBeforeToday: boolean;
+  /** Speaking task type, so a quest can pick the kind it counts; null for quizzes. */
+  taskType?: string | null;
 };
 
 export function resolveDailyPracticeRoute(
@@ -42,7 +45,7 @@ export function resolveDailyPracticeRoute(
     case 'LISTENING':
       return `/listening/${exerciseId}`;
     case 'READING':
-      return `/reading/quizzes/${exerciseId}`;
+      return `/reading/${exerciseId}`;
     case 'SPEAKING':
       return `/speaking/${exerciseId}`;
     case 'WRITING':
@@ -311,6 +314,7 @@ export function buildDailyPracticePlan(
       reasonLabel: reason.label,
       isLocked: candidate.isLocked,
       isCompleted: candidate.isCompleted,
+      taskType: candidate.taskType ?? null,
       priority: items.length + 1,
       dimension:
         dimension && candidate.dimensions.includes(dimension)
@@ -377,6 +381,7 @@ export class AdaptiveDailyPracticeService {
         id: true,
         title: true,
         type: true,
+        toeicWritingSetItems: { select: { id: true }, take: 1 },
         description: true,
         isPremiumContent: true,
         practiceTopicId: true,
@@ -438,13 +443,29 @@ export class AdaptiveDailyPracticeService {
       }
     }
 
+    // Only what the learner-facing Speaking list serves: an exercise inside a
+    // TOEIC exam set answers 404 outside that exam and earns nothing.
     const speakingExercises = await this.prisma.speakingExercise.findMany({
+      where: {
+        publicationStatus: 'PUBLISHED',
+        OR: [
+          { practiceSetId: null },
+          {
+            practiceSet: {
+              scope: 'SKILL_PRACTICE',
+              publicationStatus: 'PUBLISHED',
+            },
+          },
+        ],
+      },
       select: {
         id: true,
         title: true,
         targetText: true,
         category: true,
         isPremiumContent: true,
+        taskType: true,
+        practiceSet: { select: { scope: true, level: true } },
       },
       orderBy: { id: 'asc' },
     });
@@ -476,6 +497,17 @@ export class AdaptiveDailyPracticeService {
 
     const candidates: CandidateInput[] = [];
     for (const quiz of quizzes) {
+      // A quiz that earns nothing (a Writing task without a practice topic or
+      // inside a TOEIC writing set) advances no quest and may 404 outside its
+      // exam, so it is never suggested.
+      if (
+        !isRewardableQuiz({
+          type: quiz.type,
+          practiceTopicId: quiz.practiceTopicId,
+          inToeicWritingSet: quiz.toeicWritingSetItems.length > 0,
+        })
+      )
+        continue;
       const access = accessByQuiz.get(quiz.id);
       // Never suggest a level the learner has not opened.
       if (access?.isLevelLocked) continue;
@@ -554,6 +586,7 @@ export class AdaptiveDailyPracticeService {
         dimensions: [],
         isLocked: access?.isLocked ?? false,
         isCompleted: completedSpeakingIds.has(exercise.id),
+        taskType: exercise.taskType ?? null,
         practicedBeforeToday: practicedSpeakingIdsBeforeToday.has(exercise.id),
       });
     }

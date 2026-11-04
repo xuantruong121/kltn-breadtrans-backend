@@ -7,10 +7,12 @@ import {
 } from '@nestjs/common';
 import { summarizeAssessmentSkills } from './toeic-assessment-result';
 import {
-  COMPONENT_SECONDS,
+  attemptTimeSummary,
   canContinueSession,
   openSection,
+  sectionCutoff,
   sessionDeadline,
+  timedSections,
 } from './toeic-assessment-session';
 import {
   reviewSpeakingTasks,
@@ -364,7 +366,10 @@ export class ToeicAssessmentService {
       include: {
         components: {
           orderBy: { assessmentComponent: { order: 'asc' as const } },
-          include: { assessmentComponent: true, toeicAttempt: true },
+          include: {
+            assessmentComponent: { include: { lrExamSet: true } },
+            toeicAttempt: true,
+          },
         },
       },
     });
@@ -373,12 +378,19 @@ export class ToeicAssessmentService {
       canContinueSession(item.components, now),
     );
     if (!other) return null;
+    const lrSource = other.components.find(
+      (item) => item.assessmentComponent.lrExamSet,
+    )?.assessmentComponent.lrExamSet;
     return {
       id: other.id,
       startedAt: other.startedAt,
       sectionKind:
         openSection(other.components)?.assessmentComponent.kind ?? null,
       deadlineAt: sessionDeadline(other.components),
+      totalRemainingSeconds: attemptTimeSummary(
+        timedSections(other.components, lrSource?.durationSeconds),
+        now,
+      ).totalRemainingSeconds,
     };
   }
 
@@ -547,6 +559,10 @@ export class ToeicAssessmentService {
     });
     if (!component) throw new NotFoundException('Không tìm thấy component');
 
+    // Speaking and Writing answers count until the section's clock ends,
+    // plus a short margin for the request in flight.
+    const cutoff = sectionCutoff(component.kind, state.startedAt);
+    const late = cutoff !== null && Date.now() > cutoff.getTime();
     let ungraded: number[] = [];
     await this.db.$transaction(async (tx) => {
       if (component.kind === ToeicAssessmentComponentKind.LISTENING_READING) {
@@ -564,6 +580,7 @@ export class ToeicAssessmentService {
           component.speakingPracticeSetId!,
           userId,
           state.startedAt ?? attempt.startedAt,
+          cutoff,
         );
       } else {
         ungraded = await this.attachWritingAnswers(
@@ -571,8 +588,10 @@ export class ToeicAssessmentService {
           state.id,
           component.writingSetId!,
           userId,
-          dto.writingAnswers ?? [],
+          // Answers sent after the clock ran out are not stored.
+          late ? [] : (dto.writingAnswers ?? []),
           state.startedAt ?? attempt.startedAt,
+          cutoff,
         );
       }
       await tx.toeicAssessmentAttemptComponent.update({
@@ -1056,22 +1075,23 @@ export class ToeicAssessmentService {
 
   private projectAttempt(attempt: any) {
     const assessmentSources = attempt.assessment?.components ?? [];
-    const components = attempt.components.map((component: any) => {
+    const lrSourceSeconds = assessmentSources.find(
+      (candidate: any) => candidate.lrExamSet,
+    )?.lrExamSet?.durationSeconds;
+    // Each section keeps its own limit; the exam total is their sum.
+    const timed = timedSections(attempt.components, lrSourceSeconds);
+    const components = attempt.components.map((component: any, i: number) => {
       const source = assessmentSources.find(
         (candidate: any) => candidate.id === component.assessmentComponentId,
       );
-      const seconds = COMPONENT_SECONDS[component.assessmentComponent.kind];
       return {
         id: component.id,
         assessmentComponentId: component.assessmentComponentId,
         kind: component.assessmentComponent.kind,
         order: component.assessmentComponent.order,
         status: component.status,
-        timeLimitSeconds: seconds ?? null,
-        deadlineAt:
-          seconds && component.startedAt
-            ? new Date(component.startedAt.getTime() + seconds * 1000)
-            : null,
+        timeLimitSeconds: timed[i].limitSeconds,
+        deadlineAt: timed[i].deadlineAt,
         sourceId:
           source?.lrExamSetId ??
           source?.speakingPracticeSetId ??
@@ -1117,6 +1137,8 @@ export class ToeicAssessmentService {
       startedAt: attempt.startedAt,
       submittedAt: attempt.submittedAt,
       completedAt: attempt.completedAt,
+      // Whole-exam clock: S&W 80 minutes, the 4-skill exam 200.
+      ...attemptTimeSummary(timed, new Date()),
       components,
       currentComponent:
         components.find(
@@ -1174,11 +1196,12 @@ export class ToeicAssessmentService {
     practiceSetId: string,
     userId: number,
     startedAt: Date,
+    cutoff: Date | null,
   ) {
     const submissions = await tx.speakingSubmission.findMany({
       where: {
         userId,
-        submittedAt: { gte: startedAt },
+        submittedAt: { gte: startedAt, ...(cutoff ? { lte: cutoff } : {}) },
         exercise: { practiceSetId },
       },
       orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
@@ -1209,6 +1232,7 @@ export class ToeicAssessmentService {
     userId: number,
     answers: ToeicWritingAnswerDto[],
     startedAt: Date,
+    cutoff: Date | null,
   ) {
     const set = await tx.toeicWritingSet.findUnique({
       where: { id: writingSetId },
@@ -1256,7 +1280,7 @@ export class ToeicAssessmentService {
     const submissions = await tx.submission.findMany({
       where: {
         userId,
-        submittedAt: { gte: startedAt },
+        submittedAt: { gte: startedAt, ...(cutoff ? { lte: cutoff } : {}) },
         quizId: { in: [...questionOf.keys()] },
       },
       orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],

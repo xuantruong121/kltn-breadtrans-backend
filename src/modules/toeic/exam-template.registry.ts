@@ -150,3 +150,43 @@ export function resolveTemplateByKey(templateKey: string): ExamTemplate {
   }
   return template;
 }
+
+/** Default length of a part-practice paper, by the ETS section its Parts belong to. */
+export const PART_PRACTICE_DEFAULT_MINUTES = { LISTENING: 45, READING: 75 };
+
+/** Minutes of every timed section: L&R 120, S&W 20 + 60 = 80, 4 skills 200. */
+export function templateTotalMinutes(template: ExamTemplate): number {
+  return template.sections.reduce(
+    (sum, section) => sum + (section.minutes ?? 0),
+    0,
+  );
+}
+
+/**
+ * Length of the L&R paper an exam owns. A full test follows the ETS structure
+ * (45 + 75 minutes, also the L&R section of the 4-skill exam) and ignores what
+ * the form sends. Part practice exists for L&R only and keeps the requested
+ * length.
+ */
+export function lrPaperSeconds(
+  variantCode: string,
+  type: string | undefined,
+  requestedSeconds?: number,
+): number {
+  if (type === 'PRACTICE_BY_PART') {
+    if (variantCode !== 'TOEIC_LR')
+      throw new BadRequestException(
+        'Chỉ đề Listening & Reading có loại luyện tập theo Part',
+      );
+    return requestedSeconds ?? PART_PRACTICE_DEFAULT_MINUTES.LISTENING * 60;
+  }
+  const template = EXAM_TEMPLATES.find(
+    (candidate) => candidate.variantCode === variantCode,
+  );
+  const minutes = (template?.sections ?? [])
+    .filter((section) =>
+      ['LISTENING', 'READING', 'LISTENING_READING'].includes(section.code),
+    )
+    .reduce((sum, section) => sum + (section.minutes ?? 0), 0);
+  return (minutes || 120) * 60;
+}

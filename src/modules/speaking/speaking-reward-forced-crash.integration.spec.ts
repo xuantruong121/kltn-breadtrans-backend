@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { GamificationListener } from '../gamification/gamification.listener';
 import { RewardEligibilityService } from '../gamification/reward-eligibility';
+import { questDefinition } from '../gamification/daily-quest-catalog';
 import { SpeakingPostProcessingService } from './speaking-post-processing.service';
 import { SpeakingProcessorService } from './speaking-processor.service';
 import { SpeakingWorkerService } from './speaking-worker.service';
@@ -301,18 +302,29 @@ describeWithIsolatedDatabaseAndRedis(
     });
 
     // 3. Crash during Daily Quest processing
-    it('3. Crash during Daily Quest processing: completed quest remains committed, missing resumes on retry, no double progression', async () => {
-      // Create dedicated user so quest progress is uncompleted today
+    // A speaking practice advances exactly one quest of the learner's day
+    // (daily-quest-catalog.ts): read-aloud counts for PRACTICE_SPEAKING. The
+    // quest write crashes once; the other effects stay committed, the quest
+    // rolls back, and the retry advances it exactly once.
+    it('3. Crash during Daily Quest processing: other effects stay committed, the quest resumes on retry, no double progression', async () => {
       const user3 = await prisma.user.create({
         data: {
           email: `test_q_${Date.now()}@breadtrans.local`,
           role: 'STUDENT',
         },
       });
+      const readAloud = await prisma.speakingExercise.create({
+        data: {
+          title: 'S2A Read Aloud',
+          targetText: 'Practice speaking English accurately.',
+          category: 'GENERAL',
+          taskType: 'READ_ALOUD',
+        },
+      });
       const sub = await prisma.speakingSubmission.create({
         data: {
           userId: user3.id,
-          exerciseId: testExerciseId,
+          exerciseId: readAloud.id,
           status: 'COMPLETED',
           overallScore: 85,
           transcript: 'Practice speaking English accurately.',
@@ -324,18 +336,36 @@ describeWithIsolatedDatabaseAndRedis(
       });
       const subId = sub.id;
 
-      // Order of quests in execution
-      const activeQuests = await prisma.dailyQuest.findMany({
-        where: {
-          isActive: true,
-          type: { in: ['DO_SPEAKING', 'PRACTICE_SPEAKING'] },
-        },
+      // Both speaking quests assigned today; only the pronunciation one counts.
+      const rows = await prisma.dailyQuest.findMany({
+        where: { type: { in: ['DO_SPEAKING', 'PRACTICE_SPEAKING'] } },
         orderBy: { id: 'asc' },
       });
-      const firstQuest = activeQuests[0];
-      const secondQuest = activeQuests[1];
+      const freeSpeech = rows.find((row) => row.type === 'DO_SPEAKING')!;
+      const pronunciation = rows.find(
+        (row) => row.type === 'PRACTICE_SPEAKING',
+      )!;
+      jest.spyOn(gamificationService, 'assignedQuests').mockResolvedValue([
+        {
+          ...questDefinition('DO_SPEAKING')!,
+          id: freeSpeech.id,
+          isActive: true,
+        },
+        {
+          ...questDefinition('PRACTICE_SPEAKING')!,
+          id: pronunciation.id,
+          isActive: true,
+        },
+      ]);
+      const questRefs = async (questId: number) =>
+        prisma.speakingRewardLedger.findMany({
+          where: {
+            submissionId: subId,
+            rewardType: 'QUEST',
+            reference: `quest:${questId}:speaking:${subId}`,
+          },
+        });
 
-      // Spy to fail on the second quest in the loop
       const originalAdvance =
         gamificationService.advanceDailyQuestAndGrantRewardsTx.bind(
           gamificationService,
@@ -343,43 +373,27 @@ describeWithIsolatedDatabaseAndRedis(
       const questSpy = jest
         .spyOn(gamificationService, 'advanceDailyQuestAndGrantRewardsTx')
         .mockImplementation(async (userId, quest, count, today, tx) => {
-          if (quest.id === secondQuest.id) {
-            throw new Error('FORCED_QUEST_2_CRASH');
-          }
+          if (quest.id === pronunciation.id)
+            throw new Error('FORCED_QUEST_CRASH');
           return originalAdvance(userId, quest, count, today, tx);
         });
 
       await expect(
         postProcessingService.processReward(subId, 'trace-crash-quest', 1, 4),
-      ).rejects.toThrow('FORCED_QUEST_2_CRASH');
+      ).rejects.toThrow('FORCED_QUEST_CRASH');
 
-      // First quest committed
-      const q1Ledger = await prisma.speakingRewardLedger.findFirst({
-        where: {
-          submissionId: subId,
-          rewardType: 'QUEST',
-          reference: `quest:${firstQuest.id}:speaking:${subId}`,
-        },
+      // XP and Bánh mì committed before the quest; the quest rolled back.
+      const committed = await prisma.speakingRewardLedger.findMany({
+        where: { submissionId: subId, rewardType: { in: ['XP', 'BANH'] } },
       });
-      expect(q1Ledger).not.toBeNull();
-
-      // Second quest rolled back
-      const q2Ledger = await prisma.speakingRewardLedger.findFirst({
-        where: {
-          submissionId: subId,
-          rewardType: 'QUEST',
-          reference: `quest:${secondQuest.id}:speaking:${subId}`,
-        },
-      });
-      expect(q2Ledger).toBeNull();
-
-      // Reward status must not be completed
+      expect(committed.length).toBe(2);
+      expect(await questRefs(pronunciation.id)).toHaveLength(0);
       const subMid = await prisma.speakingSubmission.findUnique({
         where: { id: subId },
       });
       expect(subMid?.rewardStatus).toBe('PENDING');
 
-      // Retry
+      // Retry: the quest advances once, the other effects are not repeated.
       questSpy.mockRestore();
       await postProcessingService.processReward(
         subId,
@@ -388,31 +402,24 @@ describeWithIsolatedDatabaseAndRedis(
         4,
       );
 
-      // Both quests now committed exactly once
-      const finalQ1 = await prisma.speakingRewardLedger.findMany({
-        where: {
-          submissionId: subId,
-          rewardType: 'QUEST',
-          reference: `quest:${firstQuest.id}:speaking:${subId}`,
-        },
+      expect(await questRefs(pronunciation.id)).toHaveLength(1);
+      // A read-aloud never counts for the free-speech quest.
+      expect(await questRefs(freeSpeech.id)).toHaveLength(0);
+      const progress = await prisma.userQuestProgress.findMany({
+        where: { userId: user3.id, questId: pronunciation.id },
       });
-      expect(finalQ1.length).toBe(1);
-
-      const finalQ2 = await prisma.speakingRewardLedger.findMany({
-        where: {
-          submissionId: subId,
-          rewardType: 'QUEST',
-          reference: `quest:${secondQuest.id}:speaking:${subId}`,
-        },
+      expect(progress.map((row) => row.currentValue)).toEqual([1]);
+      const afterRetry = await prisma.speakingRewardLedger.findMany({
+        where: { submissionId: subId, rewardType: { in: ['XP', 'BANH'] } },
       });
-      expect(finalQ2.length).toBe(1);
-
+      expect(afterRetry.length).toBe(2);
       const subFinal = await prisma.speakingSubmission.findUnique({
         where: { id: subId },
       });
       expect(subFinal?.rewardStatus).toBe('COMPLETED');
 
       await prisma.user.delete({ where: { id: user3.id } });
+      await prisma.speakingExercise.delete({ where: { id: readAloud.id } });
     });
 
     // 4. Crash during Badge processing

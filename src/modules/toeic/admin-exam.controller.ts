@@ -29,6 +29,7 @@ import { ExamWritingService } from './exam-writing.service';
 import { GenericExamService } from './generic-exam.service';
 import { ToeicAiExamService } from './toeic-ai-exam.service';
 import {
+  ConfirmToeicAiReviewDto,
   CreateToeicAiExamDto,
   RegenerateToeicAiUnitDto,
 } from './toeic-ai-exam.dto';
@@ -132,6 +133,11 @@ export class AdminExamController {
     summary:
       'Admin: áp dụng candidate TOEIC AI đã review vào Draft (toàn bộ hoặc theo lựa chọn)',
   })
+  @ApiResponse({
+    status: 201,
+    description:
+      'Trạng thái job; skipped liệt kê nhóm bị giữ lại (chưa kiểm định, bị bác, hash lệch, lỗi cấu trúc)',
+  })
   applyAiGeneration(
     @Param('jobId') jobId: string,
     @Req() req: any,
@@ -175,6 +181,31 @@ export class AdminExamController {
       jobId,
       req.user.id,
       part,
+    );
+  }
+
+  @Post('ai/jobs/:jobId/candidates/:candidateKey/confirm')
+  @ApiOperation({
+    summary:
+      'Admin: xác nhận một nhóm Part 2-7 sau kiểm định cùng hãng (AFTER_DEGRADED_REVIEW) hoặc nhóm job cũ chưa kiểm định (MANUAL_REVIEW)',
+  })
+  @ApiResponse({ status: 201, description: 'Candidate sau khi xác nhận' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Trạng thái, phương thức hoặc content hash không cho phép xác nhận (REJECTED, Part 1, nội dung đã đổi...)',
+  })
+  confirmAiCandidate(
+    @Param('jobId') jobId: string,
+    @Param('candidateKey') candidateKey: string,
+    @Req() req: any,
+    @Body() dto: ConfirmToeicAiReviewDto,
+  ) {
+    return this.toeicAiExamService.confirmCandidate(
+      jobId,
+      req.user.id,
+      candidateKey,
+      dto.method,
     );
   }
 
@@ -295,6 +326,48 @@ export class AdminExamController {
       id,
       groupId,
       body.candidateId,
+    );
+  }
+
+  @Post(':id/ai/groups/:groupId/image-review')
+  @ApiOperation({
+    summary:
+      'Admin: chạy lại kiểm tra Vision Part 1 trên câu hỏi và ảnh hiện tại (không viết lại câu)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Metadata ảnh kèm kết quả kiểm định',
+  })
+  @ApiResponse({ status: 409, description: 'Không đọc được ảnh hiện tại' })
+  reviewPart1Draft(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('groupId', ParseIntPipe) groupId: number,
+  ) {
+    return this.toeicAiExamService.reviewPart1Draft(id, groupId);
+  }
+
+  @Post(':id/ai/groups/:groupId/image-review/confirm')
+  @ApiOperation({
+    summary:
+      'Admin: xác nhận nhóm Part 1 trên Draft (AFTER_VISION hoặc MANUAL_NO_VISION), gắn với hash câu hỏi và SHA-256 của ảnh',
+  })
+  @ApiResponse({ status: 201, description: 'Metadata ảnh sau khi xác nhận' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Câu FAILED, phương thức không hợp lệ, nội dung hoặc ảnh đã đổi sau kiểm định',
+  })
+  confirmPart1Draft(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('groupId', ParseIntPipe) groupId: number,
+    @Req() req: any,
+    @Body() dto: ConfirmToeicAiReviewDto,
+  ) {
+    return this.toeicAiExamService.confirmPart1Draft(
+      id,
+      groupId,
+      req.user.id,
+      dto.method,
     );
   }
 

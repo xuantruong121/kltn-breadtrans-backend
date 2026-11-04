@@ -1,4 +1,9 @@
+import { createHash } from 'crypto';
 import { learnerPassage } from './toeic-ai-batch.logic';
+import {
+  part1DraftHash,
+  part1PublishRefusal,
+} from './toeic-answer-review.logic';
 import {
   BadRequestException,
   ConflictException,
@@ -27,9 +32,15 @@ import {
   EXAM_TEMPLATES,
   ExamTemplate,
   PRACTICE_DISCLAIMER,
+  lrPaperSeconds,
   resolveExamTemplate,
   resolveTemplateByKey,
 } from './exam-template.registry';
+import { COMPONENT_SECONDS } from './toeic-assessment-session';
+
+/** Speaking 20 + Writing 60 minutes. */
+const SPEAKING_WRITING_SECONDS =
+  (COMPONENT_SECONDS.SPEAKING ?? 0) + (COMPONENT_SECONDS.WRITING ?? 0);
 import { CreateGenericExamDto, UpdateGenericExamDto } from './generic-exam.dto';
 import {
   TOEIC_SPEAKING_TASK_SEQUENCE,
@@ -530,9 +541,13 @@ export class GenericExamService {
       runtimeId: child?.id ?? assessment?.id ?? null,
       type: child?.type,
       difficulty: child?.difficulty,
+      // Whole exam: L&R paper plus Speaking 20 and Writing 60 minutes.
       durationSeconds:
-        child?.durationSeconds ??
-        (exam.variantCode === 'TOEIC_SW' ? 4800 : undefined),
+        exam.variantCode === 'TOEIC_SW'
+          ? SPEAKING_WRITING_SECONDS
+          : exam.variantCode === 'TOEIC_4_SKILLS'
+            ? (child?.durationSeconds ?? 7200) + SPEAKING_WRITING_SECONDS
+            : child?.durationSeconds,
       groups: child?.groups ?? [],
       // A 4-skill exam may read another exam's L&R, which it cannot edit.
       lrEditable: Boolean(exam.toeicExamSet),
@@ -1048,7 +1063,11 @@ export class GenericExamService {
             description,
             type: dto.type === 'FULL_TEST' ? 'FULL_TEST' : 'PRACTICE_BY_PART',
             difficulty: dto.difficulty ?? 'medium',
-            durationSeconds: dto.durationSeconds ?? 7200,
+            durationSeconds: lrPaperSeconds(
+              variantCode,
+              dto.type === 'FULL_TEST' ? 'FULL_TEST' : 'PRACTICE_BY_PART',
+              dto.durationSeconds,
+            ),
             createdBy,
             examId: exam.id,
             publicationStatus: QuizPublicationStatus.DRAFT,
@@ -1150,6 +1169,15 @@ export class GenericExamService {
     const exam = await this.findExam(id);
     this.assertDraftExam(exam);
     const child = exam.toeicExamSet;
+    // A full test keeps the ETS length; only part practice takes a new one.
+    const durationSeconds =
+      child && (dto.type !== undefined || dto.durationSeconds !== undefined)
+        ? lrPaperSeconds(
+            exam.variantCode,
+            dto.type ?? child.type,
+            dto.durationSeconds ?? child.durationSeconds,
+          )
+        : undefined;
     const updated = await this.prisma.exam.update({
       where: { id },
       data: {
@@ -1168,9 +1196,7 @@ export class GenericExamService {
           }),
           ...(dto.type !== undefined && { type: dto.type as any }),
           ...(dto.difficulty !== undefined && { difficulty: dto.difficulty }),
-          ...(dto.durationSeconds !== undefined && {
-            durationSeconds: dto.durationSeconds,
-          }),
+          ...(durationSeconds !== undefined && { durationSeconds }),
         },
       });
     }
@@ -1215,6 +1241,14 @@ export class GenericExamService {
         readiness: readiness.readiness,
       });
     }
+    const part1Issues = await this.aiPart1PublishIssues(this.lrSource(exam));
+    if (part1Issues.length) {
+      throw new BadRequestException({
+        message: 'Exam chưa đủ điều kiện xuất bản',
+        issues: part1Issues,
+        readiness: readiness.readiness,
+      });
+    }
     await this.ensureListeningMaster(exam);
     await this.prisma.$transaction(async (tx) => {
       await tx.exam.update({
@@ -1234,6 +1268,68 @@ export class GenericExamService {
       await this.setInternalSources(tx, exam, QuizPublicationStatus.PUBLISHED);
     });
     return this.getAdmin(id);
+  }
+
+  /**
+   * An AI-written Part 1 group goes live only when an admin confirmed exactly
+   * its current question and photo. The photo bytes are read again here: the
+   * same URL with different bytes is a different photo.
+   */
+  private async aiPart1PublishIssues(lr: any) {
+    const groups: any[] = (lr?.groups ?? []).filter(
+      (group: any) =>
+        group.part === 1 && group.mediaMetadata?.source === 'AI_GENERATED',
+    );
+    const messages: Record<string, string> = {
+      IMAGE_VERSION_UNKNOWN:
+        'Không xác định được phiên bản ảnh (thiếu hoặc không đọc được SHA-256 của ảnh); hãy chạy lại kiểm tra ảnh.',
+      IMAGE_CHANGED:
+        'Ảnh đã thay đổi sau lần xác nhận; hãy kiểm tra và xác nhận lại.',
+      QUESTION_FAILED:
+        'Câu Part 1 bị Vision đánh FAILED; hãy sửa hoặc tạo lại câu đó.',
+      NOT_CONFIRMED: 'Nhóm Part 1 do AI soạn chưa được admin xác nhận.',
+      CONFIRMATION_INVALID: 'Xác nhận Part 1 không hợp lệ; hãy xác nhận lại.',
+      HASH_MISMATCH:
+        'Nội dung Part 1 đã thay đổi sau lần xác nhận; hãy xác nhận lại.',
+    };
+    const issues: Array<Record<string, unknown>> = [];
+    for (const group of groups) {
+      const image = (group.mediaMetadata?.image ?? {}) as Record<string, any>;
+      let bytesSha: string | null = null;
+      if (group.imageUrl && /^https?:\/\//.test(group.imageUrl)) {
+        try {
+          const response = await fetch(group.imageUrl, {
+            signal: AbortSignal.timeout(12_000),
+          });
+          if (response.ok)
+            bytesSha = createHash('sha256')
+              .update(Buffer.from(await response.arrayBuffer()))
+              .digest('hex');
+        } catch {
+          bytesSha = null;
+        }
+      }
+      const refusal = part1PublishRefusal({
+        review: image.review,
+        currentHash: part1DraftHash(group, {
+          r2Key: image.r2Key,
+          url: group.imageUrl,
+          sha256: image.imageHash,
+        }),
+        questionFailed: ['FAILED', 'STALE'].includes(image.questionStatus),
+        imageSha256Stored: image.imageHash,
+        imageSha256Now: bytesSha,
+      });
+      if (refusal)
+        issues.push({
+          code: `PART1_${refusal}`,
+          message: messages[refusal] ?? refusal,
+          humanMessage: `Part 1 nhóm ${group.groupOrder}: ${messages[refusal] ?? refusal}`,
+          groupId: group.id,
+          part: 1,
+        });
+    }
+    return issues;
   }
 
   /** Speaking and Writing belong to the exam, so they follow its status. */

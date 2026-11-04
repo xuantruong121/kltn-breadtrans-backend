@@ -263,6 +263,138 @@ async function standIn(page: Page) {
   setMode('');
 }
 
+let adminToken = '';
+
+/** Starts one L&R Part job through the API and waits for it to settle. */
+async function partJob(part: number, mode: string) {
+  setMode(mode);
+  const started = await call('POST', '/admin/exams/ai/generate', adminToken, {
+    familyCode: 'TOEIC',
+    variantCode: 'TOEIC_LR',
+    mode: 'PART',
+    part,
+    difficulty: 'medium',
+  });
+  const id: string = started.data?.id;
+  for (let i = 0; i < 180; i += 1) {
+    const status = await call('GET', `/admin/exams/ai/jobs/${id}`, adminToken);
+    if (['GENERATED', 'FAILED'].includes(status.data?.status))
+      return { id, status: status.data };
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(`job ${id} did not settle`);
+}
+
+const snapshotRow = (id: string) =>
+  harnessQuery(
+    `select (select count(*) from jsonb_array_elements("draftSnapshot"->'lrBatches')), coalesce("draftSnapshot"->'lrBatches'->0->'candidate'->'groups'->0->>'passageText', "draftSnapshot"->'lrBatches'->0->'candidate'->'groups'->0->'questions'->0->>'text'), (select count(*) from jsonb_array_elements("draftSnapshot"->'failedUnits') u where u->>'code' = 'ANSWER_REVIEW_FAILED') from "AiGenerationJob" where id = '${id}'`,
+  )[0];
+
+async function openWorkspace(page: Page, id: string) {
+  await page.goto(`${FE}/admin/exams/ai/${id}`);
+  await page
+    .getByRole('button', { name: 'Tất cả', exact: true })
+    .click({ timeout: 60_000 });
+  await page
+    .getByRole('region', { name: 'Kiểm định đáp án' })
+    .first()
+    .waitFor({ timeout: 60_000 });
+  return page.locator('body').innerText();
+}
+
+/** The answer review: refusal, independent, degraded, outage and resume. */
+async function review(page: Page) {
+  const refused = await partJob(5, 'review-disagree-part-5');
+  check(
+    'a disagreeing reviewer keeps every Part 5 batch as refused',
+    refused.status.status === 'GENERATED' &&
+      Number(snapshotRow(refused.id)?.[2]) === 10,
+    JSON.stringify(snapshotRow(refused.id)),
+  );
+  let text = await openWorkspace(page, refused.id);
+  check('a refused group says so', text.includes('Bị bác bỏ'));
+  check(
+    'it names the disagreement',
+    text.includes('Người giải độc lập chọn đáp án khác'),
+  );
+  check(
+    'the answer line names the provider and model that answered',
+    text.includes('Đáp án: kiểm định độc lập bởi Cloudflare gpt-oss-120b'),
+  );
+  await page.screenshot({ path: `${SHOTS}/review-1-refused.png`, fullPage: false });
+  await page.getByRole('button', { name: 'Chọn tất cả', exact: true }).click();
+  await page.getByRole('button', { name: /Áp dụng \d+ nội dung/ }).click();
+  await page
+    .getByRole('region', { name: 'Nhóm chưa được áp dụng' })
+    .waitFor({ timeout: 60_000 });
+  text = await page.locator('body').innerText();
+  check('Apply holds the refused groups back and says why', text.includes('bị bác bỏ'));
+  const written = harnessQuery(
+    `select count(*) from "ToeicQuestionGroup" g join "ToeicExamSet" s on s.id = g."examId" join "Exam" e on e.id = s."examId" where e."aiGenerationJobId" = '${refused.id}'`,
+  )[0]?.[0];
+  check('no refused group reaches the Draft', written === '0', written);
+  await page.screenshot({ path: `${SHOTS}/review-2-skipped.png` });
+
+  const good = await partJob(6, '');
+  text = await openWorkspace(page, good.id);
+  check(
+    'an agreeing review is independent for the answer',
+    text.includes('Đáp án đã kiểm định độc lập') &&
+      text.includes('Đáp án: kiểm định độc lập bởi Cloudflare gpt-oss-120b'),
+  );
+  check(
+    'the explanation line says it came from the same vendor',
+    text.includes(
+      'Giải thích: kiểm tra bởi Gemini gemini-qa, cùng hãng với model sinh đề',
+    ),
+  );
+  await page.screenshot({ path: `${SHOTS}/review-3-independent.png` });
+
+  const degraded = await partJob(6, 'review-cloudflare-down');
+  text = await openWorkspace(page, degraded.id);
+  check(
+    'a Gemini fallback is degraded and needs the admin',
+    text.includes('Kiểm định cùng hãng, cần admin xác nhận') &&
+      text.includes(
+        'Đáp án: kiểm tra bởi Gemini gemini-qa, cùng hãng với model sinh đề, cần admin xác nhận',
+      ),
+  );
+  await page
+    .getByRole('button', { name: 'Xác nhận sau kiểm định cùng hãng' })
+    .first()
+    .click();
+  await page.getByText('Admin đã xác nhận').first().waitFor({ timeout: 30_000 });
+  check('the admin confirms a degraded group', true);
+  await page.screenshot({ path: `${SHOTS}/review-4-confirmed.png` });
+
+  const stopped = await partJob(6, 'review-outage');
+  const before = snapshotRow(stopped.id);
+  check(
+    'a reviewer outage stops the job with the batch saved',
+    stopped.status.status === 'FAILED' &&
+      /Kiểm định đáp án tạm thời không khả dụng/.test(stopped.status.error ?? '') &&
+      before?.[0] === '1',
+    `${stopped.status.status} ${JSON.stringify(before)}`,
+  );
+  setMode('');
+  await call('POST', `/admin/exams/ai/jobs/${stopped.id}/retry`, adminToken);
+  let resumed: any;
+  for (let i = 0; i < 120; i += 1) {
+    resumed = await call('GET', `/admin/exams/ai/jobs/${stopped.id}`, adminToken);
+    if (['GENERATED', 'FAILED'].includes(resumed.data?.status)) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  const after = snapshotRow(stopped.id);
+  check(
+    'the resumed job reviews the saved batch without redrafting it',
+    resumed.data?.status === 'GENERATED' &&
+      after?.[0] === '2' &&
+      after?.[1] === before?.[1],
+    `${resumed.data?.status} ${JSON.stringify(after)}`,
+  );
+  setMode('');
+}
+
 async function aiDecks(page: Page) {
   await page.goto(`${FE}/admin/vocab`);
   await page
@@ -401,7 +533,8 @@ async function main() {
   mkdirSync(SHOTS, { recursive: true });
   setMode('');
   const flow = process.argv[2];
-  const { browser, page } = await adminPage();
+  const { browser, page, admin } = await adminPage();
+  adminToken = admin.token;
   const run = async (name: string, fn: (page: Page) => Promise<void>) => {
     if (flow && flow !== name) return;
     console.log(`--- ${name}`);
@@ -415,6 +548,7 @@ async function main() {
   await run('form', manualForm);
   await run('exam', aiExam);
   if (flow === 'missing') await run('missing', missing);
+  await run('review', review);
   await run('standin', standIn);
   await run('decks', aiDecks);
   await run('pictures', pictures);

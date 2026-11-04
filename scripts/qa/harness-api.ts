@@ -43,7 +43,10 @@ export async function newStudent(label = 'api'): Promise<{
   token: string;
   userId: number;
 }> {
-  const email = `${label}-${randomUUID().slice(0, 8)}@harness.local`;
+  // Registration stores the address lower-cased; the ADMIN promotion below
+  // matches on it, so a label with capitals must not miss.
+  const email =
+    `${label}-${randomUUID().slice(0, 8)}@harness.local`.toLowerCase();
   const password = `Harness-${randomUUID().slice(0, 8)}-Aa1!`;
   const reg = await call('POST', '/auth/register', undefined, {
     email,

@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, Logger } from '@nestjs/common';
 import { IAIEvaluator, PronunciationFeedback } from './ai-evaluator.interface';
+import { speakingGradeFailure } from '../speaking-grade.logic';
 
 /**
  * Lớp giả lập OpenAI Strategy.
@@ -89,10 +90,10 @@ export class OpenAIEvaluatorStrategy implements IAIEvaluator {
     promptText: string,
     studentResponse: string,
   ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
-    return {
-      score: 3,
-      feedback: '[OpenAI Mock] Đánh giá bài nói giả lập.',
-      suggestions: ['Cải thiện phát âm.'],
-    };
+    // Never return an invented score: this strategy has no real grader.
+    throw speakingGradeFailure(
+      'GRADER_NOT_CONFIGURED',
+      'Chấm Speaking Part 3-5 chưa được cấu hình.',
+    );
   }
 }

@@ -13,6 +13,8 @@ import { DIAGNOSTIC_RUBRIC_GRADER } from './diagnostic-productive';
 import { selectDiagnosticRubricGrader } from './diagnostic-rubric-grader';
 import { DiagnosticAdviceCatalogService } from './diagnostic-advice-catalog.service';
 import { SubscriptionModule } from '../subscription/subscription.module';
+import { QuizModule } from '../quiz/quiz.module';
+import { SpeakingModule } from '../speaking/speaking.module';
 
 @Module({
   imports: [
@@ -21,6 +23,9 @@ import { SubscriptionModule } from '../subscription/subscription.module';
     UploadModule,
     GamificationModule,
     SubscriptionModule,
+    // Advice links use the item pages' own access decision (plan and level).
+    QuizModule,
+    SpeakingModule,
   ],
   controllers: [DiagnosticController],
   providers: [

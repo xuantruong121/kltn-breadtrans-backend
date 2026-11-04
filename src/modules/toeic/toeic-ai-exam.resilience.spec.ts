@@ -52,7 +52,10 @@ describe('a batch that comes back wrong', () => {
     const outcome = await draft(build(generate));
 
     expect(generate).toHaveBeenCalledTimes(3);
-    expect(outcome).toEqual({ refusal: 'Unexpected token' });
+    expect(outcome).toEqual({
+      refusal: 'Unexpected token',
+      code: 'CONTENT_CONTRACT_FAILURE',
+    });
   });
 
   it('stops at an outage: three more calls could not help', async () => {

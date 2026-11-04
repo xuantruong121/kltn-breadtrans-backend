@@ -233,6 +233,50 @@ export function plannedGroupIssue(planned: PlannedTraits, group: BatchGroup) {
   return null;
 }
 
+// 'The word "covered" in paragraph 2, line 3, is closest in meaning to'
+const CLOSEST_IN_MEANING = /closest in meaning/i;
+const QUOTED_TARGET =
+  /\b(?:word|phrase|term|expression)\s+["“”‘’']([^"“”‘’']+)["“”‘’']/i;
+
+/** A whole-word, case-insensitive match that tolerates line breaks. */
+function containsWord(text: string, target: string) {
+  const pattern = target
+    .trim()
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\s+/g, '\\s+');
+  return new RegExp(
+    `(^|[^\\p{L}\\p{N}])${pattern}($|[^\\p{L}\\p{N}])`,
+    'iu',
+  ).test(text);
+}
+
+/**
+ * Questions whose shape is valid but which cannot be answered from the group:
+ * a graphic question without a graphic, or a vocabulary question about a word
+ * the passage does not contain. The live run of 2026-11-03 drew both.
+ */
+export function questionContentIssue(part: number, group: BatchGroup) {
+  const passage = String(group.passageText ?? '');
+  const source = part <= 4 ? String(group.transcript ?? '') : passage;
+  const questions = group.questions ?? [];
+  for (const [index, question] of questions.entries()) {
+    const text = String(question.text ?? '');
+    if (
+      [3, 4].includes(part) &&
+      /look at the graphic/i.test(text) &&
+      !isListeningGraphic(passage)
+    )
+      return `Câu ${index + 1} hỏi theo hình (Look at the graphic) nhưng nhóm không có hình GRAPHIC`;
+    if (!CLOSEST_IN_MEANING.test(text)) continue;
+    const target = QUOTED_TARGET.exec(text)?.[1]?.trim();
+    if (!target)
+      return `Câu ${index + 1} hỏi từ đồng nghĩa nhưng không ghi từ cần hỏi trong ngoặc kép`;
+    if (!containsWord(source, target))
+      return `Câu ${index + 1} hỏi nghĩa của "${target}" nhưng từ này không có trong bài`;
+  }
+  return null;
+}
+
 export function isListeningGraphic(text: string | null | undefined) {
   return /^GRAPHIC:/i.test(String(text ?? '').trim());
 }

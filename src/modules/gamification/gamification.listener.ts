@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { RewardEligibilityService } from './reward-eligibility';
+import { questTypeForSpeaking, questTypesForQuiz } from './daily-quest-catalog';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Prisma, QuizType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -24,6 +25,8 @@ export class GamificationListener {
     /** XP to award when the score is not a count of correct answers (Writing). */
     xp?: number;
     quizType?: QuizType | (string & {});
+    /** Percent correct; `score` is a count of correct answers for quizzes. */
+    scorePercent?: number | null;
     isFirstSubmission?: boolean;
   }) {
     this.logger.log(
@@ -101,45 +104,26 @@ export class GamificationListener {
             );
           }
         }
-
-        // Badge: perfect score
-        if (payload.score === 100) {
-          await this.gamificationService.awardBadgeIfEarned(
-            payload.userId,
-            'Học Bá',
-          );
-        }
       }
 
-      // Daily quest progress (atomic & capped)
-      const today = getTodayDateKey('Asia/Ho_Chi_Minh');
-      const activeQuests = await this.prisma.dailyQuest.findMany({
-        where: {
-          isActive: true,
-          type: {
-            in: ['COMPLETE_QUIZ', 'DO_LISTENING', 'PERFECT_QUIZ'],
-          },
-        },
-      });
-
-      for (const quest of activeQuests) {
-        if (
-          quest.type === 'DO_LISTENING' &&
-          payload.quizType !== QuizType.LISTENING_PRACTICE
-        ) {
-          continue;
-        }
-        if (quest.type === 'PERFECT_QUIZ' && payload.score < 100) {
-          continue;
-        }
-
-        await this.gamificationService.advanceDailyQuestAndGrantRewardsTx(
+      // Badge "Học Bá" ("Đạt điểm tối đa"): a perfect rewarded practice, first
+      // try or not. `score` counts correct answers, so the percent decides;
+      // awardBadgeIfEarned grants it once.
+      if (Number(payload.scorePercent) >= 100) {
+        await this.gamificationService.awardBadgeIfEarned(
           payload.userId,
-          quest,
-          1,
-          today,
+          'Học Bá',
         );
       }
+
+      // Daily quest progress: only the quests assigned to this learner today
+      // (daily-quest-catalog.ts), by the kind of practice and its percent.
+      const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+      await this.gamificationService.advanceAssignedQuests(
+        payload.userId,
+        questTypesForQuiz(payload.quizType, Number(payload.scorePercent ?? 0)),
+        today,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to handle gamification for user ${payload.userId}`,
@@ -362,24 +346,26 @@ export class GamificationListener {
         }
       }
 
-      // 4. Daily quest progress for DO_SPEAKING / PRACTICE_SPEAKING (atomic per quest)
+      // 4. Daily quest progress: free speech counts for DO_SPEAKING, read-aloud
+      // and pronunciation drills for PRACTICE_SPEAKING, and only when that
+      // quest is assigned to the learner today (daily-quest-catalog.ts).
       const today = getTodayDateKey('Asia/Ho_Chi_Minh');
-      const activeQuests =
-        this.prisma.dailyQuest &&
-        typeof this.prisma.dailyQuest.findMany === 'function'
-          ? await this.prisma.dailyQuest.findMany({
-              where: {
-                isActive: true,
-                type: { in: ['DO_SPEAKING', 'PRACTICE_SPEAKING'] },
-              },
+      const exercise =
+        this.prisma.speakingExercise &&
+        typeof this.prisma.speakingExercise.findUnique === 'function'
+          ? await this.prisma.speakingExercise.findUnique({
+              where: { id: payload.exerciseId },
+              select: { taskType: true },
             })
-          : [];
+          : null;
+      const questType = questTypeForSpeaking(exercise?.taskType);
+      const activeQuests = questType
+        ? (
+            await this.gamificationService.assignedQuests(payload.userId, today)
+          ).filter((quest) => quest.type === questType)
+        : [];
 
       for (const quest of activeQuests) {
-        if (quest.type === 'PERFECT_QUIZ' && payload.overallScore < 100) {
-          continue;
-        }
-
         const existingProgress =
           this.prisma.userQuestProgress &&
           typeof this.prisma.userQuestProgress.findUnique === 'function'

@@ -1,4 +1,5 @@
 import { ToeicAiExamService } from './toeic-ai-exam.service';
+import { withAgreeingReview } from './toeic-answer-review.fixtures-spec';
 
 describe('ToeicAiExamService partial media materialization', () => {
   it('keeps a Speaking/Writing candidate recoverable when AI image generation fails', async () => {
@@ -170,6 +171,7 @@ describe('ToeicAiExamService partial media materialization', () => {
       }),
     };
 
+    withAgreeingReview(service);
     await service.process({ data: { jobId: 'qa-job' } });
 
     expect(service.prisma.toeicQuestionGroup.create).not.toHaveBeenCalled();

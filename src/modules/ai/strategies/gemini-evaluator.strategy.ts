@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  Optional,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { GenerativeModel, SchemaType } from '@google/generative-ai';
@@ -55,6 +50,11 @@ import {
   toeicExamImagePrompt,
   toeicSpeakingWritingRequest,
 } from '../toeic-exam-prompt';
+import {
+  SpeakingGradeOutputError,
+  parseSpeakingPart3To5Grade,
+  speakingGradeFailure,
+} from '../speaking-grade.logic';
 
 /** The model's why-wrong notes, aligned with the 4 options, or undefined. */
 function aiOptionNotes(raw: unknown, correctIndex: number) {
@@ -1521,9 +1521,11 @@ Use only visible facts. Reject images that are blurry, abstract, text-heavy, bra
   ): Promise<{ score: number; feedback: string; suggestions: string[] }> {
     // No grader configured: refuse rather than return an invented score.
     if (!this.hasKeys())
-      throw new ServiceUnavailableException(
+      throw speakingGradeFailure(
+        'GRADER_NOT_CONFIGURED',
         'Chấm Speaking Part 3-5 chưa được cấu hình.',
       );
+    let raw: string;
     try {
       const prompt = `
         You are a TOEIC Speaking Examiner. Grade this Speaking Part 3-5 response.
@@ -1546,19 +1548,50 @@ Use only visible facts. Reject images that are blurry, abstract, text-heavy, bra
       const result = await this.executeWithRotation((m) =>
         m.generateContent(prompt),
       );
-      let text = result.response.text().trim();
-      if (text.startsWith('```json'))
-        text = text.substring(7, text.length - 3).trim();
-      else if (text.startsWith('```'))
-        text = text.substring(3, text.length - 3).trim();
-      return JSON.parse(text);
+      raw = result.response.text();
     } catch (error: any) {
-      this.logger.error(`Error evaluating speaking part 3-5: ${error.message}`);
-      return {
-        score: 3,
-        feedback: 'Bài phát âm trôi chảy, đúng trọng tâm.',
-        suggestions: ['Chú ý nhấn trọng âm câu tốt hơn.'],
-      };
+      await this.recordSpeakingGradeFailure(
+        'GRADER_UNAVAILABLE',
+        redactGeminiError(error?.message ?? error),
+      );
+      throw speakingGradeFailure(
+        'GRADER_UNAVAILABLE',
+        'Chưa chấm được bài nói vì dịch vụ chấm điểm đang lỗi. Hãy nộp lại sau ít phút.',
+      );
+    }
+    try {
+      return parseSpeakingPart3To5Grade(raw);
+    } catch (error: any) {
+      const code =
+        error instanceof SpeakingGradeOutputError
+          ? error.code
+          : 'GRADER_OUTPUT_INVALID';
+      await this.recordSpeakingGradeFailure(
+        code,
+        error?.message ?? String(error),
+      );
+      throw speakingGradeFailure(
+        code,
+        'Chưa chấm được bài nói vì kết quả chấm không hợp lệ. Hãy nộp lại.',
+      );
+    }
+  }
+
+  /** Logs the cause and bumps a daily Redis counter so admins can see grading failures. */
+  private async recordSpeakingGradeFailure(code: string, detail: string) {
+    this.logger.error(
+      `Speaking part 3-5 GRADING_FAILED code=${code}: ${detail}`,
+    );
+    if (!this.redis) return;
+    const day = new Date().toISOString().slice(0, 10);
+    try {
+      await this.redis.hincrby(
+        `ai:grading-failed:speaking-p3-5:${day}`,
+        code,
+        1,
+      );
+    } catch (err) {
+      this.logger.warn(`Redis grading-failed counter failed: ${err}`);
     }
   }
 

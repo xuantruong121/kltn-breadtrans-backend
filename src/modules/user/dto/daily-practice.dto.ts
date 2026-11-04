@@ -21,6 +21,8 @@ export interface DailyPracticeItem {
   reasonLabel: string;
   isLocked: boolean;
   isCompleted: boolean;
+  /** Speaking task type (READ_ALOUD, RESPOND_TO_QUESTION…); null for quizzes. */
+  taskType: string | null;
   priority: number;
   dimension: string | null;
 }

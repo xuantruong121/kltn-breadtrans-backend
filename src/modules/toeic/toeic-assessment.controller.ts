@@ -101,6 +101,13 @@ export class ToeicAssessmentController {
   }
 
   @Get('attempts/:attemptId')
+  @ApiOperation({
+    summary: 'Lượt làm bài kèm đồng hồ cả đề và đồng hồ từng phần',
+    description:
+      'totalLimitSeconds là tổng thời gian của đề (S&W 4800, 4 kỹ năng 12000); totalRemainingSeconds là thời gian còn lại của phần đang làm cộng đủ giới hạn các phần chưa mở. Mỗi phần vẫn có timeLimitSeconds và deadlineAt riêng.',
+  })
+  @ApiResponse({ status: 200, description: 'Lượt làm bài' })
+  @ApiResponse({ status: 403, description: 'Không phải lượt của bạn' })
   getAttempt(
     @Param('attemptId', ParseIntPipe) attemptId: number,
     @Req() req: any,
@@ -132,6 +139,12 @@ export class ToeicAssessmentController {
   }
 
   @Post('attempts/:attemptId/components/:componentId/complete')
+  @ApiOperation({
+    summary: 'Nộp một phần của lượt làm bài',
+    description:
+      'Bài nói, bài viết chỉ được tính nếu nộp trước khi phần hết giờ cộng 30 giây; câu trả lời Writing gửi sau đó không được lưu.',
+  })
+  @ApiResponse({ status: 201, description: 'Lượt làm bài sau khi nộp phần' })
   completeComponent(
     @Param('attemptId', ParseIntPipe) attemptId: number,
     @Param('componentId', ParseIntPipe) componentId: number,

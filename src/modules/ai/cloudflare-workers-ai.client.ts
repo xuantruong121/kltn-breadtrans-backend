@@ -100,6 +100,56 @@ export class CloudflareWorkersAiClient {
     return JSON.parse(cloudflareAnswerText(result)) as T;
   }
 
+  /** The configured text model id, e.g. @cf/openai/gpt-oss-120b. */
+  textModel() {
+    return process.env.CLOUDFLARE_AI_TEXT_MODEL?.trim() || DEFAULT_TEXT_MODEL;
+  }
+
+  /**
+   * Like generateJson, but returns the raw answer and token usage so the
+   * caller can validate the reply itself and count cost. A reply that is not
+   * JSON throws a plain Error (not an outage).
+   */
+  async generateJsonDetailed(input: {
+    systemInstruction: string;
+    prompt: string;
+    schema: unknown;
+    temperature: number;
+    maxTokens?: number;
+  }): Promise<{
+    data: unknown;
+    model: string;
+    usage?: { inputTokens?: number; outputTokens?: number };
+  }> {
+    const model = this.textModel();
+    const result = await this.run(
+      model,
+      {
+        messages: [
+          { role: 'system', content: input.systemInstruction },
+          { role: 'user', content: input.prompt },
+        ],
+        response_format: { type: 'json_schema', json_schema: input.schema },
+        temperature: input.temperature,
+        max_tokens: input.maxTokens ?? 8000,
+      },
+      TEXT_TIMEOUT_MS,
+    );
+    const usage = result?.usage
+      ? {
+          inputTokens: Number(result.usage.prompt_tokens) || undefined,
+          outputTokens: Number(result.usage.completion_tokens) || undefined,
+        }
+      : undefined;
+    let data: unknown;
+    try {
+      data = JSON.parse(cloudflareAnswerText(result));
+    } catch {
+      throw new Error('Cloudflare reply is not valid JSON');
+    }
+    return { data, model, usage };
+  }
+
   async generateImage(
     prompt: string,
   ): Promise<{ buffer: Buffer; mimeType: string }> {

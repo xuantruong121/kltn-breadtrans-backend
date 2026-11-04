@@ -8,6 +8,11 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  CONFIRMATION_METHODS,
+  type ConfirmationMethod,
+} from './toeic-answer-review.types';
 
 export class CreateToeicAiExamDto {
   @IsString()
@@ -37,6 +42,17 @@ export class CreateToeicAiExamDto {
   @IsString()
   @IsIn(['easy', 'medium', 'hard'])
   difficulty?: 'easy' | 'medium' | 'hard';
+}
+
+export class ConfirmToeicAiReviewDto {
+  /**
+   * AFTER_VISION / MANUAL_NO_VISION for Part 1 on the Draft;
+   * AFTER_DEGRADED_REVIEW / MANUAL_REVIEW for Part 2-7 candidates.
+   */
+  @ApiProperty({ enum: CONFIRMATION_METHODS })
+  @IsString()
+  @IsIn([...CONFIRMATION_METHODS])
+  method!: ConfirmationMethod;
 }
 
 export class RegenerateToeicAiUnitDto {

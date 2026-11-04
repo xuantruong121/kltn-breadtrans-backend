@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { QuizPublicationStatus } from '@prisma/client';
+import { createHash } from 'crypto';
 import { GenericExamService, lrSourceIsLive } from './generic-exam.service';
+import { part1DraftHash } from './toeic-answer-review.logic';
 
 describe('GenericExamService Writing readiness', () => {
   const service: any = Object.create(GenericExamService.prototype);
@@ -93,6 +95,25 @@ describe('GenericExamService Writing readiness', () => {
     const projected = service.project(exam);
     expect(projected.totalQuestions).toBe(19);
     expect(projected.durationSeconds).toBe(4800);
+  });
+
+  it('gives a 4-skill exam 200 minutes: its L&R paper plus Speaking 20 and Writing 60', () => {
+    const exam: any = {
+      id: 2,
+      title: 'TOEIC 4 kỹ năng',
+      familyCode: 'TOEIC',
+      variantCode: 'TOEIC_4_SKILLS',
+      templateKey: 'TOEIC_4_SKILLS_V1',
+      toeicExamSet: {
+        id: 9,
+        type: 'FULL_TEST',
+        durationSeconds: 7200,
+        groups: [],
+      },
+      toeicAssessment: { components: [] },
+    };
+
+    expect(service.project(exam).durationSeconds).toBe(12000);
   });
 });
 
@@ -314,6 +335,130 @@ describe('GenericExamService publish builds the recording', () => {
       'Không dựng được audio liền mạch: Azure down',
     );
     expect(service.prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('GenericExamService publish gates AI Part 1 on admin confirmation', () => {
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+  const photo = Buffer.from('photo-v1');
+  const photoSha = createHash('sha256').update(photo).digest('hex');
+  const url = 'https://pub.r2.dev/ai/x.jpg';
+  const group = (image: Record<string, unknown>) => ({
+    id: 7,
+    part: 1,
+    groupOrder: 1,
+    imageUrl: url,
+    imageBrief: 'desk',
+    transcriptText: null,
+    passageText: null,
+    mediaMetadata: { source: 'AI_GENERATED', image },
+    questions: [
+      {
+        text: 'Choose the sentence that best describes the photograph.',
+        options: ['a', 'b', 'c', 'd'],
+        correctIndex: 1,
+        explanation: 'Giải thích.',
+      },
+    ],
+  });
+  const build = (lr: any) => {
+    const service: any = Object.create(GenericExamService.prototype);
+    service.findExam = jest.fn().mockResolvedValue({
+      publicationStatus: QuizPublicationStatus.DRAFT,
+      toeicExamSet: { id: 3 },
+      toeicAssessment: null,
+    });
+    service.productReadiness = jest
+      .fn()
+      .mockReturnValue({ learnerReady: true, readiness: {} });
+    service.lrSource = jest.fn().mockReturnValue(lr);
+    service.ensureListeningMaster = jest.fn();
+    service.getAdmin = jest.fn();
+    service.setInternalSources = jest.fn();
+    service.prisma = { $transaction: jest.fn() };
+    return service;
+  };
+  const confirmedImage = (lrGroup: any) => {
+    const contentHash = part1DraftHash(lrGroup, {
+      r2Key: 'k',
+      url,
+      sha256: photoSha,
+    });
+    return {
+      r2Key: 'k',
+      imageHash: photoSha,
+      questionStatus: 'READY_FOR_REVIEW',
+      review: {
+        status: 'ADMIN_CONFIRMED',
+        contentHash,
+        steps: {},
+        verdicts: [],
+        edits: [],
+        history: [],
+        confirmed: {
+          by: 1,
+          at: 't',
+          contentHash,
+          method: 'AFTER_VISION',
+          fromStatus: 'NEEDS_ADMIN_CONFIRM',
+        },
+      },
+    };
+  };
+  const serve = (buffer: Buffer) => {
+    (global as any).fetch = jest.fn(() =>
+      Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(buffer) }),
+    );
+  };
+
+  it('publishes a confirmed group whose photo bytes are unchanged', async () => {
+    const lrGroup: any = group({});
+    lrGroup.mediaMetadata.image = confirmedImage(lrGroup);
+    serve(photo);
+    const service = build({ id: 3, groups: [lrGroup] });
+    await service.publish(5);
+    expect(service.prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'not confirmed',
+      (g: any) => ({ ...confirmedImage(g), review: undefined }),
+      photo,
+      'PART1_NOT_CONFIRMED',
+    ],
+    [
+      'new bytes behind the same URL',
+      (g: any) => confirmedImage(g),
+      Buffer.from('photo-v2'),
+      'PART1_IMAGE_CHANGED',
+    ],
+    [
+      'no stored SHA-256',
+      (g: any) => ({ ...confirmedImage(g), imageHash: undefined }),
+      photo,
+      'PART1_IMAGE_VERSION_UNKNOWN',
+    ],
+  ])('refuses a group %s', async (_label, image, bytes, code) => {
+    const lrGroup: any = group({});
+    lrGroup.mediaMetadata.image = image(lrGroup);
+    serve(bytes);
+    const service = build({ id: 3, groups: [lrGroup] });
+    await expect(service.publish(5)).rejects.toMatchObject({
+      response: { issues: [expect.objectContaining({ code, groupId: 7 })] },
+    });
+    expect(service.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('leaves a manually authored Part 1 group alone', async () => {
+    const lrGroup: any = group({});
+    lrGroup.mediaMetadata = { image: {} };
+    const service = build({ id: 3, groups: [lrGroup] });
+    await service.publish(5);
+    expect(service.prisma.$transaction).toHaveBeenCalled();
   });
 });
 

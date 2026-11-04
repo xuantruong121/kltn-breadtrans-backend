@@ -182,7 +182,50 @@ describe('TOEIC assessment exam room', () => {
     expect(tx.toeicAssessmentAttemptComponent.update).toHaveBeenCalled();
   });
 
+  afterEach(() => jest.useRealTimers());
+
+  it('sums the sections into one exam clock: Speaking 20 + Writing 60 = 80 minutes', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-11-02T08:05:00Z'));
+    const { service } = setup([speaking(), writing()], 'SPEAKING', 20);
+    const attempt = await service.getAttempt(1, 7);
+
+    expect(attempt.totalLimitSeconds).toBe(4800);
+    // 15 minutes left of Speaking, all 60 of Writing.
+    expect(attempt.totalRemainingSeconds).toBe(15 * 60 + 3600);
+  });
+
+  it('does not store written answers sent after the section ran out', async () => {
+    // Writing opened at 08:00 has 60 minutes plus a 30-second margin.
+    jest.useFakeTimers().setSystemTime(new Date('2026-11-02T09:01:00Z'));
+    const { service, tx } = setup(
+      [
+        speaking({ status: 'COMPLETED' }),
+        writing({ status: 'IN_PROGRESS', startedAt: STARTED }),
+      ],
+      'WRITING',
+      21,
+    );
+    tx.submission.findMany.mockResolvedValue([]);
+
+    await service.completeComponent(1, 21, 7, {
+      writingAnswers: [{ quizId: 40, text: 'Too late' }],
+    });
+
+    expect(tx.submission.upsert).not.toHaveBeenCalled();
+    expect(tx.submission.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          submittedAt: {
+            gte: STARTED,
+            lte: new Date('2026-11-02T09:00:30Z'),
+          },
+        }),
+      }),
+    );
+  });
+
   it('stores written answers before grading, skipping blank and foreign tasks', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-11-02T08:30:00Z'));
     const { service, tx, writingService } = setup(
       [
         speaking({ status: 'COMPLETED' }),

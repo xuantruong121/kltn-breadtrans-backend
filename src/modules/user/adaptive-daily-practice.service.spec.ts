@@ -1,4 +1,5 @@
 import {
+  AdaptiveDailyPracticeService,
   buildDailyPracticePlan,
   DailyPracticeSkillProgress,
   resolveDailyPracticeRoute,
@@ -47,7 +48,7 @@ function candidate(
       skillName === 'LISTENING'
         ? `/listening/${id}`
         : skillName === 'READING'
-          ? `/reading/quizzes/${id}`
+          ? `/reading/${id}`
           : skillName === 'SPEAKING'
             ? `/speaking/${id}`
             : `/writing/${id}`,
@@ -64,6 +65,8 @@ describe('AdaptiveDailyPracticeService deterministic planner', () => {
   it('resolves recommendations to their canonical skill domains', () => {
     expect(resolveDailyPracticeRoute('WRITING', 17)).toBe('/writing/17');
     expect(resolveDailyPracticeRoute('LISTENING', 23)).toBe('/listening/23');
+    // /reading/:id is the learner page; /reading/quizzes/:id never existed.
+    expect(resolveDailyPracticeRoute('READING', 6)).toBe('/reading/6');
   });
 
   it('returns a balanced starter plan without labelling a fresh learner weak', () => {
@@ -218,5 +221,81 @@ describe('AdaptiveDailyPracticeService deterministic planner', () => {
       route: '/plans?highlight=plus',
       reasonCode: 'ACCESS_LOCKED',
     });
+  });
+});
+
+describe('AdaptiveDailyPracticeService content it may suggest', () => {
+  // Live 2026-11-03: the plan sent learners to /speaking/49, an exercise of a
+  // TOEIC exam set (404 outside the exam), and to /reading/quizzes/:id, which
+  // is not a learner page.
+  it('suggests only learner pages that open and practice that counts', async () => {
+    const writing = (id: number, inSet: boolean, topic: number | null) => ({
+      id,
+      title: `Writing ${id}`,
+      type: 'WRITING_EMAIL',
+      isPremiumContent: false,
+      practiceTopicId: topic,
+      practiceTopic: null,
+      bilingualContent: null,
+      toeicWritingSetItems: inSet ? [{ id: 1 }] : [],
+      questions: [{ id: id * 10, content: {}, audioAssets: [] }],
+      listeningAudioArtifacts: [],
+    });
+    const prisma: any = {
+      quiz: {
+        findMany: jest.fn().mockResolvedValue([
+          writing(1, true, null),
+          writing(2, false, null),
+          writing(3, false, 7),
+          {
+            ...writing(4, false, null),
+            title: 'Reading 4',
+            type: 'BILINGUAL_READING',
+          },
+        ]),
+      },
+      submission: { findMany: jest.fn().mockResolvedValue([]) },
+      speakingExercise: { findMany: jest.fn().mockResolvedValue([]) },
+      speakingSubmission: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const userService: any = {
+      getSkillProgressSummary: jest.fn().mockResolvedValue({
+        skills: [skill('READING'), skill('WRITING'), skill('LISTENING')],
+      }),
+    };
+    const open: any = { resolveMany: jest.fn().mockResolvedValue(new Map()) };
+    const service = new AdaptiveDailyPracticeService(
+      prisma,
+      userService,
+      open,
+      open,
+    );
+
+    const plan = await service.getDailyPractice(5);
+
+    const routes = plan.items.map((item) => item.route);
+    expect(routes).toContain('/writing/3');
+    expect(routes).toContain('/reading/4');
+    expect(routes).not.toContain('/writing/1');
+    expect(routes).not.toContain('/writing/2');
+    expect(routes.some((route) => route.startsWith('/reading/quizzes'))).toBe(
+      false,
+    );
+    expect(prisma.speakingExercise.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          publicationStatus: 'PUBLISHED',
+          OR: [
+            { practiceSetId: null },
+            {
+              practiceSet: {
+                scope: 'SKILL_PRACTICE',
+                publicationStatus: 'PUBLISHED',
+              },
+            },
+          ],
+        },
+      }),
+    );
   });
 });
