@@ -28,6 +28,14 @@ export const EXTERNAL_ENV_NAMES = [
   'GEMINI_IMAGE_MODEL_NAME',
   'CLOUDFLARE_ACCOUNT_ID',
   'CLOUDFLARE_AI_API_TOKEN',
+  // OpenAI-compatible answer reviewer (Groq) and the review chains that pick it
+  'AI_COMPAT_BASE_URL',
+  'AI_COMPAT_MODEL',
+  'AI_COMPAT_MODEL_VENDOR',
+  'AI_COMPAT_API_KEY',
+  'TOEIC_SOLVE_REVIEWERS',
+  'TOEIC_EXPLANATION_REVIEWERS',
+  'TOEIC_VISION_REVIEWERS',
   'AZURE_SPEECH_KEY',
   'AZURE_SPEECH_REGION',
   // Object storage (public, private, backup) and media hosts
