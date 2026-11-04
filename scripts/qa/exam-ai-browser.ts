@@ -278,7 +278,10 @@ async function partJob(part: number, mode: string) {
   const id: string = started.data?.id;
   for (let i = 0; i < 180; i += 1) {
     const status = await call('GET', `/admin/exams/ai/jobs/${id}`, adminToken);
-    if (['GENERATED', 'FAILED'].includes(status.data?.status))
+    if (
+      ['GENERATED', 'FAILED'].includes(status.data?.status) ||
+      status.data?.stage === 'WAITING_QUOTA'
+    )
       return { id, status: status.data };
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -321,14 +324,20 @@ async function review(page: Page) {
     'the answer line names the provider and model that answered',
     text.includes('Đáp án: kiểm định độc lập bởi Cloudflare gpt-oss-120b'),
   );
-  await page.screenshot({ path: `${SHOTS}/review-1-refused.png`, fullPage: false });
+  await page.screenshot({
+    path: `${SHOTS}/review-1-refused.png`,
+    fullPage: false,
+  });
   await page.getByRole('button', { name: 'Chọn tất cả', exact: true }).click();
   await page.getByRole('button', { name: /Áp dụng \d+ nội dung/ }).click();
   await page
     .getByRole('region', { name: 'Nhóm chưa được áp dụng' })
     .waitFor({ timeout: 60_000 });
   text = await page.locator('body').innerText();
-  check('Apply holds the refused groups back and says why', text.includes('bị bác bỏ'));
+  check(
+    'Apply holds the refused groups back and says why',
+    text.includes('bị bác bỏ'),
+  );
   const written = harnessQuery(
     `select count(*) from "ToeicQuestionGroup" g join "ToeicExamSet" s on s.id = g."examId" join "Exam" e on e.id = s."examId" where e."aiGenerationJobId" = '${refused.id}'`,
   )[0]?.[0];
@@ -363,24 +372,40 @@ async function review(page: Page) {
     .getByRole('button', { name: 'Xác nhận sau kiểm định cùng hãng' })
     .first()
     .click();
-  await page.getByText('Admin đã xác nhận').first().waitFor({ timeout: 30_000 });
+  await page
+    .getByText('Admin đã xác nhận')
+    .first()
+    .waitFor({ timeout: 30_000 });
   check('the admin confirms a degraded group', true);
   await page.screenshot({ path: `${SHOTS}/review-4-confirmed.png` });
 
   const stopped = await partJob(6, 'review-outage');
   const before = snapshotRow(stopped.id);
+  // Every reviewer out: the job waits (no reset known: 30 minutes) with the
+  // batch saved, instead of failing; "retry" runs it now.
+  const waitMinutes =
+    (Date.parse(stopped.status.resumeAt ?? '') - Date.now()) / 60_000;
   check(
-    'a reviewer outage stops the job with the batch saved',
-    stopped.status.status === 'FAILED' &&
-      /Kiểm định đáp án tạm thời không khả dụng/.test(stopped.status.error ?? '') &&
+    'a reviewer outage makes the job wait for the AI quota with the batch saved',
+    stopped.status.status === 'QUEUED' &&
+      stopped.status.stage === 'WAITING_QUOTA' &&
+      waitMinutes > 25 &&
+      waitMinutes <= 30 &&
+      /Kiểm định đáp án tạm thời không khả dụng/.test(
+        stopped.status.error ?? '',
+      ) &&
       before?.[0] === '1',
-    `${stopped.status.status} ${JSON.stringify(before)}`,
+    `${stopped.status.status} ${stopped.status.stage} ${stopped.status.resumeAt} ${JSON.stringify(before)}`,
   );
   setMode('');
   await call('POST', `/admin/exams/ai/jobs/${stopped.id}/retry`, adminToken);
   let resumed: any;
   for (let i = 0; i < 120; i += 1) {
-    resumed = await call('GET', `/admin/exams/ai/jobs/${stopped.id}`, adminToken);
+    resumed = await call(
+      'GET',
+      `/admin/exams/ai/jobs/${stopped.id}`,
+      adminToken,
+    );
     if (['GENERATED', 'FAILED'].includes(resumed.data?.status)) break;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -487,9 +512,7 @@ async function retake() {
   );
   await page.screenshot({ path: `${SHOTS}/13-retake.png` });
   await start.click();
-  await page
-    .getByRole('tab', { name: 'Câu 1–2' })
-    .waitFor({ timeout: 60_000 });
+  await page.getByRole('tab', { name: 'Câu 1–2' }).waitFor({ timeout: 60_000 });
   check(
     'taking it again opens a new attempt',
     !page.url().endsWith(`/${first.data.id}`),
