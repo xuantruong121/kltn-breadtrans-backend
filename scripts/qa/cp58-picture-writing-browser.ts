@@ -227,7 +227,7 @@ void (async () => {
   const { browser, page, account } = await studentPage('cp58-pic-plus', 1366);
   const planVersionId = Number(
     one(
-      `select pv.id from "PlanVersion" pv join "Plan" p on p.id = pv."planId" where pv."isCurrent" and p.code = 'PLUS'`,
+      `select pv.id from "PlanVersion" pv join "Plan" p on p.id = pv."planId" where pv."isCurrent" and coalesce(pv."durationDays", 30) = 30 and p.code = 'PLUS'`,
     ),
   );
   await call('POST', '/admin/subscriptions/grant', admin.token, {

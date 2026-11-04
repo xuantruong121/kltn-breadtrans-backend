@@ -256,6 +256,8 @@ export class PlanPurchaseService {
       const currentVersion = await tx.planVersion.findFirst({
         where: {
           planId: current.planVersion.planId,
+          // A plan sells one current version per term: keep the same term.
+          durationDays: current.planVersion.durationDays,
           isCurrent: true,
           status: PlanVersionStatus.PUBLISHED,
         },

@@ -13,9 +13,25 @@ type CanonicalPlan = {
   versionName: string;
   durationDays: number | null;
   priceVnd: number;
-  features: PlanFeatureKey[];
+  features: readonly PlanFeatureKey[];
 };
 
+const PAID_FEATURES = [
+  PlanFeatureKey.PREMIUM_VOCAB,
+  PlanFeatureKey.PREMIUM_READING,
+  PlanFeatureKey.PREMIUM_LISTENING,
+  PlanFeatureKey.PREMIUM_SPEAKING_CONTENT,
+  PlanFeatureKey.PREMIUM_WRITING_CONTENT,
+];
+
+const PLUS_TEXT = 'Mở Nói, Viết Trung cấp và Nghe chép Trung cấp trở lên';
+const PRO_TEXT = 'Mở Nói, Viết ở mọi mức, gồm Nâng cao,';
+
+/**
+ * Paid plans sell three terms. Longer terms are cheaper per day (owner,
+ * 2026-11-04): 90 days at about -10% and 180 days at about -20% against
+ * buying 30 days again and again, rounded down to the thousand.
+ */
 export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'FREE',
@@ -29,33 +45,56 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'PLUS',
     displayName: 'BreadTrans Plus',
-    description:
-      'Mở Nói, Viết Trung cấp và Nghe chép Trung cấp trở lên trong 30 ngày.',
+    description: `${PLUS_TEXT} trong 30 ngày.`,
     versionName: 'BreadTrans Plus — 30 ngày',
     durationDays: 30,
     priceVnd: 69_000,
-    features: [
-      PlanFeatureKey.PREMIUM_VOCAB,
-      PlanFeatureKey.PREMIUM_READING,
-      PlanFeatureKey.PREMIUM_LISTENING,
-      PlanFeatureKey.PREMIUM_SPEAKING_CONTENT,
-      PlanFeatureKey.PREMIUM_WRITING_CONTENT,
-    ],
+    features: PAID_FEATURES,
+  },
+  {
+    code: 'PLUS',
+    displayName: 'BreadTrans Plus',
+    description: `${PLUS_TEXT} trong 90 ngày, rẻ hơn khoảng 10% so với mua 3 lần 30 ngày.`,
+    versionName: 'BreadTrans Plus — 90 ngày',
+    durationDays: 90,
+    priceVnd: 186_000,
+    features: PAID_FEATURES,
+  },
+  {
+    code: 'PLUS',
+    displayName: 'BreadTrans Plus',
+    description: `${PLUS_TEXT} trong 180 ngày, rẻ hơn khoảng 20% so với mua 6 lần 30 ngày.`,
+    versionName: 'BreadTrans Plus — 180 ngày',
+    durationDays: 180,
+    priceVnd: 331_000,
+    features: PAID_FEATURES,
   },
   {
     code: 'PRO',
     displayName: 'BreadTrans Pro',
-    description: 'Mở Nói, Viết ở mọi mức, gồm Nâng cao, trong 30 ngày.',
+    description: `${PRO_TEXT} trong 30 ngày.`,
     versionName: 'BreadTrans Pro — 30 ngày',
     durationDays: 30,
     priceVnd: 149_000,
-    features: [
-      PlanFeatureKey.PREMIUM_VOCAB,
-      PlanFeatureKey.PREMIUM_READING,
-      PlanFeatureKey.PREMIUM_LISTENING,
-      PlanFeatureKey.PREMIUM_SPEAKING_CONTENT,
-      PlanFeatureKey.PREMIUM_WRITING_CONTENT,
-    ],
+    features: PAID_FEATURES,
+  },
+  {
+    code: 'PRO',
+    displayName: 'BreadTrans Pro',
+    description: `${PRO_TEXT} trong 90 ngày, rẻ hơn khoảng 10% so với mua 3 lần 30 ngày.`,
+    versionName: 'BreadTrans Pro — 90 ngày',
+    durationDays: 90,
+    priceVnd: 402_000,
+    features: PAID_FEATURES,
+  },
+  {
+    code: 'PRO',
+    displayName: 'BreadTrans Pro',
+    description: `${PRO_TEXT} trong 180 ngày, rẻ hơn khoảng 20% so với mua 6 lần 30 ngày.`,
+    versionName: 'BreadTrans Pro — 180 ngày',
+    durationDays: 180,
+    priceVnd: 715_000,
+    features: PAID_FEATURES,
   },
 ] as const;
 
@@ -79,24 +118,31 @@ export async function ensureCanonicalPlanCatalog(prisma: PrismaClient) {
   }> = [];
 
   await prisma.$transaction(async (tx) => {
+    const planIds = new Map<string, number>();
     for (const spec of CANONICAL_PLAN_CATALOG) {
-      const plan = await tx.plan.upsert({
-        where: { code: spec.code },
-        create: {
-          code: spec.code,
-          displayName: spec.displayName,
-          description: spec.description,
-          status: PlanStatus.ACTIVE,
-        },
-        update: {
-          displayName: spec.displayName,
-          description: spec.description,
-          status: PlanStatus.ACTIVE,
-        },
-      });
+      // The plan row takes its text from the first (shortest) term listed.
+      const known = planIds.get(spec.code);
+      const plan = known
+        ? { id: known }
+        : await tx.plan.upsert({
+            where: { code: spec.code },
+            create: {
+              code: spec.code,
+              displayName: spec.displayName,
+              description: spec.description,
+              status: PlanStatus.ACTIVE,
+            },
+            update: {
+              displayName: spec.displayName,
+              description: spec.description,
+              status: PlanStatus.ACTIVE,
+            },
+          });
+      planIds.set(spec.code, plan.id);
       const current = await tx.planVersion.findMany({
         where: {
           planId: plan.id,
+          durationDays: spec.durationDays,
           isCurrent: true,
           status: PlanVersionStatus.PUBLISHED,
         },
@@ -128,8 +174,14 @@ export async function ensureCanonicalPlanCatalog(prisma: PrismaClient) {
         where: { planId: plan.id },
         _max: { version: true },
       });
+      // Replace only the current version of this term; the other terms of
+      // the same plan stay on sale.
       await tx.planVersion.updateMany({
-        where: { planId: plan.id, isCurrent: true },
+        where: {
+          planId: plan.id,
+          durationDays: spec.durationDays,
+          isCurrent: true,
+        },
         data: { isCurrent: false },
       });
       const version = await tx.planVersion.create({

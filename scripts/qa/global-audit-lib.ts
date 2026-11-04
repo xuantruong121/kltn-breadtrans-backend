@@ -110,7 +110,7 @@ export async function createQaLearner(
   if (tier !== 'FREE') {
     const planVersion = await prisma.planVersion.findFirstOrThrow({
       where: {
-        isCurrent: true,
+        isCurrent: true, durationDays: 30,
         status: 'PUBLISHED',
         plan: { code: tier, status: 'ACTIVE' },
       },

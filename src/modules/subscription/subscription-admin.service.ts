@@ -600,7 +600,19 @@ export class SubscriptionAdminService {
       orderBy: [{ plan: { displayName: 'asc' } }, { version: 'desc' }],
     });
 
-    return versions.map((v) => ({
+    // A plan sells several terms (30, 90, 180 days) but the grant dialog picks
+    // the length itself: offer each plan once, by its shortest term.
+    const shortest = new Map<number, (typeof versions)[number]>();
+    for (const v of versions) {
+      const seen = shortest.get(v.planId);
+      if (
+        !seen ||
+        (v.durationDays ?? Infinity) < (seen.durationDays ?? Infinity)
+      )
+        shortest.set(v.planId, v);
+    }
+
+    return [...shortest.values()].map((v) => ({
       id: v.plan.id,
       code: v.plan.code,
       displayName: v.plan.displayName,

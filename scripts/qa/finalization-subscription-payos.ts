@@ -94,7 +94,7 @@ async function postWebhook(
 
 const versions = Object.fromEntries(
   harnessQuery(
-    `select p.code, pv.id, pv."priceVnd" from "PlanVersion" pv join "Plan" p on p.id = pv."planId" where pv."isCurrent" and pv.status = 'PUBLISHED'`,
+    `select p.code, pv.id, pv."priceVnd" from "PlanVersion" pv join "Plan" p on p.id = pv."planId" where pv."isCurrent" and coalesce(pv."durationDays", 30) = 30 and pv.status = 'PUBLISHED'`,
   ).map(([c, id, price]) => [c, { id: Number(id), price: Number(price) }]),
 );
 const plan = async (token: string) =>

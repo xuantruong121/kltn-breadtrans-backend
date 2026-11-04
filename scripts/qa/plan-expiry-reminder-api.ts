@@ -25,7 +25,7 @@ const dayKey = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
 async function grantPlus(admin: string, userId: number) {
   const planVersionId = Number(
     one(
-      `select pv.id from "PlanVersion" pv join "Plan" p on p.id = pv."planId" where pv."isCurrent" and pv.status = 'PUBLISHED' and p.code = 'PLUS'`,
+      `select pv.id from "PlanVersion" pv join "Plan" p on p.id = pv."planId" where pv."isCurrent" and coalesce(pv."durationDays", 30) = 30 and pv.status = 'PUBLISHED' and p.code = 'PLUS'`,
     ),
   );
   const r = await call('POST', '/admin/subscriptions/grant', admin, {

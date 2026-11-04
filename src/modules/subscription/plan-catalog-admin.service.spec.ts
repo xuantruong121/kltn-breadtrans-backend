@@ -234,7 +234,12 @@ describe('PlanCatalogAdminService', () => {
     expect(result.isCurrent).toBe(true);
     expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
     expect(tx.planVersion.updateMany).toHaveBeenCalledWith({
-      where: { planId: plan.id, isCurrent: true, id: { not: 22 } },
+      where: {
+        planId: plan.id,
+        durationDays: 30,
+        isCurrent: true,
+        id: { not: 22 },
+      },
       data: { isCurrent: false, status: PlanVersionStatus.RETIRED },
     });
     expect(tx.planVersion.update).toHaveBeenCalledWith(

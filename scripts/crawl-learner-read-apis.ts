@@ -54,7 +54,7 @@ async function main() {
   const sessions: Session[] = [];
   try {
     const paidVersions = await prisma.planVersion.findMany({
-      where: { isCurrent: true, status: 'PUBLISHED', plan: { code: { in: ['PLUS', 'PRO'] } } },
+      where: { isCurrent: true, durationDays: 30, status: 'PUBLISHED', plan: { code: { in: ['PLUS', 'PRO'] } } },
       include: { plan: { select: { code: true } } },
     });
     const byCode = new Map(paidVersions.map((version) => [version.plan.code, version]));

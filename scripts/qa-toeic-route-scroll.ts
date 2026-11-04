@@ -66,7 +66,7 @@ async function main() {
     });
     userId = user.id;
     const planVersion = await prisma.planVersion.findFirstOrThrow({
-      where: { isCurrent: true, status: 'PUBLISHED', plan: { code: 'PLUS', status: 'ACTIVE' } },
+      where: { isCurrent: true, durationDays: 30, status: 'PUBLISHED', plan: { code: 'PLUS', status: 'ACTIVE' } },
       select: { id: true },
     });
     await prisma.subscription.create({

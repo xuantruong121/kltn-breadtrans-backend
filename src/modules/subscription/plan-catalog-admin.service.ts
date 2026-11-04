@@ -299,8 +299,15 @@ export class PlanCatalogAdminService {
       }
       this.validateForPublish(current);
       await this.lockPlan(tx, current.planId);
+      // A plan sells one current version per term (30, 90, 180 days):
+      // publishing replaces only the version of the same term.
       await tx.planVersion.updateMany({
-        where: { planId: current.planId, isCurrent: true, id: { not: id } },
+        where: {
+          planId: current.planId,
+          durationDays: current.durationDays,
+          isCurrent: true,
+          id: { not: id },
+        },
         data: { isCurrent: false, status: PlanVersionStatus.RETIRED },
       });
       const row = await tx.planVersion.update({
