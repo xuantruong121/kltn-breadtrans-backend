@@ -104,7 +104,12 @@ async function main() {
       /chưa thành công|không thành công|thử lại|kéo dài hơn dự kiến/i.test(
         text,
       ) && !text.includes('ĐIỂM / 10'),
+      text.slice(0, 700),
     );
+    await s.page.screenshot({
+      path: `${process.env.SHOTS ?? '.'}/speaking-terminal-failure.png`,
+      fullPage: true,
+    });
   } finally {
     await s.browser.close();
   }
