@@ -94,7 +94,12 @@ export class RetentionMetricsService {
             status: PlanPurchaseStatus.COMPLETED,
             completedAt: { not: null },
           },
-          select: { id: true, userId: true, completedAt: true },
+          select: {
+            id: true,
+            userId: true,
+            completedAt: true,
+            promoCodeId: true,
+          },
         })
       : [];
 
@@ -121,7 +126,14 @@ export class RetentionMetricsService {
         ),
         purchases: purchases.flatMap((p) =>
           p.completedAt
-            ? [{ id: p.id, userId: p.userId, completedAt: p.completedAt }]
+            ? [
+                {
+                  id: p.id,
+                  userId: p.userId,
+                  completedAt: p.completedAt,
+                  withCode: p.promoCodeId !== null,
+                },
+              ]
             : [],
         ),
         now,

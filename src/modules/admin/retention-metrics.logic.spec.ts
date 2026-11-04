@@ -95,7 +95,9 @@ describe('renewalByWeek', () => {
   };
   const now = at('2026-11-20T10:00:00+07:00'); // past day +30
 
-  const run = (purchases: Array<{ id: number; completedAt: Date }>) =>
+  const run = (
+    purchases: Array<{ id: number; completedAt: Date; withCode?: boolean }>,
+  ) =>
     renewalByWeek({
       ended: [sub],
       purchases: [
@@ -134,6 +136,19 @@ describe('renewalByWeek', () => {
     ]);
     expect(row.renewed).toEqual({ eligible: 1, hits: 0, rate: 0 });
     expect(row.wonBack).toEqual({ eligible: 1, hits: 1, rate: 1 });
+    expect(row.wonBackWithCode).toBe(0);
+  });
+
+  it('counts a win-back paid with a promo code', () => {
+    const row = run([
+      {
+        id: 101,
+        completedAt: new Date(endsAt.getTime() + 10 * DAY),
+        withCode: true,
+      },
+    ]);
+    expect(row.wonBack.hits).toBe(1);
+    expect(row.wonBackWithCode).toBe(1);
   });
 
   it('never counts the subscription own purchase as the next one', () => {

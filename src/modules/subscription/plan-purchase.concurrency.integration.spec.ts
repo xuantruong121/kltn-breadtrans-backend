@@ -182,6 +182,7 @@ describeWithIsolatedDatabase(
           userId,
           planVersionId: targetVersionId,
           amountVnd: 99000,
+          listPriceVnd: 99000,
           currency: 'VND',
           durationDays: 30,
           idempotencyKey: `${key}-${Date.now()}-${Math.random()}`,

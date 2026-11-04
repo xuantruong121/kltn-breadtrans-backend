@@ -187,6 +187,8 @@ model User {
   subscriptions                   Subscription[]
   subscriptionEventsActed         SubscriptionEvent[]              @relation("SubscriptionEventActor")
   planPurchases                   PlanPurchase[]
+  promoCodes                      PromoCode[]
+  promoRedemptions                PromoRedemption[]
   payosPaymentIntents             PayOSPaymentIntent[]
   confirmedPlanPayments           PlanPayment[]                    @relation("PlanPaymentConfirmer")
   rejectedPlanPayments            PlanPayment[]                    @relation("PlanPaymentRejecter")
@@ -374,6 +376,12 @@ model PlanPurchase {
   amountVnd              Int
   currency               String             @default("VND")
   durationDays           Int
+  /// Price of the plan version when the purchase was made.
+  listPriceVnd           Int
+  /// Promo discount; amountVnd = listPriceVnd - discountVnd.
+  discountVnd            Int                @default(0)
+  promoCodeId            Int?
+  promoCode              PromoCode?         @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
   idempotencyKey         String
   completedAt            DateTime?
   supersededAt           DateTime?
@@ -2166,9 +2174,9 @@ model GrammarTopic {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @default(now()) @updatedAt
 
-  questions        GrammarQuestion[]
-  attempts         GrammarAttempt[]
-  rewards          UserGrammarReward[]
+  questions GrammarQuestion[]
+  attempts  GrammarAttempt[]
+  rewards   UserGrammarReward[]
 }
 
 model GrammarQuestion {
@@ -2684,4 +2692,52 @@ model LearningPlanItem {
 
   @@unique([userId, contentType, contentId])
   @@index([userId, status])
+}
+
+enum PromoCodeSource {
+  ADMIN
+  WINBACK
+}
+
+/// A discount code on a paid plan. A personal code (userId set) works for its
+/// owner only; WINBACK codes are made by the win-back job.
+model PromoCode {
+  id             Int               @id @default(autoincrement())
+  /// Stored upper-case.
+  code           String            @unique
+  percentOff     Int
+  validFrom      DateTime?
+  validTo        DateTime?
+  /// Plan codes it applies to; empty = every paid plan.
+  planCodes      String[]
+  maxRedemptions Int?
+  perUserOnce    Boolean           @default(true)
+  source         PromoCodeSource   @default(ADMIN)
+  userId         Int?
+  user           User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  active         Boolean           @default(true)
+  note           String?
+  createdById    Int?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  redemptions    PromoRedemption[]
+  purchases      PlanPurchase[]
+
+  @@index([userId])
+  @@index([source, createdAt])
+}
+
+/// One paid purchase that used a code; written when the payment completes.
+model PromoRedemption {
+  id             Int       @id @default(autoincrement())
+  promoCodeId    Int
+  promoCode      PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
+  userId         Int
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planPurchaseId Int       @unique
+  discountVnd    Int
+  createdAt      DateTime  @default(now())
+
+  @@index([promoCodeId])
+  @@index([userId, promoCodeId])
 }

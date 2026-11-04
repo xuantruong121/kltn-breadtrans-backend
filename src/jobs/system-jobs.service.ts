@@ -112,6 +112,14 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  async enqueueWinback(dayKey: string): Promise<void> {
+    await this.enqueue(
+      JOB_NAMES.WINBACK,
+      { version: 1, dayKey },
+      { jobId: `winback-${dayKey}` },
+    );
+  }
+
   async enqueueVocabularyReview(bucketKey: string): Promise<void> {
     await this.enqueue(
       JOB_NAMES.VOCABULARY_REVIEW,
@@ -190,6 +198,8 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
         return this.notifications.runPlanExpiryReminder(job.data.dayKey);
       case JOB_NAMES.WEEKLY_REPORT:
         return this.notifications.runWeeklyReport(job.data.dayKey);
+      case JOB_NAMES.WINBACK:
+        return this.notifications.runWinback(job.data.dayKey);
       case JOB_NAMES.VOCABULARY_REVIEW:
         return this.notifications.runVocabSpacedReview();
       case JOB_NAMES.R2_AUDIO_CLEANUP:

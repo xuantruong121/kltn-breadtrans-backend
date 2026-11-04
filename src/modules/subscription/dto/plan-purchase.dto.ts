@@ -24,6 +24,53 @@ export class CreatePlanPurchaseDto {
   @IsString()
   @MaxLength(120)
   idempotencyKey!: string;
+
+  @ApiPropertyOptional({
+    example: 'QUAYLAI-7KQ4M2',
+    description: 'Promo code; refused with 400 when it does not apply',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  promoCode?: string;
+}
+
+export class PromoPreviewQueryDto {
+  @ApiProperty({ example: 12 })
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  planVersionId!: number;
+
+  @ApiProperty({ example: 'QUAYLAI-7KQ4M2' })
+  @IsString()
+  @MaxLength(40)
+  code!: string;
+}
+
+export class PromoPreviewDto {
+  @ApiProperty({
+    description: 'The code applies to this plan for this learner',
+  })
+  valid!: boolean;
+
+  @ApiPropertyOptional({ nullable: true, type: String, description: 'Why not' })
+  message!: string | null;
+
+  @ApiProperty()
+  code!: string;
+
+  @ApiPropertyOptional({ nullable: true, type: Number })
+  percentOff!: number | null;
+
+  @ApiProperty()
+  listPriceVnd!: number;
+
+  @ApiProperty()
+  discountVnd!: number;
+
+  @ApiProperty({ description: 'What the learner pays' })
+  amountVnd!: number;
 }
 
 export class RejectPlanPurchaseDto {
@@ -125,6 +172,17 @@ export class PlanPurchasePaymentDto {
 export class PlanPurchaseResponseDto {
   @ApiProperty()
   id!: number;
+
+  @ApiProperty({ description: 'Plan price when bought, before any discount' })
+  listPriceVnd!: number;
+
+  @ApiProperty({
+    description: 'Promo discount; amountVnd = listPriceVnd - discountVnd',
+  })
+  discountVnd!: number;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  promoCode!: string | null;
 
   @ApiProperty()
   planVersionId!: number;

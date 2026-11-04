@@ -94,6 +94,8 @@ export type RenewalRow = {
   early: Rate;
   /** Did not renew by day +7, then came back by day +30. */
   wonBack: Rate;
+  /** Of those won back, how many paid with a promo code (win-back or admin). */
+  wonBackWithCode: number;
 };
 
 const RENEW_GRACE_DAYS = 7;
@@ -115,13 +117,23 @@ export function renewalByWeek(input: {
     purchaseId: number;
     purchasedAt: Date;
   }>;
-  purchases: Array<{ id: number; userId: number; completedAt: Date }>;
+  purchases: Array<{
+    id: number;
+    userId: number;
+    completedAt: Date;
+    withCode?: boolean;
+  }>;
   now: Date;
 }): RenewalRow[] {
-  const byUser = new Map<number, Array<{ id: number; at: number }>>();
+  type Paid = { id: number; at: number; withCode: boolean };
+  const byUser = new Map<number, Paid[]>();
   for (const purchase of input.purchases) {
     const list = byUser.get(purchase.userId) ?? [];
-    list.push({ id: purchase.id, at: purchase.completedAt.getTime() });
+    list.push({
+      id: purchase.id,
+      at: purchase.completedAt.getTime(),
+      withCode: purchase.withCode ?? false,
+    });
     byUser.set(purchase.userId, list);
   }
   const now = input.now.getTime();
@@ -136,16 +148,18 @@ export function renewalByWeek(input: {
       renewed: rate(0, 0),
       early: rate(0, 0),
       wonBack: rate(0, 0),
+      wonBackWithCode: 0,
     };
     row.ended += 1;
 
     const ownAt = sub.purchasedAt.getTime();
-    const next = (byUser.get(sub.userId) ?? [])
+    const nextPaid = (byUser.get(sub.userId) ?? [])
       .filter((p) => p.id !== sub.purchaseId && p.at > ownAt)
-      .reduce<number | null>(
-        (min, p) => (min === null || p.at < min ? p.at : min),
+      .reduce<Paid | null>(
+        (min, p) => (min === null || p.at < min.at ? p : min),
         null,
       );
+    const next = nextPaid?.at ?? null;
     const graceEnd = endsAt + RENEW_GRACE_DAYS * DAY_MS;
     const winBackEnd = endsAt + WIN_BACK_DAYS * DAY_MS;
     const renewed = next !== null && next <= graceEnd;
@@ -169,6 +183,7 @@ export function renewalByWeek(input: {
         row.wonBack.hits + (back ? 1 : 0),
         row.wonBack.eligible + 1,
       );
+      if (back && nextPaid?.withCode) row.wonBackWithCode += 1;
     }
     weeks.set(week, row);
   }
