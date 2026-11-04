@@ -13,6 +13,7 @@ import type { SpeakingTaskType } from '../speaking/speaking-contract';
 import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
 import { CloudflareWorkersAiClient } from './cloudflare-workers-ai.client';
 import { isGeminiOutage } from './gemini/gemini-credential-manager.service';
+import { exhaustedUntil, markExhausted } from './review/provider-exhaustion';
 import {
   assertToeicBatchShape,
   assertToeicSpeakingWritingShape,
@@ -155,10 +156,18 @@ export class AiService {
       return await primary();
     } catch (error) {
       if (!this.cloudflare?.configured() || !isGeminiOutage(error)) throw error;
+      // Cloudflare's daily allocation is spent: the stand-in cannot help, so
+      // the Gemini outage stands (an outage the job can wait out).
+      if (await exhaustedUntil(this.redis, 'cloudflare')) throw error;
       this.logger.warn(
         `exam_generation_stand_in reason=${error instanceof Error ? error.message.slice(0, 160) : 'unknown'}`,
       );
-      return { ...(await standIn(this.cloudflare)), provider: 'CLOUDFLARE' };
+      try {
+        return { ...(await standIn(this.cloudflare)), provider: 'CLOUDFLARE' };
+      } catch (standInError) {
+        await markExhausted(this.redis, 'cloudflare', standInError);
+        throw standInError;
+      }
     }
   }
 

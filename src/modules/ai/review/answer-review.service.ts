@@ -28,6 +28,7 @@ import {
   GeminiReviewer,
   OpenAiCompatibleReviewer,
 } from './reviewers';
+import { exhaustedUntil, markExhausted } from './provider-exhaustion';
 
 export type ReviewRun<T> = {
   step: ReviewStep;
@@ -115,6 +116,16 @@ export class AnswerReviewService {
         });
         continue;
       }
+      // A provider whose quota is spent is skipped until it resets.
+      const spentUntil = await exhaustedUntil(this.redis, reviewer.name);
+      if (spentUntil) {
+        tried.push({
+          provider: reviewer.name,
+          model,
+          reason: `unavailable: quota spent until ${spentUntil.toISOString()}`,
+        });
+        continue;
+      }
       const startedAt = Date.now();
       try {
         const reply = await reviewer.reviewJson(input.prompt, input.image);
@@ -161,6 +172,7 @@ export class AnswerReviewService {
       } catch (error) {
         const outage = isProviderOutage(error);
         if (!outage) sawInvalid = true;
+        else await markExhausted(this.redis, reviewer.name, error);
         const reason = redactGeminiError((error as Error)?.message ?? error);
         tried.push({
           provider: reviewer.name,

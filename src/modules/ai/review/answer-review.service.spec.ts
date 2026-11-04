@@ -86,6 +86,50 @@ describe('AnswerReviewService provider chain', () => {
     expect(gemini.reviewJson).not.toHaveBeenCalled();
   });
 
+  it('a spent daily allocation is recorded, and the next step skips Cloudflare without calling it', async () => {
+    const store = new Map<string, string>();
+    const redis = {
+      get: jest.fn(async (key: string) => store.get(key) ?? null),
+      set: jest.fn(async (key: string, value: string) => {
+        store.set(key, value);
+        return 'OK';
+      }),
+      pipeline: () => ({
+        hincrby: jest.fn(),
+        expire: jest.fn(),
+        exec: jest.fn(async () => []),
+      }),
+    };
+    const spent = Object.assign(
+      new Error(
+        'Cloudflare Workers AI: you have used up your daily free allocation of 10,000 neurons',
+      ),
+      { code: CLOUDFLARE_UNAVAILABLE },
+    );
+    const cloudflare = fake('cloudflare', () => Promise.reject(spent));
+    const gemini = fake('gemini', async () => goodReply());
+    const subject = new AnswerReviewService(
+      { textModel: () => '@cf/openai/gpt-oss-120b' } as any,
+      {} as any,
+      {} as any,
+      redis as any,
+    );
+    subject.useReviewers([cloudflare, gemini]);
+
+    expect((await run(subject)).step.provider).toBe('gemini');
+    expect(store.get('ai:provider-exhausted:cloudflare')).toBeDefined();
+
+    const second = await run(subject);
+    expect(second.step.provider).toBe('gemini');
+    expect(cloudflare.reviewJson).toHaveBeenCalledTimes(1);
+    expect(second.step.tried).toEqual([
+      expect.objectContaining({
+        provider: 'cloudflare',
+        reason: expect.stringContaining('quota spent until'),
+      }),
+    ]);
+  });
+
   it('a Cloudflare outage falls back to Gemini, recorded as same-provider', async () => {
     const cloudflare = fake('cloudflare', outage);
     const gemini = fake('gemini', async () => goodReply());
