@@ -77,12 +77,13 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  async enqueueWeekly(weekKey: string): Promise<void> {
+  async enqueueWeekly(weekKey: string, catchUp = false): Promise<void> {
     await this.enqueue(
       JOB_NAMES.WEEKLY_LEAGUE,
       {
         version: 1,
         weekKey,
+        ...(catchUp ? { catchUp: true } : {}),
       },
       { jobId: `weekly-league-${weekKey}` },
     );
@@ -191,7 +192,11 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
       case JOB_NAMES.DAILY_ROLLOVER:
         return this.gamification.triggerDailyCron(job.data.dayKey);
       case JOB_NAMES.WEEKLY_LEAGUE:
-        return this.gamification.triggerWeeklyCron(false, job.data.weekKey);
+        return this.gamification.triggerWeeklyCron(
+          false,
+          job.data.weekKey,
+          job.data.catchUp === true,
+        );
       case JOB_NAMES.STREAK_REMINDER:
         return this.notifications.runDailyStreakReminder(job.data.dayKey);
       case JOB_NAMES.PLAN_EXPIRY_REMINDER:

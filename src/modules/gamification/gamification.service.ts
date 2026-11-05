@@ -15,7 +15,9 @@ import {
   getBusinessDayStart,
   getPreviousBusinessDayKey,
   getBusinessWeekKey,
+  getBusinessWeekStart,
 } from '../../common/time/business-time.util';
+import { weeklyCatchUpDue } from './weekly-league.logic';
 import { questsForDay, type DailyQuestDefinition } from './daily-quest-catalog';
 
 export function getTodayDateKey(timeZone = 'Asia/Ho_Chi_Minh'): string {
@@ -2165,7 +2167,16 @@ export class GamificationService {
     };
   }
 
-  async triggerWeeklyCron(isManualTrigger = false, weekKeyOverride?: string) {
+  /**
+   * `catchUp`: called at backend startup rather than by the Monday 00:01
+   * cron; it resets only when this week has not been reset yet
+   * (weeklyCatchUpDue), so a restart never resets the league mid-week.
+   */
+  async triggerWeeklyCron(
+    isManualTrigger = false,
+    weekKeyOverride?: string,
+    catchUp = false,
+  ) {
     const tiers = ['Đồng', 'Bạc', 'Vàng', 'Bạch Kim', 'Kim Cương'];
     const now = new Date();
     const weekKey = weekKeyOverride || getBusinessWeekKey(now);
@@ -2195,6 +2206,12 @@ export class GamificationService {
         const config =
           (setting?.config as Record<string, unknown> | null) || {};
         if (config.lastProcessedWeek === weekKey) {
+          return { acquired: true, noop: true };
+        }
+        if (
+          catchUp &&
+          !weeklyCatchUpDue(config, weekKey, getBusinessWeekStart(now))
+        ) {
           return { acquired: true, noop: true };
         }
 

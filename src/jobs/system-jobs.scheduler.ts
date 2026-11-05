@@ -3,9 +3,11 @@ import { Cron } from '@nestjs/schedule';
 import {
   BUSINESS_TIMEZONE,
   getBusinessDayKey,
+  getBusinessDayStart,
   getBusinessFiveMinuteKey,
-  getBusinessWeekday,
   getBusinessWeekKey,
+  getBusinessWeekStart,
+  isPastBusinessRollover,
 } from '../common/time/business-time.util';
 import { SystemJobsService } from './system-jobs.service';
 
@@ -16,11 +18,18 @@ export class SystemJobsScheduler implements OnModuleInit {
   constructor(private readonly jobs: SystemJobsService) {}
 
   async onModuleInit(): Promise<void> {
-    // Catch up only the current logical period; deterministic job IDs make this safe.
+    // Catch up only the current logical period; deterministic job IDs make
+    // this safe. Day and week jobs run at 00:01, never 00:00: before 00:01 the
+    // catch-up waits for the cron. The weekly league catches up on any day of
+    // the week, so a backend that was off on Monday still resets it once.
     try {
-      await this.jobs.enqueueDaily(getBusinessDayKey());
-      if (getBusinessWeekday() === 0) {
-        await this.jobs.enqueueWeekly(getBusinessWeekKey());
+      const now = new Date();
+      const dayKey = getBusinessDayKey(now);
+      if (isPastBusinessRollover(getBusinessDayStart(dayKey), now)) {
+        await this.jobs.enqueueDaily(dayKey);
+      }
+      if (isPastBusinessRollover(getBusinessWeekStart(now), now)) {
+        await this.jobs.enqueueWeekly(getBusinessWeekKey(now), true);
       }
       await this.jobs.enqueueDatabaseBackupR2Sync();
     } catch (error) {
@@ -35,7 +44,8 @@ export class SystemJobsScheduler implements OnModuleInit {
     await this.jobs.enqueueDaily(getBusinessDayKey());
   }
 
-  @Cron('0 0 * * 0', { timeZone: BUSINESS_TIMEZONE })
+  // Monday 00:01: the league week runs Monday to Sunday.
+  @Cron('1 0 * * 1', { timeZone: BUSINESS_TIMEZONE })
   async enqueueWeeklyLeague(): Promise<void> {
     await this.jobs.enqueueWeekly(getBusinessWeekKey());
   }
@@ -70,7 +80,7 @@ export class SystemJobsScheduler implements OnModuleInit {
     await this.jobs.enqueueExamWritingGrading(getBusinessFiveMinuteKey());
   }
 
-  @Cron('0 0 * * 0', { timeZone: BUSINESS_TIMEZONE })
+  @Cron('1 0 * * 0', { timeZone: BUSINESS_TIMEZONE })
   async enqueueR2Cleanup(): Promise<void> {
     await this.jobs.enqueueR2Cleanup(getBusinessWeekKey());
   }

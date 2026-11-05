@@ -17,6 +17,46 @@ import {
 } from './gamification.service';
 
 describe('GamificationService weekly cron hardening', () => {
+  it('a startup catch-up leaves a league already reset this week alone', async () => {
+    const tx: any = {
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([{ locked: true }])
+        .mockResolvedValueOnce([]),
+      gameSettings: {
+        // The last Sunday 00:00 reset under the old schedule.
+        findUnique: jest.fn().mockResolvedValue({
+          config: {
+            lastProcessedWeek: '2026-W44',
+            processedAt: '2026-10-31T17:00:00.193Z',
+          },
+        }),
+        upsert: jest.fn(),
+      },
+      leaderboard: { findMany: jest.fn(), update: jest.fn() },
+    };
+    const prisma: any = {
+      $transaction: jest.fn((callback: (client: any) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = new GamificationService(
+      prisma,
+      {} as any,
+      {
+        set: jest.fn(),
+      } as any,
+    );
+    jest.useFakeTimers().setSystemTime(new Date('2026-11-05T06:00:00.000Z'));
+
+    const result = await service.triggerWeeklyCron(false, '2026-W45', true);
+    jest.useRealTimers();
+
+    expect(result.noop).toBe(true);
+    expect(tx.leaderboard.update).not.toHaveBeenCalled();
+    expect(tx.gameSettings.upsert).not.toHaveBeenCalled();
+  });
+
   it('uses a fixed snapshot and records the processed week in GameSettings', async () => {
     const updates: any[] = [];
     const tx: any = {

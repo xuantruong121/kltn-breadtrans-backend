@@ -19,4 +19,6 @@ export interface SystemJobPayload {
   version: 1;
   dayKey?: string;
   weekKey?: string;
+  /** Weekly league only: enqueued at startup, resets only if still due. */
+  catchUp?: boolean;
 }

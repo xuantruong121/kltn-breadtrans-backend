@@ -32,7 +32,7 @@ export class R2CleanupService {
 
   /**
    * Cron job tự động dọn dẹp các file audio ghi âm học sinh cũ hơn 90 ngày.
-   * Chạy vào lúc 03:00 sáng mỗi Chủ Nhật hàng tuần.
+   * Chạy lúc 00:01 mỗi Chủ Nhật (system-jobs.scheduler.ts).
    * Giúp tiết kiệm chi phí lưu trữ Cloudflare R2 theo chính sách TTL.
    */
   async runCleanup() {
