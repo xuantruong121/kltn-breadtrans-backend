@@ -1,0 +1,131 @@
+{
+  "assessmentId": 5,
+  "target": "localhost:5432/kltn_db",
+  "rows": [
+    {
+      "id": 61,
+      "key": "LST_Q_001",
+      "explanation": "Both speakers raise unfinished work on the same group task and agree to do it together; that is the thread of the exchange rather than any single detail."
+    },
+    {
+      "id": 62,
+      "key": "LST_Q_002",
+      "explanation": "One speaker proposes three and the other accepts with \"Deal\"."
+    },
+    {
+      "id": 63,
+      "key": "LST_Q_003",
+      "explanation": "Stated directly: the computer room upstairs stays closed until Thursday while the second-floor power supply is rewired."
+    },
+    {
+      "id": 64,
+      "key": "LST_Q_004",
+      "explanation": "Stated directly: the online booking system is down this week, so rooms are reserved at the desk instead."
+    },
+    {
+      "id": 65,
+      "key": "LST_Q_005",
+      "explanation": "Stated directly: pick up this week's release code from the front desk. The announcement also rules out the answer a learner would assume from general experience, saying an ID card alone will not start the machines."
+    },
+    {
+      "id": 66,
+      "key": "LST_Q_006",
+      "explanation": "Stated directly: the speaker says the landlord's signature is needed as well and that \"that page came through blank\"."
+    },
+    {
+      "id": 67,
+      "key": "LST_Q_007",
+      "explanation": "The speaker says what was filled in is fine, names one thing still needed, and ties it to a Friday cut-off. The purpose is to obtain that one remaining item in time."
+    },
+    {
+      "id": 68,
+      "key": "LST_Q_008",
+      "explanation": "The speaker contrasts processing this month with rolling into the next cycle and says they would rather not do that - the intention is to convey the consequence, not just the date."
+    },
+    {
+      "id": 69,
+      "key": "LST_Q_009",
+      "explanation": "No negative verdict is stated. The deflection to the applause, the projector failing to read the file, the fallback to speaking from memory and the twelve minutes instead of fifteen must be combined before the implication is available."
+    },
+    {
+      "id": 70,
+      "key": "LST_Q_010",
+      "explanation": "\"Twelve, in the end. I cut the part I was least sure about\" - the listener must connect the length the speaker reports to the deliberate cut rather than to the equipment problem."
+    },
+    {
+      "id": 71,
+      "key": "RDG_Q_001",
+      "explanation": "Every paragraph serves the temporary relocation and its rules; this is the notice's function."
+    },
+    {
+      "id": 72,
+      "key": "RDG_Q_002",
+      "explanation": "Stated: tagged, then removed to the campus store if not moved within three days."
+    },
+    {
+      "id": 73,
+      "key": "RDG_Q_003",
+      "explanation": "The facilities desk is open on weekday mornings only."
+    },
+    {
+      "id": 74,
+      "key": "RDG_Q_004",
+      "explanation": "The whole passage contrasts the feeling of fluency with the effectiveness of retrieval, and the final paragraph refuses the absolute position."
+    },
+    {
+      "id": 75,
+      "key": "RDG_Q_005",
+      "explanation": "Stated directly of those who persist."
+    },
+    {
+      "id": 76,
+      "key": "RDG_Q_006",
+      "explanation": "The meaning comes from the surrounding sentences, not from the term: familiarity is easily mistaken for knowledge, and smooth words on a fourth reading lead the student to conclude the content is secure. All four options are readings the phrase permits on its own, so the passage is required to choose between them."
+    },
+    {
+      "id": 77,
+      "key": "RDG_Q_007",
+      "explanation": "The pronoun continues the subject of the preceding clause, retrieval, which is described as slower."
+    },
+    {
+      "id": 78,
+      "key": "RDG_Q_008",
+      "explanation": "The phrase points back to the explicit comparison: teaching is slower and messier, and lines grow, but the owner gains the skill."
+    },
+    {
+      "id": 79,
+      "key": "RDG_Q_009",
+      "explanation": "Not stated. It follows from the organizers' reason for rejecting a free service: otherwise the owner is no better placed next time."
+    },
+    {
+      "id": 80,
+      "key": "RDG_Q_010",
+      "explanation": "The list is now shared with a consumer group that uses it in campaigns, so its value has extended outside; this is implied by the handover rather than stated as significance."
+    },
+    {
+      "id": 81,
+      "key": "LU_Q_001",
+      "explanation": "An action in progress at the moment of speaking requires the present continuous."
+    },
+    {
+      "id": 82,
+      "key": "LU_Q_002",
+      "explanation": "For the exact start time in this sentence, use \"at\": \"The session starts at half past nine.\" Other prepositions are possible with a clock time in other frames - \"by half past nine\", \"from half past nine\" - so the rule is about this slot, not about clock times in general."
+    },
+    {
+      "id": 83,
+      "key": "LU_Q_003",
+      "explanation": "\"Since\" with a period continuing to now requires the present perfect."
+    },
+    {
+      "id": 84,
+      "key": "LU_Q_004",
+      "explanation": "\"Do someone a favor\" is the fixed collocation."
+    },
+    {
+      "id": 85,
+      "key": "LU_Q_005",
+      "explanation": "The slot after a possessive and adjective needs an abstract noun naming the thing contributed."
+    }
+  ]
+}
