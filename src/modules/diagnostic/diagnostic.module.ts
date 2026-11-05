@@ -15,6 +15,7 @@ import { DiagnosticAdviceCatalogService } from './diagnostic-advice-catalog.serv
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { QuizModule } from '../quiz/quiz.module';
 import { SpeakingModule } from '../speaking/speaking.module';
+import { LearningPathModule } from '../learning-path/learning-path.module';
 
 @Module({
   imports: [
@@ -26,6 +27,8 @@ import { SpeakingModule } from '../speaking/speaking.module';
     // Advice links use the item pages' own access decision (plan and level).
     QuizModule,
     SpeakingModule,
+    // Advice falls back to open practice at the learner's level.
+    LearningPathModule,
   ],
   controllers: [DiagnosticController],
   providers: [

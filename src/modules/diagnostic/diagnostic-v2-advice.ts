@@ -18,6 +18,7 @@
  * Pure: no Prisma, no I/O.
  */
 import type { FourSkillKey, FourSkillResult } from './diagnostic-four-skill';
+import { focusKindsFor } from '../learning-path/weak-focus.logic';
 
 export const ADVICE_VERSION = 'D1_ADVICE_V1';
 
@@ -33,6 +34,8 @@ export type ResolvedResource = ResourceRef & {
   access: 'OPEN' | 'LOCKED';
   /** Learner-facing requirement when LOCKED, e.g. "Cần gói PRO". */
   requirement: string | null;
+  /** Why it is LOCKED: an unopened practice level or a missing plan. */
+  lockedBy?: 'LEVEL' | 'PLAN' | null;
   /** Speaking: the practice set the exercise belongs to (the catalog unit). */
   setKey?: string | null;
   /** Speaking: the set's authored CEFR level, for the display title. */
@@ -40,6 +43,15 @@ export type ResolvedResource = ResourceRef & {
 };
 
 export type ResourceResolver = (ref: ResourceRef) => ResolvedResource | null;
+
+/**
+ * Open practice at the learner's own level for a skill, best first; with
+ * `kinds`, only items of those kinds (speaking task types, quiz types).
+ */
+export type NearLevelResolver = (
+  skill: FourSkillKey,
+  kinds: string[] | null,
+) => ResolvedResource[];
 
 type AreaDef = {
   key: string;
@@ -237,6 +249,18 @@ const CRITERION_AREAS: Record<
     },
   },
 };
+
+/** Area key of a rubric criterion -> that criterion, for its practice kinds. */
+const CRITERION_OF_AREA = new Map<
+  string,
+  { skill: 'SPEAKING' | 'WRITING'; criterion: string }
+>(
+  (['SPEAKING', 'WRITING'] as const).flatMap((skill) =>
+    Object.entries(CRITERION_AREAS[skill]).map(
+      ([criterion, def]) => [def.key, { skill, criterion }] as const,
+    ),
+  ),
+);
 
 const GENERAL_PRACTICE: Partial<Record<FourSkillKey, ResourceRef>> = {
   SPEAKING: quiz('SPEAKING_EXERCISE', 16),
@@ -463,16 +487,36 @@ export function buildDiagnosticAdvice(input: {
   objective: ObjectiveItemEvidence[];
   productive: ProductiveTaskEvidence[];
   resolve: ResourceResolver;
+  nearLevel?: NearLevelResolver;
 }): DiagnosticAdvice {
   const { fourSkill, resolve } = input;
-  const resourcesFor = (def: AreaDef) =>
-    def.resources
+  /**
+   * The links of one area. The fixed references come first when the learner
+   * can open them; otherwise open practice at the learner's own level that
+   * trains the same thing takes their place, so a Cơ bản learner is not sent
+   * to a Trung cấp item. A fixed item locked by plan or level is shown only
+   * when nothing open is left.
+   */
+  const resourcesFor = (def: AreaDef, skill: FourSkillKey) => {
+    const fixed = def.resources
       .map(resolve)
-      .filter((r): r is ResolvedResource => r !== null)
-      .sort((a, b) =>
-        a.access === b.access ? 0 : a.access === 'OPEN' ? -1 : 1,
-      )
-      .slice(0, MAX_RESOURCES);
+      .filter((r): r is ResolvedResource => r !== null);
+    const key = (r: ResourceRef) => `${r.kind}:${r.id}`;
+    const fixedKeys = new Set(fixed.map(key));
+    const focus = CRITERION_OF_AREA.get(def.key);
+    const near = (
+      input.nearLevel?.(
+        skill,
+        focus ? focusKindsFor(focus.skill, focus.criterion) : null,
+      ) ?? []
+    ).filter((r) => !fixedKeys.has(key(r)));
+    return [
+      ...fixed.filter((r) => r.access === 'OPEN'),
+      ...near,
+      ...fixed.filter((r) => r.access === 'LOCKED' && r.lockedBy !== 'LEVEL'),
+      ...fixed.filter((r) => r.access === 'LOCKED' && r.lockedBy === 'LEVEL'),
+    ].slice(0, MAX_RESOURCES);
+  };
 
   const assessed = REQUIRED.filter(
     (s) => fourSkill.skills[s].state === 'COMPLETE',
@@ -538,7 +582,7 @@ export function buildDiagnosticAdvice(input: {
         why: candidate.def.why,
         action: candidate.def.action,
         graderFeedback: candidate.graderFeedback,
-        resources: resourcesFor(candidate.def),
+        resources: resourcesFor(candidate.def, candidate.skill),
       });
       added = true;
     }
@@ -558,7 +602,7 @@ export function buildDiagnosticAdvice(input: {
             why: c.def.why,
             action: c.def.action,
             graderFeedback: [],
-            resources: resourcesFor(c.def),
+            resources: resourcesFor(c.def, c.skill),
           }))
       : [];
 
