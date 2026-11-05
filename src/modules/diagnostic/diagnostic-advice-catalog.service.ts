@@ -16,10 +16,12 @@ import { PRACTICE_LEVEL_LABEL } from '../learning-path/placement.logic';
 import type { PracticeLevel } from '@prisma/client';
 import {
   allAdviceResourceRefs,
+  type NearLevelResolver,
   type ResolvedResource,
   type ResourceKind,
   type ResourceResolver,
 } from './diagnostic-v2-advice';
+import { LearningPathService } from '../learning-path/learning-path.service';
 import {
   advancedPracticePlan,
   isDictationContent,
@@ -77,15 +79,65 @@ export function adviceLock(access: {
   requiredPlan: string;
   isLevelLocked: boolean;
   practiceLevel: PracticeLevel | null;
-}): { access: 'OPEN' | 'LOCKED'; requirement: string | null } {
+}): {
+  access: 'OPEN' | 'LOCKED';
+  requirement: string | null;
+  lockedBy: 'LEVEL' | 'PLAN' | null;
+} {
   if (access.isLevelLocked && access.practiceLevel)
     return {
       access: 'LOCKED',
       requirement: `Cần mở mức ${PRACTICE_LEVEL_LABEL[access.practiceLevel]}`,
+      lockedBy: 'LEVEL',
     };
   if (access.isLocked)
-    return { access: 'LOCKED', requirement: `Cần gói ${access.requiredPlan}` };
-  return { access: 'OPEN', requirement: null };
+    return {
+      access: 'LOCKED',
+      requirement: `Cần gói ${access.requiredPlan}`,
+      lockedBy: 'PLAN',
+    };
+  return { access: 'OPEN', requirement: null, lockedBy: null };
+}
+
+const QUIZ_KIND_OF_SKILL: Record<string, ResourceKind> = {
+  LISTENING: 'LISTENING_QUIZ',
+  READING: 'READING_QUIZ',
+  WRITING: 'WRITING_QUIZ',
+};
+
+/** A recommendation as an advice link (always OPEN: only open items come here). */
+export function recommendationResource(r: {
+  contentType: string;
+  contentId: number;
+  skill: string;
+  title: string;
+  route: string;
+}): ResolvedResource | null {
+  if (r.contentType === 'SPEAKING_SET') {
+    const query = r.route.split('?')[1] ?? '';
+    return {
+      kind: 'SPEAKING_EXERCISE',
+      id: r.contentId,
+      title: r.title,
+      route: r.route,
+      access: 'OPEN',
+      requirement: null,
+      lockedBy: null,
+      setKey: new URLSearchParams(query).get('set'),
+      cefrLevel: null,
+    };
+  }
+  const kind = QUIZ_KIND_OF_SKILL[r.skill];
+  if (r.contentType !== 'QUIZ' || !kind) return null;
+  return {
+    kind,
+    id: r.contentId,
+    title: r.title,
+    route: r.route,
+    access: 'OPEN',
+    requirement: null,
+    lockedBy: null,
+  };
 }
 
 @Injectable()
@@ -95,7 +147,34 @@ export class DiagnosticAdviceCatalogService {
     @Optional() private readonly subscriptionService?: SubscriptionService,
     @Optional() private readonly quizAccess?: QuizContentAccessService,
     @Optional() private readonly speakingAccess?: SpeakingContentAccessService,
+    @Optional() private readonly learningPath?: LearningPathService,
   ) {}
+
+  /**
+   * Open practice at the learner's own level, per skill, for advice areas
+   * whose fixed references the learner cannot open yet. A failure here only
+   * means no substitutes: the advice keeps its fixed references.
+   */
+  async nearLevelFor(userId: number): Promise<NearLevelResolver> {
+    if (!this.learningPath) return () => [];
+    try {
+      const bySkill = await this.learningPath.openBySkill(userId, [
+        'LISTENING',
+        'READING',
+        'SPEAKING',
+        'WRITING',
+      ]);
+      return (skill, kinds) =>
+        (bySkill.get(skill as 'LISTENING') ?? [])
+          .filter(
+            (r) => !kinds?.length || r.kinds.some((k) => kinds.includes(k)),
+          )
+          .map(recommendationResource)
+          .filter((r): r is ResolvedResource => r !== null);
+    } catch {
+      return () => [];
+    }
+  }
 
   async resolverFor(userId: number): Promise<ResourceResolver> {
     const refs = allAdviceResourceRefs();
@@ -187,6 +266,7 @@ export class DiagnosticAdviceCatalogService {
           lock = {
             access: locked ? 'LOCKED' : 'OPEN',
             requirement: locked ? `Cần gói ${required}` : null,
+            lockedBy: locked ? 'PLAN' : null,
           };
         }
         resolved.set(key, {
@@ -212,6 +292,7 @@ export class DiagnosticAdviceCatalogService {
           lock = {
             access: locked ? 'LOCKED' : 'OPEN',
             requirement: locked ? `Cần gói ${required}` : null,
+            lockedBy: locked ? 'PLAN' : null,
           };
         }
         resolved.set(key, {

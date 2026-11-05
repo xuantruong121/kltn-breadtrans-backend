@@ -2,6 +2,7 @@ import { scoreFourSkillPlacementV2 } from './diagnostic-four-skill';
 import {
   allAdviceResourceRefs,
   buildDiagnosticAdvice,
+  type NearLevelResolver,
   type ProductiveTaskEvidence,
   type ResolvedResource,
   type ResourceRef,
@@ -87,10 +88,21 @@ function task(
 const pct = (v: number[]) => (v.reduce((a, b) => a + b, 0) / 16) * 100;
 
 const OPEN: ResourceRef[] = allAdviceResourceRefs();
-function resolver(opts: { missing?: string[]; locked?: string[] } = {}) {
+function resolver(
+  opts: { missing?: string[]; locked?: string[]; levelLocked?: string[] } = {},
+) {
   return (ref: ResourceRef): ResolvedResource | null => {
     const key = `${ref.kind}:${ref.id}`;
     if (opts.missing?.includes(key)) return null;
+    if (opts.levelLocked?.includes(key))
+      return {
+        ...ref,
+        title: key,
+        route: `/x/${ref.id}`,
+        access: 'LOCKED',
+        requirement: 'Cần mở mức Trung cấp',
+        lockedBy: 'LEVEL',
+      };
     const locked = opts.locked?.includes(key) ?? false;
     return {
       ...ref,
@@ -98,9 +110,42 @@ function resolver(opts: { missing?: string[]; locked?: string[] } = {}) {
       route: `/x/${ref.id}`,
       access: locked ? 'LOCKED' : 'OPEN',
       requirement: locked ? 'Cần gói PRO' : null,
+      lockedBy: locked ? 'PLAN' : null,
     };
   };
 }
+
+/** Open items at the learner's level, as the recommender would give them. */
+const openAtLevel = (
+  items: Array<{
+    id: number;
+    kind: 'SPEAKING_EXERCISE' | 'WRITING_QUIZ' | 'READING_QUIZ';
+    skill: string;
+    kinds: string[];
+  }>,
+): NearLevelResolver & { asked: Array<[string, string[] | null]> } => {
+  const asked: Array<[string, string[] | null]> = [];
+  const fn = ((skill: string, kinds: string[] | null) => {
+    asked.push([skill, kinds]);
+    return items
+      .filter(
+        (i) =>
+          i.skill === skill &&
+          (!kinds || i.kinds.some((k) => kinds.includes(k))),
+      )
+      .map((i) => ({
+        kind: i.kind,
+        id: i.id,
+        title: `near ${i.id}`,
+        route: `/near/${i.id}`,
+        access: 'OPEN' as const,
+        requirement: null,
+        lockedBy: null,
+      }));
+  }) as NearLevelResolver & { asked: Array<[string, string[] | null]> };
+  fn.asked = asked;
+  return fn;
+};
 
 function run(o: {
   lWrong?: string[];
@@ -109,6 +154,7 @@ function run(o: {
   speaking?: ProductiveTaskEvidence[];
   writing?: ProductiveTaskEvidence[];
   resolve?: ReturnType<typeof resolver>;
+  nearLevel?: NearLevelResolver;
 }) {
   const objective = [
     ...items('LISTENING', LISTENING, o.lWrong),
@@ -151,6 +197,7 @@ function run(o: {
       objective,
       productive: [...speaking, ...writing],
       resolve: o.resolve ?? resolver(),
+      nearLevel: o.nearLevel,
     }),
   };
 }
@@ -354,6 +401,118 @@ describe('D1 advice (FOUR_SKILL_PLACEMENT_V2)', () => {
     )!.resources;
     expect(res.map((r) => r.access)).toEqual(['OPEN', 'LOCKED']);
     expect(res[1].requirement).toBe('Cần gói PRO');
+  });
+
+  it('a fixed item above the learner level gives way to open practice at that level for the same criterion', () => {
+    // student1: Speaking at Cơ bản, weakest criterion pronunciation, and the
+    // fixed pronunciation item (Speaking 11) is a Trung cấp set.
+    const near = openAtLevel([
+      {
+        id: 301,
+        kind: 'SPEAKING_EXERCISE',
+        skill: 'SPEAKING',
+        kinds: ['READ_ALOUD'],
+      },
+      {
+        id: 302,
+        kind: 'SPEAKING_EXERCISE',
+        skill: 'SPEAKING',
+        kinds: ['RESPOND_TO_QUESTION'],
+      },
+      {
+        id: 303,
+        kind: 'SPEAKING_EXERCISE',
+        skill: 'SPEAKING',
+        kinds: ['READ_ALOUD'],
+      },
+    ]);
+    const { advice } = run({
+      speaking: [
+        task('SPEAKING', 21, 'GRADED', [3, 1, 3, 3]),
+        task('SPEAKING', 22, 'GRADED', [3, 1, 3, 3]),
+      ],
+      resolve: resolver({ levelLocked: ['SPEAKING_EXERCISE:11'] }),
+      nearLevel: near,
+    });
+    const card = advice.priorities.find(
+      (p) => p.areaKey === 'SPEAKING_INTELLIGIBILITY',
+    )!;
+    expect(card.resources.map((r) => [r.id, r.access])).toEqual([
+      [301, 'OPEN'],
+      [303, 'OPEN'],
+    ]);
+    expect(near.asked).toContainEqual([
+      'SPEAKING',
+      ['READ_ALOUD', 'PRONUNCIATION_DRILL'],
+    ]);
+  });
+
+  it('with no open practice at the level, the level-locked item still shows with its requirement', () => {
+    const { advice } = run({
+      speaking: [
+        task('SPEAKING', 21, 'GRADED', [3, 1, 3, 3]),
+        task('SPEAKING', 22, 'GRADED', [3, 1, 3, 3]),
+      ],
+      resolve: resolver({ levelLocked: ['SPEAKING_EXERCISE:11'] }),
+      nearLevel: openAtLevel([]),
+    });
+    const card = advice.priorities.find(
+      (p) => p.areaKey === 'SPEAKING_INTELLIGIBILITY',
+    )!;
+    expect(card.resources).toEqual([
+      expect.objectContaining({
+        id: 11,
+        access: 'LOCKED',
+        requirement: 'Cần mở mức Trung cấp',
+      }),
+    ]);
+  });
+
+  it('an open fixed item stays first; open practice at the level fills the rest', () => {
+    const { advice } = run({
+      writing: [
+        task('WRITING', 23, 'GRADED', [1, 3, 3, 3]),
+        task('WRITING', 24, 'GRADED', [1, 3, 3, 3]),
+      ],
+      resolve: resolver({ levelLocked: ['WRITING_QUIZ:4'] }),
+      nearLevel: openAtLevel([
+        {
+          id: 401,
+          kind: 'WRITING_QUIZ',
+          skill: 'WRITING',
+          kinds: ['WRITING_EMAIL'],
+        },
+        {
+          id: 402,
+          kind: 'WRITING_QUIZ',
+          skill: 'WRITING',
+          kinds: ['WRITING_PICTURE'],
+        },
+      ]),
+    });
+    const card = advice.priorities.find((p) => p.areaKey === 'WRITING_TASK')!;
+    expect(card.resources.map((r) => [r.id, r.access])).toEqual([
+      [17, 'OPEN'],
+      [401, 'OPEN'],
+    ]);
+  });
+
+  it('a plan-locked item ranks after open practice but before a level-locked one', () => {
+    const { advice } = run({
+      rWrong: ['inference', 'inference'],
+      resolve: resolver({
+        locked: ['READING_QUIZ:6'],
+        levelLocked: ['READING_QUIZ:16'],
+      }),
+      nearLevel: openAtLevel([]),
+    });
+    const res = advice.priorities.find(
+      (p) => p.areaKey === 'READING_INFERENCE',
+    )!.resources;
+    expect(res.map((r) => [r.id, r.lockedBy])).toEqual([
+      [6, 'PLAN'],
+      [16, 'LEVEL'],
+    ]);
   });
 
   it('mock-graded productive evidence is flagged', () => {

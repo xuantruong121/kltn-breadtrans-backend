@@ -88,6 +88,8 @@ export class LearningPathService {
       levelLabel: PRACTICE_LEVEL_LABEL[c.level],
       title: c.title,
       route: c.route,
+      /** Speaking task types or quiz type, e.g. READ_ALOUD, WRITING_EMAIL. */
+      kinds: c.kinds,
       minutes: c.minutes,
       status: r.status,
       requiredPlan: c.requiredPlan,
@@ -291,6 +293,26 @@ export class LearningPathService {
   }
 
   /** "Đề xuất cho bạn" on a skill page, locked items included with reasons. */
+  /**
+   * Open items ranked for each skill, from one catalog load: the diagnostic
+   * advice cites these when its fixed references sit above the learner's
+   * opened level.
+   */
+  async openBySkill(userId: number, skills: PracticeSkill[], limit = 12) {
+    const { catalog, learner } = await this.context(userId);
+    return new Map(
+      skills.map(
+        (skill) =>
+          [
+            skill,
+            recommend(catalog.candidates, learner, { limit, skill }).map((r) =>
+              this.view(r, learner.saved),
+            ),
+          ] as const,
+      ),
+    );
+  }
+
   async recommendedForSkill(userId: number, skill: PracticeSkill) {
     const { catalog, learner } = await this.context(userId);
     return recommend(catalog.candidates, learner, {

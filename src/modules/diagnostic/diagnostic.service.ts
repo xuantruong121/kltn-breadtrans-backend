@@ -418,6 +418,7 @@ export class DiagnosticService {
               })),
             ],
             resolve: await this.adviceCatalog.resolverFor(attempt.userId),
+            nearLevel: await this.adviceCatalog.nearLevelFor(attempt.userId),
           })
         : null;
     // V3 only: per-difficulty-tier and per-subskill objective evidence.

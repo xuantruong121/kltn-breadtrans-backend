@@ -56,6 +56,14 @@ export type GradedTask = {
  * graded task reports it, and none stands out when all are equal, the same
  * rules the result page uses.
  */
+/** The kinds of practice that train one rubric criterion; empty if unknown. */
+export function focusKindsFor(
+  skill: ProductiveSkill,
+  criterion: string,
+): string[] {
+  return FOCUS[skill][criterion]?.kinds ?? [];
+}
+
 export function weakFocus(tasks: GradedTask[]): WeakFocus[] {
   const skills: ProductiveSkill[] = ['SPEAKING', 'WRITING'];
   return skills.flatMap((skill) => {

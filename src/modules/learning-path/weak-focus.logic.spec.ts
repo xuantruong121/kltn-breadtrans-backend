@@ -1,4 +1,4 @@
-import { focusOf, weakFocus } from './weak-focus.logic';
+import { focusOf, weakFocus, focusKindsFor } from './weak-focus.logic';
 
 const speaking = (intelligibility: number | null, others = 3) => ({
   skill: 'SPEAKING' as const,
@@ -67,5 +67,18 @@ describe('focusOf', () => {
     expect(
       focusOf({ skill: 'WRITING', kinds: ['READ_ALOUD'] }, focus),
     ).toBeNull();
+  });
+});
+
+describe('focusKindsFor', () => {
+  it('names the practice kinds that train a criterion', () => {
+    expect(focusKindsFor('SPEAKING', 'intelligibility')).toEqual([
+      'READ_ALOUD',
+      'PRONUNCIATION_DRILL',
+    ]);
+    expect(focusKindsFor('WRITING', 'task_achievement')).toEqual([
+      'WRITING_EMAIL',
+    ]);
+    expect(focusKindsFor('WRITING', 'unknown')).toEqual([]);
   });
 });
