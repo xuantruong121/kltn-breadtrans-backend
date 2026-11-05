@@ -84,7 +84,7 @@ export class SkillCmsController {
   @ApiQuery({
     name: 'track',
     required: false,
-    description: 'Ngành, hoặc UNTAGGED cho nội dung chưa gắn ngành',
+    description: 'Lĩnh vực, hoặc UNTAGGED cho nội dung chưa gắn lĩnh vực',
   })
   @ApiResponse({
     status: 200,
@@ -390,9 +390,9 @@ export class SkillCmsController {
   }
   @Put(':domain/:id/tracks')
   @ApiOperation({
-    summary: 'Gắn ngành cho nội dung; đề xuất theo ngành đọc từ đây',
+    summary: 'Gắn lĩnh vực cho nội dung; đề xuất theo lĩnh vực đọc từ đây',
   })
-  @ApiResponse({ status: 200, description: 'Danh sách ngành sau khi lưu' })
+  @ApiResponse({ status: 200, description: 'Danh sách lĩnh vực sau khi lưu' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy nội dung' })
   setTracks(
     @Param('domain') domain: string,
