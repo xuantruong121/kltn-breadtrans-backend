@@ -479,7 +479,7 @@ export class SkillCmsService {
       ? (item as { exercises: Array<{ id: number }> }).exercises[0]?.id
       : (item as { id: number }).id;
     if (!contentId)
-      throw new BadRequestException('Bộ luyện chưa có bài để gắn ngành');
+      throw new BadRequestException('Bộ luyện chưa có bài để gắn lĩnh vực');
     await this.prisma.$transaction([
       this.prisma.contentTrackTag.deleteMany({
         where: { contentType, contentId, track: { notIn: tracks } },

@@ -30,7 +30,10 @@ export function getPreviousBusinessDayKey(dayKey: string): string {
 
 export function getBusinessWeekKey(date = new Date()): string {
   const dayKey = getBusinessDayKey(date);
-  const localDate = new Date(`${dayKey}T00:00:00+07:00`);
+  // The calendar day at UTC midnight, so getUTCDay() is that day's weekday.
+  // Midnight +07:00 read with getUTCDay() gave the previous day and put each
+  // Monday in the week before.
+  const localDate = new Date(`${dayKey}T00:00:00Z`);
   const day = localDate.getUTCDay() || 7;
   localDate.setUTCDate(localDate.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(localDate.getUTCFullYear(), 0, 1));
@@ -51,4 +54,25 @@ export function getBusinessWeekday(date = new Date()): number {
 
 export function getBusinessFiveMinuteKey(date = new Date()): string {
   return `${getBusinessDayKey(date)}-${Math.floor(date.getTime() / 300_000)}`;
+}
+
+/** Monday 00:00 (Asia/Ho_Chi_Minh) of the business week containing `date`. */
+export function getBusinessWeekStart(date = new Date()): Date {
+  const start = getBusinessDayStart(getBusinessDayKey(date));
+  const weekday = getBusinessWeekday(date);
+  return new Date(start.getTime() - ((weekday + 6) % 7) * 86_400_000);
+}
+
+/**
+ * Day and week jobs run at 00:01, never 00:00: one minute clear of the
+ * boundary. A startup catch-up waits for the same minute, so a backend that
+ * starts at 00:00:30 leaves the period to the 00:01 cron.
+ */
+export const BUSINESS_ROLLOVER_DELAY_MS = 60_000;
+
+export function isPastBusinessRollover(
+  periodStart: Date,
+  now = new Date(),
+): boolean {
+  return now.getTime() >= periodStart.getTime() + BUSINESS_ROLLOVER_DELAY_MS;
 }

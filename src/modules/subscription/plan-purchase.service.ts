@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
   UnprocessableEntityException,
@@ -51,8 +52,18 @@ type PurchaseWithDetails = Prisma.PlanPurchaseGetPayload<{
   };
 }>;
 
+export type StaleSweepResult = {
+  expired: number;
+  paid: number;
+  review: number;
+  open: number;
+  failed: number;
+};
+
 @Injectable()
 export class PlanPurchaseService {
+  private readonly logger = new Logger(PlanPurchaseService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionService: SubscriptionService,
@@ -576,7 +587,14 @@ export class PlanPurchaseService {
         `Chỉ xác nhận được khoản đã báo chuyển khoản hoặc cần xem xét (hiện tại: ${current.payment.status}).`,
       );
     }
-    if (current.status !== PlanPurchaseStatus.PENDING_PAYMENT) {
+    // A payment that reached PayOS after its purchase had expired waits for an
+    // admin with the purchase left EXPIRED (see holdPaidPurchaseForReview), so
+    // that it never blocks the learner's next purchase of the same plan.
+    const lateReview =
+      canAdminConfirm &&
+      current.status === PlanPurchaseStatus.EXPIRED &&
+      current.payment.status === PlanPaymentStatus.REVIEW_REQUIRED;
+    if (current.status !== PlanPurchaseStatus.PENDING_PAYMENT && !lateReview) {
       throw new ConflictException(
         `Không thể xác nhận giao dịch ở trạng thái ${current.status}.`,
       );
@@ -760,9 +778,14 @@ export class PlanPurchaseService {
           'Không thể từ chối khoản thanh toán đã xác nhận.',
         );
       }
-      if (current.payment.status !== PlanPaymentStatus.REPORTED) {
+      // REVIEW_REQUIRED: money PayOS received that could not be applied
+      // automatically; the admin refunds it outside the system and closes it.
+      if (
+        current.payment.status !== PlanPaymentStatus.REPORTED &&
+        current.payment.status !== PlanPaymentStatus.REVIEW_REQUIRED
+      ) {
         throw new ConflictException(
-          `Chỉ từ chối được khoản đã báo chuyển khoản (hiện tại: ${current.payment.status}).`,
+          `Chỉ từ chối được khoản đã báo chuyển khoản hoặc cần xử lý (hiện tại: ${current.payment.status}).`,
         );
       }
       await tx.planPayment.update({
@@ -796,6 +819,11 @@ export class PlanPurchaseService {
 
   private readonly paymentIntentTtlMs =
     Number(process.env.PAYMENT_INTENT_TTL_MINUTES || 15) * 60 * 1000;
+
+  // Time after the payment window before a purchase is closed, so a webhook
+  // that arrives a little late still finds the purchase open.
+  private readonly staleGraceMs =
+    Number(process.env.PAYMENT_STALE_GRACE_MINUTES || 10) * 60 * 1000;
 
   private readonly autoMatchGraceMs =
     Number(process.env.SEPAY_LEGACY_AUTO_MATCH_GRACE_HOURS || 24) *
@@ -849,6 +877,159 @@ export class PlanPurchaseService {
     await tx.planPurchase.update({
       where: { id: purchaseId },
       data: { status: PlanPurchaseStatus.EXPIRED },
+    });
+  }
+
+  /**
+   * Closes purchases whose payment window passed without payment, so they stop
+   * showing as "Chờ thanh toán". Runs every five minutes.
+   *
+   * A PayOS order is checked with PayOS before anything changes here: a paid
+   * one is confirmed, a part-paid one waits for an admin, and a link still
+   * open is cancelled first, so no payment can land on a purchase already
+   * marked expired. When PayOS cannot be reached the purchase is left alone
+   * and retried on the next run. A manual transfer (no PayOS order) expires
+   * only after its auto-match window, since a late transfer can still match.
+   */
+  async expireStalePurchases(now = new Date()): Promise<StaleSweepResult> {
+    const cutoff = new Date(now.getTime() - this.staleGraceMs);
+    const stale = await this.prisma.planPurchase.findMany({
+      where: {
+        status: PlanPurchaseStatus.PENDING_PAYMENT,
+        payment: {
+          status: PlanPaymentStatus.PENDING,
+          paymentIntentExpiresAt: { lt: cutoff },
+          OR: [{ autoMatchUntil: null }, { autoMatchUntil: { lt: now } }],
+        },
+      },
+      select: {
+        id: true,
+        payment: { select: { payosIntent: { select: { orderCode: true } } } },
+      },
+      orderBy: { id: 'asc' },
+      take: 50,
+    });
+    const result: StaleSweepResult = {
+      expired: 0,
+      paid: 0,
+      review: 0,
+      open: 0,
+      failed: 0,
+    };
+    for (const purchase of stale) {
+      const orderCode = purchase.payment?.payosIntent?.orderCode;
+      try {
+        if (orderCode !== undefined && orderCode !== null) {
+          if (!this.payos?.isEnabled()) {
+            result.open += 1;
+            continue;
+          }
+          const outcome = await this.payos.closeUnpaid(Number(orderCode));
+          if (outcome === 'PAID') {
+            result.paid += 1;
+            continue;
+          }
+          if (outcome === 'OPEN') {
+            result.open += 1;
+            continue;
+          }
+          if (outcome === 'REVIEW') {
+            if (await this.holdPaidPurchaseForReview(purchase.id))
+              result.review += 1;
+            continue;
+          }
+        }
+        if (await this.expireIfStillPending(purchase.id)) result.expired += 1;
+      } catch (caught) {
+        let error = caught;
+        // PayOS reported the order paid but confirming it failed (the plans
+        // changed, a paid plan overlaps): the money waits for an admin.
+        if (error instanceof ConflictException && orderCode != null) {
+          try {
+            if (await this.holdPaidPurchaseForReview(purchase.id))
+              result.review += 1;
+            continue;
+          } catch (holdError) {
+            error = holdError;
+          }
+        }
+        result.failed += 1;
+        this.logger.warn(
+          `stale_purchase_sweep_failed purchaseId=${purchase.id}: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Money PayOS received that cannot be applied automatically: the purchase
+   * had already expired, the amount was short, or confirming it failed. The
+   * payment becomes REVIEW_REQUIRED for an admin to confirm or reject. The
+   * purchase is EXPIRED either way, so it never blocks the learner's next
+   * purchase of the same plan (one open purchase per plan version).
+   */
+  async holdPaidPurchaseForReview(purchaseId: number): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const hint = await tx.planPurchase.findUnique({
+        where: { id: purchaseId },
+        select: { userId: true },
+      });
+      if (!hint) return false;
+      await this.lockUser(tx, hint.userId);
+      await this.lockPurchaseAndPayment(tx, purchaseId);
+      const current = await tx.planPurchase.findUniqueOrThrow({
+        where: { id: purchaseId },
+        include: { payment: true },
+      });
+      const payment = current.payment;
+      if (
+        !payment ||
+        (current.status !== PlanPurchaseStatus.PENDING_PAYMENT &&
+          current.status !== PlanPurchaseStatus.EXPIRED) ||
+        (payment.status !== PlanPaymentStatus.PENDING &&
+          payment.status !== PlanPaymentStatus.REPORTED &&
+          payment.status !== PlanPaymentStatus.EXPIRED)
+      ) {
+        return false;
+      }
+      await tx.planPayment.update({
+        where: { id: payment.id },
+        data: { status: PlanPaymentStatus.REVIEW_REQUIRED },
+      });
+      await tx.planPurchase.update({
+        where: { id: current.id },
+        data: { status: PlanPurchaseStatus.EXPIRED },
+      });
+      this.logger.warn(
+        `plan_payment_review_required purchaseId=${current.id} paymentId=${payment.id}`,
+      );
+      return true;
+    });
+  }
+
+  private async expireIfStillPending(purchaseId: number): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const hint = await tx.planPurchase.findUnique({
+        where: { id: purchaseId },
+        select: { userId: true },
+      });
+      if (!hint) return false;
+      await this.lockUser(tx, hint.userId);
+      await this.lockPurchaseAndPayment(tx, purchaseId);
+      const current = await tx.planPurchase.findUniqueOrThrow({
+        where: { id: purchaseId },
+        include: { payment: true },
+      });
+      if (
+        !current.payment ||
+        current.status !== PlanPurchaseStatus.PENDING_PAYMENT ||
+        current.payment.status !== PlanPaymentStatus.PENDING
+      ) {
+        return false;
+      }
+      await this.expirePaymentIntent(tx, current.id, current.payment.id);
+      return true;
     });
   }
 

@@ -307,7 +307,7 @@ export class SkillTracksDto {
   @ApiProperty({
     enum: LearningTrack,
     isArray: true,
-    description: 'Toàn bộ ngành của nội dung; thay thế danh sách cũ',
+    description: 'Toàn bộ lĩnh vực của nội dung; thay thế danh sách cũ',
   })
   @IsArray()
   @ArrayUnique()
