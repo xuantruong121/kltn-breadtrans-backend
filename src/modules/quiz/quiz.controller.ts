@@ -316,6 +316,24 @@ export class QuizController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Get(':quizId/transcript/status')
+  @ApiOperation({
+    summary: 'Học viên đã mở transcript của bài nghe chưa (không trả nội dung)',
+  })
+  @ApiResponse({ status: 200, description: '{ revealed: boolean }' })
+  getListeningTranscriptStatus(
+    @Request() req: any,
+    @Param('quizId', ParseIntPipe) quizId: number,
+  ) {
+    return this.quizService.getListeningTranscriptStatus(
+      req.user.id,
+      quizId,
+      req.user.role,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get(':quizId/transcript')
   @ApiOperation({ summary: 'Lấy toàn bộ transcript của bài nghe chép' })
   getListeningTranscript(

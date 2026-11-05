@@ -488,6 +488,79 @@ describe('QuizService', () => {
       });
     });
 
+    describe('transcript status (asked on load, no 403)', () => {
+      const dialogue = [
+        {
+          id: 179,
+          type: 'MULTIPLE_CHOICE',
+          order: 1,
+          content: {
+            transcriptSegments: [
+              { speaker: 'Customer', text: 'I need help.' },
+              { speaker: 'Agent', text: 'I can help.' },
+            ],
+          },
+        },
+      ];
+      beforeEach(() => {
+        mockPrismaService.quiz.findUnique.mockResolvedValue({
+          id: 28,
+          type: 'LISTENING_PRACTICE',
+          isPremiumContent: false,
+          publicationStatus: 'PUBLISHED',
+        });
+      });
+
+      it('reports an unrevealed transcript as not revealed instead of refusing', async () => {
+        mockPrismaService.question.findMany.mockResolvedValue(dialogue);
+        mockPrismaService.listeningTranscriptReveal.findUnique.mockResolvedValue(
+          null,
+        );
+
+        await expect(
+          service.getListeningTranscriptStatus(7, 28),
+        ).resolves.toEqual({ revealed: false });
+      });
+
+      it('reports a revealed transcript as revealed', async () => {
+        mockPrismaService.question.findMany.mockResolvedValue(dialogue);
+        mockPrismaService.listeningTranscriptReveal.findUnique.mockResolvedValue(
+          { id: 1 },
+        );
+
+        await expect(
+          service.getListeningTranscriptStatus(7, 28),
+        ).resolves.toEqual({ revealed: true });
+      });
+
+      it('needs no reveal when nothing in the lesson is transcript', async () => {
+        mockPrismaService.question.findMany.mockResolvedValue([
+          { id: 1, type: 'MULTIPLE_CHOICE', order: 1, content: {} },
+        ]);
+        mockPrismaService.listeningTranscriptReveal.findUnique.mockClear();
+
+        await expect(
+          service.getListeningTranscriptStatus(7, 28),
+        ).resolves.toEqual({ revealed: true });
+        expect(
+          mockPrismaService.listeningTranscriptReveal.findUnique,
+        ).not.toHaveBeenCalled();
+      });
+
+      it('keeps the same checks as the transcript itself', async () => {
+        mockPrismaService.quiz.findUnique.mockResolvedValue({
+          id: 28,
+          type: 'LISTENING_PRACTICE',
+          isPremiumContent: false,
+          publicationStatus: 'DRAFT',
+        });
+
+        await expect(
+          service.getListeningTranscriptStatus(7, 28),
+        ).rejects.toThrow(NotFoundException);
+      });
+    });
+
     it('keeps Reading answer keys out of the pre-submission payload', async () => {
       mockPrismaService.quiz.findUnique.mockResolvedValue({
         id: 10,
