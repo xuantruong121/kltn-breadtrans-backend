@@ -117,6 +117,7 @@ describe('PayosPaymentService', () => {
         findFirst: jest.fn().mockResolvedValue({
           id: 21,
           amountVnd: 99000,
+          paymentIntentExpiresAt: intent.expiresAt,
           planPurchase: { userId: 7 },
         }),
       },
@@ -160,6 +161,8 @@ describe('PayosPaymentService', () => {
           planPaymentId: 21,
           amountVnd: 99000,
           orderCode: BigInt(expectedOrderCode),
+          // The PayOS link closes with the purchase's payment window.
+          expiresAt: intent.expiresAt,
         }),
       }),
     );
@@ -167,6 +170,7 @@ describe('PayosPaymentService', () => {
       expect.objectContaining({
         orderCode: expectedOrderCode,
         amount: 99000,
+        expiredAt: Math.floor(intent.expiresAt.getTime() / 1000),
       }),
     );
     expect(result.checkoutUrl).toBe('https://payos.test/checkout');
@@ -252,6 +256,90 @@ describe('PayosPaymentService', () => {
           providerStatus: 'CANCELLED',
         }),
       }),
+    );
+  });
+
+  describe('closeUnpaid', () => {
+    const setup = (remoteStatus: string, cancel = jest.fn()) => {
+      const intent = makeIntent(PayOSPaymentIntentStatus.PENDING);
+      const prisma = {
+        payOSPaymentIntent: {
+          findUnique: jest.fn().mockResolvedValue(intent),
+          update: jest.fn((args: { data: { status?: string } }) =>
+            Promise.resolve({ ...intent, ...args.data }),
+          ),
+        },
+      };
+      const provider = {
+        getPayment: jest.fn().mockResolvedValue({
+          id: 'old-link',
+          status: remoteStatus,
+          amount: 99000,
+          amountPaid: remoteStatus === 'PAID' ? 99000 : 0,
+        }),
+        cancelPayment: cancel,
+      };
+      const service = new PayosPaymentService(
+        prisma as never,
+        provider as never,
+        {} as never,
+      );
+      const fulfill = jest.fn<Promise<void>, []>().mockResolvedValue(undefined);
+      (service as unknown as { fulfill: typeof fulfill }).fulfill = fulfill;
+      return { service, prisma, provider, fulfill, orderCode: 900000000011 };
+    };
+
+    it('cancels a link that is still open before reporting it closed', async () => {
+      const { service, provider, prisma, orderCode } = setup('PENDING');
+
+      await expect(service.closeUnpaid(orderCode)).resolves.toBe('CLOSED');
+
+      expect(provider.cancelPayment).toHaveBeenCalledWith(
+        orderCode,
+        'Hết thời hạn thanh toán',
+      );
+      expect(prisma.payOSPaymentIntent.update).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: PayOSPaymentIntentStatus.CANCELLED,
+          }),
+        }),
+      );
+    });
+
+    it('reports a link PayOS refused to cancel as still open', async () => {
+      const { service, orderCode } = setup(
+        'PENDING',
+        jest.fn().mockRejectedValue(new Error('already paid')),
+      );
+
+      await expect(service.closeUnpaid(orderCode)).resolves.toBe('OPEN');
+    });
+
+    it('confirms a paid order instead of closing it', async () => {
+      const { service, provider, fulfill, orderCode } = setup('PAID');
+
+      await expect(service.closeUnpaid(orderCode)).resolves.toBe('PAID');
+
+      expect(fulfill).toHaveBeenCalled();
+      expect(provider.cancelPayment).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['EXPIRED', 'CLOSED'],
+      ['CANCELLED', 'CLOSED'],
+      ['FAILED', 'CLOSED'],
+      ['PROCESSING', 'OPEN'],
+      ['UNDERPAID', 'REVIEW'],
+    ])(
+      'maps a PayOS %s order to %s without cancelling',
+      async (remote, outcome) => {
+        const { service, provider, orderCode } = setup(remote);
+
+        await expect(service.closeUnpaid(orderCode)).resolves.toBe(outcome);
+
+        expect(provider.cancelPayment).not.toHaveBeenCalled();
+      },
     );
   });
 });

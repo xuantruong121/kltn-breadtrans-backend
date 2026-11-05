@@ -73,6 +73,9 @@ export class PayosPaymentService {
         // The plan bought ("BreadTrans Pro — 30 ngày" → "BreadTrans Pro"); it
         // used to say Plus for every plan. PayOS caps descriptions at 25.
         description: itemName.split(' — ')[0].slice(0, 25),
+        // The PayOS link closes with the purchase's payment window. Without
+        // it a saved QR stayed payable long after the app showed it expired.
+        expiresAt: payment.paymentIntentExpiresAt,
       }));
     return this.createProviderLink(intent, itemName);
   }
@@ -137,6 +140,52 @@ export class PayosPaymentService {
       include: { planPayment: true },
     });
     return this.toDto(updated);
+  }
+
+  /**
+   * Settles an order whose payment window has passed. PayOS is asked for the
+   * real state first (synchronize also confirms a paid order); a link still
+   * open is cancelled before the caller may close the purchase.
+   *
+   * PAID: confirmed. REVIEW: part paid, for an admin. OPEN: still open or
+   * being processed, try again later. CLOSED: nothing paid and the link can
+   * no longer take a payment.
+   */
+  async closeUnpaid(
+    orderCode: number,
+  ): Promise<'PAID' | 'REVIEW' | 'OPEN' | 'CLOSED'> {
+    const synced = await this.synchronize(orderCode);
+    switch (synced.status) {
+      case PayOSPaymentIntentStatus.PAID:
+        return 'PAID';
+      case PayOSPaymentIntentStatus.UNDERPAID:
+        return 'REVIEW';
+      case PayOSPaymentIntentStatus.PROCESSING:
+        return 'OPEN';
+      case PayOSPaymentIntentStatus.PENDING:
+        try {
+          await this.provider.cancelPayment(
+            orderCode,
+            'Hết thời hạn thanh toán',
+          );
+        } catch (error) {
+          this.logger.warn(
+            `PayOS cancel refused for order ${orderCode}: ${error instanceof Error ? error.message : 'unknown error'}`,
+          );
+          return 'OPEN';
+        }
+        await this.prisma.payOSPaymentIntent.update({
+          where: { id: synced.intentId },
+          data: {
+            status: PayOSPaymentIntentStatus.CANCELLED,
+            providerStatus: 'CANCELLED',
+            lastSyncedAt: new Date(),
+          },
+        });
+        return 'CLOSED';
+      default:
+        return 'CLOSED';
+    }
   }
 
   async cancel(
@@ -235,6 +284,7 @@ export class PayosPaymentService {
     planPaymentId?: number;
     amountVnd: number;
     description: string;
+    expiresAt?: Date | null;
   }): Promise<IntentWithTarget> {
     if (!this.provider.isConfigured()) {
       throw new ConflictException('Cổng thanh toán PayOS chưa được cấu hình.');
@@ -261,6 +311,7 @@ export class PayosPaymentService {
         planPaymentId: data.planPaymentId,
         amountVnd: data.amountVnd,
         description: data.description.slice(0, 25),
+        expiresAt: data.expiresAt ?? null,
       },
       include: { planPayment: true },
     });
@@ -277,9 +328,11 @@ export class PayosPaymentService {
       itemName: itemName.slice(0, 25),
       returnUrl: this.returnUrl(intent),
       cancelUrl: this.cancelUrl(intent),
-      expiredAt: intent.expiresAt
-        ? Math.floor(intent.expiresAt.getTime() / 1000)
-        : undefined,
+      // PayOS refuses an expiry in the past.
+      expiredAt:
+        intent.expiresAt && intent.expiresAt.getTime() > Date.now()
+          ? Math.floor(intent.expiresAt.getTime() / 1000)
+          : undefined,
     });
     const updated = await this.prisma.payOSPaymentIntent.update({
       where: { id: intent.id },

@@ -864,4 +864,101 @@ describe('PlanPurchaseService', () => {
       }),
     });
   });
+
+  describe('money PayOS received after the purchase expired', () => {
+    const lateTx = (current: ReturnType<typeof purchase>) => {
+      const completed = purchase(
+        PlanPurchaseStatus.COMPLETED,
+        PlanPaymentStatus.CONFIRMED,
+        { id: 44 },
+      );
+      return {
+        $queryRaw: jest.fn().mockResolvedValue([{ id: 7 }]),
+        planPurchase: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValueOnce({ userId: 7 })
+            .mockResolvedValueOnce(completed),
+          findUniqueOrThrow: jest
+            .fn()
+            .mockResolvedValueOnce(current)
+            .mockResolvedValueOnce(completed),
+          update: jest.fn(),
+        },
+        planPayment: { update: jest.fn() },
+        planVersion: { findUnique: jest.fn() },
+        subscription: {
+          updateMany: jest.fn(),
+          findMany: jest.fn().mockResolvedValue([]),
+          findFirst: jest.fn().mockResolvedValue(null),
+          create: jest.fn(),
+        },
+      };
+    };
+    const serviceWith = (tx: ReturnType<typeof lateTx>) => {
+      const prisma = makePrisma();
+      prisma.$transaction.mockImplementation(((
+        callback: (value: typeof tx) => unknown,
+      ) => callback(tx)) as never);
+      return new PlanPurchaseService(
+        prisma as never,
+        new SubscriptionService(prisma as never),
+      );
+    };
+
+    it('an admin can confirm it and the learner gets the plan', async () => {
+      const tx = lateTx(
+        purchase(PlanPurchaseStatus.EXPIRED, PlanPaymentStatus.REVIEW_REQUIRED),
+      );
+
+      const result = await serviceWith(tx).confirmPurchase(31, 99);
+
+      expect(result.status).toBe(PlanPurchaseStatus.COMPLETED);
+      expect(tx.subscription.create).toHaveBeenCalledTimes(1);
+      expect(tx.planPurchase.update).toHaveBeenCalledWith({
+        where: { id: 31 },
+        data: expect.objectContaining({
+          status: PlanPurchaseStatus.COMPLETED,
+        }),
+      });
+    });
+
+    it('is never confirmed automatically on an expired purchase', async () => {
+      const tx = lateTx(
+        purchase(PlanPurchaseStatus.EXPIRED, PlanPaymentStatus.EXPIRED),
+      );
+
+      await expect(
+        serviceWith(tx).confirmPurchaseFromWebhook(31),
+      ).rejects.toThrow('Chỉ xác nhận được khoản');
+      expect(tx.subscription.create).not.toHaveBeenCalled();
+    });
+
+    it('an expired purchase whose payment is not under review stays closed to admins', async () => {
+      const tx = lateTx(
+        purchase(PlanPurchaseStatus.EXPIRED, PlanPaymentStatus.REPORTED),
+      );
+
+      await expect(serviceWith(tx).confirmPurchase(31, 99)).rejects.toThrow(
+        'Không thể xác nhận giao dịch ở trạng thái EXPIRED.',
+      );
+    });
+
+    it('an admin can reject it after refunding outside the system', async () => {
+      const tx = lateTx(
+        purchase(PlanPurchaseStatus.EXPIRED, PlanPaymentStatus.REVIEW_REQUIRED),
+      );
+
+      await serviceWith(tx).rejectPurchase(31, 99, 'Đã hoàn tiền');
+
+      expect(tx.planPayment.update).toHaveBeenCalledWith({
+        where: { id: 21 },
+        data: expect.objectContaining({
+          status: PlanPaymentStatus.REJECTED,
+          rejectionReason: 'Đã hoàn tiền',
+        }),
+      });
+      expect(tx.subscription.create).not.toHaveBeenCalled();
+    });
+  });
 });

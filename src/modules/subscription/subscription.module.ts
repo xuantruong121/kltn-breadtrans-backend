@@ -14,6 +14,7 @@ import { PlanCatalogPublicController } from './plan-catalog-public.controller';
 import { PlanCatalogPublicService } from './plan-catalog-public.service';
 import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { PaymentReconciliationScheduler } from './payment-reconciliation.scheduler';
+import { StalePurchaseScheduler } from './stale-purchase.scheduler';
 import { PaymentWebhookController } from './payment-webhook.controller';
 import { SepayTransactionProvider } from './sepay-transaction.provider';
 import { PaymentModule } from '../payment/payment.module';
@@ -51,6 +52,7 @@ import { PromoCodeAdminService } from './promo-code-admin.service';
     SepayTransactionProvider,
     PaymentReconciliationService,
     PaymentReconciliationScheduler,
+    StalePurchaseScheduler,
     { provide: 'PlanPurchaseService', useExisting: PlanPurchaseService },
   ],
   exports: [SubscriptionService, SubscriptionAdminService, TrialService],

@@ -8,6 +8,7 @@
  *   GET  /v2/payment-requests/:id        read by orderCode or link id
  *   POST /v2/payment-requests/:id/cancel cancel
  *   POST /__mock/pay/:orderCode          test control: mark PAID {amountPaid?}
+ *   GET  /__mock/link/:orderCode         test control: the stored link
  *   GET  /__mock/requests                every API call received
  *
  * Usage: ts-node scripts/qa/harness-fake-payos.ts <port> <clientId> <apiKey> <checksumKey>
@@ -80,6 +81,13 @@ createServer((req, res) => {
         l.status = l.amountPaid >= l.amount ? 'PAID' : 'PENDING';
         return send(res, 200, view(l));
       }
+      const stored = /^\/__mock\/link\/(\d+)$/.exec(url.pathname);
+      if (stored && req.method === 'GET') {
+        const l = links.get(Number(stored[1]));
+        return l
+          ? send(res, 200, l)
+          : send(res, 404, { error: 'unknown order' });
+      }
       if (!authorized)
         return send(res, 401, { code: '401', desc: 'unauthorized' });
       if (url.pathname === '/v2/payment-requests' && req.method === 'POST') {
@@ -129,6 +137,9 @@ createServer((req, res) => {
       if (cancel && req.method === 'POST') {
         const l = find(cancel[1]);
         if (!l) return send(res, 404, { code: '101', desc: 'not found' });
+        // As payOS does, a paid link cannot be cancelled.
+        if (l.status === 'PAID')
+          return send(res, 400, { code: '101', desc: 'payment link paid' });
         l.status = 'CANCELLED';
         return send(res, 200, await signed(view(l)));
       }
