@@ -1,86 +1,66 @@
 {
-  "generatedAt": "2026-11-04T09:14:12.523Z",
-  "calls": 8,
+  "generatedAt": "2026-11-06T13:14:18.962Z",
+  "calls": 6,
   "clips": [
     {
-      "key": "catalog/speaking/exam-prompt/b1bc4770af61f227.v1.mp3",
-      "file": "artifacts\\speaking-exam-prompt-audio\\b1bc4770af61f227.v1.mp3",
+      "key": "catalog/speaking/exam-prompt/7578631bf6baa89f.v1.mp3",
+      "file": "artifacts\\speaking-exam-prompt-audio\\7578631bf6baa89f.v1.mp3",
       "ids": [
-        40
+        36
       ],
-      "durationMs": 4716,
-      "textSha256": "b1bc4770af61f227929fe814c832042ae94b7be15d74f7a4f7483f08baa449cf",
-      "audioSha256": "b0c3d652a35e30b14b7324bc4f5e4475e3643eba3baaba7db78e67ff51f14537"
+      "durationMs": 12888,
+      "textSha256": "7578631bf6baa89f4416dba1252756239265ee0cf1f472a9bcc5284ab52c286b",
+      "audioSha256": "a00211863adf2742add9e8582908d0e4f8530b335b906929574d8e6da5d2f825"
     },
     {
-      "key": "catalog/speaking/exam-prompt/81d86fccbcdaf1f5.v1.mp3",
-      "file": "artifacts\\speaking-exam-prompt-audio\\81d86fccbcdaf1f5.v1.mp3",
+      "key": "catalog/speaking/exam-prompt/d8d4930ca89e6e66.v1.mp3",
+      "file": "artifacts\\speaking-exam-prompt-audio\\d8d4930ca89e6e66.v1.mp3",
+      "ids": [
+        37
+      ],
+      "durationMs": 5364,
+      "textSha256": "d8d4930ca89e6e66e22b73db792f8cda0aff94085cb69c82e529fa9c5168552e",
+      "audioSha256": "6c05949afe3688cd71190449794528c76cb5f7181e6272a38ef44b5cb0bb3055"
+    },
+    {
+      "key": "catalog/speaking/exam-prompt/ccb13854f007c16d.v1.mp3",
+      "file": "artifacts\\speaking-exam-prompt-audio\\ccb13854f007c16d.v1.mp3",
+      "ids": [
+        38
+      ],
+      "durationMs": 8388,
+      "textSha256": "ccb13854f007c16da82ee978302c9ce5477183f24ca1ce8e0d35c9c45f604f1f",
+      "audioSha256": "7a85f0da89e85486fd8f56a5903e3bd111b5b341f3402b8294b6d41447cc888f"
+    },
+    {
+      "key": "catalog/speaking/exam-prompt/19b17404f3b13182.v1.mp3",
+      "file": "artifacts\\speaking-exam-prompt-audio\\19b17404f3b13182.v1.mp3",
       "ids": [
         191
       ],
-      "durationMs": 4968,
-      "textSha256": "81d86fccbcdaf1f5fd02bcc7e5e6e7bf383d71161cb7a5dc0396eb08275d901a",
-      "audioSha256": "e5dece5c4fdb325f41309e03475849f1c1659787def6321d6a16bfd8aabb1e5d"
+      "durationMs": 12312,
+      "textSha256": "19b17404f3b13182a3abb373b10efe6ee0023f0a7086d9dfa5e6b8d99b8f47f8",
+      "audioSha256": "3907fe81ae8efd4264f10efe82b44d712ff45ce924e3832b50a151efe471c222"
     },
     {
-      "key": "catalog/speaking/exam-prompt/e327b1a35c029c21.v1.mp3",
-      "file": "artifacts\\speaking-exam-prompt-audio\\e327b1a35c029c21.v1.mp3",
+      "key": "catalog/speaking/exam-prompt/43f742620da91313.v1.mp3",
+      "file": "artifacts\\speaking-exam-prompt-audio\\43f742620da91313.v1.mp3",
       "ids": [
         192
       ],
-      "durationMs": 5292,
-      "textSha256": "e327b1a35c029c216af659e82fa2a4286bdda56e10434a5ee51570fa9ea2c379",
-      "audioSha256": "871250c570dcf1217b111e5c25f5e79947f50cd19fa41a45d5444294de19ffe4"
+      "durationMs": 5436,
+      "textSha256": "43f742620da913131da1a2fa776a1693d7e36b0a33e46b83b5f2deb9bcb0c8a5",
+      "audioSha256": "66ea3d0f0787acce8d91f5dda4b91a0c15849fbf2c4d0fbae5c1f08678d6eaa2"
     },
     {
-      "key": "catalog/speaking/exam-prompt/faf22485d2903bfb.v1.mp3",
-      "file": "artifacts\\speaking-exam-prompt-audio\\faf22485d2903bfb.v1.mp3",
+      "key": "catalog/speaking/exam-prompt/4d384d1e5c86a34f.v1.mp3",
+      "file": "artifacts\\speaking-exam-prompt-audio\\4d384d1e5c86a34f.v1.mp3",
       "ids": [
         193
       ],
-      "durationMs": 5832,
-      "textSha256": "faf22485d2903bfb20fa30a30afd13babb1443cba441d5273f6091dbe18bb87e",
-      "audioSha256": "afb9a7d4c0ffa9dd4e055776bd085bc62b9b9187e253ac7a6d39d7c667ed88c5"
-    },
-    {
-      "key": "catalog/speaking/exam-prompt/31ab1c3e890a62e3.v1.mp3",
-      "file": "artifacts\\speaking-exam-prompt-audio\\31ab1c3e890a62e3.v1.mp3",
-      "ids": [
-        194
-      ],
-      "durationMs": 3960,
-      "textSha256": "31ab1c3e890a62e3ec5c56cd32a5359f2775f29f2a8a5728ec946af5b1ab098c",
-      "audioSha256": "5f96592d74e4b98a14633677d9e3b796b1e7f438990e72fa28104904daebe705"
-    },
-    {
-      "key": "catalog/speaking/exam-prompt/05e30dff1b49402d.v1.mp3",
-      "file": "artifacts\\speaking-exam-prompt-audio\\05e30dff1b49402d.v1.mp3",
-      "ids": [
-        195
-      ],
-      "durationMs": 4644,
-      "textSha256": "05e30dff1b49402d9b18ff434e5ed162a553320e337d152609b190e766637fd3",
-      "audioSha256": "f36ebbf46f79df29978b359bd26b1cfb1e3ec9e5b3f9f1aab62304c5ab1c3ab8"
-    },
-    {
-      "key": "catalog/speaking/exam-prompt/f7786510c05439ac.v1.mp3",
-      "file": "artifacts\\speaking-exam-prompt-audio\\f7786510c05439ac.v1.mp3",
-      "ids": [
-        196
-      ],
-      "durationMs": 3276,
-      "textSha256": "f7786510c05439ac46a2856871a011cfe4b007e59320335b2ed86baae8b52e7d",
-      "audioSha256": "9d5df7ed43c52f0aeecc104d5465556353f4d09bf6c9397652c191b5f11787b5"
-    },
-    {
-      "key": "catalog/speaking/exam-prompt/711e3816d2216907.v1.mp3",
-      "file": "artifacts\\speaking-exam-prompt-audio\\711e3816d2216907.v1.mp3",
-      "ids": [
-        197
-      ],
-      "durationMs": 9576,
-      "textSha256": "711e3816d2216907cf4865db72b191f8106a2459c12a50ef6ccbec884b63f608",
-      "audioSha256": "f76fed799542a80666ba46733ecdee5436c07c623df303fddacc4f2e39e973bf"
+      "durationMs": 6660,
+      "textSha256": "4d384d1e5c86a34f4ffc2bf7e5f58ca848d448730994d61fe1bbabe4d16f599b",
+      "audioSha256": "9d5302149a82ccc3fe471f48cb4c6f824c98a7b461613a58dffae5242f9c333d"
     }
   ]
 }
