@@ -1,8 +1,8 @@
 {
   "examId": 3,
-  "generatedAt": "2026-11-06T14:03:36.006Z",
+  "generatedAt": "2026-11-06T14:22:23.837Z",
   "clipCount": 54,
-  "clipSeconds": 1674.1,
+  "clipSeconds": 1673.8,
   "byPart": [
     {
       "part": 1,
@@ -20,13 +20,13 @@
       "part": 3,
       "clips": 13,
       "questions": 39,
-      "seconds": 718.7
+      "seconds": 718.3
     },
     {
       "part": 4,
       "clips": 10,
       "questions": 30,
-      "seconds": 484
+      "seconds": 484.2
     }
   ],
   "clips": [
@@ -553,11 +553,11 @@
         36,
         37
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1040-v5.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\3-033-g1040-0696e6b50006.mp3",
-      "bytes": 859392,
-      "sha256": "8f2b60870f011231e9b5714f7cf4f8f92c9330059cab37d5bbce952f5cf720c7",
-      "durationSeconds": 53.712,
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1040-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\3-033-g1040-3c8617a3f740.mp3",
+      "bytes": 857664,
+      "sha256": "77d26e73da3844885d218650518730eb3f688725860e28409c4791a5189a38a6",
+      "durationSeconds": 53.604,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -625,11 +625,11 @@
         48,
         49
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1044-v3.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\3-037-g1044-9b710720f3a4.mp3",
-      "bytes": 993024,
-      "sha256": "12351c6ddecf5a3ab39370d41e5ecab1daa126b2cd24804f10a954641f5aeaf5",
-      "durationSeconds": 62.064,
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1044-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\3-037-g1044-17315ba9a50d.mp3",
+      "bytes": 994176,
+      "sha256": "9b532765554f0cabb845baae958fb387f67f94776afacfc8c418c2ae23917f07",
+      "durationSeconds": 62.136,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -661,11 +661,11 @@
         54,
         55
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1046-v3.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\3-039-g1046-9eea8a203a8d.mp3",
-      "bytes": 798912,
-      "sha256": "243f86015f95ff965cacd23a6d759a6fab94ba4a2312339877840eabb905edce",
-      "durationSeconds": 49.932,
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1046-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\3-039-g1046-c54e9bc08b75.mp3",
+      "bytes": 799488,
+      "sha256": "a3b3a6996acae675d591ff7509022cfd9152f120e92ab8a969c72dd3051ef167",
+      "durationSeconds": 49.968,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -697,11 +697,11 @@
         60,
         61
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1048-v5.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\3-041-g1048-ba5055815c81.mp3",
-      "bytes": 907776,
-      "sha256": "8a6f964f27fb874a9825a3cdafde19464cb7e902fce352ee615986084b036731",
-      "durationSeconds": 56.736,
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1048-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\3-041-g1048-d99dac701aa5.mp3",
+      "bytes": 900864,
+      "sha256": "044b4d572694c6dbc6e0274cf2471e37a93f7a5eab57ca909838daebb0ffd5fb",
+      "durationSeconds": 56.304,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -787,11 +787,11 @@
         75,
         76
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1052/audio.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\4-046-g1052-9d29b80e6c30.mp3",
-      "bytes": 849024,
-      "sha256": "176ba37227dae3e7440e79079b7ff45621f637e2adfea8bdcf9d382c5b8fc24f",
-      "durationSeconds": 53.064,
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1052-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\4-046-g1052-2293aec114d5.mp3",
+      "bytes": 847872,
+      "sha256": "52876baa7307ac786d5c7d0a7ead77b8f1390f6a6cdc6052ec38e82ac35fdae2",
+      "durationSeconds": 52.992,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -805,11 +805,11 @@
         78,
         79
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1053/audio-regenerated.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\4-047-g1053-9f8ca1faadb3.mp3",
-      "bytes": 839808,
-      "sha256": "b1216d35966ce581897d02b6eb5de4857a22d1d005d3a8d780cf914ef2523cdb",
-      "durationSeconds": 52.488,
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1053-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\4-047-g1053-f68d3bcd1f3b.mp3",
+      "bytes": 844416,
+      "sha256": "679d5b01e300d473a2a38a3db258745b8b1cc38d3ba38d2e6e11426d1199028a",
+      "durationSeconds": 52.776,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -859,11 +859,11 @@
         87,
         88
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1056/audio.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\4-050-g1056-c627952583bc.mp3",
-      "bytes": 661248,
-      "sha256": "7aa970138c3279d237deec2dfc4d7e623e9eb7e1b4a65c77e731016a8b0b4966",
-      "durationSeconds": 41.328,
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1056-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\4-050-g1056-e3d6620830f6.mp3",
+      "bytes": 664704,
+      "sha256": "68628f7fb94504528b151d16a9fb2da5bbc7a32558e6a28cbd429f132fb754d9",
+      "durationSeconds": 41.544,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -895,11 +895,11 @@
         93,
         94
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1058/audio.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\4-052-g1058-8fd1fb061460.mp3",
-      "bytes": 703872,
-      "sha256": "10d92b44fcee67a964acb2032215b2a9ea43b0a6d36ab53425f34ca080bd15a4",
-      "durationSeconds": 43.992,
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1058-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\4-052-g1058-cc261a75ac36.mp3",
+      "bytes": 699264,
+      "sha256": "ec728c7fe441a94175b52d58c145c18c14b2ed1bf8a4dbb6b835e20dd9bc47e2",
+      "durationSeconds": 43.704,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1

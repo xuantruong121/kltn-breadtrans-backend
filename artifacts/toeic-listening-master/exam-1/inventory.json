@@ -1,8 +1,8 @@
 {
   "examId": 1,
-  "generatedAt": "2026-11-06T14:00:08.449Z",
+  "generatedAt": "2026-11-06T14:18:51.828Z",
   "clipCount": 54,
-  "clipSeconds": 1620.5,
+  "clipSeconds": 1619.9,
   "byPart": [
     {
       "part": 1,
@@ -20,13 +20,13 @@
       "part": 3,
       "clips": 13,
       "questions": 39,
-      "seconds": 648.8
+      "seconds": 648.4
     },
     {
       "part": 4,
       "clips": 10,
       "questions": 30,
-      "seconds": 517.3
+      "seconds": 517.1
     }
   ],
   "clips": [
@@ -571,11 +571,11 @@
         39,
         40
       ],
-      "audioUrl": "premium/listening/toeic/exams/1/groups/34-v3.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-034-g34-2bbe0a4b8a5d.mp3",
-      "bytes": 770688,
-      "sha256": "ade1dce49b1fe28da78fdc0e0c669aaf2bf13a90f4d39c0af86470663fb915ff",
-      "durationSeconds": 48.168,
+      "audioUrl": "premium/listening/toeic/exams/1/groups/34-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\3-034-g34-1f982d262e43.mp3",
+      "bytes": 764352,
+      "sha256": "7fc580685938c51f5d050690a79fed997f2e445b178350e4b53eb595710df04b",
+      "durationSeconds": 47.772,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -823,11 +823,11 @@
         81,
         82
       ],
-      "audioUrl": "premium/listening/toeic/exams/1/groups/48-v2.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-048-g48-f9ad6f73bd20.mp3",
-      "bytes": 760896,
-      "sha256": "32c0915c4047d357c2d6c88bec6dc85d91ca3fbb342d4c624540f22051ea2a1d",
-      "durationSeconds": 47.556,
+      "audioUrl": "premium/listening/toeic/exams/1/groups/48-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-048-g48-e83e245285f4.mp3",
+      "bytes": 762624,
+      "sha256": "ceb1fa164650588b27aa577e2ae0ca64c6e85c811c2ce3645662c2cdc308b7f6",
+      "durationSeconds": 47.664,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -841,11 +841,11 @@
         84,
         85
       ],
-      "audioUrl": "premium/listening/toeic/exams/1/groups/49-v2.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-049-g49-c86faf7db446.mp3",
-      "bytes": 817920,
-      "sha256": "c77776baa12557eb67882cc4ac30ba6cf58598a638c6ed0980c46759524b47d3",
-      "durationSeconds": 51.12,
+      "audioUrl": "premium/listening/toeic/exams/1/groups/49-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-049-g49-20cd0f359b43.mp3",
+      "bytes": 816192,
+      "sha256": "498a106dab1f0738b0976cebfd7442d9319703bbc38ddaa3e53ee3299ce2017b",
+      "durationSeconds": 51.012,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -859,11 +859,11 @@
         87,
         88
       ],
-      "audioUrl": "premium/listening/toeic/exams/1/groups/50-v2.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-050-g50-fd68570fc578.mp3",
-      "bytes": 926784,
-      "sha256": "b1294c2f07fd29ceca0b18c1914889b23c05d4a6b55ed35e513f175c2c595962",
-      "durationSeconds": 57.924,
+      "audioUrl": "premium/listening/toeic/exams/1/groups/50-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-050-g50-49dffa83e7f0.mp3",
+      "bytes": 926208,
+      "sha256": "dc0fb339e6b6a66f7d00ad94b7ab330c9b35f4eabbbf7a34ade84b5aad3f03d2",
+      "durationSeconds": 57.888,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1
@@ -877,11 +877,11 @@
         90,
         91
       ],
-      "audioUrl": "premium/listening/toeic/exams/1/groups/51-v2.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-051-g51-823d197e3a73.mp3",
-      "bytes": 814464,
-      "sha256": "f4e471ae160f0686e1f063ce54b405b54d0394696b34155f5b8be0ed041ad755",
-      "durationSeconds": 50.904,
+      "audioUrl": "premium/listening/toeic/exams/1/groups/51-v6.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-1\\clips\\4-051-g51-b7dae4be91c6.mp3",
+      "bytes": 812736,
+      "sha256": "713018b07797ff2e2e6842663f47bd5a2e47813ab2936d19d1fb38de365d3d48",
+      "durationSeconds": 50.796,
       "codec": "mp3",
       "sampleRate": 16000,
       "channels": 1

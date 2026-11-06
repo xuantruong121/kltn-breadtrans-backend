@@ -6,10 +6,10 @@ import type { ListeningMaster } from '../toeic-listening-master';
 
 export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
   "examId": 1,
-  "key": "catalog/toeic/exam-1/listening-master/fe744187bd0d651b.v1.mp3",
-  "sha256": "fe744187bd0d651bcfd62b83a6e9ca39b682fb2a2c6af43c9482f4be25289fff",
-  "bytes": 20970093,
-  "durationSeconds": 2621.175,
+  "key": "catalog/toeic/exam-1/listening-master/c5166cd4fe16c294.v1.mp3",
+  "sha256": "c5166cd4fe16c29482a35b4b9b91e73d207a8c559b59b5e8542eab77a8f3780c",
+  "bytes": 20965869,
+  "durationSeconds": 2620.635,
   "format": "mp3 24000 Hz 1ch 64 kb/s CBR",
   "responseGapSeconds": {
     "1": 5,
@@ -385,7 +385,7 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         40
       ],
       "start": 917.683,
-      "end": 994.319
+      "end": 993.923
     },
     {
       "kind": "GROUP",
@@ -396,8 +396,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         42,
         43
       ],
-      "start": 994.319,
-      "end": 1072.444
+      "start": 993.923,
+      "end": 1072.048
     },
     {
       "kind": "GROUP",
@@ -408,8 +408,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         45,
         46
       ],
-      "start": 1072.444,
-      "end": 1154.09
+      "start": 1072.048,
+      "end": 1153.694
     },
     {
       "kind": "GROUP",
@@ -420,8 +420,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         48,
         49
       ],
-      "start": 1154.09,
-      "end": 1230.437
+      "start": 1153.694,
+      "end": 1230.041
     },
     {
       "kind": "GROUP",
@@ -432,8 +432,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         51,
         52
       ],
-      "start": 1230.437,
-      "end": 1315.39
+      "start": 1230.041,
+      "end": 1314.994
     },
     {
       "kind": "GROUP",
@@ -444,8 +444,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         54,
         55
       ],
-      "start": 1315.39,
-      "end": 1389.939
+      "start": 1314.994,
+      "end": 1389.543
     },
     {
       "kind": "GROUP",
@@ -456,8 +456,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         57,
         58
       ],
-      "start": 1389.939,
-      "end": 1477.254
+      "start": 1389.543,
+      "end": 1476.858
     },
     {
       "kind": "GROUP",
@@ -468,8 +468,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         60,
         61
       ],
-      "start": 1477.254,
-      "end": 1551.521
+      "start": 1476.858,
+      "end": 1551.125
     },
     {
       "kind": "GROUP",
@@ -480,8 +480,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         63,
         64
       ],
-      "start": 1551.521,
-      "end": 1631.621
+      "start": 1551.125,
+      "end": 1631.225
     },
     {
       "kind": "GROUP",
@@ -492,8 +492,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         66,
         67
       ],
-      "start": 1631.621,
-      "end": 1711.426
+      "start": 1631.225,
+      "end": 1711.03
     },
     {
       "kind": "GROUP",
@@ -504,14 +504,14 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         69,
         70
       ],
-      "start": 1711.426,
-      "end": 1791.279
+      "start": 1711.03,
+      "end": 1790.883
     },
     {
       "kind": "DIRECTIONS",
       "part": 4,
-      "start": 1791.279,
-      "end": 1812.306
+      "start": 1790.883,
+      "end": 1811.91
     },
     {
       "kind": "GROUP",
@@ -522,8 +522,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         72,
         73
       ],
-      "start": 1814.306,
-      "end": 1890.468
+      "start": 1813.91,
+      "end": 1890.072
     },
     {
       "kind": "GROUP",
@@ -534,8 +534,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         75,
         76
       ],
-      "start": 1890.468,
-      "end": 1972.721
+      "start": 1890.072,
+      "end": 1972.325
     },
     {
       "kind": "GROUP",
@@ -546,8 +546,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         78,
         79
       ],
-      "start": 1972.721,
-      "end": 2055.341
+      "start": 1972.325,
+      "end": 2054.945
     },
     {
       "kind": "GROUP",
@@ -558,8 +558,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         81,
         82
       ],
-      "start": 2055.341,
-      "end": 2131.005
+      "start": 2054.945,
+      "end": 2130.717
     },
     {
       "kind": "GROUP",
@@ -570,8 +570,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         84,
         85
       ],
-      "start": 2131.005,
-      "end": 2210.398
+      "start": 2130.717,
+      "end": 2210.002
     },
     {
       "kind": "GROUP",
@@ -582,8 +582,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         87,
         88
       ],
-      "start": 2210.398,
-      "end": 2296.644
+      "start": 2210.002,
+      "end": 2296.212
     },
     {
       "kind": "GROUP",
@@ -594,8 +594,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         90,
         91
       ],
-      "start": 2296.644,
-      "end": 2375.8
+      "start": 2296.212,
+      "end": 2375.26
     },
     {
       "kind": "GROUP",
@@ -606,8 +606,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         93,
         94
       ],
-      "start": 2375.8,
-      "end": 2460.136
+      "start": 2375.26,
+      "end": 2459.596
     },
     {
       "kind": "GROUP",
@@ -618,8 +618,8 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         96,
         97
       ],
-      "start": 2460.136,
-      "end": 2539.411
+      "start": 2459.596,
+      "end": 2538.871
     },
     {
       "kind": "GROUP",
@@ -630,13 +630,13 @@ export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
         99,
         100
       ],
-      "start": 2539.411,
-      "end": 2615.7
+      "start": 2538.871,
+      "end": 2615.16
     },
     {
       "kind": "END",
-      "start": 2615.7,
-      "end": 2621.175
+      "start": 2615.16,
+      "end": 2620.635
     }
   ]
 };
