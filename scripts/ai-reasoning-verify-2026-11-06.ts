@@ -84,7 +84,7 @@ async function main() {
     for (const g of groups)
       for (const q of g.questions) {
         key.set(reviewItemId(q.questionNumber), q.correctIndex);
-        if (/look at the graphic/i.test(q.text)) graphicIds.add(reviewItemId(q.questionNumber));
+        if (/look at the graphic/i.test(q.text ?? '')) graphicIds.add(reviewItemId(q.questionNumber));
       }
     const prompt = solvePrompt(solveRequestOf(part, rows));
     for (const mode of MODES) {
