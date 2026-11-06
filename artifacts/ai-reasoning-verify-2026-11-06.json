@@ -1,0 +1,201 @@
+{
+  "exam": 3,
+  "solve": [
+    {
+      "part": 2,
+      "mode": "low",
+      "ok": true,
+      "ms": 20160,
+      "total": 25,
+      "correct": 25,
+      "wrong": [],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 221.41329956054688
+    },
+    {
+      "part": 2,
+      "mode": "medium",
+      "ok": true,
+      "ms": 43355,
+      "total": 25,
+      "correct": 25,
+      "wrong": [],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 314.6177978515625
+    },
+    {
+      "part": 3,
+      "mode": "low",
+      "ok": true,
+      "ms": 56308,
+      "total": 39,
+      "correct": 38,
+      "wrong": [
+        "q37"
+      ],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 336.1628112792969
+    },
+    {
+      "part": 3,
+      "mode": "medium",
+      "ok": true,
+      "ms": 51573,
+      "total": 39,
+      "correct": 39,
+      "wrong": [],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 493.18548583984375
+    },
+    {
+      "part": 4,
+      "mode": "low",
+      "ok": true,
+      "ms": 32413,
+      "total": 30,
+      "correct": 29,
+      "wrong": [
+        "q96"
+      ],
+      "missing": [],
+      "graphicWrong": [
+        "q96"
+      ],
+      "neurons": 289.89031982421875
+    },
+    {
+      "part": 4,
+      "mode": "medium",
+      "ok": true,
+      "ms": 64088,
+      "total": 30,
+      "correct": 30,
+      "wrong": [],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 409.68572998046875
+    },
+    {
+      "part": 5,
+      "mode": "low",
+      "ok": true,
+      "ms": 25572,
+      "total": 30,
+      "correct": 30,
+      "wrong": [],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 194.82241821289062
+    },
+    {
+      "part": 5,
+      "mode": "medium",
+      "ok": true,
+      "ms": 40862,
+      "total": 30,
+      "correct": 30,
+      "wrong": [],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 294.1632995605469
+    },
+    {
+      "part": 6,
+      "mode": "low",
+      "ok": true,
+      "ms": 23032,
+      "total": 16,
+      "correct": 16,
+      "wrong": [],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 160.7042999267578
+    },
+    {
+      "part": 6,
+      "mode": "medium",
+      "ok": true,
+      "ms": 32820,
+      "total": 16,
+      "correct": 16,
+      "wrong": [],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 214.06336975097656
+    },
+    {
+      "part": 7,
+      "mode": "low",
+      "ok": true,
+      "ms": 146669,
+      "total": 54,
+      "correct": 51,
+      "wrong": [
+        "q186",
+        "q192",
+        "q199"
+      ],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 426.130859375
+    },
+    {
+      "part": 7,
+      "mode": "medium",
+      "ok": true,
+      "ms": 144652,
+      "total": 54,
+      "correct": 53,
+      "wrong": [
+        "q192"
+      ],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 613.7671508789062
+    }
+  ],
+  "generate": [
+    {
+      "part": 3,
+      "mode": "low",
+      "ok": true,
+      "ms": 14294,
+      "issues": [
+        "group 1: Hội thoại cần 3 người nói, hiện có 2",
+        "group 2: Thiếu hình đi kèm dạng GRAPHIC với ít nhất 3 dòng",
+        "group 2: Câu 3 hỏi theo hình (Look at the graphic) nhưng nhóm không có hình GRAPHIC"
+      ],
+      "neurons": 99.19078063964844
+    },
+    {
+      "part": 3,
+      "mode": "medium",
+      "ok": true,
+      "ms": 47497,
+      "issues": [
+        "AI trả về sai số nhóm TOEIC"
+      ],
+      "neurons": 227.71347045898438
+    },
+    {
+      "part": 7,
+      "mode": "low",
+      "ok": true,
+      "ms": 19106,
+      "issues": [],
+      "neurons": 89.37715911865234
+    },
+    {
+      "part": 7,
+      "mode": "medium",
+      "ok": true,
+      "ms": 70207,
+      "issues": [],
+      "neurons": 272.3770751953125
+    }
+  ]
+}
