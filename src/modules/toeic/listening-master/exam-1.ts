@@ -5,638 +5,484 @@
 import type { ListeningMaster } from '../toeic-listening-master';
 
 export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
-  "examId": 1,
-  "key": "catalog/toeic/exam-1/listening-master/c5166cd4fe16c294.v1.mp3",
-  "sha256": "c5166cd4fe16c29482a35b4b9b91e73d207a8c559b59b5e8542eab77a8f3780c",
-  "bytes": 20965869,
-  "durationSeconds": 2620.635,
-  "format": "mp3 24000 Hz 1ch 64 kb/s CBR",
-  "responseGapSeconds": {
-    "1": 5,
-    "2": 5,
-    "3": 8,
-    "4": 8
+  examId: 1,
+  key: 'catalog/toeic/exam-1/listening-master/c5166cd4fe16c294.v1.mp3',
+  sha256: 'c5166cd4fe16c29482a35b4b9b91e73d207a8c559b59b5e8542eab77a8f3780c',
+  bytes: 20965869,
+  durationSeconds: 2620.635,
+  format: 'mp3 24000 Hz 1ch 64 kb/s CBR',
+  responseGapSeconds: {
+    '1': 5,
+    '2': 5,
+    '3': 8,
+    '4': 8,
   },
-  "timeline": [
+  timeline: [
     {
-      "kind": "INTRO",
-      "start": 0,
-      "end": 30.82
+      kind: 'INTRO',
+      start: 0,
+      end: 30.82,
     },
     {
-      "kind": "DIRECTIONS",
-      "part": 1,
-      "start": 32.82,
-      "end": 52.6
+      kind: 'DIRECTIONS',
+      part: 1,
+      start: 32.82,
+      end: 52.6,
     },
     {
-      "kind": "GROUP",
-      "part": 1,
-      "groupId": 1,
-      "questionNumbers": [
-        1
-      ],
-      "start": 54.6,
-      "end": 77.96
+      kind: 'GROUP',
+      part: 1,
+      groupId: 1,
+      questionNumbers: [1],
+      start: 54.6,
+      end: 77.96,
     },
     {
-      "kind": "GROUP",
-      "part": 1,
-      "groupId": 2,
-      "questionNumbers": [
-        2
-      ],
-      "start": 77.96,
-      "end": 101.011
+      kind: 'GROUP',
+      part: 1,
+      groupId: 2,
+      questionNumbers: [2],
+      start: 77.96,
+      end: 101.011,
     },
     {
-      "kind": "GROUP",
-      "part": 1,
-      "groupId": 3,
-      "questionNumbers": [
-        3
-      ],
-      "start": 101.011,
-      "end": 125.401
+      kind: 'GROUP',
+      part: 1,
+      groupId: 3,
+      questionNumbers: [3],
+      start: 101.011,
+      end: 125.401,
     },
     {
-      "kind": "GROUP",
-      "part": 1,
-      "groupId": 4,
-      "questionNumbers": [
-        4
-      ],
-      "start": 125.401,
-      "end": 149.031
+      kind: 'GROUP',
+      part: 1,
+      groupId: 4,
+      questionNumbers: [4],
+      start: 125.401,
+      end: 149.031,
     },
     {
-      "kind": "GROUP",
-      "part": 1,
-      "groupId": 5,
-      "questionNumbers": [
-        5
-      ],
-      "start": 149.031,
-      "end": 173.316
+      kind: 'GROUP',
+      part: 1,
+      groupId: 5,
+      questionNumbers: [5],
+      start: 149.031,
+      end: 173.316,
     },
     {
-      "kind": "GROUP",
-      "part": 1,
-      "groupId": 6,
-      "questionNumbers": [
-        6
-      ],
-      "start": 173.316,
-      "end": 197.918
+      kind: 'GROUP',
+      part: 1,
+      groupId: 6,
+      questionNumbers: [6],
+      start: 173.316,
+      end: 197.918,
     },
     {
-      "kind": "DIRECTIONS",
-      "part": 2,
-      "start": 197.918,
-      "end": 218.315
+      kind: 'DIRECTIONS',
+      part: 2,
+      start: 197.918,
+      end: 218.315,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 7,
-      "questionNumbers": [
-        7
-      ],
-      "start": 220.315,
-      "end": 240.92
+      kind: 'GROUP',
+      part: 2,
+      groupId: 7,
+      questionNumbers: [7],
+      start: 220.315,
+      end: 240.92,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 8,
-      "questionNumbers": [
-        8
-      ],
-      "start": 240.92,
-      "end": 261.303
+      kind: 'GROUP',
+      part: 2,
+      groupId: 8,
+      questionNumbers: [8],
+      start: 240.92,
+      end: 261.303,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 9,
-      "questionNumbers": [
-        9
-      ],
-      "start": 261.303,
-      "end": 282.791
+      kind: 'GROUP',
+      part: 2,
+      groupId: 9,
+      questionNumbers: [9],
+      start: 261.303,
+      end: 282.791,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 10,
-      "questionNumbers": [
-        10
-      ],
-      "start": 282.791,
-      "end": 302.92
+      kind: 'GROUP',
+      part: 2,
+      groupId: 10,
+      questionNumbers: [10],
+      start: 282.791,
+      end: 302.92,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 11,
-      "questionNumbers": [
-        11
-      ],
-      "start": 302.92,
-      "end": 323.168
+      kind: 'GROUP',
+      part: 2,
+      groupId: 11,
+      questionNumbers: [11],
+      start: 302.92,
+      end: 323.168,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 12,
-      "questionNumbers": [
-        12
-      ],
-      "start": 323.168,
-      "end": 344.594
+      kind: 'GROUP',
+      part: 2,
+      groupId: 12,
+      questionNumbers: [12],
+      start: 323.168,
+      end: 344.594,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 13,
-      "questionNumbers": [
-        13
-      ],
-      "start": 344.594,
-      "end": 365.887
+      kind: 'GROUP',
+      part: 2,
+      groupId: 13,
+      questionNumbers: [13],
+      start: 344.594,
+      end: 365.887,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 14,
-      "questionNumbers": [
-        14
-      ],
-      "start": 365.887,
-      "end": 386.173
+      kind: 'GROUP',
+      part: 2,
+      groupId: 14,
+      questionNumbers: [14],
+      start: 365.887,
+      end: 386.173,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 15,
-      "questionNumbers": [
-        15
-      ],
-      "start": 386.173,
-      "end": 407.043
+      kind: 'GROUP',
+      part: 2,
+      groupId: 15,
+      questionNumbers: [15],
+      start: 386.173,
+      end: 407.043,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 16,
-      "questionNumbers": [
-        16
-      ],
-      "start": 407.043,
-      "end": 427.722
+      kind: 'GROUP',
+      part: 2,
+      groupId: 16,
+      questionNumbers: [16],
+      start: 407.043,
+      end: 427.722,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 17,
-      "questionNumbers": [
-        17
-      ],
-      "start": 427.722,
-      "end": 449.637
+      kind: 'GROUP',
+      part: 2,
+      groupId: 17,
+      questionNumbers: [17],
+      start: 427.722,
+      end: 449.637,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 18,
-      "questionNumbers": [
-        18
-      ],
-      "start": 449.637,
-      "end": 470.014
+      kind: 'GROUP',
+      part: 2,
+      groupId: 18,
+      questionNumbers: [18],
+      start: 449.637,
+      end: 470.014,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 19,
-      "questionNumbers": [
-        19
-      ],
-      "start": 470.014,
-      "end": 491.202
+      kind: 'GROUP',
+      part: 2,
+      groupId: 19,
+      questionNumbers: [19],
+      start: 470.014,
+      end: 491.202,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 20,
-      "questionNumbers": [
-        20
-      ],
-      "start": 491.202,
-      "end": 510.812
+      kind: 'GROUP',
+      part: 2,
+      groupId: 20,
+      questionNumbers: [20],
+      start: 491.202,
+      end: 510.812,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 21,
-      "questionNumbers": [
-        21
-      ],
-      "start": 510.812,
-      "end": 532.895
+      kind: 'GROUP',
+      part: 2,
+      groupId: 21,
+      questionNumbers: [21],
+      start: 510.812,
+      end: 532.895,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 22,
-      "questionNumbers": [
-        22
-      ],
-      "start": 532.895,
-      "end": 554.412
+      kind: 'GROUP',
+      part: 2,
+      groupId: 22,
+      questionNumbers: [22],
+      start: 532.895,
+      end: 554.412,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 23,
-      "questionNumbers": [
-        23
-      ],
-      "start": 554.412,
-      "end": 575.998
+      kind: 'GROUP',
+      part: 2,
+      groupId: 23,
+      questionNumbers: [23],
+      start: 554.412,
+      end: 575.998,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 24,
-      "questionNumbers": [
-        24
-      ],
-      "start": 575.998,
-      "end": 597.104
+      kind: 'GROUP',
+      part: 2,
+      groupId: 24,
+      questionNumbers: [24],
+      start: 575.998,
+      end: 597.104,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 25,
-      "questionNumbers": [
-        25
-      ],
-      "start": 597.104,
-      "end": 617.288
+      kind: 'GROUP',
+      part: 2,
+      groupId: 25,
+      questionNumbers: [25],
+      start: 597.104,
+      end: 617.288,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 26,
-      "questionNumbers": [
-        26
-      ],
-      "start": 617.288,
-      "end": 638.91
+      kind: 'GROUP',
+      part: 2,
+      groupId: 26,
+      questionNumbers: [26],
+      start: 617.288,
+      end: 638.91,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 27,
-      "questionNumbers": [
-        27
-      ],
-      "start": 638.91,
-      "end": 659.686
+      kind: 'GROUP',
+      part: 2,
+      groupId: 27,
+      questionNumbers: [27],
+      start: 638.91,
+      end: 659.686,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 28,
-      "questionNumbers": [
-        28
-      ],
-      "start": 659.686,
-      "end": 680.722
+      kind: 'GROUP',
+      part: 2,
+      groupId: 28,
+      questionNumbers: [28],
+      start: 659.686,
+      end: 680.722,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 29,
-      "questionNumbers": [
-        29
-      ],
-      "start": 680.722,
-      "end": 702.843
+      kind: 'GROUP',
+      part: 2,
+      groupId: 29,
+      questionNumbers: [29],
+      start: 680.722,
+      end: 702.843,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 30,
-      "questionNumbers": [
-        30
-      ],
-      "start": 702.843,
-      "end": 723.621
+      kind: 'GROUP',
+      part: 2,
+      groupId: 30,
+      questionNumbers: [30],
+      start: 702.843,
+      end: 723.621,
     },
     {
-      "kind": "GROUP",
-      "part": 2,
-      "groupId": 31,
-      "questionNumbers": [
-        31
-      ],
-      "start": 723.621,
-      "end": 746.718
+      kind: 'GROUP',
+      part: 2,
+      groupId: 31,
+      questionNumbers: [31],
+      start: 723.621,
+      end: 746.718,
     },
     {
-      "kind": "DIRECTIONS",
-      "part": 3,
-      "start": 746.718,
-      "end": 765.962
+      kind: 'DIRECTIONS',
+      part: 3,
+      start: 746.718,
+      end: 765.962,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 32,
-      "questionNumbers": [
-        32,
-        33,
-        34
-      ],
-      "start": 767.962,
-      "end": 838.483
+      kind: 'GROUP',
+      part: 3,
+      groupId: 32,
+      questionNumbers: [32, 33, 34],
+      start: 767.962,
+      end: 838.483,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 33,
-      "questionNumbers": [
-        35,
-        36,
-        37
-      ],
-      "start": 838.483,
-      "end": 917.683
+      kind: 'GROUP',
+      part: 3,
+      groupId: 33,
+      questionNumbers: [35, 36, 37],
+      start: 838.483,
+      end: 917.683,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 34,
-      "questionNumbers": [
-        38,
-        39,
-        40
-      ],
-      "start": 917.683,
-      "end": 993.923
+      kind: 'GROUP',
+      part: 3,
+      groupId: 34,
+      questionNumbers: [38, 39, 40],
+      start: 917.683,
+      end: 993.923,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 35,
-      "questionNumbers": [
-        41,
-        42,
-        43
-      ],
-      "start": 993.923,
-      "end": 1072.048
+      kind: 'GROUP',
+      part: 3,
+      groupId: 35,
+      questionNumbers: [41, 42, 43],
+      start: 993.923,
+      end: 1072.048,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 36,
-      "questionNumbers": [
-        44,
-        45,
-        46
-      ],
-      "start": 1072.048,
-      "end": 1153.694
+      kind: 'GROUP',
+      part: 3,
+      groupId: 36,
+      questionNumbers: [44, 45, 46],
+      start: 1072.048,
+      end: 1153.694,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 37,
-      "questionNumbers": [
-        47,
-        48,
-        49
-      ],
-      "start": 1153.694,
-      "end": 1230.041
+      kind: 'GROUP',
+      part: 3,
+      groupId: 37,
+      questionNumbers: [47, 48, 49],
+      start: 1153.694,
+      end: 1230.041,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 38,
-      "questionNumbers": [
-        50,
-        51,
-        52
-      ],
-      "start": 1230.041,
-      "end": 1314.994
+      kind: 'GROUP',
+      part: 3,
+      groupId: 38,
+      questionNumbers: [50, 51, 52],
+      start: 1230.041,
+      end: 1314.994,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 39,
-      "questionNumbers": [
-        53,
-        54,
-        55
-      ],
-      "start": 1314.994,
-      "end": 1389.543
+      kind: 'GROUP',
+      part: 3,
+      groupId: 39,
+      questionNumbers: [53, 54, 55],
+      start: 1314.994,
+      end: 1389.543,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 40,
-      "questionNumbers": [
-        56,
-        57,
-        58
-      ],
-      "start": 1389.543,
-      "end": 1476.858
+      kind: 'GROUP',
+      part: 3,
+      groupId: 40,
+      questionNumbers: [56, 57, 58],
+      start: 1389.543,
+      end: 1476.858,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 41,
-      "questionNumbers": [
-        59,
-        60,
-        61
-      ],
-      "start": 1476.858,
-      "end": 1551.125
+      kind: 'GROUP',
+      part: 3,
+      groupId: 41,
+      questionNumbers: [59, 60, 61],
+      start: 1476.858,
+      end: 1551.125,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 42,
-      "questionNumbers": [
-        62,
-        63,
-        64
-      ],
-      "start": 1551.125,
-      "end": 1631.225
+      kind: 'GROUP',
+      part: 3,
+      groupId: 42,
+      questionNumbers: [62, 63, 64],
+      start: 1551.125,
+      end: 1631.225,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 43,
-      "questionNumbers": [
-        65,
-        66,
-        67
-      ],
-      "start": 1631.225,
-      "end": 1711.03
+      kind: 'GROUP',
+      part: 3,
+      groupId: 43,
+      questionNumbers: [65, 66, 67],
+      start: 1631.225,
+      end: 1711.03,
     },
     {
-      "kind": "GROUP",
-      "part": 3,
-      "groupId": 44,
-      "questionNumbers": [
-        68,
-        69,
-        70
-      ],
-      "start": 1711.03,
-      "end": 1790.883
+      kind: 'GROUP',
+      part: 3,
+      groupId: 44,
+      questionNumbers: [68, 69, 70],
+      start: 1711.03,
+      end: 1790.883,
     },
     {
-      "kind": "DIRECTIONS",
-      "part": 4,
-      "start": 1790.883,
-      "end": 1811.91
+      kind: 'DIRECTIONS',
+      part: 4,
+      start: 1790.883,
+      end: 1811.91,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 45,
-      "questionNumbers": [
-        71,
-        72,
-        73
-      ],
-      "start": 1813.91,
-      "end": 1890.072
+      kind: 'GROUP',
+      part: 4,
+      groupId: 45,
+      questionNumbers: [71, 72, 73],
+      start: 1813.91,
+      end: 1890.072,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 46,
-      "questionNumbers": [
-        74,
-        75,
-        76
-      ],
-      "start": 1890.072,
-      "end": 1972.325
+      kind: 'GROUP',
+      part: 4,
+      groupId: 46,
+      questionNumbers: [74, 75, 76],
+      start: 1890.072,
+      end: 1972.325,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 47,
-      "questionNumbers": [
-        77,
-        78,
-        79
-      ],
-      "start": 1972.325,
-      "end": 2054.945
+      kind: 'GROUP',
+      part: 4,
+      groupId: 47,
+      questionNumbers: [77, 78, 79],
+      start: 1972.325,
+      end: 2054.945,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 48,
-      "questionNumbers": [
-        80,
-        81,
-        82
-      ],
-      "start": 2054.945,
-      "end": 2130.717
+      kind: 'GROUP',
+      part: 4,
+      groupId: 48,
+      questionNumbers: [80, 81, 82],
+      start: 2054.945,
+      end: 2130.717,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 49,
-      "questionNumbers": [
-        83,
-        84,
-        85
-      ],
-      "start": 2130.717,
-      "end": 2210.002
+      kind: 'GROUP',
+      part: 4,
+      groupId: 49,
+      questionNumbers: [83, 84, 85],
+      start: 2130.717,
+      end: 2210.002,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 50,
-      "questionNumbers": [
-        86,
-        87,
-        88
-      ],
-      "start": 2210.002,
-      "end": 2296.212
+      kind: 'GROUP',
+      part: 4,
+      groupId: 50,
+      questionNumbers: [86, 87, 88],
+      start: 2210.002,
+      end: 2296.212,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 51,
-      "questionNumbers": [
-        89,
-        90,
-        91
-      ],
-      "start": 2296.212,
-      "end": 2375.26
+      kind: 'GROUP',
+      part: 4,
+      groupId: 51,
+      questionNumbers: [89, 90, 91],
+      start: 2296.212,
+      end: 2375.26,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 52,
-      "questionNumbers": [
-        92,
-        93,
-        94
-      ],
-      "start": 2375.26,
-      "end": 2459.596
+      kind: 'GROUP',
+      part: 4,
+      groupId: 52,
+      questionNumbers: [92, 93, 94],
+      start: 2375.26,
+      end: 2459.596,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 53,
-      "questionNumbers": [
-        95,
-        96,
-        97
-      ],
-      "start": 2459.596,
-      "end": 2538.871
+      kind: 'GROUP',
+      part: 4,
+      groupId: 53,
+      questionNumbers: [95, 96, 97],
+      start: 2459.596,
+      end: 2538.871,
     },
     {
-      "kind": "GROUP",
-      "part": 4,
-      "groupId": 54,
-      "questionNumbers": [
-        98,
-        99,
-        100
-      ],
-      "start": 2538.871,
-      "end": 2615.16
+      kind: 'GROUP',
+      part: 4,
+      groupId: 54,
+      questionNumbers: [98, 99, 100],
+      start: 2538.871,
+      end: 2615.16,
     },
     {
-      "kind": "END",
-      "start": 2615.16,
-      "end": 2620.635
-    }
-  ]
+      kind: 'END',
+      start: 2615.16,
+      end: 2620.635,
+    },
+  ],
 };
