@@ -14,6 +14,7 @@ import { AI_EVALUATOR_TOKEN } from './strategies/ai-evaluator.interface';
 import { CloudflareWorkersAiClient } from './cloudflare-workers-ai.client';
 import { isGeminiOutage } from './gemini/gemini-credential-manager.service';
 import { exhaustedUntil, markExhausted } from './review/provider-exhaustion';
+import { assignListeningVoices } from './listening-voices';
 import {
   assertToeicBatchShape,
   assertToeicSpeakingWritingShape,
@@ -99,12 +100,6 @@ export function buildToeicListeningSsml(transcript: string): string {
   if (!turns.length) {
     throw new Error('Transcript không có nội dung để tạo audio');
   }
-  const voicePool = [
-    'en-US-JennyNeural',
-    'en-US-GuyNeural',
-    'en-US-AriaNeural',
-    'en-US-DavisNeural',
-  ];
   // A TOEIC Part 1/2 line is a plain "A. <content>" option label — speak the
   // leading letter as a letter name (SSML say-as), never leaving it to the
   // voice's own guess, without narrating a "Statement/Option/Response" word.
@@ -114,16 +109,14 @@ export function buildToeicListeningSsml(transcript: string): string {
     const [, letter, rest] = match;
     return `<say-as interpret-as="characters">${letter}</say-as>. ${escapeXml(rest)}`;
   };
-  const voiceBySpeaker = new Map<string, string>();
+  const voiceBySpeaker = assignListeningVoices(
+    turns.map((turn) => turn.speaker),
+  );
   const body = turns
-    .map((turn) => {
-      if (!voiceBySpeaker.has(turn.speaker))
-        voiceBySpeaker.set(
-          turn.speaker,
-          voicePool[voiceBySpeaker.size % voicePool.length],
-        );
-      return `<voice name="${voiceBySpeaker.get(turn.speaker)}">${renderSpeech(turn.text)}</voice>`;
-    })
+    .map(
+      (turn) =>
+        `<voice name="${voiceBySpeaker.get(turn.speaker)}">${renderSpeech(turn.text)}</voice>`,
+    )
     .join('');
   return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">${body}</speak>`;
 }

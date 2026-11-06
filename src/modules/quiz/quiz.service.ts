@@ -1681,7 +1681,31 @@ export class QuizService {
     });
   }
 
-  async getListeningTranscript(userId: number, quizId: number, role?: Role) {
+  /**
+   * Whether this learner may load the transcript now, without the 403 that
+   * getListeningTranscript raises before a reveal. The player asks this on
+   * load to restore an earlier reveal; asking the transcript itself made
+   * every unrevealed lesson log a warning.
+   */
+  async getListeningTranscriptStatus(
+    userId: number,
+    quizId: number,
+    role?: Role,
+  ): Promise<{ revealed: boolean }> {
+    const { revealed } = await this.listeningTranscriptGate(
+      userId,
+      quizId,
+      role,
+    );
+    return { revealed };
+  }
+
+  /** Shared checks of the transcript endpoints; no transcript text here. */
+  private async listeningTranscriptGate(
+    userId: number,
+    quizId: number,
+    role?: Role,
+  ) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
       select: {
@@ -1715,16 +1739,22 @@ export class QuizService {
         Array.isArray(content.transcriptSegments)
       );
     });
-    if (transcriptQuestions.length > 0) {
-      const reveal = await this.prisma.listeningTranscriptReveal.findUnique({
+    const revealed =
+      transcriptQuestions.length === 0 ||
+      (await this.prisma.listeningTranscriptReveal.findUnique({
         where: { userId_quizId: { userId, quizId } },
         select: { id: true },
-      });
-      if (!reveal) {
-        throw new ForbiddenException(
-          'Hãy xác nhận xem transcript trước khi tải nội dung.',
-        );
-      }
+      })) !== null;
+    return { transcriptQuestions, revealed };
+  }
+
+  async getListeningTranscript(userId: number, quizId: number, role?: Role) {
+    const { transcriptQuestions, revealed } =
+      await this.listeningTranscriptGate(userId, quizId, role);
+    if (!revealed) {
+      throw new ForbiddenException(
+        'Hãy xác nhận xem transcript trước khi tải nội dung.',
+      );
     }
 
     const dialogueBlocks = transcriptQuestions
@@ -1809,7 +1839,7 @@ export class QuizService {
 
     const artifact =
       await this.listeningAudioAuthoringService.getCurrentPublishedArtifact(
-        quiz.id,
+        quizId,
       );
     const timelineByTurn = new Map<
       string,
@@ -1832,7 +1862,7 @@ export class QuizService {
       }
     }
     return {
-      quizId: quiz.id,
+      quizId,
       audioArtifact: artifact
         ? {
             id: artifact.id,

@@ -32,6 +32,7 @@
  *   npx ts-node scripts/materialize-exam1-listening-phase0.ts --exam=1
  *   npx ts-node scripts/materialize-exam1-listening-phase0.ts --dry-run
  *   npx ts-node scripts/materialize-exam1-listening-phase0.ts --key-suffix=v2
+ *   npx ts-node scripts/materialize-exam1-listening-phase0.ts --exam=3 --key-suffix=v5 --force-groups=1039,1040
  */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
@@ -55,6 +56,19 @@ const suffixArg = process.argv.find((value) =>
 const keySuffix = suffixArg ? suffixArg.split('=')[1] : 'phase0';
 if (!/^[a-z0-9-]+$/.test(keySuffix))
   throw new Error('--key-suffix must be lowercase letters, digits or dashes');
+// Regenerate these groups even when their script hash is fresh: the hash
+// covers the spoken text, not the voices, so a voice fix leaves it unchanged.
+const forceArg = process.argv.find((value) =>
+  value.startsWith('--force-groups='),
+);
+const forceGroups = new Set(
+  (forceArg ? forceArg.split('=')[1] : '')
+    .split(',')
+    .filter(Boolean)
+    .map(Number),
+);
+if ([...forceGroups].some((id) => !Number.isInteger(id)))
+  throw new Error('--force-groups takes comma-separated group ids');
 
 type Report = {
   groupId: number;
@@ -123,7 +137,11 @@ async function main() {
         audio?: { sourceHash?: string };
       };
       const key = `premium/listening/toeic/exams/${examSetId}/groups/${group.id}-${keySuffix}.mp3`;
-      if (group.audioUrl && metadata.audio?.sourceHash === sourceHash) {
+      if (
+        group.audioUrl &&
+        metadata.audio?.sourceHash === sourceHash &&
+        !forceGroups.has(group.id)
+      ) {
         report.push({
           groupId: group.id,
           part: group.part,
