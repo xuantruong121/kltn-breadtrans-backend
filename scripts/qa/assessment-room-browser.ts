@@ -119,7 +119,7 @@ async function speakingAndWriting(wav: string) {
   check('the exam opens in fullscreen', await fullscreen(page));
   check(
     'the panel matches Listening & Reading',
-    /Thời gian còn lại[\s\S]*Nộp bài[\s\S]*Khôi phục[\s\S]*Lưu bài làm[\s\S]*đánh dấu review[\s\S]*Câu 1–2/i.test(
+    /Thời gian còn lại[\s\S]*Nộp bài[\s\S]*Khôi phục[\s\S]*Lưu bài làm[\s\S]*đánh dấu cần xem lại[\s\S]*Câu 1–2/i.test(
       await page.locator('aside').first().innerText(),
     ),
   );
@@ -128,12 +128,12 @@ async function speakingAndWriting(wav: string) {
     await page.getByRole('button', { name: 'Khôi phục' }).first().isDisabled(),
   );
   await page
-    .getByRole('button', { name: 'Câu 2. Bấm để đánh dấu review' })
+    .getByRole('button', { name: 'Câu 2. Bấm để đánh dấu cần xem lại' })
     .click();
   check(
     'clicking a question number marks it in the panel',
     (await page
-      .getByRole('button', { name: 'Câu 2, đã trả lời, đánh dấu review' })
+      .getByRole('button', { name: 'Câu 2, đã trả lời, đánh dấu cần xem lại' })
       .count()) === 1,
   );
   await page.screenshot({ path: `${SHOTS}/3b-speaking-marked.png` });
@@ -168,7 +168,7 @@ async function speakingAndWriting(wav: string) {
   check(
     'reloading keeps the marks',
     (await page
-      .getByRole('button', { name: 'Câu 2, đã trả lời, đánh dấu review' })
+      .getByRole('button', { name: 'Câu 2, đã trả lời, đánh dấu cần xem lại' })
       .count()) === 1,
   );
   check(
@@ -184,7 +184,7 @@ async function speakingAndWriting(wav: string) {
   const dialog = page.getByRole('dialog');
   check(
     'submit counts answered, missing and marked questions',
-    /2\s*Đã trả lời\s*9\s*Chưa trả lời\s*1\s*Đánh dấu review/.test(
+    /2\s*Đã trả lời\s*9\s*Chưa trả lời\s*1\s*Cần xem lại/.test(
       await dialog.innerText(),
     ),
   );
@@ -506,7 +506,7 @@ async function listeningReading() {
   const aside = page.locator('aside').first();
   check(
     'the shared panel keeps its order and its Parts',
-    /Thời gian còn lại[\s\S]*Nộp bài[\s\S]*Khôi phục[\s\S]*Lưu bài làm[\s\S]*đánh dấu review[\s\S]*Part 1[\s\S]*Part 7/i.test(
+    /Thời gian còn lại[\s\S]*Nộp bài[\s\S]*Khôi phục[\s\S]*Lưu bài làm[\s\S]*đánh dấu cần xem lại[\s\S]*Part 1[\s\S]*Part 7/i.test(
       await aside.innerText(),
     ),
   );

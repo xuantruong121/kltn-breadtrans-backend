@@ -189,7 +189,7 @@ async function main() {
   const sideText = (await aside.innerText()).replace(/\s+/g, ' ');
   check(
     'sidebar order: time, submit, restore/save, review hint, numbers by Part',
-    /Thời gian còn lại.*Nộp bài.*Khôi phục.*Lưu bài làm.*Chú ý: bạn có thể click vào số thứ tự câu hỏi trong bài để đánh dấu review.*Part 1/i.test(
+    /Thời gian còn lại.*Nộp bài.*Khôi phục.*Lưu bài làm.*Bấm vào số câu trong bài để đánh dấu cần xem lại.*Part 1/i.test(
       sideText,
     ),
   );
@@ -283,12 +283,12 @@ async function main() {
   await page.locator('#q-1 input[type="radio"]').nth(0).check();
   await page
     .locator('#q-1')
-    .getByRole('button', { name: /Câu 1\. Bấm để đánh dấu review/ })
+    .getByRole('button', { name: /Câu 1\. Bấm để đánh dấu cần xem lại/ })
     .click();
   check(
     'clicking the question number flags it (sidebar shows it)',
     (await aside
-      .getByRole('button', { name: /^Câu 1, .*đánh dấu review/ })
+      .getByRole('button', { name: /^Câu 1, .*đánh dấu cần xem lại/ })
       .count()) === 1,
   );
   await aside.getByRole('button', { name: 'Lưu bài làm' }).click();
@@ -334,7 +334,7 @@ async function main() {
     (await page.locator('#q-1 input[type="radio"]').nth(0).isChecked()) &&
       (await page
         .locator('#q-1')
-        .getByRole('button', { name: /đang đánh dấu review/ })
+        .getByRole('button', { name: /đang đánh dấu cần xem lại/ })
         .count()) === 1,
   );
   await page.getByRole('button', { name: /Vào toàn màn hình/ }).click();
