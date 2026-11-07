@@ -3392,7 +3392,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const sharedInformation = await this.prisma.speakingStimulus.create({
       data: {
         kind: SpeakingStimulusKind.INFORMATION,
-        title: 'TOEIC Speaking information source',
+        // The room strips "<exam title> — " and shows the rest as the box
+        // heading; a fixed English title showed as is (audit 2026-11-06).
+        title: exam.title ? `${exam.title} — Thông tin` : 'Thông tin',
         content: draft.speaking[7].informationStimulus!.trim(),
       },
     });
