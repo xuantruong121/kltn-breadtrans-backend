@@ -124,7 +124,7 @@ All six findings fixed, with owner approval in the chat on 2026-11-07. Backup be
 STRUCTURAL_AUDIT_AFTER=PASS          (FINDINGS=0, STALE_AUDIO 0 of 54 on both exams, masters current)
 E4_SOLVER_EXAM1_PART7=54/54          (medium; the first of two calls returned invalid JSON, retried)
 UX_WALK_AFTER=30/30 OK               (qa-artifacts/ux-verify-20261107; Part 5 practice 10:58, Part 3+4+7 86:5x)
-AUDIO_PLAYBACK=NOT_VERIFIED          (harness players show 0:00; new clips uploaded and referenced)
+AUDIO_PLAYBACK=PASS on 2 of 6 clips  (owner listened to Q9 and exam 3 Part 1 q3; the other 4 Part 1 clips not heard)
 ```
 
 The invalid JSON is a risk for production answer review. It sends a whole Part in one call, and exam 1 Part 7 is now longer. If it recurs, split the Part 7 review into chunks.
