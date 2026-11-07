@@ -6,8 +6,8 @@ import type { ListeningMaster } from '../toeic-listening-master';
 
 export const EXAM_1_LISTENING_MASTER: ListeningMaster = {
   examId: 1,
-  key: 'catalog/toeic/exam-1/listening-master/c5166cd4fe16c294.v1.mp3',
-  sha256: 'c5166cd4fe16c29482a35b4b9b91e73d207a8c559b59b5e8542eab77a8f3780c',
+  key: 'catalog/toeic/exam-1/listening-master/e48fafaaa27fdcb9.v1.mp3',
+  sha256: 'e48fafaaa27fdcb94a8f43c3cc137b9bf7330175b887a677dee45acc44e988cb',
   bytes: 20965869,
   durationSeconds: 2620.635,
   format: 'mp3 24000 Hz 1ch 64 kb/s CBR',

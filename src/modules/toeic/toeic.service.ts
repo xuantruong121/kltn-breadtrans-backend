@@ -32,6 +32,7 @@ import { buildToeicListeningAudioScript } from './toeic-listening-audio';
 import { buildLrStats, parseToeicGoal } from './toeic-lr-stats';
 import { reviewStatus, summarizeLrReview } from './toeic-lr-review';
 import { toeicQuestionType } from './toeic-question-type';
+import { practiceDurationSeconds } from './toeic-practice-duration.logic';
 import {
   listeningMasterFor,
   listeningMasterUrl,
@@ -582,7 +583,10 @@ export class ToeicService {
             examId,
             mode,
             selectedParts,
-            durationSeconds: exam.durationSeconds,
+            durationSeconds: practiceDurationSeconds(
+              selectedParts,
+              exam.durationSeconds,
+            ),
             status: AttemptStatus.PENDING_START,
           },
         });

@@ -41,8 +41,17 @@ if (!process.argv.includes('--live')) {
   console.log('Refusing: pass --live to make real provider calls.');
   process.exit(1);
 }
-const EXAM = 3;
-const MODES = ['low', 'medium'] as const;
+// Optional narrowing for later checks, e.g. fix E4 (2026-11-07):
+//   --exam 1 --parts 7 --modes medium --no-generate
+const argOf = (name: string) =>
+  process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined;
+const EXAM = Number(argOf('--exam') ?? 3);
+const MODES = (argOf('--modes')?.split(',') ?? ['low', 'medium']) as Array<'low' | 'medium'>;
+const PARTS = argOf('--parts')?.split(',').map(Number) ?? [2, 3, 4, 5, 6, 7];
+const GENERATE = !process.argv.includes('--no-generate');
+const OUT_FILE = process.argv.includes('--exam')
+  ? `artifacts/ai-reasoning-verify-exam${EXAM}-${new Date().toISOString().slice(0, 10)}.json`
+  : 'artifacts/ai-reasoning-verify-2026-11-06.json';
 // Same format as scripts/toeic-content-fix-c-graphic-passage-2026-11-06.ts
 // (importing it would run that script).
 const graphicPassage = (g: { title: string; columns: string[]; rows: string[][] }) =>
@@ -64,7 +73,7 @@ async function main() {
   if (!client.configured()) throw new Error('Cloudflare credentials missing');
   const out: any = { exam: EXAM, solve: [], generate: [] };
 
-  for (const part of [2, 3, 4, 5, 6, 7]) {
+  for (const part of PARTS) {
     const groups = await prisma.toeicQuestionGroup.findMany({
       where: { examId: EXAM, part },
       orderBy: { groupOrder: 'asc' },
@@ -93,12 +102,12 @@ async function main() {
         client.generateJsonDetailed({ systemInstruction: prompt.systemInstruction, prompt: prompt.prompt, schema: prompt.schema, temperature: prompt.temperature }),
       );
       const answers: any[] = r.ok ? ((r.value.data as any)?.answers ?? []) : [];
-      const wrong = answers.filter((a) => key.get(a.id) !== a.choice).map((a) => a.id);
+      const wrong = answers.filter((a) => key.get(a.id) !== a.choice).map((a) => `${a.id}:${"ABCD"[a.choice] ?? a.choice}`);
       const missing = [...key.keys()].filter((id) => !answers.some((a) => a.id === id));
       const row = {
         part, mode, ok: r.ok, ms: r.ms, error: r.ok ? undefined : r.error,
         total: key.size, correct: answers.filter((a) => key.get(a.id) === a.choice).length,
-        wrong, missing, graphicWrong: wrong.filter((id) => graphicIds.has(id)),
+        wrong, missing, graphicWrong: wrong.filter((id) => graphicIds.has(id.split(":")[0])),
         neurons: r.ok ? r.value.usage?.neurons : undefined,
       };
       out.solve.push(row);
@@ -110,7 +119,7 @@ async function main() {
     { part: 3, difficulty: 'medium' as const, topic: 'workplace and services', groups: [{ questionCount: 3, threeSpeakers: true }, { questionCount: 3, graphic: true }] },
     { part: 7, difficulty: 'medium' as const, topic: 'business correspondence', groups: [{ questionCount: 5, kind: 'MULTIPLE' as const, documents: 3 as const }] },
   ];
-  for (const plan of plans)
+  for (const plan of GENERATE ? plans : [])
     for (const mode of MODES) {
       process.env.CLOUDFLARE_AI_REASONING_EFFORT = mode;
       const request = toeicBatchRequest(plan as any);
@@ -144,7 +153,7 @@ async function main() {
       console.log(JSON.stringify(row));
     }
 
-  writeFileSync('artifacts/ai-reasoning-verify-2026-11-06.json', JSON.stringify(out, null, 2));
+  writeFileSync(OUT_FILE, JSON.stringify(out, null, 2));
   await prisma.$disconnect();
 }
 

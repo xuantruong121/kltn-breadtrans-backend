@@ -1,0 +1,18 @@
+{
+  "exam": 1,
+  "solve": [
+    {
+      "part": 7,
+      "mode": "medium",
+      "ok": true,
+      "ms": 111146,
+      "total": 54,
+      "correct": 54,
+      "wrong": [],
+      "missing": [],
+      "graphicWrong": [],
+      "neurons": 616.9488525390625
+    }
+  ],
+  "generate": []
+}
