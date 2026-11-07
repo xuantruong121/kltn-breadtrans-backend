@@ -4,9 +4,9 @@
  * L&R run with each setting" before moving to low; this is that run, plus the
  * other job the setting drives: Cloudflare as stand-in exam generator.
  *
- *   solve     exam 3, Parts 2-7, one call per Part as in production
- *             (toeic-ai-exam.service.ts runs solveRequestOf over all groups
- *             of a Part). Part 1 is reviewed by vision and is not affected.
+ *   solve     exam 3, Parts 2-7, one call per Part (stricter than production,
+ *             which reviews AI batches of at most 3 groups per call).
+ *             Part 1 is reviewed by vision and is not affected.
  *             Graphic groups take their GRAPHIC passage from batch C data,
  *             i.e. the state after the pending graphic correction.
  *   generate  one Part 3 batch (a three-speaker group and a graphic group)

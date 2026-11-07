@@ -6,7 +6,7 @@ production path `CloudflareWorkersAiClient.generateJsonDetailed`, effort switche
 The 2026-11-04 probe asked for "a full L&R run with each setting" before moving to `low`;
 the 2026-11-06 parts probe compared `low` with the chat format only, not with `medium`.
 
-## Answer review (independent solve), exam 3, Parts 2-7, one call per Part
+## Answer review (independent solve), exam 3, Parts 2-7, one call per Part (stricter than production, which reviews batches of at most 3 groups)
 
 | Part | Items | `low` correct | `medium` correct | `low` Neurons | `medium` Neurons |
 |---|---|---|---|---|---|
