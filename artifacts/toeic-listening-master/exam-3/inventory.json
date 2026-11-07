@@ -1,6 +1,6 @@
 {
   "examId": 3,
-  "generatedAt": "2026-11-06T14:22:23.837Z",
+  "generatedAt": "2026-11-07T02:59:07.895Z",
   "clipCount": 54,
   "clipSeconds": 1673.8,
   "byPart": [
@@ -69,10 +69,10 @@
       "questionNumbers": [
         3
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1010/audio-regenerated.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\1-003-g1010-3c31a4bdf9d9.mp3",
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1010-v7.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\1-003-g1010-2f7ea74cbf01.mp3",
       "bytes": 302400,
-      "sha256": "39a9f09e2dba2eb30148f20469ac205a68492e443920d4975a59c5301098463f",
+      "sha256": "723bbde18440973e89d09fea52b173b69f0ab97ab5b8964c6b7a2b8d3708b7a5",
       "durationSeconds": 18.9,
       "codec": "mp3",
       "sampleRate": 16000,
@@ -85,10 +85,10 @@
       "questionNumbers": [
         4
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1011/audio-regenerated.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\1-004-g1011-8dc627685851.mp3",
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1011-v7.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\1-004-g1011-42c4af6d4f8b.mp3",
       "bytes": 293184,
-      "sha256": "2c8ee3e40165308c733a0bb806a635e701911f964a2a3c944d5d5311fcc25ed4",
+      "sha256": "027ff1dc7b7454d7f18457cfd0faea7646aa16c07b4fc07d831b69ca9f178e12",
       "durationSeconds": 18.324,
       "codec": "mp3",
       "sampleRate": 16000,
@@ -117,10 +117,10 @@
       "questionNumbers": [
         6
       ],
-      "audioUrl": "premium/listening/toeic/exams/3/groups/1013/audio-regenerated.mp3",
-      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\1-006-g1013-1fa829e51433.mp3",
+      "audioUrl": "premium/listening/toeic/exams/3/groups/1013-v7.mp3",
+      "file": "artifacts\\toeic-listening-master\\exam-3\\clips\\1-006-g1013-17c0ec6640fa.mp3",
       "bytes": 312768,
-      "sha256": "454a4ee1d9547ad8ba43bcb314af0c2e41a3c85ae98c4a4b573289229ca30b22",
+      "sha256": "87e77fed0dbd3f1d2880d4348f13fdb6d162995d3b2832b69213e61253c44804",
       "durationSeconds": 19.548,
       "codec": "mp3",
       "sampleRate": 16000,
