@@ -21,7 +21,7 @@ import type { Page } from 'playwright';
 
 import { FE, hidePet, studentPage } from './harness-browser';
 
-const SHOTS = 'D:/Study/KLTN/qa-artifacts/ux-audit-20261106';
+const SHOTS = process.env.UX_SHOTS ?? 'D:/Study/KLTN/qa-artifacts/ux-audit-20261106';
 mkdirSync(SHOTS, { recursive: true });
 const log: Array<{ step: string; ok: boolean; note: string }> = [];
 const rec = (step: string, ok: boolean, note = '') => {
@@ -71,11 +71,16 @@ async function lrDesktop() {
     const t = await text(page);
     rec('L&R start screen offers both modes and Part choices', t.includes('Luyện tập linh hoạt') && t.includes('Làm Full Test'), '');
     await page.locator('input[name="toeic-mode"][value="PRACTICE"]').check();
+    for (const p of [3, 4, 7]) await page.locator(`input[name="toeic-part"][value="${p}"]`).check();
     await page.waitForTimeout(500);
+    rec('picker shows the practice time of Parts 3+4+7', /Thời gian:\s*87 phút/.test(await text(page)));
     await shot(page, '02-lr-practice-picker', true);
   });
   await step('Practice by Part 3+4+7', async () => {
     await startLr(page, 'PRACTICE', [3, 4, 7]);
+    await page.waitForTimeout(1500);
+    const clock = /Thời gian còn lại:?\s*(\d+):\d\d/.exec(await text(page))?.[1];
+    rec('Part 3+4+7 practice counts down from 87 minutes', clock === '86' || clock === '87', `clock ${clock}`);
     const tabs = await page.getByRole('tablist', { name: 'Part' }).getByRole('tab').allInnerTexts();
     rec('practice shows only Parts 3, 4, 7', JSON.stringify(tabs.map((t) => t.trim())) === JSON.stringify(['Part 3', 'Part 4', 'Part 7']), tabs.join(','));
     const q50 = await goToQuestion(page, 3, 50);
@@ -95,6 +100,12 @@ async function lrDesktop() {
     await shot(page, '06-lr-p7-double-q176');
     await goToQuestion(page, 7, 186);
     await shot(page, '07-lr-p7-triple-q186');
+    await goToQuestion(page, 7, 147);
+    const p149 = await text(page);
+    rec('exam 1 q147-149 is the new e-mail with [1]-[4]', /RoomLink/.test(p149) && /\[4\]/.test(p149));
+    await shot(page, '07b-lr-p7-new-q147');
+    await goToQuestion(page, 7, 156);
+    await shot(page, '07c-lr-p7-text-chain-q156');
     const audio = await page.locator('audio').count();
     rec('practice with Listening Parts has an audio player', audio > 0, String(audio));
   });
@@ -127,6 +138,13 @@ async function lrDesktop() {
     const t = await page.locator('article[data-question-number="7"]').innerText();
     rec('Part 2 hides the spoken prompt and responses text', !/When will the new printer/.test(t), t.replace(/\s+/g, ' ').slice(0, 80));
     await shot(page, '11-lr-full-part2');
+  });
+  await step('Part 5 practice is timed at 11 minutes', async () => {
+    await startLr(page, 'PRACTICE', [5]);
+    await page.waitForTimeout(1500);
+    const clock = /Thời gian còn lại:?\s*(\d+):\d\d/.exec(await text(page))?.[1];
+    rec('Part 5 practice counts down from 11 minutes', clock === '10' || clock === '11', `clock ${clock}`);
+    await shot(page, '12-lr-part5-practice');
   });
   rec('L&R desktop console errors', issues.length === 0, issues.slice(0, 3).join(' | '));
   await browser.close();
@@ -169,8 +187,13 @@ async function swRoom() {
         await shot(page, name, true);
       } else rec(`S&W tab ${tab} exists`, false, (await page.getByRole('tab').allInnerTexts()).join(','));
     }
+    await page.getByRole('tab', { name: 'Câu 8–10' }).click();
+    await page.waitForTimeout(800);
     const t = await text(page);
-    rec('Q8-10 shows the schedule', /Training Day|Opening session/.test(t));
+    rec('S&W Q8-10 schedule shows the new heading, no BreadTrans', /Riverside Business Center/.test(t) && !/BreadTrans Training Day/.test(t));
+    await page.getByRole('tab', { name: 'Câu 1–2' }).click();
+    await page.waitForTimeout(800);
+    rec('S&W Q2 read-aloud is the longer text', /carry-on bag fits under the seat/.test(await text(page)));
   });
   await step('S&W Writing tabs', async () => {
     await page.getByRole('button', { name: 'Nộp bài' }).first().click();
@@ -216,6 +239,9 @@ async function fourSkills() {
     await page.getByRole('tab', { name: 'Câu 8–10' }).click();
     await page.waitForTimeout(1200);
     await shot(page, '43-4s-speaking-q8-10', true);
+    const s810 = await text(page);
+    rec('4 Skills Q8-10 box is titled "Lịch hội nghị" and lists Day Two', s810.includes('Lịch hội nghị') && !s810.includes('information source') && /Day Two/.test(s810));
+    rec('4 Skills Q9 is the correction item', /I heard the keynote presentation is on the second day/.test(s810));
     await page.getByRole('button', { name: 'Nộp bài' }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận nộp bài' }).click();
     await page.getByRole('tab', { name: 'Câu 1–5' }).waitFor({ timeout: 40_000 });

@@ -106,3 +106,25 @@ AUDIO_PLAYBACK=NOT_VERIFIED   (harness players show 0:00/0:00; media answered HE
                                and the masters were rebuilt from current clips)
 EXAM1_PART1_PICTURES=3 of 6 re-opened today (q1, q3, q5 checked on 2026-11-04, unchanged since)
 ```
+
+## 4. Fixes E1-E6 (2026-11-07)
+
+All six findings fixed, with owner approval in the chat on 2026-11-07. Backup before the writes: `kltn_db_20261107_025548`. Rollback files are in `.local-backups/toeic-e/`.
+
+| Fix | What changed | Commit |
+|---|---|---|
+| E1 | Practice by Part takes the minutes of its Parts: P1 5, P2 9, P3 17, P4 14, P5 11, P6 8, P7 56 (sum 120). The Part picker shows the time. | BE `3cd066f`, FE `d6e892a` |
+| E2 | 4 Skills Q8-10 schedule, one item per line under "Lịch hội nghị". Q9 is a correct-the-caller item, with new prompt audio. The generator no longer stores the English title. | `a1fe104`, `7288ccb`, `c5348cc` |
+| E3 | Exam 1: q144, q145, q77, q59 and the q192 passage. | `7288ccb` |
+| E4 | Exam 1 Part 7 q147-175 rewritten. | `7288ccb` |
+| E5 | S&W read-aloud texts lengthened; the BreadTrans name dropped from the Q8-10 schedule. | `7288ccb` |
+| E6 | Part 1 key spread is now exam 1 2/1/2/1, exam 3 1/2/1/2. Five clips at `-v7`; masters rebuilt (exam 1 `e48fafaa`, exam 3 `da786b9f`). | `7288ccb` |
+
+```
+STRUCTURAL_AUDIT_AFTER=PASS          (FINDINGS=0, STALE_AUDIO 0 of 54 on both exams, masters current)
+E4_SOLVER_EXAM1_PART7=54/54          (medium; the first of two calls returned invalid JSON, retried)
+UX_WALK_AFTER=30/30 OK               (qa-artifacts/ux-verify-20261107; Part 5 practice 10:58, Part 3+4+7 86:5x)
+AUDIO_PLAYBACK=NOT_VERIFIED          (harness players show 0:00; new clips uploaded and referenced)
+```
+
+The invalid JSON is a risk for production answer review. It sends a whole Part in one call, and exam 1 Part 7 is now longer. If it recurs, split the Part 7 review into chunks.
