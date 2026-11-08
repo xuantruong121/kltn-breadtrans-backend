@@ -250,6 +250,9 @@ async function browser(width: number) {
   const nav = page.getByRole('navigation', {
     name: 'Trò chơi trong Đấu trường',
   });
+  await nav
+    .getByRole('button', { name: /Bắn chữ rơi/ })
+    .waitFor({ timeout: 30_000 });
   check(
     '/arena lists Đấu 1v1 and Bắn chữ rơi in its game sidebar',
     (await nav.getByRole('button', { name: /Đấu 1v1/ }).count()) === 1 &&
@@ -298,6 +301,10 @@ async function browser(width: number) {
     fullPage: true,
   });
   await page.getByRole('button', { name: '20 Bánh Mì', exact: true }).click();
+  // The wide run plays Từ → nghĩa (meanings typed without tone marks); the
+  // phone run keeps the default Gõ lại từ.
+  if (width >= 1280)
+    await page.getByRole('button', { name: /^Từ → nghĩa/ }).click();
   await page.getByRole('button', { name: 'Bắt đầu' }).click();
   await page.waitForURL(/\/arena\/word-blaster/, { timeout: 30_000 });
   const input = page.getByRole('textbox', { name: /Gõ đáp án/ });
@@ -317,6 +324,10 @@ async function browser(width: number) {
       // Let a few blocks fall once, for a picture of the field in play.
       if (shotCount === 8) {
         await sleep(3000);
+        check(
+          'Từ → nghĩa blocks show one underscore per letter of the meaning',
+          (await page.locator('[aria-label^="Nghĩa có"]').count()) > 0,
+        );
         await page.screenshot({
           path: `${SHOTS}/blaster-falling-${width}.png`,
         });
