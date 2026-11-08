@@ -1,5 +1,7 @@
 import {
   ARENA_ROUNDS,
+  arenaXp,
+  vietnamDayStart,
   blankedExample,
   buildArenaQuestions,
   kindsFor,
@@ -77,6 +79,27 @@ describe('roundPoints', () => {
   it('the last question is worth double', () => {
     expect(roundPoints(true, 0, 9, 10)).toBe(300);
     expect(roundPoints(false, 0, 9, 10)).toBe(0);
+  });
+});
+
+describe('arenaXp and vietnamDayStart', () => {
+  it('5 XP per correct answer, never past 150 a day', () => {
+    expect(arenaXp(10, 0)).toBe(50);
+    expect(arenaXp(0, 0)).toBe(0);
+    expect(arenaXp(7, 120)).toBe(30);
+    expect(arenaXp(7, 150)).toBe(0);
+    expect(arenaXp(7, 400)).toBe(0);
+  });
+
+  it('the day starts at midnight in Vietnam', () => {
+    // 03:00 on 9 Nov in Vietnam is 20:00 UTC on 8 Nov.
+    expect(
+      vietnamDayStart(new Date('2026-11-08T20:00:00Z')).toISOString(),
+    ).toBe('2026-11-08T17:00:00.000Z');
+    // 23:59 on 8 Nov in Vietnam.
+    expect(
+      vietnamDayStart(new Date('2026-11-08T16:59:00Z')).toISOString(),
+    ).toBe('2026-11-07T17:00:00.000Z');
   });
 });
 

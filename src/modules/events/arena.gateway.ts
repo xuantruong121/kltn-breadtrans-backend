@@ -8,7 +8,12 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -17,10 +22,15 @@ import { JwtService } from '@nestjs/jwt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getJwtSecret } from '../auth/auth.constants';
 import * as crypto from 'crypto';
+import { GamificationService } from '../gamification/gamification.service';
 import {
   ARENA_ROUNDS,
+  ARENA_XP_PER_CORRECT,
+  ARENA_XP_REASON,
   ROUND_SECONDS,
+  arenaXp,
   buildArenaQuestions,
+  vietnamDayStart,
   levelRank,
   roundPoints,
   type ArenaWord,
@@ -114,6 +124,7 @@ export class ArenaGateway
     private readonly eventsGateway: EventsGateway,
     private readonly jwtService: JwtService,
     private readonly events: EventEmitter2,
+    @Optional() private readonly gamification?: GamificationService,
   ) {}
 
   private escrowSweep?: NodeJS.Timeout;
@@ -1581,6 +1592,8 @@ export class ArenaGateway
       await this.redis.del(`arena:user_match:${match.p1.userId}`);
       await this.redis.del(`arena:user_match:${match.p2.userId}`);
 
+      const xp = await this.awardArenaXp(match);
+
       // Emit match ended event
       this.server.to(match.matchId).emit('arena:match_ended', {
         matchId: match.matchId,
@@ -1591,11 +1604,13 @@ export class ArenaGateway
           userId: match.p1.userId,
           userName: match.p1.userName,
           score: match.p1.score,
+          ...xp.p1,
         },
         p2: {
           userId: match.p2.userId,
           userName: match.p2.userName,
           score: match.p2.score,
+          ...xp.p2,
         },
         reward: winnerUserId ? totalReward : match.stake,
         isDraw: winnerRole === 'draw',
@@ -1607,6 +1622,48 @@ export class ArenaGateway
     } finally {
       await this.redis.eval(UNLOCK_SCRIPT, 1, lockKey, lockOwner);
     }
+  }
+
+  /**
+   * XP for each player's correct answers, after the Bread has settled, up to
+   * the daily Arena cap. A failure is logged and pays nothing: it must not
+   * stop the result from reaching the players.
+   */
+  private async awardArenaXp(
+    match: MatchState,
+  ): Promise<Record<'p1' | 'p2', { xp: number; xpCapped: boolean }>> {
+    const out = {
+      p1: { xp: 0, xpCapped: false },
+      p2: { xp: 0, xpCapped: false },
+    };
+    if (!this.gamification) return out;
+    const since = vietnamDayStart(new Date());
+    for (const role of ['p1', 'p2'] as const) {
+      const player = match[role];
+      try {
+        const correct = Object.values(player.answers ?? {}).filter(
+          (a) => a.isCorrect,
+        ).length;
+        const today = await this.prisma.pointHistory.aggregate({
+          where: {
+            userId: player.userId,
+            reason: ARENA_XP_REASON,
+            createdAt: { gte: since },
+          },
+          _sum: { points: true },
+        });
+        const xp = arenaXp(correct, today._sum.points ?? 0);
+        if (xp > 0)
+          await this.gamification.awardXp(player.userId, xp, ARENA_XP_REASON);
+        out[role] = { xp, xpCapped: xp < correct * ARENA_XP_PER_CORRECT };
+      } catch (err) {
+        this.logger.error(
+          `[Arena] [${match.matchId}] XP for user ${player.userId} failed:`,
+          err,
+        );
+      }
+    }
+    return out;
   }
 
   private getVietnamDateKey() {

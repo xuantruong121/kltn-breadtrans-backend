@@ -36,6 +36,32 @@ export function roundPoints(
   return (BASE_POINTS + bonus) * multiplier;
 }
 
+/**
+ * XP (owner decision 2026-11-08): the Arena counts toward the weekly league
+ * like any study. 5 XP per correct answer, whoever wins, so two accounts gain
+ * nothing by letting one another win; the doubled last question counts once.
+ * At most 150 Arena XP a Vietnam day: a match lasts about 2.5 minutes, an
+ * exercise of about 10 minutes pays up to 100 XP.
+ */
+export const ARENA_XP_PER_CORRECT = 5;
+export const ARENA_XP_DAILY_CAP = 150;
+export const ARENA_XP_REASON = 'Đấu trường từ vựng';
+
+/** XP for one match, given the Arena XP the learner already has today. */
+export function arenaXp(correctAnswers: number, earnedToday: number): number {
+  const full = Math.max(0, Math.floor(correctAnswers)) * ARENA_XP_PER_CORRECT;
+  return Math.max(0, Math.min(full, ARENA_XP_DAILY_CAP - earnedToday));
+}
+
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Midnight of the current day in Vietnam (UTC+7, no daylight saving). */
+export function vietnamDayStart(now: Date): Date {
+  const local = now.getTime() + VN_OFFSET_MS;
+  return new Date(local - (local % DAY_MS) - VN_OFFSET_MS);
+}
+
 export type QuestionKind = 'fill_blank' | 'meaning_to_word' | 'word_to_meaning';
 
 export type ArenaWord = {
