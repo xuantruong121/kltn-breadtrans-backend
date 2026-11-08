@@ -132,13 +132,15 @@ export function shuffle<T>(items: readonly T[], rng: () => number): T[] {
 
 /**
  * Allowed CEFR ranks for a round: the first 30 % A2–B1, the middle B1, the
- * last 30 % B1–B2 (for 10 rounds: 1–3, 4–7, 8–10).
+ * last 30 % B2, widened to B1 and C1 when B2 runs out (for 10 rounds: 1–3,
+ * 4–7, 8–10). The decks hold about twice as many B1 words as B2, so a B1–B2
+ * range made the last rounds mostly B1.
  */
 export function stageLevels(roundIndex: number, count: number): number[] {
   const position = roundIndex / count;
   if (position < 0.3) return [2, 3];
   if (position < 0.7) return [3];
-  return [3, 4];
+  return [4];
 }
 
 /** Kinds for a match: each kind at least count/3 times, in random order. */
@@ -168,6 +170,11 @@ function widen(levels: number[]): ((w: ArenaWord) => boolean)[] {
     (w) => w.level === null || (w.level >= lo - 2 && w.level <= hi + 2),
     () => true,
   ];
+}
+
+/** Distractors from the target's own level are harder to rule out. */
+function levelGap(a: ArenaWord, b: ArenaWord): number {
+  return a.level === null || b.level === null ? 2 : Math.abs(a.level - b.level);
 }
 
 function optionText(w: ArenaWord, kind: QuestionKind): string {
@@ -227,6 +234,7 @@ export function buildArenaQuestions(
     ).sort(
       (a, b) =>
         Number(b.pos === word.pos) - Number(a.pos === word.pos) ||
+        levelGap(a, word) - levelGap(b, word) ||
         (usage.get(a.id) ?? 0) - (usage.get(b.id) ?? 0),
     );
     const chosen: ArenaWord[] = [];

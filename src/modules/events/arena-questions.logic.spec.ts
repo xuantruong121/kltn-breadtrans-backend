@@ -38,12 +38,13 @@ const word = (
   level,
 });
 
-// 3 levels x 16 nouns, 12 verbs, plus junk and a clashing meaning.
+// 3 levels x 16 nouns (letters only: a digit would make them junk), 12 verbs,
+// plus junk and a clashing meaning.
 const pool: ArenaWord[] = [
   ...['A2', 'B1', 'B2'].flatMap((lvl, li) =>
     Array.from({ length: 16 }, (_, i) =>
       word(
-        `noun${lvl.toLowerCase()}x${String.fromCharCode(97 + i)}`,
+        `noun${['aa', 'bb', 'cc'][li]}x${String.fromCharCode(97 + i)}`,
         `danh từ ${lvl} số ${i}`,
         li + 2,
       ),
@@ -80,7 +81,7 @@ describe('roundPoints', () => {
 });
 
 describe('stageLevels and kindsFor', () => {
-  it('10 rounds: 1-3 A2-B1, 4-7 B1, 8-10 B1-B2', () => {
+  it('10 rounds: 1-3 A2-B1, 4-7 B1, 8-10 B2', () => {
     const stages = Array.from({ length: 10 }, (_, i) => stageLevels(i, 10));
     expect(stages.slice(0, 3)).toEqual([
       [2, 3],
@@ -88,11 +89,7 @@ describe('stageLevels and kindsFor', () => {
       [2, 3],
     ]);
     expect(stages.slice(3, 7)).toEqual([[3], [3], [3], [3]]);
-    expect(stages.slice(7)).toEqual([
-      [3, 4],
-      [3, 4],
-      [3, 4],
-    ]);
+    expect(stages.slice(7)).toEqual([[4], [4], [4]]);
   });
 
   it('every kind appears at least three times in 10 rounds', () => {
@@ -153,7 +150,7 @@ describe('buildArenaQuestions', () => {
 
       // Harder as the match goes on.
       if (i < 3) expect(target.level!).toBeLessThanOrEqual(3);
-      if (i >= 7) expect(target.level!).toBeGreaterThanOrEqual(3);
+      if (i >= 7) expect(target.level!).toBe(4);
 
       if (q.kind === 'fill_blank') {
         expect(q.prompt).toContain('_____');
