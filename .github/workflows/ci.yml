@@ -74,7 +74,14 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        # ffmpeg-static downloads its binary from GitHub Releases in its
+        # install script; on 2026-11-08 those downloads answered 504 for
+        # minutes and three retries all failed. CI never runs ffmpeg (the one
+        # test that converts audio skips without the binary), so install
+        # without scripts, then run only the scripts the build and tests need.
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild bcrypt msgpackr-extract @prisma/engines prisma unrs-resolver
 
       - name: Generate Prisma client
         run: npx prisma generate

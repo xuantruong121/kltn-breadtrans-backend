@@ -2,6 +2,14 @@
  * Pure item-effect rules for the Bánh Mì shop.
  */
 
+/**
+ * "Thẻ 7 ngày Plus" (owner, 2026-11-08, in place of the Phúc Long voucher that
+ * could not be supplied): each card adds 7 days to the learner's plan at once,
+ * or starts 7 days of Plus when there is none.
+ */
+export const PLUS_CARD_SLUG = 'plus-7d';
+export const PLUS_CARD_DAYS = 7;
+
 /** "Thẻ nhân đôi Bánh Mì (24h Boost)" lasts 24 hours per card. */
 export const DOUBLE_BANH_HOURS_PER_CARD = 24;
 

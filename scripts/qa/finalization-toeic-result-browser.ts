@@ -709,7 +709,7 @@ async function main() {
   );
   await page
     .locator('[data-speaking-task="1"]')
-    .getByRole('button', { name: '[Chi tiết]' })
+    .getByRole('button', { name: 'Chi tiết', exact: true })
     .click();
   const spDialog = page.getByRole('dialog', { name: 'Speaking · Câu 1' });
   await spDialog.waitFor({ timeout: 10_000 });
@@ -753,7 +753,7 @@ async function main() {
   });
   await page
     .locator('[data-writing-task="8"]')
-    .getByRole('link', { name: '[Chi tiết]' })
+    .getByRole('link', { name: 'Chi tiết', exact: true })
     .click();
   await page.waitForURL(/\/writing\/submissions\/\d+/, { timeout: 60_000 });
   await page.waitForTimeout(2500);
@@ -792,7 +792,7 @@ async function main() {
   );
   await page
     .locator('[data-speaking-task="2"]')
-    .getByRole('button', { name: '[Chi tiết]' })
+    .getByRole('button', { name: 'Chi tiết', exact: true })
     .click();
   check(
     'failed task explains that the page does not regrade',

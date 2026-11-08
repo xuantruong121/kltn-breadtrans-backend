@@ -140,13 +140,13 @@ async function scenarioWin(a: Player, b: Player) {
     s1,
     s2,
     matchId,
-    [0, 1, 2, 3, 4],
+    Array.from({ length: 10 }, (_, r) => r),
     (role, q) => (role === 'p1' ? right(q) : wrong(q)),
     results,
   );
   check(
     'every round records BOTH simultaneous answers (no lost update)',
-    results.length === 5 &&
+    results.length === 10 &&
       results.every(
         (r) => r.p1.selectedOption !== null && r.p2.selectedOption !== null,
       ),
@@ -175,10 +175,23 @@ async function scenarioWin(a: Player, b: Player) {
     bread(a.userId) === 120 && bread(b.userId) === 80,
     `(${bread(a.userId)}, ${bread(b.userId)})`,
   );
+  // Owner decision 2026-11-08: 5 XP per correct answer, whoever wins. P1
+  // answered all ten right, P2 none.
   check(
-    'Arena pays Bread only: no XP history for winner or loser',
-    xp(a.userId) - xpA === 0 && xp(b.userId) - xpB === 0,
+    'Arena XP: 5 per correct answer (winner 10/10 = 50, loser 0/10 = 0)',
+    xp(a.userId) - xpA === 50 && xp(b.userId) - xpB === 0,
     `(${xp(a.userId) - xpA}, ${xp(b.userId) - xpB})`,
+  );
+  const endedXp = e1 as unknown as {
+    p1?: { userId: number; xp?: number };
+    p2?: { userId: number; xp?: number };
+  } | null;
+  const xpOf = (u: number) =>
+    endedXp?.p1?.userId === u ? endedXp.p1.xp : endedXp?.p2?.xp;
+  check(
+    'match_ended tells each player the XP paid',
+    xpOf(a.userId) === 50 && xpOf(b.userId) === 0,
+    JSON.stringify([xpOf(a.userId), xpOf(b.userId)]),
   );
   const ledger = harnessQuery(
     `select source, count(*) from "BanhTransaction" where reference like 'arena:match:${matchId}:%' group by source order by source`,
@@ -262,7 +275,7 @@ async function scenarioReconnectDraw(a: Player, b: Player) {
       cr?.p2.selectedOption !== null,
     JSON.stringify(cr)?.slice(0, 90),
   );
-  const rest = [1, 2, 3, 4].filter((r) => r > cur);
+  const rest = Array.from({ length: 10 }, (_, r) => r).filter((r) => r > cur);
   await play(s1, s2, matchId, rest, (_r, q) => wrong(q), results);
   const e = await ended;
   check(

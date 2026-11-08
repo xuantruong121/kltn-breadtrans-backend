@@ -1,4 +1,10 @@
-import { extendDoubleBanhUntil } from './market-effects';
+import { SubscriptionEventType, SubscriptionSource } from '@prisma/client';
+import { givePlusDays } from '../subscription/plus-days';
+import {
+  PLUS_CARD_DAYS,
+  PLUS_CARD_SLUG,
+  extendDoubleBanhUntil,
+} from './market-effects';
 import {
   Injectable,
   BadRequestException,
@@ -315,6 +321,38 @@ export class MarketService {
                 stats?.doubleBanhUntil ?? null,
                 quantity,
               ),
+            },
+          });
+        }
+
+        // 7-day Plus card: the days go on the learner's plan in this same
+        // transaction, so a refusal also gives the Bánh Mì back.
+        if (product.slug === PLUS_CARD_SLUG) {
+          const days = PLUS_CARD_DAYS * quantity;
+          const given = await givePlusDays(tx, {
+            userId,
+            days,
+            now: new Date(),
+            source: SubscriptionSource.MARKET,
+            eventType: SubscriptionEventType.MARKET_REWARD,
+            reason: `Đổi ${quantity} Thẻ ${PLUS_CARD_DAYS} ngày Plus trong Cửa hàng Bánh Mì: +${days} ngày`,
+            metadata: { checkoutKey, productId: product.id, quantity },
+          });
+          if (!given) {
+            throw new BadRequestException(
+              'Gói Plus đang tạm ngừng nên chưa đổi được thẻ này. Bánh Mì của bạn chưa bị trừ.',
+            );
+          }
+          await tx.notification.create({
+            data: {
+              userId,
+              type: `market_plus:${checkoutKey}`,
+              title: `Bạn được thêm ${days} ngày học`,
+              body:
+                given.placement === 'EXTEND'
+                  ? `Gói của bạn được cộng thêm ${days} ngày.`
+                  : `Bạn được dùng Plus ${days} ngày từ hôm nay.`,
+              url: '/plans',
             },
           });
         }

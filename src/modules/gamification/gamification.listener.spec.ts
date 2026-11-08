@@ -22,6 +22,7 @@ describe('GamificationListener', () => {
     awardSpeakingReward: jest.Mock;
     awardToeicReward: jest.Mock;
     awardBadgeIfEarned: jest.Mock;
+    syncBadges: jest.Mock;
     advanceDailyQuestAndGrantRewardsTx: jest.Mock;
     advanceAssignedQuests: jest.Mock;
     assignedQuests: jest.Mock;
@@ -83,6 +84,7 @@ describe('GamificationListener', () => {
       awardSpeakingReward: jest.fn().mockResolvedValue({ granted: 5 }),
       awardToeicReward: jest.fn().mockResolvedValue({ granted: 120 }),
       awardBadgeIfEarned: jest.fn().mockResolvedValue(true),
+      syncBadges: jest.fn().mockResolvedValue([]),
       advanceDailyQuestAndGrantRewardsTx: jest.fn().mockResolvedValue({
         completedNow: true,
         currentValue: 10,
@@ -333,9 +335,9 @@ describe('GamificationListener', () => {
       expect(questTypesOf()).toEqual(['DO_WRITING']);
     });
 
-    // "Học Bá" compared `score` (a count of correct answers) with 100, so an
-    // 8/8 practice never earned it.
-    it('awards "Học Bá" for a perfect percent, even on a retake', async () => {
+    // The badges are checked after every rewarded practice; the rules
+    // themselves (10 perfect practices for "Học Bá") are badge-rules.logic.ts.
+    it('checks the badges after a rewarded practice, even on a retake', async () => {
       await listener.handleQuizSubmittedEvent({
         userId: 12,
         quizId: 9,
@@ -344,24 +346,8 @@ describe('GamificationListener', () => {
         quizType: 'LISTENING_PRACTICE',
         isFirstSubmission: false,
       });
-      expect(gamificationServiceMock.awardBadgeIfEarned).toHaveBeenCalledWith(
-        12,
-        'Học Bá',
-      );
-    });
-
-    it('does not award "Học Bá" below 100 percent, whatever the count', async () => {
-      await listener.handleQuizSubmittedEvent({
-        userId: 12,
-        quizId: 50,
-        score: 100,
-        scorePercent: 99,
-        quizType: 'LISTENING_PRACTICE',
-        isFirstSubmission: true,
-      });
-      expect(
-        gamificationServiceMock.awardBadgeIfEarned,
-      ).not.toHaveBeenCalledWith(12, 'Học Bá');
+      expect(gamificationServiceMock.syncBadges).toHaveBeenCalledWith(12);
+      expect(gamificationServiceMock.awardBadgeIfEarned).not.toHaveBeenCalled();
     });
 
     it('does not assume an event without quiz type is Listening', async () => {
@@ -441,11 +427,14 @@ describe('GamificationListener', () => {
 
     it('treats a repeated speaking settlement as a ledger NOOP without duplicate side effects', async () => {
       prismaMock.dailyQuest.findMany.mockResolvedValue([]);
-      // First settlement records XP, Bánh mì and pet EXP; the replay records none.
+      // First settlement records XP, Bánh mì, pet EXP and the badge check;
+      // the replay records none.
       prismaMock.speakingRewardLedger.createMany
         .mockResolvedValueOnce({ count: 1 })
         .mockResolvedValueOnce({ count: 1 })
         .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 })
         .mockResolvedValueOnce({ count: 0 })
         .mockResolvedValueOnce({ count: 0 })
         .mockResolvedValueOnce({ count: 0 });
@@ -462,9 +451,10 @@ describe('GamificationListener', () => {
       await listener.handleSpeakingSubmittedEvent(payload);
 
       expect(prismaMock.speakingRewardLedger.createMany).toHaveBeenCalledTimes(
-        6,
+        8,
       );
       expect(gamificationServiceMock.awardXp).toHaveBeenCalledTimes(1);
+      expect(gamificationServiceMock.syncBadges).toHaveBeenCalledTimes(1);
       expect(gamificationServiceMock.awardPetStudyExp).toHaveBeenCalledTimes(1);
       expect(gamificationServiceMock.awardSpeakingReward).toHaveBeenCalledTimes(
         1,

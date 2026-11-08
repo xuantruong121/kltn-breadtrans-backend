@@ -108,15 +108,10 @@ export class GamificationListener {
         }
       }
 
-      // Badge "Học Bá" ("Đạt điểm tối đa"): a perfect rewarded practice, first
-      // try or not. `score` counts correct answers, so the percent decides;
-      // awardBadgeIfEarned grants it once.
-      if (Number(payload.scorePercent) >= 100) {
-        await this.gamificationService.awardBadgeIfEarned(
-          payload.userId,
-          'Học Bá',
-        );
-      }
+      // Badges: the XP badges after the points above, and "Học Bá" after a
+      // perfect practice (10 different ones are needed, badge-rules.logic.ts).
+      // `score` counts correct answers, so the percent decides.
+      await this.gamificationService.syncBadges(payload.userId);
 
       // Daily quest progress: only the quests assigned to this learner today
       // (daily-quest-catalog.ts), by the kind of practice and its percent.
@@ -317,50 +312,24 @@ export class GamificationListener {
         );
       }
 
-      // 3. Badge: high speaking score - atomic and conditional on eligibility & unowned
-      const isBadgeEligible =
+      // 3. Badges: a high score may complete "Giọng Đọc Vàng" (10 different
+      // exercises at 8/10, badge-rules.logic.ts). Inside the ledger, so a
+      // crash here is retried and the badge is not granted twice.
+      const isHighScore =
         payload.overallScore >= 80 ||
         (payload.overallScore <= 10 && payload.overallScore >= 8.0);
-      if (isBadgeEligible) {
-        const badge =
-          this.prisma.badge && typeof this.prisma.badge.findFirst === 'function'
-            ? await this.prisma.badge.findFirst({
-                where: { name: 'Giọng Đọc Vàng' },
-              })
-            : null;
-        if (badge) {
-          const alreadyOwned =
-            this.prisma.userBadge &&
-            typeof this.prisma.userBadge.findUnique === 'function'
-              ? await this.prisma.userBadge.findUnique({
-                  where: {
-                    userId_badgeId: {
-                      userId: payload.userId,
-                      badgeId: badge.id,
-                    },
-                  },
-                })
-              : null;
-          if (!alreadyOwned) {
-            const badgeRef = payload.submissionId
-              ? `badge:${badge.id}:speaking:${payload.submissionId}`
-              : `badge:${badge.id}:speaking:${payload.userId}:gold`;
-
-            await this.executeRewardEffect(
-              payload.submissionId,
-              payload.userId,
-              'BADGE',
-              badgeRef,
-              async (tx) => {
-                await this.gamificationService.awardBadgeIfEarned(
-                  payload.userId,
-                  'Giọng Đọc Vàng',
-                  { tx },
-                );
-              },
-            );
-          }
-        }
+      if (isHighScore) {
+        await this.executeRewardEffect(
+          payload.submissionId,
+          payload.userId,
+          'BADGE',
+          payload.submissionId
+            ? `badge:speaking:${payload.submissionId}`
+            : `badge:speaking:${payload.userId}:gold`,
+          async (tx) => {
+            await this.gamificationService.syncBadges(payload.userId, { tx });
+          },
+        );
       }
 
       // 4. Daily quest progress: free speech counts for DO_SPEAKING, read-aloud
@@ -443,6 +412,19 @@ export class GamificationListener {
     this.logger.log(
       `vocab.learned for user ${payload.userId} (${payload.count}): not a rewarded activity, no reward`,
     );
+  }
+
+  /** An arena win may complete "Đấu Sĩ Bất Bại" (5 wins in a row). */
+  @OnEvent('arena.match_won')
+  async handleArenaMatchWon(payload: { userId: number; matchId: string }) {
+    try {
+      await this.gamificationService.syncBadges(payload.userId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to award the arena badge to user ${payload.userId} (match ${payload.matchId})`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
   }
 
   @OnEvent('gamification.xp_earned')

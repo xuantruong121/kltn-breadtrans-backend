@@ -171,6 +171,117 @@ describe('MarketService', () => {
     });
   });
 
+  describe('createOrder - 7-day Plus card', () => {
+    const plusCard = {
+      id: 10,
+      slug: 'plus-7d',
+      name: 'Thẻ 7 ngày Plus',
+      price: 2000,
+      stock: 100,
+      isActive: true,
+      fulfillmentType: 'DIGITAL',
+      category: 'BOOST',
+    };
+    const txFor = (plusVersion: { id: number } | null) => ({
+      $executeRaw: jest.fn(),
+      marketOrder: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest
+          .fn()
+          .mockResolvedValue({ id: 51, status: 'approved', totalBanh: 4000 }),
+      },
+      marketProduct: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      userStats: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 500 }),
+        update: jest.fn(),
+      },
+      banhTransaction: { create: jest.fn().mockResolvedValue({ id: 1 }) },
+      marketPhysicalRedemption: { create: jest.fn() },
+      subscription: {
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        create: jest.fn().mockResolvedValue({ id: 77 }),
+      },
+      planVersion: { findFirst: jest.fn().mockResolvedValue(plusVersion) },
+      subscriptionEvent: { create: jest.fn() },
+      notification: { create: jest.fn() },
+    });
+
+    beforeEach(() => {
+      mockPrismaService.marketProduct.findMany.mockResolvedValue([plusCard]);
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue(null);
+      mockPrismaService.profile.findUnique.mockResolvedValue({
+        fullName: 'Plus Learner',
+      });
+    });
+
+    it('two cards with no paid plan start 14 days of Plus from the shop', async () => {
+      const tx = txFor({ id: 5 });
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (client: unknown) => Promise<unknown>) => callback(tx),
+      );
+
+      const result = await service.createOrder(
+        3,
+        { items: [{ id: 'plus-7d', quantity: 2 }] },
+        'plus-key',
+      );
+
+      expect(result.success).toBe(true);
+      const created = tx.subscription.create.mock.calls[0][0].data;
+      expect(created).toMatchObject({
+        userId: 3,
+        planVersionId: 5,
+        source: 'MARKET',
+        status: 'ACTIVE',
+      });
+      expect(created.endsAt.getTime() - created.startsAt.getTime()).toBe(
+        14 * 24 * 60 * 60 * 1000,
+      );
+      // A running trial ends when the Plus days start.
+      expect(tx.subscription.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: 3, source: 'TRIAL' }),
+        }),
+      );
+      expect(tx.subscriptionEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          subscriptionId: 77,
+          type: 'MARKET_REWARD',
+          metadata: expect.objectContaining({
+            checkoutKey: 'plus-key',
+            quantity: 2,
+            placement: 'GRANT',
+          }),
+        }),
+      });
+      expect(tx.notification.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: 3,
+          title: 'Bạn được thêm 14 ngày học',
+        }),
+      });
+    });
+
+    it('refuses inside the transaction when no Plus version is published, so no Bread is kept', async () => {
+      const tx = txFor(null);
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (client: unknown) => Promise<unknown>) => callback(tx),
+      );
+
+      await expect(
+        service.createOrder(3, { items: [{ id: 'plus-7d', quantity: 1 }] }),
+      ).rejects.toThrow('Gói Plus đang tạm ngừng');
+      expect(tx.subscription.create).not.toHaveBeenCalled();
+      expect(tx.subscription.updateMany).not.toHaveBeenCalled();
+      expect(tx.marketOrder.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('createOrder - Physical reward fulfillment gate', () => {
     const mockDigitalProduct = {
       id: 1,

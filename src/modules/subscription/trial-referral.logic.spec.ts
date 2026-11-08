@@ -87,6 +87,21 @@ describe('referral.logic', () => {
     });
   });
 
+  it('takes another number of days (two 7-day Plus cards: 14)', () => {
+    const r = rewardPlacement({
+      now,
+      days: 14,
+      paidTerms: [
+        { id: 4, endsAt: new Date(now.getTime() + 10 * DAY), source: 'MARKET' },
+      ],
+    });
+    expect(r).toEqual({
+      kind: 'EXTEND',
+      subscriptionId: 4,
+      newEndsAt: new Date(now.getTime() + 24 * DAY),
+    });
+  });
+
   it('grants 7 days of PLUS now when there is no paid plan (a trial does not count)', () => {
     const r = rewardPlacement({
       now,

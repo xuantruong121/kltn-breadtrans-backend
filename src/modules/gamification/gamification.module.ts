@@ -3,6 +3,8 @@ import { Module } from '@nestjs/common';
 import { GamificationService } from './gamification.service';
 import { GamificationController } from './gamification.controller';
 import { GamificationListener } from './gamification.listener';
+import { RankingController } from './ranking.controller';
+import { RankingService } from './ranking.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -11,8 +13,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
     GamificationService,
     GamificationListener,
     RewardEligibilityService,
+    RankingService,
   ],
-  controllers: [GamificationController],
+  controllers: [GamificationController, RankingController],
   exports: [
     GamificationService,
     GamificationListener,

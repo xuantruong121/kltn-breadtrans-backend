@@ -127,4 +127,4 @@ UX_WALK_AFTER=30/30 OK               (qa-artifacts/ux-verify-20261107; Part 5 pr
 AUDIO_PLAYBACK=PASS on 2 of 6 clips  (owner listened to Q9 and exam 3 Part 1 q3; the other 4 Part 1 clips not heard)
 ```
 
-The invalid JSON is a risk for production answer review. It sends a whole Part in one call, and exam 1 Part 7 is now longer. If it recurs, split the Part 7 review into chunks.
+Correction (2026-11-07): this is not a production risk. `reviewBatch` (toeic-ai-exam.service.ts) reviews AI batches of at most 3 groups (`plan.slice(offset, offset + 3)`), about 9-15 Part 7 questions per call. The 54-question call came from the verification script, which put a whole Part in one call. A Cloudflare reply that is not JSON falls through to Gemini once (answer-review.service.ts `run`).

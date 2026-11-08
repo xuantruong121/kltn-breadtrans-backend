@@ -24,7 +24,13 @@ const prisma = new PrismaClient({
 });
 const redis = new Redis({ host: '127.0.0.1', port: 6392 });
 const events = { sendCurrencyUpdate: () => undefined };
-const gw = new ArenaGateway(prisma, redis, events as any, {} as any);
+const gw = new ArenaGateway(
+  prisma,
+  redis,
+  events as any,
+  {} as any,
+  { emit: () => true } as any,
+);
 (gw as any).server = { to: () => ({ emit: () => true }) };
 const finalize = (m: any, w: 'p1' | 'p2' | 'draw', forfeit = false) =>
   (gw as any)

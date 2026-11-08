@@ -63,18 +63,19 @@ export function decideClaim(input: {
 export type PaidTermLike = { id: number; endsAt: Date; source: string };
 
 /**
- * How a learner receives the 7 reward days: the paid plan that ends last
- * (running or queued) is extended, so nothing overlaps and a renewal still
- * queues after it; with no paid plan, a 7-day PLUS starts now. A trial is not
- * a paid plan and is never extended.
+ * How a learner receives reward days (7 by default): the paid plan that ends
+ * last (running or queued) is extended, so nothing overlaps and a renewal
+ * still queues after it; with no paid plan, a PLUS term of that length starts
+ * now. A trial is not a paid plan and is never extended.
  */
 export function rewardPlacement(input: {
   now: Date;
   paidTerms: PaidTermLike[];
+  days?: number;
 }):
   | { kind: 'EXTEND'; subscriptionId: number; newEndsAt: Date }
   | { kind: 'GRANT'; startsAt: Date; endsAt: Date } {
-  const days = REFERRAL_REWARD_DAYS * DAY_MS;
+  const days = (input.days ?? REFERRAL_REWARD_DAYS) * DAY_MS;
   const last = input.paidTerms
     .filter(
       (t) => t.source !== 'TRIAL' && t.endsAt.getTime() > input.now.getTime(),

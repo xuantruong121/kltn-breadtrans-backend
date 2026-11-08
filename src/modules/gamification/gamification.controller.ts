@@ -9,7 +9,12 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { GamificationService } from './gamification.service';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -50,6 +55,23 @@ export class GamificationController {
   @ApiOperation({ summary: 'Lấy danh sách huy hiệu của học viên hiện tại' })
   getMyBadges(@Request() req: any) {
     return this.gamificationService.getMyBadges(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('badges/progress')
+  @ApiOperation({
+    summary:
+      'Tiến độ tới từng huy hiệu: các số liệu luật huy hiệu dùng và mốc cần đạt',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'facts: totalXp, weeklyXp, isWeeklyTop, streak, perfectPractices, highSpeaking, longestArenaWinStreak, petLevel; rules: mốc của 8 huy hiệu',
+  })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  getBadgeProgress(@Request() req: any) {
+    return this.gamificationService.getBadgeProgress(req.user.id);
   }
 
   // ==========================================
@@ -97,6 +119,22 @@ export class GamificationController {
   @ApiOperation({ summary: 'Lấy tóm tắt rank đấu trường cho trang chủ' })
   getArenaSnippet(@Request() req: any) {
     return this.gamificationService.getArenaSnippet(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('arena/stats')
+  @ApiOperation({
+    summary:
+      'Thành tích đấu trường của học viên: số trận, thắng, thua, hoà, chuỗi thắng, Bánh Mì ròng',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Thành tích tính từ các trận đã kết thúc',
+  })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  getArenaStats(@Request() req: any) {
+    return this.gamificationService.getArenaStats(req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)

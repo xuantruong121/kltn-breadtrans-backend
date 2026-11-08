@@ -1,21 +1,19 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   PlanPurchaseStatus,
-  PlanVersionStatus,
   Prisma,
   ReferralStatus,
   SubscriptionEventType,
   SubscriptionSource,
-  SubscriptionStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { givePlusDays } from './plus-days';
 import {
   REFERRAL_CLAIM_DAYS,
   REFERRAL_REWARD_DAYS,
   decideClaim,
   newReferralCode,
   normalizeReferralCode,
-  rewardPlacement,
 } from './referral.logic';
 
 export type ReferralSummary = {
@@ -154,79 +152,23 @@ export class ReferralService {
     now: Date,
     referralId: number,
   ) {
-    const terms = await tx.subscription.findMany({
-      where: {
-        userId,
-        status: SubscriptionStatus.ACTIVE,
-        endsAt: { gt: now },
-        planVersion: { plan: { code: { not: 'FREE' } } },
-      },
-      select: { id: true, endsAt: true, source: true },
+    const given = await givePlusDays(tx, {
+      userId,
+      days: REFERRAL_REWARD_DAYS,
+      now,
+      source: SubscriptionSource.REFERRAL,
+      eventType: SubscriptionEventType.REFERRAL_REWARD,
+      reason: `Thưởng giới thiệu bạn bè: +${REFERRAL_REWARD_DAYS} ngày`,
+      metadata: { referralId },
     });
-    const placement = rewardPlacement({ now, paidTerms: terms });
-    let subscriptionId: number;
-    let previousEndsAt: Date | null = null;
-    let newEndsAt: Date;
-    if (placement.kind === 'EXTEND') {
-      previousEndsAt =
-        terms.find((t) => t.id === placement.subscriptionId)?.endsAt ?? null;
-      await tx.subscription.update({
-        where: { id: placement.subscriptionId },
-        data: { endsAt: placement.newEndsAt },
-      });
-      subscriptionId = placement.subscriptionId;
-      newEndsAt = placement.newEndsAt;
-    } else {
-      // A running trial ends now: the reward is a real PLUS week.
-      await tx.subscription.updateMany({
-        where: {
-          userId,
-          source: SubscriptionSource.TRIAL,
-          status: SubscriptionStatus.ACTIVE,
-          endsAt: { gt: now },
-        },
-        data: { endsAt: now },
-      });
-      const plus = await tx.planVersion.findFirst({
-        where: {
-          plan: { code: 'PLUS' },
-          status: PlanVersionStatus.PUBLISHED,
-          isCurrent: true,
-          durationDays: 30,
-        },
-        select: { id: true },
-      });
-      if (!plus) return;
-      const sub = await tx.subscription.create({
-        data: {
-          userId,
-          planVersionId: plus.id,
-          status: SubscriptionStatus.ACTIVE,
-          source: SubscriptionSource.REFERRAL,
-          startsAt: placement.startsAt,
-          endsAt: placement.endsAt,
-        },
-      });
-      subscriptionId = sub.id;
-      newEndsAt = placement.endsAt;
-    }
-    await tx.subscriptionEvent.create({
-      data: {
-        subscriptionId,
-        type: SubscriptionEventType.REFERRAL_REWARD,
-        reason: `Thưởng giới thiệu bạn bè: +${REFERRAL_REWARD_DAYS} ngày`,
-        previousEndsAt,
-        newEndsAt,
-        metadata: { referralId, placement: placement.kind },
-      },
-    });
+    if (!given) return;
     await tx.notification.create({
       data: {
         userId,
         type: `referral_reward:${referralId}:${userId}`,
         title: `Bạn được thêm ${REFERRAL_REWARD_DAYS} ngày học`,
         body:
-          placement.kind === 'EXTEND'
+          given.placement === 'EXTEND'
             ? `Nhờ lời giới thiệu, gói của bạn được cộng thêm ${REFERRAL_REWARD_DAYS} ngày.`
             : `Nhờ lời giới thiệu, bạn được dùng Plus ${REFERRAL_REWARD_DAYS} ngày từ hôm nay.`,
         url: '/plans',

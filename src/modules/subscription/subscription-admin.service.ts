@@ -746,6 +746,7 @@ export class SubscriptionAdminService {
       [SubscriptionEventType.ADMIN_REVOKED]: 'Admin thu hồi quyền',
       [SubscriptionEventType.TRIAL_GRANTED]: 'Dùng thử Plus',
       [SubscriptionEventType.REFERRAL_REWARD]: 'Thưởng giới thiệu bạn bè',
+      [SubscriptionEventType.MARKET_REWARD]: 'Đổi Thẻ Plus trong Cửa hàng',
     };
 
     const actorName =
