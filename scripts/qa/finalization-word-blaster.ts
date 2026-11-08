@@ -5,7 +5,8 @@
  *        BLASTER_WIN); a loss and leaving keep the stake; the start reply
  *        holds no answer; a game left alone is settled by the sweep.
  *   Browser: the menu shows Đấu trường, More holds Bảng xếp hạng then FAQ;
- *        /arena shows the game card; a game won by typing; a game left
+ *        /arena lists the games in a sidebar and Bắn chữ rơi's lobby opens
+ *        from it; a game won by typing; a game left
  *        through Thoát.
  *
  *   HARNESS_DB=<db> [SHOTS=<dir>] npx ts-node --transpile-only scripts/qa/finalization-word-blaster.ts
@@ -222,13 +223,24 @@ async function browser(width: number) {
         ranking < nav.indexOf('FAQ'),
     );
   }
+  // Owner 2026-11-08: the games sit in a sidebar, not one per row.
+  const nav = page.getByRole('navigation', {
+    name: 'Trò chơi trong Đấu trường',
+  });
   check(
-    '/arena shows the Bắn chữ rơi card',
-    await page
-      .getByRole('heading', { name: 'Bắn chữ rơi' })
+    '/arena lists Đấu 1v1 and Bắn chữ rơi in its game sidebar',
+    (await nav.getByRole('button', { name: /Đấu 1v1/ }).count()) === 1 &&
+      (await nav.getByRole('button', { name: /Bắn chữ rơi/ }).count()) === 1,
+  );
+  await nav.getByRole('button', { name: /Bắn chữ rơi/ }).click();
+  check(
+    'picking Bắn chữ rơi opens its lobby (?game=blaster)',
+    (await page
+      .getByRole('heading', { name: 'Bắn chữ rơi', level: 1 })
       .waitFor({ timeout: 30_000 })
       .then(() => true)
-      .catch(() => false),
+      .catch(() => false)) && page.url().includes('game=blaster'),
+    page.url(),
   );
   await page.screenshot({
     path: `${SHOTS}/blaster-arena-${width}.png`,
@@ -251,16 +263,20 @@ async function browser(width: number) {
     fullPage: true,
   });
 
-  await page.goto(`${FE}/arena/word-blaster`, {
+  await page.goto(`${FE}/arena?game=blaster`, {
     waitUntil: 'networkidle',
     timeout: 120_000,
   });
+  await page
+    .getByRole('heading', { name: 'Bắn chữ rơi', level: 1 })
+    .waitFor({ timeout: 30_000 });
   await page.screenshot({
     path: `${SHOTS}/blaster-picker-${width}.png`,
     fullPage: true,
   });
   await page.getByRole('button', { name: '20 Bánh Mì', exact: true }).click();
   await page.getByRole('button', { name: 'Bắt đầu' }).click();
+  await page.waitForURL(/\/arena\/word-blaster/, { timeout: 30_000 });
   const input = page.getByRole('textbox', { name: /Gõ đáp án/ });
   await input.waitFor({ timeout: 20_000 });
   check(
@@ -304,6 +320,20 @@ async function browser(width: number) {
       'balance 300 → 310',
       bread(s.account.userId) === 310,
       String(bread(s.account.userId)),
+    );
+    // Owner 2026-11-08: the Arena uses dictionary words only; no review list.
+    const dialog = await page.locator('[role="dialog"]').innerText();
+    check(
+      'the result has no word list to review',
+      !/ôn lại/i.test(dialog),
+      dialog.slice(0, 120),
+    );
+    await page.getByRole('button', { name: 'Chơi lại' }).click();
+    await page.waitForURL(/game=blaster/, { timeout: 20_000 });
+    check(
+      'Chơi lại returns to the lobby in the sidebar',
+      page.url().includes('/arena?game=blaster'),
+      page.url(),
     );
   } else {
     // Two hits, then leave.

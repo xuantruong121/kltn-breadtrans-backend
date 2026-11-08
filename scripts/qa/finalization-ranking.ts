@@ -7,7 +7,79 @@
  *   HARNESS_DB=<db with migration 20261108180000> npx ts-node --transpile-only scripts/qa/finalization-ranking.ts
  */
 import { call, check, failureCount, newStudent } from './harness-api';
+import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessExec } from './harness-db';
+
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
+
+/** The page itself: podium, tabs, my place, feed and badges, at a width. */
+async function browser(width: number) {
+  const s = await studentPage(`rank-ui-${width}`, width);
+  // Above everyone seeded before; the narrower run comes second and goes higher.
+  const xpToday = 200_000 - width;
+  // This learner leads today, above the seeded A.
+  harnessExec(
+    `insert into "PointHistory" ("userId", points, reason, "createdAt") values (${s.account.userId}, ${xpToday}, 'QA', '${new Date(Date.now() - 30_000).toISOString()}')`,
+  );
+  harnessExec(`insert into "Leaderboard" ("userId", tier, "weeklyExp", "totalPoints") values (${s.account.userId}, 'Bạc', 99000, 99000)
+    on conflict ("userId") do update set "weeklyExp" = 99000, "totalPoints" = 99000, tier = 'Bạc'`);
+  const page = s.page;
+  await page.goto(`${FE}/ranking`, {
+    waitUntil: 'networkidle',
+    timeout: 120_000,
+  });
+  await hidePet(page);
+  await page
+    .getByRole('heading', { name: 'Bảng xếp hạng', level: 1 })
+    .waitFor({ timeout: 30_000 });
+  await page.getByRole('tab', { name: 'Hôm nay' }).click();
+  await page.waitForTimeout(1500);
+  const body = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
+  check(
+    `${width}: today, this learner is first and sees Hạng 1`,
+    body.includes('Hạng 1 trên') &&
+      body.includes(`${xpToday.toLocaleString('vi-VN')} XP`),
+    body.slice(0, 200),
+  );
+  check(
+    `${width}: the league line shows under my place`,
+    /Hạng Bạc ·/.test(body),
+  );
+  check(
+    `${width}: the feed shows a masked level-up`,
+    /Harness R\. vừa lên Lv\. 25/.test(body),
+  );
+  check(
+    `${width}: the hall of fame is there`,
+    /Đại sảnh danh vọng/i.test(body) && /Bậc thầy XP/i.test(body),
+  );
+  await page.screenshot({
+    path: `${SHOTS}/ranking-today-${width}.png`,
+    fullPage: true,
+  });
+  await page.getByRole('tab', { name: 'Chuỗi' }).click();
+  await page.waitForTimeout(1200);
+  check(
+    `${width}: the streak board has no period tabs`,
+    (await page.getByRole('tab', { name: 'Hôm nay' }).count()) === 0,
+  );
+  await page.screenshot({
+    path: `${SHOTS}/ranking-streak-${width}.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Xem tủ huy hiệu' }).click();
+  check(
+    `${width}: the badge summary opens the cabinet`,
+    await page.getByRole('dialog', { name: 'Tủ huy hiệu' }).isVisible(),
+  );
+  await page.getByRole('button', { name: 'Đóng tủ huy hiệu' }).click();
+  check(
+    `${width}: no server or page error`,
+    s.issues.length === 0,
+    s.issues.join(' | '),
+  );
+  await s.browser.close();
+}
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -147,6 +219,9 @@ async function main() {
     !JSON.stringify(feed).includes('Harness rank-a'),
   );
   check('at most 15 lines', feed.length <= 15);
+
+  await browser(1366);
+  await browser(390);
 
   console.log(`\nRANKING_FAILURES=${failureCount()}`);
   process.exit(failureCount() ? 1 : 0);
