@@ -144,10 +144,55 @@ export function missingLetters(word: string, rng: () => number): string {
   return chars.join('');
 }
 
-/** Seconds between blocks shrink from 5 to 2.8; falls speed up by a quarter. */
+/**
+ * Seconds between blocks shrink from 3.2 to 1.5; falls speed up by 40 %.
+ * Owner 2026-11-08: 5 to 2.8 s left a fast typist waiting at an empty field.
+ */
 export function blasterTiming(index: number, count: number) {
   const p = count > 1 ? index / (count - 1) : 0;
-  return { gapMs: Math.round(5000 - 2200 * p), speed: 1 + 0.25 * p };
+  return { gapMs: Math.round(3200 - 1700 * p), speed: 1 + 0.4 * p };
+}
+
+/** A block that comes with the one before it is this far behind it. */
+export const PAIR_GAP_MS = 300;
+
+/** In the last third, every third block comes with the one before it: two fall together. */
+export function pairsWithPrevious(index: number, count: number): boolean {
+  const start = Math.ceil((count * 2) / 3);
+  return index > start && (index - start) % 3 === 1;
+}
+
+/** How soon the next block comes once the field is empty. */
+export const EMPTY_LEAD_MS = 800;
+
+/**
+ * Owner 2026-11-08: nobody should wait at an empty field. When no block is
+ * on screen (every one that appeared is broken or has landed), the blocks
+ * still to come move earlier, all by the same amount, so the next appears
+ * `leadMs` from now and the spacing between them stays. Changes `blocks` in
+ * place and returns how far they moved (0 when there was nothing to do).
+ * Past events are untouched: only blocks not yet shown move.
+ */
+export function pullForward(
+  blocks: BlasterBlock[],
+  hits: Record<number, number>,
+  nowMs: number,
+  leadMs = EMPTY_LEAD_MS,
+): number {
+  const onScreen = blocks.some(
+    (b) =>
+      hits[b.id] === undefined &&
+      b.spawnAtMs <= nowMs &&
+      nowMs <= landsAt(b) + LANDING_GRACE_MS,
+  );
+  if (onScreen) return 0;
+  const upcoming = blocks.filter((b) => b.spawnAtMs > nowMs);
+  if (upcoming.length === 0) return 0;
+  const shift =
+    Math.min(...upcoming.map((b) => b.spawnAtMs)) - (nowMs + leadMs);
+  if (shift <= 0) return 0;
+  for (const b of upcoming) b.spawnAtMs -= shift;
+  return shift;
 }
 
 /**
@@ -218,8 +263,12 @@ export function buildBlasterRound(
     }
 
     const { gapMs, speed } = blasterTiming(i, count);
-    if (i > 0) at += gapMs;
-    const lanes = LANES.map((_, k) => k).filter((k) => k !== lastLane);
+    const paired = i > 0 && pairsWithPrevious(i, count);
+    if (i > 0) at += paired ? PAIR_GAP_MS : gapMs;
+    // Two blocks falling together keep a lane between them, so they never overlap.
+    const lanes = LANES.map((_, k) => k).filter((k) =>
+      paired ? Math.abs(k - lastLane) >= 2 : k !== lastLane,
+    );
     const lane = lanes[Math.floor(rng() * lanes.length)];
     lastLane = lane;
     blocks.push({

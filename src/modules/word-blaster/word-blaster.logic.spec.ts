@@ -3,8 +3,13 @@ import {
   BLASTER_BLOCKS,
   LANDING_GRACE_MS,
   BLASTER_MODES,
+  EMPTY_LEAD_MS,
   FIRST_SPAWN_MS,
+  PAIR_GAP_MS,
   acceptedMeanings,
+  blasterTiming,
+  pairsWithPrevious,
+  pullForward,
   letterHint,
   mainSense,
   blasterPayout,
@@ -241,5 +246,82 @@ describe('blasterPayout and blasterXp', () => {
     expect(blasterXp(20, 0)).toBe(40);
     expect(blasterXp(20, 130)).toBe(20);
     expect(blasterXp(20, 150)).toBe(0);
+  });
+});
+
+describe('pace (owner 2026-11-08: too slow for a fast typist)', () => {
+  it('gaps shrink from 3.2 s to 1.5 s and falls speed up by 40 %', () => {
+    expect(blasterTiming(0, 20)).toEqual({ gapMs: 3200, speed: 1 });
+    expect(blasterTiming(19, 20)).toEqual({ gapMs: 1500, speed: 1.4 });
+  });
+
+  it('in the last third, two blocks now and then fall together, a lane apart', () => {
+    const paired = Array.from({ length: 20 }, (_, i) => i).filter((i) =>
+      pairsWithPrevious(i, 20),
+    );
+    expect(paired).toEqual([15, 18]);
+    const lanes = [0.12, 0.31, 0.5, 0.69, 0.88];
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const blocks = buildBlasterRound(pool, seeded(seed), 'copy');
+      for (const i of paired) {
+        expect(blocks[i].spawnAtMs - blocks[i - 1].spawnAtMs).toBe(PAIR_GAP_MS);
+        const apart = Math.abs(
+          lanes.indexOf(blocks[i].lane) - lanes.indexOf(blocks[i - 1].lane),
+        );
+        expect(apart).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it('a game is about half as long as before', () => {
+    const blocks = buildBlasterRound(pool, seeded(1), 'copy');
+    expect(landsAt(blocks[blocks.length - 1])).toBeLessThan(60_000);
+  });
+});
+
+describe('pullForward', () => {
+  const schedule = () => [
+    block(1, 0, 5000, 'alpha'),
+    block(2, 4000, 5000, 'beta'),
+    block(3, 7000, 5000, 'gamma'),
+  ];
+
+  it('an empty field brings the next block in soon and keeps the spacing', () => {
+    const blocks = schedule();
+    const moved = pullForward(blocks, { 1: 1500 }, 1500);
+    expect(moved).toBe(4000 - (1500 + EMPTY_LEAD_MS));
+    expect(blocks.map((b) => b.spawnAtMs)).toEqual([
+      0,
+      1500 + EMPTY_LEAD_MS,
+      1500 + EMPTY_LEAD_MS + 3000,
+    ]);
+  });
+
+  it('nothing moves while a block is still on screen', () => {
+    const blocks = schedule();
+    expect(pullForward(blocks, {}, 1500)).toBe(0);
+    expect(blocks.map((b) => b.spawnAtMs)).toEqual([0, 4000, 7000]);
+  });
+
+  it('a landed block inside the grace still counts as on screen', () => {
+    const blocks = schedule();
+    expect(pullForward(blocks, {}, 5000 + LANDING_GRACE_MS)).toBe(0);
+  });
+
+  it('nothing moves when the next block is already close, or none is left', () => {
+    const blocks = schedule();
+    expect(pullForward(blocks, { 1: 3500 }, 3500)).toBe(0);
+    const done = schedule();
+    expect(pullForward(done, { 1: 1, 2: 4100, 3: 7100 }, 7100)).toBe(0);
+  });
+
+  it('the game resolves the same after a pull: past hits and landings stay', () => {
+    const blocks = schedule();
+    const hits = { 1: 1500 };
+    pullForward(blocks, hits, 1500);
+    expect(resolve(blocks, hits, 1500)).toMatchObject({
+      destroyed: 1,
+      landed: 0,
+    });
   });
 });

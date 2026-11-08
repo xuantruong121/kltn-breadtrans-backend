@@ -29,6 +29,7 @@ import {
   buildBlasterRound,
   matchShot,
   publicBlocks,
+  pullForward,
   resolve,
   type BlasterBlock,
   type BlasterState,
@@ -225,6 +226,12 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
       const hitBlockId = matchShot(session.blocks, session.hits, text, now);
       if (hitBlockId !== null) {
         session.hits[hitBlockId] = now;
+        // An empty field brings the next block in soon; the sweep's deadline follows.
+        if (pullForward(session.blocks, session.hits, now) > 0) {
+          session.deadline =
+            session.startedAt + blasterDeadline(session.blocks);
+          await this.redis.zadd(KEY.open, session.deadline, id);
+        }
         await this.save(session, SESSION_TTL_S);
       }
       const state = resolve(session.blocks, session.hits, now);

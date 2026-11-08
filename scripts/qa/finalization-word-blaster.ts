@@ -62,15 +62,29 @@ const answerFor = (b: StoredBlock) =>
 const stored = async (id: string) =>
   JSON.parse((await redis.get(`blaster:session:${id}`))!) as Stored;
 
+/**
+ * Waits until a block is on screen, as the server times it, and returns it.
+ * The schedule is read again while waiting: after a hit on an empty field
+ * the server brings the next blocks in early (owner 2026-11-08).
+ */
+async function untilSpawned(id: string, blockId: number): Promise<StoredBlock> {
+  for (;;) {
+    const s = await stored(id);
+    const b = s.blocks.find((x) => x.id === blockId)!;
+    const wait = s.startedAt + b.spawnAtMs + 150 - Date.now();
+    if (wait <= 0) return b;
+    await sleep(Math.min(wait, 200));
+  }
+}
+
 /** Waits for each block and shoots its answer: a perfect game. */
 async function playPerfect(
   id: string,
   shoot: (text: string) => Promise<unknown>,
 ) {
   const s = await stored(id);
-  for (const b of s.blocks) {
-    const wait = s.startedAt + b.spawnAtMs + 150 - Date.now();
-    if (wait > 0) await sleep(wait);
+  for (const first of s.blocks) {
+    const b = await untilSpawned(id, first.id);
     await shoot(b.answers[0]);
   }
 }
@@ -117,12 +131,20 @@ async function api() {
     again.data?.sessionId === start.data.sessionId && bread(a.userId) === 150,
   );
   const id = start.data.sessionId as string;
+  const planned = (await stored(id)).blocks.map((b) => b.spawnAtMs);
   let last: any = null;
   await playPerfect(id, async (text) => {
     last = (
       await call('POST', `/games/word-blaster/${id}/shot`, a.token, { text })
     ).data;
   });
+  const after = (await stored(id)).blocks.map((b) => b.spawnAtMs);
+  check(
+    'a perfect player never waits long: an empty field brings blocks in early',
+    after.some((at, i) => at < planned[i]) &&
+      after.every((at, i) => i === 0 || at > after[i - 1]),
+    `${planned.at(-1)} → ${after.at(-1)} ms for the last block`,
+  );
   check(
     '20 hits win',
     last?.result?.outcome === 'win' && last.result.destroyed === 20,
@@ -243,12 +265,6 @@ const MODE_BUTTON: Record<string, RegExp> = {
   en_to_vi: /^Từ → nghĩa/,
 };
 
-/** Waits until a block is on screen, as the server times it. */
-async function untilSpawned(st: Stored, b: StoredBlock) {
-  const wait = st.startedAt + b.spawnAtMs + 150 - Date.now();
-  if (wait > 0) await sleep(wait);
-}
-
 /**
  * Types an answer one key at a time. Returns true when the page sent it by
  * itself (the box emptied without Enter); otherwise presses Enter and
@@ -360,7 +376,8 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
   if (first) {
     check(
       '/arena lists Song Đấu Từ Vựng and Pháo Bánh Mì in its game sidebar',
-      (await nav.getByRole('button', { name: /Song Đấu Từ Vựng/ }).count()) === 1 &&
+      (await nav.getByRole('button', { name: /Song Đấu Từ Vựng/ }).count()) ===
+        1 &&
         (await nav.getByRole('button', { name: /Pháo Bánh Mì/ }).count()) === 1,
     );
   }
@@ -443,8 +460,8 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
     let typedCount = 0;
     let wrongKept = false;
     let lockShown = false;
-    for (const [i, b] of st.blocks.entries()) {
-      await untilSpawned(st, b);
+    for (const [i, first] of st.blocks.entries()) {
+      const b = await untilSpawned(id, first.id);
       if (i === LET_THROUGH) {
         // Let this one land: a picture of the life it costs.
         const lands = st.startedAt + b.spawnAtMs + b.fallMs + 650;
@@ -546,7 +563,7 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
     );
   } else {
     // A meaning mode: the hint first, then a few answers typed key by key.
-    await untilSpawned(st, st.blocks[0]);
+    await untilSpawned(id, st.blocks[0].id);
     const label = mode === 'vi_to_en' ? 'Từ có' : 'Nghĩa có';
     const hinted = page.locator(`[aria-label^="${label}"]`).first();
     const hintOk = await hinted
@@ -564,8 +581,8 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
     );
     const SHOTS_TO_TYPE = width >= 1280 ? 3 : 2;
     let auto = 0;
-    for (const b of st.blocks.slice(0, SHOTS_TO_TYPE)) {
-      await untilSpawned(st, b);
+    for (const first of st.blocks.slice(0, SHOTS_TO_TYPE)) {
+      const b = await untilSpawned(id, first.id);
       if (await typeAnswer(page, answerFor(b))) auto += 1;
       await sleep(250);
     }
@@ -575,8 +592,7 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
       hits === SHOTS_TO_TYPE,
       `${hits} hits, ${auto} fired by themselves`,
     );
-    const next = st.blocks[SHOTS_TO_TYPE];
-    await untilSpawned(st, next);
+    const next = await untilSpawned(id, st.blocks[SHOTS_TO_TYPE].id);
     const half = answerFor(next).slice(
       0,
       Math.max(2, Math.floor(answerFor(next).length / 2)),
