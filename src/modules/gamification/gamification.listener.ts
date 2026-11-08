@@ -445,6 +445,22 @@ export class GamificationListener {
     );
   }
 
+  /** First arena win: the "Đấu Sĩ Bất Bại" badge (criteria ARENA, threshold 1). */
+  @OnEvent('arena.match_won')
+  async handleArenaMatchWon(payload: { userId: number; matchId: string }) {
+    try {
+      await this.gamificationService.awardBadgeIfEarned(
+        payload.userId,
+        'Đấu Sĩ Bất Bại',
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to award the arena badge to user ${payload.userId} (match ${payload.matchId})`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
   @OnEvent('gamification.xp_earned')
   async handleXpEarnedEvent(payload: { userId: number; points: number }) {
     if (payload.points <= 0) return;

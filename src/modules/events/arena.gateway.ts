@@ -14,6 +14,7 @@ import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from './events.gateway';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getJwtSecret } from '../auth/auth.constants';
 import * as crypto from 'crypto';
 
@@ -102,6 +103,7 @@ export class ArenaGateway
     @InjectRedis() private readonly redis: Redis,
     private readonly eventsGateway: EventsGateway,
     private readonly jwtService: JwtService,
+    private readonly events: EventEmitter2,
   ) {}
 
   private escrowSweep?: NodeJS.Timeout;
@@ -1316,6 +1318,12 @@ export class ArenaGateway
           newBalance: updatedStats.totalBanhRan,
           reason: `Chiến thắng Đấu Trường 1v1 (+${totalReward} Bánh Mì)`,
           studentName: winner.userName,
+        });
+        // After the payout commits: the gamification listener grants the
+        // "Đấu Sĩ Bất Bại" badge (criteria ARENA, threshold 1) on a first win.
+        this.events.emit('arena.match_won', {
+          userId: winner.userId,
+          matchId: match.matchId,
         });
       } else {
         // Draw: Refund escrow stakes to both players atomically

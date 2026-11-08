@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
 import { Socket } from 'socket.io';
 import { ArenaGateway } from './arena.gateway';
@@ -29,6 +30,7 @@ describe('ArenaGateway security validation', () => {
           useValue: { user: { findUnique: jest.fn() } },
         },
         { provide: EventsGateway, useValue: { sendCurrencyUpdate: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: getRedisConnectionToken('default'), useValue: redis },
       ],
     }).compile();
