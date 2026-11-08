@@ -57,8 +57,6 @@ export type BlasterResult = {
   /** Part of the bonus withheld by the 150 a day cap. */
   bonusCapped: number;
   xp: number;
-  /** Every word of the game, so the learner sees what they missed. */
-  words: { id: number; displayWord: string; meaningVi: string; hit: boolean }[];
 };
 
 export type BlasterView = {
@@ -317,16 +315,6 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
       net: outcome === 'win' ? bonusGranted : -session.stake,
       bonusCapped: bonus - bonusGranted,
       xp,
-      // Only the words that fell before the game ended: leaving early or
-      // losing the third life leaves the rest unseen, nothing to review.
-      words: session.blocks
-        .filter(
-          (b) => b.spawnAtMs <= (forfeit ? now : (state.endedAtMs ?? now)),
-        )
-        .map((b) => ({
-          ...b.word,
-          hit: session.hits[b.id] !== undefined,
-        })),
     };
     await this.save(session, RESULT_TTL_S);
     await this.redis.zrem(KEY.open, session.id);
