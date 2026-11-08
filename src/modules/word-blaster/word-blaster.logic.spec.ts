@@ -3,6 +3,7 @@ import {
   BLASTER_BLOCKS,
   LANDING_GRACE_MS,
   BLASTER_MODES,
+  FIRST_SPAWN_MS,
   acceptedMeanings,
   letterHint,
   mainSense,
@@ -110,9 +111,13 @@ describe('buildBlasterRound', () => {
       expect(blocks).toHaveLength(BLASTER_BLOCKS);
       expect(new Set(blocks.map((b) => b.word.id)).size).toBe(20);
       expect(blocks.every((b) => b.kind === mode)).toBe(true);
+      // Room for the 3-2-1 countdown before the first block.
+      expect(blocks[0].spawnAtMs).toBe(FIRST_SPAWN_MS);
       for (const [i, b] of blocks.entries()) {
         if (b.kind === 'en_to_vi')
           expect(b.hint).toBe(letterHint(mainSense(b.word.meaningVi)));
+        else if (b.kind === 'vi_to_en')
+          expect(b.hint).toBe(letterHint(b.word.displayWord));
         else expect(b.hint).toBeNull();
         expect(b.word.displayWord).not.toBe('the');
         if (i > 0) expect(b.spawnAtMs).toBeGreaterThan(blocks[i - 1].spawnAtMs);

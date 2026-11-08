@@ -26,7 +26,8 @@ export const BLASTER_STAKES = [20, 50, 100] as const;
 /** A shot this long after a block's landing still counts (network delay). */
 export const LANDING_GRACE_MS = 400;
 export const BLASTER_XP_PER_BLOCK = 2;
-const FIRST_SPAWN_MS = 1500;
+/** The page counts down 3, 2, 1 before the first block appears. */
+export const FIRST_SPAWN_MS = 3500;
 const LANES = [0.12, 0.31, 0.5, 0.69, 0.88];
 
 export type BlasterKind = 'copy' | 'missing' | 'vi_to_en' | 'en_to_vi';
@@ -65,8 +66,9 @@ export type BlasterBlock = {
   /** Horizontal position, 0 (left) to 1 (right). */
   lane: number;
   /**
-   * For en_to_vi: one "_" per letter of the meaning to type, spaces kept
-   * ("đàm phán" → "___ ____"). Null for the other kinds.
+   * One "_" per letter of the answer to type, spaces kept: the meaning for
+   * en_to_vi ("đàm phán" → "___ ____"), the English word for vi_to_en
+   * ("negotiate" → "_________"). Null when the word is on the block.
    */
   hint: string | null;
   word: { id: number; displayWord: string; meaningVi: string };
@@ -208,6 +210,8 @@ export function buildBlasterRound(
       ];
     }
     let hint: string | null = null;
+    // Owner 2026-11-08: both meaning modes hint the letters of the answer.
+    if (kind === 'vi_to_en') hint = letterHint(display);
     if (kind === 'en_to_vi') {
       answers = acceptedMeanings(word.meaningVi);
       hint = letterHint(mainSense(word.meaningVi));
