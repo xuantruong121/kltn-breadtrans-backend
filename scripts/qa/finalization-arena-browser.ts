@@ -1,9 +1,11 @@
 /**
  * Vocabulary Arena in two real Chromium sessions on the disposable harness:
- * both learners open /arena, pick 20 Bánh, press "Tìm đối thủ ngay", play
- * five rounds by clicking the options (A always right, B always wrong; the
- * answer key is read from the harness Redis), and see the result screen.
- * Balances, XP and the ledger are checked in the harness database.
+ * both learners open /arena, pick the 20 Bánh Mì stake, press "Tìm đối thủ",
+ * play five rounds by clicking the options (A always right, B always wrong;
+ * the answer key is read from the harness Redis), and see the result dialog.
+ * Balances, XP and the ledger are checked in the harness database; after
+ * "Về sảnh" both lobbies must show the new balance without a reload.
+ * SHOTS=<dir> also saves the intro, a round, a reveal and the results there.
  */
 import Redis from 'ioredis';
 import type { Page } from 'playwright';
@@ -12,7 +14,8 @@ import { check, failureCount } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessExec, harnessQuery } from './harness-db';
 
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
+const EXTRA = Boolean(process.env.SHOTS);
 const redis = new Redis({ host: '127.0.0.1', port: 6392 });
 const bread = (u: number) =>
   Number(harnessQuery(`select coalesce(max("totalBanhRan"),0) from "UserStats" where "userId" = ${u}`)[0][0]);
@@ -57,28 +60,43 @@ async function main() {
   const xpBefore = [xp(A.account.userId), xp(B.account.userId)];
   for (const s of [A, B]) {
     await s.page.goto(`${FE}/arena`, { waitUntil: 'networkidle', timeout: 120_000 });
-    await s.page.getByRole('button', { name: '20 Bánh' }).click();
+    await s.page.getByRole('button', { name: '20 Bánh Mì', exact: true }).click();
   }
-  await A.page.getByRole('button', { name: /Tìm đối thủ ngay/ }).click();
+  await A.page.getByRole('button', { name: /^Tìm đối thủ/ }).click();
   await A.page.getByText(/Đang tìm đối thủ/).waitFor({ timeout: 15_000 });
   check('A waits in the queue', true);
-  await B.page.getByRole('button', { name: /Tìm đối thủ ngay/ }).click();
+  if (EXTRA) await A.page.screenshot({ path: `${SHOTS}/arena-searching-1366.png` });
+  await B.page.getByRole('button', { name: /^Tìm đối thủ/ }).click();
   const match = await questions(A.account.userId);
   check('two browsers matched', Boolean(match), match?.matchId ?? '');
   if (!match) throw new Error('no match');
+  await A.page.waitForTimeout(900);
   await A.page.screenshot({ path: `${SHOTS}/arena-match-a-1366.png` });
+  if (EXTRA) await B.page.screenshot({ path: `${SHOTS}/arena-intro-b-1366.png` });
 
   const asked: string[] = [];
   for (let r = 0; r < 5; r += 1) {
+    if (EXTRA && r === 0) {
+      await A.page.locator('[role="timer"]').first().waitFor({ timeout: 15_000 });
+      await A.page.evaluate(() => window.scrollTo(0, 0));
+      await A.page.waitForTimeout(2500);
+      await A.page.screenshot({ path: `${SHOTS}/arena-round-live-1366.png` });
+    }
     const [pa] = await Promise.all([answer(A.page, match.qs, true), answer(B.page, match.qs, false)]);
     if (pa) asked.push(pa);
+    if (EXTRA && r === 1) {
+      await A.page.screenshot({ path: `${SHOTS}/arena-round-answered-1366.png` });
+      await A.page.waitForTimeout(1200);
+      await A.page.screenshot({ path: `${SHOTS}/arena-round-reveal-a-1366.png` });
+      await B.page.screenshot({ path: `${SHOTS}/arena-round-reveal-b-1366.png` });
+    }
     // Wait for this round's reveal before the next prompt.
     await A.page.waitForTimeout(3500);
   }
   check('five rounds answered in the UI', asked.length === 5 && new Set(asked).size === 5, String(asked.length));
-  await A.page.getByText(/Xuất sắc! Bạn đã đánh bại đối thủ/).waitFor({ timeout: 40_000 });
+  await A.page.getByRole('heading', { name: 'Bạn thắng!' }).waitFor({ timeout: 40_000 });
   const bodyB = (await B.page.locator('body').innerText()).replace(/\s+/g, ' ');
-  check('A sees the win screen; B sees the loss of 20 Bánh', /-20/.test(bodyB));
+  check('A sees the win dialog; B sees the loss of 20 Bánh Mì', /Bạn thua/.test(bodyB) && /[−-]20/.test(bodyB));
   await A.page.screenshot({ path: `${SHOTS}/arena-result-winner-1366.png` });
   await B.page.screenshot({ path: `${SHOTS}/arena-result-loser-1366.png` });
   await new Promise((ok) => setTimeout(ok, 1500));
@@ -87,6 +105,17 @@ async function main() {
     bread(A.account.userId) === 120 && bread(B.account.userId) === 80 && xp(A.account.userId) - xpBefore[0] === 0 && xp(B.account.userId) - xpBefore[1] === 0,
     `(${bread(A.account.userId)}, ${bread(B.account.userId)}, xp ${xp(A.account.userId) - xpBefore[0]}/${xp(B.account.userId) - xpBefore[1]})`,
   );
+  // The original bug: back in the lobby the balance stayed stale until a reload.
+  for (const [s, expected] of [[A, 120], [B, 80]] as const) {
+    await s.page.getByRole('button', { name: 'Về sảnh' }).click();
+    const ok = await s.page
+      .getByText(new RegExp(`Bạn có ${expected} Bánh Mì`))
+      .waitFor({ timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    check(`${s === A ? 'A' : 'B'}: lobby shows ${expected} Bánh Mì without a reload`, ok);
+  }
+  if (EXTRA) await A.page.screenshot({ path: `${SHOTS}/arena-lobby-after-1366.png`, fullPage: true });
   const ledger = harnessQuery(`select source, count(*) from "BanhTransaction" where reference like 'arena:match:${match.matchId}:%' group by source order by source`).map(([s, n]) => `${s}=${n}`);
   check('ledger ARENA_STAKE=2, ARENA_WIN=1', ledger.join(',') === 'ARENA_STAKE=2,ARENA_WIN=1', ledger.join(','));
   for (const s of [A, B])
