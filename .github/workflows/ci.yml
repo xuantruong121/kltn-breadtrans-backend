@@ -74,7 +74,16 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        # ffmpeg-static downloads its binary from GitHub Releases while it
+        # installs; a 504 there failed CI on 2026-11-08 with no code at fault.
+        # Retry the whole install up to three times before giving up.
+        run: |
+          for attempt in 1 2 3; do
+            npm ci && exit 0
+            echo "npm ci failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep 30
+          done
+          exit 1
 
       - name: Generate Prisma client
         run: npx prisma generate
