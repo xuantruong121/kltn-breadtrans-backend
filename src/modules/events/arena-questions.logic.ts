@@ -48,6 +48,8 @@ export type ArenaWord = {
   ipa: string | null;
   /** CEFR rank of the easiest deck holding the word (A1 = 1 … C2 = 6), null when unknown. */
   level: number | null;
+  /** Ids of the published decks holding the word; empty when unknown. */
+  topics?: number[];
 };
 
 export type ArenaQuestion = {
@@ -114,10 +116,17 @@ export function senses(meaningVi: string): string[] {
     .filter(Boolean);
 }
 
-/** Two meanings clash when they share a sense: both options would be right. */
+/**
+ * Two meanings clash when they share a sense, or one sense holds the other as
+ * whole words ("hóa đơn" in "hóa đơn thanh toán"): both options could be right.
+ */
 export function meaningsClash(a: string, b: string): boolean {
-  const left = new Set(senses(a));
-  return senses(b).some((s) => left.has(s));
+  const left = senses(a);
+  return senses(b).some((x) =>
+    left.some(
+      (y) => ` ${x} `.includes(` ${y} `) || ` ${y} `.includes(` ${x} `),
+    ),
+  );
 }
 
 /** Fisher–Yates; `rng` returns [0, 1). */
@@ -172,6 +181,30 @@ function widen(levels: number[]): ((w: ArenaWord) => boolean)[] {
   ];
 }
 
+/**
+ * For the two meaning kinds, words from the target's own deck share its
+ * subject (profit: revenue, expense, budget), so the meaning has to be known
+ * rather than guessed from the topic. A sentence with a blank is left out: a
+ * word from the same deck could fit it too.
+ */
+function sharesDeck(a: ArenaWord, b: ArenaWord): boolean {
+  return (a.topics ?? []).some((t) => (b.topics ?? []).includes(t));
+}
+
+/**
+ * How hard a distractor is to rule out: the prompt names the part of speech,
+ * so a different one gives the answer away and counts most; the same deck
+ * comes next (meaning kinds only).
+ */
+function closeness(
+  w: ArenaWord,
+  target: ArenaWord,
+  kind: QuestionKind,
+): number {
+  const deck = kind !== 'fill_blank' && sharesDeck(w, target) ? 1 : 0;
+  return (w.pos === target.pos ? 2 : 0) + deck;
+}
+
 /** Distractors from the target's own level are harder to rule out. */
 function levelGap(a: ArenaWord, b: ArenaWord): number {
   return a.level === null || b.level === null ? 2 : Math.abs(a.level - b.level);
@@ -184,7 +217,8 @@ function optionText(w: ArenaWord, kind: QuestionKind): string {
 /**
  * Builds up to `count` questions. Each round gets its own three distractors
  * from the whole pool: never a target of this match (so earlier answers
- * cannot be eliminated), the same part of speech when there are enough, and
+ * cannot be eliminated), from the target's deck for the meaning kinds, the
+ * same part of speech when there are enough, and
  * no option sharing a sense with another. Returns fewer questions only when
  * the pool is too small; the caller then falls back.
  */
@@ -233,7 +267,7 @@ export function buildArenaQuestions(
       rng,
     ).sort(
       (a, b) =>
-        Number(b.pos === word.pos) - Number(a.pos === word.pos) ||
+        closeness(b, word, kind) - closeness(a, word, kind) ||
         levelGap(a, word) - levelGap(b, word) ||
         (usage.get(a.id) ?? 0) - (usage.get(b.id) ?? 0),
     );

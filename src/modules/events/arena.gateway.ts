@@ -1642,7 +1642,7 @@ export class ArenaGateway
       exampleEn: string | null;
       ipaUs: string | null;
       ipaUk: string | null;
-      deckWords?: { topic: { level: string | null } }[];
+      deckWords?: { topic: { id: number; level: string | null } }[];
     }): ArenaWord => {
       const ranks = (entry.deckWords ?? [])
         .map((d) => levelRank(d.topic.level))
@@ -1656,6 +1656,7 @@ export class ArenaGateway
         exampleEn: entry.exampleEn,
         ipa: entry.ipaUs || entry.ipaUk,
         level: ranks.length ? Math.min(...ranks) : null,
+        topics: (entry.deckWords ?? []).map((d) => d.topic.id),
       };
     };
 
@@ -1668,7 +1669,7 @@ export class ArenaGateway
         include: {
           deckWords: {
             where: { topic: { publicationStatus: 'PUBLISHED' } },
-            select: { topic: { select: { level: true } } },
+            select: { topic: { select: { id: true, level: true } } },
           },
         },
       });

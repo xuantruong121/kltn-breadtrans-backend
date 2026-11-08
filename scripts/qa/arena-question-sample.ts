@@ -29,7 +29,7 @@ async function main() {
       include: {
         deckWords: {
           where: { topic: { publicationStatus: 'PUBLISHED' } },
-          select: { topic: { select: { level: true } } },
+          select: { topic: { select: { id: true, level: true } } },
         },
       },
     });
@@ -46,6 +46,7 @@ async function main() {
         exampleEn: e.exampleEn,
         ipa: e.ipaUs || e.ipaUk,
         level: ranks.length ? Math.min(...ranks) : null,
+        topics: e.deckWords.map((d) => d.topic.id),
       };
     });
     const levelOf = new Map(words.map((w) => [w.id, w.level]));

@@ -120,6 +120,14 @@ describe('helpers', () => {
     expect(meaningsClash('bảo mật', 'bảo mật; kín')).toBe(true);
     expect(meaningsClash('mở; khai mạc', 'đóng')).toBe(false);
   });
+
+  it('meanings clash when one sense holds the other as whole words', () => {
+    expect(meaningsClash('hóa đơn, biên lai', 'hóa đơn thanh toán')).toBe(true);
+    expect(meaningsClash('thanh toán', 'hóa đơn thanh toán')).toBe(true);
+    expect(meaningsClash('lợi nhuận', 'doanh thu')).toBe(false);
+    // Whole words only: "phí" is not inside "phía".
+    expect(meaningsClash('phí', 'phía trước')).toBe(false);
+  });
 });
 
 describe('buildArenaQuestions', () => {
@@ -191,6 +199,49 @@ describe('buildArenaQuestions', () => {
           continue;
         checked += 1;
         expect(q.options.every((o) => verbs.has(o))).toBe(true);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('meaning questions take their distractors from the target deck', () => {
+    // Deck 5 (finance) next to many unrelated B2 nouns from other decks.
+    const finance = [
+      ['profit', 'lợi nhuận'],
+      ['revenue', 'doanh thu'],
+      ['expense', 'chi phí'],
+      ['budget', 'ngân sách'],
+      ['forecast', 'dự báo'],
+      ['estimate', 'bản ước tính'],
+      ['invoice', 'hóa đơn thanh toán'],
+      ['payment', 'thanh toán'],
+    ].map(([w, m]) => ({ ...word(w, m, 4), topics: [5] }));
+    const others = Array.from({ length: 30 }, (_, i) => ({
+      ...word(
+        `otherx${String.fromCharCode(97 + (i % 26))}${'abc'[Math.floor(i / 26)]}`,
+        `nghĩa khác số ${i}`,
+        [2, 3, 4][i % 3],
+      ),
+      topics: [100 + (i % 4)],
+    }));
+    const deck = [...finance, ...others];
+    const financeIds = new Set(finance.map((w) => w.id));
+    const byText = new Map<string, number>();
+    for (const w of deck) {
+      byText.set(w.displayWord, w.id);
+      byText.set(w.meaningVi, w.id);
+    }
+    let checked = 0;
+    for (const seed of seeds) {
+      const qs = buildArenaQuestions(deck, ARENA_ROUNDS, seeded(seed));
+      const targets = new Set(qs.map((q) => q.id));
+      const spare = finance.filter((w) => !targets.has(w.id)).length;
+      for (const q of qs) {
+        if (q.kind === 'fill_blank' || !financeIds.has(q.id)) continue;
+        if (spare < 5) continue; // invoice/payment clash may leave fewer
+        checked += 1;
+        for (const o of q.options)
+          expect(financeIds.has(byText.get(o)!)).toBe(true);
       }
     }
     expect(checked).toBeGreaterThan(0);
