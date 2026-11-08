@@ -208,6 +208,61 @@ describe('ArenaGateway security validation', () => {
     expect(tx.pointHistory.create).not.toHaveBeenCalled();
   });
 
+  it('leave_match ends the match at once: the rival wins by forfeit', async () => {
+    const match = {
+      matchId: 'match-leave',
+      stake: 50,
+      p1: { userId: 1, userName: 'P1', score: 300, answers: {} },
+      p2: { userId: 2, userName: 'P2', score: 0, answers: {} },
+      isSettled: false,
+    };
+    redis.get.mockImplementation((key: string) =>
+      Promise.resolve(
+        key === 'arena:match:match-leave' ? JSON.stringify(match) : null,
+      ),
+    );
+    const internals = gateway as unknown as {
+      authUser: jest.Mock;
+      finalizeMatch: jest.Mock;
+    };
+    internals.authUser = jest.fn().mockResolvedValue({ userId: 1 });
+    internals.finalizeMatch = jest.fn().mockResolvedValue(undefined);
+    const socket = { emit: jest.fn() } as unknown as Socket;
+
+    await gateway.handleLeaveMatch(socket, { matchId: 'match-leave' });
+
+    expect(internals.finalizeMatch).toHaveBeenCalledWith(
+      expect.objectContaining({ matchId: 'match-leave' }),
+      'p2',
+      true,
+      'left',
+    );
+    expect(socket.emit).not.toHaveBeenCalled();
+  });
+
+  it('leave_match from someone outside the match changes nothing', async () => {
+    redis.get.mockResolvedValue(
+      JSON.stringify({
+        matchId: 'm',
+        p1: { userId: 1 },
+        p2: { userId: 2 },
+        isSettled: false,
+      }),
+    );
+    const internals = gateway as unknown as {
+      authUser: jest.Mock;
+      finalizeMatch: jest.Mock;
+    };
+    internals.authUser = jest.fn().mockResolvedValue({ userId: 9 });
+    internals.finalizeMatch = jest.fn();
+    const socket = { emit: jest.fn() } as unknown as Socket;
+
+    await gateway.handleLeaveMatch(socket, { matchId: 'm' });
+
+    expect(internals.finalizeMatch).not.toHaveBeenCalled();
+    expect(socket.emit).toHaveBeenCalledWith('arena:error', expect.anything());
+  });
+
   it('pays 5 XP per correct answer to both players, up to 150 Arena XP a day', async () => {
     redis.set.mockResolvedValue('OK');
     redis.eval = jest.fn().mockResolvedValue(1);
@@ -268,6 +323,7 @@ describe('ArenaGateway security validation', () => {
     expect(awardXp).toHaveBeenCalledWith(1, 35, 'Đấu trường từ vựng');
     expect(awardXp).toHaveBeenCalledWith(2, 10, 'Đấu trường từ vựng');
     const ended = emit.mock.calls.find((c) => c[0] === 'arena:match_ended')![1];
+    expect(ended.forfeitReason).toBeNull();
     expect(ended.p1).toMatchObject({ xp: 35, xpCapped: false });
     expect(ended.p2).toMatchObject({ xp: 10, xpCapped: true });
   });

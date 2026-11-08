@@ -1339,7 +1339,47 @@ export class ArenaGateway
     });
   }
 
-  private async handleForfeit(matchId: string, forfeitedUserId: number) {
+  /**
+   * A player leaves a running match on purpose (owner 2026-11-08: an exit
+   * button with a confirmation). The match ends at once and the rival wins,
+   * as after the 15-second disconnect grace.
+   */
+  @SubscribeMessage('leave_match')
+  async handleLeaveMatch(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { matchId: string },
+  ) {
+    const authUser = await this.authUser(client);
+    if (!authUser) return;
+    const matchId = typeof payload?.matchId === 'string' ? payload.matchId : '';
+    const rawMatch = matchId
+      ? await this.redis.get(`arena:match:${matchId}`)
+      : null;
+    const match: MatchState | null = rawMatch ? JSON.parse(rawMatch) : null;
+    const isPlayer =
+      match?.p1.userId === authUser.userId ||
+      match?.p2.userId === authUser.userId;
+    if (!match || !isPlayer || match.isSettled) {
+      client.emit('arena:error', {
+        message: 'Trận đấu không tồn tại hoặc đã kết thúc.',
+      });
+      return;
+    }
+    clearTimeout(this.roundTimers.get(matchId));
+    this.roundTimers.delete(matchId);
+    for (const p of [match.p1, match.p2]) {
+      const key = `${matchId}_${p.userId}`;
+      clearTimeout(this.disconnectTimers.get(key));
+      this.disconnectTimers.delete(key);
+    }
+    await this.handleForfeit(matchId, authUser.userId, 'left');
+  }
+
+  private async handleForfeit(
+    matchId: string,
+    forfeitedUserId: number,
+    reason: 'left' | 'disconnected' = 'disconnected',
+  ) {
     try {
       const rawMatch = await this.redis.get(`arena:match:${matchId}`);
       if (!rawMatch) return;
@@ -1350,10 +1390,10 @@ export class ArenaGateway
       const winnerRole = match.p1.userId === forfeitedUserId ? 'p2' : 'p1';
 
       this.logger.warn(
-        `[Arena] [${matchId}] Player #${forfeitedUserId} forfeited due to 15s disconnect timeout.`,
+        `[Arena] [${matchId}] Player #${forfeitedUserId} forfeited (${reason === 'left' ? 'left the match' : '15s disconnect timeout'}).`,
       );
 
-      await this.finalizeMatch(match, winnerRole, true);
+      await this.finalizeMatch(match, winnerRole, true, reason);
     } catch (err) {
       this.logger.error(`[Arena] Error in handleForfeit for ${matchId}:`, err);
     }
@@ -1388,6 +1428,7 @@ export class ArenaGateway
     match: MatchState,
     winnerRole: 'p1' | 'p2' | 'draw',
     isForfeit: boolean,
+    forfeitReason?: 'left' | 'disconnected',
   ) {
     const lockKey = `arena:lock:settle:${match.matchId}`;
     const lockOwner = `${process.pid}:${crypto.randomUUID()}`;
@@ -1600,6 +1641,8 @@ export class ArenaGateway
         winnerRole,
         winnerUserId,
         isForfeit,
+        // Why a forfeit happened: the loser left on purpose or lost connection.
+        forfeitReason: isForfeit ? (forfeitReason ?? 'disconnected') : null,
         p1: {
           userId: match.p1.userId,
           userName: match.p1.userName,
