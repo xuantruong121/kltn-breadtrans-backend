@@ -1407,6 +1407,16 @@ export class GamificationService {
       badgesToAward.push('Chuyên Gia Nuôi Thú');
     }
 
+    // Milestone 6: Đấu Sĩ Bất Bại (an arena win). The win event grants it as it
+    // happens; this catches wins settled before that event existed.
+    const arenaWin = await this.prisma.gameBattle.findFirst({
+      where: { status: 'settled', winnerUserId: userId },
+      select: { id: true },
+    });
+    if (arenaWin) {
+      badgesToAward.push('Đấu Sĩ Bất Bại');
+    }
+
     // Award all earned badges to user
     for (const badgeName of badgesToAward) {
       const badgeRecord = await this.prisma.badge.findFirst({
