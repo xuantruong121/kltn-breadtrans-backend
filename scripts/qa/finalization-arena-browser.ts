@@ -77,12 +77,17 @@ async function main() {
   await A.page.getByText(/Đang tìm đối thủ/).waitFor({ timeout: 15_000 });
   check('A waits in the queue', true);
   if (EXTRA) await A.page.screenshot({ path: `${SHOTS}/arena-searching-${WIDTH}.png` });
+  const pet = (page: typeof A.page) => page.getByRole('button', { name: /^Thú cưng đồng hành/ }).count();
+  const petInLobby = await pet(A.page);
   await B.page.getByRole('button', { name: /^Tìm đối thủ/ }).click();
   const match = await questions(A.account.userId);
   check('two browsers matched', Boolean(match), match?.matchId ?? '');
   if (!match) throw new Error('no match');
   await A.page.waitForTimeout(900);
   await A.page.screenshot({ path: `${SHOTS}/arena-match-a-${WIDTH}.png` });
+  // Owner 2026-11-08: the floating pet stays away while two learners play.
+  if (petInLobby === 0) console.log('NOT_VERIFIED  pet hidden in a match: no pet shown in the lobby for this account');
+  else check('the floating pet shows in the lobby and hides in the match', (await pet(A.page)) === 0, `lobby ${petInLobby}`);
   if (EXTRA) await B.page.screenshot({ path: `${SHOTS}/arena-intro-b-${WIDTH}.png` });
 
   const asked: string[] = [];
@@ -110,10 +115,28 @@ async function main() {
   check('A sees the win dialog; B sees the loss of 20 Bánh Mì', /Bạn thua/.test(bodyB) && /[−-]20/.test(bodyB));
   await A.page.screenshot({ path: `${SHOTS}/arena-result-winner-${WIDTH}.png` });
   await B.page.screenshot({ path: `${SHOTS}/arena-result-loser-${WIDTH}.png` });
+  // Owner 2026-11-08: the sticky header covered the top of the dialog. The
+  // element at the dialog's top edge must not belong to the header (a passing
+  // reward toast may sit there; it is meant to be on top).
+  for (const [s, name] of [[A, 'A'], [B, 'B']] as const) {
+    const onTop = await s.page.evaluate(() => {
+      const d = document.querySelector('[role="dialog"][aria-labelledby="result-title"]');
+      if (!d) return false;
+      const r = d.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, Math.max(r.top + 4, 1));
+      return Boolean(hit && !hit.closest('header'));
+    });
+    check(`${name}: the result dialog is above the header`, onTop);
+  }
+  const bodyA = (await A.page.locator('body').innerText()).replace(/\s+/g, ' ');
+  check(
+    'the result says the XP: A +50, B none (no correct answer)',
+    /\+50 XP/.test(bodyA) && /Chưa có câu đúng nào/.test(bodyB),
+  );
   await new Promise((ok) => setTimeout(ok, 1500));
   check(
-    'balances 120 / 80; no XP for either player (Arena pays Bread only, CP57-C)',
-    bread(A.account.userId) === 120 && bread(B.account.userId) === 80 && xp(A.account.userId) - xpBefore[0] === 0 && xp(B.account.userId) - xpBefore[1] === 0,
+    'balances 120 / 80; XP 50 for A (10 right), 0 for B (owner decision 2026-11-08)',
+    bread(A.account.userId) === 120 && bread(B.account.userId) === 80 && xp(A.account.userId) - xpBefore[0] === 50 && xp(B.account.userId) - xpBefore[1] === 0,
     `(${bread(A.account.userId)}, ${bread(B.account.userId)}, xp ${xp(A.account.userId) - xpBefore[0]}/${xp(B.account.userId) - xpBefore[1]})`,
   );
   // The original bug: back in the lobby the balance stayed stale until a reload.
