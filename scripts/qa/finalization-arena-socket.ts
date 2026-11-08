@@ -140,13 +140,13 @@ async function scenarioWin(a: Player, b: Player) {
     s1,
     s2,
     matchId,
-    [0, 1, 2, 3, 4],
+    Array.from({ length: 10 }, (_, r) => r),
     (role, q) => (role === 'p1' ? right(q) : wrong(q)),
     results,
   );
   check(
     'every round records BOTH simultaneous answers (no lost update)',
-    results.length === 5 &&
+    results.length === 10 &&
       results.every(
         (r) => r.p1.selectedOption !== null && r.p2.selectedOption !== null,
       ),
@@ -262,7 +262,7 @@ async function scenarioReconnectDraw(a: Player, b: Player) {
       cr?.p2.selectedOption !== null,
     JSON.stringify(cr)?.slice(0, 90),
   );
-  const rest = [1, 2, 3, 4].filter((r) => r > cur);
+  const rest = Array.from({ length: 10 }, (_, r) => r).filter((r) => r > cur);
   await play(s1, s2, matchId, rest, (_r, q) => wrong(q), results);
   const e = await ended;
   check(
