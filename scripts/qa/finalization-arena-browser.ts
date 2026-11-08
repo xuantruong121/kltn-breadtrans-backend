@@ -130,8 +130,8 @@ async function main() {
   }
   const bodyA = (await A.page.locator('body').innerText()).replace(/\s+/g, ' ');
   check(
-    'the result says the XP: A +50, B none (no correct answer)',
-    /\+50 XP/.test(bodyA) && /Chưa có câu đúng nào/.test(bodyB),
+    'the result says the XP: A +50, B +0 (no correct answer)',
+    /\+50 XP/.test(bodyA) && /\+0 XP/.test(bodyB),
   );
   await new Promise((ok) => setTimeout(ok, 1500));
   check(
