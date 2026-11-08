@@ -182,7 +182,13 @@ describe('WordBlasterService', () => {
 
   it('leaving loses at once and pays nothing', async () => {
     const view = await service.start(1, 20);
+    const blocks = stored(view.sessionId).blocks;
+    // Leave just after the third block appeared: only those three are words to review.
+    now = 1_000_000 + blocks[2].spawnAtMs + 10;
     const res = await service.finish(1, view.sessionId, true);
+    expect(res.result!.words.map((w) => w.id)).toEqual(
+      blocks.slice(0, 3).map((b) => b.word.id),
+    );
     expect(res.result).toMatchObject({
       outcome: 'lose',
       forfeit: true,
@@ -201,6 +207,12 @@ describe('WordBlasterService', () => {
       redis.store.get(`blaster:session:${view.sessionId}`)!,
     );
     expect(settled.result).toMatchObject({ outcome: 'lose', destroyed: 0 });
+    // The game ended at the third landing; blocks after it were never seen.
+    const third = blocks.map(landsAt).sort((a, b) => a - b)[2];
+    expect(settled.result.words).toHaveLength(
+      blocks.filter((b) => b.spawnAtMs <= third).length,
+    );
+    expect(settled.result.words.length).toBeLessThan(20);
     expect(gamification.awardBanh).not.toHaveBeenCalled();
     expect(await service.sweepExpired()).toBe(0);
   });

@@ -317,10 +317,16 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
       net: outcome === 'win' ? bonusGranted : -session.stake,
       bonusCapped: bonus - bonusGranted,
       xp,
-      words: session.blocks.map((b) => ({
-        ...b.word,
-        hit: session.hits[b.id] !== undefined,
-      })),
+      // Only the words that fell before the game ended: leaving early or
+      // losing the third life leaves the rest unseen, nothing to review.
+      words: session.blocks
+        .filter(
+          (b) => b.spawnAtMs <= (forfeit ? now : (state.endedAtMs ?? now)),
+        )
+        .map((b) => ({
+          ...b.word,
+          hit: session.hits[b.id] !== undefined,
+        })),
     };
     await this.save(session, RESULT_TTL_S);
     await this.redis.zrem(KEY.open, session.id);
