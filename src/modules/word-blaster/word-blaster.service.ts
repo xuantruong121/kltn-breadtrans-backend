@@ -88,7 +88,7 @@ const KEY = {
 };
 
 /**
- * Bắn chữ rơi, decided by the server: the answers never leave it, the clock
+ * Pháo Bánh Mì, decided by the server: the answers never leave it, the clock
  * is its own, each learner has one game open, and the money moves only here.
  */
 @Injectable()
@@ -148,7 +148,7 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
     const paid = await this.gamification.deductBanh(
       userId,
       stake,
-      'Cược Đấu Trường · Bắn chữ rơi',
+      'Cược Đấu Trường · Pháo Bánh Mì',
       'BLASTER_STAKE',
       `blaster:${id}:stake`,
       { metadata: { sessionId: id } },

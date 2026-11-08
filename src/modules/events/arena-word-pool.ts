@@ -1,7 +1,7 @@
 import { levelRank, type ArenaWord } from './arena-questions.logic';
 
 /**
- * The words both Arena games draw from (the 1v1 duel and Bắn chữ rơi):
+ * The words both Arena games draw from (the 1v1 duel and Pháo Bánh Mì):
  * reviewed curated dictionary entries, with the level of the easiest
  * published deck holding each. Only the Prisma calls live here; choosing and
  * shaping questions stays in the pure logic files.

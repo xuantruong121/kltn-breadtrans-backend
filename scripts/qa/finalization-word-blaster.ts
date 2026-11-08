@@ -1,11 +1,11 @@
 /**
- * Bắn chữ rơi on the disposable harness (owner 2026-11-08). The answers are
+ * Pháo Bánh Mì on the disposable harness (owner 2026-11-08). The answers are
  * read straight from the harness Redis, as a perfect player would know them.
  *   API: a win pays the stake back plus half (one BLASTER_RETURN, one
  *        BLASTER_WIN); a loss and leaving keep the stake; the start reply
  *        holds no answer; a game left alone is settled by the sweep.
  *   Browser: the menu shows Đấu trường, More holds Bảng xếp hạng then FAQ;
- *        /arena lists the games in a sidebar and Bắn chữ rơi's lobby opens
+ *        /arena lists the games in a sidebar and Pháo Bánh Mì's lobby opens
  *        from it. Answers are typed one key at a time, never with Enter
  *        (owner 2026-11-08, after ZType): a Gõ lại từ game won at 1366 with
  *        one block let through and one wrong key refused, a Nghĩa → từ game
@@ -355,20 +355,20 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
     name: 'Trò chơi trong Đấu trường',
   });
   await nav
-    .getByRole('button', { name: /Bắn chữ rơi/ })
+    .getByRole('button', { name: /Pháo Bánh Mì/ })
     .waitFor({ timeout: 30_000 });
   if (first) {
     check(
-      '/arena lists Đấu 1v1 and Bắn chữ rơi in its game sidebar',
-      (await nav.getByRole('button', { name: /Đấu 1v1/ }).count()) === 1 &&
-        (await nav.getByRole('button', { name: /Bắn chữ rơi/ }).count()) === 1,
+      '/arena lists Song Đấu Từ Vựng and Pháo Bánh Mì in its game sidebar',
+      (await nav.getByRole('button', { name: /Song Đấu Từ Vựng/ }).count()) === 1 &&
+        (await nav.getByRole('button', { name: /Pháo Bánh Mì/ }).count()) === 1,
     );
   }
-  await nav.getByRole('button', { name: /Bắn chữ rơi/ }).click();
+  await nav.getByRole('button', { name: /Pháo Bánh Mì/ }).click();
   check(
-    `${tag}: picking Bắn chữ rơi opens its lobby (?game=blaster)`,
+    `${tag}: picking Pháo Bánh Mì opens its lobby (?game=blaster)`,
     (await page
-      .getByRole('heading', { name: 'Bắn chữ rơi', level: 1 })
+      .getByRole('heading', { name: 'Pháo Bánh Mì', level: 1 })
       .waitFor({ timeout: 30_000 })
       .then(() => true)
       .catch(() => false)) && page.url().includes('game=blaster'),
@@ -396,7 +396,7 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
       timeout: 120_000,
     });
     await page
-      .getByRole('heading', { name: 'Bắn chữ rơi', level: 1 })
+      .getByRole('heading', { name: 'Pháo Bánh Mì', level: 1 })
       .waitFor({ timeout: 30_000 });
   }
   await page.getByRole('button', { name: '20 Bánh Mì', exact: true }).click();

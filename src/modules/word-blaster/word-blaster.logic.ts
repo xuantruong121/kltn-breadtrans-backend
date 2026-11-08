@@ -1,5 +1,5 @@
 /**
- * Bắn chữ rơi (owner 2026-11-08): word blocks fall; the learner types the
+ * Pháo Bánh Mì (owner 2026-11-08): word blocks fall; the learner types the
  * answer and the bread cannon breaks the block before it lands. 20 blocks,
  * 3 lives: the game is won when every block is gone (shot or landed) with a
  * life left. Pure: words and randomness come in as arguments, and every time

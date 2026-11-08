@@ -33,7 +33,7 @@ export class WordBlasterController {
   @Post('start')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Mở ván Bắn chữ rơi (trừ cược), hoặc trả về ván đang mở',
+    summary: 'Mở ván Pháo Bánh Mì (trừ cược), hoặc trả về ván đang mở',
   })
   @ApiResponse({
     status: 200,
@@ -49,7 +49,7 @@ export class WordBlasterController {
   }
 
   @Get('current')
-  @ApiOperation({ summary: 'Ván Bắn chữ rơi đang mở của học viên, nếu có' })
+  @ApiOperation({ summary: 'Ván Pháo Bánh Mì đang mở của học viên, nếu có' })
   @ApiResponse({ status: 200, description: 'Ván đang mở hoặc null' })
   @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
   current(@Request() req: any) {

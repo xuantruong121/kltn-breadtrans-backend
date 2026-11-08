@@ -237,7 +237,7 @@ export class ArenaGateway
             userName: name,
             userRole: 'STUDENT',
             amount: battle.stake,
-            reason: `Hoàn cược Đấu Trường 1v1 (${battle.roomId})`,
+            reason: `Hoàn cược Song Đấu Từ Vựng (${battle.roomId})`,
             type: 'add',
           },
         });
@@ -272,7 +272,7 @@ export class ArenaGateway
         this.eventsGateway.sendCurrencyUpdate(userId, {
           amount: battle.stake,
           newBalance: balance,
-          reason: 'Hoàn cược Đấu Trường 1v1 (trận bị huỷ)',
+          reason: 'Hoàn cược Song Đấu Từ Vựng (trận bị huỷ)',
           studentName: name,
         });
       }
@@ -818,7 +818,7 @@ export class ArenaGateway
                 userName: p1.userName,
                 userRole: 'STUDENT',
                 amount: -stake,
-                reason: `Cược Đấu Trường 1v1 (${matchId})`,
+                reason: `Cược Song Đấu Từ Vựng (${matchId})`,
                 type: 'subtract',
               },
               {
@@ -828,7 +828,7 @@ export class ArenaGateway
                 userName: p2.userName,
                 userRole: 'STUDENT',
                 amount: -stake,
-                reason: `Cược Đấu Trường 1v1 (${matchId})`,
+                reason: `Cược Song Đấu Từ Vựng (${matchId})`,
                 type: 'subtract',
               },
             ],
@@ -1484,8 +1484,8 @@ export class ArenaGateway
               userRole: 'STUDENT',
               amount: totalReward,
               reason: isForfeit
-                ? `Thắng do đối thủ bỏ cuộc Đấu Trường 1v1`
-                : `Chiến thắng Đấu Trường 1v1`,
+                ? `Thắng do đối thủ bỏ cuộc Song Đấu Từ Vựng`
+                : `Chiến thắng Song Đấu Từ Vựng`,
               type: 'add',
             },
           });
@@ -1510,7 +1510,7 @@ export class ArenaGateway
         this.eventsGateway.sendCurrencyUpdate(winner.userId, {
           amount: totalReward,
           newBalance: updatedStats.totalBanhRan,
-          reason: `Chiến thắng Đấu Trường 1v1 (+${totalReward} Bánh Mì)`,
+          reason: `Chiến thắng Song Đấu Từ Vựng (+${totalReward} Bánh Mì)`,
           studentName: winner.userName,
         });
         // After the payout commits: the gamification listener grants the
@@ -1555,7 +1555,7 @@ export class ArenaGateway
                   userName: match.p1.userName,
                   userRole: 'STUDENT',
                   amount: match.stake,
-                  reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
+                  reason: `Hoàn cược Song Đấu Từ Vựng do Hòa nhau (${match.matchId})`,
                   type: 'add',
                 },
                 {
@@ -1565,7 +1565,7 @@ export class ArenaGateway
                   userName: match.p2.userName,
                   userRole: 'STUDENT',
                   amount: match.stake,
-                  reason: `Hoàn cược Đấu Trường 1v1 do Hòa nhau (${match.matchId})`,
+                  reason: `Hoàn cược Song Đấu Từ Vựng do Hòa nhau (${match.matchId})`,
                   type: 'add',
                 },
               ],
@@ -1609,14 +1609,14 @@ export class ArenaGateway
         this.eventsGateway.sendCurrencyUpdate(match.p1.userId, {
           amount: match.stake,
           newBalance: p1Stats.totalBanhRan,
-          reason: `Hoàn cược Đấu Trường 1v1 (Hòa nhau)`,
+          reason: `Hoàn cược Song Đấu Từ Vựng (Hòa nhau)`,
           studentName: match.p1.userName,
         });
 
         this.eventsGateway.sendCurrencyUpdate(match.p2.userId, {
           amount: match.stake,
           newBalance: p2Stats.totalBanhRan,
-          reason: `Hoàn cược Đấu Trường 1v1 (Hòa nhau)`,
+          reason: `Hoàn cược Song Đấu Từ Vựng (Hòa nhau)`,
           studentName: match.p2.userName,
         });
       }

@@ -4,7 +4,7 @@ import { GamificationModule } from '../gamification/gamification.module';
 import { WordBlasterController } from './word-blaster.controller';
 import { WordBlasterService } from './word-blaster.service';
 
-/** Bắn chữ rơi, the Arena's single-player word game. */
+/** Pháo Bánh Mì, the Arena's single-player word game. */
 @Module({
   imports: [PrismaModule, GamificationModule],
   controllers: [WordBlasterController],
