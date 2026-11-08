@@ -444,8 +444,34 @@ describeWithIsolatedDatabaseAndRedis(
         },
       });
 
+      // "Giọng Đọc Vàng" needs 10 different exercises at 8/10 or more: nine
+      // finished ones here, and this submission makes the tenth.
+      const earlier = await Promise.all(
+        Array.from({ length: 9 }, (_, i) =>
+          prisma.speakingExercise.create({
+            data: {
+              title: `S2A badge exercise ${i + 1}`,
+              targetText: 'Practice speaking English accurately.',
+              category: 'GENERAL',
+            },
+          }),
+        ),
+      );
+      await prisma.speakingSubmission.createMany({
+        data: earlier.map((exercise) => ({
+          userId: user.id,
+          exerciseId: exercise.id,
+          status: 'COMPLETED' as const,
+          overallScore: 9,
+          transcript: 'Test speech',
+          feedbackStatus: 'NOT_REQUESTED' as const,
+          rewardStatus: 'COMPLETED' as const,
+          audioKey: 'speaking/test/dummy.wav',
+        })),
+      });
+
       const badgeSpy = jest
-        .spyOn(gamificationService, 'awardBadgeIfEarned')
+        .spyOn(gamificationService, 'syncBadges')
         .mockRejectedValueOnce(new Error('FORCED_BADGE_CRASH'));
 
       await expect(
@@ -497,6 +523,9 @@ describeWithIsolatedDatabaseAndRedis(
       expect(recheckUserBadges.length).toBe(1);
 
       await prisma.user.delete({ where: { id: user.id } });
+      await prisma.speakingExercise.deleteMany({
+        where: { id: { in: earlier.map((exercise) => exercise.id) } },
+      });
     });
 
     // 5. Crash after one logical reward commits but before the next begins

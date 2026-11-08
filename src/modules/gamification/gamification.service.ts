@@ -19,6 +19,14 @@ import {
 } from '../../common/time/business-time.util';
 import { weeklyCatchUpDue } from './weekly-league.logic';
 import { arenaStats } from './arena-stats.logic';
+import {
+  BADGE_DESCRIPTIONS,
+  BADGE_RULES,
+  countHighSpeaking,
+  countPerfectPractices,
+  qualifyingBadges,
+  type BadgeFacts,
+} from './badge-rules.logic';
 import { questsForDay, type DailyQuestDefinition } from './daily-quest-catalog';
 
 export function getTodayDateKey(timeZone = 'Asia/Ho_Chi_Minh'): string {
@@ -1300,148 +1308,106 @@ export class GamificationService {
     return arenaStats(userId, battles);
   }
 
-  async getMyBadges(userId: number) {
-    // 1. Ensure standard 8 badges exist in database
-    const DEFAULT_BADGES = [
-      {
-        name: 'Tân Binh',
-        description: 'Đạt 100 điểm kinh nghiệm đầu tiên',
-        criteria: { type: 'EXP', threshold: 100 },
+  /**
+   * What the badge rules look at (badge-rules.logic.ts), read from the
+   * learner's own records. `client` lets a caller count inside its
+   * transaction, so a reward written there is already seen.
+   */
+  async badgeFacts(
+    userId: number,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<BadgeFacts> {
+    const [leaderboard, userStats, userPet, top, quizAttempts, speaking] =
+      await Promise.all([
+        client.leaderboard.findUnique({ where: { userId } }),
+        client.userStats.findUnique({ where: { userId } }),
+        client.userPet.findUnique({ where: { userId } }),
+        client.leaderboard.findFirst({
+          orderBy: { weeklyExp: 'desc' },
+          select: { userId: true },
+        }),
+        client.submission.findMany({
+          where: {
+            userId,
+            quiz: { type: { in: ['LISTENING_PRACTICE', 'BILINGUAL_READING'] } },
+          },
+          select: { quizId: true, results: { select: { isCorrect: true } } },
+        }),
+        client.speakingSubmission.findMany({
+          where: {
+            userId,
+            status: 'COMPLETED',
+            NOT: { exercise: { practiceSet: { scope: 'EXAM_INTERNAL' } } },
+          },
+          select: { exerciseId: true, overallScore: true },
+        }),
+      ]);
+    const battles = await client.gameBattle.findMany({
+      where: { status: 'settled', OR: [{ p1Id: userId }, { p2Id: userId }] },
+      select: {
+        p1Id: true,
+        p2Id: true,
+        stake: true,
+        winnerRole: true,
+        winnerUserId: true,
+        settledAt: true,
       },
-      {
-        name: 'Chăm Chỉ',
-        description: 'Duy trì chuỗi ngày học liên tục',
-        criteria: { type: 'STREAK', threshold: 1 },
-      },
-      {
-        name: 'Siêu Sao',
-        description: 'Đạt Top 1 Bảng xếp hạng tuần',
-        criteria: { type: 'LEADERBOARD_TOP1' },
-      },
-      {
-        name: 'Thợ Săn',
-        description: 'Thu thập đủ 1000 điểm kinh nghiệm',
-        criteria: { type: 'EXP', threshold: 1000 },
-      },
-      {
-        name: 'Học Bá',
-        description: 'Đạt điểm tối đa trong các bài Quiz',
-        criteria: { type: 'QUIZ', threshold: 1 },
-      },
-      {
-        name: 'Đấu Sĩ Bất Bại',
-        description: 'Thắng các trận so tài trong Đấu Trường',
-        criteria: { type: 'ARENA', threshold: 1 },
-      },
-      {
-        name: 'Giọng Đọc Vàng',
-        description: 'Đạt điểm phát âm AI xuất sắc',
-        criteria: { type: 'SPEAKING', threshold: 1 },
-      },
-      {
-        name: 'Chuyên Gia Nuôi Thú',
-        description: 'Nuôi thú cưng đạt Cấp độ 2 trở lên',
-        criteria: { type: 'PET_LEVEL', threshold: 2 },
-      },
-    ];
+      orderBy: { settledAt: 'asc' },
+    });
+    return {
+      totalXp: leaderboard?.totalPoints ?? 0,
+      weeklyXp: leaderboard?.weeklyExp ?? 0,
+      isWeeklyTop: top?.userId === userId,
+      streak: userStats?.streakCount ?? 0,
+      perfectPractices: countPerfectPractices(quizAttempts),
+      highSpeaking: countHighSpeaking(speaking),
+      longestArenaWinStreak: arenaStats(userId, battles).longestWinStreak,
+      petLevel: userPet?.level ?? 1,
+    };
+  }
 
-    for (const b of DEFAULT_BADGES) {
-      const existing = await this.prisma.badge.findFirst({
-        where: { name: b.name },
-      });
+  /**
+   * Grants every badge whose rule the learner now meets. It never takes one
+   * away: revoking under a changed rule is a reviewed one-off script
+   * (scripts/badge-rules-2026-11-08.ts). Returns the badges newly granted.
+   */
+  async syncBadges(
+    userId: number,
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<string[]> {
+    const facts = await this.badgeFacts(userId, options?.tx ?? this.prisma);
+    const granted: string[] = [];
+    for (const name of qualifyingBadges(facts)) {
+      if (await this.awardBadgeIfEarned(userId, name, options))
+        granted.push(name);
+    }
+    return granted;
+  }
+
+  /** The facts and the marks, for the progress bars on the badge cabinet. */
+  async getBadgeProgress(userId: number) {
+    return { facts: await this.badgeFacts(userId), rules: BADGE_RULES };
+  }
+
+  async getMyBadges(userId: number) {
+    // The eight badges exist on a fresh database too (only missing ones are
+    // created; existing descriptions are changed by the reviewed script).
+    for (const [name, b] of Object.entries(BADGE_DESCRIPTIONS)) {
+      const existing = await this.prisma.badge.findFirst({ where: { name } });
       if (!existing) {
         await this.prisma.badge.create({
           data: {
-            name: b.name,
+            name,
             description: b.description,
             iconUrl: '',
-            criteria: b.criteria,
+            criteria: b.criteria as Prisma.InputJsonValue,
           },
         });
       }
     }
 
-    // 2. Fetch user stats and leaderboard to automatically unlock earned badges
-    const leaderboard = await this.prisma.leaderboard.findUnique({
-      where: { userId },
-    });
-    const userStats = await this.prisma.userStats.findUnique({
-      where: { userId },
-    });
-    const userPet = await this.prisma.userPet.findUnique({
-      where: { userId },
-    });
-
-    const totalExp = leaderboard?.totalPoints || 0;
-    const weeklyExp = leaderboard?.weeklyExp || 0;
-    const streak = userStats?.streakCount || 0;
-    const petLevel = userPet?.level || 1;
-
-    const badgesToAward: string[] = [];
-
-    // Milestone 1: Tân Binh (>= 100 EXP)
-    if (totalExp >= 100 || weeklyExp >= 100) {
-      badgesToAward.push('Tân Binh');
-    }
-
-    // Milestone 2: Thợ Săn (>= 1000 EXP)
-    if (totalExp >= 1000 || weeklyExp >= 1000) {
-      badgesToAward.push('Thợ Săn');
-    }
-
-    // Milestone 3: Chăm Chỉ (Streak >= 1)
-    if (streak >= 1) {
-      badgesToAward.push('Chăm Chỉ');
-    }
-
-    // Milestone 4: Siêu Sao (Top 1 Weekly Leaderboard)
-    const topRank = await this.prisma.leaderboard.findFirst({
-      orderBy: { weeklyExp: 'desc' },
-    });
-    if (topRank && topRank.userId === userId && weeklyExp > 0) {
-      badgesToAward.push('Siêu Sao');
-    }
-
-    // Milestone 5: Chuyên Gia Nuôi Thú (Pet Level >= 2)
-    if (petLevel >= 2) {
-      badgesToAward.push('Chuyên Gia Nuôi Thú');
-    }
-
-    // Milestone 6: Đấu Sĩ Bất Bại (an arena win). The win event grants it as it
-    // happens; this catches wins settled before that event existed.
-    const arenaWin = await this.prisma.gameBattle.findFirst({
-      where: { status: 'settled', winnerUserId: userId },
-      select: { id: true },
-    });
-    if (arenaWin) {
-      badgesToAward.push('Đấu Sĩ Bất Bại');
-    }
-
-    // Award all earned badges to user
-    for (const badgeName of badgesToAward) {
-      const badgeRecord = await this.prisma.badge.findFirst({
-        where: { name: badgeName },
-      });
-      if (badgeRecord) {
-        const userBadgeExists = await this.prisma.userBadge.findUnique({
-          where: {
-            userId_badgeId: {
-              userId,
-              badgeId: badgeRecord.id,
-            },
-          },
-        });
-
-        if (!userBadgeExists) {
-          await this.prisma.userBadge.create({
-            data: {
-              userId,
-              badgeId: badgeRecord.id,
-            },
-          });
-        }
-      }
-    }
+    // Catch up on anything earned before an award path existed.
+    await this.syncBadges(userId);
 
     return this.prisma.userBadge.findMany({
       where: { userId },
@@ -1700,7 +1666,7 @@ export class GamificationService {
     const result = options?.tx
       ? await run(options.tx)
       : await this.prisma.$transaction(run);
-    if (result.granted && result.level >= 2)
+    if (result.granted && result.level >= BADGE_RULES.petLevel)
       await this.awardBadgeIfEarned(userId, 'Chuyên Gia Nuôi Thú', options);
     return result.granted;
   }
@@ -1843,8 +1809,8 @@ export class GamificationService {
       };
     });
 
-    // Award badge at level 2 if earned
-    if (result.newLevel >= 2) {
+    // The pet badge (badge-rules.logic.ts)
+    if (result.newLevel >= BADGE_RULES.petLevel) {
       await this.awardBadgeIfEarned(userId, 'Chuyên Gia Nuôi Thú');
     }
 

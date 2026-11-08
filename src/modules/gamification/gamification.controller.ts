@@ -57,6 +57,23 @@ export class GamificationController {
     return this.gamificationService.getMyBadges(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('badges/progress')
+  @ApiOperation({
+    summary:
+      'Tiến độ tới từng huy hiệu: các số liệu luật huy hiệu dùng và mốc cần đạt',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'facts: totalXp, weeklyXp, isWeeklyTop, streak, perfectPractices, highSpeaking, longestArenaWinStreak, petLevel; rules: mốc của 8 huy hiệu',
+  })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  getBadgeProgress(@Request() req: any) {
+    return this.gamificationService.getBadgeProgress(req.user.id);
+  }
+
   // ==========================================
   // PET & DAILY QUESTS
   // ==========================================
