@@ -168,6 +168,7 @@ model User {
   listeningPracticeAttempts       ListeningPracticeAttempt[]
   listeningTranscriptReveals      ListeningTranscriptReveal[]
   pointHistory                    PointHistory[]
+  learnerEvents                   LearnerEvent[]
   userBadges                      UserBadge[]
   leaderboard                     Leaderboard?
   speakingSubmissions             SpeakingSubmission[]
@@ -287,6 +288,8 @@ model UserStats {
   admirationsSentStoryToday Json?
   speaking                  Json? // Array of SpeakingItem
   writing                   Json? // Array of WritingItem
+
+  @@index([streakCount])
 }
 
 model Plan {
@@ -793,6 +796,26 @@ model PointHistory {
   points    Int
   reason    String // vd: "Completed Quiz", "Daily Login"
   createdAt DateTime @default(now())
+
+  // Bảng xếp hạng: XP of a day or a month, for everyone and for one learner.
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+/// Moments worth showing in the ranking's activity feed that leave no other
+/// trace: a new XP level, a streak milestone (owner 2026-11-08). Recorded
+/// from that date on.
+model LearnerEvent {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// LEVEL_UP (value = the new level) | STREAK_MILESTONE (value = days)
+  type      String
+  value     Int
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }
 
 // Speaking Practice Models
@@ -1080,6 +1103,7 @@ model LearningActivity {
 
   @@index([userId, occurredAt])
   @@index([userId, type, occurredAt])
+  @@index([occurredAt])
 }
 
 /// Explicit lifecycle for a Diagnostic assessment. Replaces "highest id wins":

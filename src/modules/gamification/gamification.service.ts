@@ -19,6 +19,7 @@ import {
 } from '../../common/time/business-time.util';
 import { weeklyCatchUpDue } from './weekly-league.logic';
 import { arenaStats } from './arena-stats.logic';
+import { streakMilestone, xpLevel } from './ranking.logic';
 import {
   BADGE_DESCRIPTIONS,
   BADGE_RULES,
@@ -360,6 +361,14 @@ export class GamificationService {
         weeklyExp: { increment: points },
       },
     });
+
+    // A new XP level is a moment for the ranking's activity feed.
+    const levelAfter = xpLevel(updatedLeaderboard.totalPoints);
+    if (levelAfter > xpLevel(myLeaderboard.totalPoints)) {
+      await client.learnerEvent.create({
+        data: { userId, type: 'LEVEL_UP', value: levelAfter },
+      });
+    }
 
     // Record streak activity in the same transaction when one is supplied.
     await this.recordStreakActivity(userId, options?.tx);
@@ -1113,6 +1122,18 @@ export class GamificationService {
           (nowMidnight - lastMidnight) / (1000 * 60 * 60 * 24),
         );
 
+        // A streak reaching 3, 7, 14… days goes to the ranking's activity feed.
+        const recordMilestone = async () => {
+          const milestone = streakMilestone(
+            stats.streakCount,
+            stats.streakCount + 1,
+          );
+          if (milestone)
+            await client.learnerEvent.create({
+              data: { userId, type: 'STREAK_MILESTONE', value: milestone },
+            });
+        };
+
         if (diffDays === 1) {
           // Consecutive day - increment streak
           await client.userStats.update({
@@ -1122,6 +1143,7 @@ export class GamificationService {
               lastStreakUpdate: now,
             },
           });
+          await recordMilestone();
         } else if (diffDays > 1) {
           // Missed day(s) - check streak freeze (only if streak was active)
           if (stats.streakCount > 0 && stats.streakFreezes > 0) {
@@ -1133,6 +1155,7 @@ export class GamificationService {
                 lastStreakUpdate: now,
               },
             });
+            await recordMilestone();
           } else {
             // Streak broken or starting from 0 - reset to 1
             await client.userStats.update({
