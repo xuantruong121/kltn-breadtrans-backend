@@ -58,41 +58,71 @@ describe('ArenaGateway security validation', () => {
     },
   );
 
-  it('draws word questions only from reviewed curated dictionary entries', async () => {
+  it('draws questions from the published decks of reviewed curated words', async () => {
+    const levels = ['A2', 'B1', 'B2'];
+    const entries = Array.from({ length: 30 }, (_, i) => {
+      const word = `word${String.fromCharCode(97 + (i % 26))}${i}`.replace(
+        /\d/g,
+        (d) => 'abcdefghij'[Number(d)],
+      );
+      return {
+        id: i + 1,
+        headword: word,
+        displayWord: word,
+        pos: 'noun',
+        meaningVi: `nghĩa ${i}`,
+        exampleEn: `The ${word} is ready.`,
+        ipaUs: null,
+        ipaUk: null,
+        deckWords: [{ topic: { level: levels[i % 3] } }],
+      };
+    });
     const prisma = {
-      question: { findMany: jest.fn().mockResolvedValue([]) },
-      dictionaryEntry: {
-        count: jest.fn().mockResolvedValue(3),
-        findMany: jest.fn().mockResolvedValue(
-          ['agenda', 'minutes', 'deadline'].map((word, index) => ({
-            id: index + 1,
-            displayWord: word,
-            pos: 'noun',
-            meaningVi: `nghĩa ${word}`,
-            ipaUs: null,
-            ipaUk: null,
-            exampleEn: null,
-            exampleVi: null,
-          })),
-        ),
-      },
+      dictionaryEntry: { findMany: jest.fn().mockResolvedValue(entries) },
     };
     (gateway as unknown as { prisma: unknown }).prisma = prisma;
 
     const questions = await (
       gateway as unknown as {
-        fetchArenaQuestions: (count: number) => Promise<{ prompt: string }[]>;
+        fetchArenaQuestions: (
+          count: number,
+        ) => Promise<{ id: number; options: string[] }[]>;
       }
-    ).fetchArenaQuestions(3);
+    ).fetchArenaQuestions(10);
 
-    const where = { status: 'APPROVED', source: 'CURATED' };
-    expect(prisma.dictionaryEntry.count).toHaveBeenCalledWith({ where });
+    expect(prisma.dictionaryEntry.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.dictionaryEntry.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where, skip: 0, take: 200 }),
+      expect.objectContaining({
+        where: {
+          status: 'APPROVED',
+          source: 'CURATED',
+          deckWords: { some: { topic: { publicationStatus: 'PUBLISHED' } } },
+        },
+      }),
     );
-    expect(questions.map((question) => question.prompt)).toEqual(
-      expect.arrayContaining([expect.stringContaining('"agenda"')]),
-    );
+    expect(questions).toHaveLength(10);
+    for (const q of questions) expect(new Set(q.options).size).toBe(4);
+  });
+
+  it('falls back to every reviewed word when the decks are too small', async () => {
+    const prisma = {
+      dictionaryEntry: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    (gateway as unknown as { prisma: unknown }).prisma = prisma;
+    const questions = await (
+      gateway as unknown as {
+        fetchArenaQuestions: (
+          count: number,
+        ) => Promise<{ ipa: string | null }[]>;
+      }
+    ).fetchArenaQuestions(10);
+    expect(prisma.dictionaryEntry.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.dictionaryEntry.findMany).toHaveBeenLastCalledWith({
+      where: { status: 'APPROVED', source: 'CURATED' },
+    });
+    // The fixed sentences never show the answer's pronunciation.
+    expect(questions.length).toBeGreaterThan(0);
+    for (const q of questions) expect(q.ipa).toBeNull();
   });
 
   it('rejects an unapproved game id', async () => {

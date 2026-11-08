@@ -17,6 +17,15 @@ import { JwtService } from '@nestjs/jwt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getJwtSecret } from '../auth/auth.constants';
 import * as crypto from 'crypto';
+import {
+  ARENA_ROUNDS,
+  ROUND_SECONDS,
+  buildArenaQuestions,
+  levelRank,
+  roundPoints,
+  type ArenaWord,
+  type QuestionKind,
+} from './arena-questions.logic';
 
 const getSocketCorsConfig = () => {
   if (process.env.NODE_ENV !== 'production') {
@@ -34,8 +43,9 @@ const getSocketCorsConfig = () => {
 
 interface ServerQuestion {
   id: number;
+  kind?: QuestionKind;
   prompt: string;
-  ipa?: string;
+  ipa?: string | null;
   options: string[];
   correctAnswer: string;
   explanation?: string;
@@ -736,7 +746,7 @@ export class ArenaGateway
 
       // Generate Match
       const matchId = `match_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-      const questions = await this.fetchArenaQuestions(5);
+      const questions = await this.fetchArenaQuestions(ARENA_ROUNDS);
 
       // Escrow stakes nguyên tử qua Prisma Transaction
       let escrowError: string | null = null;
@@ -879,7 +889,7 @@ export class ArenaGateway
         currentRound: 0,
         totalRounds: questions.length,
         roundStartTime: Date.now(),
-        roundDuration: 15,
+        roundDuration: ROUND_SECONDS,
         p1: {
           userId: p1.userId,
           socketId: p1.socketId,
@@ -922,13 +932,8 @@ export class ArenaGateway
       );
 
       // Sanitized questions for client (correct answers hidden!)
-      const clientQuestions = questions.map((q) => ({
-        id: q.id,
-        prompt: q.prompt,
-        ipa: q.ipa || '',
-        options: q.options,
-      }));
-
+      // Each question is sent when its round starts, never earlier: with all
+      // of them up front a client could read every prompt before round 1.
       // Emit match found
       this.server.to(matchId).emit('arena:match_found', {
         roomId: matchId,
@@ -944,8 +949,9 @@ export class ArenaGateway
           userName: p2.userName,
           avatar: p2.avatar,
         },
-        questions: clientQuestions,
+        questions: [],
         totalRounds: questions.length,
+        roundSeconds: ROUND_SECONDS,
       });
 
       // Start Round 0 after 2.5s countdown
@@ -988,7 +994,7 @@ export class ArenaGateway
         if (m.isSettled) return false;
         m.currentRound = roundIndex;
         m.roundStartTime = Date.now();
-        m.roundDuration = 15;
+        m.roundDuration = ROUND_SECONDS;
       });
       if (!started) return;
       match.roundStartTime = started.roundStartTime;
@@ -1003,25 +1009,29 @@ export class ArenaGateway
         matchId,
         roundIndex,
         totalRounds: match.totalRounds,
-        duration: 15,
+        duration: ROUND_SECONDS,
         serverStartTime: match.roundStartTime,
         question: {
           id: q.id,
+          kind: q.kind,
           prompt: q.prompt,
           ipa: q.ipa || '',
           options: q.options,
         },
       });
 
-      // Set server round timeout (15.5s to allow for small network lag)
+      // Server round timeout, half a second past the clock for network lag.
       if (this.roundTimers.has(matchId)) {
         clearTimeout(this.roundTimers.get(matchId));
       }
 
-      const timeout = setTimeout(() => {
-        this.roundTimers.delete(matchId);
-        void this.endRound(matchId, roundIndex);
-      }, 15500);
+      const timeout = setTimeout(
+        () => {
+          this.roundTimers.delete(matchId);
+          void this.endRound(matchId, roundIndex);
+        },
+        ROUND_SECONDS * 1000 + 500,
+      );
 
       this.roundTimers.set(matchId, timeout);
     } catch (err) {
@@ -1075,12 +1085,14 @@ export class ArenaGateway
         const currentQ = m.questions[roundIndex];
         isCorrect = payload.selectedOption === currentQ.correctAnswer;
         const elapsedMs = Math.max(0, Date.now() - m.roundStartTime);
-        // Score formula: Base 100 + Speed Bonus (up to 50 for <3s)
-        if (isCorrect) {
-          const speedBonus = Math.max(0, Math.floor((15000 - elapsedMs) / 300));
-          addedPoints = 100 + speedBonus;
-          player.score += addedPoints;
-        }
+        // 100 plus up to 50 for speed; the last round counts double.
+        addedPoints = roundPoints(
+          isCorrect,
+          elapsedMs,
+          roundIndex,
+          m.totalRounds,
+        );
+        player.score += addedPoints;
         player.answers[roundIndex] = {
           selectedOption: payload.selectedOption,
           isCorrect,
@@ -1269,12 +1281,18 @@ export class ArenaGateway
     });
 
     // Send state restoration to returning player
-    const clientQuestions = match.questions.map((q) => ({
-      id: q.id,
-      prompt: q.prompt,
-      ipa: q.ipa || '',
-      options: q.options,
-    }));
+    // Only the question being played; later ones stay on the server.
+    const clientQuestions = match.questions.map((q, i) =>
+      i === match.currentRound
+        ? {
+            id: q.id,
+            kind: q.kind,
+            prompt: q.prompt,
+            ipa: q.ipa || '',
+            options: q.options,
+          }
+        : null,
+    );
 
     const remainingMs = Math.max(
       0,
@@ -1604,96 +1622,74 @@ export class ArenaGateway
   // QUESTION POOLING HELPER
   // ==========================================
 
+  /**
+   * Questions for one match, from the words of the published vocabulary
+   * decks (arena-questions.logic.ts decides kinds, levels and distractors).
+   * If the decks cannot fill a match, every reviewed dictionary word is used;
+   * the fixed sentences below are the last resort.
+   */
   private async fetchArenaQuestions(
-    count: number = 5,
+    count: number = ARENA_ROUNDS,
   ): Promise<ServerQuestion[]> {
-    const questions: ServerQuestion[] = [];
+    let questions: ServerQuestion[] = [];
+    const reviewed = { status: 'APPROVED', source: 'CURATED' } as const;
+    const toWord = (entry: {
+      id: number;
+      headword: string;
+      displayWord: string;
+      pos: string;
+      meaningVi: string;
+      exampleEn: string | null;
+      ipaUs: string | null;
+      ipaUk: string | null;
+      deckWords?: { topic: { level: string | null } }[];
+    }): ArenaWord => {
+      const ranks = (entry.deckWords ?? [])
+        .map((d) => levelRank(d.topic.level))
+        .filter((r): r is number => r !== null);
+      return {
+        id: entry.id,
+        headword: entry.headword,
+        displayWord: entry.displayWord,
+        pos: entry.pos,
+        meaningVi: entry.meaningVi,
+        exampleEn: entry.exampleEn,
+        ipa: entry.ipaUs || entry.ipaUk,
+        level: ranks.length ? Math.min(...ranks) : null,
+      };
+    };
 
     try {
-      // 1. Fetch random MCQs from Question table
-      const mcqQuestions = await this.prisma.question.findMany({
-        where: { type: 'MULTIPLE_CHOICE' },
-        take: 40,
+      const deckEntries = await this.prisma.dictionaryEntry.findMany({
+        where: {
+          ...reviewed,
+          deckWords: { some: { topic: { publicationStatus: 'PUBLISHED' } } },
+        },
+        include: {
+          deckWords: {
+            where: { topic: { publicationStatus: 'PUBLISHED' } },
+            select: { topic: { select: { level: true } } },
+          },
+        },
       });
+      questions = buildArenaQuestions(
+        deckEntries.map(toWord),
+        count,
+        Math.random,
+      );
 
-      if (mcqQuestions.length > 0) {
-        const shuffled = mcqQuestions.sort(() => Math.random() - 0.5);
-        for (const item of shuffled) {
-          if (questions.length >= count) break;
-          const content = item.content as any;
-          if (
-            content?.question &&
-            Array.isArray(content?.options) &&
-            content?.correctAnswer
-          ) {
-            questions.push({
-              id: item.id,
-              prompt: content.question,
-              ipa: content.ipa || '',
-              options: [...content.options].sort(() => Math.random() - 0.5),
-              correctAnswer: content.correctAnswer,
-              explanation: content.explanation || '',
-            });
-          }
-        }
-      }
-
-      // 2. If needed, supplement with reviewed dictionary words (F13: the
-      // store, never draft deck rows or unreviewed external entries).
       if (questions.length < count) {
-        const needed = count - questions.length;
-        const reviewed = { status: 'APPROVED', source: 'CURATED' } as const;
-        // A random window of the store, so every entry can come up.
-        const pool = 200;
-        const total = await this.prisma.dictionaryEntry.count({
+        this.logger.warn(
+          `[Arena] Decks gave ${questions.length}/${count} questions; using every reviewed word.`,
+        );
+        const allEntries = await this.prisma.dictionaryEntry.findMany({
           where: reviewed,
         });
-        const words = (
-          await this.prisma.dictionaryEntry.findMany({
-            where: reviewed,
-            orderBy: { id: 'asc' },
-            skip: Math.floor(Math.random() * Math.max(0, total - pool + 1)),
-            take: pool,
-          })
-        ).map((entry) => ({
-          id: entry.id,
-          word: entry.displayWord,
-          pos: entry.pos,
-          meaning: entry.meaningVi,
-          ipaUs: entry.ipaUs,
-          ipaUk: entry.ipaUk,
-          exampleEn: entry.exampleEn,
-          exampleVi: entry.exampleVi,
-        }));
-
-        if (words.length > 0) {
-          const shuffledWords = words.sort(() => Math.random() - 0.5);
-          for (let i = 0; i < Math.min(needed, shuffledWords.length); i++) {
-            const w = shuffledWords[i];
-            const distractorWords = shuffledWords
-              .filter((sw) => sw.id !== w.id)
-              .slice(0, 3);
-            const options = [
-              w.meaning,
-              ...(distractorWords.length >= 3
-                ? distractorWords.map((dw) => dw.meaning)
-                : [
-                    'Thỏa thuận kinh doanh',
-                    'Sự khởi hành thuận lợi',
-                    'Kế hoạch dự phòng',
-                  ]),
-            ].sort(() => Math.random() - 0.5);
-
-            questions.push({
-              id: 1000 + w.id,
-              prompt: `Nghĩa của từ "${w.word}" (${w.pos}) là gì?`,
-              ipa: w.ipaUs || w.ipaUk || '',
-              options,
-              correctAnswer: w.meaning,
-              explanation: `Từ "${w.word}" (${w.pos}) có nghĩa là: ${w.meaning}. Ví dụ: ${w.exampleEn || w.exampleVi || ''}`,
-            });
-          }
-        }
+        questions = buildArenaQuestions(
+          allEntries.map(toWord),
+          count,
+          Math.random,
+        );
       }
     } catch (err) {
       this.logger.error('[Arena] Error fetching arena questions:', err);
@@ -1706,7 +1702,6 @@ export class ArenaGateway
           id: 9001,
           prompt:
             "Customer _______ is our corporation's top priority this quarter.",
-          ipa: 'sætɪsˈfækʃən',
           options: ['satisfaction', 'satisfy', 'satisfactory', 'satisfied'],
           correctAnswer: 'satisfaction',
           explanation:
@@ -1716,7 +1711,6 @@ export class ArenaGateway
           id: 9002,
           prompt:
             'Mr. David usually _______ the weekly sales report every Monday morning.',
-          ipa: 'səbˈmɪts',
           options: ['submits', 'submitted', 'submitting', 'submit'],
           correctAnswer: 'submits',
           explanation:
@@ -1726,7 +1720,6 @@ export class ArenaGateway
           id: 9003,
           prompt:
             'Since we adopted the new system, productivity _______ by 25 percent.',
-          ipa: 'hæz ɪnˈkriːst',
           options: ['has increased', 'increased', 'increases', 'is increasing'],
           correctAnswer: 'has increased',
           explanation:
@@ -1735,7 +1728,6 @@ export class ArenaGateway
         {
           id: 9004,
           prompt: 'Please submit your _______ before Friday afternoon.',
-          ipa: 'ˌæplɪˈkeɪʃən',
           options: ['application', 'apply', 'applicant', 'applicable'],
           correctAnswer: 'application',
           explanation:
@@ -1745,14 +1737,17 @@ export class ArenaGateway
           id: 9005,
           prompt:
             'The new manager showed remarkable _______ during the team transition.',
-          ipa: 'ˈliːdərʃɪp',
           options: ['leadership', 'lead', 'leader', 'leading'],
           correctAnswer: 'leadership',
           explanation:
             'Sau tính từ "remarkable" cần danh từ trừu tượng: leadership (khả năng lãnh đạo).',
         },
       ];
-      return fallback.slice(0, count);
+      return fallback.slice(0, count).map((q) => ({
+        ...q,
+        kind: 'fill_blank' as const,
+        ipa: null,
+      }));
     }
 
     return questions.slice(0, count);
