@@ -57,7 +57,9 @@ function checkContent(): string[] {
       if (!isDuelWord(asArena))
         errors.push(`${deck.title}: ${word.word} is not a duel word`);
       if (!blankedExample(asArena))
-        errors.push(`${deck.title}: the example of ${word.word} lacks the word`);
+        errors.push(
+          `${deck.title}: the example of ${word.word} lacks the word`,
+        );
       deck.words.slice(i + 1).forEach((other) => {
         if (meaningsClash(word.meaningVi, other.meaningVi))
           errors.push(
