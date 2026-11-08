@@ -6,8 +6,11 @@
  *        holds no answer; a game left alone is settled by the sweep.
  *   Browser: the menu shows Đấu trường, More holds Bảng xếp hạng then FAQ;
  *        /arena lists the games in a sidebar and Bắn chữ rơi's lobby opens
- *        from it; a game won by typing; a game left
- *        through Thoát.
+ *        from it. Answers are typed one key at a time, never with Enter
+ *        (owner 2026-11-08, after ZType): a Gõ lại từ game won at 1366 with
+ *        one block let through and one wrong key refused, a Nghĩa → từ game
+ *        with underscore hints, a Từ → nghĩa game on a phone, both left
+ *        through Thoát. It also counts frames while blocks fall.
  *
  *   HARNESS_DB=<db> [SHOTS=<dir>] npx ts-node --transpile-only scripts/qa/finalization-word-blaster.ts
  */
@@ -36,10 +39,26 @@ const ledger = (u: number) =>
     `select source, amount from "BanhTransaction" where "userId" = ${u} and source like 'BLASTER_%' order by id`,
   ).map((r) => `${r[0]}:${r[1]}`);
 
-type Stored = {
-  startedAt: number;
-  blocks: { id: number; spawnAtMs: number; answers: string[] }[];
+type StoredBlock = {
+  id: number;
+  spawnAtMs: number;
+  fallMs: number;
+  answers: string[];
+  hint: string | null;
 };
+type Stored = { startedAt: number; blocks: StoredBlock[] };
+/** Word lengths: "dam phan" → "3,4". */
+const shape = (text: string) =>
+  text
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => [...w].length)
+    .join(',');
+/** The answer the page will take letter by letter: one that fits the hint. */
+const answerFor = (b: StoredBlock) =>
+  b.hint
+    ? (b.answers.find((a) => shape(a) === shape(b.hint!)) ?? b.answers[0])
+    : b.answers[0];
 const stored = async (id: string) =>
   JSON.parse((await redis.get(`blaster:session:${id}`))!) as Stored;
 
@@ -218,15 +237,100 @@ async function api() {
   );
 }
 
-async function browser(width: number) {
-  const s = await studentPage(`blaster-ui-${width}`, width);
+const MODE_BUTTON: Record<string, RegExp> = {
+  copy: /^Gõ lại từ/,
+  vi_to_en: /^Nghĩa → từ/,
+  en_to_vi: /^Từ → nghĩa/,
+};
+
+/** Waits until a block is on screen, as the server times it. */
+async function untilSpawned(st: Stored, b: StoredBlock) {
+  const wait = st.startedAt + b.spawnAtMs + 150 - Date.now();
+  if (wait > 0) await sleep(wait);
+}
+
+/**
+ * Types an answer one key at a time. Returns true when the page sent it by
+ * itself (the box emptied without Enter); otherwise presses Enter and
+ * returns false, so a check can count it.
+ */
+async function typeAnswer(page: Page, text: string): Promise<boolean> {
+  await page.keyboard.type(text, { delay: 30 });
+  const input = page.getByRole('textbox', { name: /Gõ đáp án/ });
+  for (let i = 0; i < 10; i += 1) {
+    if ((await input.inputValue()) === '') return true;
+    await sleep(50);
+  }
+  await input.press('Enter');
+  return false;
+}
+
+/** Frames per second over two seconds, counted with requestAnimationFrame. */
+const fps = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<number>((ok) => {
+        let frames = 0;
+        const t0 = performance.now();
+        const step = () => {
+          frames += 1;
+          const ms = performance.now() - t0;
+          if (ms < 2000) requestAnimationFrame(step);
+          else ok(Math.round((frames * 1000) / ms));
+        };
+        requestAnimationFrame(step);
+      }),
+  );
+
+const hitCount = async (id: string) =>
+  Object.keys(
+    JSON.parse((await redis.get(`blaster:session:${id}`)) ?? '{}')?.hits ?? {},
+  ).length;
+
+async function leaveGame(
+  page: Page,
+  width: number,
+  tag: string,
+  userId: number,
+) {
+  await page.getByRole('button', { name: 'Thoát', exact: true }).click();
+  const ask = page.getByRole('alertdialog', { name: 'Thoát ván chơi?' });
+  check(
+    `${tag}: Thoát asks first`,
+    await ask
+      .waitFor({ timeout: 5000 })
+      .then(() => true)
+      .catch(() => false),
+  );
+  await page.screenshot({
+    path: `${SHOTS}/blaster-leave-ask-${tag}-${width}.png`,
+  });
+  await page.getByRole('button', { name: 'Thoát, chịu thua' }).click();
+  const leftShown = await page
+    .getByRole('heading', { name: 'Đã thoát ván' })
+    .waitFor({ timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
+  await sleep(1000);
+  await page.screenshot({ path: `${SHOTS}/blaster-left-${tag}-${width}.png` });
+  check(
+    `${tag}: leaving shows the result and costs the stake (300 → 280)`,
+    leftShown && bread(userId) === 280,
+    String(bread(userId)),
+  );
+}
+
+async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
+  const tag = `${mode}-${width}`;
+  const s = await studentPage(`blaster-ui-${tag}`, width);
   fund(s.account.userId, 300);
   const page: Page = s.page;
+  const first = mode === 'copy';
   await page.goto(`${FE}/arena`, {
     waitUntil: 'networkidle',
     timeout: 120_000,
   });
-  if (width >= 1280) {
+  if (first && width >= 1280) {
     const nav = (await page.locator('header nav').first().innerText()).replace(
       /\s+/g,
       ' ',
@@ -253,14 +357,16 @@ async function browser(width: number) {
   await nav
     .getByRole('button', { name: /Bắn chữ rơi/ })
     .waitFor({ timeout: 30_000 });
-  check(
-    '/arena lists Đấu 1v1 and Bắn chữ rơi in its game sidebar',
-    (await nav.getByRole('button', { name: /Đấu 1v1/ }).count()) === 1 &&
-      (await nav.getByRole('button', { name: /Bắn chữ rơi/ }).count()) === 1,
-  );
+  if (first) {
+    check(
+      '/arena lists Đấu 1v1 and Bắn chữ rơi in its game sidebar',
+      (await nav.getByRole('button', { name: /Đấu 1v1/ }).count()) === 1 &&
+        (await nav.getByRole('button', { name: /Bắn chữ rơi/ }).count()) === 1,
+    );
+  }
   await nav.getByRole('button', { name: /Bắn chữ rơi/ }).click();
   check(
-    'picking Bắn chữ rơi opens its lobby (?game=blaster)',
+    `${tag}: picking Bắn chữ rơi opens its lobby (?game=blaster)`,
     (await page
       .getByRole('heading', { name: 'Bắn chữ rơi', level: 1 })
       .waitFor({ timeout: 30_000 })
@@ -268,138 +374,220 @@ async function browser(width: number) {
       .catch(() => false)) && page.url().includes('game=blaster'),
     page.url(),
   );
-  await page.screenshot({
-    path: `${SHOTS}/blaster-arena-${width}.png`,
-    fullPage: true,
-  });
-  await page.goto(`${FE}/ranking`, {
-    waitUntil: 'networkidle',
-    timeout: 120_000,
-  });
-  check(
-    '/ranking shows the league',
+  if (first) {
+    await page.screenshot({
+      path: `${SHOTS}/blaster-arena-${width}.png`,
+      fullPage: true,
+    });
+    await page.goto(`${FE}/ranking`, {
+      waitUntil: 'networkidle',
+      timeout: 120_000,
+    });
+    check(
+      '/ranking shows the league',
+      await page
+        .getByRole('heading', { name: 'Bảng xếp hạng', level: 1 })
+        .waitFor({ timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false),
+    );
+    await page.goto(`${FE}/arena?game=blaster`, {
+      waitUntil: 'networkidle',
+      timeout: 120_000,
+    });
     await page
-      .getByRole('heading', { name: 'Bảng xếp hạng', level: 1 })
-      .waitFor({ timeout: 30_000 })
-      .then(() => true)
-      .catch(() => false),
-  );
-  await page.screenshot({
-    path: `${SHOTS}/blaster-ranking-${width}.png`,
-    fullPage: true,
-  });
-
-  await page.goto(`${FE}/arena?game=blaster`, {
-    waitUntil: 'networkidle',
-    timeout: 120_000,
-  });
-  await page
-    .getByRole('heading', { name: 'Bắn chữ rơi', level: 1 })
-    .waitFor({ timeout: 30_000 });
-  await page.screenshot({
-    path: `${SHOTS}/blaster-picker-${width}.png`,
-    fullPage: true,
-  });
+      .getByRole('heading', { name: 'Bắn chữ rơi', level: 1 })
+      .waitFor({ timeout: 30_000 });
+  }
   await page.getByRole('button', { name: '20 Bánh Mì', exact: true }).click();
-  // The wide run plays Từ → nghĩa (meanings typed without tone marks); the
-  // phone run keeps the default Gõ lại từ.
-  if (width >= 1280)
-    await page.getByRole('button', { name: /^Từ → nghĩa/ }).click();
+  await page.getByRole('button', { name: MODE_BUTTON[mode] }).click();
+  await page.screenshot({
+    path: `${SHOTS}/blaster-picker-${tag}.png`,
+    fullPage: true,
+  });
   await page.getByRole('button', { name: 'Bắt đầu' }).click();
   await page.waitForURL(/\/arena\/word-blaster/, { timeout: 30_000 });
   const input = page.getByRole('textbox', { name: /Gõ đáp án/ });
   await input.waitFor({ timeout: 20_000 });
   check(
-    'the game hides the site header',
+    `${tag}: the game hides the site header`,
     (await page.locator('header nav').count()) === 0 ||
       !(await page.locator('header nav').first().isVisible()),
   );
   const id = await redis.get(`blaster:user:${s.account.userId}`);
   if (!id) throw new Error('no open game');
+  const st = await stored(id);
 
-  if (width >= 1280) {
-    // A perfect game, typed.
-    let shotCount = 0;
-    await playPerfect(id, async (text) => {
-      // Let a few blocks fall once, for a picture of the field in play.
-      if (shotCount === 8) {
-        await sleep(3000);
-        check(
-          'Từ → nghĩa blocks show one underscore per letter of the meaning',
-          (await page.locator('[aria-label^="Nghĩa có"]').count()) > 0,
-        );
-        await page.screenshot({
-          path: `${SHOTS}/blaster-falling-${width}.png`,
-        });
-      }
-      await input.fill(text);
-      await input.press('Enter');
-      shotCount += 1;
-      if (shotCount === 6)
-        await page.screenshot({ path: `${SHOTS}/blaster-play-${width}.png` });
-      await sleep(120);
-    });
-    const won = await page
-      .getByRole('heading', { name: 'Bạn thắng!' })
-      .waitFor({ timeout: 20_000 })
-      .then(() => true)
-      .catch(() => false);
-    await sleep(1200);
-    await page.screenshot({ path: `${SHOTS}/blaster-win-${width}.png` });
+  // The 3, 2, 1 before the first block (it shows only if the page opened in time).
+  const callout = page.locator('[data-blaster-callout]');
+  let counted = '';
+  for (let i = 0; i < 30 && !counted; i += 1) {
+    const text = (await callout.innerText().catch(() => '')).trim();
+    if (/^[321]$/.test(text)) counted = text;
+    else await sleep(100);
+  }
+  if (first) {
     check(
-      'a game won by typing shows Bạn thắng! and +10',
-      won && /\+10/.test(await page.locator('[role="dialog"]').innerText()),
+      `${tag}: a 3-2-1 countdown runs before the first block`,
+      counted !== '',
+      counted || 'no number seen',
+    );
+    await page.screenshot({ path: `${SHOTS}/blaster-countdown-${tag}.png` });
+  }
+
+  if (mode === 'copy') {
+    // Owner 2026-11-08: a wrong key is refused and the box keeps its text.
+    const LET_THROUGH = 4;
+    const WRONG_AT = 2;
+    let auto = 0;
+    let typedCount = 0;
+    let wrongKept = false;
+    let lockShown = false;
+    for (const [i, b] of st.blocks.entries()) {
+      await untilSpawned(st, b);
+      if (i === LET_THROUGH) {
+        // Let this one land: a picture of the life it costs.
+        const lands = st.startedAt + b.spawnAtMs + b.fallMs + 650;
+        setTimeout(
+          () => {
+            void page
+              .screenshot({ path: `${SHOTS}/blaster-life-lost-${tag}.png` })
+              .catch(() => undefined);
+          },
+          Math.max(0, lands - Date.now()),
+        );
+        continue;
+      }
+      const answer = answerFor(b);
+      if (i === WRONG_AT) {
+        await page.keyboard.type(answer.slice(0, 2), { delay: 30 });
+        lockShown = await page
+          .getByText('Đang ngắm:')
+          .isVisible()
+          .catch(() => false);
+        await page.screenshot({ path: `${SHOTS}/blaster-locked-${tag}.png` });
+        await page.keyboard.press('#');
+        await sleep(80);
+        wrongKept = (await input.inputValue()) === answer.slice(0, 2);
+        await page.keyboard.type(answer.slice(2), { delay: 30 });
+        for (let k = 0; k < 10 && (await input.inputValue()) !== ''; k += 1)
+          await sleep(50);
+        if ((await input.inputValue()) === '') auto += 1;
+        else await input.press('Enter');
+        typedCount += 1;
+        await sleep(90);
+        await page.screenshot({
+          path: `${SHOTS}/blaster-explosion-${tag}.png`,
+        });
+        continue;
+      }
+      if (i === 9) {
+        const rate = await fps(page);
+        check(
+          `${tag}: at least 50 frames a second while blocks fall`,
+          rate >= 50,
+          `${rate} fps`,
+        );
+      }
+      if (await typeAnswer(page, answer)) auto += 1;
+      typedCount += 1;
+      if (i === 12)
+        await page.screenshot({ path: `${SHOTS}/blaster-play-${tag}.png` });
+    }
+    check(
+      `${tag}: the first letters lock the cannon on a block (Đang ngắm)`,
+      lockShown,
     );
     check(
-      'balance 300 → 310',
+      `${tag}: a wrong key is refused and the box keeps its letters`,
+      wrongKept,
+    );
+    check(
+      `${tag}: every answer fired by itself once complete, no Enter`,
+      auto === typedCount,
+      `${auto}/${typedCount}`,
+    );
+    const won = await page
+      .getByRole('heading', { name: 'Bạn thắng!' })
+      .waitFor({ timeout: 30_000 })
+      .then(() => true)
+      .catch(() => false);
+    await sleep(1500);
+    await page.screenshot({ path: `${SHOTS}/blaster-win-${tag}.png` });
+    const dialog = won ? await page.locator('[role="dialog"]').innerText() : '';
+    check(
+      `${tag}: 19 typed and one let through still wins, +10`,
+      won && /\+10/.test(dialog) && /lọt 1/.test(dialog),
+      dialog.replace(/\s+/g, ' ').slice(0, 160),
+    );
+    check(
+      `${tag}: the result shows blocks, best combo and accuracy`,
+      /Bắn vỡ\s*19\/20/.test(dialog) &&
+        /Combo dài nhất\s*×\d+/.test(dialog) &&
+        /Chính xác\s*\d+%/.test(dialog),
+      dialog.replace(/\s+/g, ' ').slice(0, 200),
+    );
+    check(
+      `${tag}: balance 300 → 310`,
       bread(s.account.userId) === 310,
       String(bread(s.account.userId)),
     );
     // Owner 2026-11-08: the Arena uses dictionary words only; no review list.
-    const dialog = await page.locator('[role="dialog"]').innerText();
     check(
-      'the result has no word list to review',
+      `${tag}: the result has no word list to review`,
       !/ôn lại/i.test(dialog),
-      dialog.slice(0, 120),
     );
     await page.getByRole('button', { name: 'Chơi lại' }).click();
     await page.waitForURL(/game=blaster/, { timeout: 20_000 });
     check(
-      'Chơi lại returns to the lobby in the sidebar',
+      `${tag}: Chơi lại returns to the lobby in the sidebar`,
       page.url().includes('/arena?game=blaster'),
       page.url(),
     );
   } else {
-    // Two hits, then leave.
-    const st = await stored(id);
-    for (const b of st.blocks.slice(0, 2)) {
-      const wait = st.startedAt + b.spawnAtMs + 150 - Date.now();
-      if (wait > 0) await sleep(wait);
-      await input.fill(b.answers[0]);
-      await input.press('Enter');
-      await sleep(200);
-    }
-    await page.screenshot({ path: `${SHOTS}/blaster-play-${width}.png` });
-    await page.getByRole('button', { name: 'Thoát', exact: true }).click();
-    const ask = page.getByRole('alertdialog', { name: 'Thoát ván chơi?' });
-    check('Thoát asks first', await ask.isVisible());
-    await page.screenshot({ path: `${SHOTS}/blaster-leave-ask-${width}.png` });
-    await page.getByRole('button', { name: 'Thoát, chịu thua' }).click();
-    const leftShown = await page
-      .getByRole('heading', { name: 'Đã thoát ván' })
-      .waitFor({ timeout: 15_000 })
+    // A meaning mode: the hint first, then a few answers typed key by key.
+    await untilSpawned(st, st.blocks[0]);
+    const label = mode === 'vi_to_en' ? 'Từ có' : 'Nghĩa có';
+    const hinted = page.locator(`[aria-label^="${label}"]`).first();
+    const hintOk = await hinted
+      .waitFor({ timeout: 3000 })
       .then(() => true)
       .catch(() => false);
-    await sleep(1000);
-    await page.screenshot({ path: `${SHOTS}/blaster-left-${width}.png` });
+    const hintText = hintOk
+      ? ((await hinted.getAttribute('aria-label')) ?? '')
+      : '';
+    const want = st.blocks[0].hint?.replace(/ /g, '').length ?? -1;
     check(
-      'leaving shows the result and costs the stake (300 → 280)',
-      leftShown && bread(s.account.userId) === 280,
-      String(bread(s.account.userId)),
+      `${tag}: blocks show one underscore per letter of the answer`,
+      hintOk && hintText === `${label} ${want} chữ cái`,
+      `${hintText} / want ${want}`,
     );
+    const SHOTS_TO_TYPE = width >= 1280 ? 3 : 2;
+    let auto = 0;
+    for (const b of st.blocks.slice(0, SHOTS_TO_TYPE)) {
+      await untilSpawned(st, b);
+      if (await typeAnswer(page, answerFor(b))) auto += 1;
+      await sleep(250);
+    }
+    const hits = await hitCount(id);
+    check(
+      `${tag}: ${SHOTS_TO_TYPE} answers typed key by key break ${SHOTS_TO_TYPE} blocks`,
+      hits === SHOTS_TO_TYPE,
+      `${hits} hits, ${auto} fired by themselves`,
+    );
+    const next = st.blocks[SHOTS_TO_TYPE];
+    await untilSpawned(st, next);
+    const half = answerFor(next).slice(
+      0,
+      Math.max(2, Math.floor(answerFor(next).length / 2)),
+    );
+    await page.keyboard.type(half, { delay: 30 });
+    await sleep(120);
+    await page.screenshot({ path: `${SHOTS}/blaster-locked-${tag}.png` });
+    await leaveGame(page, width, tag, s.account.userId);
   }
   check(
-    `${width}: no server or page error`,
+    `${tag}: no server or page error`,
     s.issues.length === 0,
     s.issues.join(' | '),
   );
@@ -408,8 +596,9 @@ async function browser(width: number) {
 
 async function main() {
   await api();
-  await browser(1366);
-  await browser(390);
+  await browser(1366, 'copy');
+  await browser(1366, 'vi_to_en');
+  await browser(390, 'en_to_vi');
   await redis.quit();
   console.log(`\nWORD_BLASTER_FAILURES=${failureCount()}`);
   process.exit(failureCount() ? 1 : 0);
