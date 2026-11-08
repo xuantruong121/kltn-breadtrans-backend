@@ -31,6 +31,21 @@ const LANES = [0.12, 0.31, 0.5, 0.69, 0.88];
 
 export type BlasterKind = 'copy' | 'missing' | 'vi_to_en' | 'en_to_vi';
 
+/**
+ * Owner 2026-11-08: the learner picks one kind for the whole game instead of
+ * a mix: copy the word, fill the missing letters, Vietnamese meaning to the
+ * English word, or the English word to its Vietnamese meaning.
+ */
+export type BlasterMode = BlasterKind;
+export const BLASTER_MODES: BlasterMode[] = [
+  'copy',
+  'missing',
+  'vi_to_en',
+  'en_to_vi',
+];
+/** A meaning longer than this makes a block too wide to read while it falls. */
+const MAX_HINT_LENGTH = 24;
+
 /** Slower falls for kinds that take longer to type (Vietnamese most of all). */
 const BASE_FALL_MS: Record<BlasterKind, number> = {
   copy: 9000,
@@ -49,31 +64,54 @@ export type BlasterBlock = {
   fallMs: number;
   /** Horizontal position, 0 (left) to 1 (right). */
   lane: number;
+  /**
+   * For en_to_vi: one "_" per letter of the meaning to type, spaces kept
+   * ("đàm phán" → "___ ____"). Null for the other kinds.
+   */
+  hint: string | null;
   word: { id: number; displayWord: string; meaningVi: string };
 };
 
 export type PublicBlock = Pick<
   BlasterBlock,
-  'id' | 'kind' | 'prompt' | 'spawnAtMs' | 'fallMs' | 'lane'
+  'id' | 'kind' | 'prompt' | 'spawnAtMs' | 'fallMs' | 'lane' | 'hint'
 >;
 
 /** What the browser may see: no answers, no word behind the prompt. */
 export function publicBlocks(blocks: BlasterBlock[]): PublicBlock[] {
-  return blocks.map(({ id, kind, prompt, spawnAtMs, fallMs, lane }) => ({
+  return blocks.map(({ id, kind, prompt, spawnAtMs, fallMs, lane, hint }) => ({
     id,
     kind,
     prompt,
     spawnAtMs,
     fallMs,
     lane,
+    hint,
   }));
+}
+
+/** The meaning the hint stands for: the first sense, without notes in brackets. */
+export function mainSense(meaningVi: string): string {
+  const plain = meaningVi.replace(/\([^)]*\)/g, ' ');
+  const first = plain
+    .split(/[;,]/)
+    .map((s) => s.trim().replace(/\s+/g, ' '))
+    .find(Boolean);
+  return (first ?? plain.trim()).normalize('NFC');
+}
+
+/** One "_" per letter, spaces kept: "đàm phán" → "___ ____". */
+export function letterHint(sense: string): string {
+  return [...sense.normalize('NFC')]
+    .map((c) => (c === ' ' ? ' ' : '_'))
+    .join('');
 }
 
 /** Lower case, no Vietnamese tone marks, single spaces: "Đàm  Phán" → "dam phan". */
 export function normalizeAnswer(text: string): string {
   return text
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'D')
     .toLowerCase()
@@ -104,15 +142,6 @@ export function missingLetters(word: string, rng: () => number): string {
   return chars.join('');
 }
 
-/** Each kind five times in a match of 20, in random order. */
-export function blasterKinds(count: number, rng: () => number): BlasterKind[] {
-  const cycle: BlasterKind[] = ['copy', 'missing', 'vi_to_en', 'en_to_vi'];
-  return shuffle(
-    Array.from({ length: count }, (_, i) => cycle[i % cycle.length]),
-    rng,
-  );
-}
-
 /** Seconds between blocks shrink from 5 to 2.8; falls speed up by a quarter. */
 export function blasterTiming(index: number, count: number) {
   const p = count > 1 ? index / (count - 1) : 0;
@@ -126,10 +155,18 @@ export function blasterTiming(index: number, count: number) {
 export function buildBlasterRound(
   pool: readonly ArenaWord[],
   rng: () => number,
+  mode: BlasterMode,
   count = BLASTER_BLOCKS,
 ): BlasterBlock[] {
-  const words = pool.filter(isDuelWord);
-  const kinds = blasterKinds(count, rng);
+  const all = pool.filter(isDuelWord);
+  // Words that suit the mode: a gap needs a few letters, a hint a short meaning.
+  const words = all.filter((w) =>
+    mode === 'missing'
+      ? w.displayWord.trim().length >= 4
+      : mode === 'en_to_vi'
+        ? mainSense(w.meaningVi).length <= MAX_HINT_LENGTH
+        : true,
+  );
   const used = new Set<string>();
   const blocks: BlasterBlock[] = [];
   let at = FIRST_SPAWN_MS;
@@ -151,7 +188,7 @@ export function buildBlasterRound(
     const word = candidates[Math.floor(rng() * candidates.length)];
     used.add(word.headword.toLowerCase());
 
-    const kind = kinds[i];
+    const kind = mode;
     const display = word.displayWord.trim();
     const english = normalizeAnswer(display);
     let prompt = display;
@@ -162,7 +199,7 @@ export function buildBlasterRound(
       // A synonym in the decks is right too ("bảo mật": security, confidential).
       answers = [
         ...new Set(
-          words
+          all
             .filter(
               (w) => w === word || meaningsClash(w.meaningVi, word.meaningVi),
             )
@@ -170,7 +207,11 @@ export function buildBlasterRound(
         ),
       ];
     }
-    if (kind === 'en_to_vi') answers = acceptedMeanings(word.meaningVi);
+    let hint: string | null = null;
+    if (kind === 'en_to_vi') {
+      answers = acceptedMeanings(word.meaningVi);
+      hint = letterHint(mainSense(word.meaningVi));
+    }
 
     const { gapMs, speed } = blasterTiming(i, count);
     if (i > 0) at += gapMs;
@@ -185,6 +226,7 @@ export function buildBlasterRound(
       spawnAtMs: at,
       fallMs: Math.round(BASE_FALL_MS[kind] / speed),
       lane: LANES[lane],
+      hint,
       word: { id: word.id, displayWord: display, meaningVi: word.meaningVi },
     });
   }

@@ -2,7 +2,10 @@ import type { ArenaWord } from '../events/arena-questions.logic';
 import {
   BLASTER_BLOCKS,
   LANDING_GRACE_MS,
+  BLASTER_MODES,
   acceptedMeanings,
+  letterHint,
+  mainSense,
   blasterPayout,
   blasterXp,
   buildBlasterRound,
@@ -86,16 +89,31 @@ describe('missingLetters', () => {
   });
 });
 
+describe('mainSense and letterHint', () => {
+  it('the first sense, one underscore per letter, spaces kept', () => {
+    expect(mainSense('đàm phán')).toBe('đàm phán');
+    expect(mainSense('ý kiến; quan điểm')).toBe('ý kiến');
+    expect(mainSense('đổi (tiền, hàng)')).toBe('đổi');
+    expect(letterHint('đàm phán')).toBe('___ ____');
+    expect(letterHint('ý kiến')).toBe('_ ____');
+  });
+});
+
 describe('buildBlasterRound', () => {
-  it.each(Array.from({ length: 25 }, (_, i) => i + 1))(
-    'seed %i: 20 distinct words, every kind five times, answers fit',
-    (seed) => {
-      const blocks = buildBlasterRound(pool, seeded(seed));
+  const cases = BLASTER_MODES.flatMap((mode) =>
+    Array.from({ length: 10 }, (_, i) => [mode, i + 1] as const),
+  );
+  it.each(cases)(
+    '%s, seed %i: 20 distinct words, all of the chosen kind, answers fit',
+    (mode, seed) => {
+      const blocks = buildBlasterRound(pool, seeded(seed), mode);
       expect(blocks).toHaveLength(BLASTER_BLOCKS);
       expect(new Set(blocks.map((b) => b.word.id)).size).toBe(20);
-      for (const kind of ['copy', 'missing', 'vi_to_en', 'en_to_vi'])
-        expect(blocks.filter((b) => b.kind === kind)).toHaveLength(5);
+      expect(blocks.every((b) => b.kind === mode)).toBe(true);
       for (const [i, b] of blocks.entries()) {
+        if (b.kind === 'en_to_vi')
+          expect(b.hint).toBe(letterHint(mainSense(b.word.meaningVi)));
+        else expect(b.hint).toBeNull();
         expect(b.word.displayWord).not.toBe('the');
         if (i > 0) expect(b.spawnAtMs).toBeGreaterThan(blocks[i - 1].spawnAtMs);
         if (b.kind === 'copy' || b.kind === 'missing' || b.kind === 'vi_to_en')
@@ -104,18 +122,15 @@ describe('buildBlasterRound', () => {
         if (b.kind === 'vi_to_en') expect(b.prompt).toBe(b.word.meaningVi);
         if (b.kind === 'missing') expect(b.prompt).toContain('_');
       }
-      // Later blocks fall faster than early ones of the same kind.
-      const copies = blocks.filter((b) => b.kind === 'copy');
-      expect(copies[copies.length - 1].fallMs).toBeLessThanOrEqual(
-        copies[0].fallMs,
-      );
+      // Later blocks fall faster than early ones.
+      expect(blocks[blocks.length - 1].fallMs).toBeLessThan(blocks[0].fallMs);
     },
   );
 
   it('a synonym in the decks is accepted for meaning-to-word', () => {
     let checked = 0;
     for (let seed = 1; seed <= 200 && checked < 3; seed += 1) {
-      for (const b of buildBlasterRound(pool, seeded(seed))) {
+      for (const b of buildBlasterRound(pool, seeded(seed), 'vi_to_en')) {
         if (b.kind !== 'vi_to_en' || b.word.displayWord !== 'security')
           continue;
         expect(b.answers).toEqual(
@@ -128,12 +143,13 @@ describe('buildBlasterRound', () => {
   });
 
   it('the browser view has no answers and no word', () => {
-    const view = publicBlocks(buildBlasterRound(pool, seeded(3)));
+    const view = publicBlocks(buildBlasterRound(pool, seeded(3), 'en_to_vi'));
     const json = JSON.stringify(view);
     expect(json).not.toContain('answers');
     expect(json).not.toContain('meaningVi');
     expect(Object.keys(view[0]).sort()).toEqual([
       'fallMs',
+      'hint',
       'id',
       'kind',
       'lane',
@@ -157,6 +173,7 @@ const block = (
   spawnAtMs,
   fallMs,
   lane: 0.5,
+  hint: null,
   word: { id, displayWord: answer, meaningVi: '' },
 });
 

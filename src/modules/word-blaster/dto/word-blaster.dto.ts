@@ -6,7 +6,8 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
-import { BLASTER_STAKES } from '../word-blaster.logic';
+import { BLASTER_MODES, BLASTER_STAKES } from '../word-blaster.logic';
+import type { BlasterMode } from '../word-blaster.logic';
 
 export class StartBlasterDto {
   @ApiProperty({
@@ -16,6 +17,15 @@ export class StartBlasterDto {
   })
   @IsIn([...BLASTER_STAKES])
   stake!: number;
+
+  @ApiProperty({
+    enum: BLASTER_MODES,
+    example: 'en_to_vi',
+    description:
+      'Chế độ: copy (gõ lại từ), missing (điền chữ thiếu), vi_to_en (nghĩa → từ), en_to_vi (từ → nghĩa)',
+  })
+  @IsIn(BLASTER_MODES)
+  mode!: BlasterMode;
 }
 
 export class BlasterShotDto {

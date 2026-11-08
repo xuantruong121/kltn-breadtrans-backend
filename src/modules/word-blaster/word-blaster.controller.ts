@@ -45,7 +45,7 @@ export class WordBlasterController {
   })
   @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
   start(@Request() req: any, @Body() dto: StartBlasterDto) {
-    return this.blaster.start(req.user.id, dto.stake);
+    return this.blaster.start(req.user.id, dto.stake, dto.mode);
   }
 
   @Get('current')

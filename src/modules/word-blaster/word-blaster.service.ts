@@ -19,6 +19,8 @@ import {
 import { loadAllReviewedWords, loadDeckWords } from '../events/arena-word-pool';
 import {
   BLASTER_BLOCKS,
+  BLASTER_MODES,
+  type BlasterMode,
   BLASTER_LIVES,
   BLASTER_STAKES,
   blasterDeadline,
@@ -38,6 +40,8 @@ type Session = {
   id: string;
   userId: number;
   stake: number;
+  /** One kind of block for the whole game; older games (before modes) have none. */
+  mode?: BlasterMode;
   startedAt: number;
   deadline: number;
   blocks: BlasterBlock[];
@@ -62,6 +66,7 @@ export type BlasterResult = {
 export type BlasterView = {
   sessionId: string;
   stake: number;
+  mode: BlasterMode | null;
   serverNow: number;
   startedAt: number;
   lives: number;
@@ -116,17 +121,23 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Starts a game, or returns the one still open. */
-  async start(userId: number, stake: number): Promise<BlasterView> {
+  async start(
+    userId: number,
+    stake: number,
+    mode: BlasterMode,
+  ): Promise<BlasterView> {
     if (!(BLASTER_STAKES as readonly number[]).includes(stake))
       throw new BadRequestException('Mức cược không hợp lệ.');
+    if (!BLASTER_MODES.includes(mode))
+      throw new BadRequestException('Chế độ chơi không hợp lệ.');
     const open = await this.current(userId);
     if (open) return open;
 
     let words = await loadDeckWords(this.prisma);
-    let blocks = buildBlasterRound(words, Math.random);
+    let blocks = buildBlasterRound(words, Math.random, mode);
     if (blocks.length < BLASTER_BLOCKS) {
       words = await loadAllReviewedWords(this.prisma);
-      blocks = buildBlasterRound(words, Math.random);
+      blocks = buildBlasterRound(words, Math.random, mode);
     }
     if (blocks.length < BLASTER_BLOCKS)
       throw new BadRequestException(
@@ -152,6 +163,7 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
       id,
       userId,
       stake,
+      mode,
       startedAt,
       deadline: startedAt + blasterDeadline(blocks),
       blocks,
@@ -355,6 +367,7 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
     return {
       sessionId: session.id,
       stake: session.stake,
+      mode: session.mode ?? null,
       serverNow: now,
       startedAt: session.startedAt,
       lives: BLASTER_LIVES,

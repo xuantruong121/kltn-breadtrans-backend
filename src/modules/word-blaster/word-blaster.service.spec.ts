@@ -97,7 +97,7 @@ describe('WordBlasterService', () => {
     };
 
   it('refuses a stake outside 20/50/100 and a short balance, taking nothing', async () => {
-    await expect(service.start(1, 30)).rejects.toBeInstanceOf(
+    await expect(service.start(1, 30, 'copy')).rejects.toBeInstanceOf(
       BadRequestException,
     );
     gamification.deductBanh.mockResolvedValueOnce({
@@ -105,12 +105,12 @@ describe('WordBlasterService', () => {
       newBalance: 5,
       message: 'Không đủ',
     });
-    await expect(service.start(1, 20)).rejects.toThrow('Không đủ');
+    await expect(service.start(1, 20, 'copy')).rejects.toThrow('Không đủ');
     expect(redis.store.size).toBe(0);
   });
 
   it('starts a game: stake taken once, no answer sent, the open game comes back', async () => {
-    const view = await service.start(1, 20);
+    const view = await service.start(1, 20, 'copy');
     expect(gamification.deductBanh).toHaveBeenCalledWith(
       1,
       20,
@@ -123,20 +123,20 @@ describe('WordBlasterService', () => {
     const json = JSON.stringify(view);
     expect(json).not.toContain('answers');
     expect(json).not.toContain('meaningVi');
-    const again = await service.start(1, 50);
+    const again = await service.start(1, 50, 'copy');
     expect(again.sessionId).toBe(view.sessionId);
     expect(gamification.deductBanh).toHaveBeenCalledTimes(1);
   });
 
   it('only the owner can shoot', async () => {
-    const view = await service.start(1, 20);
+    const view = await service.start(1, 20, 'copy');
     await expect(service.shot(2, view.sessionId, 'x')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });
 
   it('breaking every block wins: stake back, half as a capped bonus, XP, paid once', async () => {
-    const view = await service.start(1, 50);
+    const view = await service.start(1, 50, 'copy');
     const blocks = stored(view.sessionId).blocks;
     for (const b of blocks) {
       now = 1_000_000 + b.spawnAtMs + 100;
@@ -174,7 +174,7 @@ describe('WordBlasterService', () => {
   });
 
   it('a wrong answer breaks nothing', async () => {
-    const view = await service.start(1, 20);
+    const view = await service.start(1, 20, 'copy');
     now += 3000;
     const res = await service.shot(1, view.sessionId, 'not a word here');
     expect(res.hitBlockId).toBeNull();
@@ -182,7 +182,7 @@ describe('WordBlasterService', () => {
   });
 
   it('leaving loses at once and pays nothing', async () => {
-    const view = await service.start(1, 20);
+    const view = await service.start(1, 20, 'copy');
     const res = await service.finish(1, view.sessionId, true);
     expect(res.result).toMatchObject({
       outcome: 'lose',
@@ -193,7 +193,7 @@ describe('WordBlasterService', () => {
   });
 
   it('a game left alone is settled by the sweep once every block has landed', async () => {
-    const view = await service.start(1, 20);
+    const view = await service.start(1, 20, 'copy');
     const blocks = stored(view.sessionId).blocks;
     expect(await service.sweepExpired()).toBe(0);
     now = 1_000_000 + Math.max(...blocks.map(landsAt)) + 10_000;

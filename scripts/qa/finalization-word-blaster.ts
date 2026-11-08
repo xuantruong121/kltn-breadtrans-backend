@@ -60,13 +60,24 @@ async function api() {
   // A win.
   const a = await newStudent('blaster-win');
   fund(a.userId, 200);
+  // Owner 2026-11-08: one mode per game. The meaning mode shows the word and
+  // one underscore per letter of the meaning.
   const start = await call('POST', '/games/word-blaster/start', a.token, {
     stake: 50,
+    mode: 'en_to_vi',
   });
   const raw = JSON.stringify(start.data);
+  const blocks = (start.data?.blocks ?? []) as {
+    kind: string;
+    hint: string | null;
+  }[];
   check(
-    'start opens a game of 20 blocks',
-    start.status === 200 && start.data?.blocks?.length === 20,
+    'start opens a game of 20 blocks, all Từ → nghĩa with a letter hint',
+    start.status === 200 &&
+      blocks.length === 20 &&
+      blocks.every(
+        (b) => b.kind === 'en_to_vi' && /^[_ ]+$/.test(b.hint ?? ''),
+      ),
     String(start.status),
   );
   check(
@@ -80,6 +91,7 @@ async function api() {
   );
   const again = await call('POST', '/games/word-blaster/start', a.token, {
     stake: 100,
+    mode: 'copy',
   });
   check(
     'a second start returns the open game, no second stake',
@@ -128,6 +140,7 @@ async function api() {
   fund(b.userId, 100);
   const sb = await call('POST', '/games/word-blaster/start', b.token, {
     stake: 20,
+    mode: 'copy',
   });
   const other = await call(
     'POST',
@@ -157,6 +170,7 @@ async function api() {
   fund(c.userId, 100);
   const sc = await call('POST', '/games/word-blaster/start', c.token, {
     stake: 20,
+    mode: 'missing',
   });
   const sid = sc.data.sessionId as string;
   const session = JSON.parse((await redis.get(`blaster:session:${sid}`))!);
@@ -190,7 +204,16 @@ async function api() {
 
   check(
     'a stake outside 20/50/100 is refused',
-    (await call('POST', '/games/word-blaster/start', c.token, { stake: 30 }))
+    (
+      await call('POST', '/games/word-blaster/start', c.token, {
+        stake: 30,
+        mode: 'copy',
+      })
+    ).status === 400,
+  );
+  check(
+    'a start without a mode is refused',
+    (await call('POST', '/games/word-blaster/start', c.token, { stake: 20 }))
       .status === 400,
   );
 }
