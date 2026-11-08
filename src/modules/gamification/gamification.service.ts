@@ -18,6 +18,7 @@ import {
   getBusinessWeekStart,
 } from '../../common/time/business-time.util';
 import { weeklyCatchUpDue } from './weekly-league.logic';
+import { arenaStats } from './arena-stats.logic';
 import { questsForDay, type DailyQuestDefinition } from './daily-quest-catalog';
 
 export function getTodayDateKey(timeZone = 'Asia/Ho_Chi_Minh'): string {
@@ -1266,12 +1267,37 @@ export class GamificationService {
       }
     }
 
+    // Learners in the listed tier, so the client can draw the promotion and
+    // demotion zones of the weekly cron (top and bottom 20 %); every learner
+    // when the scope is all tiers.
+    const tierSize = await this.prisma.leaderboard.count({
+      where: whereClause,
+    });
+
     return {
       tier,
       scope,
       entries,
       currentUserRank,
+      tierSize,
     };
+  }
+
+  /** The learner's arena record from their settled matches (read only). */
+  async getArenaStats(userId: number) {
+    const battles = await this.prisma.gameBattle.findMany({
+      where: { status: 'settled', OR: [{ p1Id: userId }, { p2Id: userId }] },
+      select: {
+        p1Id: true,
+        p2Id: true,
+        stake: true,
+        winnerRole: true,
+        winnerUserId: true,
+        settledAt: true,
+      },
+      orderBy: { settledAt: 'asc' },
+    });
+    return arenaStats(userId, battles);
   }
 
   async getMyBadges(userId: number) {
