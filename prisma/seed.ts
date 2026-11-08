@@ -11286,8 +11286,11 @@ async function main() {
         stock: product.stock,
         order: product.order,
         isActive: true,
+        // The voucher is a real gift card: an admin hands it out, so it waits
+        // for approval like the physical gifts.
         fulfillmentType: [
           'gift-notebook',
+          'gift-voucher',
           'gift-bottle',
           'gift-plush',
         ].includes(product.slug)
@@ -11306,8 +11309,11 @@ async function main() {
         stock: product.stock,
         order: product.order,
         isActive: true,
+        // The voucher is a real gift card: an admin hands it out, so it waits
+        // for approval like the physical gifts.
         fulfillmentType: [
           'gift-notebook',
+          'gift-voucher',
           'gift-bottle',
           'gift-plush',
         ].includes(product.slug)

@@ -519,9 +519,12 @@ export class GamificationService {
         }
       }
 
-      // 2. Check double-bread boost
+      // 2. Check double-bread boost. It doubles study rewards only (the
+      // capped sources): a market refund or an admin adjustment is returned
+      // as is, or a boost would mint Bánh Mì out of a rejected order.
       const statsNow = await tx.userStats.findUnique({ where: { userId } });
       const boostActive =
+        isCapped &&
         statsNow?.doubleBanhUntil &&
         new Date(statsNow.doubleBanhUntil) > new Date();
       const effectiveAmount = boostActive

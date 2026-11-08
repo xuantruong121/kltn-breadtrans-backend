@@ -291,6 +291,73 @@ describe('GamificationService weekly cron hardening', () => {
     });
   });
 
+  describe('awardBanh with the double-bread boost', () => {
+    const boosted = () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([{ id: 1, earnedBanh: 0 }]),
+        banhTransaction: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({ id: 1 }),
+        },
+        userStats: {
+          findUnique: jest.fn().mockResolvedValue({
+            totalBanhRan: 0,
+            doubleBanhUntil: new Date(Date.now() + 3_600_000),
+          }),
+          upsert: jest.fn().mockResolvedValue({ totalBanhRan: 999 }),
+        },
+        dailyBanhEarning: { update: jest.fn().mockResolvedValue({}) },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      return new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {
+          publish: jest.fn(),
+        } as any,
+      );
+    };
+
+    it('doubles a study reward', async () => {
+      const res = await boosted().awardBanh(
+        1,
+        20,
+        'QUIZ_FIRST_COMPLETION',
+        'quiz:1',
+      );
+      expect(res.granted).toBe(40);
+    });
+
+    it('returns a market refund or an admin adjustment as is', async () => {
+      const refund = await boosted().awardBanh(
+        1,
+        2000,
+        'MARKET_REFUND',
+        'order:1',
+        {
+          isCapped: false,
+        },
+      );
+      expect(refund.granted).toBe(2000);
+      const admin = await boosted().awardBanh(
+        1,
+        50,
+        'ADMIN_ADJUSTMENT',
+        'adj:1',
+        {
+          isCapped: false,
+        },
+      );
+      expect(admin.granted).toBe(50);
+    });
+  });
+
   describe('appendLegacyReconciliationEntry — ledger-only correction, never touches totalBanhRan', () => {
     it('appends one compensating BanhTransaction row, leaving UserStats untouched', async () => {
       const tx: any = {
