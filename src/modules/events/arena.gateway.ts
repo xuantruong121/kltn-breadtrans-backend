@@ -107,12 +107,18 @@ export class ArenaGateway
   ) {}
 
   private escrowSweep?: NodeJS.Timeout;
+  /** When this process started; set in onModuleInit. */
+  private bootAt = new Date();
 
   onModuleInit() {
-    // Round timers live in this process: after a restart an escrowed match
-    // can never finish, so its stakes are returned once it is clearly dead.
-    void this.refundStaleEscrows().catch((err) =>
-      this.logger.error('[Arena] Stale escrow sweep failed:', err),
+    // Round timers live in this process. A battle still escrowed from before
+    // this boot can never finish (a restart, or a forced kill by `nest
+    // --watch`, which runs no shutdown hook), so its stakes go back at once.
+    // This assumes one API process owns every match: the speaking worker does
+    // not load this gateway. The 20-minute sweep stays as a safety net.
+    this.bootAt = new Date();
+    void this.refundOrphanedEscrows(this.bootAt).catch((err) =>
+      this.logger.error('[Arena] Boot escrow refund failed:', err),
     );
     this.escrowSweep = setInterval(() => {
       void this.refundStaleEscrows().catch((err) =>
@@ -126,11 +132,21 @@ export class ArenaGateway
     if (this.escrowSweep) clearInterval(this.escrowSweep);
   }
 
+  /** Battles escrowed before `bootAt` belong to a process that is gone. */
+  async refundOrphanedEscrows(bootAt: Date): Promise<number> {
+    const orphaned = await this.prisma.gameBattle.findMany({
+      where: { status: 'escrowed', escrowedAt: { lt: bootAt } },
+    });
+    let refunded = 0;
+    for (const battle of orphaned) {
+      if (await this.refundEscrow(battle, 'server_restart')) refunded += 1;
+    }
+    return refunded;
+  }
+
   /**
    * Refund both stakes of matches still escrowed after `olderThanMs` (a match
-   * lasts about two minutes; its Redis state expires after 15). The status
-   * claim escrowed → cancelled happens once, so a refund is paid at most once
-   * and a match settled meanwhile is never touched.
+   * lasts under three minutes; its Redis state expires after 15).
    */
   async refundStaleEscrows(olderThanMs = 20 * 60_000): Promise<number> {
     const stale = await this.prisma.gameBattle.findMany({
@@ -141,40 +157,130 @@ export class ArenaGateway
     });
     let refunded = 0;
     for (const battle of stale) {
-      const done = await this.prisma.$transaction(async (tx) => {
-        const claim = await tx.gameBattle.updateMany({
-          where: { id: battle.id, status: 'escrowed' },
-          data: { status: 'cancelled', settledAt: new Date() },
-        });
-        if (claim.count !== 1) return false;
-        for (const userId of [battle.p1Id, battle.p2Id]) {
-          const stats = await tx.userStats.update({
-            where: { userId },
-            data: { totalBanhRan: { increment: battle.stake } },
-          });
-          await tx.banhTransaction.create({
-            data: {
-              userId,
-              amount: battle.stake,
-              source: 'ARENA_REFUND',
-              reference: `arena:match:${battle.roomId}:refund:${userId}`,
-              dateKey: this.getVietnamDateKey(),
-              isCapped: false,
-              balanceAfter: stats.totalBanhRan,
-              metadata: { matchId: battle.roomId, reason: 'stale_escrow' },
-            },
-          });
-        }
-        return true;
-      });
-      if (done) {
-        refunded += 1;
-        this.logger.warn(
-          `[Arena] Refunded stale escrow of match ${battle.roomId}`,
-        );
-      }
+      if (await this.refundEscrow(battle, 'stale_escrow')) refunded += 1;
     }
     return refunded;
+  }
+
+  /**
+   * Gives both stakes of an escrowed battle back. The status claim escrowed →
+   * cancelled happens once and the ledger reference is the draw refund's, so
+   * a battle is refunded at most once and a battle settled meanwhile is never
+   * touched. Afterwards the dead match is removed from Redis and each player
+   * is told, now if connected and otherwise on their next arena connection.
+   */
+  async refundEscrow(
+    battle: {
+      id: number;
+      roomId: string;
+      p1Id: number;
+      p2Id: number;
+      stake: number;
+    },
+    reason: 'server_restart' | 'stale_escrow',
+  ): Promise<boolean> {
+    const balances = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.gameBattle.updateMany({
+        where: { id: battle.id, status: 'escrowed' },
+        data: { status: 'cancelled', settledAt: new Date() },
+      });
+      if (claim.count !== 1) return null;
+      const result: { userId: number; balance: number; name: string }[] = [];
+      for (const userId of [battle.p1Id, battle.p2Id]) {
+        const stats = await tx.userStats.update({
+          where: { userId },
+          data: { totalBanhRan: { increment: battle.stake } },
+          include: { user: { include: { profile: true } } },
+        });
+        await tx.banhTransaction.create({
+          data: {
+            userId,
+            amount: battle.stake,
+            source: 'ARENA_REFUND',
+            reference: `arena:match:${battle.roomId}:refund:${userId}`,
+            dateKey: this.getVietnamDateKey(),
+            isCapped: false,
+            balanceAfter: stats.totalBanhRan,
+            metadata: { matchId: battle.roomId, reason },
+          },
+        });
+        const name =
+          stats.user?.profile?.fullName ||
+          stats.user?.email ||
+          `Player ${userId}`;
+        // Balances the "Cược Đấu Trường" row written when the stake was held.
+        await tx.currencyTransaction.create({
+          data: {
+            studentId: userId,
+            studentName: name,
+            userId,
+            userName: name,
+            userRole: 'STUDENT',
+            amount: battle.stake,
+            reason: `Hoàn cược Đấu Trường 1v1 (${battle.roomId})`,
+            type: 'add',
+          },
+        });
+        result.push({ userId, balance: stats.totalBanhRan, name });
+      }
+      return result;
+    });
+    if (!balances) return false;
+
+    this.logger.warn(
+      `[Arena] Refunded escrow of match ${battle.roomId} (${reason})`,
+    );
+    const notice = {
+      matchId: battle.roomId,
+      refunded: battle.stake,
+      reason,
+    };
+    try {
+      await this.redis.set(`arena:settled:${battle.roomId}`, '1', 'EX', 86400);
+      await this.redis.del(`arena:match:${battle.roomId}`);
+      for (const { userId, balance, name } of balances) {
+        if (
+          (await this.redis.get(`arena:user_match:${userId}`)) === battle.roomId
+        )
+          await this.redis.del(`arena:user_match:${userId}`);
+        await this.redis.set(
+          `arena:aborted_notice:${userId}`,
+          JSON.stringify(notice),
+          'EX',
+          86400,
+        );
+        this.eventsGateway.sendCurrencyUpdate(userId, {
+          amount: battle.stake,
+          newBalance: balance,
+          reason: 'Hoàn cược Đấu Trường 1v1 (trận bị huỷ)',
+          studentName: name,
+        });
+      }
+      this.server?.to(battle.roomId).emit('arena:match_aborted', notice);
+    } catch (err) {
+      // The money is back; a missed notice or a leftover key is cleaned by
+      // join_queue, which checks the battle before resuming a match.
+      this.logger.error('[Arena] Cleanup after refund failed:', err);
+    }
+    return true;
+  }
+
+  /** Tells a returning player that their last match was cancelled and refunded. */
+  private async deliverAbortedNotice(client: Socket, userId: number) {
+    const key = `arena:aborted_notice:${userId}`;
+    const raw = await this.redis.get(key);
+    if (!raw) return;
+    await this.redis.del(key);
+    client.emit('arena:match_aborted', JSON.parse(raw));
+  }
+
+  /** Whether the battle of a match in Redis still holds the stakes. */
+  private async battleIsLive(matchId: string): Promise<boolean> {
+    const battle = await this.prisma.gameBattle.findUnique({
+      where: { roomId: matchId },
+      select: { status: true },
+    });
+    return battle?.status === 'escrowed';
   }
 
   async handleConnection(client: Socket) {
@@ -299,6 +405,7 @@ export class ArenaGateway
       this.logger.log(
         `[Arena] Client authenticated: ${client.id} (User #${user.id})`,
       );
+      await this.deliverAbortedNotice(client, user.id);
     } catch {
       this.logger.warn(
         `[Arena] Connection rejected: Invalid auth token (${client.id})`,
@@ -494,7 +601,7 @@ export class ArenaGateway
       const rawMatch = await this.redis.get(`arena:match:${existingMatchId}`);
       if (rawMatch) {
         const match: MatchState = JSON.parse(rawMatch);
-        if (!match.isSettled) {
+        if (!match.isSettled && (await this.battleIsLive(match.matchId))) {
           // Allow client to resume match
           await this.redis.srem(queuedSetKey, String(userId));
           await this.redis.del(userLockKey);
@@ -503,6 +610,9 @@ export class ArenaGateway
         }
       }
     }
+
+    // A match left in Redis whose battle was refunded or settled is dead.
+    if (existingMatchId) await this.redis.del(`arena:user_match:${userId}`);
 
     // 3. Remove user from any existing queue to prevent duplicate entries
     await this.removeUserFromQueues(userId);
@@ -1089,6 +1199,21 @@ export class ArenaGateway
 
     try {
       const rawMatch = await this.redis.get(`arena:match:${payload.matchId}`);
+      const battle = await this.prisma.gameBattle.findUnique({
+        where: { roomId: payload.matchId },
+        select: { status: true, stake: true, p1Id: true, p2Id: true },
+      });
+      const isPlayer =
+        battle?.p1Id === authUser.userId || battle?.p2Id === authUser.userId;
+      if (battle?.status === 'cancelled' && isPlayer) {
+        await this.redis.del(`arena:aborted_notice:${authUser.userId}`);
+        client.emit('arena:match_aborted', {
+          matchId: payload.matchId,
+          refunded: battle.stake,
+          reason: 'server_restart',
+        });
+        return;
+      }
       if (!rawMatch) {
         client.emit('arena:error', {
           message: 'Trận đấu không tồn tại hoặc đã kết thúc.',
