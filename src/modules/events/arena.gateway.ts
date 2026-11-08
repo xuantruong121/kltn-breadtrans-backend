@@ -23,6 +23,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getJwtSecret } from '../auth/auth.constants';
 import * as crypto from 'crypto';
 import { GamificationService } from '../gamification/gamification.service';
+import { loadAllReviewedWords, loadDeckWords } from './arena-word-pool';
 import {
   ARENA_ROUNDS,
   ARENA_XP_PER_CORRECT,
@@ -31,9 +32,7 @@ import {
   arenaXp,
   buildArenaQuestions,
   vietnamDayStart,
-  levelRank,
   roundPoints,
-  type ArenaWord,
   type QuestionKind,
 } from './arena-questions.logic';
 
@@ -1732,49 +1731,9 @@ export class ArenaGateway
     count: number = ARENA_ROUNDS,
   ): Promise<ServerQuestion[]> {
     let questions: ServerQuestion[] = [];
-    const reviewed = { status: 'APPROVED', source: 'CURATED' } as const;
-    const toWord = (entry: {
-      id: number;
-      headword: string;
-      displayWord: string;
-      pos: string;
-      meaningVi: string;
-      exampleEn: string | null;
-      ipaUs: string | null;
-      ipaUk: string | null;
-      deckWords?: { topic: { id: number; level: string | null } }[];
-    }): ArenaWord => {
-      const ranks = (entry.deckWords ?? [])
-        .map((d) => levelRank(d.topic.level))
-        .filter((r): r is number => r !== null);
-      return {
-        id: entry.id,
-        headword: entry.headword,
-        displayWord: entry.displayWord,
-        pos: entry.pos,
-        meaningVi: entry.meaningVi,
-        exampleEn: entry.exampleEn,
-        ipa: entry.ipaUs || entry.ipaUk,
-        level: ranks.length ? Math.min(...ranks) : null,
-        topics: (entry.deckWords ?? []).map((d) => d.topic.id),
-      };
-    };
-
     try {
-      const deckEntries = await this.prisma.dictionaryEntry.findMany({
-        where: {
-          ...reviewed,
-          deckWords: { some: { topic: { publicationStatus: 'PUBLISHED' } } },
-        },
-        include: {
-          deckWords: {
-            where: { topic: { publicationStatus: 'PUBLISHED' } },
-            select: { topic: { select: { id: true, level: true } } },
-          },
-        },
-      });
       questions = buildArenaQuestions(
-        deckEntries.map(toWord),
+        await loadDeckWords(this.prisma),
         count,
         Math.random,
       );
@@ -1783,11 +1742,8 @@ export class ArenaGateway
         this.logger.warn(
           `[Arena] Decks gave ${questions.length}/${count} questions; using every reviewed word.`,
         );
-        const allEntries = await this.prisma.dictionaryEntry.findMany({
-          where: reviewed,
-        });
         questions = buildArenaQuestions(
-          allEntries.map(toWord),
+          await loadAllReviewedWords(this.prisma),
           count,
           Math.random,
         );
