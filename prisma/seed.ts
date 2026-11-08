@@ -11225,16 +11225,18 @@ async function main() {
       order: 9,
     },
     {
+      // Owner 2026-11-08: replaces the Phúc Long voucher, which could not be
+      // supplied. The system adds the days itself (market.service).
       id: 10,
-      slug: 'gift-voucher',
-      name: 'Voucher đồ uống Phúc Long 30K',
+      slug: 'plus-7d',
+      name: 'Thẻ 7 ngày Plus',
       description:
-        'Đổi mã E-Voucher thưởng đồ uống Phúc Long xua tan căng thẳng sau giờ học.',
-      category: 'PHYSICAL',
+        'Chưa có gói: dùng Plus 7 ngày từ lúc đổi. Đang có gói Plus hoặc Pro: cộng thêm 7 ngày vào gói hiện tại.',
+      category: 'BOOST',
       rarity: 'LEGENDARY',
       price: 2000,
-      imageUrl: '/images/market/gift-voucher.svg',
-      stock: 20,
+      imageUrl: '/images/market/plus-7d.svg',
+      stock: 100,
       order: 10,
     },
     {
@@ -11286,11 +11288,8 @@ async function main() {
         stock: product.stock,
         order: product.order,
         isActive: true,
-        // The voucher is a real gift card: an admin hands it out, so it waits
-        // for approval like the physical gifts.
         fulfillmentType: [
           'gift-notebook',
-          'gift-voucher',
           'gift-bottle',
           'gift-plush',
         ].includes(product.slug)
@@ -11309,11 +11308,8 @@ async function main() {
         stock: product.stock,
         order: product.order,
         isActive: true,
-        // The voucher is a real gift card: an admin hands it out, so it waits
-        // for approval like the physical gifts.
         fulfillmentType: [
           'gift-notebook',
-          'gift-voucher',
           'gift-bottle',
           'gift-plush',
         ].includes(product.slug)

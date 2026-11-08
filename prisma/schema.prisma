@@ -70,15 +70,18 @@ enum SubscriptionEventType {
   ADMIN_REVOKED
   TRIAL_GRANTED
   REFERRAL_REWARD
+  MARKET_REWARD
 }
 
 /// Where a subscription came from. TRIAL is the free 3-day PLUS after the
-/// entry diagnostic and is not a paid term; REFERRAL is a referral reward.
+/// entry diagnostic and is not a paid term; REFERRAL is a referral reward;
+/// MARKET is a 7-day Plus card bought with Bánh Mì in the shop.
 enum SubscriptionSource {
   PURCHASE
   ADMIN
   TRIAL
   REFERRAL
+  MARKET
 }
 
 enum PlanPurchaseStatus {
