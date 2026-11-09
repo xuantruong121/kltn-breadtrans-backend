@@ -373,15 +373,36 @@ async function browser(width: number) {
     path: `${SHOTS}/dungeon-lobby-${tag}.png`,
     fullPage: true,
   });
+  // A dev server compiles the play page on its first visit, which can outlast
+  // the opening (countdown, floor map); compile it before the run starts.
+  await page.request
+    .get(`${FE}/arena/dungeon`, { timeout: 120_000 })
+    .catch(() => undefined);
   await page
     .getByRole('button', {
       name: mode === 'free' ? 'Vào Hầm tự do' : 'Vào Hầm hôm nay',
     })
     .click();
+  // Owner 2026-11-09: the first time in, the story opens before the run.
+  const story = page.getByRole('dialog', { name: 'Cốt truyện Hầm Bánh Mì' });
+  const storyShown = await story
+    .waitFor({ timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  check(`${tag}: the first entry opens the story`, storyShown);
+  if (storyShown) {
+    await sleep(800);
+    await page.screenshot({ path: `${SHOTS}/dungeon-story-1-${tag}.png` });
+    await page.keyboard.press('Enter');
+    await sleep(700);
+    await page.screenshot({ path: `${SHOTS}/dungeon-story-2-${tag}.png` });
+    await story.getByRole('button', { name: 'Bỏ qua' }).click();
+  }
   await page.waitForURL(/\/arena\/dungeon/, { timeout: 30_000 });
+  // The floor opens on the chapter map (chapter 1, Lò Ủ Bột), then the monster greets.
   const intro = await page
     .locator('[data-dungeon-callout]')
-    .getByText(/Tầng 1/)
+    .getByText('Lò Ủ Bột')
     .waitFor({ timeout: 10_000 })
     .then(() => true)
     .catch(() => false);
@@ -491,6 +512,25 @@ async function browser(width: number) {
     shown && bread(s.account.userId) === expected,
     String(bread(s.account.userId)),
   );
+  if (width >= 1000) {
+    // A second run starts straight away: the story was seen.
+    await page.goto(`${FE}/arena?game=dungeon`, {
+      waitUntil: 'networkidle',
+      timeout: 120_000,
+    });
+    await page.getByRole('button', { name: 'Vào Hầm tự do' }).click();
+    const again = await story
+      .waitFor({ timeout: 1500 })
+      .then(() => true)
+      .catch(() => false);
+    await page.waitForURL(/\/arena\/dungeon/, { timeout: 30_000 });
+    check(`${tag}: the story does not come back by itself`, !again);
+    const run2 = await redis.get(`dungeon:user:${s.account.userId}`);
+    if (run2)
+      await call('POST', `/games/dungeon/${run2}/finish`, s.account.token, {
+        forfeit: true,
+      });
+  }
   check(
     `${tag}: no server or page error`,
     s.issues.length === 0,
