@@ -129,6 +129,9 @@ describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
       7,
     );
     expect(dictation).toMatchObject({ isLocked: true, requiredPlan: 'PLUS' });
+    // The fields are kept 60 s (capacity run 2026-11-09); an edit is read
+    // once that has passed.
+    jest.useFakeTimers({ now: Date.now() + 61_000 });
     quizRows.findMany.mockResolvedValue([
       { id: 10, bilingualContent: COMPREHENSION },
     ]);
@@ -140,6 +143,7 @@ describe('QuizContentAccessService (owner matrix 2026-10-30)', () => {
       isLocked: false,
       requiredPlan: 'FREE',
     });
+    jest.useRealTimers();
   });
 
   it('exposes the CEFR level the plan was decided from', async () => {

@@ -1,0 +1,17 @@
+# The Dockerfile copies only package*.json, prisma/, tsconfig*.json,
+# nest-cli.json, src/ and scripts/entrypoint.sh. Everything else stays out of
+# the build context (node_modules alone is gigabytes, and on Windows holds
+# binaries built for the wrong platform).
+node_modules
+dist
+coverage
+.git
+artifacts
+backups
+content-assets
+docs
+load-tests
+test
+*.log
+.env
+.env.*

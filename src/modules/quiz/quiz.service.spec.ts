@@ -79,6 +79,7 @@ const mockUploadService = {
   downloadPrivateFileBuffer: jest.fn(),
   getPresignedDownloadUrl: jest.fn(),
   getPrivatePresignedDownloadUrl: jest.fn(),
+  getPublicAssetUrl: jest.fn((key: string) => `https://public.example/${key}`),
   isPrivateStorageConfigured: jest.fn().mockReturnValue(true),
   privateObjectExists: jest.fn(),
 };
@@ -90,6 +91,7 @@ const mockListeningAudioAuthoringService = {
     .mockRejectedValue(
       new Error('Audio toàn bài chưa được quản trị viên tạo và duyệt'),
     ),
+  getPublishedAudioUrl: jest.fn(),
 };
 
 const mockQuizContentAccessService = {
@@ -256,6 +258,26 @@ describe('QuizService', () => {
         },
       });
       expect(result).toEqual(mockQuiz);
+    });
+
+    it('reads a quiz once per minute for learners, always fresh for admins (capacity run)', async () => {
+      const quiz = {
+        id: 77,
+        type: 'BILINGUAL_READING',
+        publicationStatus: 'PUBLISHED',
+        toeicWritingSetItems: [],
+        questions: [{ id: 770, content: { text: 'Q' } }],
+      };
+      mockPrismaService.quiz.findUnique.mockReset();
+      mockPrismaService.quiz.findUnique.mockResolvedValue(quiz);
+      const first = await service.getQuizById(77, false, 7, Role.STUDENT);
+      const second = await service.getQuizById(77, false, 8, Role.STUDENT);
+      expect(second).toEqual(first);
+      // A copy each time: reshaping one learner's questions never reaches the next.
+      expect(second).not.toBe(first);
+      expect(mockPrismaService.quiz.findUnique).toHaveBeenCalledTimes(2);
+      await service.getQuizById(77, true, 1, Role.ADMIN);
+      expect(mockPrismaService.quiz.findUnique).toHaveBeenCalledTimes(4);
     });
 
     it('never serves TOEIC exam Writing tasks to guests or learners; admins keep them', async () => {
@@ -1757,6 +1779,88 @@ describe('QuizService', () => {
       await expect(service.streamQuestionAudio(47, 131)).rejects.toThrow(
         'Audio bài luyện chưa được quản trị viên tạo và duyệt',
       );
+    });
+
+    it('gives the browser the public URL of a free clip instead of its bytes', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 97,
+        quizId: 9,
+        quiz: { id: 9, type: 'LISTENING_PRACTICE' },
+        audioAssets: [{ key: 'catalog/listening/question-97.mp3' }],
+        content: { audioText: 'The shop opens at nine.' },
+      });
+      mockUploadService.downloadFileBuffer.mockClear();
+
+      await expect(service.questionAudioUrl(9, 97)).resolves.toEqual({
+        url: 'https://public.example/catalog/listening/question-97.mp3',
+        artifact: null,
+      });
+      expect(mockUploadService.downloadFileBuffer).not.toHaveBeenCalled();
+    });
+
+    it('signs an expiring URL for private question audio', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 101,
+        quizId: 41,
+        quiz: { id: 41, type: 'LISTENING_PRACTICE', isPremiumContent: true },
+        audioAssets: [
+          { key: 'premium/listening/quiz-41/question-101/v1/audio.mp3' },
+        ],
+        content: { audioText: 'A protected sentence.' },
+      });
+      mockUploadService.getPrivatePresignedDownloadUrl.mockResolvedValue(
+        'https://private.example/signed',
+      );
+
+      await expect(service.questionAudioUrl(41, 101)).resolves.toEqual({
+        url: 'https://private.example/signed',
+        artifact: null,
+      });
+      expect(
+        mockUploadService.getPrivatePresignedDownloadUrl,
+      ).toHaveBeenCalledWith(
+        'premium/listening/quiz-41/question-101/v1/audio.mp3',
+        3600,
+      );
+    });
+
+    it('points every dialogue question at the one published track URL', async () => {
+      const artifact = {
+        id: 7,
+        version: 2,
+        checksumSha256: 'abc',
+        durationMs: 90_000,
+        timeline: [{ turnId: 't2', startMs: 1000, endMs: 4000 }],
+      };
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 130,
+        quizId: 58,
+        quiz: { id: 58, type: 'LISTENING_PRACTICE' },
+        audioAssets: [],
+        content: { targetTurnId: 't2' },
+      });
+      mockListeningAudioAuthoringService.getCurrentPublishedArtifact.mockResolvedValueOnce(
+        artifact,
+      );
+      mockListeningAudioAuthoringService.getPublishedAudioUrl.mockResolvedValue(
+        {
+          artifact,
+          url: 'https://public.example/catalog/listening/quiz-58/full.mp3',
+        },
+      );
+
+      await expect(service.questionAudioUrl(58, 130)).resolves.toEqual({
+        url: 'https://public.example/catalog/listening/quiz-58/full.mp3',
+        artifact: {
+          id: 7,
+          version: 2,
+          checksumSha256: 'abc',
+          durationMs: 90_000,
+        },
+      });
+      expect(
+        mockListeningAudioAuthoringService.getPublishedAudioUrl,
+      ).toHaveBeenCalledWith(58, {}, 3600);
     });
 
     it('keeps using a static asset for non-dialogue listening questions', async () => {

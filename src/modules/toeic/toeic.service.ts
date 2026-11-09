@@ -185,7 +185,28 @@ export class ToeicService {
     };
   }
 
+  // The learner list is the same for everyone and loads every question of
+  // every published exam to validate it; it was 83 ms of CPU per call in the
+  // capacity run (2026-11-09). Learners get it from here for up to 60 s, so a
+  // newly published exam shows within a minute; staff always read it fresh.
+  private learnerExamList: {
+    at: number;
+    value: Awaited<ReturnType<ToeicService['loadExamList']>>;
+  } | null = null;
+  static readonly LEARNER_EXAM_LIST_TTL_MS = 60_000;
+
   async getExams(isStaff = false) {
+    if (isStaff) return this.loadExamList(true);
+    const now = Date.now();
+    if (
+      !this.learnerExamList ||
+      now - this.learnerExamList.at > ToeicService.LEARNER_EXAM_LIST_TTL_MS
+    )
+      this.learnerExamList = { at: now, value: await this.loadExamList(false) };
+    return this.learnerExamList.value;
+  }
+
+  private async loadExamList(isStaff: boolean) {
     const exams = await this.prisma.toeicExamSet.findMany({
       where: isStaff
         ? {}

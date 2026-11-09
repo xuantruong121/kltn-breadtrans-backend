@@ -30,13 +30,21 @@ import {
 } from './badge-rules.logic';
 import { questsForDay, type DailyQuestDefinition } from './daily-quest-catalog';
 
+// Building an Intl.DateTimeFormat is costly and this runs several times per
+// submission; one formatter per time zone is reused (capacity profile 2026-11-09).
+const dateKeyFormatters = new Map<string, Intl.DateTimeFormat>();
+
 export function getTodayDateKey(timeZone = 'Asia/Ho_Chi_Minh'): string {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
+  let formatter = dateKeyFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    dateKeyFormatters.set(timeZone, formatter);
+  }
   return formatter.format(new Date());
 }
 

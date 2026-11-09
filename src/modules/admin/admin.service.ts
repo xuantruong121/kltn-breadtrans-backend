@@ -1,3 +1,4 @@
+import { forgetAuthUser } from '../auth/auth-user-cache';
 import {
   Injectable,
   Optional,
@@ -800,6 +801,7 @@ export class AdminService {
         where: { id: userId },
         data: updateUserData,
       });
+      forgetAuthUser(userId);
     }
 
     if (dto.fullName !== undefined || dto.phone !== undefined) {
@@ -833,7 +835,7 @@ export class AdminService {
   }
 
   async deleteUser(userId: number) {
-    return await this.prisma.$transaction(async (tx) => {
+    const deleted = await this.prisma.$transaction(async (tx) => {
       const lockedUsers = await tx.$queryRaw<Array<{ id: number; role: Role }>>`
         SELECT id, role
         FROM "User"
@@ -855,6 +857,8 @@ export class AdminService {
 
       return tx.user.delete({ where: { id: userId } });
     });
+    forgetAuthUser(userId);
+    return deleted;
   }
 
   async getVocabTopics(query: ListQuery = {}) {

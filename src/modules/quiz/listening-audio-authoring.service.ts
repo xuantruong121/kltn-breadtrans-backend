@@ -905,6 +905,18 @@ export class ListeningAudioAuthoringService {
   }
 
   async publish(quizId: number, artifactId: number, actorId: number) {
+    try {
+      return await this.publishArtifact(quizId, artifactId, actorId);
+    } finally {
+      this.playable.delete(quizId);
+    }
+  }
+
+  private async publishArtifact(
+    quizId: number,
+    artifactId: number,
+    actorId: number,
+  ) {
     const artifact = await this.prisma.listeningAudioArtifact.findFirst({
       where: { id: artifactId, quizId },
     });
@@ -972,14 +984,98 @@ export class ListeningAudioAuthoringService {
     quizId: number,
     requestedIdentity: PublishedListeningAudioIdentity = {},
   ) {
+    const { artifact, key } = await this.playableArtifact(
+      quizId,
+      requestedIdentity,
+    );
+    return {
+      artifact,
+      buffer: isPrivateListeningMediaKey(key)
+        ? await this.uploadService.downloadPrivateFileBuffer(key)
+        : await this.uploadService.downloadFileBuffer(key),
+    };
+  }
+
+  /**
+   * Where the browser fetches the published whole-quiz track itself, after the
+   * same checks as getPublishedAudio: a public URL, or for private media a
+   * signed one that expires. The bytes then never pass through the API
+   * (capacity run 2026-11-09: proxying tracks was a quarter of its CPU).
+   */
+  async getPublishedAudioUrl(
+    quizId: number,
+    requestedIdentity: PublishedListeningAudioIdentity = {},
+    expiresInSeconds = 3600,
+  ) {
+    const { artifact, key } = await this.playableArtifact(
+      quizId,
+      requestedIdentity,
+    );
+    return {
+      artifact,
+      url: isPrivateListeningMediaKey(key)
+        ? await this.uploadService.getPrivatePresignedDownloadUrl(
+            key,
+            expiresInSeconds,
+          )
+        : this.uploadService.getPublicAssetUrl(key),
+    };
+  }
+
+  /**
+   * The published track's state per quiz, kept for 60 s: finding it, re-hashing
+   * the quiz script to know whether it went stale and reading the quiz tier
+   * cost about 40 ms of CPU per question played (capacity run 2026-11-09).
+   * Publishing or relinking clears it at once; a script edit is seen within 60 s.
+   */
+  private readonly playable = new Map<
+    number,
+    {
+      at: number;
+      artifact: Awaited<
+        ReturnType<ListeningAudioAuthoringService['getArtifact']>
+      >;
+      stale: boolean;
+      isPremium: boolean;
+    }
+  >();
+  static readonly PLAYABLE_TTL_MS = 60_000;
+
+  private async playableState(quizId: number) {
+    const cached = this.playable.get(quizId);
+    if (
+      cached &&
+      Date.now() - cached.at <= ListeningAudioAuthoringService.PLAYABLE_TTL_MS
+    )
+      return cached;
     const artifact = await this.getArtifact(quizId);
+    const stale =
+      !!artifact?.r2Key &&
+      (await this.validateContent(quizId)).synthesisHash !==
+        artifact.synthesisHash;
+    const state = {
+      at: Date.now(),
+      artifact,
+      stale,
+      isPremium: artifact?.r2Key
+        ? await this.isPremiumListeningQuiz(quizId)
+        : false,
+    };
+    this.playable.set(quizId, state);
+    return state;
+  }
+
+  private async playableArtifact(
+    quizId: number,
+    requestedIdentity: PublishedListeningAudioIdentity,
+  ) {
+    const { artifact, stale, isPremium } = await this.playableState(quizId);
     if (!artifact || !artifact.r2Key)
       throw new ServiceUnavailableException({
         code: 'LISTENING_FULL_AUDIO_NOT_READY',
         message: 'Audio toàn bài chưa được quản trị viên tạo và duyệt.',
       });
-    const current = await this.validateContent(quizId);
-    if (current.synthesisHash !== artifact.synthesisHash)
+    if (stale)
       throw new ServiceUnavailableException({
         code: 'LISTENING_FULL_AUDIO_STALE',
         message: 'Audio hiện tại đã cũ; quản trị viên cần tạo lại.',
@@ -1004,18 +1100,12 @@ export class ListeningAudioAuthoringService {
         'Checksum audio không khớp phiên bản hiện hành.',
       );
     }
-    const isPremium = await this.isPremiumListeningQuiz(quizId);
     this.assertPremiumArtifactStorage(
       isPremium,
       artifact.r2Key,
       artifact.r2Url,
     );
-    return {
-      artifact,
-      buffer: isPrivateListeningMediaKey(artifact.r2Key)
-        ? await this.uploadService.downloadPrivateFileBuffer(artifact.r2Key)
-        : await this.uploadService.downloadFileBuffer(artifact.r2Key),
-    };
+    return { artifact, key: artifact.r2Key };
   }
 
   /**
@@ -1036,6 +1126,17 @@ export class ListeningAudioAuthoringService {
    * same key and reports `relinked: false`.
    */
   async relinkPublishedArtifactFromStorage(
+    quizId: number,
+    options: { maxVersionProbe?: number } = {},
+  ) {
+    try {
+      return await this.relinkArtifact(quizId, options);
+    } finally {
+      this.playable.delete(quizId);
+    }
+  }
+
+  private async relinkArtifact(
     quizId: number,
     options: { maxVersionProbe?: number } = {},
   ): Promise<{

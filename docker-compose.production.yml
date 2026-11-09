@@ -53,7 +53,13 @@ services:
       - path: .env.production
         required: false
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_test_pw}@postgres:5432/${POSTGRES_DB:-breadtrans_test}?schema=public
+      # Capacity run 2026-11-09 (load-tests/capacity): with Prisma's default pool
+      # (2 x CPUs + 1 = 5 on 2 vCPU) interactive transactions (TOEIC answer saves,
+      # submissions) ran out of connections at ~1000 learners (P2028).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_test_pw}@postgres:5432/${POSTGRES_DB:-breadtrans_test}?schema=public&connection_limit=${API_DB_POOL:-20}&pool_timeout=10
+      # A larger young generation: fewer scavenges for the many short-lived
+      # objects of each request; p95 at 1000 learners went from ~1.7 s to ~0.6 s.
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-semi-space-size=32}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_test_pw}
@@ -87,7 +93,10 @@ services:
       - path: .env.production
         required: false
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_test_pw}@postgres:5432/${POSTGRES_DB:-breadtrans_test}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_test_pw}@postgres:5432/${POSTGRES_DB:-breadtrans_test}?schema=public&connection_limit=${WORKER_DB_POOL:-5}&pool_timeout=10
+      # A larger young generation: fewer scavenges for the many short-lived
+      # objects of each request; p95 at 1000 learners went from ~1.7 s to ~0.6 s.
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-semi-space-size=32}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_test_pw}
