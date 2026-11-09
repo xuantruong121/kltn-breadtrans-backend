@@ -105,6 +105,8 @@ export type DungeonView = {
   }[];
   question: PublicQuestion | null;
   /** When the question runs out, by the server's clock, and its length. */
+  /** When the question's clock starts and runs out, by the server's clock. */
+  questionStartsAt: number | null;
   questionDeadline: number | null;
   questionMs: number | null;
   last: AnswerOutcome | null;
@@ -129,6 +131,15 @@ const EVENT: Record<DungeonMode, string> = {
   free: 'DUNGEON_FREE',
 };
 const MIN_BANK = 20;
+/**
+ * The page shows each answer's outcome (and the right answer after a miss)
+ * before the next question; that question's clock starts only then, so the
+ * learner never loses time to the animation. Answering earlier counts as 0 ms.
+ */
+const REVEAL_RIGHT_MS = 800;
+const REVEAL_WRONG_MS = 1600;
+const FLOOR_INTRO_MS = 1500;
+const RUN_INTRO_MS = 2500;
 
 /**
  * Hầm Bánh Mì, decided by the server: the answers and the clock stay here,
@@ -222,7 +233,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
       last: null,
       result: null,
     };
-    this.ask(session);
+    this.ask(session, RUN_INTRO_MS);
     try {
       await this.store(session);
       await this.redis.set(KEY.user(userId), id, 'EX', SESSION_TTL_S);
@@ -282,14 +293,18 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         q,
         bankIndex,
         value,
-        Date.now() - issuedAt,
+        Math.max(0, Date.now() - issuedAt),
       );
       session.run = step.run;
       session.last = step.outcome;
       session.question = null;
       if (session.run.phase === 'over')
         return this.view(await this.settle(session, false));
-      if (session.run.phase === 'fight') this.ask(session);
+      if (session.run.phase === 'fight')
+        this.ask(
+          session,
+          step.outcome.right ? REVEAL_RIGHT_MS : REVEAL_WRONG_MS,
+        );
       await this.store(session);
       return this.view(session);
     });
@@ -309,7 +324,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException('Topping này không có trong lựa chọn.');
       session.run = pickTopping(session.run, topping);
       session.last = null;
-      this.ask(session);
+      this.ask(session, FLOOR_INTRO_MS);
       await this.store(session);
       return this.view(session);
     });
@@ -428,14 +443,14 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Puts the next question out, timed from now. */
-  private ask(session: Session) {
+  private ask(session: Session, delayMs = 0) {
     const issued = issueQuestion(session.run, session.bank);
     session.run = issued.run;
     session.question = {
       bankIndex: issued.bankIndex,
       q: issued.question,
       view: issued.publicView,
-      issuedAt: Date.now(),
+      issuedAt: Date.now() + delayMs,
     };
   }
 
@@ -586,6 +601,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         level: run.toppings[id] ?? 0,
       })),
       question: q ? q.view : null,
+      questionStartsAt: q ? q.issuedAt : null,
       questionDeadline: q && ms !== null ? q.issuedAt + ms : null,
       questionMs: ms,
       last: session.last,
