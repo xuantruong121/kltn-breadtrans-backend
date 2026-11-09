@@ -77,8 +77,26 @@ export const floorRng = (seed: number, floor: number, what: string) =>
 
 // ---------------------------------------------------------------- monsters
 
-export const MONSTERS = ['moldy', 'mouse', 'ant', 'snail'] as const;
-export const BOSSES = ['sourdough_king', 'flour_dragon'] as const;
+// Owner 2026-11-09: more monsters and bosses (the art is Kenney's New Platformer Pack).
+export const MONSTERS = [
+  'moldy',
+  'mouse',
+  'ant',
+  'snail',
+  'bee',
+  'fly',
+  'flour_worm',
+  'cheese_worm',
+  'taiyaki',
+] as const;
+/** One boss every five floors, in this order, then round again. */
+export const BOSSES = [
+  'sourdough_king',
+  'flour_dragon',
+  'matcha_cake',
+  'pandan_jelly',
+  'yeast_frog',
+] as const;
 export type MonsterKind = (typeof MONSTERS)[number] | (typeof BOSSES)[number];
 
 export const isBossFloor = (floor: number) => floor % BOSS_EVERY === 0;

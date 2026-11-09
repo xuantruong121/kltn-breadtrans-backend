@@ -102,6 +102,17 @@ describe('floors and monsters', () => {
     expect(monsterFor(42, 3)).toBe(monsterFor(42, 3));
     expect(monsterFor(42, 5)).toBe('sourdough_king');
     expect(monsterFor(42, 10)).toBe('flour_dragon');
+    expect([15, 20, 25, 30].map((f) => monsterFor(42, f))).toEqual([
+      'matcha_cake',
+      'pandan_jelly',
+      'yeast_frog',
+      'sourdough_king',
+    ]);
+    // Ordinary floors draw from all nine monsters.
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 60; seed += 1)
+      for (const f of [1, 2, 3, 4]) seen.add(monsterFor(seed, f));
+    expect(seen.size).toBe(9);
   });
   it('the day dungeon is the same all day in Vietnam and changes at midnight there', () => {
     const morning = dailySeed(new Date('2026-11-09T01:00:00+07:00'));
