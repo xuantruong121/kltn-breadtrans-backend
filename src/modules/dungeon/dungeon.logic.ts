@@ -18,6 +18,7 @@ import {
   type ArenaQuestion,
   type ArenaWord,
   meaningsClash,
+  POS_VI,
 } from '../events/arena-questions.logic';
 import {
   letterHint,
@@ -358,7 +359,8 @@ export function typedQuestion(
     type: 'typed',
     wordId: word.id,
     prompt: word.meaningVi.trim(),
-    pos: word.pos ?? null,
+    // The part of speech in Vietnamese, as the multiple-choice prompts say it.
+    pos: word.pos ? (POS_VI[word.pos] ?? word.pos) : null,
     hint: letterHint(display),
     answers,
     display,

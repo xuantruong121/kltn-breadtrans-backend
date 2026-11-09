@@ -290,6 +290,9 @@ describe('a run', () => {
     const issued = issueQuestion(run, bank);
     expect(issued.question.type).toBe('typed');
     expect(issued.publicView.type).toBe('typed');
+    // The part of speech in Vietnamese, like the multiple-choice prompts.
+    if (issued.publicView.type === 'typed')
+      expect(issued.publicView.pos).toBe('danh từ');
     expect(JSON.stringify(issued.publicView)).not.toMatch(/answers|display/);
 
     const security = pool.find((w) => w.headword === 'security')!;
