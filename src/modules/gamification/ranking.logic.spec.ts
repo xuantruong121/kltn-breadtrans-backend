@@ -141,4 +141,15 @@ describe('activityText', () => {
       activityText({ kind: 'event', type: 'STREAK_MILESTONE', value: 7 })!.text,
     ).toBe('vừa đạt chuỗi 7 ngày');
   });
+  it('a Hầm Bánh Mì run reaches the feed only from floor 10', () => {
+    expect(
+      activityText({ kind: 'event', type: 'DUNGEON_DAILY', value: 9 }),
+    ).toBeNull();
+    expect(
+      activityText({ kind: 'event', type: 'DUNGEON_FREE', value: 12 }),
+    ).toEqual({
+      text: 'vừa xuống tới tầng 12 Hầm Bánh Mì',
+      kind: 'arena',
+    });
+  });
 });

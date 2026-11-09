@@ -101,7 +101,7 @@ export function levelRank(level: string | null | undefined): number | null {
   return level ? (LEVEL_RANK[level.trim().toUpperCase()] ?? null) : null;
 }
 
-const POS_VI: Record<string, string> = {
+export const POS_VI: Record<string, string> = {
   noun: 'danh từ',
   verb: 'động từ',
   adjective: 'tính từ',

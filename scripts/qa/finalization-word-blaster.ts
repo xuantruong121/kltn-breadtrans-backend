@@ -422,6 +422,11 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
     path: `${SHOTS}/blaster-picker-${tag}.png`,
     fullPage: true,
   });
+  // A dev server compiles the play page on its first visit, which can outlast
+  // the opening (countdown, floor map); compile it before the run starts.
+  await page.request
+    .get(`${FE}/arena/word-blaster`, { timeout: 120_000 })
+    .catch(() => undefined);
   await page.getByRole('button', { name: 'Bắt đầu' }).click();
   await page.waitForURL(/\/arena\/word-blaster/, { timeout: 30_000 });
   const input = page.getByRole('textbox', { name: /Gõ đáp án/ });
