@@ -112,6 +112,9 @@ export function leagueStanding(input: {
   };
 }
 
+/** A Hầm Bánh Mì run reaches the activity feed from this floor down. */
+export const DUNGEON_FEED_FLOOR = 10;
+
 export type FeedSource =
   | { kind: 'activity'; type: string }
   | { kind: 'badge'; name: string }
@@ -146,5 +149,14 @@ export function activityText(source: FeedSource): {
     return { text: `vừa lên Lv. ${source.value}`, kind: 'level' };
   if (source.type === 'STREAK_MILESTONE')
     return { text: `vừa đạt chuỗi ${source.value} ngày`, kind: 'streak' };
+  // Hầm Bánh Mì runs: only the deep ones make the feed (owner 2026-11-09).
+  if (
+    (source.type === 'DUNGEON_DAILY' || source.type === 'DUNGEON_FREE') &&
+    source.value >= DUNGEON_FEED_FLOOR
+  )
+    return {
+      text: `vừa xuống tới tầng ${source.value} Hầm Bánh Mì`,
+      kind: 'arena',
+    };
   return null;
 }

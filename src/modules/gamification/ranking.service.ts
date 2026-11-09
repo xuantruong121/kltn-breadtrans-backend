@@ -7,6 +7,7 @@ import {
   RANKING_SIZE,
   activityText,
   leagueStanding,
+  DUNGEON_FEED_FLOOR,
   maskName,
   periodStart,
   xpLevel,
@@ -165,7 +166,16 @@ export class RankingService {
         select: { id: true, winnerUserId: true, settledAt: true },
       }),
       this.prisma.learnerEvent.findMany({
-        where: { user: student },
+        where: {
+          user: student,
+          // Every Hầm Bánh Mì run is an event; only deep ones belong in the
+          // feed, and they are filtered here so shallow runs cannot crowd out
+          // level-ups and streaks before the feed is cut to size.
+          OR: [
+            { type: { notIn: ['DUNGEON_DAILY', 'DUNGEON_FREE'] } },
+            { value: { gte: DUNGEON_FEED_FLOOR } },
+          ],
+        },
         orderBy: { createdAt: 'desc' },
         take: FEED_SIZE,
         select: {

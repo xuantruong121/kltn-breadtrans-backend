@@ -10,6 +10,7 @@ import { QuizModule } from './modules/quiz/quiz.module';
 import { AiModule } from './modules/ai/ai.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
 import { WordBlasterModule } from './modules/word-blaster/word-blaster.module';
+import { DungeonModule } from './modules/dungeon/dungeon.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { SpeakingModule } from './modules/speaking/speaking.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -59,6 +60,7 @@ import { SuggestionModule } from './modules/suggestion/suggestion.module';
     AiModule,
     GamificationModule,
     WordBlasterModule,
+    DungeonModule,
     UploadModule,
     SpeakingModule,
     PrismaModule,
