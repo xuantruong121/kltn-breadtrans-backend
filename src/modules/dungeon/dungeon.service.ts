@@ -31,6 +31,7 @@ import {
   dungeonPayout,
   dungeonXp,
   floorIntroMs,
+  RUN_INTRO_MS,
   hashSeed,
   issueQuestion,
   newRun,
@@ -232,7 +233,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
       last: null,
       result: null,
     };
-    this.ask(session, floorIntroMs(1));
+    this.ask(session, RUN_INTRO_MS);
     try {
       await this.store(session);
       await this.redis.set(KEY.user(userId), id, 'EX', SESSION_TTL_S);

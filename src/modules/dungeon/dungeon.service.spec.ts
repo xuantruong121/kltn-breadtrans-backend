@@ -245,6 +245,8 @@ describe('DungeonService', () => {
     expect(next.floor).toBe(2);
     expect(next.phase).toBe('fight');
     expect(next.question).not.toBeNull();
+    // The map was on the topping screen: the floor opens briefly, no second map.
+    expect(next.questionStartsAt! - next.serverNow).toBe(2000);
   });
 
   it('a boss wants the word typed; beating it then falling pays the ticket back and 10, once', async () => {

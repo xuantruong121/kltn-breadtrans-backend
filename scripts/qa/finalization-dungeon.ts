@@ -481,7 +481,18 @@ async function browser(width: number) {
       .getByRole('button', { name: new RegExp(`(Thường|Hiếm|Quý)`) })
       .first()
       .click();
-    await sleep(600);
+    // Owner 2026-11-09: the map showed twice, over the toppings and again as
+    // the floor opened. After a topping only the monster comes in.
+    const secondMap = await page
+      .locator('[data-dungeon-callout]')
+      .getByText('Lò Ủ Bột')
+      .waitFor({ timeout: 1800 })
+      .then(() => true)
+      .catch(() => false);
+    check(
+      `${tag}: after the topping the map does not show a second time`,
+      !secondMap,
+    );
     const picked = await stored(id);
     check(
       `${tag}: picking a topping goes down to floor 2`,
