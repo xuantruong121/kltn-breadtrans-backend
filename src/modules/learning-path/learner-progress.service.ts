@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import type {
   LearningContentType,
   PracticeLevel,
@@ -63,7 +62,7 @@ export class LearnerProgressService {
     } | null
   >(60_000);
 
-  @OnEvent('quiz.submitted')
+  // Called by LearningEffectsQueueService for every quiz.submitted.
   async onQuizSubmitted(payload: {
     userId: number;
     quizId?: number;

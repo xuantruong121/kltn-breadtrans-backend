@@ -36,6 +36,7 @@ The harness containers must be up (`scripts/qa/finalization-harness.sh container
 ```bash
 docker build --target production -t breadtrans-api:capacity .
 DATABASE_URL=postgresql://harness:harness-disposable@127.0.0.1:5460/<db> FAKE_S3=http://127.0.0.1:9460 \
+  MASTER_FILE=<backend>/artifacts/toeic-listening-master/exam-1/master.mp3 \
   npx ts-node --transpile-only load-tests/capacity/seed-capacity.ts
 load-tests/capacity/run-capacity.sh up <db> S       # profile S, Prisma pool 20 (as production)
 load-tests/capacity/run-capacity.sh run S-run       # about 25 min
@@ -43,6 +44,11 @@ node load-tests/capacity/summarize.mjs load-tests/capacity/out/S-run
 load-tests/capacity/run-capacity.sh run S-spike spike
 load-tests/capacity/run-capacity.sh down
 ```
+
+The TOEIC Listening master is read from the fake private bucket, as production
+reads it from R2 (the API signs a URL); `CAP_LOCAL_MASTER=1` on `up` mounts the
+local build instead. Compare builds on fresh clones: every run adds submissions,
+and a virtual learner's first submissions earn more rewards than later ones.
 
 `up` refuses any database that is not a harness copy. Nothing here calls a
 provider, Cloudflare R2, the owner's database or the owner's servers.

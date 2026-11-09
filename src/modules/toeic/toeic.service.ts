@@ -59,6 +59,20 @@ type ExpiredFinalization = {
   finalized: boolean;
 };
 
+/**
+ * How long a signed Listening master URL lasts: the rest of the attempt plus
+ * 15 min, at most 3 h (a full test is 2 h); an hour to review after submitting.
+ */
+export function listeningMasterUrlTtlSeconds(
+  submitted: boolean,
+  deadline: Date | null,
+  now: Date,
+): number {
+  if (submitted || !deadline) return 3600;
+  const rest = Math.ceil((deadline.getTime() - now.getTime()) / 1000);
+  return Math.min(3 * 3600, Math.max(15 * 60, rest + 15 * 60));
+}
+
 @Injectable()
 export class ToeicService {
   constructor(
@@ -683,7 +697,13 @@ export class ToeicService {
   async getListeningMaster(attemptId: number, userId: number) {
     const attempt = await this.prisma.toeicAttempt.findUnique({
       where: { id: attemptId },
-      select: { userId: true, examId: true, status: true, section: true },
+      select: {
+        userId: true,
+        examId: true,
+        status: true,
+        section: true,
+        deadline: true,
+      },
     });
     if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài.');
     if (attempt.userId !== userId)
@@ -700,14 +720,28 @@ export class ToeicService {
     const groupIds = await this.getListeningManifestGroupIds(attempt.examId);
     if (!masterMatchesGroups(master, groupIds))
       return { available: false as const, reason: 'STALE' };
-    // The learner always gets the API stream path, never the storage URL:
-    // the stream route re-checks the attempt and serves the verified local
-    // build or, failing that, the published object through the backend.
-    if (!(await this.listeningMasterSource(attempt.examId)))
-      return { available: false as const, reason: 'NOT_PUBLISHED' };
+    const source = await this.listeningMasterSource(attempt.examId);
+    if (!source) return { available: false as const, reason: 'NOT_PUBLISHED' };
+    // The private-bucket copy is played from storage through a signed URL
+    // that lasts the rest of the attempt (capacity run 2026-11-09: streaming
+    // it through the API cost CPU and bandwidth for every exam taker; the
+    // audit recommended this, TOEIC_R2_PRIVATE_AUDIO_AUDIT.md §6). The local
+    // build and the legacy public object still go through the stream route,
+    // which re-checks the attempt; a public URL is never handed out.
+    const url =
+      'privateKey' in source && this.uploadService
+        ? await this.uploadService.getPrivatePresignedDownloadUrl(
+            source.privateKey,
+            listeningMasterUrlTtlSeconds(
+              submitted,
+              attempt.deadline,
+              new Date(),
+            ),
+          )
+        : null;
     return {
       available: true as const,
-      url: null,
+      url,
       path: `/toeic/listening-master/${attempt.examId}/audio?grant=${signListeningMasterGrant(
         { examId: attempt.examId, attemptId, userId },
         getJwtSecret(),

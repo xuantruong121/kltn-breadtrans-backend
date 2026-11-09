@@ -10,12 +10,20 @@
  *  - load-tests/capacity/out/capacity-data.json for the k6 scenario.
  *
  *   DATABASE_URL=postgresql://harness:...@127.0.0.1:5460/<db> FAKE_S3=http://127.0.0.1:9460 \
+ *     MASTER_FILE=<backend>/artifacts/toeic-listening-master/exam-1/master.mp3 \
  *     npx ts-node --transpile-only load-tests/capacity/seed-capacity.ts
+ *
+ *  MASTER_FILE puts the TOEIC Listening master for exam 1 in the fake private
+ *  bucket, where production keeps it (the API then signs a URL for it).
  */
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  listeningMasterFor,
+  privateListeningMasterKey,
+} from '../../src/modules/toeic/toeic-listening-master';
 
 const PROTECTED_SYSID = '7674533776495505443'; // kltn_db, the owner's data
 const USERS = Number(process.env.CAPACITY_USERS ?? 1000);
@@ -92,6 +100,18 @@ async function main() {
   for (const t of tracks) {
     await put('harness-public', t.r2Key!, TRACK_BYTES);
     await put('harness-private', t.r2Key!, TRACK_BYTES);
+  }
+
+  // The TOEIC Listening master in the private bucket, where production keeps it.
+  const masterFile = process.env.MASTER_FILE;
+  const examMaster = listeningMasterFor(1);
+  if (masterFile && examMaster) {
+    const body = readFileSync(masterFile);
+    const res = await fetch(
+      `${FAKE_S3}/harness-private/${privateListeningMasterKey(examMaster)}`,
+      { method: 'PUT', body },
+    );
+    if (!res.ok) throw new Error(`fake s3 PUT master: ${res.status}`);
   }
 
   const exam = await prisma.toeicExamSet.findFirst({

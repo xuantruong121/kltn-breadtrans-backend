@@ -1,0 +1,68 @@
+
+
+  █ THRESHOLDS 
+
+    http_req_failed
+    ✗ 'rate<0.01' rate=7.10%
+
+    latency_exam_submit
+    ✗ 'p(95)<1000' p(95)=6.94s
+
+    latency_quiz_submit
+    ✗ 'p(95)<1000' p(95)=15.81s
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 3000   15.965144/s
+    checks_succeeded...: 92.90% 2787 out of 3000
+    checks_failed......: 7.10%  213 out of 3000
+
+    ✓ reading_list 2xx
+    ✓ exam_start 2xx
+    ✓ quiz_detail 2xx
+    ✓ exam_begin 2xx
+    ✓ listening_list 2xx
+    ✗ quiz_submit 2xx
+      ↳  81% — ✓ 541 / ✗ 126
+    ✗ exam_submit 2xx
+      ↳  73% — ✓ 246 / ✗ 87
+
+    CUSTOM
+    bytes_exam_begin...............: 251656  1339.241427/s
+    bytes_exam_start...............: 187664  998.694262/s
+    bytes_exam_submit..............: 775335  4126.111645/s
+    bytes_listening_list...........: 4567175 24305.202205/s
+    bytes_quiz_detail..............: 4198808 22344.858136/s
+    bytes_quiz_submit..............: 559310  2976.488233/s
+    bytes_reading_list.............: 3503503 18644.643317/s
+    errors_exam_submit.............: 87      0.462989/s
+    errors_quiz_submit.............: 126     0.670536/s
+    latency_exam_begin.............: avg=79.22ms  med=59.36ms  p(90)=136.6ms  p(95)=176.83ms p(99)=322.87ms max=419.59ms
+    latency_exam_start.............: avg=139.95ms med=103.52ms p(90)=240.38ms p(95)=294.03ms p(99)=662.3ms  max=791.36ms
+    latency_exam_submit............: avg=4.5s     med=4.54s    p(90)=6.62s    p(95)=6.94s    p(99)=7.64s    max=7.79s   
+    latency_listening_list.........: avg=113.08ms med=76.79ms  p(90)=232.54ms p(95)=271.72ms p(99)=585.14ms max=782.93ms
+    latency_quiz_detail............: avg=43.48ms  med=30.77ms  p(90)=89.33ms  p(95)=119.9ms  p(99)=215.06ms max=488.57ms
+    latency_quiz_submit............: avg=9.56s    med=8.81s    p(90)=14.53s   p(95)=15.81s   p(99)=18.54s   max=18.77s  
+    latency_reading_list...........: avg=118.58ms med=94.44ms  p(90)=201.03ms p(95)=243.11ms p(99)=370.8ms  max=990.4ms 
+    status_5xx.....................: 213     1.133525/s
+
+    HTTP
+    http_req_duration..............: avg=2.68s    med=109.09ms p(90)=9.44s    p(95)=12.35s   p(99)=16.03s   max=18.77s  
+      { expected_response:true }...: avg=2.37s    med=95.24ms  p(90)=9.1s     p(95)=12.34s   p(99)=16.17s   max=18.77s  
+    http_req_failed................: 7.10%   213 out of 3000
+    http_reqs......................: 3000    15.965144/s
+
+    EXECUTION
+    iteration_duration.............: avg=2m47s    med=2m48s    p(90)=3m0s     p(95)=3m3s     p(99)=3m6s     max=3m7s    
+    iterations.....................: 1000    5.321715/s
+    vus............................: 1       min=0           max=1000
+    vus_max........................: 1000    min=251         max=1000
+
+    NETWORK
+    data_received..................: 15 MB   81 kB/s
+    data_sent......................: 1.5 MB  8.1 kB/s
+
+
+
+time="2026-11-09T16:57:54Z" level=error msg="thresholds on metrics 'http_req_failed, latency_exam_submit, latency_quiz_submit' have been crossed"

@@ -15,6 +15,19 @@ PRODUCTION_VPS=NOT_VERIFIED       measured on this machine, not on a VPS
 PRIOR_500_FIGURE=NOT_FOUND        no earlier result exists in the repo
 ```
 
+Follow-up the next day (§7): rewards moved to a queue, the TOEIC Listening
+master played through a signed URL, rankings computed once a minute. On fresh
+data, where every learner is new and every submission earns first-time
+rewards (the heaviest case):
+
+```
+FRESH_DATA_RAMP_1000=FAIL(p95)    p95 1.75 s, p99 3.13 s, errors 0.13% (C-head)
+                                  before these changes: p95 4.58 s, p99 9.15 s (C-prev)
+SPIKE_1000_SUBMIT_IN_30S=PASS(errors) FAIL(p95)  submit p95 1.24 s, errors 0.00% (C-head-spike)
+                                  before: p95 15.8 s, errors 7.10% (C-prev-spike)
+PRISMA_UPGRADE=NOT_DONE           impact large, gain unproven (§7.3)
+```
+
 ## 1. What was measured
 
 **Environment.** The production image (`Dockerfile`, target `production`) with
@@ -122,7 +135,8 @@ Half of the API's CPU is Prisma's query engine (Rust threads in the same
 process, measured per thread) and much of the rest is building and reading
 Prisma requests. Per request the floor is ~6 ms; a submission ~75-100 ms.
 
-Next steps if more headroom is needed (not done):
+Next steps if more headroom is needed (followed up on 2026-11-10: the queue and
+the signed master URL were done, the Prisma upgrade was not; see §7):
 
 - **Submission side effects to a queue.** Rewards, quests, badges and skill
   level run in the request's process; moving them to the BullMQ worker that
@@ -165,4 +179,79 @@ LISTENING_BROWSER=PASS      scripts/qa/finalization-listening-audio-url.ts 11/11
                             audio bytes through the API)
 ```
 
+Follow-up (§7):
+
+```
+TOEIC_MASTER_BROWSER=PASS   scripts/qa/finalization-toeic-master-signed.ts 6/6
+                            (signed URL, plays from storage, seeks, renews once)
+LISTENING_BROWSER=PASS      re-run, 0 failures
+REWARDS_VIA_QUEUE=PASS      new learner: +18 Bánh Mì, +30 XP 347 ms after submit
+FRONTEND_TEST_CI=PASS       957 passed
+BACKEND_JEST_HARNESS=PASS   2703 passed, 1 skipped; lint:check and typecheck clean
+```
+
 Reproduce: `load-tests/capacity/README.md`.
+
+## 7. Follow-up: more headroom (2026-11-10)
+
+The owner approved three items from §4: the reward queue "if suitable", the
+Prisma upgrade "if suitable", the signed TOEIC master URL "if the impact is
+small". A fourth was found while measuring them.
+
+### 7.1 What changed
+
+1. **Rewards from a queue** (`gamification/learning-effects-queue.service.ts`).
+   `quiz.submitted` used to start the reward work (XP, pet, Bánh Mì, badges,
+   daily quests, skill level; ~37 queries, 75-100 ms of CPU) straight away in
+   the request's process. A BullMQ queue in the API now runs it two
+   submissions at a time; a rush waits in the queue. One attempt per job (quest
+   progress is a counter); the quest day is the day of submission; if Redis
+   cannot take the job within 2 s it runs at once, as before; the speaking
+   worker process starts no queue. On the harness a new learner's submission
+   showed +18 Bánh Mì and +30 XP 347 ms later.
+2. **TOEIC Listening master through a signed URL.** When the master is in the
+   private bucket, `GET /toeic/attempts/:id/listening/master` returns a signed
+   URL lasting the rest of the attempt + 15 min (at most 3 h; 1 h in review),
+   as the audit had recommended (`Project/TOEIC_R2_PRIVATE_AUDIO_AUDIT.md` §6).
+   The local build and the legacy public object still stream through the API
+   with its grant; a public URL is never handed out. The exam page renews the
+   URL once if it stops working and resumes where the learner was.
+3. **Rankings once a minute** (`ranking.service.ts`). The day and month XP
+   rankings added up the whole PointHistory on every request; with ~17,000
+   submissions the ranking page took 9-12 s at p95. Every learner's standing
+   per metric and period is now computed once a minute (top list, total and
+   anyone's rank from it); a learner's own value is still read live.
+
+### 7.2 Same method, fresh data, before and after
+
+Each build on its own fresh clone with the same seed, so every learner is new
+and every submission earns first-time rewards: heavier than §2, where the
+virtual learners had already done the exercises in earlier runs.
+
+| | Before (C-prev) | After (C-head) |
+|---|---|---|
+| Ramp to 1000: p95 / p99 | 4.58 s / 9.15 s | 1.75 s / 3.13 s |
+| Ramp: errors | 0.15% | 0.13% |
+| Ramp: holds with p95 < 1.5 s | ~870 | ~950 |
+| Spike: reading/listening submit p95 | 15.8 s | 1.24 s |
+| Spike: TOEIC submit p95 | 6.9 s | 1.09 s |
+| Spike: errors | 7.10% | 0.00% |
+| Ranking p95 (ramp) | 12.1 s | 1.66 s |
+| Bytes the API sends (peak) | 24 Mbps | 5 Mbps |
+
+On this heaviest case 1000 learners do not yet meet p95 < 1 s (1.75 s); with
+returning learners (§2) they do (0.52 s).
+
+### 7.3 Prisma upgrade: not done
+
+- **Impact:** 135 files create `new PrismaClient()` (scripts, seed, tests) and
+  would all need a driver adapter (`@prisma/adapter-pg`); 53 raw queries to
+  re-check; the pool moves from `connection_limit` to the `pg` pool; Prisma 7
+  also changes the generator, its output path and `.env` loading.
+- **Gain unproven:** Prisma says its query compiler runs on the JavaScript main
+  thread and, once warm, performs "in line with Prisma 6". That thread is the
+  bottleneck here.
+- **Revisit** only with a throwaway branch measured on this harness, if the
+  target goes well beyond 1000 on 2 vCPU.
+
+Full tables: `capacity-1000/C-head*.md`, `capacity-1000/C-prev*.md`.

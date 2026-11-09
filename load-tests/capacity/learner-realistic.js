@@ -65,6 +65,7 @@ const ENDPOINTS = [
   'exam_detail',
   'exam_master',
   'exam_audio',
+  'exam_audio_storage',
   'exam_answers',
   'exam_submit',
   'exam_result',
@@ -341,7 +342,17 @@ function exam(tok, submitNow = true) {
   );
   // The browser streams the Listening master in ranges; the first megabyte
   // covers about two minutes at 64 kbps.
-  if (master && master.path)
+  // A signed URL plays from storage; otherwise the API streams it.
+  if (master && master.url)
+    req(
+      'exam_audio_storage',
+      'GET',
+      master.url.replace(/^https?:\/\/[^/]+/, STORAGE),
+      null,
+      null,
+      { binary: true, absolute: true, headers: { Range: 'bytes=0-1048575' } },
+    );
+  else if (master && master.path)
     req('exam_audio', 'GET', master.path, tok, null, {
       binary: true,
       headers: { Range: 'bytes=0-1048575' },
@@ -391,7 +402,9 @@ function vocab(tok) {
 }
 
 function spike(user) {
-  // Everyone prepares (not the measured part), then all submit within 30 s.
+  // Everyone prepares over 90 s (not the measured part), then all submit
+  // within the same 30 s.
+  sleep(Math.random() * 90);
   const tok = token(user);
   const kind = __VU % 3;
   let submit;
@@ -443,9 +456,9 @@ function spike(user) {
     submit = () =>
       id && req('exam_submit', 'POST', `/toeic/attempts/${id}/submit`, tok);
   }
-  // All learners are ready by 120 s after the start; then a 30 s window.
+  // All learners are ready by 150 s after the start; then a 30 s window.
   const wait =
-    Number(__ENV.SPIKE_AT || 120) -
+    Number(__ENV.SPIKE_AT || 150) -
     (Date.now() - Number(__ENV.T0 || Date.now())) / 1000 +
     Math.random() * 30;
   if (wait > 0) sleep(wait);

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, ReferralStatus, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TtlMemo } from '../../common/utils/ttl-memo';
 import {
   RANKING_METRICS,
   RANKING_PERIODS,
@@ -57,9 +58,42 @@ const STUDY_TYPES = [
  * league standing; a hall of fame; and a feed of recent learning with masked
  * names. Learners only (role STUDENT).
  */
+/** How long a computed standing is reused (see standings()). */
+export const RANKING_CACHE_MS = 60_000;
+
 @Injectable()
 export class RankingService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Every learner's value for a metric and period, best first, computed once
+   * a minute. The day and month XP rankings add up the whole PointHistory,
+   * which grows with every XP award: per request, the ranking page took 9 s at
+   * p95 once a few thousand submissions had piled up (capacity run
+   * 2026-11-09). The top list, the total and anyone's rank now come from
+   * here; a learner's own value is still read live.
+   */
+  private readonly standingsMemo = new TtlMemo<
+    string,
+    { list: { userId: number; value: number }[]; desc: number[] }
+  >(RANKING_CACHE_MS);
+  private readonly entriesMemo = new TtlMemo<string, RankingEntry[]>(
+    RANKING_CACHE_MS,
+  );
+
+  private standings(
+    metric: RankingMetric,
+    period: RankingPeriod,
+    start: Date | null,
+  ) {
+    return this.standingsMemo.get(
+      `${metric}:${period}:${start?.toISOString() ?? 'all'}`,
+      async () => {
+        const list = await this.load(metric, period, start);
+        return { list, desc: list.map((r) => r.value) };
+      },
+    );
+  }
 
   async getRanking(
     metricRaw: string | undefined,
@@ -72,15 +106,20 @@ export class RankingService {
       throw new BadRequestException('Tiêu chí hoặc kỳ xếp hạng không hợp lệ.');
 
     const start = periodStart(period, new Date());
-    const rows = await this.top(metric, period, start);
-    const people = await this.people(rows.map((r) => r.userId));
-    const entries: RankingEntry[] = rows
-      .filter((r) => people.has(r.userId))
-      .map((r, i) => ({
-        rank: i + 1,
-        ...people.get(r.userId)!,
-        value: r.value,
-      }));
+    const entries = await this.entriesMemo.get(
+      `${metric}:${period}:${start?.toISOString() ?? 'all'}`,
+      async () => {
+        const rows = await this.top(metric, period, start);
+        const people = await this.people(rows.map((r) => r.userId));
+        return rows
+          .filter((r) => people.has(r.userId))
+          .map((r, i) => ({
+            rank: i + 1,
+            ...people.get(r.userId)!,
+            value: r.value,
+          }));
+      },
+    );
 
     let me: Record<string, unknown> | null = null;
     if (currentUserId) {
@@ -274,6 +313,15 @@ export class RankingService {
     start: Date | null,
     take = RANKING_SIZE,
   ): Promise<{ userId: number; value: number }[]> {
+    return (await this.standings(metric, period, start)).list.slice(0, take);
+  }
+
+  /** Every learner with a value above zero, best first (ties as before). */
+  private async load(
+    metric: RankingMetric,
+    period: RankingPeriod,
+    start: Date | null,
+  ): Promise<{ userId: number; value: number }[]> {
     const student = { role: Role.STUDENT };
     if (metric === 'xp' && (period === 'week' || period === 'all')) {
       const field = period === 'week' ? 'weeklyExp' : 'totalPoints';
@@ -284,7 +332,6 @@ export class RankingService {
           { totalPoints: 'desc' },
           { userId: 'asc' },
         ],
-        take,
         select: { userId: true, weeklyExp: true, totalPoints: true },
       });
       return rows.map((r) => ({ userId: r.userId, value: r[field] }));
@@ -297,14 +344,13 @@ export class RankingService {
         FROM "PointHistory" ph JOIN "User" u ON u.id = ph."userId"
         WHERE u.role = 'STUDENT' AND ph."createdAt" >= ${start}
         GROUP BY ph."userId" HAVING SUM(ph.points) > 0
-        ORDER BY value DESC, ph."userId" ASC LIMIT ${take}`;
+        ORDER BY value DESC, ph."userId" ASC`;
       return rows.map((r) => ({ userId: r.userId, value: Number(r.value) }));
     }
     if (metric === 'streak') {
       const rows = await this.prisma.userStats.findMany({
         where: { streakCount: { gt: 0 }, user: student },
         orderBy: [{ streakCount: 'desc' }, { userId: 'asc' }],
-        take,
         select: { userId: true, streakCount: true },
       });
       return rows.map((r) => ({ userId: r.userId, value: r.streakCount }));
@@ -317,7 +363,7 @@ export class RankingService {
       WHERE u.role = 'STUDENT' AND r.status = ${ReferralStatus.REWARDED}::"ReferralStatus"
         ${start ? Prisma.sql`AND r."rewardedAt" >= ${start}` : Prisma.empty}
       GROUP BY r."referrerId"
-      ORDER BY value DESC, r."referrerId" ASC LIMIT ${take}`;
+      ORDER BY value DESC, r."referrerId" ASC`;
     return rows.map((r) => ({ userId: r.userId, value: Number(r.value) }));
   }
 
@@ -364,32 +410,16 @@ export class RankingService {
     start: Date | null,
     value: number,
   ) {
-    const student = { role: Role.STUDENT };
-    if (metric === 'xp' && (period === 'week' || period === 'all')) {
-      const field = period === 'week' ? 'weeklyExp' : 'totalPoints';
-      return this.prisma.leaderboard.count({
-        where: { [field]: { gt: value }, user: student },
-      });
+    const { desc } = await this.standings(metric, period, start);
+    // `desc` is sorted best first: find the first value not above `value`.
+    let lo = 0;
+    let hi = desc.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (desc[mid] > value) lo = mid + 1;
+      else hi = mid;
     }
-    if (metric === 'xp') {
-      const [row] = await this.prisma.$queryRaw<{ n: number }[]>`
-        SELECT COUNT(*)::int AS n FROM (
-          SELECT ph."userId" FROM "PointHistory" ph JOIN "User" u ON u.id = ph."userId"
-          WHERE u.role = 'STUDENT' AND ph."createdAt" >= ${start}
-          GROUP BY ph."userId" HAVING SUM(ph.points) > ${value}) t`;
-      return Number(row?.n ?? 0);
-    }
-    if (metric === 'streak')
-      return this.prisma.userStats.count({
-        where: { streakCount: { gt: value }, user: student },
-      });
-    const [row] = await this.prisma.$queryRaw<{ n: number }[]>`
-      SELECT COUNT(*)::int AS n FROM (
-        SELECT r."referrerId" FROM "Referral" r JOIN "User" u ON u.id = r."referrerId"
-        WHERE u.role = 'STUDENT' AND r.status = ${ReferralStatus.REWARDED}::"ReferralStatus"
-          ${start ? Prisma.sql`AND r."rewardedAt" >= ${start}` : Prisma.empty}
-        GROUP BY r."referrerId" HAVING COUNT(*) > ${value}) t`;
-    return Number(row?.n ?? 0);
+    return lo;
   }
 
   /** How many learners have a value above zero. */

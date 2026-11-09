@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { GamificationService } from './gamification.service';
 import { GamificationController } from './gamification.controller';
 import { GamificationListener } from './gamification.listener';
+import { LearningEffectsQueueService } from './learning-effects-queue.service';
 import { RankingController } from './ranking.controller';
 import { RankingService } from './ranking.service';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -12,6 +13,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
   providers: [
     GamificationService,
     GamificationListener,
+    LearningEffectsQueueService,
     RewardEligibilityService,
     RankingService,
   ],

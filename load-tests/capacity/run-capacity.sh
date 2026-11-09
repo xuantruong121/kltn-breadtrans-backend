@@ -60,7 +60,15 @@ case "${1:-}" in
       export CAP_CPUSET="$CPUSET"
     fi
     export CAP_DATABASE_URL="postgresql://harness:harness-disposable@host.docker.internal:5460/$DB?schema=public&connection_limit=$POOL&pool_timeout=10"
-    export CAP_MASTER_DIR="${CAP_MASTER_DIR:-D:/Study/KLTN/Project/kltn-breadtrans-backend/artifacts/toeic-listening-master}"
+    # By default no local TOEIC master build is mounted: like production, the
+    # API finds the master in the private bucket (seed-capacity.ts puts it in
+    # the fake one). CAP_LOCAL_MASTER=1 mounts the local build instead.
+    mkdir -p "$OUT/no-local-master"
+    if [ "${CAP_LOCAL_MASTER:-}" = 1 ]; then
+      export CAP_MASTER_DIR="${CAP_MASTER_DIR:-D:/Study/KLTN/Project/kltn-breadtrans-backend/artifacts/toeic-listening-master}"
+    else
+      export CAP_MASTER_DIR="$(cd "$OUT/no-local-master" && (pwd -W 2>/dev/null || pwd))"
+    fi
     if [ "${CAP_SPLIT:-}" = 1 ]; then
       export CAP_API_CPUS="$(scale 1.1 $K)" CAP_CADDY_CPUS="$(scale 0.15 $K)"
     else
