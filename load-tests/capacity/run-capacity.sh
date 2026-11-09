@@ -130,7 +130,11 @@ case "${1:-}" in
     echo "k6 exit $K6 -> $R"
     ;;
   down)
-    compose_quiet --profile two-apis down || true
+    compose_quiet --profile two-apis down || echo "compose down failed; removing the containers directly" >&2
+    # Whatever compose left behind (it failed silently once and kept the stack up).
+    left=$(docker ps -aq --filter label=com.docker.compose.project=breadtrans-capacity)
+    [ -n "$left" ] && docker rm -f $left >/dev/null && echo "removed leftover capacity containers"
+    docker network rm breadtrans-capacity_default >/dev/null 2>&1 || true
     docker update --cpus "$(docker info --format "{{.NCPU}}")" --cpuset-cpus "0-$(( $(docker info --format "{{.NCPU}}") - 1 ))" --memory 8g --memory-swap 8g $PG $REDIS >/dev/null || true
     rm -f "$STATE"
     echo "capacity stack down; harness Postgres/Redis limits lifted"
