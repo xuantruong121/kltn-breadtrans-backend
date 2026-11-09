@@ -1,0 +1,95 @@
+# The production API and Caddy on a VPS-sized slice of this machine ("Cheap 4",
+# 2 vCPU / 4 GB, owner 2026-11-09). Postgres and Redis are the harness
+# containers (127.0.0.1:5460 / :6392). run-capacity.sh pins all four to the same
+# 2 CPUs (profile M: 4), so they share them as on a VPS, and runs k6 on the
+# others. CAP_SPLIT=1 gives each a fixed share instead (API 1.1, Postgres 0.6,
+# Redis 0.15, Caddy 0.15), which starved the API in the first runs.
+#
+# Never point this at kltn_db: run-capacity.sh refuses anything but a harness DB.
+name: breadtrans-capacity
+
+x-api: &api
+  image: ${CAP_IMAGE:-breadtrans-api:capacity}
+  # The harness database is already migrated; skip the entrypoint's migrate.
+  command: ["node", "dist/src/main.js"]
+  restart: "no"
+  extra_hosts: ["host.docker.internal:host-gateway"]
+  environment:
+    NODE_ENV: production
+    PORT: "3000"
+    DATABASE_URL: ${CAP_DATABASE_URL:?CAP_DATABASE_URL is required}
+    SHADOW_DATABASE_URL: postgresql://refused:refused@127.0.0.1:9/no_shadow
+    REDIS_URL: redis://host.docker.internal:6392
+    REDIS_HOST: host.docker.internal
+    REDIS_PORT: "6392"
+    JWT_SECRET: capacity-isolated-jwt-secret
+    OTP_SECRET: capacity-isolated-otp-secret
+    # Every virtual learner comes from one machine; real learners have their
+    # own addresses. The per-IP limit would otherwise throttle the test itself.
+    THROTTLER_LIMIT: "100000"
+    PHASE812_RUNTIME_METRICS: "true"
+    # As production (docker-compose.production.yml). For a CPU profile:
+    # CAP_NODE_OPTIONS="--max-semi-space-size=32 --inspect=0.0.0.0:9229".
+    NODE_OPTIONS: ${CAP_NODE_OPTIONS:---max-semi-space-size=32}
+    TOEIC_MASTER_ON_PUBLISH: skip
+    # No provider is ever called.
+    GEMINI_API_KEYS: ""
+    GEMINI_API_KEY: ""
+    AZURE_SPEECH_KEY: ""
+    AZURE_SPEECH_REGION: ""
+    MOCK_AZURE_SPEECH: "true"
+    DIAGNOSTIC_GRADER_MODE: mock
+    PAYOS_CLIENT_ID: ""
+    PAYOS_API_KEY: ""
+    PAYOS_CHECKSUM_KEY: ""
+    CLOUDFLARE_AI_API_TOKEN: ""
+    # A throwaway pair made by run-capacity.sh up; production refuses to start without one.
+    VAPID_PRIVATE_KEY: ${CAP_VAPID_PRIVATE:?run through run-capacity.sh}
+    VAPID_PUBLIC_KEY: ${CAP_VAPID_PUBLIC:?run through run-capacity.sh}
+    R2_ACCOUNT_ID: ""
+    R2_ACCESS_KEY_ID: ""
+    R2_SECRET_ACCESS_KEY: ""
+    R2_BACKUP_ACCESS_KEY_ID: ""
+    R2_BACKUP_SECRET_ACCESS_KEY: ""
+    R2_BACKUP_ENDPOINT: ""
+    LOCAL_S3_ENDPOINT: http://host.docker.internal:9460
+    LOCAL_S3_BUCKET: harness-public
+    LOCAL_S3_ACCESS_KEY_ID: harness
+    LOCAL_S3_SECRET_ACCESS_KEY: harness
+    LOCAL_S3_PUBLIC_URL: http://host.docker.internal:9460/harness-public
+    R2_PRIVATE_ENDPOINT: http://host.docker.internal:9460
+    R2_PRIVATE_BUCKET_NAME: harness-private
+    R2_PRIVATE_ACCESS_KEY_ID: harness
+    R2_PRIVATE_SECRET_ACCESS_KEY: harness
+    R2_PRIVATE_FORCE_PATH_STYLE: "true"
+    TOEIC_LISTENING_MASTER_BASE_URL: http://host.docker.internal:9460/harness-public
+  volumes:
+    # The TOEIC Listening master, served by the API with byte ranges.
+    - ${CAP_MASTER_DIR:?CAP_MASTER_DIR is required}:/app/artifacts/toeic-listening-master:ro
+
+services:
+  api:
+    <<: *api
+    cpus: ${CAP_API_CPUS:-0}
+    cpuset: ${CAP_CPUSET:-}
+    mem_limit: ${CAP_API_MEM:-1400m}
+    ports: ["127.0.0.1:9229:9229"]
+
+  # Only started with --profile two-apis (step B4).
+  api-2:
+    <<: *api
+    profiles: ["two-apis"]
+    cpus: ${CAP_API_CPUS:-0}
+    cpuset: ${CAP_CPUSET:-}
+    mem_limit: ${CAP_API_MEM:-1400m}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: "no"
+    cpus: ${CAP_CADDY_CPUS:-0}
+    cpuset: ${CAP_CPUSET:-}
+    mem_limit: 128m
+    ports: ["127.0.0.1:3201:80"]
+    volumes:
+      - ./${CAP_CADDYFILE:-Caddyfile.capacity}:/etc/caddy/Caddyfile:ro
+    depends_on: [api]

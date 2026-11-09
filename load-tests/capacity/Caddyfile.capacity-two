@@ -1,0 +1,10 @@
+# Step B4: REST shared by two APIs; every /socket.io request goes to the
+# first one, so the Vocabulary Duel's round timers stay on a single process.
+:80 {
+	encode gzip
+	@socket path /socket.io/*
+	reverse_proxy @socket api:3000
+	reverse_proxy api:3000 api-2:3000 {
+		lb_policy least_conn
+	}
+}
