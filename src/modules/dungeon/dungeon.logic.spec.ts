@@ -15,6 +15,8 @@ import {
   dailySeed,
   dungeonPayout,
   dungeonXp,
+  floorIntroMs,
+  isChapterStart,
   hitDamage,
   isBossFloor,
   issueQuestion,
@@ -85,6 +87,14 @@ function answer(run: RunState, bank: BankEntry[], right: boolean, ms = 1000) {
 }
 
 describe('floors and monsters', () => {
+  it('a floor opens for longer at a new chapter and longest for a boss', () => {
+    expect(floorIntroMs(1)).toBe(3000);
+    expect(floorIntroMs(2)).toBe(2200);
+    expect(floorIntroMs(5)).toBe(3500);
+    expect(floorIntroMs(6)).toBe(3000);
+    expect(isChapterStart(11)).toBe(true);
+    expect(isChapterStart(10)).toBe(false);
+  });
   it('every fifth floor is a boss with twice the health', () => {
     expect([1, 4, 5, 10].map(isBossFloor)).toEqual([false, false, true, true]);
     expect(monsterHp(1)).toBe(60);

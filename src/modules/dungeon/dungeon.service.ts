@@ -30,6 +30,7 @@ import {
   dailySeed,
   dungeonPayout,
   dungeonXp,
+  floorIntroMs,
   hashSeed,
   issueQuestion,
   newRun,
@@ -138,8 +139,6 @@ const MIN_BANK = 20;
  */
 const REVEAL_RIGHT_MS = 800;
 const REVEAL_WRONG_MS = 1600;
-const FLOOR_INTRO_MS = 1500;
-const RUN_INTRO_MS = 2500;
 
 /**
  * Hầm Bánh Mì, decided by the server: the answers and the clock stay here,
@@ -233,7 +232,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
       last: null,
       result: null,
     };
-    this.ask(session, RUN_INTRO_MS);
+    this.ask(session, floorIntroMs(1));
     try {
       await this.store(session);
       await this.redis.set(KEY.user(userId), id, 'EX', SESSION_TTL_S);
@@ -324,7 +323,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException('Topping này không có trong lựa chọn.');
       session.run = pickTopping(session.run, topping);
       session.last = null;
-      this.ask(session, FLOOR_INTRO_MS);
+      this.ask(session, floorIntroMs(session.run.floor));
       await this.store(session);
       return this.view(session);
     });

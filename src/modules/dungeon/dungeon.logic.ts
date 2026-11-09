@@ -83,6 +83,21 @@ export type MonsterKind = (typeof MONSTERS)[number] | (typeof BOSSES)[number];
 
 export const isBossFloor = (floor: number) => floor % BOSS_EVERY === 0;
 
+/** The first floor of a chapter (every five floors: 1, 6, 11...). */
+export const isChapterStart = (floor: number) => floor % BOSS_EVERY === 1;
+
+/**
+ * How long the page shows a floor's opening before its first question's
+ * clock starts (owner 2026-11-09: a floor map, a chapter card, a boss's
+ * entrance): a boss 3.5 s, a new chapter (floor 1 too) 3 s, any other floor
+ * 2.2 s.
+ */
+export function floorIntroMs(floor: number): number {
+  if (isBossFloor(floor)) return 3500;
+  if (isChapterStart(floor)) return 3000;
+  return 2200;
+}
+
 export function monsterHp(floor: number): number {
   const normal = 60 + 18 * (floor - 1);
   return isBossFloor(floor) ? normal * 2 : normal;
