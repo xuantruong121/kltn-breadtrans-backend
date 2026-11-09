@@ -22,7 +22,9 @@ mkdir -p "$OUT"
 
 # logs / down need the variables compose interpolates, not their values.
 compose_quiet() {
-  (cd "$DIR" && CAP_DATABASE_URL="${CAP_DATABASE_URL:-x}" CAP_MASTER_DIR="${CAP_MASTER_DIR:-x}" \n    CAP_VAPID_PUBLIC="${CAP_VAPID_PUBLIC:-x}" CAP_VAPID_PRIVATE="${CAP_VAPID_PRIVATE:-x}" \n    MSYS_NO_PATHCONV=1 docker compose -f compose.capacity.yml "$@")
+  (cd "$DIR" && CAP_DATABASE_URL="${CAP_DATABASE_URL:-x}" CAP_MASTER_DIR="${CAP_MASTER_DIR:-x}" \
+    CAP_VAPID_PUBLIC="${CAP_VAPID_PUBLIC:-x}" CAP_VAPID_PRIVATE="${CAP_VAPID_PRIVATE:-x}" \
+    MSYS_NO_PATHCONV=1 docker compose -f compose.capacity.yml "$@")
 }
 
 scale() { awk -v a="$1" -v b="$2" 'BEGIN { printf "%g", a * b }'; }
