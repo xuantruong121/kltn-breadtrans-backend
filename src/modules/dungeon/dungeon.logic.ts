@@ -89,13 +89,14 @@ export const isChapterStart = (floor: number) => floor % BOSS_EVERY === 1;
 /**
  * How long the page shows a floor's opening before its first question's
  * clock starts (owner 2026-11-09: a floor map, a chapter card, a boss's
- * entrance): a boss 3.5 s, a new chapter (floor 1 too) 3 s, any other floor
- * 2.2 s.
+ * entrance): a boss 4.5 s, a new chapter (floor 1 too) 4 s, any other floor
+ * 3.2 s.
  */
 export function floorIntroMs(floor: number): number {
-  if (isBossFloor(floor)) return 3500;
-  if (isChapterStart(floor)) return 3000;
-  return 2200;
+  // Owner 2026-11-09: the floor map went by before it could be read.
+  if (isBossFloor(floor)) return 4500;
+  if (isChapterStart(floor)) return 4000;
+  return 3200;
 }
 
 export function monsterHp(floor: number): number {

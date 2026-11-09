@@ -161,8 +161,8 @@ describe('DungeonService', () => {
     );
     expect(view.phase).toBe('fight');
     // The first question's clock starts after the intro, not while the page shows it.
-    expect(view.questionStartsAt).toBe(now + 3000);
-    expect(view.questionDeadline).toBe(now + 3000 + 10_000);
+    expect(view.questionStartsAt).toBe(now + 4000);
+    expect(view.questionDeadline).toBe(now + 4000 + 10_000);
     expect(view.question?.type).toBe('choice');
     // The question itself carries no answer; stats.correct is the count of right answers.
     expect(JSON.stringify(view.question)).not.toMatch(

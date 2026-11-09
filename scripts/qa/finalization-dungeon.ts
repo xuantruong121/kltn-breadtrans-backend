@@ -407,7 +407,33 @@ async function browser(width: number) {
     .then(() => true)
     .catch(() => false);
   check(`${tag}: the run opens on "Tầng 1"`, intro);
+  const mapSeenAt = Date.now();
   await page.screenshot({ path: `${SHOTS}/dungeon-intro-${tag}.png` });
+  // Owner 2026-11-09: the map went by before it could be read (about 0.9 s).
+  await page
+    .locator('[data-dungeon-callout]')
+    .getByText('Lò Ủ Bột')
+    .waitFor({ state: 'hidden', timeout: 10_000 })
+    .catch(() => undefined);
+  const mapMs = Date.now() - mapSeenAt;
+  check(
+    `${tag}: the opening map stays at least 1.8 s`,
+    intro && mapMs >= 1800,
+    `${mapMs} ms`,
+  );
+  // The monsters are Kenney's sprites now; none of them fails to load.
+  const sprites = await page.evaluate(() =>
+    [
+      ...document.querySelectorAll<HTMLImageElement>(
+        'img[src*="/images/dungeon/kenney/"]',
+      ),
+    ].map((img) => img.complete && img.naturalWidth > 0),
+  );
+  check(
+    `${tag}: the monster is drawn from the Kenney sprites, all loaded`,
+    sprites.length > 0 && sprites.every(Boolean),
+    `${sprites.filter(Boolean).length}/${sprites.length}`,
+  );
   check(
     `${tag}: the game hides the site header`,
     (await page.locator('header nav').count()) === 0 ||
@@ -444,6 +470,11 @@ async function browser(width: number) {
       .then(() => true)
       .catch(() => false);
     check(`${tag}: a floor cleared deals three toppings`, choosing);
+    check(
+      `${tag}: the floor map stays over the toppings, floor 2 next`,
+      (await page.getByText('Tiếp theo · Chương 1').count()) === 1 &&
+        (await page.getByText('Tầng 2', { exact: true }).count()) >= 1,
+    );
     await page.screenshot({ path: `${SHOTS}/dungeon-toppings-${tag}.png` });
     const firstOffer = (await stored(id)).run.offers[0];
     await page
@@ -469,6 +500,10 @@ async function browser(width: number) {
     check(
       `${tag}: a reload comes back to the run; the floor 5 boss asks for a typed word`,
       bossBox,
+    );
+    check(
+      `${tag}: the boss wears its crown`,
+      (await page.locator('[data-boss-crown]').count()) === 1,
     );
     await page.screenshot({ path: `${SHOTS}/dungeon-boss-${tag}.png` });
     for (

@@ -88,10 +88,10 @@ function answer(run: RunState, bank: BankEntry[], right: boolean, ms = 1000) {
 
 describe('floors and monsters', () => {
   it('a floor opens for longer at a new chapter and longest for a boss', () => {
-    expect(floorIntroMs(1)).toBe(3000);
-    expect(floorIntroMs(2)).toBe(2200);
-    expect(floorIntroMs(5)).toBe(3500);
-    expect(floorIntroMs(6)).toBe(3000);
+    expect(floorIntroMs(1)).toBe(4000);
+    expect(floorIntroMs(2)).toBe(3200);
+    expect(floorIntroMs(5)).toBe(4500);
+    expect(floorIntroMs(6)).toBe(4000);
     expect(isChapterStart(11)).toBe(true);
     expect(isChapterStart(10)).toBe(false);
   });
