@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import type {
   LearningContentType,
   PracticeLevel,
   PracticeSkill,
   Prisma,
+  QuizType,
 } from '@prisma/client';
 
 import {
@@ -12,6 +12,7 @@ import {
   isRewardableSpeakingExercise,
 } from '../gamification/reward-eligibility';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TtlMemo } from '../../common/utils/ttl-memo';
 import { parseCefrRange } from '../subscription/practice-level';
 import { itemLevel, seedDifficulty, updateAfterAttempt } from './ability.logic';
 import { ABILITY_SEED, levelsUpTo, maxLevel } from './placement.logic';
@@ -50,7 +51,18 @@ export class LearnerProgressService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  @OnEvent('quiz.submitted')
+  private readonly quizFacts = new TtlMemo<
+    number,
+    {
+      id: number;
+      type: QuizType;
+      title: string;
+      practiceTopicId: number | null;
+      toeicWritingSetItems: { id: number }[];
+    } | null
+  >(60_000);
+
+  // Called by LearningEffectsQueueService for every quiz.submitted.
   async onQuizSubmitted(payload: {
     userId: number;
     quizId?: number;
@@ -78,16 +90,20 @@ export class LearnerProgressService {
     scorePercent: number;
   }) {
     try {
-      const quiz = await this.prisma.quiz.findUnique({
-        where: { id: input.quizId },
-        select: {
-          id: true,
-          type: true,
-          title: true,
-          practiceTopicId: true,
-          toeicWritingSetItems: { select: { id: true }, take: 1 },
-        },
-      });
+      // A quiz's type, CEFR tag and set membership: kept 60 s (see TtlMemo).
+      const quizId = input.quizId;
+      const quiz = await this.quizFacts.get(quizId, () =>
+        this.prisma.quiz.findUnique({
+          where: { id: quizId },
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            practiceTopicId: true,
+            toeicWritingSetItems: { select: { id: true }, take: 1 },
+          },
+        }),
+      );
       if (!quiz) return null;
       const skill = QUIZ_SKILL[quiz.type];
       const range = parseCefrRange(quiz.title);

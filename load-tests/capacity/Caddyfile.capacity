@@ -1,0 +1,5 @@
+# As the production Caddyfile, minus TLS: proxy to the API, gzip.
+:80 {
+	reverse_proxy api:3000
+	encode gzip
+}

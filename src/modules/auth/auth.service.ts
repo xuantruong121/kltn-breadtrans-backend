@@ -15,6 +15,7 @@ import {
   LinkGoogleAccountDto,
 } from './dto/auth.dto';
 import * as bcrypt from 'bcrypt';
+import { forgetAuthUser } from './auth-user-cache';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
@@ -127,6 +128,7 @@ export class AuthService {
       where: { id: userId },
       data: { password, mustChangePassword: false },
     });
+    forgetAuthUser(userId);
     await this.redis.del(userTokenKey);
 
     const sessionKeys = await this.redis.keys(`user:${userId}:device:*`);
@@ -378,6 +380,7 @@ export class AuthService {
       where: { id: userId },
       data: { password, mustChangePassword: false },
     });
+    forgetAuthUser(userId);
     return { message: 'Đổi mật khẩu thành công.' };
   }
 

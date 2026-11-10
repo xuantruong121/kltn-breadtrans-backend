@@ -1,0 +1,182 @@
+time="2026-11-09T13:10:44Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-32/v1.mp3\": request timeout"
+time="2026-11-09T13:15:15Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-28/v1.mp3\": request timeout"
+time="2026-11-09T13:15:16Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/quiz-23/audio/v7/full.mp3\": request timeout"
+time="2026-11-09T13:15:17Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-37/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T131447Z&X-Amz-Expires=3600&X-Amz-Signature=f29a5d242ebb5e301afe43b60c00e52e34f5e0c5236c9d4bad7408ffb603a838&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": request timeout"
+time="2026-11-09T13:15:17Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-31/v1.mp3\": request timeout"
+time="2026-11-09T13:15:17Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-38/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T131447Z&X-Amz-Expires=3600&X-Amz-Signature=8aad79cd933274bd4b71b27545fb2d3c69a5466b44b997679f5400fdd9b167ad&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": dial: i/o timeout"
+time="2026-11-09T13:16:26Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/quiz-24/audio/v7/full.mp3\": request timeout"
+time="2026-11-09T13:16:26Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-26/question-175/dialogue-v4.mp3\": dial: i/o timeout"
+time="2026-11-09T13:16:28Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-30/v1.mp3\": request timeout"
+time="2026-11-09T13:16:28Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-3/v1.mp3\": request timeout"
+time="2026-11-09T13:16:29Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-38/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T131559Z&X-Amz-Expires=3600&X-Amz-Signature=9d7ee2c8cecefe88b95a77154674048442a71f31aa7bce900f4b31b0fb64abf3&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": request timeout"
+time="2026-11-09T13:16:32Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-30/v1.mp3\": request timeout"
+time="2026-11-09T13:16:33Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-5/v1.mp3\": dial: i/o timeout"
+time="2026-11-09T13:19:28Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/quiz-24/audio/v7/full.mp3\": request timeout"
+time="2026-11-09T13:19:28Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-30/v1.mp3\": request timeout"
+time="2026-11-09T13:19:30Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-33/v1.mp3\": request timeout"
+time="2026-11-09T13:19:30Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-33/v1.mp3\": request timeout"
+time="2026-11-09T13:19:30Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-2/v1.mp3\": request timeout"
+time="2026-11-09T13:19:31Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-34/v1.mp3\": request timeout"
+time="2026-11-09T13:19:31Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-1/v1.mp3\": request timeout"
+time="2026-11-09T13:19:31Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-33/v1.mp3\": request timeout"
+time="2026-11-09T13:19:32Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-30/v1.mp3\": request timeout"
+time="2026-11-09T13:19:32Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-6/v1.mp3\": request timeout"
+time="2026-11-09T13:19:33Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-3/v1.mp3\": request timeout"
+time="2026-11-09T13:21:34Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-32/v1.mp3\": request timeout"
+time="2026-11-09T13:21:35Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-6/v1.mp3\": request timeout"
+time="2026-11-09T13:21:36Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-6/v1.mp3\": request timeout"
+time="2026-11-09T13:21:37Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-28/v1.mp3\": request timeout"
+time="2026-11-09T13:21:37Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-37/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132107Z&X-Amz-Expires=3600&X-Amz-Signature=3dc2735fe7df2759956bac51e4a107c110d28d5687bf3711d4ae30579f088d23&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": request timeout"
+time="2026-11-09T13:21:38Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/quiz-24/audio/v7/full.mp3\": request timeout"
+time="2026-11-09T13:21:38Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-39/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132108Z&X-Amz-Expires=3600&X-Amz-Signature=7444a9044fd5a77957b5b06b1eb7f8095f4cd60c144ad60dfb7904c23a5b7ac2&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": request timeout"
+time="2026-11-09T13:21:39Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-36/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132109Z&X-Amz-Expires=3600&X-Amz-Signature=f6df925c3ef0b56b1ba128eeefad68c8512f35f4862c1bef08a2d63973031760&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": dial: i/o timeout"
+time="2026-11-09T13:21:40Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-30/v1.mp3\": request timeout"
+time="2026-11-09T13:21:41Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-34/v1.mp3\": dial: i/o timeout"
+time="2026-11-09T13:21:42Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-38/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132112Z&X-Amz-Expires=3600&X-Amz-Signature=be6a9454aaae3d5b4ce932deac010850664d45d73fe9444782191229619355ca&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": request timeout"
+time="2026-11-09T13:21:43Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-32/v1.mp3\": request timeout"
+time="2026-11-09T13:21:49Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-1/v1.mp3\": request timeout"
+time="2026-11-09T13:21:49Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-3/v1.mp3\": dial: i/o timeout"
+time="2026-11-09T13:21:49Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-36/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132119Z&X-Amz-Expires=3600&X-Amz-Signature=c7007d2b486e198ed145b7065dc90aba8177c56cbcbbc14a84010fa4076a4530&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": request timeout"
+time="2026-11-09T13:21:50Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-26/question-176/dialogue-v4.mp3\": request timeout"
+time="2026-11-09T13:21:51Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-27/v1.mp3\": request timeout"
+time="2026-11-09T13:21:53Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-27/v1.mp3\": request timeout"
+time="2026-11-09T13:23:04Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-6/v1.mp3\": request timeout"
+time="2026-11-09T13:23:04Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-29/v1.mp3\": dial: i/o timeout"
+time="2026-11-09T13:23:44Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-2/v1.mp3\": request timeout"
+time="2026-11-09T13:23:45Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-27/v1.mp3\": request timeout"
+time="2026-11-09T13:23:45Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-33/v1.mp3\": request timeout"
+time="2026-11-09T13:23:45Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-28/v1.mp3\": request timeout"
+time="2026-11-09T13:23:45Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-41/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132315Z&X-Amz-Expires=3600&X-Amz-Signature=fc0e2817f99bf42934600ff2308feab31879b14c3ea14c55d099e63ae03017f6&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": request timeout"
+time="2026-11-09T13:23:46Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-29/v1.mp3\": request timeout"
+time="2026-11-09T13:23:46Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-42/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132316Z&X-Amz-Expires=3600&X-Amz-Signature=8f555b62e59458c0f99020704e2f4fec22454666848f70db5abbf5b6ec987ddf&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": dial: i/o timeout"
+time="2026-11-09T13:23:49Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-9/question-27/v1.mp3\": request timeout"
+time="2026-11-09T13:23:50Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-42/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132320Z&X-Amz-Expires=3600&X-Amz-Signature=bf7157cc63942e50170fff914986658ebfffb20eb19a65fcc99688fa10e0ea86&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": dial: i/o timeout"
+time="2026-11-09T13:23:50Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-40/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132320Z&X-Amz-Expires=3600&X-Amz-Signature=5760a331c931d07e4e8ed681fcf345f53305b3686a487d15f0dbc98081d57120&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": request timeout"
+time="2026-11-09T13:23:51Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-private/premium/listening/quiz-10/question-37/v1.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=harness%2F20261109%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261109T132321Z&X-Amz-Expires=3600&X-Amz-Signature=81e12fbaa02a1b0e49c7b5f2b1092fd182d7f105b6c385b942c1571fd642d54c&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\": request timeout"
+time="2026-11-09T13:24:53Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-26/question-175/dialogue-v4.mp3\": request timeout"
+time="2026-11-09T13:27:52Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-4/v1.mp3\": request timeout"
+time="2026-11-09T13:27:52Z" level=warning msg="Request Failed" error="Get \"http://host.docker.internal:9460/harness-public/catalog/listening/practice/audio/quiz-1/question-1/v1.mp3\": request timeout"
+
+
+  █ THRESHOLDS 
+
+    http_req_duration
+    ✓ 'p(95)<1000' p(95)=522.04ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.06%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 86559  61.394151/s
+    checks_succeeded...: 99.93% 86499 out of 86559
+    checks_failed......: 0.06%  60 out of 86559
+
+    ✓ profile 2xx
+    ✓ today 2xx
+    ✓ balance 2xx
+    ✓ pet 2xx
+    ✓ login 2xx
+    ✓ listening_list 2xx
+    ✓ ranking 2xx
+    ✓ vocab_topics 2xx
+    ✓ exam_list 2xx
+    ✓ exam_briefing 2xx
+    ✓ quiz_detail 2xx
+    ✓ listening_attempt 2xx
+    ✓ audio_url 2xx
+    ✗ audio_storage 2xx
+      ↳  98% — ✓ 4968 / ✗ 58
+    ✓ vocab_topic 2xx
+    ✓ exam_start 2xx
+    ✓ exam_begin 2xx
+    ✓ exam_detail 2xx
+    ✓ exam_master 2xx
+    ✓ exam_audio 2xx
+    ✗ vocab_review 2xx
+      ↳  99% — ✓ 7178 / ✗ 2
+    ✓ listening_save 2xx
+    ✓ reading_list 2xx
+    ✓ exam_answers 2xx
+    ✓ quiz_submit 2xx
+    ✓ exam_submit 2xx
+    ✓ exam_result 2xx
+
+    CUSTOM
+    bytes_audio_storage............: 782996544  555360.022656/s
+    bytes_audio_url................: 3220549    2284.255504/s
+    bytes_balance..................: 888218     629.990991/s
+    bytes_exam_answers.............: 419058     297.227443/s
+    bytes_exam_audio...............: 1625292800 1152779.859818/s
+    bytes_exam_begin...............: 1092184    774.659014/s
+    bytes_exam_briefing............: 1324168    939.19951/s
+    bytes_exam_detail..............: 92620309   65693.287281/s
+    bytes_exam_list................: 1734450    1230.202354/s
+    bytes_exam_master..............: 8776293    6224.806887/s
+    bytes_exam_result..............: 17846124   12657.812994/s
+    bytes_exam_start...............: 867863     615.553694/s
+    bytes_exam_submit..............: 17846124   12657.812994/s
+    bytes_listening_attempt........: 309607     219.596564/s
+    bytes_listening_list...........: 16747822   11878.814634/s
+    bytes_listening_save...........: 3466827    2458.93438/s
+    bytes_login....................: 247601     175.617246/s
+    bytes_pet......................: 1674414    1187.620308/s
+    bytes_profile..................: 1315279    932.894763/s
+    bytes_quiz_detail..............: 15390059   10915.787024/s
+    bytes_quiz_submit..............: 1836127    1302.319327/s
+    bytes_ranking..................: 7434351    5273.000719/s
+    bytes_reading_list.............: 12469740   8844.47721/s
+    bytes_today....................: 48816984   34624.675611/s
+    bytes_vocab_review.............: 1728459    1225.953086/s
+    bytes_vocab_topic..............: 5950306    4220.40442/s
+    bytes_vocab_topics.............: 13531016   9597.213947/s
+    errors_audio_storage...........: 58         0.041138/s
+    errors_vocab_review............: 2          0.001419/s
+    latency_audio_storage..........: avg=16.23ms  med=7.72ms   p(90)=20.9ms   p(95)=84.82ms  p(99)=133.97ms max=338.3ms
+    latency_audio_url..............: avg=158.17ms med=99.08ms  p(90)=354.91ms p(95)=470.46ms p(99)=894.13ms max=1.87s  
+    latency_balance................: avg=92.87ms  med=50.33ms  p(90)=216.45ms p(95)=286.99ms p(99)=597.01ms max=1.16s  
+    latency_exam_answers...........: avg=300.68ms med=192.42ms p(90)=653.76ms p(95)=880.67ms p(99)=1.59s    max=2.91s  
+    latency_exam_audio.............: avg=299.3ms  med=147.56ms p(90)=722.44ms p(95)=1.04s    p(99)=2.28s    max=2.76s  
+    latency_exam_begin.............: avg=195.9ms  med=122.36ms p(90)=435.43ms p(95)=584.7ms  p(99)=1.09s    max=1.71s  
+    latency_exam_briefing..........: avg=176.04ms med=124.62ms p(90)=344.1ms  p(95)=448.32ms p(99)=802.89ms max=1.32s  
+    latency_exam_detail............: avg=152.84ms med=105.71ms p(90)=314.65ms p(95)=401.49ms p(99)=673.97ms max=1.32s  
+    latency_exam_list..............: avg=61.25ms  med=28.28ms  p(90)=144.34ms p(95)=215.7ms  p(99)=379.27ms max=730.1ms
+    latency_exam_master............: avg=100.05ms med=60.29ms  p(90)=218.61ms p(95)=298.05ms p(99)=600.97ms max=1.13s  
+    latency_exam_result............: avg=205.61ms med=142.32ms p(90)=424.67ms p(95)=545.52ms p(99)=936.02ms max=1.55s  
+    latency_exam_start.............: avg=234.04ms med=160.55ms p(90)=480.04ms p(95)=631.89ms p(99)=1.12s    max=1.91s  
+    latency_exam_submit............: avg=275.53ms med=201.82ms p(90)=567.26ms p(95)=701.18ms p(99)=1.21s    max=1.81s  
+    latency_listening_attempt......: avg=113.99ms med=68.08ms  p(90)=252.43ms p(95)=331.54ms p(99)=619.75ms max=1.51s  
+    latency_listening_list.........: avg=203.85ms med=135.08ms p(90)=424.99ms p(95)=560.65ms p(99)=1.05s    max=2.06s  
+    latency_listening_save.........: avg=160.73ms med=95.91ms  p(90)=354.91ms p(95)=485.58ms p(99)=949.69ms max=2.48s  
+    latency_login..................: avg=698.54ms med=687.98ms p(90)=996.74ms p(95)=1.13s    p(99)=1.3s     max=1.41s  
+    latency_pet....................: avg=86.45ms  med=46.36ms  p(90)=196.76ms p(95)=278.59ms p(99)=484.65ms max=1.43s  
+    latency_profile................: avg=60.36ms  med=27.78ms  p(90)=148.09ms p(95)=200.67ms p(99)=414ms    max=1.94s  
+    latency_quiz_detail............: avg=103.27ms med=57.38ms  p(90)=235.05ms p(95)=321.38ms p(99)=650.41ms max=1.94s  
+    latency_quiz_submit............: avg=303.73ms med=211.49ms p(90)=619.32ms p(95)=792.23ms p(99)=1.62s    max=2.99s  
+    latency_ranking................: avg=296.92ms med=192.32ms p(90)=648.01ms p(95)=832.32ms p(99)=1.55s    max=2.62s  
+    latency_reading_list...........: avg=214.1ms  med=156.05ms p(90)=416.45ms p(95)=534.73ms p(99)=834.09ms max=1.63s  
+    latency_today..................: avg=118.3ms  med=69.17ms  p(90)=265.34ms p(95)=350.12ms p(99)=674.75ms max=1.91s  
+    latency_vocab_review...........: avg=148.38ms med=86.52ms  p(90)=332.2ms  p(95)=436.81ms p(99)=810.51ms max=1.94s  
+    latency_vocab_topic............: avg=135.5ms  med=84.69ms  p(90)=293.32ms p(95)=382.5ms  p(99)=872.13ms max=1.3s   
+    latency_vocab_topics...........: avg=123.94ms med=73.68ms  p(90)=255.03ms p(95)=356.49ms p(99)=715.04ms max=1.28s  
+    status_5xx.....................: 60         0.042557/s
+
+    HTTP
+    http_req_duration..............: avg=154.74ms med=84.91ms  p(90)=367.4ms  p(95)=522.04ms p(99)=984.02ms max=2.99s  
+      { expected_response:true }...: avg=154.85ms med=85ms     p(90)=367.51ms p(95)=522.21ms p(99)=984.69ms max=2.99s  
+    http_req_failed................: 0.06%      60 out of 86559
+    http_reqs......................: 86559      61.394151/s
+
+    EXECUTION
+    iteration_duration.............: avg=2m45s    med=2m25s    p(90)=5m12s    p(95)=5m39s    p(99)=10m0s    max=11m14s 
+    iterations.....................: 5283       3.747101/s
+    vus............................: 13         min=0            max=1000
+    vus_max........................: 1000       min=384          max=1000
+
+    NETWORK
+    data_received..................: 2.7 GB     1.9 MB/s
+    data_sent......................: 40 MB      29 kB/s
+
+
+

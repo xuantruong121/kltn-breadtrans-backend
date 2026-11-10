@@ -1,0 +1,75 @@
+time="2026-11-09T13:30:02Z" level=warning msg="Request Failed" error="Get \"http://caddy:80/quizzes/listening-practice\": request timeout"
+
+
+  █ THRESHOLDS 
+
+    http_req_failed
+    ✗ 'rate<0.01' rate=4.45%
+
+    latency_exam_submit
+    ✗ 'p(95)<1000' p(95)=4.13s
+
+    latency_quiz_submit
+    ✗ 'p(95)<1000' p(95)=12.26s
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 2758   17.767804/s
+    checks_succeeded...: 95.54% 2635 out of 2758
+    checks_failed......: 4.45%  123 out of 2758
+
+    ✗ exam_start 2xx
+      ↳  85% — ✓ 286 / ✗ 47
+    ✗ reading_list 2xx
+      ↳  87% — ✓ 291 / ✗ 42
+    ✗ listening_list 2xx
+      ↳  90% — ✓ 302 / ✗ 32
+    ✓ exam_begin 2xx
+    ✓ quiz_detail 2xx
+    ✗ exam_submit 2xx
+      ↳  99% — ✓ 285 / ✗ 1
+    ✗ quiz_submit 2xx
+      ↳  99% — ✓ 592 / ✗ 1
+
+    CUSTOM
+    bytes_exam_begin...............: 234399  1510.063598/s
+    bytes_exam_start...............: 162427  1046.399942/s
+    bytes_exam_submit..............: 1129093 7273.931364/s
+    bytes_listening_list...........: 4128828 26599.059142/s
+    bytes_quiz_detail..............: 3636930 23430.115318/s
+    bytes_quiz_submit..............: 566500  3649.550673/s
+    bytes_reading_list.............: 3059569 19710.59506/s
+    errors_exam_start..............: 47      0.302787/s
+    errors_exam_submit.............: 1       0.006442/s
+    errors_listening_list..........: 32      0.206153/s
+    errors_quiz_submit.............: 1       0.006442/s
+    errors_reading_list............: 42      0.270576/s
+    latency_exam_begin.............: avg=1.93s  med=649.8ms  p(90)=2.83s  p(95)=18.52s p(99)=20.63s max=20.97s
+    latency_exam_start.............: avg=13.23s med=12.82s   p(90)=24.28s p(95)=24.76s p(99)=25.36s max=25.43s
+    latency_exam_submit............: avg=2.66s  med=2.69s    p(90)=3.99s  p(95)=4.13s  p(99)=4.24s  max=4.31s 
+    latency_listening_list.........: avg=15.93s med=15.66s   p(90)=28.34s p(95)=29.03s p(99)=29.7s  max=29.79s
+    latency_quiz_detail............: avg=1.24s  med=326.16ms p(90)=1.64s  p(95)=3.6s   p(99)=18.64s max=19.8s 
+    latency_quiz_submit............: avg=6.7s   med=6.57s    p(90)=10.49s p(95)=12.26s p(99)=13.41s max=13.67s
+    latency_reading_list...........: avg=14.78s med=14.5s    p(90)=27.54s p(95)=28.93s p(99)=29.72s max=29.8s 
+    status_5xx.....................: 123     0.7924/s
+
+    HTTP
+    http_req_duration..............: avg=7.5s   med=3.96s    p(90)=21.15s p(95)=26.77s p(99)=29.11s max=29.8s 
+      { expected_response:true }...: avg=7.68s  med=4.18s    p(90)=21.6s  p(95)=26.79s p(99)=29.11s max=29.8s 
+    http_req_failed................: 4.45%   123 out of 2758
+    http_reqs......................: 2758    17.767804/s
+
+    EXECUTION
+    iteration_duration.............: avg=2m14s  med=2m14s    p(90)=2m29s  p(95)=2m32s  p(99)=2m34s  max=2m35s 
+    iterations.....................: 1000    6.442278/s
+    vus............................: 3       min=0           max=1000
+    vus_max........................: 1000    min=365         max=1000
+
+    NETWORK
+    data_received..................: 14 MB   90 kB/s
+    data_sent......................: 1.4 MB  9.0 kB/s
+
+
+
+time="2026-11-09T13:32:08Z" level=error msg="thresholds on metrics 'http_req_failed, latency_exam_submit, latency_quiz_submit' have been crossed"

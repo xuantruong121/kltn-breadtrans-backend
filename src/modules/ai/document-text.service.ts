@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
 
 /** Reads the text of an uploaded document. Nothing is stored. */
 @Injectable()
@@ -19,6 +18,10 @@ export class DocumentTextService {
         this.logger.log(
           `Extracting text from PDF: ${filename} (${buffer.length} bytes)`,
         );
+        // Loaded only when a PDF is read: on Node 20 the bundle's core-js
+        // replaces the global JSON.parse with a slower JS parser for the whole
+        // process (capacity profile, 2026-11-09).
+        const { PDFParse } = await import('pdf-parse');
         const parser = new PDFParse({ data: buffer });
         const result = await parser.getText();
         const text = String(result?.text || '').trim();

@@ -199,6 +199,43 @@ export class QuizController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Get(':quizId/questions/:questionId/audio-url')
+  @ApiOperation({
+    summary:
+      'URL để trình duyệt tự tải audio của một câu luyện nghe (công khai, hoặc có chữ ký và hết hạn với nội dung trả phí)',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      '{ url, artifact } — artifact là bản ghi toàn bài nếu câu dùng chung',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Chưa có tệp audio cho câu hỏi này',
+  })
+  questionAudioUrl(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Query('artifactId') artifactId: string | undefined,
+    @Query('v') version: string | undefined,
+    @Query('checksum') checksumSha256: string | undefined,
+    @Req() req: any,
+  ) {
+    return this.quizService
+      .questionAudioUrl(
+        quizId,
+        questionId,
+        this.parseAudioIdentity(artifactId, version, checksumSha256),
+        req.user?.id,
+        req.user?.role,
+      )
+      .catch((error: unknown) => {
+        throw asMissingQuestionAudio(error);
+      });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('gate-attempts/:attemptId/questions/:questionId/audio')
   @ApiOperation({ summary: 'Phát audio một câu của bài mở khóa đang làm' })
   @ApiResponse({ status: 404, description: 'Câu không thuộc lần làm này' })

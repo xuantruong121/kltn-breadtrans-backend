@@ -17,7 +17,7 @@ export class GamificationListener {
     @Optional() private readonly eligibility?: RewardEligibilityService,
   ) {}
 
-  @OnEvent('quiz.submitted')
+  // Called by LearningEffectsQueueService for every quiz.submitted.
   async handleQuizSubmittedEvent(payload: {
     userId: number;
     quizId?: number;
@@ -28,6 +28,8 @@ export class GamificationListener {
     /** Percent correct; `score` is a count of correct answers for quizzes. */
     scorePercent?: number | null;
     isFirstSubmission?: boolean;
+    /** The day the learner submitted (Vietnam); the quests count on it. */
+    dateKey?: string;
   }) {
     this.logger.log(
       `Handling quiz.submitted event for user ${payload.userId} with score ${payload.score} (firstSubmission: ${payload.isFirstSubmission})`,
@@ -115,7 +117,7 @@ export class GamificationListener {
 
       // Daily quest progress: only the quests assigned to this learner today
       // (daily-quest-catalog.ts), by the kind of practice and its percent.
-      const today = getTodayDateKey('Asia/Ho_Chi_Minh');
+      const today = payload.dateKey ?? getTodayDateKey('Asia/Ho_Chi_Minh');
       await this.gamificationService.advanceAssignedQuests(
         payload.userId,
         questTypesForQuiz(payload.quizType, Number(payload.scorePercent ?? 0)),

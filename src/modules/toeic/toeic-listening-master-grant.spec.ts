@@ -10,7 +10,7 @@ import {
   verifyListeningMasterGrant,
 } from './toeic-listening-master';
 import { ToeicController } from './toeic.controller';
-import { ToeicService } from './toeic.service';
+import { listeningMasterUrlTtlSeconds, ToeicService } from './toeic.service';
 
 /**
  * The local Listening master is the exam's whole Listening section. Its
@@ -272,6 +272,45 @@ describe('TOEIC Listening master grant', () => {
           delete process.env.TOEIC_LISTENING_MASTER_BASE_URL;
         else process.env.TOEIC_LISTENING_MASTER_BASE_URL = previous;
       }
+    });
+
+    it('a master in the private bucket is played from storage through a signed URL (capacity run)', async () => {
+      const deadline = new Date(Date.now() + 90 * 60_000);
+      const service = make({
+        userId: 3,
+        examId: 1,
+        status: AttemptStatus.IN_PROGRESS,
+        section: null,
+        deadline,
+      });
+      service.localMasterFile.mockReturnValue(null);
+      service.isPrivatelyStored = jest.fn().mockResolvedValue(true);
+      const sign = jest
+        .fn()
+        .mockResolvedValue('https://private.example/signed');
+      service.uploadService = { getPrivatePresignedDownloadUrl: sign };
+      const out = await service.getListeningMaster(7, 3);
+      expect(out).toMatchObject({
+        available: true,
+        url: 'https://private.example/signed',
+      });
+      expect(out.path).toMatch(/^\/toeic\/listening-master\/1\/audio\?grant=/);
+      const [key, ttl] = sign.mock.calls[0];
+      expect(key).toMatch(
+        /^premium\/listening\/toeic\/exam-1\/listening-master\//,
+      );
+      expect(ttl).toBeGreaterThanOrEqual(104 * 60);
+      expect(ttl).toBeLessThanOrEqual(106 * 60);
+    });
+
+    it('a signed master URL lasts the rest of the attempt plus 15 min, at most 3 h; 1 h in review', () => {
+      const now = new Date('2026-11-09T10:00:00Z');
+      const at = (min: number) => new Date(now.getTime() + min * 60_000);
+      expect(listeningMasterUrlTtlSeconds(false, at(60), now)).toBe(75 * 60);
+      expect(listeningMasterUrlTtlSeconds(false, at(400), now)).toBe(3 * 3600);
+      expect(listeningMasterUrlTtlSeconds(false, at(-5), now)).toBe(15 * 60);
+      expect(listeningMasterUrlTtlSeconds(true, at(60), now)).toBe(3600);
+      expect(listeningMasterUrlTtlSeconds(false, null, now)).toBe(3600);
     });
 
     it('the owner of a submitted attempt can replay it in review', async () => {

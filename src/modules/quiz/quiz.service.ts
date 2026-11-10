@@ -14,6 +14,7 @@ import {
   Role,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TtlMemo } from '../../common/utils/ttl-memo';
 import {
   CreateQuizDto,
   CreateQuestionDto,
@@ -944,6 +945,9 @@ export function calculateProgressiveDictationFeedback(
   };
 }
 
+/** How long a signed URL for private listening audio stays valid. */
+const QUESTION_AUDIO_URL_TTL_SECONDS = 3600;
+
 @Injectable()
 export class QuizService {
   constructor(
@@ -1249,19 +1253,27 @@ export class QuizService {
     );
   }
 
+  private readonly listeningQuizMeta = new TtlMemo<
+    number,
+    { id: number; type: QuizType; isPremiumContent: boolean } | null
+  >(60_000);
+
   private async assertListeningPracticeQuiz(
     quizId: number,
     userId?: number,
     role?: Role,
   ) {
-    const quiz = await this.prisma.quiz.findUnique({
-      where: { id: quizId },
-      select: {
-        id: true,
-        type: true,
-        isPremiumContent: true,
-      },
-    });
+    // Read on every saved answer and attempt; kept 60 s (see TtlMemo).
+    const quiz = await this.listeningQuizMeta.get(quizId, () =>
+      this.prisma.quiz.findUnique({
+        where: { id: quizId },
+        select: {
+          id: true,
+          type: true,
+          isPremiumContent: true,
+        },
+      }),
+    );
     if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
     if (quiz.type !== QuizType.LISTENING_PRACTICE) {
       throw new ForbiddenException('Phiên chỉ dành cho bài luyện nghe');
@@ -1447,13 +1459,21 @@ export class QuizService {
     });
   }
 
-  async getQuizById(
-    id: number,
-    includeAnswers = false,
-    userId?: number,
-    role?: Role,
-  ) {
-    const accessQuiz = await this.prisma.quiz.findUnique({
+  // A quiz and its questions are read on every open and every submission
+  // (four queries). Learners get them from here for up to 60 s; admins always
+  // read them fresh, so the CMS and its previews never lag (capacity run
+  // 2026-11-09). An edit reaches learners, and their grading, within 60 s.
+  private readonly quizAccessMeta = new TtlMemo<
+    number,
+    Awaited<ReturnType<QuizService['loadQuizAccessMeta']>>
+  >(60_000);
+  private readonly quizContent = new TtlMemo<
+    number,
+    Awaited<ReturnType<QuizService['loadQuizContent']>>
+  >(60_000);
+
+  private loadQuizAccessMeta(id: number) {
+    return this.prisma.quiz.findUnique({
       where: { id },
       select: {
         id: true,
@@ -1463,6 +1483,36 @@ export class QuizService {
         toeicWritingSetItems: { select: { id: true }, take: 1 },
       },
     });
+  }
+
+  private loadQuizContent(id: number) {
+    return this.prisma.quiz.findUnique({
+      where: { id },
+      include: {
+        questions: {
+          orderBy: { order: 'asc' },
+          include: {
+            audioAssets: {
+              where: { isActive: true },
+              orderBy: { version: 'desc' },
+            },
+            diagnosticClips: { orderBy: { createdAt: 'asc' } },
+          },
+        },
+      },
+    });
+  }
+
+  async getQuizById(
+    id: number,
+    includeAnswers = false,
+    userId?: number,
+    role?: Role,
+  ) {
+    const fresh = role === Role.ADMIN;
+    const accessQuiz = fresh
+      ? await this.loadQuizAccessMeta(id)
+      : await this.quizAccessMeta.get(id, () => this.loadQuizAccessMeta(id));
     if (!accessQuiz) throw new NotFoundException('Không tìm thấy bài tập.');
     // TOEIC exam Writing tasks are exam content: learners read them only
     // inside their assessment attempt (/writing/quizzes/:id with the attempt
@@ -1488,21 +1538,12 @@ export class QuizService {
     }
     await this.quizContentAccess.assertAccess(accessQuiz, userId, role);
 
-    const quiz = await this.prisma.quiz.findUnique({
-      where: { id },
-      include: {
-        questions: {
-          orderBy: { order: 'asc' },
-          include: {
-            audioAssets: {
-              where: { isActive: true },
-              orderBy: { version: 'desc' },
-            },
-            diagnosticClips: { orderBy: { createdAt: 'asc' } },
-          },
-        },
-      },
-    });
+    // A copy: the code below reshapes the questions it returns.
+    const quiz = fresh
+      ? await this.loadQuizContent(id)
+      : structuredClone(
+          await this.quizContent.get(id, () => this.loadQuizContent(id)),
+        );
     if (!quiz) throw new NotFoundException('Không tìm thấy bài tập.');
 
     // Deliver artifact timing separately from transcript text. The timeline is
@@ -2684,6 +2725,82 @@ export class QuizService {
     userId?: number,
     role?: Role,
   ) {
+    const question = await this.playableQuestion(
+      quizId,
+      questionId,
+      userId,
+      role,
+    );
+    return this.playQuestionAudio(question, quizId, requestedIdentity);
+  }
+
+  /**
+   * Where the browser fetches a practice question's audio itself, after the
+   * same checks as streamQuestionAudio: the public URL of a free clip, or a
+   * signed, expiring URL for private media. The bytes no longer pass through
+   * the API, and a dialogue's shared track is one URL the browser caches once
+   * (capacity run 2026-11-09: proxied audio was a quarter of the API's CPU).
+   */
+  async questionAudioUrl(
+    quizId: number,
+    questionId: number,
+    requestedIdentity: PublishedListeningAudioIdentity = {},
+    userId?: number,
+    role?: Role,
+  ): Promise<{
+    url: string;
+    artifact: {
+      id: number;
+      version: number;
+      checksumSha256: string | null;
+      durationMs: number | null;
+    } | null;
+  }> {
+    const question = await this.playableQuestion(
+      quizId,
+      questionId,
+      userId,
+      role,
+    );
+    const located = await this.playQuestionAudio(
+      question,
+      quizId,
+      requestedIdentity,
+      {
+        asset: async (key, isPrivate) => ({
+          url: isPrivate
+            ? await this.uploadService.getPrivatePresignedDownloadUrl(
+                key,
+                QUESTION_AUDIO_URL_TTL_SECONDS,
+              )
+            : this.uploadService.getPublicAssetUrl(key),
+        }),
+        artifact: (id, identity) =>
+          this.listeningAudioAuthoringService.getPublishedAudioUrl(
+            id,
+            identity,
+            QUESTION_AUDIO_URL_TTL_SECONDS,
+          ),
+      },
+    );
+    const artifact =
+      'artifact' in located && located.artifact
+        ? {
+            id: located.artifact.id,
+            version: located.artifact.version,
+            checksumSha256: located.artifact.checksumSha256,
+            durationMs: located.artifact.durationMs,
+          }
+        : null;
+    return { url: located.url, artifact };
+  }
+
+  private async playableQuestion(
+    quizId: number,
+    questionId: number,
+    userId?: number,
+    role?: Role,
+  ) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: {
@@ -2708,7 +2825,7 @@ export class QuizService {
       throw new ForbiddenException('Chỉ hỗ trợ audio cho bài luyện nghe');
     }
     await this.quizContentAccess.assertAccess(question.quiz, userId, role);
-    return this.playQuestionAudio(question, quizId, requestedIdentity);
+    return question;
   }
 
   /**
@@ -2745,7 +2862,16 @@ export class QuizService {
     return this.playQuestionAudio(question, question.quizId, {});
   }
 
-  private async playQuestionAudio(
+  /**
+   * Picks a question's audio (its own clip, or the quiz's published track) and
+   * hands it over through `deliver`: as bytes by default, or as a URL.
+   */
+  private async playQuestionAudio<
+    A = Buffer,
+    T = Awaited<
+      ReturnType<ListeningAudioAuthoringService['getPublishedAudio']>
+    >,
+  >(
     question: {
       content: unknown;
       quiz: { isPremiumContent: boolean };
@@ -2753,7 +2879,24 @@ export class QuizService {
     },
     quizId: number,
     requestedIdentity: PublishedListeningAudioIdentity,
-  ) {
+    deliver: {
+      asset: (key: string, isPrivate: boolean) => Promise<A>;
+      artifact: (
+        quizId: number,
+        identity: PublishedListeningAudioIdentity,
+      ) => Promise<T>;
+    } = {
+      asset: (key, isPrivate) =>
+        (isPrivate
+          ? this.uploadService.downloadPrivateFileBuffer(key)
+          : this.uploadService.downloadFileBuffer(key)) as Promise<A>,
+      artifact: (id, identity) =>
+        this.listeningAudioAuthoringService.getPublishedAudio(
+          id,
+          identity,
+        ) as Promise<T>,
+    },
+  ): Promise<A | T> {
     const content =
       question.content && typeof question.content === 'object'
         ? (question.content as Record<string, unknown>)
@@ -2785,12 +2928,7 @@ export class QuizService {
             'Audio toàn bài chưa có mốc thời gian hợp lệ cho câu này.',
           );
         }
-        const result =
-          await this.listeningAudioAuthoringService.getPublishedAudio(
-            quizId,
-            requestedIdentity,
-          );
-        return result;
+        return deliver.artifact(quizId, requestedIdentity);
       }
 
       // A caller that supplies an artifact identity is explicitly asking for
@@ -2815,17 +2953,14 @@ export class QuizService {
         quizId,
       ))
     ) {
-      return this.listeningAudioAuthoringService.getPublishedAudio(
-        quizId,
-        requestedIdentity,
-      );
+      return deliver.artifact(quizId, requestedIdentity);
     }
     // Published student playback is R2-only. Never call Azure from this
     // request path; content must be synthesized and approved by an author.
     // Private media is read from the private bucket whatever the quiz tier:
     // an A2 quiz moved to free keeps its private assets.
     if (activeAsset && isPrivateListeningMediaKey(activeAsset.key)) {
-      return this.uploadService.downloadPrivateFileBuffer(activeAsset.key);
+      return deliver.asset(activeAsset.key, true);
     }
     if (
       activeAsset &&
@@ -2833,7 +2968,7 @@ export class QuizService {
       (activeAsset.key.startsWith('catalog/listening/') ||
         activeAsset.key.startsWith('listening/'))
     )
-      return this.uploadService.downloadFileBuffer(activeAsset.key);
+      return deliver.asset(activeAsset.key, false);
     if (activeAsset && question.quiz.isPremiumContent) {
       throw new ServiceUnavailableException(
         'Âm thanh Nghe trả phí chưa được lưu ở kho riêng tư.',

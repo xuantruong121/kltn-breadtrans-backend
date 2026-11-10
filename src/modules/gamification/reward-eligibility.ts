@@ -16,6 +16,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { TtlMemo } from '../../common/utils/ttl-memo';
 
 export type QuizRewardFacts = {
   type: string;
@@ -44,21 +45,27 @@ export function isRewardableSpeakingExercise(f: SpeakingRewardFacts): boolean {
 export class RewardEligibilityService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Whether a quiz pays rewards depends on its type, topic and writing-set
+  // membership, which rarely change: kept 60 s (see TtlMemo).
+  private readonly quizzes = new TtlMemo<number, boolean>(60_000);
+
   async quiz(quizId: number | undefined): Promise<boolean> {
     if (!quizId) return false;
-    const quiz = await this.prisma.quiz.findUnique({
-      where: { id: quizId },
-      select: {
-        type: true,
-        practiceTopicId: true,
-        toeicWritingSetItems: { select: { id: true }, take: 1 },
-      },
-    });
-    if (!quiz) return false;
-    return isRewardableQuiz({
-      type: quiz.type,
-      practiceTopicId: quiz.practiceTopicId,
-      inToeicWritingSet: quiz.toeicWritingSetItems.length > 0,
+    return this.quizzes.get(quizId, async () => {
+      const quiz = await this.prisma.quiz.findUnique({
+        where: { id: quizId },
+        select: {
+          type: true,
+          practiceTopicId: true,
+          toeicWritingSetItems: { select: { id: true }, take: 1 },
+        },
+      });
+      if (!quiz) return false;
+      return isRewardableQuiz({
+        type: quiz.type,
+        practiceTopicId: quiz.practiceTopicId,
+        inToeicWritingSet: quiz.toeicWritingSetItems.length > 0,
+      });
     });
   }
 

@@ -10,7 +10,12 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
 
-import { getJwtSecret } from '../auth.constants';
+import { getJwtVerificationKey } from '../auth.constants';
+import {
+  AUTH_USER_TTL_MS,
+  cachedAuthUser,
+  rememberAuthUser,
+} from '../auth-user-cache';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -21,9 +26,30 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: getJwtSecret(),
+      // passport-jwt hands this to jsonwebtoken.verify, which takes a KeyObject;
+      // its typings only list string | Buffer.
+      secretOrKey: getJwtVerificationKey() as unknown as Buffer,
       passReqToCallback: true,
     });
+  }
+
+  /** See auth-user-cache.ts: the account is read at most every 60 s. */
+  static readonly USER_TTL_MS = AUTH_USER_TTL_MS;
+
+  private async currentUser(id: number) {
+    const cached = cachedAuthUser(id);
+    if (cached !== undefined) return cached;
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        mustChangePassword: true,
+      },
+    });
+    rememberAuthUser(id, user);
+    return user;
   }
 
   async validate(req: any, payload: any) {
@@ -55,15 +81,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Phiên thiết bị đã kết thúc.');
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        mustChangePassword: true,
-      },
-    });
+    const user = await this.currentUser(payload.sub);
 
     if (!user) {
       throw new UnauthorizedException(

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PlanFeatureKey, PracticeLevel, QuizType, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TtlMemo } from '../../common/utils/ttl-memo';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
   advancedPracticePlan,
@@ -73,6 +74,11 @@ export class QuizContentAccessService {
     @Optional() private readonly levelAccess?: LevelAccessService,
   ) {}
 
+  private readonly policyFields = new TtlMemo<
+    number,
+    { title: string; bilingualContent: unknown }
+  >(60_000);
+
   /** Fills the title and Listening mode of quizzes selected without them. */
   private async withPolicyFields<T extends QuizContentAccessSubject>(
     quizzes: T[],
@@ -85,11 +91,24 @@ export class QuizContentAccessService {
             q.bilingualContent === undefined)),
     );
     if (!missing.length) return quizzes;
-    const rows = await this.prisma.quiz.findMany({
-      where: { id: { in: missing.map((q) => q.id) } },
-      select: { id: true, title: true, bilingualContent: true },
-    });
-    const byId = new Map(rows.map((r) => [r.id, r]));
+    // A quiz's title (its CEFR tag) and bilingualContent are read on almost
+    // every learner request; they are kept for 60 s (see TtlMemo).
+    const unknown = missing.filter((q) => !this.policyFields.peek(q.id));
+    if (unknown.length) {
+      const rows = await this.prisma.quiz.findMany({
+        where: { id: { in: unknown.map((q) => q.id) } },
+        select: { id: true, title: true, bilingualContent: true },
+      });
+      for (const r of rows) this.policyFields.set(r.id, r);
+    }
+    const byId = new Map<
+      number,
+      { title: string; bilingualContent: unknown }
+    >();
+    for (const q of missing) {
+      const row = await this.policyFields.peek(q.id);
+      if (row) byId.set(q.id, row);
+    }
     return quizzes.map((q) =>
       missing.includes(q)
         ? {
