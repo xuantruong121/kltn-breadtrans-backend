@@ -135,91 +135,77 @@ export type Rarity = 'common' | 'rare' | 'epic';
 export const TOPPINGS = {
   garlic_butter: {
     name: 'Bơ tỏi',
-    line: '+20% sát thương mỗi cấp',
     rarity: 'common',
     max: 3,
   },
   sesame: {
     name: 'Mè đen',
-    line: 'Hồi 3 máu mỗi câu đúng, mỗi cấp',
     rarity: 'common',
     max: 3,
   },
   cheese: {
     name: 'Phô mai',
-    line: 'Chặn lần sai đầu tiên mỗi tầng (mỗi cấp thêm một lần)',
     rarity: 'rare',
     max: 3,
   },
   pate: {
     name: 'Pate',
-    line: '+15% tỉ lệ chí mạng mỗi cấp',
     rarity: 'rare',
     max: 3,
   },
   chili: {
     name: 'Ớt',
-    line: 'Combo tối đa +5 mỗi cấp',
     rarity: 'common',
     max: 3,
   },
   condensed_milk: {
     name: 'Sữa đặc',
-    line: '+3 giây mỗi câu, mỗi cấp',
     rarity: 'common',
     max: 3,
   },
   floss: {
     name: 'Chà bông',
-    line: 'Câu đầu mỗi tầng bỏ bớt 2 đáp án sai (mỗi cấp thêm một câu)',
     rarity: 'rare',
     max: 3,
   },
   egg: {
     name: 'Trứng ốp la',
-    line: 'Hồi sinh một lần với 30 máu',
     rarity: 'epic',
     max: 1,
   },
   sausage: {
     name: 'Xúc xích',
-    line: '+25 máu tối đa và hồi 25 máu',
     rarity: 'rare',
     max: 3,
   },
   shallot: {
     name: 'Hành phi',
-    line: 'Thưởng tốc độ mạnh hơn mỗi cấp',
     rarity: 'rare',
     max: 3,
   },
   cucumber: {
     name: 'Dưa leo',
-    line: 'Hồi 20 máu ngay',
     rarity: 'common',
     max: 99,
   },
   chili_sauce: {
     name: 'Tương ớt',
-    line: 'Câu đúng đầu tiên mỗi tầng: sát thương ×2 (+0,5 mỗi cấp)',
     rarity: 'epic',
     max: 3,
   },
   breadstick: {
     name: 'Bánh mì que',
-    line: 'Boss lộ thêm 1 chữ cái mỗi cấp',
     rarity: 'common',
     max: 3,
   },
   salt_pepper: {
     name: 'Muối tiêu',
-    line: 'Bị đánh mất ít máu hơn 15% mỗi cấp',
     rarity: 'common',
     max: 3,
   },
 } as const satisfies Record<
   string,
-  { name: string; line: string; rarity: Rarity; max: number }
+  { name: string; rarity: Rarity; max: number }
 >;
 export type ToppingId = keyof typeof TOPPINGS;
 export const TOPPING_IDS = Object.keys(TOPPINGS) as ToppingId[];
@@ -737,6 +723,14 @@ export function applyAnswer(
 export function pickTopping(run: RunState, id: ToppingId): RunState {
   if (run.phase !== 'pick' || !run.offers.includes(id))
     throw new Error('not offered');
+  return enterFloor({ ...run, ...takeTopping(run, id) }, run.floor + 1);
+}
+
+/** What taking a topping changes at once: its level, and the HP Xúc xích and Dưa leo give. */
+function takeTopping(
+  run: Pick<RunState, 'toppings' | 'hp' | 'maxHp'>,
+  id: ToppingId,
+): Pick<RunState, 'toppings' | 'hp' | 'maxHp'> {
   const toppings = { ...run.toppings, [id]: level(run.toppings, id) + 1 };
   let { hp, maxHp } = run;
   if (id === 'sausage') {
@@ -744,5 +738,237 @@ export function pickTopping(run: RunState, id: ToppingId): RunState {
     hp += 25;
   }
   if (id === 'cucumber') hp = Math.min(maxHp, hp + 20);
-  return enterFloor({ ...run, toppings, hp, maxHp }, run.floor + 1);
+  return { toppings, hp, maxHp };
+}
+
+// ---------------------------------------------------------------- topping text
+
+/**
+ * The words a learner reads about a topping (owner 2026-11-10: the old lines
+ * used game jargon and "mỗi cấp" without saying what the base is). Every
+ * number here comes from the rule functions above, so the text cannot drift
+ * from the rules.
+ */
+type EffectContext = {
+  floor: number;
+  boss: boolean;
+  hp: number;
+  maxHp: number;
+  toppings: Toppings;
+  revived: boolean;
+};
+
+const num = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
+/** The damage of a plain right answer with only `t`: no speed, no streak, no crit. */
+const plainHit = (
+  t: Toppings,
+  over: Partial<Parameters<typeof hitDamage>[0]>,
+) =>
+  hitDamage({
+    remainingShare: 0,
+    combo: 0,
+    toppings: t,
+    boss: false,
+    firstHitOfFloor: false,
+    crit: false,
+    ...over,
+  });
+const garlicScale = (l: number) =>
+  plainHit({ garlic_butter: l }, {}) / plainHit({}, {});
+const streakBonus = (l: number) =>
+  Math.round(
+    (plainHit({ chili: l }, { combo: comboCap({ chili: l }) }) /
+      plainHit({}, {}) -
+      1) *
+      100,
+  );
+const speedBonus = (l: number) =>
+  Math.round(
+    (plainHit({ shallot: l }, { remainingShare: 1 }) / plainHit({}, {}) - 1) *
+      100,
+  );
+const sauceScale = (l: number) =>
+  plainHit({ chili_sauce: l }, { firstHitOfFloor: true }) / plainHit({}, {});
+const guardPct = (l: number) =>
+  Math.round(
+    (1 -
+      monsterHit(100, false, { salt_pepper: l }) / monsterHit(100, false, {})) *
+      100,
+  );
+const critPct = (t: Toppings) => Math.round(critChance(t) * 100);
+const times = (n: number, one: string, many: string) =>
+  n === 1 ? one : `${n} ${many}`;
+
+type EffectText = {
+  /** What the topping does at level `l` (1 or more), in plain words. */
+  sentence: (l: number, c: EffectContext) => string;
+  /** The number the topping moves, and its value in context `c`. */
+  label: (c: EffectContext) => string;
+  value: (c: EffectContext) => string;
+};
+
+const floorNote = (c: EffectContext) =>
+  ` ở tầng ${c.floor}${c.boss ? ' (boss)' : ''}`;
+
+export const TOPPING_TEXT: Record<ToppingId, EffectText> = {
+  garlic_butter: {
+    sentence: (l) =>
+      `Mỗi câu đúng gây thêm ${Math.round((garlicScale(l) - 1) * 100)}% sát thương.`,
+    label: () => 'Sát thương',
+    value: (c) => `×${num(garlicScale(level(c.toppings, 'garlic_butter')))}`,
+  },
+  sesame: {
+    sentence: (l) =>
+      `Mỗi câu trả lời đúng hồi ${healOnCorrect({ sesame: l })} máu.`,
+    label: () => 'Hồi mỗi câu đúng',
+    value: (c) => `${healOnCorrect(c.toppings)} máu`,
+  },
+  cheese: {
+    sentence: (l) =>
+      `${times(shieldsPerFloor({ cheese: l }), 'Lần', 'lần')} trả lời sai hoặc hết giờ đầu tiên ở mỗi tầng không bị mất máu.`,
+    label: () => 'Lần sai được đỡ mỗi tầng',
+    value: (c) => `${shieldsPerFloor(c.toppings)}`,
+  },
+  pate: {
+    sentence: (l) =>
+      `Tăng khả năng ra đòn chí mạng (đòn gây gấp rưỡi sát thương) lên ${critPct({ pate: l })}%.`,
+    label: () => 'Tỉ lệ chí mạng',
+    value: (c) => `${critPct(c.toppings)}%`,
+  },
+  chili: {
+    sentence: (l) =>
+      `Trả lời đúng liên tiếp thì mỗi câu mạnh thêm 10%, tính tối đa ${comboCap({ chili: l })} câu liền (+${streakBonus(l)}%).`,
+    label: () => 'Chuỗi đúng tính tối đa',
+    value: (c) => {
+      const l = level(c.toppings, 'chili');
+      return `${comboCap(c.toppings)} câu (+${streakBonus(l)}%)`;
+    },
+  },
+  condensed_milk: {
+    sentence: (l) =>
+      `Mỗi câu có thêm ${num((questionTimeMs(1, false, { condensed_milk: l }) - questionTimeMs(1, false, {})) / 1000)} giây để trả lời.`,
+    label: (c) => `Thời gian mỗi câu${floorNote(c)}`,
+    value: (c) =>
+      `${num(questionTimeMs(c.floor, c.boss, c.toppings) / 1000)} giây`,
+  },
+  floss: {
+    sentence: (l) =>
+      `${times(flossQuestions({ floss: l }), 'Câu', 'câu')} đầu tiên của mỗi tầng được bỏ bớt 2 đáp án sai (tầng boss không có).`,
+    label: () => 'Câu được bỏ bớt đáp án mỗi tầng',
+    value: (c) => `${flossQuestions(c.toppings)}`,
+  },
+  egg: {
+    sentence: (_l, c) =>
+      c.revived && level(c.toppings, 'egg') > 0
+        ? 'Đã dùng lượt sống lại của lượt chơi này.'
+        : 'Khi hết máu, bạn sống lại một lần với 30 máu.',
+    label: () => 'Lượt sống lại',
+    value: (c) => `${level(c.toppings, 'egg') > 0 && !c.revived ? 1 : 0}`,
+  },
+  sausage: {
+    sentence: () => 'Máu tối đa tăng 25 và hồi ngay 25 máu.',
+    label: () => 'Máu',
+    value: (c) => `${c.hp}/${c.maxHp}`,
+  },
+  shallot: {
+    sentence: (l) =>
+      `Trả lời càng nhanh đòn càng mạnh. Hành phi nâng thưởng khi trả lời ngay lên +${speedBonus(l)}% sát thương.`,
+    label: () => 'Thưởng khi trả lời ngay',
+    value: (c) => `+${speedBonus(level(c.toppings, 'shallot'))}%`,
+  },
+  cucumber: {
+    sentence: () => 'Hồi ngay 20 máu (không vượt quá máu tối đa).',
+    label: () => 'Máu',
+    value: (c) => `${c.hp}/${c.maxHp}`,
+  },
+  chili_sauce: {
+    sentence: (l) => {
+      const x = sauceScale(l);
+      return `Câu đúng đầu tiên của mỗi tầng gây sát thương ${x === 2 ? 'gấp đôi' : `gấp ${num(x)} lần`}.`;
+    },
+    label: () => 'Câu đúng đầu tầng',
+    value: (c) => `×${num(sauceScale(level(c.toppings, 'chili_sauce')))}`,
+  },
+  breadstick: {
+    sentence: (l) =>
+      `Khi đánh boss (phải gõ từ), hiện sẵn ${bossHintLetters({ breadstick: l })} chữ cái của đáp án.`,
+    label: () => 'Chữ cái gợi ý ở tầng boss',
+    value: (c) => `${bossHintLetters(c.toppings)}`,
+  },
+  salt_pepper: {
+    sentence: (l) =>
+      `Khi trả lời sai hoặc hết giờ, bạn mất ít máu hơn ${guardPct(l)}%.`,
+    label: (c) => `Máu mất mỗi lần sai${floorNote(c)}`,
+    value: (c) => `${monsterHit(c.floor, c.boss, c.toppings)}`,
+  },
+};
+
+export type ToppingEffect = { label: string; now: string; next: string };
+
+/**
+ * The context the numbers are read in: while choosing, the floor about to
+ * start (its clock and its monster's hit); otherwise the floor being fought.
+ */
+function effectContext(run: RunState): EffectContext {
+  const floor = run.phase === 'pick' ? run.floor + 1 : run.floor;
+  return {
+    floor,
+    boss: isBossFloor(floor),
+    hp: run.hp,
+    maxHp: run.maxHp,
+    toppings: run.toppings,
+    revived: run.revived,
+  };
+}
+
+/** One offer in words: what the topping does at the level it would reach, and the number before and after. */
+export function toppingOffer(
+  run: RunState,
+  id: ToppingId,
+): { line: string; effect: ToppingEffect } {
+  const now = effectContext(run);
+  const next = { ...now, ...takeTopping(now, id) };
+  const text = TOPPING_TEXT[id];
+  return {
+    line: text.sentence(level(next.toppings, id), next),
+    effect: {
+      label: text.label(now),
+      now: text.value(now),
+      next: text.value(next),
+    },
+  };
+}
+
+/** The toppings the run holds, in words, with their value now. */
+export function toppingsHeld(run: RunState): {
+  id: ToppingId;
+  name: string;
+  level: number;
+  max: number;
+  line: string;
+  label: string;
+  value: string;
+}[] {
+  const c = effectContext(run);
+  return TOPPING_IDS.filter((id) => level(run.toppings, id) > 0).map((id) => {
+    const text = TOPPING_TEXT[id];
+    const l = level(run.toppings, id);
+    return {
+      id,
+      name: TOPPINGS[id].name,
+      level: l,
+      max: TOPPINGS[id].max,
+      line: held(id, l, c),
+      label: text.label(c),
+      value: text.value(c),
+    };
+  });
+}
+
+/** Instant toppings say what they did; the rest say what they do. */
+function held(id: ToppingId, l: number, c: EffectContext): string {
+  if (id === 'sausage') return `Đã tăng ${25 * l} máu tối đa.`;
+  if (id === 'cucumber')
+    return l === 1 ? 'Đã hồi 20 máu.' : `Đã dùng ${l} lần, mỗi lần hồi 20 máu.`;
+  return TOPPING_TEXT[id].sentence(l, c);
 }

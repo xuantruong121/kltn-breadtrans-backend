@@ -25,6 +25,9 @@ import {
   DUNGEON_MODES,
   DUNGEON_TICKET,
   TOPPINGS,
+  type ToppingEffect,
+  toppingOffer,
+  toppingsHeld,
   applyAnswer,
   choiceQuestion,
   dailySeed,
@@ -101,10 +104,16 @@ export type DungeonView = {
   offers: {
     id: ToppingId;
     name: string;
+    /** What it does at the level it would reach, in plain words. */
     line: string;
     rarity: string;
     level: number;
+    max: number;
+    /** The number it moves, now and after taking it. */
+    effect: ToppingEffect;
   }[];
+  /** The toppings held, for the in-run list. */
+  toppingsHeld: ReturnType<typeof toppingsHeld>;
   question: PublicQuestion | null;
   /** When the question runs out, by the server's clock, and its length. */
   /** When the question's clock starts and runs out, by the server's clock. */
@@ -596,10 +605,12 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
       offers: run.offers.map((id) => ({
         id,
         name: TOPPINGS[id].name,
-        line: TOPPINGS[id].line,
         rarity: TOPPINGS[id].rarity,
         level: run.toppings[id] ?? 0,
+        max: TOPPINGS[id].max,
+        ...toppingOffer(run, id),
       })),
+      toppingsHeld: toppingsHeld(run),
       question: q ? q.view : null,
       questionStartsAt: q ? q.issuedAt : null,
       questionDeadline: q && ms !== null ? q.issuedAt + ms : null,
