@@ -10,9 +10,10 @@
  * is in progress, and never for another learner; a reading item and a
  * grammar item are attached from the learner's own submissions; an unknown
  * source is ignored.
- * Browser: the button on the TOEIC review page opens the tutor panel with
- * the item shown, the reply is about that item, and removing the item goes
- * back to a plain question.
+ * Browser: the TOEIC review page has no button (owner 2026-11-11: keep it as
+ * it was). The button on a reading result opens the tutor panel with the item
+ * shown, the reply is about that item, and removing the item goes back to a
+ * plain question.
  *
  *   HARNESS_DB=<db> [SHOTS=<dir>] npx ts-node --transpile-only scripts/qa/finalization-tutor-context.ts
  */
@@ -69,6 +70,40 @@ async function toeicAttempt(token: string, q: ReturnType<typeof part5>) {
     answers: { [q.id]: q.wrong },
   });
   return id;
+}
+
+/** Submits the first published reading quiz with every answer right. */
+async function readingSubmission(account: { token: string; userId: number }) {
+  await onboard(account.token);
+  unlockAllLevels(account.userId);
+  const quizId = Number(
+    harnessQuery(
+      `select q.id from "Quiz" q where q.type = 'BILINGUAL_READING' and q."publicationStatus" = 'PUBLISHED' and exists (select 1 from "Question" x where x."quizId" = q.id) order by q.id limit 1`,
+    )[0][0],
+  );
+  const quiz = await call('GET', `/quizzes/${quizId}`, account.token);
+  const questions: any[] = quiz.data?.questions ?? [];
+  const keys = harnessQuery(
+    `select id, content::text from "Question" where "quizId" = ${quizId} order by "order", id`,
+  ).map(([id, content]) => ({ id: Number(id), content: JSON.parse(content) }));
+  const submitted = await call(
+    'POST',
+    `/quizzes/${quizId}/submit`,
+    account.token,
+    {
+      answers: questions.map((item) => {
+        const c = keys.find((k) => k.id === item.id)!.content;
+        return { questionId: item.id, answer: c.options[c.correctIndex] };
+      }),
+      clientAttemptId: randomUUID(),
+    },
+  );
+  const submissionId = Number(
+    harnessQuery(
+      `select id from "Submission" where "userId" = ${account.userId} and "quizId" = ${quizId} order by id desc limit 1`,
+    )[0]?.[0],
+  );
+  return { submitted, submissionId, keys };
 }
 
 async function api() {
@@ -128,30 +163,7 @@ async function api() {
   );
 
   // A reading quiz the learner submitted.
-  await onboard(a.token);
-  unlockAllLevels(a.userId);
-  const quizId = Number(
-    harnessQuery(
-      `select q.id from "Quiz" q where q.type = 'BILINGUAL_READING' and q."publicationStatus" = 'PUBLISHED' and exists (select 1 from "Question" x where x."quizId" = q.id) order by q.id limit 1`,
-    )[0][0],
-  );
-  const quiz = await call('GET', `/quizzes/${quizId}`, a.token);
-  const questions: any[] = quiz.data?.questions ?? [];
-  const keys = harnessQuery(
-    `select id, content::text from "Question" where "quizId" = ${quizId} order by "order", id`,
-  ).map(([id, content]) => ({ id: Number(id), content: JSON.parse(content) }));
-  const submitted = await call('POST', `/quizzes/${quizId}/submit`, a.token, {
-    answers: questions.map((item) => {
-      const c = keys.find((k) => k.id === item.id)!.content;
-      return { questionId: item.id, answer: c.options[c.correctIndex] };
-    }),
-    clientAttemptId: randomUUID(),
-  });
-  const submissionId = Number(
-    harnessQuery(
-      `select id from "Submission" where "userId" = ${a.userId} and "quizId" = ${quizId} order by id desc limit 1`,
-    )[0]?.[0],
-  );
+  const { submitted, submissionId, keys } = await readingSubmission(a);
   const second = keys[1] ?? keys[0];
   reply = await ask(a.token, 'giải thích câu này', {
     sourceType: 'QUIZ_SUBMISSION',
@@ -205,23 +217,35 @@ async function api() {
 
 async function browserFlow() {
   const { browser, page, account, issues } = await studentPage('ctx-ui');
-  await onboard(account.token);
+  // The TOEIC review keeps its old look: no tutor button (owner 2026-11-11).
   const q = part5();
   const attemptId = await toeicAttempt(account.token, q);
   await call('POST', `/toeic/attempts/${attemptId}/submit`, account.token, {});
-
   await page.goto(`${FE}/toeic/review/${attemptId}`, {
     waitUntil: 'networkidle',
     timeout: 120_000,
   });
-  await sleep(3000);
-  const article = page.locator(`#q-${q.number}`);
-  const button = article.getByRole('button', { name: 'Hỏi gia sư' });
+  await page.locator(`#q-${q.number}`).waitFor({ timeout: 30_000 });
   check(
-    'each reviewed item has a "Hỏi gia sư" button',
-    (await button.count()) === 1,
+    'the TOEIC review page has no "Hỏi gia sư" button',
+    (await page.getByRole('button', { name: 'Hỏi gia sư' }).count()) === 0,
   );
-  await button.click();
+
+  const { submissionId, keys } = await readingSubmission(account);
+  const first = keys[0].content;
+  const key = `${'ABCD'[first.correctIndex]}. ${first.options[first.correctIndex]}`;
+  await page.goto(`${FE}/reading/submissions/${submissionId}`, {
+    waitUntil: 'networkidle',
+    timeout: 120_000,
+  });
+  await sleep(3000);
+  const buttons = page.getByRole('button', { name: 'Hỏi gia sư' });
+  check(
+    'each reviewed reading item has a "Hỏi gia sư" button',
+    (await buttons.count()) === keys.length,
+    `${await buttons.count()} buttons, ${keys.length} questions`,
+  );
+  await buttons.first().click();
   const panel = page.locator(
     '[role="dialog"][aria-label="Cửa sổ hỗ trợ trực tuyến BreadTrans"]',
   );
@@ -229,7 +253,7 @@ async function browserFlow() {
   const text = () => panel.innerText().then((t) => t.replace(/\s+/g, ' '));
   check(
     'the panel opens with the item shown',
-    (await text()).includes(`Đang hỏi về: Câu ${q.number}, Part 5`),
+    (await text()).includes('Đang hỏi về: Câu 1'),
     (await text()).slice(0, 160),
   );
   await page.screenshot({ path: `${SHOTS}/tutor-context-chip.png` });
@@ -244,14 +268,14 @@ async function browserFlow() {
   );
   await input.press('Enter');
   await panel
-    .getByText(`[key: ${q.key}]`)
+    .getByText(`[key: ${key}]`)
     .waitFor({ timeout: 30_000 })
     .catch(() => undefined);
+  const replied = await text();
   check(
     'the reply is about that item, with the key read on the server',
-    (await text()).includes(
-      `[item: Câu ${q.number}, Part 5, đề luyện TOEIC đã nộp] [key: ${q.key}]`,
-    ),
+    replied.includes('[item: Câu 1, bài luyện đọc') &&
+      replied.includes(`[key: ${key}]`),
     (await text()).slice(-200),
   );
   await page.screenshot({ path: `${SHOTS}/tutor-context-reply.png` });
