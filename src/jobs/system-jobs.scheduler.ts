@@ -65,9 +65,14 @@ export class SystemJobsScheduler implements OnModuleInit {
     await this.jobs.enqueueWinback(getBusinessDayKey());
   }
 
-  @Cron('0 20 * * *', { timeZone: BUSINESS_TIMEZONE })
-  async enqueueStreakReminder(): Promise<void> {
-    await this.jobs.enqueueStreakReminder(getBusinessDayKey());
+  // Every hour: each learner is reminded at the hour they usually study
+  // (20:00 without a habit). This replaced the fixed 20:00 streak reminder.
+  @Cron('0 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  async enqueueStudyReminder(): Promise<void> {
+    const now = new Date();
+    await this.jobs.enqueueStudyReminder(
+      `${getBusinessDayKey(now)}-${Math.floor(now.getTime() / 3_600_000)}`,
+    );
   }
 
   @Cron('*/5 * * * *', { timeZone: BUSINESS_TIMEZONE })

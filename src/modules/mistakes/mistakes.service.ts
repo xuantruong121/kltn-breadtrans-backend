@@ -460,6 +460,25 @@ export class MistakesService {
     return { id: row.id, resolved };
   }
 
+  /**
+   * What the learner got wrong most between two moments, for the weekly
+   * report. Reads new attempts first, so a learner who never opened the
+   * notebook is covered.
+   */
+  async tagsBetween(userId: number, from: Date, until: Date) {
+    await this.sync(userId);
+    const rows = await this.prisma.learnerMistake.findMany({
+      where: {
+        userId,
+        tag: { not: null },
+        lastSeenAt: { gte: from, lt: until },
+      },
+      select: { skill: true, tag: true, wrongCount: true },
+      take: 200,
+    });
+    return topMistakeTags(rows);
+  }
+
   /** What the learner gets wrong most, for the tutor prompt. No sync here. */
   async topTags(userId: number): Promise<string[]> {
     const rows = await this.prisma.learnerMistake.findMany({

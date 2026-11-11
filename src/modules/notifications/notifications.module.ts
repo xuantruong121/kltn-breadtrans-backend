@@ -4,9 +4,10 @@ import { NotificationsController } from './notifications.controller';
 import { NotificationsCronService } from './notifications.cron';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { EmailService } from '../../common/email/email.service';
+import { MistakesModule } from '../mistakes/mistakes.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, MistakesModule],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsCronService, EmailService],
   exports: [NotificationsService, NotificationsCronService],
