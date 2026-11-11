@@ -16,9 +16,14 @@ import {
   validatePracticeWritingResult,
   type PracticeWritingResult,
 } from './practice-writing-grading';
+import {
+  planLimits,
+  revisionLimitMessage,
+  type PlanCode,
+} from '../subscription/plan-limits';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { loadRevisionChain } from './writing-revision';
 import {
-  MAX_WRITING_REVISIONS,
   revisionGate,
   revisionGraderInput,
   revisionView,
@@ -102,7 +107,17 @@ export class WritingService {
     @Optional() private readonly quizContentAccess?: QuizContentAccessService,
     @Optional() private readonly eventEmitter?: EventEmitter2,
     @Optional() private readonly trial?: TrialService,
+    @Optional() private readonly subscriptions?: SubscriptionService,
   ) {}
+
+  /** The plan that decides how many revisions this learner gets. */
+  private async revisionPlan(
+    userId: number,
+    role?: import('@prisma/client').Role,
+  ): Promise<PlanCode> {
+    if (role === 'ADMIN') return 'PRO';
+    return (await this.subscriptions?.planCodeFor(userId)) ?? 'FREE';
+  }
 
   private async resolveCanonicalTask(
     quizId: number,
@@ -1176,8 +1191,8 @@ Task: ${instructions}`
 
   /**
    * Guided rewrite: grades a corrected text for a practice answer the learner
-   * already has a grade for. At most MAX_WRITING_REVISIONS per first
-   * submission. The grade is stored as a new submission that points at the
+   * already has a grade for. As many per first submission as the learner's
+   * plan allows (plan-limits.ts); none on Free. The grade is stored as a new submission that points at the
    * first one; it earns no reward and emits no quiz event.
    */
   async reviseWriting(
@@ -1247,6 +1262,17 @@ Task: ${instructions}`
         `Câu trả lời cho bài viết theo tranh tối đa ${PICTURE_SENTENCE_MAX_WORDS} từ.`,
       );
 
+    // The plan decides how many revisions an answer gets: none on Free.
+    const plan = await this.revisionPlan(userId, role);
+    const revisionLimit = planLimits(plan).writingRevisions;
+    const limitReached = () =>
+      revisionLimit === 0
+        ? new ForbiddenException({
+            message: revisionLimitMessage(plan),
+            requiredPlan: 'PLUS',
+          })
+        : new ConflictException(revisionLimitMessage(plan));
+
     const respond = (
       stored: { id: number },
       evaluation: Parameters<WritingService['formatAssessmentResponse']>[1],
@@ -1259,7 +1285,7 @@ Task: ${instructions}`
         maxScore,
         content.taskType,
       ),
-      revision: revisionView(attempts, stored.id),
+      revision: revisionView(attempts, stored.id, revisionLimit),
     });
 
     const logicalAttemptId = clientAttemptId ?? randomUUID();
@@ -1277,11 +1303,8 @@ Task: ${instructions}`
       return respond(existing, previous, 0, chain);
     }
 
-    const gate = revisionGate(chain, answer);
-    if (!gate.ok && gate.reason === 'LIMIT')
-      throw new ConflictException(
-        `Bạn đã dùng hết ${MAX_WRITING_REVISIONS} lần sửa cho bài viết này.`,
-      );
+    const gate = revisionGate(chain, answer, revisionLimit);
+    if (!gate.ok && gate.reason === 'LIMIT') throw limitReached();
     if (!gate.ok)
       throw new BadRequestException('Hãy sửa bài viết trước khi nộp lại.');
 
@@ -1316,10 +1339,7 @@ Task: ${instructions}`
         const used = await tx.submission.count({
           where: { revisionOfId: rootId },
         });
-        if (used >= MAX_WRITING_REVISIONS)
-          throw new ConflictException(
-            `Bạn đã dùng hết ${MAX_WRITING_REVISIONS} lần sửa cho bài viết này.`,
-          );
+        if (used >= revisionLimit) throw limitReached();
         const row = await tx.submission.create({
           data: {
             quizId: source.quizId,

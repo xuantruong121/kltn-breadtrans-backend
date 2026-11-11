@@ -29,6 +29,7 @@ import {
   AdminSubscriptionQueryDto,
   PaginatedAdminSubscriptionsDto,
 } from './dto/admin-subscription.dto';
+import { grantPlanStreakFreezes } from './plan-streak-freezes';
 
 type SubscriptionWithRelations = Prisma.SubscriptionGetPayload<{
   include: {
@@ -243,6 +244,12 @@ export class SubscriptionAdminService {
           startsAt,
           endsAt,
         },
+      });
+      // A plan given by an admin comes with its streak freezes too.
+      await grantPlanStreakFreezes(tx, {
+        userId: dto.studentId,
+        planCode: planVersion.plan.code,
+        durationDays,
       });
 
       await tx.subscriptionEvent.create({

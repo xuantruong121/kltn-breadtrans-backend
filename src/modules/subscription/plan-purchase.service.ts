@@ -41,6 +41,7 @@ import {
 } from './promo.logic';
 import { PayosPaymentService } from '../payment/payos-payment.service';
 import { ReferralService } from './referral.service';
+import { grantPlanStreakFreezes } from './plan-streak-freezes';
 
 type PurchaseWithDetails = Prisma.PlanPurchaseGetPayload<{
   include: {
@@ -659,6 +660,12 @@ export class PlanPurchaseService {
         startsAt,
         endsAt,
       },
+    });
+    // The streak freezes that come with the plan, once per purchase.
+    await grantPlanStreakFreezes(tx, {
+      userId: current.userId,
+      planCode: current.planVersion.plan.code,
+      durationDays: current.durationDays,
     });
     await this.referrals?.rewardOnFirstPayment(tx, current, confirmedAt);
     if (current.promoCodeId !== null && current.promoCodeId !== undefined) {

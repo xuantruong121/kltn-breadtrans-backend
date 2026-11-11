@@ -3,6 +3,8 @@
  * conversation it sees, and how many questions a plan gives a day. Pure: no
  * I/O, so the prompt and the limits are tested without a provider.
  */
+import { planLimits } from '../subscription/plan-limits';
+
 export type TutorTurn = { role: 'user' | 'assistant'; content: string };
 
 /** What the tutor may know about the item the learner is asking about. */
@@ -18,15 +20,9 @@ export const TUTOR_TURN_MAX_CHARS = 1200;
 export const TUTOR_MESSAGE_MAX_CHARS = 2000;
 export const TUTOR_CONTEXT_MAX_CHARS = 3000;
 
-/** Questions to the tutor per learner per day (owner 2026-11-11). */
-export const TUTOR_DAILY_LIMIT: Record<string, number> = {
-  FREE: 10,
-  PLUS: 30,
-  PRO: 100,
-};
-
+/** Questions to the tutor per learner per day, from the plan limits. */
 export function tutorDailyLimit(planCode?: string | null): number {
-  return TUTOR_DAILY_LIMIT[String(planCode ?? '').toUpperCase()] ?? 10;
+  return planLimits(planCode).tutorPerDay;
 }
 
 export function tutorQuotaKey(userId: number, dayKey: string): string {

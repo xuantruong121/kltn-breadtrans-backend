@@ -6,6 +6,7 @@ import {
   ConflictException,
   UnauthorizedException,
   ServiceUnavailableException,
+  Optional,
 } from '@nestjs/common';
 import {
   ListeningPracticeAttemptStatus,
@@ -46,6 +47,8 @@ import {
 } from './reading-content.validation';
 import { QuizContentAccessService } from './quiz-content-access.service';
 import { loadWritingExerciseProgress } from '../writing/writing-exercise-progress';
+import { planLimits } from '../subscription/plan-limits';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { loadRevisionChain } from '../writing/writing-revision';
 import { revisionView } from '../writing/writing-revision.logic';
 import {
@@ -960,6 +963,7 @@ export class QuizService {
     private uploadService: UploadService,
     private listeningAudioAuthoringService: ListeningAudioAuthoringService,
     private readonly quizContentAccess: QuizContentAccessService,
+    @Optional() private readonly subscriptions?: SubscriptionService,
   ) {}
 
   async createQuiz(dto: CreateQuizDto, user?: { id: number; role: Role }) {
@@ -3208,6 +3212,11 @@ export class QuizService {
               submission.revisionOfId ?? submission.id,
             ),
             submission.id,
+            // The owner's plan decides how many revisions the answer gets.
+            planLimits(
+              (await this.subscriptions?.planCodeFor(submission.userId)) ??
+                'FREE',
+            ).writingRevisions,
           )
         : null;
 

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 
 import {
@@ -9,7 +10,6 @@ import {
   practiceWritingTask,
 } from './practice-writing-grading';
 import {
-  MAX_WRITING_REVISIONS,
   compareRevision,
   correctionsStatus,
   numberChain,
@@ -104,21 +104,31 @@ describe('writing-revision.logic', () => {
     ]);
   });
 
-  it(`allows ${MAX_WRITING_REVISIONS} revisions and no more`, () => {
-    expect(revisionGate(numberChain([first]), 'She asks.')).toEqual({
+  it('allows as many revisions as the plan gives and no more', () => {
+    // Plus: 2.
+    expect(revisionGate(numberChain([first]), 'She asks.', 2)).toEqual({
       ok: true,
     });
-    expect(revisionGate(numberChain([first, second]), 'New text.')).toEqual({
+    expect(revisionGate(numberChain([first, second]), 'New text.', 2)).toEqual({
       ok: true,
     });
     expect(
-      revisionGate(numberChain([first, second, third]), 'New text.'),
+      revisionGate(numberChain([first, second, third]), 'New text.', 2),
     ).toEqual({ ok: false, reason: 'LIMIT' });
+    // Pro: 5, so a third revision is still allowed.
+    expect(
+      revisionGate(numberChain([first, second, third]), 'New text.', 5),
+    ).toEqual({ ok: true });
+    // Free: none, not even the first.
+    expect(revisionGate(numberChain([first]), 'She asks.', 0)).toEqual({
+      ok: false,
+      reason: 'LIMIT',
+    });
   });
 
   it('refuses a text that is the same apart from case and spacing', () => {
     expect(
-      revisionGate(numberChain([first]), '  she ASK for   a refund. '),
+      revisionGate(numberChain([first]), '  she ASK for   a refund. ', 2),
     ).toEqual({ ok: false, reason: 'UNCHANGED' });
   });
 
@@ -156,7 +166,7 @@ describe('writing-revision.logic', () => {
 
   it('lets only the latest text of a chain be revised', () => {
     const chain = numberChain([first, second]);
-    expect(revisionView(chain, 1)).toMatchObject({
+    expect(revisionView(chain, 1, 2)).toMatchObject({
       number: 0,
       used: 1,
       remaining: 1,
@@ -164,7 +174,7 @@ describe('writing-revision.logic', () => {
       canRevise: false,
       comparison: null,
     });
-    const latest = revisionView(chain, 2)!;
+    const latest = revisionView(chain, 2, 2)!;
     expect(latest).toMatchObject({
       rootSubmissionId: 1,
       number: 1,
@@ -172,10 +182,19 @@ describe('writing-revision.logic', () => {
       canRevise: true,
     });
     expect(latest.comparison?.scoreBefore).toBe(8);
-    const full = revisionView(numberChain([first, second, third]), 3)!;
+    const full = revisionView(numberChain([first, second, third]), 3, 2)!;
     expect(full).toMatchObject({ remaining: 0, canRevise: false });
     expect(full.comparison?.previousSubmissionId).toBe(2);
-    expect(revisionView(chain, 77)).toBeNull();
+    expect(revisionView(chain, 77, 2)).toBeNull();
+    // The same chain on Pro has three revisions left; on Free none at all.
+    expect(
+      revisionView(numberChain([first, second, third]), 3, 5),
+    ).toMatchObject({ limit: 5, remaining: 3, canRevise: true });
+    expect(revisionView(numberChain([first]), 1, 0)).toMatchObject({
+      limit: 0,
+      remaining: 0,
+      canRevise: false,
+    });
   });
 
   it('gives the grader the earlier text and feedback, and tells it to grade the new text on its own', () => {
@@ -251,7 +270,7 @@ describe('WritingService.reviseWriting', () => {
     }),
   };
 
-  function setup() {
+  function setup(plan: 'FREE' | 'PLUS' | 'PRO' = 'PLUS') {
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       submission: {
@@ -271,13 +290,16 @@ describe('WritingService.reviseWriting', () => {
     };
     const ai = { generateStructuredJson: jest.fn().mockResolvedValue(graded) };
     const events = { emit: jest.fn() };
+    const subscriptions = { planCodeFor: jest.fn().mockResolvedValue(plan) };
     const service = new WritingService(
       prisma as any,
       ai as any,
       undefined,
       events as any,
+      undefined,
+      subscriptions as any,
     );
-    return { service, prisma, tx, ai, events };
+    return { service, prisma, tx, ai, events, subscriptions };
   }
 
   it('answers "not found" for a submission that is not the learner own', async () => {
@@ -404,10 +426,52 @@ describe('WritingService.reviseWriting', () => {
     prisma.submission.findMany.mockResolvedValue([
       chainRow(1, 'She ask for a refund.', '2026-11-11T01:00:00Z'),
     ]);
-    tx.submission.count.mockResolvedValue(MAX_WRITING_REVISIONS);
+    tx.submission.count.mockResolvedValue(2);
     await expect(
       service.reviseWriting(1, 10, 'She asks for a refund.'),
     ).rejects.toThrow(ConflictException);
     expect(tx.submission.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses any revision on Free, without calling the grader (403)', async () => {
+    const { service, prisma, ai } = setup('FREE');
+    prisma.submission.findFirst.mockResolvedValue(source());
+    prisma.submission.findMany.mockResolvedValue([
+      chainRow(1, 'She ask for a refund.', '2026-11-11T01:00:00Z'),
+    ]);
+    const attempt = service.reviseWriting(1, 10, 'She asks for a refund.');
+    await expect(attempt).rejects.toThrow(ForbiddenException);
+    await expect(attempt).rejects.toThrow(
+      'Sửa và nộp lại là quyền lợi của gói Plus và Pro.',
+    );
+    expect(ai.generateStructuredJson).not.toHaveBeenCalled();
+  });
+
+  it('allows a third revision on Pro', async () => {
+    const { service, prisma, tx } = setup('PRO');
+    prisma.submission.findFirst.mockResolvedValue(source());
+    const rows = [
+      chainRow(1, 'She ask.', '2026-11-11T01:00:00Z'),
+      chainRow(2, 'She asks.', '2026-11-11T02:00:00Z'),
+      chainRow(3, 'She asks now.', '2026-11-11T03:00:00Z'),
+    ];
+    prisma.submission.findMany.mockResolvedValue(rows);
+    tx.submission.count.mockResolvedValue(2);
+    tx.submission.create.mockResolvedValue({ id: 4 });
+    const out = await service.reviseWriting(1, 10, 'She asks for a refund.');
+    expect(tx.submission.create).toHaveBeenCalled();
+    expect(out.submissionId).toBe(4);
+  });
+
+  it('treats a learner whose plan cannot be read as Free', async () => {
+    const { service, prisma, subscriptions } = setup();
+    subscriptions.planCodeFor.mockResolvedValue('FREE');
+    prisma.submission.findFirst.mockResolvedValue(source());
+    prisma.submission.findMany.mockResolvedValue([
+      chainRow(1, 'She ask for a refund.', '2026-11-11T01:00:00Z'),
+    ]);
+    await expect(
+      service.reviseWriting(1, 10, 'She asks for a refund.'),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

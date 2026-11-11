@@ -15,7 +15,13 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { call, check, failureCount, newStudent } from './harness-api';
+import {
+  call,
+  check,
+  failureCount,
+  grantPlan,
+  newStudent,
+} from './harness-api';
 import { FE, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
@@ -60,7 +66,10 @@ const view = async (u: Learner, id: number) =>
     ?.writingRevision;
 
 async function api() {
+  // Revisions are a Plus and Pro benefit (2 and 5 per answer); these
+  // learners are on Plus. finalization-plan-benefits.ts covers Free and Pro.
   const a = await newStudent('rev-a');
+  await grantPlan(a.userId, 'PLUS');
   const b = await newStudent('rev-b');
 
   const first = await submit(a, FIRST);
@@ -191,6 +200,7 @@ async function api() {
 
   // A finished exercise has paid its reward once; a revision adds nothing.
   const d = await newStudent('rev-d');
+  await grantPlan(d.userId, 'PLUS');
   const tasks = harnessQuery(
     `select id from "Question" where "quizId" = ${QUIZ} order by "order", id`,
   ).map((r) => Number(r[0]));
@@ -219,6 +229,7 @@ async function api() {
 
   // Two requests at once for the last revision: one is stored.
   const c = await newStudent('rev-c');
+  await grantPlan(c.userId, 'PLUS');
   const c1 = Number((await submit(c, FIRST)).data?.submissionId);
   await revise(c, c1, FIXED);
   const race = await Promise.all([
@@ -237,6 +248,7 @@ async function api() {
 
 async function browserFlow() {
   const { browser, page, account, issues } = await studentPage('rev-ui');
+  await grantPlan(account.userId, 'PLUS');
   const first = await submit(account, FIRST);
   const s1 = Number(first.data?.submissionId);
 

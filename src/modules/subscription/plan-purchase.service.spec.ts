@@ -9,6 +9,12 @@ import {
 import { PlanPurchaseService } from './plan-purchase.service';
 import { SubscriptionService } from './subscription.service';
 
+// The freezes that come with a plan are tested in plan-streak-freezes.spec.ts
+// and, end to end, by scripts/qa/finalization-plan-benefits.ts.
+jest.mock('./plan-streak-freezes', () => ({
+  grantPlanStreakFreezes: jest.fn().mockResolvedValue(0),
+}));
+
 describe('PlanPurchaseService', () => {
   const now = new Date('2026-10-05T12:00:00.000Z');
   const plan = {
@@ -543,6 +549,14 @@ describe('PlanPurchaseService', () => {
         status: PlanPaymentStatus.CONFIRMED,
         confirmedById: 99,
       }),
+    });
+    // The plan's streak freezes are given in the same transaction.
+    expect(
+      jest.requireMock('./plan-streak-freezes').grantPlanStreakFreezes,
+    ).toHaveBeenLastCalledWith(tx, {
+      userId: current.userId,
+      planCode: current.planVersion.plan.code,
+      durationDays: current.durationDays,
     });
   });
 

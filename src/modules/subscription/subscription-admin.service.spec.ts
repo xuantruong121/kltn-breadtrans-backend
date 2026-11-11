@@ -10,6 +10,12 @@ import {
 import { SubscriptionAdminService } from './subscription-admin.service';
 import { SubscriptionService } from './subscription.service';
 
+// The freezes that come with a plan are tested in plan-streak-freezes.spec.ts
+// and, end to end, by scripts/qa/finalization-plan-benefits.ts.
+jest.mock('./plan-streak-freezes', () => ({
+  grantPlanStreakFreezes: jest.fn().mockResolvedValue(0),
+}));
+
 describe('SubscriptionAdminService', () => {
   let service: SubscriptionAdminService;
   let notifications: { createNotification: jest.Mock };
@@ -212,6 +218,13 @@ describe('SubscriptionAdminService', () => {
       expect(result.source).toBe('ADMIN_GRANT');
       expect(result.sourceLabel).toBe('Admin tặng');
       expect(result.planPurchaseId).toBeNull();
+      // A granted plan comes with its streak freezes.
+      expect(
+        jest.requireMock('./plan-streak-freezes').grantPlanStreakFreezes,
+      ).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ planCode: expect.any(String) }),
+      );
       expect(notifications.createNotification).toHaveBeenCalledTimes(1);
       expect(notifications.createNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'SUBSCRIPTION_GRANTED' }),

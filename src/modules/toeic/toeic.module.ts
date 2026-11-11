@@ -24,6 +24,7 @@ import { PixabayImageSearchProvider } from './pixabay-image-search.provider';
 import { OpenverseImageSearchProvider } from './openverse-image-search.provider';
 import { ImageSearchProviderChain } from './image-search.provider-chain';
 import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-search.provider';
+import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { WikimediaCommonsImageSearchProvider } from './wikimedia-commons-image-s
     UploadModule,
     WritingModule,
     NotificationsModule,
+    SubscriptionModule,
   ],
   controllers: [
     ToeicController,

@@ -1,8 +1,9 @@
 /**
  * Guided rewrite of a graded Writing practice answer (owner 2026-11-11).
  *
- * After a grade the learner may correct the text and hand it in again, at most
- * MAX_WRITING_REVISIONS times for one first submission. A revision is graded
+ * After a grade the learner may correct the text and hand it in again, as many
+ * times for one first submission as their plan allows (plan-limits.ts: none on
+ * Free, 2 on Plus, 5 on Pro). A revision is graded
  * with the same rubric on its own merits; the grader is also given the earlier
  * corrections so its comment can say what changed. A revision earns no reward.
  *
@@ -12,8 +13,6 @@
  *
  * Pure: no Prisma, no I/O.
  */
-
-export const MAX_WRITING_REVISIONS = 2;
 
 export type RevisionCorrection = {
   original: string;
@@ -122,9 +121,10 @@ export type RevisionRefusal = 'LIMIT' | 'UNCHANGED';
 export function revisionGate(
   chain: RevisionAttempt[],
   newAnswer: string,
+  /** Revisions the learner's plan allows per first submission. */
+  limit: number,
 ): { ok: true } | { ok: false; reason: RevisionRefusal } {
-  if (chain.length - 1 >= MAX_WRITING_REVISIONS)
-    return { ok: false, reason: 'LIMIT' };
+  if (chain.length - 1 >= limit) return { ok: false, reason: 'LIMIT' };
   const latest = chain[chain.length - 1];
   if (latest && sameText(latest.answer, newAnswer))
     return { ok: false, reason: 'UNCHANGED' };
@@ -196,7 +196,12 @@ export function compareRevision(
  * whether it may still be revised, and how it compares with the text before.
  * Only the latest text of a chain can be revised.
  */
-export function revisionView(chain: RevisionAttempt[], submissionId: number) {
+export function revisionView(
+  chain: RevisionAttempt[],
+  submissionId: number,
+  /** Revisions the learner's plan allows per first submission. */
+  limit: number,
+) {
   const current = chain.find((a) => a.submissionId === submissionId);
   if (!current) return null;
   const used = chain.length - 1;
@@ -205,10 +210,10 @@ export function revisionView(chain: RevisionAttempt[], submissionId: number) {
     rootSubmissionId: chain[0].submissionId,
     number: current.number,
     used,
-    limit: MAX_WRITING_REVISIONS,
-    remaining: Math.max(0, MAX_WRITING_REVISIONS - used),
+    limit,
+    remaining: Math.max(0, limit - used),
     isLatest: current.number === used,
-    canRevise: current.number === used && used < MAX_WRITING_REVISIONS,
+    canRevise: current.number === used && used < limit,
     chain: chain.map((a) => ({
       submissionId: a.submissionId,
       number: a.number,
