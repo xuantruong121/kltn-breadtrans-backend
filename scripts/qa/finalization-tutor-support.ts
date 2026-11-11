@@ -130,10 +130,11 @@ async function api() {
       ),
     modeOf(conv.id),
   );
+  const unread = await call('GET', '/support/unread-count', learner.token);
   check(
-    'the learner is told in the inbox that an admin joined',
-    notices(learner.userId).includes('Quản trị viên đã tham gia trò chuyện'),
-    notices(learner.userId).join(' | '),
+    'the learner gets an unread count for the pet badge and nothing in the inbox',
+    unread.data?.count === 1 && notices(learner.userId).length === 0,
+    `${unread.data?.count} unread, inbox: ${notices(learner.userId).join(' | ')}`,
   );
 
   const before = rows(conv.id).length;
@@ -151,9 +152,14 @@ async function api() {
     { mode: 'AI' },
   );
   check(
-    'an admin can hand the conversation back to the tutor, and the learner is told',
+    'an admin can hand the conversation back to the tutor; the learner inbox stays empty',
     modeOf(conv.id) === 'AI' &&
-      notices(learner.userId).includes('Trợ lý AI tiếp tục trả lời'),
+      rows(conv.id).some(
+        (r) =>
+          r.role === 'SYSTEM' &&
+          r.content === 'Trợ lý AI tiếp tục trả lời trong cuộc trò chuyện này.',
+      ) &&
+      notices(learner.userId).length === 0,
     notices(learner.userId).join(' | '),
   );
 

@@ -167,17 +167,20 @@ describe('SupportService: tutor replies and the AI/admin switch', () => {
     );
   });
 
-  it('tells the learner when an admin switches the mode', async () => {
+  it('keeps the conversation out of the learner inbox: no notice for an admin message or switch', async () => {
+    prisma.supportConversation.findUnique.mockResolvedValue(conversation('AI'));
+    await service.sendAdminMessage(1, 100, { content: 'Mình hỗ trợ bạn nhé.' });
     prisma.supportConversation.findUnique.mockResolvedValue(
       conversation('HUMAN'),
     );
-
     await service.updateConversationMode(100, 'AI', { id: 1, role: 'ADMIN' });
 
-    expect(notifications.createNotification).toHaveBeenCalledWith(
+    expect(notifications.createNotification).not.toHaveBeenCalled();
+    expect(events.emit).toHaveBeenCalledWith(
+      'support.mode_updated',
       expect.objectContaining({
-        userId: 10,
-        title: 'Trợ lý AI tiếp tục trả lời',
+        mode: 'AI',
+        systemMessage: 'Trợ lý AI tiếp tục trả lời trong cuộc trò chuyện này.',
       }),
     );
   });

@@ -822,13 +822,8 @@ export class SupportService {
       },
     });
 
-    await this.notificationsService.createNotification({
-      userId: conversation.studentId,
-      type: 'NEW_MESSAGE',
-      title: 'Quản trị viên đã gửi tin nhắn',
-      body: message.content.slice(0, 160),
-      url: '/messages',
-    });
+    // The learner sees an admin message as a number on the floating pet
+    // (unread count) and a toast, not as an inbox notification.
 
     // An admin who answers takes the conversation over, so the tutor and the
     // admin never both reply to the next message.
@@ -897,27 +892,15 @@ export class SupportService {
           : 'Quản trị viên đã tham gia trò chuyện. Trợ lý AI tạm dừng trả lời.'
         : 'Trợ lý AI tiếp tục trả lời trong cuộc trò chuyện này.';
 
-    // Both sides read the change in the thread; whoever did not make it is
-    // also told in their notification inbox.
-    if (byStudent) {
-      if (mode === 'HUMAN') {
-        await this.notifyAdminsAboutStudentMessage(
-          conversationId,
-          conversation.student.profile?.fullName || conversation.student.email,
-          'Học viên yêu cầu trao đổi với quản trị viên.',
-        );
-      }
-    } else {
-      await this.notificationsService.createNotification({
-        userId: conversation.studentId,
-        type: 'NEW_MESSAGE',
-        title:
-          mode === 'HUMAN'
-            ? 'Quản trị viên đã tham gia trò chuyện'
-            : 'Trợ lý AI tiếp tục trả lời',
-        body: sysContent,
-        url: '/messages',
-      });
+    // Both sides read the change in the thread. Admins are also told in
+    // their inbox when a learner asks for a person; a learner's inbox is not
+    // used for the conversation.
+    if (byStudent && mode === 'HUMAN') {
+      await this.notifyAdminsAboutStudentMessage(
+        conversationId,
+        conversation.student.profile?.fullName || conversation.student.email,
+        'Học viên yêu cầu trao đổi với quản trị viên.',
+      );
     }
 
     await this.db.supportMessage.create({
