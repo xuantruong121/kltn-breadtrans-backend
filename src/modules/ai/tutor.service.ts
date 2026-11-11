@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import { getBusinessDayKey } from '../../common/time/business-time.util';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { AiService } from './ai.service';
+import { MistakesService } from '../mistakes/mistakes.service';
 import { TutorContextService } from './tutor-context.service';
 import type { TutorContextRef } from './tutor-context.logic';
 import {
@@ -38,7 +39,19 @@ export class TutorService {
     @InjectRedis() private readonly redis: Redis,
     @Optional() private readonly subscriptions?: SubscriptionService,
     @Optional() private readonly contexts?: TutorContextService,
+    @Optional() private readonly mistakes?: MistakesService,
   ) {}
+
+  /** What the learner gets wrong most, as one note for the prompt. */
+  private async mistakeNotes(userId: number): Promise<string[]> {
+    try {
+      const tags = (await this.mistakes?.topTags(userId)) ?? [];
+      return tags.length ? [`Hay sai ở: ${tags.join('; ')}`] : [];
+    } catch (error) {
+      this.logger.warn(`Mistake tags failed for ${userId}: ${String(error)}`);
+      return [];
+    }
+  }
 
   private async limitFor(userId: number): Promise<number> {
     try {
@@ -88,7 +101,14 @@ export class TutorService {
           ? await this.contexts.load(userId, input.contextRef)
           : null);
       const reply = await this.aiService.tutorChat(
-        buildTutorPrompt({ ...input, context }),
+        buildTutorPrompt({
+          ...input,
+          context,
+          learnerNotes: [
+            ...(input.learnerNotes ?? []),
+            ...(await this.mistakeNotes(userId)),
+          ],
+        }),
       );
       return { reply, quota, limited: false };
     } catch (error) {

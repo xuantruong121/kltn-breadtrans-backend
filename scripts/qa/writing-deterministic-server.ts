@@ -247,9 +247,14 @@ const provider = {
   // QA script can tell whether the server attached the item (and its key).
   tutorChat: async (prompt: string) => {
     const item = /Bài đang hỏi \((.+?)\):/.exec(prompt)?.[1];
-    if (!item) return 'Deterministic chat response.';
+    // "[[notes]]" in the question echoes what the prompt says about the
+    // learner's frequent mistakes (the mistake notebook's top tags).
+    const notes = /\[\[notes\]\]/.test(prompt)
+      ? ` [mistakes: ${/- Hay sai ở: (.+)/.exec(prompt)?.[1] ?? 'none'}]`
+      : '';
+    if (!item) return `Deterministic chat response.${notes}`;
     const key = /- Đáp án đúng: (.+)/.exec(prompt)?.[1] ?? 'none';
-    return `Deterministic chat response. [item: ${item}] [key: ${key}]`;
+    return `Deterministic chat response. [item: ${item}] [key: ${key}]${notes}`;
   },
   assessPronunciation: async () => ({
     overallScore: 0,
