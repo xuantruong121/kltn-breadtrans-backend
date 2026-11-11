@@ -30,8 +30,8 @@ export async function grantPlanStreakFreezes(
     data: {
       userId: input.userId,
       type: PLAN_STREAK_FREEZE_TYPE,
-      title: `Gói ${PLAN_LABEL[planCodeOf(input.planCode)]} tặng bạn ${count} thẻ giữ chuỗi`,
-      body: 'Thẻ giữ chuỗi tự được dùng khi bạn lỡ một ngày học, để chuỗi ngày của bạn không bị mất.',
+      title: `Gói ${PLAN_LABEL[planCodeOf(input.planCode)]} tặng bạn ${count} khiên giữ chuỗi`,
+      body: 'Khiên giữ chuỗi tự được dùng khi bạn lỡ một ngày học, để chuỗi ngày của bạn không bị mất.',
       url: '/dashboard',
     },
   });

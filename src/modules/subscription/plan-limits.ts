@@ -7,7 +7,7 @@
  *   tutorPerDay             questions to the tutor per day
  *   writingRevisions        "Sửa và nộp lại" per first Writing answer
  *   toeicProductive         TOEIC Speaking & Writing and four-skill exams
- *   streakFreezesPer30Days  streak freezes given with each 30 days bought
+ *   streakFreezesPer30Days  streak shields ("khiên giữ chuỗi") given with each 30 days bought
  *
  * A learner on a PLUS trial is on PLUS. An unknown or missing plan is FREE.
  * The practice-level policy (which CEFR levels a plan opens) stays in

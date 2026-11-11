@@ -11136,9 +11136,9 @@ async function main() {
     {
       id: 3,
       slug: 'streak-freeze',
-      name: 'Vé bảo vệ chuỗi học (Streak Freeze)',
+      name: 'Khiên giữ chuỗi',
       description:
-        'Tự động bảo vệ chuỗi ngày học liên tục nếu bạn bận rộn bỏ lỡ 1 ngày.',
+        'Tự được dùng khi bạn lỡ một ngày học, để chuỗi ngày học không bị mất. Mỗi ngày lỡ dùng 1 khiên.',
       category: 'BOOST',
       rarity: 'RARE',
       price: 250,

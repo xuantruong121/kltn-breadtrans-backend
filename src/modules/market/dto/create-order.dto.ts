@@ -15,7 +15,7 @@ export class CreateMarketOrderDto {
     example: [
       {
         id: 'streak-freeze',
-        name: 'Khiên Bảo Vệ Streak',
+        name: 'Khiên giữ chuỗi',
         quantity: 1,
         type: 'streak_freeze',
       },

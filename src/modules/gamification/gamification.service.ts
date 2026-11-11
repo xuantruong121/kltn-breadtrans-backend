@@ -4,6 +4,7 @@ import {
   Optional,
   Logger,
 } from '@nestjs/common';
+import { streakShieldUsedNotice } from './streak-shield.logic';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -1163,6 +1164,16 @@ export class GamificationService {
                 lastStreakUpdate: now,
               },
             });
+            // The learner is told a shield was used, and how many are left.
+            await client.notification.create({
+              data: {
+                userId,
+                ...streakShieldUsedNotice({
+                  streak: stats.streakCount,
+                  remaining: stats.streakFreezes - 1,
+                }),
+              },
+            });
             await recordMilestone();
           } else {
             // Streak broken or starting from 0 - reset to 1
@@ -2151,6 +2162,17 @@ export class GamificationService {
               data: {
                 streakFreezes: { decrement: 1 },
                 lastStreakUpdate: processedAt,
+              },
+            });
+            // Same transaction as the shield it reports, so a retried batch
+            // cannot tell the learner twice.
+            await tx.notification.create({
+              data: {
+                userId: stat.userId,
+                ...streakShieldUsedNotice({
+                  streak: stat.streakCount,
+                  remaining: stat.streakFreezes - 1,
+                }),
               },
             });
           } else {

@@ -137,9 +137,9 @@ async function api() {
   check(
     'the learner is told once',
     JSON.stringify(freezeNotices(plus)) ===
-      JSON.stringify(['Gói Plus tặng bạn 1 thẻ giữ chuỗi']) &&
+      JSON.stringify(['Gói Plus tặng bạn 1 khiên giữ chuỗi']) &&
       JSON.stringify(freezeNotices(pro90)) ===
-        JSON.stringify(['Gói Pro tặng bạn 9 thẻ giữ chuỗi']) &&
+        JSON.stringify(['Gói Pro tặng bạn 9 khiên giữ chuỗi']) &&
       freezeNotices(free).length === 0,
     JSON.stringify([freezeNotices(plus), freezeNotices(pro90)]),
   );
@@ -298,7 +298,7 @@ async function browserFlow() {
         '10 lượt 30 lượt 100 lượt',
       ) &&
       row('Sửa và nộp lại bài viết').includes('2 lần mỗi bài 5 lần mỗi bài') &&
-      row('Thẻ giữ chuỗi tặng kèm mỗi 30 ngày').includes('1 thẻ 3 thẻ') &&
+      row('Khiên giữ chuỗi tặng kèm mỗi 30 ngày').includes('1 khiên 3 khiên') &&
       rows.some((r) =>
         r.startsWith('Đề TOEIC Speaking & Writing và đề 4 kỹ năng'),
       ) &&

@@ -28,7 +28,7 @@ describe('grantPlanStreakFreezes', () => {
       data: expect.objectContaining({
         userId: 7,
         type: PLAN_STREAK_FREEZE_TYPE,
-        title: 'Gói Plus tặng bạn 1 thẻ giữ chuỗi',
+        title: 'Gói Plus tặng bạn 1 khiên giữ chuỗi',
         url: '/dashboard',
       }),
     });
@@ -47,7 +47,7 @@ describe('grantPlanStreakFreezes', () => {
       expect.objectContaining({ update: { streakFreezes: { increment: 9 } } }),
     );
     expect(t.notification.create.mock.calls[0][0].data.title).toBe(
-      'Gói Pro tặng bạn 9 thẻ giữ chuỗi',
+      'Gói Pro tặng bạn 9 khiên giữ chuỗi',
     );
   });
 
