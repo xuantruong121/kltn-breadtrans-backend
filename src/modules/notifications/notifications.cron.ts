@@ -148,7 +148,12 @@ export class NotificationsCronService {
       }),
       this.prisma.learnerMistake.groupBy({
         by: ['userId'],
-        where: { userId: { in: dueIds }, resolvedAt: null },
+        // TOEIC exam questions are not in the notebook (owner 2026-11-11).
+        where: {
+          userId: { in: dueIds },
+          resolvedAt: null,
+          skill: { not: 'TOEIC' },
+        },
         _count: { _all: true },
       }),
     ]);

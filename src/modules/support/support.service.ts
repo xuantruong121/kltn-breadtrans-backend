@@ -13,7 +13,6 @@ import { SupportQueryDto } from './dto/support-query.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TutorService } from '../ai/tutor.service';
 import { TUTOR_HISTORY_TURNS, type TutorTurn } from '../ai/tutor-prompt.logic';
-import { parseTutorContextRef } from '../ai/tutor-context.logic';
 
 export const SUPPORT_AI_NAME = 'Trợ Lý Bánh Mì';
 
@@ -37,7 +36,6 @@ export class SupportService {
     studentId: number,
     studentMessageId: number,
     content: string,
-    context?: unknown,
   ) {
     if (!this.tutor) return null;
     const earlier = await this.db.supportMessage.findMany({
@@ -54,11 +52,9 @@ export class SupportService {
       role: m.senderRole === 'AI' ? 'assistant' : 'user',
       content: m.content,
     }));
-    const contextRef = parseTutorContextRef(context);
     const { reply, quota, limited } = await this.tutor.reply(studentId, {
       message: content,
       history,
-      ...(contextRef ? { contextRef } : {}),
     });
     const saved = await this.createAiMessage(
       conversationId,
@@ -354,7 +350,6 @@ export class SupportService {
         studentId,
         message.id,
         message.content,
-        dto.context,
       ).catch((error) => {
         this.logger.error(`Tutor reply failed: ${String(error)}`);
         return null;

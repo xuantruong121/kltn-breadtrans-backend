@@ -30,7 +30,11 @@ import {
 import { validateToeicExam } from './toeic.validation';
 import { buildToeicListeningAudioScript } from './toeic-listening-audio';
 import { buildLrStats, parseToeicGoal } from './toeic-lr-stats';
-import { reviewStatus, summarizeLrReview } from './toeic-lr-review';
+import {
+  hideUnansweredKeys,
+  reviewStatus,
+  summarizeLrReview,
+} from './toeic-lr-review';
 import { toeicQuestionType } from './toeic-question-type';
 import { practiceDurationSeconds } from './toeic-practice-duration.logic';
 import {
@@ -1652,6 +1656,8 @@ export class ToeicService {
           ? (question.options as string[])
           : [];
         const status = reviewStatus(selected, question.correctIndex);
+        // Nullable: a skipped question loses its key further down.
+        const keyIndex: number | null = question.correctIndex;
         return {
           questionId: question.id,
           questionNumber: question.questionNumber,
@@ -1663,7 +1669,7 @@ export class ToeicService {
           questionText: question.text,
           options,
           selectedIndex: selected,
-          correctIndex: question.correctIndex,
+          correctIndex: keyIndex,
           learnerAnswer: selected === null ? null : (options[selected] ?? null),
           standardAnswer: options[question.correctIndex] ?? null,
           status,
@@ -1672,6 +1678,9 @@ export class ToeicService {
           explanation: question.explanation ?? null,
         };
       });
+    // The learner sees keys only for the questions they answered.
+    const visibleQuestions =
+      role === 'ADMIN' ? questions : hideUnansweredKeys(questions);
     const durationSeconds =
       attempt.startedAt && attempt.submittedAt
         ? Math.max(
@@ -1703,7 +1712,7 @@ export class ToeicService {
         total: attempt.totalScore,
       },
       summary: summarizeLrReview(questions),
-      questions,
+      questions: visibleQuestions,
     };
   }
 

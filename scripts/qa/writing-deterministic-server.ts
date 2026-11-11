@@ -243,18 +243,14 @@ const provider = {
     })),
   }),
   chat: async () => 'Deterministic chat response.',
-  // The tutor: the same fixed text, plus what item reached the prompt, so a
-  // QA script can tell whether the server attached the item (and its key).
+  // The tutor: a fixed text. "[[notes]]" in the question echoes what the
+  // prompt says about the learner's frequent mistakes (the mistake
+  // notebook's top tags).
   tutorChat: async (prompt: string) => {
-    const item = /Bài đang hỏi \((.+?)\):/.exec(prompt)?.[1];
-    // "[[notes]]" in the question echoes what the prompt says about the
-    // learner's frequent mistakes (the mistake notebook's top tags).
     const notes = /\[\[notes\]\]/.test(prompt)
       ? ` [mistakes: ${/- Hay sai ở: (.+)/.exec(prompt)?.[1] ?? 'none'}]`
       : '';
-    if (!item) return `Deterministic chat response.${notes}`;
-    const key = /- Đáp án đúng: (.+)/.exec(prompt)?.[1] ?? 'none';
-    return `Deterministic chat response. [item: ${item}] [key: ${key}]${notes}`;
+    return `Deterministic chat response.${notes}`;
   },
   assessPronunciation: async () => ({
     overallScore: 0,

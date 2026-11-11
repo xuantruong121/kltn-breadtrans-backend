@@ -16,7 +16,6 @@ import { SpeakingCategoryService } from '../content/speaking-category.service';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { TutorService } from './tutor.service';
 import { MistakesModule } from '../mistakes/mistakes.module';
-import { TutorContextService } from './tutor-context.service';
 
 @Module({
   imports: [UploadModule, PrismaModule, SubscriptionModule, MistakesModule],
@@ -30,7 +29,6 @@ import { TutorContextService } from './tutor-context.service';
     AiImageSemanticValidator,
     CloudflareWorkersAiClient,
     AnswerReviewService,
-    TutorContextService,
     TutorService,
     {
       provide: AI_EVALUATOR_TOKEN,

@@ -1,7 +1,7 @@
 /**
  * Mistake notebook ("Sổ lỗi") on the disposable harness (owner 2026-11-11).
  *
- * API: wrong answers of grammar, reading, a submitted TOEIC attempt and the
+ * API: wrong answers of grammar and reading (not of a TOEIC exam) and the
  * corrections of a graded Writing answer are read into the notebook when it
  * is opened; an attempt in progress is not; each attempt is read once; a
  * review question carries no key; two right answers in a row close a
@@ -26,7 +26,7 @@ import {
   unlockAllLevels,
 } from './harness-api';
 import { FE, studentPage } from './harness-browser';
-import { harnessQuery } from './harness-db';
+import { harnessExec, harnessQuery } from './harness-db';
 
 const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 const one = (sql: string) => harnessQuery(sql)[0]?.[0];
@@ -265,7 +265,8 @@ async function api() {
     JSON.stringify(reading[0])?.slice(0, 200),
   );
 
-  // TOEIC: not while in progress.
+  // TOEIC exam questions are not in the notebook (owner 2026-11-11): a
+  // submitted attempt with a wrong answer adds nothing.
   const [qid, correct] = harnessQuery(
     `select q.id, q."correctIndex" from "ToeicQuestion" q join "ToeicQuestionGroup" g on g.id = q."groupId" where g."examId" = 1 and g.part = 5 order by q."questionNumber" limit 1`,
   )[0];
@@ -277,21 +278,60 @@ async function api() {
   await call('PATCH', `/toeic/attempts/${attemptId}/answers`, a.token, {
     answers: { [Number(qid)]: (Number(correct) + 1) % 4 },
   });
+  const beforeToeic = (await summary(a))?.open;
+  const submitted = await call(
+    'POST',
+    `/toeic/attempts/${attemptId}/submit`,
+    a.token,
+    {},
+  );
   s = await summary(a);
   check(
-    'a TOEIC attempt in progress adds nothing',
-    s?.bySkill?.TOEIC === 0,
+    'a submitted TOEIC attempt with a wrong answer adds nothing to the notebook',
+    submitted.data?.status === 'SUBMITTED' &&
+      s?.open === beforeToeic &&
+      !('TOEIC' in (s?.bySkill ?? {})) &&
+      one(
+        `select count(*) from "LearnerMistake" where "userId" = ${a.userId} and skill = 'TOEIC'`,
+      ) === '0',
     JSON.stringify(s?.bySkill),
   );
-  await call('POST', `/toeic/attempts/${attemptId}/submit`, a.token, {});
-  s = await summary(a);
-  const toeic = (await list(a, '?skill=toeic')).items;
+  const toeicFilter = await call('GET', '/mistakes?skill=toeic', a.token);
   check(
-    'after submit, only the answered wrong question is a mistake (blank ones are not)',
-    s?.bySkill?.TOEIC === 1 &&
-      toeic[0]?.tag === 'Part 5' &&
-      toeic[0]?.detail?.ref?.attemptId === attemptId,
-    `${JSON.stringify(s?.bySkill)} ${JSON.stringify(toeic[0])?.slice(0, 160)}`,
+    'the notebook has no TOEIC filter (400)',
+    toeicFilter.status === 400,
+    String(toeicFilter.status),
+  );
+
+  // A TOEIC row written before the change stays in the table and is never
+  // shown, counted, reviewed or reachable.
+  harnessExec(
+    `insert into "LearnerMistake" ("userId", skill, "sourceType", "itemKey", tag, detail)
+     values (${a.userId}, 'TOEIC', 'TOEIC_QUESTION', 'qa-legacy', 'Part 5',
+       '{"kind":"CHOICE","title":"Legacy","options":["a","b"],"correctIndex":1,"answerable":true,"ref":{}}'::jsonb)`,
+  );
+  const legacyId = Number(
+    one(
+      `select id from "LearnerMistake" where "userId" = ${a.userId} and "itemKey" = 'qa-legacy'`,
+    ),
+  );
+  s = await summary(a);
+  const everything = (await list(a)).items as Array<{ id: number }>;
+  const reviewAll = (await call('GET', '/mistakes/review', a.token)).data
+    ?.items as Array<{ id: number }>;
+  const legacyAnswer = await call(
+    'POST',
+    `/mistakes/${legacyId}/answer`,
+    a.token,
+    { selectedIndex: 1 },
+  );
+  check(
+    'an old TOEIC row is not counted, listed, reviewed or answerable (404)',
+    s?.open === beforeToeic &&
+      !everything.some((i) => i.id === legacyId) &&
+      !reviewAll.some((i) => i.id === legacyId) &&
+      legacyAnswer.status === 404,
+    `${s?.open}/${beforeToeic} ${legacyAnswer.status}`,
   );
 
   // Writing: a correction of a graded practice answer.
@@ -342,7 +382,8 @@ async function api() {
   });
   check(
     'the tutor prompt names the top mistake tags',
-    /\[mistakes: .*(Ngữ pháp|Luyện đề: Part 5)/.test(String(chat.data?.reply)),
+    /\[mistakes: .*Ngữ pháp/.test(String(chat.data?.reply)) &&
+      !String(chat.data?.reply).includes('Luyện đề'),
     String(chat.data?.reply),
   );
   return a;
@@ -393,6 +434,11 @@ async function browserFlow() {
     .getByRole('heading', { name: 'Sổ lỗi', exact: true })
     .waitFor({ timeout: 60_000 });
   check(
+    'the notebook has no "Hỏi gia sư" button and no "Luyện đề" filter',
+    (await page.getByRole('button', { name: 'Hỏi gia sư' }).count()) === 0 &&
+      (await page.getByRole('button', { name: /^Luyện đề/ }).count()) === 0,
+  );
+  check(
     'the notebook lists three mistakes',
     (await page.locator('article').count()) === 3,
   );
@@ -407,12 +453,7 @@ async function browserFlow() {
   check(
     'the skill filter narrows the list and is in the address',
     (await page.locator('article').count()) === 1 &&
-      (await page.getByRole('link', { name: 'Làm lại bài đọc' }).count()) ===
-        1 &&
-      (await page
-        .locator('article')
-        .getByRole('button', { name: 'Hỏi gia sư' })
-        .count()) === 1,
+      (await page.getByRole('link', { name: 'Làm lại bài đọc' }).count()) === 1,
   );
 
   await page.getByRole('button', { name: 'Tất cả' }).click();

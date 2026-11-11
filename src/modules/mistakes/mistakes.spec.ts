@@ -7,7 +7,6 @@ import {
   quizObservations,
   reviewQuestion,
   speakingObservations,
-  toeicObservations,
   topMistakeTags,
   writingObservations,
   type MistakeDetail,
@@ -113,51 +112,6 @@ describe('mistake-extract.logic', () => {
         results: [],
       }),
     ).toEqual([]);
-  });
-
-  it('reads a TOEIC attempt: a blank answer is not a mistake, Part 5 can be answered again, Part 2 cannot', () => {
-    const question = {
-      text: 'q',
-      options: ['a', 'b', 'c', 'd'],
-      correctIndex: 2,
-      explanation: null,
-      passageText: null,
-      transcriptText: 'Where is the meeting?',
-    };
-    const obs = toeicObservations({
-      id: 7,
-      examId: 1,
-      examTitle: 'Đề 1',
-      submittedAt: at,
-      answers: [
-        { questionId: 101, selectedIndex: 0 },
-        { questionId: 9, selectedIndex: 1 },
-        { questionId: 102, selectedIndex: null },
-        { questionId: 103, selectedIndex: 2 },
-      ],
-      questions: [
-        { ...question, id: 101, questionNumber: 101, part: 5 },
-        { ...question, id: 9, questionNumber: 9, part: 2 },
-        { ...question, id: 102, questionNumber: 102, part: 5 },
-        { ...question, id: 103, questionNumber: 103, part: 5 },
-      ],
-    });
-    expect(obs.map((o) => [o.itemKey, o.outcome])).toEqual([
-      ['101', 'WRONG'],
-      ['9', 'WRONG'],
-      ['103', 'CORRECT'],
-    ]);
-    expect(obs[0]).toMatchObject({ skill: 'TOEIC', tag: 'Part 5' });
-    expect(obs[0].detail).toMatchObject({
-      title: 'Đề 1 · Part 5 · Câu 101',
-      answerable: true,
-      ref: { attemptId: 7, questionNumber: 101, part: 5 },
-    });
-    expect(obs[0].detail?.passage).toBeUndefined();
-    expect(obs[1].detail).toMatchObject({
-      answerable: false,
-      passageKind: 'TRANSCRIPT',
-    });
   });
 
   it('reads a grammar attempt with its topic as the tag', () => {
@@ -344,13 +298,13 @@ describe('mistake-extract.logic', () => {
     expect(
       topMistakeTags([
         { skill: 'GRAMMAR', tag: 'Giới từ', wrongCount: 1 },
-        { skill: 'TOEIC', tag: 'Part 5', wrongCount: 4 },
+        { skill: 'LISTENING', tag: 'Hội thoại ngắn', wrongCount: 4 },
         { skill: 'GRAMMAR', tag: 'Giới từ', wrongCount: 2 },
         { skill: 'READING', tag: 'DETAIL', wrongCount: 1 },
         { skill: 'READING', tag: 'INFERENCE', wrongCount: 1 },
         { skill: 'WRITING', tag: null, wrongCount: 9 },
       ]),
-    ).toEqual(['Luyện đề: Part 5', 'Ngữ pháp: Giới từ', 'Đọc: chi tiết']);
+    ).toEqual(['Nghe: Hội thoại ngắn', 'Ngữ pháp: Giới từ', 'Đọc: chi tiết']);
   });
 });
 
@@ -385,8 +339,15 @@ describe('MistakesService', () => {
   it('answers "not found" for a mistake of another learner', async () => {
     const { service, prisma } = setup(null);
     await expect(service.answer(10, 5, 1)).rejects.toThrow(NotFoundException);
+    // A row of a skill the notebook no longer has (TOEIC) is not found either.
     expect(prisma.learnerMistake.findFirst).toHaveBeenCalledWith({
-      where: { id: 5, userId: 10 },
+      where: {
+        id: 5,
+        userId: 10,
+        skill: {
+          in: ['LISTENING', 'SPEAKING', 'READING', 'WRITING', 'GRAMMAR'],
+        },
+      },
     });
   });
 
@@ -462,9 +423,11 @@ describe('MistakesService', () => {
       learnerMistake: { findUnique: jest.fn(), upsert: jest.fn() },
     };
     const none = { findMany: jest.fn().mockResolvedValue([]) };
+    // TOEIC exam attempts are not part of the notebook: never read.
+    const toeicAttempt = { findMany: jest.fn(), findUnique: jest.fn() };
     const prisma = {
       submission: none,
-      toeicAttempt: none,
+      toeicAttempt,
       speakingSubmission: none,
       grammarAttempt: {
         findMany: jest.fn().mockResolvedValue([{ id: 4 }]),
@@ -522,5 +485,7 @@ describe('MistakesService', () => {
     prisma.grammarAttempt.findUnique.mockClear();
     await service.sync(10);
     expect(prisma.grammarAttempt.findUnique).not.toHaveBeenCalled();
+    expect(toeicAttempt.findMany).not.toHaveBeenCalled();
+    expect(toeicAttempt.findUnique).not.toHaveBeenCalled();
   });
 });

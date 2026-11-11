@@ -223,7 +223,7 @@ async function browserFlow() {
     page.url(),
   );
 
-  const input = panel.locator('input[type="text"]');
+  const input = panel.locator('textarea');
   await input.fill('Phân biệt since và for');
   await input.press('Enter');
   await panel

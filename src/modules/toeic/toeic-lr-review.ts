@@ -52,3 +52,34 @@ export function summarizeLrReview(
     parts,
   };
 }
+
+/**
+ * What a learner may see of each question after submitting (owner
+ * 2026-11-11): the key, the worded answer and the explanation only for a
+ * question they answered. A skipped question keeps its text and choices and
+ * nothing else, so answering a few questions and submitting does not hand out
+ * the key of the whole exam. A listening transcript gives the answers of its
+ * group away, so it is shown only when at least one question of the group was
+ * answered.
+ */
+export function hideUnansweredKeys<
+  T extends {
+    groupId: number;
+    selectedIndex: number | null;
+    correctIndex: number | null;
+    standardAnswer: string | null;
+    explanation: string | null;
+    transcript: string | null;
+  },
+>(questions: T[]): T[] {
+  const answeredGroups = new Set(
+    questions.filter((q) => q.selectedIndex !== null).map((q) => q.groupId),
+  );
+  return questions.map((q) => ({
+    ...q,
+    transcript: answeredGroups.has(q.groupId) ? q.transcript : null,
+    ...(q.selectedIndex === null
+      ? { correctIndex: null, standardAnswer: null, explanation: null }
+      : {}),
+  }));
+}

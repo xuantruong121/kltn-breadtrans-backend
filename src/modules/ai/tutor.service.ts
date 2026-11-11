@@ -5,8 +5,6 @@ import { getBusinessDayKey } from '../../common/time/business-time.util';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { AiService } from './ai.service';
 import { MistakesService } from '../mistakes/mistakes.service';
-import { TutorContextService } from './tutor-context.service';
-import type { TutorContextRef } from './tutor-context.logic';
 import {
   TUTOR_UNAVAILABLE_MESSAGE,
   buildTutorPrompt,
@@ -38,7 +36,6 @@ export class TutorService {
     private readonly aiService: AiService,
     @InjectRedis() private readonly redis: Redis,
     @Optional() private readonly subscriptions?: SubscriptionService,
-    @Optional() private readonly contexts?: TutorContextService,
     @Optional() private readonly mistakes?: MistakesService,
   ) {}
 
@@ -77,8 +74,6 @@ export class TutorService {
       message: string;
       history?: TutorTurn[];
       context?: TutorContext | null;
-      /** Ids of the item asked about; the item itself is read on the server. */
-      contextRef?: TutorContextRef | null;
       learnerNotes?: string[];
     },
   ): Promise<TutorReply> {
@@ -95,15 +90,9 @@ export class TutorService {
     }
     const quota = { limit, remaining: Math.max(0, limit - used) };
     try {
-      const context =
-        input.context ??
-        (input.contextRef && this.contexts
-          ? await this.contexts.load(userId, input.contextRef)
-          : null);
       const reply = await this.aiService.tutorChat(
         buildTutorPrompt({
           ...input,
-          context,
           learnerNotes: [
             ...(input.learnerNotes ?? []),
             ...(await this.mistakeNotes(userId)),

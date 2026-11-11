@@ -14,7 +14,6 @@ import type { Response } from 'express';
 import { AiService } from './ai.service';
 import { TutorService } from './tutor.service';
 import type { TutorTurn } from './tutor-prompt.logic';
-import { parseTutorContextRef } from './tutor-context.logic';
 import {
   ApiTags,
   ApiOperation,
@@ -23,7 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
-import { IsString, IsOptional, IsArray, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsArray } from 'class-validator';
 
 export class ChatDto {
   @ApiProperty({
@@ -43,15 +42,6 @@ export class ChatDto {
   @IsOptional()
   @IsArray()
   messages?: Array<{ role: string; content: string }>;
-
-  @ApiProperty({
-    required: false,
-    description:
-      'The answered item being asked about: { sourceType: TOEIC_ATTEMPT | QUIZ_SUBMISSION | GRAMMAR_ATTEMPT, sourceId, questionId }. The server reads the item itself, only for the learner own submitted attempt.',
-  })
-  @IsOptional()
-  @IsObject()
-  context?: Record<string, unknown>;
 }
 
 @ApiTags('ai')
@@ -100,7 +90,6 @@ export class AiController {
     const { reply, quota, limited } = await this.tutor.reply(req.user.id, {
       message,
       history,
-      contextRef: parseTutorContextRef(chatDto.context),
     });
     return { reply, answer: reply, quota, limited };
   }

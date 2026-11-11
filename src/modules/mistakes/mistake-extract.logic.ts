@@ -18,13 +18,11 @@ export const MISTAKE_SKILLS = [
   'READING',
   'WRITING',
   'GRAMMAR',
-  'TOEIC',
 ] as const;
 export type MistakeSkill = (typeof MISTAKE_SKILLS)[number];
 
 export const MISTAKE_SOURCES = [
   'QUIZ_QUESTION',
-  'TOEIC_QUESTION',
   'GRAMMAR_QUESTION',
   'WRITING_CORRECTION',
   'SPEAKING_WORD',
@@ -64,9 +62,6 @@ export type MistakeDetail = {
     submissionId?: number;
     questionId?: number;
     attemptId?: number;
-    examId?: number;
-    questionNumber?: number;
-    part?: number;
     topicId?: number;
     exerciseId?: number;
   };
@@ -233,83 +228,6 @@ export function quizObservations(submission: {
     });
   }
   return out.slice(0, MAX_ITEMS_PER_ATTEMPT * 3);
-}
-
-/**
- * A submitted TOEIC Listening/Reading attempt. A blank answer is not a
- * mistake: a practice attempt covers only some parts, and an unanswered
- * question says nothing about what the learner knows.
- */
-export function toeicObservations(attempt: {
-  id: number;
-  examId: number;
-  examTitle: string;
-  submittedAt: Date;
-  answers: Array<{ questionId: number; selectedIndex: number | null }>;
-  questions: Array<{
-    id: number;
-    questionNumber: number;
-    text: string | null;
-    options: unknown;
-    correctIndex: number;
-    explanation: string | null;
-    part: number;
-    passageText: string | null;
-    transcriptText: string | null;
-  }>;
-}): MistakeObservation[] {
-  const out: MistakeObservation[] = [];
-  for (const answer of attempt.answers) {
-    if (answer.selectedIndex === null) continue;
-    const q = attempt.questions.find((item) => item.id === answer.questionId);
-    if (!q) continue;
-    const base = {
-      sourceType: 'TOEIC_QUESTION' as const,
-      itemKey: String(q.id),
-      skill: 'TOEIC' as const,
-      tag: `Part ${q.part}`,
-      at: attempt.submittedAt,
-    };
-    if (answer.selectedIndex === q.correctIndex) {
-      out.push({ ...base, outcome: 'CORRECT' });
-      continue;
-    }
-    const options = optionList(q.options);
-    const listening = q.part <= 4;
-    const passage = clean(
-      listening ? q.transcriptText : q.passageText,
-      PASSAGE_MAX,
-    );
-    out.push({
-      ...base,
-      outcome: 'WRONG',
-      detail: {
-        kind: 'CHOICE',
-        title: `${attempt.examTitle} · Part ${q.part} · Câu ${q.questionNumber}`,
-        question: clean(q.text) || undefined,
-        passage: passage || undefined,
-        passageKind: passage
-          ? listening
-            ? 'TRANSCRIPT'
-            : 'PASSAGE'
-          : undefined,
-        options,
-        selectedIndex: validIndex(answer.selectedIndex, options.length),
-        correctIndex: q.correctIndex,
-        explanation: clean(q.explanation) || undefined,
-        // Parts 1-4 need audio or a picture; Part 5-7 are text.
-        answerable: !listening && options.length > 1,
-        ref: {
-          attemptId: attempt.id,
-          examId: attempt.examId,
-          questionId: q.id,
-          questionNumber: q.questionNumber,
-          part: q.part,
-        },
-      },
-    });
-  }
-  return out;
 }
 
 /** A grammar attempt: `answers` maps question id to the chosen index. */
@@ -568,5 +486,4 @@ export const SKILL_LABEL_VI: Record<MistakeSkill, string> = {
   READING: 'Đọc',
   WRITING: 'Viết',
   GRAMMAR: 'Ngữ pháp',
-  TOEIC: 'Luyện đề',
 };

@@ -15,7 +15,6 @@ import {
   quizObservations,
   reviewQuestion,
   speakingObservations,
-  toeicObservations,
   topMistakeTags,
   writingObservations,
   type MistakeDetail,
@@ -24,8 +23,7 @@ import {
   type MistakeState,
 } from './mistake-extract.logic';
 
-type IngestKind =
-  'SUBMISSION' | 'TOEIC_ATTEMPT' | 'GRAMMAR_ATTEMPT' | 'SPEAKING_SUBMISSION';
+type IngestKind = 'SUBMISSION' | 'GRAMMAR_ATTEMPT' | 'SPEAKING_SUBMISSION';
 
 /** Attempts older than this are not read into the notebook. */
 const LOOKBACK_DAYS = 90;
@@ -33,6 +31,12 @@ const LOOKBACK_DAYS = 90;
 const BATCH_PER_KIND = 40;
 const PAGE_SIZE = 20;
 const REVIEW_SIZE = 10;
+/**
+ * Only the skills the notebook has. TOEIC exam questions were taken out
+ * (owner 2026-11-11); rows written before that stay in the table and are
+ * never shown, counted or reviewed.
+ */
+const IN_NOTEBOOK = { skill: { in: [...MISTAKE_SKILLS] as string[] } };
 
 /**
  * The mistake notebook. Rows are derived from graded attempts when the
@@ -51,13 +55,9 @@ export class MistakesService {
   async sync(userId: number): Promise<void> {
     try {
       const since = new Date(Date.now() - LOOKBACK_DAYS * 86_400_000);
-      const [submissions, toeic, grammar, speaking, done] = await Promise.all([
+      const [submissions, grammar, speaking, done] = await Promise.all([
         this.prisma.submission.findMany({
           where: { userId, score: { not: null }, submittedAt: { gte: since } },
-          select: { id: true },
-        }),
-        this.prisma.toeicAttempt.findMany({
-          where: { userId, status: 'SUBMITTED', submittedAt: { gte: since } },
           select: { id: true },
         }),
         this.prisma.grammarAttempt.findMany({
@@ -84,10 +84,6 @@ export class MistakesService {
       for (const id of fresh('SUBMISSION', submissions))
         await this.ingest(userId, 'SUBMISSION', id, () =>
           this.readSubmission(id),
-        );
-      for (const id of fresh('TOEIC_ATTEMPT', toeic))
-        await this.ingest(userId, 'TOEIC_ATTEMPT', id, () =>
-          this.readToeic(id),
         );
       for (const id of fresh('GRAMMAR_ATTEMPT', grammar))
         await this.ingest(userId, 'GRAMMAR_ATTEMPT', id, () =>
@@ -130,46 +126,6 @@ export class MistakesService {
       ...quizObservations({ ...row, questions: row.quiz.questions }),
       ...writingObservations(row),
     ];
-  }
-
-  private async readToeic(id: number): Promise<MistakeObservation[]> {
-    const row = await this.prisma.toeicAttempt.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        examId: true,
-        submittedAt: true,
-        createdAt: true,
-        exam: { select: { title: true } },
-        answers: { select: { questionId: true, selectedIndex: true } },
-      },
-    });
-    if (!row || row.answers.length === 0) return [];
-    const questions = await this.prisma.toeicQuestion.findMany({
-      where: {
-        id: { in: row.answers.map((a) => a.questionId) },
-        group: { examId: row.examId },
-      },
-      select: {
-        id: true,
-        questionNumber: true,
-        text: true,
-        options: true,
-        correctIndex: true,
-        explanation: true,
-        group: {
-          select: { part: true, passageText: true, transcriptText: true },
-        },
-      },
-    });
-    return toeicObservations({
-      id: row.id,
-      examId: row.examId,
-      examTitle: row.exam.title,
-      submittedAt: row.submittedAt ?? row.createdAt,
-      answers: row.answers,
-      questions: questions.map((q) => ({ ...q, ...q.group })),
-    });
   }
 
   private async readGrammar(id: number): Promise<MistakeObservation[]> {
@@ -297,7 +253,7 @@ export class MistakesService {
     await this.sync(userId);
     const groups = await this.prisma.learnerMistake.groupBy({
       by: ['skill'],
-      where: { userId, resolvedAt: null },
+      where: { userId, resolvedAt: null, ...IN_NOTEBOOK },
       _count: { _all: true },
     });
     const bySkill = Object.fromEntries(
@@ -308,12 +264,13 @@ export class MistakesService {
     ) as Record<MistakeSkill, number>;
     const [resolved, answerable] = await Promise.all([
       this.prisma.learnerMistake.count({
-        where: { userId, resolvedAt: { not: null } },
+        where: { userId, resolvedAt: { not: null }, ...IN_NOTEBOOK },
       }),
       this.prisma.learnerMistake.count({
         where: {
           userId,
           resolvedAt: null,
+          ...IN_NOTEBOOK,
           detail: { path: ['answerable'], equals: true },
         },
       }),
@@ -338,7 +295,7 @@ export class MistakesService {
     const page = Math.max(1, Math.floor(Number(query.page) || 1));
     const where = {
       userId,
-      ...(skill ? { skill } : {}),
+      ...(skill ? { skill } : IN_NOTEBOOK),
       resolvedAt: resolved ? { not: null } : null,
     };
     const [total, rows] = await Promise.all([
@@ -377,7 +334,7 @@ export class MistakesService {
       where: {
         userId,
         resolvedAt: null,
-        ...(skill ? { skill } : {}),
+        ...(skill ? { skill } : IN_NOTEBOOK),
         detail: { path: ['answerable'], equals: true },
       },
       // The ones not seen for longest come first.
@@ -398,7 +355,7 @@ export class MistakesService {
 
   private async own(userId: number, id: number) {
     const row = await this.prisma.learnerMistake.findFirst({
-      where: { id, userId },
+      where: { id, userId, ...IN_NOTEBOOK },
     });
     if (!row) throw new NotFoundException('Không tìm thấy lỗi này.');
     return row;
@@ -470,6 +427,7 @@ export class MistakesService {
     const rows = await this.prisma.learnerMistake.findMany({
       where: {
         userId,
+        ...IN_NOTEBOOK,
         tag: { not: null },
         lastSeenAt: { gte: from, lt: until },
       },
@@ -482,7 +440,7 @@ export class MistakesService {
   /** What the learner gets wrong most, for the tutor prompt. No sync here. */
   async topTags(userId: number): Promise<string[]> {
     const rows = await this.prisma.learnerMistake.findMany({
-      where: { userId, resolvedAt: null, tag: { not: null } },
+      where: { userId, resolvedAt: null, tag: { not: null }, ...IN_NOTEBOOK },
       select: { skill: true, tag: true, wrongCount: true },
       orderBy: { lastSeenAt: 'desc' },
       take: 200,
