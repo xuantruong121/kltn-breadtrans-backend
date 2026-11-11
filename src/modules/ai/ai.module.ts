@@ -15,6 +15,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { SpeakingCategoryService } from '../content/speaking-category.service';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { TutorService } from './tutor.service';
+import { TutorContextService } from './tutor-context.service';
 
 @Module({
   imports: [UploadModule, PrismaModule, SubscriptionModule],
@@ -28,6 +29,7 @@ import { TutorService } from './tutor.service';
     AiImageSemanticValidator,
     CloudflareWorkersAiClient,
     AnswerReviewService,
+    TutorContextService,
     TutorService,
     {
       provide: AI_EVALUATOR_TOKEN,

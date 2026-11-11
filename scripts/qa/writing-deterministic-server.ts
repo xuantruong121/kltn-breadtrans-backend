@@ -243,6 +243,14 @@ const provider = {
     })),
   }),
   chat: async () => 'Deterministic chat response.',
+  // The tutor: the same fixed text, plus what item reached the prompt, so a
+  // QA script can tell whether the server attached the item (and its key).
+  tutorChat: async (prompt: string) => {
+    const item = /Bài đang hỏi \((.+?)\):/.exec(prompt)?.[1];
+    if (!item) return 'Deterministic chat response.';
+    const key = /- Đáp án đúng: (.+)/.exec(prompt)?.[1] ?? 'none';
+    return `Deterministic chat response. [item: ${item}] [key: ${key}]`;
+  },
   assessPronunciation: async () => ({
     overallScore: 0,
     clarity: 'Poor',
@@ -430,9 +438,7 @@ const provider = {
  *   review-cloudflare-down  Cloudflare is unreachable, Gemini answers
  *   review-outage           every reviewer is unreachable
  */
-function deterministicReviewer(
-  name: 'cloudflare' | 'gemini',
-): AnswerReviewer {
+function deterministicReviewer(name: 'cloudflare' | 'gemini'): AnswerReviewer {
   const isKey = (option: string) => /0$/.test(option.trim().replace(/\.$/, ''));
   return {
     name,
@@ -451,7 +457,8 @@ function deterministicReviewer(
           code: CLOUDFLARE_UNAVAILABLE,
         });
       const data = JSON.parse(prompt.prompt.split('DATA:\n')[1] ?? '{}');
-      const model = name === 'cloudflare' ? '@cf/openai/gpt-oss-120b' : 'gemini-qa';
+      const model =
+        name === 'cloudflare' ? '@cf/openai/gpt-oss-120b' : 'gemini-qa';
       if (Array.isArray(data.statements)) {
         const key = data.statements.findIndex(isKey);
         return {
