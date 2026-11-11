@@ -2,9 +2,11 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { planCodeOf, type PlanCode } from './plan-limits';
 import {
   EntitlementPeriod,
   EntitlementUnit,
@@ -120,7 +122,24 @@ export interface EffectiveEntitlement {
 
 @Injectable()
 export class SubscriptionService {
+  private readonly planLogger = new Logger(SubscriptionService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * The plan whose limits apply to this learner right now (plan-limits.ts).
+   * A failed lookup answers FREE: a limit must never open because of an error.
+   */
+  async planCodeFor(userId: number): Promise<PlanCode> {
+    try {
+      return planCodeOf((await this.resolveEffectivePlan(userId)).plan.code);
+    } catch (error) {
+      this.planLogger.warn(
+        `Plan lookup failed for ${userId}: ${String(error).slice(0, 160)}`,
+      );
+      return 'FREE';
+    }
+  }
 
   async resolveEffectivePlan(
     userId: number,

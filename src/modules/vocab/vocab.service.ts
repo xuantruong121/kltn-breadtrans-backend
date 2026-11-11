@@ -11,9 +11,17 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { DECK_WORD_INCLUDE, flattenDeckWord } from './dictionary-entry';
+import {
+  nextReviewAt as srsNextReviewAt,
+  previewSrs,
+  rateSrs,
+  srsStateOf,
+  type SrsGrade,
+  type SrsState,
+} from './srs.logic';
 
-/** Days until the next review, by how many correct reviews a word has had. */
-const REVIEW_DAYS = [1, 3, 7, 14, 30, 60];
+/** "Đã thuộc" on a card: the word is next reviewed after this many days. */
+const MASTERED_INTERVAL_DAYS = 7;
 
 @Injectable()
 export class VocabService {
@@ -185,17 +193,25 @@ export class VocabService {
 
     const userProgressMap: Record<
       number,
-      { isStarred: boolean; isMastered: boolean }
+      { isStarred: boolean; isMastered: boolean; srs: SrsState }
     > = {};
     if (userId) {
       const progresses = await this.prisma.userVocabWordProgress.findMany({
         where: { userId, word: { topicId } },
-        select: { wordId: true, isStarred: true, isMastered: true },
+        select: {
+          wordId: true,
+          isStarred: true,
+          isMastered: true,
+          intervalDays: true,
+          easeFactor: true,
+          lapses: true,
+        },
       });
       progresses.forEach((p) => {
         userProgressMap[p.wordId] = {
           isStarred: p.isStarred,
           isMastered: p.isMastered,
+          srs: srsStateOf(p),
         };
       });
     }
@@ -204,6 +220,7 @@ export class VocabService {
       const prog = userProgressMap[w.id] || {
         isStarred: false,
         isMastered: false,
+        srs: srsStateOf(null),
       };
       return {
         id: w.id,
@@ -219,6 +236,8 @@ export class VocabService {
         collocations: w.collocations,
         isStarred: prog.isStarred,
         isMastered: prog.isMastered,
+        // Days until the next review for each self-rating (0 = ten minutes).
+        reviewPreview: previewSrs(prog.srs),
       };
     });
 
@@ -277,23 +296,16 @@ export class VocabService {
     }
   }
 
-  private calculateNextReviewAt(reviewCount: number, isCorrect: boolean): Date {
-    const now = Date.now();
-    if (!isCorrect) {
-      return new Date(now + 10 * 60 * 1000); // 10 minutes
-    }
-    const days = REVIEW_DAYS[Math.max(0, reviewCount - 1)] ?? 60;
-    return new Date(now + days * 24 * 60 * 60 * 1000);
-  }
-
   async setMastered(userId: number, wordId: number, isMastered: boolean) {
     await this.assertLearnerWordAccess(userId, wordId);
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
     });
 
+    // The later reviews grow from this interval; un-mastering starts over.
+    const intervalDays = isMastered ? MASTERED_INTERVAL_DAYS : 0;
     const nextReviewAt = isMastered
-      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      ? new Date(Date.now() + MASTERED_INTERVAL_DAYS * 24 * 60 * 60 * 1000)
       : new Date(Date.now() + 10 * 60 * 1000);
 
     if (existing) {
@@ -302,6 +314,7 @@ export class VocabService {
         data: {
           isMastered,
           nextReviewAt,
+          intervalDays,
           remindedAt: null,
           lastReviewedAt: new Date(),
         },
@@ -321,6 +334,7 @@ export class VocabService {
           wordId,
           isMastered,
           nextReviewAt,
+          intervalDays,
           remindedAt: null,
           lastReviewedAt: new Date(),
         },
@@ -336,17 +350,34 @@ export class VocabService {
     }
   }
 
-  async submitReview(userId: number, wordId: number, isCorrect: boolean) {
+  /**
+   * One review of a word. `grade` is the learner's self-rating in the
+   * flashcard room and marks the word as known unless it is "Học lại"; a
+   * caller that only knows right or wrong sends `isCorrect`, which counts as
+   * "Tốt" or "Học lại" and needs two right answers before the word is known.
+   */
+  async submitReview(
+    userId: number,
+    wordId: number,
+    isCorrect: boolean,
+    grade?: SrsGrade,
+  ) {
     await this.assertLearnerWordAccess(userId, wordId);
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
     });
 
+    const rating: SrsGrade = grade ?? (isCorrect ? 'GOOD' : 'AGAIN');
     const newReviewCount = (existing?.reviewCount || 0) + 1;
-    const isMastered = isCorrect
-      ? existing?.isMastered || newReviewCount >= 2
-      : false;
-    const nextReviewAt = this.calculateNextReviewAt(newReviewCount, isCorrect);
+    const isMastered =
+      rating === 'AGAIN'
+        ? false
+        : grade
+          ? true
+          : existing?.isMastered || newReviewCount >= 2;
+    const srs = rateSrs(srsStateOf(existing), rating);
+    const now = new Date();
+    const nextReviewAt = srsNextReviewAt(srs, now);
 
     if (existing) {
       const updated = await this.prisma.userVocabWordProgress.update({
@@ -354,9 +385,10 @@ export class VocabService {
         data: {
           reviewCount: newReviewCount,
           isMastered,
-          lastReviewedAt: new Date(),
+          lastReviewedAt: now,
           nextReviewAt,
           remindedAt: null,
+          ...srs,
         },
       });
       if (updated.isMastered && !existing.isMastered) {
@@ -370,10 +402,11 @@ export class VocabService {
           userId,
           wordId,
           reviewCount: 1,
-          isMastered: isCorrect,
-          lastReviewedAt: new Date(),
+          isMastered: grade ? rating !== 'AGAIN' : isCorrect,
+          lastReviewedAt: now,
           nextReviewAt,
           remindedAt: null,
+          ...srs,
         },
       });
       if (created.isMastered) {

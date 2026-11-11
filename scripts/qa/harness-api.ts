@@ -106,6 +106,41 @@ export async function newProStudent(label = 'pro') {
   return { ...s, admin };
 }
 
+let planGranter: Awaited<ReturnType<typeof newAdmin>> | null = null;
+
+/**
+ * Puts a harness learner on a paid plan through the Admin API (the current
+ * published 30-day version of the plan). Suites about plan benefits need a
+ * learner on a known plan: revisions, AI gradings a day, TOEIC S&W exams.
+ */
+export async function grantPlan(
+  userId: number,
+  code: 'PLUS' | 'PRO',
+  durationDays = 30,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { harnessQuery } = require('./harness-db');
+  const planVersionId = Number(
+    harnessQuery(
+      `select v.id from "PlanVersion" v join "Plan" p on p.id = v."planId" where p.code = '${code}' and v."durationDays" = 30 and v.status = 'PUBLISHED' order by v.id desc limit 1`,
+    )[0]?.[0],
+  );
+  planGranter ??= await newAdmin('plan-granter');
+  const grant = await call(
+    'POST',
+    '/admin/subscriptions/grant',
+    planGranter.token,
+    {
+      studentId: userId,
+      planVersionId,
+      durationDays,
+      reason: 'Harness QA access',
+    },
+  );
+  if (grant.status >= 300)
+    throw new Error(`grant ${grant.status} ${JSON.stringify(grant.message)}`);
+}
+
 /**
  * Opens every practice level for a harness learner (fixture only). Suites
  * written before the level lock pick B1-C1 content for a fresh learner, which

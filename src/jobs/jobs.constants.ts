@@ -4,6 +4,7 @@ export const JOB_NAMES = {
   DAILY_ROLLOVER: 'daily-rollover',
   WEEKLY_LEAGUE: 'weekly-league',
   STREAK_REMINDER: 'streak-reminder',
+  STUDY_REMINDER: 'study-reminder',
   PLAN_EXPIRY_REMINDER: 'plan-expiry-reminder',
   WEEKLY_REPORT: 'weekly-report',
   WINBACK: 'winback',

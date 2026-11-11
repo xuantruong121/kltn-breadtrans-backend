@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -11,6 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { VocabService } from './vocab.service';
+import { isSrsGrade } from './srs.logic';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import {
@@ -120,8 +122,19 @@ export class VocabController {
   submitReview(
     @Param('id', ParseIntPipe) wordId: number,
     @Body('isCorrect') isCorrect: boolean,
+    @Body('grade') grade: unknown,
     @Request() req: any,
   ) {
-    return this.vocabService.submitReview(req.user.id, wordId, isCorrect);
+    if (grade !== undefined && grade !== null && !isSrsGrade(grade)) {
+      throw new BadRequestException(
+        'grade phải là AGAIN, HARD, GOOD hoặc EASY',
+      );
+    }
+    return this.vocabService.submitReview(
+      req.user.id,
+      wordId,
+      isCorrect,
+      isSrsGrade(grade) ? grade : undefined,
+    );
   }
 }

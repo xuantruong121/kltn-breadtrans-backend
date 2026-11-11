@@ -17,6 +17,8 @@ describe('NotificationsCronService', () => {
     prisma = {
       notification: {
         findFirst: jest.fn().mockResolvedValue(null),
+        // Study reminders already sent today (the one-push-a-day allowance).
+        count: jest.fn().mockResolvedValue(0),
       },
       userStats: {
         findMany: jest.fn().mockResolvedValue([
@@ -81,6 +83,30 @@ describe('NotificationsCronService', () => {
   });
 
   describe('handleVocabSpacedReview', () => {
+    // 10:00 Vietnam time: outside the quiet hours, whenever the suite runs.
+    beforeEach(() =>
+      jest
+        .useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] })
+        .setSystemTime(new Date('2026-11-11T03:00:00Z')),
+    );
+    afterEach(() => jest.useRealTimers());
+
+    it('writes the inbox entry but sends no push in the quiet hours', async () => {
+      jest.setSystemTime(new Date('2026-11-11T16:30:00Z')); // 23:30 in Vietnam
+      await cronService.handleVocabSpacedReview();
+      expect(notificationsService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 202, type: 'vocab_review' }),
+      );
+      expect(notificationsService.sendPushToUser).not.toHaveBeenCalled();
+    });
+
+    it('sends no second study push on the same day', async () => {
+      prisma.notification.count.mockResolvedValue(1);
+      await cronService.handleVocabSpacedReview();
+      expect(notificationsService.createNotification).toHaveBeenCalledTimes(1);
+      expect(notificationsService.sendPushToUser).not.toHaveBeenCalled();
+    });
+
     it('claims due items atomically, writes inbox notification and sends push', async () => {
       await cronService.handleVocabSpacedReview();
 

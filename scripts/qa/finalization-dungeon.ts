@@ -337,6 +337,136 @@ async function answerOnScreen(page: Page, id: string, right: boolean) {
   await sleep(500);
 }
 
+/** Whether box `a` covers any of box `b`. */
+const overlaps = (
+  a: { x: number; y: number; width: number; height: number } | null,
+  b: { x: number; y: number; width: number; height: number } | null,
+) =>
+  !!a &&
+  !!b &&
+  a.x < b.x + b.width &&
+  b.x < a.x + a.width &&
+  a.y < b.y + b.height &&
+  b.y < a.y + a.height;
+
+/**
+ * Owner 2026-11-10: a place to see the toppings held, during a question.
+ * A chip shows a card, the bag opens the list; neither covers the answers,
+ * and the question's clock keeps running behind them.
+ */
+async function heldToppingChecks(
+  page: Page,
+  tag: string,
+  id: string,
+  holding: boolean,
+) {
+  // The question's clock starts after the floor's intro; look once it runs.
+  const q = (await stored(id)).question;
+  if (q && q.issuedAt + 300 > Date.now())
+    await sleep(q.issuedAt + 300 - Date.now());
+  const panelOfQuestion = page
+    .locator('[role=timer]')
+    .first()
+    .locator('xpath=..');
+  await panelOfQuestion.waitFor({ timeout: 15_000 });
+  const answers = await panelOfQuestion.boundingBox();
+  if (holding) {
+    const chip = page
+      .getByRole('list', { name: 'Topping đang có' })
+      .getByRole('button')
+      .first();
+    await chip.click();
+    const card = page.locator('#dungeon-topping-card');
+    const cardShown = await card
+      .waitFor({ timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+    const cardText = cardShown ? await card.innerText() : '';
+    check(
+      `${tag}: a topping chip shows what it does now`,
+      cardShown && /Cấp|Đã dùng/.test(cardText) && cardText.includes(':'),
+      cardText.replace(/\s+/g, ' ').slice(0, 120),
+    );
+    check(
+      `${tag}: the chip's card does not cover the answers`,
+      !overlaps(await card.boundingBox(), answers),
+    );
+    await page.screenshot({ path: `${SHOTS}/dungeon-topping-chip-${tag}.png` });
+    await page.keyboard.press('Escape');
+    check(
+      `${tag}: Escape closes the chip's card`,
+      await card
+        .waitFor({ state: 'hidden', timeout: 2000 })
+        .then(() => true)
+        .catch(() => false),
+    );
+  }
+  await page.getByRole('button', { name: /^Topping đang có \(/ }).click();
+  const list = page.getByRole('dialog', { name: 'Topping đang có' });
+  const listShown = await list
+    .waitFor({ timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  const listText = listShown ? await list.innerText() : '';
+  check(
+    `${tag}: the bag opens the list, and says the clock keeps running`,
+    listShown &&
+      listText.includes('Đồng hồ vẫn chạy') &&
+      (holding
+        ? /Cấp|Đã dùng/.test(listText)
+        : listText.includes('Chưa có topping nào')),
+    listText.replace(/\s+/g, ' ').slice(0, 160),
+  );
+  check(
+    `${tag}: the list does not cover the answers`,
+    !overlaps(await list.boundingBox(), answers),
+    JSON.stringify({ list: await list.boundingBox(), answers }),
+  );
+  const timer = page.locator('[role=timer]').first();
+  const before = await timer.getAttribute('aria-label');
+  await sleep(2200);
+  const after = await timer.getAttribute('aria-label');
+  check(
+    `${tag}: the question's clock keeps running while the list is open`,
+    !!before && !!after && before !== after,
+    `${before} → ${after}`,
+  );
+  await page.screenshot({ path: `${SHOTS}/dungeon-topping-list-${tag}.png` });
+  await page.keyboard.press('Escape');
+  check(
+    `${tag}: Escape closes the list`,
+    await list
+      .waitFor({ state: 'hidden', timeout: 2000 })
+      .then(() => true)
+      .catch(() => false),
+  );
+}
+
+/** The topping cards read in plain words, with a before and after number. */
+async function toppingCardChecks(page: Page, tag: string) {
+  const cards = page.getByRole('button', { name: /(Thường|Hiếm|Quý)/ });
+  const texts = await cards.allInnerTexts();
+  check(
+    `${tag}: every topping card says what it does and shows its number now and after`,
+    texts.length === 3 &&
+      texts.every(
+        (t) => /\.\s/.test(t + ' ') && /(Mới|Lên cấp|Đã dùng)/.test(t),
+      ),
+    texts
+      .map((t) => t.replace(/\s+/g, ' '))
+      .join(' | ')
+      .slice(0, 300),
+  );
+  check(
+    `${tag}: no card text spills out of its card`,
+    await page.evaluate(() =>
+      [...document.querySelectorAll('button')]
+        .filter((b) => /Thường|Hiếm|Quý/.test(b.textContent ?? ''))
+        .every((b) => b.scrollWidth <= b.clientWidth + 1),
+    ),
+  );
+}
+
 async function browser(width: number) {
   const mode = width >= 1000 ? 'free' : 'daily';
   const tag = `${mode}-${width}`;
@@ -476,6 +606,7 @@ async function browser(width: number) {
         (await page.getByText('Tầng 2', { exact: true }).count()) >= 1,
     );
     await page.screenshot({ path: `${SHOTS}/dungeon-toppings-${tag}.png` });
+    await toppingCardChecks(page, tag);
     const firstOffer = (await stored(id)).run.offers[0];
     await page
       .getByRole('button', { name: new RegExp(`(Thường|Hiếm|Quý)`) })
@@ -499,6 +630,7 @@ async function browser(width: number) {
       picked.run.floor === 2,
       `${firstOffer} → floor ${picked.run.floor}`,
     );
+    await heldToppingChecks(page, tag, id, true);
     // Down to the boss with the API's help, then the boss on screen.
     await playTo(s.account.token, id, 5);
     await page.reload({ waitUntil: 'networkidle' });
@@ -532,6 +664,36 @@ async function browser(width: number) {
         (await stored(id)).run.floor === 5,
     );
     await page.screenshot({ path: `${SHOTS}/dungeon-boss-down-${tag}.png` });
+  } else {
+    // The phone: the bag before any topping, then floor 1 cleared through the
+    // API, the cards on a narrow screen, one picked, and the chip and list.
+    await heldToppingChecks(page, tag, id, false);
+    for (let i = 0; i < 20 && (await stored(id)).run.phase === 'fight'; i += 1)
+      await call(
+        'POST',
+        `/games/dungeon/${id}/answer`,
+        s.account.token,
+        await rightBody(id),
+      );
+    await page.reload({ waitUntil: 'networkidle' });
+    const choosing = await page
+      .getByRole('heading', { name: /Chọn một topping/ })
+      .waitFor({ timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+    check(`${tag}: a floor cleared deals three toppings`, choosing);
+    await sleep(1200);
+    await page.screenshot({
+      path: `${SHOTS}/dungeon-toppings-${tag}.png`,
+      fullPage: true,
+    });
+    await toppingCardChecks(page, tag);
+    await page
+      .getByRole('button', { name: /(Thường|Hiếm|Quý)/ })
+      .first()
+      .click();
+    await sleep(600);
+    await heldToppingChecks(page, tag, id, true);
   }
 
   await page.getByRole('button', { name: 'Rời hầm', exact: true }).click();

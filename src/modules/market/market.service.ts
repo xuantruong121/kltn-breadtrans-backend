@@ -13,6 +13,7 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
+import { isStreakShieldProduct } from '../gamification/streak-shield.logic';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
@@ -290,12 +291,9 @@ export class MarketService {
 
       const updatedStats = { totalBanhRan: deductResult.newBalance };
 
-      // 2d. Kích hoạt hiệu ứng vật phẩm nếu là vật phẩm tức thì (Ví dụ Khiên chuỗi)
+      // 2d. Kích hoạt hiệu ứng vật phẩm nếu là vật phẩm tức thì (khiên giữ chuỗi)
       for (const { product, quantity } of resolvedItems) {
-        if (
-          product.name.includes('Khiên') ||
-          product.name.toLowerCase().includes('streak')
-        ) {
+        if (isStreakShieldProduct(product)) {
           await tx.userStats.update({
             where: { userId },
             data: { streakFreezes: { increment: quantity } },

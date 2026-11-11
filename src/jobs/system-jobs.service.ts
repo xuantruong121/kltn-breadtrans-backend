@@ -97,6 +97,14 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  async enqueueStudyReminder(hourKey: string): Promise<void> {
+    await this.enqueue(
+      JOB_NAMES.STUDY_REMINDER,
+      { version: 1 },
+      { jobId: `study-reminder-${hourKey}` },
+    );
+  }
+
   async enqueuePlanExpiryReminder(dayKey: string): Promise<void> {
     await this.enqueue(
       JOB_NAMES.PLAN_EXPIRY_REMINDER,
@@ -199,6 +207,8 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
         );
       case JOB_NAMES.STREAK_REMINDER:
         return this.notifications.runDailyStreakReminder(job.data.dayKey);
+      case JOB_NAMES.STUDY_REMINDER:
+        return this.notifications.runStudyReminder();
       case JOB_NAMES.PLAN_EXPIRY_REMINDER:
         return this.notifications.runPlanExpiryReminder(job.data.dayKey);
       case JOB_NAMES.WEEKLY_REPORT:

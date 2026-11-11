@@ -22,6 +22,7 @@ import { ToeicModule } from './modules/toeic/toeic.module';
 import { EventsModule } from './modules/events/events.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { GrammarModule } from './modules/grammar/grammar.module';
+import { MistakesModule } from './modules/mistakes/mistakes.module';
 import { MarketModule } from './modules/market/market.module';
 import { ContentModule } from './modules/content/content.module';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -71,6 +72,7 @@ import { SuggestionModule } from './modules/suggestion/suggestion.module';
     EventsModule,
     AdminModule,
     GrammarModule,
+    MistakesModule,
     MarketModule,
     ContentModule,
     NotificationsModule,

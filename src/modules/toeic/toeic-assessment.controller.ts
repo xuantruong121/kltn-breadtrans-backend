@@ -78,7 +78,7 @@ export class ToeicAssessmentController {
 
   @Get()
   list(@Req() req: any) {
-    return this.assessments.listLearner(req.user.id);
+    return this.assessments.listLearner(req.user.id, req.user.role);
   }
 
   @Get('history')
@@ -88,7 +88,7 @@ export class ToeicAssessmentController {
 
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
-    return this.assessments.getLearnerDetail(id, req.user.id);
+    return this.assessments.getLearnerDetail(id, req.user.id, req.user.role);
   }
 
   @Post(':id/attempts')
@@ -97,7 +97,12 @@ export class ToeicAssessmentController {
     @Req() req: any,
     @Body() dto: StartToeicAssessmentAttemptDto,
   ) {
-    return this.assessments.startAttempt(id, req.user.id, dto?.idempotencyKey);
+    return this.assessments.startAttempt(
+      id,
+      req.user.id,
+      dto?.idempotencyKey,
+      req.user.role,
+    );
   }
 
   @Get('attempts/:attemptId')

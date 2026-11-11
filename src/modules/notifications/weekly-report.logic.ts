@@ -121,6 +121,8 @@ export function weeklyReportMessage(input: {
   weekStart: Date;
   skills: SkillWeek[];
   daysToExam: number | null;
+  /** What the learner got wrong most last week (mistake notebook), if known. */
+  mistakeTags?: string[];
 }) {
   const total = input.skills.reduce((sum, s) => sum + s.count, 0);
   const week = lastWeekLabel(input.weekStart);
@@ -144,6 +146,12 @@ export function weeklyReportMessage(input: {
         `${SKILL_LABEL[rise.s.skill]}: điểm luyện tập trung bình ${rise.s.average}% (tuần trước ${rise.s.previousAverage}%).`,
       );
   }
+
+  const tags = (input.mistakeTags ?? []).filter(Boolean).slice(0, 3);
+  if (tags.length)
+    parts.push(
+      `Lỗi hay gặp tuần qua: ${tags.join('; ')}. Mở Sổ lỗi để ôn lại.`,
+    );
 
   const focus = focusSkill(input.skills);
   if (focus)

@@ -14,7 +14,13 @@ import { WritingService } from './writing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiBody,
+  ApiResponse,
+} from '@nestjs/swagger';
 import {
   IsInt,
   IsNotEmpty,
@@ -38,6 +44,17 @@ class SubmitWritingDto {
   @IsOptional()
   @IsInt()
   questionId?: number;
+}
+
+class ReviseWritingDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20000)
+  answer!: string;
+
+  @IsOptional()
+  @IsUUID()
+  clientAttemptId?: string;
 }
 
 class SubmitWritingPart2Dto {
@@ -159,6 +176,40 @@ export class WritingController {
           }
         : undefined,
       body.questionId,
+    );
+  }
+
+  @Post('submissions/:id/revise')
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Sửa và nộp lại một bài luyện viết đã chấm (tối đa 2 lần, không cộng thưởng)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        answer: { type: 'string' },
+        clientAttemptId: { type: 'string', format: 'uuid' },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Điểm và nhận xét của bản sửa' })
+  @ApiResponse({ status: 400, description: 'Bài chưa sửa hoặc không hỗ trợ' })
+  @ApiResponse({ status: 404, description: 'Không phải bài nộp của học viên' })
+  @ApiResponse({ status: 409, description: 'Đã dùng hết số lần sửa' })
+  reviseWriting(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @Body() body: ReviseWritingDto,
+  ) {
+    return this.writingService.reviseWriting(
+      id,
+      req.user.id,
+      body.answer,
+      req.user.role,
+      body.clientAttemptId,
     );
   }
 

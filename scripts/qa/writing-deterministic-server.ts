@@ -243,6 +243,15 @@ const provider = {
     })),
   }),
   chat: async () => 'Deterministic chat response.',
+  // The tutor: a fixed text. "[[notes]]" in the question echoes what the
+  // prompt says about the learner's frequent mistakes (the mistake
+  // notebook's top tags).
+  tutorChat: async (prompt: string) => {
+    const notes = /\[\[notes\]\]/.test(prompt)
+      ? ` [mistakes: ${/- Hay sai ở: (.+)/.exec(prompt)?.[1] ?? 'none'}]`
+      : '';
+    return `Deterministic chat response.${notes}`;
+  },
   assessPronunciation: async () => ({
     overallScore: 0,
     clarity: 'Poor',
@@ -346,6 +355,7 @@ const provider = {
     const data = JSON.parse(input.prompt) as {
       rubric: Array<{ key: string; max: number }>;
       learnerResponse: string;
+      previousAttempt?: { corrections: unknown[] };
     };
     // QA markers in the learner text: "[[fail]]" makes this grading call
     // fail; "[[percent:NN]]" scores every criterion at NN % of its maximum.
@@ -393,7 +403,10 @@ const provider = {
               },
             ]
           : [],
-        feedback: 'Nhận xét tất định: bài viết đáp ứng yêu cầu chính của đề.',
+        // A guided rewrite: says that the earlier feedback reached the grader.
+        feedback: data.previousAttempt
+          ? `Nhận xét tất định cho bản sửa: đã nhận ${data.previousAttempt.corrections.length} lỗi của lần trước.`
+          : 'Nhận xét tất định: bài viết đáp ứng yêu cầu chính của đề.',
         suggestions: ['Kiểm tra lại cách chia động từ.'],
         ...(wantsRelevance
           ? {
@@ -430,9 +443,7 @@ const provider = {
  *   review-cloudflare-down  Cloudflare is unreachable, Gemini answers
  *   review-outage           every reviewer is unreachable
  */
-function deterministicReviewer(
-  name: 'cloudflare' | 'gemini',
-): AnswerReviewer {
+function deterministicReviewer(name: 'cloudflare' | 'gemini'): AnswerReviewer {
   const isKey = (option: string) => /0$/.test(option.trim().replace(/\.$/, ''));
   return {
     name,
@@ -451,7 +462,8 @@ function deterministicReviewer(
           code: CLOUDFLARE_UNAVAILABLE,
         });
       const data = JSON.parse(prompt.prompt.split('DATA:\n')[1] ?? '{}');
-      const model = name === 'cloudflare' ? '@cf/openai/gpt-oss-120b' : 'gemini-qa';
+      const model =
+        name === 'cloudflare' ? '@cf/openai/gpt-oss-120b' : 'gemini-qa';
       if (Array.isArray(data.statements)) {
         const key = data.statements.findIndex(isKey);
         return {

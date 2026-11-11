@@ -55,7 +55,25 @@ export class EventsGateway
     this.logger.log('WebSocket Gateway initialized');
   }
 
+  /**
+   * The token check reads Redis and the database, so it is still running when
+   * the client's first messages arrive: a page emits `joinUserRoom` as soon as
+   * it connects. Handlers wait on this promise instead of reading
+   * `client.data.user` at once; reading it early used to disconnect a valid
+   * client, and Socket.IO does not reconnect after a server-side disconnect.
+   */
   async handleConnection(client: Socket) {
+    client.data.ready = this.authenticate(client);
+    await client.data.ready;
+  }
+
+  /** The signed-in user of a socket, once its token check has finished. */
+  private async userOf(client: Socket) {
+    await client.data?.ready;
+    return client.data?.user;
+  }
+
+  private async authenticate(client: Socket) {
     const token =
       client.handshake.auth?.token ||
       client.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
@@ -135,7 +153,7 @@ export class EventsGateway
   // 1. Người dùng tham gia Room cá nhân & Room hỗ trợ (xác thực nghiêm ngặt từ token, không tin payload client)
   @SubscribeMessage('joinUserRoom')
   async handleJoinUserRoom(@ConnectedSocket() client: Socket) {
-    const authUser = client.data?.user;
+    const authUser = await this.userOf(client);
     if (!authUser) {
       client.disconnect(true);
       return;
@@ -195,12 +213,14 @@ export class EventsGateway
     studentId: number;
     mode: 'AI' | 'HUMAN';
     adminName: string;
+    systemMessage?: string;
   }) {
     const socketPayload = {
       conversationId: payload.conversationId,
       studentId: `student_${payload.studentId}`,
       mode: payload.mode,
       adminName: payload.adminName,
+      systemMessage: payload.systemMessage,
       targetUserId: payload.studentId,
     };
 
@@ -231,7 +251,7 @@ export class EventsGateway
       targetUserId?: number;
     },
   ) {
-    const authUser = client.data?.user;
+    const authUser = await this.userOf(client);
     if (!authUser) {
       client.disconnect(true);
       return;
@@ -258,22 +278,13 @@ export class EventsGateway
         const conv = await this.supportService.getOrCreateStudentConversation(
           authUser.userId,
         );
-        if (payload.message?.role === 'assistant') {
-          await this.supportService.createAiMessage(
-            conv.id,
-            content,
-            payload.message?.id,
-          );
-        } else {
-          await this.supportService.sendStudentMessage(
-            authUser.userId,
-            conv.id,
-            {
-              content,
-              clientMessageId: payload.message?.id,
-            },
-          );
-        }
+        // The server writes the tutor's replies itself (SupportService);
+        // a browser cannot store a message as "the AI".
+        if (payload.message?.role === 'assistant') return;
+        await this.supportService.sendStudentMessage(authUser.userId, conv.id, {
+          content,
+          clientMessageId: payload.message?.id,
+        });
       } else {
         // 2. Tin nhắn từ Support Staff (Admin) trả lời:
         const targetUserId =
@@ -311,7 +322,7 @@ export class EventsGateway
       targetUserId?: number;
     },
   ) {
-    const authUser = client.data?.user;
+    const authUser = await this.userOf(client);
     if (!authUser) return;
 
     if (!['AI', 'HUMAN'].includes(payload.mode)) return;

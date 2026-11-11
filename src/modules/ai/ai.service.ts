@@ -218,6 +218,13 @@ export class AiService {
     return this.aiEvaluator.chat(prompt);
   }
 
+  /** The tutor's answer to a prompt built by tutor-prompt.logic.ts; throws on failure. */
+  async tutorChat(prompt: string): Promise<string> {
+    return this.aiEvaluator.tutorChat
+      ? this.aiEvaluator.tutorChat(prompt)
+      : this.aiEvaluator.chat(prompt);
+  }
+
   async assessPronunciation(
     targetText: string,
     audioBuffer: Buffer,

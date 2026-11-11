@@ -229,6 +229,8 @@ model User {
   levelUnlocks                    LevelUnlock[]
   gateAttempts                    GateAttempt[]
   learnerProgressEvents           LearnerProgressEvent[]
+  learnerMistakes                 LearnerMistake[]
+  learnerMistakeIngests           LearnerMistakeIngest[]
   learningPlanItems               LearningPlanItem[]
 }
 
@@ -739,12 +741,17 @@ model Submission {
   score           Float?
   submittedAt     DateTime @default(now())
   aiFeedback      String?  @db.Text
+  // Guided rewrite: a revision points at the first submission of its chain.
+  revisionOfId    Int?
+  revisionOf      Submission?  @relation("SubmissionRevisions", fields: [revisionOfId], references: [id], onDelete: Cascade)
+  revisions       Submission[] @relation("SubmissionRevisions")
 
   results         Result[]
   assessmentLinks ToeicAssessmentWritingSubmission[]
 
   @@unique([userId, quizId, clientAttemptId])
   @@index([userId, clientAttemptId])
+  @@index([revisionOfId])
 }
 
 model Result {
@@ -1782,6 +1789,11 @@ model UserVocabWordProgress {
   nextReviewAt   DateTime?
   lastReviewedAt DateTime?
   remindedAt     DateTime?
+  /// Adaptive review schedule (srs.logic.ts): days to the next review, how
+  /// fast that grows for this learner and word, and how often it was forgotten.
+  intervalDays   Int       @default(0)
+  easeFactor     Float     @default(2.5)
+  lapses         Int       @default(0)
 
   @@unique([userId, wordId])
 }
@@ -2811,4 +2823,44 @@ model Referral {
   createdAt        DateTime       @default(now())
 
   @@index([referrerId, status])
+}
+
+/// Mistake notebook: one row per thing a learner got wrong (a question, a
+/// writing correction, a weakly pronounced word), kept until it is resolved.
+/// Rows are derived from graded attempts by MistakeSyncService.
+model LearnerMistake {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// LISTENING | SPEAKING | READING | WRITING | GRAMMAR | TOEIC
+  skill         String    @db.VarChar(16)
+  /// QUIZ_QUESTION | TOEIC_QUESTION | GRAMMAR_QUESTION | WRITING_CORRECTION | SPEAKING_WORD
+  sourceType    String    @db.VarChar(24)
+  /// Question id, or a normalised text key for corrections and words.
+  itemKey       String    @db.VarChar(191)
+  /// Sub-skill, TOEIC part or grammar topic; used to group and to tell the tutor.
+  tag           String?   @db.VarChar(120)
+  detail        Json
+  wrongCount    Int       @default(1)
+  /// Correct answers in a row since the last wrong one.
+  correctStreak Int       @default(0)
+  firstSeenAt   DateTime  @default(now())
+  lastSeenAt    DateTime  @default(now())
+  resolvedAt    DateTime?
+
+  @@unique([userId, sourceType, itemKey])
+  @@index([userId, resolvedAt, lastSeenAt])
+}
+
+/// A graded attempt already read into the mistake notebook.
+model LearnerMistakeIngest {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SUBMISSION | TOEIC_ATTEMPT | GRAMMAR_ATTEMPT | SPEAKING_SUBMISSION
+  kind      String   @db.VarChar(24)
+  sourceId  Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, kind, sourceId])
 }

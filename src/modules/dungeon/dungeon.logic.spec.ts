@@ -28,6 +28,10 @@ import {
   questionTimeMs,
   seededRng,
   toppingOffers,
+  toppingOffer,
+  toppingsHeld,
+  critChance,
+  comboCap,
   typedQuestion,
   type BankEntry,
   type RunState,
@@ -373,5 +377,79 @@ describe('rewards', () => {
     expect(dungeonXp(10, 0)).toBe(20);
     expect(dungeonXp(100, 140)).toBe(10);
     expect(dungeonXp(5, 150)).toBe(0);
+  });
+});
+
+describe('topping text (owner 2026-11-10: plain words, real numbers)', () => {
+  const choosing = (over: Partial<ReturnType<typeof newRun>> = {}) => ({
+    ...newRun(1, 'free'),
+    phase: 'pick' as const,
+    hp: 70,
+    ...over,
+  });
+
+  it('every topping has a plain sentence and a before/after number', () => {
+    for (const id of TOPPING_IDS) {
+      const { line, effect } = toppingOffer(choosing(), id);
+      expect(line).toMatch(/\.$/);
+      expect(line).not.toMatch(/combo|mỗi cấp|buff|crit\b/i);
+      expect(effect.label.length).toBeGreaterThan(2);
+      expect(effect.now).not.toBe(effect.next);
+    }
+  });
+
+  it('the numbers come from the rules, for the floor about to start', () => {
+    const run = choosing({ floor: 1 });
+    expect(toppingOffer(run, 'condensed_milk').effect).toEqual({
+      label: 'Thời gian mỗi câu ở tầng 2',
+      now: `${String(questionTimeMs(2, false, {}) / 1000).replace('.', ',')} giây`,
+      next: `${String(questionTimeMs(2, false, { condensed_milk: 1 }) / 1000).replace('.', ',')} giây`,
+    });
+    expect(toppingOffer(run, 'pate').effect.next).toBe(
+      `${Math.round(critChance({ pate: 1 }) * 100)}%`,
+    );
+    expect(toppingOffer(run, 'chili').effect.next).toBe(
+      `${comboCap({ chili: 1 })} câu (+150%)`,
+    );
+    expect(toppingOffer(run, 'salt_pepper').effect).toMatchObject({
+      now: `${monsterHit(2, false, {})}`,
+      next: `${monsterHit(2, false, { salt_pepper: 1 })}`,
+    });
+    expect(toppingOffer(run, 'sausage').effect).toMatchObject({
+      now: '70/100',
+      next: '95/125',
+    });
+    expect(toppingOffer(run, 'cucumber').effect.next).toBe('90/100');
+  });
+
+  it('a boss floor ahead and higher levels change the words', () => {
+    const run = choosing({
+      floor: 4,
+      toppings: { chili_sauce: 1, condensed_milk: 2 },
+    });
+    expect(toppingOffer(run, 'condensed_milk').effect.label).toBe(
+      'Thời gian mỗi câu ở tầng 5 (boss)',
+    );
+    expect(toppingOffer(run, 'condensed_milk').effect.next).toBe(
+      `${questionTimeMs(5, true, { condensed_milk: 3 }) / 1000} giây`,
+    );
+    const sauce = toppingOffer(run, 'chili_sauce');
+    expect(sauce.line).toContain('gấp 2,5 lần');
+    expect(sauce.effect).toMatchObject({ now: '×2', next: '×2,5' });
+  });
+
+  it('the held list says what each topping does now', () => {
+    const run = {
+      ...newRun(1, 'free'),
+      toppings: { egg: 1, sausage: 2, garlic_butter: 1 },
+      revived: true,
+    };
+    const held = toppingsHeld(run);
+    expect(held.map((h) => h.id)).toEqual(['garlic_butter', 'egg', 'sausage']);
+    expect(held[0]).toMatchObject({ level: 1, max: 3, value: '×1,2' });
+    expect(held[1]).toMatchObject({ value: '0' });
+    expect(held[1].line).toContain('Đã dùng');
+    expect(held[2].line).toBe('Đã tăng 50 máu tối đa.');
+    expect(toppingsHeld(newRun(1, 'free'))).toEqual([]);
   });
 });

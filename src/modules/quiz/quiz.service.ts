@@ -6,6 +6,7 @@ import {
   ConflictException,
   UnauthorizedException,
   ServiceUnavailableException,
+  Optional,
 } from '@nestjs/common';
 import {
   ListeningPracticeAttemptStatus,
@@ -46,6 +47,10 @@ import {
 } from './reading-content.validation';
 import { QuizContentAccessService } from './quiz-content-access.service';
 import { loadWritingExerciseProgress } from '../writing/writing-exercise-progress';
+import { planLimits } from '../subscription/plan-limits';
+import { SubscriptionService } from '../subscription/subscription.service';
+import { loadRevisionChain } from '../writing/writing-revision';
+import { revisionView } from '../writing/writing-revision.logic';
 import {
   isWritingQuizType,
   learnerVisibleTaskContent,
@@ -958,6 +963,7 @@ export class QuizService {
     private uploadService: UploadService,
     private listeningAudioAuthoringService: ListeningAudioAuthoringService,
     private readonly quizContentAccess: QuizContentAccessService,
+    @Optional() private readonly subscriptions?: SubscriptionService,
   ) {}
 
   async createQuiz(dto: CreateQuizDto, user?: { id: number; role: Role }) {
@@ -3196,6 +3202,24 @@ export class QuizService {
       };
     }
 
+    // Guided rewrite: where this text stands in its chain, whether it may
+    // still be revised, and how it compares with the text before it.
+    const writingRevision =
+      isWritingSubmission && submission.quiz.practiceTopicId
+        ? revisionView(
+            await loadRevisionChain(
+              this.prisma,
+              submission.revisionOfId ?? submission.id,
+            ),
+            submission.id,
+            // The owner's plan decides how many revisions the answer gets.
+            planLimits(
+              (await this.subscriptions?.planCodeFor(submission.userId)) ??
+                'FREE',
+            ).writingRevisions,
+          )
+        : null;
+
     return {
       submissionId,
       quizId: submission.quizId,
@@ -3227,6 +3251,7 @@ export class QuizService {
           : 'Thành tích rất tốt! Hãy tiếp tục duy trì và thử sức ở đề thi khó hơn.',
       writingFeedback,
       writingExercise,
+      writingRevision,
       submittedAnswer: isWritingSubmission
         ? (submission.results[0]?.answer ?? null)
         : null,

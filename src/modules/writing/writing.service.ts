@@ -17,6 +17,19 @@ import {
   type PracticeWritingResult,
 } from './practice-writing-grading';
 import {
+  planLimits,
+  revisionLimitMessage,
+  type PlanCode,
+} from '../subscription/plan-limits';
+import { SubscriptionService } from '../subscription/subscription.service';
+import { loadRevisionChain } from './writing-revision';
+import {
+  revisionGate,
+  revisionGraderInput,
+  revisionView,
+  type RevisionAttempt,
+} from './writing-revision.logic';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -94,7 +107,17 @@ export class WritingService {
     @Optional() private readonly quizContentAccess?: QuizContentAccessService,
     @Optional() private readonly eventEmitter?: EventEmitter2,
     @Optional() private readonly trial?: TrialService,
+    @Optional() private readonly subscriptions?: SubscriptionService,
   ) {}
+
+  /** The plan that decides how many revisions this learner gets. */
+  private async revisionPlan(
+    userId: number,
+    role?: import('@prisma/client').Role,
+  ): Promise<PlanCode> {
+    if (role === 'ADMIN') return 'PRO';
+    return (await this.subscriptions?.planCodeFor(userId)) ?? 'FREE';
+  }
 
   private async resolveCanonicalTask(
     quizId: number,
@@ -894,6 +917,7 @@ export class WritingService {
     content: any,
     answer: string,
     practiceTask: ReturnType<typeof practiceWritingTask> | null,
+    previousAttempt?: ReturnType<typeof revisionGraderInput>,
   ) {
     let evaluation: {
       score: number;
@@ -904,7 +928,11 @@ export class WritingService {
     let detail: PracticeWritingResult | undefined;
     try {
       if (practiceTask) {
-        const request = buildPracticeWritingRequest(practiceTask, answer);
+        const request = buildPracticeWritingRequest(
+          practiceTask,
+          answer,
+          previousAttempt,
+        );
         let reason = 'NO_ATTEMPT';
         for (
           let attempt = 1;
@@ -1158,6 +1186,210 @@ Task: ${instructions}`
       evaluation.maxScore,
       content.taskType,
       await exerciseState(),
+    );
+  }
+
+  /**
+   * Guided rewrite: grades a corrected text for a practice answer the learner
+   * already has a grade for. As many per first submission as the learner's
+   * plan allows (plan-limits.ts); none on Free. The grade is stored as a new submission that points at the
+   * first one; it earns no reward and emits no quiz event.
+   */
+  async reviseWriting(
+    submissionId: number,
+    userId: number,
+    text: string,
+    role?: import('@prisma/client').Role,
+    clientAttemptId?: string,
+  ) {
+    const answer = text?.trim();
+    if (!answer) throw new BadRequestException('Bài viết không được để trống');
+    if (answer.length > 20000)
+      throw new BadRequestException('Bài viết vượt quá giới hạn cho phép');
+
+    const source = await this.prisma.submission.findFirst({
+      where: { id: submissionId, userId },
+      select: {
+        id: true,
+        quizId: true,
+        revisionOfId: true,
+        results: {
+          select: { questionId: true },
+          orderBy: { id: 'asc' },
+          take: 1,
+        },
+        quiz: {
+          include: {
+            practiceTopic: true,
+            questions: {
+              select: { id: true, content: true },
+              orderBy: [{ order: 'asc' }, { id: 'asc' }],
+            },
+          },
+        },
+      },
+    });
+    const quiz = source?.quiz;
+    if (
+      !source ||
+      !quiz ||
+      !quiz.practiceTopic ||
+      !isWritingQuiz(quiz) ||
+      quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED
+    )
+      throw new NotFoundException('Không tìm thấy bài nộp.');
+    await this.assertWritingAccess(quiz, userId, role);
+
+    const question = quiz.questions.find(
+      (item) => item.id === source.results[0]?.questionId,
+    );
+    const content = (question?.content ?? {}) as Record<string, unknown>;
+    const practiceTask = question
+      ? practiceWritingTask(content, quiz.title)
+      : null;
+    const rootId = source.revisionOfId ?? source.id;
+    const chain = await loadRevisionChain(this.prisma, rootId);
+    if (
+      !question ||
+      !practiceTask ||
+      !chain.some((attempt) => attempt.submissionId === source.id)
+    )
+      throw new BadRequestException(
+        'Bài viết này không hỗ trợ sửa và nộp lại.',
+      );
+    if (exceedsPictureWordLimit(practiceTask, answer))
+      throw new BadRequestException(
+        `Câu trả lời cho bài viết theo tranh tối đa ${PICTURE_SENTENCE_MAX_WORDS} từ.`,
+      );
+
+    // The plan decides how many revisions an answer gets: none on Free.
+    const plan = await this.revisionPlan(userId, role);
+    const revisionLimit = planLimits(plan).writingRevisions;
+    const limitReached = () =>
+      revisionLimit === 0
+        ? new ForbiddenException({
+            message: revisionLimitMessage(plan),
+            requiredPlan: 'PLUS',
+          })
+        : new ConflictException(revisionLimitMessage(plan));
+
+    const respond = (
+      stored: { id: number },
+      evaluation: Parameters<WritingService['formatAssessmentResponse']>[1],
+      maxScore: number,
+      attempts: RevisionAttempt[],
+    ) => ({
+      ...this.formatAssessmentResponse(
+        stored,
+        evaluation,
+        maxScore,
+        content.taskType,
+      ),
+      revision: revisionView(attempts, stored.id, revisionLimit),
+    });
+
+    const logicalAttemptId = clientAttemptId ?? randomUUID();
+    const existing = await this.getIdempotentSubmission(
+      userId,
+      source.quizId,
+      logicalAttemptId,
+    );
+    if (existing) {
+      const previous = this.parsePersistedEvaluation(existing.aiFeedback, 0);
+      if (!previous || existing.revisionOfId !== rootId)
+        throw new ConflictException(
+          'Lần nộp bài này đang được xử lý hoặc không hợp lệ',
+        );
+      return respond(existing, previous, 0, chain);
+    }
+
+    const gate = revisionGate(chain, answer, revisionLimit);
+    if (!gate.ok && gate.reason === 'LIMIT') throw limitReached();
+    if (!gate.ok)
+      throw new BadRequestException('Hãy sửa bài viết trước khi nộp lại.');
+
+    // A free PLUS trial grades at most 3 paid-level Writing answers; a
+    // revision is one more graded answer.
+    const trialCounted = this.quizContentAccess?.isPremium(quiz) ?? false;
+    if (trialCounted) await this.trial?.assertGradingLeft(userId, 'WRITING');
+
+    const previousAttempt = chain[chain.length - 1];
+    const { evaluation, validatedEvaluation, detail } = await this.gradeAnswer(
+      quiz,
+      content,
+      answer,
+      practiceTask,
+      revisionGraderInput(previousAttempt),
+    );
+    if (trialCounted) await this.trial?.recordGrading(userId, 'WRITING');
+
+    const feedback = JSON.stringify({
+      ...(detail ?? {}),
+      feedback: validatedEvaluation.feedback,
+      suggestions: validatedEvaluation.suggestions,
+      maxScore: evaluation.maxScore,
+      score: validatedEvaluation.score,
+      skill: 'WRITING',
+    });
+    let created: { id: number };
+    try {
+      created = await this.prisma.$transaction(async (tx) => {
+        // Two requests at once must not both take the last revision.
+        await tx.$queryRaw`SELECT id FROM "Submission" WHERE id = ${rootId} FOR UPDATE`;
+        const used = await tx.submission.count({
+          where: { revisionOfId: rootId },
+        });
+        if (used >= revisionLimit) throw limitReached();
+        const row = await tx.submission.create({
+          data: {
+            quizId: source.quizId,
+            userId,
+            clientAttemptId: logicalAttemptId,
+            revisionOfId: rootId,
+            score: validatedEvaluation.score,
+            aiFeedback: feedback,
+            results: {
+              create: [
+                {
+                  questionId: question.id,
+                  answer,
+                  score: validatedEvaluation.score,
+                },
+              ],
+            },
+          },
+          select: { id: true },
+        });
+        await tx.learningActivity.create({
+          data: {
+            userId,
+            type: 'WRITING_PRACTICE_COMPLETED',
+            title: `${quiz.title} — bản sửa ${used + 1}`,
+            detail: `${validatedEvaluation.score}/${evaluation.maxScore} điểm`,
+            score: Math.round(
+              (validatedEvaluation.score / evaluation.maxScore) * 100,
+            ),
+            sourceType: 'WRITING_SUBMISSION',
+            sourceId: String(row.id),
+          },
+        });
+        return row;
+      });
+    } catch (error) {
+      if (!this.isClientAttemptConflict(error)) throw error;
+      const stored = await this.getIdempotentSubmission(
+        userId,
+        source.quizId,
+        logicalAttemptId,
+      );
+      if (!stored || stored.revisionOfId !== rootId) throw error;
+      created = stored;
+    }
+    return respond(
+      created,
+      { ...validatedEvaluation, detail },
+      evaluation.maxScore,
+      await loadRevisionChain(this.prisma, rootId),
     );
   }
 

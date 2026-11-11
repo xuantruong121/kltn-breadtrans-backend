@@ -4,7 +4,13 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import {
+  TOEIC_PRODUCTIVE_PLAN_MESSAGE,
+  toeicExamLock,
+} from '../subscription/plan-limits';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { summarizeAssessmentSkills } from './toeic-assessment-result';
 import {
   attemptTimeSummary,
@@ -63,7 +69,18 @@ export class ToeicAssessmentService {
     private readonly db: PrismaService,
     private readonly quizAccess: QuizContentAccessService,
     private readonly writing: WritingService,
+    @Optional() private readonly subscriptions?: SubscriptionService,
   ) {}
+
+  /**
+   * The plan that decides which exam families this learner may start
+   * (plan-limits.ts). An admin is not limited; a learner whose plan cannot be
+   * read is on Free.
+   */
+  private async examPlan(userId: number, role?: string) {
+    if (role === Role.ADMIN) return 'PRO' as const;
+    return (await this.subscriptions?.planCodeFor(userId)) ?? ('FREE' as const);
+  }
 
   async listAdmin() {
     const assessments = await this.db.toeicAssessment.findMany({
@@ -75,7 +92,8 @@ export class ToeicAssessmentService {
     );
   }
 
-  async listLearner(userId: number) {
+  async listLearner(userId: number, role?: string) {
+    const plan = await this.examPlan(userId, role);
     const assessments = await this.db.toeicAssessment.findMany({
       where: { publicationStatus: QuizPublicationStatus.PUBLISHED },
       include: this.componentInclude(),
@@ -110,6 +128,8 @@ export class ToeicAssessmentService {
         title: assessment.title,
         description: assessment.description,
         productFamily: assessment.productFamily,
+        // Speaking & Writing and four-skill exams need Pro to start.
+        ...toeicExamLock(assessment.productFamily, plan),
         version: assessment.version,
         components: await this.projectComponents(assessment.components),
         attempt: latest.get(assessment.id) ?? null,
@@ -122,7 +142,7 @@ export class ToeicAssessmentService {
     return this.projectAdmin(assessment);
   }
 
-  async getLearnerDetail(id: number, userId: number) {
+  async getLearnerDetail(id: number, userId: number, role?: string) {
     const assessment = await this.db.toeicAssessment.findFirst({
       where: { id, publicationStatus: QuizPublicationStatus.PUBLISHED },
       include: this.componentInclude(),
@@ -141,6 +161,10 @@ export class ToeicAssessmentService {
       title: assessment.title,
       description: assessment.description,
       productFamily: assessment.productFamily,
+      ...toeicExamLock(
+        assessment.productFamily,
+        await this.examPlan(userId, role),
+      ),
       version: assessment.version,
       components: await this.projectComponents(assessment.components),
       attempt: attempt ? this.projectAttempt(attempt) : null,
@@ -241,8 +265,19 @@ export class ToeicAssessmentService {
     assessmentId: number,
     userId: number,
     idempotencyKey?: string,
+    role?: string,
   ) {
     const assessment = await this.getPublishedAssessment(assessmentId);
+    // A new session of a Speaking & Writing or four-skill exam needs Pro.
+    // Sessions already started, and their results, stay open.
+    if (
+      toeicExamLock(assessment.productFamily, await this.examPlan(userId, role))
+        .isLocked
+    )
+      throw new ForbiddenException({
+        message: TOEIC_PRODUCTIVE_PLAN_MESSAGE,
+        requiredPlan: 'PRO',
+      });
     await this.assertLearnerEntitlements(assessment, userId);
     const key = idempotencyKey?.trim() || null;
 

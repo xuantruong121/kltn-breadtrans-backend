@@ -32,6 +32,17 @@ import {
 import { GOAL_SKILLS } from '../learning-path/recommendation.logic';
 import { isWinbackDay, winbackMessage, winbackType } from './winback-message';
 import {
+  ACTIVE_WITHIN_DAYS,
+  HABIT_LOOKBACK_DAYS,
+  STUDY_PUSH_TYPES,
+  STUDY_REMINDER_TYPE,
+  isQuietHour,
+  reminderHour,
+  studyReminderMessage,
+  vietnamHour,
+} from './study-reminder.logic';
+import { MistakesService } from '../mistakes/mistakes.service';
+import {
   WINBACK_AFTER_DAYS,
   WINBACK_PERCENT,
   WINBACK_VALID_DAYS,
@@ -48,7 +59,136 @@ export class NotificationsCronService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     @Optional() private readonly email?: EmailService,
+    @Optional() private readonly mistakes?: MistakesService,
   ) {}
+
+  /**
+   * Whether a study reminder may be pushed to the device now: not in the
+   * quiet hours, and no other study reminder (daily, vocabulary, streak)
+   * today. The inbox entry is written either way.
+   */
+  private async mayPushStudyReminder(userId: number, now: Date) {
+    if (isQuietHour(vietnamHour(now))) return false;
+    const today = getBusinessDayStart(getBusinessDayKey(now));
+    const earlier = await this.prisma.notification.count({
+      where: {
+        userId,
+        type: { in: STUDY_PUSH_TYPES },
+        createdAt: { gte: today },
+      },
+    });
+    return earlier === 0;
+  }
+
+  /**
+   * Queue worker entry point (every hour, Vietnam time): the daily study
+   * reminder. A learner gets it at the hour they usually practise (20:00
+   * until they have a habit), once a day, only if they have not studied
+   * today and something concrete is waiting: a streak, due words, open
+   * mistakes. Nothing is sent from 22:00 to 07:00. A rerun of the hour sends
+   * nothing new (one study_reminder per learner and day).
+   */
+  async runStudyReminder(now = new Date()) {
+    const hour = vietnamHour(now);
+    if (isQuietHour(hour)) return { hour, candidates: 0, sent: 0 };
+    const today = getBusinessDayStart(getBusinessDayKey(now));
+    const candidates = await this.prisma.userStats.findMany({
+      where: {
+        user: {
+          role: Role.STUDENT,
+          notifications: {
+            none: {
+              type: { in: [STUDY_REMINDER_TYPE, 'streak'] },
+              createdAt: { gte: today },
+            },
+          },
+        },
+        // Studied recently, but not today.
+        lastStreakUpdate: {
+          gte: new Date(today.getTime() - ACTIVE_WITHIN_DAYS * DAY_MS),
+          lt: today,
+        },
+      },
+      select: {
+        userId: true,
+        streakCount: true,
+        user: { select: { profile: { select: { fullName: true } } } },
+      },
+    });
+    if (candidates.length === 0) return { hour, candidates: 0, sent: 0 };
+
+    const ids = candidates.map((c) => c.userId);
+    const events = await this.prisma.learnerProgressEvent.findMany({
+      where: {
+        userId: { in: ids },
+        createdAt: {
+          gte: new Date(today.getTime() - HABIT_LOOKBACK_DAYS * DAY_MS),
+        },
+      },
+      select: { userId: true, createdAt: true },
+    });
+    const practisedAt = new Map<number, Date[]>();
+    for (const event of events) {
+      const list = practisedAt.get(event.userId) ?? [];
+      list.push(event.createdAt);
+      practisedAt.set(event.userId, list);
+    }
+    const due = candidates.filter(
+      (c) => reminderHour(practisedAt.get(c.userId) ?? []) === hour,
+    );
+    if (due.length === 0)
+      return { hour, candidates: candidates.length, sent: 0 };
+
+    const dueIds = due.map((c) => c.userId);
+    const [words, mistakes] = await Promise.all([
+      this.prisma.userVocabWordProgress.groupBy({
+        by: ['userId'],
+        where: { userId: { in: dueIds }, nextReviewAt: { lte: now } },
+        _count: { _all: true },
+      }),
+      this.prisma.learnerMistake.groupBy({
+        by: ['userId'],
+        // TOEIC exam questions are not in the notebook (owner 2026-11-11).
+        where: {
+          userId: { in: dueIds },
+          resolvedAt: null,
+          skill: { not: 'TOEIC' },
+        },
+        _count: { _all: true },
+      }),
+    ]);
+    const countOf = (
+      rows: Array<{ userId: number; _count: { _all: number } }>,
+      userId: number,
+    ) => rows.find((row) => row.userId === userId)?._count._all ?? 0;
+
+    let sent = 0;
+    for (const learner of due) {
+      const message = studyReminderMessage({
+        learnerName: learner.user?.profile?.fullName,
+        streak: learner.streakCount,
+        dueWords: countOf(words, learner.userId),
+        openMistakes: countOf(mistakes, learner.userId),
+      });
+      if (!message) continue;
+      const push = await this.mayPushStudyReminder(learner.userId, now);
+      await this.notificationsService.createNotification({
+        userId: learner.userId,
+        type: STUDY_REMINDER_TYPE,
+        ...message,
+      });
+      if (push)
+        await this.notificationsService.sendPushToUser(learner.userId, {
+          ...message,
+          icon: '/icons/icon-192.png',
+        });
+      sent += 1;
+    }
+    this.logger.log(
+      `[Queue] study reminder hour=${hour} candidates=${candidates.length} due=${due.length} sent=${sent}`,
+    );
+    return { hour, candidates: candidates.length, sent };
+  }
 
   /**
    * Queue worker entry point (09:00 Vietnam time): remind learners 7, 3 and
@@ -206,6 +346,7 @@ export class NotificationsCronService {
         skillWeights(GOAL_SKILLS[profile?.goal ?? 'GENERAL'], null),
       );
       const message = weeklyReportMessage({
+        mistakeTags: await this.lastWeekMistakeTags(learner.id, thisWeek),
         weekStart: thisWeek,
         skills: summarizeWeeks({
           events: events.filter((e) => e.userId === learner.id),
@@ -336,6 +477,24 @@ export class NotificationsCronService {
       `[Queue] win-back day=${dayKey} candidates=${ended.length} sent=${sent}`,
     );
     return { candidates: ended.length, sent };
+  }
+
+  /** What the learner got wrong most last week; empty when unknown. */
+  private async lastWeekMistakeTags(userId: number, thisWeek: Date) {
+    try {
+      return (
+        (await this.mistakes?.tagsBetween(
+          userId,
+          new Date(thisWeek.getTime() - 7 * DAY_MS),
+          thisWeek,
+        )) ?? []
+      );
+    } catch (error) {
+      this.logger.warn(
+        `weekly_report_mistakes_failed user=${userId}: ${String(error).slice(0, 160)}`,
+      );
+      return [];
+    }
   }
 
   /** A personal code; a rare collision with an existing code just retries. */
@@ -508,15 +667,19 @@ export class NotificationsCronService {
 
         const title =
           count === 1
-            ? `Đã đến giờ ôn tập từ vựng "${firstWord}" ⏰`
-            : `Bạn có ${count} từ vựng cần ôn tập ngay! ⏰`;
+            ? `Đã đến giờ ôn từ "${firstWord}"`
+            : `Bạn có ${count} từ vựng đến hạn ôn`;
         const body =
           count === 1
             ? `Hãy dành 1 phút để ôn tập lại từ "${firstWord}" trong chủ đề "${topicTitle}".`
             : `Bao gồm "${firstWord}" và ${count - 1} từ khác. Ôn tập đều đặn giúp ghi nhớ sâu hơn!`;
         const url = topicId ? `/flashcard/${topicId}` : '/flashcard';
 
+        let push = false;
         try {
+          // Checked before the inbox entry is written, which would count
+          // itself. A failure here releases the claims like any other.
+          push = await this.mayPushStudyReminder(userId, now);
           // 1. Create persistent in-app notification. This is the
           // authoritative delivery channel for the reminder.
           await this.notificationsService.createNotification({
@@ -545,8 +708,10 @@ export class NotificationsCronService {
           continue;
         }
 
-        // 2. Send Web Push. This service deliberately swallows per-device
+        // 2. Send Web Push, at most one study reminder a day and never in
+        // the quiet hours. This service deliberately swallows per-device
         // push failures so the inbox notification remains authoritative.
+        if (!push) continue;
         try {
           await this.notificationsService.sendPushToUser(userId, {
             title,
