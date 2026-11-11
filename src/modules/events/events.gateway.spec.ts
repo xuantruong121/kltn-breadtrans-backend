@@ -222,4 +222,47 @@ describe('EventsGateway Socket.IO Room Authentication & Isolation', () => {
 
     clientInvalid.disconnect();
   });
+
+  it('5. A client that emits joinUserRoom before its token check finishes stays connected', async () => {
+    // A page emits joinUserRoom the moment it connects, while the server is
+    // still reading Redis and the database. That used to disconnect it, and
+    // Socket.IO does not reconnect after a server-side disconnect.
+    mockRedis.get.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve(null), 150)),
+    );
+    const client: ClientSocket = io(`http://localhost:${serverPort}`, {
+      auth: { token: createValidToken(101) },
+      transports: ['websocket'],
+    });
+    let dropped = false;
+    client.on('disconnect', () => {
+      dropped = true;
+    });
+    await new Promise<void>((res) => client.on('connect', () => res()));
+    client.emit('joinUserRoom', { userId: 101, role: 'STUDENT' });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    expect(dropped).toBe(false);
+    expect(client.connected).toBe(true);
+
+    const received = new Promise((resolve) =>
+      client.on('chat:mode_updated', resolve),
+    );
+    gateway.handleSupportModeUpdated({
+      conversationId: 1,
+      studentId: 101,
+      mode: 'HUMAN',
+      adminName: 'Admin',
+    });
+    await expect(
+      Promise.race([
+        received,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('no event in the room')), 1000),
+        ),
+      ]),
+    ).resolves.toMatchObject({ mode: 'HUMAN' });
+
+    client.disconnect();
+  });
 });
