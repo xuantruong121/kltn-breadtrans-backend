@@ -381,6 +381,12 @@ export function keywordCheck(answer: string, keywords: string[]) {
 export function buildPracticeWritingRequest(
   task: PracticeWritingTask,
   answer: string,
+  /** Guided rewrite: the earlier text of this task and its feedback. */
+  previousAttempt?: {
+    previousResponse: string;
+    corrections: Array<{ original: string; corrected: string }>;
+    suggestions: string[];
+  },
 ) {
   const keywords = keywordCheck(answer, task.requiredKeywords);
   const words = countWords(answer);
@@ -424,6 +430,14 @@ export function buildPracticeWritingRequest(
           'Return relevanceEvidence in Vietnamese with full diacritics: one sentence naming what in the response does or does not address the task.',
         ]
       : []),
+    ...(previousAttempt
+      ? [
+          'This response is a REVISION. previousAttempt holds the earlier text of the same learner for the same task, the corrections and the suggestions they received.',
+          'Grade learnerResponse on its own with the same rubric, exactly as a first response: never raise a score because it is a revision and never lower it because of the earlier text.',
+          'Never quote previousAttempt in "corrections": every "original" must come from learnerResponse.',
+          'In "feedback", say in one or two Vietnamese sentences which earlier problems are now fixed and which are still there.',
+        ]
+      : []),
     ...(task.requireLinking
       ? [
           'This is a B1 task: the learner was told to write ONE sentence that links two ideas from the picture with a connector (while, because, so that, when, which...). facts.linking reports the connector found and the sentence count.',
@@ -449,6 +463,7 @@ export function buildPracticeWritingRequest(
         keywords,
         ...(linking ? { linking } : {}),
       },
+      ...(previousAttempt ? { previousAttempt } : {}),
       learnerResponse: answer,
     },
     null,

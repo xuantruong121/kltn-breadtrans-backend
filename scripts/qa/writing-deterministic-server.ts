@@ -354,6 +354,7 @@ const provider = {
     const data = JSON.parse(input.prompt) as {
       rubric: Array<{ key: string; max: number }>;
       learnerResponse: string;
+      previousAttempt?: { corrections: unknown[] };
     };
     // QA markers in the learner text: "[[fail]]" makes this grading call
     // fail; "[[percent:NN]]" scores every criterion at NN % of its maximum.
@@ -401,7 +402,10 @@ const provider = {
               },
             ]
           : [],
-        feedback: 'Nhận xét tất định: bài viết đáp ứng yêu cầu chính của đề.',
+        // A guided rewrite: says that the earlier feedback reached the grader.
+        feedback: data.previousAttempt
+          ? `Nhận xét tất định cho bản sửa: đã nhận ${data.previousAttempt.corrections.length} lỗi của lần trước.`
+          : 'Nhận xét tất định: bài viết đáp ứng yêu cầu chính của đề.',
         suggestions: ['Kiểm tra lại cách chia động từ.'],
         ...(wantsRelevance
           ? {

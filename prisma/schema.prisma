@@ -739,12 +739,17 @@ model Submission {
   score           Float?
   submittedAt     DateTime @default(now())
   aiFeedback      String?  @db.Text
+  // Guided rewrite: a revision points at the first submission of its chain.
+  revisionOfId    Int?
+  revisionOf      Submission?  @relation("SubmissionRevisions", fields: [revisionOfId], references: [id], onDelete: Cascade)
+  revisions       Submission[] @relation("SubmissionRevisions")
 
   results         Result[]
   assessmentLinks ToeicAssessmentWritingSubmission[]
 
   @@unique([userId, quizId, clientAttemptId])
   @@index([userId, clientAttemptId])
+  @@index([revisionOfId])
 }
 
 model Result {

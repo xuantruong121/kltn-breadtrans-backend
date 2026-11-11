@@ -46,6 +46,8 @@ import {
 } from './reading-content.validation';
 import { QuizContentAccessService } from './quiz-content-access.service';
 import { loadWritingExerciseProgress } from '../writing/writing-exercise-progress';
+import { loadRevisionChain } from '../writing/writing-revision';
+import { revisionView } from '../writing/writing-revision.logic';
 import {
   isWritingQuizType,
   learnerVisibleTaskContent,
@@ -3196,6 +3198,19 @@ export class QuizService {
       };
     }
 
+    // Guided rewrite: where this text stands in its chain, whether it may
+    // still be revised, and how it compares with the text before it.
+    const writingRevision =
+      isWritingSubmission && submission.quiz.practiceTopicId
+        ? revisionView(
+            await loadRevisionChain(
+              this.prisma,
+              submission.revisionOfId ?? submission.id,
+            ),
+            submission.id,
+          )
+        : null;
+
     return {
       submissionId,
       quizId: submission.quizId,
@@ -3227,6 +3242,7 @@ export class QuizService {
           : 'Thành tích rất tốt! Hãy tiếp tục duy trì và thử sức ở đề thi khó hơn.',
       writingFeedback,
       writingExercise,
+      writingRevision,
       submittedAnswer: isWritingSubmission
         ? (submission.results[0]?.answer ?? null)
         : null,
