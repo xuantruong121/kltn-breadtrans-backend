@@ -259,7 +259,7 @@ describe('SupportService', () => {
         clientMessageId: 'client-uuid-1',
       });
 
-      expect(result).toBe(existingMessage);
+      expect(result).toEqual({ ...existingMessage, aiReply: null });
       expect(mockPrisma.supportMessage.create).not.toHaveBeenCalled();
     });
 
@@ -311,7 +311,7 @@ describe('SupportService', () => {
         conversationId: 100,
         senderUserId: null,
         senderRole: 'AI',
-        senderName: 'Trợ Lý Bánh Mì 🍞',
+        senderName: 'Trợ Lý Bánh Mì',
         content: 'AI response text',
         clientMessageId: 'ai-client-1',
         isRead: true,
@@ -331,7 +331,7 @@ describe('SupportService', () => {
         data: expect.objectContaining({
           conversationId: 100,
           senderRole: 'AI',
-          senderName: 'Trợ Lý Bánh Mì 🍞',
+          senderName: 'Trợ Lý Bánh Mì',
           content: 'AI response text',
         }),
       });

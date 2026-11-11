@@ -355,6 +355,19 @@ Nội dung câu hỏi của học sinh:
     }
   }
 
+  async tutorChat(prompt: string): Promise<string> {
+    if (!this.hasKeys()) {
+      const question = prompt.slice(prompt.lastIndexOf('\n') + 1);
+      return `[Mock Gemini Tutor] ${question}`;
+    }
+    const result = await this.executeWithRotation((m) =>
+      m.generateContent(prompt),
+    );
+    const text = result.response.text().trim();
+    if (!text) throw new Error('empty tutor reply');
+    return text;
+  }
+
   async assessPronunciation(
     targetText: string,
     audioBuffer: Buffer,

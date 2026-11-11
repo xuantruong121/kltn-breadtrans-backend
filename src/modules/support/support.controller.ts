@@ -9,7 +9,6 @@ import {
   UseGuards,
   Request,
   ParseIntPipe,
-  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -59,28 +58,6 @@ export class SupportController {
     @Body() dto: CreateSupportMessageDto,
   ) {
     return this.supportService.sendStudentMessage(req.user.id, id, dto);
-  }
-
-  @Post('conversations/:id/ai-messages')
-  @ApiOperation({ summary: 'Học viên lưu phản hồi của AI vào cuộc trò chuyện' })
-  async saveAiMessage(
-    @Request() req: { user: { id: number } },
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: CreateSupportMessageDto,
-  ) {
-    const conv = await this.supportService.getOrCreateStudentConversation(
-      req.user.id,
-    );
-    if (conv.id !== id) {
-      throw new ForbiddenException(
-        'Bạn không có quyền gửi tin trong cuộc trò chuyện này.',
-      );
-    }
-    return this.supportService.createAiMessage(
-      id,
-      dto.content,
-      dto.clientMessageId,
-    );
   }
 
   @Patch('conversations/:id/mode')

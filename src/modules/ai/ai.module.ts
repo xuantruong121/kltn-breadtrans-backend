@@ -13,9 +13,11 @@ import { AiImageSemanticValidator } from './ai-image-semantic-validator.service'
 import { UploadModule } from '../upload/upload.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { SpeakingCategoryService } from '../content/speaking-category.service';
+import { SubscriptionModule } from '../subscription/subscription.module';
+import { TutorService } from './tutor.service';
 
 @Module({
-  imports: [UploadModule, PrismaModule],
+  imports: [UploadModule, PrismaModule, SubscriptionModule],
   controllers: [AiController, AdminContextualAiController],
   providers: [
     AiService,
@@ -26,6 +28,7 @@ import { SpeakingCategoryService } from '../content/speaking-category.service';
     AiImageSemanticValidator,
     CloudflareWorkersAiClient,
     AnswerReviewService,
+    TutorService,
     {
       provide: AI_EVALUATOR_TOKEN,
       useClass: GeminiEvaluatorStrategy,
@@ -38,6 +41,7 @@ import { SpeakingCategoryService } from '../content/speaking-category.service';
     GeminiCredentialManager,
     AiImageSemanticValidator,
     AnswerReviewService,
+    TutorService,
   ],
 })
 export class AiModule {}

@@ -99,6 +99,13 @@ export interface IAIEvaluator {
   chat(prompt: string): Promise<string>;
 
   /**
+   * The learner's tutor: sends the prompt as built (tutor-prompt.logic.ts),
+   * with no persona of its own, and THROWS on failure so the caller can give
+   * the question back to the learner's daily limit.
+   */
+  tutorChat?(prompt: string): Promise<string>;
+
+  /**
    * Schema-constrained JSON generation for machine consumers such as rubric
    * grading. Unlike `chat`, it adds no persona, never substitutes a friendly
    * fallback string, and THROWS on every failure (missing credentials

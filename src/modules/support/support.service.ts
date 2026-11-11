@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -10,6 +11,10 @@ import { Role } from '@prisma/client';
 import { CreateSupportMessageDto } from './dto/create-support-message.dto';
 import { SupportQueryDto } from './dto/support-query.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TutorService } from '../ai/tutor.service';
+import { TUTOR_HISTORY_TURNS, type TutorTurn } from '../ai/tutor-prompt.logic';
+
+export const SUPPORT_AI_NAME = 'Trợ Lý Bánh Mì';
 
 @Injectable()
 export class SupportService {
@@ -19,7 +24,45 @@ export class SupportService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly notificationsService: NotificationsService,
+    @Optional() private readonly tutor?: TutorService,
   ) {}
+
+  /**
+   * The tutor's answer to a learner message in a conversation on AI mode,
+   * written by the server: the browser never supplies what "the AI" said.
+   */
+  private async replyAsTutor(
+    conversationId: number,
+    studentId: number,
+    studentMessageId: number,
+    content: string,
+  ) {
+    if (!this.tutor) return null;
+    const earlier = await this.db.supportMessage.findMany({
+      where: {
+        conversationId,
+        id: { lt: studentMessageId },
+        senderRole: { in: ['STUDENT', 'AI'] },
+      },
+      orderBy: { id: 'desc' },
+      take: TUTOR_HISTORY_TURNS,
+      select: { senderRole: true, content: true },
+    });
+    const history: TutorTurn[] = earlier.reverse().map((m) => ({
+      role: m.senderRole === 'AI' ? 'assistant' : 'user',
+      content: m.content,
+    }));
+    const { reply, quota, limited } = await this.tutor.reply(studentId, {
+      message: content,
+      history,
+    });
+    const saved = await this.createAiMessage(
+      conversationId,
+      reply,
+      `ai-for-${studentMessageId}`,
+    );
+    return saved ? { ...saved, quota, limited } : null;
+  }
 
   // Helper access to support models typed via PrismaService
   private get db(): PrismaService {
@@ -253,7 +296,7 @@ export class SupportService {
         },
       });
       if (existing) {
-        return existing;
+        return { ...existing, aiReply: null };
       }
     }
 
@@ -299,13 +342,28 @@ export class SupportService {
       },
     });
 
+    // On AI mode the tutor answers and nobody is waiting on an admin; on
+    // HUMAN mode the admins are told a learner wrote.
+    if (conversation.mode === 'AI') {
+      const aiReply = await this.replyAsTutor(
+        conversationId,
+        studentId,
+        message.id,
+        message.content,
+      ).catch((error) => {
+        this.logger.error(`Tutor reply failed: ${String(error)}`);
+        return null;
+      });
+      return { ...message, aiReply };
+    }
+
     await this.notifyAdminsAboutStudentMessage(
       conversationId,
       studentName,
       message.content.slice(0, 140),
     );
 
-    return message;
+    return { ...message, aiReply: null };
   }
 
   // 4. Create AI reply message in conversation
@@ -351,7 +409,7 @@ export class SupportService {
         conversationId,
         senderUserId: null,
         senderRole: 'AI',
-        senderName: 'Trợ Lý Bánh Mì 🍞',
+        senderName: SUPPORT_AI_NAME,
         content: content.trim(),
         clientMessageId: clientMessageId || null,
         isRead: true,
@@ -772,6 +830,15 @@ export class SupportService {
       url: '/messages',
     });
 
+    // An admin who answers takes the conversation over, so the tutor and the
+    // admin never both reply to the next message.
+    if (conversation.mode === 'AI') {
+      await this.updateConversationMode(conversationId, 'HUMAN', {
+        id: adminId,
+        role: Role.ADMIN,
+      });
+    }
+
     return message;
   }
 
@@ -820,10 +887,38 @@ export class SupportService {
     });
     const actorName = actor?.profile?.fullName || actor?.email || 'Hệ thống';
 
+    if (conversation.mode === mode) return updated;
+
+    const byStudent = authUser.role === 'STUDENT';
     const sysContent =
       mode === 'HUMAN'
-        ? `${actorName} đã chuyển sang chế độ TRỰC TIẾP HỖ TRỢ. Mọi thắc mắc sẽ được phản hồi trực tiếp bởi Quản trị viên!`
-        : 'Đã kích hoạt lại TRỢ LÝ AI. Bánh Mì Assistant sẽ tự động giải đáp thắc mắc học tập!';
+        ? byStudent
+          ? 'Bạn đã yêu cầu trao đổi với quản trị viên. Trợ lý AI tạm dừng trả lời; quản trị viên sẽ phản hồi tại đây.'
+          : 'Quản trị viên đã tham gia trò chuyện. Trợ lý AI tạm dừng trả lời.'
+        : 'Trợ lý AI tiếp tục trả lời trong cuộc trò chuyện này.';
+
+    // Both sides read the change in the thread; whoever did not make it is
+    // also told in their notification inbox.
+    if (byStudent) {
+      if (mode === 'HUMAN') {
+        await this.notifyAdminsAboutStudentMessage(
+          conversationId,
+          conversation.student.profile?.fullName || conversation.student.email,
+          'Học viên yêu cầu trao đổi với quản trị viên.',
+        );
+      }
+    } else {
+      await this.notificationsService.createNotification({
+        userId: conversation.studentId,
+        type: 'NEW_MESSAGE',
+        title:
+          mode === 'HUMAN'
+            ? 'Quản trị viên đã tham gia trò chuyện'
+            : 'Trợ lý AI tiếp tục trả lời',
+        body: sysContent,
+        url: '/messages',
+      });
+    }
 
     await this.db.supportMessage.create({
       data: {
@@ -840,6 +935,7 @@ export class SupportService {
       studentId: conversation.studentId,
       mode,
       adminName: actorName,
+      systemMessage: sysContent,
     });
 
     return updated;

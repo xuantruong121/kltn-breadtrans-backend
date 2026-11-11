@@ -195,12 +195,14 @@ export class EventsGateway
     studentId: number;
     mode: 'AI' | 'HUMAN';
     adminName: string;
+    systemMessage?: string;
   }) {
     const socketPayload = {
       conversationId: payload.conversationId,
       studentId: `student_${payload.studentId}`,
       mode: payload.mode,
       adminName: payload.adminName,
+      systemMessage: payload.systemMessage,
       targetUserId: payload.studentId,
     };
 
@@ -258,22 +260,13 @@ export class EventsGateway
         const conv = await this.supportService.getOrCreateStudentConversation(
           authUser.userId,
         );
-        if (payload.message?.role === 'assistant') {
-          await this.supportService.createAiMessage(
-            conv.id,
-            content,
-            payload.message?.id,
-          );
-        } else {
-          await this.supportService.sendStudentMessage(
-            authUser.userId,
-            conv.id,
-            {
-              content,
-              clientMessageId: payload.message?.id,
-            },
-          );
-        }
+        // The server writes the tutor's replies itself (SupportService);
+        // a browser cannot store a message as "the AI".
+        if (payload.message?.role === 'assistant') return;
+        await this.supportService.sendStudentMessage(authUser.userId, conv.id, {
+          content,
+          clientMessageId: payload.message?.id,
+        });
       } else {
         // 2. Tin nhắn từ Support Staff (Admin) trả lời:
         const targetUserId =

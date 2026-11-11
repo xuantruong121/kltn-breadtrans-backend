@@ -5,12 +5,15 @@ import {
   Query,
   Res,
   Body,
+  Request,
   UseGuards,
   BadRequestException,
   HttpStatus,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { AiService } from './ai.service';
+import { TutorService } from './tutor.service';
+import type { TutorTurn } from './tutor-prompt.logic';
 import {
   ApiTags,
   ApiOperation,
@@ -44,31 +47,51 @@ export class ChatDto {
 @ApiTags('ai')
 @Controller('ai')
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    private readonly tutor: TutorService,
+  ) {}
 
-  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  // The tutor has its own daily limit by plan (TutorService), so this route
+  // does not also count against the shared AI grading quota.
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('chat')
-  @ApiOperation({ summary: 'Chat với trợ lý AI ảo (Hỗ trợ học tập)' })
-  async chat(@Body() chatDto: ChatDto) {
-    let textPrompt = chatDto.prompt;
-    if (!textPrompt && chatDto.messages && chatDto.messages.length > 0) {
-      const lastUserMsg = [...chatDto.messages]
-        .reverse()
-        .find((m) => m.role === 'user');
-      textPrompt = lastUserMsg
-        ? lastUserMsg.content
-        : chatDto.messages[chatDto.messages.length - 1].content;
+  @ApiOperation({
+    summary:
+      'Hỏi trợ lý học tập; messages là hội thoại gần đây, tin cuối của người học là câu hỏi',
+  })
+  async chat(
+    @Request() req: { user: { id: number } },
+    @Body() chatDto: ChatDto,
+  ) {
+    const turns: TutorTurn[] = (chatDto.messages ?? [])
+      .filter((m) => typeof m?.content === 'string' && m.content.trim())
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      }));
+    let message = chatDto.prompt?.trim();
+    let history = turns;
+    if (!message) {
+      const last = turns.map((t) => t.role).lastIndexOf('user');
+      if (last >= 0) {
+        message = turns[last].content.trim();
+        history = turns.slice(0, last);
+      }
     }
 
-    if (!textPrompt) {
+    if (!message) {
       throw new BadRequestException(
         'Vui lòng cung cấp nội dung câu hỏi (prompt hoặc messages)',
       );
     }
 
-    const reply = await this.aiService.chat(textPrompt);
-    return { reply, answer: reply };
+    const { reply, quota, limited } = await this.tutor.reply(req.user.id, {
+      message,
+      history,
+    });
+    return { reply, answer: reply, quota, limited };
   }
 
   @UseGuards(JwtAuthGuard, AiRateLimitGuard)
