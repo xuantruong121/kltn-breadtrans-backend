@@ -251,27 +251,99 @@ describe('VocabService', () => {
       expect(Math.round(diffDays)).toBe(1);
     });
 
-    it('spaces correct reviews further apart, up to 60 days', async () => {
+    const reviewOf = async (
+      row: Record<string, unknown>,
+      isCorrect: boolean,
+      grade?: 'AGAIN' | 'HARD' | 'GOOD' | 'EASY',
+    ) => {
       const prisma = (service as any).prisma;
-      const after = async (reviewCount: number) => {
-        prisma.userVocabWordProgress = {
-          findUnique: jest
-            .fn()
-            .mockResolvedValue({ id: 1, reviewCount, isMastered: false }),
-          update: jest
-            .fn()
-            .mockImplementation(({ data }) => Promise.resolve(data)),
-        };
-        const before = Date.now();
-        const res = await service.submitReview(1, 10, true);
-        return Math.round(
-          (res.nextReviewAt!.getTime() - before) / (24 * 60 * 60 * 1000),
-        );
+      prisma.userVocabWordProgress = {
+        findUnique: jest.fn().mockResolvedValue({ id: 1, ...row }),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
       };
-      expect(await after(1)).toBe(3);
-      expect(await after(3)).toBe(14);
-      expect(await after(5)).toBe(60);
-      expect(await after(20)).toBe(60);
+      const before = Date.now();
+      const res = await service.submitReview(1, 10, isCorrect, grade);
+      return {
+        res,
+        days: Math.round(
+          (res.nextReviewAt!.getTime() - before) / (24 * 60 * 60 * 1000),
+        ),
+      };
+    };
+
+    it("grows the interval from the word's own interval and ease", async () => {
+      const row = { reviewCount: 3, isMastered: true, lapses: 0 };
+      const steady = await reviewOf(
+        { ...row, intervalDays: 8, easeFactor: 2.5 },
+        true,
+      );
+      expect(steady.days).toBe(20);
+      expect(steady.res.intervalDays).toBe(20);
+      const shaky = await reviewOf(
+        { ...row, intervalDays: 8, easeFactor: 1.5 },
+        true,
+      );
+      expect(shaky.days).toBe(12);
+    });
+
+    it('stores the lapse and a lower ease when the word is forgotten', async () => {
+      const { res } = await reviewOf(
+        {
+          reviewCount: 4,
+          isMastered: true,
+          intervalDays: 20,
+          easeFactor: 2.5,
+          lapses: 1,
+        },
+        false,
+      );
+      expect(res.intervalDays).toBe(0);
+      expect(res.easeFactor).toBe(2.3);
+      expect(res.lapses).toBe(2);
+      expect(res.isMastered).toBe(false);
+    });
+
+    it('takes the self-rating: Dễ goes further than Khó, and the word is known', async () => {
+      const row = {
+        reviewCount: 1,
+        isMastered: false,
+        intervalDays: 3,
+        easeFactor: 2.5,
+        lapses: 0,
+      };
+      const hard = await reviewOf(row, true, 'HARD');
+      const easy = await reviewOf(row, true, 'EASY');
+      expect(hard.days).toBe(4);
+      expect(easy.days).toBe(10);
+      expect(hard.res.isMastered).toBe(true);
+      expect(easy.res.easeFactor).toBe(2.65);
+    });
+
+    it('lets "Học lại" win over isCorrect and un-knows the word', async () => {
+      const { res } = await reviewOf(
+        {
+          reviewCount: 2,
+          isMastered: true,
+          intervalDays: 7,
+          easeFactor: 2.5,
+          lapses: 0,
+        },
+        true,
+        'AGAIN',
+      );
+      expect(res.isMastered).toBe(false);
+      expect(res.intervalDays).toBe(0);
+    });
+
+    it('reads a row from before the schedule columns as a new word', async () => {
+      const { days, res } = await reviewOf(
+        { reviewCount: 5, isMastered: true },
+        true,
+      );
+      expect(days).toBe(1);
+      expect(res.easeFactor).toBe(2.5);
     });
   });
 });

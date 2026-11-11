@@ -1782,6 +1782,11 @@ model UserVocabWordProgress {
   nextReviewAt   DateTime?
   lastReviewedAt DateTime?
   remindedAt     DateTime?
+  /// Adaptive review schedule (srs.logic.ts): days to the next review, how
+  /// fast that grows for this learner and word, and how often it was forgotten.
+  intervalDays   Int       @default(0)
+  easeFactor     Float     @default(2.5)
+  lapses         Int       @default(0)
 
   @@unique([userId, wordId])
 }
