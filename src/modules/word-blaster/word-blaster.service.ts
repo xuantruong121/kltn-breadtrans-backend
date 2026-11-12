@@ -149,7 +149,7 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
     const paid = await this.gamification.deductBanh(
       userId,
       stake,
-      'Cược Đấu Trường · Pháo Bánh Mì',
+      'Cược Đấu trường · Pháo Bánh Mì',
       'BLASTER_STAKE',
       `blaster:${id}:stake`,
       { metadata: { sessionId: id } },

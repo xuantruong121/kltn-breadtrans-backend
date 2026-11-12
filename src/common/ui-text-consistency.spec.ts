@@ -57,6 +57,13 @@ const RULES: Array<{ name: string; wrong: RegExp; right: string }> = [
     right: 'lời thoại (bài nghe) / lời nói (bài nói)',
   },
   { name: 'paid content', wrong: /\bPremium\b/, right: 'gói Plus / gói Pro' },
+  {
+    name: 'Title Case term',
+    wrong:
+      /Đấu Trường|Cửa Hàng|Thú Cưng|Huy Hiệu|Nhiệm Vụ|Bảng Xếp Hạng|Sổ Lỗi|Thông Báo|Ngữ Pháp|Luyện Đề|Giữ Chuỗi|Nghe Chép|Trợ Lý/,
+    right: 'sentence case: Đấu trường, Cửa hàng, Thú cưng...',
+  },
+  { name: 'English unit', wrong: /\b24h\b|\bBoost\b/, right: '24 giờ' },
 ];
 
 /** Real exceptions, with the reason. */
@@ -65,6 +72,11 @@ const ALLOW: Array<{ file: string; rule: string; why: string }> = [
     file: 'modules/gamification/gamification.controller.ts',
     rule: 'streak',
     why: 'Swagger text listing API field names (`streak` is a field)',
+  },
+  {
+    file: 'modules/market/market.service.ts',
+    rule: 'Title Case term',
+    why: 'matches shop product names stored in the database, not shown text',
   },
 ];
 

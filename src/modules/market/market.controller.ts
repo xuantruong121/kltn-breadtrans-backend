@@ -34,7 +34,7 @@ export class MarketController {
   constructor(private readonly marketService: MarketService) {}
 
   @Get('products')
-  @ApiOperation({ summary: 'Lấy danh sách vật phẩm trong Cửa Hàng Bánh Mì' })
+  @ApiOperation({ summary: 'Lấy danh sách vật phẩm trong Cửa hàng Bánh Mì' })
   getProducts() {
     return this.marketService.getProducts();
   }
@@ -106,7 +106,7 @@ export class MarketController {
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Post('admin/products')
-  @ApiOperation({ summary: '[Admin] Tạo mới quà tặng trong Cửa Hàng Bánh Mì' })
+  @ApiOperation({ summary: '[Admin] Tạo mới quà tặng trong Cửa hàng Bánh Mì' })
   adminCreateProduct(@Body() dto: CreateMarketProductDto) {
     return this.marketService.adminCreateProduct(dto);
   }

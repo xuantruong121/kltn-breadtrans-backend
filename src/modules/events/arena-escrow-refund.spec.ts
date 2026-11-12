@@ -99,7 +99,7 @@ describe('ArenaGateway escrow refund after a restart', () => {
     });
     expect(eventsGateway.sendCurrencyUpdate).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ amount: 50, newBalance: 150 }),
+      expect.objectContaining({ amount: 50, newBalance: 150, source: 'arena' }),
     );
     expect(emit).toHaveBeenCalledWith(
       'arena:match_aborted',

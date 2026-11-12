@@ -108,7 +108,7 @@ export class QuizController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get('listening-practice')
-  @ApiOperation({ summary: 'Lấy danh sách các bài Luyện Nghe (Nghe Chép)' })
+  @ApiOperation({ summary: 'Lấy danh sách các bài luyện Nghe (Nghe chép)' })
   getListeningPractices(@Request() req: any) {
     return this.quizService.getListeningPractices(req.user?.id, req.user?.role);
   }

@@ -228,7 +228,7 @@ export class ArenaGateway
           stats.user?.profile?.fullName ||
           stats.user?.email ||
           `Player ${userId}`;
-        // Balances the "Cược Đấu Trường" row written when the stake was held.
+        // Balances the "Cược Song Đấu Từ Vựng" row written when the stake was held.
         await tx.currencyTransaction.create({
           data: {
             studentId: userId,
@@ -273,6 +273,7 @@ export class ArenaGateway
           amount: battle.stake,
           newBalance: balance,
           reason: 'Hoàn cược Song Đấu Từ Vựng (trận bị huỷ)',
+          source: 'arena',
           studentName: name,
         });
       }
@@ -1511,6 +1512,7 @@ export class ArenaGateway
           amount: totalReward,
           newBalance: updatedStats.totalBanhRan,
           reason: `Chiến thắng Song Đấu Từ Vựng (+${totalReward} Bánh Mì)`,
+          source: 'arena',
           studentName: winner.userName,
         });
         // After the payout commits: the gamification listener grants the
@@ -1610,6 +1612,7 @@ export class ArenaGateway
           amount: match.stake,
           newBalance: p1Stats.totalBanhRan,
           reason: `Hoàn cược Song Đấu Từ Vựng (Hòa nhau)`,
+          source: 'arena',
           studentName: match.p1.userName,
         });
 
@@ -1617,6 +1620,7 @@ export class ArenaGateway
           amount: match.stake,
           newBalance: p2Stats.totalBanhRan,
           reason: `Hoàn cược Song Đấu Từ Vựng (Hòa nhau)`,
+          source: 'arena',
           studentName: match.p2.userName,
         });
       }
