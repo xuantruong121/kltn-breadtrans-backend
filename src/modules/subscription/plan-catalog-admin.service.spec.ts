@@ -179,7 +179,7 @@ describe('PlanCatalogAdminService', () => {
       new SubscriptionService(prisma as never),
     );
     await expect(service.createDraft('FREE', {}, 7)).rejects.toThrow(
-      'Gói FREE được bảo vệ, không thể thay đổi.',
+      'Gói Free được bảo vệ, không thể thay đổi.',
     );
 
     const subscription = new SubscriptionService(prisma as never);

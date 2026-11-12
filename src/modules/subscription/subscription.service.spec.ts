@@ -198,7 +198,7 @@ describe('SubscriptionService', () => {
 
     await expect(
       new SubscriptionService(prisma as never).resolveEffectivePlan(7, now),
-    ).rejects.toThrow('Gói FREE chưa được cấu hình.');
+    ).rejects.toThrow('Gói Free chưa được cấu hình.');
   });
 
   it('fails closed when more than one current FREE version is returned', async () => {
@@ -211,7 +211,7 @@ describe('SubscriptionService', () => {
 
     await expect(
       new SubscriptionService(prisma as never).resolveEffectivePlan(7, now),
-    ).rejects.toThrow('Có nhiều phiên bản gói FREE đang hiệu lực.');
+    ).rejects.toThrow('Có nhiều phiên bản gói Free đang hiệu lực.');
   });
 
   it('normalizes and validates entitlement metadata', () => {
@@ -303,7 +303,7 @@ describe('SubscriptionService', () => {
         startsAt: now,
         endsAt: new Date('2026-11-01T00:00:00.000Z'),
       }),
-    ).rejects.toThrow('cho gói FREE');
+    ).rejects.toThrow('cho gói Free');
 
     prisma.planVersion.findUnique.mockResolvedValue({
       ...version,

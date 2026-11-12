@@ -262,15 +262,16 @@ export class GeminiEvaluatorStrategy implements IAIEvaluator {
           return `[Mock Gemini Feedback] Nhận xét cho câu trả lời của em: "${studentAnswer}".`;
         }
 
-        const prompt = `Bạn là một giáo viên tiếng Anh tận tâm, vui vẻ và ân cần đang chấm bài viết cho học sinh/trẻ em trên nền tảng BreadTrans Junior.
+        const prompt = `Bạn là một giáo viên tiếng Anh tận tâm, vui vẻ và ân cần đang chấm bài viết cho người học trên nền tảng BreadTrans.
 Đề bài: "${question}"
 Bài làm của học sinh: "${studentAnswer}"
 
 Hãy đưa ra nhận xét chi tiết HOÀN TOÀN BẰNG TIẾNG VIỆT với giọng điệu động viên, khen ngợi và hướng dẫn tận tình theo cấu trúc sau:
-1. 🌟 Khen ngợi và nhận xét tổng quan bài làm
-2. ✏️ Sửa lỗi ngữ pháp & từ vựng (chỉ rõ từ/câu cần sửa, viết lại câu hoàn chỉnh và giải thích ngắn gọn, dễ hiểu)
-3. 💡 Gợi ý mẹo nhỏ để em viết hay và tự nhiên hơn
-4. 🏆 Đánh giá mức độ hoàn thành`;
+1. Nhận xét tổng quan bài làm
+2. Sửa lỗi ngữ pháp & từ vựng (chỉ rõ từ/câu cần sửa, viết lại câu hoàn chỉnh và giải thích ngắn gọn, dễ hiểu)
+3. Gợi ý để viết hay và tự nhiên hơn
+4. Đánh giá mức độ hoàn thành
+Không dùng emoji.`;
 
         const result = await this.executeWithRotation((m) =>
           m.generateContent(prompt),
@@ -328,21 +329,16 @@ Hãy đưa ra nhận xét chi tiết HOÀN TOÀN BẰNG TIẾNG VIỆT với gi�
   async chat(prompt: string): Promise<string> {
     try {
       if (!this.hasKeys()) {
-        return `[Mock Gemini Chat] Bánh Mì Gia Sư đã nhận tin nhắn của em: "${prompt}".`;
+        return `[Mock Gemini Chat] Trợ lý Bánh Mì đã nhận tin nhắn: "${prompt}".`;
       }
 
-      const fullPrompt = `Bạn là "Bánh Mì Gia Sư" (AI Tutor) - Trợ lý gia sư tiếng Anh thông minh, vui vẻ, tận tâm và thân thiện dành riêng cho trẻ em và học sinh trên nền tảng học tiếng Anh BreadTrans Junior.
+      // Used only when the strategy has no tutorChat; the tutor prompt itself
+      // is built by tutor-prompt.logic.ts.
+      const fullPrompt = `Bạn là Trợ lý Bánh Mì, trợ lý học tiếng Anh của nền tảng BreadTrans.
+Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng; không dùng emoji.
+Khi giải thích từ, câu hoặc ngữ pháp: nêu quy tắc, một ví dụ tiếng Anh kèm nghĩa tiếng Việt.
 
-NHIỆM VỤ & PHONG CÁCH GIAO TIẾP:
-- Giọng văn: Luôn ấm áp, vui tươi, khích lệ, dùng nhiều icon/emoji sinh động (🍞, ✨, 🌟, 🎒, 👏, 🎉) phù hợp với lứa tuổi thiếu nhi và học sinh.
-- Ngôn ngữ trả lời: BẮT BUỘC trả lời chủ yếu bằng TIẾNG VIỆT tự nhiên, dễ hiểu, trong sáng.
-- Khi học sinh hỏi về từ vựng, câu hoặc ngữ pháp tiếng Anh:
-  + Cung cấp từ/câu tiếng Anh chính xác kèm phiên âm dễ đọc và dịch nghĩa tiếng Việt chi tiết.
-  + Đưa ra ví dụ vui nhộn, gần gũi với đời sống học đường và tuổi thơ.
-- Khi học sinh chào hỏi (như "ha lô", "chào bạn", "hello", "hi"): Chào đón các em thật nhiệt tình bằng tiếng Việt, khen ngợi tinh thần học tập và hỏi xem em cần giúp đỡ bài học nào hôm nay.
-- Trình bày câu trả lời rõ ràng, có định dạng markdown đẹp mắt (in đậm, danh sách gạch đầu dòng), không quá dài dòng gây khó hiểu cho trẻ em.
-
-Nội dung câu hỏi của học sinh:
+Câu hỏi của người học:
 "${prompt}"`;
 
       const result = await this.executeWithRotation((m) =>
@@ -351,7 +347,7 @@ Nội dung câu hỏi của học sinh:
       return result.response.text();
     } catch (error) {
       this.logger.error('Chat Gemini AI failed', error);
-      return 'Bánh Mì Gia Sư đang gặp chút trục trặc nhỏ. Em chờ một lát rồi hỏi lại nhé! 🍞';
+      return 'Trợ lý Bánh Mì đang gặp trục trặc. Bạn chờ một lát rồi hỏi lại nhé.';
     }
   }
 
@@ -2223,8 +2219,7 @@ Return only the requested transcript fields. Do not return audio, duration, imag
         typeof parsed?.text === 'string'
           ? parsed.text.trim().slice(0, 4000)
           : '';
-      if (!text)
-        throw new Error('AI không thể tạo transcript Dictation hợp lệ');
+      if (!text) throw new Error('AI không thể tạo lời thoại nghe chép hợp lệ');
       return { mode: 'DICTATION', text };
     }
     const turns = Array.isArray(parsed?.turns)

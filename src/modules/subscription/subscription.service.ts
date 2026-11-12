@@ -446,7 +446,7 @@ export class SubscriptionService {
     }
     if (planVersion.plan.code === 'FREE') {
       throw new ConflictException(
-        'Không thể gán đăng ký trả phí cho gói FREE.',
+        'Không thể gán đăng ký trả phí cho gói Free.',
       );
     }
     if (planVersion.plan.status !== PlanStatus.ACTIVE) {
@@ -540,8 +540,8 @@ export class SubscriptionService {
     if (freeVersions.length !== 1) {
       throw new ServiceUnavailableException(
         freeVersions.length === 0
-          ? 'Gói FREE chưa được cấu hình.'
-          : 'Có nhiều phiên bản gói FREE đang hiệu lực.',
+          ? 'Gói Free chưa được cấu hình.'
+          : 'Có nhiều phiên bản gói Free đang hiệu lực.',
       );
     }
 

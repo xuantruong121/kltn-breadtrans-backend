@@ -68,7 +68,7 @@ describe('importApprovedContent contentVersion (C2-FIND-001)', () => {
     const { client, writes } = fakeClient({
       id: 5,
       sourceKey: 'DIAG_V2_ASSESSMENT',
-      title: 'Kiểm tra đầu vào',
+      title: 'Đánh giá đầu vào',
       description: '',
       isActive: false,
       status: 'DRAFT',

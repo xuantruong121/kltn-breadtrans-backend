@@ -32,7 +32,7 @@ export type ResolvedResource = ResourceRef & {
   route: string;
   /** OPEN: usable now. LOCKED: exists and is published, but needs a plan. */
   access: 'OPEN' | 'LOCKED';
-  /** Learner-facing requirement when LOCKED, e.g. "Cần gói PRO". */
+  /** Learner-facing requirement when LOCKED, e.g. "Cần gói Pro". */
   requirement: string | null;
   /** Why it is LOCKED: an unopened practice level or a missing plan. */
   lockedBy?: 'LEVEL' | 'PLAN' | null;

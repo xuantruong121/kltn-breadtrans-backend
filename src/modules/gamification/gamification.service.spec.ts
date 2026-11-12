@@ -959,7 +959,7 @@ describe('GamificationService weekly cron hardening', () => {
       );
 
       await expect(service.feedPet(5)).rejects.toThrow(
-        'Thú cưng đang no, chưa cần ăn thêm. Hãy quay lại khi pet đói hơn.',
+        'Thú ảo đang no, chưa cần ăn thêm. Hãy quay lại khi pet đói hơn.',
       );
     });
 
@@ -1062,7 +1062,7 @@ describe('GamificationService weekly cron hardening', () => {
       );
 
       await expect(service.feedPet(5)).rejects.toThrow(
-        'Bạn không đủ 10 Bánh Mì để cho thú cưng ăn!',
+        'Bạn không đủ 10 Bánh Mì để cho thú ảo ăn!',
       );
     });
   });

@@ -34,14 +34,14 @@ void (async () => {
   await hidePet(free.page);
   const fl = await textOf(free.page, '/listening');
   check(
-    'FREE Listening: B1+ says "Mở khóa với PLUS"',
-    fl.includes('Mở khóa với PLUS'),
+    'FREE Listening: B1+ says "Mở khóa với Plus"',
+    fl.includes('Mở khóa với Plus'),
   );
   for (const path of ['/speaking', '/writing']) {
     const t = await textOf(free.page, path);
     check(
-      `FREE ${path}: B1+ says "Mở khóa với PRO", never PLUS`,
-      t.includes('Mở khóa với PRO') && !t.includes('Mở khóa với PLUS'),
+      `FREE ${path}: B1+ says "Mở khóa với Pro", never PLUS`,
+      t.includes('Mở khóa với Pro') && !t.includes('Mở khóa với Plus'),
     );
   }
   await free.browser.close();
@@ -65,8 +65,8 @@ void (async () => {
   check('PLUS Listening: nothing locked', !pl.includes('Mở khóa với'));
   const ps = await textOf(plus.page, '/speaking');
   check(
-    'PLUS Speaking: B1+ says "Mở khóa với PRO", never PLUS',
-    ps.includes('Mở khóa với PRO') && !ps.includes('Mở khóa với PLUS'),
+    'PLUS Speaking: B1+ says "Mở khóa với Pro", never PLUS',
+    ps.includes('Mở khóa với Pro') && !ps.includes('Mở khóa với Plus'),
   );
   await plus.page
     .getByRole('button', { name: /Mở khóa bài luyện nói/ })
@@ -76,8 +76,8 @@ void (async () => {
   await dialog.waitFor({ timeout: 10_000 });
   const dt = (await dialog.innerText()).replace(/\s+/g, ' ');
   check(
-    'PLUS Speaking paywall: "Xem gói PRO", no PLUS offer',
-    dt.includes('Xem gói PRO') && !dt.includes('Xem gói PLUS'),
+    'PLUS Speaking paywall: "Xem gói Pro", no PLUS offer',
+    dt.includes('Xem gói Pro') && !dt.includes('Xem gói Plus'),
     dt.slice(0, 160),
   );
   await plus.page.screenshot({
@@ -86,18 +86,18 @@ void (async () => {
   await dialog.getByRole('button', { name: 'Để sau' }).click();
   const pw = await textOf(plus.page, '/writing');
   check(
-    'PLUS Writing: B1+ says "Mở khóa với PRO", never PLUS',
-    pw.includes('Mở khóa với PRO') && !pw.includes('Mở khóa với PLUS'),
+    'PLUS Writing: B1+ says "Mở khóa với Pro", never PLUS',
+    pw.includes('Mở khóa với Pro') && !pw.includes('Mở khóa với Plus'),
   );
   const pd = await textOf(plus.page, `/speaking/${spkB1}`);
   check(
     'PLUS opening B1 Speaking directly: "Nội dung dành cho PRO"',
-    pd.includes('Nội dung dành cho PRO') && pd.includes('Xem gói PRO'),
+    pd.includes('Nội dung dành cho PRO') && pd.includes('Xem gói Pro'),
   );
   const wd = await textOf(plus.page, '/writing/18');
   check(
     'PLUS opening B1 Writing directly: "Nội dung dành cho PRO"',
-    wd.includes('Nội dung dành cho PRO') && wd.includes('Xem gói PRO'),
+    wd.includes('Nội dung dành cho PRO') && wd.includes('Xem gói Pro'),
   );
   // Locked detail pages answer 403 by design; only crashes and 5xx count.
   const crashes = plus.issues.filter((i) => !i.startsWith('console:'));

@@ -559,8 +559,8 @@ export class NotificationsCronService {
 
       for (const item of usersWithStreak) {
         const studentName = item.user?.profile?.fullName || 'Học viên';
-        const title = `Đừng để mất ngọn lửa Streak ${item.streakCount} ngày! 🔥`;
-        const body = `Chào ${studentName}, bạn chưa hoàn thành bài học hôm nay. Học ngay 5 phút để bảo vệ chuỗi streak nhé!`;
+        const title = `Đừng để mất chuỗi ${item.streakCount} ngày`;
+        const body = `Chào ${studentName}, bạn chưa hoàn thành bài học hôm nay. Học ngay 5 phút để giữ chuỗi nhé!`;
         const url = '/dashboard';
 
         // Check if streak notification already created today for this user

@@ -81,7 +81,7 @@ const DIMENSION_LABELS: Record<string, string> = {
   INFERENCE: 'câu hỏi suy luận',
   MAIN_IDEA: 'ý chính',
   VOCAB_IN_CONTEXT: 'từ vựng trong ngữ cảnh',
-  DICTATION: 'nghe chép chính tả',
+  DICTATION: 'nghe chép',
   MULTIPLE_CHOICE: 'nghe hiểu trắc nghiệm',
   pronunciationScore: 'độ chính xác phát âm',
   fluencyScore: 'độ trôi chảy',

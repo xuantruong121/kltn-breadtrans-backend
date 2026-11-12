@@ -53,7 +53,7 @@ const SHOTS = 'artifacts/finalization/evidence';
   );
   check(
     'no PLUS/PRO paywall on /grammar',
-    !/Mở khóa với PLUS|Yêu cầu gói|Mở khóa với PRO/.test(body),
+    !/Mở khóa với PLUS|Yêu cầu gói|Mở khóa với PRO/i.test(body),
   );
   await page.screenshot({
     path: `${SHOTS}/cp54-owner-grammar-free-1366.png`,

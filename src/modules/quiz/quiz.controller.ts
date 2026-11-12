@@ -108,7 +108,7 @@ export class QuizController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get('listening-practice')
-  @ApiOperation({ summary: 'Lấy danh sách các bài Luyện Nghe (Nghe Chép)' })
+  @ApiOperation({ summary: 'Lấy danh sách các bài luyện Nghe (Nghe chép)' })
   getListeningPractices(@Request() req: any) {
     return this.quizService.getListeningPractices(req.user?.id, req.user?.role);
   }
@@ -339,7 +339,7 @@ export class QuizController {
   @ApiBearerAuth()
   @Post(':quizId/transcript/reveal')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Ghi nhận học viên chủ động xem transcript' })
+  @ApiOperation({ summary: 'Ghi nhận học viên chủ động xem lời thoại' })
   revealListeningTranscript(
     @Request() req: any,
     @Param('quizId', ParseIntPipe) quizId: number,
@@ -355,7 +355,7 @@ export class QuizController {
   @ApiBearerAuth()
   @Get(':quizId/transcript/status')
   @ApiOperation({
-    summary: 'Học viên đã mở transcript của bài nghe chưa (không trả nội dung)',
+    summary: 'Học viên đã mở lời thoại của bài nghe chưa (không trả nội dung)',
   })
   @ApiResponse({ status: 200, description: '{ revealed: boolean }' })
   getListeningTranscriptStatus(
@@ -372,7 +372,7 @@ export class QuizController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get(':quizId/transcript')
-  @ApiOperation({ summary: 'Lấy toàn bộ transcript của bài nghe chép' })
+  @ApiOperation({ summary: 'Lấy toàn bộ lời thoại của bài nghe chép' })
   getListeningTranscript(
     @Request() req: any,
     @Param('quizId', ParseIntPipe) quizId: number,

@@ -300,7 +300,7 @@ export class SpeakingController {
         promptText: { type: 'string', description: 'Nội dung câu hỏi đề bài' },
         studentResponse: {
           type: 'string',
-          description: 'Bài nói hoặc transcript của học viên',
+          description: 'Bài nói hoặc lời nói của học viên',
         },
       },
     },

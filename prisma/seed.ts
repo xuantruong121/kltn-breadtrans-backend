@@ -5419,21 +5419,26 @@ async function main() {
   const badges = [
     [
       1,
-      'First Step',
-      'Hoàn thành bài học đầu tiên',
+      'Bước Đầu Tiên',
+      'Hoàn thành bài luyện đầu tiên',
       { type: 'LESSON', threshold: 1 },
     ],
     [
       2,
-      'Seven Day Streak',
-      'Duy trì streak 7 ngày',
+      'Bảy Ngày Liền',
+      'Giữ chuỗi 7 ngày học',
       { type: 'STREAK', threshold: 7 },
     ],
-    [3, 'Quiz Explorer', 'Hoàn thành 10 quiz', { type: 'QUIZ', threshold: 10 }],
+    [
+      3,
+      'Nhà Khám Phá',
+      'Hoàn thành 10 bài luyện',
+      { type: 'QUIZ', threshold: 10 },
+    ],
     [
       4,
-      'Speaking Brave',
-      'Nộp bài speaking đầu tiên',
+      'Can Đảm Cất Lời',
+      'Nộp bài luyện nói đầu tiên',
       { type: 'SPEAKING', threshold: 1 },
     ],
   ] as const;
@@ -11112,7 +11117,7 @@ async function main() {
       slug: 'badge-star',
       name: 'Huy hiệu Ngôi Sao',
       description:
-        'Huy hiệu Ngôi Sao danh giá dành cho học viên tích cực hoàn thành bài học.',
+        'Huy hiệu Ngôi Sao đeo trên ảnh đại diện, dành cho học viên chăm luyện tập.',
       category: 'BADGE',
       rarity: 'COMMON',
       price: 100,
@@ -11162,7 +11167,7 @@ async function main() {
     {
       id: 5,
       slug: 'double-bread',
-      name: 'Thẻ nhân đôi Bánh Mì (24h Boost)',
+      name: 'Thẻ nhân đôi Bánh Mì (24 giờ)',
       description:
         'Nhận gấp đôi số lượng Bánh Mì thưởng khi luyện tập và làm bài kiểm tra.',
       category: 'BOOST',

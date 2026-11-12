@@ -230,7 +230,7 @@ async function main() {
     }));
   const openPanel = async () => {
     await page
-      .getByRole('button', { name: /Hỏi trợ lý học tập/ })
+      .getByRole('button', { name: /Hỏi Trợ lý Bánh Mì/ })
       .first()
       .click();
     await log.waitFor({ timeout: 30_000 });
@@ -277,7 +277,7 @@ async function main() {
     (await jump.count()) ? await jump.innerText() : 'no button',
   );
   harnessExec(
-    `insert into "SupportMessage" ("conversationId", "senderRole", "senderName", content) values (${conv.id}, 'AI', 'Trợ Lý Bánh Mì', 'Tin đến khi bạn đang đọc tin cũ.')`,
+    `insert into "SupportMessage" ("conversationId", "senderRole", "senderName", content) values (${conv.id}, 'AI', 'Trợ lý Bánh Mì', 'Tin đến khi bạn đang đọc tin cũ.')`,
   );
   await page
     .getByRole('button', { name: 'Tin mới nhất (1)' })

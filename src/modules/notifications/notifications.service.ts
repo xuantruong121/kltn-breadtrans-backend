@@ -105,7 +105,7 @@ export class NotificationsService implements OnModuleInit {
       let failedCount = 0;
 
       const formattedPayload = JSON.stringify({
-        title: payload.title || 'BreadTrans Thông Báo',
+        title: payload.title || 'Thông báo BreadTrans',
         body: payload.body || '',
         icon: payload.icon || '/icons/icon-192.png',
         badge: '/icons/icon-192.png',

@@ -35,7 +35,7 @@ export class UpdateLearnerProfileDto {
 
   @ApiPropertyOptional({
     enum: PracticeLevel,
-    description: 'Tự chọn mức (chỉ khi chưa có mức từ bài kiểm tra đầu vào)',
+    description: 'Tự chọn mức (chỉ khi chưa có mức từ bài đánh giá đầu vào)',
   })
   @IsOptional()
   @IsEnum(PracticeLevel)

@@ -43,7 +43,7 @@ describe('adviceLock', () => {
       adviceLock({ ...open, isLocked: true, requiredPlan: 'PRO' }),
     ).toEqual({
       access: 'LOCKED',
-      requirement: 'Cần gói PRO',
+      requirement: 'Cần gói Pro',
       lockedBy: 'PLAN',
     });
   });

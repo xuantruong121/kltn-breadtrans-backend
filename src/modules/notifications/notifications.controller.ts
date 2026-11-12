@@ -51,7 +51,7 @@ export class NotificationsController {
   async sendTestPush(@Req() req: any) {
     const userId = req.user.id;
     const result = await this.notificationsService.sendPushToUser(userId, {
-      title: 'BreadTrans - Kiểm Tra Thông Báo! 🍞',
+      title: 'BreadTrans - Kiểm tra thông báo',
       body: 'Chúc mừng bạn đã kích hoạt thành công tính năng Web Push Notification trên thiết bị!',
       icon: '/icons/icon-192.png',
       url: '/dashboard',

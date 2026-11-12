@@ -54,7 +54,7 @@ export class LearningPathController {
   @ApiResponse({ status: 200, description: 'Hồ sơ sau cập nhật.' })
   @ApiResponse({
     status: 409,
-    description: 'Đã có mức từ bài kiểm tra đầu vào; không tự chọn mức.',
+    description: 'Đã có mức từ bài đánh giá đầu vào; không tự chọn mức.',
   })
   updateProfile(
     @Request() req: { user: { id: number } },

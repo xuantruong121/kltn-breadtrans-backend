@@ -69,7 +69,7 @@ async function api() {
     'the reply is stored as the tutor, with no emoji in its name',
     stored.length === 2 &&
       stored[1].role === 'AI' &&
-      stored[1].name === 'Trợ Lý Bánh Mì',
+      stored[1].name === 'Trợ lý Bánh Mì',
     JSON.stringify(stored.map((r) => [r.role, r.name])),
   );
 

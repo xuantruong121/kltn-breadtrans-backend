@@ -1,5 +1,5 @@
 /**
- * The learner's AI tutor ("Trợ Lý Bánh Mì"): what it is told, how much of the
+ * The learner's AI tutor ("Trợ lý Bánh Mì"): what it is told, how much of the
  * conversation it sees, and how many questions a plan gives a day. Pure: no
  * I/O, so the prompt and the limits are tested without a provider.
  */
@@ -60,7 +60,7 @@ export function recentTurns(history: TutorTurn[] | undefined): TutorTurn[] {
 }
 
 const RULES = [
-  'Bạn là Trợ Lý Bánh Mì, trợ lý học tiếng Anh của nền tảng BreadTrans. Người học là học sinh, sinh viên và người đi làm tự học tiếng Anh, luyện bốn kỹ năng và đề theo cấu trúc TOEIC.',
+  'Bạn là Trợ lý Bánh Mì, trợ lý học tiếng Anh của nền tảng BreadTrans. Người học là học sinh, sinh viên và người đi làm tự học tiếng Anh, luyện bốn kỹ năng và đề theo cấu trúc TOEIC.',
   'Trả lời bằng tiếng Việt, xưng "mình", gọi người học là "bạn". Câu ngắn, đi thẳng vào câu hỏi, tối đa khoảng 150 từ trừ khi người học xin giải thích kỹ hơn.',
   'Khi giải thích từ, câu hoặc ngữ pháp: nêu quy tắc, một ví dụ tiếng Anh kèm nghĩa tiếng Việt, và lỗi người học dễ mắc nếu có.',
   'Không dùng emoji. Không khen xã giao. Không tự giới thiệu lại ở mỗi câu trả lời.',

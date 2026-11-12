@@ -147,9 +147,11 @@ async function waitGraded(token: string, ids: number[]) {
 }
 
 async function main() {
+  // Pro: TOEIC Speaking & Writing and four-skill tests are Pro only.
   const { browser, page, account, issues } = await studentPage(
     'toeic-result',
     1920,
+    true,
   );
   await hidePet(page);
   const token = account.token;
@@ -201,16 +203,39 @@ async function main() {
     fullReview.data.questions.find((q: any) => q.questionNumber === 12)
       .flagged === true,
   );
+  // Since a2274e3 the review gives the key, the explanation and a listening
+  // transcript only where the learner answered (toeic-lr-review.ts).
+  const qs = fullReview.data.questions as any[];
+  const answered = qs.filter((q) => q.selectedIndex !== null);
+  const skipped = qs.filter((q) => q.selectedIndex === null);
+  const answeredGroups = new Set(answered.map((q) => q.groupId));
   check(
-    'API: every question carries its stored explanation',
-    fullReview.data.questions.every(
-      (q: any) => typeof q.explanation === 'string' && q.explanation.length > 0,
-    ),
+    'API: each answered question carries its key and stored explanation (17)',
+    answered.length === 17 &&
+      answered.every(
+        (q) =>
+          q.correctIndex !== null &&
+          typeof q.explanation === 'string' &&
+          q.explanation.length > 0,
+      ),
+    `(${answered.length})`,
   );
   check(
-    'API: Parts 1-4 carry the authored transcript, Parts 5-7 none',
-    fullReview.data.questions.every((q: any) =>
-      q.part <= 4 ? Boolean(q.transcript) : q.transcript === null,
+    'API: a skipped question shows no key and no explanation',
+    skipped.length === 183 &&
+      skipped.every(
+        (q) =>
+          q.correctIndex === null &&
+          q.standardAnswer === null &&
+          q.explanation === null,
+      ),
+  );
+  check(
+    'API: a transcript only for a Parts 1-4 group with an answered question',
+    qs.every((q) =>
+      q.part <= 4 && answeredGroups.has(q.groupId)
+        ? Boolean(q.transcript)
+        : q.transcript === null,
     ),
   );
   const partialReview = await call(
@@ -252,9 +277,14 @@ async function main() {
   // 4 Skills: L&R child + 11 recordings + 8 writing answers. Assessment 2
   // was archived on 2026-11-02; the published one is read from the clone.
   const four = fourSkillsAssessment();
-  const fs = await call('POST', `/toeic/assessments/${four.id}/attempts`, token, {
-    idempotencyKey: randomUUID(),
-  });
+  const fs = await call(
+    'POST',
+    `/toeic/assessments/${four.id}/attempts`,
+    token,
+    {
+      idempotencyKey: randomUUID(),
+    },
+  );
   const fsId = fs.data.id as number;
   const comp = (data: any, kind: string) =>
     data.components.find((c: any) => c.kind === kind);
@@ -549,9 +579,9 @@ async function main() {
     t > seg.start && t < seg.end,
     `(t=${t.toFixed(1)} span ${seg.start.toFixed(1)}-${seg.end.toFixed(1)})`,
   );
-  await dialog.getByRole('button', { name: 'Hiện Transcript' }).click();
+  await dialog.getByRole('button', { name: 'Hiện lời thoại' }).click();
   check(
-    '"Hiện Transcript" shows the authored script',
+    '"Hiện lời thoại" shows the authored script',
     (await dialog.innerText()).includes(
       q11.transcript.split('\n')[0].slice(0, 30),
     ),

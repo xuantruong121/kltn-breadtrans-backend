@@ -1052,7 +1052,7 @@ export class GamificationService {
     // Send push notification for new badge
     if (this.notificationsService) {
       void this.notificationsService.sendPushToUser(userId, {
-        title: '🏅 Huy hiệu mới!',
+        title: 'Huy hiệu mới!',
         body: `Bạn vừa mở khóa huy hiệu "${badgeName}". Tiếp tục cố gắng nhé!`,
         icon: '/icons/icon-192.png',
         url: '/arena',
@@ -1772,7 +1772,7 @@ export class GamificationService {
       // 4. Reject operation when satiety >= 80
       if (activePetData.satiety >= 80) {
         throw new BadRequestException(
-          'Thú cưng đang no, chưa cần ăn thêm. Hãy quay lại khi pet đói hơn.',
+          'Thú ảo đang no, chưa cần ăn thêm. Hãy quay lại khi pet đói hơn.',
         );
       }
 
@@ -1790,7 +1790,7 @@ export class GamificationService {
       if (cas.count === 0) {
         const stats = await tx.userStats.findUnique({ where: { userId } });
         throw new BadRequestException(
-          `Bạn không đủ ${feedCost} Bánh Mì để cho thú cưng ăn! (Hiện có: ${stats?.totalBanhRan ?? 0})`,
+          `Bạn không đủ ${feedCost} Bánh Mì để cho thú ảo ăn! (Hiện có: ${stats?.totalBanhRan ?? 0})`,
         );
       }
 
@@ -2380,7 +2380,7 @@ export class GamificationService {
     // Send Web Push Notification to target user
     if (this.notificationsService) {
       void this.notificationsService.sendPushToUser(targetUserId, {
-        title: '⭐ Bạn nhận được lời ngưỡng mộ mới!',
+        title: 'Bạn nhận được lời ngưỡng mộ mới!',
         body: `${senderName}: "${admirationMsg}"`,
         icon: sender?.profile?.avatar || '/icons/icon-192.png',
         url: '/student/profile',

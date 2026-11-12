@@ -95,7 +95,7 @@ async function main() {
       if (index < expected.length - 1) await page.locator('button[aria-label="Câu tiếp theo"]').click();
     }
     if (observed.length) { await page.locator('button[aria-label="Câu trước"]').click(); await page.locator('button[aria-label="Câu tiếp theo"]').click(); }
-    await page.getByRole('button', { name: /Toàn bộ kịch bản/ }).click();
+    await page.getByRole('button', { name: /Toàn bộ lời thoại/ }).click();
     await page.waitForFunction(() => {
       const button = document.querySelector('button[aria-label="Phát câu"]') as HTMLButtonElement | null;
       return Boolean(button && !button.disabled);

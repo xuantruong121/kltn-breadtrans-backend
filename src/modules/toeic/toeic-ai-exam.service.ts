@@ -2733,7 +2733,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
   private async makeAudio(audioScript: string) {
     const audio = await this.ai.generateToeicListeningAudio(audioScript);
     if (!audio?.length)
-      throw new BadRequestException('Không thể tạo audio TTS cho transcript');
+      throw new BadRequestException('Không thể tạo audio TTS cho lời thoại');
     // music-metadata is ESM-only. Keep it out of module bootstrap so the
     // CommonJS Jest E2E harness can load AppModule without parsing audio.
     const { parseBuffer } = await import('music-metadata');

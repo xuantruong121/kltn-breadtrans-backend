@@ -50,7 +50,7 @@ void (async () => {
     await page
       .addStyleTag({
         content:
-          '[data-companion-pet], [aria-label*="thú cưng" i] { display:none !important }',
+          '[data-companion-pet], [aria-label*="thú ảo" i] { display:none !important }',
       })
       .catch(() => undefined);
 
@@ -68,7 +68,7 @@ void (async () => {
       'DRAFT topics 1/2 absent (their replacements 13/14 present)',
       (await cards
         .filter({ hasText: 'Past Simple & Time Expressions' })
-        .count()) === 1 && !/Mở khóa với PLUS|Mở khóa với PRO/.test(body),
+        .count()) === 1 && !/Mở khóa với PLUS|Mở khóa với PRO/i.test(body),
     );
     const verbs = await page
       .locator('section[aria-labelledby="grammar-VERB"] article h3')

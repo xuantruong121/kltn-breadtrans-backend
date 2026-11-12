@@ -301,7 +301,7 @@ export class MarketService {
         }
 
         // Double-bread boost: 24 hours per card, as the product is sold
-        // ("Thẻ nhân đôi Bánh Mì (24h Boost)"). It used to grant 7 days per
+        // ("Thẻ nhân đôi Bánh Mì (24 giờ)"). It used to grant 7 days per
         // card and reset a running boost.
         if (
           product.slug.includes('double-bread') ||
@@ -446,7 +446,7 @@ export class MarketService {
       success: true,
       status: initialStatus,
       message: hasRealGift
-        ? 'Yêu cầu đổi quà đã được gửi tới Ban Quản Trị! Vui lòng chờ phê duyệt nhé 🎁'
+        ? 'Yêu cầu đổi quà đã được gửi tới quản trị viên. Vui lòng chờ phê duyệt.'
         : 'Đổi vật phẩm thành công!',
       orderId: result.order.id,
       totalBanh: calculatedTotalBanh,

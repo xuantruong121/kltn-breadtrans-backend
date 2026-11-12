@@ -360,6 +360,11 @@ export class EventsGateway
       newBalance: number;
       reason: string;
       studentName: string;
+      /**
+       * "arena": Song Đấu Từ Vựng shows its stake, payout and refund on its
+       * own screens, so the learner app updates the balance without a toast.
+       */
+      source?: 'arena';
     },
   ) {
     this.logger.log(

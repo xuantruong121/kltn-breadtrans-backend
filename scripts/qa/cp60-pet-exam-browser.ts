@@ -9,7 +9,7 @@ import { check, failureCount } from './harness-api';
 import { FE, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
-const PET = 'button[aria-label^="Thú cưng đồng hành"]';
+const PET = 'button[aria-label^="Thú ảo đồng hành"]';
 
 void (async () => {
   const lrId = harnessQuery(

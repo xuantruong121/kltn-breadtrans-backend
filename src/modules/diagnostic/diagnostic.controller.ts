@@ -31,7 +31,7 @@ export class DiagnosticController {
   ) {}
 
   @Get('current')
-  @ApiOperation({ summary: 'Lấy bài kiểm tra đầu vào đang hoạt động' })
+  @ApiOperation({ summary: 'Lấy bài đánh giá đầu vào đang hoạt động' })
   getCurrent(@Request() req: { user: { id: number } }) {
     return this.diagnosticService.getCurrentAssessment(req.user.id);
   }
@@ -151,7 +151,7 @@ export class DiagnosticController {
 
   @Get('results/latest')
   @ApiOperation({
-    summary: 'Lấy kết quả kiểm tra đầu vào gần nhất của học viên',
+    summary: 'Lấy kết quả đánh giá đầu vào gần nhất của học viên',
   })
   getLatestResult(@Request() req: { user: { id: number } }) {
     return this.diagnosticService.getLatestResult(req.user.id);
@@ -159,7 +159,7 @@ export class DiagnosticController {
 
   @Post(':id/attempts')
   @ApiOperation({
-    summary: 'Nộp bài kiểm tra đầu vào và nhận kết quả từ server',
+    summary: 'Nộp bài đánh giá đầu vào và nhận kết quả từ server',
   })
   submit(
     @Request() req: { user: { id: number } },

@@ -21,7 +21,7 @@ void (async () => {
   // Pet: feeding costs 10 Bread; a learner with 0 Bread must not be charged.
   await page.goto(`${FE}/pet`, { waitUntil: 'networkidle', timeout: 120_000 });
   await page.waitForTimeout(1500);
-  const feed = page.getByRole('button', { name: /cho thú cưng ăn/i });
+  const feed = page.getByRole('button', { name: /cho thú ảo ăn/i });
   const disabled = await feed.isDisabled();
   if (!disabled) await feed.click();
   await page.waitForTimeout(2000);

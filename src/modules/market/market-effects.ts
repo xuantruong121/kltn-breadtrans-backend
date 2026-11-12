@@ -10,7 +10,7 @@
 export const PLUS_CARD_SLUG = 'plus-7d';
 export const PLUS_CARD_DAYS = 7;
 
-/** "Thẻ nhân đôi Bánh Mì (24h Boost)" lasts 24 hours per card. */
+/** "Thẻ nhân đôi Bánh Mì (24 giờ)" lasts 24 hours per card. */
 export const DOUBLE_BANH_HOURS_PER_CARD = 24;
 
 /**

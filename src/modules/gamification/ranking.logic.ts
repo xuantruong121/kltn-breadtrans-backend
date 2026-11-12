@@ -126,7 +126,7 @@ const ACTIVITY_TEXT: Record<string, string> = {
   LISTENING_PRACTICE_COMPLETED: 'vừa hoàn thành 1 bài luyện nghe',
   WRITING_PRACTICE_COMPLETED: 'vừa hoàn thành 1 bài luyện viết',
   CONTENT: 'vừa hoàn thành 1 bài luyện tập',
-  DIAGNOSTIC: 'vừa làm bài kiểm tra đầu vào',
+  DIAGNOSTIC: 'vừa làm bài đánh giá đầu vào',
 };
 
 /**
@@ -146,7 +146,7 @@ export function activityText(source: FeedSource): {
   if (source.kind === 'arena_win')
     return { text: 'vừa thắng 1 trận Đấu trường', kind: 'arena' };
   if (source.type === 'LEVEL_UP')
-    return { text: `vừa lên Lv. ${source.value}`, kind: 'level' };
+    return { text: `vừa lên Cấp ${source.value}`, kind: 'level' };
   if (source.type === 'STREAK_MILESTONE')
     return { text: `vừa đạt chuỗi ${source.value} ngày`, kind: 'streak' };
   // Hầm Bánh Mì runs: only the deep ones make the feed (owner 2026-11-09).

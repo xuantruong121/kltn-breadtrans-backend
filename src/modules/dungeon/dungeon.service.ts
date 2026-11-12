@@ -218,7 +218,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
     const paid = await this.gamification.deductBanh(
       userId,
       DUNGEON_TICKET,
-      'Vé Đấu Trường · Hầm Bánh Mì',
+      'Vé Đấu trường · Hầm Bánh Mì',
       'DUNGEON_STAKE',
       `dungeon:${id}:stake`,
       { metadata: { sessionId: id, mode } },

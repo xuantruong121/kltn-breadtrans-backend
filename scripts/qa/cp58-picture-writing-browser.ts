@@ -36,10 +36,10 @@ void (async () => {
     const cards = page.locator('article');
     check('10 picture cards', (await cards.count()) === 10);
     check(
-      'A2 pictures open with "Luyện viết", B1 pictures say "Mở khóa với PRO"',
+      'A2 pictures open with "Luyện viết", B1 pictures say "Mở khóa với Pro"',
       (await page.getByRole('button', { name: /^Luyện viết/ }).count()) === 5 &&
-        (await cards.filter({ hasText: 'Mở khóa với PRO' }).count()) === 5 &&
-        (await cards.filter({ hasText: 'Mở khóa với PLUS' }).count()) === 0,
+        (await cards.filter({ hasText: 'Mở khóa với Pro' }).count()) === 5 &&
+        (await cards.filter({ hasText: 'Mở khóa với Plus' }).count()) === 0,
     );
     const first = (await cards.first().innerText()).replace(/\s+/g, ' ');
     check(
@@ -63,13 +63,13 @@ void (async () => {
     check(
       'Trung cấp shows the five locked B1 pictures',
       (await cards.count()) === 5 &&
-        (await cards.filter({ hasText: 'Mở khóa với PRO' }).count()) === 5,
+        (await cards.filter({ hasText: 'Mở khóa với Pro' }).count()) === 5,
     );
     await page
       .getByRole('button', { name: 'Đặt lại tất cả bộ lọc về mặc định' })
       .click();
     await cards
-      .filter({ hasText: 'Mở khóa với PRO' })
+      .filter({ hasText: 'Mở khóa với Pro' })
       .first()
       .getByRole('button')
       .click();
@@ -77,7 +77,7 @@ void (async () => {
     await dialog.waitFor({ timeout: 10_000 });
     check(
       'a locked picture offers PRO',
-      (await dialog.innerText()).includes('Xem gói PRO'),
+      (await dialog.innerText()).includes('Xem gói Pro'),
     );
     await dialog.getByRole('button', { name: 'Để sau' }).click();
     if (width === 1366)
@@ -244,9 +244,9 @@ void (async () => {
   await page.waitForTimeout(2000);
   const cards = page.locator('article');
   check(
-    'PLUS: B1 pictures still say "Mở khóa với PRO", never PLUS',
-    (await cards.filter({ hasText: 'Mở khóa với PRO' }).count()) === 5 &&
-      (await cards.filter({ hasText: 'Mở khóa với PLUS' }).count()) === 0,
+    'PLUS: B1 pictures still say "Mở khóa với Pro", never PLUS',
+    (await cards.filter({ hasText: 'Mở khóa với Pro' }).count()) === 5 &&
+      (await cards.filter({ hasText: 'Mở khóa với Plus' }).count()) === 0,
   );
   await browser.close();
 

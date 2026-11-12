@@ -10,7 +10,9 @@
 import Redis from 'ioredis';
 import type { Page } from 'playwright';
 
-import { check, failureCount } from './harness-api';
+import { randomUUID } from 'node:crypto';
+
+import { call, check, failureCount, newAdmin } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessExec, harnessQuery } from './harness-db';
 
@@ -61,12 +63,31 @@ async function answer(page: Page, qs: Array<{ prompt: string; correctAnswer: str
   return null;
 }
 
+/**
+ * Every react-hot-toast message the page shows (role="status"), from the
+ * next navigation on, so a toast that came and went is still seen.
+ */
+async function recordToasts(page: Page) {
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    (window as unknown as { __toasts: string[] }).__toasts = seen;
+    new MutationObserver(() => {
+      document.querySelectorAll('[role="status"]').forEach((el) => {
+        const t = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+        if (t && !seen.includes(t)) seen.push(t);
+      });
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  });
+}
+const toasts = (page: Page) => page.evaluate(() => (window as unknown as { __toasts?: string[] }).__toasts ?? []);
+
 async function main() {
   const A = await studentPage('arena-ui-a', WIDTH);
   const B = await studentPage('arena-ui-b', WIDTH);
   for (const s of [A, B]) {
     await hidePet(s.page);
     fund(s.account.userId);
+    await recordToasts(s.page);
   }
   const xpBefore = [xp(A.account.userId), xp(B.account.userId)];
   for (const s of [A, B]) {
@@ -77,7 +98,7 @@ async function main() {
   await A.page.getByText(/Đang tìm đối thủ/).waitFor({ timeout: 15_000 });
   check('A waits in the queue', true);
   if (EXTRA) await A.page.screenshot({ path: `${SHOTS}/arena-searching-${WIDTH}.png` });
-  const pet = (page: typeof A.page) => page.getByRole('button', { name: /^Thú cưng đồng hành/ }).count();
+  const pet = (page: typeof A.page) => page.getByRole('button', { name: /^Thú ảo đồng hành/ }).count();
   const petInLobby = await pet(A.page);
   await B.page.getByRole('button', { name: /^Tìm đối thủ/ }).click();
   const match = await questions(A.account.userId);
@@ -150,6 +171,27 @@ async function main() {
     check(`${s === A ? 'A' : 'B'}: lobby shows ${expected} Bánh Mì without a reload`, ok);
   }
   if (EXTRA) await A.page.screenshot({ path: `${SHOTS}/arena-lobby-after-${WIDTH}.png`, fullPage: true });
+  // The match screens show the stake, payout and refund; the win must not
+  // also raise a "+N Bánh Mì! Lý do: Chiến thắng Song Đấu…" toast
+  // (server events carry source "arena", 2026-11-12).
+  for (const [s, name] of [[A, 'A'], [B, 'B']] as const) {
+    const seen = await toasts(s.page);
+    check(`${name}: no Bánh Mì toast for the Song Đấu result`, !seen.some((t) => /Song Đấu/.test(t)), seen.join(' | ').slice(0, 200));
+  }
+  // Control: an admin grant still toasts, so the recorder does see toasts.
+  const admin = await newAdmin('arena-toast-admin');
+  const grant = await call('POST', '/market/currency/adjust', admin.token, {
+    userId: A.account.userId,
+    amount: 5,
+    reason: 'Kiểm thử thông báo',
+    idempotencyKey: randomUUID(),
+  });
+  let shown = false;
+  for (let i = 0; i < 40 && !shown; i += 1) {
+    shown = (await toasts(A.page)).some((t) => /\+5 Bánh Mì/.test(t) && /Kiểm thử thông báo/.test(t));
+    if (!shown) await A.page.waitForTimeout(250);
+  }
+  check('A: an admin grant still shows its toast (+5 Bánh Mì)', grant.status < 300 && shown, `(${grant.status})`);
   const ledger = harnessQuery(`select source, count(*) from "BanhTransaction" where reference like 'arena:match:${match.matchId}:%' group by source order by source`).map(([s, n]) => `${s}=${n}`);
   check('ledger ARENA_STAKE=2, ARENA_WIN=1', ledger.join(',') === 'ARENA_STAKE=2,ARENA_WIN=1', ledger.join(','));
   for (const s of [A, B])

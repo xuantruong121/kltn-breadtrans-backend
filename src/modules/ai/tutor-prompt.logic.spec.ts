@@ -40,7 +40,7 @@ describe('tutor-prompt.logic', () => {
 
   it('writes for an adult learner: Vietnamese, no emoji, no score claims', () => {
     const prompt = buildTutorPrompt({ message: 'present perfect là gì?' });
-    expect(prompt).toContain('Trợ Lý Bánh Mì');
+    expect(prompt).toContain('Trợ lý Bánh Mì');
     expect(prompt).toContain('Không dùng emoji');
     expect(prompt).toContain('CEFR');
     expect(prompt).not.toMatch(/thiếu nhi|trẻ em|Junior/);

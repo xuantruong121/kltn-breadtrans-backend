@@ -281,7 +281,7 @@ async function runQa() {
     // Screenshot 9: No Companion Overlay on Result
     // Check if floating companion is in viewport
     const companionVisible = await page
-      .locator('[aria-label*="Bready"], [aria-label*="thú cưng"]')
+      .locator('[aria-label*="Bready"], [aria-label*="thú ảo"]')
       .count();
     console.log('Companion elements on /diagnostic:', companionVisible);
     await page.screenshot({
