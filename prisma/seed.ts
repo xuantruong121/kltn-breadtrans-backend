@@ -5429,7 +5429,12 @@ async function main() {
       'Giữ chuỗi 7 ngày học',
       { type: 'STREAK', threshold: 7 },
     ],
-    [3, 'Nhà Khám Phá', 'Hoàn thành 10 bài luyện', { type: 'QUIZ', threshold: 10 }],
+    [
+      3,
+      'Nhà Khám Phá',
+      'Hoàn thành 10 bài luyện',
+      { type: 'QUIZ', threshold: 10 },
+    ],
     [
       4,
       'Can Đảm Cất Lời',
@@ -11112,7 +11117,7 @@ async function main() {
       slug: 'badge-star',
       name: 'Huy hiệu Ngôi Sao',
       description:
-        'Huy hiệu Ngôi Sao danh giá dành cho học viên tích cực hoàn thành bài học.',
+        'Huy hiệu Ngôi Sao đeo trên ảnh đại diện, dành cho học viên chăm luyện tập.',
       category: 'BADGE',
       rarity: 'COMMON',
       price: 100,
