@@ -24,8 +24,11 @@ const PAID_FEATURES = [
   PlanFeatureKey.PREMIUM_WRITING_CONTENT,
 ];
 
-const PLUS_TEXT = 'Mở Nói, Viết Trung cấp và Nghe chép Trung cấp trở lên';
-const PRO_TEXT = 'Mở Nói, Viết ở mọi mức, gồm Nâng cao,';
+// What each plan gives (plan-limits.ts holds the numbers the checks use).
+const PLUS_TEXT =
+  'Mở Nói, Viết Trung cấp và Nghe chép mọi mức; AI chấm 30 bài mỗi ngày, sửa và nộp lại bài viết 2 lần mỗi bài, tặng 1 khiên giữ chuỗi mỗi 30 ngày.';
+const PRO_TEXT =
+  'Mở Nói, Viết mọi mức và đề TOEIC Speaking & Writing, 4 kỹ năng; AI chấm 60 bài mỗi ngày, sửa và nộp lại bài viết 5 lần mỗi bài, tặng 3 khiên giữ chuỗi mỗi 30 ngày.';
 
 /**
  * Paid plans sell three terms. Longer terms are cheaper per day (owner,
@@ -45,7 +48,7 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'PLUS',
     displayName: 'BreadTrans Plus',
-    description: `${PLUS_TEXT} trong 30 ngày.`,
+    description: `${PLUS_TEXT} Thời hạn 30 ngày.`,
     versionName: 'BreadTrans Plus — 30 ngày',
     durationDays: 30,
     priceVnd: 69_000,
@@ -54,7 +57,7 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'PLUS',
     displayName: 'BreadTrans Plus',
-    description: `${PLUS_TEXT} trong 90 ngày, rẻ hơn khoảng 10% so với mua 3 lần 30 ngày.`,
+    description: `${PLUS_TEXT} Thời hạn 90 ngày, rẻ hơn khoảng 10% so với mua 3 lần 30 ngày.`,
     versionName: 'BreadTrans Plus — 90 ngày',
     durationDays: 90,
     priceVnd: 186_000,
@@ -63,7 +66,7 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'PLUS',
     displayName: 'BreadTrans Plus',
-    description: `${PLUS_TEXT} trong 180 ngày, rẻ hơn khoảng 20% so với mua 6 lần 30 ngày.`,
+    description: `${PLUS_TEXT} Thời hạn 180 ngày, rẻ hơn khoảng 20% so với mua 6 lần 30 ngày.`,
     versionName: 'BreadTrans Plus — 180 ngày',
     durationDays: 180,
     priceVnd: 331_000,
@@ -72,7 +75,7 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'PRO',
     displayName: 'BreadTrans Pro',
-    description: `${PRO_TEXT} trong 30 ngày.`,
+    description: `${PRO_TEXT} Thời hạn 30 ngày.`,
     versionName: 'BreadTrans Pro — 30 ngày',
     durationDays: 30,
     priceVnd: 149_000,
@@ -81,7 +84,7 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'PRO',
     displayName: 'BreadTrans Pro',
-    description: `${PRO_TEXT} trong 90 ngày, rẻ hơn khoảng 10% so với mua 3 lần 30 ngày.`,
+    description: `${PRO_TEXT} Thời hạn 90 ngày, rẻ hơn khoảng 10% so với mua 3 lần 30 ngày.`,
     versionName: 'BreadTrans Pro — 90 ngày',
     durationDays: 90,
     priceVnd: 402_000,
@@ -90,7 +93,7 @@ export const CANONICAL_PLAN_CATALOG: readonly CanonicalPlan[] = [
   {
     code: 'PRO',
     displayName: 'BreadTrans Pro',
-    description: `${PRO_TEXT} trong 180 ngày, rẻ hơn khoảng 20% so với mua 6 lần 30 ngày.`,
+    description: `${PRO_TEXT} Thời hạn 180 ngày, rẻ hơn khoảng 20% so với mua 6 lần 30 ngày.`,
     versionName: 'BreadTrans Pro — 180 ngày',
     durationDays: 180,
     priceVnd: 715_000,
@@ -105,7 +108,9 @@ const sameFeatures = (actual: PlanFeatureKey[], expected: PlanFeatureKey[]) =>
 /**
  * Make the current commercial catalog deterministic without rewriting rows
  * referenced by purchases or subscriptions. Historical versions remain intact;
- * a replacement version is created only when the current contract differs.
+ * a replacement version is created only when the current contract (price,
+ * term, features) differs. The display text of the current version (name and
+ * description) is not part of the contract: it is updated in place.
  */
 export async function ensureCanonicalPlanCatalog(prisma: PrismaClient) {
   const now = new Date();
@@ -160,6 +165,17 @@ export async function ensureCanonicalPlanCatalog(prisma: PrismaClient) {
           ),
       );
       if (matching) {
+        if (
+          matching.displayName !== spec.versionName ||
+          matching.description !== spec.description
+        )
+          await tx.planVersion.update({
+            where: { id: matching.id },
+            data: {
+              displayName: spec.versionName,
+              description: spec.description,
+            },
+          });
         results.push({
           code: spec.code,
           planId: plan.id,
