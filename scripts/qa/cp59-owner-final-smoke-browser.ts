@@ -21,7 +21,7 @@ const ACCOUNTS = {
 } as const;
 /** Text that must never reach a learner screen. */
 const INTERNAL =
-  /\b(undefined|NaN|\[object Object\]|PICTURE_SENTENCE|WRITING_EMAIL|WRITING_PICTURE|LISTENING_PRACTICE|BILINGUAL_READING|BEGINNER|INTERMEDIATE|ADVANCED|PUBLISHED|DRAFT)\b|Entry Diagnostic v2|Mở khóa với PLUS(?=.*Nói)/;
+  /\b(undefined|NaN|\[object Object\]|PICTURE_SENTENCE|WRITING_EMAIL|WRITING_PICTURE|LISTENING_PRACTICE|BILINGUAL_READING|BEGINNER|INTERMEDIATE|ADVANCED|PUBLISHED|DRAFT)\b|Entry Diagnostic v2|Mở khóa với Plus(?=.*Nói)/;
 
 let fails = 0;
 const check = (n: string, ok: boolean, d = '') => {
@@ -184,13 +184,13 @@ void (async () => {
     if (path === '/listening')
       check(
         'listening: B1 locked with PLUS, A2 dictation open',
-        text.includes('Mở khóa với PLUS') &&
+        text.includes('Mở khóa với Plus') &&
           text.includes('Nghe chép: du lịch và chỉ đường (A2)'),
       );
     if (path === '/speaking')
       check(
         'speaking: B1+ locked with PRO, never PLUS',
-        text.includes('Mở khóa với PRO') && !text.includes('Mở khóa với PLUS'),
+        text.includes('Mở khóa với Pro') && !text.includes('Mở khóa với Plus'),
       );
     if (path === '/arena')
       check('arena: no XP promised for a win', !/\+\s*\d+\s*XP/.test(text));
@@ -231,8 +231,8 @@ void (async () => {
   check('PLUS: Listening B1+ open (no lock)', !pl.includes('Mở khóa với'));
   const ps = await visit(plus.page, '/speaking');
   check(
-    'PLUS: Speaking B1+ says "Mở khóa với PRO"',
-    ps.includes('Mở khóa với PRO') && !ps.includes('Mở khóa với PLUS'),
+    'PLUS: Speaking B1+ says "Mở khóa với Pro"',
+    ps.includes('Mở khóa với Pro') && !ps.includes('Mở khóa với Plus'),
   );
   check(
     'PLUS: no write request, no error',

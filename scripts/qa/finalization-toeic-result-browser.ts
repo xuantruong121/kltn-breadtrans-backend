@@ -549,9 +549,9 @@ async function main() {
     t > seg.start && t < seg.end,
     `(t=${t.toFixed(1)} span ${seg.start.toFixed(1)}-${seg.end.toFixed(1)})`,
   );
-  await dialog.getByRole('button', { name: 'Hiện Transcript' }).click();
+  await dialog.getByRole('button', { name: 'Hiện lời thoại' }).click();
   check(
-    '"Hiện Transcript" shows the authored script',
+    '"Hiện lời thoại" shows the authored script',
     (await dialog.innerText()).includes(
       q11.transcript.split('\n')[0].slice(0, 30),
     ),

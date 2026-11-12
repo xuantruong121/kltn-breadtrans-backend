@@ -72,7 +72,7 @@ void (async () => {
     const text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
     check(
       `${route} opens for FREE`,
-      expect.test(text) && !/Mở khóa với PLUS/.test(text.slice(0, 400)),
+      expect.test(text) && !/Mở khóa với PLUS/i.test(text.slice(0, 400)),
       text.slice(0, 100),
     );
   }

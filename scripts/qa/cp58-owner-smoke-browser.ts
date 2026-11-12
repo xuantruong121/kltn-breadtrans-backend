@@ -72,9 +72,9 @@ void (async () => {
   });
   const emailText = (await email.innerText()).replace(/\s+/g, ' ');
   check(
-    'Writing B1 email: Trung cấp · B1, "Mở khóa với PRO"',
+    'Writing B1 email: Trung cấp · B1, "Mở khóa với Pro"',
     emailText.includes('Trung cấp · B1') &&
-      emailText.includes('Mở khóa với PRO') &&
+      emailText.includes('Mở khóa với Pro') &&
       !emailText.includes('Cơ bản'),
     emailText.slice(0, 120),
   );

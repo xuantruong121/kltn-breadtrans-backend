@@ -339,8 +339,8 @@ async function main() {
       await s.page.waitForTimeout(800);
       return {
         text: (await s.page.locator('body').innerText()).replace(/\s+/g, ' '),
-        plus: await s.page.getByText('Mở khóa với PLUS').count(),
-        pro: await s.page.getByText('Mở khóa với PRO').count(),
+        plus: await s.page.getByText('Mở khóa với Plus').count(),
+        pro: await s.page.getByText('Mở khóa với Pro').count(),
       };
     };
     const c1Sets = Number(

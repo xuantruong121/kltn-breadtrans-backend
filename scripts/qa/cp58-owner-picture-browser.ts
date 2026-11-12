@@ -137,15 +137,15 @@ void (async () => {
     );
     const b1Locked = plan !== 'PRO';
     check(
-      `A2 "Luyện viết" ×5; B1 ${b1Locked ? '"Mở khóa với PRO" ×5' : '"Luyện viết" ×5'}`,
+      `A2 "Luyện viết" ×5; B1 ${b1Locked ? '"Mở khóa với Pro" ×5' : '"Luyện viết" ×5'}`,
       a2.every((t) => t.includes('Luyện viết')) &&
         b1.every((t) =>
-          b1Locked ? t.includes('Mở khóa với PRO') : t.includes('Luyện viết'),
+          b1Locked ? t.includes('Mở khóa với Pro') : t.includes('Luyện viết'),
         ),
     );
     check(
       'no PLUS offer and no plan badge above the cards',
-      !texts.some((t) => t.includes('Mở khóa với PLUS')) &&
+      !texts.some((t) => t.includes('Mở khóa với Plus')) &&
         !texts.some((t) => /^(PRO|PLUS)\b/.test(t)),
     );
     await page.screenshot({
@@ -154,7 +154,7 @@ void (async () => {
 
     if (b1Locked) {
       await cards
-        .filter({ hasText: 'Mở khóa với PRO' })
+        .filter({ hasText: 'Mở khóa với Pro' })
         .first()
         .getByRole('button')
         .click();
@@ -162,7 +162,7 @@ void (async () => {
       await dialog.waitFor({ timeout: 10_000 });
       check(
         'locked B1 card offers PRO',
-        (await dialog.innerText()).includes('Xem gói PRO'),
+        (await dialog.innerText()).includes('Xem gói Pro'),
       );
       await dialog.getByRole('button', { name: 'Để sau' }).click();
     }
