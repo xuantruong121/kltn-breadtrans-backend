@@ -5365,56 +5365,11 @@ async function main() {
     );
   }
 
-  for (let index = 0; index < 4; index += 1) {
-    const quizId = index + 1;
-    const firstQuestion = await prisma.question.findFirst({
-      where: { quizId },
-      orderBy: { order: 'asc' },
-    });
-    if (!firstQuestion) continue;
-    const submissionId = 200 + index;
-    await prisma.submission.upsert({
-      where: { id: submissionId },
-      update: {
-        quizId,
-        userId: students[index].id,
-        score: 7.5 + index / 2,
-        aiFeedback:
-          'Seed demo: kết quả dùng để kiểm tra UI lịch sử; điểm thật trong sản phẩm phải do server/evaluator tính.',
-      },
-      create: {
-        id: submissionId,
-        quizId,
-        userId: students[index].id,
-        score: 7.5 + index / 2,
-        aiFeedback:
-          'Seed demo: kết quả dùng để kiểm tra UI lịch sử; điểm thật trong sản phẩm phải do server/evaluator tính.',
-      },
-    });
-    const firstContent = firstQuestion.content as { correctIndex?: number };
-    const seededSelectedIndex =
-      typeof firstContent.correctIndex === 'number'
-        ? firstContent.correctIndex
-        : 0;
-    await prisma.result.upsert({
-      where: { id: submissionId },
-      update: {
-        submissionId,
-        questionId: firstQuestion.id,
-        answer: { selectedIndex: seededSelectedIndex },
-        isCorrect: true,
-        score: 1,
-      },
-      create: {
-        id: submissionId,
-        submissionId,
-        questionId: firstQuestion.id,
-        answer: { selectedIndex: seededSelectedIndex },
-        isCorrect: true,
-        score: 1,
-      },
-    });
-  }
+  // No demo submissions: the four seeded rows (ids 200-203) stored answers as
+  // { selectedIndex } and only one result each, so the result pages showed
+  // "1/1 câu đúng" on a six-question quiz. Rows 200 and 201 were removed from
+  // kltn_db with the owner's approval on 2026-11-12; real submissions come from
+  // the learners.
 
   const badges = [
     [
