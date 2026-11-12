@@ -15,7 +15,7 @@ import { FE } from './harness-browser';
 import { harnessExec } from './harness-db';
 
 const OUT = process.env.OUT ?? 'artifacts/report-ch4-screens';
-const LEARNER = 'student2@breadtrans.com';
+const LEARNER = process.env.LEARNER ?? 'student2@breadtrans.com';
 const ADMIN = 'admin@breadtrans.com';
 const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
@@ -39,6 +39,10 @@ async function open(page: Page, path: string, settle = 3500) {
     waitUntil: 'networkidle',
     timeout: 120_000,
   });
+  // The Next.js dev indicator is not part of the product.
+  await page.addStyleTag({
+    content: 'nextjs-portal { display: none !important; }',
+  });
   await sleep(settle);
 }
 
@@ -54,8 +58,13 @@ async function blockClip(page: Page, top: string, bottom: string, pad = 25) {
         let n: Node | null;
         while ((n = walker.nextNode()))
           if (n.textContent?.includes(text)) {
+            // The card itself: the first wide ancestor drawn with a border.
             let el = n.parentElement;
-            while (el && el.getBoundingClientRect().width < 1000)
+            while (
+              el &&
+              (el.getBoundingClientRect().width < 1000 ||
+                getComputedStyle(el).borderTopWidth === '0px')
+            )
               el = el.parentElement;
             if (el) return el.getBoundingClientRect();
           }
@@ -95,7 +104,20 @@ async function main() {
     fullPage: true,
     clip: await blockClip(learner, 'Chào buổi', 'Lộ trình mức'),
   });
+  await learner.screenshot({
+    path: `${OUT}/fig_4_05.png`,
+    fullPage: true,
+    clip: await blockClip(learner, 'Tuần này của bạn', 'Bài luyện hôm nay'),
+  });
 
+  // The plain study screen the report describes: the learner's own
+  // "Không gian" switch turns the forest scene and its sounds off.
+  await learner.evaluate(() =>
+    localStorage.setItem(
+      'breadtrans.study.ambience',
+      JSON.stringify({ scene: false, music: false, rain: false, sfx: false }),
+    ),
+  );
   await open(learner, '/flashcard/1', 4000);
   await learner.screenshot({ path: `${OUT}/fig_4_06.png` });
 
@@ -110,6 +132,9 @@ async function main() {
 
   await learner.setViewportSize({ width: 1440, height: 940 });
   await open(learner, '/plans', 4000);
+  // 90 days, as in v7: the cards then show the price per 30 days too.
+  await learner.getByRole('radio', { name: /90 ngày/ }).click();
+  await sleep(1500);
   await learner.screenshot({ path: `${OUT}/fig_4_12.png` });
 
   await learner.setViewportSize({ width: 1440, height: 900 });

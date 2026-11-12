@@ -219,7 +219,7 @@ export async function importApprovedContent(
         `CONTENT_VERSION_INVALID: approved draft has contentVersion ${String(draft.contentVersion)}`,
       );
     const assessmentFields = {
-      title: String(draft.assessment?.title ?? 'Kiểm tra đầu vào'),
+      title: String(draft.assessment?.title ?? 'Đánh giá đầu vào'),
       description: String(draft.assessment?.description ?? ''),
       isActive: false,
       status: 'DRAFT',

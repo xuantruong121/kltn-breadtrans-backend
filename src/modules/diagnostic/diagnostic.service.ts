@@ -90,7 +90,7 @@ export class DiagnosticService {
     const defects = validateQuestionBank(questions);
     if (defects.length > 0) {
       throw new InternalServerErrorException(
-        'Bài kiểm tra đầu vào chưa sẵn sàng để chấm điểm',
+        'Bài đánh giá đầu vào chưa sẵn sàng để chấm điểm',
       );
     }
   }
@@ -616,7 +616,7 @@ export class DiagnosticService {
     });
 
     if (!assessment)
-      throw new NotFoundException('Chưa có bài kiểm tra đầu vào');
+      throw new NotFoundException('Chưa có bài đánh giá đầu vào');
     this.assertQuestionBank(assessment.questions);
     const formQuestions = this.formQuestions(assessment.questions);
 
@@ -689,7 +689,7 @@ export class DiagnosticService {
       include: { questions: { orderBy: { order: 'asc' } } },
     });
     if (!assessment)
-      throw new NotFoundException('Chưa có bài kiểm tra đầu vào');
+      throw new NotFoundException('Chưa có bài đánh giá đầu vào');
     this.assertQuestionBank(assessment.questions);
     const formQuestions = this.formQuestions(assessment.questions);
     const attempt = await this.prisma.diagnosticAttempt.findFirst({

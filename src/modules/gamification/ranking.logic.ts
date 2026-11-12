@@ -126,7 +126,7 @@ const ACTIVITY_TEXT: Record<string, string> = {
   LISTENING_PRACTICE_COMPLETED: 'vừa hoàn thành 1 bài luyện nghe',
   WRITING_PRACTICE_COMPLETED: 'vừa hoàn thành 1 bài luyện viết',
   CONTENT: 'vừa hoàn thành 1 bài luyện tập',
-  DIAGNOSTIC: 'vừa làm bài kiểm tra đầu vào',
+  DIAGNOSTIC: 'vừa làm bài đánh giá đầu vào',
 };
 
 /**

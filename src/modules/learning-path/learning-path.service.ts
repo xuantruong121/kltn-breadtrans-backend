@@ -448,7 +448,7 @@ export class LearningPathService {
     });
     if (dto.selfLevel && current?.placementSource === 'DIAGNOSTIC')
       throw new ConflictException(
-        'Bạn đã có mức luyện tập từ bài kiểm tra đầu vào. Mức cao hơn được mở qua bài kiểm tra mở khóa hoặc tiến độ luyện tập.',
+        'Bạn đã có mức luyện tập từ bài đánh giá đầu vào. Mức cao hơn được mở qua bài kiểm tra mở khóa hoặc tiến độ luyện tập.',
       );
     const data = {
       ...(dto.track ? { track: dto.track } : {}),

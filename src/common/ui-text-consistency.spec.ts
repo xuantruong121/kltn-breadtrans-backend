@@ -64,6 +64,11 @@ const RULES: Array<{ name: string; wrong: RegExp; right: string }> = [
     right: 'sentence case: Đấu trường, Cửa hàng, Thú ảo...',
   },
   { name: 'pet', wrong: /[Tt]hú cưng/, right: 'thú ảo' },
+  {
+    name: 'diagnostic',
+    wrong: /[Kk]iểm tra đầu vào/,
+    right: 'bài đánh giá đầu vào',
+  },
   { name: 'English unit', wrong: /\b24h\b|\bBoost\b/, right: '24 giờ' },
 ];
 
