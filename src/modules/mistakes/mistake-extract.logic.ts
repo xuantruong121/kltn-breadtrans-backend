@@ -455,6 +455,10 @@ export function reviewQuestion(
     id,
     skill,
     title: detail.title,
+    // The source's id, so the learner sees the Vietnamese title the catalog
+    // shows (the stored title is the authoring one). No key travels with it.
+    quizId: detail.ref.quizId ?? null,
+    topicId: detail.ref.topicId ?? null,
     question: detail.question ?? null,
     passage: detail.passageKind === 'PASSAGE' ? (detail.passage ?? null) : null,
     options: detail.options ?? [],

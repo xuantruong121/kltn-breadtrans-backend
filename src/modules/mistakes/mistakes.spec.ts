@@ -284,6 +284,8 @@ describe('mistake-extract.logic', () => {
       id: 5,
       skill: 'GRAMMAR',
       title: 't',
+      quizId: null,
+      topicId: null,
       question: 'q',
       passage: 'p',
       options: ['a', 'b'],
@@ -292,6 +294,13 @@ describe('mistake-extract.logic', () => {
       reviewQuestion(5, 'LISTENING', { ...detail, passageKind: 'TRANSCRIPT' })
         .passage,
     ).toBeNull();
+    // The ids of the source travel, for its Vietnamese title.
+    expect(
+      reviewQuestion(5, 'READING', {
+        ...detail,
+        ref: { quizId: 2, questionId: 7 },
+      }),
+    ).toMatchObject({ quizId: 2, topicId: null });
   });
 
   it('names the tags a learner gets wrong most', () => {
