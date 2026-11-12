@@ -272,7 +272,10 @@ describe('DungeonService', () => {
     expect(stored(id).question!.q.type).toBe('typed');
     const boss = await service.answer(1, id, rightAnswer(id));
     expect(boss.stats.bossesDown).toBe(1);
-    const next = await service.pick(1, id, boss.offers[0].id);
+    // A free run's seed is random, and about one run in twenty offers Trứng
+    // ốp la first; it revives once, so the fall below would not end the run.
+    const notEgg = boss.offers.find((o) => o.id !== 'egg')!;
+    const next = await service.pick(1, id, notEgg.id);
     patch(id, (x) => {
       x.run.hp = 1;
       x.run.shieldsLeft = 0;
