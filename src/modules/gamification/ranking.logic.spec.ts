@@ -136,7 +136,7 @@ describe('activityText', () => {
     expect(activityText({ kind: 'arena_win' })!.kind).toBe('arena');
     expect(
       activityText({ kind: 'event', type: 'LEVEL_UP', value: 13 })!.text,
-    ).toBe('vừa lên Lv. 13');
+    ).toBe('vừa lên Cấp 13');
     expect(
       activityText({ kind: 'event', type: 'STREAK_MILESTONE', value: 7 })!.text,
     ).toBe('vừa đạt chuỗi 7 ngày');

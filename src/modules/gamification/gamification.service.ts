@@ -1052,7 +1052,7 @@ export class GamificationService {
     // Send push notification for new badge
     if (this.notificationsService) {
       void this.notificationsService.sendPushToUser(userId, {
-        title: '🏅 Huy hiệu mới!',
+        title: 'Huy hiệu mới!',
         body: `Bạn vừa mở khóa huy hiệu "${badgeName}". Tiếp tục cố gắng nhé!`,
         icon: '/icons/icon-192.png',
         url: '/arena',
@@ -2380,7 +2380,7 @@ export class GamificationService {
     // Send Web Push Notification to target user
     if (this.notificationsService) {
       void this.notificationsService.sendPushToUser(targetUserId, {
-        title: '⭐ Bạn nhận được lời ngưỡng mộ mới!',
+        title: 'Bạn nhận được lời ngưỡng mộ mới!',
         body: `${senderName}: "${admirationMsg}"`,
         icon: sender?.profile?.avatar || '/icons/icon-192.png',
         url: '/student/profile',

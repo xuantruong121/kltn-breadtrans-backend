@@ -878,7 +878,7 @@ export function buildPracticeRecommendations(
       id: 'rec-listen-default',
       skill: 'Nghe hiểu',
       title: 'Listening A1 — Essential Everyday English',
-      description: 'Luyện nghe phản xạ với các bài nghe ngắn kèm transcript.',
+      description: 'Luyện nghe phản xạ với các bài nghe ngắn kèm lời thoại.',
       route: '/listening/9',
       badge: 'Nghe hiểu A1',
       fallback: true,

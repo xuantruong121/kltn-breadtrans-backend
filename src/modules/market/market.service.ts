@@ -446,7 +446,7 @@ export class MarketService {
       success: true,
       status: initialStatus,
       message: hasRealGift
-        ? 'Yêu cầu đổi quà đã được gửi tới Ban Quản Trị! Vui lòng chờ phê duyệt nhé 🎁'
+        ? 'Yêu cầu đổi quà đã được gửi tới quản trị viên. Vui lòng chờ phê duyệt.'
         : 'Đổi vật phẩm thành công!',
       orderId: result.order.id,
       totalBanh: calculatedTotalBanh,

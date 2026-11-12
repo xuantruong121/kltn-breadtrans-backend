@@ -98,7 +98,7 @@ export function buildToeicListeningSsml(transcript: string): string {
     })
     .filter((turn) => turn.text);
   if (!turns.length) {
-    throw new Error('Transcript không có nội dung để tạo audio');
+    throw new Error('Lời thoại không có nội dung để tạo audio');
   }
   // A TOEIC Part 1/2 line is a plain "A. <content>" option label — speak the
   // leading letter as a letter name (SSML say-as), never leaving it to the
@@ -806,7 +806,7 @@ export class AiService {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestDictationLines) {
       throw new BadRequestException(
-        'Chiến lược AI hiện tại không hỗ trợ soạn câu chép chính tả',
+        'Chiến lược AI hiện tại không hỗ trợ soạn câu nghe chép',
       );
     }
     return this.aiEvaluator.suggestDictationLines(input);

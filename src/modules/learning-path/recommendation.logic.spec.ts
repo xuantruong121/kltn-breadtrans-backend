@@ -83,7 +83,7 @@ describe('recommend', () => {
       { limit: 1, includeLocked: true },
     );
     expect(r[0].status).toBe('LOCKED_PLAN');
-    expect(r[0].reasons).toContain('Cần gói PLUS hoặc PRO');
+    expect(r[0].reasons).toContain('Cần gói Plus hoặc Pro');
   });
 
   it('boosts the career track and the weakest skill', () => {

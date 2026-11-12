@@ -434,7 +434,7 @@ export class AdminContextualAiController {
   }
 
   @Post('listening/ai/dictation-lines')
-  @ApiOperation({ summary: 'Soạn các câu chép chính tả nháp' })
+  @ApiOperation({ summary: 'Soạn các câu nghe chép nháp' })
   async suggestDictationLines(@Body() dto: SuggestDictationLinesDto) {
     try {
       const draft = await this.aiService.suggestDictationLines({
@@ -450,9 +450,7 @@ export class AdminContextualAiController {
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI dictation failed: ${error?.message || ''}`);
-      throw new BadGatewayException(
-        'Không thể soạn câu chép chính tả lúc này.',
-      );
+      throw new BadGatewayException('Không thể soạn câu nghe chép lúc này.');
     }
   }
 

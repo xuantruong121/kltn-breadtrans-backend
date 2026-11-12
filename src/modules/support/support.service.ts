@@ -14,7 +14,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { TutorService } from '../ai/tutor.service';
 import { TUTOR_HISTORY_TURNS, type TutorTurn } from '../ai/tutor-prompt.logic';
 
-export const SUPPORT_AI_NAME = 'Trợ Lý Bánh Mì';
+export const SUPPORT_AI_NAME = 'Trợ lý Bánh Mì';
 
 @Injectable()
 export class SupportService {

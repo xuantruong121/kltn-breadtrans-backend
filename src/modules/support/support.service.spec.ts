@@ -311,7 +311,7 @@ describe('SupportService', () => {
         conversationId: 100,
         senderUserId: null,
         senderRole: 'AI',
-        senderName: 'Trợ Lý Bánh Mì',
+        senderName: 'Trợ lý Bánh Mì',
         content: 'AI response text',
         clientMessageId: 'ai-client-1',
         isRead: true,
@@ -331,7 +331,7 @@ describe('SupportService', () => {
         data: expect.objectContaining({
           conversationId: 100,
           senderRole: 'AI',
-          senderName: 'Trợ Lý Bánh Mì',
+          senderName: 'Trợ lý Bánh Mì',
           content: 'AI response text',
         }),
       });

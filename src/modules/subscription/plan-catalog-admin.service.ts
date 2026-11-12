@@ -336,7 +336,7 @@ export class PlanCatalogAdminService {
         throw new NotFoundException('Không tìm thấy phiên bản gói.');
       }
       if (current.plan.code === 'FREE') {
-        throw new ConflictException('Không được sửa phiên bản của gói FREE.');
+        throw new ConflictException('Không được sửa phiên bản của gói Free.');
       }
       if (current.isCurrent) {
         throw new ConflictException(
@@ -374,10 +374,10 @@ export class PlanCatalogAdminService {
       throw new NotFoundException('Không tìm thấy gói.');
     }
     if (code === 'FREE') {
-      throw new ConflictException('Gói FREE được bảo vệ, không thể thay đổi.');
+      throw new ConflictException('Gói Free được bảo vệ, không thể thay đổi.');
     }
     if (code !== 'PLUS' && code !== 'PRO') {
-      throw new ConflictException('Trang này chỉ quản lý gói PLUS và PRO.');
+      throw new ConflictException('Trang này chỉ quản lý gói Plus và Pro.');
     }
     if (status !== PlanStatus.ACTIVE) {
       throw new ConflictException('Gói không còn hoạt động.');

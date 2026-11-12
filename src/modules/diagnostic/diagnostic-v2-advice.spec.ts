@@ -109,7 +109,7 @@ function resolver(
       title: key,
       route: `/x/${ref.id}`,
       access: locked ? 'LOCKED' : 'OPEN',
-      requirement: locked ? 'Cần gói PRO' : null,
+      requirement: locked ? 'Cần gói Pro' : null,
       lockedBy: locked ? 'PLAN' : null,
     };
   };
@@ -400,7 +400,7 @@ describe('D1 advice (FOUR_SKILL_PLACEMENT_V2)', () => {
       (p) => p.areaKey === 'READING_INFERENCE',
     )!.resources;
     expect(res.map((r) => r.access)).toEqual(['OPEN', 'LOCKED']);
-    expect(res[1].requirement).toBe('Cần gói PRO');
+    expect(res[1].requirement).toBe('Cần gói Pro');
   });
 
   it('a fixed item above the learner level gives way to open practice at that level for the same criterion', () => {

@@ -59,7 +59,7 @@ export class AiController {
   @Post('chat')
   @ApiOperation({
     summary:
-      'Hỏi trợ lý học tập; messages là hội thoại gần đây, tin cuối của người học là câu hỏi',
+      'Hỏi Trợ lý Bánh Mì; messages là hội thoại gần đây, tin cuối của người học là câu hỏi',
   })
   async chat(
     @Request() req: { user: { id: number } },
@@ -98,7 +98,7 @@ export class AiController {
   @ApiBearerAuth()
   @Post('explain-toeic-error/:questionId')
   @ApiOperation({
-    summary: 'AI Gia sư giải thích tại sao câu TOEIC này bị sai',
+    summary: 'Trợ lý Bánh Mì giải thích tại sao câu TOEIC này bị sai',
   })
   async explainToeicError(
     @Body()

@@ -31,6 +31,7 @@ import {
   type PracticeSkill,
   requiredPracticePlan,
 } from '../subscription/practice-level';
+import { PLAN_LABEL, planCodeOf } from '../subscription/plan-limits';
 
 const QUIZ_KINDS: Partial<
   Record<
@@ -93,7 +94,7 @@ export function adviceLock(access: {
   if (access.isLocked)
     return {
       access: 'LOCKED',
-      requirement: `Cần gói ${access.requiredPlan}`,
+      requirement: `Cần gói ${PLAN_LABEL[planCodeOf(access.requiredPlan)]}`,
       lockedBy: 'PLAN',
     };
   return { access: 'OPEN', requirement: null, lockedBy: null };
@@ -265,7 +266,9 @@ export class DiagnosticAdviceCatalogService {
             required !== 'FREE' && !planSatisfies(await planCode(), required);
           lock = {
             access: locked ? 'LOCKED' : 'OPEN',
-            requirement: locked ? `Cần gói ${required}` : null,
+            requirement: locked
+              ? `Cần gói ${PLAN_LABEL[planCodeOf(required)]}`
+              : null,
             lockedBy: locked ? 'PLAN' : null,
           };
         }
@@ -291,7 +294,9 @@ export class DiagnosticAdviceCatalogService {
             required !== 'FREE' && !planSatisfies(await planCode(), required);
           lock = {
             access: locked ? 'LOCKED' : 'OPEN',
-            requirement: locked ? `Cần gói ${required}` : null,
+            requirement: locked
+              ? `Cần gói ${PLAN_LABEL[planCodeOf(required)]}`
+              : null,
             lockedBy: locked ? 'PLAN' : null,
           };
         }

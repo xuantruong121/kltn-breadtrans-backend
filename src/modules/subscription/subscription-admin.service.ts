@@ -207,7 +207,7 @@ export class SubscriptionAdminService {
         throw new NotFoundException('Gói nâng cấp không tồn tại');
       }
       if (planVersion.plan.code === 'FREE') {
-        throw new BadRequestException('Không thể tặng gói FREE');
+        throw new BadRequestException('Không thể tặng gói Free');
       }
 
       const now = new Date();

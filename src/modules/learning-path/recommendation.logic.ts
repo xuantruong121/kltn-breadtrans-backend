@@ -213,7 +213,7 @@ export function scoreCandidate(
         : 'OPEN';
   if (status === 'LOCKED_LEVEL')
     reasons.push(`Cần mở khóa mức ${PRACTICE_LEVEL_LABEL[c.level]}`);
-  if (status === 'LOCKED_PLAN') reasons.push('Cần gói PLUS hoặc PRO');
+  if (status === 'LOCKED_PLAN') reasons.push('Cần gói Plus hoặc Pro');
   return {
     candidate: c,
     status,

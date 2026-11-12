@@ -1766,7 +1766,7 @@ export class QuizService {
     if (!quiz) throw new NotFoundException('Không tìm thấy bài luyện nghe');
     if (quiz.type !== QuizType.LISTENING_PRACTICE) {
       throw new ForbiddenException(
-        'Transcript chỉ khả dụng cho bài luyện nghe chép',
+        'Lời thoại chỉ khả dụng cho bài luyện nghe chép',
       );
     }
     if (quiz.publicationStatus !== 'PUBLISHED') {
@@ -1800,7 +1800,7 @@ export class QuizService {
       await this.listeningTranscriptGate(userId, quizId, role);
     if (!revealed) {
       throw new ForbiddenException(
-        'Hãy xác nhận xem transcript trước khi tải nội dung.',
+        'Hãy xác nhận xem lời thoại trước khi tải nội dung.',
       );
     }
 

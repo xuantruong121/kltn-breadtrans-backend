@@ -454,7 +454,7 @@ export class ListeningAudioAuthoringService {
           });
         }
         if (turns.length === 0)
-          throw new BadRequestException('Bài luyện chưa có transcript hợp lệ.');
+          throw new BadRequestException('Bài luyện chưa có lời thoại hợp lệ.');
         const resolvedAccent = turns.some((turn) =>
           turn.providerVoice.startsWith('en-GB'),
         )

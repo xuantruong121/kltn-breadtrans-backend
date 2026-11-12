@@ -21,6 +21,7 @@ import {
 } from '../learning-path/level-access.service';
 import { PRACTICE_LEVEL_LABEL } from '../learning-path/placement.logic';
 import { UNPLACED_UNLOCKED } from '../learning-path/progression.logic';
+import { PLAN_LABEL, planCodeOf } from '../subscription/plan-limits';
 
 export type SpeakingContentAccessSubject = {
   id: number;
@@ -183,7 +184,7 @@ export class SpeakingContentAccessService {
     }
     throw new ForbiddenException({
       statusCode: 403,
-      message: `Bài luyện này yêu cầu gói ${access.requiredPlan}.`,
+      message: `Bài luyện này yêu cầu gói ${PLAN_LABEL[planCodeOf(access.requiredPlan)]}.`,
       error: {
         code: 'FEATURE_NOT_INCLUDED',
         featureKey: access.featureKey,
