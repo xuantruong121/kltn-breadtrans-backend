@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { isRewardableQuiz } from '../gamification/reward-eligibility';
 import {
   MISTAKE_SKILLS,
   RESOLVE_AFTER_CORRECT,
@@ -111,8 +112,8 @@ export class MistakesService {
             id: true,
             type: true,
             title: true,
-            // Exam Writing tasks have no practice topic; they stay out.
             practiceTopicId: true,
+            toeicWritingSetItems: { select: { id: true }, take: 1 },
             questions: { select: { id: true, type: true, content: true } },
           },
         },
@@ -121,7 +122,20 @@ export class MistakesService {
         },
       },
     });
-    if (!row || !row.quiz.practiceTopicId) return [];
+    // Only practice quizzes, by the same rule as rewards and progress: every
+    // listening and reading quiz, a Writing task only with a practice topic and
+    // outside the TOEIC writing sets. Requiring a topic for every quiz left out
+    // the listening quizzes that have none (owner 2026-11-12: 7 wrong answers,
+    // an empty notebook).
+    if (
+      !row ||
+      !isRewardableQuiz({
+        type: row.quiz.type,
+        practiceTopicId: row.quiz.practiceTopicId,
+        inToeicWritingSet: row.quiz.toeicWritingSetItems.length > 0,
+      })
+    )
+      return [];
     return [
       ...quizObservations({ ...row, questions: row.quiz.questions }),
       ...writingObservations(row),

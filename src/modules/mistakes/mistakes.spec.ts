@@ -488,4 +488,92 @@ describe('MistakesService', () => {
     expect(toeicAttempt.findMany).not.toHaveBeenCalled();
     expect(toeicAttempt.findUnique).not.toHaveBeenCalled();
   });
+
+  describe('which quiz submissions are read', () => {
+    const at = new Date('2026-11-12T10:02:56Z');
+    function run(quiz: Record<string, unknown>) {
+      const tx = {
+        learnerMistakeIngest: {
+          createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        learnerMistake: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          upsert: jest.fn(),
+        },
+      };
+      const none = { findMany: jest.fn().mockResolvedValue([]) };
+      const prisma = {
+        submission: {
+          findMany: jest.fn().mockResolvedValue([{ id: 204 }]),
+          findUnique: jest.fn().mockResolvedValue({
+            id: 204,
+            submittedAt: at,
+            aiFeedback: null,
+            quiz: {
+              id: 12,
+              title: 'Listening B2',
+              toeicWritingSetItems: [],
+              questions: [
+                {
+                  id: 51,
+                  type: 'MULTIPLE_CHOICE',
+                  content: {
+                    text: 'What will the speaker probably do?',
+                    options: ['Change the client', 'Postpone the presentation'],
+                    correctIndex: 1,
+                  },
+                },
+              ],
+              ...quiz,
+            },
+            results: [
+              { questionId: 51, answer: 'Change the client', isCorrect: false },
+            ],
+          }),
+        },
+        grammarAttempt: none,
+        speakingSubmission: none,
+        learnerMistakeIngest: { findMany: jest.fn().mockResolvedValue([]) },
+        $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
+      };
+      return { tx, service: new MistakesService(prisma as any) };
+    }
+
+    it('a listening quiz without a practice topic is read (owner 2026-11-12)', async () => {
+      const { tx, service } = run({
+        type: 'LISTENING_PRACTICE',
+        practiceTopicId: null,
+      });
+      await service.sync(19);
+      expect(tx.learnerMistakeIngest.createMany).toHaveBeenCalledWith({
+        data: [{ userId: 19, kind: 'SUBMISSION', sourceId: 204 }],
+        skipDuplicates: true,
+      });
+      expect(tx.learnerMistake.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            userId: 19,
+            skill: 'LISTENING',
+            itemKey: '51',
+          }),
+        }),
+      );
+    });
+
+    it('an exam Writing task stays out: no topic, or inside a TOEIC writing set', async () => {
+      for (const quiz of [
+        { type: 'WRITING_PICTURE', practiceTopicId: null },
+        {
+          type: 'WRITING_EMAIL',
+          practiceTopicId: 3,
+          toeicWritingSetItems: [{ id: 1 }],
+        },
+      ]) {
+        const { tx, service } = run(quiz);
+        await service.sync(19);
+        expect(tx.learnerMistakeIngest.createMany).toHaveBeenCalled();
+        expect(tx.learnerMistake.upsert).not.toHaveBeenCalled();
+      }
+    });
+  });
 });
