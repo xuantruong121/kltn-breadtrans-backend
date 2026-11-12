@@ -90,7 +90,7 @@ async function session(plan: keyof typeof ACCOUNTS) {
   await page
     .addStyleTag({
       content:
-        '[data-companion-pet], [aria-label*="thú cưng" i] { display:none !important }',
+        '[data-companion-pet], [aria-label*="thú ảo" i] { display:none !important }',
     })
     .catch(() => undefined);
   return { browser, page, blocked, errors };

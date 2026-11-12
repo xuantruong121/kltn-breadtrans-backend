@@ -81,7 +81,7 @@ export class GamificationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('pet')
-  @ApiOperation({ summary: 'Lấy thông tin thú cưng của học sinh' })
+  @ApiOperation({ summary: 'Lấy thông tin thú ảo của học sinh' })
   getMyPet(@Request() req: any) {
     return this.gamificationService.getMyPet(req.user.id);
   }
@@ -89,7 +89,7 @@ export class GamificationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('pet/feed')
-  @ApiOperation({ summary: 'Cho thú cưng ăn (Tiêu hao Bánh Mì)' })
+  @ApiOperation({ summary: 'Cho thú ảo ăn (Tiêu hao Bánh Mì)' })
   feedPet(@Request() req: any) {
     return this.gamificationService.feedPet(req.user.id);
   }
@@ -97,7 +97,7 @@ export class GamificationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('pet/change-type')
-  @ApiOperation({ summary: 'Đổi loài thú cưng' })
+  @ApiOperation({ summary: 'Đổi loài thú ảo' })
   changePetType(@Request() req: any, @Body('petName') petName: string) {
     return this.gamificationService.changePetType(
       req.user.id,

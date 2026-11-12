@@ -37,7 +37,7 @@ const starve = (u: number, satiety: number) =>
 const bubble = (page: Page) =>
   page.locator('[role="dialog"][aria-live="polite"]');
 const petButton = (page: Page) =>
-  page.locator('button[aria-label^="Thú cưng đồng hành"]');
+  page.locator('button[aria-label^="Thú ảo đồng hành"]');
 const shownWithin = (page: Page, ms: number) =>
   bubble(page)
     .first()

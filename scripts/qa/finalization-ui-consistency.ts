@@ -184,7 +184,7 @@ async function main() {
   );
   await page.screenshot({ path: `${SHOTS}/ui-pet-dot-390.png` });
 
-  await page.getByRole('button', { name: /Thú cưng đồng hành/ }).click();
+  await page.getByRole('button', { name: /Thú ảo đồng hành/ }).click();
   const nudge = page.locator('[data-pet-nudge="HUNGRY"]');
   const inPanel = await nudge
     .waitFor({ timeout: 20_000 })
@@ -195,7 +195,7 @@ async function main() {
     inPanel &&
       (await nudge.innerText()).includes('Đang đói') &&
       (await nudge.locator('a, button').count()) === 0 &&
-      (await page.getByRole('button', { name: /^Cho thú cưng ăn/ }).count()) === 1,
+      (await page.getByRole('button', { name: /^Cho thú ảo ăn/ }).count()) === 1,
     inPanel
       ? (await nudge.innerText()).replace(/\s+/g, ' ').slice(0, 120)
       : 'no line',

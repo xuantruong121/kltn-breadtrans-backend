@@ -77,7 +77,7 @@ async function main() {
   await A.page.getByText(/Đang tìm đối thủ/).waitFor({ timeout: 15_000 });
   check('A waits in the queue', true);
   if (EXTRA) await A.page.screenshot({ path: `${SHOTS}/arena-searching-${WIDTH}.png` });
-  const pet = (page: typeof A.page) => page.getByRole('button', { name: /^Thú cưng đồng hành/ }).count();
+  const pet = (page: typeof A.page) => page.getByRole('button', { name: /^Thú ảo đồng hành/ }).count();
   const petInLobby = await pet(A.page);
   await B.page.getByRole('button', { name: /^Tìm đối thủ/ }).click();
   const match = await questions(A.account.userId);

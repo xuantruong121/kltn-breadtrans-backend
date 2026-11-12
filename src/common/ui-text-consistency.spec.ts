@@ -60,9 +60,10 @@ const RULES: Array<{ name: string; wrong: RegExp; right: string }> = [
   {
     name: 'Title Case term',
     wrong:
-      /Đấu Trường|Cửa Hàng|Thú Cưng|Huy Hiệu|Nhiệm Vụ|Bảng Xếp Hạng|Sổ Lỗi|Thông Báo|Ngữ Pháp|Luyện Đề|Giữ Chuỗi|Nghe Chép|Trợ Lý/,
-    right: 'sentence case: Đấu trường, Cửa hàng, Thú cưng...',
+      /Đấu Trường|Cửa Hàng|Thú Cưng|Thú Ảo|Huy Hiệu|Nhiệm Vụ|Bảng Xếp Hạng|Sổ Lỗi|Thông Báo|Ngữ Pháp|Luyện Đề|Giữ Chuỗi|Nghe Chép|Trợ Lý/,
+    right: 'sentence case: Đấu trường, Cửa hàng, Thú ảo...',
   },
+  { name: 'pet', wrong: /[Tt]hú cưng/, right: 'thú ảo' },
   { name: 'English unit', wrong: /\b24h\b|\bBoost\b/, right: '24 giờ' },
 ];
 
