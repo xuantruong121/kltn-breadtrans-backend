@@ -135,7 +135,7 @@ describe('WordBlasterService', () => {
     );
   });
 
-  it('breaking every block wins: stake back, half as a capped bonus, XP, paid once', async () => {
+  it('breaking every block wins: stake back, the stake again as a capped bonus, XP, paid once', async () => {
     const view = await service.start(1, 50, 'copy');
     const blocks = stored(view.sessionId).blocks;
     for (const b of blocks) {
@@ -147,7 +147,7 @@ describe('WordBlasterService', () => {
     expect(last.result).toMatchObject({
       outcome: 'win',
       destroyed: 20,
-      net: 25,
+      net: 50,
       xp: 40,
     });
     // The Arena only plays with dictionary words: no word list, nothing to review.
@@ -162,7 +162,7 @@ describe('WordBlasterService', () => {
     );
     expect(gamification.awardBanh).toHaveBeenCalledWith(
       1,
-      25,
+      50,
       'BLASTER_WIN',
       `blaster:${view.sessionId}:win`,
       expect.objectContaining({ isCapped: true }),

@@ -1,10 +1,10 @@
 /**
  * Pháo Bánh Mì on the disposable harness (owner 2026-11-08). The answers are
  * read straight from the harness Redis, as a perfect player would know them.
- *   API: a win pays the stake back plus half (one BLASTER_RETURN, one
- *        BLASTER_WIN); a loss and leaving keep the stake; the start reply
+ *   API: a win pays the stake back plus the stake again (one BLASTER_RETURN,
+ *        one BLASTER_WIN; owner 2026-11-13); a loss and leaving keep the stake; the start reply
  *        holds no answer; a game left alone is settled by the sweep.
- *   Browser: the menu shows Đấu trường, More holds Bảng xếp hạng then FAQ;
+ *   Browser: the menu shows Đấu trường, Thêm holds Bảng xếp hạng then Trợ giúp;
  *        /arena lists the games in a sidebar and Pháo Bánh Mì's lobby opens
  *        from it. Answers are typed one key at a time, never with Enter
  *        (owner 2026-11-08, after ZType): a Gõ lại từ game won at 1366 with
@@ -151,8 +151,8 @@ async function api() {
     JSON.stringify(last?.result)?.slice(0, 120),
   );
   check(
-    'a win: 150 + 50 back + 25 bonus = 225',
-    bread(a.userId) === 225,
+    'a win: 150 + 50 back + 50 bonus = 250',
+    bread(a.userId) === 250,
     String(bread(a.userId)),
   );
   check(
@@ -161,7 +161,7 @@ async function api() {
       JSON.stringify([
         'BLASTER_STAKE:-50',
         'BLASTER_RETURN:50',
-        'BLASTER_WIN:25',
+        'BLASTER_WIN:50',
       ]),
     JSON.stringify(ledger(a.userId)),
   );
@@ -173,7 +173,7 @@ async function api() {
   );
   check(
     'finishing again pays nothing more',
-    fin.data?.result?.outcome === 'win' && bread(a.userId) === 225,
+    fin.data?.result?.outcome === 'win' && bread(a.userId) === 250,
   );
 
   // Leaving.
@@ -356,14 +356,15 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
       /Đấu trường/.test(nav),
       nav.slice(0, 120),
     );
-    // The More list is in the header markup in order: More, Bảng xếp hạng, FAQ.
-    const more = nav.indexOf('More');
+    // The Thêm list is in the header markup in order: Thêm, Bảng xếp hạng, Trợ giúp
+    // (More and FAQ were renamed 2026-11-12).
+    const more = nav.indexOf('Thêm');
     const ranking = nav.indexOf('Bảng xếp hạng');
     check(
-      'More holds Bảng xếp hạng before FAQ, after the Đấu trường button',
+      'Thêm holds Bảng xếp hạng before Trợ giúp, after the Đấu trường button',
       nav.indexOf('Đấu trường') < more &&
         more < ranking &&
-        ranking < nav.indexOf('FAQ'),
+        ranking < nav.indexOf('Trợ giúp'),
     );
   }
   // Owner 2026-11-08: the games sit in a sidebar, not one per row.
@@ -538,8 +539,8 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
     await page.screenshot({ path: `${SHOTS}/blaster-win-${tag}.png` });
     const dialog = won ? await page.locator('[role="dialog"]').innerText() : '';
     check(
-      `${tag}: 19 typed and one let through still wins, +10`,
-      won && /\+10/.test(dialog) && /lọt 1/.test(dialog),
+      `${tag}: 19 typed and one let through still wins, +20`,
+      won && /\+20/.test(dialog) && /lọt 1/.test(dialog),
       dialog.replace(/\s+/g, ' ').slice(0, 160),
     );
     check(
@@ -550,8 +551,8 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
       dialog.replace(/\s+/g, ' ').slice(0, 200),
     );
     check(
-      `${tag}: balance 300 → 310`,
-      bread(s.account.userId) === 310,
+      `${tag}: balance 300 → 320`,
+      bread(s.account.userId) === 320,
       String(bread(s.account.userId)),
     );
     // Owner 2026-11-08: the Arena uses dictionary words only; no review list.

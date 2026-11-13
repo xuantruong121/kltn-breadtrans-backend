@@ -236,9 +236,10 @@ describe('matchShot and resolve', () => {
 });
 
 describe('blasterPayout and blasterXp', () => {
-  it('a win returns the stake and half of it; a loss nothing', () => {
-    expect(blasterPayout(50, 'win')).toEqual({ returned: 50, bonus: 25 });
-    expect(blasterPayout(20, 'win')).toEqual({ returned: 20, bonus: 10 });
+  it('a win returns the stake and adds the stake again; a loss nothing', () => {
+    expect(blasterPayout(50, 'win')).toEqual({ returned: 50, bonus: 50 });
+    expect(blasterPayout(20, 'win')).toEqual({ returned: 20, bonus: 20 });
+    expect(blasterPayout(100, 'win')).toEqual({ returned: 100, bonus: 100 });
     expect(blasterPayout(100, 'lose')).toEqual({ returned: 0, bonus: 0 });
   });
 

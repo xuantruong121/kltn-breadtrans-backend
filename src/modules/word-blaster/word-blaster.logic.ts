@@ -5,10 +5,11 @@
  * life left. Pure: words and randomness come in as arguments, and every time
  * is in milliseconds since the game started, by the server's clock.
  *
- * Reward (owner: "as little inflation as possible, not x3"): a win returns
- * the stake and adds half of it, and that half counts toward the shared 150
- * Bánh Mì daily cap; a loss keeps the stake. The game takes Bánh Mì out more
- * than it puts in.
+ * Reward: a win returns the stake and adds the stake again, as Song Đấu Từ
+ * Vựng does; a loss keeps the stake. Owner 2026-11-13: half the stake (+10
+ * for 20 blocks at stake 20) was not worth the game. The bonus still counts
+ * toward the shared 150 Bánh Mì daily cap, which bounds the inflation the
+ * owner first asked to keep low ("as little inflation as possible, not x3").
  */
 import {
   ARENA_XP_DAILY_CAP,
@@ -382,10 +383,10 @@ export function blasterDeadline(blocks: BlasterBlock[]): number {
   return Math.max(0, ...blocks.map(landsAt)) + LANDING_GRACE_MS + 2000;
 }
 
-/** Bánh Mì back on a win: the stake (outside the daily cap) and half of it as a bonus (inside). */
+/** Bánh Mì back on a win: the stake (outside the daily cap) and the stake again as a bonus (inside). */
 export function blasterPayout(stake: number, outcome: 'win' | 'lose') {
   return outcome === 'win'
-    ? { returned: stake, bonus: Math.floor(stake / 2) }
+    ? { returned: stake, bonus: stake }
     : { returned: 0, bonus: 0 };
 }
 
