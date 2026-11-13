@@ -4,7 +4,7 @@
  *   API: a win pays the stake back plus the stake again (one BLASTER_RETURN,
  *        one BLASTER_WIN; owner 2026-11-13); a loss and leaving keep the stake; the start reply
  *        holds no answer; a game left alone is settled by the sweep.
- *   Browser: the menu shows Đấu trường, Thêm holds Bảng xếp hạng then Trợ giúp;
+ *   Browser: the menu shows Đấu trường, More holds Bảng xếp hạng then FAQ;
  *        /arena lists the games in a sidebar and Pháo Bánh Mì's lobby opens
  *        from it. Answers are typed one key at a time, never with Enter
  *        (owner 2026-11-08, after ZType): a Gõ lại từ game won at 1366 with
@@ -356,15 +356,14 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
       /Đấu trường/.test(nav),
       nav.slice(0, 120),
     );
-    // The Thêm list is in the header markup in order: Thêm, Bảng xếp hạng, Trợ giúp
-    // (More and FAQ were renamed 2026-11-12).
-    const more = nav.indexOf('Thêm');
+    // The More list is in the header markup in order: More, Bảng xếp hạng, FAQ.
+    const more = nav.indexOf('More');
     const ranking = nav.indexOf('Bảng xếp hạng');
     check(
-      'Thêm holds Bảng xếp hạng before Trợ giúp, after the Đấu trường button',
+      'More holds Bảng xếp hạng before FAQ, after the Đấu trường button',
       nav.indexOf('Đấu trường') < more &&
         more < ranking &&
-        ranking < nav.indexOf('Trợ giúp'),
+        ranking < nav.indexOf('FAQ'),
     );
   }
   // Owner 2026-11-08: the games sit in a sidebar, not one per row.
