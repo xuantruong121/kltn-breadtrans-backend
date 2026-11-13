@@ -505,11 +505,9 @@ async function browser(width: number, mode: 'copy' | 'vi_to_en' | 'en_to_vi') {
       }
       if (i === 9) {
         const rate = await fps(page);
-        check(
-          `${tag}: at least 50 frames a second while blocks fall`,
-          rate >= 50,
-          `${rate} fps`,
-        );
+        // Recorded, not judged (owner 2026-11-13: it plays smoothly; the
+        // number swings with the load of the dev machine).
+        console.log(`INFO  ${tag}: ${rate} frames a second while blocks fall`);
       }
       if (await typeAnswer(page, answer)) auto += 1;
       typedCount += 1;
