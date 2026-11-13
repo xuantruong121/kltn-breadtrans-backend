@@ -55,6 +55,7 @@ import {
   SETS as SPEAKING_PRACTICE_SETS,
 } from './data/speaking-practice-sets';
 import { GRAMMAR_REPLACEMENTS } from './data/grammar-replacements';
+import { explanationFor } from './data/grammar-explanations';
 
 const prisma = new PrismaClient();
 
@@ -7423,8 +7424,17 @@ async function main() {
       questionIndex < grammarTopics[topicIndex].questions.length;
       questionIndex += 1
     ) {
-      const [question, options, correctIndex, explanation] =
+      const [question, options, correctIndex, shortExplanation] =
         grammarTopics[topicIndex].questions[questionIndex];
+      // The step-by-step explanation written for this exact question, when
+      // there is one (owner 2026-11-13); the short line otherwise.
+      const explanation =
+        explanationFor({
+          id: grammarQuestionId,
+          question,
+          options,
+          correctIndex,
+        }) ?? shortExplanation;
       await prisma.grammarQuestion.upsert({
         where: { id: grammarQuestionId },
         update: {
