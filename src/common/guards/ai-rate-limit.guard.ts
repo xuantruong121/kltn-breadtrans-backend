@@ -77,7 +77,9 @@ export class AiRateLimitGuard implements CanActivate {
       throw new HttpException(
         {
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          error: 'Too Many Requests',
+          // The page tells this apart from other 429s and shows the
+          // out-of-gradings notice (owner 2026-11-13).
+          error: 'AI_QUOTA_EXHAUSTED',
           message: aiGradingLimitMessage(planCode),
           limit,
           currentUsage: count,

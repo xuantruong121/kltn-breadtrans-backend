@@ -222,14 +222,30 @@ describe('SpeakingService - Durable Submissions & Security', () => {
       expect(mockWorker.triggerProcessing).toHaveBeenCalled();
     });
 
-    it('rejects when daily limit is exceeded', async () => {
+    it('rejects an exam recording past the daily exam limit', async () => {
       mockPrisma.speakingSubmission.findUnique.mockResolvedValueOnce(null);
-      mockPrisma.speakingExercise.findUnique.mockResolvedValueOnce({ id: 1 });
-      mockPrisma.speakingSubmission.count.mockResolvedValueOnce(10); // at limit
+      // The record lookup, then the quota lookup: an exam exercise.
+      mockPrisma.speakingExercise.findUnique
+        .mockResolvedValueOnce({ id: 1 })
+        .mockResolvedValueOnce({ practiceSet: { scope: 'EXAM_INTERNAL' } });
+      mockPrisma.speakingSubmission.count.mockResolvedValueOnce(33); // at limit
 
       await expect(
         service.submitAudio(1, 10, mockFile, 'idemp-key-limit'),
-      ).rejects.toThrow('Bạn đã đạt giới hạn chấm điểm phát âm hôm nay');
+      ).rejects.toThrow('giới hạn chấm bài Speaking trong đề thi');
+    });
+
+    it('practice has no fixed daily count of its own: the plan guard bounds it (owner 2026-11-13)', async () => {
+      mockPrisma.speakingSubmission.findUnique.mockResolvedValueOnce(null);
+      mockPrisma.speakingExercise.findUnique.mockResolvedValueOnce({ id: 1 });
+      mockPrisma.speakingSubmission.count.mockClear();
+
+      await service
+        .submitAudio(1, 10, mockFile, 'idemp-key-eleventh')
+        .catch(() => undefined);
+
+      // The practice path never counts today's submissions any more.
+      expect(mockPrisma.speakingSubmission.count).not.toHaveBeenCalled();
     });
 
     it('returns HTTP 202 with PENDING status when BullMQ enqueue fails after DB commit, allowing polling while reconciliation recovers', async () => {

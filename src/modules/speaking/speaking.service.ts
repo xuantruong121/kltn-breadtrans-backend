@@ -216,8 +216,6 @@ function difficultyLabel(values: string[]) {
   return `${labels[unique[0]]} – ${labels[unique[unique.length - 1]]}`;
 }
 
-/** Daily Speaking grading allowance per learner (see dailySpeakingQuotaError). */
-export const DAILY_PRACTICE_SPEAKING_LIMIT = 10;
 /** A recording plus one retake; the exam room shows the same limit. */
 export const MAX_EXAM_TAKES_PER_QUESTION = 2;
 /** Three full 11-task TOEIC speaking sections per day. */
@@ -836,6 +834,11 @@ export class SpeakingService {
    * S&W and 4 Skills exams impossible to finish, and exam recordings used to
    * consume the learner's practice allowance. Exam tasks are the exercises of
    * EXAM_INTERNAL practice sets; their limit still bounds provider usage.
+   *
+   * Owner 2026-11-13: practice Speaking has no limit of its own any more. The
+   * fixed 10 a day stopped Plus (30) and Pro (60) learners at the tenth
+   * answer; practice is bounded by the plan's AI gradings (AiRateLimitGuard),
+   * shared with Writing.
    */
   private async dailySpeakingQuotaError(
     db: Pick<
@@ -852,6 +855,7 @@ export class SpeakingService {
     });
     const exam =
       exercise?.practiceSet?.scope === SpeakingPracticeScope.EXAM_INTERNAL;
+    if (!exam) return null;
     const examFilter: Prisma.SpeakingSubmissionWhereInput = {
       exercise: {
         practiceSet: { scope: SpeakingPracticeScope.EXAM_INTERNAL },
@@ -861,13 +865,11 @@ export class SpeakingService {
       where: {
         userId,
         submittedAt: { gte: startOfDay },
-        ...(exam ? examFilter : { NOT: examFilter }),
+        ...examFilter,
       },
     });
-    if (exam && count >= DAILY_EXAM_SPEAKING_LIMIT)
+    if (count >= DAILY_EXAM_SPEAKING_LIMIT)
       return `Bạn đã đạt giới hạn chấm bài Speaking trong đề thi hôm nay (${DAILY_EXAM_SPEAKING_LIMIT} lần). Vui lòng quay lại vào ngày mai.`;
-    if (!exam && count >= DAILY_PRACTICE_SPEAKING_LIMIT)
-      return `Bạn đã đạt giới hạn chấm điểm phát âm hôm nay (${DAILY_PRACTICE_SPEAKING_LIMIT} lần). Vui lòng quay lại vào ngày mai để luyện tập tiếp nhé!`;
     return null;
   }
 
