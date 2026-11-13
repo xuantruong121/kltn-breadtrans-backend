@@ -17,6 +17,7 @@ import {
 import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
 import {
   filterGrammarTopics,
+  gradeGrammarQuestion,
   grammarTopicFacets,
   normalizeOptionExplanations,
   questionProblems,
@@ -170,6 +171,34 @@ export class GrammarService {
     };
   }
 
+  /**
+   * One question checked as soon as the learner picks an option (owner
+   * 2026-11-13). Same visibility as the topic detail; nothing is stored: the
+   * attempt, the first-completion record and the mistake notebook still come
+   * from submitAttempt when the topic is done.
+   */
+  async checkAnswer(
+    topicId: number,
+    questionId: number,
+    selectedOption: number,
+    isStaff = false,
+  ) {
+    const question = await this.prisma.grammarQuestion.findFirst({
+      where: { id: questionId, topicId },
+      include: { topic: { select: { publicationStatus: true } } },
+    });
+    if (
+      !question ||
+      (!isStaff &&
+        question.topic.publicationStatus !== QuizPublicationStatus.PUBLISHED)
+    ) {
+      throw new NotFoundException(
+        `Không tìm thấy câu hỏi #${questionId} trong chủ đề #${topicId}.`,
+      );
+    }
+    return gradeGrammarQuestion(question, selectedOption);
+  }
+
   async submitAttempt(
     topicId: number,
     userId: number,
@@ -187,20 +216,10 @@ export class GrammarService {
       throw new NotFoundException(`Không tìm thấy chủ đề #${topicId}.`);
     }
 
-    let correctCount = 0;
-    const questionsResult = topic.questions.map((q) => {
-      const selected = answers[String(q.id)] ?? answers[q.id];
-      const isCorrect = selected === q.correctIndex;
-      if (isCorrect) correctCount++;
-      return {
-        questionId: q.id,
-        selectedOption: selected,
-        correctOption: q.correctIndex,
-        isCorrect,
-        explanation: q.explanation,
-        optionExplanations: q.optionExplanations ?? null,
-      };
-    });
+    const questionsResult = topic.questions.map((q) =>
+      gradeGrammarQuestion(q, answers[String(q.id)] ?? answers[q.id]),
+    );
+    const correctCount = questionsResult.filter((r) => r.isCorrect).length;
 
     const totalQuestions = topic.questions.length || 1;
     const score = Math.round((correctCount / totalQuestions) * 100);
