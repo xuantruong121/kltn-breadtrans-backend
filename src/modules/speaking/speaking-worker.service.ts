@@ -325,7 +325,13 @@ export class SpeakingWorkerService implements OnModuleInit {
     const submission = await this.prisma.speakingSubmission.findUnique({
       where: { id: submissionId },
       include: {
-        exercise: { include: { practiceSet: { select: { scope: true } } } },
+        exercise: {
+          include: {
+            practiceSet: { select: { scope: true } },
+            // A respond-using-information task is graded against its notice.
+            stimulus: { select: { title: true, content: true } },
+          },
+        },
       },
     });
 
@@ -458,7 +464,12 @@ export class SpeakingWorkerService implements OnModuleInit {
     let assessmentResult: any;
     try {
       assessmentResult = legacyMockEnabled()
-        ? await mockPracticeSpeech(submission.exercise, audioBuffer)
+        ? await mockPracticeSpeech(
+            submission.exercise,
+            audioBuffer,
+            undefined,
+            this.aiService,
+          )
         : await assessPracticeSpeech(
             this.aiService,
             submission.exercise,
@@ -501,7 +512,7 @@ export class SpeakingWorkerService implements OnModuleInit {
         transcript,
         aiFeedback: assessmentResult,
         provider: legacyMockEnabled() ? 'mock' : 'azure',
-        scoreVersion: 'v1',
+        scoreVersion: assessmentResult.scoreVersion ?? 'v1',
         processedAt: new Date(),
         lastErrorCode,
         lastErrorMessage: null,
