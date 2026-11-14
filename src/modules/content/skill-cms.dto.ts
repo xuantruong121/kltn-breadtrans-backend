@@ -11,6 +11,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  MaxLength,
   ArrayMaxSize,
   ArrayMinSize,
   ValidateNested,
@@ -103,6 +104,11 @@ export class SkillContentDto {
   @IsOptional()
   @IsString()
   type?: string;
+
+  /** Writing: TRANSLATION creates a "Dịch câu" exercise (WRITING_PICTURE, its own topic). */
+  @IsOptional()
+  @IsIn(['TRANSLATION'])
+  writingKind?: 'TRANSLATION';
 
   @IsOptional()
   @IsBoolean()
@@ -253,6 +259,19 @@ export class ListeningQuestionDto {
   order?: number;
 }
 
+/** One word of help on a "Dịch câu" sentence. */
+export class TranslationHintDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  vi!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  en!: string;
+}
+
 export class WritingQuestionDto {
   @IsString()
   @IsNotEmpty()
@@ -296,6 +315,28 @@ export class WritingQuestionDto {
   @IsOptional()
   @IsString()
   explanation?: string;
+
+  /** "Dịch câu": the English translations the check accepts. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(400, { each: true })
+  acceptedAnswers?: string[];
+
+  /** "Dịch câu": word help shown on request. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @ValidateNested({ each: true })
+  @Type(() => TranslationHintDto)
+  hints?: TranslationHintDto[];
+
+  /** "Dịch câu": one grammar note shown after a check. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  grammarTip?: string;
 
   @IsOptional()
   @IsInt()

@@ -13,10 +13,7 @@
  */
 import type { TranslationHint } from '../../src/modules/writing/sentence-translation.logic';
 
-export const SENTENCE_TRANSLATION_TOPIC = {
-  name: 'Sentence Translation',
-  vietnameseName: 'Dịch câu',
-} as const;
+export { SENTENCE_TRANSLATION_TOPIC } from '../../src/modules/writing/sentence-translation.logic';
 
 export type TranslationSentenceSeed = {
   vi: string;

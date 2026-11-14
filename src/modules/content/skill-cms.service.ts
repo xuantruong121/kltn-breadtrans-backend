@@ -53,6 +53,11 @@ import {
   speakingSetFacets,
 } from './skill-cms-list';
 import { UploadService } from '../upload/upload.service';
+import {
+  SENTENCE_TRANSLATION,
+  SENTENCE_TRANSLATION_TOPIC,
+  translationTaskIssues,
+} from '../writing/sentence-translation.logic';
 
 type Domain = 'listening' | 'reading' | 'writing' | 'speaking';
 type Admin = { id: number; role: Role };
@@ -67,6 +72,8 @@ const PICTURE_WRITING_TASK_TYPES = new Set([
   'SENTENCE',
   'PICTURE_SENTENCE',
   'DESCRIBE_PICTURE',
+  // "Dịch câu" exercises are stored on WRITING_PICTURE too (owner 2026-11-14).
+  SENTENCE_TRANSLATION,
 ]);
 
 function asJson(value: unknown): Prisma.InputJsonValue {
@@ -155,6 +162,7 @@ export class SkillCmsService {
     domain: Exclude<Domain, 'speaking'>,
     type: QuizType,
     level?: string,
+    writingKind?: 'TRANSLATION',
   ) {
     const category =
       domain === 'reading'
@@ -163,11 +171,33 @@ export class SkillCmsService {
           ? TopicCategory.WRITING_PART1
           : TopicCategory.WRITING_PART2;
     if (!this.prisma.practiceTopic?.findMany) return undefined;
-    const topics = await this.prisma.practiceTopic.findMany({
-      where: { category },
-      select: { id: true, name: true },
-      orderBy: { order: 'asc' },
-    });
+    // "Dịch câu" has its own topic, created on first use.
+    if (writingKind === 'TRANSLATION') {
+      const where = {
+        name: SENTENCE_TRANSLATION_TOPIC.name,
+        category: TopicCategory.WRITING_PART1,
+      };
+      const existing = await this.prisma.practiceTopic.findFirst({
+        where,
+        select: { id: true },
+      });
+      if (existing) return existing.id;
+      const created = await this.prisma.practiceTopic.create({
+        data: {
+          ...where,
+          vietnameseName: SENTENCE_TRANSLATION_TOPIC.vietnameseName,
+        },
+        select: { id: true },
+      });
+      return created.id;
+    }
+    const topics = (
+      await this.prisma.practiceTopic.findMany({
+        where: { category },
+        select: { id: true, name: true },
+        orderBy: { order: 'asc' },
+      })
+    ).filter((topic) => topic.name !== SENTENCE_TRANSLATION_TOPIC.name);
     if (!topics.length) return undefined;
     if (domain !== 'reading') return topics[0].id;
     const normalizedLevel = level?.trim().toUpperCase() ?? '';
@@ -524,14 +554,17 @@ export class SkillCmsService {
       });
     }
     const type = this.quizType(domain);
+    const translation =
+      domain === 'writing' && dto.writingKind === 'TRANSLATION';
     const writingType =
-      domain === 'writing' && dto.type === 'WRITING_PICTURE'
+      domain === 'writing' && (dto.type === 'WRITING_PICTURE' || translation)
         ? QuizType.WRITING_PICTURE
         : type;
     const practiceTopicId = await this.practiceTopicId(
       domain,
       writingType,
       dto.level,
+      translation ? 'TRANSLATION' : undefined,
     );
     return this.prisma.quiz.create({
       data: {
@@ -782,7 +815,8 @@ export class SkillCmsService {
     if (!question)
       throw new NotFoundException('Câu hỏi không thuộc nội dung Viết này.');
     this.assertWritingTaskType(question.quiz?.type, dto.taskType);
-    const content = this.writingContent(dto);
+    // Keeps what the CMS form does not edit (dismissed translations).
+    const content = this.writingContent(dto, question.content);
     await this.assertQuestionEditable(quizId, question, {
       type: dto.type,
       content,
@@ -1307,6 +1341,13 @@ export class SkillCmsService {
         !isAcceptedContentImageReference(content.imageUrl)
       )
         errors.push(`Câu ${index + 1}: Picture task cần imageUrl`);
+      if (
+        domain === 'writing' &&
+        typeof content.taskType === 'string' &&
+        content.taskType.trim().toUpperCase() === SENTENCE_TRANSLATION
+      )
+        for (const issue of translationTaskIssues(content))
+          errors.push(`Câu ${index + 1}: ${issue}`);
       if (domain === 'writing' && content.wordRange !== undefined) {
         const range = content.wordRange;
         if (
@@ -1433,8 +1474,29 @@ export class SkillCmsService {
     return id;
   }
 
-  private writingContent(dto: WritingQuestionDto): Prisma.InputJsonValue {
+  private writingContent(
+    dto: WritingQuestionDto,
+    previous?: unknown,
+  ): Prisma.InputJsonValue {
+    const translation =
+      dto.taskType?.trim().toUpperCase() === SENTENCE_TRANSLATION;
+    const kept = (previous ?? {}) as Record<string, unknown>;
+    const trimmed = (list?: string[]) => [
+      ...new Set((list ?? []).map((x) => x.trim()).filter(Boolean)),
+    ];
     return {
+      ...(translation
+        ? {
+            acceptedAnswers: trimmed(dto.acceptedAnswers),
+            hints: (dto.hints ?? [])
+              .map((h) => ({ vi: h.vi.trim(), en: h.en.trim() }))
+              .filter((h) => h.vi && h.en),
+            grammarTip: dto.grammarTip?.trim() ?? '',
+            ...(Array.isArray(kept.dismissedAnswers)
+              ? { dismissedAnswers: kept.dismissedAnswers }
+              : {}),
+          }
+        : {}),
       skill: 'WRITING',
       prompt: dto.prompt.trim(),
       ...(dto.taskType?.trim() ? { taskType: dto.taskType.trim() } : {}),

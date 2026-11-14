@@ -175,10 +175,10 @@ describe('translationTaskOf and translationTaskIssues', () => {
         grammarTip: '',
       }),
     ).toEqual([
-      'prompt is not Vietnamese with diacritics',
-      'fewer than 2 accepted answers',
-      'no hints',
-      'no grammar tip',
+      'Câu tiếng Việt phải viết có dấu',
+      'Cần ít nhất 2 đáp án tiếng Anh',
+      'Cần ít nhất 1 gợi ý từ vựng',
+      'Cần lưu ý ngữ pháp',
     ]);
   });
 });

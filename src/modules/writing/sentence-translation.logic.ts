@@ -13,6 +13,11 @@ import {
 } from '../quiz/listening-number-words';
 
 export const SENTENCE_TRANSLATION = 'SENTENCE_TRANSLATION';
+/** The practice topic every "Dịch câu" exercise belongs to (WRITING_PART1). */
+export const SENTENCE_TRANSLATION_TOPIC = {
+  name: 'Sentence Translation',
+  vietnameseName: 'Dịch câu',
+} as const;
 export const SENTENCE_TRANSLATION_MAX_SCORE = 2;
 export const SENTENCE_TRANSLATION_RUBRIC = 'SENTENCE_TRANSLATION_V1';
 /** A sentence answer is short; anything longer is not a translation. */
@@ -352,18 +357,18 @@ const VIETNAMESE =
 /** Authoring checks before a translation exercise is published or seeded. */
 export function translationTaskIssues(content: unknown): string[] {
   const task = translationTaskOf(content);
-  if (!task) return ['not a translation task with a prompt and answers'];
+  if (!task) return ['Cần câu tiếng Việt và đáp án tiếng Anh'];
   const issues: string[] = [];
   if (!VIETNAMESE.test(task.prompt))
-    issues.push('prompt is not Vietnamese with diacritics');
+    issues.push('Câu tiếng Việt phải viết có dấu');
   if (task.acceptedAnswers.length < 2)
-    issues.push('fewer than 2 accepted answers');
+    issues.push('Cần ít nhất 2 đáp án tiếng Anh');
   for (const a of task.acceptedAnswers) {
-    if (VIETNAMESE.test(a)) issues.push(`answer has Vietnamese letters: ${a}`);
+    if (VIETNAMESE.test(a)) issues.push(`Đáp án có chữ tiếng Việt: ${a}`);
     if (matchTranslation(a, task.acceptedAnswers).kind !== 'EXACT')
-      issues.push(`answer does not match itself: ${a}`);
+      issues.push(`Đáp án không đọc được thành câu: ${a}`);
   }
-  if (task.hints.length === 0) issues.push('no hints');
-  if (!task.grammarTip) issues.push('no grammar tip');
+  if (task.hints.length === 0) issues.push('Cần ít nhất 1 gợi ý từ vựng');
+  if (!task.grammarTip) issues.push('Cần lưu ý ngữ pháp');
   return issues;
 }
