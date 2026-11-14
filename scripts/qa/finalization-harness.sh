@@ -200,7 +200,9 @@ case "${1:-}" in
         GEMINI_API_KEYS= GEMINI_API_KEY= $azure_env \
         DIAGNOSTIC_GRADER_MODE="${QA_GRADER_MODE:-mock}" FRONTEND_URL=http://localhost:3100 \
         R2_PUBLIC_URL="${QA_R2_PUBLIC_URL:-}" TOEIC_LISTENING_MASTER_BASE_URL="${QA_MASTER_BASE_URL:-}" \
-        JWT_SECRET=harness-only-jwt-secret POSTGRES_BACKUP_DIR="$WORK/backups" \
+        JWT_SECRET=harness-only-jwt-secret JWT_REFRESH_SECRET=harness-only-refresh-secret \
+        AUTH_THROTTLE_FACTOR="${QA_AUTH_THROTTLE_FACTOR:-100}" ACCESS_TOKEN_TTL="${QA_ACCESS_TOKEN_TTL:-15m}" \
+        POSTGRES_BACKUP_DIR="$WORK/backups" \
         WRITING_QA_COUNTER_FILE="$WORK/grader-calls.json" $EXTERNAL_BLANKS $payos_env \
         ${QA_DICTIONARY_URL:+DICTIONARY_API_BASE_URL=$QA_DICTIONARY_URL} \
         nohup npx ts-node --transpile-only "$server" \

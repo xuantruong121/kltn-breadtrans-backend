@@ -36,6 +36,20 @@ import {
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import * as crypto from 'crypto';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
+
+/**
+ * Per-IP limits on the routes guessing would target (owner 2026-11-14).
+ * AUTH_THROTTLE_FACTOR multiplies them for load tests and the QA harness,
+ * which register many accounts from one address.
+ */
+const PER_MINUTE = (limit: number) =>
+  Throttle({
+    default: {
+      limit: limit * Math.max(1, Number(process.env.AUTH_THROTTLE_FACTOR) || 1),
+      ttl: 60_000,
+    },
+  });
 import type { Request as ExpressRequest, Response } from 'express';
 import {
   REFRESH_COOKIE,
@@ -67,6 +81,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @PER_MINUTE(5)
   @ApiOperation({ summary: 'Đăng ký tài khoản học viên mới' })
   @ApiResponse({ status: 201, description: 'Đăng ký thành công.' })
   @ApiResponse({ status: 409, description: 'Email đã tồn tại.' })
@@ -75,6 +90,7 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @PER_MINUTE(3)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Gửi liên kết đặt lại mật khẩu' })
   async forgotPassword(@Body() body: ForgotPasswordDto) {
@@ -82,6 +98,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @PER_MINUTE(5)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đặt lại mật khẩu bằng token một lần' })
   async resetPassword(@Body() body: ResetPasswordDto) {
@@ -89,6 +106,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @PER_MINUTE(10)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })
   @ApiResponse({
@@ -111,6 +129,7 @@ export class AuthController {
   }
 
   @Post('google')
+  @PER_MINUTE(10)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Đăng nhập bằng Google Identity Services (ID token)',
@@ -137,6 +156,7 @@ export class AuthController {
   }
 
   @Post('google/link')
+  @PER_MINUTE(10)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Liên kết tài khoản Google với tài khoản mật khẩu hiện có',
@@ -197,6 +217,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @PER_MINUTE(30)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -287,6 +308,7 @@ export class AuthController {
   }
 
   @Post('otp/generate')
+  @PER_MINUTE(3)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tạo mã OTP' })
   async generateOtp(@Body() body: GenerateOtpDto) {
@@ -294,6 +316,7 @@ export class AuthController {
   }
 
   @Post('otp/verify')
+  @PER_MINUTE(10)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Xác thực mã OTP' })
   async verifyOtp(@Body() body: VerifyOtpDto) {

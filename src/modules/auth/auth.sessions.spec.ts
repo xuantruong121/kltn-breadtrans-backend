@@ -44,6 +44,8 @@ function memoryRedis() {
     }),
     smembers: jest.fn(async (k: string) => [...(sets.get(k) ?? [])]),
     expire: jest.fn(async () => 1),
+    ttl: jest.fn(async () => -2),
+    incr: jest.fn(async () => 1),
   };
 }
 

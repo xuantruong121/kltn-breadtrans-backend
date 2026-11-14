@@ -26,6 +26,7 @@ import {
   getOtpSecret,
 } from './auth.constants';
 import { AuthSessionStore } from './session-store';
+import { LoginGuard, OTP_MAX_ATTEMPTS } from './login-guard';
 
 /** What the controller knows about the device signing in. */
 export type DeviceMeta = { userAgent?: string | null; remember?: boolean };
@@ -46,7 +47,10 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {
     this.sessions = new AuthSessionStore(redis);
+    this.loginGuard = new LoginGuard(redis);
   }
+
+  private readonly loginGuard: LoginGuard;
 
   /** Refresh sessions per device (hashed tokens, a set per user). */
   readonly sessions: AuthSessionStore;
@@ -152,16 +156,18 @@ export class AuthService {
   }
   async login(loginDto: LoginDto, deviceId: string, meta: DeviceMeta = {}) {
     const { email, password } = loginDto;
+    await this.loginGuard.assertAllowed(email);
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { profile: true },
     });
-    if (!user || !user.password)
+    const isPasswordValid =
+      !!user?.password && (await bcrypt.compare(password, user.password));
+    if (!user || !isPasswordValid) {
+      await this.loginGuard.recordFailure(email);
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác.');
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid)
-      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác.');
+    }
+    await this.loginGuard.recordSuccess(email);
 
     // Update login count and last login timestamp
     await this.prisma.user.update({
@@ -260,8 +266,15 @@ export class AuthService {
   // ================= HMAC-SHA256 OTP =================
 
   async generateOtp(email: string) {
+    const sent = {
+      message:
+        process.env.NODE_ENV === 'production'
+          ? 'Nếu email có tài khoản, mã OTP đã được gửi.'
+          : 'Nếu email có tài khoản, mã OTP đã được gửi (xem console ở môi trường DEV).',
+    };
+    // The same answer for every e-mail: it must not tell who is registered.
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
+    if (!user) return sent;
 
     // Cryptographically secure 6-digit OTP (100000 to 999999 inclusive)
     const otp = crypto.randomInt(100000, 1000000).toString();
@@ -272,17 +285,13 @@ export class AuthService {
 
     const redisKey = `otp:${email}`;
     await this.redis.set(redisKey, hash, 'EX', 300); // 5 mins TTL
+    await this.redis.del(`otp:attempts:${email}`);
 
     if (process.env.NODE_ENV !== 'production') {
       console.log(`[DEV MODE ONLY] OTP for ${email}: ${otp}`);
     }
 
-    return {
-      message:
-        process.env.NODE_ENV === 'production'
-          ? 'Đã gửi mã OTP.'
-          : 'Đã gửi mã OTP (xem console ở môi trường DEV).',
-    };
+    return sent;
   }
 
   async verifyOtp(email: string, providedOtp: string) {
@@ -298,11 +307,21 @@ export class AuthService {
       .digest('hex');
 
     if (storedHash !== computedHash) {
+      const attemptsKey = `otp:attempts:${email}`;
+      const attempts = await this.redis.incr(attemptsKey);
+      if (attempts === 1) await this.redis.expire(attemptsKey, 300);
+      if (attempts >= OTP_MAX_ATTEMPTS) {
+        // Too many guesses: the code is gone, a new one must be requested.
+        await this.redis.del(redisKey, attemptsKey);
+        throw new UnauthorizedException(
+          'Nhập sai mã OTP quá nhiều lần. Hãy yêu cầu mã mới.',
+        );
+      }
       throw new UnauthorizedException('Mã OTP không chính xác.');
     }
 
     // Single-use: Destroy OTP
-    await this.redis.del(redisKey);
+    await this.redis.del(redisKey, `otp:attempts:${email}`);
     return { message: 'Xác thực OTP thành công.' };
   }
 
