@@ -310,10 +310,21 @@ export class SkillCmsService {
       domain,
       quizzes.map((quiz) => quiz.id),
     );
+    // The list card names a "Dịch câu" exercise by its topic.
+    const translationTopic =
+      domain === 'writing' && this.prisma.practiceTopic?.findFirst
+        ? await this.prisma.practiceTopic.findFirst({
+            where: { name: SENTENCE_TRANSLATION_TOPIC.name },
+            select: { id: true },
+          })
+        : null;
     const tagged = quizzes.map((quiz) => ({
       ...quiz,
       tracks: quizTracks.get(quiz.id) ?? [],
       thumbnailUrl: thumbnails.get(quiz.id) ?? null,
+      ...(translationTopic && quiz.practiceTopicId === translationTopic.id
+        ? { writingKind: 'TRANSLATION' as const }
+        : {}),
     }));
     if (domain !== 'listening' || !quizzes.length)
       return this.listPage(tagged, query);
