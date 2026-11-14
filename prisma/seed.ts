@@ -56,6 +56,7 @@ import {
 } from './data/speaking-practice-sets';
 import { GRAMMAR_REPLACEMENTS } from './data/grammar-replacements';
 import { explanationFor } from './data/grammar-explanations';
+import { applySentenceTranslation } from './data/sentence-translation-apply';
 
 const prisma = new PrismaClient();
 
@@ -11889,6 +11890,12 @@ async function main() {
       END LOOP;
     END $$;
   `);
+
+  // "Dịch câu" (owner 2026-11-14): created by title, without explicit ids,
+  // after the sequences above are raised; a rerun creates nothing.
+  const translation = await applySentenceTranslation(prisma);
+  if (translation.created.length)
+    console.log(`Dịch câu: ${translation.created.length} exercises created`);
 
   const activeDiagnostics = await prisma.diagnosticAssessment.count({
     where: { isActive: true },

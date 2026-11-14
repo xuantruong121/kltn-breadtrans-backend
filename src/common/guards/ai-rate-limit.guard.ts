@@ -25,6 +25,32 @@ export const aiQuotaKey = (userId: number, dayKey: string) =>
   `ai_quota:${userId}:${dayKey}`;
 
 /**
+ * Takes one AI grading from today's allowance. The count goes up even past
+ * the limit (the caller decides what to do); `allowed` says whether this one
+ * was within it. Used by the guard and by checks that call the AI only
+ * sometimes (sentence translation).
+ */
+export async function takeAiGrading(
+  redis: Redis,
+  userId: number,
+  planCode: PlanCode,
+) {
+  const limit = planLimits(planCode).aiGradingPerDay;
+  const key = aiQuotaKey(userId, getBusinessDayKey());
+  const count = await redis.incr(key);
+  if (count === 1) {
+    // The key outlives its day by a margin and then goes away.
+    await redis.expire(key, 2 * 86400);
+  }
+  return { key, limit, count, allowed: count <= limit };
+}
+
+/** Gives back a grading taken with takeAiGrading that was not used. */
+export async function returnAiGrading(redis: Redis, key: string) {
+  await redis.decr(key);
+}
+
+/**
  * AI gradings per learner per day (Speaking and Writing answers, revisions,
  * AI explanations). The number is the learner's plan's (plan-limits.ts: Free
  * 10, Plus 30, Pro 60). The day is the Vietnam day, like the tutor's limit.
@@ -57,15 +83,8 @@ export class AiRateLimitGuard implements CanActivate {
 
     const planCode: PlanCode =
       (await this.subscriptions?.planCodeFor(user.id)) ?? 'FREE';
-    const limit = planLimits(planCode).aiGradingPerDay;
-    const key = aiQuotaKey(user.id, getBusinessDayKey());
-
     // Atomic INCR trên Redis (O(1), TOCTOU-free)
-    const count = await this.redis.incr(key);
-    if (count === 1) {
-      // The key outlives its day by a margin and then goes away.
-      await this.redis.expire(key, 2 * 86400);
-    }
+    const { limit, count } = await takeAiGrading(this.redis, user.id, planCode);
 
     const res = http.getResponse<Response>();
     if (res && typeof res.setHeader === 'function') {

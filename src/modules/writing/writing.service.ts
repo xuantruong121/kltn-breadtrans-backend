@@ -24,6 +24,31 @@ import {
 import { SubscriptionService } from '../subscription/subscription.service';
 import { loadRevisionChain } from './writing-revision';
 import {
+  closestAnswer,
+  matchTranslation,
+  SENTENCE_TRANSLATION_MAX_CHARS,
+  SENTENCE_TRANSLATION_MAX_SCORE,
+  SENTENCE_TRANSLATION_RUBRIC,
+  translationTaskOf,
+  type SentenceTranslationTask,
+} from './sentence-translation.logic';
+import {
+  buildTranslationGradeRequest,
+  validateTranslationGrade,
+  type TranslationGrade,
+} from './sentence-translation-grading';
+import {
+  translationResult,
+  translationVerdictLabel,
+  type TranslationCheck,
+} from './sentence-translation-result';
+import {
+  returnAiGrading,
+  takeAiGrading,
+} from '../../common/guards/ai-rate-limit.guard';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import type Redis from 'ioredis';
+import {
   revisionGate,
   revisionGraderInput,
   revisionView,
@@ -81,6 +106,8 @@ const PRACTICE_GRADE_ATTEMPTS = 2;
  * another key; the learner's text is not stored and they may submit again.
  */
 const PRACTICE_GRADE_TIMEOUT_MS = 60_000;
+/** One sentence is quick to judge; a learner is waiting on it. */
+const TRANSLATION_GRADE_TIMEOUT_MS = 20_000;
 
 function isWritingQuiz(quiz: {
   type: QuizType;
@@ -108,6 +135,7 @@ export class WritingService {
     @Optional() private readonly eventEmitter?: EventEmitter2,
     @Optional() private readonly trial?: TrialService,
     @Optional() private readonly subscriptions?: SubscriptionService,
+    @Optional() @InjectRedis() private readonly redis?: Redis,
   ) {}
 
   /** The plan that decides how many revisions this learner gets. */
@@ -262,9 +290,12 @@ export class WritingService {
     exercise?: { questionIds: number[]; position: number };
     /** An exam answer stored earlier: its grade is written onto that row. */
     pendingSubmissionId?: number;
+    /** More fields for aiFeedback (a translation check keeps its result here). */
+    extra?: Record<string, unknown>;
   }) {
     const feedback = JSON.stringify({
       ...(input.detail ?? {}),
+      ...(input.extra ?? {}),
       feedback: input.evaluation.feedback,
       suggestions: input.evaluation.suggestions,
       maxScore: input.maxScore,
@@ -818,6 +849,7 @@ export class WritingService {
           const c = q.content as any;
           const latest = progress?.latest.get(q.id);
           const rubric = practiceRubric(c);
+          const translation = translationTaskOf(c);
           return {
             id: q.id,
             position: index + 1,
@@ -827,7 +859,15 @@ export class WritingService {
             keywords: keywordsOf(c),
             requirements: Array.isArray(c?.requirements) ? c.requirements : [],
             wordRange: Array.isArray(c?.wordRange) ? c.wordRange : null,
-            maxScore: rubric ? rubric.reduce((n, r) => n + r.max, 0) : null,
+            maxScore: translation
+              ? SENTENCE_TRANSLATION_MAX_SCORE
+              : rubric
+                ? rubric.reduce((n, r) => n + r.max, 0)
+                : null,
+            // Translation: word help and the tip; never the accepted answers.
+            ...(translation
+              ? { hints: translation.hints, grammarTip: translation.grammarTip }
+              : {}),
             latest: latest
               ? {
                   submissionId: latest.submissionId,
@@ -862,8 +902,13 @@ export class WritingService {
       sampleSentences: content.sampleSentences,
       email: typeof content.email === 'string' ? content.email : null,
       wordRange: Array.isArray(content.wordRange) ? content.wordRange : null,
-      maxScore:
-        quiz.type === QuizType.WRITING_PICTURE ? 3 : isEssayTask ? 5 : 4,
+      maxScore: translationTaskOf(content)
+        ? SENTENCE_TRANSLATION_MAX_SCORE
+        : quiz.type === QuizType.WRITING_PICTURE
+          ? 3
+          : isEssayTask
+            ? 5
+            : 4,
     };
   }
 
@@ -1086,6 +1131,12 @@ Task: ${instructions}`
     if (!question || (!isExercise && question !== quiz.questions[0]))
       throw new BadRequestException('Câu hỏi không thuộc bài luyện viết này');
     const content = question.content as any;
+    // A translation sentence is checked on its own endpoint, never by the
+    // writing grader.
+    if (translationTaskOf(content))
+      throw new BadRequestException(
+        'Câu dịch được kiểm tra từng câu, không nộp như bài viết.',
+      );
     const exercise = isExercise
       ? {
           questionIds: quiz.questions.map((item) => item.id),
@@ -1187,6 +1238,204 @@ Task: ${instructions}`
       content.taskType,
       await exerciseState(),
     );
+  }
+
+  /**
+   * "Dịch câu" (owner 2026-11-14): checks one translated sentence. An answer
+   * that matches an accepted translation (after normalisation, or with one
+   * typo in a longer word) is right without the AI and costs no grading. Any
+   * other answer takes one AI grading from the learner's daily allowance; with
+   * none left it is compared with the answers only (UNMATCHED, 0 points). The
+   * grade is stored like a picture task, so progress, completion and the
+   * exercise reward work the same way.
+   */
+  async checkTranslation(
+    quizId: number,
+    questionId: number,
+    userId: number,
+    text: string,
+    role?: import('@prisma/client').Role,
+    clientAttemptId?: string,
+  ) {
+    const answer = text?.trim();
+    if (!answer) throw new BadRequestException('Câu dịch không được để trống');
+    if (answer.length > SENTENCE_TRANSLATION_MAX_CHARS)
+      throw new BadRequestException('Câu dịch quá dài cho một câu.');
+
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: {
+        practiceTopic: true,
+        toeicWritingSetItems: { select: { id: true }, take: 1 },
+        questions: {
+          select: { id: true, content: true },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        },
+      },
+    });
+    if (
+      !quiz ||
+      !isWritingQuiz(quiz) ||
+      !quiz.practiceTopic ||
+      (quiz.publicationStatus !== undefined &&
+        quiz.publicationStatus !== QuizPublicationStatus.PUBLISHED)
+    )
+      throw new NotFoundException('Không tìm thấy bài tập.');
+    await this.assertWritingAccess(quiz, userId, role);
+
+    const question = quiz.questions.find((item) => item.id === questionId);
+    const task = question ? translationTaskOf(question.content) : null;
+    if (!question || !task)
+      throw new BadRequestException('Câu này không thuộc bài dịch câu.');
+    const exercise = {
+      questionIds: quiz.questions.map((item) => item.id),
+      position: quiz.questions.indexOf(question) + 1,
+    };
+    const exerciseState = async () => ({
+      questionId: question.id,
+      position: exercise.position,
+      ...(
+        await loadWritingExerciseProgress(
+          this.prisma,
+          userId,
+          quizId,
+          exercise.questionIds,
+        )
+      ).summary,
+    });
+
+    const logicalAttemptId = clientAttemptId ?? randomUUID();
+    const existing = await this.getIdempotentSubmission(
+      userId,
+      quizId,
+      logicalAttemptId,
+    );
+    if (existing) {
+      let stored: { translation?: TranslationCheck } = {};
+      try {
+        stored = JSON.parse(existing.aiFeedback ?? '{}');
+      } catch {
+        stored = {};
+      }
+      if (!stored.translation)
+        throw new ConflictException(
+          'Lần kiểm tra này đang được xử lý hoặc không hợp lệ',
+        );
+      return {
+        ...stored.translation,
+        submissionId: existing.id,
+        exercise: await exerciseState(),
+      };
+    }
+
+    const match = matchTranslation(answer, task.acceptedAnswers);
+    let check: TranslationCheck;
+    if (match.kind !== 'NONE') {
+      check = translationResult(task, answer, {
+        verdict: 'CORRECT',
+        source: 'MATCH',
+        closest: match.matched,
+        typo:
+          match.kind === 'TYPO'
+            ? { typed: match.typed, expected: match.expected }
+            : null,
+      });
+    } else {
+      const grading = await this.takeTranslationGrading(userId, role);
+      if (!grading.allowed) {
+        check = translationResult(task, answer, {
+          verdict: 'UNMATCHED',
+          source: 'NO_AI',
+          closest: closestAnswer(answer, task.acceptedAnswers),
+          quotaExhausted: true,
+        });
+      } else {
+        let grade: TranslationGrade | null = null;
+        try {
+          grade = await this.gradeTranslationWithAi(task, answer);
+        } finally {
+          if (!grade && grading.key && this.redis)
+            await returnAiGrading(this.redis, grading.key);
+        }
+        if (!grade)
+          throw new ServiceUnavailableException(
+            'Chưa chấm được câu này, hãy thử lại.',
+          );
+        check = translationResult(task, answer, {
+          verdict: grade.verdict,
+          source: 'AI',
+          closest: closestAnswer(answer, task.acceptedAnswers),
+          grade,
+        });
+      }
+    }
+
+    const submission = await this.persistAssessment({
+      exercise,
+      quizId,
+      quizTitle: quiz.title,
+      quizType: quiz.type,
+      questionId: question.id,
+      userId,
+      answer,
+      clientAttemptId: logicalAttemptId,
+      evaluation: {
+        score: check.score,
+        feedback: check.explanation ?? translationVerdictLabel(check.verdict),
+        suggestions: [],
+      },
+      maxScore: SENTENCE_TRANSLATION_MAX_SCORE,
+      extra: { rubricVersion: SENTENCE_TRANSLATION_RUBRIC, translation: check },
+    });
+    return {
+      ...check,
+      submissionId: submission.id,
+      exercise: await exerciseState(),
+    };
+  }
+
+  /** One AI grading for a translation; admins are never counted. */
+  private async takeTranslationGrading(
+    userId: number,
+    role?: import('@prisma/client').Role,
+  ): Promise<{ allowed: boolean; key: string | null }> {
+    if (role === 'ADMIN') return { allowed: true, key: null };
+    // Without Redis the allowance cannot be counted: no AI, answers only.
+    if (!this.redis) return { allowed: false, key: null };
+    const planCode = (await this.subscriptions?.planCodeFor(userId)) ?? 'FREE';
+    const taken = await takeAiGrading(this.redis, userId, planCode);
+    if (!taken.allowed) {
+      // Not used: the count stays at what the learner really used.
+      await returnAiGrading(this.redis, taken.key);
+      return { allowed: false, key: null };
+    }
+    return { allowed: true, key: taken.key };
+  }
+
+  /** The AI's grade, or null when every try failed or was unusable. */
+  private async gradeTranslationWithAi(
+    task: SentenceTranslationTask,
+    answer: string,
+  ): Promise<TranslationGrade | null> {
+    const request = buildTranslationGradeRequest(task, answer);
+    for (let attempt = 1; attempt <= PRACTICE_GRADE_ATTEMPTS; attempt += 1) {
+      try {
+        const out = await this.aiService.generateStructuredJson({
+          ...request,
+          temperature: 0.1,
+          timeoutMs: TRANSLATION_GRADE_TIMEOUT_MS,
+          failoverOnTimeout: false,
+        });
+        const verdict = validateTranslationGrade(JSON.parse(out.text), answer);
+        if (verdict.ok) return verdict.value;
+        this.logger.warn(`Translation grade rejected: ${verdict.reason}`);
+      } catch (error) {
+        this.logger.warn(
+          `Translation grade failed: ${(error as Error)?.message ?? error}`,
+        );
+      }
+    }
+    return null;
   }
 
   /**
