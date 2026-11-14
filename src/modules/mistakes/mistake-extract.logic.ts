@@ -7,7 +7,8 @@
  * item; a wrong answer opens or reopens it, and RESOLVE_AFTER_CORRECT right
  * answers in a row close it. Writing corrections and weak words are items
  * too: a correction has no "right answer" event and is closed by the learner;
- * a word closes when later recordings pronounce it well.
+ * a word closes when later recordings pronounce it well. A translated
+ * sentence ("Dịch câu") is answered again in the notebook, by typing.
  *
  * Pure: no Prisma, no I/O.
  */
@@ -26,6 +27,7 @@ export const MISTAKE_SOURCES = [
   'GRAMMAR_QUESTION',
   'WRITING_CORRECTION',
   'SPEAKING_WORD',
+  'TRANSLATION_SENTENCE',
 ] as const;
 export type MistakeSource = (typeof MISTAKE_SOURCES)[number];
 
@@ -39,7 +41,7 @@ const PASSAGE_MAX = 1500;
 const TEXT_MAX = 600;
 
 export type MistakeDetail = {
-  kind: 'CHOICE' | 'DICTATION' | 'CORRECTION' | 'WORD';
+  kind: 'CHOICE' | 'DICTATION' | 'CORRECTION' | 'WORD' | 'TRANSLATION';
   /** Where it came from, in the learner's words: quiz title, exam, topic. */
   title: string;
   question?: string;
@@ -54,7 +56,7 @@ export type MistakeDetail = {
   correctAnswer?: string;
   /** Word accuracy, 0-100. */
   score?: number;
-  /** The item can be answered again inside the notebook (text only). */
+  /** The item can be answered again inside the notebook (choice or typed translation). */
   answerable: boolean;
   /** Ids for links and for the tutor; the frontend builds the addresses. */
   ref: {
@@ -288,15 +290,73 @@ export function grammarObservations(attempt: {
 }
 
 /**
+ * One checked "Dịch câu" sentence (SENTENCE_TRANSLATION_V1, owner
+ * 2026-11-14): anything but a right translation opens the sentence in the
+ * notebook; a right one counts towards closing it.
+ */
+function translationObservations(
+  submission: {
+    id: number;
+    submittedAt: Date;
+    quiz: { id: number; title: string };
+    questions?: Array<{ id: number; content: unknown }>;
+    results?: Array<{ questionId: number }>;
+  },
+  translation: Record<string, unknown>,
+): MistakeObservation[] {
+  const questionId = submission.results?.[0]?.questionId;
+  if (typeof questionId !== 'number') return [];
+  const base = {
+    sourceType: 'TRANSLATION_SENTENCE' as const,
+    itemKey: `q:${questionId}`,
+    skill: 'WRITING' as const,
+    tag: clean(submission.quiz.title, 120) || null,
+    at: submission.submittedAt,
+  };
+  if (translation.verdict === 'CORRECT')
+    return [{ ...base, outcome: 'CORRECT' }];
+  const content = (submission.questions?.find((q) => q.id === questionId)
+    ?.content ?? {}) as Record<string, unknown>;
+  const prompt = clean(content.prompt);
+  const closest = clean(translation.closest);
+  if (!prompt || !closest) return [];
+  return [
+    {
+      ...base,
+      outcome: 'WRONG',
+      detail: {
+        kind: 'TRANSLATION',
+        title: submission.quiz.title,
+        question: prompt,
+        yourAnswer: clean(translation.answer, 400) || undefined,
+        correctAnswer: closest,
+        explanation:
+          clean(translation.explanation) ||
+          clean(translation.grammarTip) ||
+          undefined,
+        answerable: true,
+        ref: {
+          quizId: submission.quiz.id,
+          submissionId: submission.id,
+          questionId,
+        },
+      },
+    },
+  ];
+}
+
+/**
  * The corrections of a graded practice Writing answer (PRACTICE_WRITING_V1).
  * Each one quotes the learner's text; the same slip in a later answer is the
- * same item.
+ * same item. A "Dịch câu" sentence goes to translationObservations.
  */
 export function writingObservations(submission: {
   id: number;
   submittedAt: Date;
   quiz: { id: number; type: string; title: string };
   aiFeedback: string | null;
+  questions?: Array<{ id: number; content: unknown }>;
+  results?: Array<{ questionId: number }>;
 }): MistakeObservation[] {
   if (!submission.quiz.type.startsWith('WRITING_') || !submission.aiFeedback)
     return [];
@@ -306,6 +366,15 @@ export function writingObservations(submission: {
   } catch {
     return [];
   }
+  if (
+    parsed.rubricVersion === 'SENTENCE_TRANSLATION_V1' &&
+    parsed.translation &&
+    typeof parsed.translation === 'object'
+  )
+    return translationObservations(
+      submission,
+      parsed.translation as Record<string, unknown>,
+    );
   if (
     parsed.rubricVersion !== 'PRACTICE_WRITING_V1' ||
     !Array.isArray(parsed.corrections)
@@ -444,7 +513,8 @@ export function applyObservation(
 
 /**
  * A choice item as shown before the learner answers it again: no key, no
- * explanation, no earlier choice. A listening transcript is left out too.
+ * explanation, no earlier choice. A listening transcript is left out too. A
+ * translation item carries only its Vietnamese sentence.
  */
 export function reviewQuestion(
   id: number,
@@ -462,6 +532,7 @@ export function reviewQuestion(
     question: detail.question ?? null,
     passage: detail.passageKind === 'PASSAGE' ? (detail.passage ?? null) : null,
     options: detail.options ?? [],
+    kind: detail.kind === 'TRANSLATION' ? 'TRANSLATION' : 'CHOICE',
   };
 }
 

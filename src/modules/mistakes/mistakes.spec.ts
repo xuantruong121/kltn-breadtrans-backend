@@ -289,6 +289,7 @@ describe('mistake-extract.logic', () => {
       question: 'q',
       passage: 'p',
       options: ['a', 'b'],
+      kind: 'CHOICE',
     });
     expect(
       reviewQuestion(5, 'LISTENING', { ...detail, passageKind: 'TRANSCRIPT' })

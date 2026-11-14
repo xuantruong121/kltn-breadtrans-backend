@@ -47,6 +47,7 @@ import {
   takeAiGrading,
 } from '../../common/guards/ai-rate-limit.guard';
 import { InjectRedis } from '@nestjs-modules/ioredis';
+import { MistakesService } from '../mistakes/mistakes.service';
 import type Redis from 'ioredis';
 import {
   revisionGate,
@@ -136,6 +137,7 @@ export class WritingService {
     @Optional() private readonly trial?: TrialService,
     @Optional() private readonly subscriptions?: SubscriptionService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
+    @Optional() private readonly mistakes?: MistakesService,
   ) {}
 
   /** The plan that decides how many revisions this learner gets. */
@@ -1328,47 +1330,7 @@ Task: ${instructions}`
       };
     }
 
-    const match = matchTranslation(answer, task.acceptedAnswers);
-    let check: TranslationCheck;
-    if (match.kind !== 'NONE') {
-      check = translationResult(task, answer, {
-        verdict: 'CORRECT',
-        source: 'MATCH',
-        closest: match.matched,
-        typo:
-          match.kind === 'TYPO'
-            ? { typed: match.typed, expected: match.expected }
-            : null,
-      });
-    } else {
-      const grading = await this.takeTranslationGrading(userId, role);
-      if (!grading.allowed) {
-        check = translationResult(task, answer, {
-          verdict: 'UNMATCHED',
-          source: 'NO_AI',
-          closest: closestAnswer(answer, task.acceptedAnswers),
-          quotaExhausted: true,
-        });
-      } else {
-        let grade: TranslationGrade | null = null;
-        try {
-          grade = await this.gradeTranslationWithAi(task, answer);
-        } finally {
-          if (!grade && grading.key && this.redis)
-            await returnAiGrading(this.redis, grading.key);
-        }
-        if (!grade)
-          throw new ServiceUnavailableException(
-            'Chưa chấm được câu này, hãy thử lại.',
-          );
-        check = translationResult(task, answer, {
-          verdict: grade.verdict,
-          source: 'AI',
-          closest: closestAnswer(answer, task.acceptedAnswers),
-          grade,
-        });
-      }
-    }
+    const check = await this.gradeTranslation(task, answer, userId, role);
 
     const submission = await this.persistAssessment({
       exercise,
@@ -1392,6 +1354,92 @@ Task: ${instructions}`
       submissionId: submission.id,
       exercise: await exerciseState(),
     };
+  }
+
+  /**
+   * The grade of one translated sentence, stored nowhere: an accepted answer
+   * (or a typo of one) is right without the AI; any other answer takes one AI
+   * grading, or with none left is only compared with the answers (UNMATCHED).
+   * When the AI fails the grading is given back and a 503 is thrown.
+   */
+  private async gradeTranslation(
+    task: SentenceTranslationTask,
+    answer: string,
+    userId: number,
+    role?: import('@prisma/client').Role,
+  ): Promise<TranslationCheck> {
+    const match = matchTranslation(answer, task.acceptedAnswers);
+    if (match.kind !== 'NONE')
+      return translationResult(task, answer, {
+        verdict: 'CORRECT',
+        source: 'MATCH',
+        closest: match.matched,
+        typo:
+          match.kind === 'TYPO'
+            ? { typed: match.typed, expected: match.expected }
+            : null,
+      });
+    const grading = await this.takeTranslationGrading(userId, role);
+    if (!grading.allowed)
+      return translationResult(task, answer, {
+        verdict: 'UNMATCHED',
+        source: 'NO_AI',
+        closest: closestAnswer(answer, task.acceptedAnswers),
+        quotaExhausted: true,
+      });
+    let grade: TranslationGrade | null = null;
+    try {
+      grade = await this.gradeTranslationWithAi(task, answer);
+    } finally {
+      if (!grade && grading.key && this.redis)
+        await returnAiGrading(this.redis, grading.key);
+    }
+    if (!grade)
+      throw new ServiceUnavailableException(
+        'Chưa chấm được câu này, hãy thử lại.',
+      );
+    return translationResult(task, answer, {
+      verdict: grade.verdict,
+      source: 'AI',
+      closest: closestAnswer(answer, task.acceptedAnswers),
+      grade,
+    });
+  }
+
+  /**
+   * A "Dịch câu" mistake answered again in the notebook (owner 2026-11-14):
+   * graded like the exercise, nothing stored as a submission (so exercise
+   * progress and rewards do not move); only the notebook streak changes.
+   */
+  async reviewTranslationMistake(
+    userId: number,
+    mistakeId: number,
+    text: string,
+    role?: import('@prisma/client').Role,
+  ) {
+    if (!this.mistakes)
+      throw new ServiceUnavailableException('Sổ lỗi chưa sẵn sàng.');
+    const answer = text?.trim();
+    if (!answer) throw new BadRequestException('Câu dịch không được để trống');
+    if (answer.length > SENTENCE_TRANSLATION_MAX_CHARS)
+      throw new BadRequestException('Câu dịch quá dài cho một câu.');
+    const target = await this.mistakes.translationReviewTarget(
+      userId,
+      mistakeId,
+    );
+    const question = await this.prisma.question.findFirst({
+      where: { id: target.questionId, quizId: target.quizId },
+      select: { content: true },
+    });
+    const task = question ? translationTaskOf(question.content) : null;
+    if (!task) throw new NotFoundException('Câu dịch này không còn nữa.');
+    const check = await this.gradeTranslation(task, answer, userId, role);
+    const outcome = await this.mistakes.recordTranslationReview(
+      userId,
+      mistakeId,
+      check.verdict === 'CORRECT',
+    );
+    return { ...outcome, check };
   }
 
   /** One AI grading for a translation; admins are never counted. */

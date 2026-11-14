@@ -227,6 +227,33 @@ export class WritingController {
     );
   }
 
+  // Sổ lỗi: a "Dịch câu" mistake typed again. Graded like the exercise (no
+  // AiRateLimitGuard: an accepted answer costs no grading).
+  @Post('mistakes/:id/translate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Ôn một câu dịch sai trong Sổ lỗi: chấm như bài Dịch câu',
+  })
+  @ApiBody({
+    schema: { type: 'object', properties: { answer: { type: 'string' } } },
+  })
+  @ApiResponse({ status: 201, description: 'Kết quả và chuỗi đúng của lỗi' })
+  @ApiResponse({ status: 400, description: 'Không phải câu dịch' })
+  @ApiResponse({ status: 404, description: 'Không phải lỗi của học viên' })
+  reviewTranslationMistake(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @Body() body: CheckTranslationDto,
+  ) {
+    return this.writingService.reviewTranslationMistake(
+      req.user.id,
+      id,
+      body.answer,
+      req.user.role,
+    );
+  }
+
   @Post('submissions/:id/revise')
   @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @ApiBearerAuth()
