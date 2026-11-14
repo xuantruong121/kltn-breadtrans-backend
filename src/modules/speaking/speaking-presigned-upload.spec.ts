@@ -253,10 +253,14 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('enforces daily speaking quota before generating intent', async () => {
+    it('enforces the daily exam speaking quota before generating intent', async () => {
+      // The record lookup, then the quota lookup: an exam exercise.
+      (mockPrisma.speakingExercise.findUnique as jest.Mock)
+        .mockResolvedValueOnce(mockExercise)
+        .mockResolvedValueOnce({ practiceSet: { scope: 'EXAM_INTERNAL' } });
       (mockPrisma.speakingSubmission.count as jest.Mock).mockResolvedValueOnce(
-        10,
-      ); // reached limit
+        33,
+      ); // reached the exam limit
 
       await expect(service.createUploadIntent(1, 10, validDto)).rejects.toThrow(
         BadRequestException,

@@ -11,6 +11,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { applyHttpSecurity } from './common/http/security';
 
 function startPhase812RuntimeMetrics() {
   if (process.env.PHASE812_RUNTIME_METRICS !== 'true') return;
@@ -64,6 +65,8 @@ async function bootstrap() {
     }),
   });
 
+  applyHttpSecurity(app);
+
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
@@ -109,7 +112,7 @@ async function bootstrap() {
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     });
   }
 

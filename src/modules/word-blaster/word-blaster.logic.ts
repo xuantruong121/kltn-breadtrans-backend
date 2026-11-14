@@ -5,10 +5,11 @@
  * life left. Pure: words and randomness come in as arguments, and every time
  * is in milliseconds since the game started, by the server's clock.
  *
- * Reward (owner: "as little inflation as possible, not x3"): a win returns
- * the stake and adds half of it, and that half counts toward the shared 150
- * Bánh Mì daily cap; a loss keeps the stake. The game takes Bánh Mì out more
- * than it puts in.
+ * Reward: a win returns the stake and adds the stake again, as Song Đấu Từ
+ * Vựng does; a loss keeps the stake. Owner 2026-11-13: half the stake (+10
+ * for 20 blocks at stake 20) was not worth the game. The bonus still counts
+ * toward the shared 150 Bánh Mì daily cap, which bounds the inflation the
+ * owner first asked to keep low ("as little inflation as possible, not x3").
  */
 import {
   ARENA_XP_DAILY_CAP,
@@ -145,21 +146,29 @@ export function missingLetters(word: string, rng: () => number): string {
 }
 
 /**
- * Seconds between blocks shrink from 3.2 to 1.5; falls speed up by 40 %.
+ * Seconds between blocks shrink from 3.2 to 2.3; falls speed up by 25 %.
  * Owner 2026-11-08: 5 to 2.8 s left a fast typist waiting at an empty field.
+ * Owner 2026-11-12: the end (1.5 s, 40 %) asked for about 6 letters a second
+ * without a break, too fast for most learners; 2.3 s asks for about 4.
  */
 export function blasterTiming(index: number, count: number) {
   const p = count > 1 ? index / (count - 1) : 0;
-  return { gapMs: Math.round(3200 - 1700 * p), speed: 1 + 0.4 * p };
+  return {
+    gapMs: Math.round(3200 - 900 * p),
+    speed: Math.round((1 + 0.25 * p) * 1000) / 1000,
+  };
 }
 
 /** A block that comes with the one before it is this far behind it. */
 export const PAIR_GAP_MS = 300;
 
-/** In the last third, every third block comes with the one before it: two fall together. */
+/**
+ * The second to last block comes with the one before it: two fall together
+ * once, as the finale. Owner 2026-11-12: a second pair earlier (block 16)
+ * piled up on top of the fastest stretch, so only this one is kept.
+ */
 export function pairsWithPrevious(index: number, count: number): boolean {
-  const start = Math.ceil((count * 2) / 3);
-  return index > start && (index - start) % 3 === 1;
+  return count >= 6 && index === count - 2;
 }
 
 /** How soon the next block comes once the field is empty. */
@@ -374,10 +383,10 @@ export function blasterDeadline(blocks: BlasterBlock[]): number {
   return Math.max(0, ...blocks.map(landsAt)) + LANDING_GRACE_MS + 2000;
 }
 
-/** Bánh Mì back on a win: the stake (outside the daily cap) and half of it as a bonus (inside). */
+/** Bánh Mì back on a win: the stake (outside the daily cap) and the stake again as a bonus (inside). */
 export function blasterPayout(stake: number, outcome: 'win' | 'lose') {
   return outcome === 'win'
-    ? { returned: stake, bonus: Math.floor(stake / 2) }
+    ? { returned: stake, bonus: stake }
     : { returned: 0, bonus: 0 };
 }
 

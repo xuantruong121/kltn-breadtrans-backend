@@ -32,12 +32,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let message = 'Internal server error';
     let errorDetails: any = null;
+    // The day's AI gradings ran out: which plan and how many, for the notice.
+    let quota: { limit: number; planCode: string } | undefined;
 
     if (exception instanceof HttpException) {
       const responseObj = exception.getResponse();
       if (typeof responseObj === 'object' && responseObj !== null) {
         message = (responseObj as any)['message'] || responseObj.toString();
         errorDetails = (responseObj as any)['error'] || null;
+        const { limit, planCode } = responseObj as Record<string, unknown>;
+        if (typeof limit === 'number' && typeof planCode === 'string')
+          quota = { limit, planCode };
       } else {
         message = responseObj.toString();
       }
@@ -71,6 +76,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       requestId,
       message,
       error: errorDetails,
+      ...(quota ? { quota } : {}),
     });
   }
 }

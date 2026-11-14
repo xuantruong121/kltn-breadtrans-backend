@@ -19,7 +19,17 @@ import { forgetAuthUser } from './auth-user-cache';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
-import { getOtpSecret } from './auth.constants';
+import {
+  ACCESS_TOKEN_TTL,
+  REFRESH_TOKEN_TTL_SECONDS,
+  getJwtRefreshSecret,
+  getOtpSecret,
+} from './auth.constants';
+import { AuthSessionStore } from './session-store';
+import { LoginGuard, OTP_MAX_ATTEMPTS } from './login-guard';
+
+/** What the controller knows about the device signing in. */
+export type DeviceMeta = { userAgent?: string | null; remember?: boolean };
 import { Role } from '@prisma/client';
 import { GoogleProfile } from './strategies/google.strategy';
 import { OAuth2Client } from 'google-auth-library';
@@ -35,7 +45,15 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @InjectRedis() private readonly redis: Redis,
     private readonly emailService: EmailService,
-  ) {}
+  ) {
+    this.sessions = new AuthSessionStore(redis);
+    this.loginGuard = new LoginGuard(redis);
+  }
+
+  private readonly loginGuard: LoginGuard;
+
+  /** Refresh sessions per device (hashed tokens, a set per user). */
+  readonly sessions: AuthSessionStore;
 
   async register(registerDto: RegisterDto) {
     const { email, password, fullName } = registerDto;
@@ -131,23 +149,25 @@ export class AuthService {
     forgetAuthUser(userId);
     await this.redis.del(userTokenKey);
 
-    const sessionKeys = await this.redis.keys(`user:${userId}:device:*`);
-    if (sessionKeys.length > 0) await this.redis.del(...sessionKeys);
+    // Every device, and every access token it still holds.
+    await this.sessions.revokeAll(userId);
 
     return { message: 'Đặt lại mật khẩu thành công.' };
   }
-  async login(loginDto: LoginDto, deviceId: string) {
+  async login(loginDto: LoginDto, deviceId: string, meta: DeviceMeta = {}) {
     const { email, password } = loginDto;
+    await this.loginGuard.assertAllowed(email);
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { profile: true },
     });
-    if (!user || !user.password)
+    const isPasswordValid =
+      !!user?.password && (await bcrypt.compare(password, user.password));
+    if (!user || !isPasswordValid) {
+      await this.loginGuard.recordFailure(email);
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác.');
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid)
-      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác.');
+    }
+    await this.loginGuard.recordSuccess(email);
 
     // Update login count and last login timestamp
     await this.prisma.user.update({
@@ -158,32 +178,61 @@ export class AuthService {
       },
     });
 
-    const access_token = this.jwtService.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        deviceId,
-        type: 'access',
-        jti: crypto.randomUUID(),
-      },
-      { expiresIn: '1d' },
-    );
+    return this.issueTokens(user, deviceId, {
+      userAgent: meta.userAgent,
+      remember: loginDto.rememberMe ?? false,
+    });
+  }
 
-    // Generate signed JWT refresh token (30 days) containing userId and deviceId
-    const refreshToken = this.jwtService.sign(
-      { sub: user.id, deviceId, type: 'refresh', jti: crypto.randomUUID() },
-      { expiresIn: '30d' },
-    );
+  /**
+   * Renews the access token from the refresh cookie. The current refresh
+   * token rotates; the one just rotated out (another tab) renews without
+   * rotating for a few seconds; any older one revokes the device.
+   */
+  async refreshTokens(providedRefreshToken: string | null) {
+    const invalid = () =>
+      new UnauthorizedException(
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      );
+    if (!providedRefreshToken) throw invalid();
+    let payload: { sub?: number; deviceId?: string; type?: string };
+    try {
+      payload = this.jwtService.verify(providedRefreshToken, {
+        secret: getJwtRefreshSecret(),
+      });
+    } catch {
+      throw invalid();
+    }
+    if (payload?.type !== 'refresh' || !payload.sub || !payload.deviceId)
+      throw invalid();
+    const userId = payload.sub;
+    const deviceId = payload.deviceId;
 
-    // Redis is the per-device source of truth for refresh sessions.
-    const redisKey = `user:${user.id}:device:${deviceId}`;
-    await this.redis.set(redisKey, refreshToken, 'EX', 30 * 24 * 60 * 60);
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    });
+    if (!user) throw invalid();
+
+    const next = this.signRefresh(user.id, deviceId);
+    const result = await this.sessions.rotate(
+      userId,
+      deviceId,
+      providedRefreshToken,
+      next,
+    );
+    if (result.kind === 'REUSED')
+      this.logger.warn(
+        `Refresh token reuse for user ${userId} device ${deviceId}: session revoked`,
+      );
+    if (result.kind === 'REUSED' || result.kind === 'MISSING') throw invalid();
 
     return {
-      access_token,
-      refresh_token: refreshToken,
-      deviceId,
+      access_token: this.signAccess(user, deviceId),
+      // Only a real rotation sets a new cookie; a grace renewal keeps the
+      // cookie the other tab just received.
+      refresh_token: result.kind === 'ROTATED' ? next : null,
+      remember: result.session.remember,
       user: {
         id: user.id,
         email: user.email,
@@ -193,105 +242,8 @@ export class AuthService {
     };
   }
 
-  async refreshTokens(
-    userId: number,
-    deviceId: string,
-    providedRefreshToken: string,
-  ) {
-    // 1. Verify token signature and type
-    let tokenPayload: any = null;
-    try {
-      tokenPayload = this.jwtService.verify(providedRefreshToken);
-    } catch {
-      throw new UnauthorizedException(
-        'Refresh token không hợp lệ hoặc đã hết hạn',
-      );
-    }
-
-    if (tokenPayload?.type !== 'refresh') {
-      throw new UnauthorizedException(
-        'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
-      );
-    }
-
-    const effectiveUserId = tokenPayload?.sub || userId;
-    const effectiveDeviceId = tokenPayload?.deviceId;
-
-    if (!effectiveUserId || !effectiveDeviceId) {
-      throw new UnauthorizedException(
-        'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
-      );
-    }
-    if (deviceId && deviceId !== effectiveDeviceId) {
-      throw new UnauthorizedException(
-        'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
-      );
-    }
-
-    const redisKey = `user:${effectiveUserId}:device:${effectiveDeviceId}`;
-    let storedToken: string | null = null;
-    storedToken = await this.redis.get(redisKey);
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: effectiveUserId },
-      include: { profile: true },
-    });
-    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
-
-    // 2. Check token validity only against the per-device Redis session.
-    const isValidToken = storedToken === providedRefreshToken;
-
-    if (!isValidToken) {
-      if (storedToken) {
-        await this.redis.del(redisKey);
-      }
-      throw new UnauthorizedException(
-        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-      );
-    }
-
-    // 3. Token is valid. Rotate tokens!
-    const new_access_token = this.jwtService.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        deviceId: effectiveDeviceId,
-        type: 'access',
-        jti: crypto.randomUUID(),
-      },
-      { expiresIn: '1d' },
-    );
-    const new_refresh_token = this.jwtService.sign(
-      {
-        sub: user.id,
-        deviceId: effectiveDeviceId,
-        type: 'refresh',
-        // Unique per issue: without it a rotation inside the same second
-        // produced a byte-identical token, so the old one stayed valid.
-        jti: crypto.randomUUID(),
-      },
-      { expiresIn: '30d' },
-    );
-
-    // Replace the per-device refresh session in Redis only.
-    await this.redis.set(redisKey, new_refresh_token, 'EX', 30 * 24 * 60 * 60);
-
-    return {
-      access_token: new_access_token,
-      refresh_token: new_refresh_token,
-    };
-  }
-
   async logout(userId: number, deviceId: string, accessToken: string) {
-    const redisKey = `user:${userId}:device:${deviceId}`;
-    await this.redis.del(redisKey);
-    await this.redis.set(
-      `${redisKey}:logged_out_at`,
-      Date.now().toString(),
-      'EX',
-      86400,
-    );
+    await this.sessions.revoke(userId, deviceId);
     const tokenHash = crypto
       .createHash('sha256')
       .update(accessToken)
@@ -299,7 +251,7 @@ export class AuthService {
     const decoded = this.jwtService.decode(accessToken);
     const remainingTtl = Math.max(
       1,
-      (decoded?.exp ?? Math.floor(Date.now() / 1000) + 86400) -
+      (decoded?.exp ?? Math.floor(Date.now() / 1000) + 3600) -
         Math.floor(Date.now() / 1000),
     );
     await this.redis.set(
@@ -314,8 +266,15 @@ export class AuthService {
   // ================= HMAC-SHA256 OTP =================
 
   async generateOtp(email: string) {
+    const sent = {
+      message:
+        process.env.NODE_ENV === 'production'
+          ? 'Nếu email có tài khoản, mã OTP đã được gửi.'
+          : 'Nếu email có tài khoản, mã OTP đã được gửi (xem console ở môi trường DEV).',
+    };
+    // The same answer for every e-mail: it must not tell who is registered.
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
+    if (!user) return sent;
 
     // Cryptographically secure 6-digit OTP (100000 to 999999 inclusive)
     const otp = crypto.randomInt(100000, 1000000).toString();
@@ -326,17 +285,13 @@ export class AuthService {
 
     const redisKey = `otp:${email}`;
     await this.redis.set(redisKey, hash, 'EX', 300); // 5 mins TTL
+    await this.redis.del(`otp:attempts:${email}`);
 
     if (process.env.NODE_ENV !== 'production') {
       console.log(`[DEV MODE ONLY] OTP for ${email}: ${otp}`);
     }
 
-    return {
-      message:
-        process.env.NODE_ENV === 'production'
-          ? 'Đã gửi mã OTP.'
-          : 'Đã gửi mã OTP (xem console ở môi trường DEV).',
-    };
+    return sent;
   }
 
   async verifyOtp(email: string, providedOtp: string) {
@@ -352,11 +307,21 @@ export class AuthService {
       .digest('hex');
 
     if (storedHash !== computedHash) {
+      const attemptsKey = `otp:attempts:${email}`;
+      const attempts = await this.redis.incr(attemptsKey);
+      if (attempts === 1) await this.redis.expire(attemptsKey, 300);
+      if (attempts >= OTP_MAX_ATTEMPTS) {
+        // Too many guesses: the code is gone, a new one must be requested.
+        await this.redis.del(redisKey, attemptsKey);
+        throw new UnauthorizedException(
+          'Nhập sai mã OTP quá nhiều lần. Hãy yêu cầu mã mới.',
+        );
+      }
       throw new UnauthorizedException('Mã OTP không chính xác.');
     }
 
     // Single-use: Destroy OTP
-    await this.redis.del(redisKey);
+    await this.redis.del(redisKey, `otp:attempts:${email}`);
     return { message: 'Xác thực OTP thành công.' };
   }
 
@@ -364,6 +329,7 @@ export class AuthService {
     userId: number,
     currentPassword: string,
     newPassword: string,
+    currentDeviceId?: string,
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (
@@ -381,7 +347,9 @@ export class AuthService {
       data: { password, mustChangePassword: false },
     });
     forgetAuthUser(userId);
-    return { message: 'Đổi mật khẩu thành công.' };
+    // Someone holding another session must not keep it (owner 2026-11-14).
+    const signedOut = await this.sessions.revokeAll(userId, currentDeviceId);
+    return { message: 'Đổi mật khẩu thành công.', signedOutDevices: signedOut };
   }
 
   /**
@@ -389,7 +357,7 @@ export class AuthService {
    * New users are strictly Role.STUDENT.
    * If email matches existing password account, throw ACCOUNT_LINK_REQUIRED.
    */
-  async loginWithGoogle(dto: GoogleLoginDto) {
+  async loginWithGoogle(dto: GoogleLoginDto, meta: DeviceMeta = {}) {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
       throw new ServiceUnavailableException(
@@ -432,13 +400,16 @@ export class AuthService {
       where: { id: user.id },
       data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
     });
-    return this.issueTokens(user, deviceId);
+    return this.issueTokens(user, deviceId, { ...meta, remember: true });
   }
 
   /**
    * Liên kết tài khoản Google với tài khoản đã tồn tại qua xác nhận mật khẩu.
    */
-  async linkGoogleWithPassword(dto: LinkGoogleAccountDto) {
+  async linkGoogleWithPassword(
+    dto: LinkGoogleAccountDto,
+    meta: DeviceMeta = {},
+  ) {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
       throw new ServiceUnavailableException(
@@ -525,7 +496,7 @@ export class AuthService {
       data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
     });
 
-    return this.issueTokens(user, deviceId);
+    return this.issueTokens(user, deviceId, { ...meta, remember: true });
   }
 
   /**
@@ -548,7 +519,7 @@ export class AuthService {
     return code;
   }
 
-  async exchangeGoogleLoginCode(code: string) {
+  async exchangeGoogleLoginCode(code: string, meta: DeviceMeta = {}) {
     const key = `auth:google:code:${code}`;
     const raw = await this.redis.getdel(key);
     if (!raw)
@@ -561,7 +532,10 @@ export class AuthService {
     if (!user || (user.role !== Role.STUDENT && user.role !== Role.ADMIN)) {
       throw new UnauthorizedException('Tài khoản không còn hợp lệ.');
     }
-    return this.issueTokens(user, payload.deviceId);
+    return this.issueTokens(user, payload.deviceId, {
+      ...meta,
+      remember: true,
+    });
   }
 
   private async getOrCreateGoogleUser(profile: GoogleProfile) {
@@ -631,11 +605,11 @@ export class AuthService {
     });
   }
 
-  private async issueTokens(
-    user: { id: number; email: string; role: Role; profile?: unknown },
+  private signAccess(
+    user: { id: number; email: string; role: Role },
     deviceId: string,
   ) {
-    const access_token = this.jwtService.sign(
+    return this.jwtService.sign(
       {
         sub: user.id,
         email: user.email,
@@ -644,21 +618,34 @@ export class AuthService {
         type: 'access',
         jti: crypto.randomUUID(),
       },
-      { expiresIn: '1d' },
+      { expiresIn: ACCESS_TOKEN_TTL as any },
     );
-    const refresh_token = this.jwtService.sign(
-      { sub: user.id, deviceId, type: 'refresh', jti: crypto.randomUUID() },
-      { expiresIn: '30d' },
+  }
+
+  private signRefresh(userId: number, deviceId: string) {
+    return this.jwtService.sign(
+      { sub: userId, deviceId, type: 'refresh', jti: crypto.randomUUID() },
+      { secret: getJwtRefreshSecret(), expiresIn: REFRESH_TOKEN_TTL_SECONDS },
     );
-    await this.redis.set(
-      `user:${user.id}:device:${deviceId}`,
-      refresh_token,
-      'EX',
-      30 * 24 * 60 * 60,
-    );
+  }
+
+  /** A new device session: access token, refresh token (for the cookie) and the user. */
+  private async issueTokens(
+    user: { id: number; email: string; role: Role; profile?: unknown },
+    deviceId: string,
+    meta: DeviceMeta = {},
+  ) {
+    const access_token = this.signAccess(user, deviceId);
+    const refresh_token = this.signRefresh(user.id, deviceId);
+    const remember = meta.remember ?? true;
+    await this.sessions.create(user.id, deviceId, refresh_token, {
+      userAgent: meta.userAgent ?? null,
+      remember,
+    });
     return {
       access_token,
       refresh_token,
+      remember,
       deviceId,
       user: {
         id: user.id,
@@ -666,6 +653,33 @@ export class AuthService {
         role: user.role,
         profile: user.profile,
       },
+    };
+  }
+
+  /** The account's signed-in devices for the devices page. */
+  async listSessions(userId: number, currentDeviceId?: string) {
+    const sessions = await this.sessions.list(userId);
+    return sessions
+      .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
+      .map((s) => ({
+        deviceId: s.deviceId,
+        userAgent: s.userAgent,
+        createdAt: new Date(s.createdAt).toISOString(),
+        lastUsedAt: new Date(s.lastUsedAt).toISOString(),
+        current: s.deviceId === currentDeviceId,
+      }));
+  }
+
+  async revokeSession(userId: number, deviceId: string) {
+    const exists = await this.sessions.get(userId, deviceId);
+    if (!exists) throw new BadRequestException('Không tìm thấy thiết bị này.');
+    await this.sessions.revoke(userId, deviceId);
+    return { revoked: true };
+  }
+
+  async revokeOtherSessions(userId: number, currentDeviceId: string) {
+    return {
+      revoked: await this.sessions.revokeAll(userId, currentDeviceId),
     };
   }
 }

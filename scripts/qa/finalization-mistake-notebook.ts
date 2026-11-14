@@ -438,9 +438,17 @@ async function browserFlow() {
     (await page.getByRole('button', { name: 'Hỏi gia sư' }).count()) === 0 &&
       (await page.getByRole('button', { name: /^Luyện đề/ }).count()) === 0,
   );
+  // Owner 2026-11-12/13: one row per mistake in a panel per exercise, the
+  // chosen one in a detail pane; no Chưa / Đã khắc phục filter.
+  const rows = page.locator('section[aria-label] li > button');
+  check('the notebook lists three mistakes', (await rows.count()) === 3);
   check(
-    'the notebook lists three mistakes',
-    (await page.locator('article').count()) === 3,
+    'one mistake is open in the detail pane',
+    (await page.locator('article').count()) === 1,
+  );
+  check(
+    'there is no Chưa / Đã khắc phục filter',
+    (await page.getByRole('button', { name: /khắc phục/ }).count()) === 0,
   );
   await page.screenshot({
     path: `${SHOTS}/mistakes-page-1366.png`,
@@ -452,13 +460,37 @@ async function browserFlow() {
   await page.waitForTimeout(1500);
   check(
     'the skill filter narrows the list and is in the address',
-    (await page.locator('article').count()) === 1 &&
-      (await page.getByRole('link', { name: 'Làm lại bài đọc' }).count()) === 1,
+    (await rows.count()) === 1 &&
+      (await page.getByRole('link', { name: 'Làm lại bài đọc' }).count()) >= 1,
   );
 
-  await page.getByRole('button', { name: 'Tất cả' }).click();
-  await page.waitForTimeout(1000);
-  await page.getByRole('button', { name: 'Ôn lỗi' }).click();
+  await page.getByRole('button', { name: /^Tất cả/ }).click();
+  await page.waitForTimeout(1500);
+
+  // "Đã hiểu" takes a mistake out and offers Hoàn tác (owner 2026-11-13).
+  await page
+    .getByRole('button', { name: 'Đã hiểu, bỏ khỏi sổ' })
+    .first()
+    .click();
+  const undo = page.getByRole('button', { name: 'Hoàn tác' });
+  await undo.waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(1500);
+  check(
+    '"Đã hiểu" takes the mistake out and offers Hoàn tác',
+    (await rows.count()) === 2 &&
+      (await page.getByText('Đã bỏ lỗi này khỏi sổ.').count()) === 1,
+    `${await rows.count()} rows`,
+  );
+  await page.screenshot({ path: `${SHOTS}/mistakes-undo-toast.png` });
+  await undo.click();
+  await page.waitForTimeout(2500);
+  check(
+    'Hoàn tác brings it back',
+    (await rows.count()) === 3,
+    `${await rows.count()} rows`,
+  );
+
+  await page.getByRole('button', { name: /^Ôn \d+ câu$/ }).click();
   await page
     .getByRole('heading', { name: /Ôn lỗi · Câu 1\/3/ })
     .waitFor({ timeout: 60_000 });

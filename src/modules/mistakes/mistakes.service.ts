@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { isRewardableQuiz } from '../gamification/reward-eligibility';
 import {
   MISTAKE_SKILLS,
   RESOLVE_AFTER_CORRECT,
@@ -111,8 +112,8 @@ export class MistakesService {
             id: true,
             type: true,
             title: true,
-            // Exam Writing tasks have no practice topic; they stay out.
             practiceTopicId: true,
+            toeicWritingSetItems: { select: { id: true }, take: 1 },
             questions: { select: { id: true, type: true, content: true } },
           },
         },
@@ -121,10 +122,23 @@ export class MistakesService {
         },
       },
     });
-    if (!row || !row.quiz.practiceTopicId) return [];
+    // Only practice quizzes, by the same rule as rewards and progress: every
+    // listening and reading quiz, a Writing task only with a practice topic and
+    // outside the TOEIC writing sets. Requiring a topic for every quiz left out
+    // the listening quizzes that have none (owner 2026-11-12: 7 wrong answers,
+    // an empty notebook).
+    if (
+      !row ||
+      !isRewardableQuiz({
+        type: row.quiz.type,
+        practiceTopicId: row.quiz.practiceTopicId,
+        inToeicWritingSet: row.quiz.toeicWritingSetItems.length > 0,
+      })
+    )
+      return [];
     return [
       ...quizObservations({ ...row, questions: row.quiz.questions }),
-      ...writingObservations(row),
+      ...writingObservations({ ...row, questions: row.quiz.questions }),
     ];
   }
 
@@ -375,6 +389,28 @@ export class MistakesService {
     )
       throw new BadRequestException('Câu này không trả lời lại được ở đây.');
     const correct = selectedIndex === detail.correctIndex;
+    const next = await this.moveOn(row, correct);
+    return {
+      id: row.id,
+      correct,
+      selectedIndex,
+      correctIndex: detail.correctIndex,
+      explanation: detail.explanation ?? null,
+      passage: detail.passage ?? null,
+      ...next,
+    };
+  }
+
+  /**
+   * One answer given in a review: right moves the streak on (closing the
+   * mistake at RESOLVE_AFTER_CORRECT), wrong counts it and starts again.
+   */
+  private async moveOn(
+    row: Pick<MistakeState, 'wrongCount' | 'correctStreak' | 'resolvedAt'> & {
+      id: number;
+    },
+    correct: boolean,
+  ) {
     const now = new Date();
     const next: Pick<
       MistakeState,
@@ -393,16 +429,37 @@ export class MistakesService {
       data: { ...next, lastSeenAt: now },
     });
     return {
-      id: row.id,
-      correct,
-      selectedIndex,
-      correctIndex: detail.correctIndex,
-      explanation: detail.explanation ?? null,
-      passage: detail.passage ?? null,
       correctStreak: next.correctStreak,
       resolved: next.resolvedAt !== null,
       resolveAfterCorrect: RESOLVE_AFTER_CORRECT,
     };
+  }
+
+  /**
+   * The sentence behind an open "Dịch câu" mistake of this learner, for the
+   * typed review (graded by the Writing module, which owns the AI grader).
+   */
+  async translationReviewTarget(userId: number, id: number) {
+    const row = await this.own(userId, id);
+    const detail = row.detail as unknown as MistakeDetail;
+    if (
+      row.sourceType !== 'TRANSLATION_SENTENCE' ||
+      detail.kind !== 'TRANSLATION' ||
+      typeof detail.ref?.questionId !== 'number' ||
+      typeof detail.ref?.quizId !== 'number'
+    )
+      throw new BadRequestException('Câu này không phải câu dịch.');
+    return {
+      id: row.id,
+      questionId: detail.ref.questionId,
+      quizId: detail.ref.quizId,
+    };
+  }
+
+  /** Records the outcome of a typed translation review. */
+  async recordTranslationReview(userId: number, id: number, correct: boolean) {
+    const row = await this.own(userId, id);
+    return { id: row.id, correct, ...(await this.moveOn(row, correct)) };
   }
 
   /** The learner says a mistake is understood, or opens it again. */

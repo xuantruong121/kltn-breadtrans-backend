@@ -22,6 +22,9 @@ export const LEARNER_VISIBLE_WRITING_FIELDS = [
   'keywords',
   'requireLinking',
   'rubric',
+  // Sentence translation: word help and the tip, never acceptedAnswers.
+  'hints',
+  'grammarTip',
 ] as const;
 
 export function isWritingQuizType(type: unknown): boolean {

@@ -111,3 +111,31 @@ export function grammarTopicFacets(rows: GrammarTopicListRow[]) {
     locked: rows.filter((row) => row.learnerAttemptCount > 0).length,
   };
 }
+
+export type GradableGrammarQuestion = {
+  id: number;
+  correctIndex: number;
+  explanation: string | null;
+  optionExplanations?: unknown;
+};
+
+/**
+ * One question graded: what the learner picked, the key and why. The same for
+ * the per-question check (owner 2026-11-13: show the result as soon as an
+ * option is chosen) and the whole-topic attempt, so the two never disagree.
+ */
+export function gradeGrammarQuestion(
+  question: GradableGrammarQuestion,
+  selected: number | undefined,
+) {
+  return {
+    questionId: question.id,
+    selectedOption: selected,
+    correctOption: question.correctIndex,
+    isCorrect: selected === question.correctIndex,
+    explanation: question.explanation,
+    optionExplanations: Array.isArray(question.optionExplanations)
+      ? (question.optionExplanations as Array<string | null>)
+      : null,
+  };
+}

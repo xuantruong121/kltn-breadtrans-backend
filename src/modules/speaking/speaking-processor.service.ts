@@ -174,7 +174,13 @@ export class SpeakingProcessorService implements OnModuleDestroy {
     const existing = await this.prisma.speakingSubmission.findUnique({
       where: { id: submissionId },
       include: {
-        exercise: { include: { practiceSet: { select: { scope: true } } } },
+        exercise: {
+          include: {
+            practiceSet: { select: { scope: true } },
+            // A respond-using-information task is graded against its notice.
+            stimulus: { select: { title: true, content: true } },
+          },
+        },
       },
     });
 
@@ -447,6 +453,7 @@ export class SpeakingProcessorService implements OnModuleDestroy {
           existing.exercise,
           audioBuffer,
           { signal },
+          this.aiService,
         );
       } else {
         assessmentResult = await assessPracticeSpeech(
@@ -509,7 +516,7 @@ export class SpeakingProcessorService implements OnModuleDestroy {
         transcript,
         aiFeedback: assessmentResult,
         provider: MockSpeakingEvaluator.isMockEnabled() ? 'mock' : 'azure',
-        scoreVersion: 'v1',
+        scoreVersion: assessmentResult.scoreVersion ?? 'v1',
         processedAt: new Date(),
         lastErrorCode,
         lastErrorMessage: null,

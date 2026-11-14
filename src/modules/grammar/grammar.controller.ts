@@ -17,6 +17,7 @@ import {
   CreateGrammarQuestionDto,
   UpdateGrammarQuestionDto,
   SubmitGrammarAttemptDto,
+  CheckGrammarAnswerDto,
   ReorderGrammarQuestionsDto,
   CreateGrammarQuestionsDto,
 } from './dto';
@@ -55,6 +56,32 @@ export class GrammarController {
     const userId = req?.user?.id;
     const isStaff = req?.user?.role === Role.ADMIN;
     return this.grammarService.getTopicDetail(id, userId, isStaff);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('topics/:id/questions/:questionId/check')
+  @ApiOperation({
+    summary:
+      'Chấm ngay một câu ngữ pháp vừa chọn: đúng/sai, đáp án đúng và giải thích (không lưu)',
+  })
+  @ApiResponse({ status: 201, description: 'Kết quả của câu hỏi' })
+  @ApiResponse({
+    status: 404,
+    description: 'Không có câu hỏi này trong chủ đề',
+  })
+  checkAnswer(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Body() dto: CheckGrammarAnswerDto,
+    @Request() req: any,
+  ) {
+    const isStaff = req?.user?.role === Role.ADMIN;
+    return this.grammarService.checkAnswer(
+      id,
+      questionId,
+      dto.selectedOption,
+      isStaff,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

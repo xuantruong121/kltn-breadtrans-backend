@@ -48,6 +48,7 @@ describe('speaking practice assessment mode', () => {
   it('a read-aloud task keeps the scripted assessment against its text', async () => {
     const ai = {
       assessPronunciation: jest.fn().mockResolvedValue({ overallScore: 8 }),
+      generateStructuredJson: jest.fn(),
     };
     await assessPracticeSpeech(
       ai,
@@ -89,7 +90,7 @@ describe('speaking practice assessment mode', () => {
     try {
       await expect(
         assessPracticeSpeech(
-          { assessPronunciation: jest.fn() },
+          { assessPronunciation: jest.fn(), generateStructuredJson: jest.fn() },
           { taskType: 'EXPRESS_OPINION', targetText: 'q' },
           Buffer.from('not a wav'),
         ),

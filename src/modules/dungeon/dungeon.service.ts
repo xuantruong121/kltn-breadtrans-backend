@@ -514,7 +514,11 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         bonus,
         'DUNGEON_WIN',
         `dungeon:${session.id}:win`,
-        { isCapped: true, metadata: { sessionId: session.id } },
+        {
+          isCapped: true,
+          bucket: 'ARENA',
+          metadata: { sessionId: session.id },
+        },
       );
       bonusGranted = award.granted;
     }

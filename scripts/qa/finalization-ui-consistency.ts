@@ -80,8 +80,8 @@ async function main() {
   );
   const navText = await page.locator('header nav').first().innerText();
   check(
-    'the top menu is Vietnamese: "Thêm", not "More"',
-    navText.includes('Thêm') && !/\bMore\b/.test(navText),
+    'the top menu says More and FAQ (owner 2026-11-13)',
+    /\bMore\b/.test(navText) && !navText.includes('Trợ giúp'),
     navText.replace(/\s+/g, ' ').slice(0, 140),
   );
   await page.screenshot({ path: `${SHOTS}/ui-menu-1366.png` });
@@ -195,7 +195,8 @@ async function main() {
     inPanel &&
       (await nudge.innerText()).includes('Đang đói') &&
       (await nudge.locator('a, button').count()) === 0 &&
-      (await page.getByRole('button', { name: /^Cho thú ảo ăn/ }).count()) === 1,
+      (await page.getByRole('button', { name: /^Cho thú ảo ăn/ }).count()) ===
+        1,
     inPanel
       ? (await nudge.innerText()).replace(/\s+/g, ' ').slice(0, 120)
       : 'no line',

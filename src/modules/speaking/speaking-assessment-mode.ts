@@ -10,6 +10,10 @@
  * learner was never asked to say: "omitted" words and a meaningless
  * completeness score. Free answers are now assessed unscripted, on what the
  * learner actually said, and no word-level error list is claimed for them.
+ *
+ * Owner 2026-11-13: pronunciation alone let an answer about something else
+ * score 6.9. A free answer now also gets a content grade from Gemini
+ * (speaking-content-grade.ts); the total is the mean of both.
  */
 import type { AiService } from '../ai/ai.service';
 import type { PronunciationFeedback } from '../ai/strategies/ai-evaluator.interface';
@@ -21,6 +25,16 @@ import {
 } from '../diagnostic/diagnostic-azure-speech';
 import { DiagnosticGraderError } from '../diagnostic/diagnostic-productive';
 import { MockSpeakingEvaluator } from './mock-speaking-evaluator';
+import {
+  gradeFreeAnswerContent,
+  type SpeakingContentTask,
+} from './speaking-content-grade';
+
+type PracticeAi = Pick<
+  AiService,
+  'assessPronunciation' | 'generateStructuredJson'
+>;
+type PracticeExercise = SpeakingContentTask;
 
 const SCRIPTED_TASKS = new Set(['READ_ALOUD', 'PRONUNCIATION_DRILL']);
 
@@ -152,8 +166,8 @@ const NO_SPEECH: PronunciationFeedback = {
 
 /** Assess one practice recording with the mode its task type calls for. */
 export async function assessPracticeSpeech(
-  aiService: Pick<AiService, 'assessPronunciation'>,
-  exercise: { taskType: string | null; targetText: string },
+  aiService: PracticeAi,
+  exercise: PracticeExercise,
   audio: Buffer,
   options?: { signal?: AbortSignal },
 ): Promise<PronunciationFeedback> {
@@ -181,7 +195,12 @@ export async function assessPracticeSpeech(
     const evidence = await new AzureUnscriptedSpeechAssessor(
       createAzureRecognitionSession({ key, region }),
     ).assess(audio, durationMs);
-    return unscriptedPracticeFeedback(evidence);
+    // Never throws: a failed content grade leaves pronunciation alone, labelled.
+    return await gradeFreeAnswerContent(
+      (request) => aiService.generateStructuredJson(request),
+      exercise,
+      unscriptedPracticeFeedback(evidence),
+    );
   } catch (error) {
     if (error instanceof DiagnosticGraderError) {
       if (/INSUFFICIENT/i.test(error.code)) return NO_SPEECH;
@@ -199,9 +218,10 @@ export async function assessPracticeSpeech(
  * answer the way a real one is shown. The transcript says it is mock output.
  */
 export async function mockPracticeSpeech(
-  exercise: { taskType: string | null; targetText: string },
+  exercise: PracticeExercise,
   audio: Buffer,
   options?: { signal?: AbortSignal },
+  aiService?: Pick<AiService, 'generateStructuredJson'>,
 ): Promise<PronunciationFeedback> {
   const scripted = await MockSpeakingEvaluator.evaluate(
     exercise.targetText,
@@ -210,7 +230,7 @@ export async function mockPracticeSpeech(
   );
   if (isScriptedSpeakingTask(exercise.taskType))
     return scripted as unknown as PronunciationFeedback;
-  return unscriptedPracticeFeedback({
+  const pronunciationOnly = unscriptedPracticeFeedback({
     locale: 'en-US',
     mode: 'UNSCRIPTED_CONTINUOUS',
     transcript: '[mock] I think it is a good idea because it saves time.',
@@ -223,4 +243,11 @@ export async function mockPracticeSpeech(
     longestPauseMs: 1200,
     azure: { accuracy: 86, fluency: 78, prosody: 74, pronunciation: 81 },
   });
+  return aiService
+    ? gradeFreeAnswerContent(
+        (request) => aiService.generateStructuredJson(request),
+        exercise,
+        pronunciationOnly,
+      )
+    : pronunciationOnly;
 }

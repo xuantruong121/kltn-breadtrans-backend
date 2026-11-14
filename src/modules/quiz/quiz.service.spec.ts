@@ -956,6 +956,92 @@ describe('QuizService', () => {
       },
     );
 
+    it('accepts a skipped Listening question ("") and scores it wrong', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 9,
+        title: 'Listening',
+        type: 'LISTENING_PRACTICE',
+        questions: [
+          {
+            id: 91,
+            type: 'MULTIPLE_CHOICE',
+            content: { options: ['A', 'B'], correctIndex: 0 },
+          },
+          {
+            id: 92,
+            type: 'DICTATION',
+            content: { correctAnswer: 'See you then.' },
+          },
+        ],
+      });
+      const tx = {
+        submission: {
+          create: jest.fn().mockResolvedValue({ id: 79, results: [] }),
+        },
+      };
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (transaction: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      );
+      mockPrismaService.userQuizReward.createMany.mockResolvedValue({
+        count: 1,
+      });
+
+      await service.submitQuiz(9, 7, {
+        answers: [
+          { questionId: 91, answer: 'A' },
+          { questionId: 92, answer: '' },
+        ],
+      });
+
+      expect(tx.submission.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            score: 1,
+            results: {
+              create: [
+                expect.objectContaining({ questionId: 91, isCorrect: true }),
+                expect.objectContaining({
+                  questionId: 92,
+                  answer: '',
+                  isCorrect: false,
+                  score: 0,
+                }),
+              ],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('still refuses a Listening answer that is not text, or a question twice', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 9,
+        title: 'Listening',
+        type: 'LISTENING_PRACTICE',
+        questions: [
+          { id: 91, type: 'MULTIPLE_CHOICE', content: { options: ['A'] } },
+          { id: 92, type: 'MULTIPLE_CHOICE', content: { options: ['A'] } },
+        ],
+      });
+      await expect(
+        service.submitQuiz(9, 7, {
+          answers: [
+            { questionId: 91, answer: 'A' },
+            { questionId: 92, answer: 3 },
+          ],
+        }),
+      ).rejects.toThrow('Dữ liệu câu trả lời không hợp lệ');
+      await expect(
+        service.submitQuiz(9, 7, {
+          answers: [
+            { questionId: 91, answer: 'A' },
+            { questionId: 91, answer: 'A' },
+          ],
+        }),
+      ).rejects.toThrow('Dữ liệu câu trả lời không hợp lệ');
+    });
+
     it('keeps Listening activity creation outside the Reading transaction path', async () => {
       mockPrismaService.quiz.findUnique.mockResolvedValue({
         id: 9,
@@ -1269,7 +1355,7 @@ describe('QuizService', () => {
       expect(JSON.stringify(result)).not.toContain('tomorrow');
     });
 
-    it('handles wrong inflection with masked token and relative grammar hint without leaking target word (Case A)', async () => {
+    it('handles wrong inflection: shows that one word, masks the rest, gives a relative grammar hint (Case A)', async () => {
       mockPrismaService.question.findUnique.mockResolvedValue({
         id: 942,
         quizId: 23,
@@ -1286,10 +1372,52 @@ describe('QuizService', () => {
       expect((result as any).correctAnswer).toBeUndefined();
       expect(result.verifiedPrefix).toBe('She');
       expect(result.nextWordMask).toBe('******'); // 6 letters for drinks
+      // Owner 2026-11-13: the word to fix is shown, as dailydictation.com does.
+      expect(result.nextWord).toBe('drinks');
+      expect(result.remainingMasks?.join(' ')).not.toMatch(/[a-z]/i);
       expect(result.hint).toContain('dạng động từ');
       expect(result.hint).toContain('She');
-      // Critical negative assertion: target word 'drinks' must NOT be in the wrong attempt response
-      expect(JSON.stringify(result)).not.toContain('drinks');
+    });
+
+    it('shows only the first word to fix and keeps the words after it masked', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 945,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: {
+          correctAnswer:
+            'Sounds good. Did you bring the reading passage for tomorrow?',
+        },
+      });
+
+      const result = await service.checkPracticeQuestion(23, 945, {
+        answer: 'Sounds good. Did you',
+      });
+
+      expect(result.isCorrect).toBe(false);
+      expect(result.verifiedPrefix).toBe('Sounds good. Did you');
+      expect(result.nextWord).toBe('bring');
+      expect(JSON.stringify(result)).not.toContain('passage');
+      expect(JSON.stringify(result)).not.toContain('tomorrow');
+    });
+
+    it('accepts digits for numbers said as words (owner 2026-11-13)', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 946,
+        quizId: 23,
+        type: 'DICTATION',
+        quiz: { id: 23, type: 'LISTENING_PRACTICE' },
+        content: {
+          correctAnswer: 'I reserved the study room from nine to eleven.',
+        },
+      });
+
+      const result = await service.checkPracticeQuestion(23, 946, {
+        answer: 'I reserved the study room from 9 to 11',
+      });
+
+      expect(result.isCorrect).toBe(true);
     });
 
     it('handles missing function word with masked token without leaking target word (Case B)', async () => {

@@ -46,6 +46,17 @@ class SubmitWritingDto {
   questionId?: number;
 }
 
+class CheckTranslationDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(400)
+  answer!: string;
+
+  @IsOptional()
+  @IsUUID()
+  clientAttemptId?: string;
+}
+
 class ReviseWritingDto {
   @IsString()
   @IsNotEmpty()
@@ -176,6 +187,70 @@ export class WritingController {
           }
         : undefined,
       body.questionId,
+    );
+  }
+
+  // No AiRateLimitGuard: an answer that matches an accepted translation costs
+  // no grading; the service takes one only when it calls the AI.
+  @Post('quizzes/:id/questions/:questionId/translate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Kiểm tra một câu dịch Việt→Anh: so với đáp án mẫu, AI chỉ chấm khi không khớp',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        answer: { type: 'string' },
+        clientAttemptId: { type: 'string', format: 'uuid' },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Kết quả của câu dịch' })
+  @ApiResponse({ status: 400, description: 'Câu không thuộc bài dịch câu' })
+  @ApiResponse({ status: 503, description: 'AI chưa chấm được, thử lại' })
+  checkTranslation(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Request() req: any,
+    @Body() body: CheckTranslationDto,
+  ) {
+    return this.writingService.checkTranslation(
+      id,
+      questionId,
+      req.user.id,
+      body.answer,
+      req.user.role,
+      body.clientAttemptId,
+    );
+  }
+
+  // Sổ lỗi: a "Dịch câu" mistake typed again. Graded like the exercise (no
+  // AiRateLimitGuard: an accepted answer costs no grading).
+  @Post('mistakes/:id/translate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Ôn một câu dịch sai trong Sổ lỗi: chấm như bài Dịch câu',
+  })
+  @ApiBody({
+    schema: { type: 'object', properties: { answer: { type: 'string' } } },
+  })
+  @ApiResponse({ status: 201, description: 'Kết quả và chuỗi đúng của lỗi' })
+  @ApiResponse({ status: 400, description: 'Không phải câu dịch' })
+  @ApiResponse({ status: 404, description: 'Không phải lỗi của học viên' })
+  reviewTranslationMistake(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @Body() body: CheckTranslationDto,
+  ) {
+    return this.writingService.reviewTranslationMistake(
+      req.user.id,
+      id,
+      body.answer,
+      req.user.role,
     );
   }
 

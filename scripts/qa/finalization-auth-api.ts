@@ -5,7 +5,34 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { call, check, failureCount, newStudent } from './harness-api';
+import { BE, call, check, failureCount, newStudent } from './harness-api';
+
+/** POSTs with an optional refresh cookie and returns the cookie the API sets. */
+async function cookiePost(path: string, body: unknown, cookie?: string) {
+  const res = await fetch(BE + path, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-requested-with': 'breadtrans',
+      ...(cookie ? { cookie: `bt_rt=${cookie}` } : {}),
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+  const set = res.headers.get('set-cookie') ?? '';
+  const match = /bt_rt=([^;]*)/.exec(set);
+  let json: any = null;
+  try {
+    json = await res.json();
+  } catch {
+    /* empty */
+  }
+  return {
+    status: res.status,
+    data: json?.data ?? json,
+    setCookie: set,
+    cookie: match ? decodeURIComponent(match[1]) : null,
+  };
+}
 
 async function main() {
   console.log('\n== Register / login');
@@ -53,14 +80,20 @@ async function main() {
     wrong.status === 401,
     `(status ${wrong.status})`,
   );
-  const login = await call('POST', '/auth/login', undefined, {
-    email,
-    password,
-  });
+  const login = await cookiePost('/auth/login', { email, password });
   const access = login.data?.access_token;
-  const refresh = login.data?.refresh_token;
-  const deviceId = login.data?.deviceId;
-  check('login returns access and refresh tokens', !!access && !!refresh);
+  const refresh = login.cookie;
+  check(
+    'login returns an access token and sets the refresh cookie',
+    !!access && !!refresh,
+  );
+  check(
+    'the refresh token is not in the JSON and the cookie is HttpOnly and Strict',
+    !('refresh_token' in (login.data ?? {})) &&
+      /HttpOnly/i.test(login.setCookie) &&
+      /SameSite=Strict/i.test(login.setCookie),
+    login.setCookie,
+  );
   check(
     'a role sent at registration is ignored',
     login.data?.user?.role === 'STUDENT',
@@ -76,23 +109,30 @@ async function main() {
   check('protected routes need a token', noToken.status === 401);
 
   console.log('\n== Refresh / logout');
-  const r1 = await call('POST', '/auth/refresh', access, {
-    deviceId,
-    refreshToken: refresh,
+  const noHeader = await fetch(BE + '/auth/refresh', {
+    method: 'POST',
+    headers: { cookie: `bt_rt=${refresh}` },
   });
   check(
-    'refresh issues a new access token',
-    r1.status < 300 && !!r1.data?.access_token,
-    `(status ${r1.status} ${JSON.stringify(r1.message)})`,
+    'refresh without the CSRF header is refused',
+    noHeader.status === 403,
+    `(status ${noHeader.status})`,
   );
-  const reuse = await call('POST', '/auth/refresh', access, {
-    deviceId,
-    refreshToken: refresh,
-  });
+  const r1 = await cookiePost('/auth/refresh', {}, refresh ?? undefined);
   check(
-    'a refresh token cannot be reused after rotation',
-    reuse.status === 401 || reuse.status === 403,
-    `(status ${reuse.status})`,
+    'refresh issues a new access token and rotates the cookie',
+    r1.status < 300 &&
+      !!r1.data?.access_token &&
+      !!r1.cookie &&
+      r1.cookie !== refresh,
+    `(status ${r1.status})`,
+  );
+  // Within 30 s the old cookie renews without rotating (parallel tabs).
+  const grace = await cookiePost('/auth/refresh', {}, refresh ?? undefined);
+  check(
+    'the previous cookie renews once within the grace window',
+    grace.status < 300 && !grace.cookie,
+    `(status ${grace.status})`,
   );
   const out = await call('POST', '/auth/logout', r1.data?.access_token);
   check(
@@ -100,16 +140,25 @@ async function main() {
     out.status < 300,
     `(status ${out.status} ${JSON.stringify(out.message)})`,
   );
-  const afterLogout = await call(
-    'POST',
+  const afterLogout = await cookiePost(
     '/auth/refresh',
-    r1.data?.access_token,
-    { deviceId, refreshToken: r1.data?.refresh_token },
+    {},
+    r1.cookie ?? undefined,
   );
   check(
-    'the refresh token is invalid after logout',
+    'the refresh cookie is invalid after logout',
     afterLogout.status === 401,
     `(status ${afterLogout.status})`,
+  );
+  const deniedAccess = await call(
+    'GET',
+    '/users/profile',
+    r1.data?.access_token,
+  );
+  check(
+    'the access token is refused after logout',
+    deniedAccess.status === 401,
+    `(status ${deniedAccess.status})`,
   );
 
   console.log('\n== Profile');

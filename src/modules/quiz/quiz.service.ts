@@ -52,6 +52,12 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { loadRevisionChain } from '../writing/writing-revision';
 import { revisionView } from '../writing/writing-revision.logic';
 import {
+  bareWord,
+  joinThousandsSeparators,
+  normalizeNumberTokens,
+  startsNumberGroup,
+} from './listening-number-words';
+import {
   isWritingQuizType,
   learnerVisibleTaskContent,
 } from '../writing/writing-task-visibility';
@@ -247,7 +253,7 @@ const AMBIGUOUS_CONTRACTIONS: Record<string, [string[], string[]]> = {
 };
 
 function tokenizeStandardListeningAnswer(value: unknown): string[] {
-  return String(value ?? '')
+  return joinThousandsSeparators(String(value ?? ''))
     .normalize('NFKC')
     .toLocaleLowerCase('en-US')
     .replace(/[’‘ʼ`]/g, "'")
@@ -292,8 +298,11 @@ function expandStandardContraction(
  */
 export function normalizeStandardListeningTokens(value: unknown): string[] {
   const tokens = tokenizeStandardListeningAnswer(value);
-  return tokens.flatMap((token, index) =>
-    expandStandardContraction(token, tokens[index + 1]),
+  // Numbers last: "nine" and "9" are the same word to a listener.
+  return normalizeNumberTokens(
+    tokens.flatMap((token, index) =>
+      expandStandardContraction(token, tokens[index + 1]),
+    ),
   );
 }
 
@@ -715,6 +724,11 @@ export interface ProgressiveDictationFeedback {
   isCorrect: boolean;
   verifiedPrefix: string;
   nextWordMask: string;
+  /**
+   * The word expected where the answer first goes wrong, shown in place of its
+   * mask (owner 2026-11-13, as dailydictation.com does). Empty when none.
+   */
+  nextWord: string;
   remainingMasks: string[];
   nextErrorType: 'WRONG' | 'MISSING' | 'EXTRA' | null;
   hint: string | null;
@@ -877,6 +891,7 @@ export function calculateProgressiveDictationFeedback(
       isCorrect: true,
       verifiedPrefix: trimmedExpected,
       nextWordMask: '',
+      nextWord: '',
       remainingMasks: [],
       nextErrorType: null,
       hint: null,
@@ -887,32 +902,55 @@ export function calculateProgressiveDictationFeedback(
   let subIndex = 0;
   let matchedCanonicalCount = 0;
 
-  for (let idx = 0; idx < canonicalTokens.length; idx += 1) {
-    const canonicalToken = canonicalTokens[idx];
-    const expNorm = normalizeStandardListeningTokens(canonicalToken);
+  const matchesAt = (norm: string[]) =>
+    norm.length > 0 &&
+    subIndex + norm.length <= normSubmittedTokens.length &&
+    norm.every((token, k) => normSubmittedTokens[subIndex + k] === token);
 
-    if (
-      expNorm.length > 0 &&
-      subIndex + expNorm.length <= normSubmittedTokens.length &&
-      expNorm.every((token, k) => normSubmittedTokens[subIndex + k] === token)
-    ) {
+  for (let idx = 0; idx < canonicalTokens.length; idx += 1) {
+    const expNorm = normalizeStandardListeningTokens(canonicalTokens[idx]);
+    if (matchesAt(expNorm)) {
       matchedCanonicalCount += 1;
       subIndex += expNorm.length;
-    } else {
-      break;
+      continue;
     }
+    // A number spread over several words ("twenty five") reads as one ("25").
+    let span = 0;
+    let groupNorm: string[] = [];
+    if (startsNumberGroup(expNorm[0])) {
+      for (
+        let extra = 1;
+        extra <= 5 && idx + extra < canonicalTokens.length;
+        extra += 1
+      ) {
+        const norm = normalizeStandardListeningTokens(
+          canonicalTokens.slice(idx, idx + extra + 1).join(' '),
+        );
+        if (matchesAt(norm)) {
+          span = extra + 1;
+          groupNorm = norm;
+          break;
+        }
+      }
+    }
+    if (span === 0) break;
+    matchedCanonicalCount += span;
+    subIndex += groupNorm.length;
+    idx += span - 1;
   }
 
   const verifiedTokens = canonicalTokens.slice(0, matchedCanonicalCount);
   const verifiedPrefix = verifiedTokens.join(' ');
 
   let nextWordMask = '';
+  let nextWord = '';
   let remainingMasks: string[] = [];
   let nextErrorType: 'WRONG' | 'MISSING' | 'EXTRA' = 'WRONG';
 
   if (matchedCanonicalCount < canonicalTokens.length) {
     const nextCanonicalToken = canonicalTokens[matchedCanonicalCount];
     nextWordMask = maskExpectedWord(nextCanonicalToken);
+    nextWord = bareWord(nextCanonicalToken);
 
     const remainingTokens = canonicalTokens.slice(matchedCanonicalCount + 1);
     remainingMasks = remainingTokens.map((t) => maskExpectedWord(t));
@@ -943,6 +981,7 @@ export function calculateProgressiveDictationFeedback(
     isCorrect: false,
     verifiedPrefix,
     nextWordMask,
+    nextWord,
     remainingMasks,
     nextErrorType,
     hint,
@@ -2645,6 +2684,7 @@ export class QuizService {
           verifiedPrefix: expectedAnswer,
           canonicalizedAnswer: expectedAnswer,
           nextWordMask: '',
+          nextWord: '',
           nextErrorType: null,
           tokens: correctTokens,
           hint: null,
@@ -2675,6 +2715,7 @@ export class QuizService {
         wordAccuracy,
         verifiedPrefix: progressiveFeedback.verifiedPrefix,
         nextWordMask: progressiveFeedback.nextWordMask,
+        nextWord: progressiveFeedback.nextWord,
         remainingMasks: progressiveFeedback.remainingMasks,
         nextErrorType: progressiveFeedback.nextErrorType,
         canonicalizedAnswer: canonicalizeSubmittedDictation(
@@ -2996,13 +3037,15 @@ export class QuizService {
       );
     }
 
+    // An empty answer is a skipped question ("Bỏ qua"): the page sends "" for
+    // it, and it is scored wrong. Rejecting it (owner 2026-11-13: 400 on
+    // "Hoàn thành bài tập") left any game with a skipped question unsubmittable.
     const seenQuestionIds = new Set<number>();
     for (const answer of answers) {
       if (
         !questionIds.has(answer.questionId) ||
         seenQuestionIds.has(answer.questionId) ||
-        typeof answer.answer !== 'string' ||
-        answer.answer.trim().length === 0
+        typeof answer.answer !== 'string'
       ) {
         throw new BadRequestException('Dữ liệu câu trả lời không hợp lệ');
       }

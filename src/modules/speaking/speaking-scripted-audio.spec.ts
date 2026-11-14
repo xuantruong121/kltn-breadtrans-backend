@@ -41,7 +41,10 @@ describe('scripted Speaking audio limit', () => {
   });
 
   it('a read-aloud answer reaches Azure as at most 30 s', async () => {
-    const ai = { assessPronunciation: jest.fn().mockResolvedValue({}) };
+    const ai = {
+      assessPronunciation: jest.fn().mockResolvedValue({}),
+      generateStructuredJson: jest.fn(),
+    };
     await assessPracticeSpeech(
       ai,
       { taskType: 'READ_ALOUD', targetText: 'Read this.' },

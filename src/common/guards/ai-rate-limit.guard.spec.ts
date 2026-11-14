@@ -71,6 +71,7 @@ describe('AiRateLimitGuard', () => {
     await expect(guard.canActivate(context)).rejects.toMatchObject({
       response: {
         statusCode: 429,
+        error: 'AI_QUOTA_EXHAUSTED',
         limit: 10,
         currentUsage: 11,
         planCode: 'FREE',

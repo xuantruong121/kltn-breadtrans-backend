@@ -33,6 +33,11 @@ describe('AuthService', () => {
       keys: jest.fn().mockResolvedValue([]),
       incr: jest.fn().mockResolvedValue(1),
       expire: jest.fn(),
+      sadd: jest.fn(),
+      srem: jest.fn(),
+      smembers: jest.fn().mockResolvedValue([]),
+      mget: jest.fn().mockResolvedValue([]),
+      ttl: jest.fn().mockResolvedValue(-2),
     };
     module = await Test.createTestingModule({
       providers: [
@@ -177,11 +182,12 @@ describe('AuthService', () => {
       expect(ttl).toBe(300);
     });
 
-    it('should reject non-existent user when generating OTP', async () => {
+    it('answers an unknown email like a known one and stores no code', async () => {
+      const redis = module.get(getRedisConnectionToken('default'));
       mockCtx.prisma.user.findUnique.mockResolvedValue(null);
-      await expect(service.generateOtp('unknown@example.com')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      const out = await service.generateOtp('unknown@example.com');
+      expect(out.message).toMatch(/Nếu email có tài khoản/);
+      expect(redis.set).not.toHaveBeenCalled();
     });
 
     it('should verify matching OTP and delete key from Redis', async () => {
@@ -196,7 +202,10 @@ describe('AuthService', () => {
 
       const result = await service.verifyOtp('test@example.com', testOtp);
       expect(result).toEqual({ message: 'Xác thực OTP thành công.' });
-      expect(redis.del).toHaveBeenCalledWith('otp:test@example.com');
+      expect(redis.del).toHaveBeenCalledWith(
+        'otp:test@example.com',
+        'otp:attempts:test@example.com',
+      );
     });
 
     it('should reject invalid OTP', async () => {

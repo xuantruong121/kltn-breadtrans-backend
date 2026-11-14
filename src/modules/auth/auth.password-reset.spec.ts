@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 /** Minimal in-memory Redis covering the commands the reset flow uses. */
 function memoryRedis() {
   const store = new Map<string, string>();
+  const sets = new Map<string, Set<string>>();
   return {
     store,
     set: jest.fn(async (key: string, value: string, ...args: unknown[]) => {
@@ -27,6 +28,22 @@ function memoryRedis() {
       const prefix = pattern.replace(/\*$/, '');
       return [...store.keys()].filter((k) => k.startsWith(prefix));
     }),
+    sets,
+    sadd: jest.fn(async (key: string, ...members: string[]) => {
+      const set = sets.get(key) ?? new Set<string>();
+      members.forEach((m) => set.add(m));
+      sets.set(key, set);
+      return members.length;
+    }),
+    srem: jest.fn(async (key: string, ...members: string[]) => {
+      members.forEach((m) => sets.get(key)?.delete(m));
+      return members.length;
+    }),
+    smembers: jest.fn(async (key: string) => [...(sets.get(key) ?? [])]),
+    mget: jest.fn(async (keys: string[]) =>
+      keys.map((k) => store.get(k) ?? null),
+    ),
+    expire: jest.fn(async () => 1),
   };
 }
 
@@ -63,7 +80,9 @@ describe('AuthService password reset', () => {
   });
 
   it('resets the password with the emailed token, once, and revokes sessions', async () => {
-    redis.store.set(`user:${user.id}:device:phone`, 'refresh');
+    await service.sessions.create(user.id, 'phone', 'refresh', {
+      remember: true,
+    });
     await service.requestPasswordReset(user.email);
     const token = tokenFrom();
     expect(token).toHaveLength(64);
@@ -72,7 +91,11 @@ describe('AuthService password reset', () => {
     await service.resetPassword(token, 'New-Password-1!');
     const saved = prisma.user.update.mock.calls[0][0].data.password;
     expect(await bcrypt.compare('New-Password-1!', saved)).toBe(true);
-    expect(redis.store.has(`user:${user.id}:device:phone`)).toBe(false);
+    expect(await service.sessions.get(user.id, 'phone')).toBeNull();
+    // Access tokens already issued to that device are refused from now on.
+    expect(redis.store.has(`user:${user.id}:device:phone:logged_out_at`)).toBe(
+      true,
+    );
 
     await expect(service.resetPassword(token, 'Another-1!')).rejects.toThrow(
       'không hợp lệ',

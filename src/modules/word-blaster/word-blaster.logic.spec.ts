@@ -236,9 +236,10 @@ describe('matchShot and resolve', () => {
 });
 
 describe('blasterPayout and blasterXp', () => {
-  it('a win returns the stake and half of it; a loss nothing', () => {
-    expect(blasterPayout(50, 'win')).toEqual({ returned: 50, bonus: 25 });
-    expect(blasterPayout(20, 'win')).toEqual({ returned: 20, bonus: 10 });
+  it('a win returns the stake and adds the stake again; a loss nothing', () => {
+    expect(blasterPayout(50, 'win')).toEqual({ returned: 50, bonus: 50 });
+    expect(blasterPayout(20, 'win')).toEqual({ returned: 20, bonus: 20 });
+    expect(blasterPayout(100, 'win')).toEqual({ returned: 100, bonus: 100 });
     expect(blasterPayout(100, 'lose')).toEqual({ returned: 0, bonus: 0 });
   });
 
@@ -250,16 +251,28 @@ describe('blasterPayout and blasterXp', () => {
 });
 
 describe('pace (owner 2026-11-08: too slow for a fast typist)', () => {
-  it('gaps shrink from 3.2 s to 1.5 s and falls speed up by 40 %', () => {
+  it('gaps shrink from 3.2 s to 2.3 s and falls speed up by 25 % (owner 2026-11-12: the end was too fast)', () => {
     expect(blasterTiming(0, 20)).toEqual({ gapMs: 3200, speed: 1 });
-    expect(blasterTiming(19, 20)).toEqual({ gapMs: 1500, speed: 1.4 });
+    expect(blasterTiming(19, 20)).toEqual({ gapMs: 2300, speed: 1.25 });
   });
 
-  it('in the last third, two blocks now and then fall together, a lane apart', () => {
+  it('the last block falls 7.2 s in copy mode and 10.4 s in Vietnamese', () => {
+    const copy = buildBlasterRound(pool, seeded(1), 'copy');
+    expect(copy[copy.length - 1].fallMs).toBe(7200);
+    const vi = buildBlasterRound(pool, seeded(1), 'en_to_vi');
+    expect(vi[vi.length - 1].fallMs).toBe(10400);
+  });
+
+  it('only the second to last block falls together with the one before it, a lane apart', () => {
     const paired = Array.from({ length: 20 }, (_, i) => i).filter((i) =>
       pairsWithPrevious(i, 20),
     );
-    expect(paired).toEqual([15, 18]);
+    expect(paired).toEqual([18]);
+    expect(
+      Array.from({ length: 5 }, (_, i) => i).filter((i) =>
+        pairsWithPrevious(i, 5),
+      ),
+    ).toEqual([]);
     const lanes = [0.12, 0.31, 0.5, 0.69, 0.88];
     for (let seed = 1; seed <= 30; seed += 1) {
       const blocks = buildBlasterRound(pool, seeded(seed), 'copy');
@@ -273,9 +286,11 @@ describe('pace (owner 2026-11-08: too slow for a fast typist)', () => {
     }
   });
 
-  it('a game is about half as long as before', () => {
+  it('a game still runs about a minute', () => {
+    // Owner 2026-11-12: the slower end adds a few seconds; pullForward still
+    // cuts the wait for a learner who clears the field early.
     const blocks = buildBlasterRound(pool, seeded(1), 'copy');
-    expect(landsAt(blocks[blocks.length - 1])).toBeLessThan(60_000);
+    expect(landsAt(blocks[blocks.length - 1])).toBeLessThan(65_000);
   });
 });
 
