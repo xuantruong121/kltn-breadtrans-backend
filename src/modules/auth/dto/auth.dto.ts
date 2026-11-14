@@ -1,4 +1,10 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { NewPassword } from '../password-policy';
@@ -39,20 +45,11 @@ export class LoginDto {
   @IsNotEmpty()
   password: string;
 
-  @ApiProperty({ example: 'device-uuid-1234', required: false })
-  deviceId?: string;
-}
-
-export class RefreshTokenDto {
-  @ApiProperty({ example: 'device-uuid-1234' })
-  @IsString()
-  @IsNotEmpty()
-  deviceId: string;
-
-  @ApiProperty({ example: 'long-refresh-token' })
-  @IsString()
-  @IsNotEmpty()
-  refreshToken: string;
+  /** Keep the refresh cookie after the browser closes (30 days). */
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  rememberMe?: boolean;
 }
 
 export class GenerateOtpDto {

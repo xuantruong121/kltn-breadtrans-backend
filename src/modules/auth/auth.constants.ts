@@ -44,3 +44,25 @@ export const getOtpSecret = (): string => {
   }
   return secret;
 };
+
+/**
+ * Refresh tokens are signed with their own secret (owner 2026-11-14), so an
+ * access-token secret leak cannot mint refresh tokens and the other way
+ * round. Mandatory in production, like JWT_SECRET.
+ */
+export const getJwtRefreshSecret = (): string => {
+  const secret = process.env.JWT_REFRESH_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        '[Security] JWT_REFRESH_SECRET is mandatory in production environment.',
+      );
+    }
+    return 'dev-insecure-refresh-secret-do-not-use-in-production';
+  }
+  return secret;
+};
+
+/** Access tokens live 15 minutes; the refresh cookie renews them. */
+export const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '15m';
+export const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;

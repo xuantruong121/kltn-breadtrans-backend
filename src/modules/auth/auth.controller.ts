@@ -9,12 +9,14 @@ import {
   Request,
   Res,
   UnauthorizedException,
+  ForbiddenException,
+  Delete,
+  Param,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
   LoginDto,
   RegisterDto,
-  RefreshTokenDto,
   GenerateOtpDto,
   VerifyOtpDto,
   ForgotPasswordDto,
@@ -34,7 +36,30 @@ import {
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import * as crypto from 'crypto';
 import { AuthGuard } from '@nestjs/passport';
-import type { Response } from 'express';
+import type { Request as ExpressRequest, Response } from 'express';
+import {
+  REFRESH_COOKIE,
+  clearRefreshCookie,
+  csrfProblem,
+  readCookie,
+  setRefreshCookie,
+} from './auth-cookie';
+
+/** The refresh token goes into the cookie only, never into the JSON body. */
+function withCookie<
+  T extends { refresh_token: string | null; remember: boolean },
+>(res: Response, result: T) {
+  if (result.refresh_token)
+    setRefreshCookie(res, result.refresh_token, result.remember);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { refresh_token, ...rest } = result;
+  return rest;
+}
+
+const userAgentOf = (req: ExpressRequest) =>
+  typeof req.headers['user-agent'] === 'string'
+    ? req.headers['user-agent']
+    : null;
 
 @ApiTags('auth')
 @Controller('auth')
@@ -71,10 +96,18 @@ export class AuthController {
     description: 'Trả về access token và refresh token.',
   })
   @ApiResponse({ status: 401, description: 'Sai tài khoản hoặc mật khẩu.' })
-  async login(@Body() loginDto: LoginDto) {
-    // If client doesn't provide a deviceId, generate a temporary one
-    const deviceId = loginDto.deviceId || crypto.randomUUID();
-    return this.authService.login(loginDto, deviceId);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Request() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Each sign-in is a new device session; the id lives in the tokens.
+    return withCookie(
+      res,
+      await this.authService.login(loginDto, crypto.randomUUID(), {
+        userAgent: userAgentOf(req),
+      }),
+    );
   }
 
   @Post('google')
@@ -90,8 +123,17 @@ export class AuthController {
     status: 401,
     description: 'Token không hợp lệ hoặc cần liên kết tài khoản.',
   })
-  async googleSignIn(@Body() dto: GoogleLoginDto) {
-    return this.authService.loginWithGoogle(dto);
+  async googleSignIn(
+    @Body() dto: GoogleLoginDto,
+    @Request() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return withCookie(
+      res,
+      await this.authService.loginWithGoogle(dto, {
+        userAgent: userAgentOf(req),
+      }),
+    );
   }
 
   @Post('google/link')
@@ -103,8 +145,17 @@ export class AuthController {
     status: 200,
     description: 'Liên kết thành công và trả về cặp token.',
   })
-  async linkGoogleAccount(@Body() dto: LinkGoogleAccountDto) {
-    return this.authService.linkGoogleWithPassword(dto);
+  async linkGoogleAccount(
+    @Body() dto: LinkGoogleAccountDto,
+    @Request() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return withCookie(
+      res,
+      await this.authService.linkGoogleWithPassword(dto, {
+        userAgent: userAgentOf(req),
+      }),
+    );
   }
 
   @Get('google')
@@ -132,31 +183,42 @@ export class AuthController {
   @Post('google/exchange')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đổi mã Google OAuth lấy JWT phiên đăng nhập' })
-  async exchangeGoogleCode(@Body() body: GoogleExchangeDto) {
-    return this.authService.exchangeGoogleLoginCode(body.code);
+  async exchangeGoogleCode(
+    @Body() body: GoogleExchangeDto,
+    @Request() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return withCookie(
+      res,
+      await this.authService.exchangeGoogleLoginCode(body.code, {
+        userAgent: userAgentOf(req),
+      }),
+    );
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Lấy token mới bằng Refresh Token' })
-  async refreshTokens(@Request() req: any, @Body() body: RefreshTokenDto) {
-    let userId: number | null = null;
-
-    // Try extracting userId from Authorization header if passed
-    const authHeader = req.headers.authorization as string;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const decoded: any = this.authService['jwtService'].decode(token);
-      if (decoded && decoded.sub) {
-        userId = decoded.sub;
-      }
+  @ApiOperation({
+    summary:
+      'Lấy access token mới từ cookie refresh (cần header X-Requested-With: breadtrans)',
+  })
+  async refreshTokens(
+    @Request() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const csrf = csrfProblem(req.headers);
+    if (csrf) throw new ForbiddenException(csrf);
+    try {
+      return withCookie(
+        res,
+        await this.authService.refreshTokens(
+          readCookie(req.headers.cookie, REFRESH_COOKIE),
+        ),
+      );
+    } catch (error) {
+      clearRefreshCookie(res);
+      throw error;
     }
-
-    return this.authService.refreshTokens(
-      userId as any,
-      body.deviceId,
-      body.refreshToken,
-    );
   }
 
   @Post('logout')
@@ -164,7 +226,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Đăng xuất khỏi thiết bị hiện tại' })
-  async logout(@Request() req: any) {
+  async logout(@Request() req: any, @Res({ passthrough: true }) res: Response) {
+    clearRefreshCookie(res);
     const deviceId = req.user?.deviceId;
     if (!deviceId) {
       throw new UnauthorizedException(
@@ -194,7 +257,33 @@ export class AuthController {
       req.user.id,
       body.currentPassword,
       body.newPassword,
+      req.user.deviceId,
     );
+  }
+
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Các thiết bị đang đăng nhập tài khoản này' })
+  listSessions(@Request() req: any) {
+    return this.authService.listSessions(req.user.id, req.user.deviceId);
+  }
+
+  @Post('sessions/revoke-others')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng xuất mọi thiết bị khác' })
+  revokeOtherSessions(@Request() req: any) {
+    return this.authService.revokeOtherSessions(req.user.id, req.user.deviceId);
+  }
+
+  @Delete('sessions/:deviceId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Đăng xuất một thiết bị' })
+  revokeSession(@Request() req: any, @Param('deviceId') deviceId: string) {
+    return this.authService.revokeSession(req.user.id, deviceId);
   }
 
   @Post('otp/generate')

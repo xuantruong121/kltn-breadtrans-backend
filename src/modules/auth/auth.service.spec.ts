@@ -33,6 +33,10 @@ describe('AuthService', () => {
       keys: jest.fn().mockResolvedValue([]),
       incr: jest.fn().mockResolvedValue(1),
       expire: jest.fn(),
+      sadd: jest.fn(),
+      srem: jest.fn(),
+      smembers: jest.fn().mockResolvedValue([]),
+      mget: jest.fn().mockResolvedValue([]),
     };
     module = await Test.createTestingModule({
       providers: [

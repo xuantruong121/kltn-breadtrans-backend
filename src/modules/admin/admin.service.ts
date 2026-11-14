@@ -20,6 +20,7 @@ import {
 } from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import { AuthSessionStore } from '../auth/session-store';
 import { R2Service, type StorageUsage } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import * as bcrypt from 'bcrypt';
@@ -802,6 +803,8 @@ export class AdminService {
         data: updateUserData,
       });
       forgetAuthUser(userId);
+      // A new password or role ends every session of the account.
+      if (this.redis) await new AuthSessionStore(this.redis).revokeAll(userId);
     }
 
     if (dto.fullName !== undefined || dto.phone !== undefined) {

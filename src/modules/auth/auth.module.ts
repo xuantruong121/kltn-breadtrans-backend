@@ -4,7 +4,7 @@ import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { getJwtSecret } from './auth.constants';
+import { ACCESS_TOKEN_TTL, getJwtSecret } from './auth.constants';
 import { EmailService } from '../../common/email/email.service';
 import { GoogleStrategy } from './strategies/google.strategy';
 
@@ -13,7 +13,7 @@ import { GoogleStrategy } from './strategies/google.strategy';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: getJwtSecret(),
-      signOptions: { expiresIn: '1h' }, // Access Token valid for 1 hour
+      signOptions: { expiresIn: ACCESS_TOKEN_TTL as any }, // 15 minutes
     }),
   ],
   controllers: [AuthController],
