@@ -352,6 +352,33 @@ const provider = {
     persistCounter();
     if (mode === 'failure')
       throw new Error('deterministic writing provider unavailable');
+    // Sentence translation ("Dịch câu"): MINOR by default; "[[correct]]",
+    // "[[wrong]]" or "[[fail]]" in the learner answer choose the outcome.
+    if (input.responseSchema?.required?.includes('verdict')) {
+      const t = JSON.parse(input.prompt) as {
+        acceptedTranslations: string[];
+        learnerAnswer: string;
+      };
+      if (/\[\[fail\]\]/.test(t.learnerAnswer))
+        throw new Error('deterministic writing provider unavailable');
+      const verdict = /\[\[correct\]\]/.test(t.learnerAnswer)
+        ? 'CORRECT'
+        : /\[\[wrong\]\]/.test(t.learnerAnswer)
+          ? 'WRONG'
+          : 'MINOR';
+      return {
+        model: 'deterministic',
+        text: JSON.stringify({
+          verdict,
+          correctedSentence: t.acceptedTranslations[0],
+          explanation:
+            verdict === 'CORRECT'
+              ? 'Câu dịch đúng nghĩa và đúng ngữ pháp.'
+              : 'Nhận xét tất định: câu còn thiếu hoặc sai một từ so với đáp án.',
+          errorTags: verdict === 'CORRECT' ? [] : ['ARTICLE'],
+        }),
+      };
+    }
     const data = JSON.parse(input.prompt) as {
       rubric: Array<{ key: string; max: number }>;
       learnerResponse: string;
