@@ -54,6 +54,10 @@ describe('tutor-prompt.logic', () => {
     expect(prompt).toContain('Không viết đáp án');
     expect(prompt).toContain('chờ người học trả lời');
     expect(prompt).toContain('Khi người học nộp câu trả lời');
+    // Checks before deciding; a correct sentence is never marked wrong.
+    expect(prompt).toContain('trước khi kết luận');
+    expect(prompt).toContain('kể cả khi khác câu bạn nghĩ trong đầu');
+    expect(prompt).toContain('Kết luận phải khớp với phần giải thích');
   });
 
   it('puts the item, the learner notes and the conversation before the question', () => {
