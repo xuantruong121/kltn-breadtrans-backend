@@ -316,10 +316,10 @@ export class WritingQuestionDto {
   @IsString()
   explanation?: string;
 
-  /** "Dịch câu": the English translations the check accepts. */
+  /** "Dịch câu": the English translations the check accepts (the review queue adds more). */
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(20)
   @IsString({ each: true })
   @MaxLength(400, { each: true })
   acceptedAnswers?: string[];

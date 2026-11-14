@@ -200,7 +200,7 @@ describe('Dịch câu in the skill CMS', () => {
     expect(await validate(ok)).toEqual([]);
     const tooMany = plainToInstance(WritingQuestionDto, {
       ...translationDto,
-      acceptedAnswers: Array.from({ length: 11 }, (_, i) => `Answer ${i}`),
+      acceptedAnswers: Array.from({ length: 21 }, (_, i) => `Answer ${i}`),
     });
     expect((await validate(tooMany)).map((e) => e.property)).toEqual([
       'acceptedAnswers',

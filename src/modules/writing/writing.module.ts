@@ -11,6 +11,8 @@ import {
   ToeicWritingSetController,
 } from './toeic-writing-set.controller';
 import { ToeicWritingSetService } from './toeic-writing-set.service';
+import { TranslationReviewController } from './translation-review.controller';
+import { TranslationReviewService } from './translation-review.service';
 
 @Module({
   imports: [
@@ -24,8 +26,9 @@ import { ToeicWritingSetService } from './toeic-writing-set.service';
     WritingController,
     AdminToeicWritingSetController,
     ToeicWritingSetController,
+    TranslationReviewController,
   ],
-  providers: [WritingService, ToeicWritingSetService],
+  providers: [WritingService, ToeicWritingSetService, TranslationReviewService],
   exports: [WritingService],
 })
 export class WritingModule {}
