@@ -296,7 +296,7 @@ describe('DungeonService', () => {
       10,
       'DUNGEON_WIN',
       `dungeon:${id}:win`,
-      expect.objectContaining({ isCapped: true }),
+      expect.objectContaining({ isCapped: true, bucket: 'ARENA' }),
     );
     await service.finish(1, id, true);
     expect(gamification.awardBanh).toHaveBeenCalledTimes(2);

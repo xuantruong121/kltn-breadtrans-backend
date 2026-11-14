@@ -165,7 +165,7 @@ describe('WordBlasterService', () => {
       50,
       'BLASTER_WIN',
       `blaster:${view.sessionId}:win`,
-      expect.objectContaining({ isCapped: true }),
+      expect.objectContaining({ isCapped: true, bucket: 'ARENA' }),
     );
     // A second finish pays nothing more.
     await service.finish(1, view.sessionId, false);

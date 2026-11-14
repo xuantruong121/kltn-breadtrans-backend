@@ -318,7 +318,11 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
         bonus,
         'BLASTER_WIN',
         `blaster:${session.id}:win`,
-        { isCapped: true, metadata: { sessionId: session.id } },
+        {
+          isCapped: true,
+          bucket: 'ARENA',
+          metadata: { sessionId: session.id },
+        },
       );
       bonusGranted = award.granted;
     }

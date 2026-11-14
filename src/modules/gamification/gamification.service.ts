@@ -400,6 +400,14 @@ export class GamificationService {
 
   /** Constants for the daily cap and daily quotas */
   static readonly MAX_DAILY_EARNABLE_BANH = 150;
+  /**
+   * Win bonuses of the Arena games that mint Bánh Mì (Pháo Bánh Mì, Hầm
+   * Bánh Mì) have their own daily cap (owner 2026-11-14): they no longer use
+   * up the 150 of study rewards, and study no longer leaves the games with
+   * nothing. Song Đấu moves Bánh Mì between players and has no cap.
+   */
+  static readonly MAX_DAILY_ARENA_BANH = 300;
+  static readonly ARENA_CAPPED_SOURCES = ['BLASTER_WIN', 'DUNGEON_WIN'];
   static readonly MAX_DAILY_VOCAB_REWARDS = 30;
   static readonly MAX_DAILY_SPEAKING_REWARDS = 3;
 
@@ -493,6 +501,8 @@ export class GamificationService {
     reference: string | null,
     options: {
       isCapped?: boolean; // false = exempt from daily cap (admin, refund, system)
+      /** Which daily cap a capped grant counts toward; study by default. */
+      bucket?: 'LEARNING' | 'ARENA';
       metadata?: Record<string, unknown>;
     } = {},
     externalTx?: Prisma.TransactionClient,
@@ -505,6 +515,10 @@ export class GamificationService {
     isCapped: boolean;
   }> {
     const isCapped = options.isCapped !== false;
+    const arena = isCapped && options.bucket === 'ARENA';
+    const dailyCap = arena
+      ? GamificationService.MAX_DAILY_ARENA_BANH
+      : GamificationService.MAX_DAILY_EARNABLE_BANH;
     const today = getTodayDateKey('Asia/Ho_Chi_Minh');
 
     const run = async (tx: Prisma.TransactionClient) => {
@@ -550,7 +564,7 @@ export class GamificationService {
         : requestedAmount;
 
       let granted = effectiveAmount;
-      let remaining = GamificationService.MAX_DAILY_EARNABLE_BANH;
+      let remaining = dailyCap;
 
       if (isCapped) {
         // Row-lock the daily earning row
@@ -568,14 +582,24 @@ export class GamificationService {
           FOR UPDATE
         `;
 
-        remaining = Math.max(
-          0,
-          GamificationService.MAX_DAILY_EARNABLE_BANH -
-            (dailyRow?.earnedBanh ?? 0),
-        );
+        // The row lock above also serialises Arena grants of the day; their
+        // total is read from the ledger, so no new column is needed.
+        const earnedToday = arena
+          ? ((
+              await tx.banhTransaction.aggregate({
+                where: {
+                  userId,
+                  dateKey: today,
+                  source: { in: GamificationService.ARENA_CAPPED_SOURCES },
+                },
+                _sum: { amount: true },
+              })
+            )._sum.amount ?? 0)
+          : (dailyRow?.earnedBanh ?? 0);
+        remaining = Math.max(0, dailyCap - earnedToday);
         granted = Math.min(effectiveAmount, remaining);
 
-        if (granted > 0) {
+        if (granted > 0 && !arena) {
           await tx.dailyBanhEarning.update({
             where: { userId_dateKey: { userId, dateKey: today } },
             data: { earnedBanh: { increment: granted } },
@@ -614,7 +638,11 @@ export class GamificationService {
           dateKey: today,
           isCapped,
           balanceAfter: updatedStats.totalBanhRan,
-          metadata: options.metadata ? (options.metadata as any) : undefined,
+          metadata: arena
+            ? ({ ...(options.metadata ?? {}), capBucket: 'ARENA' } as any)
+            : options.metadata
+              ? (options.metadata as any)
+              : undefined,
         },
       });
 
@@ -626,9 +654,7 @@ export class GamificationService {
         requested: requestedAmount,
         granted,
         rejected: requestedAmount - granted,
-        remainingDaily: isCapped
-          ? Math.max(0, remaining - granted)
-          : GamificationService.MAX_DAILY_EARNABLE_BANH,
+        remainingDaily: isCapped ? Math.max(0, remaining - granted) : dailyCap,
         newBalance: updatedStats.totalBanhRan,
         isCapped,
       };
