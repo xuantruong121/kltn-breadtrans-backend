@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { applyHttpSecurity } from '../../src/common/http/security';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../../src/app.module';
 import { AI_EVALUATOR_TOKEN } from '../../src/modules/ai/strategies/ai-evaluator.interface';
@@ -555,6 +556,7 @@ async function bootstrap() {
       deterministicReviewer('gemini'),
     ]);
   const app = moduleRef.createNestApplication({ rawBody: true });
+  applyHttpSecurity(app);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());

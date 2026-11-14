@@ -18,6 +18,7 @@
  *
  *   LIVE_AZURE_BUDGET=2 LIVE_AZURE_LOG=<file.jsonl> npx ts-node --transpile-only scripts/qa/speaking-live-azure-server.ts
  */
+import { applyHttpSecurity } from '../../src/common/http/security';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -262,6 +263,7 @@ async function bootstrap() {
     imports: [AppModule],
   }).compile();
   const app = moduleRef.createNestApplication({ rawBody: true });
+  applyHttpSecurity(app);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());

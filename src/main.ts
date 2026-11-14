@@ -11,8 +11,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import helmet from 'helmet';
-import type { NestExpressApplication } from '@nestjs/platform-express';
+import { applyHttpSecurity } from './common/http/security';
 
 function startPhase812RuntimeMetrics() {
   if (process.env.PHASE812_RUNTIME_METRICS !== 'true') return;
@@ -49,7 +48,7 @@ function startPhase812RuntimeMetrics() {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+  const app = await NestFactory.create(AppModule, {
     rawBody: true,
     logger: WinstonModule.createLogger({
       transports: [
@@ -66,24 +65,7 @@ async function bootstrap() {
     }),
   });
 
-  // Security headers (owner 2026-11-14). The API answers JSON, so no page
-  // CSP here (Swagger keeps working); media served from here may be embedded
-  // by the web app on another origin.
-  app.use(
-    helmet({
-      contentSecurityPolicy: false,
-      crossOriginResourcePolicy: { policy: 'cross-origin' },
-    }),
-  );
-  // Behind Caddy / Cloudflare: the client IP for rate limits comes from the
-  // proxy hop count in TRUST_PROXY (unset: trust nothing).
-  if (process.env.TRUST_PROXY)
-    app.set(
-      'trust proxy',
-      /^d+$/.test(process.env.TRUST_PROXY)
-        ? Number(process.env.TRUST_PROXY)
-        : process.env.TRUST_PROXY,
-    );
+  applyHttpSecurity(app);
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
