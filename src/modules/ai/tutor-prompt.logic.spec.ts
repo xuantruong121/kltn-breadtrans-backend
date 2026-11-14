@@ -48,6 +48,14 @@ describe('tutor-prompt.logic', () => {
     expect(prompt.endsWith('present perfect là gì?')).toBe(true);
   });
 
+  it('sets an exercise without its answer and grades the reply', () => {
+    const prompt = buildTutorPrompt({ message: 'có' });
+    expect(prompt).toContain('Khi ra bài tập');
+    expect(prompt).toContain('Không viết đáp án');
+    expect(prompt).toContain('chờ người học trả lời');
+    expect(prompt).toContain('Khi người học nộp câu trả lời');
+  });
+
   it('puts the item, the learner notes and the conversation before the question', () => {
     const prompt = buildTutorPrompt({
       message: 'Vì sao B sai?',
