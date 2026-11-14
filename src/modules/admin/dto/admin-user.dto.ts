@@ -1,21 +1,14 @@
-import {
-  IsEmail,
-  IsEnum,
-  IsOptional,
-  IsString,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { NewPassword } from '../../auth/password-policy';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'student@example.com' })
   @IsEmail({}, { message: 'Email không hợp lệ.' })
   email: string;
 
-  @ApiProperty({ example: 'password123', minLength: 6 })
-  @IsString({ message: 'Mật khẩu phải là chuỗi.' })
-  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự.' })
+  @NewPassword()
   password: string;
 
   @ApiProperty({ enum: Role, example: Role.STUDENT })
@@ -48,9 +41,7 @@ export class UpdateUserDto {
   @IsEnum(Role, { message: 'Vai trò không hợp lệ.' })
   role?: Role;
 
-  @ApiPropertyOptional({ example: 'newpassword123', minLength: 6 })
   @IsOptional()
-  @IsString({ message: 'Mật khẩu mới phải là chuỗi.' })
-  @MinLength(6, { message: 'Mật khẩu mới phải có ít nhất 6 ký tự.' })
+  @NewPassword()
   password?: string;
 }

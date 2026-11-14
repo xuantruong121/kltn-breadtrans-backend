@@ -1,12 +1,7 @@
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+import { NewPassword } from '../password-policy';
 
 /**
  * Accounts are keyed by e-mail; the API stores and looks it up trimmed and
@@ -24,10 +19,7 @@ export class RegisterDto {
   @NormalizeEmail()
   email: string;
 
-  @ApiProperty({ example: 'password123' })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự.' })
+  @NewPassword()
   password: string;
 
   @ApiProperty({ example: 'John Doe' })
@@ -95,10 +87,7 @@ export class ResetPasswordDto {
   @IsNotEmpty()
   token: string;
 
-  @ApiProperty({ example: 'NewStrongPassword123!', minLength: 8 })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(8, { message: 'Mật khẩu phải có ít nhất 8 ký tự.' })
+  @NewPassword()
   newPassword: string;
 }
 
@@ -108,10 +97,8 @@ export class ChangePasswordDto {
   @IsNotEmpty({ message: 'Vui lòng nhập mật khẩu hiện tại.' })
   currentPassword: string;
 
-  @ApiProperty({ example: 'NewStrongPassword123!' })
-  @IsString()
   @IsNotEmpty({ message: 'Vui lòng nhập mật khẩu mới.' })
-  @MinLength(8, { message: 'Mật khẩu mới cần có ít nhất 8 ký tự.' })
+  @NewPassword()
   newPassword: string;
 }
 
