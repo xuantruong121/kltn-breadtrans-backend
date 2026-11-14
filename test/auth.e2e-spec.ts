@@ -41,7 +41,7 @@ describe('AuthModule (e2e)', () => {
         .post('/auth/register')
         .send({
           email: 'test_e2e@breadtrans.com',
-          password: 'password123',
+          password: 'mot cum tu e2e test',
           fullName: 'Test E2E User',
         })
         .expect(201)
@@ -57,7 +57,7 @@ describe('AuthModule (e2e)', () => {
         .post('/auth/register')
         .send({
           email: 'test_e2e@breadtrans.com', // same email now in DB
-          password: 'password123',
+          password: 'mot cum tu e2e test',
           fullName: 'Test E2E User',
         })
         .expect(409);
@@ -68,7 +68,7 @@ describe('AuthModule (e2e)', () => {
         .post('/auth/register')
         .send({
           email: ' Test_E2E@BreadTrans.COM ',
-          password: 'password123',
+          password: 'mot cum tu e2e test',
           fullName: 'Test E2E User',
         })
         .expect(409);
@@ -81,7 +81,7 @@ describe('AuthModule (e2e)', () => {
         .post('/auth/login')
         .send({
           email: ' Test_E2E@BreadTrans.COM ',
-          password: 'password123',
+          password: 'mot cum tu e2e test',
         })
         .expect(200)
         .expect((res) => {
@@ -94,7 +94,7 @@ describe('AuthModule (e2e)', () => {
         .post('/auth/login')
         .send({
           email: 'test_e2e@breadtrans.com',
-          password: 'password123',
+          password: 'mot cum tu e2e test',
         })
         .expect(200)
         .expect((res) => {
