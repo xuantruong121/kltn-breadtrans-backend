@@ -90,8 +90,22 @@ export class SystemJobsScheduler implements OnModuleInit {
     await this.jobs.enqueueR2Cleanup(getBusinessWeekKey());
   }
 
-  @Cron('15 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  // Daily off-site copy (owner 2026-11-16: daily, not hourly), two minutes
+  // after the 00:00 dump; the dump takes a few seconds.
+  @Cron('2 0 * * *', { timeZone: BUSINESS_TIMEZONE })
   async enqueueDatabaseBackupR2Sync(): Promise<void> {
-    await this.jobs.enqueueDatabaseBackupR2Sync();
+    await this.jobs.enqueueDatabaseBackupR2Sync(
+      `day-${getBusinessDayKey(new Date())}`,
+    );
+  }
+
+  // A dump made after a cold start (machine off at midnight) should not wait
+  // a day for R2. Local check only; R2 is called only when a file is new.
+  @Cron('20 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  async enqueuePendingDatabaseBackupR2Sync(): Promise<void> {
+    const now = new Date();
+    await this.jobs.enqueueDatabaseBackupR2SyncIfPending(
+      `pending-${getBusinessDayKey(now)}-${Math.floor(now.getTime() / 3_600_000)}`,
+    );
   }
 }

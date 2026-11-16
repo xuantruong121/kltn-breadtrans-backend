@@ -20,6 +20,11 @@ describe('SystemJobsScheduler', () => {
     expect(cronOf('enqueueR2Cleanup')).toBe('1 0 * * 0');
   });
 
+  it('copies backups to R2 once a day at 00:02, plus an hourly local-only check', () => {
+    expect(cronOf('enqueueDatabaseBackupR2Sync')).toBe('2 0 * * *');
+    expect(cronOf('enqueuePendingDatabaseBackupR2Sync')).toBe('20 * * * *');
+  });
+
   describe('startup catch-up', () => {
     const jobs = () => ({
       enqueueDaily: jest.fn(),

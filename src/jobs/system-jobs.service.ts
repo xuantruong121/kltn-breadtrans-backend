@@ -153,6 +153,15 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  /** Enqueues an R2 sync only when a local dump is not uploaded yet. */
+  async enqueueDatabaseBackupR2SyncIfPending(
+    syncKey: string,
+  ): Promise<boolean> {
+    if (!this.dbBackupSync.hasUnsyncedLocalDumps()) return false;
+    await this.enqueueDatabaseBackupR2Sync(syncKey);
+    return true;
+  }
+
   async enqueueDatabaseBackupR2Sync(syncKey?: string): Promise<void> {
     const key = syncKey ?? new Date().toISOString().slice(0, 13);
     await this.enqueue(

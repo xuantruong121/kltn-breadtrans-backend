@@ -13,6 +13,66 @@ describe('DatabaseBackupR2SyncService', () => {
     process.env = originalEnv;
   });
 
+  describe('hasUnsyncedLocalDumps (hourly local-only check)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs') as typeof import('fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { join } = require('path') as typeof import('path');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { tmpdir } = require('os') as typeof import('os');
+    let dir: string;
+
+    beforeEach(() => {
+      dir = fs.mkdtempSync(join(tmpdir(), 'r2-pending-'));
+      jest.spyOn(service, 'getBackupDirs').mockReturnValue([dir]);
+      jest
+        .spyOn(service, 'getCatalogPath')
+        .mockReturnValue(join(dir, 'backup-catalog.json'));
+    });
+    afterEach(() => {
+      jest.restoreAllMocks();
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    const catalog = (backups: object[]) =>
+      fs.writeFileSync(
+        join(dir, 'backup-catalog.json'),
+        JSON.stringify({ schemaVersion: 1, updatedAt: '', backups }),
+      );
+
+    it('is false with no dump, or only empty and partial files', () => {
+      expect(service.hasUnsyncedLocalDumps()).toBe(false);
+      fs.writeFileSync(join(dir, 'kltn_db_20261116_170000.dump'), '');
+      fs.writeFileSync(join(dir, 'kltn_db_20261116_170001.dump.partial'), 'x');
+      expect(service.hasUnsyncedLocalDumps()).toBe(false);
+    });
+
+    it('is true for a dump the catalog has not seen uploaded at that size', () => {
+      fs.writeFileSync(join(dir, 'kltn_db_20261116_170000.dump'), 'abcd');
+      expect(service.hasUnsyncedLocalDumps()).toBe(true);
+      catalog([
+        {
+          dumpFile: 'kltn_db_20261116_170000.dump',
+          r2UploadVerified: true,
+          bytes: 3,
+        },
+      ]);
+      expect(service.hasUnsyncedLocalDumps()).toBe(true);
+    });
+
+    it('is false once every dump is recorded as uploaded', () => {
+      fs.writeFileSync(join(dir, 'kltn_db_20261116_170000.dump'), 'abcd');
+      catalog([
+        {
+          dumpFile: 'kltn_db_20261116_170000.dump',
+          r2UploadVerified: true,
+          bytes: 4,
+        },
+      ]);
+      expect(service.hasUnsyncedLocalDumps()).toBe(false);
+    });
+  });
+
   describe('getClient validation', () => {
     it('returns null if any R2_BACKUP credential is missing', () => {
       delete process.env.R2_BACKUP_BUCKET_NAME;
