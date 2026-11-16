@@ -136,6 +136,10 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
     expect(
       await prisma.banhTransaction.count({ where: { userId: shell.id } }),
     ).toBe(1);
+    // The shell itself cannot be purged again.
+    await expect(service.purgeUser(shell.id)).rejects.toThrow(
+      'Tài khoản này đã được ẩn danh.',
+    );
   });
 
   it('runDue purges only accounts past their date', async () => {

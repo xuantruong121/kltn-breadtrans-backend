@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { Prisma } from '@prisma/client';
@@ -70,10 +75,15 @@ export class AccountPurgeService {
     const files = await this.filesOf(userId);
 
     const outcome = await this.prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRaw<Array<{ id: number }>>`
-        SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+      const locked = await tx.$queryRaw<
+        Array<{ id: number; anonymizedAt: Date | null }>
+      >`
+        SELECT id, "anonymizedAt" FROM "User" WHERE id = ${userId} FOR UPDATE`;
       if (!locked.length)
         throw new NotFoundException('Người dùng không tồn tại');
+      // A shell already holds only kept records: nothing personal left.
+      if (locked[0].anonymizedAt)
+        throw new BadRequestException('Tài khoản này đã được ẩn danh.');
 
       // Exam links to the learner's submissions have a Restrict key: first.
       await tx.toeicAssessmentSpeakingSubmission.deleteMany({
