@@ -5,7 +5,11 @@ import { JwtService } from '@nestjs/jwt';
 import { createMockContext, MockContext } from '../../prisma/prisma.mock';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
 import { getOtpSecret } from './auth.constants';
@@ -80,6 +84,7 @@ describe('AuthService', () => {
           email: 'test@example.com',
           password: '123',
           fullName: 'Test',
+          acceptTerms: true,
         }),
       ).rejects.toThrow(ConflictException);
     });
@@ -93,11 +98,15 @@ describe('AuthService', () => {
         profile: { fullName: 'Test User' },
       } as any);
 
-      const result = await service.register({
-        email: 'test@example.com',
-        password: '123456',
-        fullName: 'Test User',
-      });
+      const result = await service.register(
+        {
+          email: 'test@example.com',
+          password: '123456',
+          fullName: 'Test User',
+          acceptTerms: true,
+        },
+        { ip: '203.0.113.7', userAgent: 'Jest' },
+      );
 
       expect(result).not.toHaveProperty('password');
       expect(mockCtx.prisma.user.create).toHaveBeenCalledWith(
@@ -105,6 +114,23 @@ describe('AuthService', () => {
           data: expect.objectContaining({
             role: Role.STUDENT,
             emailVerifiedAt: expect.any(Date),
+            // Consent evidence is written with the account (owner 2026-11-16).
+            consents: {
+              create: [
+                expect.objectContaining({
+                  document: 'TERMS',
+                  version: '2026-11-16',
+                  method: 'EMAIL_SIGNUP',
+                  ip: '203.0.113.7',
+                  userAgent: 'Jest',
+                }),
+                expect.objectContaining({
+                  document: 'PRIVACY',
+                  version: '2026-11-16',
+                  method: 'EMAIL_SIGNUP',
+                }),
+              ],
+            },
           }),
         }),
       );
@@ -160,6 +186,81 @@ describe('AuthService', () => {
 
       expect(result).toHaveProperty('access_token', 'mock-jwt-token');
       expect(result.user).toHaveProperty('email', 'test@example.com');
+    });
+
+    // Owner 2026-11-16: an account waiting for deletion gets no session, but
+    // the right password hands out a one-time token to cancel the deletion.
+    it('answers 403 ACCOUNT_PENDING_DELETION with a cancel token, no session', async () => {
+      const scheduled = new Date('2026-11-23T10:00:00.000Z');
+      mockCtx.prisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        email: 'test@example.com',
+        password: 'hashedPassword',
+        role: Role.STUDENT,
+        deletionRequestedAt: new Date('2026-11-16T10:00:00.000Z'),
+        deletionScheduledAt: scheduled,
+        anonymizedAt: null,
+      } as any);
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+
+      const error = await service
+        .login({ email: 'test@example.com', password: 'password' }, 'dev')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      const body = error.getResponse();
+      expect(body).toMatchObject({
+        code: 'ACCOUNT_PENDING_DELETION',
+        scheduledAt: scheduled.toISOString(),
+      });
+      expect(body.cancelToken).toMatch(/^[0-9a-f]{48}$/);
+      expect(redisMock.set).toHaveBeenCalledWith(
+        `account:deletion:cancel:${body.cancelToken}`,
+        '1',
+        'EX',
+        600,
+      );
+      expect(mockCtx.prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('a wrong password on a pending account reveals nothing', async () => {
+      mockCtx.prisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        email: 'test@example.com',
+        password: 'hashedPassword',
+        role: Role.STUDENT,
+        deletionRequestedAt: new Date(),
+        deletionScheduledAt: new Date(),
+      } as any);
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+      await expect(
+        service.login({ email: 'test@example.com', password: 'x' }, 'dev'),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(redisMock.set).not.toHaveBeenCalledWith(
+        expect.stringMatching(/^account:deletion:cancel:/),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('an anonymous shell cannot sign in', async () => {
+      mockCtx.prisma.user.findUnique.mockResolvedValue({
+        id: 2,
+        email: 'deleted-1-1@deleted.invalid',
+        password: 'hashedPassword',
+        role: Role.STUDENT,
+        anonymizedAt: new Date(),
+      } as any);
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+
+      await expect(
+        service.login(
+          { email: 'deleted-1-1@deleted.invalid', password: 'x' },
+          'dev',
+        ),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -255,12 +356,46 @@ describe('AuthService', () => {
         },
       } as any);
 
-      const res = await service.loginWithGoogle({
-        credential: 'valid-id-token',
-        deviceId: 'device-abc',
+      // No consent yet: nothing is created (owner 2026-11-16).
+      await expect(
+        service.loginWithGoogle({
+          credential: 'valid-id-token',
+          deviceId: 'device-abc',
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'CONSENT_REQUIRED' },
       });
+      expect(mockCtx.prisma.user.create).not.toHaveBeenCalled();
+
+      const res = await service.loginWithGoogle(
+        {
+          credential: 'valid-id-token',
+          deviceId: 'device-abc',
+          acceptTerms: true,
+        },
+        { ip: '198.51.100.2', userAgent: 'Jest' },
+      );
 
       expect(res).toHaveProperty('access_token');
+      expect(mockCtx.prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            consents: {
+              create: [
+                expect.objectContaining({
+                  document: 'TERMS',
+                  method: 'GOOGLE_SIGNUP',
+                  ip: '198.51.100.2',
+                }),
+                expect.objectContaining({
+                  document: 'PRIVACY',
+                  method: 'GOOGLE_SIGNUP',
+                }),
+              ],
+            },
+          }),
+        }),
+      );
       expect(res).toHaveProperty('refresh_token');
       expect(res.user.role).toBe(Role.STUDENT);
       expect(mockCtx.prisma.user.create).toHaveBeenCalledWith(

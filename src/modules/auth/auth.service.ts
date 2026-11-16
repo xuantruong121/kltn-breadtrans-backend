@@ -4,6 +4,7 @@ import {
   Logger,
   UnauthorizedException,
   ConflictException,
+  ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -27,9 +28,26 @@ import {
 } from './auth.constants';
 import { AuthSessionStore } from './session-store';
 import { LoginGuard, OTP_MAX_ATTEMPTS } from './login-guard';
+import {
+  CONSENT_REQUIRED_CODE,
+  CONSENT_REQUIRED_MESSAGE,
+  LEGAL_VERSION,
+  consentRequired,
+  consentRows,
+} from './legal-consent';
+import {
+  CANCEL_TOKEN_TTL_SECONDS,
+  PENDING_DELETION_CODE,
+  cancelTokenKey,
+} from '../account/account-deletion.logic';
 
 /** What the controller knows about the device signing in. */
-export type DeviceMeta = { userAgent?: string | null; remember?: boolean };
+export type DeviceMeta = {
+  userAgent?: string | null;
+  remember?: boolean;
+  /** Client IP, recorded with a consent. */
+  ip?: string | null;
+};
 import { Role } from '@prisma/client';
 import { GoogleProfile } from './strategies/google.strategy';
 import { OAuth2Client } from 'google-auth-library';
@@ -55,13 +73,15 @@ export class AuthService {
   /** Refresh sessions per device (hashed tokens, a set per user). */
   readonly sessions: AuthSessionStore;
 
-  async register(registerDto: RegisterDto) {
+  async register(registerDto: RegisterDto, meta: DeviceMeta = {}) {
     const { email, password, fullName } = registerDto;
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
     if (existingUser) throw new ConflictException('Email này đã được đăng ký.');
     const hashedPassword = await bcrypt.hash(password, 12);
+    // The DTO requires acceptTerms === true; the acceptance is stored with the
+    // account, in the same write (owner 2026-11-16).
     const user = await this.prisma.user.create({
       data: {
         email,
@@ -69,6 +89,7 @@ export class AuthService {
         role: Role.STUDENT,
         emailVerifiedAt: new Date(),
         profile: { create: { fullName } },
+        consents: { create: consentRows('EMAIL_SIGNUP', meta) },
       },
       include: { profile: true },
     });
@@ -168,6 +189,7 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác.');
     }
     await this.loginGuard.recordSuccess(email);
+    await this.assertNotPendingDeletion(user);
 
     // Update login count and last login timestamp
     await this.prisma.user.update({
@@ -212,7 +234,7 @@ export class AuthService {
       where: { id: userId },
       include: { profile: true },
     });
-    if (!user) throw invalid();
+    if (!user || user.deletionRequestedAt || user.anonymizedAt) throw invalid();
 
     const next = this.signRefresh(user.id, deviceId);
     const result = await this.sessions.rotate(
@@ -238,6 +260,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         profile: user.profile,
+        consentRequired: await this.consentRequiredFor(user.id),
       },
     };
   }
@@ -390,12 +413,11 @@ export class AuthService {
     const avatar = payload.picture || null;
     const deviceId = dto.deviceId || crypto.randomUUID();
 
-    const user = await this.resolveGoogleUser({
-      providerId: googleSub,
-      email,
-      fullName,
-      avatar,
-    });
+    const profile = { providerId: googleSub, email, fullName, avatar };
+    const user =
+      (await this.findGoogleUser(profile)) ??
+      (await this.createGoogleUser(profile, dto.acceptTerms === true, meta));
+    await this.assertNotPendingDeletion(user);
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
@@ -458,6 +480,7 @@ export class AuthService {
     }
 
     const deviceId = dto.deviceId || crypto.randomUUID();
+    await this.assertNotPendingDeletion(user);
 
     const linkedAccount = await this.prisma.authAccount.findUnique({
       where: {
@@ -504,27 +527,56 @@ export class AuthService {
    * always STUDENT and existing email accounts are linked by verified email.
    */
   async createGoogleLoginCode(profile: GoogleProfile, deviceId: string) {
-    const user = await this.getOrCreateGoogleUser(profile);
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
-    });
+    // An unknown Google account is not created here: the learner has not
+    // consented yet. The code carries the profile; the exchange creates the
+    // account once the consent box was ticked (owner 2026-11-16).
+    const user = await this.findGoogleUser(profile);
+    if (user)
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
+      });
     const code = crypto.randomBytes(32).toString('hex');
     await this.redis.set(
       `auth:google:code:${code}`,
-      JSON.stringify({ userId: user.id, deviceId }),
+      JSON.stringify(
+        user ? { userId: user.id, deviceId } : { pending: profile, deviceId },
+      ),
       'EX',
       60,
     );
     return code;
   }
 
-  async exchangeGoogleLoginCode(code: string, meta: DeviceMeta = {}) {
+  async exchangeGoogleLoginCode(
+    code: string,
+    meta: DeviceMeta = {},
+    acceptTerms = false,
+  ) {
     const key = `auth:google:code:${code}`;
     const raw = await this.redis.getdel(key);
     if (!raw)
       throw new UnauthorizedException('Mã đăng nhập Google đã hết hạn.');
-    const payload = JSON.parse(raw) as { userId: number; deviceId: string };
+    const payload = JSON.parse(raw) as {
+      userId?: number;
+      pending?: GoogleProfile;
+      deviceId: string;
+    };
+    if (payload.pending) {
+      if (!acceptTerms) {
+        // Kept for a few minutes so the learner can tick the box and resend.
+        await this.redis.set(key, raw, 'EX', 300);
+        throw new ConflictException({
+          code: CONSENT_REQUIRED_CODE,
+          message: CONSENT_REQUIRED_MESSAGE,
+        });
+      }
+      const created = await this.createGoogleUser(payload.pending, true, meta);
+      return this.issueTokens(created, payload.deviceId, {
+        ...meta,
+        remember: true,
+      });
+    }
     const user = await this.prisma.user.findUnique({
       where: { id: payload.userId },
       include: { profile: true },
@@ -532,18 +584,61 @@ export class AuthService {
     if (!user || (user.role !== Role.STUDENT && user.role !== Role.ADMIN)) {
       throw new UnauthorizedException('Tài khoản không còn hợp lệ.');
     }
+    await this.assertNotPendingDeletion(user);
     return this.issueTokens(user, payload.deviceId, {
       ...meta,
       remember: true,
     });
   }
 
-  private async getOrCreateGoogleUser(profile: GoogleProfile) {
-    return this.resolveGoogleUser(profile);
+  /**
+   * A new account from a Google profile, only with consent: without it,
+   * 409 CONSENT_REQUIRED and nothing is created.
+   */
+  private async createGoogleUser(
+    rawProfile: GoogleProfile,
+    acceptTerms: boolean,
+    meta: DeviceMeta,
+  ) {
+    if (!acceptTerms)
+      throw new ConflictException({
+        code: CONSENT_REQUIRED_CODE,
+        message: CONSENT_REQUIRED_MESSAGE,
+      });
+    const profile = {
+      ...rawProfile,
+      email: rawProfile.email.trim().toLowerCase(),
+    };
+    // No password: the learner never chose one. Password login stays closed
+    // (it rejects a null password) until they set one via "Quên mật khẩu",
+    // and the account page hides "Đổi mật khẩu" while it is null.
+    return this.prisma.user.create({
+      data: {
+        email: profile.email,
+        password: null,
+        role: Role.STUDENT,
+        emailVerifiedAt: new Date(),
+        profile: {
+          create: { fullName: profile.fullName, avatar: profile.avatar },
+        },
+        authAccounts: {
+          create: {
+            provider: 'GOOGLE',
+            providerAccountId: profile.providerId,
+          },
+        },
+        consents: { create: consentRows('GOOGLE_SIGNUP', meta) },
+      },
+      include: { profile: true },
+    });
   }
 
-  /** Shared account resolution for GIS and Passport OAuth callbacks. */
-  private async resolveGoogleUser(rawProfile: GoogleProfile) {
+  /**
+   * The account a Google profile signs in to, or null when none exists yet.
+   * Shared by GIS and the Passport callback. An e-mail already used by a
+   * password account asks for linking instead.
+   */
+  private async findGoogleUser(rawProfile: GoogleProfile) {
     // Same e-mail key as password accounts (see NormalizeEmail).
     const profile = {
       ...rawProfile,
@@ -581,28 +676,7 @@ export class AuthService {
           'Email này đã tồn tại trong hệ thống. Hãy xác nhận mật khẩu để liên kết tài khoản Google.',
       });
     }
-
-    // No password: the learner never chose one. Password login stays closed
-    // (it rejects a null password) until they set one via "Quên mật khẩu",
-    // and the account page hides "Đổi mật khẩu" while it is null.
-    return this.prisma.user.create({
-      data: {
-        email: profile.email,
-        password: null,
-        role: Role.STUDENT,
-        emailVerifiedAt: new Date(),
-        profile: {
-          create: { fullName: profile.fullName, avatar: profile.avatar },
-        },
-        authAccounts: {
-          create: {
-            provider: 'GOOGLE',
-            providerAccountId: profile.providerId,
-          },
-        },
-      },
-      include: { profile: true },
-    });
+    return null;
   }
 
   private signAccess(
@@ -652,7 +726,69 @@ export class AuthService {
         email: user.email,
         role: user.role,
         profile: user.profile,
+        consentRequired: await this.consentRequiredFor(user.id),
       },
+    };
+  }
+
+  /**
+   * A sign-in that proved who the user is, on an account waiting for
+   * deletion: 403 ACCOUNT_PENDING_DELETION with the date and a one-time
+   * cancel token, no session (owner 2026-11-16).
+   */
+  private async assertNotPendingDeletion(user: {
+    id: number;
+    deletionRequestedAt?: Date | null;
+    deletionScheduledAt?: Date | null;
+    anonymizedAt?: Date | null;
+  }) {
+    if (user.anonymizedAt)
+      throw new UnauthorizedException('Tài khoản không còn hợp lệ.');
+    if (!user.deletionRequestedAt) return;
+    const cancelToken = crypto.randomBytes(24).toString('hex');
+    await this.redis.set(
+      cancelTokenKey(cancelToken),
+      String(user.id),
+      'EX',
+      CANCEL_TOKEN_TTL_SECONDS,
+    );
+    throw new ForbiddenException({
+      code: PENDING_DELETION_CODE,
+      message: 'Tài khoản đang chờ xoá. Bạn có thể huỷ yêu cầu xoá.',
+      scheduledAt: user.deletionScheduledAt?.toISOString() ?? null,
+      cancelToken,
+    });
+  }
+
+  /** Whether the user still has to accept the current terms and privacy policy. */
+  async consentRequiredFor(userId: number): Promise<boolean> {
+    const consents = await this.prisma.userConsent.findMany({
+      where: { userId, version: LEGAL_VERSION },
+      select: { document: true, version: true },
+    });
+    return consentRequired(consents ?? []);
+  }
+
+  /** Records consent given after sign-up (older account or new documents). */
+  async acceptConsent(userId: number, meta: DeviceMeta = {}) {
+    if (await this.consentRequiredFor(userId))
+      await this.prisma.userConsent.createMany({
+        data: consentRows('PROMPT', meta).map((row) => ({ ...row, userId })),
+      });
+    return { consentRequired: false, version: LEGAL_VERSION };
+  }
+
+  /** The user's own consent history, newest first. */
+  async listConsents(userId: number) {
+    const rows = await this.prisma.userConsent.findMany({
+      where: { userId },
+      orderBy: { acceptedAt: 'desc' },
+      select: { document: true, version: true, method: true, acceptedAt: true },
+    });
+    return {
+      currentVersion: LEGAL_VERSION,
+      consentRequired: consentRequired(rows),
+      consents: rows,
     };
   }
 

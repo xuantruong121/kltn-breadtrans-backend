@@ -147,6 +147,10 @@ describeWithIsolatedDatabaseAndRedis(
     afterAll(async () => {
       try {
         if (testUserId) {
+          // Ledger rows keep a Restrict key to User (soft-delete rule): test junk goes first.
+          await prisma.banhTransaction.deleteMany({
+            where: { userId: testUserId },
+          });
           await prisma.user.delete({ where: { id: testUserId } });
         }
         if (testExerciseId) {
@@ -418,6 +422,7 @@ describeWithIsolatedDatabaseAndRedis(
       });
       expect(subFinal?.rewardStatus).toBe('COMPLETED');
 
+      await prisma.banhTransaction.deleteMany({ where: { userId: user3.id } });
       await prisma.user.delete({ where: { id: user3.id } });
       await prisma.speakingExercise.delete({ where: { id: readAloud.id } });
     });
@@ -522,6 +527,7 @@ describeWithIsolatedDatabaseAndRedis(
       });
       expect(recheckUserBadges.length).toBe(1);
 
+      await prisma.banhTransaction.deleteMany({ where: { userId: user.id } });
       await prisma.user.delete({ where: { id: user.id } });
       await prisma.speakingExercise.deleteMany({
         where: { id: { in: earlier.map((exercise) => exercise.id) } },

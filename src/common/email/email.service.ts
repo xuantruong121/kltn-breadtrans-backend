@@ -45,6 +45,11 @@ export class EmailService {
     return this.send(to, subject, html);
   }
 
+  /** The account will be deleted on a date; signing in before it cancels. HTML escaped by the caller. */
+  sendAccountDeletionScheduled(to: string, html: string): Promise<void> {
+    return this.send(to, 'BreadTrans - Tài khoản sẽ bị xoá', html);
+  }
+
   /** A personal win-back discount, a few days after a paid plan ended. */
   sendWinbackOffer(to: string, subject: string, html: string): Promise<void> {
     return this.send(to, subject, html);

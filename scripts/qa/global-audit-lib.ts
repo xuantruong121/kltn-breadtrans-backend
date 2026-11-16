@@ -150,6 +150,14 @@ export async function destroyQaLearner(userId: number) {
     .catch(ignore);
   await prisma.toeicAttempt.deleteMany({ where: { userId } }).catch(ignore);
   await prisma.subscription.deleteMany({ where: { userId } }).catch(ignore);
+  // QA junk only: the ledger and orders keep a Restrict key to User
+  // (soft-delete rule, owner 2026-11-16), so they go before the account.
+  await prisma.marketPhysicalRedemption
+    .deleteMany({ where: { userId } })
+    .catch(ignore);
+  await prisma.marketOrder.deleteMany({ where: { userId } }).catch(ignore);
+  await prisma.banhTransaction.deleteMany({ where: { userId } }).catch(ignore);
+  await prisma.promoRedemption.deleteMany({ where: { userId } }).catch(ignore);
   await prisma.user.delete({ where: { id: userId } }).catch(ignore);
 }
 

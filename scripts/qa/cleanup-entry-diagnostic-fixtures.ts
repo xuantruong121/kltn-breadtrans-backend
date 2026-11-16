@@ -21,6 +21,8 @@ async function main() {
   });
   for (const user of users) {
     await prisma.subscription.deleteMany({ where: { userId: user.id } });
+    // QA junk: the ledger keeps a Restrict key to User (soft-delete rule).
+    await prisma.banhTransaction.deleteMany({ where: { userId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });
   }
   console.log(JSON.stringify({ prefix, deleted: users }, null, 2));

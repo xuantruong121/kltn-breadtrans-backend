@@ -41,4 +41,42 @@ describe('HttpExceptionFilter', () => {
     const body = run(new HttpException('Không tìm thấy', HttpStatus.NOT_FOUND));
     expect(body).not.toHaveProperty('quota');
   });
+
+  it('passes a client-facing code through, with the pending-deletion values (owner 2026-11-16)', () => {
+    const link = run(
+      new HttpException(
+        { code: 'ACCOUNT_LINK_REQUIRED', message: 'Hãy xác nhận mật khẩu.' },
+        HttpStatus.UNAUTHORIZED,
+      ),
+    );
+    expect(link).toMatchObject({
+      code: 'ACCOUNT_LINK_REQUIRED',
+      message: 'Hãy xác nhận mật khẩu.',
+    });
+
+    const pending = run(
+      new HttpException(
+        {
+          code: 'ACCOUNT_PENDING_DELETION',
+          message: 'Tài khoản đang chờ xoá.',
+          scheduledAt: '2026-11-23T10:00:00.000Z',
+          cancelToken: 'abc',
+          secret: 'never sent',
+        },
+        HttpStatus.FORBIDDEN,
+      ),
+    );
+    expect(pending).toMatchObject({
+      code: 'ACCOUNT_PENDING_DELETION',
+      scheduledAt: '2026-11-23T10:00:00.000Z',
+      cancelToken: 'abc',
+    });
+    expect(pending).not.toHaveProperty('secret');
+  });
+
+  it('sends no code with a plain error', () => {
+    const body = run(new HttpException('Không tìm thấy', HttpStatus.NOT_FOUND));
+    expect(body).not.toHaveProperty('code');
+    expect(body).not.toHaveProperty('cancelToken');
+  });
 });

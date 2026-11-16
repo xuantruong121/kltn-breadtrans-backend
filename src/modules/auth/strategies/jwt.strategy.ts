@@ -39,15 +39,28 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   private async currentUser(id: number) {
     const cached = cachedAuthUser(id);
     if (cached !== undefined) return cached;
-    const user = await this.prisma.user.findUnique({
+    const row = await this.prisma.user.findUnique({
       where: { id },
       select: {
         id: true,
         email: true,
         role: true,
         mustChangePassword: true,
+        deletionRequestedAt: true,
+        anonymizedAt: true,
       },
     });
+    // An account waiting for deletion, or an anonymous shell, has no session
+    // (owner 2026-11-16): treated as missing.
+    const user =
+      row && !row.deletionRequestedAt && !row.anonymizedAt
+        ? {
+            id: row.id,
+            email: row.email,
+            role: row.role,
+            mustChangePassword: row.mustChangePassword,
+          }
+        : null;
     rememberAuthUser(id, user);
     return user;
   }

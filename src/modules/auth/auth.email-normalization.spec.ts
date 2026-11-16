@@ -64,12 +64,14 @@ describe('auth e-mail normalisation', () => {
       {} as any,
       {} as any,
     );
-    await service.resolveGoogleUser({
+    const profile = {
       providerId: 'g-1',
       email: 'Student.Name@Example.COM',
       fullName: 'A B',
       avatar: null,
-    });
+    };
+    expect(await service.findGoogleUser(profile)).toBeNull();
+    await service.createGoogleUser(profile, true, {});
     expect(prisma.user.findUnique.mock.calls[0][0].where.email).toBe(KEY);
     expect(prisma.user.create.mock.calls[0][0].data.email).toBe(KEY);
   });

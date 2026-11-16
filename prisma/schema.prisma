@@ -158,10 +158,18 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  // Self-service deletion (owner 2026-11-16): locked at request, purged or
+  // anonymised once deletionScheduledAt passes. anonymizedAt marks a shell
+  // kept only to hold orders and payments.
+  deletionRequestedAt DateTime?
+  deletionScheduledAt DateTime?
+  anonymizedAt        DateTime?
+
   // Core Relations
   profile      Profile?
   stats        UserStats?
   authAccounts AuthAccount[]
+  consents     UserConsent[]
 
   // Other Relations
   submissions                     Submission[]
@@ -232,6 +240,25 @@ model User {
   learnerMistakes                 LearnerMistake[]
   learnerMistakeIngests           LearnerMistakeIngest[]
   learningPlanItems               LearningPlanItem[]
+}
+
+/// Evidence of consent (owner 2026-11-16): who accepted which document, which
+/// version, when, how, from where. One row per document per acceptance.
+model UserConsent {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// TERMS | PRIVACY
+  document   String   @db.VarChar(16)
+  /// The documents' "Cập nhật ngày" date, e.g. 2026-11-16
+  version    String   @db.VarChar(16)
+  /// EMAIL_SIGNUP | GOOGLE_SIGNUP | PROMPT
+  method     String   @db.VarChar(16)
+  ip         String?  @db.VarChar(64)
+  userAgent  String?  @db.VarChar(255)
+  acceptedAt DateTime @default(now())
+
+  @@index([userId, document])
 }
 
 model AuthAccount {
@@ -732,15 +759,15 @@ model ListeningDiagnosticClip {
 }
 
 model Submission {
-  id              Int      @id @default(autoincrement())
+  id              Int          @id @default(autoincrement())
   quizId          Int
-  quiz            Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quiz            Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
   userId          Int
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clientAttemptId String?  @db.VarChar(36)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientAttemptId String?      @db.VarChar(36)
   score           Float?
-  submittedAt     DateTime @default(now())
-  aiFeedback      String?  @db.Text
+  submittedAt     DateTime     @default(now())
+  aiFeedback      String?      @db.Text
   // Guided rewrite: a revision points at the first submission of its chain.
   revisionOfId    Int?
   revisionOf      Submission?  @relation("SubmissionRevisions", fields: [revisionOfId], references: [id], onDelete: Cascade)
@@ -1507,7 +1534,7 @@ model MarketProduct {
 model MarketOrder {
   id                  Int                        @id @default(autoincrement())
   userId              Int
-  user                User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User                       @relation(fields: [userId], references: [id], onDelete: Restrict) // soft-delete rule (owner 2026-11-16): never lost with the user
   studentName         String
   items               Json // Array of item objects
   totalK              Float
@@ -1546,7 +1573,7 @@ model UserShippingProfile {
 model MarketPhysicalRedemption {
   id               Int         @id @default(autoincrement())
   userId           Int
-  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User        @relation(fields: [userId], references: [id], onDelete: Restrict) // soft-delete rule (owner 2026-11-16): never lost with the user
   orderId          Int
   order            MarketOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId        Int
@@ -2504,7 +2531,7 @@ model DailyBanhEarning {
 model BanhTransaction {
   id           Int      @id @default(autoincrement())
   userId       Int
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Restrict) // soft-delete rule (owner 2026-11-16): never lost with the user
   amount       Int // Positive = credit, Negative = debit
   source       String // VOCAB_MASTERY | QUIZ_FIRST_COMPLETION | QUIZ_RETAKE | TOEIC_COMPLETION | TOEIC_PRACTICE | SPEAKING_SUBMISSION | GRAMMAR_COMPLETION | ASSIGNMENT_COMPLETION | DAILY_QUEST | PET_FEED | MARKET_PURCHASE | MARKET_REFUND | ADMIN_ADJUSTMENT | ARENA_WIN | ARENA_STAKE | ARENA_REFUND | GAME_REWARD | CONTENT_COMPLETION | DIAGNOSTIC_COMPLETION | SEED_FIXTURE (dev/demo seed opening balances only — never written by runtime code) | LEGACY_RECONCILIATION (one-time compensating entry that reconciles the ledger to a pre-existing UserStats.totalBanhRan without ever changing that balance — see GamificationService.appendLegacyReconciliationEntry)
   reference    String? // Unique idempotency key (e.g. "quiz:42", "vocab:word:7", "quest:1:2026-09-15")
@@ -2787,7 +2814,7 @@ model PromoRedemption {
   promoCodeId    Int
   promoCode      PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
   userId         Int
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Restrict) // soft-delete rule (owner 2026-11-16): never lost with the user
   planPurchaseId Int       @unique
   discountVnd    Int
   createdAt      DateTime  @default(now())

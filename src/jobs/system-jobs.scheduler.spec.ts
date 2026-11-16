@@ -25,11 +25,16 @@ describe('SystemJobsScheduler', () => {
     expect(cronOf('enqueuePendingDatabaseBackupR2Sync')).toBe('20 * * * *');
   });
 
+  it('purges accounts past their deletion date daily at 02:30', () => {
+    expect(cronOf('enqueueAccountPurge')).toBe('30 2 * * *');
+  });
+
   describe('startup catch-up', () => {
     const jobs = () => ({
       enqueueDaily: jest.fn(),
       enqueueWeekly: jest.fn(),
       enqueueDatabaseBackupR2Sync: jest.fn(),
+      enqueueAccountPurge: jest.fn(),
     });
     const startAt = async (iso: string) => {
       jest.useFakeTimers().setSystemTime(new Date(iso));
@@ -46,6 +51,8 @@ describe('SystemJobsScheduler', () => {
       expect(fake.enqueueDaily).not.toHaveBeenCalled();
       expect(fake.enqueueWeekly).not.toHaveBeenCalled();
       expect(fake.enqueueDatabaseBackupR2Sync).toHaveBeenCalled();
+      // Purge catch-up on its own key, so the 02:30 run still happens.
+      expect(fake.enqueueAccountPurge).toHaveBeenCalledWith('start-2026-11-09');
     });
 
     it('catches up the day and the league week from 00:01', async () => {

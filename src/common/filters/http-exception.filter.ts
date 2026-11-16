@@ -34,6 +34,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let errorDetails: any = null;
     // The day's AI gradings ran out: which plan and how many, for the notice.
     let quota: { limit: number; planCode: string } | undefined;
+    // A machine-readable code the client branches on (ACCOUNT_LINK_REQUIRED,
+    // CONSENT_REQUIRED, ACCOUNT_PENDING_DELETION) and the two values the
+    // pending-deletion notice needs. Nothing else of the exception goes out.
+    let coded: Record<string, string | null> = {};
 
     if (exception instanceof HttpException) {
       const responseObj = exception.getResponse();
@@ -43,6 +47,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const { limit, planCode } = responseObj as Record<string, unknown>;
         if (typeof limit === 'number' && typeof planCode === 'string')
           quota = { limit, planCode };
+        const { code, scheduledAt, cancelToken } = responseObj as Record<
+          string,
+          unknown
+        >;
+        if (typeof code === 'string') {
+          coded = { code };
+          if (typeof scheduledAt === 'string' || scheduledAt === null)
+            coded.scheduledAt = scheduledAt;
+          if (typeof cancelToken === 'string') coded.cancelToken = cancelToken;
+        }
       } else {
         message = responseObj.toString();
       }
@@ -77,6 +91,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message,
       error: errorDetails,
       ...(quota ? { quota } : {}),
+      ...(status < 500 ? coded : {}),
     });
   }
 }
