@@ -160,7 +160,7 @@ case "${1:-}" in
     while true; do
       now=$(now_epoch)
       slot=$(current_slot_epoch "$now")
-      last=$(tr -dc '0-9' <"$STATE_FILE" 2>/dev/null || echo 0)
+      last=$( { tr -dc "0-9" <"$STATE_FILE"; } 2>/dev/null || echo 0)
       if [ "${last:-0}" -ge "$slot" ]; then
         remaining=$((slot + 7 * 86400 - now))
         log "drill for the slot at $(date -u -d "@${slot}" '+%Y-%m-%dT%H:%M:%SZ') already done; next in ${remaining}s"
