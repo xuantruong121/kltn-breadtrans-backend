@@ -42,8 +42,48 @@ describe('VocabService personal saved vocabulary', () => {
       { emitAsync: jest.fn() } as never,
       dictionary as never,
     );
-    return { service, upsert, deleteMany };
+    return { service, upsert, deleteMany, findMany };
   }
+
+  it('lists the newest first, with what the saved page and the flashcard button need', async () => {
+    const { service, findMany } = create();
+    const savedAt = new Date('2026-11-16T09:00:00Z');
+    findMany.mockResolvedValue([
+      {
+        id: 8,
+        displayWord: 'Opens',
+        canonicalWord: 'open',
+        partOfSpeech: 'verb',
+        meaningVi: null,
+        definitionEn: 'to make accessible',
+        ipaUs: '/ˈoʊpən/',
+        ipaUk: null,
+        audioUs: 'us.mp3',
+        audioUk: null,
+        exampleEn: 'The shop opens at nine.',
+        exampleVi: 'Cửa hàng mở cửa lúc chín giờ.',
+        collocations: [],
+        createdAt: savedAt,
+      },
+    ]);
+    const [item] = await service.listSavedWords(3);
+    expect(findMany).toHaveBeenCalledWith({
+      where: { userId: 3 },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(item).toMatchObject({
+      id: 8,
+      word: 'Opens',
+      canonicalWord: 'open',
+      savedAt,
+      definitionEn: 'to make accessible',
+      pos: 'verb',
+      ipaUs: '/ˈoʊpən/',
+      // No Vietnamese meaning: the English definition stands in.
+      meaning: 'to make accessible',
+      exampleVi: 'Cửa hàng mở cửa lúc chín giờ.',
+    });
+  });
 
   it('saves an inflection under its canonical identity and is idempotent', async () => {
     const { service, upsert } = create();

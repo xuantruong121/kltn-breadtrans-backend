@@ -516,6 +516,10 @@ export class VocabService {
     return items.map((item) => ({
       id: item.id,
       word: item.displayWord,
+      // The flashcard save button matches a card to a saved row by this.
+      canonicalWord: item.canonicalWord,
+      savedAt: item.createdAt,
+      definitionEn: item.definitionEn,
       pos: item.partOfSpeech || '',
       ipaUs: item.ipaUs,
       ipaUk: item.ipaUk,
