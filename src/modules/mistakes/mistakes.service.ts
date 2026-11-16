@@ -24,10 +24,20 @@ import {
   type MistakeState,
 } from './mistake-extract.logic';
 
-type IngestKind = 'SUBMISSION' | 'GRAMMAR_ATTEMPT' | 'SPEAKING_SUBMISSION';
+/**
+ * SPEAKING_SUBMISSION was the per-word reading, no longer done; recordings
+ * are read again as SPEAKING_SENTENCE (one row per sentence).
+ */
+type IngestKind = 'SUBMISSION' | 'GRAMMAR_ATTEMPT' | 'SPEAKING_SENTENCE';
 
 /** Attempts older than this are not read into the notebook. */
 const LOOKBACK_DAYS = 90;
+/**
+ * Recordings before the microphone fix (FE d43851f, 2026-11-16 15:15:53
+ * +07:00) had soft words chopped by browser noise suppression, so their
+ * "omitted" words are not the learner's. Sentence rows start after it.
+ */
+export const SPEAKING_SENTENCE_FROM = new Date('2026-11-16T08:15:53Z');
 /** At most this many attempts of each kind are read in one pass. */
 const BATCH_PER_KIND = 40;
 const PAGE_SIZE = 20;
@@ -37,7 +47,11 @@ const REVIEW_SIZE = 10;
  * (owner 2026-11-11); rows written before that stay in the table and are
  * never shown, counted or reviewed.
  */
-const IN_NOTEBOOK = { skill: { in: [...MISTAKE_SKILLS] as string[] } };
+const IN_NOTEBOOK = {
+  skill: { in: [...MISTAKE_SKILLS] as string[] },
+  // Per-word Speaking rows (before 2026-11-16) stay in the table, unseen.
+  sourceType: { not: 'SPEAKING_WORD' },
+};
 
 /**
  * The mistake notebook. Rows are derived from graded attempts when the
@@ -66,7 +80,14 @@ export class MistakesService {
           select: { id: true },
         }),
         this.prisma.speakingSubmission.findMany({
-          where: { userId, status: 'COMPLETED', submittedAt: { gte: since } },
+          where: {
+            userId,
+            status: 'COMPLETED',
+            submittedAt: {
+              gte:
+                since > SPEAKING_SENTENCE_FROM ? since : SPEAKING_SENTENCE_FROM,
+            },
+          },
           select: { id: true },
         }),
         this.prisma.learnerMistakeIngest.findMany({
@@ -90,8 +111,8 @@ export class MistakesService {
         await this.ingest(userId, 'GRAMMAR_ATTEMPT', id, () =>
           this.readGrammar(id),
         );
-      for (const id of fresh('SPEAKING_SUBMISSION', speaking))
-        await this.ingest(userId, 'SPEAKING_SUBMISSION', id, () =>
+      for (const id of fresh('SPEAKING_SENTENCE', speaking))
+        await this.ingest(userId, 'SPEAKING_SENTENCE', id, () =>
           this.readSpeaking(id),
         );
     } catch (error) {
@@ -179,11 +200,24 @@ export class MistakesService {
         exerciseId: true,
         submittedAt: true,
         aiFeedback: true,
-        exercise: { select: { title: true } },
+        overallScore: true,
+        exercise: {
+          select: {
+            title: true,
+            targetText: true,
+            practiceSet: { select: { id: true, title: true } },
+          },
+        },
       },
     });
     return row
-      ? speakingObservations({ ...row, exerciseTitle: row.exercise.title })
+      ? speakingObservations({
+          ...row,
+          exerciseTitle: row.exercise.title,
+          targetText: row.exercise.targetText,
+          setKey: row.exercise.practiceSet?.id ?? null,
+          setTitle: row.exercise.practiceSet?.title ?? null,
+        })
       : [];
   }
 
@@ -309,7 +343,8 @@ export class MistakesService {
     const page = Math.max(1, Math.floor(Number(query.page) || 1));
     const where = {
       userId,
-      ...(skill ? { skill } : IN_NOTEBOOK),
+      ...IN_NOTEBOOK,
+      ...(skill ? { skill } : {}),
       resolvedAt: resolved ? { not: null } : null,
     };
     const [total, rows] = await Promise.all([
@@ -348,7 +383,8 @@ export class MistakesService {
       where: {
         userId,
         resolvedAt: null,
-        ...(skill ? { skill } : IN_NOTEBOOK),
+        ...IN_NOTEBOOK,
+        ...(skill ? { skill } : {}),
         detail: { path: ['answerable'], equals: true },
       },
       // The ones not seen for longest come first.
