@@ -219,6 +219,18 @@ export class EventsGateway
       .emit('user:progress_updated', { userId: payload.userId });
   }
 
+  /**
+   * A plan was granted, confirmed, extended or revoked, often by someone else
+   * (an admin, the PayOS webhook): the learner's open pages refetch the plan,
+   * the shields it gave and what it unlocks.
+   */
+  @OnEvent('subscription.changed')
+  handleSubscriptionChanged(payload: { userId: number }) {
+    this.server
+      ?.to(`user_${payload.userId}`)
+      .emit('user:plan_updated', { userId: payload.userId });
+  }
+
   @OnEvent('support.mode_updated')
   handleSupportModeUpdated(payload: {
     conversationId: number;

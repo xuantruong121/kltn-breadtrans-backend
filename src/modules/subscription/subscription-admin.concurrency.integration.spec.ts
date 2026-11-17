@@ -15,6 +15,7 @@ describeWithIsolatedDatabase(
   () => {
     let prisma: PrismaService;
     let service: SubscriptionAdminService;
+    const events = { emit: jest.fn() };
     let adminUserId: number;
     let studentUserId: number;
     let planId: number;
@@ -24,9 +25,11 @@ describeWithIsolatedDatabase(
     beforeAll(async () => {
       prisma = new PrismaService();
       await prisma.$connect();
-      service = new SubscriptionAdminService(prisma, {
-        createNotification: jest.fn().mockResolvedValue({}),
-      } as never);
+      service = new SubscriptionAdminService(
+        prisma,
+        { createNotification: jest.fn().mockResolvedValue({}) } as never,
+        events as never,
+      );
 
       const suffix = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 
@@ -135,6 +138,28 @@ describeWithIsolatedDatabase(
       });
       expect(subsInDb).toHaveLength(1);
       expect(subsInDb[0].planPurchaseId).toBeNull(); // Hard gate: no fake payment
+    });
+
+    it('tells the learner when a plan is granted, extended or revoked (owner 2026-11-17)', async () => {
+      events.emit.mockClear();
+      const granted = await service.grantSubscription(adminUserId, {
+        studentId: studentUserId,
+        planVersionId,
+        durationDays: 30,
+        reason: 'Realtime notice',
+      });
+      createdSubscriptionIds.push(granted.id);
+      expect(events.emit).toHaveBeenLastCalledWith('subscription.changed', {
+        userId: studentUserId,
+      });
+      await service.extendSubscription(adminUserId, granted.id, {
+        extensionDays: 3,
+        reason: 'Realtime notice',
+      });
+      await service.revokeSubscription(adminUserId, granted.id, {
+        reason: 'Realtime notice',
+      });
+      expect(events.emit).toHaveBeenCalledTimes(3);
     });
 
     it('guarantees idempotency on Admin Grant with duplicate client operation key (ADMIN_PRO_ACTION_IDEMPOTENCY_PASS=true)', async () => {

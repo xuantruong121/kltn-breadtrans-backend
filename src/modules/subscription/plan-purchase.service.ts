@@ -7,6 +7,7 @@ import {
   Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   PayOSPaymentIntentStatus,
   PlanPaymentStatus,
@@ -70,7 +71,13 @@ export class PlanPurchaseService {
     private readonly subscriptionService: SubscriptionService,
     @Optional() private readonly payos?: PayosPaymentService,
     @Optional() private readonly referrals?: ReferralService,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
+
+  // The learner's open pages refetch the plan, shields and gated content (owner 2026-11-17).
+  private announce(userId: number) {
+    this.events?.emit('subscription.changed', { userId });
+  }
 
   async createPurchase(
     studentId: number,
@@ -510,6 +517,7 @@ export class PlanPurchaseService {
         actorId: adminId,
       });
     });
+    this.announce(purchase.userId);
     return this.toAdminDto(purchase);
   }
 
@@ -524,12 +532,15 @@ export class PlanPurchaseService {
         bankTransactionId,
       });
     }
-    return this.prisma.$transaction(async (tx) => {
+    // With the caller's transaction the commit is the caller's: no notice yet.
+    const confirmed = await this.prisma.$transaction(async (tx) => {
       return this.confirmPurchaseInTransaction(tx, purchaseId, {
         source: 'AUTO_WEBHOOK',
         bankTransactionId,
       });
     });
+    this.announce(confirmed.userId);
+    return confirmed;
   }
 
   private async confirmPurchaseInTransaction(
