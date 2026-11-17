@@ -17,7 +17,7 @@ import { call, check, failureCount } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 const EXAM_PAGE = `${FE}/exams/2`;
 
 const fullscreen = (page: Page) =>

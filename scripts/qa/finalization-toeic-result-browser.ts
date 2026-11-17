@@ -32,7 +32,7 @@ import {
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessExec, harnessQuery } from './harness-db';
 
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 // The companion pet's speech bubble is also role=dialog; result dialogs are modal.
 const MODAL = '[role="dialog"][aria-modal="true"]';
 const wav = readFileSync(process.argv[2]);

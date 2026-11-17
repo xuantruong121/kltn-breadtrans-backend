@@ -10,7 +10,7 @@ import { BE, call, check, failureCount } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 const sign = (data: Record<string, unknown>) =>
   createHmac('sha256', 'mock-checksum-key')
     .update(

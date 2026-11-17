@@ -27,7 +27,7 @@ import {
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessExec, harnessQuery } from './harness-db';
 
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 const wav = readFileSync(process.argv[2]);
 const one = (sql: string) => harnessQuery(sql)[0]?.[0];
 type Acct = Awaited<ReturnType<typeof newStudent>>;

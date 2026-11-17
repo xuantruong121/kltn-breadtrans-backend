@@ -8,7 +8,7 @@ import { call, check, failureCount } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 
 async function submitPractice(token: string, wrongExtra: boolean) {
   const start = await call('POST', '/toeic/exams/1/attempts', token, {
