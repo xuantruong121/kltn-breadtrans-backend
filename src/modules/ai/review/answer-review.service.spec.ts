@@ -256,6 +256,83 @@ describe('AnswerReviewService provider chain', () => {
   });
 });
 
+describe('AnswerReviewService short rate limit (Groq per-minute 429)', () => {
+  const env = process.env.TOEIC_SOLVE_REVIEWERS;
+  beforeEach(() => {
+    process.env.TOEIC_SOLVE_REVIEWERS = 'openai-compatible,gemini';
+  });
+  afterEach(() => {
+    if (env === undefined) delete process.env.TOEIC_SOLVE_REVIEWERS;
+    else process.env.TOEIC_SOLVE_REVIEWERS = env;
+  });
+
+  const rateLimited = (retryAfterSeconds?: number) =>
+    Object.assign(new Error('OpenAI-compatible endpoint HTTP 429'), {
+      status: 429,
+      ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+    });
+
+  /** A provider that fails with the given errors first, then answers. */
+  function flaky(errors: Error[]) {
+    let calls = 0;
+    return fake(
+      'openai-compatible',
+      () =>
+        calls < errors.length
+          ? Promise.reject(errors[calls++])
+          : Promise.resolve(goodReply()),
+      'openai/gpt-oss-120b',
+      'openai',
+    );
+  }
+
+  function withWaits(reviewers: AnswerReviewer[]) {
+    const waits: number[] = [];
+    const subject = service(reviewers);
+    subject.useWait(async (ms) => {
+      waits.push(ms);
+    });
+    return { subject, waits };
+  }
+
+  it('waits for retry-after and asks the same provider once more, keeping the review independent', async () => {
+    const groq = flaky([rateLimited(3)]);
+    const gemini = fake('gemini', async () => goodReply());
+    const { subject, waits } = withWaits([groq, gemini]);
+    const result = await run(subject);
+    expect(waits).toEqual([3000]);
+    expect(groq.reviewJson).toHaveBeenCalledTimes(2);
+    expect(gemini.reviewJson).not.toHaveBeenCalled();
+    expect(result.step).toMatchObject({
+      status: 'OK',
+      provider: 'openai-compatible',
+      reviewKind: 'INDEPENDENT',
+    });
+  });
+
+  it('retries only once: a second 429 moves on to the next provider', async () => {
+    const groq = flaky([rateLimited(3), rateLimited(3)]);
+    const gemini = fake('gemini', async () => goodReply());
+    const { subject, waits } = withWaits([groq, gemini]);
+    const result = await run(subject);
+    expect(waits).toEqual([3000]);
+    expect(groq.reviewJson).toHaveBeenCalledTimes(2);
+    expect(result.step.provider).toBe('gemini');
+  });
+
+  it('a 429 without retry-after, or asking for more than a minute, is not waited for', async () => {
+    for (const error of [rateLimited(), rateLimited(3600)]) {
+      const groq = flaky([error]);
+      const gemini = fake('gemini', async () => goodReply());
+      const { subject, waits } = withWaits([groq, gemini]);
+      const result = await run(subject);
+      expect(waits).toEqual([]);
+      expect(groq.reviewJson).toHaveBeenCalledTimes(1);
+      expect(result.step.provider).toBe('gemini');
+    }
+  });
+});
+
 describe('OpenAiCompatibleReviewer', () => {
   const saved = { ...process.env };
   afterEach(() => {

@@ -21,6 +21,7 @@ import type {
 import {
   AnswerReviewer,
   ReviewerImage,
+  ReviewerReply,
   ReviewUsage,
   isProviderOutage,
 } from './answer-reviewer';
@@ -29,7 +30,11 @@ import {
   GeminiReviewer,
   OpenAiCompatibleReviewer,
 } from './reviewers';
-import { exhaustedUntil, markExhausted } from './provider-exhaustion';
+import {
+  exhaustedUntil,
+  markExhausted,
+  shortRetryDelayMs,
+} from './provider-exhaustion';
 
 export type ReviewRun<T> = {
   step: ReviewStep;
@@ -66,6 +71,14 @@ export class AnswerReviewService {
   /** Swaps in fake providers (tests and the deterministic QA server). */
   useReviewers(reviewers: AnswerReviewer[]) {
     for (const reviewer of reviewers) this.reviewers[reviewer.name] = reviewer;
+  }
+
+  private wait = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  /** Swaps the pause before a rate-limit retry (tests). */
+  useWait(wait: (ms: number) => Promise<void>) {
+    this.wait = wait;
   }
 
   private chain(envName: string, fallback: string) {
@@ -127,9 +140,30 @@ export class AnswerReviewService {
         });
         continue;
       }
-      const startedAt = Date.now();
+      let startedAt = Date.now();
       try {
-        const reply = await reviewer.reviewJson(input.prompt, input.image);
+        let reply: ReviewerReply;
+        try {
+          reply = await reviewer.reviewJson(input.prompt, input.image);
+        } catch (error) {
+          // A short 429 (burst limit) gets one retry with the same provider
+          // after the wait it asks for; a second failure takes the usual path.
+          const delay = shortRetryDelayMs(error);
+          if (delay === null) throw error;
+          this.logger.warn(
+            `answer_review_rate_limited step=${input.stepName} provider=${reviewer.name} retry_in_ms=${delay}`,
+          );
+          await this.count(
+            reviewer.name,
+            model,
+            'unavailable',
+            undefined,
+            startedAt,
+          );
+          await this.wait(delay);
+          startedAt = Date.now();
+          reply = await reviewer.reviewJson(input.prompt, input.image);
+        }
         const checked = input.validate?.(reply.data);
         if (checked && !checked.ok) {
           sawInvalid = true;

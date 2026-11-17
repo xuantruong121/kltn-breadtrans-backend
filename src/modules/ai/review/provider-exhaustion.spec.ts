@@ -4,7 +4,31 @@ import {
   exhaustionKey,
   exhaustionUntil,
   markExhausted,
+  shortRetryDelayMs,
 } from './provider-exhaustion';
+
+describe('shortRetryDelayMs', () => {
+  it('a 429 asking to wait up to a minute is worth one retry after the wait', () => {
+    expect(shortRetryDelayMs({ status: 429, retryAfterSeconds: 2 })).toBe(2000);
+    expect(shortRetryDelayMs({ status: 429, retryAfterSeconds: 1.5 })).toBe(
+      2000,
+    );
+    expect(shortRetryDelayMs({ status: 429, retryAfterSeconds: 60 })).toBe(
+      60_000,
+    );
+    // "retry now" still waits a second
+    expect(shortRetryDelayMs({ status: 429, retryAfterSeconds: 0 })).toBe(1000);
+  });
+
+  it('no retry-after, a spent quota, or another error is not retried', () => {
+    expect(shortRetryDelayMs({ status: 429 })).toBeNull();
+    expect(
+      shortRetryDelayMs({ status: 429, retryAfterSeconds: 61 }),
+    ).toBeNull();
+    expect(shortRetryDelayMs({ status: 503, retryAfterSeconds: 2 })).toBeNull();
+    expect(shortRetryDelayMs(new Error('down'))).toBeNull();
+  });
+});
 
 const now = new Date('2026-11-04T15:22:00.000Z');
 const cloudflareDaily = new Error(
