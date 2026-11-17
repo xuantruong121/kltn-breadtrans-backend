@@ -1,6 +1,7 @@
 import { keywordsOf } from '../writing/writing.service';
 import { levelFromTitle, pictureCardHiddenReason } from './skill-cms-list';
 import { historyEditProblem } from './edit-with-history';
+import { skillDeleteRefusal } from './skill-content-delete';
 import { parseCefrRange, titleWithLevel } from '../subscription/practice-level';
 import {
   mergeListeningContent,
@@ -1125,6 +1126,68 @@ export class SkillCmsService {
         imageUrl: imageUrl?.trim() || null,
       },
     });
+  }
+
+  /**
+   * Deletes a whole skill item (owner 2026-11-17). Refused once learners have
+   * worked on it (their submissions would cascade away), for exam content, and
+   * for a quiz that is not a draft: see skill-content-delete.ts.
+   */
+  async deleteContent(rawDomain: string, rawId: string, user: Admin) {
+    this.admin(user);
+    const domain = this.domain(rawDomain);
+    if (domain === 'speaking') {
+      const set = await this.prisma.speakingPracticeSet.findUnique({
+        where: { id: rawId },
+        select: { id: true, scope: true, publicationStatus: true },
+      });
+      if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
+      const attempts = await this.prisma.speakingSubmission.count({
+        where: { exercise: { practiceSetId: set.id } },
+      });
+      const refusal = skillDeleteRefusal({
+        domain,
+        status: set.publicationStatus,
+        attempts,
+        examInternal: set.scope === 'EXAM_INTERNAL',
+      });
+      if (refusal) throw new ConflictException(refusal);
+      // practiceSet on SpeakingExercise is SetNull: delete the exercises first
+      // so none is left behind without a set.
+      await this.prisma.$transaction([
+        this.prisma.speakingExercise.deleteMany({
+          where: { practiceSetId: set.id },
+        }),
+        this.prisma.speakingPracticeSet.delete({ where: { id: set.id } }),
+      ]);
+      return { id: set.id, deleted: true };
+    }
+    const id = this.id(rawId);
+    const quiz = await this.prisma.quiz.findFirst({
+      where: { id, ...this.contentTypeWhere(domain) },
+      select: { id: true, publicationStatus: true },
+    });
+    if (!quiz) throw new NotFoundException('Không tìm thấy bài này.');
+    const attempts = await this.prisma.submission.count({
+      where: { quizId: id },
+    });
+    const refusal = skillDeleteRefusal({
+      domain,
+      status: quiz.publicationStatus,
+      attempts,
+      examInternal: await this.isExamTask(id),
+    });
+    if (refusal) throw new ConflictException(refusal);
+    try {
+      await this.prisma.quiz.delete({ where: { id } });
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2003')
+        throw new ConflictException(
+          'Bài đang được dùng ở nơi khác nên chưa xoá được.',
+        );
+      throw error;
+    }
+    return { id, deleted: true };
   }
 
   async deleteSpeakingExercise(
