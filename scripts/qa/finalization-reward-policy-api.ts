@@ -264,6 +264,8 @@ async function main() {
             .join(' | '),
         );
       },
+      // TOEIC Speaking & Writing and 4 Skills exams are a PRO benefit.
+      true,
     );
   await expectDelta('grammar topic', false, async (l) => {
     const topic = harnessQuery(

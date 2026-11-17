@@ -441,6 +441,11 @@ async function browserFlow() {
   // Owner 2026-11-12/13: one row per mistake in a panel per exercise, the
   // chosen one in a detail pane; no Chưa / Đã khắc phục filter.
   const rows = page.locator('section[aria-label] li > button');
+  // The heading renders before the list query settles; count once a row is up.
+  await rows
+    .first()
+    .waitFor({ timeout: 30_000 })
+    .catch(() => undefined);
   check('the notebook lists three mistakes', (await rows.count()) === 3);
   check(
     'one mistake is open in the detail pane',

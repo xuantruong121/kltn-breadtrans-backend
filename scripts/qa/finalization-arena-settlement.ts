@@ -18,7 +18,8 @@ import { check, failureCount, newStudent } from './harness-api';
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: 'postgresql://harness:harness-disposable@127.0.0.1:5460/harness_clone',
+      // The database the running harness backend uses (harness-db.ts default).
+      url: `postgresql://harness:harness-disposable@127.0.0.1:5460/${process.env.HARNESS_DB ?? 'harness_clone'}`,
     },
   },
 });

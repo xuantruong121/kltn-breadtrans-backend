@@ -357,12 +357,14 @@ async function main() {
         list: m ? text.slice(m.index) : '',
       };
     };
+    // A card's footer reads "<mức> · ~N phút" since FE 2406345 (2026-11-13)
+    // dropped the task tag in front of the level.
     const onlyAdvanced = (text: string) => {
       const c = catalog(text);
       return (
         c.count === c1Sets &&
-        c.list.includes('· Nâng cao ·') &&
-        !/· (Mất gốc|Cơ bản|Trung cấp) ·/.test(c.list)
+        /Nâng cao · ~\d+ phút/.test(c.list) &&
+        !/(Mất gốc|Cơ bản|Trung cấp) · ~\d+ phút/.test(c.list)
       );
     };
     const basic = await levelView('Cơ bản');

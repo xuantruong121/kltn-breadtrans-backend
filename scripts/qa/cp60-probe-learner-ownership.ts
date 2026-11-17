@@ -115,7 +115,14 @@ void (async () => {
   );
 
   console.log('\n== Saved vocabulary');
-  const save = await call('POST', '/vocab/saved', a.token, { word: 'harbour' });
+  // Saving looks the word up first. The harness has no outside dictionary, so
+  // the probe saves a word from the local dictionary.
+  const word = String(
+    harnessQuery(
+      `select headword from "DictionaryEntry" where status <> 'REJECTED' order by id limit 1`,
+    )[0]?.[0] ?? 'harbour',
+  );
+  const save = await call('POST', '/vocab/saved', a.token, { word });
   const savedId =
     save.data?.id ??
     Number(
@@ -127,7 +134,7 @@ void (async () => {
   const savedB = await call('GET', '/vocab/saved', b.token);
   check(
     "B's saved list does not show A's word",
-    savedB.status === 200 && !JSON.stringify(savedB.data).includes('harbour'),
+    savedB.status === 200 && !JSON.stringify(savedB.data).includes(`"${word}"`),
   );
   const delSavedB = await call('DELETE', `/vocab/saved/${savedId}`, b.token);
   const savedLeft = harnessQuery(
