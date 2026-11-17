@@ -1,7 +1,7 @@
 /**
  * Checkpoint 58 plans page (harness, Chromium 1440): the cards, comparison
- * table and FAQ state the 2026-10-28 matrix, prices stay unchanged, and a
- * PRO lock CTA lands on the highlighted PRO card.
+ * table and FAQ state the current plan matrix (PlanCard copy as of
+ * 2026-11-17) and prices stay unchanged.
  * Usage: npx ts-node --transpile-only scripts/qa/cp58-plans-browser.ts
  */
 import { check, failureCount } from './harness-api';
@@ -21,13 +21,17 @@ void (async () => {
     /69\.000/.test(text) && /149\.000/.test(text),
   );
   check(
-    'PLUS card: Listening/Reading Intermediate+, and says it excludes S/W B1+',
-    text.includes('Mở bài Nghe và Đọc Trung cấp, Nâng cao') &&
-      text.includes('Không gồm Nói, Viết'),
+    'PLUS card: Speaking/Writing Intermediate and dictation Intermediate+, excludes Advanced and TOEIC S&W',
+    text.includes('Nói và Viết Trung cấp') &&
+      text.includes('Nghe chép Trung cấp trở lên') &&
+      text.includes(
+        'Không gồm Nói, Viết Nâng cao và đề TOEIC Speaking & Writing, 4 kỹ năng',
+      ),
   );
   check(
-    'PRO card: S/W Intermediate+',
-    text.includes('Bài Nói và Viết Trung cấp, Nâng cao'),
+    'PRO card: Speaking/Writing at every level and the TOEIC S&W and 4-skill tests',
+    text.includes('Nói và Viết ở mọi mức, gồm Nâng cao') &&
+      text.includes('Đề TOEIC Speaking & Writing và đề 4 kỹ năng'),
   );
   check(
     'no stale claim that PLUS opens Speaking/Writing',
